@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
+import android.graphics.Rect
 import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Bundle
@@ -39,6 +40,7 @@ class MainActivity : Activity() {
     private var playerReady = false
     private var busy = false
     private var highlightedWord = -1
+    private var touchingTranscript = false
 
     override fun attachBaseContext(newBase: Context) = super.attachBaseContext(AppLanguage.wrap(newBase))
 
@@ -74,7 +76,16 @@ class MainActivity : Activity() {
         ui.download.setOnClickListener { downloadModel() }
         ui.export.setOnClickListener { exportTranscript() }
         ui.play.setOnClickListener {
-            if (playerReady) player?.let { if (it.isPlaying) it.pause() else it.start() }
+            if (playerReady) player?.let {
+                if (it.isPlaying) it.pause() else { it.start(); renderTranscript() }
+            }
+        }
+        ui.scroll.setOnTouchListener { _, event ->
+            when (event.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN -> touchingTranscript = true
+                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> touchingTranscript = false
+            }
+            false
         }
         ui.back.setOnClickListener { skip(-10_000) }
         ui.forward.setOnClickListener { skip(10_000) }
@@ -307,6 +318,32 @@ class MainActivity : Activity() {
         ui.matches.visibility = if (query.isEmpty() || words.isEmpty()) View.GONE else View.VISIBLE
         ui.matches.text = if (matchCount == 0) getString(R.string.no_matches)
             else resources.getQuantityString(R.plurals.search_matches, matchCount, matchCount)
+        ranges.getOrNull(highlightedWord)?.let { range ->
+            // Spans may have requested a new text layout. Measure after that layout settles.
+            ui.transcript.post {
+                if (!isDestroyed && playerReady && player?.isPlaying == true && !touchingTranscript) {
+                    followWord(range)
+                }
+            }
+        }
+    }
+
+    private fun followWord(range: IntRange) {
+        val layout = ui.transcript.layout ?: return
+        if (range.last >= ui.transcript.text.length || ui.scroll.height == 0) return
+        val firstLine = layout.getLineForOffset(range.first)
+        val lastLine = layout.getLineForOffset(range.last)
+        val bounds = Rect(0, ui.transcript.totalPaddingTop + layout.getLineTop(firstLine),
+            ui.transcript.width, ui.transcript.totalPaddingTop + layout.getLineBottom(lastLine))
+        ui.scroll.offsetDescendantRectToMyCoords(ui.transcript, bounds)
+        val margin = (ui.scroll.height / 6).coerceAtMost(ui.scroll.height / 2 - bounds.height() / 2).coerceAtLeast(0)
+        val visibleTop = ui.scroll.scrollY + margin
+        val visibleBottom = ui.scroll.scrollY + ui.scroll.height - margin
+        if (bounds.top < visibleTop || bounds.bottom > visibleBottom) {
+            // Leave room to read ahead; don't move the page for every word on the same line.
+            val maximum = (ui.scroll.getChildAt(0).height - ui.scroll.height).coerceAtLeast(0)
+            ui.scroll.smoothScrollTo(0, (bounds.centerY() - ui.scroll.height / 2).coerceIn(0, maximum))
+        }
     }
 
     @Deprecated("Framework activity result API keeps this prototype dependency-light")
