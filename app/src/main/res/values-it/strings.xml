@@ -36,7 +36,7 @@
     <string name="saving">Salvataggio della trascrizione…</string>
     <string name="saved">Trascrizione salvata. L’audio non è incluso.</string>
     <string name="empty_title">Carica un nastro.</string>
-    <string name="empty_hint">WAV, MP3, M4A o Opus. Fino a 30 secondi.\nUna registrazione. Parole e tempi. Tutto in locale.</string>
+    <string name="empty_hint">WAV, MP3, M4A o Opus. Fino a 3 minuti.\nUna registrazione. Parole e tempi. Tutto in locale.</string>
     <string name="loaded_title">Sentiamo cosa dice.</string>
     <string name="loaded_hint">Tocca Trascrivi per ottenere parole e tempi da questa registrazione.</string>
     <string name="no_speech">Nessun parlato riconosciuto.</string>
@@ -77,7 +77,7 @@
     <string name="cancel">Annulla</string>
     <string name="error_open">Impossibile aprire la registrazione. Seleziona di nuovo il file.</string>
     <string name="error_large">Questo prototipo accetta file fino a 64 MB.</string>
-    <string name="error_long">Scegli una clip di massimo 30 secondi.</string>
+    <string name="error_long">Scegli una clip di massimo 3 minuti.</string>
     <string name="error_short">Scegli almeno 200 millisecondi di audio.</string>
     <string name="error_audio">Impossibile leggere l’audio. Prova WAV PCM16, MP3, M4A o Opus.</string>
     <string name="error_wav">Usa un WAV PCM a 16 bit, oppure MP3, M4A o Opus.</string>

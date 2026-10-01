@@ -6,7 +6,7 @@ Choose **INT8** (640 MiB) or **FP32** (2.37 GiB) in the app. Both use sherpa-onn
 
 The interface supports **English and Italian**, follows the phone language by default, and can be changed in **Settings → Interface language**. On Android 13+ it also integrates with Android's [per-app language settings](https://developer.android.com/guide/topics/resources/app-languages). Both translations are bundled for offline switching; changing the interface language preserves the recording, transcript and playback position, and does not change the transcript's language label.
 
-The native tape-deck UI keeps playback/seek controls fixed at the bottom, with 10-second skips, sentence paragraphs, active-word/search highlights and a clear-search button. During playback the transcript smoothly scrolls to keep the active word visible, including after seeking backward; paused playback leaves reading position alone. A dedicated Android settings screen has grouped preference rows, current language/model summaries, installation status and standard back navigation. Downloads and failures use localized messages. The latest session restores after reopening the app if the audio provider retains its read grant.
+The native tape-deck UI keeps playback/seek controls fixed at the bottom, with 10-second skips, sentence paragraphs, active-word/search highlights and a clear-search button. During playback the transcript smoothly scrolls to keep the active word visible. Seeking with the slider or 10-second buttons also reveals that word while paused; ordinary paused reading leaves the page in place. A dedicated Android settings screen has grouped preference rows, current language/model summaries, installation status and standard back navigation. Downloads and failures use localized messages. The latest session restores after reopening the app if the audio provider retains its read grant.
 
 ## Build and install
 
@@ -24,7 +24,7 @@ The AAR is downloaded separately and verified by `setup.sh`; weights are downloa
 ## Try it
 
 1. Choose INT8 or FP32 in **Settings → Transcription model** and download that model once if needed. Keep the app open during download/inference.
-2. Choose an audio file of **at most 30 seconds** and at most 64 MB. PCM16 WAV, MP3, M4A/AAC and Ogg Opus are the tested import paths. FLAC is routed through Android's decoder but has not been tested here. WAV supports 16-bit PCM mono/stereo; decoded sample rates can be 8–96 kHz.
+2. Choose an audio file of **at most 3 minutes** and at most 64 MB. PCM16 WAV, MP3, M4A/AAC and Ogg Opus are the tested import paths. FLAC is routed through Android's decoder but has not been tested here. WAV supports 16-bit PCM mono/stereo; decoded sample rates can be 8–96 kHz.
 3. Tap **Transcribe**. Words appear as native sentence paragraphs. Tap a word to seek/play; use the fixed playback controls or search field to inspect it.
 4. Tap **Export** to choose a JSON export destination. The body names the unidentified speaker `spk_1`.
 
@@ -39,9 +39,12 @@ python3 scripts/fetch-smoke-audio.py  # requires ffmpeg
 ./scripts/fetch-youtube-audio.sh     # uses uvx yt-dlp + ffmpeg
 ./scripts/device-smoke.sh int8 youtube
 ./scripts/device-smoke.sh fp32 youtube
+# Longer viewer/seek check: same video, 00:28–03:28.
+./scripts/fetch-youtube-audio.sh 180
+./scripts/device-smoke.sh int8 youtube-long
 ```
 
-The supplied sample is [il Pericolo Invisibile](https://www.youtube.com/watch?v=UmZwQf5TV3c), **00:28–00:58**. Extraction produces exactly 480,000 mono PCM16 samples at 16 kHz, with a 30.000-second duration. Audio/downloads are local ignored test artifacts, not distributed in this repository. `fetch-smoke-audio.py` records the FLEURS source, pinned revision, reference text and CC-BY-4.0 attribution alongside its local fixture.
+The supplied sample is [il Pericolo Invisibile](https://www.youtube.com/watch?v=UmZwQf5TV3c), **00:28–00:58**. Extraction produces exactly 480,000 mono PCM16 samples at 16 kHz, with a 30.000-second duration. The optional three-minute excerpt is **00:28–03:28**, exactly 2,880,000 samples, saved as `.tools/cassini-italian-28-208.wav`. Audio/downloads are local ignored test artifacts, not distributed in this repository. `fetch-smoke-audio.py` records the FLEURS source, pinned revision, reference text and CC-BY-4.0 attribution alongside its local fixture.
 
 `device-smoke.sh` installs the app and test APK and invokes instrumentation through adb, retaining model downloads. Avoid Gradle's `connectedDebugAndroidTest` on an installation you want to preserve: its managed device-test cleanup can uninstall the app and erase its data. Inference tests download the selected model if necessary. They verify actual JNI inference, basic Italian content on the FLEURS sample, and valid word timestamps; they do **not** establish ASR accuracy. Decoder checks compare duration and speech onset across WAV, MP3, AAC and Opus. An interface test switches English → Italian → English while checking transcript/session restoration, playback position and search; it restores the previous interface language and session afterward.
 

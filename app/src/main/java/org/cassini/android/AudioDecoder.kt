@@ -17,7 +17,7 @@ data class PcmAudio(val samples: FloatArray, val sampleRate: Int) {
 
 /** Bounded, whole-utterance import. Reject long clips rather than silently dropping audio. */
 object AudioDecoder {
-    const val MAX_SECONDS = 30
+    const val MAX_SECONDS = 180
     fun decode(context: Context, uri: Uri): PcmAudio {
         val local = File.createTempFile("audio-", ".input", context.cacheDir)
         try {

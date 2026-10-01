@@ -37,3 +37,17 @@ Validation on the same Pixel:
 - Debug build and lint pass with no errors. Localization, launcher icon and backup configuration warnings from the initial prototype are addressed.
 
 The updated APK is installed on the Pixel with both existing model bundles retained.
+
+## Three-minute excerpt and paused seeking
+
+The same video's **00:28–03:28** excerpt contains exactly 2,880,000 mono PCM16 samples at 16 kHz (180.000 seconds). It is available in the phone's Downloads directory as `cassini-italian-28-208.wav`. The import limit is now three minutes, with the existing 64 MB file-size bound. Recognition still runs on the whole clip with the stock frontend; no segmentation or overlap reconciliation has been introduced.
+
+| Precision | Model creation + recognition | Process peak RSS | Words | Last word onset |
+| --- | ---: | ---: | ---: | ---: |
+| INT8 | 40.569 s | 2,556,964 KiB / 2.44 GiB | 492 | 179.520 s |
+
+The phone-generated body validates against the published Cassini schema. Timing/memory definitions and uncontrolled conditions are the same as above. Reaching the final seconds and producing valid word timings verifies execution and coverage; no human reference or accuracy evaluation has been completed. FP32 has only been measured on the 30-second sample so far.
+
+Explicit seeking now brings the highlighted word into view even while paused. The slider and ±10-second buttons follow the player’s completed seek, including a seek within the currently highlighted word. Restoring a paused session and ordinary manual reading do not trigger scrolling. The device regression check exercises these cases on a transcript longer than the viewport.
+
+Six device tests and ten JVM tests pass, with a successful debug build and no lint errors. The actual app imported the three-minute file through Android's picker and transcribed it in 37.679 seconds (another uncontrolled run). Manual paused jumps between early and late passages show the highlighted word in view while the Play button remains paused. This recording and its 492-word transcript are left loaded on the Pixel with INT8 selected; both model bundles remain installed.

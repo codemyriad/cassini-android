@@ -37,7 +37,7 @@
     <string name="saving">Saving transcript…</string>
     <string name="saved">Transcript saved. Audio is not included.</string>
     <string name="empty_title">Load a tape.</string>
-    <string name="empty_hint">WAV, MP3, M4A or Opus. Up to 30 seconds.\nOne recording. Words and timestamps. All local.</string>
+    <string name="empty_hint">WAV, MP3, M4A or Opus. Up to 3 minutes.\nOne recording. Words and timestamps. All local.</string>
     <string name="loaded_title">Let’s hear it.</string>
     <string name="loaded_hint">Tap Transcribe to turn this recording into timed words.</string>
     <string name="no_speech">No speech recognized.</string>
@@ -80,7 +80,7 @@
     <string name="cancel">Cancel</string>
     <string name="error_open">Could not open this recording. Choose the file again.</string>
     <string name="error_large">This prototype accepts files up to 64 MB.</string>
-    <string name="error_long">Choose a clip of 30 seconds or less.</string>
+    <string name="error_long">Choose a clip of 3 minutes or less.</string>
     <string name="error_short">Choose at least 200 milliseconds of audio.</string>
     <string name="error_audio">Could not read this audio. Try PCM16 WAV, MP3, M4A or Opus.</string>
     <string name="error_wav">Use a 16-bit PCM WAV, or try MP3, M4A or Opus.</string>

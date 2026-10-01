@@ -6,18 +6,33 @@ import android.text.style.ClickableSpan
 import android.widget.Button
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.SeekBar
+import android.view.accessibility.AccessibilityNodeInfo
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
 import org.junit.Assert.*
 import org.junit.Test
 import java.io.File
 
 class InterfaceTest {
+    private fun finishExistingScreens() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.runOnMainSync {
+            val monitor = ActivityLifecycleMonitorRegistry.getInstance()
+            Stage.values().flatMap { monitor.getActivitiesInStage(it) }.distinct()
+                .filter { it is MainActivity || it is SettingsActivity }.forEach { it.finish() }
+        }
+        instrumentation.waitForIdleSync()
+    }
+
     @Test fun playbackFollowsOffscreenWordsAndLeavesPausedReadingAlone() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         val store = SessionStore(context.filesDir)
         val originalSession = store.load()
+        finishExistingScreens()
         val audio = File(context.cacheDir, "follow-playback.wav")
         instrumentation.context.assets.open("italian-smoke.wav").use { input ->
             audio.outputStream().use { output -> input.copyTo(output) }
@@ -38,6 +53,16 @@ class InterfaceTest {
             }
             fail(description)
         }
+        fun wordVisible(activity: MainActivity, first: Boolean): Boolean {
+            val text = activity.findViewById<TextView>(R.id.transcript_text)
+            val layout = text.layout ?: return false
+            val line = if (first) 0 else layout.lineCount - 1
+            val bounds = android.graphics.Rect(0, text.totalPaddingTop + layout.getLineTop(line),
+                text.width, text.totalPaddingTop + layout.getLineBottom(line))
+            val scroll = activity.findViewById<ScrollView>(R.id.content_scroll)
+            scroll.offsetDescendantRectToMyCoords(text, bounds)
+            return bounds.top >= scroll.scrollY && bounds.bottom <= scroll.scrollY + scroll.height
+        }
         try {
             awaitCondition("Audio should become ready") { it.findViewById<Button>(R.id.play_button).isEnabled }
             scenario.onActivity { activity ->
@@ -45,13 +70,7 @@ class InterfaceTest {
                 activity.findViewById<Button>(R.id.play_button).performClick()
             }
             awaitCondition("Playback should bring the final word into view") { activity ->
-                val text = activity.findViewById<TextView>(R.id.transcript_text)
-                val layout = text.layout
-                val bounds = android.graphics.Rect(0, text.totalPaddingTop + layout.getLineTop(layout.lineCount - 1),
-                    text.width, text.totalPaddingTop + layout.getLineBottom(layout.lineCount - 1))
-                val scroll = activity.findViewById<ScrollView>(R.id.content_scroll)
-                scroll.offsetDescendantRectToMyCoords(text, bounds)
-                scroll.scrollY > 0 && bounds.top >= scroll.scrollY && bounds.bottom <= scroll.scrollY + scroll.height
+                activity.findViewById<ScrollView>(R.id.content_scroll).scrollY > 0 && wordVisible(activity, first = false)
             }
             scenario.onActivity { activity ->
                 activity.findViewById<Button>(R.id.play_button).performClick()
@@ -61,18 +80,29 @@ class InterfaceTest {
             android.os.SystemClock.sleep(400)
             scenario.onActivity { activity ->
                 assertEquals("Paused playback must leave manual scrolling alone", 0, activity.findViewById<ScrollView>(R.id.content_scroll).scrollY)
+                val seek = activity.findViewById<SeekBar>(R.id.playback_seek)
+                assertTrue(seek.performAccessibilityAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_PROGRESS.id,
+                    android.os.Bundle().apply { putFloat(AccessibilityNodeInfo.ACTION_ARGUMENT_PROGRESS_VALUE, 11000f) }))
+            }
+            awaitCondition("Seeking while paused should reveal the final word, even when it stays highlighted") {
+                wordVisible(it, first = false)
+            }
+            scenario.onActivity { activity ->
+                assertEquals(activity.getString(R.string.play), activity.findViewById<Button>(R.id.play_button).text.toString())
+                activity.findViewById<Button>(R.id.back_button).performClick()
+            }
+            awaitCondition("Back 10 seconds while paused should reveal the first word") { wordVisible(it, first = true) }
+            scenario.onActivity { it.findViewById<Button>(R.id.forward_button).performClick() }
+            awaitCondition("Forward 10 seconds while paused should reveal the final word") { wordVisible(it, first = false) }
+            scenario.onActivity { activity ->
+                assertEquals(activity.getString(R.string.play), activity.findViewById<Button>(R.id.play_button).text.toString())
                 val scroll = activity.findViewById<ScrollView>(R.id.content_scroll)
                 scroll.scrollTo(0, scroll.getChildAt(0).height)
                 val text = activity.findViewById<TextView>(R.id.transcript_text)
                 (text.text as Spanned).getSpans(0, 1, ClickableSpan::class.java).single().onClick(text)
             }
             awaitCondition("Seeking backward should follow the first word") { activity ->
-                val text = activity.findViewById<TextView>(R.id.transcript_text)
-                val scroll = activity.findViewById<ScrollView>(R.id.content_scroll)
-                val bounds = android.graphics.Rect(0, text.totalPaddingTop, text.width,
-                    text.totalPaddingTop + text.layout.getLineBottom(0))
-                scroll.offsetDescendantRectToMyCoords(text, bounds)
-                bounds.top >= scroll.scrollY && bounds.bottom <= scroll.scrollY + scroll.height
+                wordVisible(activity, first = true)
             }
         } finally {
             scenario.close()
@@ -87,6 +117,7 @@ class InterfaceTest {
         val store = SessionStore(context.filesDir)
         val originalSession = store.load()
         val originalLanguage = AppLanguage.selected(context)
+        finishExistingScreens()
         val audio = File(context.cacheDir, "interface-test.wav")
         instrumentation.context.assets.open("italian-smoke.wav").use { input ->
             audio.outputStream().use { output -> input.copyTo(output) }

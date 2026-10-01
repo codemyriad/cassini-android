@@ -40,23 +40,14 @@ class MainActivity : Activity() {
     private var busy = false
     private var highlightedWord = -1
     private var touchingTranscript = false
+    private var followCompletedSeeks = false
 
     override fun attachBaseContext(newBase: Context) = super.attachBaseContext(AppLanguage.wrap(newBase))
 
     private val ticker = object : Runnable {
         override fun run() {
             if (playerReady) player?.let { media ->
-                val time = media.currentPosition
-                if (!ui.seek.isPressed) ui.seek.progress = time
-                val clock = getString(R.string.position, clock(time.toLong()), clock(session.durationMs))
-                if (ui.position.text.toString() != clock) ui.position.text = clock
-                val playText = getString(if (media.isPlaying) R.string.pause else R.string.play)
-                if (ui.play.text.toString() != playText) ui.play.text = playText
-                val active = session.transcript?.words?.indexOfFirst { time >= it.startMs && time < it.endMs } ?: -1
-                if (active != highlightedWord) {
-                    highlightedWord = active
-                    renderTranscript()
-                }
+                updatePlayback(media)
             }
             handler.postDelayed(this, 150)
         }
@@ -90,7 +81,7 @@ class MainActivity : Activity() {
         ui.forward.setOnClickListener { skip(10_000) }
         ui.seek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(bar: SeekBar?, value: Int, fromUser: Boolean) {
-                if (fromUser && playerReady) player?.seekTo(value)
+                if (fromUser) seekTo(value)
             }
             override fun onStartTrackingTouch(bar: SeekBar?) {}
             override fun onStopTrackingTouch(bar: SeekBar?) {}
@@ -270,7 +261,21 @@ class MainActivity : Activity() {
         refreshControls()
     }
 
-    private fun renderTranscript() {
+    private fun updatePlayback(media: MediaPlayer, followSeek: Boolean = false) {
+        val time = media.currentPosition
+        if (!ui.seek.isPressed) ui.seek.progress = time
+        val clock = getString(R.string.position, clock(time.toLong()), clock(session.durationMs))
+        if (ui.position.text.toString() != clock) ui.position.text = clock
+        val playText = getString(if (media.isPlaying) R.string.pause else R.string.play)
+        if (ui.play.text.toString() != playText) ui.play.text = playText
+        val active = session.transcript?.words?.indexOfFirst { time >= it.startMs && time < it.endMs } ?: -1
+        if (active != highlightedWord || followSeek) {
+            highlightedWord = active
+            renderTranscript(followPausedSeek = followSeek)
+        }
+    }
+
+    private fun renderTranscript(followPausedSeek: Boolean = false) {
         val words = session.transcript?.words ?: emptyList()
         val builder = StringBuilder()
         val ranges = mutableListOf<IntRange>()
@@ -300,7 +305,7 @@ class MainActivity : Activity() {
             spannable.setSpan(object : ClickableSpan() {
                 override fun onClick(widget: View) {
                     if (playerReady) player?.let {
-                        it.seekTo(word.startMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
+                        seekTo(word.startMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
                         it.start()
                     }
                 }
@@ -320,7 +325,7 @@ class MainActivity : Activity() {
         ranges.getOrNull(highlightedWord)?.let { range ->
             // Spans may have requested a new text layout. Measure after that layout settles.
             ui.transcript.post {
-                if (!isDestroyed && playerReady && player?.isPlaying == true && !touchingTranscript) {
+                if (!isDestroyed && playerReady && (player?.isPlaying == true || followPausedSeek) && !touchingTranscript) {
                     followWord(range)
                 }
             }
@@ -378,10 +383,16 @@ class MainActivity : Activity() {
 
     private fun preparePlayer(uri: Uri) {
         playerReady = false
+        followCompletedSeeks = false
         player?.release()
         val media = MediaPlayer()
         player = media
         refreshControls()
+        media.setOnSeekCompleteListener {
+            if (!isDestroyed && player === media && playerReady && followCompletedSeeks) {
+                updatePlayback(media, followSeek = true)
+            }
+        }
         media.setOnPreparedListener {
             if (isDestroyed || player !== media) return@setOnPreparedListener
             playerReady = true
@@ -408,7 +419,16 @@ class MainActivity : Activity() {
     }
 
     private fun skip(delta: Int) {
-        if (playerReady) player?.let { it.seekTo((it.currentPosition + delta).coerceIn(0, it.duration)) }
+        if (playerReady) player?.let { seekTo(it.currentPosition + delta) }
+    }
+
+    private fun seekTo(position: Int) {
+        if (playerReady) player?.let {
+            // Follow every completion, including coalesced seeks during a quick slider drag.
+            // Initial session restoration uses a direct seek and leaves this disabled.
+            followCompletedSeeks = true
+            it.seekTo(position.coerceIn(0, it.duration))
+        }
     }
 
     private fun showSettings() {

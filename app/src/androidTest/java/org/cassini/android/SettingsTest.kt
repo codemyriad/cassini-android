@@ -37,12 +37,20 @@ class SettingsTest {
             fail("Expected visible text: $text")
         }
         fun clickText(text: String) {
-            awaitText(text)
-            var node = instrumentation.uiAutomation.rootInActiveWindow.findAccessibilityNodeInfosByText(text)
-                .first { it.text?.toString() == text }
-            while (!node.isClickable) node = node.parent ?: error("No clickable row for $text")
-            assertTrue(node.performAction(AccessibilityNodeInfo.ACTION_CLICK))
-            instrumentation.waitForIdleSync()
+            val deadline = android.os.SystemClock.uptimeMillis() + 5000
+            while (android.os.SystemClock.uptimeMillis() < deadline) {
+                val nodes = instrumentation.uiAutomation.rootInActiveWindow?.findAccessibilityNodeInfosByText(text).orEmpty()
+                for (found in nodes.filter { it.text?.toString() == text }) {
+                    var node: AccessibilityNodeInfo? = found
+                    while (node != null && !node.isClickable) node = node.parent
+                    if (node?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true) {
+                        instrumentation.waitForIdleSync()
+                        return
+                    }
+                }
+                android.os.SystemClock.sleep(50)
+            }
+            fail("Expected clickable row: $text")
         }
         try {
             scenario.onActivity { AppLanguage.set(it, "en") }

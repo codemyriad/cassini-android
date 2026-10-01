@@ -49,10 +49,16 @@ class DeviceSmokeTest {
             instrumentation.sendStatus(0, Bundle().apply { putString("stream", "$message\n") })
         }
         assumeTrue("Download Parakeet in the app before running native inference test", models.ready())
-        val youtube = arguments.getString("audioSample") == "youtube"
-        val file = fixture(if (youtube) "youtube-smoke.wav" else "italian-smoke.wav")
+        val sample = arguments.getString("audioSample")
+        val youtube = sample == "youtube" || sample == "youtube-long"
+        val file = fixture(when (sample) {
+            "youtube-long" -> "youtube-long.wav"
+            "youtube" -> "youtube-smoke.wav"
+            else -> "italian-smoke.wav"
+        })
         try {
             val audio = AudioDecoder.decode(context, Uri.fromFile(file))
+            if (sample == "youtube-long") assertEquals(180000L, audio.durationMs)
             val began = System.nanoTime()
             val transcript = Parakeet.transcribe(audio, models)
             val elapsedMs = (System.nanoTime() - began) / 1_000_000
@@ -63,7 +69,11 @@ class DeviceSmokeTest {
             val metrics = JSONObject()
                 .put("audioDurationMs", audio.durationMs).put("inferenceMs", elapsedMs)
                 .put("precision", models.precision).put("peakRssKiB", peakRssKiB)
-                .put("audioSample", if (youtube) "YouTube UmZwQf5TV3c, 28–58 seconds" else "FLEURS Italian dev")
+                .put("audioSample", when (sample) {
+                    "youtube-long" -> "YouTube UmZwQf5TV3c, 28–208 seconds"
+                    "youtube" -> "YouTube UmZwQf5TV3c, 28–58 seconds"
+                    else -> "FLEURS Italian dev"
+                })
                 .put("text", text).toString(2)
             File(context.filesDir, "device-smoke.${models.precision}.metrics.json").writeText(metrics)
             instrumentation.sendStatus(0, Bundle().apply { putString("stream", "$metrics\n") })
@@ -71,6 +81,8 @@ class DeviceSmokeTest {
             if (!youtube) assertTrue("Recognized: $text", text.contains("settentrionale", ignoreCase = true))
             assertTrue(transcript.words.all { it.startMs >= 0 && it.endMs >= it.startMs })
             assertTrue(transcript.words.all { it.startMs <= audio.durationMs + 500 })
+            if (sample == "youtube-long") assertTrue("Long sample should reach its final 30 seconds",
+                transcript.words.any { it.startMs >= 150000 })
         } finally { file.delete() }
     }
 }
