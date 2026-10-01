@@ -50,6 +50,16 @@ object AudioDecoder {
         }
     }
 
+    /**
+     * Codec timestamps are whole microseconds, so a buffer that continues the previous one can
+     * name a time just short of it: 48 kHz AAC frames last 21333.3 µs. Only a gap or overlap
+     * beyond a millisecond moves the write position away from [next].
+     */
+    internal fun framePosition(presentationTimeUs: Long, sampleRate: Int, next: Int): Int {
+        val nominal = (presentationTimeUs.coerceAtLeast(0) * sampleRate + 500_000) / 1_000_000
+        return if (kotlin.math.abs(nominal - next) <= sampleRate / 1000) next else nominal.toInt()
+    }
+
     private fun decodeWav(file: RandomAccessFile): PcmAudio {
         var sampleRate = 0
         var channels = 0
@@ -119,6 +129,7 @@ object AudioDecoder {
             var encoding = AudioFormat.ENCODING_PCM_16BIT
             var pcm: FloatArray? = null
             var count = 0
+            var next = 0
             var inputEnded = false
             var outputEnded = false
             val info = MediaCodec.BufferInfo()
@@ -165,7 +176,8 @@ object AudioDecoder {
                                 val frames = info.size / (sampleBytes * channels)
                                 // Keep real container gaps as silence. The player and words share a zero origin.
                                 requireUser(info.presentationTimeUs <= MAX_SECONDS * 1_000_000L + (if (opusSamples != null) 120_000 else 0), Failure.LONG)
-                                val firstFrame = (info.presentationTimeUs.coerceAtLeast(0) * sampleRate / 1_000_000).toInt()
+                                val firstFrame = framePosition(info.presentationTimeUs, sampleRate, next)
+                                next = firstFrame + frames
                                 val playableFrames = opusSamples?.let { minOf(frames.toLong(), (it * sampleRate / 48000 - firstFrame).coerceAtLeast(0)).toInt() } ?: frames
                                 requireUser(playableFrames == 0 || firstFrame.toLong() + playableFrames <= destination.size, Failure.LONG)
                                 repeat(playableFrames) { frame ->
