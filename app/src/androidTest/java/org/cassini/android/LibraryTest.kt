@@ -92,6 +92,35 @@ class LibraryTest {
             source.delete()
         }
     }
+    @Test fun cancelledImportReturnsToTheLibraryInsteadOfTheLastNote() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        finishScreens()
+        val sessions = SessionStore(context.filesDir)
+        val originalSession = sessions.load()
+        sessions.save(Session(uri = "file:///previous.wav", name = "Previous note.wav"))
+        val picker = instrumentation.addMonitor(android.content.IntentFilter(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE); addDataType("*/*")
+        }, android.app.Instrumentation.ActivityResult(android.app.Activity.RESULT_CANCELED, null), true)
+        val scenario = ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java).putExtra(MainActivity.REQUEST_IMPORT, true))
+        try {
+            val deadline = SystemClock.uptimeMillis() + 8000
+            var library = false
+            // The notes resume before the finishing viewer is destroyed.
+            while ((!library || scenario.state != androidx.lifecycle.Lifecycle.State.DESTROYED) && SystemClock.uptimeMillis() < deadline) {
+                instrumentation.runOnMainSync {
+                    library = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).any { it is LibraryActivity }
+                }
+                SystemClock.sleep(50)
+            }
+            assertEquals(1, picker.hits)
+            assertTrue("Cancelling the picker should return to the notes", library)
+            assertEquals(androidx.lifecycle.Lifecycle.State.DESTROYED, scenario.state)
+        } finally {
+            instrumentation.removeMonitor(picker); scenario.close(); finishScreens(); sessions.save(originalSession)
+        }
+    }
+
     @Test fun savedAudioUpdatesOneCardAndCorruptIndexIsNeverOverwritten() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val directory = File(context.cacheDir, "library-store-test").apply { deleteRecursively(); mkdirs() }

@@ -71,8 +71,14 @@ class MainActivity : Activity() {
         documents = DocumentStore(this)
         val preferences = sessions.load()
         val noteId = intent.getStringExtra(NOTE_ID)
-        val selected = if (noteId == null) preferences else try { library.load().firstOrNull { it.id == noteId }?.session ?: Session() }
-            catch (error: Exception) { Log.e(TAG, "Could not load note", error); Session() }
+        val importing = savedInstanceState == null && intent.getBooleanExtra(REQUEST_IMPORT, false)
+        val selected = when {
+            // An import starts a new note. The last one must not sit behind the file picker.
+            importing -> Session()
+            noteId == null -> preferences
+            else -> try { library.load().firstOrNull { it.id == noteId }?.session ?: Session() }
+                catch (error: Exception) { Log.e(TAG, "Could not load note", error); Session() }
+        }
         session = selected.copy(modelChoice = preferences.modelChoice, fp32 = ModelPolicy.resolve(this, preferences.modelChoice))
         autoTranscribe = savedInstanceState == null && intent.getBooleanExtra(AUTO_TRANSCRIBE, false)
         models = modelStore(session.fp32)
@@ -123,7 +129,7 @@ class MainActivity : Activity() {
             onUi { adoptDocument(loaded); renderScreen(); defaultStatus() }
         } }
         if (intent.action == Intent.ACTION_VIEW) intent.data?.let { importFile(it) }
-        if (savedInstanceState == null && intent.getBooleanExtra(REQUEST_IMPORT, false)) chooseFile()
+        if (importing) chooseFile()
         savedInstanceState?.let { state -> ui.scroll.post { ui.scroll.scrollTo(0, state.getInt("scroll")) } }
     }
 
@@ -519,7 +525,11 @@ class MainActivity : Activity() {
     @Deprecated("Framework activity result API keeps this prototype dependency-light")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (resultCode != RESULT_OK) return
+        if (resultCode != RESULT_OK) {
+            // A cancelled library import leaves nothing to show on this screen.
+            if (requestCode == OPEN_FILE && session.uri == null && intent.getBooleanExtra(REQUEST_IMPORT, false)) returnToLibrary()
+            return
+        }
         val uri = data?.data ?: return
         when (requestCode) {
             OPEN_FILE -> importFile(uri)
