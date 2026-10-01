@@ -53,11 +53,12 @@ object AudioDecoder {
     /**
      * Codec timestamps are whole microseconds, so a buffer that continues the previous one can
      * name a time just short of it: 48 kHz AAC frames last 21333.3 µs. Only a gap or overlap
-     * beyond a millisecond moves the write position away from [next].
+     * beyond a millisecond moves the write position away from [next]. The first buffer has no
+     * predecessor and keeps its own time.
      */
-    internal fun framePosition(presentationTimeUs: Long, sampleRate: Int, next: Int): Int {
+    internal fun framePosition(presentationTimeUs: Long, sampleRate: Int, next: Int?): Int {
         val nominal = (presentationTimeUs.coerceAtLeast(0) * sampleRate + 500_000) / 1_000_000
-        return if (kotlin.math.abs(nominal - next) <= sampleRate / 1000) next else nominal.toInt()
+        return if (next != null && kotlin.math.abs(nominal - next) <= sampleRate / 1000) next else nominal.toInt()
     }
 
     private fun decodeWav(file: RandomAccessFile): PcmAudio {
@@ -129,7 +130,7 @@ object AudioDecoder {
             var encoding = AudioFormat.ENCODING_PCM_16BIT
             var pcm: FloatArray? = null
             var count = 0
-            var next = 0
+            var next: Int? = null
             var inputEnded = false
             var outputEnded = false
             val info = MediaCodec.BufferInfo()
