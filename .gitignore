@@ -1,0 +1,14 @@
+.gradle/
+**/build/
+local.properties
+app/libs/*.aar
+.idea/
+*.iml
+.tools/
+__pycache__/
+*.pyc
+*.wav
+*.opus
+app/src/androidTest/assets/*.mp3
+app/src/androidTest/assets/*.m4a
+app/src/androidTest/assets/italian-smoke.json
