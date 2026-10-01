@@ -3,6 +3,15 @@
     <string name="brand" translatable="false">cassini</string>
     <string name="prototype_badge">PROTOTYPE / 02</string>
     <string name="settings">Settings</string>
+    <string name="settings_general">General</string>
+    <string name="settings_transcription">Transcription</string>
+    <string name="settings_app">App</string>
+    <string name="processing_location">Audio processing</string>
+    <string name="processing_local_summary">On this phone. Recordings stay on your device.</string>
+    <string name="settings_model_summary">%1$s · %2$s · %3$s</string>
+    <string name="model_installed">installed</string>
+    <string name="model_download_needed">download needed</string>
+    <string name="app_version">Cassini · version %1$s</string>
     <string name="open_audio">Open audio</string>
     <string name="change_audio">Change file</string>
     <string name="transcribe">Transcribe</string>

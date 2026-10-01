@@ -9,4 +9,20 @@
         <item name="android:windowActionModeOverlay">true</item>
     </style>
     <style name="Theme.Cassini" parent="Theme.Cassini.Base" />
+    <style name="Theme.Cassini.Settings" parent="android:style/Theme.Material">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#F4C56A</item>
+        <item name="android:colorBackground">#10120F</item>
+        <item name="android:windowBackground">#10120F</item>
+        <item name="android:statusBarColor">#10120F</item>
+        <item name="android:navigationBarColor">#10120F</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:textColorPrimary">#E8E5D9</item>
+        <item name="android:textColorSecondary">#A9B09F</item>
+        <item name="android:actionBarStyle">@style/Cassini.SettingsActionBar</item>
+    </style>
+    <style name="Cassini.SettingsActionBar" parent="android:style/Widget.Material.ActionBar.Solid">
+        <item name="android:background">#10120F</item>
+        <item name="android:elevation">0dp</item>
+    </style>
 </resources>

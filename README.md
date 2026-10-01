@@ -6,7 +6,7 @@ Choose **INT8** (640 MiB) or **FP32** (2.37 GiB) in the app. Both use sherpa-onn
 
 The interface supports **English and Italian**, follows the phone language by default, and can be changed in **Settings → Interface language**. On Android 13+ it also integrates with Android's [per-app language settings](https://developer.android.com/guide/topics/resources/app-languages). Both translations are bundled for offline switching; changing the interface language preserves the recording, transcript and playback position, and does not change the transcript's language label.
 
-The native tape-deck UI keeps playback/seek controls fixed at the bottom, with 10-second skips, sentence paragraphs, active-word/search highlights and a clear-search button. During playback the transcript smoothly scrolls to keep the active word visible, including after seeking backward; paused playback leaves reading position alone. Settings contain the model selector; downloads and failures use localized messages. The latest session restores after reopening the app if the audio provider retains its read grant.
+The native tape-deck UI keeps playback/seek controls fixed at the bottom, with 10-second skips, sentence paragraphs, active-word/search highlights and a clear-search button. During playback the transcript smoothly scrolls to keep the active word visible, including after seeking backward; paused playback leaves reading position alone. A dedicated Android settings screen has grouped preference rows, current language/model summaries, installation status and standard back navigation. Downloads and failures use localized messages. The latest session restores after reopening the app if the audio provider retains its read grant.
 
 ## Build and install
 

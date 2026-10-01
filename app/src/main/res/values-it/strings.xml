@@ -2,6 +2,15 @@
     <string name="app_name">Cassini</string>
     <string name="prototype_badge">PROTOTIPO / 02</string>
     <string name="settings">Impostazioni</string>
+    <string name="settings_general">Generali</string>
+    <string name="settings_transcription">Trascrizione</string>
+    <string name="settings_app">App</string>
+    <string name="processing_location">Elaborazione dell’audio</string>
+    <string name="processing_local_summary">Su questo telefono. Le registrazioni restano sul dispositivo.</string>
+    <string name="settings_model_summary">%1$s · %2$s · %3$s</string>
+    <string name="model_installed">installato</string>
+    <string name="model_download_needed">da scaricare</string>
+    <string name="app_version">Cassini · versione %1$s</string>
     <string name="open_audio">Apri audio</string>
     <string name="change_audio">Cambia file</string>
     <string name="transcribe">Trascrivi</string>

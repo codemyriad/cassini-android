@@ -1,7 +1,6 @@
 package org.cassini.android
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.graphics.Rect
@@ -413,37 +412,13 @@ class MainActivity : Activity() {
     }
 
     private fun showSettings() {
-        AlertDialog.Builder(this).setTitle(R.string.settings)
-            .setItems(arrayOf(getString(R.string.interface_language), getString(R.string.recognition_model), getString(R.string.about))) { _, index ->
-                when (index) { 0 -> chooseLanguage(); 1 -> chooseModel(); 2 -> showAbout() }
-            }.setNegativeButton(R.string.done, null).show()
+        startActivity(Intent(this, SettingsActivity::class.java))
     }
-    private fun chooseLanguage() {
-        val tags = listOf("", "en", "it")
-        val selected = AppLanguage.selected(this)
-        val index = tags.indexOfFirst { it == selected }.coerceAtLeast(0)
-        AlertDialog.Builder(this).setTitle(R.string.interface_language)
-            .setSingleChoiceItems(arrayOf(getString(R.string.system_language), getString(R.string.english_name), getString(R.string.italian_name)), index) { dialog, choice ->
-                dialog.dismiss()
-                persistSession()
-                AppLanguage.set(this, tags[choice])
-            }.setNegativeButton(R.string.cancel, null).show()
-    }
-    private fun chooseModel() {
-        AlertDialog.Builder(this).setTitle(R.string.recognition_model)
-            .setSingleChoiceItems(arrayOf(getString(R.string.int8_option), getString(R.string.fp32_option)), if (session.fp32) 1 else 0) { dialog, choice ->
-                dialog.dismiss()
-                session = session.copy(fp32 = choice == 1)
-                models = modelStore(session.fp32)
-                persistSession()
-                refreshControls()
-            }.setNegativeButton(R.string.cancel, null).show()
-    }
-    private fun showAbout() = AlertDialog.Builder(this).setTitle(R.string.about)
-        .setMessage(R.string.about_body).setPositiveButton(R.string.done, null).show()
 
     private fun persistSession() {
         if (playerReady) player?.let { session = session.copy(positionMs = it.currentPosition) }
+        // Settings can change the model while this activity is stopped or being recreated.
+        session = session.copy(fp32 = sessions.load().fp32)
         try { sessions.save(session) } catch (error: Exception) { Log.e(TAG, "Could not persist session", error) }
     }
     override fun onSaveInstanceState(outState: Bundle) {
@@ -452,7 +427,16 @@ class MainActivity : Activity() {
         outState.putInt("scroll", ui.scroll.scrollY)
         super.onSaveInstanceState(outState)
     }
-    override fun onResume() { super.onResume(); handler.post(ticker) }
+    override fun onResume() {
+        super.onResume()
+        val fp32 = sessions.load().fp32
+        if (fp32 != session.fp32) {
+            session = session.copy(fp32 = fp32)
+            models = modelStore(fp32)
+            refreshControls()
+        }
+        handler.post(ticker)
+    }
     override fun onPause() {
         handler.removeCallbacks(ticker)
         if (playerReady) player?.pause()
