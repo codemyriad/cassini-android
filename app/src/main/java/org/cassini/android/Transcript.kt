@@ -21,13 +21,16 @@ data class Transcript(val words: List<Word>, val language: String = "it") {
 
     companion object {
         fun fromJson(json: String): Transcript {
-            val body = JSONObject(json)
+            val body = CassiniPayload.json(json)
             requireUser(body.getString("format") == "cassini.words.v1", Failure.TIMINGS)
+            require(body.get("format") is String)
+            require(!body.has("items") || body.isNull("items") || body.get("items") is JSONArray)
             val items = body.optJSONArray("items") ?: JSONArray()
             val words = (0 until items.length()).map { i ->
                 val item = items.getJSONObject(i)
-                val word = Word(item.getString("speaker"), item.getLong("startMs"), item.getLong("endMs"), item.getString("text"))
-                requireUser(word.startMs >= 0 && word.endMs >= word.startMs && word.text.isNotBlank(), Failure.TIMINGS)
+                require(item.get("speaker") is String && item.get("text") is String)
+                val word = Word(item.getString("speaker"), CassiniDocument.number(item, "startMs"), CassiniDocument.number(item, "endMs"), item.getString("text"))
+                requireUser(word.startMs >= 0 && word.endMs >= word.startMs && word.text.isNotBlank() && word.speaker.isNotEmpty() && word.text.none { it.isWhitespace() }, Failure.TIMINGS)
                 word
             }
             return Transcript(words, body.optString("language", ""))
