@@ -67,4 +67,5 @@ for name in ['gpu','hybrid']:
 PY
 # This removes only the disposable probe. Cassini's models and documents are retained.
 adb uninstall org.cassini.probe
-adb shell am start -n org.cassini.android/.MainActivity
+# Recreate the viewer: Android can reclaim its MediaPlayer while it is behind the probe.
+adb shell am start -W -f 0x10008000 -n org.cassini.android/.MainActivity
