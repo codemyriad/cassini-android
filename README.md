@@ -81,3 +81,5 @@ Measured runs on the connected Pixel 8 are in [the device results](docs/pixel8-r
 - [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx), Apache-2.0, with ONNX Runtime, MIT, in the upstream Android AAR. Packaging their complete notices is required before distributing a release.
 - [NVIDIA Parakeet v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3), CC-BY-4.0 weights; ONNX bundles published by the sherpa maintainer. Model revision, sizes and SHA-256 hashes are pinned in `ModelStore.kt`.
 - [Google FLEURS](https://huggingface.co/datasets/google/fleurs), CC-BY-4.0, used only for locally fetched device regression fixtures.
+
+An [Android GPU investigation](docs/android-acceleration.md) includes an isolated, reproducible LiteRT Parakeet v3 probe and measured CPU/GPU/hybrid results on the Pixel. GPU execution works; the main app keeps the verified sherpa CPU backend while quality, window boundaries and memory are evaluated.

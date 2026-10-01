@@ -46,3 +46,7 @@ The prototype converts SentencePiece tokens to words using their timestamps and 
 5. Add microphone capture using AudioRecord, explicit recording controls/permission and durable foreground recording. Add diarization only if multi-speaker attribution is required; preserve unidentified speakers until attribution is supported.
 
 The reference extractor and packet-digest tools independently check Android output. `scripts/check-portable-document.mjs` also passes the saved file through the sibling web viewer’s actual reader and word adapter.
+
+## Android acceleration update (2026-10-01)
+
+An isolated LiteRT 2.2.0 experiment successfully delegates multilingual Parakeet v3 INT8 to the Pixel 8 GPU and produces Italian output. Full GPU was slower than LiteRT CPU; GPU encoding with CPU decoding showed a small warm-run improvement but higher startup cost and duplicate model allocations. The stock sherpa app remains on CPU. See [the investigation, existing branches and measured limitations](android-acceleration.md).
