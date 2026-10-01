@@ -73,7 +73,14 @@ class InterfaceTest {
             awaitCondition("Playback should bring the final word into view") { activity ->
                 activity.findViewById<ScrollView>(R.id.content_scroll).scrollY > 0 && wordVisible(activity, first = false)
             }
+            fun activeWord(text: Spanned) = text.getSpans(0, text.length, android.text.style.BackgroundColorSpan::class.java).single()
+                .let { text.subSequence(text.getSpanStart(it), text.getSpanEnd(it)).toString() }
+            var buffer: CharSequence? = null
+            var firstWord: ClickableSpan? = null
             scenario.onActivity { activity ->
+                val text = activity.findViewById<TextView>(R.id.transcript_text).text as Spanned
+                assertEquals("Fine.", activeWord(text))
+                buffer = text; firstWord = text.getSpans(0, 1, ClickableSpan::class.java).single()
                 activity.findViewById<Button>(R.id.play_button).performClick()
             }
             android.os.SystemClock.sleep(350) // Let the smooth scroll finish before reading manually.
@@ -91,9 +98,19 @@ class InterfaceTest {
             }
             scenario.onActivity { activity ->
                 assertEquals(activity.getString(R.string.play), activity.findViewById<Button>(R.id.play_button).text.toString())
+                // Keyboard activation leaves LinkMovementMethod's selection on the word.
+                val text = activity.findViewById<TextView>(R.id.transcript_text).text as android.text.Spannable
+                android.text.Selection.setSelection(text, text.length - "Fine.".length, text.length)
                 activity.findViewById<Button>(R.id.back_button).performClick()
             }
             awaitCondition("Back 10 seconds while paused should reveal the first word") { wordVisible(it, first = true) }
+            scenario.onActivity { activity ->
+                val text = activity.findViewById<TextView>(R.id.transcript_text).text as Spanned
+                assertEquals("Inizio.", activeWord(text))
+                assertSame("Moving the highlight must not rebuild the transcript", buffer, text)
+                assertSame(firstWord, text.getSpans(0, 1, ClickableSpan::class.java).single())
+                assertEquals("A stale word selection must not look like a second active word", -1, android.text.Selection.getSelectionStart(text))
+            }
             scenario.onActivity { it.findViewById<Button>(R.id.forward_button).performClick() }
             awaitCondition("Forward 10 seconds while paused should reveal the final word") { wordVisible(it, first = false) }
             scenario.onActivity { activity ->

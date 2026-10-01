@@ -12,6 +12,8 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.OpenableColumns
 import android.text.Editable
+import android.text.Selection
+import android.text.Spannable
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.TextWatcher
@@ -23,6 +25,7 @@ import android.util.Log
 import android.view.View
 import android.view.WindowManager
 import android.widget.SeekBar
+import android.widget.TextView
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
@@ -44,6 +47,9 @@ class MainActivity : Activity() {
     private var playerReady = false
     private var busy = false
     private var highlightedWord = -1
+    private var wordRanges = emptyList<IntRange>()
+    private val activeBackground = BackgroundColorSpan(DeckViews.amber)
+    private val activeForeground = ForegroundColorSpan(DeckViews.ink)
     private var touchingTranscript = false
     private var followCompletedSeeks = false
 
@@ -82,7 +88,7 @@ class MainActivity : Activity() {
         ui.variant.setOnClickListener { chooseVariant() }
         ui.play.setOnClickListener {
             if (playerReady) player?.let {
-                if (it.isPlaying) it.pause() else { it.start(); renderTranscript() }
+                if (it.isPlaying) it.pause() else { it.start(); highlightWord() }
             }
         }
         ui.scroll.setOnTouchListener { _, event ->
@@ -421,11 +427,11 @@ class MainActivity : Activity() {
         val active = session.transcript?.words?.indexOfFirst { time >= it.startMs && time < it.endMs } ?: -1
         if (active != highlightedWord || followSeek) {
             highlightedWord = active
-            renderTranscript(followPausedSeek = followSeek)
+            highlightWord(followPausedSeek = followSeek)
         }
     }
 
-    private fun renderTranscript(followPausedSeek: Boolean = false) {
+    private fun renderTranscript() {
         val words = session.transcript?.words ?: emptyList()
         val builder = StringBuilder()
         val ranges = mutableListOf<IntRange>()
@@ -464,23 +470,30 @@ class MainActivity : Activity() {
                 }
                 override fun updateDrawState(ds: android.text.TextPaint) { ds.isUnderlineText = false }
             }, range.first, range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-            if (index == highlightedWord) {
-                spannable.setSpan(BackgroundColorSpan(DeckViews.amber), range.first, range.last + 1, 0)
-                spannable.setSpan(ForegroundColorSpan(DeckViews.ink), range.first, range.last + 1, 0)
-            }
         }
-        ui.transcript.text = spannable
+        ui.transcript.setText(spannable, TextView.BufferType.SPANNABLE)
+        wordRanges = ranges
         ui.clearSearch.isEnabled = query.isNotEmpty()
         ui.clearSearch.alpha = if (query.isEmpty()) .4f else 1f
         ui.matches.visibility = if (query.isEmpty() || words.isEmpty()) View.GONE else View.VISIBLE
         ui.matches.text = if (matchCount == 0) getString(R.string.no_matches)
             else resources.getQuantityString(R.plurals.search_matches, matchCount, matchCount)
-        ranges.getOrNull(highlightedWord)?.let { range ->
-            // Spans may have requested a new text layout. Measure after that layout settles.
-            ui.transcript.post {
-                if (!isDestroyed && playerReady && (player?.isPlaying == true || followPausedSeek) && !touchingTranscript) {
-                    followWord(range)
-                }
+        highlightWord()
+    }
+
+    /** Playback moves two spans. Rebuilding every word span per spoken word stalls long documents. */
+    private fun highlightWord(followPausedSeek: Boolean = false) {
+        val text = ui.transcript.text as? Spannable ?: return
+        // A word activated from the keyboard stays selected, drawn in the same amber as the active word.
+        Selection.removeSelection(text)
+        text.removeSpan(activeBackground); text.removeSpan(activeForeground)
+        val range = wordRanges.getOrNull(highlightedWord) ?: return
+        text.setSpan(activeBackground, range.first, range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        text.setSpan(activeForeground, range.first, range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        // A rebuilt transcript may have requested a new text layout. Measure after that layout settles.
+        ui.transcript.post {
+            if (!isDestroyed && playerReady && (player?.isPlaying == true || followPausedSeek) && !touchingTranscript) {
+                followWord(range)
             }
         }
     }
