@@ -52,6 +52,6 @@ Owned recordings/documents live in private `files/documents/`. Atomic `session.j
 
 ## Beta releases
 
-Update `versionName`, increase `versionCode`, and refresh [release notes](release-notes.md). A matching `vVERSION` tag triggers the same build/test/lint checks, then publishes the APK, checksum, notices and native source archive. Tag builds require the repository’s `ANDROID_BETA_KEYSTORE` secret; missing signing material fails the build.
+Update `versionName`, increase `versionCode`, and refresh [release notes](release-notes.md). A matching `vVERSION` tag triggers the same build/test/lint checks, then publishes the APK, checksum, notices and native source archive. Packaging checks both supported 64-bit ABIs and each native library’s 16 KB ELF/ZIP alignment. These checks catch build regressions; runtime behavior still needs testing on actual devices. Tag builds require the repository’s `ANDROID_BETA_KEYSTORE` secret; missing signing material fails the build.
 
 The signing key matches the existing development installation. Keep it stable for these beta updates. The beta release build disables debugging; the key comes from the earlier debug installation to allow upgrades. A production signing identity can be chosen for a future stable release. Never commit it.

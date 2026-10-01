@@ -8,6 +8,8 @@ import shutil
 import subprocess
 import zipfile
 
+from apk_compatibility import check_apk_compatibility
+
 variant = os.environ.get('APK_VARIANT', 'debug')
 if variant not in {'debug', 'release'}:
     raise SystemExit('APK_VARIANT must be debug or release')
@@ -23,11 +25,10 @@ with zipfile.ZipFile(source) as apk:
     for required in ['assets/licenses/Cassini-GPL-3.0.txt', 'assets/licenses/THIRD_PARTY_NOTICES.md']:
         if required not in names:
             raise SystemExit(f'APK is missing {required}')
-    abis = {name.split('/')[1] for name in names if name.startswith('lib/')}
-    if abis != {'arm64-v8a', 'x86_64'}:
-        raise SystemExit(f'Unexpected APK architectures: {abis}')
     if any(name.endswith(('.onnx', '.tflite', '.keystore')) for name in names):
         raise SystemExit('APK contains model weights or signing material')
+libraries = check_apk_compatibility(source)
+print(f'Checked {libraries} native libraries: 64-bit ABI and 16 KB ELF/ZIP alignment')
 if os.environ.get('IS_TAG') == 'true':
     if variant != 'release':
         raise SystemExit('Tagged APK must use the release build type')
