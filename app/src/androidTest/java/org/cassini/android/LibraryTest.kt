@@ -1,0 +1,252 @@
+package org.cassini.android
+
+import android.Manifest
+import android.content.Intent
+import android.net.Uri
+import android.os.SystemClock
+import android.widget.Button
+import android.widget.EditText
+import android.widget.TextView
+import androidx.test.core.app.ActivityScenario
+import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
+import org.json.JSONObject
+import org.junit.Assert.*
+import org.junit.Test
+import java.io.File
+
+class LibraryTest {
+    @get:org.junit.Rule val preserveLibrary = PreserveLibraryRule()
+    private fun finishScreens() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.runOnMainSync {
+            Stage.values().flatMap { ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(it) }.distinct()
+                .filter { it is MainActivity || it is RecordingActivity || it is LibraryActivity || it is SettingsActivity }.forEach { it.finish() }
+        }
+        instrumentation.waitForIdleSync()
+    }
+
+    @Test fun librarySearchOpensTheMatchingDocumentAndKeepsQueryOnReturn() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        finishScreens()
+        val sessions = SessionStore(context.filesDir)
+        val originalSession = sessions.load()
+        val backups = listOf("library.json", "library-migrated").associateWith { File(context.filesDir, it).takeIf { f -> f.exists() }?.readBytes() }
+        val source = File(context.cacheDir, "library-viewer.opus")
+        val scenario: ActivityScenario<LibraryActivity>
+        try {
+            File(context.filesDir, "library.json").delete()
+            File(context.filesDir, "library-migrated").writeText("1")
+            sessions.save(Session())
+            val head = "OpusHead".toByteArray() + byteArrayOf(1, 1, 0, 0, -128, -69, 0, 0, 0, 0, 0)
+            val tags = CassiniDocument.tagsPacket(emptyList())
+            val audio = OggOpus.mux(OggOpus.Stream(head, tags, listOf(byteArrayOf(-8, -1, -2)), 960, true), tags)
+            val words = Transcript(listOf(Word("spk_1", 0, 10, "Ritrovare.")), "it")
+            source.writeBytes(CassiniDocument.create(audio, words, "Library document", JSONObject()))
+            val store = LibraryStore(context.filesDir)
+            val note = store.save(Session(uri = Uri.fromFile(source).toString(), document = source.absolutePath,
+                name = "Library document", transcript = words, selectedVariant = CassiniDocument.read(source.readBytes()).defaultId))
+            store.save(Session(uri = "file:///other.m4a", name = "Other note"))
+            scenario = ActivityScenario.launch(LibraryActivity::class.java)
+            try {
+                fun await(description: String, condition: () -> Boolean) {
+                    val deadline = SystemClock.uptimeMillis() + 8000
+                    while (SystemClock.uptimeMillis() < deadline) { if (condition()) return; SystemClock.sleep(50) }
+                    fail(description)
+                }
+                fun cards(activity: LibraryActivity) = activity.findViewById<android.widget.LinearLayout>(R.id.library_cards).let { container ->
+                    (0 until container.childCount).map { container.getChildAt(it) }.filter { it.isClickable }
+                }
+                await("Library should display both notes") {
+                    var ready = false; scenario.onActivity { ready = cards(it).size == 2 }; ready
+                }
+                scenario.onActivity {
+                    it.findViewById<EditText>(R.id.library_search).setText("ritrovare")
+                    cards(it).single().performClick()
+                }
+                await("Search result should open authoritative timed words") {
+                    var ready = false
+                    instrumentation.runOnMainSync {
+                        val viewer = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>().firstOrNull()
+                        ready = viewer?.findViewById<TextView>(R.id.transcript_text)?.text?.contains("Ritrovare.") == true
+                    }
+                    ready
+                }
+                instrumentation.runOnMainSync {
+                    val viewer = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>().single()
+                    assertEquals("ritrovare", viewer.findViewById<EditText>(R.id.search_input).text.toString())
+                    assertEquals(note.libraryId, sessions.load().libraryId)
+                    viewer.findViewById<Button>(R.id.notes_button).performClick()
+                }
+                instrumentation.waitForIdleSync()
+                scenario.onActivity {
+                    assertEquals("ritrovare", it.findViewById<EditText>(R.id.library_search).text.toString())
+                    assertEquals(1, cards(it).size)
+                }
+            } finally { scenario.close() }
+        } finally {
+            finishScreens(); sessions.save(originalSession)
+            backups.forEach { (name, bytes) -> File(context.filesDir, name).let { if (bytes == null) it.delete() else it.writeBytes(bytes) } }
+            source.delete()
+        }
+    }
+    @Test fun savedAudioUpdatesOneCardAndCorruptIndexIsNeverOverwritten() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val directory = File(context.cacheDir, "library-store-test").apply { deleteRecursively(); mkdirs() }
+        try {
+            val store = LibraryStore(directory)
+            val first = store.save(Session(uri = "file:///first.m4a", name = "First", durationMs = 2000))
+            store.save(Session(uri = "file:///second.m4a", name = "Second"))
+            val words = Transcript(listOf(Word("spk_1", 0, 100, "Ricordare.")), "it")
+            val updated = store.save(first.copy(uri = "file:///first.opus", document = "/first.opus", transcript = words,
+                selectedVariant = "first", positionMs = 1000))
+            val notes = store.load()
+            assertEquals(2, notes.size)
+            val note = notes.single { it.id == updated.libraryId }
+            assertTrue(note.matches("ricordare")); assertEquals(1000, note.session.positionMs)
+            assertNull(note.session.transcript)
+            val file = File(directory, "library.json"); file.writeText("damaged")
+            try { store.save(updated); fail("Must refuse to overwrite an unreadable index") } catch (_: org.json.JSONException) {}
+            assertEquals("damaged", file.readText())
+        } finally { directory.deleteRecursively() }
+    }
+
+    @Test fun migrationRecoversOldDocumentsAndKeepsSelectedVariantOfCurrentNote() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val directory = File(context.cacheDir, "library-migration-test").apply { deleteRecursively(); mkdirs() }
+        try {
+            val documents = File(directory, "documents").apply { mkdirs() }
+            val head = "OpusHead".toByteArray() + byteArrayOf(1, 1, 0, 0, -128, -69, 0, 0, 0, 0, 0)
+            val tags = CassiniDocument.tagsPacket(emptyList())
+            val audio = OggOpus.mux(OggOpus.Stream(head, tags, listOf(byteArrayOf(-8, -1, -2)), 960, true), tags)
+            val words = Transcript(listOf(Word("spk_1", 0, 10, "Ciao.")), "it")
+            val first = CassiniDocument.create(audio, words, "First meeting", JSONObject())
+            val old = File(documents, "old.opus").apply { writeBytes(first); setLastModified(100) }
+            val appended = CassiniDocument.create(first, words.copy(words = listOf(Word("spk_1", 0, 10, "Nuovo."))), "Ignored", JSONObject(), CassiniDocument.read(first))
+            File(documents, "new.opus").apply { writeBytes(appended); setLastModified(200) }
+            File(documents, "other.opus").writeBytes(CassiniDocument.create(audio, words, "Other meeting", JSONObject()))
+            val store = LibraryStore(directory)
+            // A session saved before the launcher migration must not suppress recovery.
+            val current = store.save(Session(uri = Uri.fromFile(old).toString(), name = "First meeting", document = old.absolutePath,
+                selectedVariant = CassiniDocument.read(first).defaultId, positionMs = 5))
+            val createdAt = store.load().single().createdAt
+            store.migrate(current)
+            val notes = store.load()
+            assertEquals(2, notes.size)
+            val selected = notes.single { it.id == current.libraryId }
+            assertEquals("Ciao.", selected.text)
+            assertEquals(old.absolutePath, selected.session.document)
+            assertEquals(5, selected.session.positionMs)
+            assertEquals(createdAt, selected.createdAt)
+            store.migrate(current)
+            assertEquals(notes, store.load())
+        } finally { directory.deleteRecursively() }
+    }
+
+    @android.annotation.TargetApi(28)
+    @androidx.test.filters.SdkSuppress(minSdkVersion = 28)
+    @Test fun microphonePauseResumeSavesPlayableAudioAndReopensFromLibrary() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val sessions = SessionStore(context.filesDir)
+        val originalSession = sessions.load()
+        val files = listOf("library.json", "library-migrated")
+        val backups = files.associateWith { name -> File(context.filesDir, name).takeIf { it.exists() }?.readBytes() }
+        val originalFiles = File(context.filesDir, "documents").listFiles().orEmpty().map { it.name }.toSet()
+        finishScreens()
+        instrumentation.uiAutomation.grantRuntimePermission(context.packageName, Manifest.permission.RECORD_AUDIO)
+        val scenario = ActivityScenario.launch<RecordingActivity>(Intent(context, RecordingActivity::class.java).putExtra(RecordingActivity.AUTO_TRANSCRIBE, false))
+        try {
+            SystemClock.sleep(1100)
+            scenario.onActivity {
+                assertTrue(it.findViewById<Button>(R.id.capture_done).isEnabled)
+                it.findViewById<EditText>(R.id.capture_title).setText("Microphone test")
+                it.findViewById<Button>(R.id.capture_pause).performClick()
+            }
+            SystemClock.sleep(150)
+            var paused = ""
+            scenario.onActivity { paused = it.findViewById<TextView>(R.id.capture_timer).text.toString() }
+            SystemClock.sleep(1200)
+            scenario.onActivity {
+                assertEquals(paused, it.findViewById<TextView>(R.id.capture_timer).text.toString())
+                it.findViewById<Button>(R.id.capture_pause).performClick()
+            }
+            SystemClock.sleep(1200)
+            scenario.onActivity { it.findViewById<Button>(R.id.capture_done).performClick() }
+            instrumentation.waitForIdleSync()
+            val recorded = sessions.load()
+            assertEquals("Microphone test.m4a", recorded.name)
+            assertNotNull(recorded.libraryId)
+            assertNull(recorded.document)
+            val audio = AudioDecoder.decode(context, Uri.parse(recorded.uri))
+            assertTrue("Paused time must be excluded: ${audio.durationMs}", audio.durationMs in 1800..3200)
+            assertEquals(48000, audio.sampleRate)
+            assertEquals(1, LibraryStore(context.filesDir).load().count { it.id == recorded.libraryId })
+            finishScreens()
+            ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java).putExtra(MainActivity.NOTE_ID, recorded.libraryId)).use { reopened ->
+                SystemClock.sleep(500)
+                reopened.onActivity {
+                    assertEquals(recorded.name, it.findViewById<TextView>(R.id.recording_name).text.toString())
+                    assertTrue(it.findViewById<Button>(R.id.play_button).isEnabled)
+                }
+            }
+        } finally {
+            scenario.close(); finishScreens(); sessions.save(originalSession)
+            backups.forEach { (name, bytes) -> File(context.filesDir, name).let { if (bytes == null) it.delete() else it.writeBytes(bytes) } }
+            File(context.filesDir, "documents").listFiles().orEmpty().filter { it.name !in originalFiles }.forEach { it.delete() }
+        }
+    }
+
+    @android.annotation.TargetApi(28)
+    @androidx.test.filters.SdkSuppress(minSdkVersion = 28)
+    @Test fun leavingRecordingScreenFinalizesAudioWithoutBackgroundTranscription() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val sessions = SessionStore(context.filesDir)
+        val original = sessions.load()
+        instrumentation.uiAutomation.grantRuntimePermission(context.packageName, Manifest.permission.RECORD_AUDIO)
+        val scenario = ActivityScenario.launch(RecordingActivity::class.java)
+        try {
+            SystemClock.sleep(1200)
+            scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
+            val saved = sessions.load()
+            assertNotNull(saved.libraryId)
+            assertNull(saved.document)
+            assertTrue(AudioDecoder.decode(context, Uri.parse(saved.uri)).durationMs >= 900)
+            assertEquals(1, LibraryStore(context.filesDir).load().count { it.id == saved.libraryId })
+            scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+            instrumentation.waitForIdleSync()
+            assertEquals(saved.libraryId, sessions.load().libraryId)
+            assertNull(sessions.load().document)
+        } finally { scenario.close(); finishScreens(); sessions.save(original) }
+    }
+
+    @android.annotation.TargetApi(28)
+    @androidx.test.filters.SdkSuppress(minSdkVersion = 28)
+    @Test fun doneAutomaticallyTranscribesAndSealsTheSameLibraryNote() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val model = ModelStore(File(context.filesDir, "parakeet-v3"), false)
+        org.junit.Assume.assumeTrue("Install INT8 for the microphone-to-document check", model.ready())
+        val sessions = SessionStore(context.filesDir)
+        val original = sessions.load()
+        sessions.save(original.copy(modelChoice = "int8", fp32 = false))
+        instrumentation.uiAutomation.grantRuntimePermission(context.packageName, Manifest.permission.RECORD_AUDIO)
+        val scenario = ActivityScenario.launch(RecordingActivity::class.java)
+        try {
+            SystemClock.sleep(1500)
+            scenario.onActivity { it.findViewById<Button>(R.id.capture_done).performClick() }
+            val id = sessions.load().libraryId
+            assertNotNull(id)
+            val deadline = SystemClock.uptimeMillis() + 90000
+            while (sessions.load().document == null && SystemClock.uptimeMillis() < deadline) SystemClock.sleep(100)
+            val saved = sessions.load()
+            assertEquals(id, saved.libraryId)
+            assertNotNull("Done should transcribe automatically", saved.document)
+            assertEquals("ok", CassiniDocument.read(File(saved.document!!).readBytes()).state)
+            assertEquals(1, LibraryStore(context.filesDir).load().count { it.id == id })
+        } finally { scenario.close(); finishScreens(); sessions.save(original) }
+    }
+}

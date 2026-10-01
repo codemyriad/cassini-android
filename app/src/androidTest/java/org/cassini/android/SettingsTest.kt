@@ -11,6 +11,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SettingsTest {
+    @get:org.junit.Rule val preserveLibrary = PreserveLibraryRule()
     @Test fun modelAndLanguageChoicesSurviveReturningFromSettings() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
@@ -44,6 +45,20 @@ class SettingsTest {
                     var node: AccessibilityNodeInfo? = found
                     while (node != null && !node.isClickable) node = node.parent
                     if (node?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true) {
+                        instrumentation.waitForIdleSync()
+                        return
+                    }
+                    // API 34's platform Preference list can omit clickable ancestors in its
+                    // accessibility tree. Exercise the actual touch target in that case.
+                    val bounds = android.graphics.Rect().also { found.getBoundsInScreen(it) }
+                    if (!bounds.isEmpty) {
+                        val now = android.os.SystemClock.uptimeMillis()
+                        for (action in listOf(android.view.MotionEvent.ACTION_DOWN, android.view.MotionEvent.ACTION_UP)) {
+                            val event = android.view.MotionEvent.obtain(now, now, action, bounds.centerX().toFloat(), bounds.centerY().toFloat(), 0)
+                            event.source = android.view.InputDevice.SOURCE_TOUCHSCREEN
+                            instrumentation.uiAutomation.injectInputEvent(event, true)
+                            event.recycle()
+                        }
                         instrumentation.waitForIdleSync()
                         return
                     }

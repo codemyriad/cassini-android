@@ -35,6 +35,8 @@ class MainActivity : Activity() {
     private lateinit var ui: DeckViews
     private lateinit var models: ModelStore
     private lateinit var sessions: SessionStore
+    private lateinit var library: LibraryStore
+    private var autoTranscribe = false
     private var session = Session()
     private var document: CassiniDocument? = null
     private lateinit var documents: DocumentStore
@@ -59,11 +61,18 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         sessions = SessionStore(filesDir)
+        library = LibraryStore(filesDir)
         documents = DocumentStore(this)
-        session = sessions.load().let { it.copy(fp32 = ModelPolicy.resolve(this, it.modelChoice)) }
+        val preferences = sessions.load()
+        val noteId = intent.getStringExtra(NOTE_ID)
+        val selected = if (noteId == null) preferences else try { library.load().firstOrNull { it.id == noteId }?.session ?: Session() }
+            catch (error: Exception) { Log.e(TAG, "Could not load note", error); Session() }
+        session = selected.copy(modelChoice = preferences.modelChoice, fp32 = ModelPolicy.resolve(this, preferences.modelChoice))
+        autoTranscribe = savedInstanceState == null && intent.getBooleanExtra(AUTO_TRANSCRIBE, false)
         models = modelStore(session.fp32)
         ui = DeckViews(this)
         setContentView(ui.root)
+        ui.library.setOnClickListener { returnToLibrary() }
         ui.menu.setOnClickListener { showSettings() }
         ui.open.setOnClickListener { chooseFile() }
         ui.transcribe.setOnClickListener { transcribe() }
@@ -99,7 +108,7 @@ class MainActivity : Activity() {
         })
         ui.clearSearch.setOnClickListener { ui.search.text.clear() }
         ui.transcript.movementMethod = LinkMovementMethod.getInstance()
-        ui.search.setText(savedInstanceState?.getString("query").orEmpty())
+        ui.search.setText(savedInstanceState?.getString("query") ?: intent.getStringExtra(SEARCH_QUERY).orEmpty())
         renderScreen()
         defaultStatus()
         session.uri?.let { preparePlayer(Uri.parse(it)) }
@@ -108,6 +117,7 @@ class MainActivity : Activity() {
             onUi { adoptDocument(loaded); renderScreen(); defaultStatus() }
         } }
         if (intent.action == Intent.ACTION_VIEW) intent.data?.let { importFile(it) }
+        if (savedInstanceState == null && intent.getBooleanExtra(REQUEST_IMPORT, false)) chooseFile()
         savedInstanceState?.let { state -> ui.scroll.post { ui.scroll.scrollTo(0, state.getInt("scroll")) } }
     }
 
@@ -219,7 +229,7 @@ class MainActivity : Activity() {
                     resultPrecision = "")
                 adoptDocument(portable.takeIf { it.state != "plain-audio" })
                 ui.search.text.clear(); ui.scroll.scrollTo(0, 0)
-                sessions.save(session); preparePlayer(Uri.fromFile(file)); renderScreen(); defaultStatus()
+                persistSession(); preparePlayer(Uri.fromFile(file)); renderScreen(); defaultStatus()
             }
         }
     }
@@ -313,6 +323,7 @@ class MainActivity : Activity() {
                     window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                     ui.progress.visibility = View.GONE
                     refreshControls()
+                    maybeAutoTranscribe()
                 }
             }
         }
@@ -342,6 +353,7 @@ class MainActivity : Activity() {
         ui.download.text = getString(R.string.download_model, getString(if (models.fp32) R.string.model_size_fp32 else R.string.model_size_int8))
         ui.download.visibility = if (ready) View.GONE else View.VISIBLE
         ui.menu.isEnabled = !busy
+        ui.library.isEnabled = !busy
         ui.open.isEnabled = !busy
         ui.transcribe.isEnabled = !busy && session.uri != null && ready && (document == null || document?.state == "ok")
         ui.download.isEnabled = !busy
@@ -528,6 +540,7 @@ class MainActivity : Activity() {
             ui.seek.max = session.durationMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
             it.seekTo(session.positionMs.coerceIn(0, it.duration))
             refreshControls()
+            persistSession()
         }
         media.setOnErrorListener { _, _, _ ->
             playerReady = false
@@ -575,7 +588,8 @@ class MainActivity : Activity() {
         val preferences = sessions.load()
         session = session.copy(modelChoice = preferences.modelChoice,
             fp32 = if (preferences.modelChoice == "auto") session.fp32 else preferences.fp32)
-        try { sessions.save(session) } catch (error: Exception) { Log.e(TAG, "Could not persist session", error) }
+        try { sessions.save(session); session = library.save(session); sessions.save(session) }
+        catch (error: Exception) { Log.e(TAG, "Could not persist session", error); setStatus(R.string.library_error, error = true) }
     }
     override fun onSaveInstanceState(outState: Bundle) {
         persistSession()
@@ -592,6 +606,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         if (!busy) { updateModelChoice(); refreshControls() }
+        maybeAutoTranscribe()
         handler.post(ticker)
     }
     override fun onPause() {
@@ -607,5 +622,22 @@ class MainActivity : Activity() {
         super.onDestroy()
     }
     private fun clock(ms: Long) = String.format(Locale.ROOT, "%02d:%02d", ms / 60000, ms / 1000 % 60)
-    companion object { const val OPEN_FILE = 1; const val SAVE_DOCUMENT = 2; private const val TAG = "Cassini" }
+    private fun maybeAutoTranscribe() {
+        if (autoTranscribe && !busy && models.ready() && session.uri != null) {
+            autoTranscribe = false
+            transcribe()
+        }
+    }
+    private fun returnToLibrary() {
+        persistSession()
+        startActivity(Intent(this, LibraryActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+        finish()
+    }
+    @Deprecated("Framework back callback")
+    override fun onBackPressed() { if (!busy) returnToLibrary() }
+    companion object {
+        const val OPEN_FILE = 1; const val SAVE_DOCUMENT = 2; private const val TAG = "Cassini"
+        const val NOTE_ID = "noteId"; const val SEARCH_QUERY = "searchQuery"
+        const val REQUEST_IMPORT = "requestImport"; const val AUTO_TRANSCRIBE = "autoTranscribe"
+    }
 }

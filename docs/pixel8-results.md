@@ -70,6 +70,14 @@ The supplied audio and generated artifacts remain local ignored files. The updat
 
 New installs choose Automatic, favoring FP32 when memory/storage headroom permits and respecting explicit INT8/FP32 overrides. Existing choices migrate as manual choices. This is a resource heuristic; no labeled Italian evaluation establishes that FP32 improves accuracy over INT8 on this recording. The stock frontend still differs from the desktop Cassini fork.
 
+## Notes library and microphone recording
+
+The speech-notes reference now guides a native Notes home screen with date groups, duration, transcript previews, full selected-transcript search and recording/import actions. On this Pixel, first-launch recovery found eight retained meetings across twelve portable files. The current three-minute document, selected variant and 7.063-second playback position were preserved. Retranscription updates one stable library entry while keeping earlier portable revisions.
+
+All **13 focused Android checks** passed on the Pixel, including real microphone pause/resume, AAC decoding/playback after saving, stopping/saving on foreground exit, automatic microphone → INT8 Parakeet → verified portable document creation, search-result navigation, library recovery/corruption protection, language/model switching and the existing portable-document checks. All **20 JVM tests**, debug assembly and lint passed; lint has existing warnings and no errors. Test fixtures are removed from the library and original recordings/model downloads remain installed.
+
+Capture uses mono 48 kHz AAC and automatically stops at 2:59 to leave room for encoder padding within the three-minute decoder limit. It finalizes audio before recognition and retains it when recognition or packaging fails. Leaving the foreground saves audio without starting background inference. This remains the Android whole-utterance, stock-frontend CPU pipeline; it does not adopt the desktop fork or provide long-recording segmentation, background recording/transcription, flags or typed annotations. Cassini saving still produces a complete portable Opus document, rather than a standalone word-body JSON export.
+
 The three-minute FP32 document restores its previously measured 90.159-second recognition time and displays `2.00× realtime` in Italian. New recognition records `x-inferenceMs` in the variant's speech-to-text provenance. Completion separately measures the whole decode/recognize/package operation; higher multipliers are faster.
 
 Verification: 17 JVM tests and assemble/lint pass. Device settings tests select Automatic, then FP32, switch language and return with the manual preference retained; both interface/playback tests pass. A separate actual 30-second INT8 recognition test passes, creates a verified Cassini document with processing time in its provenance, and checks the completion multiplier. The existing three-minute document and both model downloads remain intact.

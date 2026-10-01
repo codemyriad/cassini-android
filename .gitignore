@@ -12,3 +12,4 @@ __pycache__/
 app/src/androidTest/assets/*.mp3
 app/src/androidTest/assets/*.m4a
 app/src/androidTest/assets/italian-smoke.json
+dist/

@@ -1,6 +1,6 @@
 <resources>
     <string name="app_name">Cassini</string>
-    <string name="prototype_badge">PROTOTIPO / 03</string>
+    <string name="prototype_badge">BETA / 0.0.1</string>
     <string name="settings">Impostazioni</string>
     <string name="settings_general">Generali</string>
     <string name="settings_transcription">Trascrizione</string>
@@ -72,7 +72,7 @@
     <string name="int8_option">INT8 · 640 MiB · più leggero e veloce</string>
     <string name="fp32_option">FP32 · 2,37 GiB · precisione completa</string>
     <string name="about">Informazioni sul prototipo</string>
-    <string name="about_body">Parakeet v3 sul tuo telefono. L’audio resta in locale.\n\nClip brevi, una voce non identificata, riconoscimento multilingue automatico. La lingua indicata nella trascrizione è attualmente l’italiano.\n\nL’esportazione salva un JSON con le parole in formato Cassini. I file Opus portatili e la registrazione dal microfono sono i prossimi passi.</string>
+    <string name="about_body">Parakeet v3 sul tuo telefono. L’audio resta in locale.\n\nRegistra note vocali, cerca nelle trascrizioni e salva documenti Cassini Opus portatili con audio e parole temporizzate.\n\nClip fino a 3 minuti, una voce non identificata, riconoscimento multilingue automatico. La lingua indicata nella trascrizione è attualmente l’italiano.\n\nGPLv3. Codice sorgente e licenze: github.com/codemyriad/cassini-android</string>
     <string name="done">Fine</string>
     <string name="cancel">Annulla</string>
     <string name="error_open">Impossibile aprire la registrazione. Seleziona di nuovo il file.</string>
@@ -117,4 +117,38 @@
     <string name="automatic_model_explanation">Usa FP32 quando memoria e spazio lo permettono; altrimenti sceglie il modello INT8 più piccolo. Le scelte manuali vengono rispettate.</string>
     <string name="processing_speed">Pronto in %1$.1f s · %2$.2f× tempo reale</string>
     <string name="transcription_speed">Trascritto in %1$.1f s · %2$.2f× tempo reale</string>
+    <string name="notes">Note</string>
+    <string name="back_to_notes">‹ Note</string>
+    <string name="library_search">Cerca note e parole trascritte</string>
+    <string name="import_audio">Importa audio</string>
+    <string name="record_note">● Registra</string>
+    <string name="library_loading">Apertura delle note…</string>
+    <string name="library_error">Impossibile salvare o aprire la libreria. I file audio sono ancora sul dispositivo.</string>
+    <string name="library_local">Parakeet su questo dispositivo · audio conservato qui</string>
+    <string name="library_needs_model">Registra ora · scarica un modello nella nota per trascrivere</string>
+    <string name="library_empty">Le tue parole, da ritrovare.</string>
+    <string name="library_empty_hint">Registra una nota vocale o importa un audio. Qui troverai registrazioni e trascrizioni.</string>
+    <string name="library_search_hint">Prova un’altra parola o il titolo di una nota.</string>
+    <string name="library_audio_ready">Pronto da trascrivere · tocca per aprire</string>
+    <string name="library_document">Documento portabile · tocca per aprire</string>
+    <string name="library_recorded">Audio salvato</string>
+    <string name="today">Oggi</string>
+    <string name="yesterday">Ieri</string>
+    <string name="recording_preparing">Nuova registrazione</string>
+    <string name="recording_title">Titolo della nota</string>
+    <string name="voice_note_name">Nota vocale %1$s</string>
+    <string name="microphone_format">Microfono · AAC mono · 48 kHz</string>
+    <string name="microphone_level">Livello del microfono in tempo reale</string>
+    <string name="recording_hint">Le parole appariranno dopo lo stop. Registra fino a 3 minuti; Parakeet trascrive sul dispositivo. Uscendo da questa schermata la registrazione si ferma e viene salvata.</string>
+    <string name="enable_microphone">Abilita il microfono</string>
+    <string name="pause_recording">Pausa</string>
+    <string name="resume_recording">Riprendi</string>
+    <string name="finish_recording">■ Fine</string>
+    <string name="recording_paused">In pausa</string>
+    <string name="recording_active">● Registrazione</string>
+    <string name="microphone_permission_denied">Consenti l’accesso al microfono nelle impostazioni Android per registrare.</string>
+    <string name="recording_saved_interrupted">Registrazione fermata e salvata.</string>
+    <string name="error_microphone">Impossibile registrare. Verifica l’accesso al microfono e riprova.</string>
+    <string name="library_note_metadata">%1$s · %2$s</string>
+    <string name="library_saved_document">Documento salvato</string>
 </resources>

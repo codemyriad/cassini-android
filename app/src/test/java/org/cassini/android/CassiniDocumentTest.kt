@@ -9,6 +9,9 @@ import java.io.File
 class CassiniDocumentTest {
     @Test fun publishedConformanceVectors() {
         val directory = File(System.getProperty("cassini.conformance", "../cassini-format/spec/conformance")!!)
+        if (System.getProperty("cassini.conformance.required").toBoolean()) {
+            assertTrue("Required Cassini conformance directory is missing: $directory", directory.isDirectory)
+        }
         assumeTrue("Checkout cassini-format beside this repository for the published conformance suite", directory.isDirectory)
         val vectors = JSONObject(File(directory, "index.json").readText()).getJSONArray("vectors")
         val failures = mutableListOf<String>()

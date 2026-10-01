@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">Cassini</string>
     <string name="brand" translatable="false">cassini</string>
-    <string name="prototype_badge">PROTOTYPE / 03</string>
+    <string name="prototype_badge">BETA / 0.0.1</string>
     <string name="settings">Settings</string>
     <string name="settings_general">General</string>
     <string name="settings_transcription">Transcription</string>
@@ -75,7 +75,7 @@
     <string name="int8_option">INT8 · 640 MiB · smaller, faster</string>
     <string name="fp32_option">FP32 · 2.37 GiB · full precision</string>
     <string name="about">About this prototype</string>
-    <string name="about_body">Parakeet v3 on your phone. Audio stays local.\n\nShort clips, one unidentified voice, automatic multilingual recognition. The current transcript language label is Italian.\n\nExport saves Cassini word JSON. Portable Opus files and microphone recording are coming next.</string>
+    <string name="about_body">Parakeet v3 on your phone. Audio stays local.\n\nRecord voice notes, search past transcriptions, and save portable Cassini Opus documents with audio and timed words.\n\nClips up to 3 minutes, one unidentified voice, automatic multilingual recognition. The current transcript language label is Italian.\n\nGPLv3. Source and dependency notices: github.com/codemyriad/cassini-android</string>
     <string name="done">Done</string>
     <string name="cancel">Cancel</string>
     <string name="error_open">Could not open this recording. Choose the file again.</string>
@@ -120,4 +120,39 @@
     <string name="automatic_model_explanation">Uses FP32 when RAM and storage allow; otherwise chooses the smaller INT8 model. Manual choices are respected.</string>
     <string name="processing_speed">Ready in %1$.1f s · %2$.2f× realtime</string>
     <string name="transcription_speed">Transcribed in %1$.1f s · %2$.2f× realtime</string>
+    <string name="notes">Notes</string>
+    <string name="back_to_notes">‹ Notes</string>
+    <string name="library_search">Search notes and what was said</string>
+    <string name="import_audio">Import audio</string>
+    <string name="record_note">● Record</string>
+    <string name="library_loading">Opening your notes…</string>
+    <string name="library_error">Could not save or open the library. Your audio files are still on this device.</string>
+    <string name="library_local">Parakeet on this device · audio stays here</string>
+    <string name="library_needs_model">Record now · download a model in a note to transcribe</string>
+    <string name="library_empty">Your words, remembered.</string>
+    <string name="library_empty_hint">Record a voice note or import audio. Your recordings and transcripts will appear here.</string>
+    <string name="library_search_hint">Try another word or a note title.</string>
+    <string name="library_audio_ready">Ready to transcribe · tap to open</string>
+    <string name="library_document">Portable document · tap to open</string>
+    <string name="library_recorded">Audio saved</string>
+    <string name="today">Today</string>
+    <string name="yesterday">Yesterday</string>
+    <string name="recording_preparing">New recording</string>
+    <string name="recording_title">Note title</string>
+    <string name="voice_note_name">Voice note %1$s</string>
+    <string name="microphone_format">Microphone · mono AAC · 48 kHz</string>
+    <string name="microphone_level">Live microphone level</string>
+    <string name="recording_hint">Your words appear after you stop. Record up to 3 minutes; Parakeet transcribes on this device. Leaving this screen stops and saves the recording.</string>
+    <string name="enable_microphone">Enable microphone</string>
+    <string name="pause_recording">Pause</string>
+    <string name="resume_recording">Resume</string>
+    <string name="finish_recording">■ Done</string>
+    <string name="recording_paused">Paused</string>
+    <string name="recording_active">● Recording</string>
+    <string name="microphone_permission_denied">Allow microphone access in Android settings to record.</string>
+    <string name="recording_saved_interrupted">Recording stopped and saved.</string>
+    <string name="error_microphone">Could not record. Check microphone access and try again.</string>
+    <string name="note_clock" translatable="false">%1$02d:%2$02d</string>
+    <string name="library_note_metadata">%1$s · %2$s</string>
+    <string name="library_saved_document">Saved document</string>
 </resources>

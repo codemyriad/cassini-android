@@ -14,6 +14,7 @@ import org.junit.Test
 import java.io.File
 
 class PortableDocumentTest {
+    @get:org.junit.Rule val preserveLibrary = PreserveLibraryRule()
     private fun finishScreens() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         instrumentation.runOnMainSync {

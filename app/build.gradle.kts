@@ -10,17 +10,38 @@ android {
         applicationId = "org.cassini.android"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "0.3"
+        versionCode = 4
+        versionName = "0.0.1-beta"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
+    }
+    val betaKeystore = providers.environmentVariable("CASSINI_BETA_KEYSTORE_FILE").orNull
+    signingConfigs {
+        if (betaKeystore != null) create("beta") {
+            storeFile = file(betaKeystore)
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+    buildTypes {
+        getByName("release") {
+            isDebuggable = false
+            if (betaKeystore != null) signingConfig = signingConfigs.getByName("beta")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    testOptions { unitTests.all { it.systemProperty("cassini.conformance", rootProject.projectDir.parentFile.resolve("cassini-format/spec/conformance").absolutePath) } }
+    val conformanceDirectory = providers.gradleProperty("cassiniConformanceDir")
+        .getOrElse(rootProject.projectDir.parentFile.resolve("cassini-format/spec/conformance").absolutePath)
+    val requireConformance = providers.gradleProperty("requireCassiniConformance").getOrElse("false")
+    testOptions { unitTests.all {
+        it.systemProperty("cassini.conformance", conformanceDirectory)
+        it.systemProperty("cassini.conformance.required", requireConformance)
+    } }
     bundle { language { enableSplit = false } }
 }
 

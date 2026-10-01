@@ -21,4 +21,15 @@
     <item name="document_info_button" type="id"/>
     <item name="variant_button" type="id"/>
     <item name="document_trust" type="id"/>
+    <item name="notes_button" type="id" />
+    <item name="library_search" type="id" />
+    <item name="library_cards" type="id" />
+    <item name="library_status" type="id" />
+    <item name="record_button" type="id" />
+    <item name="capture_status" type="id" />
+    <item name="capture_title" type="id" />
+    <item name="capture_timer" type="id" />
+    <item name="capture_start" type="id" />
+    <item name="capture_pause" type="id" />
+    <item name="capture_done" type="id" />
 </resources>

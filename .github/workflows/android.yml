@@ -1,0 +1,103 @@
+name: Android
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Get published format conformance vectors
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: codemyriad/cassini-format
+          ref: e43bad1bd157b56a8e8f71a0620c364c4214746d
+          path: .tools/cassini-format
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+      - run: sdkmanager 'platforms;android-34' 'build-tools;34.0.0'
+      - uses: gradle/actions/setup-gradle@48b5f213c81028ace310571dc5ec0fbbca0b2947 # v4
+      - name: Restore beta signing key
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          BETA_KEYSTORE: ${{ secrets.ANDROID_BETA_KEYSTORE }}
+        run: |
+          test -n "$BETA_KEYSTORE"
+          mkdir -p "$HOME/.android"
+          printf '%s' "$BETA_KEYSTORE" | base64 --decode > "$HOME/.android/debug.keystore"
+          chmod 600 "$HOME/.android/debug.keystore"
+          echo "CASSINI_BETA_KEYSTORE_FILE=$HOME/.android/debug.keystore" >> "$GITHUB_ENV"
+      - run: ./scripts/setup.sh
+      - name: Build APK, run unit and conformance tests, and lint
+        env:
+          BUILD_TYPE: ${{ startsWith(github.ref, 'refs/tags/') && 'Release' || 'Debug' }}
+        run: |
+          ./gradlew --no-daemon \
+            -PcassiniConformanceDir="$GITHUB_WORKSPACE/.tools/cassini-format/spec/conformance" \
+            -PrequireCassiniConformance=true \
+            ":app:assemble$BUILD_TYPE" :app:testDebugUnitTest ":app:lint$BUILD_TYPE"
+      - name: Prepare installable APK
+        env:
+          TAG: ${{ github.ref_name }}
+          APK_VARIANT: ${{ startsWith(github.ref, 'refs/tags/') && 'release' || 'debug' }}
+          IS_TAG: ${{ startsWith(github.ref, 'refs/tags/') }}
+        run: |
+          python3 scripts/package-apk.py
+      - name: Collect corresponding native sources
+        if: startsWith(github.ref, 'refs/tags/')
+        run: python3 scripts/package-native-sources.py
+      - name: Upload APK and sources
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cassini-android
+          path: dist/*
+          if-no-files-found: error
+      - name: Upload test and lint reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: android-checks
+          path: |
+            app/build/reports/tests/testDebugUnitTest/
+            app/build/test-results/testDebugUnitTest/
+            app/build/reports/lint-results-*.html
+          if-no-files-found: warn
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: cassini-android
+          path: dist
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          prerelease=()
+          if [[ "$TAG" == *-* ]]; then prerelease=(--prerelease); fi
+          gh release create "$TAG" dist/* --verify-tag --title "${TAG#v}" \
+            --notes-file docs/release-notes.md "${prerelease[@]}"

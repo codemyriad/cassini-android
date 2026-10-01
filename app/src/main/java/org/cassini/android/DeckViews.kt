@@ -51,6 +51,7 @@ class DeckViews(private val context: Context) {
     }
 
     val root = column().apply { setBackgroundColor(ink) }
+    val library = button(R.string.back_to_notes).apply { id = R.id.notes_button; textSize = 12f }
     val menu = button(R.string.settings).apply { id = R.id.settings_button; textSize = 12f }
     val model = text(12f, amber, true).apply { id = R.id.model_status }
     val filename = text(18f).apply { id = R.id.recording_name; maxLines = 2; ellipsize = TextUtils.TruncateAt.MIDDLE }
@@ -107,6 +108,8 @@ class DeckViews(private val context: Context) {
             add(text(25f).apply { setText(R.string.brand); typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL) })
             add(label(R.string.prototype_badge).apply { setTextColor(amber) }, marginTop = 2)
         }
+        heading.add(library, LinearLayout.LayoutParams.WRAP_CONTENT)
+        heading.add(Space(context), dp(12), dp(1))
         heading.add(brand, 0, weight = 1f)
         heading.add(menu, LinearLayout.LayoutParams.WRAP_CONTENT)
         root.add(heading)

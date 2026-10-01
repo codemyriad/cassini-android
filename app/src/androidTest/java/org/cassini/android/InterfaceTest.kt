@@ -17,6 +17,7 @@ import org.junit.Test
 import java.io.File
 
 class InterfaceTest {
+    @get:org.junit.Rule val preserveLibrary = PreserveLibraryRule()
     private fun finishExistingScreens() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         instrumentation.runOnMainSync {
@@ -126,9 +127,20 @@ class InterfaceTest {
         val transcript = Transcript(listOf(Word("spk_1", 0, 800, "Ciao"), Word("spk_1", 1500, 2500, "mondo.")), "it")
         store.save(Session(Uri.fromFile(audio).toString(), "Italian sample.wav", transcript, 15840, 500, 3500))
         val scenario = ActivityScenario.launch(MainActivity::class.java)
+        fun awaitSettingsLabel(label: String) {
+            val deadline = android.os.SystemClock.uptimeMillis() + 5000
+            while (android.os.SystemClock.uptimeMillis() < deadline) {
+                var ready = false
+                scenario.onActivity { ready = it.findViewById<TextView>(R.id.settings_button).text.toString() == label }
+                if (ready) return
+                android.os.SystemClock.sleep(50)
+            }
+            fail("Locale recreation should display $label")
+        }
         try {
             scenario.onActivity { AppLanguage.set(it, "en") }
             instrumentation.waitForIdleSync()
+            awaitSettingsLabel("Settings")
             scenario.onActivity { activity ->
                 assertEquals("Settings", activity.findViewById<TextView>(R.id.settings_button).text.toString())
                 assertEquals("Ciao mondo.", activity.findViewById<TextView>(R.id.transcript_text).text.toString())
@@ -136,6 +148,7 @@ class InterfaceTest {
                 AppLanguage.set(activity, "it")
             }
             instrumentation.waitForIdleSync()
+            awaitSettingsLabel("Impostazioni")
             scenario.onActivity { activity ->
                 assertEquals("Impostazioni", activity.findViewById<TextView>(R.id.settings_button).text.toString())
                 assertEquals("Trascrivi di nuovo", activity.findViewById<TextView>(R.id.transcribe_button).text.toString())
@@ -151,6 +164,7 @@ class InterfaceTest {
                 AppLanguage.set(activity, "en")
             }
             instrumentation.waitForIdleSync()
+            awaitSettingsLabel("Settings")
             scenario.onActivity { activity ->
                 assertEquals("Settings", activity.findViewById<TextView>(R.id.settings_button).text.toString())
                 assertEquals("Ciao mondo.", activity.findViewById<TextView>(R.id.transcript_text).text.toString())
