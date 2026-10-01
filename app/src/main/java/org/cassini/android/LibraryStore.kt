@@ -32,6 +32,11 @@ class LibraryStore(private val directory: File) {
         return note.session
     }
 
+    /** Adds a session the catalogue does not hold yet. session.json alone may reference it. */
+    fun adopt(session: Session) {
+        if (session.uri != null && load().none { it.id == session.libraryId || it.session.uri == session.uri }) save(session)
+    }
+
     private fun write(notes: List<LibraryNote>) {
         val json = JSONObject().put("version", 1).put("notes", JSONArray(notes.map { it.json() }))
         val stream = file.startWrite()
@@ -47,17 +52,26 @@ class LibraryStore(private val directory: File) {
         if (marker.exists()) return
         val existing = load()
         val recovered = linkedMapOf<String, LibraryNote>()
-        val currentKey = latest.document?.let { path ->
-            try { CassiniDocument.read(File(path).readBytes()).manifest?.getJSONObject("meeting")?.getString("id") }
+        fun meeting(path: String) = try { CassiniDocument.read(File(path).readBytes()).manifest?.getJSONObject("meeting")?.getString("id") }
             catch (_: Exception) { null }
-        }
+        // Notes saved before this recovery keep their state. Like the current note, each stands for its meeting.
+        val kept = existing.mapNotNull { it.session.document }.filter { it != latest.document }.toSet()
+        val knownKeys = (kept + listOfNotNull(latest.document)).mapNotNull(::meeting).toSet()
         File(directory, "documents").listFiles().orEmpty().filter { it.extension == "opus" }
             .sortedBy { it.lastModified() }.forEach { source ->
                 try {
                     if (source.length() > OggOpus.MAX_FILE_BYTES) return@forEach
                     val doc = CassiniDocument.read(source.readBytes())
+                    val known = existing.firstOrNull { it.session.document == source.absolutePath }?.takeIf { source.absolutePath in kept }
+                    if (known != null) {
+                        // session.json does not carry a document's words, so a note adopted from it has no search text yet.
+                        doc.selected(known.session.selectedVariant)?.transcript?.takeIf { known.text.isEmpty() }?.let {
+                            recovered[known.id] = LibraryNote.update(known, known.session.copy(transcript = it), known.id, known.createdAt)
+                        }
+                        return@forEach
+                    }
                     val key = doc.manifest?.optJSONObject("meeting")?.optString("id")?.takeIf { it.isNotEmpty() } ?: source.name
-                    if (key == currentKey && latest.document != source.absolutePath) return@forEach
+                    if (key in knownKeys && latest.document != source.absolutePath) return@forEach
                     val selected = doc.selected(if (latest.document == source.absolutePath) latest.selectedVariant else null)
                     val session = if (latest.document == source.absolutePath) latest.copy(transcript = selected?.transcript)
                     else Session(uri = Uri.fromFile(source).toString(), document = source.absolutePath,

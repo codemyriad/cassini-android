@@ -174,6 +174,37 @@ class LibraryTest {
         } finally { directory.deleteRecursively() }
     }
 
+    @Test fun migrationKeepsNotesSavedBeforeIt() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val directory = File(context.cacheDir, "library-kept-test").apply { deleteRecursively(); mkdirs() }
+        try {
+            val documents = File(directory, "documents").apply { mkdirs() }
+            val head = "OpusHead".toByteArray() + byteArrayOf(1, 1, 0, 0, -128, -69, 0, 0, 0, 0, 0)
+            val tags = CassiniDocument.tagsPacket(emptyList())
+            val audio = OggOpus.mux(OggOpus.Stream(head, tags, listOf(byteArrayOf(-8, -1, -2)), 960, true), tags)
+            val words = Transcript(listOf(Word("spk_1", 0, 10, "Ciao.")), "it")
+            val first = CassiniDocument.create(audio, words, "First meeting", JSONObject())
+            val old = File(documents, "old.opus").apply { writeBytes(first); setLastModified(100) }
+            val newer = File(documents, "new.opus").apply {
+                writeBytes(CassiniDocument.create(first, words.copy(words = listOf(Word("spk_1", 0, 10, "Nuovo."))), "Ignored", JSONObject(), CassiniDocument.read(first)))
+                setLastModified(200)
+            }
+            val store = LibraryStore(directory)
+            // A viewer saved this note with its state before the library first opened. Another note is current by then.
+            // It came from session.json, which does not carry a document's words.
+            val saved = store.save(Session(uri = Uri.fromFile(old).toString(), name = "First meeting", document = old.absolutePath,
+                selectedVariant = CassiniDocument.read(first).defaultId, positionMs = 5))
+            val before = store.load().single()
+            assertEquals("", before.text)
+            store.migrate(Session(uri = "file:///current.m4a", name = "Current"))
+            val notes = store.load()
+            assertEquals("Only the missing search text is filled in", before.copy(text = "Ciao."), notes.single { it.id == saved.libraryId })
+            assertEquals("Each note needs its own ID", notes.size, notes.map { it.id }.toSet().size)
+            assertTrue("A later revision of a meeting that already has a note stays off the library", notes.none { it.session.document == newer.absolutePath })
+            assertEquals(2, notes.size)
+        } finally { directory.deleteRecursively() }
+    }
+
     @android.annotation.TargetApi(28)
     @androidx.test.filters.SdkSuppress(minSdkVersion = 28)
     @Test fun microphonePauseResumeSavesPlayableAudioAndReopensFromLibrary() {

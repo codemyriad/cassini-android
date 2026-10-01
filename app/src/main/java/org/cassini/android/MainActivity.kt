@@ -30,6 +30,7 @@ import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 import java.util.Locale
+import java.util.UUID
 import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
@@ -52,6 +53,7 @@ class MainActivity : Activity() {
     private val activeForeground = ForegroundColorSpan(DeckViews.ink)
     private var touchingTranscript = false
     private var followCompletedSeeks = false
+    private var screen = ""
 
     override fun attachBaseContext(newBase: Context) = super.attachBaseContext(AppLanguage.wrap(newBase))
 
@@ -71,10 +73,18 @@ class MainActivity : Activity() {
         documents = DocumentStore(this)
         val preferences = sessions.load()
         val noteId = intent.getStringExtra(NOTE_ID)
-        val importing = savedInstanceState == null && intent.getBooleanExtra(REQUEST_IMPORT, false)
+        screen = savedInstanceState?.getString("screen") ?: UUID.randomUUID().toString()
+        val restored = savedInstanceState?.let { state ->
+            val notes = try { library.load() } catch (error: Exception) { Log.e(TAG, "Could not load notes", error); emptyList() }
+            LibraryNote.shown(screen, state.getString(NOTE_ID), state.getString("uri"), preferences, notes)
+        }
+        val importing = intent.getBooleanExtra(REQUEST_IMPORT, false)
+        // A recreated activity keeps its launch intent. It is imported again only while this screen has no note yet.
+        val viewing = restored == null && intent.action == Intent.ACTION_VIEW && intent.data != null
         val selected = when {
-            // An import starts a new note. The last one must not sit behind the file picker.
-            importing -> Session()
+            restored != null -> restored
+            // An import starts a new note. The last one must not sit behind the file picker or the file being opened.
+            importing || viewing -> Session()
             noteId == null -> preferences
             else -> try { library.load().firstOrNull { it.id == noteId }?.session ?: Session() }
                 catch (error: Exception) { Log.e(TAG, "Could not load note", error); Session() }
@@ -124,12 +134,12 @@ class MainActivity : Activity() {
         renderScreen()
         defaultStatus()
         session.uri?.let { preparePlayer(Uri.parse(it)) }
-        session.document?.takeIf { intent.action != Intent.ACTION_VIEW }?.let { path -> runWork(R.string.opening_document) {
+        session.document?.takeIf { !viewing }?.let { path -> runWork(R.string.opening_document) {
             val loaded = CassiniDocument.read(File(path).readBytes())
             onUi { adoptDocument(loaded); renderScreen(); defaultStatus() }
         } }
-        if (intent.action == Intent.ACTION_VIEW) intent.data?.let { importFile(it) }
-        if (importing) chooseFile()
+        if (viewing) intent.data?.let { importFile(it) }
+        if (importing && savedInstanceState == null) chooseFile()
         savedInstanceState?.let { state -> ui.scroll.post { ui.scroll.scrollTo(0, state.getInt("scroll")) } }
     }
 
@@ -234,14 +244,21 @@ class MainActivity : Activity() {
         runWork(R.string.opening_document) {
             val (file, portable) = documents.import(uri)
             onUi {
-                playerReady = false; player?.release(); player = null
-                session = Session(uri = Uri.fromFile(file).toString(), name = name ?: uri.lastPathSegment.orEmpty(), fp32 = session.fp32,
-                    document = file.absolutePath.takeIf { portable.state != "plain-audio" }, selectedVariant = portable.defaultId,
-                    modelChoice = session.modelChoice,
-                    resultPrecision = "")
+                val location = Uri.fromFile(file).toString()
+                // Imports are named by content. Opening a file that is already on screen changes nothing.
+                if (session.uri != location) {
+                    // A file opened before returns to its note, with its position and chosen transcript.
+                    val known = try { library.load().firstOrNull { it.session.uri == location }?.session }
+                        catch (error: Exception) { Log.e(TAG, "Could not load note", error); null }
+                    playerReady = false; player?.release(); player = null
+                    session = (known ?: Session(uri = location, name = name ?: uri.lastPathSegment.orEmpty(),
+                        document = file.absolutePath.takeIf { portable.state != "plain-audio" }, selectedVariant = portable.defaultId,
+                        resultPrecision = "")).copy(fp32 = session.fp32, modelChoice = session.modelChoice)
+                    ui.search.text.clear(); ui.scroll.scrollTo(0, 0)
+                    preparePlayer(Uri.fromFile(file))
+                }
                 adoptDocument(portable.takeIf { it.state != "plain-audio" })
-                ui.search.text.clear(); ui.scroll.scrollTo(0, 0)
-                persistSession(); preparePlayer(Uri.fromFile(file)); renderScreen(); defaultStatus()
+                persistSession(); renderScreen(); defaultStatus()
             }
         }
     }
@@ -610,14 +627,22 @@ class MainActivity : Activity() {
         // Settings can change the model while this activity is stopped or being recreated.
         val preferences = sessions.load()
         session = session.copy(modelChoice = preferences.modelChoice,
-            fp32 = if (preferences.modelChoice == "auto") session.fp32 else preferences.fp32)
-        try { sessions.save(session); session = library.save(session); sessions.save(session) }
-        catch (error: Exception) { Log.e(TAG, "Could not persist session", error); setStatus(R.string.library_error, error = true) }
+            fp32 = if (preferences.modelChoice == "auto") session.fp32 else preferences.fp32, screen = screen)
+        // An empty viewer has nothing to remember, and session.json may hold a session that exists nowhere else.
+        if (session.uri == null) return
+        try {
+            // The session another screen left there, or one from before the notes library, reaches the catalogue before it is replaced.
+            if (preferences.screen != screen) library.adopt(preferences)
+            sessions.save(session); session = library.save(session); sessions.save(session)
+        } catch (error: Exception) { Log.e(TAG, "Could not persist session", error); setStatus(R.string.library_error, error = true) }
     }
     override fun onSaveInstanceState(outState: Bundle) {
         persistSession()
         outState.putString("query", ui.search.text.toString())
         outState.putInt("scroll", ui.scroll.scrollY)
+        outState.putString(NOTE_ID, session.libraryId)
+        outState.putString("uri", session.uri)
+        outState.putString("screen", screen)
         super.onSaveInstanceState(outState)
     }
     private fun updateModelChoice() {

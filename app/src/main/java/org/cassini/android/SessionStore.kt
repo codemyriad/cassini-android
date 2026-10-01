@@ -11,6 +11,8 @@ data class Session(
     val document: String? = null, val selectedVariant: String? = null,
     val modelChoice: String = if (fp32) "fp32" else "int8", val processingMs: Long = 0,
     val libraryId: String? = null,
+    /** The viewer that wrote session.json last. Not part of a note. */
+    val screen: String? = null,
 )
 
 class SessionStore(directory: File) {
@@ -29,6 +31,7 @@ class SessionStore(directory: File) {
                 .takeIf { it in listOf("auto", "int8", "fp32") } ?: "auto",
             processingMs = json.optLong("processingMs"),
             libraryId = json.optString("libraryId").takeIf { it.isNotEmpty() },
+            screen = json.optString("screen").takeIf { it.isNotEmpty() },
         )
     } catch (_: Exception) { Session(modelChoice = "auto") }
 
@@ -40,7 +43,7 @@ class SessionStore(directory: File) {
             .put("resultPrecision", session.resultPrecision)
             .put("document", session.document ?: "").put("selectedVariant", session.selectedVariant ?: "")
             .put("modelChoice", session.modelChoice).put("processingMs", session.processingMs)
-            .put("libraryId", session.libraryId ?: "")
+            .put("libraryId", session.libraryId ?: "").put("screen", session.screen ?: "")
         val stream = file.startWrite()
         try {
             stream.write(json.toString().toByteArray(Charsets.UTF_8))

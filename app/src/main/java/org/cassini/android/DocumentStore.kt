@@ -9,8 +9,9 @@ import java.util.UUID
 /** Owned immutable files: a session points at a document, never at an external recording grant. */
 internal class DocumentStore(private val context: Context) {
     private val directory = File(context.filesDir, "documents").also { it.mkdirs() }
+    /** The owned copy is named by its content, so importing the same file again finds it instead of adding another. */
     fun import(uri: Uri): Pair<File, CassiniDocument> {
-        val source = File(directory, "${UUID.randomUUID()}.input")
+        val source = File(directory, "${UUID.randomUUID()}.part")
         try {
             context.contentResolver.openInputStream(uri).use { input ->
                 requireUser(input != null, Failure.OPEN)
@@ -24,13 +25,11 @@ internal class DocumentStore(private val context: Context) {
                     }
                 }
             }
-            val doc = CassiniDocument.read(source.readBytes())
-            if (doc.state != "plain-audio") {
-                val portable = File(directory, "${UUID.randomUUID()}.opus")
-                check(source.renameTo(portable))
-                return portable to doc
-            }
-            return source to doc
+            val bytes = source.readBytes()
+            val doc = CassiniDocument.read(bytes)
+            val owned = File(directory, "${CassiniPayload.sha(bytes)}.${if (doc.state == "plain-audio") "input" else "opus"}")
+            if (owned.exists()) source.delete() else check(source.renameTo(owned))
+            return owned to doc
         } catch (error: Throwable) { source.delete(); throw error }
     }
     fun create(uri: Uri, audio: PcmAudio, transcript: Transcript, name: String, processing: JSONObject,

@@ -95,6 +95,52 @@ class PortableDocumentTest {
         } finally { scenario.close(); finishScreens(); sessions.save(originalSession) }
     }
 
+    @Test fun viewerKeepsTheSessionItReplaces() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation(); val context = instrumentation.targetContext
+        finishScreens()
+        val sessions = SessionStore(context.filesDir); val originalSession = sessions.load()
+        // Before the notes library, the current recording was referenced by session.json alone.
+        val legacy = Session(uri = "file:///legacy-${System.nanoTime()}.input", name = "Legacy.wav", positionMs = 8500,
+            transcript = Transcript(listOf(Word("spk_1", 0, 100, "Prima.")), "it"))
+        sessions.save(legacy)
+        fun open(file: File) = ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java).setAction(Intent.ACTION_VIEW).setData(Uri.fromFile(file)))
+        fun await(scenario: ActivityScenario<MainActivity>, description: String, condition: (MainActivity) -> Boolean) {
+            val deadline = android.os.SystemClock.uptimeMillis() + 8000
+            while (android.os.SystemClock.uptimeMillis() < deadline) {
+                var ready = false; scenario.onActivity { ready = condition(it) }
+                if (ready) return
+                android.os.SystemClock.sleep(50)
+            }
+            fail(description)
+        }
+        val document = File(context.cacheDir, "replacing-document.opus")
+        try {
+            // A file that cannot be opened leaves an empty viewer, which has nothing to save over that session.
+            open(File(context.cacheDir, "missing-document.opus")).use { scenario ->
+                await(scenario, "A missing file must report that it could not be opened") {
+                    it.findViewById<TextView>(R.id.operation_status).text.toString() == it.getString(R.string.error_open)
+                }
+                scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
+                assertEquals(legacy.uri, sessions.load().uri); assertEquals(8500, sessions.load().positionMs)
+            }
+            // A file that opens replaces the session, once that has reached the catalogue with its state.
+            // A second session, so that nothing the first viewer did can account for it.
+            val replaced = legacy.copy(uri = "file:///legacy-${System.nanoTime()}.input", positionMs = 4200)
+            sessions.save(replaced)
+            val head = "OpusHead".toByteArray() + byteArrayOf(1, 1, 0, 0, -128, -69, 0, 0, 0, 0, 0)
+            val tags = CassiniDocument.tagsPacket(emptyList())
+            val audio = OggOpus.mux(OggOpus.Stream(head, tags, listOf(byteArrayOf(-8, -1, -2)), 960, true), tags)
+            document.writeBytes(CassiniDocument.create(audio, Transcript(listOf(Word("spk_1", 0, 10, "Dopo.")), "it"), "Replacing document", JSONObject()))
+            open(document).use { scenario ->
+                await(scenario, "The document must open") { it.findViewById<TextView>(R.id.transcript_text).text.contains("Dopo.") }
+                scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
+                assertNotEquals(replaced.uri, sessions.load().uri)
+                val kept = LibraryStore(context.filesDir).load().single { it.session.uri == replaced.uri }
+                assertEquals("Prima.", kept.text); assertEquals(4200, kept.session.positionMs)
+            }
+        } finally { finishScreens(); sessions.save(originalSession); document.delete() }
+    }
+
     @android.annotation.TargetApi(33)
     @androidx.test.filters.SdkSuppress(minSdkVersion = 33)
     @Test fun openSaveAndReopenUseDocumentAsAuthority() {
@@ -142,8 +188,63 @@ class PortableDocumentTest {
             assertArrayEquals("Save must preserve every unknown field, variant, tag and audio packet", source.readBytes(), exported.readBytes())
             val saved = sessions.load()
             assertNotNull(saved.document); assertNull("Session cache must not replace the portable body", saved.transcript)
-            scenario.recreate()
-            await("Document body must restore after activity recreation") { it.findViewById<TextView>(R.id.transcript_text).text.contains("Benvenuti.") }
+            fun documents() = File(context.filesDir, "documents").listFiles().orEmpty().map { it.name }.toSet()
+            fun notes() = LibraryStore(context.filesDir).load().count { it.session.uri == saved.uri }
+            fun shows(activity: MainActivity, word: String, clock: String) = activity.findViewById<TextView>(R.id.transcript_text).text.contains(word) &&
+                activity.findViewById<Button>(R.id.export_button).isEnabled && activity.findViewById<TextView>(R.id.playback_position).text.startsWith(clock)
+            fun seek(position: Float) = scenario.onActivity {
+                assertTrue(it.findViewById<android.widget.SeekBar>(R.id.playback_seek).performAccessibilityAction(
+                    android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_PROGRESS.id,
+                    android.os.Bundle().apply { putFloat(android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_PROGRESS_VALUE, position) }))
+            }
+            // The same URI with other content: ActivityScenario stops tracking an activity whose intent changes.
+            fun deliver(bytes: ByteArray) {
+                source.writeBytes(bytes)
+                scenario.onActivity { instrumentation.callActivityOnNewIntent(it, Intent(it.intent)) }
+            }
+            // Another viewer can replace session.json while this one waits to be recreated.
+            fun recreateAfterAnotherViewer(other: Session = Session(uri = "file:///elsewhere.wav", name = "Elsewhere.wav")) {
+                val elsewhere = androidx.test.runner.lifecycle.ActivityLifecycleCallback { activity, stage ->
+                    if (stage == Stage.PRE_ON_CREATE && activity is MainActivity) sessions.save(other)
+                }
+                ActivityLifecycleMonitorRegistry.getInstance().addLifecycleCallback(elsewhere)
+                try { scenario.recreate() } finally { ActivityLifecycleMonitorRegistry.getInstance().removeLifecycleCallback(elsewhere) }
+            }
+            val original = source.readBytes()
+            val imported = documents()
+            assertEquals(1, notes())
+            await("Audio must become ready") { it.findViewById<Button>(R.id.play_button).isEnabled }
+            seek(8500f)
+            await("Seeking must move playback") { shows(it, "Benvenuti.", "00:08") }
+            recreateAfterAnotherViewer()
+            await("The recreated screen must return to its own document and position") { shows(it, "Benvenuti.", "00:08") }
+            assertEquals("Recreation must not import the intent again", imported, documents())
+            assertEquals(1, notes())
+            deliver(CassiniDocument.create(audio.readBytes(), Transcript(listOf(Word("spk_a", 100, 600, "Secondo.")), "it"), "Second document", JSONObject()))
+            await("A new view intent must open its document") { shows(it, "Secondo.", "00:00") }
+            val both = documents()
+            assertEquals(imported.size + 1, both.size)
+            deliver(original)
+            await("A file opened before must return to its note and position") { shows(it, "Benvenuti.", "00:08") }
+            assertEquals("Opening the same file again must reuse its owned copy", both, documents())
+            assertEquals("Opening the same file again must return to its note", 1, notes())
+            seek(3500f)
+            await("Seeking must move playback") { shows(it, "Benvenuti.", "00:03") }
+            deliver(original)
+            await("Opening the file already on screen must leave playback alone") { shows(it, "Benvenuti.", "00:03") }
+            // Retranscription moves the note to a new revision. A recreated viewer stays on it rather than importing its intent again.
+            val revision = File(context.filesDir, "documents/portable-ui-revision.opus")
+            revision.writeBytes(CassiniDocument.create(original, Transcript(listOf(Word("spk_a", 100, 600, "Revisione.")), "it"), "Ignored", JSONObject(), CassiniDocument.read(original)))
+            scenario.onActivity {
+                val field = MainActivity::class.java.getDeclaredField("session").apply { isAccessible = true }
+                field.set(it, (field.get(it) as Session).copy(uri = Uri.fromFile(revision).toString(), document = revision.absolutePath,
+                    selectedVariant = CassiniDocument.read(revision.readBytes()).defaultId))
+            }
+            // The other viewer shows the same file as a different note, at its start.
+            recreateAfterAnotherViewer(Session(uri = Uri.fromFile(revision).toString(), document = revision.absolutePath, name = "Other note", libraryId = "other", screen = "other"))
+            await("A recreated viewer must keep the revision it moved to, as its own note") { shows(it, "Revisione.", "00:03") }
+            assertEquals(Uri.fromFile(revision).toString(), LibraryStore(context.filesDir).load().single { it.id == saved.libraryId }.session.uri)
+            assertEquals(both + revision.name, documents())
             assertTrue(CassiniDocument.read(exported.readBytes()).manifest!!.getJSONObject("x-test").getBoolean("preserve"))
         } finally {
             scenario.close(); finishScreens(); context.getSystemService(android.app.LocaleManager::class.java).applicationLocales = android.os.LocaleList.forLanguageTags(language); sessions.save(originalSession)

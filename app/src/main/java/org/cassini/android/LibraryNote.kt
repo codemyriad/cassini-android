@@ -33,6 +33,20 @@ data class LibraryNote(val id: String, val createdAt: Long, val session: Session
                 resultPrecision = value.optString("resultPrecision")), json.optString("text"))
         }
 
+        /**
+         * The session a recreated viewer returns to. Saved state can predate work that finished
+         * while the viewer was stopped, so session.json wins when that viewer wrote it last.
+         * Otherwise a note is known by its ID, which it keeps when retranscription moves it to
+         * another file. Without a catalogue entry, session.json still counts when it holds that
+         * ID, or the same file under no other ID.
+         */
+        fun shown(screen: String?, id: String?, uri: String?, latest: Session, notes: List<LibraryNote>): Session? {
+            if (screen != null && latest.screen == screen) return latest.takeIf { it.uri != null }
+            if (uri == null) return null
+            val note = if (id != null) notes.firstOrNull { it.id == id } else notes.firstOrNull { it.session.uri == uri }
+            return note?.session ?: latest.takeIf { if (id != null && it.libraryId != null) it.libraryId == id else it.uri == uri }
+        }
+
         fun update(previous: LibraryNote?, session: Session, id: String, now: Long): LibraryNote =
             LibraryNote(id, previous?.createdAt ?: now, session.copy(libraryId = id),
                 session.transcript?.words?.joinToString(" ") { it.text }
