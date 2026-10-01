@@ -29,7 +29,7 @@ internal object OggOpus {
             return hex(hash.digest())
         }
     }
-    fun read(bytes: ByteArray): Stream {
+    fun read(bytes: ByteArray, headersOnly: Boolean = false): Stream {
         require(bytes.size <= MAX_FILE_BYTES)
         val packets = mutableListOf<ByteArray>()
         val partial = ByteArrayOutputStream()
@@ -62,10 +62,14 @@ internal object OggOpus {
                     if ((packets.size == 1 || packets.size == 2) && i != count - 1) valid = false
                 }
             }
+            if (headersOnly && packets.size >= 2) {
+                require(packets[0].startsWith("OpusHead") && packets[1].startsWith("OpusTags"))
+                return Stream(packets[0], packets[1], emptyList(), -1, false)
+            }
             if (flags and 4 != 0) { eos = true; final = i64(bytes, pos + 6) }
             pos = end
         }
-        require(packets.size >= 2 && packets[0].size >= 19 && packets[0].startsWith("OpusHead") && packets[1].startsWith("OpusTags"))
+        require(packets.size >= 2 && packets[0].startsWith("OpusHead") && packets[1].startsWith("OpusTags"))
         return Stream(packets[0], packets[1], packets.drop(2), final, valid && eos && partial.size() == 0)
     }
     fun mux(stream: Stream, tags: ByteArray): ByteArray {

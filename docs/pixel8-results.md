@@ -51,3 +51,17 @@ The phone-generated body validates against the published Cassini schema. Timing/
 Explicit seeking now brings the highlighted word into view even while paused. The slider and ±10-second buttons follow the player’s completed seek, including a seek within the currently highlighted word. Restoring a paused session and ordinary manual reading do not trigger scrolling. The device regression check exercises these cases on a transcript longer than the viewport.
 
 Six device tests and ten JVM tests pass, with a successful debug build and no lint errors. The actual app imported the three-minute file through Android's picker and transcribed it in 37.679 seconds (another uncontrolled run). Manual paused jumps between early and late passages show the highlighted word in view while the Play button remains paused. This recording and its 492-word transcript are left loaded on the Pixel with INT8 selected; both model bundles remain installed.
+
+## Complete Cassini documents (0.3)
+
+Cassini is now the persisted document. Recognition creates a sealed `.opus` file automatically; the native viewer opens it without a model or another ASR run. Save copies the full artifact, and activity/session restoration reads the selected body from that artifact rather than from a cached word JSON.
+
+Validation on this Pixel:
+
+- Fifteen JVM tests pass, including all 26 published conformance vectors, strict payload boundaries, variant/extension preservation, CRC failures and readable metadata after truncated audio.
+- Ten distinct device checks pass across focused runs: the existing three audio/ASR tests, two interface tests, settings, and four portable-document tests. The latter cover actual Parakeet → document creation, native open/save/reopen, multiple variants/speaker labels, exact saved-byte preservation, native encoding speech onset/tail, and three-minute Opus EOS trimming at the ASR limit.
+- The new 30-second activity-generated INT8 document contains 87 words and exactly 1,440,000 playable 48 kHz samples. The independent extractor and public manifest schema pass; the independent audio digest and shape match the embedded integrity record.
+- The phone's existing three-minute FP32 session (495 words) was migrated without another recognition run. Its saved document has 8,640,000 playable samples / 180,000 ms and is 1,355,601 bytes. Manifest and word schemas, payload checksums, exact audio digest/shape and the sibling web viewer's actual portable reader/word adapter all pass.
+- The three-minute sample is saved in Downloads as `cassini-italian-28-208.opus`, with its original WAV retained. Both model downloads remain installed. Encoding uses Android's platform Opus codec; no native codec library or external conversion service is needed on this Pixel.
+
+The supplied audio and generated artifacts remain local ignored files. The updated APK restores the Italian three-minute document with FP32 selected. Display transcripts, annotations and other unsupported metadata survive unchanged saves but are not rendered yet; microphone capture, new diarization, background jobs and a document history browser remain future work.

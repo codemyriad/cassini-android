@@ -81,8 +81,9 @@ class InterfaceTest {
             scenario.onActivity { activity ->
                 assertEquals("Paused playback must leave manual scrolling alone", 0, activity.findViewById<ScrollView>(R.id.content_scroll).scrollY)
                 val seek = activity.findViewById<SeekBar>(R.id.playback_seek)
+                // A different position within the same word: Android ignores no-op progress actions.
                 assertTrue(seek.performAccessibilityAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_PROGRESS.id,
-                    android.os.Bundle().apply { putFloat(AccessibilityNodeInfo.ACTION_ARGUMENT_PROGRESS_VALUE, 11000f) }))
+                    android.os.Bundle().apply { putFloat(AccessibilityNodeInfo.ACTION_ARGUMENT_PROGRESS_VALUE, 10500f) }))
             }
             awaitCondition("Seeking while paused should reveal the final word, even when it stays highlighted") {
                 wordVisible(it, first = false)
@@ -138,7 +139,7 @@ class InterfaceTest {
             scenario.onActivity { activity ->
                 assertEquals("Impostazioni", activity.findViewById<TextView>(R.id.settings_button).text.toString())
                 assertEquals("Trascrivi di nuovo", activity.findViewById<TextView>(R.id.transcribe_button).text.toString())
-                assertEquals("Esporta", activity.findViewById<TextView>(R.id.export_button).text.toString())
+                assertEquals("Salva Cassini", activity.findViewById<TextView>(R.id.export_button).text.toString())
                 assertEquals("Ciao mondo.", activity.findViewById<TextView>(R.id.transcript_text).text.toString())
                 assertEquals("2 parole · 00:15 · INT8", activity.findViewById<TextView>(R.id.transcript_details).text.toString())
                 assertTrue(activity.findViewById<TextView>(R.id.playback_position).text.toString().contains("00:03"))

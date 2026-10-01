@@ -1,6 +1,6 @@
 <resources>
     <string name="app_name">Cassini</string>
-    <string name="prototype_badge">PROTOTIPO / 02</string>
+    <string name="prototype_badge">PROTOTIPO / 03</string>
     <string name="settings">Impostazioni</string>
     <string name="settings_general">Generali</string>
     <string name="settings_transcription">Trascrizione</string>
@@ -11,7 +11,7 @@
     <string name="model_installed">installato</string>
     <string name="model_download_needed">da scaricare</string>
     <string name="app_version">Cassini · versione %1$s</string>
-    <string name="open_audio">Apri audio</string>
+    <string name="open_audio">Apri file</string>
     <string name="change_audio">Cambia file</string>
     <string name="transcribe">Trascrivi</string>
     <string name="transcribe_again">Trascrivi di nuovo</string>
@@ -31,12 +31,12 @@
     <string name="transcribing">Trascrizione in corso… tieni aperta l’app.</string>
     <string name="file_ready">Pronto quando vuoi.</string>
     <string name="transcript">TRASCRIZIONE</string>
-    <string name="export">Esporta</string>
-    <string name="export_description">Salva la trascrizione come JSON Cassini</string>
-    <string name="saving">Salvataggio della trascrizione…</string>
-    <string name="saved">Trascrizione salvata. L’audio non è incluso.</string>
+    <string name="export">Salva Cassini</string>
+    <string name="export_description">Salva audio, parole con tempi e metadati in un documento Cassini Opus</string>
+    <string name="saving">Salvataggio del documento Cassini…</string>
+    <string name="saved">Cassini salvato · audio e trascrizione insieme.</string>
     <string name="empty_title">Carica un nastro.</string>
-    <string name="empty_hint">WAV, MP3, M4A o Opus. Fino a 3 minuti.\nUna registrazione. Parole e tempi. Tutto in locale.</string>
+    <string name="empty_hint">Apri un documento Cassini, oppure trascrivi WAV, MP3, M4A o Opus.\nFino a 3 minuti per la trascrizione. Tutto sul telefono.</string>
     <string name="loaded_title">Sentiamo cosa dice.</string>
     <string name="loaded_hint">Tocca Trascrivi per ottenere parole e tempi da questa registrazione.</string>
     <string name="no_speech">Nessun parlato riconosciuto.</string>
@@ -95,4 +95,21 @@
     <string name="error_unknown">Qualcosa non ha funzionato. Riprova.</string>
     <string name="error_playback">Riproduzione non disponibile per questo file.</string>
     <string name="busy_description">Elaborazione in corso</string>
+    <string name="error_opus_encoder">Questo telefono non ha un codificatore Opus. La creazione di file Cassini richiede Android 10 o successivo. Puoi comunque aprire documenti esistenti.</string>
+    <string name="opening_document">Apertura del file…</string>
+    <string name="packaging_document">Creazione Cassini · audio + parole con tempi…</string>
+    <string name="cassini_document">CASSINI / AUDIO + TRASCRIZIONE</string>
+    <string name="document_info">Info</string>
+    <string name="choose_transcript">Scegli trascrizione</string>
+    <string name="selected_transcript">Trascrizione · %1$s ▾</string>
+    <string name="variant_unavailable">Trascrizione non disponibile</string>
+    <string name="variant_unavailable_hint">Puoi comunque ascoltare l’audio. Prova un’altra trascrizione, se presente nel documento.</string>
+    <string name="document_verified">Cassini · audio verificato</string>
+    <string name="document_unverified">Cassini · audio non verificato. I tempi delle parole potrebbero non corrispondere.</string>
+    <string name="document_stale">Cassini · audio diverso da quello della trascrizione. I tempi potrebbero non corrispondere.</string>
+    <string name="document_invalid">I metadati Cassini sono danneggiati. Puoi comunque ascoltare l’audio.</string>
+    <string name="document_unknown">Questa versione Cassini non è supportata. Puoi comunque ascoltare l’audio.</string>
+    <string name="document_contents">%1$d trascrizioni · %2$d voci\nIl salvataggio conserva tutti i metadati del documento.</string>
+    <string name="document_processing">Elaborazione della trascrizione</string>
+    <string name="unknown_speaker">Voce sconosciuta · %1$s</string>
 </resources>

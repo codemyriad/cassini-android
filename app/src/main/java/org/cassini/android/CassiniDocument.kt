@@ -31,7 +31,10 @@ internal data class CassiniDocument(
         private val fields = linkedMapOf("mime" to "MIME", "encoding" to "ENCODING", "chunkCount" to "CHUNK_COUNT",
             "sha256" to "SHA256", "rawBytes" to "RAW_BYTES", "gzipBytes" to "GZIP_BYTES")
         fun read(bytes: ByteArray): CassiniDocument {
-            val stream = try { OggOpus.read(bytes) } catch (_: Exception) { return CassiniDocument("plain-audio") }
+            val stream = try { OggOpus.read(bytes) } catch (_: Exception) {
+                // Audio corruption must not conceal an otherwise intact manifest/transcript.
+                try { OggOpus.read(bytes, headersOnly = true) } catch (_: Exception) { return CassiniDocument("plain-audio") }
+            }
             val comments = try { readComments(stream.tags) } catch (_: Exception) { return CassiniDocument("invalid-cassini-metadata") }
             val tags = linkedMapOf<String, String>()
             val duplicates = mutableListOf<String>()
@@ -196,8 +199,9 @@ internal data class CassiniDocument(
                 .put("reason", "No speaker diarization").put("wordsMeasured", 0).put("wordsFlagged", 0).put("wordsDropped", 0))
             val comments = (existing?.comments ?: readComments(stream.tags)).filterNot {
                 val name = it.substringBefore('=').uppercase(Locale.ROOT)
-                name == "CASSINI_FORMAT" || name == "CASSINI_PROFILE" || name.startsWith(MANIFEST_PREFIX) ||
-                    name in setOf("CASSINI_TRANSCRIPT_IDS", "CASSINI_TRANSCRIPT_DEFAULT", "CASSINI_DECODE_HINT", "CASSINI_SPEAKER_COUNT", "CASSINI_MEETING_ID", "CASSINI_CREATED_AT") || name.startsWith("CASSINI_AUDIO_")
+                name == "CASSINI_FORMAT" || name == "CASSINI_PROFILE" || name == "CASSINI_PAYLOAD_SCHEMA" ||
+                    name in fields.values.map { MANIFEST_PREFIX + it } || name.matches(Regex("CASSINI_PAYLOAD_[0-9]+")) ||
+                    name in setOf("CASSINI_TRANSCRIPT_IDS", "CASSINI_TRANSCRIPT_DEFAULT", "CASSINI_DECODE_HINT", "CASSINI_SPEAKER_COUNT", "CASSINI_MEETING_ID", "CASSINI_CREATED_AT") || name in setOf("CASSINI_AUDIO_SAMPLE_RATE", "CASSINI_AUDIO_CHANNELS", "CASSINI_AUDIO_SAMPLE_COUNT", "CASSINI_AUDIO_DURATION_MS", "CASSINI_AUDIO_MATCH_POLICY", "CASSINI_AUDIO_OPUS_SHA256")
             }.toMutableList()
             comments += listOf("CASSINI_FORMAT=$FORMAT", "CASSINI_PROFILE=ogg-opus",
                 "CASSINI_PAYLOAD_SCHEMA=https://format.gocassini.com/schema/cassini-portable-meeting-manifest-v1.schema.json",

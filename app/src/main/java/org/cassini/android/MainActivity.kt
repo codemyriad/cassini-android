@@ -1,6 +1,7 @@
 package org.cassini.android
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.graphics.Rect
@@ -35,6 +36,8 @@ class MainActivity : Activity() {
     private lateinit var models: ModelStore
     private lateinit var sessions: SessionStore
     private var session = Session()
+    private var document: CassiniDocument? = null
+    private lateinit var documents: DocumentStore
     private var player: MediaPlayer? = null
     private var playerReady = false
     private var busy = false
@@ -56,15 +59,18 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         sessions = SessionStore(filesDir)
+        documents = DocumentStore(this)
         session = sessions.load()
         models = modelStore(session.fp32)
         ui = DeckViews(this)
         setContentView(ui.root)
         ui.menu.setOnClickListener { showSettings() }
-        ui.open.setOnClickListener { chooseAudio() }
+        ui.open.setOnClickListener { chooseFile() }
         ui.transcribe.setOnClickListener { transcribe() }
         ui.download.setOnClickListener { downloadModel() }
-        ui.export.setOnClickListener { exportTranscript() }
+        ui.export.setOnClickListener { saveCassiniDocument() }
+        ui.documentInfo.setOnClickListener { showDocumentInfo() }
+        ui.variant.setOnClickListener { chooseVariant() }
         ui.play.setOnClickListener {
             if (playerReady) player?.let {
                 if (it.isPlaying) it.pause() else { it.start(); renderTranscript() }
@@ -97,16 +103,21 @@ class MainActivity : Activity() {
         renderScreen()
         defaultStatus()
         session.uri?.let { preparePlayer(Uri.parse(it)) }
+        session.document?.takeIf { intent.action != Intent.ACTION_VIEW }?.let { path -> runWork(R.string.opening_document) {
+            val loaded = CassiniDocument.read(File(path).readBytes())
+            onUi { adoptDocument(loaded); renderScreen(); defaultStatus() }
+        } }
+        if (intent.action == Intent.ACTION_VIEW) intent.data?.let { importFile(it) }
         savedInstanceState?.let { state -> ui.scroll.post { ui.scroll.scrollTo(0, state.getInt("scroll")) } }
     }
 
     private fun modelStore(fp32: Boolean) = ModelStore(File(filesDir, if (fp32) "parakeet-v3-fp32" else "parakeet-v3"), fp32)
 
-    private fun chooseAudio() {
+    private fun chooseFile() {
         startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-            type = "audio/*"; addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"; putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("audio/*", "application/ogg")); addCategory(Intent.CATEGORY_OPENABLE)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
-        }, OPEN_AUDIO)
+        }, OPEN_FILE)
     }
 
     private fun downloadModel() = runWork(R.string.preparing_download) {
@@ -140,10 +151,15 @@ class MainActivity : Activity() {
                     .put("wordTimings", "TDT token-derived; punctuation excluded from word ends; no acoustic bounding")
                     .toString(2))
             } catch (error: IOException) { Log.e(TAG, "Could not cache processing artifacts", error) }
+            onUi { setStatus(R.string.packaging_document) }
+            val (file, portable) = documents.create(uri, audio, transcript, session.name, processing(chosenModel.precision, chosenModel.revision), document)
             onUi {
-                session = session.copy(transcript = transcript, durationMs = audio.durationMs,
-                    inferenceMs = elapsed, resultPrecision = chosenModel.precision)
-                highlightedWord = -1
+                val position = if (playerReady) player?.currentPosition ?: session.positionMs else session.positionMs
+                session = session.copy(uri = Uri.fromFile(file).toString(), document = file.absolutePath,
+                    name = "${session.name.substringBeforeLast('.')}.opus", selectedVariant = portable.defaultId,
+                    durationMs = audio.durationMs, inferenceMs = elapsed, resultPrecision = chosenModel.precision, positionMs = position)
+                adoptDocument(portable)
+                preparePlayer(Uri.fromFile(file))
                 persistSession()
                 renderScreen()
                 defaultStatus()
@@ -151,13 +167,107 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun exportTranscript() {
-        if (session.transcript == null) return
+    private fun processing(precision: String, revision: String? = null): JSONObject = JSONObject()
+        .put("backend", "sherpa-onnx").put("engine", "Parakeet TDT")
+        .put("model", "nvidia/parakeet-tdt-0.6b-v3 $precision")
+        .put("device", "Android CPU").put("language", "it")
+        .put("source", "recording").put("version", "sherpa-onnx 1.13.7${revision?.let { "; model revision $it" }.orEmpty()}")
+
+    private fun saveCassiniDocument() {
+        if (session.document == null) {
+            val transcript = session.transcript ?: return
+            val uri = session.uri?.let(Uri::parse) ?: return
+            // Migrate prototype sessions without running speech recognition again.
+            runWork(R.string.packaging_document) {
+                val audio = AudioDecoder.decode(this, uri)
+                val (file, portable) = documents.create(uri, audio, transcript, session.name, processing(session.resultPrecision), null)
+                onUi {
+                    val position = if (playerReady) player?.currentPosition ?: session.positionMs else session.positionMs
+                    session = session.copy(uri = Uri.fromFile(file).toString(), document = file.absolutePath,
+                        name = "${session.name.substringBeforeLast('.')}.opus", selectedVariant = portable.defaultId, positionMs = position)
+                    adoptDocument(portable); preparePlayer(Uri.fromFile(file)); persistSession(); renderScreen(); defaultStatus()
+                    saveDocumentPicker()
+                }
+            }
+        } else saveDocumentPicker()
+    }
+
+    private fun saveDocumentPicker() {
         startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-            type = "application/json"; addCategory(Intent.CATEGORY_OPENABLE)
-            val name = session.name.ifBlank { getString(R.string.recording) }
-            putExtra(Intent.EXTRA_TITLE, "${name.substringBeforeLast('.')}.words.json")
-        }, SAVE_WORDS)
+            type = "audio/ogg"; addCategory(Intent.CATEGORY_OPENABLE)
+            putExtra(Intent.EXTRA_TITLE, "${session.name.ifBlank { getString(R.string.recording) }.substringBeforeLast('.')}.opus")
+        }, SAVE_DOCUMENT)
+    }
+
+    private fun importFile(uri: Uri) {
+        if (busy) return
+        val name = try { contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
+            if (it.moveToFirst()) it.getString(0) else null
+        } } catch (_: Exception) { null }
+        runWork(R.string.opening_document) {
+            val (file, portable) = documents.import(uri)
+            onUi {
+                playerReady = false; player?.release(); player = null
+                session = Session(uri = Uri.fromFile(file).toString(), name = name ?: uri.lastPathSegment.orEmpty(), fp32 = session.fp32,
+                    document = file.absolutePath.takeIf { portable.state != "plain-audio" }, selectedVariant = portable.defaultId,
+                    resultPrecision = "")
+                adoptDocument(portable.takeIf { it.state != "plain-audio" })
+                ui.search.text.clear(); ui.scroll.scrollTo(0, 0)
+                sessions.save(session); preparePlayer(Uri.fromFile(file)); renderScreen(); defaultStatus()
+            }
+        }
+    }
+
+    private fun adoptDocument(portable: CassiniDocument?) {
+        document = portable
+        if (portable != null) {
+            val selected = portable.selected(session.selectedVariant)
+            session = session.copy(transcript = selected?.transcript, selectedVariant = selected?.id)
+        }
+        highlightedWord = -1
+    }
+
+    private fun chooseVariant() {
+        val portable = document ?: return
+        val labels = portable.variants.map { variant ->
+            val words = variant.transcript?.words?.size
+            "${variant.id} · ${variant.descriptor.optString("language")}" + if (words == null) " · ${getString(R.string.variant_unavailable)}"
+                else " · ${resources.getQuantityString(R.plurals.word_count, words, words)}"
+        }.toTypedArray()
+        AlertDialog.Builder(this).setTitle(R.string.choose_transcript)
+            .setSingleChoiceItems(labels, portable.variants.indexOfFirst { it.id == session.selectedVariant }) { dialog, index ->
+                session = session.copy(selectedVariant = portable.variants[index].id)
+                adoptDocument(portable); persistSession(); renderScreen(); defaultStatus(); dialog.dismiss()
+            }.setNegativeButton(android.R.string.cancel, null).show()
+    }
+
+    private fun showDocumentInfo() {
+        val portable = document ?: return
+        val content = buildString {
+            append(getString(trustResource(portable.state)))
+            portable.manifest?.let { manifest ->
+                append("\n\n"); append(manifest.getJSONObject("meeting").optString("title"))
+                append("\n"); append(manifest.getJSONObject("meeting").optString("createdAtUtc"))
+                append("\n\n"); append(getString(R.string.document_contents, portable.variants.size, manifest.getJSONArray("speakers").length()))
+                manifest.optJSONObject("provenance")?.optJSONObject("speechToText")?.optJSONObject(session.selectedVariant.orEmpty())?.let { step ->
+                    append("\n\n"); append(getString(R.string.document_processing))
+                    for (key in listOf("engine", "model", "backend", "device", "language", "version")) {
+                        step.optString(key).takeIf { it.isNotEmpty() }?.let { append("\n"); append(it) }
+                    }
+                }
+            }
+            if (portable.selected(session.selectedVariant)?.error != null) { append("\n\n"); append(getString(R.string.variant_unavailable_hint)) }
+        }
+        AlertDialog.Builder(this).setTitle(R.string.document_info).setMessage(content)
+            .setPositiveButton(android.R.string.ok, null).show()
+    }
+
+    private fun trustResource(state: String) = when (state) {
+        "ok" -> R.string.document_verified
+        "stale-audio" -> R.string.document_stale
+        "invalid-cassini-metadata" -> R.string.document_invalid
+        "unknown-cassini-format" -> R.string.document_unknown
+        else -> R.string.document_unverified
     }
 
     private fun runWork(message: Int, action: () -> Unit) {
@@ -204,6 +314,7 @@ class MainActivity : Activity() {
     }
     private fun defaultStatus() {
         when {
+            document != null -> setStatus(trustResource(document!!.state))
             session.transcript != null -> setStatus(R.string.inference_time, session.inferenceMs / 1000.0)
             session.uri != null -> setStatus(R.string.file_ready)
             else -> ui.status.text = ""
@@ -217,9 +328,11 @@ class MainActivity : Activity() {
         ui.download.visibility = if (ready) View.GONE else View.VISIBLE
         ui.menu.isEnabled = !busy
         ui.open.isEnabled = !busy
-        ui.transcribe.isEnabled = !busy && session.uri != null && ready
+        ui.transcribe.isEnabled = !busy && session.uri != null && ready && (document == null || document?.state == "ok")
         ui.download.isEnabled = !busy
-        ui.export.isEnabled = !busy && session.transcript != null
+        ui.export.isEnabled = !busy && (session.document != null || session.transcript != null)
+        ui.documentInfo.isEnabled = !busy
+        ui.variant.isEnabled = !busy
         ui.play.isEnabled = playerReady
         ui.seek.isEnabled = playerReady
         ui.back.isEnabled = playerReady
@@ -229,8 +342,16 @@ class MainActivity : Activity() {
     }
 
     private fun renderScreen() {
-        ui.filename.text = session.name.ifBlank { getString(R.string.no_file) }
-        ui.caption.text = getString(R.string.voice_caption, getString(R.string.italian))
+        ui.filename.text = document?.title?.takeIf { it.isNotBlank() } ?: session.name.ifBlank { getString(R.string.no_file) }
+        ui.caption.text = if (document == null) getString(R.string.voice_caption, getString(R.string.italian)) else "${getString(R.string.cassini_document)}\n${session.name}"
+        ui.trust.visibility = if (document == null) View.GONE else View.VISIBLE
+        document?.let {
+            ui.trust.setText(trustResource(it.state))
+            ui.trust.setTextColor(if (it.state == "ok") DeckViews.amber else DeckViews.warning)
+        }
+        ui.documentInfo.visibility = if (document == null) View.GONE else View.VISIBLE
+        ui.variant.visibility = if ((document?.variants?.size ?: 0) > 1) View.VISIBLE else View.GONE
+        ui.variant.text = getString(R.string.selected_transcript, session.selectedVariant.orEmpty())
         ui.open.setText(if (session.uri == null) R.string.open_audio else R.string.change_audio)
         ui.transcribe.setText(if (session.transcript == null) R.string.transcribe else R.string.transcribe_again)
         ui.seek.max = session.durationMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
@@ -240,19 +361,21 @@ class MainActivity : Activity() {
         transcript?.let {
             ui.details.text = getString(R.string.transcript_details,
                 resources.getQuantityString(R.plurals.word_count, it.words.size, it.words.size),
-                clock(session.durationMs), session.resultPrecision)
+                clock(session.durationMs), if (document == null) session.resultPrecision else session.selectedVariant.orEmpty())
         }
         val hasWords = transcript?.words?.isNotEmpty() == true
         ui.searchRow.visibility = if (hasWords) View.VISIBLE else View.GONE
-        ui.voice.visibility = if (hasWords) View.VISIBLE else View.GONE
+        ui.voice.visibility = if (hasWords && document == null) View.VISIBLE else View.GONE
         ui.transcript.visibility = if (hasWords) View.VISIBLE else View.GONE
         ui.empty.visibility = if (hasWords) View.GONE else View.VISIBLE
         ui.emptyTitle.setText(when {
+            document != null && transcript == null -> R.string.variant_unavailable
             transcript != null -> R.string.no_speech
             session.uri != null -> R.string.loaded_title
             else -> R.string.empty_title
         })
         ui.emptyHint.setText(when {
+            document != null && transcript == null -> R.string.variant_unavailable_hint
             transcript != null -> R.string.no_speech_hint
             session.uri != null -> R.string.loaded_hint
             else -> R.string.empty_hint
@@ -283,6 +406,9 @@ class MainActivity : Activity() {
             if (index > 0) {
                 val previous = words[index - 1]
                 builder.append(if (previous.speaker != word.speaker || previous.text.lastOrNull() in listOf('.', '?', '!')) "\n\n" else " ")
+            }
+            if (document != null && (index == 0 || words[index - 1].speaker != word.speaker)) {
+                builder.append(document?.speakerLabel(word.speaker)?.takeUnless { it == word.speaker } ?: getString(R.string.unknown_speaker, word.speaker)).append("\n")
             }
             val start = builder.length
             builder.append(word.text)
@@ -356,25 +482,12 @@ class MainActivity : Activity() {
         if (resultCode != RESULT_OK) return
         val uri = data?.data ?: return
         when (requestCode) {
-            OPEN_AUDIO -> {
-                try { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-                catch (_: SecurityException) { /* A provider may offer only a temporary grant. */ }
-                val name = try { contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
-                    if (it.moveToFirst()) it.getString(0) else null
-                } } catch (_: Exception) { null }
-                session = Session(uri = uri.toString(), name = name.orEmpty(), fp32 = session.fp32)
-                highlightedWord = -1
-                ui.search.text.clear()
-                renderScreen()
-                defaultStatus()
-                persistSession()
-                preparePlayer(uri)
-            }
-            SAVE_WORDS -> {
-                val json = session.transcript?.json() ?: return
+            OPEN_FILE -> importFile(uri)
+            SAVE_DOCUMENT -> {
+                val path = session.document ?: return
                 runWork(R.string.saving) {
                     val output = contentResolver.openOutputStream(uri, "wt") ?: throw UserFacingException(Failure.SAVE)
-                    output.bufferedWriter().use { it.write(json) }
+                    output.use { sink -> File(path).inputStream().use { it.copyTo(sink) } }
                     onUi { setStatus(R.string.saved) }
                 }
             }
@@ -396,8 +509,8 @@ class MainActivity : Activity() {
         media.setOnPreparedListener {
             if (isDestroyed || player !== media) return@setOnPreparedListener
             playerReady = true
-            session = session.copy(durationMs = it.duration.toLong())
-            ui.seek.max = it.duration
+            session = session.copy(durationMs = if (document?.state == "ok") document!!.manifest!!.getJSONObject("audio").getLong("durationMs") else it.duration.toLong())
+            ui.seek.max = session.durationMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
             it.seekTo(session.positionMs.coerceIn(0, it.duration))
             refreshControls()
         }
@@ -429,6 +542,12 @@ class MainActivity : Activity() {
             followCompletedSeeks = true
             it.seekTo(position.coerceIn(0, it.duration))
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.action == Intent.ACTION_VIEW) intent.data?.let { importFile(it) }
     }
 
     private fun showSettings() {
@@ -470,5 +589,5 @@ class MainActivity : Activity() {
         super.onDestroy()
     }
     private fun clock(ms: Long) = String.format(Locale.ROOT, "%02d:%02d", ms / 60000, ms / 1000 % 60)
-    companion object { const val OPEN_AUDIO = 1; const val SAVE_WORDS = 2; private const val TAG = "Cassini" }
+    companion object { const val OPEN_FILE = 1; const val SAVE_DOCUMENT = 2; private const val TAG = "Cassini" }
 }

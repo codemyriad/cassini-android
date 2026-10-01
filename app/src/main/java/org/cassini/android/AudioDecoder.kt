@@ -95,6 +95,9 @@ object AudioDecoder {
         var decoder: MediaCodec? = null
         var started = false
         try {
+            // Android's Opus decoder removes pre-skip but can expose the final frame's padding.
+            // Trust the independently verified Ogg EOS sample count, not codec buffer length.
+            val opusSamples = try { OggOpus.read(file.readBytes()).also { it.digest() }.sampleCount } catch (_: Exception) { null }
             extractor.setDataSource(file.absolutePath)
             val track = (0 until extractor.trackCount).firstOrNull {
                 extractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true
@@ -102,7 +105,7 @@ object AudioDecoder {
             extractor.selectTrack(track)
             val format = extractor.getTrackFormat(track)
             if (format.containsKey(MediaFormat.KEY_DURATION)) {
-                requireUser(format.getLong(MediaFormat.KEY_DURATION) <= MAX_SECONDS * 1_000_000L, Failure.LONG)
+                requireUser((opusSamples?.let { it * 1_000_000 / 48000 } ?: format.getLong(MediaFormat.KEY_DURATION)) <= MAX_SECONDS * 1_000_000L, Failure.LONG)
             }
             val mime = requireNotNull(format.getString(MediaFormat.KEY_MIME))
             val codec = MediaCodec.createDecoderByType(mime)
@@ -161,10 +164,11 @@ object AudioDecoder {
                                 requireUser(info.size % (sampleBytes * channels) == 0, Failure.AUDIO)
                                 val frames = info.size / (sampleBytes * channels)
                                 // Keep real container gaps as silence. The player and words share a zero origin.
-                                requireUser(info.presentationTimeUs <= MAX_SECONDS * 1_000_000L, Failure.LONG)
+                                requireUser(info.presentationTimeUs <= MAX_SECONDS * 1_000_000L + (if (opusSamples != null) 120_000 else 0), Failure.LONG)
                                 val firstFrame = (info.presentationTimeUs.coerceAtLeast(0) * sampleRate / 1_000_000).toInt()
-                                requireUser(firstFrame.toLong() + frames <= destination.size, Failure.LONG)
-                                repeat(frames) { frame ->
+                                val playableFrames = opusSamples?.let { minOf(frames.toLong(), (it * sampleRate / 48000 - firstFrame).coerceAtLeast(0)).toInt() } ?: frames
+                                requireUser(playableFrames == 0 || firstFrame.toLong() + playableFrames <= destination.size, Failure.LONG)
+                                repeat(playableFrames) { frame ->
                                     var sum = 0f
                                     repeat(channels) {
                                         val sample = if (sampleBytes == 4) buffer.float else buffer.short / 32768f
@@ -173,7 +177,7 @@ object AudioDecoder {
                                     }
                                     destination[firstFrame + frame] = sum / channels
                                 }
-                                count = maxOf(count, firstFrame + frames)
+                                if (playableFrames > 0) count = maxOf(count, firstFrame + playableFrames)
                             }
                             outputEnded = info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0
                             lastProgress = System.nanoTime()

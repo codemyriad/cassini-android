@@ -7,7 +7,7 @@ enum class Failure(val stringRes: Int) {
     MODEL(R.string.error_model), SPACE(R.string.error_space), DOWNLOAD(R.string.error_download),
     VERIFY(R.string.error_verify), INSTALL(R.string.error_install), SAVE(R.string.error_save),
     MEMORY(R.string.error_memory), CANCELLED(R.string.error_cancelled), UNKNOWN(R.string.error_unknown),
-    PLAYBACK(R.string.error_playback),
+    PLAYBACK(R.string.error_playback), OPUS_ENCODER(R.string.error_opus_encoder),
 }
 
 /** Keep stable failure codes separate from localized copy and native diagnostic messages. */

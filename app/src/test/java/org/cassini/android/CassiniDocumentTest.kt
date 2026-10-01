@@ -37,10 +37,12 @@ class CassiniDocumentTest {
         val original = CassiniDocument.read(bytes)
         assertEquals("ok", original.state); assertEquals(transcript, original.selected(null)?.transcript)
         assertTrue(original.comments.contains("X_CUSTOM=keep=me"))
+        val withPrivate = original.copy(comments = original.comments + listOf("CASSINI_AUDIO_FUTURE=keep", "CASSINI_PAYLOAD_FUTURE=keep"))
         original.manifest!!.put("extension", JSONObject().put("keep", true))
         original.manifest.getJSONArray("speakers").getJSONObject(0).put("pronouns", "they")
-        val next = CassiniDocument.read(CassiniDocument.create(bytes, transcript.copy(language = "en"), "Ignored", JSONObject(), original))
+        val next = CassiniDocument.read(CassiniDocument.create(bytes, transcript.copy(language = "en"), "Ignored", JSONObject(), withPrivate))
         assertEquals("ok", next.state); assertEquals(2, next.variants.size)
+        assertTrue(next.comments.contains("CASSINI_AUDIO_FUTURE=keep")); assertTrue(next.comments.contains("CASSINI_PAYLOAD_FUTURE=keep"))
         assertTrue(next.manifest!!.getJSONObject("extension").getBoolean("keep"))
         assertEquals("they", next.manifest.getJSONArray("speakers").getJSONObject(0).getString("pronouns"))
         assertEquals(original.variants[0].body, next.variants[0].body)
@@ -56,6 +58,12 @@ class CassiniDocumentTest {
         val compressed = java.util.Base64.getUrlDecoder().decode(chunk)
         val extra = java.util.Base64.getUrlEncoder().encodeToString(compressed + compressed)
         try { CassiniPayload.decode(listOf(extra), ref.getLong("rawBytes"), compressed.size * 2L, ref.getString("sha256")); fail() } catch (_: IllegalArgumentException) {}
+    }
+    @Test fun truncatedAudioKeepsReadableMetadata() {
+        val bytes = CassiniDocument.create(silence(), Transcript(emptyList()), "Truncated", JSONObject())
+        val doc = CassiniDocument.read(bytes.copyOf(bytes.size - 1))
+        assertEquals("unverified", doc.state)
+        assertNotNull(doc.selected(null)?.transcript)
     }
     @Test fun crcFailureKeepsTranscriptButDoesNotVerifyAudio() {
         val bytes = CassiniDocument.create(silence(), Transcript(emptyList()), "CRC", JSONObject())

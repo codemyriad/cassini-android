@@ -18,4 +18,7 @@
     <item name="play_button" type="id" />
     <item name="back_button" type="id" />
     <item name="forward_button" type="id" />
+    <item name="document_info_button" type="id"/>
+    <item name="variant_button" type="id"/>
+    <item name="document_trust" type="id"/>
 </resources>

@@ -63,6 +63,9 @@ class DeckViews(private val context: Context) {
         max = 100; visibility = View.GONE; contentDescription = context.getString(R.string.busy_description)
     }
     val export = button(R.string.export).apply { id = R.id.export_button; textSize = 12f; contentDescription = context.getString(R.string.export_description) }
+    val documentInfo = button(R.string.document_info).apply { id = R.id.document_info_button; textSize = 12f }
+    val variant = button(R.string.choose_transcript).apply { id = R.id.variant_button; textSize = 12f }
+    val trust = text(12f, muted).apply { id = R.id.document_trust }
     val details = text(12f, muted, true).apply { id = R.id.transcript_details }
     val search = EditText(context).apply {
         id = R.id.search_input; setHint(R.string.search_hint); setSingleLine(true); textSize = 15f
@@ -116,6 +119,7 @@ class DeckViews(private val context: Context) {
         val fileCard = column().apply { background = background(surface); setPadding(dp(14), dp(12), dp(14), dp(12)) }
         fileCard.add(filename)
         fileCard.add(caption, marginTop = 5)
+        fileCard.add(trust, marginTop = 5)
         content.add(fileCard)
         val actions = row()
         actions.add(open, 0, weight = 1f)
@@ -127,9 +131,12 @@ class DeckViews(private val context: Context) {
         content.add(progress, height = dp(3))
         val transcriptHeading = row().apply { setPadding(0, dp(16), 0, dp(8)) }
         transcriptHeading.add(label(R.string.transcript), 0, weight = 1f)
+        transcriptHeading.add(documentInfo, LinearLayout.LayoutParams.WRAP_CONTENT)
+        transcriptHeading.add(Space(context), dp(6), dp(1))
         transcriptHeading.add(export, LinearLayout.LayoutParams.WRAP_CONTENT)
         content.add(transcriptHeading)
         content.add(details)
+        content.add(variant, marginTop = 8)
         searchRow.add(search, 0, weight = 1f)
         searchRow.add(Space(context), dp(6), dp(1))
         searchRow.add(clearSearch, dp(48))
