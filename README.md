@@ -2,7 +2,9 @@
 
 Native Kotlin app: import audio, transcribe locally with **Parakeet TDT 0.6B v3**, display clickable timed words, play/search the recording, and save/open **complete Cassini `.opus` documents** containing audio, `cassini.words.v1` timed words, speakers, provenance and integrity metadata. Italian is the selected transcript language; Parakeet automatically recognizes among its supported languages rather than accepting a forced Italian decoder setting.
 
-Choose **INT8** (640 MiB) or **FP32** (2.37 GiB) in the app. Both use sherpa-onnx 1.13.7 on CPU, greedy decoding, two threads, and the stock frontend. Weights download from a pinned Hugging Face revision into private app storage and are SHA-256 checked before installation. After that, audio processing is offline. Models are installed separately; switching precision preserves each download.
+New installations default to **Automatic**, preferring **FP32** (2.37 GiB) when the device has enough memory and storage, otherwise **INT8** (640 MiB). Settings retain explicit precision choices. This resource policy avoids quantization when practical; it is not an Italian accuracy benchmark. Both use sherpa-onnx 1.13.7 on CPU, greedy decoding, two threads, and the stock frontend. Weights download from a pinned Hugging Face revision into private app storage and are SHA-256 checked before installation. After that, audio processing is offline. Models are installed separately; switching precision preserves each download.
+
+Completion shows elapsed time and **audio duration / elapsed time**: 60 seconds processed in 30 seconds is **2× realtime**. “Ready” includes audio decoding, recognition and Cassini packaging; Info shows recognition-only speed. Recognition time is also stored in the selected variant's processing provenance, so it survives portable save/open. Older documents without that measurement do not invent one. Automatic currently requires a 64-bit process, at least 7 GiB physical RAM, 3 GiB available RAM, no Android low-memory signal, and enough space for remaining FP32 downloads plus 512 MiB. This is a conservative heuristic, not a per-device calibration.
 
 The interface supports **English and Italian**, follows the phone language by default, and can be changed in **Settings → Interface language**. On Android 13+ it also integrates with Android's [per-app language settings](https://developer.android.com/guide/topics/resources/app-languages). Both translations are bundled for offline switching; changing the interface language preserves the recording, transcript and playback position, and does not change the transcript's language label.
 
@@ -23,7 +25,7 @@ The AAR is downloaded separately and verified by `setup.sh`; weights are downloa
 
 ## Try it
 
-1. Choose INT8 or FP32 in **Settings → Transcription model** and download that model once if needed. Keep the app open during download/inference.
+1. Use Automatic or choose INT8/FP32 in **Settings → Transcription model**, then download the selected model once if needed. Keep the app open during download/inference.
 2. Choose an audio file of **at most 3 minutes** and at most 64 MB. PCM16 WAV, MP3, M4A/AAC and Ogg Opus are the tested import paths. FLAC is routed through Android's decoder but has not been tested here. WAV supports 16-bit PCM mono/stereo; decoded sample rates can be 8–96 kHz.
 3. Tap **Transcribe**. Words appear as native sentence paragraphs. Tap a word to seek/play; use the fixed playback controls or search field to inspect it.
 4. Tap **Save Cassini** to choose a destination for one `.opus` file containing audio and transcript. Open it again using **Open file**, or Android’s **Open with → Cassini**. Opening an existing document needs no model download or transcription.

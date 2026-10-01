@@ -60,7 +60,7 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         sessions = SessionStore(filesDir)
         documents = DocumentStore(this)
-        session = sessions.load()
+        session = sessions.load().let { it.copy(fp32 = ModelPolicy.resolve(this, it.modelChoice)) }
         models = modelStore(session.fp32)
         ui = DeckViews(this)
         setContentView(ui.root)
@@ -131,8 +131,11 @@ class MainActivity : Activity() {
 
     private fun transcribe() {
         val uri = session.uri?.let(Uri::parse) ?: return
+        updateModelChoice()
         val chosenModel = models
+        if (!chosenModel.ready()) { refreshControls(); return }
         runWork(R.string.decoding) {
+            val totalBegan = System.nanoTime()
             val audio = AudioDecoder.decode(this, uri)
             requireUser(audio.durationMs >= 200, Failure.SHORT)
             onUi { setStatus(R.string.transcribing) }
@@ -152,12 +155,14 @@ class MainActivity : Activity() {
                     .toString(2))
             } catch (error: IOException) { Log.e(TAG, "Could not cache processing artifacts", error) }
             onUi { setStatus(R.string.packaging_document) }
-            val (file, portable) = documents.create(uri, audio, transcript, session.name, processing(chosenModel.precision, chosenModel.revision), document)
+            val (file, portable) = documents.create(uri, audio, transcript, session.name, processing(chosenModel.precision, chosenModel.revision).put("x-inferenceMs", elapsed), document)
+            val processingMs = (System.nanoTime() - totalBegan) / 1_000_000
             onUi {
                 val position = if (playerReady) player?.currentPosition ?: session.positionMs else session.positionMs
                 session = session.copy(uri = Uri.fromFile(file).toString(), document = file.absolutePath,
                     name = "${session.name.substringBeforeLast('.')}.opus", selectedVariant = portable.defaultId,
-                    durationMs = audio.durationMs, inferenceMs = elapsed, resultPrecision = chosenModel.precision, positionMs = position)
+                    durationMs = audio.durationMs, inferenceMs = elapsed, resultPrecision = chosenModel.precision, positionMs = position,
+                    processingMs = processingMs)
                 adoptDocument(portable)
                 preparePlayer(Uri.fromFile(file))
                 persistSession()
@@ -180,7 +185,7 @@ class MainActivity : Activity() {
             // Migrate prototype sessions without running speech recognition again.
             runWork(R.string.packaging_document) {
                 val audio = AudioDecoder.decode(this, uri)
-                val (file, portable) = documents.create(uri, audio, transcript, session.name, processing(session.resultPrecision), null)
+                val (file, portable) = documents.create(uri, audio, transcript, session.name, processing(session.resultPrecision).put("x-inferenceMs", session.inferenceMs), null)
                 onUi {
                     val position = if (playerReady) player?.currentPosition ?: session.positionMs else session.positionMs
                     session = session.copy(uri = Uri.fromFile(file).toString(), document = file.absolutePath,
@@ -210,6 +215,7 @@ class MainActivity : Activity() {
                 playerReady = false; player?.release(); player = null
                 session = Session(uri = Uri.fromFile(file).toString(), name = name ?: uri.lastPathSegment.orEmpty(), fp32 = session.fp32,
                     document = file.absolutePath.takeIf { portable.state != "plain-audio" }, selectedVariant = portable.defaultId,
+                    modelChoice = session.modelChoice,
                     resultPrecision = "")
                 adoptDocument(portable.takeIf { it.state != "plain-audio" })
                 ui.search.text.clear(); ui.scroll.scrollTo(0, 0)
@@ -222,7 +228,9 @@ class MainActivity : Activity() {
         document = portable
         if (portable != null) {
             val selected = portable.selected(session.selectedVariant)
-            session = session.copy(transcript = selected?.transcript, selectedVariant = selected?.id)
+            val inference = portable.manifest?.optJSONObject("provenance")?.optJSONObject("speechToText")
+                ?.optJSONObject(selected?.id.orEmpty())?.optLong("x-inferenceMs", session.inferenceMs) ?: session.inferenceMs
+            session = session.copy(transcript = selected?.transcript, selectedVariant = selected?.id, inferenceMs = inference)
         }
         highlightedWord = -1
     }
@@ -236,7 +244,7 @@ class MainActivity : Activity() {
         }.toTypedArray()
         AlertDialog.Builder(this).setTitle(R.string.choose_transcript)
             .setSingleChoiceItems(labels, portable.variants.indexOfFirst { it.id == session.selectedVariant }) { dialog, index ->
-                session = session.copy(selectedVariant = portable.variants[index].id)
+                session = session.copy(selectedVariant = portable.variants[index].id, inferenceMs = 0, processingMs = 0)
                 adoptDocument(portable); persistSession(); renderScreen(); defaultStatus(); dialog.dismiss()
             }.setNegativeButton(android.R.string.cancel, null).show()
     }
@@ -251,6 +259,9 @@ class MainActivity : Activity() {
                 append("\n\n"); append(getString(R.string.document_contents, portable.variants.size, manifest.getJSONArray("speakers").length()))
                 manifest.optJSONObject("provenance")?.optJSONObject("speechToText")?.optJSONObject(session.selectedVariant.orEmpty())?.let { step ->
                     append("\n\n"); append(getString(R.string.document_processing))
+                    ProcessingSpeed.realtime(session.durationMs, session.inferenceMs)?.let { speed ->
+                        append("\n"); append(getString(R.string.transcription_speed, session.inferenceMs / 1000.0, speed))
+                    }
                     for (key in listOf("engine", "model", "backend", "device", "language", "version")) {
                         step.optString(key).takeIf { it.isNotEmpty() }?.let { append("\n"); append(it) }
                     }
@@ -314,8 +325,11 @@ class MainActivity : Activity() {
     }
     private fun defaultStatus() {
         when {
-            document != null -> setStatus(trustResource(document!!.state))
-            session.transcript != null -> setStatus(R.string.inference_time, session.inferenceMs / 1000.0)
+            session.transcript != null && session.processingMs > 0 -> setStatus(R.string.processing_speed,
+                session.processingMs / 1000.0, ProcessingSpeed.realtime(session.durationMs, session.processingMs) ?: 0.0)
+            session.transcript != null && session.inferenceMs > 0 -> setStatus(R.string.transcription_speed,
+                session.inferenceMs / 1000.0, ProcessingSpeed.realtime(session.durationMs, session.inferenceMs) ?: 0.0)
+            document != null -> ui.status.text = ""
             session.uri != null -> setStatus(R.string.file_ready)
             else -> ui.status.text = ""
         }
@@ -323,7 +337,8 @@ class MainActivity : Activity() {
 
     private fun refreshControls() {
         val ready = models.ready()
-        ui.model.text = getString(if (ready) R.string.model_ready else R.string.model_missing, models.precision)
+        ui.model.text = getString(if (ready) R.string.model_ready else R.string.model_missing,
+            if (session.modelChoice == "auto") getString(R.string.automatic_precision, models.precision) else models.precision)
         ui.download.text = getString(R.string.download_model, getString(if (models.fp32) R.string.model_size_fp32 else R.string.model_size_int8))
         ui.download.visibility = if (ready) View.GONE else View.VISIBLE
         ui.menu.isEnabled = !busy
@@ -557,7 +572,9 @@ class MainActivity : Activity() {
     private fun persistSession() {
         if (playerReady) player?.let { session = session.copy(positionMs = it.currentPosition) }
         // Settings can change the model while this activity is stopped or being recreated.
-        session = session.copy(fp32 = sessions.load().fp32)
+        val preferences = sessions.load()
+        session = session.copy(modelChoice = preferences.modelChoice,
+            fp32 = if (preferences.modelChoice == "auto") session.fp32 else preferences.fp32)
         try { sessions.save(session) } catch (error: Exception) { Log.e(TAG, "Could not persist session", error) }
     }
     override fun onSaveInstanceState(outState: Bundle) {
@@ -566,14 +583,15 @@ class MainActivity : Activity() {
         outState.putInt("scroll", ui.scroll.scrollY)
         super.onSaveInstanceState(outState)
     }
+    private fun updateModelChoice() {
+        val choice = sessions.load().modelChoice
+        val fp32 = ModelPolicy.resolve(this, choice)
+        session = session.copy(modelChoice = choice, fp32 = fp32)
+        if (models.fp32 != fp32) models = modelStore(fp32)
+    }
     override fun onResume() {
         super.onResume()
-        val fp32 = sessions.load().fp32
-        if (fp32 != session.fp32) {
-            session = session.copy(fp32 = fp32)
-            models = modelStore(fp32)
-            refreshControls()
-        }
+        if (!busy) { updateModelChoice(); refreshControls() }
         handler.post(ticker)
     }
     override fun onPause() {

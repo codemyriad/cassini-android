@@ -83,8 +83,14 @@ class PortableDocumentTest {
             val step = doc.manifest!!.getJSONObject("provenance").getJSONObject("speechToText").getJSONObject(doc.defaultId!!)
             assertTrue(step.getString("model").contains("INT8"))
             assertTrue(step.getString("version").contains(model.revision))
+            assertTrue(step.getLong("x-inferenceMs") > 0)
+            assertTrue(saved.processingMs >= saved.inferenceMs)
+            scenario.onActivity {
+                val status = it.findViewById<TextView>(R.id.operation_status).text.toString()
+                assertTrue("Completion shows the realtime multiplier: $status", status.contains("×"))
+            }
             assertEquals(30000L, doc.manifest.getJSONObject("audio").getLong("durationMs"))
-            File(context.filesDir, "portable-asr-test.opus").writeBytes(File(saved.document).readBytes())
+            File(context.filesDir, "portable-asr-test.opus").writeBytes(File(saved.document!!).readBytes())
         } finally { scenario.close(); finishScreens(); sessions.save(originalSession) }
     }
 

@@ -60,19 +60,24 @@ class SettingsActivity : Activity() {
             val model = ListPreference(context).apply {
                 key = "transcription_model"; isPersistent = false
                 setTitle(R.string.recognition_model); setDialogTitle(R.string.recognition_model)
-                entries = arrayOf(getString(R.string.int8_option), getString(R.string.fp32_option))
-                entryValues = arrayOf("int8", "fp32")
-                value = if (sessions.load().fp32) "fp32" else "int8"
-                summary = modelSummary(context, value == "fp32")
+                entries = arrayOf(getString(R.string.automatic_model), getString(R.string.int8_option), getString(R.string.fp32_option))
+                entryValues = arrayOf("auto", "int8", "fp32")
+                value = sessions.load().modelChoice
+                summary = modelSummary(context, value)
                 setNegativeButtonText(R.string.cancel)
                 setOnPreferenceChangeListener { preference, chosen ->
-                    val fp32 = chosen == "fp32"
-                    sessions.save(sessions.load().copy(fp32 = fp32))
-                    preference.summary = modelSummary(context, fp32)
+                    val choice = chosen as String
+                    val fp32 = ModelPolicy.resolve(context, choice)
+                    sessions.save(sessions.load().copy(fp32 = fp32, modelChoice = choice))
+                    preference.summary = modelSummary(context, choice)
                     true
                 }
             }
             transcription.addPreference(model)
+            transcription.addPreference(Preference(context).apply {
+                setTitle(R.string.automatic_model); setSummary(R.string.automatic_model_explanation)
+                isSelectable = false
+            })
             transcription.addPreference(Preference(context).apply {
                 setTitle(R.string.processing_location); setSummary(R.string.processing_local_summary)
                 isSelectable = false
@@ -90,9 +95,10 @@ class SettingsActivity : Activity() {
             })
         }
 
-        private fun modelSummary(context: Context, fp32: Boolean): String {
+        private fun modelSummary(context: Context, choice: String): String {
+            val fp32 = ModelPolicy.resolve(context, choice)
             val models = ModelStore(File(context.filesDir, if (fp32) "parakeet-v3-fp32" else "parakeet-v3"), fp32)
-            return getString(R.string.settings_model_summary, models.precision,
+            return getString(R.string.settings_model_summary, if (choice == "auto") getString(R.string.automatic_precision, models.precision) else models.precision,
                 getString(if (fp32) R.string.model_size_fp32 else R.string.model_size_int8),
                 getString(if (models.ready()) R.string.model_installed else R.string.model_download_needed))
         }

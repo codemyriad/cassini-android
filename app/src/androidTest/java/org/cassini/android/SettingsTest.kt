@@ -57,8 +57,12 @@ class SettingsTest {
             instrumentation.waitForIdleSync()
             scenario.onActivity { it.findViewById<TextView>(R.id.settings_button).performClick() }
             clickText("Transcription model")
+            clickText("Automatic · prefer full precision")
+            assertEquals("auto", sessions.load().modelChoice)
+            clickText("Transcription model")
             clickText("FP32 · 2.37 GiB · full precision")
             assertTrue(sessions.load().fp32)
+            assertEquals("fp32", sessions.load().modelChoice)
             clickText("Interface language")
             clickText("Italiano")
             awaitText("Impostazioni")

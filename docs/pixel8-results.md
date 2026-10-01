@@ -65,3 +65,11 @@ Validation on this Pixel:
 - The three-minute sample is saved in Downloads as `cassini-italian-28-208.opus`, with its original WAV retained. Both model downloads remain installed. Encoding uses Android's platform Opus codec; no native codec library or external conversion service is needed on this Pixel.
 
 The supplied audio and generated artifacts remain local ignored files. The updated APK restores the Italian three-minute document with FP32 selected. Display transcripts, annotations and other unsupported metadata survive unchanged saves but are not rendered yet; microphone capture, new diarization, background jobs and a document history browser remain future work.
+
+## Resource preference and realtime speed (2026-10-01)
+
+New installs choose Automatic, favoring FP32 when memory/storage headroom permits and respecting explicit INT8/FP32 overrides. Existing choices migrate as manual choices. This is a resource heuristic; no labeled Italian evaluation establishes that FP32 improves accuracy over INT8 on this recording. The stock frontend still differs from the desktop Cassini fork.
+
+The three-minute FP32 document restores its previously measured 90.159-second recognition time and displays `2.00× realtime` in Italian. New recognition records `x-inferenceMs` in the variant's speech-to-text provenance. Completion separately measures the whole decode/recognize/package operation; higher multipliers are faster.
+
+Verification: 17 JVM tests and assemble/lint pass. Device settings tests select Automatic, then FP32, switch language and return with the manual preference retained; both interface/playback tests pass. A separate actual 30-second INT8 recognition test passes, creates a verified Cassini document with processing time in its provenance, and checks the completion multiplier. The existing three-minute document and both model downloads remain intact.
