@@ -1,8 +1,9 @@
 package org.cassini.android
 
 import android.app.Activity
+import android.app.AlertDialog
+import android.content.Context
 import android.content.Intent
-import android.graphics.Color
 import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Bundle
@@ -16,54 +17,41 @@ import android.text.TextWatcher
 import android.text.method.LinkMovementMethod
 import android.text.style.BackgroundColorSpan
 import android.text.style.ClickableSpan
+import android.text.style.ForegroundColorSpan
+import android.util.Log
 import android.view.View
 import android.view.WindowManager
-import android.widget.Button
-import android.widget.EditText
-import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.SeekBar
-import android.widget.TextView
-import android.widget.Spinner
-import android.widget.ArrayAdapter
-import android.widget.AdapterView
 import org.json.JSONObject
 import java.io.File
+import java.io.IOException
+import java.util.Locale
 import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
     private val worker = Executors.newSingleThreadExecutor()
     private val handler = Handler(Looper.getMainLooper())
+    private lateinit var ui: DeckViews
     private lateinit var models: ModelStore
-    private lateinit var status: TextView
-    private lateinit var transcriptView: TextView
-    private lateinit var position: TextView
-    private lateinit var seek: SeekBar
-    private lateinit var search: EditText
-    private lateinit var download: Button
-    private lateinit var open: Button
-    private lateinit var transcribe: Button
-    private lateinit var export: Button
-    private lateinit var play: Button
-    private lateinit var precision: Spinner
-    private var selected: Uri? = null
-    private var selectedName = "Recording"
-    private var result: Transcript? = null
+    private lateinit var sessions: SessionStore
+    private var session = Session()
     private var player: MediaPlayer? = null
+    private var playerReady = false
     private var busy = false
-    private var preparingPlayback = false
-    private var durationMs = 0L
     private var highlightedWord = -1
+
+    override fun attachBaseContext(newBase: Context) = super.attachBaseContext(AppLanguage.wrap(newBase))
 
     private val ticker = object : Runnable {
         override fun run() {
-            val media = player
-            if (media != null && !preparingPlayback) {
+            if (playerReady) player?.let { media ->
                 val time = media.currentPosition
-                seek.progress = time
-                position.text = "${clock(time.toLong())} / ${clock(durationMs)}"
-                play.text = if (media.isPlaying) "Pause" else "Play"
-                val active = result?.words?.indexOfFirst { time >= it.startMs && time < it.endMs } ?: -1
+                if (!ui.seek.isPressed) ui.seek.progress = time
+                val clock = getString(R.string.position, clock(time.toLong()), clock(session.durationMs))
+                if (ui.position.text.toString() != clock) ui.position.text = clock
+                val playText = getString(if (media.isPlaying) R.string.pause else R.string.play)
+                if (ui.play.text.toString() != playText) ui.play.text = playText
+                val active = session.transcript?.words?.indexOfFirst { time >= it.startMs && time < it.endMs } ?: -1
                 if (active != highlightedWord) {
                     highlightedWord = active
                     renderTranscript()
@@ -75,148 +63,253 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        models = ModelStore(File(filesDir, "parakeet-v3"))
-        val column = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(20), dp(20), dp(20))
+        sessions = SessionStore(filesDir)
+        session = sessions.load()
+        models = modelStore(session.fp32)
+        ui = DeckViews(this)
+        setContentView(ui.root)
+        ui.menu.setOnClickListener { showSettings() }
+        ui.open.setOnClickListener { chooseAudio() }
+        ui.transcribe.setOnClickListener { transcribe() }
+        ui.download.setOnClickListener { downloadModel() }
+        ui.export.setOnClickListener { exportTranscript() }
+        ui.play.setOnClickListener {
+            if (playerReady) player?.let { if (it.isPlaying) it.pause() else it.start() }
         }
-        setContentView(ScrollView(this).apply { addView(column) })
-        fun label(text: String, size: Float = 16f): TextView = TextView(this).apply {
-            this.text = text; textSize = size; setPadding(0, dp(8), 0, dp(8)); column.addView(this)
-        }
-        fun button(text: String, action: () -> Unit): Button = Button(this).apply {
-            this.text = text; setOnClickListener { action() }; column.addView(this)
-        }
-        label("Cassini · Italian prototype", 24f)
-        label("Import a clip up to 30 seconds. Transcription runs on this device. One speaker; tap words to listen.")
-        precision = Spinner(this).apply {
-            adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item,
-                arrayOf("Parakeet v3 · INT8 · 640 MiB", "Parakeet v3 · FP32 · 2.37 GiB"))
-            column.addView(this)
-        }
-        download = button("Download Parakeet v3 · 640 MiB") {
-            runWork("Preparing model download…") {
-                models.install { updateStatus(it) }
-                updateStatus("Parakeet ready. Audio stays on this device.")
+        ui.back.setOnClickListener { skip(-10_000) }
+        ui.forward.setOnClickListener { skip(10_000) }
+        ui.seek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(bar: SeekBar?, value: Int, fromUser: Boolean) {
+                if (fromUser && playerReady) player?.seekTo(value)
             }
-        }
-        open = button("Choose audio file") {
-            startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                type = "audio/*"; addCategory(Intent.CATEGORY_OPENABLE)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
-            }, OPEN_AUDIO)
-        }
-        transcribe = button("Transcribe Italian") {
-            val uri = selected ?: return@button
-            runWork("Decoding $selectedName…") {
-                val audio = AudioDecoder.decode(this, uri)
-                require(audio.durationMs >= 200) { "Choose at least 200 milliseconds of audio." }
-                updateStatus("Transcribing ${clock(audio.durationMs)} with Parakeet…")
-                val began = System.nanoTime()
-                val transcript = Parakeet.transcribe(audio, models)
-                val elapsedMs = (System.nanoTime() - began) / 1_000_000
+            override fun onStartTrackingTouch(bar: SeekBar?) {}
+            override fun onStopTrackingTouch(bar: SeekBar?) {}
+        })
+        ui.search.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { renderTranscript() }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+        ui.clearSearch.setOnClickListener { ui.search.text.clear() }
+        ui.transcript.movementMethod = LinkMovementMethod.getInstance()
+        ui.search.setText(savedInstanceState?.getString("query").orEmpty())
+        renderScreen()
+        defaultStatus()
+        session.uri?.let { preparePlayer(Uri.parse(it)) }
+        savedInstanceState?.let { state -> ui.scroll.post { ui.scroll.scrollTo(0, state.getInt("scroll")) } }
+    }
+
+    private fun modelStore(fp32: Boolean) = ModelStore(File(filesDir, if (fp32) "parakeet-v3-fp32" else "parakeet-v3"), fp32)
+
+    private fun chooseAudio() {
+        startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            type = "audio/*"; addCategory(Intent.CATEGORY_OPENABLE)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+        }, OPEN_AUDIO)
+    }
+
+    private fun downloadModel() = runWork(R.string.preparing_download) {
+        models.install { progress -> onUi {
+            ui.progress.isIndeterminate = false
+            ui.progress.progress = progress.percent
+            setStatus(if (progress.verifying) R.string.verifying else R.string.downloading, progress.percent)
+        } }
+        onUi { setStatus(R.string.download_complete) }
+    }
+
+    private fun transcribe() {
+        val uri = session.uri?.let(Uri::parse) ?: return
+        val chosenModel = models
+        runWork(R.string.decoding) {
+            val audio = AudioDecoder.decode(this, uri)
+            requireUser(audio.durationMs >= 200, Failure.SHORT)
+            onUi { setStatus(R.string.transcribing) }
+            val began = System.nanoTime()
+            val transcript = Parakeet.transcribe(audio, chosenModel)
+            val elapsed = (System.nanoTime() - began) / 1_000_000
+            // Processing records are machine-readable provenance, independent of UI language.
+            try {
                 File(filesDir, "latest.words.json").writeText(transcript.json())
                 File(filesDir, "latest.processing.json").writeText(JSONObject()
-                    .put("model", "nvidia/parakeet-tdt-0.6b-v3")
-                    .put("modelRevision", models.revision)
-                    .put("runtime", "sherpa-onnx 1.13.7, stock frontend, CPU ${models.precision}, greedy, 2 threads")
+                    .put("model", "nvidia/parakeet-tdt-0.6b-v3").put("modelRevision", chosenModel.revision)
+                    .put("runtime", "sherpa-onnx 1.13.7, stock frontend, CPU ${chosenModel.precision}, greedy, 2 threads")
                     .put("language", "it (user-selected; automatic multilingual recognition)")
-                    .put("durationMs", audio.durationMs).put("inferenceMs", elapsedMs)
+                    .put("durationMs", audio.durationMs).put("inferenceMs", elapsed)
                     .put("speakerAttribution", "single recording; no diarization")
                     .put("wordTimings", "TDT token-derived; punctuation excluded from word ends; no acoustic bounding")
                     .toString(2))
-                runOnUiThread {
-                    if (!isDestroyed) {
-                        result = transcript
-                        highlightedWord = -1
-                        renderTranscript()
-                        status.text = "${transcript.words.size} words · audio ${clock(audio.durationMs)} · inference ${elapsedMs / 1000.0}s" +
-                            if (transcript.words.isEmpty()) "\nNo speech recognized." else "\nTap any word to seek."
-                    }
-                }
+            } catch (error: IOException) { Log.e(TAG, "Could not cache processing artifacts", error) }
+            onUi {
+                session = session.copy(transcript = transcript, durationMs = audio.durationMs,
+                    inferenceMs = elapsed, resultPrecision = chosenModel.precision)
+                highlightedWord = -1
+                persistSession()
+                renderScreen()
+                defaultStatus()
             }
         }
-        export = button("Save Cassini words JSON") {
-            startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-                type = "application/json"; addCategory(Intent.CATEGORY_OPENABLE)
-                putExtra(Intent.EXTRA_TITLE, "${selectedName.substringBeforeLast('.')}.words.json")
-            }, SAVE_WORDS)
-        }
-        status = label(if (models.ready()) "Parakeet ready. Choose an audio file." else "Download the model, then choose an audio file.")
-        play = button("Play") {
-            player?.let { if (it.isPlaying) it.pause() else it.start() }
-        }
-        position = label("00:00 / 00:00")
-        seek = SeekBar(this).apply {
-            column.addView(this)
-            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                override fun onProgressChanged(bar: SeekBar?, value: Int, fromUser: Boolean) {
-                    if (fromUser && !preparingPlayback) player?.seekTo(value)
-                }
-                override fun onStartTrackingTouch(bar: SeekBar?) {}
-                override fun onStopTrackingTouch(bar: SeekBar?) {}
-            })
-        }
-        search = EditText(this).apply {
-            hint = "Search transcript"; setSingleLine(true); column.addView(this)
-            addTextChangedListener(object : TextWatcher {
-                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { renderTranscript() }
-                override fun afterTextChanged(s: Editable?) {}
-            })
-        }
-        transcriptView = label("Your transcription will appear here.", 20f).apply {
-            movementMethod = LinkMovementMethod.getInstance()
-            setLineSpacing(dp(6).toFloat(), 1f)
-        }
-        precision.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                models = ModelStore(File(filesDir, if (position == 0) "parakeet-v3" else "parakeet-v3-fp32"), position == 1)
-                status.text = if (models.ready()) "${models.precision} ready." else "Download ${models.precision} to continue."
-                refreshControls()
-            }
-            override fun onNothingSelected(parent: AdapterView<*>?) {}
-        }
-        refreshControls()
     }
 
-    private fun runWork(message: String, action: () -> Unit) {
+    private fun exportTranscript() {
+        if (session.transcript == null) return
+        startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            type = "application/json"; addCategory(Intent.CATEGORY_OPENABLE)
+            val name = session.name.ifBlank { getString(R.string.recording) }
+            putExtra(Intent.EXTRA_TITLE, "${name.substringBeforeLast('.')}.words.json")
+        }, SAVE_WORDS)
+    }
+
+    private fun runWork(message: Int, action: () -> Unit) {
         if (busy) return
         busy = true
-        status.text = message
+        setStatus(message)
+        ui.progress.visibility = View.VISIBLE
+        ui.progress.isIndeterminate = true
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         refreshControls()
         worker.execute {
-            try { action() } catch (error: Exception) {
-                updateStatus("Failed: ${error.message ?: error.javaClass.simpleName}")
-            } catch (_: OutOfMemoryError) {
-                updateStatus("Not enough memory. Try a shorter clip and close other apps.")
+            try { action() } catch (error: UserFacingException) {
+                Log.e(TAG, "Operation failed: ${error.failure}", error)
+                onUi { setStatus(error.failure.stringRes, error = true) }
+            } catch (error: IOException) {
+                Log.e(TAG, "I/O operation failed", error)
+                val failure = when (message) {
+                    R.string.preparing_download -> Failure.DOWNLOAD
+                    R.string.saving -> Failure.SAVE
+                    else -> Failure.OPEN
+                }
+                onUi { setStatus(failure.stringRes, error = true) }
+            } catch (error: Exception) {
+                Log.e(TAG, "Operation failed", error)
+                onUi { setStatus(R.string.error_unknown, error = true) }
+            } catch (error: OutOfMemoryError) {
+                Log.e(TAG, "Insufficient memory", error)
+                onUi { setStatus(R.string.error_memory, error = true) }
             } finally {
-                runOnUiThread {
-                    if (!isDestroyed) {
-                        busy = false
-                        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                        refreshControls()
-                    }
+                onUi {
+                    busy = false
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    ui.progress.visibility = View.GONE
+                    refreshControls()
                 }
             }
         }
     }
 
-    private fun updateStatus(message: String) = runOnUiThread { if (!isDestroyed) status.text = message }
-    private fun refreshControls() {
-        download.isEnabled = !busy && !models.ready()
-        download.text = if (models.ready()) "${models.precision} model ready" else
-            "Download Parakeet v3 · ${if (models.fp32) "2.37 GiB" else "640 MiB"}"
-        precision.isEnabled = !busy
-        open.isEnabled = !busy
-        transcribe.isEnabled = !busy && selected != null && models.ready()
-        export.isEnabled = !busy && result != null
-        play.isEnabled = player != null && !preparingPlayback
-        seek.isEnabled = play.isEnabled
+    private fun onUi(action: () -> Unit) = runOnUiThread { if (!isDestroyed) action() }
+    private fun setStatus(resource: Int, vararg args: Any, error: Boolean = false) {
+        ui.status.text = getString(resource, *args)
+        ui.status.setTextColor(if (error) DeckViews.warning else DeckViews.muted)
+    }
+    private fun defaultStatus() {
+        when {
+            session.transcript != null -> setStatus(R.string.inference_time, session.inferenceMs / 1000.0)
+            session.uri != null -> setStatus(R.string.file_ready)
+            else -> ui.status.text = ""
+        }
     }
 
-    @Deprecated("Framework activity result API is sufficient for this dependency-light prototype")
+    private fun refreshControls() {
+        val ready = models.ready()
+        ui.model.text = getString(if (ready) R.string.model_ready else R.string.model_missing, models.precision)
+        ui.download.text = getString(R.string.download_model, getString(if (models.fp32) R.string.model_size_fp32 else R.string.model_size_int8))
+        ui.download.visibility = if (ready) View.GONE else View.VISIBLE
+        ui.menu.isEnabled = !busy
+        ui.open.isEnabled = !busy
+        ui.transcribe.isEnabled = !busy && session.uri != null && ready
+        ui.download.isEnabled = !busy
+        ui.export.isEnabled = !busy && session.transcript != null
+        ui.play.isEnabled = playerReady
+        ui.seek.isEnabled = playerReady
+        ui.back.isEnabled = playerReady
+        ui.forward.isEnabled = playerReady
+        listOf(ui.menu, ui.open, ui.transcribe, ui.download, ui.export, ui.play, ui.back, ui.forward)
+            .forEach { it.alpha = if (it.isEnabled) 1f else .4f }
+    }
+
+    private fun renderScreen() {
+        ui.filename.text = session.name.ifBlank { getString(R.string.no_file) }
+        ui.caption.text = getString(R.string.voice_caption, getString(R.string.italian))
+        ui.open.setText(if (session.uri == null) R.string.open_audio else R.string.change_audio)
+        ui.transcribe.setText(if (session.transcript == null) R.string.transcribe else R.string.transcribe_again)
+        ui.seek.max = session.durationMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+        ui.position.text = getString(R.string.position, clock(session.positionMs.toLong()), clock(session.durationMs))
+        val transcript = session.transcript
+        ui.details.visibility = if (transcript == null) View.GONE else View.VISIBLE
+        transcript?.let {
+            ui.details.text = getString(R.string.transcript_details,
+                resources.getQuantityString(R.plurals.word_count, it.words.size, it.words.size),
+                clock(session.durationMs), session.resultPrecision)
+        }
+        val hasWords = transcript?.words?.isNotEmpty() == true
+        ui.searchRow.visibility = if (hasWords) View.VISIBLE else View.GONE
+        ui.voice.visibility = if (hasWords) View.VISIBLE else View.GONE
+        ui.transcript.visibility = if (hasWords) View.VISIBLE else View.GONE
+        ui.empty.visibility = if (hasWords) View.GONE else View.VISIBLE
+        ui.emptyTitle.setText(when {
+            transcript != null -> R.string.no_speech
+            session.uri != null -> R.string.loaded_title
+            else -> R.string.empty_title
+        })
+        ui.emptyHint.setText(when {
+            transcript != null -> R.string.no_speech_hint
+            session.uri != null -> R.string.loaded_hint
+            else -> R.string.empty_hint
+        })
+        renderTranscript()
+        refreshControls()
+    }
+
+    private fun renderTranscript() {
+        val words = session.transcript?.words ?: emptyList()
+        val builder = StringBuilder()
+        val ranges = mutableListOf<IntRange>()
+        words.forEachIndexed { index, word ->
+            if (index > 0) {
+                val previous = words[index - 1]
+                builder.append(if (previous.speaker != word.speaker || previous.text.lastOrNull() in listOf('.', '?', '!')) "\n\n" else " ")
+            }
+            val start = builder.length
+            builder.append(word.text)
+            ranges += start until builder.length
+        }
+        val text = builder.toString()
+        val spannable = SpannableString(text)
+        val query = ui.search.text.toString().trim()
+        var matchCount = 0
+        if (query.isNotEmpty()) {
+            var start = text.indexOf(query, ignoreCase = true)
+            while (start >= 0) {
+                spannable.setSpan(BackgroundColorSpan(android.graphics.Color.rgb(76, 86, 45)), start, start + query.length, 0)
+                matchCount++
+                start = text.indexOf(query, start + query.length, ignoreCase = true)
+            }
+        }
+        words.forEachIndexed { index, word ->
+            val range = ranges[index]
+            spannable.setSpan(object : ClickableSpan() {
+                override fun onClick(widget: View) {
+                    if (playerReady) player?.let {
+                        it.seekTo(word.startMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
+                        it.start()
+                    }
+                }
+                override fun updateDrawState(ds: android.text.TextPaint) { ds.isUnderlineText = false }
+            }, range.first, range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            if (index == highlightedWord) {
+                spannable.setSpan(BackgroundColorSpan(DeckViews.amber), range.first, range.last + 1, 0)
+                spannable.setSpan(ForegroundColorSpan(DeckViews.ink), range.first, range.last + 1, 0)
+            }
+        }
+        ui.transcript.text = spannable
+        ui.clearSearch.isEnabled = query.isNotEmpty()
+        ui.clearSearch.alpha = if (query.isEmpty()) .4f else 1f
+        ui.matches.visibility = if (query.isEmpty() || words.isEmpty()) View.GONE else View.VISIBLE
+        ui.matches.text = if (matchCount == 0) getString(R.string.no_matches)
+            else resources.getQuantityString(R.plurals.search_matches, matchCount, matchCount)
+    }
+
+    @Deprecated("Framework activity result API keeps this prototype dependency-light")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (resultCode != RESULT_OK) return
@@ -224,91 +317,109 @@ class MainActivity : Activity() {
         when (requestCode) {
             OPEN_AUDIO -> {
                 try { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-                catch (_: SecurityException) { /* Some document providers offer only temporary grants. */ }
-                selected = uri
-                selectedName = contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
+                catch (_: SecurityException) { /* A provider may offer only a temporary grant. */ }
+                val name = try { contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
                     if (it.moveToFirst()) it.getString(0) else null
-                } ?: "Recording"
-                result = null
+                } } catch (_: Exception) { null }
+                session = Session(uri = uri.toString(), name = name.orEmpty(), fp32 = session.fp32)
                 highlightedWord = -1
-                transcriptView.text = "Your transcription will appear here."
-                status.text = "Selected: $selectedName"
+                ui.search.text.clear()
+                renderScreen()
+                defaultStatus()
+                persistSession()
                 preparePlayer(uri)
             }
             SAVE_WORDS -> {
-                val json = result?.json() ?: return
-                runWork("Saving transcript…") {
-                    requireNotNull(contentResolver.openOutputStream(uri, "wt")) { "Cannot save transcript." }
-                        .bufferedWriter().use { it.write(json) }
-                    updateStatus("Saved cassini.words.v1 JSON. Speaker ID: spk_1 (unidentified).")
+                val json = session.transcript?.json() ?: return
+                runWork(R.string.saving) {
+                    val output = contentResolver.openOutputStream(uri, "wt") ?: throw UserFacingException(Failure.SAVE)
+                    output.bufferedWriter().use { it.write(json) }
+                    onUi { setStatus(R.string.saved) }
                 }
             }
         }
-        refreshControls()
     }
 
     private fun preparePlayer(uri: Uri) {
+        playerReady = false
         player?.release()
-        preparingPlayback = true
         val media = MediaPlayer()
         player = media
+        refreshControls()
         media.setOnPreparedListener {
-            preparingPlayback = false
-            durationMs = it.duration.toLong()
-            seek.max = it.duration
+            if (isDestroyed || player !== media) return@setOnPreparedListener
+            playerReady = true
+            session = session.copy(durationMs = it.duration.toLong())
+            ui.seek.max = it.duration
+            it.seekTo(session.positionMs.coerceIn(0, it.duration))
             refreshControls()
         }
         media.setOnErrorListener { _, _, _ ->
-            preparingPlayback = false
+            playerReady = false
             media.release()
             if (player === media) player = null
-            status.append("\nPlayback is unavailable for this file.")
+            setStatus(R.string.error_playback, error = true)
             refreshControls()
             true
         }
-        try {
-            media.setDataSource(this, uri)
-            media.prepareAsync()
-        } catch (error: Exception) {
-            media.release(); player = null; preparingPlayback = false
-            status.append("\nPlayback unavailable: ${error.message}")
+        try { media.setDataSource(this, uri); media.prepareAsync() }
+        catch (error: Exception) {
+            Log.e(TAG, "Playback setup failed", error)
+            media.release(); player = null; playerReady = false
+            setStatus(R.string.error_playback, error = true)
+            refreshControls()
         }
     }
 
-    private fun renderTranscript() {
-        val transcript = result ?: return
-        val text = transcript.words.joinToString(" ") { it.text }
-        val spannable = SpannableString(text)
-        var offset = 0
-        transcript.words.forEachIndexed { index, word ->
-            val end = offset + word.text.length
-            spannable.setSpan(object : ClickableSpan() {
-                override fun onClick(widget: View) {
-                    if (!preparingPlayback) player?.let {
-                        it.seekTo(word.startMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
-                        it.start()
-                    }
-                }
-                override fun updateDrawState(ds: android.text.TextPaint) { ds.isUnderlineText = false }
-            }, offset, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-            if (index == highlightedWord) spannable.setSpan(BackgroundColorSpan(Color.rgb(170, 215, 255)), offset, end, 0)
-            offset = end + 1
-        }
-        val query = search.text.toString().trim()
-        if (query.isNotEmpty()) {
-            var start = text.indexOf(query, ignoreCase = true)
-            while (start >= 0) {
-                spannable.setSpan(BackgroundColorSpan(Color.YELLOW), start, start + query.length, 0)
-                start = text.indexOf(query, start + query.length, ignoreCase = true)
-            }
-        }
-        transcriptView.text = if (text.isEmpty()) "No speech recognized." else spannable
+    private fun skip(delta: Int) {
+        if (playerReady) player?.let { it.seekTo((it.currentPosition + delta).coerceIn(0, it.duration)) }
     }
 
+    private fun showSettings() {
+        AlertDialog.Builder(this).setTitle(R.string.settings)
+            .setItems(arrayOf(getString(R.string.interface_language), getString(R.string.recognition_model), getString(R.string.about))) { _, index ->
+                when (index) { 0 -> chooseLanguage(); 1 -> chooseModel(); 2 -> showAbout() }
+            }.setNegativeButton(R.string.done, null).show()
+    }
+    private fun chooseLanguage() {
+        val tags = listOf("", "en", "it")
+        val selected = AppLanguage.selected(this)
+        val index = tags.indexOfFirst { it == selected }.coerceAtLeast(0)
+        AlertDialog.Builder(this).setTitle(R.string.interface_language)
+            .setSingleChoiceItems(arrayOf(getString(R.string.system_language), getString(R.string.english_name), getString(R.string.italian_name)), index) { dialog, choice ->
+                dialog.dismiss()
+                persistSession()
+                AppLanguage.set(this, tags[choice])
+            }.setNegativeButton(R.string.cancel, null).show()
+    }
+    private fun chooseModel() {
+        AlertDialog.Builder(this).setTitle(R.string.recognition_model)
+            .setSingleChoiceItems(arrayOf(getString(R.string.int8_option), getString(R.string.fp32_option)), if (session.fp32) 1 else 0) { dialog, choice ->
+                dialog.dismiss()
+                session = session.copy(fp32 = choice == 1)
+                models = modelStore(session.fp32)
+                persistSession()
+                refreshControls()
+            }.setNegativeButton(R.string.cancel, null).show()
+    }
+    private fun showAbout() = AlertDialog.Builder(this).setTitle(R.string.about)
+        .setMessage(R.string.about_body).setPositiveButton(R.string.done, null).show()
+
+    private fun persistSession() {
+        if (playerReady) player?.let { session = session.copy(positionMs = it.currentPosition) }
+        try { sessions.save(session) } catch (error: Exception) { Log.e(TAG, "Could not persist session", error) }
+    }
+    override fun onSaveInstanceState(outState: Bundle) {
+        persistSession()
+        outState.putString("query", ui.search.text.toString())
+        outState.putInt("scroll", ui.scroll.scrollY)
+        super.onSaveInstanceState(outState)
+    }
     override fun onResume() { super.onResume(); handler.post(ticker) }
     override fun onPause() {
         handler.removeCallbacks(ticker)
-        if (!preparingPlayback) player?.pause()
+        if (playerReady) player?.pause()
+        persistSession()
         super.onPause()
     }
     override fun onDestroy() {
@@ -317,7 +428,6 @@ class MainActivity : Activity() {
         player?.release()
         super.onDestroy()
     }
-    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
-    private fun clock(ms: Long) = "%02d:%02d".format(ms / 60000, ms / 1000 % 60)
-    companion object { const val OPEN_AUDIO = 1; const val SAVE_WORDS = 2 }
+    private fun clock(ms: Long) = String.format(Locale.ROOT, "%02d:%02d", ms / 60000, ms / 1000 % 60)
+    companion object { const val OPEN_AUDIO = 1; const val SAVE_WORDS = 2; private const val TAG = "Cassini" }
 }

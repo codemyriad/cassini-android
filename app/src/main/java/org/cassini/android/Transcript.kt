@@ -20,11 +20,22 @@ data class Transcript(val words: List<Word>, val language: String = "it") {
         }).toString(2)
 
     companion object {
+        fun fromJson(json: String): Transcript {
+            val body = JSONObject(json)
+            requireUser(body.getString("format") == "cassini.words.v1", Failure.TIMINGS)
+            val items = body.optJSONArray("items") ?: JSONArray()
+            val words = (0 until items.length()).map { i ->
+                val item = items.getJSONObject(i)
+                val word = Word(item.getString("speaker"), item.getLong("startMs"), item.getLong("endMs"), item.getString("text"))
+                requireUser(word.startMs >= 0 && word.endMs >= word.startMs && word.text.isNotBlank(), Failure.TIMINGS)
+                word
+            }
+            return Transcript(words, body.optString("language", ""))
+        }
+
         /** SentencePiece pieces carry seconds, including TDT durations. No guessed alignment. */
         fun fromTokens(tokens: Array<String>, timestamps: FloatArray, durations: FloatArray): Transcript {
-            require(tokens.size == timestamps.size && tokens.size == durations.size) {
-                "Parakeet returned incomplete token timings. Cannot export a word-timed transcript."
-            }
+            requireUser(tokens.size == timestamps.size && tokens.size == durations.size, Failure.TIMINGS)
             val words = mutableListOf<Word>()
             val text = StringBuilder()
             var start = 0L
@@ -37,17 +48,13 @@ data class Transcript(val words: List<Word>, val language: String = "it") {
             tokens.forEachIndexed { i, original ->
                 val timestamp = timestamps[i]
                 val duration = durations[i]
-                require(timestamp.isFinite() && duration.isFinite() && timestamp >= 0 && duration >= 0) {
-                    "Parakeet returned invalid token timings."
-                }
-                require(timestamp >= previousTimestamp) { "Parakeet token times went backwards." }
+                requireUser(timestamp.isFinite() && duration.isFinite() && timestamp >= 0 && duration >= 0, Failure.TIMINGS)
+                requireUser(timestamp >= previousTimestamp, Failure.TIMINGS)
                 previousTimestamp = timestamp
                 val boundary = original.startsWith('▁') || original.startsWith(' ') || original == "<space>"
                 if (boundary) flush()
                 val piece = if (original == "<space>") "" else original.removePrefix("▁").trim()
-                require(piece.none { it.isWhitespace() || it == '▁' }) {
-                    "Unexpected multiword token: cannot assign individual word timings."
-                }
+                requireUser(piece.none { it.isWhitespace() || it == '▁' }, Failure.TIMINGS)
                 if (piece.isNotEmpty()) {
                     if (text.isEmpty()) {
                         start = (timestamp.toDouble() * 1000).roundToLong()

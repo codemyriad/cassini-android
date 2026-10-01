@@ -1,0 +1,92 @@
+<resources>
+    <string name="app_name">Cassini</string>
+    <string name="brand" translatable="false">cassini</string>
+    <string name="prototype_badge">PROTOTYPE / 02</string>
+    <string name="settings">Settings</string>
+    <string name="open_audio">Open audio</string>
+    <string name="change_audio">Change file</string>
+    <string name="transcribe">Transcribe</string>
+    <string name="transcribe_again">Transcribe again</string>
+    <string name="recording">Recording</string>
+    <string name="no_file">No tape loaded</string>
+    <string name="on_device">ON DEVICE</string>
+    <string name="model_ready">%1$s · ready</string>
+    <string name="model_missing">%1$s · download needed</string>
+    <string name="download_model">Download model · %1$s</string>
+    <string name="model_size_int8">640 MiB</string>
+    <string name="model_size_fp32">2.37 GiB</string>
+    <string name="preparing_download">Preparing download…</string>
+    <string name="downloading">Downloading model · %1$d%%</string>
+    <string name="verifying">Checking model · %1$d%%</string>
+    <string name="download_complete">Model ready. Everything runs on this phone.</string>
+    <string name="decoding">Reading audio…</string>
+    <string name="transcribing">Transcribing… keep the app open.</string>
+    <string name="file_ready">Ready when you are.</string>
+    <string name="transcript">TRANSCRIPT</string>
+    <string name="export">Export</string>
+    <string name="export_description">Save transcript as Cassini JSON</string>
+    <string name="saving">Saving transcript…</string>
+    <string name="saved">Transcript saved. Audio is not included.</string>
+    <string name="empty_title">Load a tape.</string>
+    <string name="empty_hint">WAV, MP3, M4A or Opus. Up to 30 seconds.\nOne recording. Words and timestamps. All local.</string>
+    <string name="loaded_title">Let’s hear it.</string>
+    <string name="loaded_hint">Tap Transcribe to turn this recording into timed words.</string>
+    <string name="no_speech">No speech recognized.</string>
+    <string name="no_speech_hint">Try a clearer recording or another model.</string>
+    <string name="search_hint">Find a word…</string>
+    <string name="clear_search">Clear search</string>
+    <plurals name="search_matches">
+        <item quantity="one">%1$d match</item>
+        <item quantity="other">%1$d matches</item>
+    </plurals>
+    <string name="no_matches">No matches</string>
+    <plurals name="word_count">
+        <item quantity="one">%1$d word</item>
+        <item quantity="other">%1$d words</item>
+    </plurals>
+    <string name="transcript_details">%1$s · %2$s · %3$s</string>
+    <string name="inference_time">Processed in %1$.1f s · tap words to listen</string>
+    <string name="unidentified_voice">VOICE 01 / UNIDENTIFIED</string>
+    <string name="italian">Italian</string>
+    <string name="voice_caption">%1$s · one voice</string>
+    <string name="playback">PLAYBACK</string>
+    <string name="play">Play</string>
+    <string name="pause">Pause</string>
+    <string name="back_ten">Back 10 seconds</string>
+    <string name="forward_ten">Forward 10 seconds</string>
+    <string name="back_ten_label" translatable="false">−10 s</string>
+    <string name="forward_ten_label" translatable="false">+10 s</string>
+    <string name="seek_description">Playback position</string>
+    <string name="position">%1$s / %2$s</string>
+    <string name="interface_language">Interface language</string>
+    <string name="system_language">Follow phone language</string>
+    <string name="english_name" translatable="false">English</string>
+    <string name="italian_name" translatable="false">Italiano</string>
+    <string name="recognition_model">Transcription model</string>
+    <string name="int8_option">INT8 · 640 MiB · smaller, faster</string>
+    <string name="fp32_option">FP32 · 2.37 GiB · full precision</string>
+    <string name="about">About this prototype</string>
+    <string name="about_body">Parakeet v3 on your phone. Audio stays local.\n\nShort clips, one unidentified voice, automatic multilingual recognition. The current transcript language label is Italian.\n\nExport saves Cassini word JSON. Portable Opus files and microphone recording are coming next.</string>
+    <string name="done">Done</string>
+    <string name="cancel">Cancel</string>
+    <string name="error_open">Could not open this recording. Choose the file again.</string>
+    <string name="error_large">This prototype accepts files up to 64 MB.</string>
+    <string name="error_long">Choose a clip of 30 seconds or less.</string>
+    <string name="error_short">Choose at least 200 milliseconds of audio.</string>
+    <string name="error_audio">Could not read this audio. Try PCM16 WAV, MP3, M4A or Opus.</string>
+    <string name="error_wav">Use a 16-bit PCM WAV, or try MP3, M4A or Opus.</string>
+    <string name="error_stalled">Audio decoding stalled. Try another file.</string>
+    <string name="error_empty">This recording contains no audio samples.</string>
+    <string name="error_timings">Word timing could not be read. Try transcribing again.</string>
+    <string name="error_model">Download the selected model first.</string>
+    <string name="error_space">Not enough storage for this model. Free some space and retry.</string>
+    <string name="error_download">Model download failed. Check your connection and retry.</string>
+    <string name="error_verify">Model verification failed. Please download it again.</string>
+    <string name="error_install">Could not save the model. Free some space and retry.</string>
+    <string name="error_save">Could not save the transcript. Choose another location.</string>
+    <string name="error_memory">Not enough memory. Try a shorter clip and close other apps.</string>
+    <string name="error_cancelled">Operation cancelled.</string>
+    <string name="error_unknown">Something went wrong. Please try again.</string>
+    <string name="error_playback">Playback is unavailable for this file.</string>
+    <string name="busy_description">Processing</string>
+</resources>

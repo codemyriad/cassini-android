@@ -32,9 +32,10 @@ The prototype converts SentencePiece tokens to words using their timestamps and 
 - Whole clips, 200 ms–30 seconds; longer imports fail visibly. This avoids adding an arbitrary segmentation policy before testing recognition and memory.
 - One unidentified speaker. A mixed recording has no separate participant tracks; diarization needs another model and a validated attribution/alignment pipeline.
 - Native platform UI, MediaPlayer for playback, PCM16 WAV parser and MediaExtractor/MediaCodec for compressed import. Original rates go to sherpa's resampler. Decoder timestamps preserve container gaps rather than concatenating sparse audio. Import/playback origin and Opus pre-skip need broader mechanical auditing before long-recording claims.
-- Downloads/inference run on a worker thread while the activity stays open. Rotation is handled, but there is no durable job queue, foreground processing service, inference cancellation, interrupted-download resume, or history restoration. Android can terminate a background process or kill it under native memory pressure.
+- Downloads/inference run on a worker thread while the activity stays open. Rotation is handled and the latest completed session restores after reopening or changing the interface language. There is no durable job queue, foreground processing service, inference cancellation, interrupted-download resume, or meeting history. Android can terminate a background process or kill it under native memory pressure.
 - Models download via HTTPS from immutable revisions, with checked sizes/hashes and a verified-install marker. Audio is not uploaded. The prototype requires network only for downloading missing weights.
-- Compile/target API 34 uses the SDK installed in this workspace. Shipping requires a current target SDK, release signing, dependency notices, accessibility/localization work and validation on current devices.
+- The interface has complete English/Italian resources, an in-app language picker and Android 13+ per-app language integration. Recording language and interface language remain separate; the current transcript label remains Italian.
+- Compile/target API 34 uses the SDK installed in this workspace. Shipping requires a current target SDK, release signing, dependency notices, further accessibility checks and validation on current devices.
 
 ## Path to a complete app
 

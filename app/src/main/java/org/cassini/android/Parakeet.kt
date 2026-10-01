@@ -8,7 +8,7 @@ import com.k2fsa.sherpa.onnx.OfflineTransducerModelConfig
 
 object Parakeet {
     fun transcribe(audio: PcmAudio, models: ModelStore): Transcript {
-        require(models.ready()) { "Download Parakeet first." }
+        requireUser(models.ready(), Failure.MODEL)
         val recognizer = OfflineRecognizer(config = OfflineRecognizerConfig(
             featConfig = FeatureConfig(sampleRate = 16000, featureDim = 128, dither = 0f),
             modelConfig = OfflineModelConfig(
@@ -30,7 +30,7 @@ object Parakeet {
                 stream.acceptWaveform(audio.samples, audio.sampleRate)
                 recognizer.decode(stream)
                 val result = recognizer.getResult(stream)
-                check(result.text.isBlank() || result.tokens.isNotEmpty()) { "Parakeet returned text without timed tokens." }
+                requireUser(result.text.isBlank() || result.tokens.isNotEmpty(), Failure.TIMINGS)
                 return Transcript.fromTokens(result.tokens, result.timestamps, result.durations)
             } finally {
                 stream.release()

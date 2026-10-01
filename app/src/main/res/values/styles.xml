@@ -1,0 +1,12 @@
+<resources>
+    <style name="Theme.Cassini.Base" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#F4C56A</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">#10120F</item>
+        <item name="android:navigationBarColor">#10120F</item>
+        <item name="android:windowBackground">#10120F</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+    <style name="Theme.Cassini" parent="Theme.Cassini.Base" />
+</resources>

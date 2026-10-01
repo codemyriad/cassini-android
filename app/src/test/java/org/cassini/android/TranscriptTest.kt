@@ -5,6 +5,21 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class TranscriptTest {
+    @Test fun sessionRoundTripPreservesLanguageAndOverlappingTurnOrder() {
+        val original = Transcript(listOf(Word("a", 2000, 2500, "perché?"), Word("b", 1000, 2200, "Ciao.")), "it")
+        assertEquals(original, Transcript.fromJson(original.json()))
+    }
+
+    @Test fun restoredBodyTreatsNullItemsAsEmptyWithoutAssumingALanguage() {
+        val restored = Transcript.fromJson("""{"format":"cassini.words.v1","items":null,"wordCount":0,"futureHint":true}""")
+        assertTrue(restored.words.isEmpty())
+        assertEquals("", restored.language)
+    }
+
+    @Test(expected = IllegalArgumentException::class) fun rejectsCorruptPersistedWordExtents() {
+        Transcript.fromJson("""{"format":"cassini.words.v1","items":[{"speaker":"a","startMs":900,"endMs":100,"text":"ciao"}]}""")
+    }
+
     @Test fun italianPiecesAndDelayedPunctuationKeepAcousticExtent() {
         val transcript = Transcript.fromTokens(
             arrayOf("▁C", "iao", ",", "▁per", "ché", "?", "▁Sì", "."),

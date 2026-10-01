@@ -13,7 +13,7 @@ An earlier INT8 run took 6.754 seconds and produced the same text. The table use
 
 FP32 and INT8 produced the same word sequence except for a comma after “galleggia” and a trailing “Il” in the INT8 result at the clip boundary. No human reference or word-error-rate evaluation has been completed for this excerpt. This comparison does not establish that FP32 is more accurate. On the separate FLEURS Italian fixture, the INT8 result contained lexical errors, including “Antarti” for “Antartide”; successful execution is distinct from recognition quality.
 
-Validation completed:
+Initial prototype validation completed:
 
 - Seven JVM tests covering Italian SentencePiece reconstruction, accented text/apostrophes, delayed punctuation, empty speech, speaker-turn order and invalid timing rejection.
 - Three Android device tests passing with each precision: real WAV decoding, actual native recognition, and AAC/MP3/Opus duration/onset comparison against WAV. Compressed duration and onset tolerance is 100 ms, not a precise alignment certification.
@@ -24,3 +24,16 @@ Validation completed:
 The generated bodies and metrics remain in the phone's private app storage and in local ignored `.tools/` artifacts. Reproduce the checks with the commands in [README.md](../README.md). Both model bundles remain installed; the supplied WAV is in the phone's Downloads directory as `cassini-italian-28-58.wav`.
 
 Storage cleanup removed the two explicitly approved Gemma/Qwen downloads and requested Android cache trimming. About 5.5 GB was recovered. After retaining both Parakeet bundles, the phone reports approximately **4.5 GB free**. Photos, recordings, Maps data and the Linux Terminal environment were retained.
+
+## Interface update (0.2)
+
+English and Italian resources now cover controls, dialogs, progress, failures, accessibility descriptions and plurals. The native interface uses dark cassette-deck surfaces, amber controls, sentence paragraphs and a fixed playback deck. Switching language or reopening the activity restores the latest recording, transcript and playback position.
+
+Validation on the same Pixel:
+
+- Ten JVM tests pass, including transcript persistence and invalid saved timing rejection.
+- Four Android tests pass with INT8 on the supplied excerpt, including English → Italian → English switching, session/playback restoration and search/clear-search.
+- Manual checks in both languages confirm translated labels, localized decimal formatting, word-tap playback/highlighting and ±10-second skips. The actual activity transcribed the 30-second sample in 5.736 seconds; this is another uncontrolled short-clip measurement.
+- Debug build and lint pass with no errors. Localization, launcher icon and backup configuration warnings from the initial prototype are addressed.
+
+The updated APK is installed on the Pixel with both existing model bundles retained.

@@ -22,16 +22,16 @@ object AudioDecoder {
         val local = File.createTempFile("audio-", ".input", context.cacheDir)
         try {
             context.contentResolver.openInputStream(uri).use { input ->
-                requireNotNull(input) { "Cannot open recording." }
+                val source = input ?: throw UserFacingException(Failure.OPEN)
                 local.outputStream().use { output ->
                     val buffer = ByteArray(64 * 1024)
                     var size = 0L
                     while (true) {
-                        check(!Thread.currentThread().isInterrupted) { "Cancelled" }
-                        val n = input.read(buffer)
+                        requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
+                        val n = source.read(buffer)
                         if (n < 0) break
                         size += n
-                        require(size <= 64 * 1024 * 1024) { "Prototype import limit is 64 MB." }
+                        requireUser(size <= 64 * 1024 * 1024, Failure.LARGE)
                         output.write(buffer, 0, n)
                     }
                 }
@@ -59,25 +59,25 @@ object AudioDecoder {
             val id = ByteArray(4).also(file::readFully).toString(Charsets.US_ASCII)
             val size = Integer.reverseBytes(file.readInt()).toLong() and 0xffffffffL
             val offset = file.filePointer
-            require(offset + size <= file.length()) { "Truncated WAV chunk." }
+            requireUser(offset + size <= file.length(), Failure.AUDIO)
             when (id) {
                 "fmt " -> {
-                    require(size >= 16) { "Invalid WAV format." }
+                    requireUser(size >= 16, Failure.AUDIO)
                     val format = java.lang.Short.reverseBytes(file.readShort()).toInt() and 0xffff
                     channels = java.lang.Short.reverseBytes(file.readShort()).toInt() and 0xffff
                     sampleRate = Integer.reverseBytes(file.readInt())
                     file.skipBytes(6)
                     val bits = java.lang.Short.reverseBytes(file.readShort()).toInt() and 0xffff
-                    require(format == 1 && bits == 16) { "Use a 16-bit PCM WAV, or MP3/M4A/FLAC/Opus." }
+                    requireUser(format == 1 && bits == 16, Failure.WAV)
                 }
                 "data" -> { dataOffset = offset; dataSize = size }
             }
             file.seek(offset + size + (size and 1))
         }
-        require(sampleRate in 8000..96000 && channels in 1..2 && dataOffset >= 0) { "Invalid WAV audio." }
-        require(dataSize % (2 * channels) == 0L) { "Partial WAV sample." }
+        requireUser(sampleRate in 8000..96000 && channels in 1..2 && dataOffset >= 0, Failure.AUDIO)
+        requireUser(dataSize % (2 * channels) == 0L, Failure.AUDIO)
         val frames = dataSize / (2 * channels)
-        require(frames in 1..(sampleRate.toLong() * MAX_SECONDS)) { "Choose a clip of 30 seconds or less." }
+        requireUser(frames in 1..(sampleRate.toLong() * MAX_SECONDS), Failure.LONG)
         file.seek(dataOffset)
         val pcm = ByteArray(dataSize.toInt()).also(file::readFully)
         val samples = FloatArray(frames.toInt())
@@ -98,13 +98,11 @@ object AudioDecoder {
             extractor.setDataSource(file.absolutePath)
             val track = (0 until extractor.trackCount).firstOrNull {
                 extractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true
-            } ?: error("No supported audio track in recording.")
+            } ?: throw UserFacingException(Failure.AUDIO)
             extractor.selectTrack(track)
             val format = extractor.getTrackFormat(track)
             if (format.containsKey(MediaFormat.KEY_DURATION)) {
-                require(format.getLong(MediaFormat.KEY_DURATION) <= MAX_SECONDS * 1_000_000L) {
-                    "Choose a clip of 30 seconds or less."
-                }
+                requireUser(format.getLong(MediaFormat.KEY_DURATION) <= MAX_SECONDS * 1_000_000L, Failure.LONG)
             }
             val mime = requireNotNull(format.getString(MediaFormat.KEY_MIME))
             val codec = MediaCodec.createDecoderByType(mime)
@@ -123,8 +121,8 @@ object AudioDecoder {
             val info = MediaCodec.BufferInfo()
             var lastProgress = System.nanoTime()
             while (!outputEnded) {
-                check(!Thread.currentThread().isInterrupted) { "Cancelled" }
-                check(System.nanoTime() - lastProgress < 30_000_000_000L) { "Audio decoder stalled." }
+                requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
+                requireUser(System.nanoTime() - lastProgress < 30_000_000_000L, Failure.STALLED)
                 if (!inputEnded) {
                     val index = codec.dequeueInputBuffer(10_000)
                     if (index >= 0) {
@@ -144,7 +142,7 @@ object AudioDecoder {
                     MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                         val output = codec.outputFormat
                         val nextRate = output.getInteger(MediaFormat.KEY_SAMPLE_RATE)
-                        require(count == 0 || nextRate == sampleRate) { "Changing sample rates are unsupported." }
+                        requireUser(count == 0 || nextRate == sampleRate, Failure.AUDIO)
                         sampleRate = nextRate
                         channels = output.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
                         encoding = if (output.containsKey(MediaFormat.KEY_PCM_ENCODING))
@@ -152,31 +150,25 @@ object AudioDecoder {
                     }
                     else -> if (index >= 0) {
                         try {
-                            require(sampleRate in 8000..96000 && channels in 1..2) { "Only mono/stereo audio is supported." }
-                            require(encoding == AudioFormat.ENCODING_PCM_16BIT || encoding == AudioFormat.ENCODING_PCM_FLOAT) {
-                                "Unsupported decoded PCM format."
-                            }
+                            requireUser(sampleRate in 8000..96000 && channels in 1..2, Failure.AUDIO)
+                            requireUser(encoding == AudioFormat.ENCODING_PCM_16BIT || encoding == AudioFormat.ENCODING_PCM_FLOAT, Failure.AUDIO)
                             if (info.size > 0) {
                                 val destination = pcm ?: FloatArray(sampleRate * MAX_SECONDS).also { pcm = it }
                                 val buffer = requireNotNull(codec.getOutputBuffer(index)).order(ByteOrder.LITTLE_ENDIAN)
                                 buffer.position(info.offset)
                                 buffer.limit(info.offset + info.size)
                                 val sampleBytes = if (encoding == AudioFormat.ENCODING_PCM_FLOAT) 4 else 2
-                                require(info.size % (sampleBytes * channels) == 0) { "Partial decoded PCM frame." }
+                                requireUser(info.size % (sampleBytes * channels) == 0, Failure.AUDIO)
                                 val frames = info.size / (sampleBytes * channels)
                                 // Keep real container gaps as silence. The player and words share a zero origin.
-                                require(info.presentationTimeUs <= MAX_SECONDS * 1_000_000L) {
-                                    "Choose a clip of 30 seconds or less."
-                                }
+                                requireUser(info.presentationTimeUs <= MAX_SECONDS * 1_000_000L, Failure.LONG)
                                 val firstFrame = (info.presentationTimeUs.coerceAtLeast(0) * sampleRate / 1_000_000).toInt()
-                                require(firstFrame.toLong() + frames <= destination.size) {
-                                    "Choose a clip of 30 seconds or less."
-                                }
+                                requireUser(firstFrame.toLong() + frames <= destination.size, Failure.LONG)
                                 repeat(frames) { frame ->
                                     var sum = 0f
                                     repeat(channels) {
                                         val sample = if (sampleBytes == 4) buffer.float else buffer.short / 32768f
-                                        require(sample.isFinite()) { "Invalid audio sample." }
+                                        requireUser(sample.isFinite(), Failure.AUDIO)
                                         sum += sample
                                     }
                                     destination[firstFrame + frame] = sum / channels
@@ -191,7 +183,7 @@ object AudioDecoder {
                     }
                 }
             }
-            require(count > 0) { "Recording contains no audio samples." }
+            requireUser(count > 0, Failure.EMPTY)
             return PcmAudio(requireNotNull(pcm).copyOf(count), sampleRate)
         } finally {
             try { if (started) decoder?.stop() } finally {

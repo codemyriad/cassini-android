@@ -7,6 +7,7 @@ import java.security.MessageDigest
 
 class ModelStore(private val directory: File, val fp32: Boolean = false) {
     data class Artifact(val name: String, val size: Long, val sha256: String)
+    data class Progress(val percent: Int, val verifying: Boolean = false)
     companion object {
         const val REVISION = "2bda32ec70b097a55adaa07d9a7173915b43cc78"
         const val REPOSITORY = "csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8"
@@ -41,7 +42,7 @@ class ModelStore(private val directory: File, val fp32: Boolean = false) {
         file.inputStream().buffered().use { input ->
             val bytes = ByteArray(128 * 1024)
             while (true) {
-                check(!Thread.currentThread().isInterrupted) { "Cancelled" }
+                requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
                 val count = input.read(bytes)
                 if (count < 0) break
                 hash.update(bytes, 0, count)
@@ -50,46 +51,51 @@ class ModelStore(private val directory: File, val fp32: Boolean = false) {
         return hash.digest().joinToString("") { "%02x".format(it) }
     }
 
-    fun install(progress: (String) -> Unit) {
+    fun install(progress: (Progress) -> Unit) {
         directory.mkdirs()
         val remaining = artifacts.filter { File(directory, it.name).length() != it.size }.sumOf { it.size }
-        require(directory.usableSpace > remaining + 128 * 1024 * 1024L) { "Insufficient space for $precision model." }
+        requireUser(directory.usableSpace > remaining + 128 * 1024 * 1024L, Failure.SPACE)
         File(directory, "verified").delete()
+        val total = artifacts.sumOf { it.size }
+        var completed = 0L
         artifacts.forEach { artifact ->
             val destination = File(directory, artifact.name)
-            if (destination.length() == artifact.size && digest(destination) == artifact.sha256) return@forEach
-            require(directory.usableSpace > artifact.size + 32 * 1024 * 1024) { "Insufficient space for Parakeet." }
+            if (destination.length() == artifact.size && digest(destination) == artifact.sha256) {
+                completed += artifact.size
+                progress(Progress((completed * 100 / total).toInt(), true))
+                return@forEach
+            }
+            requireUser(directory.usableSpace > artifact.size + 32 * 1024 * 1024, Failure.SPACE)
             val partial = File(directory, "${artifact.name}.part")
             val connection = URL("https://huggingface.co/$repository/resolve/$revision/${artifact.name}")
                 .openConnection() as HttpURLConnection
             connection.connectTimeout = 30_000
             connection.readTimeout = 30_000
             try {
-                require(connection.responseCode == 200) { "Model download failed: HTTP ${connection.responseCode}" }
+                if (connection.responseCode != 200) throw UserFacingException(Failure.DOWNLOAD, "HTTP ${connection.responseCode}")
                 connection.inputStream.buffered().use { input ->
                     partial.outputStream().buffered().use { output ->
                         val bytes = ByteArray(128 * 1024)
                         var received = 0L
                         var lastUpdate = 0L
                         while (true) {
-                            check(!Thread.currentThread().isInterrupted) { "Cancelled" }
+                            requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
                             val count = input.read(bytes)
                             if (count < 0) break
                             received += count
-                            require(received <= artifact.size) { "Unexpected model download size." }
+                            requireUser(received <= artifact.size, Failure.VERIFY)
                             output.write(bytes, 0, count)
                             if (System.currentTimeMillis() - lastUpdate > 500) {
-                                progress("Downloading ${artifact.name}: ${received * 100 / artifact.size}%")
+                                progress(Progress(((completed + received) * 100 / total).toInt()))
                                 lastUpdate = System.currentTimeMillis()
                             }
                         }
                     }
                 }
-                progress("Verifying ${artifact.name}…")
-                require(partial.length() == artifact.size && digest(partial) == artifact.sha256) {
-                    "Model checksum failed: ${artifact.name}"
-                }
-                require(partial.renameTo(destination)) { "Could not install ${artifact.name}" }
+                progress(Progress(((completed + artifact.size) * 100 / total).toInt(), true))
+                requireUser(partial.length() == artifact.size && digest(partial) == artifact.sha256, Failure.VERIFY)
+                requireUser(partial.renameTo(destination), Failure.INSTALL)
+                completed += artifact.size
             } finally {
                 connection.disconnect()
                 partial.delete()

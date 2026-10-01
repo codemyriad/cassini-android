@@ -1,0 +1,21 @@
+<resources>
+    <item name="settings_button" type="id" />
+    <item name="model_status" type="id" />
+    <item name="recording_name" type="id" />
+    <item name="open_button" type="id" />
+    <item name="transcribe_button" type="id" />
+    <item name="download_button" type="id" />
+    <item name="operation_status" type="id" />
+    <item name="export_button" type="id" />
+    <item name="transcript_details" type="id" />
+    <item name="search_input" type="id" />
+    <item name="clear_search_button" type="id" />
+    <item name="search_matches" type="id" />
+    <item name="transcript_text" type="id" />
+    <item name="content_scroll" type="id" />
+    <item name="playback_position" type="id" />
+    <item name="playback_seek" type="id" />
+    <item name="play_button" type="id" />
+    <item name="back_button" type="id" />
+    <item name="forward_button" type="id" />
+</resources>
