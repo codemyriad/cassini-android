@@ -18,7 +18,7 @@ python3 scripts/fetch-smoke-audio.py  # requires ffmpeg
 ./scripts/device-smoke.sh int8 youtube-long
 ```
 
-Set `ANDROID_SERIAL` when several devices are connected. To verify CI’s actual APK, set `CASSINI_APK=/absolute/path/to/downloaded.apk`; the script builds the instrumentation APK and installs the supplied app APK.
+Unlock the phone first. The script wakes it and dismisses an unsecured keyguard, but fails early if authentication is still required. Set `ANDROID_SERIAL` when several devices are connected. To verify CI’s actual APK, set `CASSINI_APK=/absolute/path/to/downloaded.apk`; the script detects debug/release and builds the matching instrumentation APK. To use both binaries from CI, also set `CASSINI_TEST_APK=/absolute/path/to/test.apk`. The `cassini-android-device-tests` artifact contains that test APK. Kotlin’s internal method names differ across variants, so a debug test APK cannot reliably exercise a release app.
 
 The supplied sample is [il Pericolo Invisibile](https://www.youtube.com/watch?v=UmZwQf5TV3c), 00:28–00:58 (30 seconds), or 00:28–03:28 (three minutes). Local FLEURS fixtures record the pinned revision, reference text and CC-BY-4.0 attribution. These audio files are not distributed here.
 

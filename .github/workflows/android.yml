@@ -46,6 +46,11 @@ jobs:
           chmod 600 "$HOME/.android/debug.keystore"
           echo "CASSINI_BETA_KEYSTORE_FILE=$HOME/.android/debug.keystore" >> "$GITHUB_ENV"
       - run: ./scripts/setup.sh
+      - name: Fetch attributed device test fixtures
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          python3 scripts/fetch-smoke-audio.py
       - name: Build APK, run unit and conformance tests, and lint
         env:
           BUILD_TYPE: ${{ startsWith(github.ref, 'refs/tags/') && 'Release' || 'Debug' }}
@@ -53,7 +58,9 @@ jobs:
           ./gradlew --no-daemon \
             -PcassiniConformanceDir="$GITHUB_WORKSPACE/.tools/cassini-format/spec/conformance" \
             -PrequireCassiniConformance=true \
-            ":app:assemble$BUILD_TYPE" :app:testDebugUnitTest ":app:lint$BUILD_TYPE"
+            -PdeviceTestBuildType="${BUILD_TYPE,,}" \
+            ":app:assemble$BUILD_TYPE" ":app:assemble${BUILD_TYPE}AndroidTest" \
+            :app:testDebugUnitTest ":app:lint$BUILD_TYPE"
       - name: Prepare installable APK
         env:
           TAG: ${{ github.ref_name }}
@@ -70,6 +77,12 @@ jobs:
           name: cassini-android
           compression-level: 0
           path: dist/*
+          if-no-files-found: error
+      - name: Upload matching device test APK
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cassini-android-device-tests
+          path: app/build/outputs/apk/androidTest/*/*.apk
           if-no-files-found: error
       - name: Upload test and lint reports
         if: always()

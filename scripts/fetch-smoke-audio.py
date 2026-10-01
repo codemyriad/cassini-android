@@ -28,6 +28,8 @@ row = next(line.split("\t") for line in tsv.splitlines() if FILENAME in line)
 (ASSETS / "italian-smoke.json").write_text(json.dumps({
     "source": BASE, "revision": REVISION, "filename": FILENAME,
     "reference": row[2], "license": "CC-BY-4.0", "attribution": "Google FLEURS contributors",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "modifications": "Converted to PCM16 WAV, AAC, MP3 and Opus for decoder regression checks",
 }, ensure_ascii=False, indent=2))
 for suffix, options in {
     "wav": ["-c:a", "pcm_s16le"], "m4a": ["-c:a", "aac", "-b:a", "96k"],

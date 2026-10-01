@@ -15,6 +15,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
     }
+    testBuildType = providers.gradleProperty("deviceTestBuildType").getOrElse("debug")
     val betaKeystore = providers.environmentVariable("CASSINI_BETA_KEYSTORE_FILE").orNull
     signingConfigs {
         if (betaKeystore != null) create("beta") {
