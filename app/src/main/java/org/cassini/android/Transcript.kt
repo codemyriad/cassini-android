@@ -6,6 +6,15 @@ import kotlin.math.roundToLong
 
 data class Word(val speaker: String, val startMs: Long, val endMs: Long, val text: String)
 
+/**
+ * Decode scaffolding, never transcript data: [capMs] is the furthest end [WordGate] may extend
+ * the word to over its speaker's continuing audio, the end of its last piece INCLUDING trailing
+ * punctuation. A cap not above the word's end permits no extension.
+ */
+internal data class TimedWord(val word: Word, val capMs: Long = 0) {
+    val extentCapMs: Long get() = if (capMs > word.endMs) capMs else word.endMs
+}
+
 /** Word order is canonical; never sort a Cassini transcript by time. */
 data class Transcript(val words: List<Word>, val language: String = "it") {
     fun json(): String = JSONObject()
@@ -37,16 +46,28 @@ data class Transcript(val words: List<Word>, val language: String = "it") {
         }
 
         /** SentencePiece pieces carry seconds, including TDT durations. No guessed alignment. */
-        fun fromTokens(tokens: Array<String>, timestamps: FloatArray, durations: FloatArray): Transcript {
+        fun fromTokens(tokens: Array<String>, timestamps: FloatArray, durations: FloatArray): Transcript =
+            Transcript(timedWordsFromTokens(tokens, timestamps, durations).map { it.word })
+
+        /**
+         * [fromTokens] words with their extension cap: the end of the word's last piece, punctuation
+         * included. Only a word with a speech-bearing piece gets one; a mark alone has no audio of its
+         * own, and its timestamp is the next onset, so a cap would walk it over the next word.
+         */
+        internal fun timedWordsFromTokens(tokens: Array<String>, timestamps: FloatArray, durations: FloatArray): List<TimedWord> {
             requireUser(tokens.size == timestamps.size && tokens.size == durations.size, Failure.TIMINGS)
-            val words = mutableListOf<Word>()
+            val words = mutableListOf<TimedWord>()
             val text = StringBuilder()
             var start = 0L
             var speechEnd = 0L
+            var pieceEnd = 0L
+            var spoken = false
             var previousTimestamp = -1f
             fun flush() {
-                if (text.isNotEmpty()) words += Word("spk_1", start, maxOf(start, speechEnd), text.toString())
+                val end = maxOf(start, speechEnd)
+                if (text.isNotEmpty()) words += TimedWord(Word("spk_1", start, end, text.toString()), if (spoken) maxOf(end, pieceEnd) else end)
                 text.clear()
+                spoken = false
             }
             tokens.forEachIndexed { i, original ->
                 val timestamp = timestamps[i]
@@ -62,17 +83,21 @@ data class Transcript(val words: List<Word>, val language: String = "it") {
                     if (text.isEmpty()) {
                         start = (timestamp.toDouble() * 1000).roundToLong()
                         speechEnd = start
+                        pieceEnd = start
                     }
                     text.append(piece)
+                    val end = ((timestamp.toDouble() + duration) * 1000).roundToLong()
+                    pieceEnd = maxOf(pieceEnd, end)
                     // Punctuation can be stamped at the NEXT acoustic onset. Preserve its text,
                     // but do not stretch the previous word across the intervening silence.
                     if (piece.any { it.isLetterOrDigit() }) {
-                        speechEnd = maxOf(speechEnd, ((timestamp.toDouble() + duration) * 1000).roundToLong())
+                        spoken = true
+                        speechEnd = maxOf(speechEnd, end)
                     }
                 }
             }
             flush()
-            return Transcript(words)
+            return words
         }
     }
 }
