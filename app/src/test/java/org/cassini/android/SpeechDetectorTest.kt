@@ -34,6 +34,42 @@ class SpeechDetectorTest {
         assertEquals(512 - 300, fed.size - samples.size)
     }
 
+    @Test fun feedReturnsTheZeroPaddingOfTheLastWindow() {
+        assertEquals(512 - 300, SpeechDetector.feed(FakeStream(), FloatArray(16000 * 12 + 300)) {})
+        assertEquals(511, SpeechDetector.feed(FakeStream(), FloatArray(1)) {})
+        assertEquals(0, SpeechDetector.feed(FakeStream(), FloatArray(1024)) {})
+        assertEquals(0, SpeechDetector.feed(FakeStream(), FloatArray(0)) {})
+    }
+
+    /** gocassini stt_chunk_test.go TestSamplesToCeilMSMatchesActualVADTailPadding. */
+    @Test fun samplesToCeilMsMatchesTheVadTailPadding() {
+        assertEquals(0L, samplesToCeilMs(0, 16000))
+        assertEquals(32L, samplesToCeilMs(511, 16000))
+        assertEquals(500L, samplesToCeilMs(8000, 16000))
+        assertEquals(0L, samplesToCeilMs(-1, 16000))
+        assertEquals(0L, samplesToCeilMs(100, 0))
+        assertEquals(134_218L, samplesToCeilMs(Int.MAX_VALUE, 16_000_000))
+    }
+
+    @Test fun scanReportsTheTailPaddingOfTheSixteenKilohertzCopy() {
+        // 480300 samples at 48 kHz: a 160100-sample copy, 156 zeros in its last window, ceil(9.75) = 10 ms.
+        val audio = PcmAudio(FloatArray(480300), 48000)
+        val stream = FakeStream(mapOf(313 to listOf(SpeechSegment(159744, FloatArray(512)))))
+        val spans = mutableListOf<Span>()
+        val paddedTailMs = SpeechDetector.scan(stream, audio, spans::add)
+        assertEquals(10L, paddedTailMs)
+        assertEquals(156, stream.windows.size * 512 - 160100)
+        // The span still stops at the recording's end; the padding travels separately.
+        assertEquals(listOf(Span(479232, 480300)), spans)
+        // The desktop clamp keeps a word starting by audioEndMs + paddedTailMs as a zero-length end word.
+        val audioEndMs = audio.durationMs
+        assertEquals(10006L, audioEndMs)
+        assertTrue(10011 <= audioEndMs + paddedTailMs)
+        assertFalse(10017 <= audioEndMs + paddedTailMs)
+        // A copy ending on a window boundary has no padding: only words at audioEndMs itself survive.
+        assertEquals(0L, SpeechDetector.scan(FakeStream(), PcmAudio(FloatArray(512 * 3 * 3), 48000)) {})
+    }
+
     @Test fun resetsOnceDrainsEveryFiveSecondsThenFlushesAndDrains() {
         val samples = FloatArray(16000 * 12 + 300)
         val stream = FakeStream()

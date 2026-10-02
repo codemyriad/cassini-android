@@ -9,6 +9,10 @@ import java.io.File
 /** Half-open sample range [start, end) of a recording, at the recording's own rate. */
 internal data class Span(val start: Int, val end: Int)
 
+/** Duration of [samples] at [rate] rounded up to whole milliseconds; 0 for non-positive input. */
+internal fun samplesToCeilMs(samples: Int, rate: Int): Long =
+    if (samples <= 0 || rate <= 0) 0 else (samples.toLong() * 1000 + rate - 1) / rate
+
 /**
  * Silero VAD over a 16 kHz copy of the recording, configured and fed as the desktop pipeline does on a
  * stock sherpa runtime (gocassini transcribe/stt.go). Speech spans reach the caller in order, at the
@@ -49,9 +53,10 @@ internal class SpeechDetector(modelPath: String) : AutoCloseable {
         /**
          * Resets [stream] once, feeds exact [WINDOW]-sample windows of 16 kHz [samples], zero-pads the last
          * partial window, drains completed segments every [DRAIN_EVERY] real samples fed, then flushes and
-         * drains the rest. Empty segments are skipped. Interruption is checked at every drain.
+         * drains the rest. Empty segments are skipped. Interruption is checked at every drain. Returns the
+         * zeros appended to the last window, 0 when it was full: the detector heard that much synthetic tail.
          */
-        fun feed(stream: Stream, samples: FloatArray, onSegment: (SpeechSegment) -> Unit) {
+        fun feed(stream: Stream, samples: FloatArray, onSegment: (SpeechSegment) -> Unit): Int {
             fun drain() {
                 requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
                 while (!stream.empty()) {
@@ -62,10 +67,12 @@ internal class SpeechDetector(modelPath: String) : AutoCloseable {
             }
             stream.reset()
             var sinceDrain = 0
+            var padding = 0
             var offset = 0
             while (offset < samples.size) {
                 val end = minOf(offset + WINDOW, samples.size)
                 // A short final window keeps the zeros it was allocated with.
+                padding = WINDOW - (end - offset)
                 stream.acceptWaveform(FloatArray(WINDOW).also { samples.copyInto(it, 0, offset, end) })
                 sinceDrain += end - offset
                 if (sinceDrain >= DRAIN_EVERY) {
@@ -76,6 +83,20 @@ internal class SpeechDetector(modelPath: String) : AutoCloseable {
             }
             stream.flush()
             drain()
+            return padding
+        }
+
+        /**
+         * Feeds the 16 kHz copy of [audio] to [stream], passes each span mapped to the recording to [onSpan],
+         * and returns the zero padding of the last window in milliseconds, rounded up. Spans stop at the
+         * recording's end, so a caller clamping decoded words to the timeline needs this value to keep a
+         * word stamped inside that padding as a zero-length word at the end, as the desktop does.
+         */
+        fun scan(stream: Stream, audio: PcmAudio, onSpan: (Span) -> Unit): Long {
+            val padding = feed(stream, resampleTo16k(audio.samples, audio.sampleRate)) { segment ->
+                recordingSpan(segment.start, segment.samples.size, audio.sampleRate, audio.samples.size)?.let(onSpan)
+            }
+            return samplesToCeilMs(padding, VAD_SAMPLE_RATE)
         }
 
         /**
@@ -106,12 +127,11 @@ internal class SpeechDetector(modelPath: String) : AutoCloseable {
         override fun flush() = vad.flush()
     }
 
-    /** Calls [onSpan] with each speech span of [audio], in order. Reusable: every call starts from a reset. */
-    fun detect(audio: PcmAudio, onSpan: (Span) -> Unit) {
-        feed(stream, resampleTo16k(audio.samples, audio.sampleRate)) { segment ->
-            recordingSpan(segment.start, segment.samples.size, audio.sampleRate, audio.samples.size)?.let(onSpan)
-        }
-    }
+    /**
+     * Calls [onSpan] with each speech span of [audio], in order, and returns the detector's tail padding in
+     * milliseconds for the timeline clamp (see [scan]). Reusable: every call starts from a reset.
+     */
+    fun detect(audio: PcmAudio, onSpan: (Span) -> Unit): Long = scan(stream, audio, onSpan)
 
     override fun close() = vad.release()
 }
