@@ -26,6 +26,8 @@ Full texts and copyright notices are checked in under [app assets](app/src/main/
 
 [NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) weights are CC-BY-4.0, with ONNX conversion published by the sherpa-onnx maintainer. Weights are downloaded separately and are not in the APK. Model revisions and hashes are in `ModelStore.kt`. Cassini runs on-device inference with the converted model.
 
+[Silero VAD](https://github.com/snakers4/silero-vad) is MIT-licensed. Its ONNX model (`silero_vad.onnx`, 630 KB) is downloaded separately from the sherpa-onnx `asr-models` release and is not in the APK. Its size and SHA-256 are in `ModelStore.kt`.
+
 [Google FLEURS](https://huggingface.co/datasets/google/fleurs) is CC-BY-4.0. Its pinned source, attribution and reference text accompany locally fetched device fixtures; those files are not in the distributed APK or repository. README screenshots show an excerpt of [il Pericolo Invisibile](https://www.youtube.com/watch?v=UmZwQf5TV3c) by Dario Bressanini, used for the documented device checks. No sample audio is distributed.
 
 JUnit, AndroidX Test and the JVM JSON dependency are test-only dependencies and are not packaged in the app APK.

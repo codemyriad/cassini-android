@@ -43,12 +43,12 @@ class SpeechDetectorTest {
 
     /** gocassini stt_chunk_test.go TestSamplesToCeilMSMatchesActualVADTailPadding. */
     @Test fun samplesToCeilMsMatchesTheVadTailPadding() {
-        assertEquals(0L, samplesToCeilMs(0, 16000))
-        assertEquals(32L, samplesToCeilMs(511, 16000))
-        assertEquals(500L, samplesToCeilMs(8000, 16000))
-        assertEquals(0L, samplesToCeilMs(-1, 16000))
-        assertEquals(0L, samplesToCeilMs(100, 0))
-        assertEquals(134_218L, samplesToCeilMs(Int.MAX_VALUE, 16_000_000))
+        assertEquals(0L, SpeechWindows.ceilMs(0, 16000))
+        assertEquals(32L, SpeechWindows.ceilMs(511, 16000))
+        assertEquals(500L, SpeechWindows.ceilMs(8000, 16000))
+        assertEquals(0L, SpeechWindows.ceilMs(-1, 16000))
+        assertEquals(0L, SpeechWindows.ceilMs(100, 0))
+        assertEquals(134_218L, SpeechWindows.ceilMs(Int.MAX_VALUE, 16_000_000))
     }
 
     @Test fun scanReportsTheTailPaddingOfTheSixteenKilohertzCopy() {

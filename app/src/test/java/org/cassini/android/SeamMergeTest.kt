@@ -177,4 +177,57 @@ class SeamMergeTest {
         assertEquals(1L, SeamMerge.midpointMs(w("x", 1, 2)))
         assertEquals(5L, SeamMerge.midpointMs(w("x", 5, 5)))
     }
+
+    // A forced cut at 11.0 s decoded with a second of the recording on each side: the overlap is 10.0 to 12.0 s.
+    private fun splice(acc: List<Word>, next: List<Word>) = SeamMerge.splice(acc, next, 10_000, 2_000)
+
+    @Test fun aWordTheCutRunsThroughIsKeptOnceAndEachEdgeComesFromTheOtherDecode() {
+        val acc = listOf(w("prima", 9_000, 9_400), w("la", 10_600, 10_750), w("batterica.", 10_780, 11_300), w("poi", 11_350, 11_600),
+            w("tronc", 11_800, 12_000))
+        val next = listOf(w("ella", 10_050, 10_300), w("la", 10_620, 10_760), w("batterica.", 10_800, 11_310), w("poi", 11_360, 11_610),
+            w("troncato", 11_790, 12_300), w("dopo", 12_350, 12_600))
+        val got = splice(acc, next)
+        assertEquals(listOf("prima", "la", "batterica.", "poi", "troncato", "dopo"), got.map { it.text })
+        // Joined at the agreed word nearest the cut: the earlier decode up to it, the later one after it.
+        assertSame(acc[2], got[2])
+        assertSame(next[3], got[3])
+    }
+
+    @Test fun twoReadingsOfTheSameAudioAtACutKeepOne() {
+        val got = splice(listOf(w("della", 10_400, 10_700), w("batterica.", 10_780, 11_300)),
+            listOf(w("della", 10_410, 10_700), w("batteria", 10_790, 11_250), w("dopo", 11_400, 11_700)))
+        assertEquals(listOf("della", "batteria", "dopo"), got.map { it.text })
+    }
+
+    @Test fun aWordTimedOnOppositeSidesOfTheCutIsNeitherLostNorDoubled() {
+        // The same short word 240 ms apart: too far for a lone pair in the window merge, and with no time in common.
+        for ((early, late) in listOf(11_040L to 10_800L, 10_800L to 11_040L)) {
+            val got = splice(listOf(w("prima", 9_000, 9_400), w("sì", early, early + 80)), listOf(w("sì", late, late + 80), w("dopo", 12_100, 12_400)))
+            assertEquals(listOf("prima", "sì", "dopo"), got.map { it.text })
+        }
+    }
+
+    @Test fun oneReadingOfASplitWordIsTakenWhole() {
+        // One decode hears a word, the other two shorter ones: never half of each.
+        val acc = listOf(w("che", 10_300, 10_500), w("alimento", 10_800, 11_240))
+        val next = listOf(w("che", 10_310, 10_500), w("a", 10_840, 10_920), w("lento", 10_920, 11_280), w("dopo", 11_500, 11_800))
+        assertEquals(listOf("che", "a", "lento", "dopo"), splice(acc, next).map { it.text })
+        // Without any agreed word the join is an instant outside every word: again one whole reading.
+        val alone = splice(listOf(w("alimento", 10_800, 11_240)), listOf(w("a", 10_840, 10_920), w("lento", 10_920, 11_280)))
+        assertTrue(alone.map { it.text }.toString(), alone.map { it.text } in listOf(listOf("alimento"), listOf("a", "lento")))
+    }
+
+    @Test fun wordsOnlyOneDecodeFoundStayOnItsOwnSideOfTheJoin() {
+        val acc = listOf(w("prima", 10_200, 10_500), w("fantasma", 11_500, 11_700))
+        val next = listOf(w("eco", 10_550, 10_700), w("dopo", 11_800, 12_100))
+        val got = splice(acc, next).map { it.text }
+        assertTrue(got.toString(), got.first() == "prima" && got.last() == "dopo" && got.size in 2..3)
+        assertEquals(listOf("solo"), splice(listOf(w("solo", 10_200, 10_500)), emptyList()).map { it.text })
+    }
+
+    @Test fun aRepeatedWordShiftedByMoreThanTheLoneToleranceIsStillOneWordAtACut() {
+        // Measured on the phone: copies of one word 220 ms apart, above the 200 ms the desktop accepts for a lone pair.
+        val got = splice(listOf(w("di", 10_368, 10_448), w("cronometro.", 10_448, 10_928)), listOf(w("Cronometro", 10_668, 11_228), w("che", 11_228, 11_388)))
+        assertEquals(listOf("di", "cronometro", "che"), got.map { SeamMerge.normalize(it.text) })
+    }
 }

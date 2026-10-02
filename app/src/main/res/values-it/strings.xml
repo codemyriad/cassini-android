@@ -29,6 +29,7 @@
     <string name="download_complete">Modello pronto. Tutto viene elaborato sul telefono.</string>
     <string name="decoding">Lettura dell’audio…</string>
     <string name="transcribing">Trascrizione in corso… tieni aperta l’app.</string>
+    <string name="transcribing_progress">Trascrizione · %1$d%% · %2$.1f× tempo reale · circa %3$d s rimanenti</string>
     <string name="file_ready">Pronto quando vuoi.</string>
     <string name="transcript">TRASCRIZIONE</string>
     <string name="export">Salva Cassini</string>

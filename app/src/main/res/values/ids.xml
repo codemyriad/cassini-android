@@ -6,6 +6,7 @@
     <item name="transcribe_button" type="id" />
     <item name="download_button" type="id" />
     <item name="operation_status" type="id" />
+    <item name="operation_progress" type="id" />
     <item name="export_button" type="id" />
     <item name="transcript_details" type="id" />
     <item name="search_input" type="id" />

@@ -6,13 +6,6 @@ import com.k2fsa.sherpa.onnx.Vad
 import com.k2fsa.sherpa.onnx.VadModelConfig
 import java.io.File
 
-/** Half-open sample range [start, end) of a recording, at the recording's own rate. */
-internal data class Span(val start: Int, val end: Int)
-
-/** Duration of [samples] at [rate] rounded up to whole milliseconds; 0 for non-positive input. */
-internal fun samplesToCeilMs(samples: Int, rate: Int): Long =
-    if (samples <= 0 || rate <= 0) 0 else (samples.toLong() * 1000 + rate - 1) / rate
-
 /**
  * Silero VAD over a 16 kHz copy of the recording, configured and fed as the desktop pipeline does on a
  * stock sherpa runtime (gocassini transcribe/stt.go). Speech spans reach the caller in order, at the
@@ -96,7 +89,7 @@ internal class SpeechDetector(modelPath: String) : AutoCloseable {
             val padding = feed(stream, resampleTo16k(audio.samples, audio.sampleRate)) { segment ->
                 recordingSpan(segment.start, segment.samples.size, audio.sampleRate, audio.samples.size)?.let(onSpan)
             }
-            return samplesToCeilMs(padding, VAD_SAMPLE_RATE)
+            return SpeechWindows.ceilMs(padding, VAD_SAMPLE_RATE)
         }
 
         /**

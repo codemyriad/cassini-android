@@ -65,7 +65,7 @@ class DeckViews(private val context: Context) {
     val download = button(R.string.download_model).apply { id = R.id.download_button }
     val status = text(12f, muted).apply { id = R.id.operation_status; setPadding(0, dp(8), 0, dp(8)); accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE }
     val progress = ProgressBar(context, null, android.R.attr.progressBarStyleHorizontal).apply {
-        max = 100; visibility = View.GONE; contentDescription = context.getString(R.string.busy_description)
+        id = R.id.operation_progress; max = 100; visibility = View.GONE; contentDescription = context.getString(R.string.busy_description)
     }
     val export = button(R.string.export).apply { id = R.id.export_button; textSize = 12f; contentDescription = context.getString(R.string.export_description) }
     val documentInfo = button(R.string.document_info).apply { id = R.id.document_info_button; textSize = 12f }

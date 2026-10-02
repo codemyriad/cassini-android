@@ -30,6 +30,7 @@
     <string name="download_complete">Model ready. Everything runs on this phone.</string>
     <string name="decoding">Reading audio…</string>
     <string name="transcribing">Transcribing… keep the app open.</string>
+    <string name="transcribing_progress">Transcribing · %1$d%% · %2$.1f× realtime · about %3$d s left</string>
     <string name="file_ready">Ready when you are.</string>
     <string name="transcript">TRANSCRIPT</string>
     <string name="export">Save Cassini</string>

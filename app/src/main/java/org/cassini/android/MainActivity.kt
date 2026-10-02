@@ -47,6 +47,8 @@ class MainActivity : Activity() {
     private var player: MediaPlayer? = null
     private var playerReady = false
     private var busy = false
+    /** Words of a transcription still running. Shown, never saved. */
+    private var interim: Transcript? = null
     private var highlightedWord = -1
     private var wordRanges = emptyList<IntRange>()
     private val activeBackground = BackgroundColorSpan(DeckViews.amber)
@@ -158,7 +160,7 @@ class MainActivity : Activity() {
             ui.progress.progress = progress.percent
             setStatus(if (progress.verifying) R.string.verifying else R.string.downloading, progress.percent)
         } }
-        onUi { setStatus(R.string.download_complete) }
+        onUi { setStatus(R.string.download_complete); fetchSpeechDetector() }
     }
 
     private fun transcribe() {
@@ -171,8 +173,9 @@ class MainActivity : Activity() {
             val audio = AudioDecoder.decode(this, uri)
             requireUser(audio.durationMs >= 200, Failure.SHORT)
             onUi { setStatus(R.string.transcribing) }
+            val detector = ModelStore.vadPath(filesDir).takeIf { ModelStore.vadReady(filesDir) }
             val began = System.nanoTime()
-            val transcript = Parakeet.transcribe(audio, chosenModel)
+            val transcript = Parakeet.transcribe(audio, chosenModel, detector) { progress -> onUi { showProgress(progress) } }
             val elapsed = (System.nanoTime() - began) / 1_000_000
             // Processing records are machine-readable provenance, independent of UI language.
             try {
@@ -183,14 +186,17 @@ class MainActivity : Activity() {
                     .put("language", "it (user-selected; automatic multilingual recognition)")
                     .put("durationMs", audio.durationMs).put("inferenceMs", elapsed)
                     .put("speakerAttribution", "single recording; no diarization")
-                    .put("wordTimings", "TDT token-derived; punctuation excluded from word ends; no acoustic bounding")
+                    .put("segmentation", Parakeet.cutting(detector).provenance)
+                    .put("wordTimings", "TDT token-derived; words over silence dropped; ends follow continuing audio up to the punctuation-inclusive end")
                     .toString(2))
             } catch (error: IOException) { Log.e(TAG, "Could not cache processing artifacts", error) }
-            onUi { setStatus(R.string.packaging_document) }
-            val (file, portable) = documents.create(uri, audio, transcript, session.name, processing(chosenModel.precision, chosenModel.revision).put("x-inferenceMs", elapsed), document)
+            onUi { ui.progress.isIndeterminate = true; setStatus(R.string.packaging_document) }
+            val (file, portable) = documents.create(uri, audio, transcript, session.name, processing(chosenModel.precision, chosenModel.revision)
+                .put("x-inferenceMs", elapsed).put("x-segmentation", Parakeet.cutting(detector).provenance), document)
             val processingMs = (System.nanoTime() - totalBegan) / 1_000_000
             onUi {
                 val position = if (playerReady) player?.currentPosition ?: session.positionMs else session.positionMs
+                interim = null
                 session = session.copy(uri = Uri.fromFile(file).toString(), document = file.absolutePath,
                     name = "${session.name.substringBeforeLast('.')}.opus", selectedVariant = portable.defaultId,
                     durationMs = audio.durationMs, inferenceMs = elapsed, resultPrecision = chosenModel.precision, positionMs = position,
@@ -349,12 +355,42 @@ class MainActivity : Activity() {
             } finally {
                 onUi {
                     busy = false
+                    // A run that failed or was cancelled leaves no partial transcript on screen.
+                    if (interim != null) { interim = null; renderScreen() }
                     window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                     ui.progress.visibility = View.GONE
                     refreshControls()
                     maybeAutoTranscribe()
                 }
             }
+        }
+    }
+
+    /**
+     * The speech detector is optional and small. It is fetched on its own thread once Parakeet is installed, also
+     * on an installation from before it existed, so neither the model download nor a transcription waits for it.
+     */
+    private fun fetchSpeechDetector() {
+        if (!models.ready() || ModelStore.vadReady(filesDir) || !detectorAttempted.compareAndSet(false, true)) return
+        val directory = filesDir
+        Thread { installSpeechDetector(directory) }.start()
+    }
+
+    /** Progress, speed and time left come from the pieces decoded so far; their words are shown as they arrive. */
+    private fun showProgress(progress: Parakeet.Progress) {
+        if (!busy) return
+        val percent = if (progress.totalMs > 0) (progress.doneMs * 100 / progress.totalMs).toInt().coerceIn(0, 100) else 0
+        // Nothing is measured until the first piece is decoded.
+        ui.progress.isIndeterminate = progress.doneMs <= 0
+        ui.progress.progress = percent
+        val speed = ProcessingSpeed.realtime(progress.doneMs, progress.elapsedMs)
+        val remaining = ProcessingSpeed.remainingMs(progress.doneMs, progress.totalMs, progress.elapsedMs)
+        if (speed == null || remaining == null) setStatus(R.string.transcribing)
+        else setStatus(R.string.transcribing_progress, percent, speed, (remaining + 999) / 1000)
+        if (progress.words.isNotEmpty() && progress.words != interim?.words) {
+            interim = Transcript(progress.words)
+            highlightedWord = -1
+            renderScreen()
         }
     }
 
@@ -400,24 +436,29 @@ class MainActivity : Activity() {
     private fun renderScreen() {
         ui.filename.text = document?.title?.takeIf { it.isNotBlank() } ?: session.name.ifBlank { getString(R.string.no_file) }
         ui.caption.text = if (document == null) getString(R.string.voice_caption, getString(R.string.italian)) else "${getString(R.string.cassini_document)}\n${session.name}"
-        ui.trust.visibility = if (document == null) View.GONE else View.VISIBLE
+        // Words of a running transcription belong to no document yet: not to its trust state, variants or speakers.
+        ui.trust.visibility = if (document == null || interim != null) View.GONE else View.VISIBLE
         document?.let {
             ui.trust.setText(trustResource(it.state))
             ui.trust.setTextColor(if (it.state == "ok") DeckViews.amber else DeckViews.warning)
         }
         ui.documentInfo.visibility = if (document == null) View.GONE else View.VISIBLE
-        ui.variant.visibility = if ((document?.variants?.size ?: 0) > 1) View.VISIBLE else View.GONE
+        ui.variant.visibility = if ((document?.variants?.size ?: 0) > 1 && interim == null) View.VISIBLE else View.GONE
         ui.variant.text = getString(R.string.selected_transcript, session.selectedVariant.orEmpty())
         ui.open.setText(if (session.uri == null) R.string.open_audio else R.string.change_audio)
         ui.transcribe.setText(if (session.transcript == null) R.string.transcribe else R.string.transcribe_again)
         ui.seek.max = session.durationMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
         ui.position.text = getString(R.string.position, clock(session.positionMs.toLong()), clock(session.durationMs))
-        val transcript = session.transcript
+        val transcript = interim ?: session.transcript
         ui.details.visibility = if (transcript == null) View.GONE else View.VISIBLE
         transcript?.let {
             ui.details.text = getString(R.string.transcript_details,
                 resources.getQuantityString(R.plurals.word_count, it.words.size, it.words.size),
-                clock(session.durationMs), if (document == null) session.resultPrecision else session.selectedVariant.orEmpty())
+                clock(session.durationMs), when {
+                    interim != null -> models.precision
+                    document == null -> session.resultPrecision
+                    else -> session.selectedVariant.orEmpty()
+                })
         }
         val hasWords = transcript?.words?.isNotEmpty() == true
         ui.searchRow.visibility = if (hasWords) View.VISIBLE else View.GONE
@@ -447,7 +488,7 @@ class MainActivity : Activity() {
         if (ui.position.text.toString() != clock) ui.position.text = clock
         val playText = getString(if (media.isPlaying) R.string.pause else R.string.play)
         if (ui.play.text.toString() != playText) ui.play.text = playText
-        val active = session.transcript?.words?.indexOfFirst { time >= it.startMs && time < it.endMs } ?: -1
+        val active = (interim ?: session.transcript)?.words?.indexOfFirst { time >= it.startMs && time < it.endMs } ?: -1
         if (active != highlightedWord || followSeek) {
             highlightedWord = active
             highlightWord(followPausedSeek = followSeek)
@@ -455,7 +496,7 @@ class MainActivity : Activity() {
     }
 
     private fun renderTranscript() {
-        val words = session.transcript?.words ?: emptyList()
+        val words = (interim ?: session.transcript)?.words ?: emptyList()
         val builder = StringBuilder()
         val ranges = mutableListOf<IntRange>()
         words.forEachIndexed { index, word ->
@@ -463,7 +504,7 @@ class MainActivity : Activity() {
                 val previous = words[index - 1]
                 builder.append(if (previous.speaker != word.speaker || previous.text.lastOrNull() in listOf('.', '?', '!')) "\n\n" else " ")
             }
-            if (document != null && (index == 0 || words[index - 1].speaker != word.speaker)) {
+            if (document != null && interim == null && (index == 0 || words[index - 1].speaker != word.speaker)) {
                 builder.append(document?.speakerLabel(word.speaker)?.takeUnless { it == word.speaker } ?: getString(R.string.unknown_speaker, word.speaker)).append("\n")
             }
             val start = builder.length
@@ -654,6 +695,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         if (!busy) { updateModelChoice(); refreshControls() }
+        fetchSpeechDetector()
         maybeAutoTranscribe()
         handler.post(ticker)
     }
@@ -685,6 +727,15 @@ class MainActivity : Activity() {
     @Deprecated("Framework back callback")
     override fun onBackPressed() { if (!busy) returnToLibrary() }
     companion object {
+        /** One attempt per process: a network that cannot reach the detector must not be retried at every note. */
+        private val detectorAttempted = java.util.concurrent.atomic.AtomicBoolean()
+
+        /** The detector is optional (without it recordings are cut at quiet points), so a failed fetch is only logged. */
+        private fun installSpeechDetector(filesDir: File) {
+            if (ModelStore.vadReady(filesDir)) return
+            try { ModelStore.installVad(filesDir) { } } catch (error: Exception) { Log.w(TAG, "Speech detector unavailable", error) }
+        }
+
         const val OPEN_FILE = 1; const val SAVE_DOCUMENT = 2; private const val TAG = "Cassini"
         const val NOTE_ID = "noteId"; const val SEARCH_QUERY = "searchQuery"
         const val REQUEST_IMPORT = "requestImport"; const val AUTO_TRANSCRIBE = "autoTranscribe"

@@ -84,11 +84,23 @@ class PortableDocumentTest {
             scenario.onActivity { it.findViewById<Button>(R.id.transcribe_button).performClick() }
             val deadline = android.os.SystemClock.uptimeMillis() + 120000
             var success = false
+            // While it runs: a moving progress bar, the pace with the time left, and words before the document exists.
+            var progressSeen = 0; var paceSeen = ""; var interimWords = false
             while (android.os.SystemClock.uptimeMillis() < deadline) {
                 if (sessions.load().document != null) { success = true; break }
+                scenario.onActivity {
+                    val status = it.findViewById<TextView>(R.id.operation_status).text.toString()
+                    if (status.contains("×") && status.contains("%")) paceSeen = status
+                    val bar = it.findViewById<android.widget.ProgressBar>(R.id.operation_progress)
+                    if (bar.isShown && !bar.isIndeterminate && bar.progress in 1..99) progressSeen = bar.progress
+                    if (it.findViewById<TextView>(R.id.transcript_text).text.isNotBlank()) interimWords = true
+                }
                 android.os.SystemClock.sleep(100)
             }
             assertTrue("ASR should create a portable document automatically", success)
+            assertTrue("Transcription should show measured progress before it completes", progressSeen in 1..99)
+            assertTrue("Transcription should show its pace and the time left", paceSeen.isNotEmpty())
+            assertTrue("Words should appear while transcription is still running", interimWords)
             val saved = sessions.load()
             val doc = CassiniDocument.read(File(saved.document!!).readBytes())
             assertEquals("ok", doc.state)

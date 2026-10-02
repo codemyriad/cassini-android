@@ -142,4 +142,48 @@ class SpeechWindowsTest {
         assertEquals(1, SpeechWindows.windows(55 * sr + frames - 1, sr, false, ref).single().chunks.size)
         assertEquals(Chunk(Span(0, 1), 0, sr / 2), SpeechWindows.windows(1, sr, true).single().chunks.single())
     }
+
+    /** Steady noise with [quiet] stretches of silence, given in milliseconds. */
+    private fun noisy(seconds: Int, rate: Int, vararg quiet: IntRange): FloatArray {
+        val random = java.util.Random(7)
+        return FloatArray(seconds * rate) { i ->
+            val ms = i * 1000L / rate
+            if (quiet.any { ms in it }) 0f else (random.nextFloat() - .5f) * .4f
+        }
+    }
+
+    @Test fun aSpanOfOrdinaryLengthStaysWhole() {
+        for (rate in listOf(16000, 48000)) {
+            val samples = noisy(28, rate)
+            assertEquals(listOf(Span(0, samples.size)), SpeechWindows.quietPieces(samples, Span(0, samples.size), rate))
+            assertEquals(listOf(Span(rate, 20 * rate)), SpeechWindows.quietPieces(samples, Span(rate, 20 * rate), rate))
+        }
+    }
+
+    @Test fun aLongSpanIsCutWhereItIsQuiet() {
+        for (rate in listOf(16000, 48000)) {
+            // Pauses at 22.0 s and, 23.4 s after the first cut, at 45.5 s. The pause at 10 s is too early to be used.
+            val samples = noisy(70, rate, 10_000..10_200, 22_000..22_100, 45_500..45_600)
+            val pieces = SpeechWindows.quietPieces(samples, Span(0, samples.size), rate)
+            assertEquals(3, pieces.size)
+            assertEquals(0, pieces.first().start)
+            assertEquals(samples.size, pieces.last().end)
+            assertTrue("Pieces cover the span back to back", pieces.zipWithNext().all { (a, b) -> a.end == b.start })
+            assertTrue("First cut inside the pause: ${pieces[0].end * 1000L / rate}", pieces[0].end * 1000L / rate in 22_000..22_100)
+            assertTrue("Second cut inside the pause: ${pieces[1].end * 1000L / rate}", pieces[1].end * 1000L / rate in 45_500..45_600)
+            assertTrue(pieces.dropLast(1).all { it.length in 20 * rate..25 * rate })
+            assertTrue(pieces.last().length <= 28 * rate)
+        }
+    }
+
+    @Test fun aSpanWithNoPauseIsStillCutBeforeADecodeRunsLong() {
+        val rate = 16000
+        val samples = FloatArray(180 * rate) { .2f }
+        val pieces = SpeechWindows.quietPieces(samples, Span(3 * rate, samples.size), rate)
+        assertTrue(pieces.size >= 7)
+        assertEquals(3 * rate, pieces.first().start)
+        assertEquals(samples.size, pieces.last().end)
+        assertTrue(pieces.zipWithNext().all { (a, b) -> a.end == b.start })
+        assertTrue(pieces.all { it.length <= 28 * rate && it.length > 3 * rate })
+    }
 }

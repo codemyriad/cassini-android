@@ -27,14 +27,53 @@ internal object SeamMerge {
      * earlier decode owns starts before the overlap midpoint and the later one the rest.
      */
     fun merge(acc: List<Word>, next: List<Word>, firstWindow: Boolean, windowStartMs: Long, overlapMs: Long,
-              midpointOnDisagreement: Boolean = false): List<Word> {
-        if (firstWindow || acc.isEmpty()) return acc + next
-        if (next.isEmpty()) return acc
+              midpointOnDisagreement: Boolean = false): List<Word> =
+        merge(acc, next, firstWindow, windowStartMs, overlapMs, midpointOnDisagreement) { it }
+
+    /**
+     * Joins two decodes of a forced cut that both heard `[overlapStartMs, overlapStartMs + overlapMs]`,
+     * centred on the cut. They agree on most words there, so the join is made at one agreed word, the
+     * one nearest the cut: everything up to it comes from the earlier decode and everything after it
+     * from the later one. Each reading is taken whole on its side, so a word the two decodes time or
+     * split differently is neither doubled nor lost. Without an agreed word the join is the instant
+     * nearest the cut at which neither decode is inside a word.
+     */
+    fun <T> splice(items: List<T>, more: List<T>, overlapStartMs: Long, overlapMs: Long, word: (T) -> Word): List<T> {
+        if (items.isEmpty() || more.isEmpty()) return items + more
+        val acc = items.map(word)
+        val next = more.map(word)
+        val overlapEndMs = overlapStartMs + overlapMs
+        val cutMs = overlapStartMs + overlapMs / 2
+        val aligned = align(acc, next, overlapStartMs, overlapEndMs, DUPLICATE_TOLERANCE_MS)
+        // A lone pair further apart than the singleton tolerance is still the best evidence when nothing firmer exists.
+        val agreed = confidentMatches(aligned, acc, next, overlapEndMs).ifEmpty { aligned }
+        val anchor = agreed.minByOrNull { Math.abs((midpointMs(acc[it.acc]) + midpointMs(next[it.next])) / 2 - cutMs) }
+        if (anchor != null) return items.subList(0, anchor.acc + 1) + more.subList(anchor.next + 1, more.size)
+        val inside = { at: Long -> (acc + next).any { it.startMs < at && at < it.endMs } }
+        val joinMs = (acc + next).flatMap { listOf(it.startMs, it.endMs) }.filter { it in overlapStartMs..overlapEndMs && !inside(it) }
+            .minByOrNull { Math.abs(it - cutMs) } ?: cutMs
+        return items.filterIndexed { i, _ -> midpointMs(acc[i]) < joinMs } + more.filterIndexed { i, _ -> midpointMs(next[i]) >= joinMs }
+    }
+
+    fun splice(acc: List<Word>, next: List<Word>, overlapStartMs: Long, overlapMs: Long): List<Word> =
+        splice(acc, next, overlapStartMs, overlapMs) { it }
+
+    /** The same merge over items that carry a word, such as decoder words with their extension cap. */
+    fun <T> merge(items: List<T>, more: List<T>, firstWindow: Boolean, windowStartMs: Long, overlapMs: Long,
+                  midpointOnDisagreement: Boolean = false, word: (T) -> Word): List<T> {
+        if (firstWindow || items.isEmpty()) return items + more
+        if (more.isEmpty()) return items
+        val acc = items.map(word)
+        val next = more.map(word)
         val overlapEndMs = windowStartMs + overlapMs
         val matches = confidentMatches(align(acc, next, windowStartMs, overlapEndMs, DUPLICATE_TOLERANCE_MS), acc, next, overlapEndMs)
         if (midpointOnDisagreement && matches.isEmpty() &&
             hasWordInOverlap(acc, windowStartMs, overlapEndMs) && hasWordInOverlap(next, windowStartMs, overlapEndMs)) {
-            return mergeAtMidpoint(acc, next, windowStartMs, overlapMs)
+            // One owner per instant: the earlier decode keeps starts before the overlap midpoint, the later one the rest.
+            val cutMs = windowStartMs + overlapMs / 2
+            var kept = items.size
+            while (kept > 0 && acc[kept - 1].startMs >= cutMs) kept--
+            return items.subList(0, kept) + more.filterIndexed { i, _ -> next[i].startMs >= cutMs }
         }
         val dropAcc = BooleanArray(acc.size)
         val dropNext = BooleanArray(next.size)
@@ -51,8 +90,8 @@ internal object SeamMerge {
             val newContext = maxOf(0L, midpointMs(new) - windowStartMs)
             if (newContext > oldContext) dropAcc[match.acc] = true else dropNext[match.next] = true
         }
-        val merged = acc.filterIndexed { i, _ -> !dropAcc[i] } + next.filterIndexed { i, _ -> !dropNext[i] }
-        return merged.sortedBy { it.startMs }
+        val merged = items.filterIndexed { i, _ -> !dropAcc[i] } + more.filterIndexed { i, _ -> !dropNext[i] }
+        return merged.sortedBy { word(it).startMs }
     }
 
     /** True when [words] positively populate the overlap; touching a boundary does not count. */
@@ -62,14 +101,6 @@ internal object SeamMerge {
             word.endMs == word.startMs -> word.startMs in overlapStartMs..overlapEndMs
             else -> word.endMs > overlapStartMs && word.startMs < overlapEndMs
         }
-    }
-
-    /** One owner per instant: [acc] keeps starts before the overlap midpoint, [next] the rest. */
-    internal fun mergeAtMidpoint(acc: List<Word>, next: List<Word>, windowStartMs: Long, overlapMs: Long): List<Word> {
-        val cutMs = windowStartMs + overlapMs / 2
-        var trimmed = acc.size
-        while (trimmed > 0 && acc[trimmed - 1].startMs >= cutMs) trimmed--
-        return acc.subList(0, trimmed) + next.filter { it.startMs >= cutMs }
     }
 
     internal data class Match(val acc: Int, val next: Int)

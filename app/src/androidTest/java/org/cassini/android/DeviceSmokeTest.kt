@@ -95,14 +95,41 @@ class DeviceSmokeTest {
         } finally { file.delete() }
     }
 
+    @Test fun speechDetectorFindsOrderedSpansInsideTheRecording() {
+        if (InstrumentationRegistry.getArguments().getString("downloadModels") == "true") ModelStore.installVad(context.filesDir) { }
+        assumeTrue("Install the speech detector first", ModelStore.vadReady(context.filesDir))
+        val file = fixture()
+        try {
+            val speech = AudioDecoder.decode(context, Uri.fromFile(file))
+            // The same recording at the microphone's rate, so spans must come back on that clock.
+            val upsampled = PcmAudio(FloatArray(speech.samples.size * 3) { speech.samples[it / 3] }, speech.sampleRate * 3)
+            SpeechDetector(ModelStore.vadPath(context.filesDir)).use { detector ->
+                for (audio in listOf(speech, upsampled)) {
+                    val spans = ArrayList<Span>()
+                    val paddedTailMs = detector.detect(audio) { spans += it }
+                    assertTrue("${audio.sampleRate} Hz: $spans", spans.isNotEmpty())
+                    assertTrue(spans.all { it.start >= 0 && it.end <= audio.samples.size && it.start < it.end })
+                    assertTrue(spans.zipWithNext().all { (a, b) -> a.end <= b.start })
+                    assertTrue("Most of this recording is speech", spans.sumOf { it.length.toLong() } * 2 > audio.samples.size)
+                    assertTrue(paddedTailMs in 0..32)
+                }
+                val silence = ArrayList<Span>()
+                detector.detect(PcmAudio(FloatArray(48000), 48000)) { silence += it }
+                assertTrue("Silence has no speech: $silence", silence.isEmpty())
+            }
+        } finally { file.delete() }
+    }
+
     @Test fun nativeParakeetProducesTimedItalianWords() {
         val arguments = InstrumentationRegistry.getArguments()
         val fp32 = arguments.getString("precision") == "fp32"
         val models = ModelStore(File(context.filesDir, if (fp32) "parakeet-v3-fp32" else "parakeet-v3"), fp32)
-        if (arguments.getString("downloadModels") == "true") models.install { message ->
-            instrumentation.sendStatus(0, Bundle().apply { putString("stream", "$message\n") })
+        if (arguments.getString("downloadModels") == "true") {
+            models.install { message -> instrumentation.sendStatus(0, Bundle().apply { putString("stream", "$message\n") }) }
+            ModelStore.installVad(context.filesDir) { }
         }
         assumeTrue("Download Parakeet in the app before running native inference test", models.ready())
+        val detector = ModelStore.vadPath(context.filesDir).takeIf { ModelStore.vadReady(context.filesDir) }
         val sample = arguments.getString("audioSample")
         val youtube = sample == "youtube" || sample == "youtube-long"
         val file = fixture(when (sample) {
@@ -114,8 +141,14 @@ class DeviceSmokeTest {
             val audio = AudioDecoder.decode(context, Uri.fromFile(file))
             if (sample == "youtube-long") assertEquals(180000L, audio.durationMs)
             val began = System.nanoTime()
-            val transcript = Parakeet.transcribe(audio, models)
+            val steps = ArrayList<Parakeet.Progress>()
+            val transcript = Parakeet.transcribe(audio, models, detector) { steps += it }
             val elapsedMs = (System.nanoTime() - began) / 1_000_000
+            // Pieces are decoded one after another: the position only moves forward and ends at the recording's end.
+            assertTrue(steps.zipWithNext().all { (a, b) -> b.doneMs >= a.doneMs && b.elapsedMs >= a.elapsedMs })
+            assertEquals(audio.durationMs, steps.last().doneMs)
+            assertTrue("Words should exist while part of the recording is still to be decoded",
+                steps.any { it.words.isNotEmpty() && it.doneMs in 1 until audio.durationMs } || audio.durationMs < 20_000)
             val peakRssKiB = File("/proc/self/status").readLines()
                 .firstOrNull { it.startsWith("VmHWM:") }?.trim()?.split(Regex("\\s+"))?.getOrNull(1)?.toLongOrNull()
             val text = transcript.words.joinToString(" ") { it.text }

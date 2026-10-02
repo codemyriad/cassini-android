@@ -20,6 +20,12 @@ internal data class DecodePolicy(
     companion object {
         /** Whole detected utterance plus 30 ms of recorded context, and no synthetic silence: the reference frontend normalises over the entire input. */
         val PARAKEET_V3_REFERENCE = DecodePolicy(preserveSpan = true, contextMs = 30, tailPaddingMs = 0, syntheticPadding = false)
+        /**
+         * What this app uses: each detected span decoded whole with the stock 0.5 s synthetic tail, long spans
+         * first cut by [SpeechWindows.quietPieces]. On a Pixel 8 with the stock frontend, 10 s windows left
+         * duplicated words at their seams; see docs/pixel8-results.md.
+         */
+        val WHOLE_SPANS = DecodePolicy(preserveSpan = true)
     }
 }
 
@@ -42,7 +48,55 @@ internal object SpeechWindows {
     /** Non-VAD decodes shorter than this get 0.5 s of synthetic tail silence. */
     const val TAIL_PAD_MIN_SECONDS = 10
 
+    /** A span up to this long is decoded whole. The detector's 25 s limit is a hint: spans close a little after it. */
+    const val WHOLE_SPAN_MS = 28_000
+    /** A longer span is cut where it is quietest in this stretch after the previous cut. */
+    const val CUT_FROM_MS = 20_000
+    const val CUT_TO_MS = 25_000
+    /** Recorded audio decoded on each side of a forced cut, so a word the cut runs through is heard whole by both decodes. */
+    const val CUT_CONTEXT_MS = 1_000
+    private const val QUIET_FRAME_MS = 30
+    private const val QUIET_STEP_MS = 10
+
     fun samples(ms: Int, sampleRate: Int): Int = (ms.toLong() * sampleRate / 1000).toInt()
+
+    /**
+     * Sherpa's detector does not close a span at its maximum duration; it only becomes stricter, and over
+     * noise one span can run for minutes. A [span] longer than [WHOLE_SPAN_MS] is cut at the quietest
+     * 30 ms between [CUT_FROM_MS] and [CUT_TO_MS] after the previous cut, so each decode stays short,
+     * progress keeps moving, and a cut falls between words where the recording allows it. The quietest
+     * frame can still be a closure inside a word, so the caller decodes [CUT_CONTEXT_MS] of the recording
+     * past each cut on both sides and reconciles the two readings. The pieces cover the span back to back.
+     */
+    fun quietPieces(samples: FloatArray, span: Span, sampleRate: Int): List<Span> {
+        require(sampleRate > 0)
+        val whole = samples(WHOLE_SPAN_MS, sampleRate)
+        val out = ArrayList<Span>()
+        var start = span.start
+        while (span.end - start > whole) {
+            val cut = quietest(samples, start + samples(CUT_FROM_MS, sampleRate), start + samples(CUT_TO_MS, sampleRate), sampleRate)
+            out += Span(start, cut)
+            start = cut
+        }
+        if (span.end > start) out += Span(start, span.end)
+        return out
+    }
+
+    /** Centre of the lowest-energy frame inside [from, to), the earliest on a tie. */
+    private fun quietest(samples: FloatArray, from: Int, to: Int, sampleRate: Int): Int {
+        val frame = maxOf(1, samples(QUIET_FRAME_MS, sampleRate))
+        val step = maxOf(1, samples(QUIET_STEP_MS, sampleRate))
+        var best = from
+        var least = Double.MAX_VALUE
+        var at = from
+        while (at + frame <= to) {
+            var energy = 0.0
+            for (i in at until at + frame) energy += samples[i].toDouble() * samples[i]
+            if (energy < least) { least = energy; best = at + frame / 2 }
+            at += step
+        }
+        return best
+    }
     fun maxSafeSamples(sampleRate: Int): Int = samples(MAX_SAFE_MS, sampleRate)
     /** Floor, as the decoder places source offsets on the timeline. */
     fun floorMs(samples: Int, sampleRate: Int): Long = samples.toLong() * 1000 / sampleRate
