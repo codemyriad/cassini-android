@@ -91,6 +91,13 @@ class PortableDocumentTest {
                 assertTrue("Completion shows the realtime multiplier: $status", status.contains("×"))
             }
             assertEquals(30000L, doc.manifest.getJSONObject("audio").getLong("durationMs"))
+            val playable = android.os.SystemClock.uptimeMillis() + 8000
+            var enabled = false; var status = ""
+            while (!enabled && android.os.SystemClock.uptimeMillis() < playable) {
+                scenario.onActivity { enabled = it.findViewById<Button>(R.id.play_button).isEnabled; status = it.findViewById<TextView>(R.id.operation_status).text.toString() }
+                android.os.SystemClock.sleep(100)
+            }
+            assertTrue("The new document must be playable after transcription: $status", enabled)
             File(context.filesDir, "portable-asr-test.opus").writeBytes(File(saved.document!!).readBytes())
         } finally { scenario.close(); finishScreens(); sessions.save(originalSession) }
     }

@@ -659,7 +659,8 @@ class MainActivity : Activity() {
     }
     override fun onPause() {
         handler.removeCallbacks(ticker)
-        if (playerReady) player?.pause()
+        // Pausing a player that is prepared but not playing is a MediaPlayer error, which ends playback for this screen.
+        if (playerReady) player?.takeIf { it.isPlaying }?.pause()
         persistSession()
         super.onPause()
     }

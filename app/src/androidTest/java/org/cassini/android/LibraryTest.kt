@@ -307,6 +307,17 @@ class LibraryTest {
             assertNotNull("Done should transcribe automatically", saved.document)
             assertEquals("ok", CassiniDocument.read(File(saved.document!!).readBytes()).state)
             assertEquals(1, LibraryStore(context.filesDir).load().count { it.id == id })
+            val playable = SystemClock.uptimeMillis() + 8000
+            var enabled = false; var status = ""
+            while (!enabled && SystemClock.uptimeMillis() < playable) {
+                instrumentation.runOnMainSync {
+                    ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>().firstOrNull()?.let {
+                        enabled = it.findViewById<Button>(R.id.play_button).isEnabled; status = it.findViewById<TextView>(R.id.operation_status).text.toString()
+                    }
+                }
+                SystemClock.sleep(100)
+            }
+            assertTrue("The new document must be playable after transcription: $status", enabled)
         } finally { scenario.close(); finishScreens(); sessions.save(original) }
     }
 }

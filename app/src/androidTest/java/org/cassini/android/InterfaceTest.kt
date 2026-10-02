@@ -130,6 +130,59 @@ class InterfaceTest {
         }
     }
 
+    @Test fun leavingBeforePlaybackStartsKeepsAudioPlayable() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val store = SessionStore(context.filesDir)
+        val originalSession = store.load()
+        finishExistingScreens()
+        val audio = File(context.cacheDir, "leave-before-playback.wav")
+        instrumentation.context.assets.open("italian-smoke.wav").use { input -> audio.outputStream().use { output -> input.copyTo(output) } }
+        store.save(Session(Uri.fromFile(audio).toString(), "Leave sample.wav", Transcript(listOf(Word("spk_1", 0, 1500, "Inizio.")), "it"), durationMs = 15840))
+        val scenario = ActivityScenario.launch(MainActivity::class.java)
+        fun awaitCondition(description: String, condition: (MainActivity) -> Boolean) {
+            val deadline = android.os.SystemClock.uptimeMillis() + 4000
+            while (android.os.SystemClock.uptimeMillis() < deadline) {
+                var satisfied = false
+                scenario.onActivity { satisfied = condition(it) }
+                if (satisfied) return
+                android.os.SystemClock.sleep(50)
+            }
+            fail(description)
+        }
+        try {
+            awaitCondition("Audio should become ready") { it.findViewById<Button>(R.id.play_button).isEnabled }
+            // The player is prepared but has never played. Pausing it in that state is a MediaPlayer error.
+            scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
+            scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+            android.os.SystemClock.sleep(500) // The player reports errors asynchronously.
+            scenario.onActivity { activity ->
+                val play = activity.findViewById<Button>(R.id.play_button)
+                assertTrue("Returning to a note that was never played must leave playback available: " +
+                    activity.findViewById<TextView>(R.id.operation_status).text, play.isEnabled)
+                play.performClick()
+            }
+            awaitCondition("Playback should start after returning") {
+                it.findViewById<Button>(R.id.play_button).text.toString() == it.getString(R.string.pause)
+            }
+            // A playing note is paused when the screen leaves, and can resume.
+            scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
+            scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+            awaitCondition("Leaving should pause playback and keep it available") {
+                val play = it.findViewById<Button>(R.id.play_button)
+                play.isEnabled && play.text.toString() == it.getString(R.string.play)
+            }
+            scenario.onActivity { it.findViewById<Button>(R.id.play_button).performClick() }
+            awaitCondition("Playback should resume after it was paused by leaving") {
+                it.findViewById<Button>(R.id.play_button).text.toString() == it.getString(R.string.pause)
+            }
+        } finally {
+            scenario.close()
+            store.save(originalSession)
+            audio.delete()
+        }
+    }
+
     @Test fun languageSwitchRetainsItalianTranscriptRecordingAndPlayback() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
