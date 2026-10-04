@@ -12,12 +12,12 @@ Record a thought, find the words later, and keep the audio with the transcript. 
 
 ## Requirements
 
-* **Android:** 8.0+ to install; **10+ for the full recording/transcription flow**. Android 8/9 can read existing documents but lack the [platform Opus encoder](https://developer.android.com/media/platform/supported-formats) needed to package new recordings.
+* **Android:** 8.0+ to install; creating Cassini files needs **10+ and a working [platform Opus encoder](https://developer.android.com/media/platform/supported-formats)**. Some emulator images lack that encoder. Existing documents can still be read.
 * **Processor:** a 64-bit ARM phone (`arm64-v8a`) running 64-bit Android. The APK also includes `x86_64` for emulators. It does not support 32-bit ARM or x86 systems. Transcription runs on CPU; no GPU/NPU is required.
 * **RAM (recommended):** **4 GB+ for INT8**, **8 GB+ for FP32**. These are starting recommendations, not tested minimums. Short-clip process memory peaked at about 1.02 GiB / 2.60 GiB on the Pixel; longer clips and other apps need additional memory.
 * **Free storage:** allow **1 GiB for INT8** or **3 GiB for FP32**, plus space for recordings. Model downloads are about 640 MiB / 2.37 GiB. Reading existing documents needs no model.
 
-I’ve tested recording and transcription on a **Pixel 8 (8 GB RAM, Android 17)**; see [device results](docs/pixel8-results.md). Other phones and older Android versions haven’t been verified end to end. Installation alone doesn’t guarantee usable transcription speed or enough memory.
+I’ve tested recording and transcription on a **Pixel 8 (8 GB RAM, Android 17)**; see [device results](docs/pixel8-results.md). An Android 14 x86_64 emulator has also passed recording/transcription checks. Other physical phones haven’t been verified end to end. Installation alone doesn’t guarantee usable transcription speed or enough memory.
 
 ## Try it
 
@@ -44,7 +44,7 @@ Requires JDK 17 and Android SDK platform/build tools 34. Set `ANDROID_HOME` or `
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-[GitHub Actions](https://github.com/codemyriad/cassini-android/actions/workflows/android.yml) builds and checks each push and pull request, including playback/settings checks on Android 8 and 10 emulators. Version tags publish the APK with a stable beta signing key, so updates preserve notes and downloaded models. Models and the pinned Android runtime are fetched separately.
+[GitHub Actions](https://github.com/codemyriad/cassini-android/actions/workflows/android.yml) builds and checks each push and pull request, including playback/settings checks on Android 8, 10 and 14 emulators. Version tags publish the APK with a stable beta signing key, so updates preserve notes and downloaded models. Models and the pinned Android runtime are fetched separately.
 
 For device checks and format interoperability, see [development notes](docs/development.md), [Pixel 8 results](docs/pixel8-results.md) and the [Android acceleration investigation](docs/android-acceleration.md). Android currently uses stock sherpa-onnx on CPU; desktop Cassini uses a modified runtime.
 

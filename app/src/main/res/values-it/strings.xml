@@ -95,7 +95,7 @@
     <string name="error_unknown">Qualcosa non ha funzionato. Riprova.</string>
     <string name="error_playback">Riproduzione non disponibile per questo file.</string>
     <string name="busy_description">Elaborazione in corso</string>
-    <string name="error_opus_encoder">Questo telefono non ha un codificatore Opus. La creazione di file Cassini richiede Android 10 o successivo. Puoi comunque aprire documenti esistenti.</string>
+    <string name="error_opus_encoder">Questo dispositivo non ha un codificatore Opus. Può aprire documenti esistenti, ma non creare nuovi file Cassini.</string>
     <string name="opening_document">Apertura del file…</string>
     <string name="packaging_document">Creazione Cassini · audio + parole con tempi…</string>
     <string name="cassini_document">CASSINI / AUDIO + TRASCRIZIONE</string>

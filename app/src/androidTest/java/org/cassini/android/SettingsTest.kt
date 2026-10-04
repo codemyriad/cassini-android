@@ -72,6 +72,9 @@ class SettingsTest {
             instrumentation.waitForIdleSync()
             scenario.onActivity { it.findViewById<TextView>(R.id.settings_button).performClick() }
             clickText("Transcription model")
+            // Automatic also labels a row behind the dialog. Wait for a unique option so
+            // an older platform's stale accessibility window cannot select that row.
+            awaitText("FP32 · 2.37 GiB · full precision")
             clickText("Automatic · prefer full precision")
             assertEquals("auto", sessions.load().modelChoice)
             clickText("Transcription model")

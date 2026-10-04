@@ -44,6 +44,18 @@ class PortableDocumentTest {
         assertTrue("Speech onset moved", kotlin.math.abs(edge(original, false) - edge(decoded, false)) < 30)
         assertTrue("Speech tail moved", kotlin.math.abs(edge(original, true) - edge(decoded, true)) < 30)
     }
+    @Test fun opusEncoderCapabilityHasClearOutcome() {
+        val available = OpusEncoder.available()
+        android.util.Log.i("CassiniCompatibility", "API ${android.os.Build.VERSION.SDK_INT}: Opus encoder available=$available")
+        if (available) {
+            platformOpusEncodingKeepsDurationAndSpeechClock()
+        } else {
+            val failure = assertThrows(UserFacingException::class.java) {
+                OpusEncoder.encode(PcmAudio(FloatArray(1600), 16000))
+            }
+            assertEquals(Failure.OPUS_ENCODER, failure.failure)
+        }
+    }
     @Test fun threeMinuteOpusTrimsPaddingAtTheTranscriptionLimit() {
         val instrumentation = InstrumentationRegistry.getInstrumentation(); val context = instrumentation.targetContext
         org.junit.Assume.assumeTrue("Fetch the optional three-minute YouTube fixture", instrumentation.context.assets.list("")!!.contains("youtube-long.wav"))

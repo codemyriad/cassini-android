@@ -98,7 +98,7 @@
     <string name="error_unknown">Something went wrong. Please try again.</string>
     <string name="error_playback">Playback is unavailable for this file.</string>
     <string name="busy_description">Processing</string>
-    <string name="error_opus_encoder">This phone has no Opus encoder. Cassini creation requires Android 10 or later. Existing documents can still be opened.</string>
+    <string name="error_opus_encoder">This device has no Opus encoder. It can open existing documents, but cannot create new Cassini files.</string>
     <string name="opening_document">Opening file…</string>
     <string name="packaging_document">Creating Cassini · audio + timed words…</string>
     <string name="cassini_document">CASSINI / AUDIO + TRANSCRIPT</string>
