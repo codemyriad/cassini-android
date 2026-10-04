@@ -38,7 +38,7 @@ class PreserveLibraryRule : ExternalResource() {
         finishScreens()
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         live = RecordingPreferences.live(context)
-        RecordingPreferences.setLive(context, false)
+        RecordingPreferences.setLive(context, false, awaitWrite = true)
         val directory = context.filesDir
         catalogue = listOf("library.json", "library-migrated", "session.json", "session.json.bak").associateWith { File(directory, it).takeIf { file -> file.exists() }?.readBytes() }
         documents = File(directory, "documents").listFiles().orEmpty().map { it.name }.toSet()
@@ -48,7 +48,7 @@ class PreserveLibraryRule : ExternalResource() {
         finishScreens()
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val directory = context.filesDir
-        RecordingPreferences.setLive(context, live)
+        RecordingPreferences.setLive(context, live, awaitWrite = true)
         catalogue.forEach { (name, bytes) -> File(directory, name).let { if (bytes == null) it.delete() else it.writeBytes(bytes) } }
         File(directory, "documents").listFiles().orEmpty().filter { it.name !in documents }.forEach { it.delete() }
     }
