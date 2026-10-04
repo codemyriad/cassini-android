@@ -1,9 +1,11 @@
 package org.cassini.android
 
 import android.view.KeyEvent
-import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.TextView
 import androidx.test.core.app.ActivityScenario
+import androidx.test.uiautomator.By
+import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.Until
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
@@ -27,45 +29,15 @@ class SettingsTest {
         val transcript = Transcript(listOf(Word("spk_1", 0, 500, "Ciao"), Word("spk_1", 600, 1000, "mondo.")), "it")
         sessions.save(Session(name = "Italian sample.wav", transcript = transcript, durationMs = 1000))
         val scenario = ActivityScenario.launch(MainActivity::class.java)
-        fun textVisible(text: String): Boolean = instrumentation.uiAutomation.rootInActiveWindow
-            ?.findAccessibilityNodeInfosByText(text)?.any { it.text?.toString() == text } == true
+        val device = UiDevice.getInstance(instrumentation)
         fun awaitText(text: String) {
-            val deadline = android.os.SystemClock.uptimeMillis() + 5000
-            while (android.os.SystemClock.uptimeMillis() < deadline) {
-                if (textVisible(text)) return
-                android.os.SystemClock.sleep(50)
-            }
-            fail("Expected visible text: $text")
+            assertTrue("Expected visible text: $text", device.wait(Until.hasObject(By.text(text)), 5000))
         }
         fun clickText(text: String) {
-            val deadline = android.os.SystemClock.uptimeMillis() + 5000
-            while (android.os.SystemClock.uptimeMillis() < deadline) {
-                val nodes = instrumentation.uiAutomation.rootInActiveWindow?.findAccessibilityNodeInfosByText(text).orEmpty()
-                for (found in nodes.filter { it.text?.toString() == text }) {
-                    var node: AccessibilityNodeInfo? = found
-                    while (node != null && !node.isClickable) node = node.parent
-                    if (node?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true) {
-                        instrumentation.waitForIdleSync()
-                        return
-                    }
-                    // API 34's platform Preference list can omit clickable ancestors in its
-                    // accessibility tree. Exercise the actual touch target in that case.
-                    val bounds = android.graphics.Rect().also { found.getBoundsInScreen(it) }
-                    if (!bounds.isEmpty) {
-                        val now = android.os.SystemClock.uptimeMillis()
-                        for (action in listOf(android.view.MotionEvent.ACTION_DOWN, android.view.MotionEvent.ACTION_UP)) {
-                            val event = android.view.MotionEvent.obtain(now, now, action, bounds.centerX().toFloat(), bounds.centerY().toFloat(), 0)
-                            event.source = android.view.InputDevice.SOURCE_TOUCHSCREEN
-                            instrumentation.uiAutomation.injectInputEvent(event, true)
-                            event.recycle()
-                        }
-                        instrumentation.waitForIdleSync()
-                        return
-                    }
-                }
-                android.os.SystemClock.sleep(50)
-            }
-            fail("Expected clickable row: $text")
+            val target = device.wait(Until.findObject(By.text(text)), 5000)
+                ?: throw AssertionError("Expected clickable row: $text")
+            target.click()
+            device.waitForIdle()
         }
         try {
             scenario.onActivity { AppLanguage.set(it, "en") }
