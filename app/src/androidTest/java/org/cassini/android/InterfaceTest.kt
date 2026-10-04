@@ -52,7 +52,26 @@ class InterfaceTest {
                 if (satisfied) return
                 android.os.SystemClock.sleep(50)
             }
-            fail(description)
+            var state = ""
+            scenario.onActivity { activity ->
+                val scroll = activity.findViewById<ScrollView>(R.id.content_scroll)
+                val text = activity.findViewById<TextView>(R.id.transcript_text)
+                val spans = text.text as? Spanned
+                val active = spans?.getSpans(0, spans.length, android.text.style.BackgroundColorSpan::class.java)
+                    ?.map { spans.subSequence(spans.getSpanStart(it), spans.getSpanEnd(it)).toString() }
+                val last = text.layout?.let { layout ->
+                    android.graphics.Rect(0, text.totalPaddingTop + layout.getLineTop(layout.lineCount - 1),
+                        text.width, text.totalPaddingTop + layout.getLineBottom(layout.lineCount - 1)).also {
+                        scroll.offsetDescendantRectToMyCoords(text, it)
+                    }
+                }
+                state = "position=${activity.findViewById<TextView>(R.id.playback_position).text}, " +
+                    "play=${activity.findViewById<Button>(R.id.play_button).text}, " +
+                    "scroll=${scroll.scrollY}/${scroll.height}, lines=${text.layout?.lineCount}, " +
+                    "last=$last, content=${scroll.getChildAt(0).height}, " +
+                    "active=$active, status=${activity.findViewById<TextView>(R.id.operation_status).text}"
+            }
+            fail("$description ($state)")
         }
         fun wordVisible(activity: MainActivity, first: Boolean): Boolean {
             val text = activity.findViewById<TextView>(R.id.transcript_text)
@@ -67,6 +86,7 @@ class InterfaceTest {
         try {
             awaitCondition("Audio should become ready") { it.findViewById<Button>(R.id.play_button).isEnabled }
             scenario.onActivity { activity ->
+                assertFalse("Opening a note must not focus the search field", activity.findViewById<android.widget.EditText>(R.id.search_input).hasFocus())
                 assertEquals("Restored paused playback must not scroll", 0, activity.findViewById<ScrollView>(R.id.content_scroll).scrollY)
                 activity.findViewById<Button>(R.id.play_button).performClick()
             }

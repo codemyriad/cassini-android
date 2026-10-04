@@ -50,7 +50,11 @@ class DeckViews(private val context: Context) {
         addView(view, LinearLayout.LayoutParams(width, height, weight).apply { topMargin = dp(marginTop) })
     }
 
-    val root = column().apply { setBackgroundColor(ink) }
+    val root = column().apply {
+        setBackgroundColor(ink)
+        // Opening a note should start with the page focused, rather than its search keyboard.
+        isFocusableInTouchMode = true
+    }
     val library = button(R.string.back_to_notes).apply { id = R.id.notes_button; textSize = 12f }
     val menu = button(R.string.settings).apply { id = R.id.settings_button; textSize = 12f }
     val model = text(12f, amber, true).apply { id = R.id.model_status }

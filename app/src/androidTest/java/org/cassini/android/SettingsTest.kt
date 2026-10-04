@@ -39,6 +39,13 @@ class SettingsTest {
             target.click()
             device.waitForIdle()
         }
+        fun awaitModelChoice(choice: String) {
+            val deadline = android.os.SystemClock.uptimeMillis() + 5000
+            while (sessions.load().modelChoice != choice && android.os.SystemClock.uptimeMillis() < deadline) {
+                android.os.SystemClock.sleep(50)
+            }
+            assertEquals("The selected model must be saved", choice, sessions.load().modelChoice)
+        }
         try {
             scenario.onActivity { AppLanguage.set(it, "en") }
             instrumentation.waitForIdleSync()
@@ -48,11 +55,11 @@ class SettingsTest {
             // an older platform's stale accessibility window cannot select that row.
             awaitText("FP32 · 2.37 GiB · full precision")
             clickText("Automatic · prefer full precision")
-            assertEquals("auto", sessions.load().modelChoice)
+            awaitModelChoice("auto")
             clickText("Transcription model")
             clickText("FP32 · 2.37 GiB · full precision")
+            awaitModelChoice("fp32")
             assertTrue(sessions.load().fp32)
-            assertEquals("fp32", sessions.load().modelChoice)
             clickText("Interface language")
             clickText("Italiano")
             awaitText("Impostazioni")
