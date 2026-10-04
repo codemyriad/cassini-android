@@ -71,16 +71,25 @@ class SettingsTest {
             awaitText("Italiano") // The selected value appears under the language row.
             assertTrue("Changing language must retain the chosen model", sessions.load().fp32)
             instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
-            // Constrain the check to the viewer; the closing preference window can still be present.
-            var decor: android.view.View? = null
-            scenario.onActivity { decor = it.window.decorView }
-            onView(withText("Ciao mondo.")).inRoot(androidx.test.espresso.matcher.RootMatchers.withDecorView(org.hamcrest.Matchers.`is`(decor)))
-                .check(matches(isDisplayed()))
-            assertTrue("Returning from settings must keep live transcription enabled", RecordingPreferences.live(context))
-            scenario.onActivity { activity ->
-                assertTrue(activity.findViewById<TextView>(R.id.model_status).text.toString().startsWith("FP32"))
-                assertEquals("Italian sample.wav", activity.findViewById<TextView>(R.id.recording_name).text.toString())
+            // Applying app locales can replace the viewer after Back. Wait for the current
+            // focused activity instead of retaining a decor view from the closing instance.
+            val viewerDeadline = android.os.SystemClock.uptimeMillis() + 5000
+            var returned = false
+            while (!returned && android.os.SystemClock.uptimeMillis() < viewerDeadline) {
+                instrumentation.runOnMainSync {
+                    val viewer = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED)
+                        .filterIsInstance<MainActivity>().firstOrNull { it.hasWindowFocus() && !it.isFinishing }
+                    if (viewer != null && viewer.findViewById<TextView>(R.id.transcript_text).text.toString() == "Ciao mondo.") {
+                        assertTrue(viewer.findViewById<TextView>(R.id.transcript_text).isShown)
+                        assertTrue(viewer.findViewById<TextView>(R.id.model_status).text.toString().startsWith("FP32"))
+                        assertEquals("Italian sample.wav", viewer.findViewById<TextView>(R.id.recording_name).text.toString())
+                        returned = true
+                    }
+                }
+                if (!returned) android.os.SystemClock.sleep(25)
             }
+            assertTrue("The focused viewer must show the original note after settings", returned)
+            assertTrue("Returning from settings must keep live transcription enabled", RecordingPreferences.live(context))
         } finally {
             // Finish any settings activity before restoring the user's session.
             instrumentation.runOnMainSync {

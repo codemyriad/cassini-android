@@ -41,6 +41,7 @@ class RecordingActivity : Activity() {
     private var capturedSession: Session? = null
     private var finishingLive = false
     private var stopping = false
+    internal val savingAudio: Boolean get() = stopping
     private var foreground = false
     private var interrupted = false
 

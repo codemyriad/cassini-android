@@ -14,10 +14,23 @@ class PreserveLibraryRule : ExternalResource() {
 
     private fun finishScreens() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
+        var screens = emptyList<android.app.Activity>()
         instrumentation.runOnMainSync {
-            Stage.values().flatMap { ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(it) }.distinct()
-                .filter { it is MainActivity || it is SettingsActivity || it is LibraryActivity || it is RecordingActivity }.forEach { it.finish() }
+            screens = Stage.values().flatMap { ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(it) }.distinct()
+                .filter { it is MainActivity || it is SettingsActivity || it is LibraryActivity || it is RecordingActivity }
+            screens.forEach { it.finish() }
         }
+        // finish() requests an asynchronous lifecycle transition. Restoring the catalogue at the
+        // first idle can race onPause() and its save; wait for destruction and pending audio writes.
+        val deadline = android.os.SystemClock.uptimeMillis() + 10000
+        var finished = false
+        while (!finished && android.os.SystemClock.uptimeMillis() < deadline) {
+            instrumentation.runOnMainSync {
+                finished = screens.all { it.isDestroyed && (it !is RecordingActivity || !it.savingAudio) }
+            }
+            if (!finished) android.os.SystemClock.sleep(25)
+        }
+        org.junit.Assert.assertTrue("Screens and audio writes must finish before restoring user data", finished)
         instrumentation.waitForIdleSync()
     }
 
