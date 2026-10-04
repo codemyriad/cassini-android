@@ -3,14 +3,19 @@ package org.cassini.android
 import android.view.KeyEvent
 import android.widget.TextView
 import androidx.test.core.app.ActivityScenario
-import androidx.test.uiautomator.By
-import androidx.test.uiautomator.UiDevice
-import androidx.test.uiautomator.Until
+import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.action.ViewActions.click
+import androidx.test.espresso.assertion.ViewAssertions.matches
+import androidx.test.espresso.matcher.RootMatchers.isDialog
+import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
+import androidx.test.espresso.matcher.ViewMatchers.withId
+import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
 import org.junit.Assert.*
 import org.junit.Test
+import org.hamcrest.Matchers.allOf
 
 class SettingsTest {
     @get:org.junit.Rule val preserveLibrary = PreserveLibraryRule()
@@ -27,17 +32,17 @@ class SettingsTest {
         }
         instrumentation.waitForIdleSync()
         val transcript = Transcript(listOf(Word("spk_1", 0, 500, "Ciao"), Word("spk_1", 600, 1000, "mondo.")), "it")
-        sessions.save(Session(name = "Italian sample.wav", transcript = transcript, durationMs = 1000))
+        sessions.save(Session(name = "Italian sample.wav", transcript = transcript, durationMs = 1000, modelChoice = "int8"))
         val scenario = ActivityScenario.launch(MainActivity::class.java)
-        val device = UiDevice.getInstance(instrumentation)
         fun awaitText(text: String) {
-            assertTrue("Expected visible text: $text", device.wait(Until.hasObject(By.text(text)), 5000))
+            onView(withText(text)).check(matches(isDisplayed()))
         }
-        fun clickText(text: String) {
-            val target = device.wait(Until.findObject(By.text(text)), 5000)
-                ?: throw AssertionError("Expected clickable row: $text")
-            target.click()
-            device.waitForIdle()
+        fun openPreference(text: String) {
+            onView(allOf(withId(android.R.id.title), withText(text))).perform(click())
+        }
+        fun selectOption(text: String) {
+            // Restrict options to the dialog: Automatic also labels a row behind it.
+            onView(withText(text)).inRoot(isDialog()).perform(click())
         }
         fun awaitModelChoice(choice: String) {
             val deadline = android.os.SystemClock.uptimeMillis() + 5000
@@ -50,18 +55,15 @@ class SettingsTest {
             scenario.onActivity { AppLanguage.set(it, "en") }
             instrumentation.waitForIdleSync()
             scenario.onActivity { it.findViewById<TextView>(R.id.settings_button).performClick() }
-            clickText("Transcription model")
-            // Automatic also labels a row behind the dialog. Wait for a unique option so
-            // an older platform's stale accessibility window cannot select that row.
-            awaitText("FP32 · 2.37 GiB · full precision")
-            clickText("Automatic · prefer full precision")
+            openPreference("Transcription model")
+            selectOption("Automatic · prefer full precision")
             awaitModelChoice("auto")
-            clickText("Transcription model")
-            clickText("FP32 · 2.37 GiB · full precision")
+            openPreference("Transcription model")
+            selectOption("FP32 · 2.37 GiB · full precision")
             awaitModelChoice("fp32")
             assertTrue(sessions.load().fp32)
-            clickText("Interface language")
-            clickText("Italiano")
+            openPreference("Interface language")
+            selectOption("Italiano")
             awaitText("Impostazioni")
             awaitText("Italiano") // The selected value appears under the language row.
             assertTrue("Changing language must retain the chosen model", sessions.load().fp32)
