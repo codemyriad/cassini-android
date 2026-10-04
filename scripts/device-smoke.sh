@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-if [ ! -f app/src/androidTest/assets/italian-smoke.wav ]; then
+if [ -z "${CASSINI_TEST_APK:-}" ] && [ ! -f app/src/androidTest/assets/italian-smoke.wav ]; then
     printf 'Run python3 scripts/fetch-smoke-audio.py first (requires ffmpeg).\n' >&2
     exit 1
 fi
@@ -54,8 +54,13 @@ adb shell am instrument -w -r "${selection[@]}" -e precision "${1:-int8}" -e dow
     org.cassini.android.test/androidx.test.runner.AndroidJUnitRunner | tee "$report"
 # am instrument can return shell status 0 even when tests fail or the process crashes.
 python3 - "$report" <<'PY'
-import pathlib,sys
+import os,pathlib,re,sys
 report=pathlib.Path(sys.argv[1]).read_text()
 if 'OK (' not in report or any(marker in report for marker in ['FAILURES!!!','INSTRUMENTATION_FAILED','shortMsg=']):
     raise SystemExit('Device smoke test failed; inspect instrumentation output above.')
+expected=os.environ.get('CASSINI_EXPECTED_TESTS')
+if expected is not None:
+    count=re.search(r'OK \((\d+) tests?\)', report)
+    if not count or int(count.group(1)) != int(expected) or re.search(r'INSTRUMENTATION_STATUS_CODE: -(3|4)\b', report):
+        raise SystemExit('Required device checks did not all run; inspect instrumentation output above.')
 PY

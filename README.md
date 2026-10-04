@@ -44,7 +44,7 @@ Requires JDK 17 and Android SDK platform/build tools 34. Set `ANDROID_HOME` or `
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-[GitHub Actions](https://github.com/codemyriad/cassini-android/actions/workflows/android.yml) builds and checks each push and pull request. Version tags publish the APK with a stable beta signing key, so updates preserve notes and downloaded models. Models and the pinned Android runtime are fetched separately.
+[GitHub Actions](https://github.com/codemyriad/cassini-android/actions/workflows/android.yml) builds and checks each push and pull request, including playback/settings checks on Android 8 and 10 emulators. Version tags publish the APK with a stable beta signing key, so updates preserve notes and downloaded models. Models and the pinned Android runtime are fetched separately.
 
 For device checks and format interoperability, see [development notes](docs/development.md), [Pixel 8 results](docs/pixel8-results.md) and the [Android acceleration investigation](docs/android-acceleration.md). Android currently uses stock sherpa-onnx on CPU; desktop Cassini uses a modified runtime.
 

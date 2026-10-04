@@ -24,6 +24,8 @@ The supplied sample is [il Pericolo Invisibile](https://www.youtube.com/watch?v=
 
 Device tests check JNI inference, timestamps, codec decoding, complete-document integrity, microphone pause/resume, catalogue recovery and interface-language restoration. They do not establish ASR accuracy. Test rules restore the previous catalogue/session and remove only their own generated documents.
 
+CI installs its built app and matching test APK on Android 8 (API 26) and Android 10 (API 29) x86_64 emulators. Both run four playback/settings checks; Android 10 also checks platform Opus encoding. These checks require no models. CI fails if a selected check is skipped or the expected count changes, and saves instrumentation output and logcat. Release publication waits for both emulators. Native inference and the complete recording/transcription flow still need the separate device checks above.
+
 ```sh
 adb exec-out run-as org.cassini.android cat files/device-smoke.INT8.metrics.json
 adb exec-out run-as org.cassini.android cat files/device-smoke.INT8.words.json > transcript.words.json
