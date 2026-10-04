@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">Cassini</string>
     <string name="brand" translatable="false">cassini</string>
-    <string name="prototype_badge">BETA / 0.0.3</string>
+    <string name="prototype_badge">BETA / 0.0.4</string>
     <string name="settings">Settings</string>
     <string name="settings_general">General</string>
     <string name="settings_transcription">Transcription</string>
