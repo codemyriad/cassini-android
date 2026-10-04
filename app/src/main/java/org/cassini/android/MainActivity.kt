@@ -387,10 +387,20 @@ class MainActivity : Activity() {
         val remaining = ProcessingSpeed.remainingMs(progress.doneMs, progress.totalMs, progress.elapsedMs)
         if (speed == null || remaining == null) setStatus(R.string.transcribing)
         else setStatus(R.string.transcribing_progress, percent, speed, (remaining + 999) / 1000)
-        if (progress.words.isNotEmpty() && progress.words != interim?.words) {
+        if (progress.words != interim?.words && (progress.words.isNotEmpty() || interim != null)) {
+            val first = interim == null
+            val follow = ui.scroll.getChildAt(0).height - ui.scroll.height - ui.scroll.scrollY <= ui.scroll.height / 4
             interim = Transcript(progress.words)
             highlightedWord = -1
             renderScreen()
+            if (first || follow) ui.transcript.post {
+                if (busy && !isDestroyed) {
+                    val bounds = android.graphics.Rect()
+                    ui.transcript.getDrawingRect(bounds)
+                    ui.scroll.offsetDescendantRectToMyCoords(ui.transcript, bounds)
+                    ui.scroll.smoothScrollTo(0, if (first) bounds.top else (bounds.bottom - ui.scroll.height).coerceAtLeast(0))
+                }
+            }
         }
     }
 
@@ -434,6 +444,7 @@ class MainActivity : Activity() {
     }
 
     private fun renderScreen() {
+        ui.draft.visibility = if (interim != null) View.VISIBLE else View.GONE
         ui.filename.text = document?.title?.takeIf { it.isNotBlank() } ?: session.name.ifBlank { getString(R.string.no_file) }
         ui.caption.text = if (document == null) getString(R.string.voice_caption, getString(R.string.italian)) else "${getString(R.string.cassini_document)}\n${session.name}"
         // Words of a running transcription belong to no document yet: not to its trust state, variants or speakers.

@@ -152,4 +152,16 @@
     <string name="error_microphone">Impossibile registrare. Verifica l’accesso al microfono e riprova.</string>
     <string name="library_note_metadata">%1$s · %2$s</string>
     <string name="library_saved_document">Documento salvato</string>
+    <string name="live_recording">Trascrivi durante la registrazione</string>
+    <string name="live_recording_summary">Disattivato per impostazione predefinita. Mostra una bozza a brevi intervalli. Richiede un modello scaricato e consuma più CPU e batteria.</string>
+    <string name="live_recording_hint">La bozza appare dopo ogni breve tratto trascritto. Puoi continuare a registrare mentre la trascrizione recupera; Fine salva l’audio e completa il testo.</string>
+    <string name="live_recording_loading">Caricamento del modello…</string>
+    <string name="live_recording_waiting">In ascolto · la bozza apparirà qui</string>
+    <string name="live_recording_progress">Bozza · trascritto fino a %1$d:%2$02d</string>
+    <string name="live_recording_finishing">Audio salvato · completamento della trascrizione…</string>
+    <string name="live_recording_unavailable">La trascrizione durante la registrazione richiede il modello selezionato. Scaricalo prima; questa registrazione verrà comunque salvata.</string>
+    <string name="live_recording_failed">La trascrizione si è interrotta. La registrazione è al sicuro; puoi trascriverla dopo averla salvata.</string>
+    <string name="microphone_pcm_format">MONO · 16 kHz · trascrizione durante la registrazione</string>
+    <string name="transcript_draft">Bozza · parole e tempi possono cambiare</string>
+    <string name="recording_saving">Salvataggio dell’audio…</string>
 </resources>

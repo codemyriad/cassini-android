@@ -147,6 +147,7 @@ class DeviceSmokeTest {
             // Pieces are decoded one after another: the position only moves forward and ends at the recording's end.
             assertTrue(steps.zipWithNext().all { (a, b) -> b.doneMs >= a.doneMs && b.elapsedMs >= a.elapsedMs })
             assertEquals(audio.durationMs, steps.last().doneMs)
+            assertEquals("Final filtered words must be visible before packaging", transcript.words, steps.last().words)
             assertTrue("Words should exist while part of the recording is still to be decoded",
                 steps.any { it.words.isNotEmpty() && it.doneMs in 1 until audio.durationMs } || audio.durationMs < 20_000)
             val peakRssKiB = File("/proc/self/status").readLines()

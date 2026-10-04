@@ -22,7 +22,8 @@ I’ve tested recording and transcription on a **Pixel 8 (8 GB RAM, Android 17)*
 ## Try it
 
 * Install the APK, then download a model in **Settings** once. Automatic chooses according to available resources. After download, audio processing works offline.
-* Tap **Record**, allow microphone access, then **Done**. You can pause and resume. Transcription starts when the model is ready. Or import WAV, MP3, M4A/AAC or Ogg Opus and tap **Transcribe**. While it works you see how far along it is, how fast it’s going and roughly how long is left, and the words show up as each stretch of speech is done.
+* Tap **Record**, allow microphone access, then **Done**. You can pause and resume. Transcription starts when the model is ready. Or import WAV, MP3, M4A/AAC or Ogg Opus and tap **Transcribe**. While it works you see how far along it is, how fast it’s going and roughly how long is left, and draft words show up as each chunk is decoded.
+* Enable **Settings → Transcribe while recording** for draft words during capture. It’s off by default and needs the selected model downloaded. Results arrive in short chunks; slow phones catch up after **Done**. This uses more battery, and short chunks can reduce accuracy. **Transcribe again** reruns the batch pipeline.
 * Browse **Notes** or search titles and past transcriptions. Tap a word to hear that part of the recording. Each note remembers its playback position.
 * Use **Save Cassini** to keep a complete `.opus` document containing audio, timed words and metadata. You can open it again without downloading a model. This is a portable recording, not just a word-body JSON export.
 
@@ -44,7 +45,7 @@ Requires JDK 17 and Android SDK platform/build tools 34. Set `ANDROID_HOME` or `
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-[GitHub Actions](https://github.com/codemyriad/cassini-android/actions/workflows/android.yml) builds and checks each push and pull request, including playback/settings checks on Android 8, 10 and 14 emulators. Version tags publish the APK with a stable beta signing key, so updates preserve notes and downloaded models. Models and the pinned Android runtime are fetched separately.
+[GitHub Actions](https://github.com/codemyriad/cassini-android/actions/workflows/android.yml) builds and checks each push and pull request, including playback, recording and settings checks on Android 8, 10 and 14 emulators. Version tags publish the APK with a stable beta signing key, so updates preserve notes and downloaded models. Models and the pinned Android runtime are fetched separately.
 
 For device checks and format interoperability, see [development notes](docs/development.md), [Pixel 8 results](docs/pixel8-results.md) and the [Android acceleration investigation](docs/android-acceleration.md). Android currently uses stock sherpa-onnx on CPU; desktop Cassini uses a modified runtime. Cutting recordings at speech pauses is borrowed from the desktop pipeline.
 

@@ -98,7 +98,7 @@ jobs:
           if-no-files-found: warn
 
   emulator:
-    name: Playback and settings (API ${{ matrix.api }})
+    name: Playback, recording and settings (API ${{ matrix.api }})
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 20

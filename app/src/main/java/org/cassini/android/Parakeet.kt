@@ -28,6 +28,9 @@ object Parakeet {
     /** State after a decode: [doneMs] of [totalMs] of the recording, [elapsedMs] since decoding began, and the provisional words. */
     internal class Progress(val doneMs: Long, val totalMs: Long, val elapsedMs: Long, val words: List<Word>)
 
+    // A cancelled native call finishes before another screen loads a second copy of the model.
+    private val decoderLease = java.util.concurrent.Semaphore(1, true)
+
     /** Recorded context for retrying a span that decoded to nothing: the detector's silence decision interval. */
     private const val RETRY_CONTEXT_MS = 500
 
@@ -40,25 +43,17 @@ object Parakeet {
                             cutting: Cutting = cutting(detectorModel), onProgress: (Progress) -> Unit = {}): Transcript {
         requireUser(models.ready(), Failure.MODEL)
         requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
-        val recognizer = OfflineRecognizer(config = OfflineRecognizerConfig(
-            featConfig = FeatureConfig(sampleRate = 16000, featureDim = 128, dither = 0f),
-            modelConfig = OfflineModelConfig(
-                transducer = OfflineTransducerModelConfig(
-                    encoder = models.modelPath("encoder"),
-                    decoder = models.modelPath("decoder"),
-                    joiner = models.modelPath("joiner"),
-                ),
-                tokens = models.path("tokens.txt"),
-                modelType = "nemo_transducer",
-                provider = "cpu", numThreads = 2,
-            ),
-            decodingMethod = "greedy_search",
-        ))
+        val decoder = Decoder(models)
         try {
-            if (cutting == Cutting.WHOLE) return Transcript(Session(recognizer, audio, policy).whole())
+            if (cutting == Cutting.WHOLE) {
+                val began = System.nanoTime()
+                val transcript = Transcript(Session(decoder, audio, policy).whole())
+                onProgress(Progress(audio.durationMs, audio.durationMs, (System.nanoTime() - began) / 1_000_000, transcript.words))
+                return transcript
+            }
             // The clock starts once the model is loaded, so speed and remaining time describe decoding alone.
             val began = System.nanoTime()
-            val session = Session(recognizer, audio, policy)
+            val session = Session(decoder, audio, policy)
             // Recorded context makes a decode end past its speech span, so the position only ever moves forward.
             var reached = 0
             val report = { done: Int ->
@@ -75,15 +70,66 @@ object Parakeet {
                 Cutting.QUIET -> session.speech(Span(0, audio.samples.size), report)
                 else -> session.fixed(report)
             }
-            report(audio.samples.size)
-            return Transcript(WordGate.finalizeTranscriptWords(audio, session.words, paddedTailMs))
+            val transcript = Transcript(WordGate.finalizeTranscriptWords(audio, session.words, paddedTailMs))
+            onProgress(Progress(audio.durationMs, audio.durationMs, (System.nanoTime() - began) / 1_000_000, transcript.words))
+            return transcript
         } finally {
-            recognizer.release()
+            decoder.close()
+        }
+    }
+
+    /** One native recognizer, owned and closed by the decoding thread. */
+    internal class Decoder(models: ModelStore) : AutoCloseable {
+        private val recognizer: OfflineRecognizer
+        private var closed = false
+        init {
+            decoderLease.acquire()
+            try {
+                requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
+                recognizer = OfflineRecognizer(config = OfflineRecognizerConfig(
+                    featConfig = FeatureConfig(sampleRate = 16000, featureDim = 128, dither = 0f),
+                    modelConfig = OfflineModelConfig(
+                        transducer = OfflineTransducerModelConfig(
+                            encoder = models.modelPath("encoder"),
+                            decoder = models.modelPath("decoder"),
+                            joiner = models.modelPath("joiner"),
+                        ),
+                        tokens = models.path("tokens.txt"),
+                        modelType = "nemo_transducer",
+                        provider = "cpu", numThreads = 2,
+                    ),
+                    decodingMethod = "greedy_search",
+                ))
+            } catch (error: Throwable) {
+                decoderLease.release()
+                throw error
+            }
+        }
+        fun decode(audio: PcmAudio, start: Int = 0, length: Int = audio.samples.size, headPad: Int = 0, tailPad: Int = 0): List<TimedWord> {
+            requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
+            val stream = recognizer.createStream()
+            try {
+                // Sherpa resamples to the feature rate. Keep the input's original sample rate.
+                stream.acceptWaveform(if (headPad == 0 && tailPad == 0 && start == 0 && length == audio.samples.size) audio.samples
+                    else FloatArray(headPad + length + tailPad).also { audio.samples.copyInto(it, headPad, start, start + length) }, audio.sampleRate)
+                recognizer.decode(stream)
+                val result = recognizer.getResult(stream)
+                requireUser(result.text.isBlank() || result.tokens.isNotEmpty(), Failure.TIMINGS)
+                return Transcript.timedWordsFromTokens(result.tokens, result.timestamps, result.durations)
+            } finally {
+                stream.release()
+            }
+        }
+
+        override fun close() {
+            if (closed) return
+            closed = true
+            try { recognizer.release() } finally { decoderLease.release() }
         }
     }
 
     /** The decodes of one recording on one recognizer. Fed span by span, so a live recording could feed it too. */
-    private class Session(private val recognizer: OfflineRecognizer, private val audio: PcmAudio, private val policy: DecodePolicy) {
+    private class Session(private val decoder: Decoder, private val audio: PcmAudio, private val policy: DecodePolicy) {
         private val rate = audio.sampleRate
         private val total = audio.samples.size
         private var previousEnd = 0
@@ -95,21 +141,8 @@ object Parakeet {
         private fun ms(samples: Int) = SpeechWindows.floorMs(samples, rate)
 
         /** One decoder call over [length] recording samples from [start], between [headPad] and [tailPad] zeros. */
-        private fun decode(start: Int, length: Int, headPad: Int = 0, tailPad: Int = 0): List<TimedWord> {
-            requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
-            val stream = recognizer.createStream()
-            try {
-                // Sherpa resamples to the feature rate. Keep the input's original sample rate.
-                stream.acceptWaveform(if (headPad == 0 && tailPad == 0 && length == total) audio.samples
-                    else FloatArray(headPad + length + tailPad).also { audio.samples.copyInto(it, headPad, start, start + length) }, rate)
-                recognizer.decode(stream)
-                val result = recognizer.getResult(stream)
-                requireUser(result.text.isBlank() || result.tokens.isNotEmpty(), Failure.TIMINGS)
-                return Transcript.timedWordsFromTokens(result.tokens, result.timestamps, result.durations)
-            } finally {
-                stream.release()
-            }
-        }
+        private fun decode(start: Int, length: Int, headPad: Int = 0, tailPad: Int = 0) =
+            decoder.decode(audio, start, length, headPad, tailPad)
 
         fun whole(): List<Word> = decode(0, total).map { it.word }
 
@@ -125,6 +158,8 @@ object Parakeet {
                     // A final token can be stamped inside the synthetic tail: keep it at the real boundary for the gate to judge.
                     decoded = decoded + WordGate.clampWordsToTimelineEnd(placed,
                         windowOffsetMs + ms(chunk.span.end - window.span.start), SpeechWindows.ceilMs(chunk.tailPad, rate))
+                    pending = SeamMerge.merge(merged, decoded, index == 0, windowOffsetMs, ms(window.overlap)) { it.word }
+                    onDecoded(span.start + chunk.span.end)
                 }
                 merged = SeamMerge.merge(merged, decoded, index == 0, windowOffsetMs, ms(window.overlap)) { it.word }
                 pending = merged
@@ -182,7 +217,7 @@ object Parakeet {
         fun fixed(onDecoded: (Int) -> Unit) {
             var previous: Span? = null
             for (span in SpeechWindows.fixed(total, rate)) {
-                val found = segment(span, false)
+                val found = segment(span, false, onDecoded)
                 pending = emptyList()
                 settled = SeamMerge.merge(settled, found, previous == null, ms(span.start),
                     ms(SpeechWindows.overlap(previous, span)), midpointOnDisagreement = true) { it.word }

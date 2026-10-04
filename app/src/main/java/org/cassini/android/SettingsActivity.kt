@@ -10,6 +10,7 @@ import android.preference.ListPreference
 import android.preference.Preference
 import android.preference.PreferenceCategory
 import android.preference.PreferenceFragment
+import android.preference.SwitchPreference
 import android.view.MenuItem
 import java.io.File
 
@@ -74,6 +75,15 @@ class SettingsActivity : Activity() {
                 }
             }
             transcription.addPreference(model)
+            transcription.addPreference(SwitchPreference(context).apply {
+                key = "live_recording"; isPersistent = false
+                setTitle(R.string.live_recording); setSummary(R.string.live_recording_summary)
+                isChecked = RecordingPreferences.live(context)
+                setOnPreferenceChangeListener { _, enabled ->
+                    RecordingPreferences.setLive(context, enabled as Boolean)
+                    true
+                }
+            })
             transcription.addPreference(Preference(context).apply {
                 setTitle(R.string.automatic_model); setSummary(R.string.automatic_model_explanation)
                 isSelectable = false

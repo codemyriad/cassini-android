@@ -156,4 +156,16 @@
     <string name="note_clock" translatable="false">%1$02d:%2$02d</string>
     <string name="library_note_metadata">%1$s · %2$s</string>
     <string name="library_saved_document">Saved document</string>
+    <string name="live_recording">Transcribe while recording</string>
+    <string name="live_recording_summary">Off by default. Shows draft words in short chunks. Requires a downloaded model and uses more CPU and battery.</string>
+    <string name="live_recording_hint">Draft words appear after each short chunk is decoded. Keep recording while recognition catches up; Done saves the audio and finishes the transcript.</string>
+    <string name="live_recording_loading">Loading recognition model…</string>
+    <string name="live_recording_waiting">Listening · draft words will appear here</string>
+    <string name="live_recording_progress">Draft · transcribed through %1$d:%2$02d</string>
+    <string name="live_recording_finishing">Audio saved · finishing transcription…</string>
+    <string name="live_recording_unavailable">Live transcription needs the selected model. Download it first; this recording will still be saved.</string>
+    <string name="live_recording_failed">Live transcription stopped. Your recording is safe; you can transcribe it after saving.</string>
+    <string name="microphone_pcm_format">MONO · 16 kHz · live transcription</string>
+    <string name="transcript_draft">Draft · words and timings may change</string>
+    <string name="recording_saving">Saving audio…</string>
 </resources>

@@ -83,6 +83,7 @@ class DeckViews(private val context: Context) {
         id = R.id.clear_search_button; text = "×"; textSize = 22f; contentDescription = context.getString(R.string.clear_search)
     }
     val matches = text(12f, muted).apply { id = R.id.search_matches }
+    val draft = text(12f, amber).apply { id = R.id.transcript_draft; setText(R.string.transcript_draft); visibility = View.GONE }
     val voice = label(R.string.unidentified_voice)
     val transcript = text(18f).apply {
         id = R.id.transcript_text; setLineSpacing(dp(7).toFloat(), 1.1f)
@@ -142,6 +143,7 @@ class DeckViews(private val context: Context) {
         transcriptHeading.add(Space(context), dp(6), dp(1))
         transcriptHeading.add(export, LinearLayout.LayoutParams.WRAP_CONTENT)
         content.add(transcriptHeading)
+        content.add(draft)
         content.add(details)
         content.add(variant, marginTop = 8)
         searchRow.add(search, 0, weight = 1f)

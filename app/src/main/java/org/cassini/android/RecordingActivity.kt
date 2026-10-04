@@ -20,6 +20,7 @@ import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
+import org.json.JSONObject
 
 class RecordingActivity : Activity() {
     private lateinit var views: NoteViews
@@ -30,7 +31,26 @@ class RecordingActivity : Activity() {
     private lateinit var done: Button
     private lateinit var start: Button
     private lateinit var waveform: WaveformView
-    private var capture: MicrophoneRecording? = null
+    private var capture: RecordingCapture? = null
+    private lateinit var hint: TextView
+    private lateinit var format: TextView
+    private lateinit var liveStatus: TextView
+    private lateinit var liveWords: TextView
+    private lateinit var scroll: ScrollView
+    private var liveJob: LiveJob? = null
+    private var capturedSession: Session? = null
+    private var finishingLive = false
+    private var stopping = false
+    private var foreground = false
+    private var interrupted = false
+
+    private class LiveJob(val audio: LiveAudioBuffer, val models: ModelStore) {
+        @Volatile var cancelled = false
+        var failed = false
+        var result: Transcript? = null
+        var inferenceMs = 0L
+        var thread: Thread? = null
+    }
     private val handler = Handler(Looper.getMainLooper())
     private var savedNote: String? = null
     private var permissionDenied = false
@@ -63,15 +83,25 @@ class RecordingActivity : Activity() {
             maxLines = 2
         }
         views.add(content, title, top = 32)
-        views.add(content, views.text(12f, DeckViews.muted).apply { gravity = Gravity.CENTER; setText(R.string.microphone_format) }, top = 12)
+        format = views.text(12f, DeckViews.muted).apply { gravity = Gravity.CENTER; setText(R.string.microphone_format) }
+        views.add(content, format, top = 12)
         timer = views.text(64f, DeckViews.paper, true).apply { id = R.id.capture_timer; text = getString(R.string.note_clock, 0, 0); gravity = Gravity.CENTER }
         views.add(content, timer, top = 30)
         waveform = WaveformView(this, views).apply { contentDescription = getString(R.string.microphone_level) }
         views.add(content, waveform, height = views.dp(170), top = 24)
-        views.add(content, views.text(15f, DeckViews.muted).apply {
+        hint = views.text(15f, DeckViews.muted).apply {
             setText(R.string.recording_hint); setLineSpacing(views.dp(4).toFloat(), 1f)
-        }, top = 16)
-        views.add(root, ScrollView(this).apply { isFillViewport = true; isVerticalScrollBarEnabled = false; addView(content) }, height = 0, weight = 1f)
+        }
+        views.add(content, hint, top = 16)
+        liveStatus = views.text(13f, DeckViews.amber).apply { id = R.id.capture_live_status; visibility = View.GONE }
+        liveWords = views.text(18f, DeckViews.paper).apply {
+            id = R.id.capture_transcript; visibility = View.GONE
+            setLineSpacing(views.dp(5).toFloat(), 1f)
+        }
+        views.add(content, liveStatus, top = 20)
+        views.add(content, liveWords, top = 8)
+        scroll = ScrollView(this).apply { isFillViewport = true; isVerticalScrollBarEnabled = false; addView(content) }
+        views.add(root, scroll, height = 0, weight = 1f)
         start = views.button(R.string.enable_microphone, views.record, DeckViews.ink).apply {
             id = R.id.capture_start
             setOnClickListener {
@@ -106,16 +136,35 @@ class RecordingActivity : Activity() {
     }
 
     private fun requestCapture() {
-        if (capture != null) return
+        if (capture != null || stopping) return
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), MICROPHONE)
             return
         }
         permissionDenied = false
+        capturedSession = null
+        interrupted = false
         try {
             val directory = File(filesDir, "documents").also { check(it.mkdirs() || it.isDirectory) }
-            capture = MicrophoneRecording(this, File(directory, "${UUID.randomUUID()}.m4a"),
-                onLimit = { finishRecording(true) }, onError = { recordingFailed(IllegalStateException("Microphone error")) })
+            val preferences = SessionStore(filesDir).load()
+            val fp32 = ModelPolicy.resolve(this, preferences.modelChoice)
+            val model = ModelStore(File(filesDir, if (fp32) "parakeet-v3-fp32" else "parakeet-v3"), fp32)
+            val live = RecordingPreferences.live(this)
+            if (live && model.ready()) {
+                val job = LiveJob(LiveAudioBuffer(), model)
+                liveJob = job
+                capture = PcmMicrophoneRecording(File(directory, "${UUID.randomUUID()}.wav"), job.audio,
+                    onLimit = { finishRecording(true) }, onError = { recordingFailed(it) })
+                format.setText(R.string.microphone_pcm_format)
+                hint.setText(R.string.live_recording_hint)
+                liveStatus.visibility = View.VISIBLE; liveStatus.setText(R.string.live_recording_loading)
+                liveWords.visibility = View.VISIBLE
+                startLive(job)
+            } else {
+                capture = MicrophoneRecording(this, File(directory, "${UUID.randomUUID()}.m4a"),
+                    onLimit = { finishRecording(true) }, onError = { recordingFailed(IllegalStateException("Microphone error")) })
+                if (live) { liveStatus.visibility = View.VISIBLE; liveStatus.setText(R.string.live_recording_unavailable) }
+            }
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             start.visibility = View.GONE; pause.isEnabled = true; done.isEnabled = true
             status.setText(R.string.recording_active)
@@ -133,29 +182,147 @@ class RecordingActivity : Activity() {
     private fun finishRecording(autoTranscribe: Boolean) {
         val recording = capture ?: return
         capture = null
+        stopping = true
         handler.removeCallbacks(tick)
+        pause.isEnabled = false; done.isEnabled = false
+        status.setText(R.string.recording_saving)
+        val name = title.text.toString().trim().ifEmpty { getString(R.string.recording) } + ".${recording.file.extension}"
+        val previous = SessionStore(filesDir).load()
+        val stopped: () -> Unit = {
+            try {
+                val file = recording.stop()
+                val elapsed = recording.elapsedMs
+                if (Looper.myLooper() == Looper.getMainLooper()) saveRecording(file, elapsed, name, previous, autoTranscribe)
+                else handler.post { saveRecording(file, elapsed, name, previous, autoTranscribe) }
+            } catch (error: Exception) {
+                recording.release()
+                handler.post { stopping = false; recordingFailed(error) }
+            }
+        }
+        // PCM stop joins the disk writer, including its final fsync. Audio capture is already stopping;
+        // keep the screen responsive while slow storage finishes. The worker retains the capture handle.
+        if (recording is PcmMicrophoneRecording) Thread(stopped, "Cassini-save-recording").start()
+        else stopped()
+    }
+
+    private fun saveRecording(file: File, elapsed: Long, name: String, previous: Session, autoTranscribe: Boolean) {
+        stopping = false
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        var finalized = false
         try {
-            val elapsed = recording.elapsedMs
-            val file = recording.stop()
-            finalized = true
             val sessions = SessionStore(filesDir)
             val preferences = sessions.load()
             val captured = Session(uri = Uri.fromFile(file).toString(), libraryId = UUID.randomUUID().toString(),
-                name = title.text.toString().trim().ifEmpty { getString(R.string.recording) } + ".m4a",
-                durationMs = elapsed, modelChoice = preferences.modelChoice, fp32 = preferences.fp32)
-            // Keep a durable current-session reference even if updating the catalogue fails.
-            sessions.save(captured)
+                name = name, durationMs = elapsed, modelChoice = preferences.modelChoice, fp32 = preferences.fp32)
+            // If another screen selected a note while the file was closing, retain that current selection.
+            // Otherwise keep a durable session reference even if updating the catalogue fails.
+            val stillCurrent = preferences.uri == previous.uri && preferences.libraryId == previous.libraryId && preferences.screen == previous.screen
+            if (stillCurrent) sessions.save(captured)
             val session = LibraryStore(filesDir).save(captured)
-            sessions.save(session)
+            if (stillCurrent) sessions.save(session)
             savedNote = session.libraryId
-            if (autoTranscribe) openSavedNote(intent.getBooleanExtra(AUTO_TRANSCRIBE, true))
-            else { status.setText(R.string.recording_saved_interrupted); pause.isEnabled = false; done.isEnabled = false }
+            capturedSession = session
+            val job = liveJob
+            if (autoTranscribe && !interrupted && foreground && !isDestroyed && job != null && !job.failed && intent.getBooleanExtra(AUTO_TRANSCRIBE, true)) {
+                finishingLive = true
+                window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                status.setText(R.string.live_recording_finishing)
+                completeLive(job)
+            } else {
+                cancelLive()
+                if (foreground && !isDestroyed) openSavedNote(autoTranscribe && !interrupted && job == null && intent.getBooleanExtra(AUTO_TRANSCRIBE, true))
+                else if (!isDestroyed) status.setText(R.string.recording_saved_interrupted)
+            }
         } catch (error: Exception) {
-            recordingFailed(error)
-            if (finalized) status.setText(R.string.library_error)
+            cancelLive()
+            android.util.Log.e("Cassini", "Could not catalogue retained recording", error)
+            if (!isDestroyed) status.setText(R.string.library_error)
         }
+    }
+
+    private fun startLive(job: LiveJob) {
+        job.thread = Thread({
+            try {
+                val began = System.nanoTime()
+                val result = Parakeet.Decoder(job.models).use { decoder ->
+                    handler.post { if (liveJob === job && !job.cancelled) liveStatus.setText(R.string.live_recording_waiting) }
+                    job.inferenceMs = (System.nanoTime() - began) / 1_000_000
+                    LiveTranscription.transcribe(job.audio, { audio, padding ->
+                        val decodeBegan = System.nanoTime()
+                        decoder.decode(audio, tailPad = padding).also { job.inferenceMs += (System.nanoTime() - decodeBegan) / 1_000_000 }
+                    }) { progress ->
+                        handler.post {
+                            if (liveJob === job && !job.cancelled && !isDestroyed) {
+                                val first = liveWords.text.isEmpty()
+                                val follow = scroll.getChildAt(0).height - scroll.height - scroll.scrollY <= views.dp(80)
+                                liveWords.text = progress.words.joinToString(" ") { it.text }
+                                liveStatus.text = getString(R.string.live_recording_progress, progress.doneMs / 60000, progress.doneMs / 1000 % 60)
+                                if (progress.words.isNotEmpty() && (first || follow)) scroll.post {
+                                    if (!job.cancelled) scroll.smoothScrollTo(0, (liveWords.bottom - scroll.height).coerceAtLeast(0))
+                                }
+                            }
+                        }
+                    }
+                }
+                handler.post {
+                    if (liveJob === job && !job.cancelled && !isDestroyed) {
+                        job.result = result
+                        completeLive(job)
+                    }
+                }
+            } catch (error: Exception) { liveFailed(job, error) }
+            catch (error: OutOfMemoryError) { liveFailed(job, error) }
+        }, "Cassini-live-transcription").also { it.start() }
+    }
+
+    /** Called only after both the microphone file and the last decode have finished. */
+    private fun completeLive(job: LiveJob) {
+        val session = capturedSession ?: return
+        val transcript = job.result ?: return
+        if (!finishingLive || job.cancelled || liveJob !== job) return
+        job.result = null // Only one packaging job, even if completion callbacks meet.
+        job.thread = Thread({
+            try {
+                if (job.cancelled) return@Thread
+                val audio = job.audio.snapshot()
+                val processing = JSONObject().put("backend", "sherpa-onnx").put("engine", "Parakeet TDT")
+                    .put("model", "nvidia/parakeet-tdt-0.6b-v3 ${job.models.precision}")
+                    .put("device", "Android CPU").put("language", "it").put("source", "recording")
+                    .put("version", "sherpa-onnx 1.13.7; model revision ${job.models.revision}")
+                    .put("x-segmentation", LiveTranscription.PROVENANCE).put("x-inferenceMs", job.inferenceMs)
+                val (file, portable) = DocumentStore(applicationContext).create(Uri.parse(session.uri), audio, transcript, session.name, processing, null)
+                handler.post {
+                    if (job.cancelled || liveJob !== job || isDestroyed) { file.delete(); return@post }
+                    try {
+                        val complete = session.copy(uri = Uri.fromFile(file).toString(), document = file.absolutePath, transcript = transcript,
+                            name = session.name.substringBeforeLast('.') + ".opus", selectedVariant = portable.defaultId,
+                            durationMs = audio.durationMs, inferenceMs = job.inferenceMs, resultPrecision = job.models.precision,
+                            fp32 = job.models.fp32)
+                        val saved = LibraryStore(filesDir).save(complete)
+                        SessionStore(filesDir).save(saved)
+                        liveJob = null; finishingLive = false
+                        openSavedNote(false)
+                    } catch (error: Exception) { liveFailed(job, error) }
+                }
+            } catch (error: Exception) { liveFailed(job, error) }
+            catch (error: OutOfMemoryError) { liveFailed(job, error) }
+        }, "Cassini-live-document").also { it.start() }
+    }
+
+    private fun liveFailed(job: LiveJob, error: Throwable) {
+        if (job.cancelled) return
+        android.util.Log.e("Cassini", "Live transcription failed; audio retained", error)
+        handler.post {
+            if (liveJob !== job || job.cancelled || isDestroyed) return@post
+            job.failed = true
+            liveStatus.setText(R.string.live_recording_failed)
+            if (finishingLive) { cancelLive(); openSavedNote(false) }
+        }
+    }
+
+    private fun cancelLive() {
+        liveJob?.let { it.cancelled = true; it.audio.cancel(); it.thread?.interrupt() }
+        liveJob = null; finishingLive = false
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
     private fun openSavedNote(autoTranscribe: Boolean) {
@@ -167,6 +334,7 @@ class RecordingActivity : Activity() {
 
     private fun recordingFailed(error: Exception) {
         android.util.Log.e("Cassini", "Microphone recording failed", error)
+        cancelLive()
         val recording = capture
         capture = null
         recording?.release(); recording?.file?.delete()
@@ -177,18 +345,22 @@ class RecordingActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        if (savedNote != null) openSavedNote(false)
+        foreground = true
+        if (savedNote != null && !finishingLive) openSavedNote(false)
         else if (permissionDenied && checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) requestCapture()
     }
     override fun onPause() {
+        foreground = false
+        if (capture != null || stopping || finishingLive) interrupted = true
         // No background service yet: finalize before leaving the foreground, retaining the note.
         finishRecording(false)
+        cancelLive()
         super.onPause()
     }
     @Deprecated("Framework back callback")
     override fun onBackPressed() { if (capture != null) finishRecording(true) else super.onBackPressed() }
     override fun onSaveInstanceState(outState: Bundle) { outState.putString("savedNote", savedNote); super.onSaveInstanceState(outState) }
-    override fun onDestroy() { handler.removeCallbacks(tick); capture?.release(); super.onDestroy() }
+    override fun onDestroy() { handler.removeCallbacks(tick); cancelLive(); capture?.release(); super.onDestroy() }
 
     private class WaveformView(context: Context, private val views: NoteViews) : View(context) {
         private val levels = ArrayDeque<Float>()

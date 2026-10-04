@@ -55,6 +55,9 @@ class SettingsTest {
             scenario.onActivity { AppLanguage.set(it, "en") }
             instrumentation.waitForIdleSync()
             scenario.onActivity { it.findViewById<TextView>(R.id.settings_button).performClick() }
+            assertFalse("Live recording must be opt-in", RecordingPreferences.live(context))
+            openPreference("Transcribe while recording")
+            assertTrue(RecordingPreferences.live(context))
             openPreference("Transcription model")
             selectOption("Automatic · prefer full precision")
             awaitModelChoice("auto")
@@ -68,7 +71,12 @@ class SettingsTest {
             awaitText("Italiano") // The selected value appears under the language row.
             assertTrue("Changing language must retain the chosen model", sessions.load().fp32)
             instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
-            awaitText("Ciao mondo.")
+            // Constrain the check to the viewer; the closing preference window can still be present.
+            var decor: android.view.View? = null
+            scenario.onActivity { decor = it.window.decorView }
+            onView(withText("Ciao mondo.")).inRoot(androidx.test.espresso.matcher.RootMatchers.withDecorView(org.hamcrest.Matchers.`is`(decor)))
+                .check(matches(isDisplayed()))
+            assertTrue("Returning from settings must keep live transcription enabled", RecordingPreferences.live(context))
             scenario.onActivity { activity ->
                 assertTrue(activity.findViewById<TextView>(R.id.model_status).text.toString().startsWith("FP32"))
                 assertEquals("Italian sample.wav", activity.findViewById<TextView>(R.id.recording_name).text.toString())

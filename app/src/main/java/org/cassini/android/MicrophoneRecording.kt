@@ -7,14 +7,14 @@ import android.os.SystemClock
 import java.io.File
 
 /** Foreground AAC capture. Finalized audio is retained even if recognition fails. */
-internal class MicrophoneRecording(context: Context, val file: File, onLimit: () -> Unit, onError: () -> Unit) {
+internal class MicrophoneRecording(context: Context, override val file: File, onLimit: () -> Unit, onError: () -> Unit) : RecordingCapture {
     private var recorder: MediaRecorder? = null
     private var segmentStarted = 0L
     private var accumulatedMs = 0L
-    var paused = false
+    override var paused = false
         private set
-    val elapsedMs get() = accumulatedMs + if (paused || recorder == null) 0 else SystemClock.elapsedRealtime() - segmentStarted
-    val amplitude get() = if (paused) 0 else try { recorder?.maxAmplitude ?: 0 } catch (_: IllegalStateException) { 0 }
+    override val elapsedMs get() = accumulatedMs + if (paused || recorder == null) 0 else SystemClock.elapsedRealtime() - segmentStarted
+    override val amplitude get() = if (paused) 0 else try { recorder?.maxAmplitude ?: 0 } catch (_: IllegalStateException) { 0 }
 
     init {
         @Suppress("DEPRECATION")
@@ -37,13 +37,13 @@ internal class MicrophoneRecording(context: Context, val file: File, onLimit: ()
         } catch (error: Exception) { media.release(); recorder = null; file.delete(); throw error }
     }
 
-    fun togglePause() {
+    override fun togglePause() {
         val media = recorder ?: return
         if (paused) { media.resume(); segmentStarted = SystemClock.elapsedRealtime(); paused = false }
         else { media.pause(); accumulatedMs = elapsedMs; paused = true }
     }
 
-    fun stop(): File {
+    override fun stop(): File {
         val media = recorder ?: error("Recording already stopped")
         accumulatedMs = elapsedMs
         recorder = null
@@ -53,6 +53,6 @@ internal class MicrophoneRecording(context: Context, val file: File, onLimit: ()
         return file
     }
 
-    fun release() { recorder?.release(); recorder = null }
+    override fun release() { recorder?.release(); recorder = null }
     companion object { const val MAX_DURATION_MS = AudioDecoder.MAX_SECONDS * 1000 - 1000 }
 }
