@@ -62,7 +62,7 @@ class ModelStore(private val directory: File, val fp32: Boolean = false) {
          * `.part` file that replaces nothing until its size and SHA-256 match. [progress] receives the bytes
          * done so far and whether they are being verified rather than downloaded.
          */
-        private fun fetch(url: String, artifact: Artifact, directory: File, progress: (Long, Boolean) -> Unit) {
+        internal fun fetch(url: String, artifact: Artifact, directory: File, progress: (Long, Boolean) -> Unit) {
             val destination = File(directory, artifact.name)
             if (destination.length() == artifact.size && digest(destination) == artifact.sha256) {
                 progress(artifact.size, true)

@@ -28,6 +28,8 @@ Full texts and copyright notices are checked in under [app assets](app/src/main/
 
 [Silero VAD](https://github.com/snakers4/silero-vad) is MIT-licensed. Its ONNX model (`silero_vad.onnx`, 630 KB) is downloaded separately from the sherpa-onnx `asr-models` release and is not in the APK. Its size and SHA-256 are in `ModelStore.kt`.
 
+[pyannote segmentation 3.0](https://huggingface.co/pyannote/segmentation-3.0) (MIT, CNRS) and [3D-Speaker ERes2Net-Base](https://modelscope.cn/models/iic/speech_eres2net_base_sv_zh-cn_3dspeaker_16k) (Apache-2.0) are optional speaker-identification models. The sherpa-onnx ONNX conversions download separately (about 40 MiB together). Hashes and download sources are pinned in `DiarizationModels.kt`; their license texts are included in the APK. Speaker labels are anonymous estimates, not voice identification.
+
 [Google FLEURS](https://huggingface.co/datasets/google/fleurs) is CC-BY-4.0. Its pinned source, attribution and reference text accompany locally fetched device fixtures; those files are not in the distributed APK or repository. README screenshots show an excerpt of [il Pericolo Invisibile](https://www.youtube.com/watch?v=UmZwQf5TV3c) by Dario Bressanini, used for the documented device checks. No sample audio is distributed.
 
 JUnit, AndroidX Test and the JVM JSON dependency are test-only dependencies and are not packaged in the app APK.

@@ -46,6 +46,7 @@ class MainActivity : Activity() {
     private lateinit var documents: DocumentStore
     private var player: MediaPlayer? = null
     private var playerReady = false
+    private var speakerCancellation: java.util.concurrent.atomic.AtomicBoolean? = null
     private var busy = false
     /** Words of a transcription still running. Shown, never saved. */
     private var interim: Transcript? = null
@@ -100,6 +101,8 @@ class MainActivity : Activity() {
         ui.menu.setOnClickListener { showSettings() }
         ui.open.setOnClickListener { chooseFile() }
         ui.transcribe.setOnClickListener { transcribe() }
+        ui.speakers.setOnClickListener { chooseSpeakerCount() }
+        ui.cancelOperation.setOnClickListener { cancelSpeakerIdentification() }
         ui.download.setOnClickListener { downloadModel() }
         ui.export.setOnClickListener { saveCassiniDocument() }
         ui.documentInfo.setOnClickListener { showDocumentInfo() }
@@ -206,6 +209,95 @@ class MainActivity : Activity() {
                 persistSession()
                 renderScreen()
                 defaultStatus()
+            }
+        }
+    }
+
+    private fun chooseSpeakerCount() {
+        if (busy || session.transcript?.words?.isNotEmpty() != true) return
+        var count = -1
+        val choices = arrayOf(getString(R.string.speaker_automatic), getString(R.string.speaker_one)) +
+            (2..8).map { getString(R.string.speaker_number, it) }
+        AlertDialog.Builder(this).setTitle(R.string.speaker_count)
+            .setSingleChoiceItems(choices, 0) { _, index -> count = if (index == 0) -1 else index }
+            .setView(TextView(this).apply {
+                setText(R.string.speaker_count_hint)
+                val padding = (16 * resources.displayMetrics.density).toInt()
+                setPadding(padding, padding, padding, padding)
+            })
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.identify_speakers) { _, _ ->
+                if (DiarizationModels.inFiles(filesDir).ready()) identifySpeakers(count)
+                else AlertDialog.Builder(this).setTitle(R.string.speaker_models_download)
+                    .setMessage(R.string.speaker_models_summary)
+                    .setNegativeButton(R.string.cancel, null)
+                    .setPositiveButton(R.string.download_speaker_models) { _, _ -> identifySpeakers(count) }.show()
+            }.show()
+    }
+
+    private fun cancelSpeakerIdentification() {
+        speakerCancellation?.set(true)
+        returnToLibrary()
+    }
+
+    private fun identifySpeakers(count: Int) {
+        if (busy || (document != null && document?.state != "ok")) return
+        val source = session.transcript?.takeIf { it.words.isNotEmpty() } ?: return
+        val uri = session.uri?.let(Uri::parse) ?: return
+        val original = session
+        val originalDocument = document
+        val sourceId = original.selectedVariant
+        val cancelled = java.util.concurrent.atomic.AtomicBoolean()
+        speakerCancellation = cancelled
+        ui.cancelOperation.visibility = View.VISIBLE
+        val speakerModels = DiarizationModels.inFiles(filesDir)
+        fun checkActive() = requireUser(!cancelled.get() && !Thread.currentThread().isInterrupted, Failure.CANCELLED)
+        runWork(if (speakerModels.ready()) R.string.identifying_speakers else R.string.preparing_download) {
+            if (!speakerModels.ready()) speakerModels.install { progress -> onUi {
+                if (!cancelled.get()) {
+                    ui.progress.isIndeterminate = false
+                    ui.progress.progress = progress.percent
+                    setStatus(if (progress.verifying) R.string.verifying else R.string.downloading, progress.percent)
+                }
+            } }
+            checkActive()
+            onUi { ui.progress.isIndeterminate = true; setStatus(R.string.identifying_speakers) }
+            val began = System.nanoTime()
+            val audio = AudioDecoder.decode(this, uri)
+            checkActive()
+            val turns = Diarization.turns(audio, speakerModels.segmentationPath, speakerModels.embeddingPath, count) { done, total ->
+                onUi {
+                    if (!cancelled.get() && total > 0) {
+                        val percent = (done * 100L / total).toInt().coerceIn(0, 100)
+                        ui.progress.isIndeterminate = false; ui.progress.progress = percent
+                        setStatus(R.string.identifying_speakers_progress, percent)
+                    }
+                }
+            }
+            checkActive()
+            val elapsed = (System.nanoTime() - began) / 1_000_000
+            val previousProcessing = originalDocument?.manifest?.optJSONObject("provenance")?.optJSONObject("speechToText")?.optJSONObject(sourceId ?: "")
+            val result = SpeakerAttribution.derive(source, turns, previousProcessing, sourceId, count, elapsed, originalDocument?.manifest?.optJSONObject("provenance")?.optJSONObject("attribution"))
+            val labels = result.transcript.words.map { it.speaker }.distinct().mapIndexed { index, id ->
+                id to getString(R.string.speaker_label, index + 1)
+            }.toMap()
+            onUi { ui.progress.isIndeterminate = true; setStatus(R.string.packaging_document) }
+            checkActive()
+            val (file, portable) = documents.create(uri, audio, result.transcript, original.name,
+                result.processing, originalDocument, labels)
+            // A completed native call may outlive its screen. Never publish a cancelled result,
+            // and remove only this job's new immutable document when it cannot be adopted.
+            handler.post {
+                if (isDestroyed || isFinishing || cancelled.get()) file.delete()
+                else {
+                    val position = if (playerReady) player?.currentPosition ?: session.positionMs else session.positionMs
+                    session = original.copy(uri = Uri.fromFile(file).toString(), document = file.absolutePath,
+                        name = "${original.name.substringBeforeLast('.')}.opus", selectedVariant = portable.defaultId,
+                        durationMs = audio.durationMs, positionMs = position,
+                        processingMs = maxOf(original.processingMs, original.inferenceMs) + elapsed)
+                    adoptDocument(portable); preparePlayer(Uri.fromFile(file)); persistSession(); renderScreen()
+                    setStatus(R.string.speakers_complete, labels.size, elapsed / 1000.0)
+                }
             }
         }
     }
@@ -355,6 +447,8 @@ class MainActivity : Activity() {
             } finally {
                 onUi {
                     busy = false
+                    speakerCancellation = null
+                    ui.cancelOperation.visibility = View.GONE
                     // A run that failed or was cancelled leaves no partial transcript on screen.
                     if (interim != null) { interim = null; renderScreen() }
                     window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -431,6 +525,8 @@ class MainActivity : Activity() {
         ui.library.isEnabled = !busy
         ui.open.isEnabled = !busy
         ui.transcribe.isEnabled = !busy && session.uri != null && ready && (document == null || document?.state == "ok")
+        ui.speakers.visibility = if (session.transcript?.words?.isNotEmpty() == true && interim == null) View.VISIBLE else View.GONE
+        ui.speakers.isEnabled = !busy && session.uri != null && (document == null || document?.state == "ok")
         ui.download.isEnabled = !busy
         ui.export.isEnabled = !busy && (session.document != null || session.transcript != null)
         ui.documentInfo.isEnabled = !busy
@@ -439,7 +535,7 @@ class MainActivity : Activity() {
         ui.seek.isEnabled = playerReady
         ui.back.isEnabled = playerReady
         ui.forward.isEnabled = playerReady
-        listOf(ui.menu, ui.open, ui.transcribe, ui.download, ui.export, ui.play, ui.back, ui.forward)
+        listOf(ui.menu, ui.open, ui.transcribe, ui.speakers, ui.download, ui.export, ui.play, ui.back, ui.forward)
             .forEach { it.alpha = if (it.isEnabled) 1f else .4f }
     }
 
@@ -719,6 +815,7 @@ class MainActivity : Activity() {
     }
     override fun onDestroy() {
         handler.removeCallbacks(ticker)
+        speakerCancellation?.set(true)
         worker.shutdownNow()
         player?.release()
         super.onDestroy()
@@ -736,7 +833,9 @@ class MainActivity : Activity() {
         finish()
     }
     @Deprecated("Framework back callback")
-    override fun onBackPressed() { if (!busy) returnToLibrary() }
+    override fun onBackPressed() {
+        if (speakerCancellation != null) cancelSpeakerIdentification() else if (!busy) returnToLibrary()
+    }
     companion object {
         /** One attempt per process: a network that cannot reach the detector must not be retried at every note. */
         private val detectorAttempted = java.util.concurrent.atomic.AtomicBoolean()

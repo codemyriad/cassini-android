@@ -29,7 +29,7 @@ object Parakeet {
     internal class Progress(val doneMs: Long, val totalMs: Long, val elapsedMs: Long, val words: List<Word>)
 
     // A cancelled native call finishes before another screen loads a second copy of the model.
-    private val decoderLease = java.util.concurrent.Semaphore(1, true)
+    private val decoderLease = NativeInference.lease
 
     /** Recorded context for retrying a span that decoded to nothing: the detector's silence decision interval. */
     private const val RETRY_CONTEXT_MS = 500
@@ -83,7 +83,7 @@ object Parakeet {
         private val recognizer: OfflineRecognizer
         private var closed = false
         init {
-            decoderLease.acquire()
+            NativeInference.acquire()
             try {
                 requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
                 recognizer = OfflineRecognizer(config = OfflineRecognizerConfig(

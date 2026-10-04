@@ -33,7 +33,7 @@ internal class DocumentStore(private val context: Context) {
         } catch (error: Throwable) { source.delete(); throw error }
     }
     fun create(uri: Uri, audio: PcmAudio, transcript: Transcript, name: String, processing: JSONObject,
-               existing: CassiniDocument?): Pair<File, CassiniDocument> {
+               existing: CassiniDocument?, speakerLabels: Map<String, String> = emptyMap()): Pair<File, CassiniDocument> {
         val original = context.contentResolver.openInputStream(uri)?.use { input ->
             // Imports and current portable documents are already bounded; legacy external sessions may not be.
             val out = java.io.ByteArrayOutputStream(); val buffer = ByteArray(65536)
@@ -45,7 +45,7 @@ internal class DocumentStore(private val context: Context) {
             out.toByteArray()
         } ?: throw UserFacingException(Failure.OPEN)
         val opus = try { OggOpus.read(original).also { it.digest() }; original } catch (_: Exception) { OpusEncoder.encode(audio) }
-        val bytes = CassiniDocument.create(opus, transcript, name.substringBeforeLast('.'), processing, existing)
+        val bytes = CassiniDocument.create(opus, transcript, name.substringBeforeLast('.'), processing, existing, speakerLabels)
         val temporary = File(directory, "${UUID.randomUUID()}.tmp")
         val output = File(directory, "${UUID.randomUUID()}.opus")
         try {

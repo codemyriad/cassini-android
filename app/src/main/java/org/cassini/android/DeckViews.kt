@@ -62,6 +62,8 @@ class DeckViews(private val context: Context) {
     val caption = text(12f, muted)
     val open = button(R.string.open_audio).apply { id = R.id.open_button }
     val transcribe = button(R.string.transcribe, true).apply { id = R.id.transcribe_button }
+    val speakers = button(R.string.identify_speakers).apply { id = R.id.speakers_button }
+    val cancelOperation = button(R.string.cancel).apply { id = R.id.cancel_operation; visibility = View.GONE }
     val download = button(R.string.download_model).apply { id = R.id.download_button }
     val status = text(12f, muted).apply { id = R.id.operation_status; setPadding(0, dp(8), 0, dp(8)); accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE }
     val progress = ProgressBar(context, null, android.R.attr.progressBarStyleHorizontal).apply {
@@ -134,9 +136,11 @@ class DeckViews(private val context: Context) {
         actions.add(Space(context), dp(8), dp(1))
         actions.add(transcribe, 0, weight = 1f)
         content.add(actions, marginTop = 10)
+        content.add(speakers, marginTop = 8)
         content.add(download, marginTop = 8)
         content.add(status)
         content.add(progress, height = dp(3))
+        content.add(cancelOperation, marginTop = 8)
         val transcriptHeading = row().apply { setPadding(0, dp(16), 0, dp(8)) }
         transcriptHeading.add(label(R.string.transcript), 0, weight = 1f)
         transcriptHeading.add(documentInfo, LinearLayout.LayoutParams.WRAP_CONTENT)

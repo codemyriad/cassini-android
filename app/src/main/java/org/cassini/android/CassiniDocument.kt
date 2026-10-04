@@ -169,7 +169,7 @@ internal data class CassiniDocument(
         }
         /** Adds a variant while retaining existing descriptors, bodies, extensions and unrelated tags. */
         fun create(audioBytes: ByteArray, transcript: Transcript, title: String, processing: JSONObject,
-                   existing: CassiniDocument? = null): ByteArray {
+                   existing: CassiniDocument? = null, speakerLabels: Map<String, String> = emptyMap()): ByteArray {
             val stream = OggOpus.read(audioBytes); val digest = stream.digest()
             require(existing == null || existing.state == "ok") // Never rebind stale transcripts to different audio.
             val now = Instant.now().toString()
@@ -191,12 +191,15 @@ internal data class CassiniDocument(
                 .put("language", transcript.language).put("wordCount", transcript.words.size).put("createdAtUtc", now).put("payloadRef", ref))
             val speakers = manifest.getJSONArray("speakers")
             val known = (0 until speakers.length()).map { speakers.getJSONObject(it).getString("id") }.toSet()
-            transcript.words.map { it.speaker }.distinct().filterNot { it in known }.forEach { speakers.put(JSONObject().put("id", it).put("label", it)) }
+            transcript.words.map { it.speaker }.distinct().filterNot { it in known }.forEach { speakers.put(JSONObject().put("id", it).put("label", speakerLabels[it] ?: it)) }
             val provenance = manifest.optJSONObject("provenance") ?: JSONObject().also { manifest.put("provenance", it) }
             val speech = provenance.optJSONObject("speechToText") ?: JSONObject().also { provenance.put("speechToText", it) }
             speech.put(id, processing)
+            // This document-wide record describes cross-track crosstalk auditing, not
+            // clustering a mixed recording. Preserve an imported audit exactly as supplied.
             if (existing == null) provenance.put("attribution", JSONObject().put("ran", false).put("mode", "single-source")
-                .put("reason", "No speaker diarization").put("wordsMeasured", 0).put("wordsFlagged", 0).put("wordsDropped", 0))
+                .put("reason", "Single mixed recording; no separate speaker tracks")
+                .put("wordsMeasured", 0).put("wordsFlagged", 0).put("wordsDropped", 0))
             val comments = (existing?.comments ?: readComments(stream.tags)).filterNot {
                 val name = it.substringBefore('=').uppercase(Locale.ROOT)
                 name == "CASSINI_FORMAT" || name == "CASSINI_PROFILE" || name == "CASSINI_PAYLOAD_SCHEMA" ||

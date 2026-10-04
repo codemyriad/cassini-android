@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">Cassini</string>
     <string name="brand" translatable="false">cassini</string>
-    <string name="prototype_badge">BETA / 0.0.5</string>
+    <string name="prototype_badge">BETA / 0.0.6</string>
     <string name="settings">Settings</string>
     <string name="settings_general">General</string>
     <string name="settings_transcription">Transcription</string>
@@ -168,4 +168,18 @@
     <string name="microphone_pcm_format">MONO · 16 kHz · live transcription</string>
     <string name="transcript_draft">Draft · words and timings may change</string>
     <string name="recording_saving">Saving audio…</string>
+    <string name="identify_speakers">Identify speakers</string>
+    <string name="speaker_count">How many speakers?</string>
+    <string name="speaker_count_hint">Automatic detection can merge or split voices. Choose a count if you know it. Labels are guesses, especially when voices overlap.</string>
+    <string name="speaker_automatic">Detect automatically</string>
+    <string name="speaker_number">%1$d speakers</string>
+    <string name="speaker_one">1 speaker</string>
+    <string name="speaker_label">Speaker %1$d</string>
+    <string name="speaker_models_download">Download speaker models?</string>
+    <string name="speaker_models_summary">This optional download is about 40 MiB. Speaker identification runs on your phone after transcription, and keeps the original transcript. It can take a while; keep the app open.</string>
+    <string name="identifying_speakers">Identifying speakers…</string>
+    <string name="identifying_speakers_progress">Identifying speakers: embeddings %1$d%%</string>
+    <string name="speakers_complete">%1$d speaker labels added in %2$.1f s. Check the labels against the audio.</string>
+    <string name="error_speakers">No speaker turns were found. The original transcript is unchanged.</string>
+    <string name="download_speaker_models">Download and identify</string>
 </resources>

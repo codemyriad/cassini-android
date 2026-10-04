@@ -6,6 +6,7 @@ enum class Failure(val stringRes: Int) {
     STALLED(R.string.error_stalled), EMPTY(R.string.error_empty), TIMINGS(R.string.error_timings),
     MODEL(R.string.error_model), SPACE(R.string.error_space), DOWNLOAD(R.string.error_download),
     VERIFY(R.string.error_verify), INSTALL(R.string.error_install), SAVE(R.string.error_save),
+    SPEAKERS(R.string.error_speakers),
     MEMORY(R.string.error_memory), CANCELLED(R.string.error_cancelled), UNKNOWN(R.string.error_unknown),
     PLAYBACK(R.string.error_playback), OPUS_ENCODER(R.string.error_opus_encoder),
 }

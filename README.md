@@ -2,7 +2,7 @@
 
 Record a thought, find the words later, and keep the audio with the transcript. I’m building Cassini around that simple flow, with transcription running on your phone.
 
-**[Download 0.0.5-beta](https://github.com/codemyriad/cassini-android/releases/download/v0.0.5-beta/cassini-android-0.0.5-beta.apk)** · [Release notes](https://github.com/codemyriad/cassini-android/releases/tag/v0.0.5-beta)
+**[Download 0.0.6-beta](https://github.com/codemyriad/cassini-android/releases/download/v0.0.6-beta/cassini-android-0.0.6-beta.apk)** · [Release notes](https://github.com/codemyriad/cassini-android/releases/tag/v0.0.6-beta)
 
 <p>
   <img src="docs/screenshots/library.png" width="240" alt="Notes library with dates, transcript previews and search">
@@ -33,7 +33,9 @@ The interface supports English and Italian. Parakeet recognizes speech languages
 
 This is an early beta: microphone recordings stop at **2:59**, imports for transcription are limited to **3 minutes / 64 MiB**, and recording and transcription need the app in the foreground. Leaving the recording screen stops and saves the audio. Failed transcription retains the recording for retry.
 
-There’s no transcription queue, new speaker diarization or storage cleanup UI yet. The APK is a release build signed with a stable beta key.
+There’s no transcription queue or storage cleanup UI yet. The APK is a release build signed with a stable beta key.
+
+Tap **Identify speakers** on a completed transcript to add anonymous labels, with automatic detection or a known speaker count (1–8). The optional models download separately (about 40 MiB). The original stays under **Choose transcript**. Labels can be wrong, especially with overlapping voices.
 
 ## Build
 
