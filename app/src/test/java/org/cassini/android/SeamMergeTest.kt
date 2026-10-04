@@ -230,4 +230,18 @@ class SeamMergeTest {
         val got = splice(listOf(w("di", 10_368, 10_448), w("cronometro.", 10_448, 10_928)), listOf(w("Cronometro", 10_668, 11_228), w("che", 11_228, 11_388)))
         assertEquals(listOf("di", "cronometro", "che"), got.map { SeamMerge.normalize(it.text) })
     }
+
+    @Test fun aZeroLengthCopyAtTheJoinGivesWayToTheOtherDecodesCopyWithDuration() {
+        // The earlier decode stamped "sì" in padding and it was clamped to the overlap end; the later one heard it whole.
+        val clamped = w("sì", 12_000, 12_000)
+        val whole = w("sì", 11_800, 12_320)
+        val got = splice(listOf(w("prima", 9_000, 9_400), clamped), listOf(whole, w("dopo", 12_400, 12_700)))
+        assertEquals(listOf("prima", "sì", "dopo"), got.map { it.text })
+        assertSame(whole, got[1])
+        // The other way round the copy with duration is already the earlier decode's and stays.
+        val kept = w("sì", 11_800, 12_320)
+        val back = splice(listOf(w("prima", 9_000, 9_400), kept), listOf(w("sì", 12_000, 12_000), w("dopo", 12_400, 12_700)))
+        assertSame(kept, back[1])
+        assertEquals(3, back.size)
+    }
 }

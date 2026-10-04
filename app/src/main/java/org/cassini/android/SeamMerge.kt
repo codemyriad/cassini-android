@@ -46,9 +46,18 @@ internal object SeamMerge {
         val cutMs = overlapStartMs + overlapMs / 2
         val aligned = align(acc, next, overlapStartMs, overlapEndMs, DUPLICATE_TOLERANCE_MS)
         // A lone pair further apart than the singleton tolerance is still the best evidence when nothing firmer exists.
+        // Known trade-off: two distinct, quickly repeated words ("sì sì") inside the overlap can collapse into one
+        // here, in exchange for never doubling a word the decodes timed 220-240 ms apart (measured on the phone).
         val agreed = confidentMatches(aligned, acc, next, overlapEndMs).ifEmpty { aligned }
         val anchor = agreed.minByOrNull { Math.abs((midpointMs(acc[it.acc]) + midpointMs(next[it.next])) / 2 - cutMs) }
-        if (anchor != null) return items.subList(0, anchor.acc + 1) + more.subList(anchor.next + 1, more.size)
+        if (anchor != null) {
+            // A copy with duration beats a zero-length one, as in merge: a word stamped in padding and clamped to the
+            // timeline edge would never highlight, so the later decode's copy replaces it.
+            val clamped = acc[anchor.acc].endMs <= acc[anchor.acc].startMs
+            val replacement = next[anchor.next].endMs > next[anchor.next].startMs
+            return if (clamped && replacement) items.subList(0, anchor.acc) + more.subList(anchor.next, more.size)
+            else items.subList(0, anchor.acc + 1) + more.subList(anchor.next + 1, more.size)
+        }
         val inside = { at: Long -> (acc + next).any { it.startMs < at && at < it.endMs } }
         val joinMs = (acc + next).flatMap { listOf(it.startMs, it.endMs) }.filter { it in overlapStartMs..overlapEndMs && !inside(it) }
             .minByOrNull { Math.abs(it - cutMs) } ?: cutMs
