@@ -10,8 +10,8 @@ android {
         applicationId = "org.cassini.android"
         minSdk = 26
         targetSdk = 34
-        versionCode = 7
-        versionName = "0.0.4-beta"
+        versionCode = 8
+        versionName = "0.0.5-beta"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
     }
