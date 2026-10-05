@@ -118,3 +118,29 @@ Why whole spans with the tail: it avoided the failure modes seen with the altern
 The detector’s maximum span is not a cap in sherpa-onnx 1.13.7: with the same version and settings on a desktop, the three-minute clip gave seven spans of 19 to 27.7 s, and noisy input gave spans of minutes. The app therefore cuts a span longer than 28 s at its quietest point between 20 and 25 s after the previous cut. None of these clips has such a span, so that rule changed nothing in the detector rows above; it is exercised only by the fallback row, where the whole recording is one span. In that row a cut at 133.58 s fell inside “batterica” and the word came out as “batteria”. Each side of a cut is now decoded with 1 s of the recording past it, and the two decodes are joined at a word they agree on. That change was made after the phone had locked, so it was checked on an Android 14 x86_64 emulator with INT8: the fallback kept “batterica” and differed from the captions by 10 words, the same as whole spans with tail there, against 18 for the whole recording and 15 for fixed windows. Emulator and phone decode slightly differently, so those counts are not comparable with the table.
 
 Verification of the final code: 100 JVM tests pass, including the desktop’s window, seam and gate tests ported with the code, and new tests for the detector loop, the quiet-point cuts and the join at a cut. On the Pixel, 22 device checks passed with INT8 before the last round of changes (the detector on 16 kHz and 48 kHz input, measured progress and interim words during a real transcription, record → transcribe → document); `ChunkingComparisonTest` runs only when asked for and produced the tables above. After those changes the phone was locked, so the same 22 checks, and the comparison, were run with the INT8 model on an Android 14 x86_64 emulator instead.
+
+## Speaker identification (2026-10-05, 0.0.6-beta)
+
+The published, signed **0.0.6-beta APK** passed six speaker-identification UI checks on the same Pixel 8 (Android 17, 8 GB RAM): explicit opt-in, no action for empty transcripts, download consent, a playable new variant with unchanged text/timing/audio, automatic separation of the two fixture voices, and cancellation during native embedding work. The variant check measures 35.707 s for 46.840 s of audio, from confirmation through saving, decoding the output and checking displayed labels. It excludes fixture creation and model downloads. Cancellation retains the original variant and the native model lease is released after the ongoing computation finishes.
+
+Three additional native diagnostics completed without skips:
+
+| Recording | Speaker count setting | Diarization time | Result |
+| --- | --- | ---: | --- |
+| [Public four-speaker clip](https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/0-four-speakers-zh.wav), 56.860 s | Automatic | 29.822 s | 7 speakers, 11 turns |
+| Same clip | Known: 4 | 32.434 s | 4 speakers, 10 turns |
+| Joined two-voice fixture, 46.840 s | Automatic | 41.996 s | 2 speakers; all 113 recognized words on the correct side of the join |
+| Two-person conversation, 26.261 s | Automatic | 18.001 s | 3 speakers, 4 turns |
+| Same conversation | Known: 2 | 20.898 s | 2 speakers, 3 turns |
+
+The two-voice fixture first ran INT8 Parakeet in 15.142 s. Diarization timings include speaker model construction, inference and cleanup, excluding audio decoding, ASR and saving. The public-clip diagnostic ran in a fresh instrumentation process; its peak RSS was **284 MiB** after both passes. The process that also ran ASR peaked at **1,088 MiB**. These are `/proc/self/status` high-water marks, not PSS or separate measurements of each model's memory.
+
+Automatic clustering overestimated both the four-speaker clip and the conversation. Use the known count when available. Requesting a count does not establish correct identities or boundaries: there is no human-labelled diarization reference for these runs, and the join check covers sequential voices rather than overlapping speech. These are single runs on a USB-powered phone without controlled cache, thermal or background-load conditions. The private conversation and transcript remain local.
+
+The speaker pipeline uses stock sherpa-onnx 1.13.7 on CPU with two threads, INT8 pyannote segmentation and ERes2Net embeddings. It labels one mixed recording; it does not reproduce desktop attribution from separate participant tracks. Output remains a complete portable Opus document with an added word variant, preserving the original audio and transcript.
+
+Android 17 exposed a failure in the old Espresso test harness's reflective input API. Updating test-only dependencies to runner 1.7.0, JUnit extension 1.3.0 and Espresso 3.7.0 fixed it ([AndroidX release notes](https://developer.android.com/jetpack/androidx/releases/test#espresso-3.7.0)). The application APK used for these checks is the published release, without app code changes.
+
+Four existing playback/settings checks also passed, bringing this phone run to **13 passing checks**. Debug assembly, all 143 JVM tests and lint passed after the harness update. SHA-256 comparison of every original private file confirmed that all 62 were unchanged, including the 16-note catalogue, recordings, documents, session, preferences and both Parakeet bundles. Only the three optional speaker-model files were added. The signed, non-debuggable 0.0.6-beta release was reinstalled afterward, retaining that data.
+
+[CI for the updated harness](https://github.com/codemyriad/cassini-android/actions/runs/37291277773) also passed build, unit/conformance tests, lint and 31 model-free device checks across Android 8, 10 and 14. Those emulator checks cover consent, playback, recording and settings; native diarization measurements above come from the Pixel.

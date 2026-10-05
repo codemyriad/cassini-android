@@ -35,7 +35,7 @@ This is an early beta: microphone recordings stop at **2:59**, imports for trans
 
 There’s no transcription queue or storage cleanup UI yet. The APK is a release build signed with a stable beta key.
 
-Tap **Identify speakers** on a completed transcript to add anonymous labels, with automatic detection or a known speaker count (1–8). The optional models download separately (about 40 MiB). The original stays under **Choose transcript**. Labels can be wrong, especially with overlapping voices.
+Tap **Identify speakers** on a completed transcript to add anonymous labels, with automatic detection or a known speaker count (1–8). The optional models download separately (about 40 MiB). The original stays under **Choose transcript**. Labels can be wrong, especially with overlapping voices; automatic detection can overestimate the count.
 
 ## Build
 
