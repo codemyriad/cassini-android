@@ -22,7 +22,6 @@
     <string name="model_missing">%1$s · da scaricare</string>
     <string name="download_model">Scarica modello · %1$s</string>
     <string name="model_size_int8">640 MiB</string>
-    <string name="model_size_fp32">2,37 GiB</string>
     <string name="preparing_download">Preparazione del download…</string>
     <string name="downloading">Download del modello · %1$d%%</string>
     <string name="verifying">Verifica del modello · %1$d%%</string>
@@ -41,7 +40,7 @@
     <string name="loaded_title">Sentiamo cosa dice.</string>
     <string name="loaded_hint">Tocca Trascrivi per ottenere parole e tempi da questa registrazione.</string>
     <string name="no_speech">Nessun parlato riconosciuto.</string>
-    <string name="no_speech_hint">Prova una registrazione più chiara o un altro modello.</string>
+    <string name="no_speech_hint">Prova una registrazione più chiara.</string>
     <string name="search_hint">Cerca una parola…</string>
     <string name="clear_search">Cancella ricerca</string>
     <plurals name="search_matches">
@@ -56,7 +55,6 @@
         <item quantity="other">%1$d parole</item>
     </plurals>
     <string name="transcript_details">%1$s · %2$s · %3$s</string>
-    <string name="inference_time">Elaborato in %1$.1f s · tocca le parole per ascoltarle</string>
     <string name="unidentified_voice">VOCE 01 / NON IDENTIFICATA</string>
     <string name="italian">Italiano</string>
     <string name="voice_caption">%1$s · una voce</string>
@@ -70,8 +68,6 @@
     <string name="interface_language">Lingua dell’interfaccia</string>
     <string name="system_language">Segui la lingua del telefono</string>
     <string name="recognition_model">Modello di trascrizione</string>
-    <string name="int8_option">INT8 · 640 MiB · più leggero e veloce</string>
-    <string name="fp32_option">FP32 · 2,37 GiB · precisione completa</string>
     <string name="about">Informazioni sul prototipo</string>
     <string name="about_body">Parakeet v3 sul tuo telefono. L’audio resta in locale.\n\nRegistra note vocali, cerca nelle trascrizioni e salva documenti Cassini Opus portatili con audio e parole temporizzate.\n\nClip fino a 3 minuti, una voce non identificata, riconoscimento multilingue automatico. La lingua indicata nella trascrizione è attualmente l’italiano.\n\nGPLv3. Codice sorgente e licenze: github.com/codemyriad/cassini-android</string>
     <string name="done">Fine</string>
@@ -85,7 +81,7 @@
     <string name="error_stalled">La lettura dell’audio si è bloccata. Prova un altro file.</string>
     <string name="error_empty">La registrazione non contiene campioni audio.</string>
     <string name="error_timings">Impossibile leggere i tempi delle parole. Prova a trascrivere di nuovo.</string>
-    <string name="error_model">Scarica prima il modello selezionato.</string>
+    <string name="error_model">Scarica prima il modello di trascrizione.</string>
     <string name="error_space">Spazio insufficiente per il modello. Libera spazio e riprova.</string>
     <string name="error_download">Download non riuscito. Controlla la connessione e riprova.</string>
     <string name="error_verify">Verifica del modello non riuscita. Scaricalo di nuovo.</string>
@@ -113,9 +109,6 @@
     <string name="document_contents">%1$d trascrizioni · %2$d voci\nIl salvataggio conserva tutti i metadati del documento.</string>
     <string name="document_processing">Elaborazione della trascrizione</string>
     <string name="unknown_speaker">Voce sconosciuta · %1$s</string>
-    <string name="automatic_model">Automatico · preferisci precisione completa</string>
-    <string name="automatic_precision">Auto · %1$s</string>
-    <string name="automatic_model_explanation">Usa FP32 quando memoria e spazio lo permettono; altrimenti sceglie il modello INT8 più piccolo. Le scelte manuali vengono rispettate.</string>
     <string name="processing_speed">Pronto in %1$.1f s · %2$.2f× tempo reale</string>
     <string name="transcription_speed">Trascritto in %1$.1f s · %2$.2f× tempo reale</string>
     <string name="notes">Note</string>
@@ -152,16 +145,6 @@
     <string name="error_microphone">Impossibile registrare. Verifica l’accesso al microfono e riprova.</string>
     <string name="library_note_metadata">%1$s · %2$s</string>
     <string name="library_saved_document">Documento salvato</string>
-    <string name="live_recording">Trascrivi durante la registrazione</string>
-    <string name="live_recording_summary">Disattivato per impostazione predefinita. Mostra una bozza a brevi intervalli. Richiede un modello scaricato e consuma più CPU e batteria.</string>
-    <string name="live_recording_hint">La bozza appare dopo ogni breve tratto trascritto. Puoi continuare a registrare mentre la trascrizione recupera; Fine salva l’audio e completa il testo.</string>
-    <string name="live_recording_loading">Caricamento del modello…</string>
-    <string name="live_recording_waiting">In ascolto · la bozza apparirà qui</string>
-    <string name="live_recording_progress">Bozza · trascritto fino a %1$d:%2$02d</string>
-    <string name="live_recording_finishing">Audio salvato · completamento della trascrizione…</string>
-    <string name="live_recording_unavailable">La trascrizione durante la registrazione richiede il modello selezionato. Scaricalo prima; questa registrazione verrà comunque salvata.</string>
-    <string name="live_recording_failed">La trascrizione si è interrotta. La registrazione è al sicuro; puoi trascriverla dopo averla salvata.</string>
-    <string name="microphone_pcm_format">MONO · 16 kHz · trascrizione durante la registrazione</string>
     <string name="transcript_draft">Bozza · parole e tempi possono cambiare</string>
     <string name="recording_saving">Salvataggio dell’audio…</string>
     <string name="identify_speakers">Distingui le voci</string>

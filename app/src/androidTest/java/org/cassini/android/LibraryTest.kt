@@ -205,18 +205,22 @@ class LibraryTest {
         } finally { directory.deleteRecursively() }
     }
 
-    @android.annotation.TargetApi(28)
-    @androidx.test.filters.SdkSuppress(minSdkVersion = 28)
     @Test fun microphonePauseResumeSavesPlayableAudioAndReopensFromLibrary() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         val sessions = SessionStore(context.filesDir)
         val originalSession = sessions.load()
+        // An upgrade can retain this retired opt-in; it must never change the capture path.
+        val recordingPreferences = context.getSharedPreferences("recording", android.content.Context.MODE_PRIVATE)
+        val hadLivePreference = recordingPreferences.contains("transcribe_while_recording")
+        val oldLivePreference = recordingPreferences.getBoolean("transcribe_while_recording", false)
+        assertTrue(recordingPreferences.edit().putBoolean("transcribe_while_recording", true).commit())
         val files = listOf("library.json", "library-migrated")
         val backups = files.associateWith { name -> File(context.filesDir, name).takeIf { it.exists() }?.readBytes() }
         val originalFiles = File(context.filesDir, "documents").listFiles().orEmpty().map { it.name }.toSet()
         finishScreens()
-        instrumentation.uiAutomation.grantRuntimePermission(context.packageName, Manifest.permission.RECORD_AUDIO)
+        instrumentation.uiAutomation.executeShellCommand("pm grant ${context.packageName} ${Manifest.permission.RECORD_AUDIO}")
+            .use { descriptor -> java.io.FileInputStream(descriptor.fileDescriptor).use { it.readBytes() } }
         val scenario = ActivityScenario.launch<RecordingActivity>(Intent(context, RecordingActivity::class.java).putExtra(RecordingActivity.AUTO_TRANSCRIBE, false))
         try {
             SystemClock.sleep(1100)
@@ -254,19 +258,22 @@ class LibraryTest {
             }
         } finally {
             scenario.close(); finishScreens(); sessions.save(originalSession)
+            val editor = recordingPreferences.edit()
+            if (hadLivePreference) editor.putBoolean("transcribe_while_recording", oldLivePreference)
+            else editor.remove("transcribe_while_recording")
+            assertTrue(editor.commit())
             backups.forEach { (name, bytes) -> File(context.filesDir, name).let { if (bytes == null) it.delete() else it.writeBytes(bytes) } }
             File(context.filesDir, "documents").listFiles().orEmpty().filter { it.name !in originalFiles }.forEach { it.delete() }
         }
     }
 
-    @android.annotation.TargetApi(28)
-    @androidx.test.filters.SdkSuppress(minSdkVersion = 28)
     @Test fun leavingRecordingScreenFinalizesAudioWithoutBackgroundTranscription() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         val sessions = SessionStore(context.filesDir)
         val original = sessions.load()
-        instrumentation.uiAutomation.grantRuntimePermission(context.packageName, Manifest.permission.RECORD_AUDIO)
+        instrumentation.uiAutomation.executeShellCommand("pm grant ${context.packageName} ${Manifest.permission.RECORD_AUDIO}")
+            .use { descriptor -> java.io.FileInputStream(descriptor.fileDescriptor).use { it.readBytes() } }
         val scenario = ActivityScenario.launch(RecordingActivity::class.java)
         try {
             SystemClock.sleep(1200)
@@ -283,17 +290,15 @@ class LibraryTest {
         } finally { scenario.close(); finishScreens(); sessions.save(original) }
     }
 
-    @android.annotation.TargetApi(28)
-    @androidx.test.filters.SdkSuppress(minSdkVersion = 28)
     @Test fun doneAutomaticallyTranscribesAndSealsTheSameLibraryNote() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
-        val model = ModelStore(File(context.filesDir, "parakeet-v3"), false)
+        val model = ModelStore(File(context.filesDir, "parakeet-v3"))
         org.junit.Assume.assumeTrue("Install INT8 for the microphone-to-document check", model.ready())
         val sessions = SessionStore(context.filesDir)
         val original = sessions.load()
-        sessions.save(original.copy(modelChoice = "int8", fp32 = false))
-        instrumentation.uiAutomation.grantRuntimePermission(context.packageName, Manifest.permission.RECORD_AUDIO)
+        instrumentation.uiAutomation.executeShellCommand("pm grant ${context.packageName} ${Manifest.permission.RECORD_AUDIO}")
+            .use { descriptor -> java.io.FileInputStream(descriptor.fileDescriptor).use { it.readBytes() } }
         val scenario = ActivityScenario.launch(RecordingActivity::class.java)
         try {
             SystemClock.sleep(1500)

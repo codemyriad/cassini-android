@@ -34,6 +34,22 @@ class CassiniDocumentTest {
         return OggOpus.mux(OggOpus.Stream(head, CassiniDocument.tagsPacket(listOf("X_CUSTOM=keep=me")),
             listOf(byteArrayOf(-8, -1, -2)), 960, true), CassiniDocument.tagsPacket(listOf("X_CUSTOM=keep=me")))
     }
+    @Test fun retiredAsrProvenanceSurvivesAnInt8Retranscription() {
+        val transcript = Transcript(listOf(Word("spk_1", 0, 20, "Prima.")), "it")
+        val provenance = JSONObject().put("model", "nvidia/parakeet-tdt-0.6b-v3 FP32")
+            .put("x-segmentation", "live 5 s steps with 1 s recorded overlap, 0.5 s synthetic tail, seams spliced at an aligned word")
+        val bytes = CassiniDocument.create(silence(), transcript, "Old live note", provenance)
+        val original = CassiniDocument.read(bytes)
+        val nextBytes = CassiniDocument.create(bytes, transcript.copy(words = listOf(Word("spk_1", 0, 20, "Dopo."))),
+            "Ignored", JSONObject().put("model", "nvidia/parakeet-tdt-0.6b-v3 INT8"), original)
+        val next = CassiniDocument.read(nextBytes)
+        assertEquals("ok", next.state)
+        assertEquals(2, next.variants.size)
+        assertEquals(original.variants[0].body, next.variants[0].body)
+        assertEquals(original.manifest!!.getJSONObject("provenance").getJSONObject("speechToText").getJSONObject(original.variants[0].id).toString(),
+            next.manifest!!.getJSONObject("provenance").getJSONObject("speechToText").getJSONObject(original.variants[0].id).toString())
+        assertEquals(OggOpus.read(bytes).digest(), OggOpus.read(nextBytes).digest())
+    }
     @Test fun newDocumentSealsAudioAndAppendedVariantPreservesExtensions() {
         val transcript = Transcript(listOf(Word("spk_1", 0, 20, "Ciao")), "it")
         val bytes = CassiniDocument.create(silence(), transcript, "Italian sample", JSONObject().put("engine", "sherpa-onnx"))

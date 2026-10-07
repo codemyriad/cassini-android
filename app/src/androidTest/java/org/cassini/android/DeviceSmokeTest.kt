@@ -122,8 +122,7 @@ class DeviceSmokeTest {
 
     @Test fun nativeParakeetProducesTimedItalianWords() {
         val arguments = InstrumentationRegistry.getArguments()
-        val fp32 = arguments.getString("precision") == "fp32"
-        val models = ModelStore(File(context.filesDir, if (fp32) "parakeet-v3-fp32" else "parakeet-v3"), fp32)
+        val models = ModelStore(File(context.filesDir, "parakeet-v3"))
         if (arguments.getString("downloadModels") == "true") {
             models.install { message -> instrumentation.sendStatus(0, Bundle().apply { putString("stream", "$message\n") }) }
             ModelStore.installVad(context.filesDir) { }

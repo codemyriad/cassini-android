@@ -1,5 +1,7 @@
 # Pixel 8 prototype results — 2026-10-01
 
+These measurements describe earlier versions, including FP32 and Automatic model selection. The current app uses INT8 only and transcribes after recording; historical FP32 results and saved documents remain valid.
+
 **Both INT8 and FP32 ran successfully on the connected Pixel 8.** The tested recording is the requested [YouTube video](https://www.youtube.com/watch?v=UmZwQf5TV3c), cut from **00:28 to 00:58** with `uvx yt-dlp` and ffmpeg. The resulting input has exactly 480,000 mono PCM16 samples at 16 kHz (30.000 seconds).
 
 The device reports Pixel 8, Android 17 / API 37, with 7,754,764 KiB total system RAM (nominal 8 GB). The debug APK uses stock sherpa-onnx 1.13.7, CPU provider, greedy decoding, 128-dimensional features and two inference threads.
@@ -144,3 +146,11 @@ Android 17 exposed a failure in the old Espresso test harness's reflective input
 Four existing playback/settings checks also passed, bringing this phone run to **13 passing checks**. Debug assembly, all 143 JVM tests and lint passed after the harness update. SHA-256 comparison of every original private file confirmed that all 62 were unchanged, including the 16-note catalogue, recordings, documents, session, preferences and both Parakeet bundles. Only the three optional speaker-model files were added. The signed, non-debuggable 0.0.6-beta release was reinstalled afterward, retaining that data.
 
 [CI for the updated harness](https://github.com/codemyriad/cassini-android/actions/runs/37291277773) also passed build, unit/conformance tests, lint and 31 model-free device checks across Android 8, 10 and 14. Those emulator checks cover consent, playback, recording and settings; native diarization measurements above come from the Pixel.
+
+## INT8 and recording cleanup (2026-10-07, development build)
+
+The app now uses Parakeet INT8 exclusively and transcribes after AAC recording finishes. FP32 downloads, Automatic/manual model selection and the five-second live transcription path were removed. Startup reclaimed the Pixel’s obsolete FP32 model directory while retaining the verified INT8 install.
+
+The debug APK, 118 JVM tests (including all published format vectors) and lint pass. The revised CI selection passes all 12 checks on an Android 14 x86_64 emulator. The Pixel 8 / Android 17 run completed 27 selected checks: 26 passed and the speaker-download consent check skipped because those optional models were already installed; the model-free emulator passed that consent check. Pixel checks included pause/resume, interruption recovery, automatic transcription after Done, batch progress, native INT8 recognition, legacy session loading, playback, portable export and three-minute Opus duration. All 36 pre-existing recording/document files retained their SHA-256 hashes. The phone’s generated 30-second portable ASR document passes the reference manifest/word payload checks and the sibling web viewer’s actual portable reader.
+
+A separate native speaker-identification check passed, preserving words, timings, the original variant and audio. Further native clustering/cancellation checks were stopped when the phone was needed; they were not completed in this cleanup session. No release tag was created.

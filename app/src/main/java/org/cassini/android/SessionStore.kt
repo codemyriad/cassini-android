@@ -7,9 +7,9 @@ import java.io.File
 data class Session(
     val uri: String? = null, val name: String = "", val transcript: Transcript? = null,
     val durationMs: Long = 0, val inferenceMs: Long = 0, val positionMs: Int = 0,
-    val fp32: Boolean = false, val resultPrecision: String = "INT8",
+    val resultPrecision: String = "INT8",
     val document: String? = null, val selectedVariant: String? = null,
-    val modelChoice: String = if (fp32) "fp32" else "int8", val processingMs: Long = 0,
+    val processingMs: Long = 0,
     val libraryId: String? = null,
     /** The viewer that wrote session.json last. Not part of a note. */
     val screen: String? = null,
@@ -23,26 +23,24 @@ class SessionStore(directory: File) {
             uri = json.optString("uri").takeIf { it.isNotEmpty() }, name = json.optString("name"),
             transcript = json.optJSONObject("transcript")?.let { Transcript.fromJson(it.toString()) },
             durationMs = json.optLong("durationMs"), inferenceMs = json.optLong("inferenceMs"),
-            positionMs = json.optInt("positionMs"), fp32 = json.optBoolean("fp32"),
+            positionMs = json.optInt("positionMs"),
             resultPrecision = json.optString("resultPrecision", "INT8"),
             document = json.optString("document").takeIf { it.isNotEmpty() },
             selectedVariant = json.optString("selectedVariant").takeIf { it.isNotEmpty() },
-            modelChoice = json.optString("modelChoice", if (json.optBoolean("fp32")) "fp32" else "int8")
-                .takeIf { it in listOf("auto", "int8", "fp32") } ?: "auto",
             processingMs = json.optLong("processingMs"),
             libraryId = json.optString("libraryId").takeIf { it.isNotEmpty() },
             screen = json.optString("screen").takeIf { it.isNotEmpty() },
         )
-    } catch (_: Exception) { Session(modelChoice = "auto") }
+    } catch (_: Exception) { Session() }
 
     fun save(session: Session) {
         val json = JSONObject().put("uri", session.uri ?: "").put("name", session.name)
             .put("transcript", session.transcript?.takeIf { session.document == null }?.let { JSONObject(it.json()) })
             .put("durationMs", session.durationMs).put("inferenceMs", session.inferenceMs)
-            .put("positionMs", session.positionMs).put("fp32", session.fp32)
+            .put("positionMs", session.positionMs)
             .put("resultPrecision", session.resultPrecision)
             .put("document", session.document ?: "").put("selectedVariant", session.selectedVariant ?: "")
-            .put("modelChoice", session.modelChoice).put("processingMs", session.processingMs)
+            .put("processingMs", session.processingMs)
             .put("libraryId", session.libraryId ?: "").put("screen", session.screen ?: "")
         val stream = file.startWrite()
         try {

@@ -42,10 +42,9 @@ class ChunkingComparisonTest {
 
     @Test fun cuttingModesAgainstTheWholeRecording() {
         val arguments = InstrumentationRegistry.getArguments()
-        // Minutes of decoding per run: asked for by name, scripts/device-smoke.sh int8 cutting org.cassini.android.ChunkingComparisonTest
+        // Minutes of decoding per run: asked for by name, scripts/device-smoke.sh cutting org.cassini.android.ChunkingComparisonTest
         assumeTrue("Pass audioSample=cutting to measure cutting modes", arguments.getString("audioSample") == "cutting")
-        val fp32 = arguments.getString("precision") == "fp32"
-        val models = ModelStore(File(context.filesDir, if (fp32) "parakeet-v3-fp32" else "parakeet-v3"), fp32)
+        val models = ModelStore(File(context.filesDir, "parakeet-v3"))
         if (arguments.getString("downloadModels") == "true") {
             models.install { }
             ModelStore.installVad(context.filesDir) { }
@@ -67,8 +66,7 @@ class ChunkingComparisonTest {
         for (name in listOf("italian-smoke.wav", "italian-smoke.m4a", "youtube-smoke.wav", "youtube-long.wav").filter { it in available }) {
             val audio = fixture(name)
             var whole = emptyList<String>()
-            // Full precision is three times slower: compare the app's policy with the alternatives that matter.
-            for ((mode, run) in modes.filterKeys { !fp32 || it in setOf("whole", "quiet-cuts", "speech-10s-tail", "speech-span-tail") }) {
+            for ((mode, run) in modes) {
                 val steps = ArrayList<Parakeet.Progress>()
                 val began = System.nanoTime()
                 var firstWordsMs = -1L

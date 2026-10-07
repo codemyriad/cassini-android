@@ -20,4 +20,4 @@ done
 if [ -f .tools/diar/conversation.wav ]; then adb push .tools/diar/conversation.wav "$remote/conversation.wav"; fi
 adb shell chmod -R a+rX "$remote"
 export CASSINI_EXPECTED_TESTS=1
-scripts/device-smoke.sh int8 fleurs "${1:-org.cassini.android.DiarizationPocTest#fourSpeakerClipTimeAndMemory}"
+scripts/device-smoke.sh fleurs "${1:-org.cassini.android.DiarizationPocTest#fourSpeakerClipTimeAndMemory}"

@@ -49,8 +49,8 @@ adb install -r "${CASSINI_TEST_APK:-app/build/outputs/apk/androidTest/$CASSINI_T
 report=$(mktemp)
 trap 'rm -f "$report"' EXIT
 selection=()
-if [ -n "${3:-}" ]; then selection=(-e class "$3"); fi
-adb shell am instrument -w -r "${selection[@]}" -e precision "${1:-int8}" -e downloadModels true -e audioSample "${2:-fleurs}" \
+if [ -n "${2:-}" ]; then selection=(-e class "$2"); fi
+adb shell am instrument -w -r "${selection[@]}" -e downloadModels true -e audioSample "${1:-fleurs}" \
     org.cassini.android.test/androidx.test.runner.AndroidJUnitRunner | tee "$report"
 # am instrument can return shell status 0 even when tests fail or the process crashes.
 python3 - "$report" <<'PY'

@@ -72,13 +72,13 @@ class PortableDocumentTest {
 
     @Test fun transcriptionCreatesASealedPortableDocument() {
         val instrumentation = InstrumentationRegistry.getInstrumentation(); val context = instrumentation.targetContext
-        val model = ModelStore(File(context.filesDir, "parakeet-v3"), false)
+        val model = ModelStore(File(context.filesDir, "parakeet-v3"))
         org.junit.Assume.assumeTrue("Install the INT8 model for the end-to-end transcription check", model.ready())
         finishScreens()
         val sessions = SessionStore(context.filesDir); val originalSession = sessions.load()
         val wav = File(context.cacheDir, "portable-asr-source.wav")
         instrumentation.context.assets.open("youtube-smoke.wav").use { input -> wav.outputStream().use { input.copyTo(it) } }
-        sessions.save(Session(uri = Uri.fromFile(wav).toString(), name = "Italian ASR.wav", fp32 = false))
+        sessions.save(Session(uri = Uri.fromFile(wav).toString(), name = "Italian ASR.wav"))
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         try {
             scenario.onActivity { it.findViewById<Button>(R.id.transcribe_button).performClick() }

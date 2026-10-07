@@ -21,7 +21,7 @@ class ModelStoreVadTest {
             File(directory, "silero_vad.onnx").writeBytes(ByteArray(10))
             assertFalse(ModelStore.vadReady(filesDir))
             // A Parakeet install does not depend on the detector.
-            assertFalse((ModelStore.int8Artifacts + ModelStore.fp32Artifacts).any { it.name == ModelStore.sileroVad.name })
+            assertFalse(ModelStore.int8Artifacts.any { it.name == ModelStore.sileroVad.name })
         } finally {
             filesDir.deleteRecursively()
         }

@@ -19,7 +19,7 @@ import org.hamcrest.Matchers.allOf
 
 class SettingsTest {
     @get:org.junit.Rule val preserveLibrary = PreserveLibraryRule()
-    @Test fun modelAndLanguageChoicesSurviveReturningFromSettings() {
+    @Test fun languageChoiceSurvivesReturningFromSettings() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         val sessions = SessionStore(context.filesDir)
@@ -32,7 +32,7 @@ class SettingsTest {
         }
         instrumentation.waitForIdleSync()
         val transcript = Transcript(listOf(Word("spk_1", 0, 500, "Ciao"), Word("spk_1", 600, 1000, "mondo.")), "it")
-        sessions.save(Session(name = "Italian sample.wav", transcript = transcript, durationMs = 1000, modelChoice = "int8"))
+        sessions.save(Session(name = "Italian sample.wav", transcript = transcript, durationMs = 1000))
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         fun awaitText(text: String) {
             onView(withText(text)).check(matches(isDisplayed()))
@@ -41,35 +41,19 @@ class SettingsTest {
             onView(allOf(withId(android.R.id.title), withText(text))).perform(click())
         }
         fun selectOption(text: String) {
-            // Restrict options to the dialog: Automatic also labels a row behind it.
             onView(withText(text)).inRoot(isDialog()).perform(click())
-        }
-        fun awaitModelChoice(choice: String) {
-            val deadline = android.os.SystemClock.uptimeMillis() + 5000
-            while (sessions.load().modelChoice != choice && android.os.SystemClock.uptimeMillis() < deadline) {
-                android.os.SystemClock.sleep(50)
-            }
-            assertEquals("The selected model must be saved", choice, sessions.load().modelChoice)
         }
         try {
             scenario.onActivity { AppLanguage.set(it, "en") }
             instrumentation.waitForIdleSync()
             scenario.onActivity { it.findViewById<TextView>(R.id.settings_button).performClick() }
-            assertFalse("Live recording must be opt-in", RecordingPreferences.live(context))
-            openPreference("Transcribe while recording")
-            assertTrue(RecordingPreferences.live(context))
-            openPreference("Transcription model")
-            selectOption("Automatic · prefer full precision")
-            awaitModelChoice("auto")
-            openPreference("Transcription model")
-            selectOption("FP32 · 2.37 GiB · full precision")
-            awaitModelChoice("fp32")
-            assertTrue(sessions.load().fp32)
+            awaitText("Transcription model")
+            onView(withText("Transcribe while recording")).check(androidx.test.espresso.assertion.ViewAssertions.doesNotExist())
+            onView(withText("Automatic · prefer full precision")).check(androidx.test.espresso.assertion.ViewAssertions.doesNotExist())
             openPreference("Interface language")
             selectOption("Italiano")
             awaitText("Impostazioni")
             awaitText("Italiano") // The selected value appears under the language row.
-            assertTrue("Changing language must retain the chosen model", sessions.load().fp32)
             instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
             // Applying app locales can replace the viewer after Back. Wait for the current
             // focused activity instead of retaining a decor view from the closing instance.
@@ -81,7 +65,7 @@ class SettingsTest {
                         .filterIsInstance<MainActivity>().firstOrNull { it.hasWindowFocus() && !it.isFinishing }
                     if (viewer != null && viewer.findViewById<TextView>(R.id.transcript_text).text.toString() == "Ciao mondo.") {
                         assertTrue(viewer.findViewById<TextView>(R.id.transcript_text).isShown)
-                        assertTrue(viewer.findViewById<TextView>(R.id.model_status).text.toString().startsWith("FP32"))
+                        assertTrue(viewer.findViewById<TextView>(R.id.model_status).text.toString().startsWith("INT8"))
                         assertEquals("Italian sample.wav", viewer.findViewById<TextView>(R.id.recording_name).text.toString())
                         returned = true
                     }
@@ -89,7 +73,6 @@ class SettingsTest {
                 if (!returned) android.os.SystemClock.sleep(25)
             }
             assertTrue("The focused viewer must show the original note after settings", returned)
-            assertTrue("Returning from settings must keep live transcription enabled", RecordingPreferences.live(context))
         } finally {
             // Finish any settings activity before restoring the user's session.
             instrumentation.runOnMainSync {

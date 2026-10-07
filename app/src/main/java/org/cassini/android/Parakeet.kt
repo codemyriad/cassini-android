@@ -128,7 +128,7 @@ object Parakeet {
         }
     }
 
-    /** The decodes of one recording on one recognizer. Fed span by span, so a live recording could feed it too. */
+    /** The decodes of one recording on one recognizer. Fed span by span to report batch progress. */
     private class Session(private val decoder: Decoder, private val audio: PcmAudio, private val policy: DecodePolicy) {
         private val rate = audio.sampleRate
         private val total = audio.samples.size

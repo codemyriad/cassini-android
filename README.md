@@ -14,16 +14,15 @@ Record a thought, find the words later, and keep the audio with the transcript. 
 
 * **Android:** 8.0+ to install; creating Cassini files needs **10+ and a working [platform Opus encoder](https://developer.android.com/media/platform/supported-formats)**. Some emulator images lack that encoder. Existing documents can still be read.
 * **Processor:** a 64-bit ARM phone (`arm64-v8a`) running 64-bit Android. The APK also includes `x86_64` for emulators. It does not support 32-bit ARM or x86 systems. Transcription runs on CPU; no GPU/NPU is required.
-* **RAM (recommended):** **4 GB+ for INT8**, **8 GB+ for FP32**. These are starting recommendations, not tested minimums. Short-clip process memory peaked at about 1.02 GiB / 2.60 GiB on the Pixel; longer clips and other apps need additional memory.
-* **Free storage:** allow **1 GiB for INT8** or **3 GiB for FP32**, plus space for recordings. Model downloads are about 640 MiB / 2.37 GiB. Reading existing documents needs no model.
+* **RAM (recommended):** **4 GB+**. This is a starting recommendation, not a tested minimum. Short-clip INT8 process memory peaked at about 1.02 GiB on the Pixel; longer clips and other apps need additional memory.
+* **Free storage:** allow **1 GiB** for the INT8 model, plus space for recordings. The model download is about 640 MiB. Reading existing documents needs no model.
 
 I’ve tested recording and transcription on a **Pixel 8 (8 GB RAM, Android 17)**; see [device results](docs/pixel8-results.md). An Android 14 x86_64 emulator has also passed recording/transcription checks. Other physical phones haven’t been verified end to end. Installation alone doesn’t guarantee usable transcription speed or enough memory.
 
 ## Try it
 
-* Install the APK, then download a model in **Settings** once. Automatic chooses according to available resources. After download, audio processing works offline.
+* Install the APK, open a note, then tap **Download model** once. Transcription uses Parakeet v3 INT8. After download, audio processing works offline.
 * Tap **Record**, allow microphone access, then **Done**. You can pause and resume. Transcription starts when the model is ready. Or import WAV, MP3, M4A/AAC or Ogg Opus and tap **Transcribe**. While it works you see how far along it is, how fast it’s going and roughly how long is left, and draft words show up as each chunk is decoded.
-* Enable **Settings → Transcribe while recording** for draft words during capture. It’s off by default and needs the selected model downloaded. Results arrive in short chunks; slow phones catch up after **Done**. This uses more battery, and short chunks can reduce accuracy. **Transcribe again** reruns the batch pipeline.
 * Browse **Notes** or search titles and past transcriptions. Tap a word to hear that part of the recording. Each note remembers its playback position.
 * Use **Save Cassini** to keep a complete `.opus` document containing audio, timed words and metadata. You can open it again without downloading a model. This is a portable recording, not just a word-body JSON export.
 
@@ -32,6 +31,8 @@ The interface supports English and Italian. Parakeet recognizes speech languages
 ## What’s still limited
 
 This is an early beta: microphone recordings stop at **2:59**, imports for transcription are limited to **3 minutes / 64 MiB**, and recording and transcription need the app in the foreground. Leaving the recording screen stops and saves the audio. Failed transcription retains the recording for retry.
+
+The current development build transcribes after recording finishes. The earlier live transcription mode and FP32 model have been removed. Updates reclaim obsolete FP32 downloads and keep existing recordings and transcripts; installations with only FP32 need to download INT8.
 
 There’s no transcription queue or storage cleanup UI yet. The APK is a release build signed with a stable beta key.
 

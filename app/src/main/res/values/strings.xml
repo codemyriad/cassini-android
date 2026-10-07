@@ -23,7 +23,6 @@
     <string name="model_missing">%1$s · download needed</string>
     <string name="download_model">Download model · %1$s</string>
     <string name="model_size_int8">640 MiB</string>
-    <string name="model_size_fp32">2.37 GiB</string>
     <string name="preparing_download">Preparing download…</string>
     <string name="downloading">Downloading model · %1$d%%</string>
     <string name="verifying">Checking model · %1$d%%</string>
@@ -42,7 +41,7 @@
     <string name="loaded_title">Let’s hear it.</string>
     <string name="loaded_hint">Tap Transcribe to turn this recording into timed words.</string>
     <string name="no_speech">No speech recognized.</string>
-    <string name="no_speech_hint">Try a clearer recording or another model.</string>
+    <string name="no_speech_hint">Try a clearer recording.</string>
     <string name="search_hint">Find a word…</string>
     <string name="clear_search">Clear search</string>
     <plurals name="search_matches">
@@ -55,7 +54,6 @@
         <item quantity="other">%1$d words</item>
     </plurals>
     <string name="transcript_details">%1$s · %2$s · %3$s</string>
-    <string name="inference_time">Processed in %1$.1f s · tap words to listen</string>
     <string name="unidentified_voice">VOICE 01 / UNIDENTIFIED</string>
     <string name="italian">Italian</string>
     <string name="voice_caption">%1$s · one voice</string>
@@ -73,8 +71,6 @@
     <string name="english_name" translatable="false">English</string>
     <string name="italian_name" translatable="false">Italiano</string>
     <string name="recognition_model">Transcription model</string>
-    <string name="int8_option">INT8 · 640 MiB · smaller, faster</string>
-    <string name="fp32_option">FP32 · 2.37 GiB · full precision</string>
     <string name="about">About this prototype</string>
     <string name="about_body">Parakeet v3 on your phone. Audio stays local.\n\nRecord voice notes, search past transcriptions, and save portable Cassini Opus documents with audio and timed words.\n\nClips up to 3 minutes, one unidentified voice, automatic multilingual recognition. The current transcript language label is Italian.\n\nGPLv3. Source and dependency notices: github.com/codemyriad/cassini-android</string>
     <string name="done">Done</string>
@@ -88,7 +84,7 @@
     <string name="error_stalled">Audio decoding stalled. Try another file.</string>
     <string name="error_empty">This recording contains no audio samples.</string>
     <string name="error_timings">Word timing could not be read. Try transcribing again.</string>
-    <string name="error_model">Download the selected model first.</string>
+    <string name="error_model">Download the transcription model first.</string>
     <string name="error_space">Not enough storage for this model. Free some space and retry.</string>
     <string name="error_download">Model download failed. Check your connection and retry.</string>
     <string name="error_verify">Model verification failed. Please download it again.</string>
@@ -116,9 +112,6 @@
     <string name="document_contents">%1$d transcripts · %2$d speakers\nSaving keeps all document metadata.</string>
     <string name="document_processing">Transcription processing</string>
     <string name="unknown_speaker">Unknown speaker · %1$s</string>
-    <string name="automatic_model">Automatic · prefer full precision</string>
-    <string name="automatic_precision">Auto · %1$s</string>
-    <string name="automatic_model_explanation">Uses FP32 when RAM and storage allow; otherwise chooses the smaller INT8 model. Manual choices are respected.</string>
     <string name="processing_speed">Ready in %1$.1f s · %2$.2f× realtime</string>
     <string name="transcription_speed">Transcribed in %1$.1f s · %2$.2f× realtime</string>
     <string name="notes">Notes</string>
@@ -156,16 +149,6 @@
     <string name="note_clock" translatable="false">%1$02d:%2$02d</string>
     <string name="library_note_metadata">%1$s · %2$s</string>
     <string name="library_saved_document">Saved document</string>
-    <string name="live_recording">Transcribe while recording</string>
-    <string name="live_recording_summary">Off by default. Shows draft words in short chunks. Requires a downloaded model and uses more CPU and battery.</string>
-    <string name="live_recording_hint">Draft words appear after each short chunk is decoded. Keep recording while recognition catches up; Done saves the audio and finishes the transcript.</string>
-    <string name="live_recording_loading">Loading recognition model…</string>
-    <string name="live_recording_waiting">Listening · draft words will appear here</string>
-    <string name="live_recording_progress">Draft · transcribed through %1$d:%2$02d</string>
-    <string name="live_recording_finishing">Audio saved · finishing transcription…</string>
-    <string name="live_recording_unavailable">Live transcription needs the selected model. Download it first; this recording will still be saved.</string>
-    <string name="live_recording_failed">Live transcription stopped. Your recording is safe; you can transcribe it after saving.</string>
-    <string name="microphone_pcm_format">MONO · 16 kHz · live transcription</string>
     <string name="transcript_draft">Draft · words and timings may change</string>
     <string name="recording_saving">Saving audio…</string>
     <string name="identify_speakers">Identify speakers</string>

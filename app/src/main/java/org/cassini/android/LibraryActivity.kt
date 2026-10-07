@@ -95,9 +95,7 @@ class LibraryActivity : Activity() {
 
     private fun refresh() {
         record.isEnabled = true; open.isEnabled = true
-        val session = SessionStore(filesDir).load()
-        val fp32 = ModelPolicy.resolve(this, session.modelChoice)
-        val model = ModelStore(File(filesDir, if (fp32) "parakeet-v3-fp32" else "parakeet-v3"), fp32)
+        val model = ModelStore(File(filesDir, "parakeet-v3"))
         summary.setText(if (model.ready()) R.string.library_local else R.string.library_needs_model)
         renderNotes()
     }

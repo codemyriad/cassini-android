@@ -92,9 +92,9 @@ class MainActivity : Activity() {
             else -> try { library.load().firstOrNull { it.id == noteId }?.session ?: Session() }
                 catch (error: Exception) { Log.e(TAG, "Could not load note", error); Session() }
         }
-        session = selected.copy(modelChoice = preferences.modelChoice, fp32 = ModelPolicy.resolve(this, preferences.modelChoice))
+        session = selected
         autoTranscribe = savedInstanceState == null && intent.getBooleanExtra(AUTO_TRANSCRIBE, false)
-        models = modelStore(session.fp32)
+        models = ModelStore(File(filesDir, "parakeet-v3"))
         ui = DeckViews(this)
         setContentView(ui.root)
         ui.library.setOnClickListener { returnToLibrary() }
@@ -148,8 +148,6 @@ class MainActivity : Activity() {
         savedInstanceState?.let { state -> ui.scroll.post { ui.scroll.scrollTo(0, state.getInt("scroll")) } }
     }
 
-    private fun modelStore(fp32: Boolean) = ModelStore(File(filesDir, if (fp32) "parakeet-v3-fp32" else "parakeet-v3"), fp32)
-
     private fun chooseFile() {
         startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             type = "*/*"; putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("audio/*", "application/ogg")); addCategory(Intent.CATEGORY_OPENABLE)
@@ -168,7 +166,6 @@ class MainActivity : Activity() {
 
     private fun transcribe() {
         val uri = session.uri?.let(Uri::parse) ?: return
-        updateModelChoice()
         val chosenModel = models
         if (!chosenModel.ready()) { refreshControls(); return }
         runWork(R.string.decoding) {
@@ -351,7 +348,7 @@ class MainActivity : Activity() {
                     playerReady = false; player?.release(); player = null
                     session = (known ?: Session(uri = location, name = name ?: uri.lastPathSegment.orEmpty(),
                         document = file.absolutePath.takeIf { portable.state != "plain-audio" }, selectedVariant = portable.defaultId,
-                        resultPrecision = "")).copy(fp32 = session.fp32, modelChoice = session.modelChoice)
+                        resultPrecision = ""))
                     ui.search.text.clear(); ui.scroll.scrollTo(0, 0)
                     preparePlayer(Uri.fromFile(file))
                 }
@@ -518,8 +515,8 @@ class MainActivity : Activity() {
     private fun refreshControls() {
         val ready = models.ready()
         ui.model.text = getString(if (ready) R.string.model_ready else R.string.model_missing,
-            if (session.modelChoice == "auto") getString(R.string.automatic_precision, models.precision) else models.precision)
-        ui.download.text = getString(R.string.download_model, getString(if (models.fp32) R.string.model_size_fp32 else R.string.model_size_int8))
+            models.precision)
+        ui.download.text = getString(R.string.download_model, getString(R.string.model_size_int8))
         ui.download.visibility = if (ready) View.GONE else View.VISIBLE
         ui.menu.isEnabled = !busy
         ui.library.isEnabled = !busy
@@ -772,10 +769,8 @@ class MainActivity : Activity() {
 
     private fun persistSession() {
         if (playerReady) player?.let { session = session.copy(positionMs = it.currentPosition) }
-        // Settings can change the model while this activity is stopped or being recreated.
         val preferences = sessions.load()
-        session = session.copy(modelChoice = preferences.modelChoice,
-            fp32 = if (preferences.modelChoice == "auto") session.fp32 else preferences.fp32, screen = screen)
+        session = session.copy(screen = screen)
         // An empty viewer has nothing to remember, and session.json may hold a session that exists nowhere else.
         if (session.uri == null) return
         try {
@@ -793,15 +788,9 @@ class MainActivity : Activity() {
         outState.putString("screen", screen)
         super.onSaveInstanceState(outState)
     }
-    private fun updateModelChoice() {
-        val choice = sessions.load().modelChoice
-        val fp32 = ModelPolicy.resolve(this, choice)
-        session = session.copy(modelChoice = choice, fp32 = fp32)
-        if (models.fp32 != fp32) models = modelStore(fp32)
-    }
     override fun onResume() {
         super.onResume()
-        if (!busy) { updateModelChoice(); refreshControls() }
+        if (!busy) refreshControls()
         fetchSpeechDetector()
         maybeAutoTranscribe()
         handler.post(ticker)

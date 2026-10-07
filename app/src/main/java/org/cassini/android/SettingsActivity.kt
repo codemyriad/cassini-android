@@ -10,7 +10,6 @@ import android.preference.ListPreference
 import android.preference.Preference
 import android.preference.PreferenceCategory
 import android.preference.PreferenceFragment
-import android.preference.SwitchPreference
 import android.view.MenuItem
 import java.io.File
 
@@ -57,35 +56,8 @@ class SettingsActivity : Activity() {
             general.addPreference(language)
 
             val transcription = category(R.string.settings_transcription)
-            val sessions = SessionStore(context.filesDir)
-            val model = ListPreference(context).apply {
-                key = "transcription_model"; isPersistent = false
-                setTitle(R.string.recognition_model); setDialogTitle(R.string.recognition_model)
-                entries = arrayOf(getString(R.string.automatic_model), getString(R.string.int8_option), getString(R.string.fp32_option))
-                entryValues = arrayOf("auto", "int8", "fp32")
-                value = sessions.load().modelChoice
-                summary = modelSummary(context, value)
-                setNegativeButtonText(R.string.cancel)
-                setOnPreferenceChangeListener { preference, chosen ->
-                    val choice = chosen as String
-                    val fp32 = ModelPolicy.resolve(context, choice)
-                    sessions.save(sessions.load().copy(fp32 = fp32, modelChoice = choice))
-                    preference.summary = modelSummary(context, choice)
-                    true
-                }
-            }
-            transcription.addPreference(model)
-            transcription.addPreference(SwitchPreference(context).apply {
-                key = "live_recording"; isPersistent = false
-                setTitle(R.string.live_recording); setSummary(R.string.live_recording_summary)
-                isChecked = RecordingPreferences.live(context)
-                setOnPreferenceChangeListener { _, enabled ->
-                    RecordingPreferences.setLive(context, enabled as Boolean)
-                    true
-                }
-            })
             transcription.addPreference(Preference(context).apply {
-                setTitle(R.string.automatic_model); setSummary(R.string.automatic_model_explanation)
+                setTitle(R.string.recognition_model); summary = modelSummary(context)
                 isSelectable = false
             })
             transcription.addPreference(Preference(context).apply {
@@ -105,11 +77,10 @@ class SettingsActivity : Activity() {
             })
         }
 
-        private fun modelSummary(context: Context, choice: String): String {
-            val fp32 = ModelPolicy.resolve(context, choice)
-            val models = ModelStore(File(context.filesDir, if (fp32) "parakeet-v3-fp32" else "parakeet-v3"), fp32)
-            return getString(R.string.settings_model_summary, if (choice == "auto") getString(R.string.automatic_precision, models.precision) else models.precision,
-                getString(if (fp32) R.string.model_size_fp32 else R.string.model_size_int8),
+        private fun modelSummary(context: Context): String {
+            val models = ModelStore(File(context.filesDir, "parakeet-v3"))
+            return getString(R.string.settings_model_summary, models.precision,
+                getString(R.string.model_size_int8),
                 getString(if (models.ready()) R.string.model_installed else R.string.model_download_needed))
         }
     }

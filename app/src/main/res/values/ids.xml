@@ -33,8 +33,6 @@
     <item name="capture_start" type="id" />
     <item name="capture_pause" type="id" />
     <item name="capture_done" type="id" />
-    <item name="capture_transcript" type="id" />
-    <item name="capture_live_status" type="id" />
     <item name="transcript_draft" type="id" />
     <item name="speakers_button" type="id" />
     <item name="cancel_operation" type="id" />
