@@ -246,7 +246,7 @@ class LibraryTest {
             assertNull(recorded.document)
             val audio = AudioDecoder.decode(context, Uri.parse(recorded.uri))
             assertTrue("Paused time must be excluded: ${audio.durationMs}", audio.durationMs in 1800..3200)
-            assertEquals(48000, audio.sampleRate)
+            assertEquals(16000, audio.sampleRate)
             assertEquals(1, LibraryStore(context.filesDir).load().count { it.id == recorded.libraryId })
             finishScreens()
             ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java).putExtra(MainActivity.NOTE_ID, recorded.libraryId)).use { reopened ->

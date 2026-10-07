@@ -74,7 +74,7 @@
     <string name="cancel">Annulla</string>
     <string name="error_open">Impossibile aprire la registrazione. Seleziona di nuovo il file.</string>
     <string name="error_large">Questo prototipo accetta file fino a 64 MB.</string>
-    <string name="error_long">Scegli una clip di massimo 3 minuti.</string>
+    <string name="error_long">Scegli una registrazione di massimo 2 ore.</string>
     <string name="error_short">Scegli almeno 200 millisecondi di audio.</string>
     <string name="error_audio">Impossibile leggere l’audio. Prova WAV PCM16, MP3, M4A o Opus.</string>
     <string name="error_wav">Usa un WAV PCM a 16 bit, oppure MP3, M4A o Opus.</string>

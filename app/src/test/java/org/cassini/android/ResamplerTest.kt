@@ -49,4 +49,40 @@ class ResamplerTest {
             output.forEachIndexed { j, value -> assertEquals("$rate Hz sample $j", 0.25, value.toDouble(), 1e-5) }
         }
     }
+
+    private fun streamed(input: FloatArray, rate: Int, random: kotlin.random.Random): FloatArray {
+        val out = mutableListOf<Float>()
+        val resampler = StreamingResampler(rate) { chunk, n -> repeat(n) { out += chunk[it] } }
+        var at = 0
+        while (at < input.size) {
+            val n = minOf(input.size - at, random.nextInt(0, 5000))
+            if (random.nextInt(8) == 0) resampler.push(FloatArray(n + 3).also { input.copyInto(it, 3, at, at + n) }, 3, n)
+            else resampler.push(input.copyOfRange(at, at + n))
+            at += n
+        }
+        val length = resampler.finish()
+        assertEquals(length, out.size.toLong())
+        assertEquals(length, resampler.produced)
+        return out.toFloatArray()
+    }
+
+    @Test fun streamingInRandomBlocksEqualsWholeArray() {
+        val random = kotlin.random.Random(7)
+        for (rate in rates + 16000) for (n in listOf(0, 1, 37, 44100, 123_457)) {
+            val input = FloatArray(n) { random.nextFloat() * 2 - 1 }
+            val expected = resampleTo16k(input, rate)
+            val actual = streamed(input, rate, random)
+            assertEquals("$rate Hz, $n samples", expected.size, actual.size)
+            for (j in expected.indices) assertEquals("$rate Hz sample $j", expected[j], actual[j], 1e-5f)
+        }
+    }
+
+    @Test fun streamingSilenceMatchesZeros() {
+        val out = mutableListOf<Float>()
+        StreamingResampler(44100) { chunk, n -> repeat(n) { out += chunk[it] } }.apply {
+            push(FloatArray(1000) { 0.25f }); silence(10_000); push(FloatArray(1000) { -0.25f }); finish()
+        }
+        val expected = resampleTo16k(FloatArray(1000) { 0.25f } + FloatArray(10_000) + FloatArray(1000) { -0.25f }, 44100)
+        assertArrayEquals(expected, out.toFloatArray(), 1e-6f)
+    }
 }

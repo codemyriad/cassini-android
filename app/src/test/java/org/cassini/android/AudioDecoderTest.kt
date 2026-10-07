@@ -27,4 +27,50 @@ class AudioDecoderTest {
         assertEquals(48000, AudioDecoder.framePosition(1_000_900, 48000, 48000))
         assertEquals(48096, AudioDecoder.framePosition(1_002_000, 48000, 48000))
     }
+
+    private fun wav(rate: Int, channels: Int, pcm: ShortArray, extraChunk: Boolean = true): java.io.File {
+        val data = java.nio.ByteBuffer.allocate(pcm.size * 2).order(java.nio.ByteOrder.LITTLE_ENDIAN).also { b -> pcm.forEach { b.putShort(it) } }.array()
+        val out = java.io.ByteArrayOutputStream()
+        fun u32(v: Int) = out.write(java.nio.ByteBuffer.allocate(4).order(java.nio.ByteOrder.LITTLE_ENDIAN).putInt(v).array())
+        fun u16(v: Int) = out.write(byteArrayOf(v.toByte(), (v shr 8).toByte()))
+        out.write("RIFF".toByteArray()); u32(0); out.write("WAVE".toByteArray())
+        out.write("fmt ".toByteArray()); u32(16); u16(1); u16(channels); u32(rate); u32(rate * channels * 2); u16(channels * 2); u16(16)
+        if (extraChunk) { out.write("LIST".toByteArray()); u32(3); out.write(byteArrayOf(1, 2, 3, 0)) }
+        out.write("data".toByteArray()); u32(data.size); out.write(data)
+        return java.io.File.createTempFile("decoder", ".wav").also { it.writeBytes(out.toByteArray()); it.deleteOnExit() }
+    }
+
+    @Test fun blockWavReaderMatchesWholeFileConversion() {
+        val random = kotlin.random.Random(3)
+        for ((rate, channels) in listOf(48000 to 2, 44100 to 1, 16000 to 1, 8000 to 2)) {
+            val frames = rate * 3 + 17
+            val pcm = ShortArray(frames * channels) { random.nextInt(-32768, 32768).toShort() }
+            // The previous whole-file reader: average channels at the source rate, then convert.
+            val mono = FloatArray(frames) { f -> var sum = 0f; repeat(channels) { sum += pcm[f * channels + it] / 32768f }; sum / channels }
+            val expected = resampleTo16k(mono, rate)
+            val file = wav(rate, channels, pcm)
+            val audio = java.io.RandomAccessFile(file, "r").use { it.seek(12); AudioDecoder.decodeWav(it) }
+            assertEquals(16000, audio.sampleRate)
+            assertArrayEquals("$rate Hz x$channels", expected, audio.samples, 1e-5f)
+        }
+    }
+
+    @Test fun growableBufferKeepsEverySampleAndTrimsOnlyWrongGuesses() {
+        val builder = PcmBuilder(16000)
+        val chunk = FloatArray(1000) { it.toFloat() }
+        repeat(50) { builder.append(chunk, 1000) }
+        assertEquals(50_000, builder.size)
+        val samples = builder.build()
+        assertEquals(50_000, samples.size)
+        assertEquals(999f, samples[49_999])
+        val exact = PcmBuilder(16000).apply { repeat(16) { append(chunk, 1000) } }
+        assertSame(exact.build(), exact.build())
+    }
+
+    @Test fun durationCapAndMemoryGuard() {
+        assertEquals(7_200_000L, Limits.MAX_RECORDING_MS)
+        assertTrue(Limits.memoryAllows(3_600_000, 400L shl 20))
+        assertFalse(Limits.memoryAllows(3_600_000, 200L shl 20))
+        try { Limits.requireDuration(Limits.MAX_RECORDING_MS + 1); fail() } catch (e: UserFacingException) { assertEquals(Failure.LONG, e.failure) }
+    }
 }

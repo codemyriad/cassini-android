@@ -22,7 +22,7 @@ internal object OpusEncoder {
             }, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
             codec.start(); started = true
             val samples = audio.samples.size * 48000L / audio.sampleRate
-            require(samples in 1..48000L * AudioDecoder.MAX_SECONDS)
+            require(samples in 1..48L * Limits.MAX_RECORDING_MS)
             // Feed a silent frame after the recording to flush encoder lookahead; EOS granule
             // discards this padding. It never enters the transcript or the playable timeline.
             var cursor = 0L; var queuedEos = false; var eos = false; var head: ByteArray? = null

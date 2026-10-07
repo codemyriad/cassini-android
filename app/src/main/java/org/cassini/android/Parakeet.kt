@@ -33,6 +33,9 @@ object Parakeet {
 
     /** Recorded context for retrying a span that decoded to nothing: the detector's silence decision interval. */
     private const val RETRY_CONTEXT_MS = 500
+    /** A single decode's memory grows with its length; longer recordings are always cut. */
+    internal const val WHOLE_MAX_MS = 60_000L
+    private const val PROGRESS_INTERVAL_NS = 1_000_000_000L
 
     /**
      * Cuts by speech when [detectorModel] is given, otherwise at quiet points. [onProgress] runs on the
@@ -46,6 +49,7 @@ object Parakeet {
         val decoder = Decoder(models)
         try {
             if (cutting == Cutting.WHOLE) {
+                requireUser(audio.durationMs <= WHOLE_MAX_MS, Failure.LONG)
                 val began = System.nanoTime()
                 val transcript = Transcript(Session(decoder, audio, policy).whole())
                 onProgress(Progress(audio.durationMs, audio.durationMs, (System.nanoTime() - began) / 1_000_000, transcript.words))
@@ -56,10 +60,16 @@ object Parakeet {
             val session = Session(decoder, audio, policy)
             // Recorded context makes a decode end past its speech span, so the position only ever moves forward.
             var reached = 0
+            var reported = 0L
             val report = { done: Int ->
                 reached = maxOf(reached, minOf(done, audio.samples.size))
-                onProgress(Progress(SpeechWindows.floorMs(reached, audio.sampleRate), audio.durationMs,
-                    (System.nanoTime() - began) / 1_000_000, session.words.map { it.word }))
+                val now = System.nanoTime()
+                // Each report copies every word so far: at most one a second keeps a long recording linear.
+                if (reported == 0L || now - reported >= PROGRESS_INTERVAL_NS) {
+                    reported = now
+                    onProgress(Progress(SpeechWindows.floorMs(reached, audio.sampleRate), audio.durationMs,
+                        (now - began) / 1_000_000, session.words.map { it.word }))
+                }
             }
             report(0)
             var paddedTailMs = 0L
@@ -109,7 +119,7 @@ object Parakeet {
             requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
             val stream = recognizer.createStream()
             try {
-                // Sherpa resamples to the feature rate. Keep the input's original sample rate.
+                // The decoder delivers the feature rate, so sherpa does not resample again.
                 stream.acceptWaveform(if (headPad == 0 && tailPad == 0 && start == 0 && length == audio.samples.size) audio.samples
                     else FloatArray(headPad + length + tailPad).also { audio.samples.copyInto(it, headPad, start, start + length) }, audio.sampleRate)
                 recognizer.decode(stream)

@@ -191,7 +191,7 @@ class MainActivity : Activity() {
                     .toString(2))
             } catch (error: IOException) { Log.e(TAG, "Could not cache processing artifacts", error) }
             onUi { ui.progress.isIndeterminate = true; setStatus(R.string.packaging_document) }
-            val (file, portable) = documents.create(uri, audio, transcript, session.name, processing(chosenModel.precision, chosenModel.revision)
+            val (file, portable) = documents.create(uri, { audio }, transcript, session.name, processing(chosenModel.precision, chosenModel.revision)
                 .put("x-inferenceMs", elapsed).put("x-segmentation", Parakeet.cutting(detector).provenance), document)
             val processingMs = (System.nanoTime() - totalBegan) / 1_000_000
             onUi {
@@ -247,7 +247,9 @@ class MainActivity : Activity() {
             checkActive()
             onUi { ui.progress.isIndeterminate = true; setStatus(R.string.identifying_speakers) }
             val began = System.nanoTime()
-            val audio = AudioDecoder.decode(this, uri)
+            // Only the duration outlives diarization; a source that needs re-encoding is decoded again.
+            var audio: PcmAudio? = AudioDecoder.decode(this, uri)
+            val durationMs = audio!!.durationMs
             checkActive()
             val turns = Diarization.turns(audio, speakerModels.modelPath) { done, total ->
                 onUi {
@@ -258,6 +260,7 @@ class MainActivity : Activity() {
                     }
                 }
             }
+            audio = null
             checkActive()
             val elapsed = (System.nanoTime() - began) / 1_000_000
             val previousProcessing = originalDocument?.manifest?.optJSONObject("provenance")?.optJSONObject("speechToText")?.optJSONObject(sourceId ?: "")
@@ -267,7 +270,7 @@ class MainActivity : Activity() {
             }.toMap()
             onUi { ui.progress.isIndeterminate = true; setStatus(R.string.packaging_document) }
             checkActive()
-            val (file, portable) = documents.create(uri, audio, result.transcript, original.name,
+            val (file, portable) = documents.create(uri, { AudioDecoder.decode(this, uri) }, result.transcript, original.name,
                 result.processing, originalDocument, labels)
             // A completed native call may outlive its screen. Never publish a cancelled result,
             // and remove only this job's new immutable document when it cannot be adopted.
@@ -277,7 +280,7 @@ class MainActivity : Activity() {
                     val position = if (playerReady) player?.currentPosition ?: session.positionMs else session.positionMs
                     session = original.copy(uri = Uri.fromFile(file).toString(), document = file.absolutePath,
                         name = "${original.name.substringBeforeLast('.')}.opus", selectedVariant = portable.defaultId,
-                        durationMs = audio.durationMs, positionMs = position,
+                        durationMs = durationMs, positionMs = position,
                         processingMs = maxOf(original.processingMs, original.inferenceMs) + elapsed)
                     adoptDocument(portable); preparePlayer(Uri.fromFile(file)); persistSession(); renderScreen()
                     setStatus(R.string.speakers_complete, labels.size, elapsed / 1000.0)
@@ -298,8 +301,7 @@ class MainActivity : Activity() {
             val uri = session.uri?.let(Uri::parse) ?: return
             // Migrate prototype sessions without running speech recognition again.
             runWork(R.string.packaging_document) {
-                val audio = AudioDecoder.decode(this, uri)
-                val (file, portable) = documents.create(uri, audio, transcript, session.name, processing(session.resultPrecision).put("x-inferenceMs", session.inferenceMs), null)
+                val (file, portable) = documents.create(uri, { AudioDecoder.decode(this, uri) }, transcript, session.name, processing(session.resultPrecision).put("x-inferenceMs", session.inferenceMs), null)
                 onUi {
                     val position = if (playerReady) player?.currentPosition ?: session.positionMs else session.positionMs
                     session = session.copy(uri = Uri.fromFile(file).toString(), document = file.absolutePath,

@@ -54,5 +54,5 @@ internal class MicrophoneRecording(context: Context, val file: File, onLimit: ()
     }
 
     fun release() { recorder?.release(); recorder = null }
-    companion object { const val MAX_DURATION_MS = AudioDecoder.MAX_SECONDS * 1000 - 1000 }
+    companion object { const val MAX_DURATION_MS = 179_000 }
 }
