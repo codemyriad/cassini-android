@@ -2,36 +2,39 @@ package org.cassini.android
 
 import java.io.File
 
-/** Optional speaker models, verified before use. Never part of the APK or an ASR download. */
+/** The optional speaker model, verified before use. Never part of the APK or an ASR download. */
 internal class DiarizationModels(private val directory: File) {
     companion object {
-        const val SEGMENTATION_REVISION = "9403a6902bb58e3d5ae8c7e77c3422de279db2e0"
-        val segmentation = ModelStore.Artifact("segmentation.int8.onnx", 1540506,
-            "d582f4b4c6b48205de7e0643c57df0df5615a3c176189be3fc461e9d18827b5d")
-        val embedding = ModelStore.Artifact("embedding.onnx", 39593761,
-            "1a331345f04805badbb495c775a6ddffcdd1a732567d5ec8b3d5749e3c7a5e4b")
-        const val SEGMENTATION_URL = "https://huggingface.co/csukuangfj/sherpa-onnx-pyannote-segmentation-3-0/resolve/$SEGMENTATION_REVISION/model.int8.onnx"
-        const val EMBEDDING_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx"
-        val verification = "${segmentation.sha256}\n${embedding.sha256}"
+        /** NVIDIA Nemotron-3-Diarization, exported to INT8 ONNX for sherpa-onnx's Sortformer runtime. */
+        const val SOURCE_REVISION = "f667ed73aee57d40cc39428eb768b4fd87a0a29e"
+        val model = ModelStore.Artifact("nemotron-3-diarization.int8.onnx", 103941758,
+            "01d1f893f394cc0418ae78425d216ed62c334c0125e650135332a7a8e595f168")
+        /** Seekable Zstandard copy of [model] on Cassini's model host, verified before decompression. */
+        val download = ModelStore.Artifact("nemotron-3-diarization.int8.onnx.zst", 64982914,
+            "51249515e4cb49dc00c5d5dc0a41ac59aa91157d689ec9586b3f4bf567c3f602")
+        const val URL = "https://dist.gocassini.com/models/files/51249515e4cb49dc00c5d5dc0a41ac59aa91157d689ec9586b3f4bf567c3f602/model.int8.onnx.zst"
         fun inFiles(files: File) = DiarizationModels(File(files, "speaker-models"))
+
+        /** Files of the earlier pyannote + ERes2Net pipeline. Removing them never touches recordings. */
+        private val retired = listOf("segmentation.int8.onnx", "embedding.onnx", "segmentation.int8.onnx.part", "embedding.onnx.part")
+        internal fun removeRetiredModels(filesDir: File): Boolean {
+            val directory = File(filesDir, "speaker-models")
+            val verified = File(directory, "verified")
+            if (verified.isFile && verified.readText() != model.sha256) verified.delete()
+            return retired.map { File(directory, it) }.all { !it.exists() || it.delete() }
+        }
     }
-    val segmentationPath get() = File(directory, segmentation.name).absolutePath
-    val embeddingPath get() = File(directory, embedding.name).absolutePath
-    fun ready() = File(segmentationPath).length() == segmentation.size && File(embeddingPath).length() == embedding.size &&
-        File(directory, "verified").takeIf { it.isFile }?.readText() == verification
+    val modelPath get() = File(directory, model.name).absolutePath
+    fun ready() = File(modelPath).length() == model.size &&
+        File(directory, "verified").takeIf { it.isFile }?.readText() == model.sha256
 
     fun install(progress: (ModelStore.Progress) -> Unit) {
         directory.mkdirs()
         File(directory, "verified").delete()
-        val total = segmentation.size + embedding.size
-        var completed = 0L
-        for ((artifact, url) in listOf(segmentation to SEGMENTATION_URL, embedding to EMBEDDING_URL)) {
-            ModelStore.fetch(url, artifact, directory) { received, verifying ->
-                progress(ModelStore.Progress(((completed + received) * 100 / total).toInt(), verifying))
-            }
-            completed += artifact.size
+        ModelStore.fetchZstd(URL, download, model, directory) { received, verifying ->
+            progress(ModelStore.Progress((received * 100 / download.size).toInt(), verifying))
         }
         requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
-        File(directory, "verified").writeText(verification)
+        File(directory, "verified").writeText(model.sha256)
     }
 }

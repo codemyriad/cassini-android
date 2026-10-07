@@ -100,6 +100,57 @@ class ModelStore(private val directory: File) {
                 partial.delete()
             }
         }
+
+        /**
+         * Like [fetch] for a Zstandard-compressed [download] of [artifact]. The compressed file is verified,
+         * then decompressed to a `.part` file that replaces nothing until the decompressed size and SHA-256
+         * match. Neither temporary file is kept.
+         */
+        internal fun fetchZstd(url: String, download: Artifact, artifact: Artifact, directory: File,
+                               progress: (Long, Boolean) -> Unit) {
+            val destination = File(directory, artifact.name)
+            if (destination.length() == artifact.size && digest(destination) == artifact.sha256) {
+                progress(download.size, true)
+                return
+            }
+            requireUser(directory.usableSpace > download.size + artifact.size + 32 * 1024 * 1024, Failure.SPACE)
+            val compressed = File(directory, download.name)
+            try {
+                fetch(url, download, directory, progress)
+                decompress(compressed, artifact, directory)
+            } finally {
+                compressed.delete()
+            }
+        }
+
+        /** Decompresses a verified Zstandard [source] into [directory] as [artifact], or fails without a file. */
+        internal fun decompress(source: File, artifact: Artifact, directory: File) {
+            val destination = File(directory, artifact.name)
+            val partial = File(directory, "${artifact.name}.part")
+            try {
+                // Seekable Zstandard ends with a skippable seek-table frame, which the decoder skips.
+                com.github.luben.zstd.ZstdInputStream(source.inputStream().buffered()).use { input ->
+                    partial.outputStream().buffered().use { output ->
+                        val bytes = ByteArray(128 * 1024)
+                        var written = 0L
+                        while (true) {
+                            requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
+                            val count = input.read(bytes)
+                            if (count < 0) break
+                            written += count
+                            requireUser(written <= artifact.size, Failure.VERIFY)
+                            output.write(bytes, 0, count)
+                        }
+                    }
+                }
+                requireUser(partial.length() == artifact.size && digest(partial) == artifact.sha256, Failure.VERIFY)
+                requireUser(partial.renameTo(destination), Failure.INSTALL)
+            } catch (e: java.io.IOException) {
+                throw UserFacingException(Failure.VERIFY, e.message ?: "Zstandard")
+            } finally {
+                partial.delete()
+            }
+        }
     }
 
     val revision = REVISION

@@ -23,4 +23,20 @@ class ModelUpgradeTest {
         assertTrue(ModelStore.removeLegacyModel(directory))
         kept.forEach { name -> assertEquals(name, File(directory, name).readText()) }
     }
+
+    @Test fun retiredSpeakerModelsAreRemovedAndTheirVerificationRevoked() {
+        val directory = File(folder.root, "speaker-models").apply { mkdirs() }
+        listOf("segmentation.int8.onnx", "embedding.onnx", "embedding.onnx.part").forEach { File(directory, it).writeText("old weights") }
+        File(directory, "verified").writeText("old\nhashes")
+        val recording = File(folder.root, "documents/note.opus").apply { parentFile!!.mkdirs(); writeText("audio") }
+
+        assertTrue(DiarizationModels.removeRetiredModels(folder.root))
+        assertEquals(emptyList<String>(), directory.list()!!.toList())
+        assertEquals("audio", recording.readText())
+
+        File(directory, "verified").writeText(DiarizationModels.model.sha256)
+        assertTrue(DiarizationModels.removeRetiredModels(folder.root))
+        assertEquals(DiarizationModels.model.sha256, File(directory, "verified").readText())
+        assertTrue(DiarizationModels.removeRetiredModels(File(folder.root, "absent")))
+    }
 }

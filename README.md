@@ -36,7 +36,7 @@ The current development build transcribes after recording finishes. The earlier 
 
 There’s no transcription queue or storage cleanup UI yet. The APK is a release build signed with a stable beta key.
 
-Tap **Identify speakers** on a completed transcript to add anonymous labels, with automatic detection or a known speaker count (1–8). The optional models download separately (about 40 MiB). The original stays under **Choose transcript**. Labels can be wrong, especially with overlapping voices; automatic detection can overestimate the count.
+Tap **Identify speakers** on a completed transcript to add anonymous labels. [NVIDIA Nemotron-3-Diarization](https://huggingface.co/nvidia/Nemotron-3-Diarization) detects up to 8 speakers on the phone; you don’t need to say how many. The optional model downloads separately (about 62 MiB). The original stays under **Choose transcript**. Labels can be wrong, especially with overlapping voices.
 
 ## Build
 
@@ -50,6 +50,6 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 [GitHub Actions](https://github.com/codemyriad/cassini-android/actions/workflows/android.yml) builds and checks each push and pull request, including playback, recording and settings checks on Android 8, 10 and 14 emulators. Version tags publish the APK with a stable beta signing key, so updates preserve notes and downloaded models. Models and the pinned Android runtime are fetched separately.
 
-For device checks and format interoperability, see [development notes](docs/development.md), [Pixel 8 results](docs/pixel8-results.md) and the [Android acceleration investigation](docs/android-acceleration.md). Android currently uses stock sherpa-onnx on CPU; desktop Cassini uses a modified runtime. Cutting recordings at speech pauses is borrowed from the desktop pipeline.
+For device checks and format interoperability, see [development notes](docs/development.md), [Pixel 8 results](docs/pixel8-results.md) and the [Android acceleration investigation](docs/android-acceleration.md). Android uses sherpa-onnx 1.13.7 on CPU, rebuilt with Sortformer speaker diarization; desktop Cassini uses a modified runtime. Cutting recordings at speech pauses is borrowed from the desktop pipeline.
 
 Developed with AI coding assistance; recording, transcription and portable-file checks ran on a Pixel 8. [GPLv3](LICENSE). See [dependency licenses and sources](THIRD_PARTY_NOTICES.md).

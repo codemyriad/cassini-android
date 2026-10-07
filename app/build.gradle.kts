@@ -47,7 +47,11 @@ android {
 }
 
 dependencies {
-    implementation(files("libs/sherpa-onnx-1.13.7.aar"))
+    implementation(files("libs/sherpa-onnx-1.13.7-nemotron.aar"))
+    // Decompresses the speaker model download. The AAR carries the Android native libraries;
+    // the JVM unit tests use the jar, which carries the desktop ones.
+    implementation("com.github.luben:zstd-jni:1.5.7-6@aar")
+    testImplementation("com.github.luben:zstd-jni:1.5.7-6")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
     androidTestImplementation("androidx.test:runner:1.7.0")

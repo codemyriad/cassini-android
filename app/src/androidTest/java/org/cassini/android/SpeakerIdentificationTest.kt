@@ -11,7 +11,6 @@ import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.ViewMatchers.withId
-import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.platform.app.InstrumentationRegistry
 import org.json.JSONObject
 import org.junit.Assert.*
@@ -45,9 +44,8 @@ class SpeakerIdentificationTest {
                 assertEquals(View.VISIBLE, it.findViewById<Button>(R.id.speakers_button).visibility)
                 assertTrue(it.findViewById<Button>(R.id.speakers_button).isEnabled)
                 assertEquals(View.GONE, it.findViewById<Button>(R.id.cancel_operation).visibility)
-                it.findViewById<Button>(R.id.speakers_button).performClick()
             }
-            onView(withId(android.R.id.button2)).inRoot(isDialog()).perform(click())
+            SystemClock.sleep(1000)
             assertEquals(original, SessionStore(context.filesDir).load().transcript)
             assertNull(SessionStore(context.filesDir).load().document)
         } finally { scenario.close(); file.delete() }
@@ -64,7 +62,6 @@ class SpeakerIdentificationTest {
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         try {
             scenario.onActivity { it.findViewById<Button>(R.id.speakers_button).performClick() }
-            onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
             onView(withId(android.R.id.button2)).inRoot(isDialog()).perform(click())
             assertFalse(DiarizationModels.inFiles(context.filesDir).ready())
             assertNull(SessionStore(context.filesDir).load().document)
@@ -87,7 +84,7 @@ class SpeakerIdentificationTest {
             document = file.path, selectedVariant = doc.defaultId, durationMs = audio.durationMs))
         return file to doc
     }
-    private fun startIdentification(scenario: ActivityScenario<MainActivity>, count: Int) {
+    private fun startIdentification(scenario: ActivityScenario<MainActivity>) {
         val deadline = SystemClock.uptimeMillis() + 10000
         var ready = false
         while (!ready && SystemClock.uptimeMillis() < deadline) {
@@ -95,20 +92,14 @@ class SpeakerIdentificationTest {
             if (!ready) SystemClock.sleep(50)
         }
         assertTrue(ready)
-        var two = ""
-        scenario.onActivity {
-            two = if (count == -1) it.getString(R.string.speaker_automatic) else it.getString(R.string.speaker_number, count)
-            it.findViewById<Button>(R.id.speakers_button).performClick()
-        }
-        onView(withText(two)).inRoot(isDialog()).perform(click())
-        onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
+        scenario.onActivity { it.findViewById<Button>(R.id.speakers_button).performClick() }
     }
     @Test fun actualModelsAddAPlayableVariantWithoutChangingRecognitionOrAudio() {
         DiarizationModels.inFiles(context.filesDir).install { }
         val (file, original) = twoVoiceDocument()
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         try {
-            startIdentification(scenario, 2)
+            startIdentification(scenario)
             val began = SystemClock.uptimeMillis()
             val sessions = SessionStore(context.filesDir)
             while (sessions.load().document == file.path && SystemClock.uptimeMillis() - began < 180000) SystemClock.sleep(100)
@@ -138,12 +129,12 @@ class SpeakerIdentificationTest {
             println("Speaker identification: ${SystemClock.uptimeMillis() - began} ms for ${saved.durationMs} ms, correct two-voice fixture attribution")
         } finally { scenario.close(); file.delete() }
     }
-    @Test fun automaticClusteringDistinguishesTheTwoFixtureVoices() {
+    @Test fun automaticDetectionDistinguishesTheTwoFixtureVoices() {
         DiarizationModels.inFiles(context.filesDir).install { }
         val (file, _) = twoVoiceDocument()
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         try {
-            startIdentification(scenario, -1)
+            startIdentification(scenario)
             val deadline = SystemClock.uptimeMillis() + 180000
             val sessions = SessionStore(context.filesDir)
             while (sessions.load().document == file.path && SystemClock.uptimeMillis() < deadline) SystemClock.sleep(100)
@@ -161,7 +152,7 @@ class SpeakerIdentificationTest {
         val (file, original) = twoVoiceDocument()
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         try {
-            startIdentification(scenario, 2)
+            startIdentification(scenario)
             val deadline = SystemClock.uptimeMillis() + 180000
             var embedding = false
             while (!embedding && SystemClock.uptimeMillis() < deadline) {
