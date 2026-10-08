@@ -8,7 +8,7 @@ test "${#apks[@]}" -eq 1
 test "${#test_apks[@]}" -eq 1
 export CASSINI_APK="${apks[0]}" CASSINI_TEST_APK="${test_apks[0]}"
 classes=org.cassini.android.InterfaceTest,org.cassini.android.SettingsTest,org.cassini.android.PortableDocumentTest#opusEncoderCapabilityHasClearOutcome
-classes+=,org.cassini.android.LibraryTest#microphonePauseResumeSavesPlayableAudioAndReopensFromLibrary,org.cassini.android.LibraryTest#leavingRecordingScreenFinalizesAudioWithoutBackgroundTranscription
+classes+=,org.cassini.android.LibraryTest#microphonePauseResumeSavesPlayableAudioAndReopensFromLibrary,org.cassini.android.LibraryTest#leavingRecordingScreenKeepsCapturingInTheService
 classes+=,org.cassini.android.SessionUpgradeTest
 classes+=,org.cassini.android.SpeakerIdentificationTest#speakerIdentificationRequiresAnExplicitAction,org.cassini.android.SpeakerIdentificationTest#noWordsMeansNoSpeakerIdentification,org.cassini.android.SpeakerIdentificationTest#downloadingSpeakerModelsRequiresConsent
 export CASSINI_EXPECTED_TESTS=11
