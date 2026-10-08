@@ -9,6 +9,9 @@ internal object Limits {
     const val MAX_IMPORT_BYTES = 2L shl 30
     /** Cache space left free while copying an import. */
     const val MIN_FREE_BYTES = 64L shl 20
+    /** A recording stops before the device runs out of space, and warns this long before [MAX_RECORDING_MS]. */
+    const val MIN_RECORDING_FREE_BYTES = 200L shl 20
+    const val RECORDING_WARNING_MS = 5 * 60 * 1000L
 
     /** PCM plus 30% headroom for decode slices, words and the resampler. */
     fun memoryAllows(durationMs: Long, availableBytes: Long) = durationMs * ASR_RATE / 1000 * 4 * 13 / 10 <= availableBytes
@@ -19,6 +22,13 @@ internal object Limits {
         requireUser(durationMs <= MAX_RECORDING_MS, Failure.LONG)
         requireUser(memoryAllows(durationMs, availableHeap()), Failure.MEMORY)
     }
+}
+
+/** mm:ss, or h:mm:ss from one hour. */
+internal fun clock(ms: Long): String {
+    val s = ms.coerceAtLeast(0) / 1000
+    return if (s >= 3600) String.format(java.util.Locale.ROOT, "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60)
+    else String.format(java.util.Locale.ROOT, "%02d:%02d", s / 60, s % 60)
 }
 
 /** 16 kHz samples collected without knowing their final count. Grows by half; trimmed only when the guess was wrong. */

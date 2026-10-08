@@ -186,6 +186,29 @@ internal object OggOpus {
             writer.packet(pending!!, 4, finalGranule); pending = null
         }
     }
+    /**
+     * Live capture: the final length is unknown until [finish]. Every page written so far is a valid prefix, so a
+     * file cut short after a flush still decodes up to its last whole page.
+     */
+    class LiveMuxer(out: OutputStream, head: ByteArray, tags: ByteArray, serial: Int = Random.nextInt()) {
+        private val writer = Writer(out, serial)
+        private var pending: ByteArray? = null
+        var granule = 0L
+            private set
+        val preSkip = u16(head, 10)
+        init { require(tags.size <= MAX_HEADER_BYTES); writer.packet(head, 2, 0); writer.packet(tags, 0, 0) }
+        val empty get() = pending == null
+        fun add(packet: ByteArray) {
+            val samples = packetSamples(packet)
+            pending?.let { writer.packet(it, 0, granule) }
+            pending = packet; granule += samples
+        }
+        /** Ends the stream at [finalGranule], clamped to what the packets cover; null keeps every sample. */
+        fun finish(finalGranule: Long? = null) {
+            val last = pending ?: throw IllegalStateException("No Opus audio packets")
+            writer.packet(last, 4, (finalGranule ?: granule).coerceIn(minOf(preSkip.toLong(), granule), granule)); pending = null
+        }
+    }
     fun mux(stream: Stream, tags: ByteArray, serial: Int = Random.nextInt()): ByteArray {
         require(stream.validFraming && tags.size <= MAX_HEADER_BYTES && stream.audio.isNotEmpty())
         val out = ByteArrayOutputStream()

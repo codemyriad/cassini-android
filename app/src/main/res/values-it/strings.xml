@@ -131,9 +131,9 @@
     <string name="recording_preparing">Nuova registrazione</string>
     <string name="recording_title">Titolo della nota</string>
     <string name="voice_note_name">Nota vocale %1$s</string>
-    <string name="microphone_format">Microfono · AAC mono · 48 kHz</string>
+    <string name="microphone_format">Microfono · Opus mono · 48 kHz</string>
     <string name="microphone_level">Livello del microfono in tempo reale</string>
-    <string name="recording_hint">Le parole appariranno dopo lo stop. Registra fino a 3 minuti; Parakeet trascrive sul dispositivo. Uscendo da questa schermata la registrazione si ferma e viene salvata.</string>
+    <string name="recording_hint">Le parole compaiono dopo lo stop. Registra fino a 2 ore; la registrazione continua anche a schermo spento o in un’altra app. Parakeet trascrive sul telefono.</string>
     <string name="enable_microphone">Abilita il microfono</string>
     <string name="pause_recording">Pausa</string>
     <string name="resume_recording">Riprendi</string>
@@ -156,4 +156,10 @@
     <string name="speakers_complete">%1$d etichette vocali aggiunte in %2$.1f s. Controllale ascoltando l’audio.</string>
     <string name="error_speakers">Nessun turno di parola trovato. La trascrizione originale è invariata.</string>
     <string name="download_speaker_models">Scarica e distingui le voci</string>
+    <string name="microphone_format_aac">Microfono · AAC mono · 48 kHz</string>
+    <string name="recording_channel">Registrazione</string>
+    <string name="stop_recording">Stop</string>
+    <string name="recording_near_limit">● Registrazione · si ferma da sola tra 5 minuti</string>
+    <string name="recording_focus_paused">In pausa: un’altra app usa l’audio. Tocca Riprendi per continuare.</string>
+    <string name="recording_error_saved">La registrazione si è fermata per un errore. L’audio fin qui è salvato nella libreria.</string>
 </resources>

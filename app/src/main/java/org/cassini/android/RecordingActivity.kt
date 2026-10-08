@@ -2,26 +2,26 @@ package org.cassini.android
 
 import android.Manifest
 import android.app.Activity
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
+import android.os.IBinder
 import android.os.Looper
 import android.view.Gravity
 import android.view.View
-import android.view.WindowManager
 import android.widget.*
-import java.io.File
 import java.text.DateFormat
 import java.util.Date
-import java.util.Locale
-import java.util.UUID
 
-class RecordingActivity : Activity() {
+class RecordingActivity : Activity(), RecordingService.Listener {
     private lateinit var views: NoteViews
     private lateinit var title: EditText
     private lateinit var timer: TextView
@@ -29,12 +29,13 @@ class RecordingActivity : Activity() {
     private lateinit var pause: Button
     private lateinit var done: Button
     private lateinit var start: Button
+    private lateinit var format: TextView
     private lateinit var waveform: WaveformView
-    private var capture: MicrophoneRecording? = null
-    private var stopping = false
-    internal val savingAudio: Boolean get() = stopping
+    private var service: RecordingService? = null
+    private val capture get() = service?.capture
+    internal val savingAudio: Boolean get() = service?.stopping == true
     private var foreground = false
-    private var interrupted = false
+    private var wantCapture = false
 
     private val handler = Handler(Looper.getMainLooper())
     private var savedNote: String? = null
@@ -42,11 +43,19 @@ class RecordingActivity : Activity() {
     private val tick = object : Runnable {
         override fun run() {
             val recording = capture ?: return
-            timer.text = String.format(Locale.ROOT, "%02d:%02d", recording.elapsedMs / 60000, recording.elapsedMs / 1000 % 60)
+            timer.text = clock(recording.elapsedMs)
             waveform.push(recording.amplitude / 32768f)
-            if (recording.elapsedMs >= MicrophoneRecording.MAX_DURATION_MS) finishRecording(true)
-            else handler.postDelayed(this, 100)
+            handler.postDelayed(this, 100)
         }
+    }
+    private val connection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName, binder: IBinder) {
+            val bound = (binder as RecordingService.Local).service
+            service = bound; bound.listener = this@RecordingActivity
+            if (bound.capture != null) { title.setText(bound.title); showRecording() }
+            else if (wantCapture) requestCapture()
+        }
+        override fun onServiceDisconnected(name: ComponentName) { service = null }
     }
 
     override fun attachBaseContext(newBase: Context) = super.attachBaseContext(AppLanguage.wrap(newBase))
@@ -68,9 +77,12 @@ class RecordingActivity : Activity() {
             maxLines = 2
         }
         views.add(content, title, top = 32)
-        val format = views.text(12f, DeckViews.muted).apply { gravity = Gravity.CENTER; setText(R.string.microphone_format) }
+        format = views.text(12f, DeckViews.muted).apply {
+            gravity = Gravity.CENTER
+            setText(if (MicrophoneRecording.extension() == "opus") R.string.microphone_format else R.string.microphone_format_aac)
+        }
         views.add(content, format, top = 12)
-        timer = views.text(64f, DeckViews.paper, true).apply { id = R.id.capture_timer; text = getString(R.string.note_clock, 0, 0); gravity = Gravity.CENTER }
+        timer = views.text(64f, DeckViews.paper, true).apply { id = R.id.capture_timer; text = clock(0); gravity = Gravity.CENTER }
         views.add(content, timer, top = 30)
         waveform = WaveformView(this, views).apply { contentDescription = getString(R.string.microphone_level) }
         views.add(content, waveform, height = views.dp(170), top = 24)
@@ -92,14 +104,7 @@ class RecordingActivity : Activity() {
         val controls = views.row()
         pause = views.button(R.string.pause_recording).apply {
             id = R.id.capture_pause; isEnabled = false
-            setOnClickListener {
-                try {
-                    capture?.togglePause()
-                    val paused = capture?.paused == true
-                    setText(if (paused) R.string.resume_recording else R.string.pause_recording)
-                    status.setText(if (paused) R.string.recording_paused else R.string.recording_active)
-                } catch (error: Exception) { recordingFailed(error) }
-            }
+            setOnClickListener { try { service?.togglePause() } catch (error: Exception) { recordingFailed(error) } }
         }
         done = views.button(R.string.finish_recording, DeckViews.paper, DeckViews.ink).apply {
             id = R.id.capture_done; isEnabled = false; setOnClickListener { finishRecording(true) }
@@ -110,75 +115,77 @@ class RecordingActivity : Activity() {
         views.add(root, controls, top = 20)
         setContentView(root)
         savedNote = savedInstanceState?.getString("savedNote")
-        if (savedNote == null && savedInstanceState == null) requestCapture()
+        wantCapture = savedNote == null && savedInstanceState == null
+        bindService(Intent(this, RecordingService::class.java), connection, Context.BIND_AUTO_CREATE)
     }
 
     private fun requestCapture() {
-        if (capture != null || stopping) return
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), MICROPHONE)
+        val bound = service ?: run { wantCapture = true; return }
+        wantCapture = false
+        if (bound.capture != null || bound.stopping) return
+        val missing = listOfNotNull(Manifest.permission.RECORD_AUDIO.takeIf { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED },
+            Manifest.permission.POST_NOTIFICATIONS.takeIf { Build.VERSION.SDK_INT >= 33 && checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED && !notificationsAsked })
+        if (Manifest.permission.RECORD_AUDIO in missing) {
+            notificationsAsked = true
+            requestPermissions(missing.toTypedArray(), MICROPHONE)
             return
         }
         permissionDenied = false
-        interrupted = false
         try {
-            val directory = File(filesDir, "documents").also { check(it.mkdirs() || it.isDirectory) }
-            capture = MicrophoneRecording(this, File(directory, "${UUID.randomUUID()}.m4a"),
-                onLimit = { finishRecording(true) }, onError = { recordingFailed(IllegalStateException("Microphone error")) })
-            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            start.visibility = View.GONE; pause.isEnabled = true; done.isEnabled = true
-            status.setText(R.string.recording_active)
-            handler.post(tick)
+            bound.begin(title.text.toString())
+            showRecording()
         } catch (error: Exception) { recordingFailed(error) }
+    }
+    private var notificationsAsked = false
+
+    private fun showRecording() {
+        start.visibility = View.GONE; pause.isEnabled = true; done.isEnabled = true
+        onRecordingChanged()
+        handler.removeCallbacks(tick); handler.post(tick)
+    }
+
+    override fun onRecordingChanged() {
+        val bound = service ?: return
+        val paused = bound.capture?.paused == true
+        pause.setText(if (paused) R.string.resume_recording else R.string.pause_recording)
+        status.setText(when {
+            bound.notice == RecordingService.Notice.NEAR_LIMIT -> R.string.recording_near_limit
+            bound.notice == RecordingService.Notice.FOCUS && paused -> R.string.recording_focus_paused
+            paused -> R.string.recording_paused
+            else -> R.string.recording_active
+        })
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode != MICROPHONE) return
-        if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) requestCapture()
+        val microphone = permissions.indexOf(Manifest.permission.RECORD_AUDIO)
+        if (microphone >= 0 && grantResults.getOrNull(microphone) == PackageManager.PERMISSION_GRANTED) requestCapture()
         else { permissionDenied = true; status.setText(R.string.microphone_permission_denied) }
     }
 
     private fun finishRecording(autoTranscribe: Boolean) {
-        val recording = capture ?: return
-        capture = null
-        stopping = true
+        val bound = service ?: return
+        if (bound.capture == null) return
+        bound.title = title.text.toString()
         handler.removeCallbacks(tick)
         pause.isEnabled = false; done.isEnabled = false
         status.setText(R.string.recording_saving)
-        val name = title.text.toString().trim().ifEmpty { getString(R.string.recording) } + ".${recording.file.extension}"
-        val previous = SessionStore(filesDir).load()
-        try {
-            val file = recording.stop()
-            saveRecording(file, recording.elapsedMs, name, previous, autoTranscribe)
-        } catch (error: Exception) {
-            recording.release()
-            stopping = false
-            recordingFailed(error)
-        }
+        bound.finish(autoTranscribe)
     }
 
-    private fun saveRecording(file: File, elapsed: Long, name: String, previous: Session, autoTranscribe: Boolean) {
-        stopping = false
-        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        try {
-            val sessions = SessionStore(filesDir)
-            val preferences = sessions.load()
-            val captured = Session(uri = Uri.fromFile(file).toString(), libraryId = UUID.randomUUID().toString(),
-                name = name, durationMs = elapsed)
-            // If another screen selected a note while the file was closing, retain that current selection.
-            // Otherwise keep a durable session reference even if updating the catalogue fails.
-            val stillCurrent = preferences.uri == previous.uri && preferences.libraryId == previous.libraryId && preferences.screen == previous.screen
-            if (stillCurrent) sessions.save(captured)
-            val session = LibraryStore(filesDir).save(captured)
-            if (stillCurrent) sessions.save(session)
-            savedNote = session.libraryId
-            if (foreground && !isDestroyed) openSavedNote(autoTranscribe && !interrupted && intent.getBooleanExtra(AUTO_TRANSCRIBE, true))
-            else if (!isDestroyed) status.setText(R.string.recording_saved_interrupted)
-        } catch (error: Exception) {
-            android.util.Log.e("Cassini", "Could not catalogue retained recording", error)
-            if (!isDestroyed) status.setText(R.string.library_error)
+    override fun onRecordingFinished(noteId: String?, autoTranscribe: Boolean, failed: Boolean) {
+        handler.removeCallbacks(tick)
+        pause.isEnabled = false; done.isEnabled = false
+        if (failed) {
+            status.setText(if (noteId != null) R.string.recording_error_saved else R.string.error_microphone)
+            start.visibility = View.VISIBLE
+            return
         }
+        if (noteId == null) { status.setText(R.string.library_error); return }
+        savedNote = noteId
+        if (foreground && !isDestroyed) openSavedNote(autoTranscribe && intent.getBooleanExtra(AUTO_TRANSCRIBE, true))
+        else if (!isDestroyed) status.setText(R.string.recording_saved_interrupted)
     }
 
     private fun openSavedNote(autoTranscribe: Boolean) {
@@ -190,10 +197,7 @@ class RecordingActivity : Activity() {
 
     private fun recordingFailed(error: Exception) {
         android.util.Log.e("Cassini", "Microphone recording failed", error)
-        val recording = capture
-        capture = null
-        recording?.release(); recording?.file?.delete()
-        handler.removeCallbacks(tick); window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        handler.removeCallbacks(tick)
         status.setText(R.string.error_microphone)
         pause.isEnabled = false; done.isEnabled = false; start.visibility = View.VISIBLE
     }
@@ -204,17 +208,17 @@ class RecordingActivity : Activity() {
         if (savedNote != null) openSavedNote(false)
         else if (permissionDenied && checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) requestCapture()
     }
-    override fun onPause() {
-        foreground = false
-        if (capture != null || stopping) interrupted = true
-        // No background service yet: finalize before leaving the foreground, retaining the note.
-        finishRecording(false)
-        super.onPause()
-    }
+    // Capture continues in RecordingService while this screen is hidden or the display is off.
+    override fun onPause() { foreground = false; if (capture != null) service?.title = title.text.toString(); super.onPause() }
     @Deprecated("Framework back callback")
     override fun onBackPressed() { if (capture != null) finishRecording(true) else super.onBackPressed() }
     override fun onSaveInstanceState(outState: Bundle) { outState.putString("savedNote", savedNote); super.onSaveInstanceState(outState) }
-    override fun onDestroy() { handler.removeCallbacks(tick); capture?.release(); super.onDestroy() }
+    override fun onDestroy() {
+        handler.removeCallbacks(tick)
+        service?.let { if (it.listener === this) it.listener = null }
+        unbindService(connection); service = null
+        super.onDestroy()
+    }
 
     private class WaveformView(context: Context, private val views: NoteViews) : View(context) {
         private val levels = ArrayDeque<Float>()

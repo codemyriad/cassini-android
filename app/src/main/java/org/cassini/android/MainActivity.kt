@@ -798,7 +798,6 @@ class MainActivity : Activity() {
         player?.release()
         super.onDestroy()
     }
-    private fun clock(ms: Long) = String.format(Locale.ROOT, "%02d:%02d", ms / 60000, ms / 1000 % 60)
     private fun maybeAutoTranscribe() {
         if (autoTranscribe && !busy && models.ready() && session.uri != null) {
             autoTranscribe = false

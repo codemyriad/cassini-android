@@ -128,7 +128,7 @@ class LibraryActivity : Activity() {
             val titleRow = views.row()
             views.add(titleRow, views.text(20f).apply { text = note.session.name; maxLines = 2; typeface = android.graphics.Typeface.DEFAULT_BOLD }, 0, weight = 1f)
             views.add(titleRow, views.text(12f, DeckViews.muted, true).apply {
-                text = getString(R.string.note_clock, note.session.durationMs / 60000, note.session.durationMs / 1000 % 60)
+                text = clock(note.session.durationMs)
                 setPadding(views.dp(12), 0, 0, 0)
             }, -2)
             views.add(card, titleRow)
