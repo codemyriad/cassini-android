@@ -271,7 +271,10 @@ class SpeakerIdentificationTest {
             val named = awaitDocument(first); made = made + named
             val anna = app.voices.load().single()
             assertEquals("Anna", anna.name)
-            val speaker = CassiniDocument.read(File(named)).let { doc -> listOf("spk_1", "spk_2", "spk_0").first { doc.speakerLabel(it) == "Anna" } }
+            val speaker = CassiniDocument.read(File(named)).let { doc ->
+                val speakers = doc.manifest!!.getJSONArray("speakers")
+                (0 until speakers.length()).map { speakers.getJSONObject(it).getString("id") }.firstOrNull { doc.speakerLabel(it) == "Anna" }
+                    ?: throw AssertionError("No speaker is named Anna in $named (was $first): $speakers") }
             waitFor(scenario) { it.findViewById<Button>(R.id.more_button).isEnabled }
             onView(withId(R.id.more_button)).perform(click())
             onView(withText(R.string.transcribe_again)).inRoot(androidx.test.espresso.matcher.RootMatchers.isPlatformPopup()).perform(click())
