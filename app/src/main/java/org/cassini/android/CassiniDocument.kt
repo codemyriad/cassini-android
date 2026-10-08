@@ -2,7 +2,10 @@ package org.cassini.android
 
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.InputStream
 import java.time.Instant
 import java.util.Locale
 import java.util.UUID
@@ -30,12 +33,13 @@ internal data class CassiniDocument(
         private val idPattern = Regex("[a-z0-9][a-z0-9-]{0,31}")
         private val fields = linkedMapOf("mime" to "MIME", "encoding" to "ENCODING", "chunkCount" to "CHUNK_COUNT",
             "sha256" to "SHA256", "rawBytes" to "RAW_BYTES", "gzipBytes" to "GZIP_BYTES")
-        fun read(bytes: ByteArray): CassiniDocument {
-            val stream = try { OggOpus.read(bytes) } catch (_: Exception) {
-                // Audio corruption must not conceal an otherwise intact manifest/transcript.
-                try { OggOpus.read(bytes, headersOnly = true) } catch (_: Exception) { return CassiniDocument("plain-audio") }
-            }
-            val comments = try { readComments(stream.tags) } catch (_: Exception) { return CassiniDocument("invalid-cassini-metadata") }
+        fun read(bytes: ByteArray) = read { ByteArrayInputStream(bytes) }
+        /** Streams [file]; without [verify] only the headers are read and the audio stays unverified. */
+        fun read(file: File, verify: Boolean = true) = read(verify) { file.inputStream().buffered() }
+        private fun read(verify: Boolean = true, open: () -> InputStream): CassiniDocument {
+            // Audio corruption must not conceal an otherwise intact manifest/transcript.
+            val (head, tagPacket) = try { open().use(OggOpus::headers) } catch (_: Exception) { return CassiniDocument("plain-audio") }
+            val comments = try { readComments(tagPacket) } catch (_: Exception) { return CassiniDocument("invalid-cassini-metadata") }
             val tags = linkedMapOf<String, String>()
             val duplicates = mutableListOf<String>()
             comments.forEach { comment ->
@@ -86,8 +90,10 @@ internal data class CassiniDocument(
                 if (tags["CASSINI_AUDIO_$suffix"] != integrity.opt(field)?.toString()) warnings += "tag-manifest-disagreement: CASSINI_AUDIO_$suffix"
             }
             var state = "unverified"
-            if (integrity.keys().asSequence().toSet() == integrityKeys && integrity.optString("matchPolicy") == "exact-opus-audio-v1" && warnings.isEmpty()) {
+            if (verify && integrity.keys().asSequence().toSet() == integrityKeys && integrity.optString("matchPolicy") == "exact-opus-audio-v1" && warnings.isEmpty()) {
                 try {
+                    val stream = open().use(OggOpus::scan)
+                    require(stream.head.contentEquals(head))
                     val digest = stream.digest()
                     val shapeMatches = number(audio, "sampleRate") == 48000L && number(audio, "channels") == stream.channels.toLong() &&
                         number(audio, "sampleCount") == stream.sampleCount && number(audio, "durationMs") == stream.durationMs &&
@@ -170,7 +176,23 @@ internal data class CassiniDocument(
         /** Adds a variant while retaining existing descriptors, bodies, extensions and unrelated tags. */
         fun create(audioBytes: ByteArray, transcript: Transcript, title: String, processing: JSONObject,
                    existing: CassiniDocument? = null, speakerLabels: Map<String, String> = emptyMap()): ByteArray {
-            val stream = OggOpus.read(audioBytes); val digest = stream.digest()
+            val (tags, digest) = seal(OggOpus.scan(ByteArrayInputStream(audioBytes)), transcript, title, processing, existing, speakerLabels)
+            val out = ByteArrayOutputStream()
+            require(OggOpus.rewrite(ByteArrayInputStream(audioBytes), tags, out).digest() == digest)
+            return out.toByteArray().also { verify(read(it), transcript) }
+        }
+        /** Streams [audio] into [target] behind the new tags and verifies the written file from disk. */
+        fun create(audio: File, transcript: Transcript, title: String, processing: JSONObject, existing: CassiniDocument?,
+                   speakerLabels: Map<String, String>, target: File): CassiniDocument {
+            val (tags, digest) = seal(OggOpus.scan(audio), transcript, title, processing, existing, speakerLabels)
+            require(OggOpus.rewrite(audio, tags, target).digest() == digest)
+            return read(target).also { verify(it, transcript) }
+        }
+        private fun verify(sealed: CassiniDocument, transcript: Transcript) =
+            require(sealed.state == "ok" && sealed.selected(null)?.transcript == transcript)
+        private fun seal(stream: OggOpus.Info, transcript: Transcript, title: String, processing: JSONObject,
+                         existing: CassiniDocument?, speakerLabels: Map<String, String>): Pair<ByteArray, String> {
+            val digest = stream.digest()
             require(existing == null || existing.state == "ok") // Never rebind stale transcripts to different audio.
             val now = Instant.now().toString()
             val manifest = existing?.manifest?.let { JSONObject(it.toString()) } ?: JSONObject()
@@ -218,10 +240,7 @@ internal data class CassiniDocument(
             if (existing == null && comments.none { it.substringBefore('=').equals("TITLE", true) }) comments += "TITLE=${manifest.getJSONObject("meeting").getString("title")}" 
             comments += bodyTags
             comments += CassiniPayload.encode(MANIFEST_PREFIX, CassiniPayload.MIME, manifest.toString()).second
-            val result = OggOpus.mux(stream, tagsPacket(comments))
-            val sealed = read(result)
-            require(sealed.state == "ok" && sealed.selected(null)?.transcript == transcript && OggOpus.read(result).digest() == digest)
-            return result
+            return tagsPacket(comments) to digest
         }
     }
 }

@@ -126,8 +126,7 @@ object AudioDecoder {
         try {
             // Android's Opus decoder removes pre-skip but can expose the final frame's padding.
             // Trust the independently verified Ogg EOS sample count, not codec buffer length.
-            val opusSamples = if (file.length() > OggOpus.MAX_FILE_BYTES) null
-                else try { OggOpus.read(file.readBytes()).also { it.digest() }.sampleCount } catch (_: Exception) { null }
+            val opusSamples = try { OggOpus.scan(file).also { it.digest() }.sampleCount } catch (_: Exception) { null }
             extractor.setDataSource(file.absolutePath)
             val track = (0 until extractor.trackCount).firstOrNull {
                 extractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true

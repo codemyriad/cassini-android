@@ -140,7 +140,7 @@ class MainActivity : Activity() {
         defaultStatus()
         session.uri?.let { preparePlayer(Uri.parse(it)) }
         session.document?.takeIf { !viewing }?.let { path -> runWork(R.string.opening_document) {
-            val loaded = CassiniDocument.read(File(path).readBytes())
+            val loaded = CassiniDocument.read(File(path))
             onUi { adoptDocument(loaded); renderScreen(); defaultStatus() }
         } }
         if (viewing) intent.data?.let { importFile(it) }
