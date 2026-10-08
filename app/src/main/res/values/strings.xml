@@ -12,28 +12,22 @@
     <string name="model_installed">installed</string>
     <string name="model_download_needed">download needed</string>
     <string name="app_version">Cassini · version %1$s</string>
-    <string name="open_audio">Open file</string>
-    <string name="change_audio">Change file</string>
     <string name="transcribe">Transcribe</string>
     <string name="transcribe_again">Transcribe again</string>
     <string name="recording">Recording</string>
     <string name="no_file">No tape loaded</string>
-    <string name="on_device">ON DEVICE</string>
     <string name="model_ready">%1$s · ready</string>
     <string name="model_missing">%1$s · download needed</string>
-    <string name="download_model">Download model · %1$s</string>
     <string name="model_size_int8">640 MiB</string>
     <string name="preparing_download">Preparing download…</string>
     <string name="downloading">Downloading model · %1$d%%</string>
     <string name="verifying">Checking model · %1$d%%</string>
-    <string name="download_complete">Model ready. Everything runs on this phone.</string>
     <string name="decoding">Reading audio…</string>
     <string name="transcribing">Transcribing… keep the app open.</string>
     <string name="transcribing_progress">Transcribing · %1$d%% · %2$.1f× realtime · about %3$d s left</string>
     <string name="file_ready">Ready when you are.</string>
     <string name="transcript">TRANSCRIPT</string>
     <string name="export">Save Cassini</string>
-    <string name="export_description">Save audio, timed words and metadata together as a Cassini Opus document</string>
     <string name="saving">Saving Cassini document…</string>
     <string name="saved">Cassini saved · audio and transcript together.</string>
     <string name="empty_title">Load a tape.</string>
@@ -72,7 +66,7 @@
     <string name="italian_name" translatable="false">Italiano</string>
     <string name="recognition_model">Transcription model</string>
     <string name="about">About this prototype</string>
-    <string name="about_body">Parakeet v3 on your phone. Audio stays local.\n\nRecord voice notes, search past transcriptions, and save portable Cassini Opus documents with audio and timed words.\n\nAudio up to 2 hours, one unidentified voice, automatic multilingual recognition. The current transcript language label is Italian.\n\nGPLv3. Source and dependency notices: github.com/codemyriad/cassini-android</string>
+    <string name="about_body">Parakeet v3 on your phone. Audio stays local.\n\nRecord voice notes, search past transcriptions, and save portable Cassini Opus documents with audio and timed words.\n\nAudio up to 2 hours, speakers labelled and recognised on the phone (voices never leave it), automatic multilingual recognition. The current transcript language label is Italian.\n\nGPLv3. Source and dependency notices: github.com/codemyriad/cassini-android</string>
     <string name="done">Done</string>
     <string name="cancel">Cancel</string>
     <string name="error_open">Could not open this recording. Choose the file again.</string>
@@ -101,7 +95,6 @@
     <string name="cassini_document">CASSINI / AUDIO + TRANSCRIPT</string>
     <string name="document_info">Info</string>
     <string name="choose_transcript">Choose transcript</string>
-    <string name="selected_transcript">Transcript · %1$s ▾</string>
     <string name="variant_unavailable">Transcript unavailable</string>
     <string name="variant_unavailable_hint">The audio is still playable. Try another transcript if this document has one.</string>
     <string name="document_verified">Cassini · audio verified</string>
@@ -150,7 +143,6 @@
     <string name="library_saved_document">Saved document</string>
     <string name="transcript_draft">Draft · words and timings may change</string>
     <string name="recording_saving">Saving audio…</string>
-    <string name="identify_speakers">Identify speakers</string>
     <string name="speaker_label">Speaker %1$d</string>
     <string name="rename_speaker_title">Who is speaking?</string>
     <string name="speaker_name_hint">Name</string>
@@ -168,13 +160,9 @@
     <string name="speaker_same_person_no">Someone else</string>
     <string name="matching_voices">Recognising voices…</string>
     <string name="speakers_menu">Speakers…</string>
-    <string name="speaker_models_download">Download speaker models?</string>
-    <string name="speaker_models_summary">This optional download is about 62 MiB (99 MiB once installed). It tells apart up to 8 voices on your phone after transcription, and keeps the original transcript. Labels are guesses, especially when voices overlap. Keep the app open.</string>
     <string name="identifying_speakers">Identifying speakers…</string>
     <string name="identifying_speakers_progress">Identifying speakers: %1$d%%</string>
-    <string name="speakers_complete">%1$d speaker labels added in %2$.1f s. Check the labels against the audio.</string>
     <string name="error_speakers">No speaker turns were found. The original transcript is unchanged.</string>
-    <string name="download_speaker_models">Download and identify</string>
     <string name="microphone_format_aac">Microphone · mono AAC · 48 kHz</string>
     <string name="recording_recovered">Recovered recording</string>
     <string name="recording_channel">Recording</string>
