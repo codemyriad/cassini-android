@@ -252,17 +252,33 @@ class MainActivity : Activity() {
             }
             checkActive()
             val speakerTurns = turns
-            if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0 && speakerTurns != null && attributed != null && voiceprintModel.ready()) try {
-                // Tuning aid for the match thresholds: speaker-to-speaker similarity within this note.
-                val prints = Voiceprints.compute(File(voiceprintModel.modelPath), audio,
+            val app = application as CassiniApplication
+            val printModel = VoiceprintModel.model.sha256
+            // Naming speakers is best effort, like telling them apart: any failure keeps "Speaker N".
+            val prints: Map<String, SpeakerPrint> = if (speakerTurns == null || attributed == null || !voiceprintModel.ready()) emptyMap() else try {
+                val computed = Voiceprints.compute(File(voiceprintModel.modelPath), audio,
                     Voiceprints.select(speakerTurns, attributed.transcript.words, audio.sampleRate, audio.samples.size)) { checkActive() }
-                for ((a, first) in prints) for ((b, second) in prints) if (a < b)
-                    Log.d(TAG, "Voiceprint similarity $a/$b: ${"%.3f".format(java.util.Locale.ROOT, Voiceprints.cosine(first.first, second.first))}")
-            } catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error; Log.w(TAG, "Voiceprints failed", error) }
-            catch (error: RuntimeException) { Log.w(TAG, "Voiceprints failed", error) }
+                val matches = VoiceMatcher.match(computed.mapValues { it.value.first }, app.voices.load(), printModel, Voiceprints.THRESHOLDS.getValue(printModel))
+                if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) for ((id, print) in computed)
+                    Log.d(TAG, "Voiceprint $id ${"%.1f".format(java.util.Locale.ROOT, print.second)} s: ${matches[id]?.let { "${it.state} ${"%.3f".format(java.util.Locale.ROOT, it.score)}" } ?: "no match"}")
+                computed.mapValues { (id, print) -> SpeakerPrint(print.first, print.second, matches[id]) }
+            } catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error; Log.w(TAG, "Voiceprints failed", error); emptyMap() }
+            catch (error: RuntimeException) { Log.w(TAG, "Voiceprints failed", error); emptyMap() }
+            catch (error: OutOfMemoryError) { Log.w(TAG, "Voiceprints failed", error); emptyMap() }
+            checkActive()
+            val names = app.voices.load().associate { it.id to it.name }
             val labels = attributed?.transcript?.words?.map { it.speaker }?.distinct()?.mapIndexed { index, id ->
-                id to getString(R.string.speaker_label, index + 1)
+                id to (prints[id]?.match?.takeIf { it.state == Match.State.AUTO }?.let { names[it.voiceId] } ?: getString(R.string.speaker_label, index + 1))
             }?.toMap().orEmpty()
+            // Counts only: which person a voice resembles never enters the document.
+            if (attributed != null && speakerTurns != null && voiceprintModel.ready()) {
+                val t = Voiceprints.THRESHOLDS.getValue(printModel)
+                attributed.processing.put("x-speakerIdentification", JSONObject()
+                    .put("model", "3dspeaker_speech_campplus_sv_en_voxceleb_16k").put("sha256", printModel).put("dim", prints.values.firstOrNull()?.embedding?.size ?: 512)
+                    .put("metric", "cosine").put("autoThreshold", t.auto.toDouble()).put("suggestThreshold", t.suggest.toDouble()).put("margin", t.margin.toDouble())
+                    .put("speakersWithPrints", prints.size).put("autoApplied", prints.values.count { it.match?.state == Match.State.AUTO && it.match.voiceId in names })
+                    .put("suggested", prints.values.count { it.match?.state == Match.State.SUGGESTED }))
+            }
             onUi { ui.progress.isIndeterminate = true; setStatus(R.string.packaging_document) }
             val (file, portable) = documents.create(uri, { audio }, attributed?.transcript ?: transcript, session.name,
                 attributed?.processing ?: recognition, document, labels)
@@ -281,6 +297,9 @@ class MainActivity : Activity() {
                     adoptDocument(portable)
                     preparePlayer(Uri.fromFile(file))
                     persistSession()
+                    portable.manifest?.optJSONObject("meeting")?.optString("id")?.takeIf { it.isNotEmpty() && prints.isNotEmpty() }?.let { meeting ->
+                        try { app.noteVoices.merge(meeting, printModel, prints) } catch (error: Exception) { Log.w(TAG, "Could not save voiceprints", error) }
+                    }
                     renderScreen()
                     if (attributed == null && transcript.words.isNotEmpty()) setStatus(R.string.speakers_unavailable) else defaultStatus()
                 }
