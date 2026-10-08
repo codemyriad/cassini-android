@@ -47,7 +47,7 @@ class ProcessingService : Service() {
                 if (worker == null && noteId != null) begin(ProcessingJobs.interrupted(filesDir)?.takeIf { it.noteId == noteId }
                     ?.copy(speakers = speakers(intent), failure = null)
                     ?: ProcessingJob(noteId, name, speakers(intent)))
-                else if (worker != null) startInForeground(ProcessingJobs.current ?: ProcessingJob(noteId.orEmpty(), name, speakers(intent)))
+                else if (worker != null) { if (!startInForeground(ProcessingJobs.current ?: ProcessingJob(noteId.orEmpty(), name, speakers(intent)))) stopSelfResult(startId) }
                 else { startInForeground(ProcessingJob("", name, false)); stopSelfResult(startId) }
             }
             CANCEL -> cancel()
@@ -61,7 +61,13 @@ class ProcessingService : Service() {
 
     private fun begin(initial: ProcessingJob) {
         val job = initial.copy(attempts = initial.attempts + 1, phase = ProcessingJob.Phase.QUEUED, pending = emptyList())
-        startInForeground(job)
+        if (!startInForeground(job)) {
+            // The system refused the foreground start: the job waits, counted, for a later app open.
+            ProcessingJobs.running = false
+            ProcessingJobs.update(filesDir, job.copy(phase = ProcessingJob.Phase.PAUSED, failure = Failure.TIME_LIMIT, pending = emptyList()), persist = true)
+            stopSelfResult(lastStartId)
+            return
+        }
         cancelled = false
         stoppedBySystem = false
         ProcessingJobs.running = true
@@ -102,11 +108,19 @@ class ProcessingService : Service() {
         worker?.start()
     }
 
-    private fun startInForeground(job: ProcessingJob) {
+    /** False when the system refuses the foreground start (ForegroundServiceStartNotAllowedException, e.g. a background start or, once targeting 35, the dataSync time limit). */
+    private fun startInForeground(job: ProcessingJob): Boolean {
         val notification = notification(job)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) startForeground(NOTIFICATION, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
-        else startForeground(NOTIFICATION, notification)
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) startForeground(NOTIFICATION, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+            else startForeground(NOTIFICATION, notification)
+            true
+        } catch (error: IllegalStateException) {
+            Log.w(TAG, "Foreground start refused", error)
+            false
+        }
     }
+
 
     /** From the work thread. The notification moves at most once a second. */
     private fun progress(job: ProcessingJob, persist: Boolean) {

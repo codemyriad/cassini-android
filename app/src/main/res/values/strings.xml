@@ -92,6 +92,7 @@
     <string name="error_save">Could not save the transcript. Choose another location.</string>
     <string name="error_memory">Not enough memory. Try a shorter clip and close other apps.</string>
     <string name="error_cancelled">Operation cancelled.</string>
+    <string name="error_time_limit">Android paused transcription in the background. Open Cassini to continue.</string>
     <string name="error_unknown">Something went wrong. Please try again.</string>
     <string name="error_playback">Playback is unavailable for this file.</string>
     <string name="busy_description">Processing</string>

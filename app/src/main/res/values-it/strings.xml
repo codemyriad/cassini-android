@@ -89,6 +89,7 @@
     <string name="error_save">Impossibile salvare la trascrizione. Scegli un’altra destinazione.</string>
     <string name="error_memory">Memoria insufficiente. Prova una clip più breve e chiudi altre app.</string>
     <string name="error_cancelled">Operazione annullata.</string>
+    <string name="error_time_limit">Android ha sospeso la trascrizione in background. Apri Cassini per continuare.</string>
     <string name="error_unknown">Qualcosa non ha funzionato. Riprova.</string>
     <string name="error_playback">Riproduzione non disponibile per questo file.</string>
     <string name="busy_description">Elaborazione in corso</string>

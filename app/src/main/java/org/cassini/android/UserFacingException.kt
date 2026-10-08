@@ -9,6 +9,7 @@ enum class Failure(val stringRes: Int) {
     SPEAKERS(R.string.error_speakers),
     MEMORY(R.string.error_memory), CANCELLED(R.string.error_cancelled), UNKNOWN(R.string.error_unknown),
     PLAYBACK(R.string.error_playback), OPUS_ENCODER(R.string.error_opus_encoder),
+    TIME_LIMIT(R.string.error_time_limit),
 }
 
 /** Keep stable failure codes separate from localized copy and native diagnostic messages. */
