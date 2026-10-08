@@ -66,6 +66,8 @@ class DeckViews(private val context: Context) {
     val cancelOperation = button(R.string.cancel).apply { id = R.id.cancel_operation; visibility = View.GONE }
     val download = button(R.string.download_model).apply { id = R.id.download_button }
     val status = text(12f, muted).apply { id = R.id.operation_status; setPadding(0, dp(8), 0, dp(8)); accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE }
+    /** Time left of the running job, right-aligned beside [status]; empty when there is no estimate. */
+    val eta = text(12f, muted, true).apply { id = R.id.operation_eta; setPadding(dp(8), dp(8), 0, dp(8)); gravity = Gravity.END }
     val progress = ProgressBar(context, null, android.R.attr.progressBarStyleHorizontal).apply {
         id = R.id.operation_progress; max = 100; visibility = View.GONE; contentDescription = context.getString(R.string.busy_description)
     }
@@ -138,7 +140,10 @@ class DeckViews(private val context: Context) {
         content.add(actions, marginTop = 10)
         content.add(speakers, marginTop = 8)
         content.add(download, marginTop = 8)
-        content.add(status)
+        val statusRow = row()
+        statusRow.add(status, 0, weight = 1f)
+        statusRow.add(eta, LinearLayout.LayoutParams.WRAP_CONTENT)
+        content.add(statusRow)
         content.add(progress, height = dp(3))
         content.add(cancelOperation, marginTop = 8)
         val transcriptHeading = row().apply { setPadding(0, dp(16), 0, dp(8)) }

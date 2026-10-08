@@ -494,8 +494,10 @@ class MainActivity : Activity(), ProcessingJobs.Listener {
             ProcessingJob.Phase.DIARIZE -> if (speed == null || job.doneMs <= 0) setStatus(R.string.identifying_speakers)
                 else setStatus(R.string.identifying_speakers_speed, job.percent, speed)
             else -> if (speed == null || remaining == null) setStatus(R.string.transcribing)
-                else setStatus(R.string.transcribing_progress, job.percent, speed, (remaining + 999) / 1000)
+                else setStatus(R.string.transcribing_progress, job.percent, speed)
         }
+        val measured = speed != null && remaining != null && job.doneMs > 0 && job.phase != ProcessingJob.Phase.PACKAGE
+        ui.eta.text = if (measured) clock(remaining!! + 999) else ""
         if (job.phase != ProcessingJob.Phase.ASR) { refreshControls(); return }
         val words = ProcessingJobs.settled
         val follow = ui.scroll.getChildAt(0).height - ui.scroll.height - ui.scroll.scrollY <= ui.scroll.height / 4
@@ -548,6 +550,7 @@ class MainActivity : Activity(), ProcessingJobs.Listener {
 
     private fun onUi(action: () -> Unit) = runOnUiThread { if (!isDestroyed) action() }
     private fun setStatus(resource: Int, vararg args: Any, error: Boolean = false) {
+        ui.eta.text = ""
         ui.status.text = getString(resource, *args)
         ui.status.setTextColor(if (error) DeckViews.warning else DeckViews.muted)
     }

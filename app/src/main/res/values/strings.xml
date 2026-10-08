@@ -29,7 +29,7 @@
     <string name="download_complete">Model ready. Everything runs on this phone.</string>
     <string name="decoding">Reading audio…</string>
     <string name="transcribing">Transcribing… you can leave this screen, open or play other notes, and record.</string>
-    <string name="transcribing_progress">Transcribing · %1$d%% · %2$.1f× realtime · about %3$d s left</string>
+    <string name="transcribing_progress">Transcribing · %1$d%% · %2$.1f×</string>
     <string name="file_ready">Ready when you are.</string>
     <string name="transcript">TRANSCRIPT</string>
     <string name="export">Save Cassini</string>
@@ -169,7 +169,7 @@
     <string name="processing_channel">Transcription</string>
     <string name="processing_title_transcribing">Transcribing %1$s</string>
     <string name="processing_title_speakers">Identifying speakers in %1$s</string>
-    <string name="processing_notification_progress">%1$d%% · %2$.1f× · about %3$s left</string>
+    <string name="processing_notification_progress">%1$d%% · %2$.1f× · %3$s</string>
     <string name="processing_done">Ready: %1$s</string>
     <plurals name="processing_failed_partial">
         <item quantity="one">Processing stopped. %1$d word kept: open the note to continue.</item>
@@ -181,7 +181,8 @@
     <string name="processing_other_note">Another note is being processed. Try again when it is done.</string>
     <string name="partial_transcript">Partial transcript up to %1$s. Processing stopped: tap Transcribe to continue.</string>
     <string name="library_processing">Transcribing · %1$d%%</string>
+    <string name="library_processing_eta">Transcribing · %1$d%% · %2$.1f× · %3$s</string>
     <string name="library_processing_speed">Transcribing · %1$d%% · %2$.1f×</string>
     <string name="library_partial">Partial transcript</string>
-    <string name="identifying_speakers_speed">Identifying speakers · %1$d%% · %2$.1f× realtime</string>
+    <string name="identifying_speakers_speed">Identifying speakers · %1$d%% · %2$.1f×</string>
 </resources>

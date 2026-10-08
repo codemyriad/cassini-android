@@ -181,7 +181,7 @@ class ProcessingService : Service() {
         val text = when {
             job.phase == ProcessingJob.Phase.PACKAGE -> getString(R.string.packaging_document)
             job.phase == ProcessingJob.Phase.QUEUED || job.phase == ProcessingJob.Phase.DECODE -> getString(R.string.decoding)
-            speed != null && remaining != null && job.doneMs > 0 -> getString(R.string.processing_notification_progress, job.percent, speed, clock(remaining))
+            speed != null && remaining != null && job.doneMs > 0 -> getString(R.string.processing_notification_progress, job.percent, speed, clock(remaining + 999))
             else -> getString(if (job.phase == ProcessingJob.Phase.DIARIZE) R.string.identifying_speakers else R.string.transcribing)
         }
         val stop = PendingIntent.getService(this, 1, Intent(this, ProcessingService::class.java).setAction(CANCEL),

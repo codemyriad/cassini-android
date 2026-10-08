@@ -28,7 +28,7 @@
     <string name="download_complete">Modello pronto. Tutto viene elaborato sul telefono.</string>
     <string name="decoding">Lettura dell’audio…</string>
     <string name="transcribing">Trascrizione in corso… puoi lasciare questa schermata, aprire o ascoltare altre note e registrare.</string>
-    <string name="transcribing_progress">Trascrizione · %1$d%% · %2$.1f× tempo reale · circa %3$d s rimanenti</string>
+    <string name="transcribing_progress">Trascrizione · %1$d%% · %2$.1f×</string>
     <string name="file_ready">Pronto quando vuoi.</string>
     <string name="transcript">TRASCRIZIONE</string>
     <string name="export">Salva Cassini</string>
@@ -166,7 +166,7 @@
     <string name="processing_channel">Trascrizione</string>
     <string name="processing_title_transcribing">Trascrizione di %1$s</string>
     <string name="processing_title_speakers">Distinzione delle voci in %1$s</string>
-    <string name="processing_notification_progress">%1$d%% · %2$.1f× · circa %3$s rimanenti</string>
+    <string name="processing_notification_progress">%1$d%% · %2$.1f× · %3$s</string>
     <string name="processing_done">Pronta: %1$s</string>
     <plurals name="processing_failed_partial">
         <item quantity="one">Elaborazione interrotta. %1$d parola conservata: apri la nota per continuare.</item>
@@ -179,7 +179,8 @@
     <string name="processing_other_note">È in corso l’elaborazione di un’altra nota. Riprova quando è finita.</string>
     <string name="partial_transcript">Trascrizione parziale fino a %1$s. Elaborazione interrotta: tocca Trascrivi per continuare.</string>
     <string name="library_processing">Trascrizione · %1$d%%</string>
+    <string name="library_processing_eta">Trascrizione · %1$d%% · %2$.1f× · %3$s</string>
     <string name="library_processing_speed">Trascrizione · %1$d%% · %2$.1f×</string>
     <string name="library_partial">Trascrizione parziale</string>
-    <string name="identifying_speakers_speed">Distinzione delle voci · %1$d%% · %2$.1f× tempo reale</string>
+    <string name="identifying_speakers_speed">Distinzione delle voci · %1$d%% · %2$.1f×</string>
 </resources>

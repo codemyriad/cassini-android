@@ -139,7 +139,9 @@ class LibraryActivity : Activity(), ProcessingJobs.Listener {
 
     private fun progressText(job: ProcessingJob): String {
         val speed = job.speed
-        return if (speed != null && job.doneMs > 0) getString(R.string.library_processing_speed, job.percent, speed)
+        val remaining = job.remainingMs
+        return if (speed != null && remaining != null && job.doneMs > 0) getString(R.string.library_processing_eta, job.percent, speed, clock(remaining + 999))
+            else if (speed != null && job.doneMs > 0) getString(R.string.library_processing_speed, job.percent, speed)
             else getString(R.string.library_processing, job.percent)
     }
 
