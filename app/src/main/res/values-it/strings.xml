@@ -152,6 +152,16 @@
     <string name="rename_speaker_title">Chi sta parlando?</string>
     <string name="speaker_name_hint">Nome</string>
     <string name="speaker_renamed">Salvato come %1$s</string>
+    <string name="speaker_remember">Ricorda questa voce su questo telefono</string>
+    <string name="speaker_too_short">Troppo poco parlato per ricordare questa voce</string>
+    <string name="speaker_not_this_person">Non è questa persona</string>
+    <string name="speaker_suggestion">%1$s?</string>
+    <string name="speaker_auto_mark">auto</string>
+    <string name="speaker_person_likely">%1$s (probabile)</string>
+    <string name="speaker_same_person">È la stessa persona salvata come “%1$s”?</string>
+    <string name="speaker_same_person_yes">Stessa persona</string>
+    <string name="speaker_same_person_no">Un’altra persona</string>
+    <string name="matching_voices">Riconoscimento delle voci…</string>
     <string name="speakers_menu">Voci…</string>
     <string name="speaker_models_download">Scaricare i modelli per le voci?</string>
     <string name="speaker_models_summary">Questo download facoltativo occupa circa 62 MiB (99 MiB una volta installato). Distingue fino a 8 voci sul telefono dopo la trascrizione, mantenendo il testo originale. Le etichette sono stime, soprattutto quando le voci si sovrappongono. Tieni aperta l’app.</string>

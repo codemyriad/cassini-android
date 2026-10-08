@@ -32,4 +32,6 @@
     <item name="more_button" type="id" />
     <item name="cancel_operation" type="id" />
     <item name="speaker_name_input" type="id" />
+    <item name="speaker_remember" type="id" />
+    <item name="speaker_people_list" type="id" />
 </resources>

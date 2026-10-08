@@ -61,6 +61,10 @@ class MainActivity : Activity() {
     private var pendingSpeaker: String? = null
     private var pendingName: String? = null
     private var speakerDialog: AlertDialog? = null
+    /** This note's speaker prints and matches and the saved people, app-private; reloaded when a document is adopted. */
+    private var notePrints: Map<String, SpeakerPrint> = emptyMap()
+    private var people: Map<String, Voice> = emptyMap()
+    private val app get() = application as CassiniApplication
 
     override fun attachBaseContext(newBase: Context) = super.attachBaseContext(AppLanguage.wrap(newBase))
 
@@ -252,10 +256,10 @@ class MainActivity : Activity() {
             }
             checkActive()
             val speakerTurns = turns
-            val app = application as CassiniApplication
             val printModel = VoiceprintModel.model.sha256
             // Naming speakers is best effort, like telling them apart: any failure keeps "Speaker N".
             val prints: Map<String, SpeakerPrint> = if (speakerTurns == null || attributed == null || !voiceprintModel.ready()) emptyMap() else try {
+                onUi { ui.progress.isIndeterminate = true; setStatus(R.string.matching_voices) }
                 val computed = Voiceprints.compute(File(voiceprintModel.modelPath), audio,
                     Voiceprints.select(speakerTurns, attributed.transcript.words, audio.sampleRate, audio.samples.size)) { checkActive() }
                 val matches = VoiceMatcher.match(computed.mapValues { it.value.first }, app.voices.load(), printModel, Voiceprints.THRESHOLDS.getValue(printModel))
@@ -300,6 +304,7 @@ class MainActivity : Activity() {
                     portable.manifest?.optJSONObject("meeting")?.optString("id")?.takeIf { it.isNotEmpty() && prints.isNotEmpty() }?.let { meeting ->
                         try { app.noteVoices.merge(meeting, portable.defaultId ?: return@let, printModel, prints) } catch (error: Exception) { Log.w(TAG, "Could not save voiceprints", error) }
                     }
+                    loadVoices()
                     renderScreen()
                     if (attributed == null && transcript.words.isNotEmpty()) setStatus(R.string.speakers_unavailable) else defaultStatus()
                 }
@@ -373,7 +378,29 @@ class MainActivity : Activity() {
                 ?.optJSONObject(selected?.id.orEmpty())?.optLong("x-inferenceMs", session.inferenceMs) ?: session.inferenceMs
             session = session.copy(transcript = selected?.transcript, selectedVariant = selected?.id, inferenceMs = inference)
         }
+        loadVoices()
         highlightedWord = -1
+    }
+
+    private fun meetingId() = document?.manifest?.optJSONObject("meeting")?.optString("id")?.takeIf { it.isNotEmpty() }
+
+    private fun loadVoices() {
+        val meeting = meetingId(); val variant = session.selectedVariant
+        notePrints = if (meeting == null || variant == null) emptyMap() else try { app.noteVoices.load(meeting, variant) }
+            catch (error: Exception) { Log.w(TAG, "Could not load voiceprints", error); emptyMap() }
+        people = app.voices.load().associateBy { it.id }
+    }
+
+    /** The suggestion or auto mark after a speaker label: a saved person this voice resembles. */
+    private fun speakerMark(speaker: String, label: String): Pair<String, () -> Unit>? {
+        val match = notePrints[speaker]?.match ?: return null
+        val person = people[match.voiceId] ?: return null
+        return when {
+            match.state == Match.State.SUGGESTED && isDefaultLabel(speaker, label) ->
+                getString(R.string.speaker_suggestion, person.name) to { applySpeakerName(speaker, person.name, person.id, remember = true) }
+            match.state == Match.State.AUTO && label == person.name -> getString(R.string.speaker_auto_mark) to { showSpeakerDialog(speaker) }
+            else -> null
+        }
     }
 
     private fun canRename() = document?.state == "ok" && interim == null && !busy
@@ -398,21 +425,39 @@ class MainActivity : Activity() {
         if (!canRename()) return
         val current = document?.speakerLabel(speakerId) ?: return
         val input = SpeakerDialog.nameInput(this, draft ?: current.takeUnless { isDefaultLabel(speakerId, it) }.orEmpty())
-        val dialog = AlertDialog.Builder(this).setTitle(R.string.rename_speaker_title).setView(SpeakerDialog.frame(this, input))
+        val print = notePrints[speakerId]
+        val match = print?.match?.takeIf { it.state != Match.State.REJECTED && it.state != Match.State.NONE && it.voiceId in people }
+        // A label that already names the matched person keeps that person unless the name is changed.
+        var chosen: String? = match?.voiceId?.takeIf { people[it]?.name == input.text.toString().trim() }
+        val model = VoiceprintModel.model.sha256
+        val t = Voiceprints.THRESHOLDS.getValue(model)
+        val ranked = people.values.filter { it.model == model }.map { it to (print?.let { p -> Voiceprints.cosine(p.embedding, it.mean) } ?: 0f) }
+            .sortedWith(compareByDescending<Pair<Voice, Float>> { it.second }.thenBy { it.first.name.lowercase() })
+        val list = SpeakerDialog.people(this, ranked.map { (voice, score) ->
+            (if (score >= t.suggest) getString(R.string.speaker_person_likely, voice.name) else voice.name) to {
+                input.setText(voice.name); input.setSelection(input.text.length); chosen = voice.id }
+        })
+        val remember = SpeakerDialog.remember(this, print != null)
+        val builder = AlertDialog.Builder(this).setTitle(R.string.rename_speaker_title)
+            .setView(SpeakerDialog.frame(this, SpeakerDialog.column(this, input, list, remember)))
             .setNegativeButton(android.R.string.cancel, null)
-            .setPositiveButton(android.R.string.ok) { _, _ -> applySpeakerName(speakerId, input.text.toString().trim()) }
-            .create()
+            .setPositiveButton(android.R.string.ok) { _, _ -> applySpeakerName(speakerId, input.text.toString().trim(), chosen, remember.isChecked) }
+        if (match != null) builder.setNeutralButton(R.string.speaker_not_this_person) { _, _ -> rejectMatch(speakerId) }
+        val dialog = builder.create()
         // Dismissal is delivered later; only the dialog still on screen may clear the draft.
         dialog.setOnDismissListener { if (speakerDialog === dialog && !isChangingConfigurations) { speakerDialog = null; pendingSpeaker = null; pendingName = null } }
         speakerDialog?.dismiss()
         speakerDialog = dialog; pendingSpeaker = speakerId; pendingName = draft
         dialog.show()
         val save = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-        fun validate() { save.isEnabled = input.text.isNotBlank() && input.text.toString().trim() != current }
+        // Keeping the same name still confirms an unconfirmed match.
+        fun validate() { save.isEnabled = input.text.isNotBlank() && (input.text.toString().trim() != current ||
+            print != null && print.match?.state != Match.State.CONFIRMED) }
         validate()
         input.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { pendingName = s?.toString(); validate() }
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                pendingName = s?.toString(); if (chosen != null && people[chosen]?.name != s?.toString()?.trim()) chosen = null; validate() }
             override fun afterTextChanged(s: Editable?) {}
         })
         input.requestFocus()
@@ -420,14 +465,24 @@ class MainActivity : Activity() {
     }
 
     /** Seals a new file with the name and retires the old one only once the note points at the new one. */
-    private fun applySpeakerName(speakerId: String, name: String) {
+    private fun applySpeakerName(speakerId: String, name: String, voiceId: String? = null, remember: Boolean = false, asked: Boolean = false) {
         val existing = document ?: return
         val path = session.document ?: return
         if (name.isEmpty() || !canRename()) return
+        val print = notePrints[speakerId]
+        if (remember && print != null && voiceId == null && !asked) people.values.firstOrNull {
+            it.name.equals(name, ignoreCase = true) && it.model == VoiceprintModel.model.sha256 }?.let { same ->
+            AlertDialog.Builder(this).setMessage(getString(R.string.speaker_same_person, same.name))
+                .setPositiveButton(R.string.speaker_same_person_yes) { _, _ -> applySpeakerName(speakerId, name, same.id, true, true) }
+                .setNegativeButton(R.string.speaker_same_person_no) { _, _ -> applySpeakerName(speakerId, name, null, true, true) }.show()
+            return
+        }
+        if (existing.speakerLabel(speakerId) == name) { rememberVoice(speakerId, name, voiceId, remember); renderTranscript(); setStatus(R.string.speaker_renamed, name); return }
         runWork(R.string.saving) {
             val (file, renamed) = documents.relabel(File(path), existing, mapOf(speakerId to name))
             handler.post {
                 if (isDestroyed || isFinishing) { file.delete(); return@post }
+                rememberVoice(speakerId, name, voiceId, remember)
                 val position = if (playerReady) player?.currentPosition ?: session.positionMs else session.positionMs
                 session = session.copy(uri = Uri.fromFile(file).toString(), document = file.absolutePath, positionMs = position)
                 adoptDocument(renamed)
@@ -437,6 +492,46 @@ class MainActivity : Activity() {
                 setStatus(R.string.speaker_renamed, name.trim())
             }
         }
+    }
+
+    /** Enrols a named voice. Only a person's confirmation teaches it, so a wrong automatic name never reinforces itself. */
+    private fun rememberVoice(speakerId: String, name: String, voiceId: String?, remember: Boolean) {
+        val meeting = meetingId() ?: return; val variant = session.selectedVariant ?: return
+        val print = notePrints[speakerId] ?: return
+        val previous = print.match?.takeIf { it.state == Match.State.CONFIRMED }
+        val target = voiceId ?: previous?.voiceId?.takeIf { people[it]?.name.equals(name, ignoreCase = true) }
+        try {
+            // A voice confirmed as someone else no longer belongs to that person.
+            if (previous != null && previous.voiceId != target) {
+                app.voices.unenrol(previous.voiceId, print.embedding); app.noteVoices.setMatch(meeting, variant, speakerId, null)
+            }
+            if (remember) {
+                val score = people[target]?.let { Voiceprints.cosine(print.embedding, it.mean) } ?: 1f
+                val voice = if (previous != null && previous.voiceId == target) people.getValue(target).also { app.voices.rename(it.id, name) }
+                    else app.voices.enrol(target, name, VoiceprintModel.model.sha256, print.embedding, print.seconds, System.currentTimeMillis())
+                app.noteVoices.setMatch(meeting, variant, speakerId, Match(voice.id, score, Match.State.CONFIRMED))
+            }
+        } catch (error: Exception) { Log.w(TAG, "Could not remember voice", error) }
+        loadVoices()
+    }
+
+    /** "Not this person": the match is never offered again here, and an automatic or confirmed name goes back to "Speaker N". */
+    private fun rejectMatch(speakerId: String) {
+        val meeting = meetingId() ?: return; val variant = session.selectedVariant ?: return
+        val print = notePrints[speakerId] ?: return; val match = print.match ?: return
+        val name = people[match.voiceId]?.name
+        try {
+            if (match.state == Match.State.CONFIRMED) app.voices.unenrol(match.voiceId, print.embedding)
+            app.noteVoices.setMatch(meeting, variant, speakerId, match.copy(state = Match.State.REJECTED))
+        } catch (error: Exception) { Log.w(TAG, "Could not reject voice", error) }
+        loadVoices()
+        if (name != null && document?.speakerLabel(speakerId) == name) applySpeakerName(speakerId, defaultLabel(speakerId)) else renderTranscript()
+    }
+
+    private fun defaultLabel(speakerId: String): String {
+        val speakers = document?.manifest?.optJSONArray("speakers")
+        val index = (0 until (speakers?.length() ?: 0)).indexOfFirst { speakers!!.getJSONObject(it).optString("id") == speakerId }
+        return getString(R.string.speaker_label, index + 1)
     }
 
     /** A document another note still opens stays. */
@@ -688,6 +783,7 @@ class MainActivity : Activity() {
         val builder = StringBuilder()
         val ranges = mutableListOf<IntRange>()
         val labels = mutableListOf<Pair<IntRange, String>>()
+        val marks = mutableListOf<Pair<IntRange, () -> Unit>>()
         words.forEachIndexed { index, word ->
             if (index > 0) {
                 val previous = words[index - 1]
@@ -697,6 +793,9 @@ class MainActivity : Activity() {
                 val start = builder.length
                 builder.append(document?.speakerLabel(word.speaker)?.takeUnless { it == word.speaker } ?: getString(R.string.unknown_speaker, word.speaker))
                 labels += (start until builder.length) to word.speaker
+                speakerMark(word.speaker, builder.substring(start)).let { mark ->
+                    if (mark != null) { builder.append("  · "); val at = builder.length; builder.append(mark.first); marks += (at until builder.length) to mark.second }
+                }
                 builder.append("\n")
             }
             val start = builder.length
@@ -732,6 +831,12 @@ class MainActivity : Activity() {
                 override fun onClick(widget: View) = showSpeakerDialog(speaker)
                 override fun updateDrawState(ds: android.text.TextPaint) { ds.isUnderlineText = false; ds.color = DeckViews.amber }
             }, range.first, range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+        marks.forEach { (range, action) ->
+            spannable.setSpan(if (canRename()) object : ClickableSpan() {
+                override fun onClick(widget: View) { if (canRename()) action() }
+                override fun updateDrawState(ds: android.text.TextPaint) { ds.isUnderlineText = false; ds.color = DeckViews.muted }
+            } else ForegroundColorSpan(DeckViews.muted), range.first, range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
         ui.transcript.setText(spannable, TextView.BufferType.SPANNABLE)
         wordRanges = ranges

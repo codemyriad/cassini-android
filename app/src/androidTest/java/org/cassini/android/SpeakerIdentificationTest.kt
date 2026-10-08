@@ -138,14 +138,14 @@ class SpeakerIdentificationTest {
         } finally { scenario.close(); file.delete() }
     }
     /** A sealed two-speaker note made without the recognition models. */
-    private fun twoSpeakerNote(): File {
+    private fun twoSpeakerNote(first: String = context.getString(R.string.speaker_label, 1)): File {
         val wav = File(context.cacheDir, "speaker-rename.wav")
         instrumentation.context.assets.open("italian-smoke.wav").use { input -> wav.outputStream().use { input.copyTo(it) } }
         try {
             val transcript = Transcript(listOf(Word("spk_1", 1000, 1400, "Ciao."), Word("spk_2", 2000, 2400, "Salve.")), "it")
             val (file, doc) = DocumentStore(context).create(Uri.fromFile(wav), { AudioDecoder.decode(context, Uri.fromFile(wav)) }, transcript,
                 "rename.wav", JSONObject().put("engine", "Parakeet TDT"), null,
-                mapOf("spk_1" to context.getString(R.string.speaker_label, 1), "spk_2" to context.getString(R.string.speaker_label, 2)))
+                mapOf("spk_1" to first, "spk_2" to context.getString(R.string.speaker_label, 2)))
             SessionStore(context.filesDir).save(Session(uri = Uri.fromFile(file).toString(), name = "rename.opus", document = file.absolutePath,
                 selectedVariant = doc.defaultId, durationMs = 15800))
             return file
@@ -160,6 +160,7 @@ class SpeakerIdentificationTest {
     private fun tapLabel(scenario: ActivityScenario<MainActivity>, label: String) = scenario.onActivity {
         val view = it.findViewById<TextView>(R.id.transcript_text)
         val text = view.text as Spanned; val start = text.indexOf(label)
+        assertTrue("$label is shown", start >= 0)
         text.getSpans(start, start + label.length, ClickableSpan::class.java).single().onClick(view)
     }
     @Test fun renamingSpeakerRewritesDocumentAndKeepsVariant() {
@@ -195,5 +196,119 @@ class SpeakerIdentificationTest {
             onView(withId(R.id.speaker_name_input)).inRoot(isDialog()).check(matches(withText("Anna")))
             onView(withId(android.R.id.button2)).inRoot(isDialog()).perform(click())
         } finally { scenario.close(); original.delete(); renamed?.delete() }
+    }
+
+    private val app get() = context.applicationContext as CassiniApplication
+    private fun meeting(file: File) = CassiniDocument.read(file).let { it.manifest!!.getJSONObject("meeting").getString("id") to it.defaultId!! }
+    private fun print() = Voiceprints.normalised(FloatArray(512) { kotlin.random.Random(7).nextFloat() - .5f + it % 3 })!!
+    /** Saves [name] as a person and records how this note's first speaker matched them, as a transcription would. */
+    private fun savedMatch(note: File, name: String, state: Match.State): Voice {
+        File(context.filesDir, "voices.json").delete()
+        val voice = app.voices.enrol(null, name, VoiceprintModel.model.sha256, print(), 12.0, 1)
+        val (meeting, variant) = meeting(note)
+        app.noteVoices.merge(meeting, variant, VoiceprintModel.model.sha256, mapOf("spk_1" to SpeakerPrint(print(), 12.0, Match(voice.id, .6f, state))))
+        return voice
+    }
+    @Test fun suggestionTapAppliesName() {
+        val original = twoSpeakerNote()
+        val voice = savedMatch(original, "Marco", Match.State.SUGGESTED)
+        val (meeting, variant) = meeting(original)
+        val scenario = ActivityScenario.launch(MainActivity::class.java)
+        try {
+            val suggestion = context.getString(R.string.speaker_suggestion, "Marco")
+            waitFor(scenario) { it.findViewById<TextView>(R.id.transcript_text).text.contains(suggestion) }
+            waitFor(scenario) { it.findViewById<Button>(R.id.more_button).isEnabled }
+            tapLabel(scenario, suggestion)
+            val sessions = SessionStore(context.filesDir)
+            waitFor(scenario) { sessions.load().document != original.absolutePath }
+            assertEquals("Marco", CassiniDocument.read(File(sessions.load().document!!)).speakerLabel("spk_1"))
+            val match = app.noteVoices.load(meeting, variant).getValue("spk_1").match!!
+            assertEquals(voice.id to Match.State.CONFIRMED, match.voiceId to match.state)
+            assertEquals("Accepting teaches the saved voice", 2, app.voices.load().single().count)
+            scenario.onActivity { assertFalse(it.findViewById<TextView>(R.id.transcript_text).text.contains(suggestion)) }
+        } finally { scenario.close(); original.delete(); SessionStore(context.filesDir).load().document?.let { File(it).delete() } }
+    }
+    @Test fun notThisPersonRevertsLabel() {
+        val original = twoSpeakerNote("Marco")
+        val voice = savedMatch(original, "Marco", Match.State.AUTO)
+        val (meeting, variant) = meeting(original)
+        val scenario = ActivityScenario.launch(MainActivity::class.java)
+        try {
+            val auto = context.getString(R.string.speaker_auto_mark)
+            waitFor(scenario) { it.findViewById<TextView>(R.id.transcript_text).text.contains("Marco  · $auto") }
+            tapLabel(scenario, "Marco")
+            onView(withId(android.R.id.button3)).inRoot(isDialog()).perform(click())
+            val sessions = SessionStore(context.filesDir)
+            val first = context.getString(R.string.speaker_label, 1)
+            waitFor(scenario) { sessions.load().document != original.absolutePath && it.findViewById<TextView>(R.id.transcript_text).text.contains(first) }
+            assertEquals(first, CassiniDocument.read(File(sessions.load().document!!)).speakerLabel("spk_1"))
+            assertEquals(Match.State.REJECTED, app.noteVoices.load(meeting, variant).getValue("spk_1").match!!.state)
+            assertEquals("An automatic name never taught the voice", 1, app.voices.load().single { it.id == voice.id }.count)
+        } finally { scenario.close(); original.delete(); SessionStore(context.filesDir).load().document?.let { File(it).delete() } }
+    }
+    private fun awaitDocument(previous: String?): String {
+        val began = SystemClock.uptimeMillis()
+        val sessions = SessionStore(context.filesDir)
+        while ((sessions.load().document == null || sessions.load().document == previous) && SystemClock.uptimeMillis() - began < 300000) SystemClock.sleep(100)
+        return requireNotNull(sessions.load().document) { "Transcription must save a document" }
+    }
+    @Test fun namedVoiceIsAutoAppliedOnSecondTranscription() {
+        DiarizationModels.inFiles(context.filesDir).install { }
+        org.junit.Assume.assumeTrue("Install the voice model", VoiceprintModel.inFiles(context.filesDir).ready())
+        File(context.filesDir, "voices.json").delete()
+        val (file, _) = twoVoiceRecording()
+        val scenario = ActivityScenario.launch(MainActivity::class.java)
+        var made = emptyList<String>()
+        try {
+            startTranscription(scenario)
+            val first = awaitDocument(null); made = made + first
+            val label = context.getString(R.string.speaker_label, 1)
+            waitFor(scenario) { it.findViewById<TextView>(R.id.transcript_text).text.contains(label) && it.findViewById<Button>(R.id.more_button).isEnabled }
+            tapLabel(scenario, label)
+            onView(withId(R.id.speaker_remember)).inRoot(isDialog()).check(matches(androidx.test.espresso.matcher.ViewMatchers.isChecked()))
+            onView(withId(R.id.speaker_name_input)).inRoot(isDialog()).perform(replaceText("Anna"))
+            onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
+            val named = awaitDocument(first); made = made + named
+            val anna = app.voices.load().single()
+            assertEquals("Anna", anna.name)
+            val speaker = CassiniDocument.read(File(named)).let { doc -> listOf("spk_1", "spk_2", "spk_0").first { doc.speakerLabel(it) == "Anna" } }
+            waitFor(scenario) { it.findViewById<Button>(R.id.more_button).isEnabled }
+            onView(withId(R.id.more_button)).perform(click())
+            onView(withText(R.string.transcribe_again)).inRoot(androidx.test.espresso.matcher.RootMatchers.isPlatformPopup()).perform(click())
+            val again = awaitDocument(named); made = made + again
+            val doc = CassiniDocument.read(File(again))
+            assertEquals(2, doc.variants.size)
+            val prints = app.noteVoices.load(doc.manifest!!.getJSONObject("meeting").getString("id"), doc.defaultId!!)
+            val matched = prints.entries.singleOrNull { it.value.match?.voiceId == anna.id }
+            assertNotNull("The saved voice is recognised again", matched)
+            assertTrue(matched!!.value.match!!.state in setOf(Match.State.AUTO, Match.State.SUGGESTED))
+            println("Second transcription matched $speaker as ${matched.key} ${matched.value.match}")
+            waitFor(scenario) { it.findViewById<TextView>(R.id.transcript_text).text.contains("Anna") }
+        } finally { scenario.close(); file.delete(); made.forEach { File(it).delete() } }
+    }
+    @Test fun cancelDuringVoiceprintsSavesNothing() {
+        DiarizationModels.inFiles(context.filesDir).install { }
+        org.junit.Assume.assumeTrue("Install the voice model", VoiceprintModel.inFiles(context.filesDir).ready())
+        val voices = File(context.filesDir, "voices.json").takeIf { it.exists() }?.readBytes()
+        val notes = File(context.filesDir, "voiceprints").list().orEmpty().toSet()
+        val (file, _) = twoVoiceRecording()
+        val scenario = ActivityScenario.launch(MainActivity::class.java)
+        try {
+            startTranscription(scenario)
+            val deadline = SystemClock.uptimeMillis() + 300000
+            var matching = false
+            while (!matching && SystemClock.uptimeMillis() < deadline) {
+                scenario.onActivity { matching = it.findViewById<TextView>(R.id.operation_status).text.toString() == it.getString(R.string.matching_voices) }
+                if (!matching) SystemClock.sleep(5)
+            }
+            assertTrue("Cancel while voiceprints are computed", matching)
+            scenario.onActivity { it.findViewById<Button>(R.id.cancel_operation).performClick() }
+            assertTrue(NativeInference.lease.tryAcquire(180, TimeUnit.SECONDS))
+            NativeInference.lease.release()
+            instrumentation.waitForIdleSync()
+            assertNull(SessionStore(context.filesDir).load().document)
+            assertEquals(notes, File(context.filesDir, "voiceprints").list().orEmpty().toSet())
+            assertArrayEquals(voices, File(context.filesDir, "voices.json").takeIf { it.exists() }?.readBytes())
+        } finally { scenario.close(); file.delete() }
     }
 }
