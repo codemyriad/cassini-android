@@ -161,9 +161,12 @@ object AudioDecoder {
             while (!outputEnded) {
                 requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
                 requireUser(System.nanoTime() - lastProgress < 30_000_000_000L, Failure.STALLED)
+                // Block only when neither side moved: a fixed wait per packet made an hour of Opus take minutes.
+                var fed = false
                 if (!inputEnded) {
-                    val index = codec.dequeueInputBuffer(10_000)
+                    val index = codec.dequeueInputBuffer(0)
                     if (index >= 0) {
+                        fed = true
                         val buffer = requireNotNull(codec.getInputBuffer(index))
                         val size = extractor.readSampleData(buffer, 0)
                         if (size < 0) {
@@ -176,7 +179,7 @@ object AudioDecoder {
                         lastProgress = System.nanoTime()
                     }
                 }
-                when (val index = codec.dequeueOutputBuffer(info, 10_000)) {
+                when (val index = codec.dequeueOutputBuffer(info, if (fed) 0 else 10_000)) {
                     MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                         val output = codec.outputFormat
                         val nextRate = output.getInteger(MediaFormat.KEY_SAMPLE_RATE)

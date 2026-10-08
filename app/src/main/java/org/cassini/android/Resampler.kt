@@ -67,6 +67,15 @@ internal class StreamingResampler(private val rate: Int, private val sink: (Floa
     private val step = rate.toDouble() / VAD_SAMPLE_RATE
     private val crossingsPerSample = 2 * CUTOFF_FRACTION * min(rate, VAD_SAMPLE_RATE) / rate
     private val halfWidth = ZERO_CROSSINGS / crossingsPerSample
+    /** Whole-multiple rates put every output on an input sample, so the taps are the same each time. */
+    private val fixed = rate % VAD_SAMPLE_RATE == 0
+    private val first = ceil(-halfWidth).toInt()
+    private val taps = if (!fixed) FloatArray(0) else FloatArray(floor(halfWidth).toInt() - first + 1) { i ->
+        val position = abs((first + i).toDouble()) * crossingsPerSample * TABLE_STEPS
+        val cell = position.toInt()
+        kernel[cell] + (kernel[cell + 1] - kernel[cell]) * (position - cell).toFloat()
+    }
+    private val tapWeight = taps.fold(0.0) { sum, tap -> sum + tap }
     private var history = FloatArray(8192)
     private var base = 0L
     private var size = 0
@@ -118,6 +127,16 @@ internal class StreamingResampler(private val rate: Int, private val sink: (Floa
             val time = produced * step
             val last = floor(time + halfWidth).toLong()
             if (target == null && last >= end) break
+            val start = produced * (rate / VAD_SAMPLE_RATE) + first
+            if (fixed && start >= 0 && last < end) {
+                var sum = 0.0
+                val at = (start - base).toInt()
+                for (i in taps.indices) sum += taps[i] * history[at + i]
+                out[pending++] = (sum / tapWeight).toFloat()
+                if (pending == out.size) flush()
+                produced++
+                continue
+            }
             var sum = 0.0
             var weight = 0.0
             for (k in max(0L, ceil(time - halfWidth).toLong())..min(end - 1, last)) {
