@@ -45,6 +45,8 @@ else
 fi
 adb install -r "${CASSINI_APK:-app/build/outputs/apk/$CASSINI_TEST_BUILD_TYPE/app-$CASSINI_TEST_BUILD_TYPE.apk}"
 adb install -r "${CASSINI_TEST_APK:-app/build/outputs/apk/androidTest/$CASSINI_TEST_BUILD_TYPE/app-$CASSINI_TEST_BUILD_TYPE-androidTest.apk}"
+# Processing and recording tests must not stop at the notification permission prompt.
+adb shell pm grant org.cassini.android android.permission.POST_NOTIFICATIONS 2>/dev/null || true
 # Direct instrumentation retains app data/model downloads; Gradle UTP may uninstall the app.
 report=$(mktemp)
 trap 'rm -f "$report"' EXIT

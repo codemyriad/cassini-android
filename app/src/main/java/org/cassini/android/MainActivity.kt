@@ -1,12 +1,15 @@
 package org.cassini.android
 
+import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Rect
 import android.media.MediaPlayer
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -205,11 +208,19 @@ class MainActivity : Activity(), ProcessingJobs.Listener {
         persistSession { startSaved(speakers) }
     }
 
+    private var notificationsAsked = false
+
     private fun startSaved(speakers: Boolean) {
         val id = session.libraryId ?: run { setStatus(R.string.library_error, error = true); return }
         val running = ProcessingJobs.current?.takeIf { ProcessingJobs.running && it.phase.active }
         if (running != null && running.noteId != id) { setStatus(R.string.processing_other_note, error = true); return }
         if (running == null) ProcessingService.start(this, id, session.name, speakers)
+        // Progress, speed and the outcome are shown in a notification while the app is away; ask once per screen.
+        if (Build.VERSION.SDK_INT >= 33 && !notificationsAsked &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            notificationsAsked = true
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATIONS)
+        }
         watched = ProcessingJob(id, session.name, speakers)
         setStatus(if (speakers) R.string.identifying_speakers else R.string.decoding)
         ui.progress.visibility = View.VISIBLE
@@ -929,6 +940,7 @@ class MainActivity : Activity(), ProcessingJobs.Listener {
         if (!busy) returnToLibrary()
     }
     companion object {
+        private const val NOTIFICATIONS = 41
         /** One attempt per process: a network that cannot reach the detector must not be retried at every note. */
         private val detectorAttempted = java.util.concurrent.atomic.AtomicBoolean()
 
