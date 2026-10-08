@@ -157,11 +157,11 @@ class MainActivity : Activity() {
         }, OPEN_FILE)
     }
 
-    /** The first transcription asks once before the large download; later ones fetch only what is missing. */
+    /** The first transcription asks once before the large download; later ones quietly retry any optional model still missing. */
     private fun confirmTranscription() {
         if (busy || session.uri == null) return
         val bundle = ModelBundle.inFiles(filesDir)
-        if (bundle.ready()) transcribe()
+        if (bundle.consented()) transcribe()
         else AlertDialog.Builder(this).setTitle(R.string.models_download)
             .setMessage(getString(R.string.models_download_summary, bundle.missingBytes().let {
                 if (it == ModelBundle.totalBytes) getString(R.string.models_size)
@@ -877,7 +877,7 @@ class MainActivity : Activity() {
         super.onDestroy()
     }
     private fun maybeAutoTranscribe() {
-        if (autoTranscribe && !busy && session.uri != null && ModelBundle.inFiles(filesDir).ready()) {
+        if (autoTranscribe && !busy && session.uri != null && ModelBundle.inFiles(filesDir).consented()) {
             autoTranscribe = false
             transcribe()
         }

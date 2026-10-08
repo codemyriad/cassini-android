@@ -39,6 +39,14 @@ class ModelBundleTest {
         assertEquals(0L, bundle.missingBytes())
     }
 
+    @Test fun onceParakeetIsInstalledAMissingOptionalModelDoesNotAskAgain() {
+        val bundle = ModelBundle.inFiles(folder.root)
+        assertFalse(bundle.consented())
+        installParakeet()
+        assertTrue(bundle.consented())
+        assertFalse(bundle.ready())
+    }
+
     @Test fun aVoiceprintMarkerForAnotherModelIsNotReady() {
         installVoiceprint()
         File(folder.root, "speaker-models/${VoiceprintModel.MARKER}").writeText("other")

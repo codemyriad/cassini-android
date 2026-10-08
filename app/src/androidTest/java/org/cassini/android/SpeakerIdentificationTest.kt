@@ -47,9 +47,9 @@ class SpeakerIdentificationTest {
         } finally { scenario.close(); file.delete() }
     }
     @Test fun downloadingModelsRequiresConsent() {
-        // Also covers existing installs that lack only the voiceprint model.
+        // Once Parakeet is installed consent was given; optional models are retried without asking.
         val bundle = ModelBundle.inFiles(context.filesDir)
-        org.junit.Assume.assumeFalse("Requires a model to be absent", bundle.ready())
+        org.junit.Assume.assumeFalse("Requires the speech model to be absent", bundle.consented())
         val missing = bundle.missingBytes()
         val file = File(context.cacheDir, "speaker-consent.wav")
         instrumentation.context.assets.open("italian-smoke.wav").use { input -> file.outputStream().use { input.copyTo(it) } }
