@@ -298,7 +298,7 @@ class MainActivity : Activity() {
                     preparePlayer(Uri.fromFile(file))
                     persistSession()
                     portable.manifest?.optJSONObject("meeting")?.optString("id")?.takeIf { it.isNotEmpty() && prints.isNotEmpty() }?.let { meeting ->
-                        try { app.noteVoices.merge(meeting, printModel, prints) } catch (error: Exception) { Log.w(TAG, "Could not save voiceprints", error) }
+                        try { app.noteVoices.merge(meeting, portable.defaultId ?: return@let, printModel, prints) } catch (error: Exception) { Log.w(TAG, "Could not save voiceprints", error) }
                     }
                     renderScreen()
                     if (attributed == null && transcript.words.isNotEmpty()) setStatus(R.string.speakers_unavailable) else defaultStatus()

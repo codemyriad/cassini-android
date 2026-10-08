@@ -8,7 +8,7 @@ internal data class Match(val voiceId: String, val score: Float, val state: Stat
 }
 internal data class SpeakerPrint(val embedding: FloatArray, val seconds: Double, val match: Match?)
 
-/** filesDir/voiceprints/<meetingId>.json: each note's speaker prints and match state, never part of a document. */
+/** filesDir/voiceprints/<meetingId>.json: each note's speaker prints and match state keyed by "<variantId>/<speakerId>", never part of a document. */
 internal class NoteVoiceStore(filesDir: File, private val warn: (String, Throwable) -> Unit = { m, e -> android.util.Log.w("Cassini", m, e) }) {
     private val directory = File(filesDir, "voiceprints")
 
@@ -17,19 +17,22 @@ internal class NoteVoiceStore(filesDir: File, private val warn: (String, Throwab
         return File(directory, "$meetingId.json")
     }
 
-    @Synchronized fun load(meetingId: String): Map<String, SpeakerPrint> = read(file(meetingId))?.second.orEmpty()
+    /** One transcript variant's prints by speaker id; diarization reuses ids like spk_1 in every variant. */
+    @Synchronized fun load(meetingId: String, variantId: String): Map<String, SpeakerPrint> =
+        read(file(meetingId))?.second.orEmpty().filterKeys { it.startsWith(prefix(variantId)) }.mapKeys { it.key.removePrefix(prefix(variantId)) }
 
-    /** Adds or replaces these speakers' prints; speakers of earlier variants stay. A print from another model resets the file. */
-    @Synchronized fun merge(meetingId: String, model: String, prints: Map<String, SpeakerPrint>) {
+    /** Stores a variant's prints, replacing that variant's earlier ones; other variants stay. A print from another model resets the file. */
+    @Synchronized fun merge(meetingId: String, variantId: String, model: String, prints: Map<String, SpeakerPrint>) {
         if (prints.isEmpty()) return
-        val existing = read(file(meetingId))?.takeIf { it.first == model }?.second.orEmpty()
-        write(meetingId, model, existing + prints)
+        val existing = read(file(meetingId))?.takeIf { it.first == model }?.second.orEmpty().filterKeys { !it.startsWith(prefix(variantId)) }
+        write(meetingId, model, existing + prints.mapKeys { prefix(variantId) + it.key })
     }
 
-    @Synchronized fun setMatch(meetingId: String, speakerId: String, match: Match?) {
+    @Synchronized fun setMatch(meetingId: String, variantId: String, speakerId: String, match: Match?) {
         val (model, prints) = read(file(meetingId)) ?: return
-        val print = prints[speakerId] ?: return
-        write(meetingId, model, prints + (speakerId to print.copy(match = match)))
+        val key = prefix(variantId) + speakerId
+        val print = prints[key] ?: return
+        write(meetingId, model, prints + (key to print.copy(match = match)))
     }
 
     @Synchronized fun delete(meetingId: String) { file(meetingId).delete() }
@@ -42,6 +45,8 @@ internal class NoteVoiceStore(filesDir: File, private val warn: (String, Throwab
             write(note.nameWithoutExtension, model, prints.mapValues { (_, p) -> if (p.match?.voiceId == voiceId) p.copy(match = null) else p })
         }
     }
+
+    private fun prefix(variantId: String): String { require(variantId.isNotEmpty() && '/' !in variantId) { "Bad variant id" }; return "$variantId/" }
 
     private fun read(file: File): Pair<String, Map<String, SpeakerPrint>>? = try {
         if (!file.exists()) null else {
@@ -65,5 +70,5 @@ internal class NoteVoiceStore(filesDir: File, private val warn: (String, Throwab
         writeAtomically(file(meetingId), JSONObject().put("version", VERSION).put("model", model).put("speakers", speakers).toString())
     }
 
-    companion object { const val VERSION = 1 }
+    companion object { const val VERSION = 2 }
 }
