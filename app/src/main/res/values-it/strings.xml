@@ -149,6 +149,10 @@
     <string name="recording_saving">Salvataggio dell’audio…</string>
     <string name="identify_speakers">Distingui le voci</string>
     <string name="speaker_label">Voce %1$d</string>
+    <string name="rename_speaker_title">Chi sta parlando?</string>
+    <string name="speaker_name_hint">Nome</string>
+    <string name="speaker_renamed">Salvato come %1$s</string>
+    <string name="speakers_menu">Voci…</string>
     <string name="speaker_models_download">Scaricare i modelli per le voci?</string>
     <string name="speaker_models_summary">Questo download facoltativo occupa circa 62 MiB (99 MiB una volta installato). Distingue fino a 8 voci sul telefono dopo la trascrizione, mantenendo il testo originale. Le etichette sono stime, soprattutto quando le voci si sovrappongono. Tieni aperta l’app.</string>
     <string name="identifying_speakers">Distinzione delle voci…</string>

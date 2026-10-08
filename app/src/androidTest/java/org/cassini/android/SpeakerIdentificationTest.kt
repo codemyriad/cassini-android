@@ -9,9 +9,15 @@ import android.widget.TextView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
+import androidx.test.espresso.action.ViewActions.replaceText
+import androidx.test.espresso.assertion.ViewAssertions.matches
+import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.platform.app.InstrumentationRegistry
+import android.text.Spanned
+import android.text.style.ClickableSpan
+import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
 import java.io.File
@@ -127,5 +133,64 @@ class SpeakerIdentificationTest {
             instrumentation.waitForIdleSync()
             assertNull(SessionStore(context.filesDir).load().document)
         } finally { scenario.close(); file.delete() }
+    }
+    /** A sealed two-speaker note made without the recognition models. */
+    private fun twoSpeakerNote(): File {
+        val wav = File(context.cacheDir, "speaker-rename.wav")
+        instrumentation.context.assets.open("italian-smoke.wav").use { input -> wav.outputStream().use { input.copyTo(it) } }
+        try {
+            val transcript = Transcript(listOf(Word("spk_1", 1000, 1400, "Ciao."), Word("spk_2", 2000, 2400, "Salve.")), "it")
+            val (file, doc) = DocumentStore(context).create(Uri.fromFile(wav), { AudioDecoder.decode(context, Uri.fromFile(wav)) }, transcript,
+                "rename.wav", JSONObject().put("engine", "Parakeet TDT"), null,
+                mapOf("spk_1" to context.getString(R.string.speaker_label, 1), "spk_2" to context.getString(R.string.speaker_label, 2)))
+            SessionStore(context.filesDir).save(Session(uri = Uri.fromFile(file).toString(), name = "rename.opus", document = file.absolutePath,
+                selectedVariant = doc.defaultId, durationMs = 15800))
+            return file
+        } finally { wav.delete() }
+    }
+    private fun waitFor(scenario: ActivityScenario<MainActivity>, condition: (MainActivity) -> Boolean) {
+        val deadline = SystemClock.uptimeMillis() + 20000
+        var done = false
+        while (!done && SystemClock.uptimeMillis() < deadline) { scenario.onActivity { done = condition(it) }; if (!done) SystemClock.sleep(50) }
+        assertTrue(done)
+    }
+    private fun tapLabel(scenario: ActivityScenario<MainActivity>, label: String) = scenario.onActivity {
+        val view = it.findViewById<TextView>(R.id.transcript_text)
+        val text = view.text as Spanned; val start = text.indexOf(label)
+        text.getSpans(start, start + label.length, ClickableSpan::class.java).single().onClick(view)
+    }
+    @Test fun renamingSpeakerRewritesDocumentAndKeepsVariant() {
+        val original = twoSpeakerNote()
+        val before = CassiniDocument.read(original)
+        val first = context.getString(R.string.speaker_label, 1)
+        val scenario = ActivityScenario.launch(MainActivity::class.java)
+        var renamed: File? = null
+        try {
+            waitFor(scenario) { it.findViewById<TextView>(R.id.transcript_text).text.contains(first) }
+            tapLabel(scenario, first)
+            onView(withId(R.id.speaker_name_input)).inRoot(isDialog()).check(matches(withText("")))
+            onView(withId(R.id.speaker_name_input)).inRoot(isDialog()).perform(replaceText("Anna"))
+            // The draft survives recreation and the dialog comes back with it.
+            scenario.recreate()
+            onView(withId(R.id.speaker_name_input)).inRoot(isDialog()).check(matches(withText("Anna")))
+            onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
+            val sessions = SessionStore(context.filesDir)
+            waitFor(scenario) { sessions.load().document != original.absolutePath && it.findViewById<TextView>(R.id.transcript_text).text.contains("Anna") }
+            renamed = File(sessions.load().document!!)
+            val after = CassiniDocument.read(renamed)
+            assertEquals("ok", after.state)
+            assertEquals("Anna", after.speakerLabel("spk_1"))
+            assertEquals(before.speakerLabel("spk_2"), after.speakerLabel("spk_2"))
+            assertEquals(before.variants.map { it.id to it.body }, after.variants.map { it.id to it.body })
+            assertEquals(before.manifest!!.getJSONObject("meeting").getString("id"), after.manifest!!.getJSONObject("meeting").getString("id"))
+            assertFalse("The old file is retired once the note points at the new one", original.exists())
+            assertEquals(Uri.fromFile(renamed).toString(), sessions.load().uri)
+            assertTrue(LibraryStore(context.filesDir).load().any { it.session.document == renamed.absolutePath })
+            scenario.onActivity { assertEquals(it.getString(R.string.speaker_renamed, "Anna"), it.findViewById<TextView>(R.id.operation_status).text.toString()) }
+            // Naming again prefills the current name.
+            tapLabel(scenario, "Anna")
+            onView(withId(R.id.speaker_name_input)).inRoot(isDialog()).check(matches(withText("Anna")))
+            onView(withId(android.R.id.button2)).inRoot(isDialog()).perform(click())
+        } finally { scenario.close(); original.delete(); renamed?.delete() }
     }
 }

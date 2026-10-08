@@ -152,6 +152,10 @@
     <string name="recording_saving">Saving audio…</string>
     <string name="identify_speakers">Identify speakers</string>
     <string name="speaker_label">Speaker %1$d</string>
+    <string name="rename_speaker_title">Who is speaking?</string>
+    <string name="speaker_name_hint">Name</string>
+    <string name="speaker_renamed">Saved as %1$s</string>
+    <string name="speakers_menu">Speakers…</string>
     <string name="speaker_models_download">Download speaker models?</string>
     <string name="speaker_models_summary">This optional download is about 62 MiB (99 MiB once installed). It tells apart up to 8 voices on your phone after transcription, and keeps the original transcript. Labels are guesses, especially when voices overlap. Keep the app open.</string>
     <string name="identifying_speakers">Identifying speakers…</string>

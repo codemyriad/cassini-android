@@ -57,6 +57,10 @@ class MainActivity : Activity() {
     private var touchingTranscript = false
     private var followCompletedSeeks = false
     private var screen = ""
+    /** The speaker whose name is being edited, kept across recreation until the document is open again. */
+    private var pendingSpeaker: String? = null
+    private var pendingName: String? = null
+    private var speakerDialog: AlertDialog? = null
 
     override fun attachBaseContext(newBase: Context) = super.attachBaseContext(AppLanguage.wrap(newBase))
 
@@ -77,6 +81,7 @@ class MainActivity : Activity() {
         val preferences = sessions.load()
         val noteId = intent.getStringExtra(NOTE_ID)
         screen = savedInstanceState?.getString("screen") ?: UUID.randomUUID().toString()
+        pendingSpeaker = savedInstanceState?.getString("pendingSpeaker"); pendingName = savedInstanceState?.getString("pendingName")
         val restored = savedInstanceState?.let { state ->
             val notes = try { library.load() } catch (error: Exception) { Log.e(TAG, "Could not load notes", error); emptyList() }
             LibraryNote.shown(screen, state.getString(NOTE_ID), state.getString("uri"), preferences, notes)
@@ -135,7 +140,10 @@ class MainActivity : Activity() {
         session.uri?.let { preparePlayer(Uri.parse(it)) }
         session.document?.takeIf { !viewing }?.let { path -> runWork(R.string.opening_document) {
             val loaded = CassiniDocument.read(File(path))
-            onUi { adoptDocument(loaded); renderScreen(); defaultStatus() }
+            onUi {
+                adoptDocument(loaded); renderScreen(); defaultStatus()
+                pendingSpeaker?.let { speaker -> handler.post { if (!isDestroyed) showSpeakerDialog(speaker, pendingName) } }
+            }
         } }
         if (viewing) intent.data?.let { importFile(it) }
         if (importing && savedInstanceState == null) chooseFile()
@@ -328,6 +336,77 @@ class MainActivity : Activity() {
         highlightedWord = -1
     }
 
+    private fun canRename() = document?.state == "ok" && interim == null && !busy
+
+    /** "Speaker 2" in any interface language: a note sealed before the language changed still has no name. */
+    private val defaultLabels by lazy {
+        listOf("en", "it").map { tag -> createConfigurationContext(android.content.res.Configuration(resources.configuration)
+            .apply { setLocale(Locale.forLanguageTag(tag)) }).getString(R.string.speaker_label, 0).substringBefore('0') }.toSet()
+    }
+    private fun isDefaultLabel(id: String, label: String) = label == id || label.isBlank() ||
+        defaultLabels.any { label.startsWith(it) && label.removePrefix(it).toIntOrNull() != null }
+
+    private fun showSpeakers() {
+        val manifest = document?.manifest ?: return
+        val speakers = manifest.getJSONArray("speakers").let { list -> (0 until list.length()).map { list.getJSONObject(it).getString("id") } }
+        AlertDialog.Builder(this).setTitle(R.string.speakers_menu)
+            .setItems(speakers.map { document?.speakerLabel(it)?.ifBlank { it } ?: it }.toTypedArray()) { _, index -> showSpeakerDialog(speakers[index]) }
+            .setNegativeButton(android.R.string.cancel, null).show()
+    }
+
+    private fun showSpeakerDialog(speakerId: String, draft: String? = null) {
+        if (!canRename()) return
+        val current = document?.speakerLabel(speakerId) ?: return
+        val input = SpeakerDialog.nameInput(this, draft ?: current.takeUnless { isDefaultLabel(speakerId, it) }.orEmpty())
+        val dialog = AlertDialog.Builder(this).setTitle(R.string.rename_speaker_title).setView(SpeakerDialog.frame(this, input))
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(android.R.string.ok) { _, _ -> applySpeakerName(speakerId, input.text.toString().trim()) }
+            .create()
+        // Dismissal is delivered later; only the dialog still on screen may clear the draft.
+        dialog.setOnDismissListener { if (speakerDialog === dialog && !isChangingConfigurations) { speakerDialog = null; pendingSpeaker = null; pendingName = null } }
+        speakerDialog?.dismiss()
+        speakerDialog = dialog; pendingSpeaker = speakerId; pendingName = draft
+        dialog.show()
+        val save = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+        fun validate() { save.isEnabled = input.text.isNotBlank() && input.text.toString().trim() != current }
+        validate()
+        input.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { pendingName = s?.toString(); validate() }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+        input.requestFocus()
+        dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
+    }
+
+    /** Seals a new file with the name and retires the old one only once the note points at the new one. */
+    private fun applySpeakerName(speakerId: String, name: String) {
+        val existing = document ?: return
+        val path = session.document ?: return
+        if (name.isEmpty() || !canRename()) return
+        runWork(R.string.saving) {
+            val (file, renamed) = documents.relabel(File(path), existing, mapOf(speakerId to name))
+            handler.post {
+                if (isDestroyed || isFinishing) { file.delete(); return@post }
+                val position = if (playerReady) player?.currentPosition ?: session.positionMs else session.positionMs
+                session = session.copy(uri = Uri.fromFile(file).toString(), document = file.absolutePath, positionMs = position)
+                adoptDocument(renamed)
+                preparePlayer(Uri.fromFile(file))
+                if (persistSession()) retire(File(path)) else Log.w(TAG, "Kept $path: the note could not be saved")
+                renderScreen()
+                setStatus(R.string.speaker_renamed, name.trim())
+            }
+        }
+    }
+
+    /** A document another note still opens stays. */
+    private fun retire(old: File) {
+        val location = Uri.fromFile(old).toString()
+        val used = try { library.load().any { it.session.document == old.absolutePath || it.session.uri == location } }
+            catch (error: Exception) { Log.e(TAG, "Could not load notes", error); true }
+        if (!used && !old.delete()) Log.w(TAG, "Could not delete $old")
+    }
+
     private fun chooseVariant() {
         val portable = document ?: return
         val labels = portable.variants.map { variant ->
@@ -407,6 +486,8 @@ class MainActivity : Activity() {
                     ui.cancelOperation.visibility = View.GONE
                     // A run that failed or was cancelled leaves no partial transcript on screen.
                     if (interim != null) { interim = null; renderScreen() }
+                    // Speaker labels become tappable once nothing is running.
+                    else if (document != null) renderTranscript()
                     window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                     ui.progress.visibility = View.GONE
                     refreshControls()
@@ -497,6 +578,7 @@ class MainActivity : Activity() {
         if (session.transcript != null) add(R.string.transcribe_again, document == null || document?.state == "ok") { confirmTranscription() }
         if ((document?.variants?.size ?: 0) > 1) add(R.string.choose_transcript) { chooseVariant() }
         if (session.document != null || session.transcript != null) add(R.string.export) { saveCassiniDocument() }
+        if ((document?.manifest?.optJSONArray("speakers")?.length() ?: 0) > 0) add(R.string.speakers_menu, canRename()) { showSpeakers() }
         if (document != null) add(R.string.document_info) { showDocumentInfo() }
         add(R.string.settings) { showSettings() }
         menu.setOnMenuItemClickListener { item -> actions[item.itemId]?.invoke(); true }
@@ -565,13 +647,17 @@ class MainActivity : Activity() {
         val words = (interim ?: session.transcript)?.words ?: emptyList()
         val builder = StringBuilder()
         val ranges = mutableListOf<IntRange>()
+        val labels = mutableListOf<Pair<IntRange, String>>()
         words.forEachIndexed { index, word ->
             if (index > 0) {
                 val previous = words[index - 1]
                 builder.append(if (previous.speaker != word.speaker || previous.text.lastOrNull() in listOf('.', '?', '!')) "\n\n" else " ")
             }
             if (document != null && interim == null && (index == 0 || words[index - 1].speaker != word.speaker)) {
-                builder.append(document?.speakerLabel(word.speaker)?.takeUnless { it == word.speaker } ?: getString(R.string.unknown_speaker, word.speaker)).append("\n")
+                val start = builder.length
+                builder.append(document?.speakerLabel(word.speaker)?.takeUnless { it == word.speaker } ?: getString(R.string.unknown_speaker, word.speaker))
+                labels += (start until builder.length) to word.speaker
+                builder.append("\n")
             }
             val start = builder.length
             builder.append(word.text)
@@ -599,6 +685,12 @@ class MainActivity : Activity() {
                     }
                 }
                 override fun updateDrawState(ds: android.text.TextPaint) { ds.isUnderlineText = false }
+            }, range.first, range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+        if (canRename()) labels.forEach { (range, speaker) ->
+            spannable.setSpan(object : ClickableSpan() {
+                override fun onClick(widget: View) = showSpeakerDialog(speaker)
+                override fun updateDrawState(ds: android.text.TextPaint) { ds.isUnderlineText = false; ds.color = DeckViews.amber }
             }, range.first, range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
         ui.transcript.setText(spannable, TextView.BufferType.SPANNABLE)
@@ -729,17 +821,18 @@ class MainActivity : Activity() {
         startActivity(Intent(this, SettingsActivity::class.java))
     }
 
-    private fun persistSession() {
+    private fun persistSession(): Boolean {
         if (playerReady) player?.let { session = session.copy(positionMs = it.currentPosition) }
         val preferences = sessions.load()
         session = session.copy(screen = screen)
         // An empty viewer has nothing to remember, and session.json may hold a session that exists nowhere else.
-        if (session.uri == null) return
+        if (session.uri == null) return false
         try {
             // The session another screen left there, or one from before the notes library, reaches the catalogue before it is replaced.
             if (preferences.screen != screen) library.adopt(preferences)
             sessions.save(session); session = library.save(session); sessions.save(session)
-        } catch (error: Exception) { Log.e(TAG, "Could not persist session", error); setStatus(R.string.library_error, error = true) }
+            return true
+        } catch (error: Exception) { Log.e(TAG, "Could not persist session", error); setStatus(R.string.library_error, error = true); return false }
     }
     override fun onSaveInstanceState(outState: Bundle) {
         persistSession()
@@ -748,6 +841,7 @@ class MainActivity : Activity() {
         outState.putString(NOTE_ID, session.libraryId)
         outState.putString("uri", session.uri)
         outState.putString("screen", screen)
+        outState.putString("pendingSpeaker", pendingSpeaker); outState.putString("pendingName", pendingName)
         super.onSaveInstanceState(outState)
     }
     override fun onResume() {
@@ -766,6 +860,7 @@ class MainActivity : Activity() {
     }
     override fun onDestroy() {
         handler.removeCallbacks(ticker)
+        speakerDialog?.dismiss()
         cancellation?.set(true)
         worker.shutdownNow()
         player?.release()
