@@ -55,6 +55,40 @@ class AudioDecoderTest {
         }
     }
 
+    @Test fun killedWavDecodeResumesByteIdentical() {
+        val random = kotlin.random.Random(5)
+        for ((rate, channels) in listOf(44100 to 2, 48000 to 1, 16000 to 1)) {
+            val frames = rate * 25 + 311
+            val pcm = ShortArray(frames * channels) { random.nextInt(-32768, 32768).toShort() }
+            val file = wav(rate, channels, pcm)
+            fun cacheSink(cache: PcmCache, killAfter: Long = Long.MAX_VALUE) = object : AudioDecoder.Sink {
+                var pushed = 0L
+                override fun begin(expectedSamples: Long) = cache.openWriter(expectedSamples)
+                override fun push(samples: FloatArray, count: Int, inputUs: Long) {
+                    if (pushed + count > killAfter) throw IllegalStateException("killed")
+                    pushed += count
+                    cache.append(samples, count, inputUs)
+                }
+            }
+            val whole = PcmCache.open(java.nio.file.Files.createTempDirectory("whole").toFile(), "opus-0123456789abcdef")
+            AudioDecoder.decodeTo(file, cacheSink(whole), 0)
+            whole.finish()
+            val directory = java.nio.file.Files.createTempDirectory("resume").toFile()
+            val killed = PcmCache.open(directory, "opus-0123456789abcdef")
+            try { AudioDecoder.decodeTo(file, cacheSink(killed, 230_000), 0); fail() } catch (_: IllegalStateException) {}
+            // No abandon: a hard kill leaves only the last checkpoint.
+            val resumed = PcmCache.open(directory, "opus-0123456789abcdef")
+            val at = resumed.state.decodedSamples
+            assertTrue("$rate Hz checkpoint", at in 1 until whole.state.decodedSamples)
+            assertEquals(at * 1_000_000 / Limits.ASR_RATE, resumed.state.sourceInputUs)
+            val sink = cacheSink(resumed)
+            AudioDecoder.decodeTo(file, sink, at)
+            resumed.finish()
+            assertEquals(whole.state.decodedSamples - at, sink.pushed)
+            assertArrayEquals("$rate Hz x$channels", whole.data.readBytes(), resumed.data.readBytes())
+        }
+    }
+
     @Test fun growableBufferKeepsEverySampleAndTrimsOnlyWrongGuesses() {
         val builder = PcmBuilder(16000)
         val chunk = FloatArray(1000) { it.toFloat() }

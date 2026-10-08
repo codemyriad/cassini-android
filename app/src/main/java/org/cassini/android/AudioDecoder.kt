@@ -29,19 +29,19 @@ object AudioDecoder {
         fun push(samples: FloatArray, count: Int, inputUs: Long)
     }
 
-    /** Drops the first [skip] output samples: a resumed decode replays from zero but writes only what is new. */
-    private class Skipping(private val sink: Sink, private var skip: Long) {
-        var inputUs = 0L
-        var total = 0L
-            private set
+    /**
+     * Writes output from sample [start] on. A resumed decode seeks the input and continues the
+     * resampler at [start]; only a fallback replay from zero passes earlier samples, which are dropped.
+     * The input position handed to the sink is the time of the next output sample: output j is at j / 16000 s.
+     */
+    private class Skipping(private val sink: Sink, private val start: Long, var total: Long = 0) {
         fun push(samples: FloatArray, count: Int) {
+            val skip = (start - total).coerceIn(0, count.toLong()).toInt()
             total += count
-            if (skip >= count) { skip -= count; return }
-            if (skip > 0) {
-                val from = skip.toInt()
-                sink.push(samples.copyOfRange(from, count), count - from, inputUs)
-                skip = 0
-            } else sink.push(samples, count, inputUs)
+            if (skip == count) return
+            val inputUs = total * 1_000_000 / Limits.ASR_RATE
+            if (skip > 0) sink.push(samples.copyOfRange(skip, count), count - skip, inputUs)
+            else sink.push(samples, count, inputUs)
         }
     }
 
@@ -179,19 +179,20 @@ object AudioDecoder {
         requireUser(frames >= 1, Failure.LONG)
         Limits.requireDuration(frames * 1000 / sampleRate)
         sink.begin((frames * Limits.ASR_RATE + sampleRate / 2) / sampleRate)
-        val out = Skipping(sink, skip)
-        val resampler = StreamingResampler(sampleRate, out::push)
-        file.seek(dataOffset)
+        // Resume by seeking: the resampler continues at [skip] from the input frames it depends on.
+        val out = Skipping(sink, skip, skip)
+        val resampler = StreamingResampler(sampleRate, skip, out::push)
+        val firstFrame = minOf(resampler.resumeInput(skip), frames)
+        file.seek(dataOffset + firstFrame * 2 * channels)
         val block = ByteArray(64 * 1024)
         val mono = FloatArray(block.size / 2)
         val buffer = ByteBuffer.wrap(block).order(ByteOrder.LITTLE_ENDIAN)
-        var remaining = dataSize
+        var remaining = dataSize - firstFrame * 2 * channels
         while (remaining > 0) {
             requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
             val n = minOf(block.size.toLong(), remaining).toInt()
             file.readFully(block, 0, n)
             remaining -= n
-            out.inputUs = (dataSize - remaining) / (2 * channels) * 1_000_000 / sampleRate
             buffer.clear()
             val count = n / (2 * channels)
             for (i in 0 until count) {
@@ -204,7 +205,7 @@ object AudioDecoder {
         resampler.finish()
     }
 
-    private fun decodeCompressed(file: File, sink: Sink, skip: Long) {
+    private fun decodeCompressed(file: File, sink: Sink, resumeAt: Long) {
         val extractor = MediaExtractor()
         var decoder: MediaCodec? = null
         var started = false
@@ -224,7 +225,20 @@ object AudioDecoder {
             // Presized exactly for Ogg Opus; a container estimate that is wrong costs one trim or growth.
             sink.begin(opusSamples?.let { (it * Limits.ASR_RATE + 24000) / 48000 }
                 ?: durationUs?.let { it * Limits.ASR_RATE / 1_000_000 } ?: (Limits.ASR_RATE * 60L))
-            val out = Skipping(sink, skip)
+            var sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+            // Resume by seeking to the input the resampler needs for output [resumeAt], less the
+            // Opus 80 ms pre-roll so the decoder has settled; frames before it are dropped by time.
+            // A container that cannot seek there falls back to replaying from zero.
+            var resumeFrame = 0L
+            if (resumeAt > 0 && sampleRate in 8000..96000) {
+                val frame = StreamingResampler(sampleRate, resumeAt) { _, _ -> }.resumeInput(resumeAt)
+                val frameUs = frame * 1_000_000 / sampleRate
+                extractor.seekTo((frameUs - 80_000).coerceAtLeast(0), MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+                val landed = extractor.sampleTime
+                if (landed in 0..frameUs) resumeFrame = frame
+                else extractor.seekTo(0, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+            }
+            val out = if (resumeFrame > 0) Skipping(sink, resumeAt, resumeAt) else Skipping(sink, resumeAt)
             val mime = requireNotNull(format.getString(MediaFormat.KEY_MIME))
             val codec = MediaCodec.createDecoderByType(mime)
             decoder = codec
@@ -232,12 +246,11 @@ object AudioDecoder {
             codec.configure(format, null, null, 0)
             codec.start()
             started = true
-            var sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
             var channels = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
             var encoding = AudioFormat.ENCODING_PCM_16BIT
             var resampler: StreamingResampler? = null
             var mono = FloatArray(0)
-            var count = 0
+            var count = resumeFrame.toInt()
             var next: Int? = null
             var inputEnded = false
             var outputEnded = false
@@ -259,7 +272,6 @@ object AudioDecoder {
                             inputEnded = true
                         } else {
                             codec.queueInputBuffer(index, 0, size, extractor.sampleTime, 0)
-                            out.inputUs = extractor.sampleTime
                             extractor.advance()
                         }
                         lastProgress = System.nanoTime()
@@ -269,7 +281,8 @@ object AudioDecoder {
                     MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                         val output = codec.outputFormat
                         val nextRate = output.getInteger(MediaFormat.KEY_SAMPLE_RATE)
-                        requireUser(count == 0 || nextRate == sampleRate, Failure.AUDIO)
+                        // A resumed decode planned its seek at the track rate, so the rate may not change.
+                        requireUser((count == 0 && resumeFrame == 0L) || nextRate == sampleRate, Failure.AUDIO)
                         sampleRate = nextRate
                         channels = output.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
                         encoding = if (output.containsKey(MediaFormat.KEY_PCM_ENCODING))
@@ -294,7 +307,8 @@ object AudioDecoder {
                                 // An overlap keeps the audio already passed on: the resampler only moves forward.
                                 val skip = (count - firstFrame).coerceIn(0, playableFrames)
                                 if (playableFrames > skip) {
-                                    val stream = resampler ?: StreamingResampler(sampleRate, out::push).also { resampler = it }
+                                    val stream = resampler ?: (if (resumeFrame > 0) StreamingResampler(sampleRate, resumeAt, out::push)
+                                        else StreamingResampler(sampleRate, out::push)).also { resampler = it }
                                     if (firstFrame > count) stream.silence((firstFrame - count).toLong())
                                     buffer.position(info.offset + skip * sampleBytes * channels)
                                     if (mono.size < frames) mono = FloatArray(frames)

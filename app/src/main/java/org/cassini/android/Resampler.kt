@@ -64,6 +64,19 @@ internal fun resampleTo16k(samples: FloatArray, rate: Int): FloatArray {
  */
 internal class StreamingResampler(private val rate: Int, private val sink: (FloatArray, Int) -> Unit) {
     init { require(rate in 8000..96000) { "Unsupported sample rate $rate" } }
+
+    /**
+     * Continues a conversion at output sample [output]. The first input pushed must be input sample
+     * [resumeInput] of [output]; the output then equals the uninterrupted conversion from [output] on.
+     */
+    constructor(rate: Int, output: Long, sink: (FloatArray, Int) -> Unit) : this(rate, sink) {
+        base = resumeInput(output)
+        produced = output
+    }
+
+    /** The first input sample output [output] and every later output depend on. */
+    fun resumeInput(output: Long): Long =
+        if (rate == VAD_SAMPLE_RATE) output else max(0L, ceil(output * step - halfWidth).toLong())
     private val step = rate.toDouble() / VAD_SAMPLE_RATE
     private val crossingsPerSample = 2 * CUTOFF_FRACTION * min(rate, VAD_SAMPLE_RATE) / rate
     private val halfWidth = ZERO_CROSSINGS / crossingsPerSample
