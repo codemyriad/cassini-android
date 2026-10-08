@@ -105,9 +105,12 @@ class SettingsActivity : Activity() {
         private var countRequest = 0
 
         /** Saved voices, rebuilt on each resume so names given in a note appear here. Note counts scan every note, so they follow. */
-        private fun buildPeople() {
+        private fun buildPeople(countsChanged: Boolean = false) {
+            // After a forget the cached counts are wrong: show "counting" rather than old numbers.
+            if (countsChanged) counts = null
             showPeople()
             val request = ++countRequest
+            val app = app
             background.execute {
                 val found = try { app.noteVoices.noteCounts() } catch (error: Exception) { android.util.Log.w("Settings", "Could not count notes", error); return@execute }
                 main.post { if (isAdded && !isDetached && request == countRequest) { counts = found; showPeople() } }
@@ -164,7 +167,7 @@ class SettingsActivity : Activity() {
                     background.execute {
                         try { forget(app) } catch (error: Exception) { android.util.Log.w("Settings", "Could not forget voices", error) }
                         // A rotation may have replaced this fragment meanwhile: refresh whichever one is on screen.
-                        main.post { resumed.get()?.takeIf { it.isAdded }?.buildPeople() }
+                        main.post { resumed.get()?.takeIf { it.isAdded }?.buildPeople(countsChanged = true) }
                     }
                 }.show()
         }
