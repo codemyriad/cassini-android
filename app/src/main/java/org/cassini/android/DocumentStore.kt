@@ -34,7 +34,7 @@ internal class DocumentStore(private val context: Context) {
     }
     fun create(uri: Uri, audio: () -> PcmAudio, transcript: Transcript, name: String, processing: JSONObject,
                existing: CassiniDocument?, speakerLabels: Map<String, String> = emptyMap()): Pair<File, CassiniDocument> {
-        // Only Ogg Opus is kept as is, so anything else is never buffered: it is re-encoded at 48 kb/s instead.
+        // Only Ogg Opus up to MAX_FILE_BYTES is kept as is; anything else (or larger) is re-encoded at 16 kHz Opus instead.
         val original = (context.contentResolver.openInputStream(uri) ?: throw UserFacingException(Failure.OPEN)).use { input ->
             val head = ByteArray(OggOpus.HEAD_BYTES); var got = 0
             while (got < head.size) { val n = input.read(head, got, head.size - got); if (n < 0) break; got += n }
@@ -42,7 +42,7 @@ internal class DocumentStore(private val context: Context) {
             val out = java.io.ByteArrayOutputStream(); out.write(head, 0, got); val buffer = ByteArray(65536)
             while (true) {
                 val n = input.read(buffer); if (n < 0) break
-                requireUser(out.size().toLong() + n <= OggOpus.MAX_FILE_BYTES, Failure.LARGE)
+                if (out.size().toLong() + n > OggOpus.MAX_FILE_BYTES) return@use null
                 out.write(buffer, 0, n)
             }
             out.toByteArray()
