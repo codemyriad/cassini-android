@@ -28,7 +28,7 @@
     <string name="verifying">Checking model · %1$d%%</string>
     <string name="download_complete">Model ready. Everything runs on this phone.</string>
     <string name="decoding">Reading audio…</string>
-    <string name="transcribing">Transcribing… keep the app open.</string>
+    <string name="transcribing">Transcribing… you can leave this screen.</string>
     <string name="transcribing_progress">Transcribing · %1$d%% · %2$.1f× realtime · about %3$d s left</string>
     <string name="file_ready">Ready when you are.</string>
     <string name="transcript">TRANSCRIPT</string>
@@ -155,7 +155,6 @@
     <string name="speaker_models_download">Download speaker models?</string>
     <string name="speaker_models_summary">This optional download is about 62 MiB (99 MiB once installed). It tells apart up to 8 voices on your phone after transcription, and keeps the original transcript. Labels are guesses, especially when voices overlap. Keep the app open.</string>
     <string name="identifying_speakers">Identifying speakers…</string>
-    <string name="identifying_speakers_progress">Identifying speakers: %1$d%%</string>
     <string name="speakers_complete">%1$d speaker labels added in %2$.1f s. Check the labels against the audio.</string>
     <string name="error_speakers">No speaker turns were found. The original transcript is unchanged.</string>
     <string name="download_speaker_models">Download and identify</string>
@@ -166,4 +165,22 @@
     <string name="recording_near_limit">● Recording · stops automatically in 5 minutes</string>
     <string name="recording_focus_paused">Paused: another app is using audio. Tap Resume to continue.</string>
     <string name="recording_error_saved">Recording stopped by an error. The audio so far is saved in your library.</string>
+    <string name="processing_channel">Transcription</string>
+    <string name="processing_title_transcribing">Transcribing %1$s</string>
+    <string name="processing_title_speakers">Identifying speakers in %1$s</string>
+    <string name="processing_notification_progress">%1$d%% · %2$.1f× · about %3$s left</string>
+    <string name="processing_done">Ready: %1$s</string>
+    <plurals name="processing_failed_partial">
+        <item quantity="one">Processing stopped. %1$d word kept: open the note to continue.</item>
+        <item quantity="other">Processing stopped. %1$d words kept: open the note to continue.</item>
+    </plurals>
+    <string name="processing_failed">Processing failed: %1$s</string>
+    <string name="processing_cancelled">Processing cancelled</string>
+    <string name="processing_resuming">Resuming the interrupted transcription…</string>
+    <string name="processing_other_note">Another note is being processed. Try again when it is done.</string>
+    <string name="partial_transcript">Partial transcript up to %1$s. Processing stopped: tap Transcribe to continue.</string>
+    <string name="library_processing">Transcribing · %1$d%%</string>
+    <string name="library_processing_speed">Transcribing · %1$d%% · %2$.1f×</string>
+    <string name="library_partial">Partial transcript</string>
+    <string name="identifying_speakers_speed">Identifying speakers · %1$d%% · %2$.1f× realtime</string>
 </resources>

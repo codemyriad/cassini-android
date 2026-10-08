@@ -33,7 +33,7 @@ import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.Executors
 
-class MainActivity : Activity() {
+class MainActivity : Activity(), ProcessingJobs.Listener {
     private val worker = Executors.newSingleThreadExecutor()
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var ui: DeckViews
@@ -46,10 +46,14 @@ class MainActivity : Activity() {
     private lateinit var documents: DocumentStore
     private var player: MediaPlayer? = null
     private var playerReady = false
-    private var speakerCancellation: java.util.concurrent.atomic.AtomicBoolean? = null
     private var busy = false
-    /** Words of a transcription still running. Shown, never saved. */
+    /** Words of this note's transcription while the service runs it. Shown, never saved from here. */
     private var interim: Transcript? = null
+    /** The job of this note last seen running here, so its end is reported once. */
+    private var watched: ProcessingJob? = null
+    /** The finished job whose note this screen has already reloaded. */
+    private var synced: ProcessingJob? = null
+    private var renderedInterimAt = 0L
     private var highlightedWord = -1
     private var wordRanges = emptyList<IntRange>()
     private val activeBackground = BackgroundColorSpan(DeckViews.amber)
@@ -164,49 +168,71 @@ class MainActivity : Activity() {
         onUi { setStatus(R.string.download_complete); fetchSpeechDetector() }
     }
 
+    /** Hands the note to [ProcessingService]: the work outlives this screen, which only shows its progress. */
     private fun transcribe() {
-        val uri = session.uri?.let(Uri::parse) ?: return
-        val chosenModel = models
-        if (!chosenModel.ready()) { refreshControls(); return }
-        runWork(R.string.decoding) {
-            val totalBegan = System.nanoTime()
-            val audio = AudioDecoder.decode(this, uri)
-            requireUser(audio.durationMs >= 200, Failure.SHORT)
-            onUi { setStatus(R.string.transcribing) }
-            val detector = ModelStore.vadPath(filesDir).takeIf { ModelStore.vadReady(filesDir) }
-            val began = System.nanoTime()
-            val transcript = Parakeet.transcribe(audio, chosenModel, detector) { progress -> onUi { showProgress(progress) } }
-            val elapsed = (System.nanoTime() - began) / 1_000_000
-            // Processing records are machine-readable provenance, independent of UI language.
-            try {
-                File(filesDir, "latest.words.json").writeText(transcript.json())
-                File(filesDir, "latest.processing.json").writeText(JSONObject()
-                    .put("model", "nvidia/parakeet-tdt-0.6b-v3").put("modelRevision", chosenModel.revision)
-                    .put("runtime", "sherpa-onnx 1.13.7, stock frontend, CPU ${chosenModel.precision}, greedy, 2 threads")
-                    .put("language", "it (user-selected; automatic multilingual recognition)")
-                    .put("durationMs", audio.durationMs).put("inferenceMs", elapsed)
-                    .put("speakerAttribution", "single recording; no diarization")
-                    .put("segmentation", Parakeet.cutting(detector).provenance)
-                    .put("wordTimings", "TDT token-derived; words over silence dropped; ends follow continuing audio up to the punctuation-inclusive end")
-                    .toString(2))
-            } catch (error: IOException) { Log.e(TAG, "Could not cache processing artifacts", error) }
-            onUi { ui.progress.isIndeterminate = true; setStatus(R.string.packaging_document) }
-            val (file, portable) = documents.create(uri, { audio }, transcript, session.name, processing(chosenModel.precision, chosenModel.revision)
-                .put("x-inferenceMs", elapsed).put("x-segmentation", Parakeet.cutting(detector).provenance), document)
-            val processingMs = (System.nanoTime() - totalBegan) / 1_000_000
-            onUi {
-                val position = if (playerReady) player?.currentPosition ?: session.positionMs else session.positionMs
-                interim = null
-                session = session.copy(uri = Uri.fromFile(file).toString(), document = file.absolutePath,
-                    name = "${session.name.substringBeforeLast('.')}.opus", selectedVariant = portable.defaultId,
-                    durationMs = audio.durationMs, inferenceMs = elapsed, resultPrecision = chosenModel.precision, positionMs = position,
-                    processingMs = processingMs)
-                adoptDocument(portable)
-                preparePlayer(Uri.fromFile(file))
-                persistSession()
-                renderScreen()
-                defaultStatus()
+        if (session.uri == null) return
+        if (!models.ready()) { refreshControls(); return }
+        startProcessing(speakers = false)
+    }
+
+    private fun startProcessing(speakers: Boolean) {
+        persistSession()
+        val id = session.libraryId ?: run { setStatus(R.string.library_error, error = true); return }
+        val running = ProcessingJobs.current?.takeIf { ProcessingJobs.running && it.phase.active }
+        if (running != null && running.noteId != id) { setStatus(R.string.processing_other_note, error = true); return }
+        if (running == null) ProcessingService.start(this, id, session.name, speakers)
+        watched = ProcessingJob(id, session.name, speakers)
+        setStatus(if (speakers) R.string.identifying_speakers else R.string.decoding)
+        ui.progress.visibility = View.VISIBLE
+        ui.progress.isIndeterminate = true
+        refreshControls()
+    }
+
+    /** True while the service works on the note on screen. */
+    private fun processingHere(): Boolean = ProcessingJobs.running &&
+        ProcessingJobs.current?.let { it.phase.active && it.noteId == session.libraryId } == true
+
+    override fun onJobChanged(job: ProcessingJob?) {
+        if (isDestroyed || job == null || job.noteId != session.libraryId) { refreshControls(); return }
+        if (job.phase.active && ProcessingJobs.running) {
+            watched = job
+            showProgress(job)
+            return
+        }
+        if (job.phase.active || job === synced) return
+        // Finished, failed or stopped: the service saved the note; show what it saved.
+        val seen = watched != null
+        watched = null
+        synced = job
+        ui.progress.visibility = View.GONE
+        reloadNote {
+            when {
+                seen && job.phase == ProcessingJob.Phase.DONE && job.speakers -> setStatus(R.string.speakers_complete,
+                    session.transcript?.words?.map { it.speaker }?.distinct()?.size ?: 0, job.stageMs / 1000.0)
+                !seen || job.phase == ProcessingJob.Phase.DONE -> defaultStatus()
+                job.phase == ProcessingJob.Phase.CANCELLED -> setStatus(R.string.error_cancelled)
+                else -> setStatus((job.failure ?: Failure.UNKNOWN).stringRes, error = true)
             }
+        }
+    }
+
+    /** Re-reads this note from the library, which the service wrote, and its document. */
+    private fun reloadNote(then: () -> Unit) {
+        val id = session.libraryId ?: return then()
+        val fresh = try { library.load().firstOrNull { it.id == id }?.session } catch (error: Exception) {
+            Log.e(TAG, "Could not load note", error); null
+        } ?: return then()
+        val position = if (playerReady) player?.currentPosition ?: session.positionMs else session.positionMs
+        val moved = fresh.uri != session.uri
+        session = fresh.copy(positionMs = position, screen = screen)
+        interim = null
+        try { sessions.save(session) } catch (error: Exception) { Log.e(TAG, "Could not persist session", error) }
+        if (moved) session.uri?.let { preparePlayer(Uri.parse(it)) }
+        val path = fresh.document
+        if (path == null) { document = null; renderScreen(); then(); return }
+        worker.execute {
+            val loaded = try { CassiniDocument.read(File(path)) } catch (error: Exception) { Log.e(TAG, "Could not open document", error); null }
+            onUi { adoptDocument(loaded); renderScreen(); then() }
         }
     }
 
@@ -219,83 +245,31 @@ class MainActivity : Activity() {
             .setPositiveButton(R.string.download_speaker_models) { _, _ -> identifySpeakers() }.show()
     }
 
+    /** Cancels the job of this note; its settled words stay in the note. */
     private fun cancelSpeakerIdentification() {
-        speakerCancellation?.set(true)
-        returnToLibrary()
+        if (processingHere()) ProcessingService.cancel(this)
     }
 
     private fun identifySpeakers() {
-        if (busy || (document != null && document?.state != "ok")) return
-        val source = session.transcript?.takeIf { it.words.isNotEmpty() } ?: return
-        val uri = session.uri?.let(Uri::parse) ?: return
-        val original = session
-        val originalDocument = document
-        val sourceId = original.selectedVariant
-        val cancelled = java.util.concurrent.atomic.AtomicBoolean()
-        speakerCancellation = cancelled
-        ui.cancelOperation.visibility = View.VISIBLE
+        if (busy || processingHere() || (document != null && document?.state != "ok")) return
+        if (session.transcript?.words?.isNotEmpty() != true || session.uri == null) return
         val speakerModels = DiarizationModels.inFiles(filesDir)
-        fun checkActive() = requireUser(!cancelled.get() && !Thread.currentThread().isInterrupted, Failure.CANCELLED)
-        runWork(if (speakerModels.ready()) R.string.identifying_speakers else R.string.preparing_download) {
-            if (!speakerModels.ready()) speakerModels.install { progress -> onUi {
-                if (!cancelled.get()) {
-                    ui.progress.isIndeterminate = false
-                    ui.progress.progress = progress.percent
-                    setStatus(if (progress.verifying) R.string.verifying else R.string.downloading, progress.percent)
-                }
+        if (speakerModels.ready()) { startProcessing(speakers = true); return }
+        runWork(R.string.preparing_download) {
+            speakerModels.install { progress -> onUi {
+                ui.progress.isIndeterminate = false
+                ui.progress.progress = progress.percent
+                setStatus(if (progress.verifying) R.string.verifying else R.string.downloading, progress.percent)
             } }
-            checkActive()
-            onUi { ui.progress.isIndeterminate = true; setStatus(R.string.identifying_speakers) }
-            val began = System.nanoTime()
-            // Only the duration outlives diarization; a source that needs re-encoding is decoded again.
-            var audio: PcmAudio? = AudioDecoder.decode(this, uri)
-            val durationMs = audio!!.durationMs
-            checkActive()
-            val turns = Diarization.turns(audio, speakerModels.modelPath) { done, total ->
-                onUi {
-                    if (!cancelled.get() && total > 0) {
-                        val percent = (done * 100L / total).toInt().coerceIn(0, 100)
-                        ui.progress.isIndeterminate = false; ui.progress.progress = percent
-                        setStatus(R.string.identifying_speakers_progress, percent)
-                    }
-                }
-            }
-            audio = null
-            checkActive()
-            val elapsed = (System.nanoTime() - began) / 1_000_000
-            val previousProcessing = originalDocument?.manifest?.optJSONObject("provenance")?.optJSONObject("speechToText")?.optJSONObject(sourceId ?: "")
-            val result = SpeakerAttribution.derive(source, turns, previousProcessing, sourceId, elapsed, originalDocument?.manifest?.optJSONObject("provenance")?.optJSONObject("attribution"))
-            val labels = result.transcript.words.map { it.speaker }.distinct().mapIndexed { index, id ->
-                id to getString(R.string.speaker_label, index + 1)
-            }.toMap()
-            onUi { ui.progress.isIndeterminate = true; setStatus(R.string.packaging_document) }
-            checkActive()
-            val (file, portable) = documents.create(uri, { AudioDecoder.decode(this, uri) }, result.transcript, original.name,
-                result.processing, originalDocument, labels)
-            // A completed native call may outlive its screen. Never publish a cancelled result,
-            // and remove only this job's new immutable document when it cannot be adopted.
-            handler.post {
-                if (isDestroyed || isFinishing || cancelled.get()) file.delete()
-                else {
-                    val position = if (playerReady) player?.currentPosition ?: session.positionMs else session.positionMs
-                    session = original.copy(uri = Uri.fromFile(file).toString(), document = file.absolutePath,
-                        name = "${original.name.substringBeforeLast('.')}.opus", selectedVariant = portable.defaultId,
-                        durationMs = durationMs, positionMs = position,
-                        processingMs = maxOf(original.processingMs, original.inferenceMs) + elapsed)
-                    adoptDocument(portable); preparePlayer(Uri.fromFile(file)); persistSession(); renderScreen()
-                    setStatus(R.string.speakers_complete, labels.size, elapsed / 1000.0)
-                }
-            }
+            onUi { handler.post { if (!isDestroyed && !busy) startProcessing(speakers = true) } }
         }
     }
 
-    private fun processing(precision: String, revision: String? = null): JSONObject = JSONObject()
-        .put("backend", "sherpa-onnx").put("engine", "Parakeet TDT")
-        .put("model", "nvidia/parakeet-tdt-0.6b-v3 $precision")
-        .put("device", "Android CPU").put("language", "it")
-        .put("source", "recording").put("version", "sherpa-onnx 1.13.7${revision?.let { "; model revision $it" }.orEmpty()}")
+    private fun processing(precision: String, revision: String? = null): JSONObject = ProcessingPipeline.processing(precision, revision)
 
     private fun saveCassiniDocument() {
+        // Settled words of a stopped job are not a complete transcript: never package them as one.
+        if (session.partial) { setStatus(R.string.partial_transcript, clock(session.transcript?.words?.lastOrNull()?.endMs ?: 0)); return }
         if (session.document == null) {
             val transcript = session.transcript ?: return
             val uri = session.uri?.let(Uri::parse) ?: return
@@ -353,7 +327,9 @@ class MainActivity : Activity() {
             val selected = portable.selected(session.selectedVariant)
             val inference = portable.manifest?.optJSONObject("provenance")?.optJSONObject("speechToText")
                 ?.optJSONObject(selected?.id.orEmpty())?.optLong("x-inferenceMs", session.inferenceMs) ?: session.inferenceMs
-            session = session.copy(transcript = selected?.transcript, selectedVariant = selected?.id, inferenceMs = inference)
+            // A stopped job's partial words are newer than the document they will replace.
+            session = session.copy(transcript = if (session.partial) session.transcript else selected?.transcript,
+                selectedVariant = selected?.id, inferenceMs = inference)
         }
         highlightedWord = -1
     }
@@ -424,6 +400,8 @@ class MainActivity : Activity() {
                     else -> Failure.OPEN
                 }
                 onUi { setStatus(failure.stringRes, error = true) }
+            } catch (error: InterruptedException) {
+                Log.i(TAG, "Operation interrupted", error)
             } catch (error: Exception) {
                 Log.e(TAG, "Operation failed", error)
                 onUi { setStatus(R.string.error_unknown, error = true) }
@@ -433,10 +411,6 @@ class MainActivity : Activity() {
             } finally {
                 onUi {
                     busy = false
-                    speakerCancellation = null
-                    ui.cancelOperation.visibility = View.GONE
-                    // A run that failed or was cancelled leaves no partial transcript on screen.
-                    if (interim != null) { interim = null; renderScreen() }
                     window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                     ui.progress.visibility = View.GONE
                     refreshControls()
@@ -456,30 +430,39 @@ class MainActivity : Activity() {
         Thread { installSpeechDetector(directory) }.start()
     }
 
-    /** Progress, speed and time left come from the pieces decoded so far; their words are shown as they arrive. */
-    private fun showProgress(progress: Parakeet.Progress) {
-        if (!busy) return
-        val percent = if (progress.totalMs > 0) (progress.doneMs * 100 / progress.totalMs).toInt().coerceIn(0, 100) else 0
+    /** Progress, speed and time left of the service's job; its settled and pending words are shown as they arrive. */
+    private fun showProgress(job: ProcessingJob) {
+        ui.progress.visibility = View.VISIBLE
+        ui.cancelOperation.visibility = View.VISIBLE
         // Nothing is measured until the first piece is decoded.
-        ui.progress.isIndeterminate = progress.doneMs <= 0
-        ui.progress.progress = percent
-        val speed = ProcessingSpeed.realtime(progress.doneMs, progress.elapsedMs)
-        val remaining = ProcessingSpeed.remainingMs(progress.doneMs, progress.totalMs, progress.elapsedMs)
-        if (speed == null || remaining == null) setStatus(R.string.transcribing)
-        else setStatus(R.string.transcribing_progress, percent, speed, (remaining + 999) / 1000)
-        if (progress.words != interim?.words && (progress.words.isNotEmpty() || interim != null)) {
-            val first = interim == null
-            val follow = ui.scroll.getChildAt(0).height - ui.scroll.height - ui.scroll.scrollY <= ui.scroll.height / 4
-            interim = Transcript(progress.words)
-            highlightedWord = -1
-            renderScreen()
-            if (first || follow) ui.transcript.post {
-                if (busy && !isDestroyed) {
-                    val bounds = android.graphics.Rect()
-                    ui.transcript.getDrawingRect(bounds)
-                    ui.scroll.offsetDescendantRectToMyCoords(ui.transcript, bounds)
-                    ui.scroll.smoothScrollTo(0, if (first) bounds.top else (bounds.bottom - ui.scroll.height).coerceAtLeast(0))
-                }
+        ui.progress.isIndeterminate = job.doneMs <= 0 || job.phase == ProcessingJob.Phase.PACKAGE
+        ui.progress.progress = job.percent
+        val speed = job.speed
+        val remaining = job.remainingMs
+        when (job.phase) {
+            ProcessingJob.Phase.QUEUED, ProcessingJob.Phase.DECODE -> setStatus(R.string.decoding)
+            ProcessingJob.Phase.PACKAGE -> setStatus(R.string.packaging_document)
+            ProcessingJob.Phase.DIARIZE -> if (speed == null || job.doneMs <= 0) setStatus(R.string.identifying_speakers)
+                else setStatus(R.string.identifying_speakers_speed, job.percent, speed)
+            else -> if (speed == null || remaining == null) setStatus(R.string.transcribing)
+                else setStatus(R.string.transcribing_progress, job.percent, speed, (remaining + 999) / 1000)
+        }
+        if (job.phase != ProcessingJob.Phase.ASR || job.words.isEmpty() || job.words === interim?.words) { refreshControls(); return }
+        // A full rebuild per tick grows with the transcript: a long one is refreshed less often.
+        val now = android.os.SystemClock.uptimeMillis()
+        if (interim != null && now - renderedInterimAt < (1000L + job.words.size / 4).coerceAtMost(5000)) return
+        renderedInterimAt = now
+        val first = interim == null
+        val follow = ui.scroll.getChildAt(0).height - ui.scroll.height - ui.scroll.scrollY <= ui.scroll.height / 4
+        interim = Transcript(job.words)
+        highlightedWord = -1
+        renderScreen()
+        if (first || follow) ui.transcript.post {
+            if (interim != null && !isDestroyed) {
+                val bounds = android.graphics.Rect()
+                ui.transcript.getDrawingRect(bounds)
+                ui.scroll.offsetDescendantRectToMyCoords(ui.transcript, bounds)
+                ui.scroll.smoothScrollTo(0, if (first) bounds.top else (bounds.bottom - ui.scroll.height).coerceAtLeast(0))
             }
         }
     }
@@ -491,6 +474,7 @@ class MainActivity : Activity() {
     }
     private fun defaultStatus() {
         when {
+            session.partial -> setStatus(R.string.partial_transcript, clock(session.transcript?.words?.lastOrNull()?.endMs ?: 0))
             session.transcript != null && session.processingMs > 0 -> setStatus(R.string.processing_speed,
                 session.processingMs / 1000.0, ProcessingSpeed.realtime(session.durationMs, session.processingMs) ?: 0.0)
             session.transcript != null && session.inferenceMs > 0 -> setStatus(R.string.transcription_speed,
@@ -507,14 +491,18 @@ class MainActivity : Activity() {
             models.precision)
         ui.download.text = getString(R.string.download_model, getString(R.string.model_size_int8))
         ui.download.visibility = if (ready) View.GONE else View.VISIBLE
+        // Processing runs in the service: only this note's own processing controls wait for it.
+        val processing = processingHere()
         ui.menu.isEnabled = !busy
         ui.library.isEnabled = !busy
-        ui.open.isEnabled = !busy
-        ui.transcribe.isEnabled = !busy && session.uri != null && ready && (document == null || document?.state == "ok")
-        ui.speakers.visibility = if (session.transcript?.words?.isNotEmpty() == true && interim == null) View.VISIBLE else View.GONE
-        ui.speakers.isEnabled = !busy && session.uri != null && (document == null || document?.state == "ok")
+        ui.open.isEnabled = !busy && !processing
+        ui.transcribe.isEnabled = !busy && !processing && session.uri != null && ready && (document == null || document?.state == "ok")
+        ui.speakers.visibility = if (session.transcript?.words?.isNotEmpty() == true && interim == null && !session.partial) View.VISIBLE else View.GONE
+        ui.speakers.isEnabled = !busy && !processing && session.uri != null && (document == null || document?.state == "ok")
+        ui.cancelOperation.visibility = if (processing) View.VISIBLE else View.GONE
+        if (!processing && !busy) ui.progress.visibility = View.GONE
         ui.download.isEnabled = !busy
-        ui.export.isEnabled = !busy && (session.document != null || session.transcript != null)
+        ui.export.isEnabled = !busy && !processing && !session.partial && (session.document != null || session.transcript != null)
         ui.documentInfo.isEnabled = !busy
         ui.variant.isEnabled = !busy
         ui.play.isEnabled = playerReady
@@ -526,11 +514,11 @@ class MainActivity : Activity() {
     }
 
     private fun renderScreen() {
-        ui.draft.visibility = if (interim != null) View.VISIBLE else View.GONE
+        ui.draft.visibility = if (interim != null || session.partial) View.VISIBLE else View.GONE
         ui.filename.text = document?.title?.takeIf { it.isNotBlank() } ?: session.name.ifBlank { getString(R.string.no_file) }
         ui.caption.text = if (document == null) getString(R.string.voice_caption, getString(R.string.italian)) else "${getString(R.string.cassini_document)}\n${session.name}"
         // Words of a running transcription belong to no document yet: not to its trust state, variants or speakers.
-        ui.trust.visibility = if (document == null || interim != null) View.GONE else View.VISIBLE
+        ui.trust.visibility = if (document == null || interim != null || session.partial) View.GONE else View.VISIBLE
         document?.let {
             ui.trust.setText(trustResource(it.state))
             ui.trust.setTextColor(if (it.state == "ok") DeckViews.amber else DeckViews.warning)
@@ -597,7 +585,7 @@ class MainActivity : Activity() {
                 val previous = words[index - 1]
                 builder.append(if (previous.speaker != word.speaker || previous.text.lastOrNull() in listOf('.', '?', '!')) "\n\n" else " ")
             }
-            if (document != null && interim == null && (index == 0 || words[index - 1].speaker != word.speaker)) {
+            if (document != null && interim == null && !session.partial && (index == 0 || words[index - 1].speaker != word.speaker)) {
                 builder.append(document?.speakerLabel(word.speaker)?.takeUnless { it == word.speaker } ?: getString(R.string.unknown_speaker, word.speaker)).append("\n")
             }
             val start = builder.length
@@ -765,7 +753,13 @@ class MainActivity : Activity() {
         try {
             // The session another screen left there, or one from before the notes library, reaches the catalogue before it is replaced.
             if (preferences.screen != screen) library.adopt(preferences)
-            sessions.save(session); session = library.save(session); sessions.save(session)
+            val id = session.libraryId
+            if (id != null && ProcessingJobs.current?.noteId == id && ProcessingJobs.current !== synced) {
+                // The service owns this note's transcript and document until this screen has reloaded them.
+                val position = session.positionMs
+                library.update(id) { it.copy(positionMs = position) }
+                sessions.save(session)
+            } else { sessions.save(session); session = library.save(session); sessions.save(session) }
         } catch (error: Exception) { Log.e(TAG, "Could not persist session", error); setStatus(R.string.library_error, error = true) }
     }
     override fun onSaveInstanceState(outState: Bundle) {
@@ -777,10 +771,20 @@ class MainActivity : Activity() {
         outState.putString("screen", screen)
         super.onSaveInstanceState(outState)
     }
+    override fun onStart() {
+        super.onStart()
+        ProcessingJobs.addListener(this)
+        onJobChanged(ProcessingJobs.load(filesDir))
+    }
+    override fun onStop() {
+        ProcessingJobs.removeListener(this)
+        super.onStop()
+    }
     override fun onResume() {
         super.onResume()
         if (!busy) refreshControls()
         fetchSpeechDetector()
+        resumeInterrupted()
         maybeAutoTranscribe()
         handler.post(ticker)
     }
@@ -793,7 +797,7 @@ class MainActivity : Activity() {
     }
     override fun onDestroy() {
         handler.removeCallbacks(ticker)
-        speakerCancellation?.set(true)
+        // Downloads stop with the screen; transcription runs in ProcessingService and does not.
         worker.shutdownNow()
         player?.release()
         super.onDestroy()
@@ -801,8 +805,19 @@ class MainActivity : Activity() {
     private fun maybeAutoTranscribe() {
         if (autoTranscribe && !busy && models.ready() && session.uri != null) {
             autoTranscribe = false
-            transcribe()
+            if (!processingHere()) transcribe()
         }
+    }
+
+    /** A job the process lost (killed, or stopped by the system) continues from its checkpoints now that Cassini is in front. */
+    private fun resumeInterrupted() {
+        val job = ProcessingJobs.interrupted(filesDir) ?: return
+        if (job.attempts >= MAX_ATTEMPTS || !models.ready()) {
+            ProcessingJobs.update(filesDir, job.copy(phase = ProcessingJob.Phase.FAILED, failure = job.failure ?: Failure.UNKNOWN), persist = true)
+            return
+        }
+        ProcessingService.start(this, job.noteId, job.name, job.speakers)
+        if (job.noteId == session.libraryId) { watched = job; setStatus(R.string.processing_resuming); refreshControls() }
     }
     private fun returnToLibrary() {
         persistSession()
@@ -811,7 +826,7 @@ class MainActivity : Activity() {
     }
     @Deprecated("Framework back callback")
     override fun onBackPressed() {
-        if (speakerCancellation != null) cancelSpeakerIdentification() else if (!busy) returnToLibrary()
+        if (!busy) returnToLibrary()
     }
     companion object {
         /** One attempt per process: a network that cannot reach the detector must not be retried at every note. */
@@ -823,6 +838,8 @@ class MainActivity : Activity() {
             try { ModelStore.installVad(filesDir) { } } catch (error: Exception) { Log.w(TAG, "Speech detector unavailable", error) }
         }
 
+        /** Runs of one job before a job that keeps ending the process is given up. */
+        private const val MAX_ATTEMPTS = 4
         const val OPEN_FILE = 1; const val SAVE_DOCUMENT = 2; private const val TAG = "Cassini"
         const val NOTE_ID = "noteId"; const val SEARCH_QUERY = "searchQuery"
         const val REQUEST_IMPORT = "requestImport"; const val AUTO_TRANSCRIBE = "autoTranscribe"

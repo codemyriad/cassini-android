@@ -64,8 +64,15 @@ internal object WordGate {
      * word's last token short of the sound. The cap is consumed here: kept words come back plain.
      * Without samples or a sample rate nothing can be measured, so words pass through unchanged.
      */
-    fun filterWordsByEnergy(samples: FloatArray, sampleRate: Int, words: List<TimedWord>): List<Word> {
-        if (words.isEmpty() || samples.isEmpty() || sampleRate <= 0) return words.map { it.word }
+    fun filterWordsByEnergy(samples: FloatArray, sampleRate: Int, words: List<TimedWord>): List<Word> =
+        filterWordsByEnergy(ArrayReader(samples), sampleRate, words)
+
+    /** [finalizeTranscriptWords] over a recording read through [samples], such as the decode cache. */
+    fun finalizeTranscriptWords(samples: SampleReader, sampleRate: Int, words: List<TimedWord>, paddedTailMs: Long): List<Word> =
+        filterWordsByEnergy(samples, sampleRate, clampWordsToTimelineEnd(words, samples.size.toLong() * 1000 / sampleRate, paddedTailMs))
+
+    fun filterWordsByEnergy(samples: SampleReader, sampleRate: Int, words: List<TimedWord>): List<Word> {
+        if (words.isEmpty() || samples.size == 0 || sampleRate <= 0) return words.map { it.word }
         val audioEndMs = samples.size.toLong() * 1000 / sampleRate
         val minimumActiveSamples = (sampleRate * MIN_ACTIVE_MS + 999) / 1000
         return words.mapNotNull { timed ->
@@ -101,7 +108,10 @@ internal object WordGate {
      * window: never past the cap, so never past the punctuation-inclusive end, and never before the
      * word's own end, so no speech is cut. Silence right after the word leaves its end alone.
      */
-    fun wordEndOverContinuingAudio(samples: FloatArray, sampleRate: Int, timed: TimedWord, audioEndMs: Long): Long {
+    fun wordEndOverContinuingAudio(samples: FloatArray, sampleRate: Int, timed: TimedWord, audioEndMs: Long): Long =
+        wordEndOverContinuingAudio(ArrayReader(samples), sampleRate, timed, audioEndMs)
+
+    fun wordEndOverContinuingAudio(samples: SampleReader, sampleRate: Int, timed: TimedWord, audioEndMs: Long): Long {
         val end = timed.word.endMs
         val capMs = minOf(timed.extentCapMs, audioEndMs)
         if (capMs <= end || sampleRate <= 0) return end

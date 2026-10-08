@@ -68,18 +68,31 @@ internal object SpeechWindows {
      * frame can still be a closure inside a word, so the caller decodes [CUT_CONTEXT_MS] of the recording
      * past each cut on both sides and reconciles the two readings. The pieces cover the span back to back.
      */
-    fun quietPieces(samples: FloatArray, span: Span, sampleRate: Int): List<Span> {
+    fun quietPieces(samples: FloatArray, span: Span, sampleRate: Int): List<Span> =
+        quietPieces(ArraySource(PcmAudio(samples, sampleRate)), span.start, span.end).toList()
+
+    /**
+     * [quietPieces] of [source] from [start] to [end], or to the end of the input when [end] is null.
+     * Lazy: each cut reads only the 5 s it is chosen from, waiting for samples still being decoded.
+     */
+    fun quietPieces(source: AudioSource, start: Int, end: Int?): Sequence<Span> = sequence {
+        val sampleRate = source.sampleRate
         require(sampleRate > 0)
         val whole = samples(WHOLE_SPAN_MS, sampleRate)
-        val out = ArrayList<Span>()
-        var start = span.start
-        while (span.end - start > whole) {
-            val cut = quietest(samples, start + samples(CUT_FROM_MS, sampleRate), start + samples(CUT_TO_MS, sampleRate), sampleRate)
-            out += Span(start, cut)
-            start = cut
+        var from = start
+        while (true) {
+            val limit = end ?: source.await(from + whole + 1)
+            if (limit - from <= whole) {
+                if (limit > from) yield(Span(from, limit))
+                break
+            }
+            val a = from + samples(CUT_FROM_MS, sampleRate)
+            val b = from + samples(CUT_TO_MS, sampleRate)
+            source.await(b)
+            val cut = a + quietest(source.read(a, b - a), 0, b - a, sampleRate)
+            yield(Span(from, cut))
+            from = cut
         }
-        if (span.end > start) out += Span(start, span.end)
-        return out
     }
 
     /** Centre of the lowest-energy frame inside [from, to), the earliest on a tie. */

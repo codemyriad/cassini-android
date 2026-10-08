@@ -27,7 +27,7 @@
     <string name="verifying">Verifica del modello · %1$d%%</string>
     <string name="download_complete">Modello pronto. Tutto viene elaborato sul telefono.</string>
     <string name="decoding">Lettura dell’audio…</string>
-    <string name="transcribing">Trascrizione in corso… tieni aperta l’app.</string>
+    <string name="transcribing">Trascrizione in corso… puoi lasciare questa schermata.</string>
     <string name="transcribing_progress">Trascrizione · %1$d%% · %2$.1f× tempo reale · circa %3$d s rimanenti</string>
     <string name="file_ready">Pronto quando vuoi.</string>
     <string name="transcript">TRASCRIZIONE</string>
@@ -152,7 +152,6 @@
     <string name="speaker_models_download">Scaricare i modelli per le voci?</string>
     <string name="speaker_models_summary">Questo download facoltativo occupa circa 62 MiB (99 MiB una volta installato). Distingue fino a 8 voci sul telefono dopo la trascrizione, mantenendo il testo originale. Le etichette sono stime, soprattutto quando le voci si sovrappongono. Tieni aperta l’app.</string>
     <string name="identifying_speakers">Distinzione delle voci…</string>
-    <string name="identifying_speakers_progress">Distinzione delle voci: %1$d%%</string>
     <string name="speakers_complete">%1$d etichette vocali aggiunte in %2$.1f s. Controllale ascoltando l’audio.</string>
     <string name="error_speakers">Nessun turno di parola trovato. La trascrizione originale è invariata.</string>
     <string name="download_speaker_models">Scarica e distingui le voci</string>
@@ -163,4 +162,23 @@
     <string name="recording_near_limit">● Registrazione · si ferma da sola tra 5 minuti</string>
     <string name="recording_focus_paused">In pausa: un’altra app usa l’audio. Tocca Riprendi per continuare.</string>
     <string name="recording_error_saved">La registrazione si è fermata per un errore. L’audio fin qui è salvato nella libreria.</string>
+    <string name="processing_channel">Trascrizione</string>
+    <string name="processing_title_transcribing">Trascrizione di %1$s</string>
+    <string name="processing_title_speakers">Distinzione delle voci in %1$s</string>
+    <string name="processing_notification_progress">%1$d%% · %2$.1f× · circa %3$s rimanenti</string>
+    <string name="processing_done">Pronta: %1$s</string>
+    <plurals name="processing_failed_partial">
+        <item quantity="one">Elaborazione interrotta. %1$d parola conservata: apri la nota per continuare.</item>
+        <item quantity="many">Elaborazione interrotta. %1$d parole conservate: apri la nota per continuare.</item>
+        <item quantity="other">Elaborazione interrotta. %1$d parole conservate: apri la nota per continuare.</item>
+    </plurals>
+    <string name="processing_failed">Elaborazione non riuscita: %1$s</string>
+    <string name="processing_cancelled">Elaborazione annullata</string>
+    <string name="processing_resuming">Ripresa della trascrizione interrotta…</string>
+    <string name="processing_other_note">È in corso l’elaborazione di un’altra nota. Riprova quando è finita.</string>
+    <string name="partial_transcript">Trascrizione parziale fino a %1$s. Elaborazione interrotta: tocca Trascrivi per continuare.</string>
+    <string name="library_processing">Trascrizione · %1$d%%</string>
+    <string name="library_processing_speed">Trascrizione · %1$d%% · %2$.1f×</string>
+    <string name="library_partial">Trascrizione parziale</string>
+    <string name="identifying_speakers_speed">Distinzione delle voci · %1$d%% · %2$.1f× tempo reale</string>
 </resources>

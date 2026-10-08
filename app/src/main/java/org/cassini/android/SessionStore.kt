@@ -11,6 +11,8 @@ data class Session(
     val document: String? = null, val selectedVariant: String? = null,
     val processingMs: Long = 0,
     val libraryId: String? = null,
+    /** [transcript] holds the settled words of a processing job that stopped: not a complete transcript. */
+    val partial: Boolean = false,
     /** The viewer that wrote session.json last. Not part of a note. */
     val screen: String? = null,
 )
@@ -30,18 +32,20 @@ class SessionStore(directory: File) {
             processingMs = json.optLong("processingMs"),
             libraryId = json.optString("libraryId").takeIf { it.isNotEmpty() },
             screen = json.optString("screen").takeIf { it.isNotEmpty() },
+            partial = json.optBoolean("partial"),
         )
     } catch (_: Exception) { Session() }
 
     fun save(session: Session) {
         val json = JSONObject().put("uri", session.uri ?: "").put("name", session.name)
-            .put("transcript", session.transcript?.takeIf { session.document == null }?.let { JSONObject(it.json()) })
+            .put("transcript", session.transcript?.takeIf { session.document == null || session.partial }?.let { JSONObject(it.json()) })
             .put("durationMs", session.durationMs).put("inferenceMs", session.inferenceMs)
             .put("positionMs", session.positionMs)
             .put("resultPrecision", session.resultPrecision)
             .put("document", session.document ?: "").put("selectedVariant", session.selectedVariant ?: "")
             .put("processingMs", session.processingMs)
             .put("libraryId", session.libraryId ?: "").put("screen", session.screen ?: "")
+            .put("partial", session.partial)
         val stream = file.startWrite()
         try {
             stream.write(json.toString().toByteArray(Charsets.UTF_8))

@@ -14,7 +14,7 @@ import java.util.Calendar
 import java.util.Date
 import java.util.concurrent.Executors
 
-class LibraryActivity : Activity() {
+class LibraryActivity : Activity(), ProcessingJobs.Listener {
     private lateinit var views: NoteViews
     private lateinit var store: LibraryStore
     private lateinit var cards: LinearLayout
@@ -25,6 +25,9 @@ class LibraryActivity : Activity() {
     private var notes = emptyList<LibraryNote>()
     private var loading = true
     private val worker = Executors.newSingleThreadExecutor()
+    /** The card line of the note being processed, updated in place on every progress tick. */
+    private var jobLine: TextView? = null
+    private var jobNote: String? = null
 
     override fun attachBaseContext(newBase: Context) = super.attachBaseContext(AppLanguage.wrap(newBase))
 
@@ -86,12 +89,53 @@ class LibraryActivity : Activity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        ProcessingJobs.addListener(this)
+        ProcessingJobs.load(filesDir)
+    }
+
+    override fun onStop() {
+        ProcessingJobs.removeListener(this)
+        super.onStop()
+    }
+
     override fun onResume() {
         super.onResume()
-        if (!loading) {
-            try { notes = store.load(); refresh() }
-            catch (error: Exception) { android.util.Log.e("Cassini", "Library refresh failed", error); summary.setText(R.string.library_error) }
+        resumeInterrupted()
+        if (!loading) reload()
+    }
+
+    /** Reads the catalogue off the main thread: it grows with every note and transcript. */
+    private fun reload() {
+        worker.execute {
+            try {
+                val loaded = store.load()
+                runOnUiThread { if (!isDestroyed) { notes = loaded; refresh() } }
+            } catch (error: Exception) {
+                android.util.Log.e("Cassini", "Library refresh failed", error)
+                runOnUiThread { if (!isDestroyed) summary.setText(R.string.library_error) }
+            }
         }
+    }
+
+    /** As in the note screen: a job the process lost continues now that Cassini is in front. */
+    private fun resumeInterrupted() {
+        val job = ProcessingJobs.interrupted(filesDir) ?: return
+        if (job.attempts < 4 && ModelStore(File(filesDir, "parakeet-v3")).ready()) ProcessingService.start(this, job.noteId, job.name, job.speakers)
+        else ProcessingJobs.update(filesDir, job.copy(phase = ProcessingJob.Phase.FAILED, failure = job.failure ?: Failure.UNKNOWN), persist = true)
+    }
+
+    override fun onJobChanged(job: ProcessingJob?) {
+        if (job == null || loading) return
+        if (job.noteId != jobNote || !job.phase.active) { reload(); return }
+        jobLine?.text = progressText(job)
+    }
+
+    private fun progressText(job: ProcessingJob): String {
+        val speed = job.speed
+        return if (speed != null && job.doneMs > 0) getString(R.string.library_processing_speed, job.percent, speed)
+            else getString(R.string.library_processing, job.percent)
     }
 
     private fun refresh() {
@@ -103,6 +147,9 @@ class LibraryActivity : Activity() {
 
     private fun renderNotes() {
         cards.removeAllViews()
+        jobLine = null
+        val active = ProcessingJobs.current?.takeIf { ProcessingJobs.running && it.phase.active }
+        jobNote = active?.noteId
         val search = query.text.toString().trim()
         val matches = notes.filter { it.matches(search) }
         if (matches.isEmpty()) {
@@ -142,6 +189,14 @@ class LibraryActivity : Activity() {
                 text = getString(R.string.library_note_metadata, DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(note.createdAt)),
                     getString(if (note.session.document != null) R.string.library_saved_document else R.string.library_recorded))
             }, top = 12)
+            if (active?.noteId == note.id || note.session.partial) {
+                val line = views.text(12f, views.accent).apply {
+                    text = if (active?.noteId == note.id) progressText(active) else getString(R.string.library_partial)
+                    accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+                }
+                if (active?.noteId == note.id) jobLine = line
+                views.add(card, line, top = 6)
+            }
             views.add(cards, card, top = 10)
         }
     }

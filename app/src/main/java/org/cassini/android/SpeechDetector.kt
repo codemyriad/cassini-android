@@ -49,7 +49,15 @@ internal class SpeechDetector(modelPath: String) : AutoCloseable {
          * drains the rest. Empty segments are skipped. Interruption is checked at every drain. Returns the
          * zeros appended to the last window, 0 when it was full: the detector heard that much synthetic tail.
          */
-        fun feed(stream: Stream, samples: FloatArray, onSegment: (SpeechSegment) -> Unit): Int {
+        fun feed(stream: Stream, samples: FloatArray, onSegment: (SpeechSegment) -> Unit): Int =
+            feed(stream, ArraySource(PcmAudio(samples, VAD_SAMPLE_RATE)), 0, onSegment)
+
+        /**
+         * [feed] over 16 kHz [source] from sample [from], waiting for samples a decoder is still writing.
+         * Segment starts stay relative to [from], as the detector counts from its reset.
+         */
+        fun feed(stream: Stream, source: AudioSource, from: Int, onSegment: (SpeechSegment) -> Unit): Int {
+            require(source.sampleRate == VAD_SAMPLE_RATE)
             fun drain() {
                 requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
                 while (!stream.empty()) {
@@ -61,18 +69,31 @@ internal class SpeechDetector(modelPath: String) : AutoCloseable {
             stream.reset()
             var sinceDrain = 0
             var padding = 0
-            var offset = 0
-            while (offset < samples.size) {
-                val end = minOf(offset + WINDOW, samples.size)
+            // Read in blocks of whole windows: one cache read per block, not per 32 ms window.
+            val block = FloatArray(WINDOW * 160)
+            var blockStart = from
+            var blockLength = 0
+            var offset = from
+            while (true) {
+                if (offset >= blockStart + blockLength) {
+                    val available = source.await(offset + block.size)
+                    if (available <= offset) break
+                    blockStart = offset
+                    blockLength = minOf(block.size, available - offset)
+                    source.read(blockStart, blockLength, block)
+                }
+                val end = minOf(offset + WINDOW, blockStart + blockLength)
                 // A short final window keeps the zeros it was allocated with.
                 padding = WINDOW - (end - offset)
-                stream.acceptWaveform(FloatArray(WINDOW).also { samples.copyInto(it, 0, offset, end) })
+                stream.acceptWaveform(FloatArray(WINDOW).also { block.copyInto(it, 0, offset - blockStart, end - blockStart) })
                 sinceDrain += end - offset
                 if (sinceDrain >= DRAIN_EVERY) {
                     sinceDrain = 0
                     drain()
                 }
                 offset += WINDOW
+                // A short window is the last: the source has ended.
+                if (padding > 0) break
             }
             stream.flush()
             drain()
@@ -88,6 +109,16 @@ internal class SpeechDetector(modelPath: String) : AutoCloseable {
         fun scan(stream: Stream, audio: PcmAudio, onSpan: (Span) -> Unit): Long {
             val padding = feed(stream, resampleTo16k(audio.samples, audio.sampleRate)) { segment ->
                 recordingSpan(segment.start, segment.samples.size, audio.sampleRate, audio.samples.size)?.let(onSpan)
+            }
+            return SpeechWindows.ceilMs(padding, VAD_SAMPLE_RATE)
+        }
+
+        /** [scan] of a 16 kHz [source] from sample [from]; spans are on the recording's clock. */
+        fun scan(stream: Stream, source: AudioSource, from: Int, onSpan: (Span) -> Unit): Long {
+            val padding = feed(stream, source, from) { segment ->
+                // Only the final flush can reach into the zero padding, and by then the length is known.
+                val length = if (source.ended) source.size() else Int.MAX_VALUE
+                recordingSpan(from + segment.start, segment.samples.size, VAD_SAMPLE_RATE, length)?.let(onSpan)
             }
             return SpeechWindows.ceilMs(padding, VAD_SAMPLE_RATE)
         }
@@ -111,7 +142,7 @@ internal class SpeechDetector(modelPath: String) : AutoCloseable {
         vad = Vad(config = config(modelPath))
     }
 
-    private val stream = object : Stream {
+    internal val stream = object : Stream {
         override fun reset() = vad.reset()
         override fun acceptWaveform(window: FloatArray) = vad.acceptWaveform(window)
         override fun empty() = vad.empty()
@@ -125,6 +156,9 @@ internal class SpeechDetector(modelPath: String) : AutoCloseable {
      * milliseconds for the timeline clamp (see [scan]). Reusable: every call starts from a reset.
      */
     fun detect(audio: PcmAudio, onSpan: (Span) -> Unit): Long = scan(stream, audio, onSpan)
+
+    /** [detect] over 16 kHz [source] from sample [from], as the samples arrive. */
+    fun detect(source: AudioSource, from: Int, onSpan: (Span) -> Unit): Long = scan(stream, source, from, onSpan)
 
     override fun close() = vad.release()
 }

@@ -28,6 +28,11 @@ object Parakeet {
     /** State after a decode: [doneMs] of [totalMs] of the recording, [elapsedMs] since decoding began, and the provisional words. */
     internal class Progress(val doneMs: Long, val totalMs: Long, val elapsedMs: Long, val words: List<Word>)
 
+    /** What turns samples into timed words, so the cutting can be checked on the JVM with a fake. */
+    internal interface Recognizer {
+        fun decode(samples: FloatArray, sampleRate: Int): List<TimedWord>
+    }
+
     // A cancelled native call finishes before another screen loads a second copy of the model.
     private val decoderLease = NativeInference.lease
 
@@ -36,6 +41,8 @@ object Parakeet {
     /** A single decode's memory grows with its length; longer recordings are always cut. */
     internal const val WHOLE_MAX_MS = 60_000L
     private const val PROGRESS_INTERVAL_NS = 1_000_000_000L
+    /** Recorded audio decoded again before a resume point, so the first new decode hears the words it joins. */
+    internal const val RESUME_OVERLAP_MS = 1_000
 
     /**
      * Cuts by speech when [detectorModel] is given, otherwise at quiet points. [onProgress] runs on the
@@ -43,53 +50,94 @@ object Parakeet {
      * and the energy gate runs once at the end.
      */
     internal fun transcribe(audio: PcmAudio, models: ModelStore, detectorModel: String?, policy: DecodePolicy = DecodePolicy.WHOLE_SPANS,
-                            cutting: Cutting = cutting(detectorModel), onProgress: (Progress) -> Unit = {}): Transcript {
+                            cutting: Cutting = cutting(detectorModel), onProgress: (Progress) -> Unit = {}): Transcript =
+        transcribe(ArraySource(audio), models, detectorModel, policy, cutting, onProgress = onProgress)
+
+    /**
+     * [transcribe] over a [source] that may still be arriving. [resume] continues a journaled run:
+     * its words are kept and decoding starts [RESUME_OVERLAP_MS] before its end, joined at that seam.
+     * [onSettled] receives words in order, each once, as soon as no later decode can change them,
+     * with the sample up to which everything is final.
+     */
+    internal fun transcribe(source: AudioSource, models: ModelStore, detectorModel: String?, policy: DecodePolicy = DecodePolicy.WHOLE_SPANS,
+                            cutting: Cutting = cutting(detectorModel), resume: TranscriptJournal.State? = null,
+                            onSettled: (List<TimedWord>, Long) -> Unit = { _, _ -> }, onProgress: (Progress) -> Unit = {}): Transcript {
         requireUser(models.ready(), Failure.MODEL)
         requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
         val decoder = Decoder(models)
         try {
-            if (cutting == Cutting.WHOLE) {
-                requireUser(audio.durationMs <= WHOLE_MAX_MS, Failure.LONG)
-                val began = System.nanoTime()
-                val transcript = Transcript(Session(decoder, audio, policy).whole())
-                onProgress(Progress(audio.durationMs, audio.durationMs, (System.nanoTime() - began) / 1_000_000, transcript.words))
-                return transcript
-            }
-            // The clock starts once the model is loaded, so speed and remaining time describe decoding alone.
-            val began = System.nanoTime()
-            val session = Session(decoder, audio, policy)
-            // Recorded context makes a decode end past its speech span, so the position only ever moves forward.
-            var reached = 0
-            var reported = 0L
-            val report = { done: Int ->
-                reached = maxOf(reached, minOf(done, audio.samples.size))
-                val now = System.nanoTime()
-                // Each report copies every word so far: at most one a second keeps a long recording linear.
-                if (reported == 0L || now - reported >= PROGRESS_INTERVAL_NS) {
-                    reported = now
-                    onProgress(Progress(SpeechWindows.floorMs(reached, audio.sampleRate), audio.durationMs,
-                        (now - began) / 1_000_000, session.words.map { it.word }))
-                }
-            }
-            report(0)
-            var paddedTailMs = 0L
-            when (cutting) {
-                Cutting.SPEECH -> SpeechDetector(requireNotNull(detectorModel)).use { detector ->
-                    paddedTailMs = detector.detect(audio) { span -> session.speech(span, report) }
-                }
-                Cutting.QUIET -> session.speech(Span(0, audio.samples.size), report)
-                else -> session.fixed(report)
-            }
-            val transcript = Transcript(WordGate.finalizeTranscriptWords(audio, session.words, paddedTailMs))
-            onProgress(Progress(audio.durationMs, audio.durationMs, (System.nanoTime() - began) / 1_000_000, transcript.words))
-            return transcript
+            val detector = if (cutting == Cutting.SPEECH) SpeechDetector(requireNotNull(detectorModel)) else null
+            try {
+                return run(source, decoder, detector, policy, cutting, resume, onSettled, onProgress)
+            } finally { detector?.close() }
         } finally {
             decoder.close()
         }
     }
 
+    /** The cutting itself, over any [recognizer] and speech [detector]. */
+    internal fun run(source: AudioSource, recognizer: Recognizer, detector: SpeechDetector?, policy: DecodePolicy, cutting: Cutting,
+                     resume: TranscriptJournal.State?, onSettled: (List<TimedWord>, Long) -> Unit, onProgress: (Progress) -> Unit): Transcript =
+        runCutting(source, recognizer, detector?.let { d -> { s: AudioSource, from: Int, onSpan: (Span) -> Unit ->
+            if (s is ArraySource && s.sampleRate != VAD_SAMPLE_RATE) { require(from == 0); d.detect(s.audio, onSpan) } else d.detect(s, from, onSpan)
+        } }, policy, cutting, resume, onSettled, onProgress)
+
+    internal fun runCutting(source: AudioSource, recognizer: Recognizer, detect: ((AudioSource, Int, (Span) -> Unit) -> Long)?, policy: DecodePolicy,
+                     cutting: Cutting, resume: TranscriptJournal.State?, onSettled: (List<TimedWord>, Long) -> Unit,
+                     onProgress: (Progress) -> Unit): Transcript {
+        val rate = source.sampleRate
+        val totalMs = { SpeechWindows.floorMs(if (source.ended) source.size() else source.expectedSize, rate) }
+        if (cutting == Cutting.WHOLE) {
+            val size = source.size()
+            requireUser(size.toLong() * 1000 / rate <= WHOLE_MAX_MS, Failure.LONG)
+            val began = System.nanoTime()
+            val transcript = Transcript(Session(recognizer, source, policy, null) { _, _ -> }.whole())
+            onProgress(Progress(totalMs(), totalMs(), (System.nanoTime() - began) / 1_000_000, transcript.words))
+            return transcript
+        }
+        // A fixed grid and a single decode have no seam a resume could join at.
+        val continued = resume?.takeIf { cutting != Cutting.FIXED && it.settledEnd > 0 }
+        // The clock starts once the model is loaded, so speed and remaining time describe decoding alone.
+        val began = System.nanoTime()
+        val session = Session(recognizer, source, policy, continued, onSettled)
+        // Recorded context makes a decode end past its speech span, so the position only ever moves forward.
+        var reached = continued?.settledEnd?.toInt() ?: 0
+        var reported = 0L
+        val report = { done: Int ->
+            reached = maxOf(reached, done)
+            val now = System.nanoTime()
+            // Each report copies every word so far: at most one a second keeps a long recording linear.
+            if (reported == 0L || now - reported >= PROGRESS_INTERVAL_NS) {
+                reported = now
+                onProgress(Progress(SpeechWindows.floorMs(reached, rate).coerceAtMost(totalMs()), totalMs(),
+                    (now - began) / 1_000_000, session.words.map { it.word }))
+            }
+        }
+        report(reached)
+        val from = continued?.let { state ->
+            val back = state.settledEnd - SpeechWindows.samples(RESUME_OVERLAP_MS, rate)
+            (back / SpeechDetector.WINDOW * SpeechDetector.WINDOW).coerceAtLeast(0).toInt()
+        } ?: 0
+        val after = continued?.settledEnd ?: 0
+        var paddedTailMs = 0L
+        when (cutting) {
+            Cutting.SPEECH -> paddedTailMs = requireNotNull(detect)(source, from) { span ->
+                // Spans the journal already holds whole are skipped; one across its end is decoded and joined.
+                if (span.end > after) session.speech(span, report)
+            }
+            Cutting.QUIET -> session.quiet(from, report)
+            else -> session.fixed(report)
+        }
+        val size = source.size()
+        session.settleAll(size)
+        val transcript = Transcript(WordGate.finalizeTranscriptWords(
+            if (source is ArraySource) ArrayReader(source.audio.samples) else BlockReader(source, size), rate, session.words, paddedTailMs))
+        onProgress(Progress(totalMs(), totalMs(), (System.nanoTime() - began) / 1_000_000, transcript.words))
+        return transcript
+    }
+
     /** One native recognizer, owned and closed by the decoding thread. */
-    internal class Decoder(models: ModelStore) : AutoCloseable {
+    internal class Decoder(models: ModelStore) : Recognizer, AutoCloseable {
         private val recognizer: OfflineRecognizer
         private var closed = false
         init {
@@ -115,13 +163,12 @@ object Parakeet {
                 throw error
             }
         }
-        fun decode(audio: PcmAudio, start: Int = 0, length: Int = audio.samples.size, headPad: Int = 0, tailPad: Int = 0): List<TimedWord> {
+        override fun decode(samples: FloatArray, sampleRate: Int): List<TimedWord> {
             requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
             val stream = recognizer.createStream()
             try {
                 // The decoder delivers the feature rate, so sherpa does not resample again.
-                stream.acceptWaveform(if (headPad == 0 && tailPad == 0 && start == 0 && length == audio.samples.size) audio.samples
-                    else FloatArray(headPad + length + tailPad).also { audio.samples.copyInto(it, headPad, start, start + length) }, audio.sampleRate)
+                stream.acceptWaveform(samples, sampleRate)
                 recognizer.decode(stream)
                 val result = recognizer.getResult(stream)
                 requireUser(result.text.isBlank() || result.tokens.isNotEmpty(), Failure.TIMINGS)
@@ -138,23 +185,60 @@ object Parakeet {
         }
     }
 
-    /** The decodes of one recording on one recognizer. Fed span by span to report batch progress. */
-    private class Session(private val decoder: Decoder, private val audio: PcmAudio, private val policy: DecodePolicy) {
-        private val rate = audio.sampleRate
-        private val total = audio.samples.size
-        private var previousEnd = 0
-        private var settled = emptyList<TimedWord>()
+    /**
+     * The decodes of one recording on one recognizer. Fed span by span to report batch progress. Words
+     * reach [onSettled] once a margin behind the last decode, where no later seam can touch them.
+     */
+    private class Session(private val recognizer: Recognizer, private val source: AudioSource, private val policy: DecodePolicy,
+                          resume: TranscriptJournal.State?, private val onSettled: (List<TimedWord>, Long) -> Unit) {
+        private val rate = source.sampleRate
+        private var previousEnd = resume?.settledEnd?.toInt() ?: 0
+        private var settled: List<TimedWord> = resume?.words ?: emptyList()
         /** The span being decoded: its windows so far, shown before the span is settled. */
         private var pending = emptyList<TimedWord>()
         val words: List<TimedWord> get() = settled + pending
+        private var emitted = settled.size
+        private var lastEmitted = settled.lastOrNull()
+        private var finalEnd = resume?.settledEnd ?: 0L
+        /** A later decode starts at most this far before the end of the last one, and a seam moves a word at most the tolerance. */
+        private val margin = SpeechWindows.samples(2 * SpeechWindows.CUT_CONTEXT_MS + 2 * policy.contextMs, rate) +
+            SpeechWindows.samples(SeamMerge.DUPLICATE_TOLERANCE_MS.toInt(), rate)
 
         private fun ms(samples: Int) = SpeechWindows.floorMs(samples, rate)
 
         /** One decoder call over [length] recording samples from [start], between [headPad] and [tailPad] zeros. */
-        private fun decode(start: Int, length: Int, headPad: Int = 0, tailPad: Int = 0) =
-            decoder.decode(audio, start, length, headPad, tailPad)
+        private fun decode(start: Int, length: Int, headPad: Int = 0, tailPad: Int = 0): List<TimedWord> {
+            source.await(start + length)
+            val samples = FloatArray(headPad + length + tailPad)
+            source.read(start, length, samples, headPad)
+            return recognizer.decode(samples, rate)
+        }
 
-        fun whole(): List<Word> = decode(0, total).map { it.word }
+        fun whole(): List<Word> = decode(0, source.size()).map { it.word }
+
+        /** Hands on the words that end before [decodedEnd] less the margin; the final call passes everything. */
+        private fun settle(decodedEnd: Int, all: Boolean = false) {
+            // A seam never reaches this far back, but if it ever did, continue after the last word handed on.
+            if (emitted > 0 && settled.getOrNull(emitted - 1) != lastEmitted) emitted = settled.lastIndexOf(lastEmitted) + 1
+            val stableMs = ms(decodedEnd - margin)
+            var end = emitted
+            while (end < settled.size && (all || settled[end].word.endMs <= stableMs)) end++
+            val finalTo = if (all) decodedEnd.toLong() else minOf(decodedEnd - margin.toLong(),
+                settled.getOrNull(end)?.word?.startMs?.let { it * rate / 1000 } ?: Long.MAX_VALUE)
+            if (end > emitted || all) {
+                finalEnd = maxOf(finalEnd, finalTo)
+                onSettled(settled.subList(emitted, end).toList(), finalEnd)
+                emitted = end
+                lastEmitted = settled.getOrNull(end - 1)
+            }
+        }
+
+        fun settleAll(total: Int) = settle(total, all = true)
+
+        /** Joins a first decode to words settled before it: only a resume overlaps them. */
+        private fun join(found: List<TimedWord>, start: Int): List<TimedWord> =
+            if (previousEnd > start) SeamMerge.merge(settled, found, false, ms(start), ms(previousEnd - start)) { it.word }
+            else settled + found
 
         /** The windows of one source span, each decoded, placed on the recording clock and reconciled at its seam. */
         private fun segment(span: Span, detected: Boolean, onDecoded: (Int) -> Unit = {}): List<TimedWord> {
@@ -182,56 +266,75 @@ object Parakeet {
          * A span of speech. When the policy keeps spans whole, a long one is first cut at quiet points so no
          * decode runs long. Neighbouring pieces are decoded with recorded context past the cut and reconciled there.
          */
-        fun speech(span: Span, onDecoded: (Int) -> Unit) {
-            val pieces = if (policy.preserveSpan) SpeechWindows.quietPieces(audio.samples, span, rate) else listOf(span)
-            if (pieces.size == 1) return piece(span, onDecoded)
+        fun speech(span: Span, onDecoded: (Int) -> Unit) =
+            pieces(if (policy.preserveSpan) SpeechWindows.quietPieces(source, span.start, span.end) else sequenceOf(span), onDecoded)
+
+        /** No detector: everything from [from] to the end of the input, as it arrives, cut at its quiet points. */
+        fun quiet(from: Int, onDecoded: (Int) -> Unit) = pieces(SpeechWindows.quietPieces(source, from, null), onDecoded)
+
+        private fun pieces(cuts: Sequence<Span>, onDecoded: (Int) -> Unit) {
+            val iterator = cuts.iterator()
+            if (!iterator.hasNext()) return
+            var cut = iterator.next()
+            // Peek one ahead: only the last piece goes without recorded context past its end.
+            var next = if (iterator.hasNext()) iterator.next() else null
+            if (next == null) return piece(cut, onDecoded)
             val context = SpeechWindows.samples(SpeechWindows.CUT_CONTEXT_MS, rate)
             var previous: Span? = null
-            pieces.forEachIndexed { index, cut ->
-                val source = Span(if (index == 0) cut.start else cut.start - context, if (index == pieces.lastIndex) cut.end else cut.end + context)
+            while (true) {
+                val source = Span(if (previous == null) cut.start else cut.start - context, if (next == null) cut.end else cut.end + context)
                 val found = segment(source, true, onDecoded)
                 pending = emptyList()
                 settled = previous?.let {
                     SeamMerge.splice(settled, found, ms(source.start), ms(it.end - source.start)) { timed -> timed.word }
-                } ?: (settled + found)
+                } ?: join(found, source.start)
                 previous = source
+                settle(source.end)
                 // Shows the joined words at once; until here the piece was listed after the words it overlaps.
                 onDecoded(source.end)
+                cut = next ?: break
+                next = if (iterator.hasNext()) iterator.next() else null
             }
-            previousEnd = span.end
-            onDecoded(span.end)
+            previousEnd = cut.end
+            onDecoded(cut.end)
         }
 
         /** One piece of speech, with recorded context when the policy asks for it. */
         private fun piece(span: Span, onDecoded: (Int) -> Unit) {
-            var source = if (policy.contextMs > 0) SpeechWindows.context(span.start, span.end, total, rate, policy.contextMs) else span
+            var source = if (policy.contextMs > 0) context(span, policy.contextMs) else span
             var found = segment(source, true, onDecoded)
             // A tight crop can make an utterance-normalised decode emit only blanks. Retry once with real context,
             // keeping only words that overlap the detected speech.
             if (found.isEmpty() && policy.preserveSpan) {
-                val retry = SpeechWindows.context(span.start, span.end, total, rate, RETRY_CONTEXT_MS)
+                val retry = context(span, RETRY_CONTEXT_MS)
                 if (retry.start < source.start || retry.end > source.end) {
-                    found = WordGate.wordsOverlappingSpeech(segment(retry, true), ms(span.start), ms(minOf(total, span.end)))
+                    found = WordGate.wordsOverlappingSpeech(segment(retry, true), ms(span.start), ms(minOf(retry.end, span.end)))
                     source = retry
                 }
             }
             pending = emptyList()
-            settled = if (policy.contextMs > 0 && previousEnd > source.start) {
-                SeamMerge.merge(settled, found, false, ms(source.start), ms(previousEnd - source.start)) { it.word }
-            } else settled + found
+            settled = join(found, source.start)
             previousEnd = source.end
+            settle(source.end)
             onDecoded(span.end)
+        }
+
+        /** [span] widened by [contextMs] of real recording on each side, clipped to what the input holds. */
+        private fun context(span: Span, contextMs: Int): Span {
+            val wanted = span.end + SpeechWindows.samples(contextMs, rate)
+            return SpeechWindows.context(span.start, span.end, source.await(wanted), rate, contextMs)
         }
 
         /** Dense audio without a detector: when two overlapping windows disagree entirely, each instant keeps one owner. */
         fun fixed(onDecoded: (Int) -> Unit) {
             var previous: Span? = null
-            for (span in SpeechWindows.fixed(total, rate)) {
+            for (span in SpeechWindows.fixed(source.size(), rate)) {
                 val found = segment(span, false, onDecoded)
                 pending = emptyList()
                 settled = SeamMerge.merge(settled, found, previous == null, ms(span.start),
                     ms(SpeechWindows.overlap(previous, span)), midpointOnDisagreement = true) { it.word }
                 previous = span
+                settle(span.end)
                 onDecoded(span.end)
             }
         }

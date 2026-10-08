@@ -14,10 +14,10 @@ data class LibraryNote(val id: String, val createdAt: Long, val session: Session
     fun json(): JSONObject = JSONObject().put("id", id).put("createdAt", createdAt).put("text", text)
         .put("session", JSONObject().put("uri", session.uri).put("name", session.name)
             .put("document", session.document).put("selectedVariant", session.selectedVariant)
-            .put("transcript", session.transcript?.takeIf { session.document == null }?.let { JSONObject(it.json()) })
+            .put("transcript", session.transcript?.takeIf { session.document == null || session.partial }?.let { JSONObject(it.json()) })
             .put("durationMs", session.durationMs).put("positionMs", session.positionMs)
             .put("inferenceMs", session.inferenceMs).put("processingMs", session.processingMs)
-            .put("resultPrecision", session.resultPrecision))
+            .put("resultPrecision", session.resultPrecision).put("partial", session.partial))
 
     companion object {
         fun fromJson(json: JSONObject): LibraryNote {
@@ -30,7 +30,7 @@ data class LibraryNote(val id: String, val createdAt: Long, val session: Session
                 transcript = value.optJSONObject("transcript")?.let { Transcript.fromJson(it.toString()) },
                 durationMs = value.optLong("durationMs"), positionMs = value.optInt("positionMs"),
                 inferenceMs = value.optLong("inferenceMs"), processingMs = value.optLong("processingMs"),
-                resultPrecision = value.optString("resultPrecision")), json.optString("text"))
+                resultPrecision = value.optString("resultPrecision"), partial = value.optBoolean("partial")), json.optString("text"))
         }
 
         /**
