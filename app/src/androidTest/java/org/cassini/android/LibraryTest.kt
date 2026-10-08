@@ -56,8 +56,14 @@ class LibraryTest {
                     while (SystemClock.uptimeMillis() < deadline) { if (condition()) return; SystemClock.sleep(50) }
                     fail(description)
                 }
+                fun texts(view: android.view.View): List<String> = when (view) {
+                    is TextView -> listOf(view.text.toString())
+                    is android.view.ViewGroup -> (0 until view.childCount).flatMap { texts(view.getChildAt(it)) }
+                    else -> emptyList()
+                }
                 fun cards(activity: LibraryActivity) = activity.findViewById<android.widget.LinearLayout>(R.id.library_cards).let { container ->
-                    (0 until container.childCount).map { container.getChildAt(it) }.filter { it.isClickable }
+                    // Startup recovery catalogues the device's own captures into this temporary library; ignore them.
+                    (0 until container.childCount).map { container.getChildAt(it) }.filter { it.isClickable && !texts(it).any { t -> t.startsWith(context.getString(R.string.recording_recovered)) } }
                 }
                 await("Library should display both notes") {
                     var ready = false; scenario.onActivity { ready = cards(it).size == 2 }; ready
