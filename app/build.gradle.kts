@@ -58,3 +58,12 @@ dependencies {
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
 }
+
+// Host evaluation (app/src/test/.../eval): writes the unit-test runtime classpath for scripts/asr-eval.sh.
+afterEvaluate {
+    tasks.register("writeEvalClasspath") {
+        val test = tasks.named<Test>("testDebugUnitTest")
+        dependsOn("compileDebugUnitTestKotlin")
+        doLast { layout.buildDirectory.file("eval-classpath.txt").get().asFile.writeText(test.get().classpath.asPath) }
+    }
+}

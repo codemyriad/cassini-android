@@ -208,7 +208,7 @@ object Parakeet {
             var found = segment(source, true, onDecoded)
             // A tight crop can make an utterance-normalised decode emit only blanks. Retry once with real context,
             // keeping only words that overlap the detected speech.
-            if (found.isEmpty() && policy.preserveSpan && !policy.syntheticPadding) {
+            if (found.isEmpty() && policy.preserveSpan) {
                 val retry = SpeechWindows.context(span.start, span.end, total, rate, RETRY_CONTEXT_MS)
                 if (retry.start < source.start || retry.end > source.end) {
                     found = WordGate.wordsOverlappingSpeech(segment(retry, true), ms(span.start), ms(minOf(total, span.end)))
