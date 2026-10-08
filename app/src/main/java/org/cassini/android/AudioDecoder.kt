@@ -20,9 +20,86 @@ data class PcmAudio(val samples: FloatArray, val sampleRate: Int) {
  * Reject long recordings rather than silently dropping audio.
  */
 object AudioDecoder {
+    /**
+     * Where decoded 16 kHz mono goes. [begin] comes once, before any samples, with the expected
+     * sample count. [inputUs] is the container position the decoder has read up to.
+     */
+    interface Sink {
+        fun begin(expectedSamples: Long) {}
+        fun push(samples: FloatArray, count: Int, inputUs: Long)
+    }
+
+    /** Drops the first [skip] output samples: a resumed decode replays from zero but writes only what is new. */
+    private class Skipping(private val sink: Sink, private var skip: Long) {
+        var inputUs = 0L
+        var total = 0L
+            private set
+        fun push(samples: FloatArray, count: Int) {
+            total += count
+            if (skip >= count) { skip -= count; return }
+            if (skip > 0) {
+                val from = skip.toInt()
+                sink.push(samples.copyOfRange(from, count), count - from, inputUs)
+                skip = 0
+            } else sink.push(samples, count, inputUs)
+        }
+    }
+
     fun decode(context: Context, uri: Uri): PcmAudio {
+        var out: PcmBuilder? = null
+        stream(context, uri, keyed = false) { file, _ ->
+            decodeTo(file, object : Sink {
+                override fun begin(expectedSamples: Long) { out = PcmBuilder(expectedSamples.toInt()) }
+                override fun push(samples: FloatArray, count: Int, inputUs: Long) = checkNotNull(out).append(samples, count)
+            }, 0)
+        }
+        return PcmAudio(checkNotNull(out).build(), Limits.ASR_RATE)
+    }
+
+    /**
+     * Decodes [uri] once into a [PcmCache] under [directory], continuing a decode a kill
+     * interrupted. A complete cache is returned without decoding. The cache key is the Ogg Opus
+     * audio digest, or the SHA-256 of the bytes of any other format.
+     */
+    fun decodeToCache(context: Context, uri: Uri, directory: File, onOpen: (PcmCache) -> Unit = {}): PcmCache {
+        var result: PcmCache? = null
+        stream(context, uri, keyed = true) { file, key ->
+            val cache = PcmCache.open(directory, requireNotNull(key))
+            result = cache
+            PcmCache.trim(directory, 2, except = key)
+            onOpen(cache)
+            if (cache.state.complete) return@stream
+            try {
+                decodeTo(file, object : Sink {
+                    override fun begin(expectedSamples: Long) = cache.openWriter(expectedSamples)
+                    override fun push(samples: FloatArray, count: Int, inputUs: Long) = cache.append(samples, count, inputUs)
+                }, cache.state.decodedSamples)
+                cache.finish()
+            } catch (error: Throwable) {
+                cache.abandon()
+                throw error
+            }
+        }
+        return checkNotNull(result)
+    }
+
+    /** Decodes a local copy of any supported file into [sink], skipping the first [skip] samples. */
+    internal fun decodeTo(file: File, sink: Sink, skip: Long) {
+        RandomAccessFile(file, "r").use { input ->
+            val header = ByteArray(OggOpus.HEAD_BYTES)
+            if (input.length() >= 12) {
+                input.readFully(header, 0, minOf(input.length(), header.size.toLong()).toInt())
+                if (String(header, 0, 4, Charsets.US_ASCII) == "RIFF" &&
+                    String(header, 8, 4, Charsets.US_ASCII) == "WAVE") { decodeWav(input, sink, skip); return }
+            }
+        }
+        decodeCompressed(file, sink, skip)
+    }
+
+    private fun stream(context: Context, uri: Uri, keyed: Boolean, body: (File, String?) -> Unit) {
         val local = File.createTempFile("audio-", ".input", context.cacheDir)
         try {
+            val hash = if (keyed) java.security.MessageDigest.getInstance("SHA-256") else null
             context.contentResolver.openInputStream(uri).use { input ->
                 val source = input ?: throw UserFacingException(Failure.OPEN)
                 local.outputStream().use { output ->
@@ -37,18 +114,15 @@ object AudioDecoder {
                         size += n
                         requireUser(size <= Limits.MAX_IMPORT_BYTES, Failure.LARGE)
                         output.write(buffer, 0, n)
+                        hash?.update(buffer, 0, n)
                     }
                 }
             }
-            RandomAccessFile(local, "r").use { file ->
-                val header = ByteArray(OggOpus.HEAD_BYTES)
-                if (file.length() >= 12) {
-                    file.readFully(header, 0, minOf(file.length(), header.size.toLong()).toInt())
-                    if (String(header, 0, 4, Charsets.US_ASCII) == "RIFF" &&
-                        String(header, 8, 4, Charsets.US_ASCII) == "WAVE") return decodeWav(file)
-                }
+            val key = hash?.let { bytes ->
+                val opus = try { OggOpus.scan(local).digest() } catch (_: Exception) { null }
+                opus?.let { "opus-$it" } ?: "file-${OggOpus.hex(bytes.digest())}"
             }
-            return decodeCompressed(local)
+            body(local, key)
         } finally {
             local.delete()
         }
@@ -66,6 +140,15 @@ object AudioDecoder {
     }
 
     internal fun decodeWav(file: RandomAccessFile): PcmAudio {
+        var out: PcmBuilder? = null
+        decodeWav(file, object : Sink {
+            override fun begin(expectedSamples: Long) { out = PcmBuilder(expectedSamples.toInt()) }
+            override fun push(samples: FloatArray, count: Int, inputUs: Long) = checkNotNull(out).append(samples, count)
+        }, 0)
+        return PcmAudio(checkNotNull(out).build(), Limits.ASR_RATE)
+    }
+
+    internal fun decodeWav(file: RandomAccessFile, sink: Sink, skip: Long) {
         var sampleRate = 0
         var channels = 0
         var dataOffset = -1L
@@ -95,8 +178,9 @@ object AudioDecoder {
         val frames = dataSize / (2 * channels)
         requireUser(frames >= 1, Failure.LONG)
         Limits.requireDuration(frames * 1000 / sampleRate)
-        val out = PcmBuilder(((frames * Limits.ASR_RATE + sampleRate / 2) / sampleRate).toInt())
-        val resampler = StreamingResampler(sampleRate, out::append)
+        sink.begin((frames * Limits.ASR_RATE + sampleRate / 2) / sampleRate)
+        val out = Skipping(sink, skip)
+        val resampler = StreamingResampler(sampleRate, out::push)
         file.seek(dataOffset)
         val block = ByteArray(64 * 1024)
         val mono = FloatArray(block.size / 2)
@@ -107,6 +191,7 @@ object AudioDecoder {
             val n = minOf(block.size.toLong(), remaining).toInt()
             file.readFully(block, 0, n)
             remaining -= n
+            out.inputUs = (dataSize - remaining) / (2 * channels) * 1_000_000 / sampleRate
             buffer.clear()
             val count = n / (2 * channels)
             for (i in 0 until count) {
@@ -117,10 +202,9 @@ object AudioDecoder {
             resampler.push(mono, 0, count)
         }
         resampler.finish()
-        return PcmAudio(out.build(), Limits.ASR_RATE)
     }
 
-    private fun decodeCompressed(file: File): PcmAudio {
+    private fun decodeCompressed(file: File, sink: Sink, skip: Long) {
         val extractor = MediaExtractor()
         var decoder: MediaCodec? = null
         var started = false
@@ -138,8 +222,9 @@ object AudioDecoder {
                 ?: if (format.containsKey(MediaFormat.KEY_DURATION)) format.getLong(MediaFormat.KEY_DURATION) else null
             durationUs?.let { Limits.requireDuration(it / 1000) }
             // Presized exactly for Ogg Opus; a container estimate that is wrong costs one trim or growth.
-            val out = PcmBuilder(opusSamples?.let { (it * Limits.ASR_RATE + 24000) / 48000 }?.toInt()
-                ?: durationUs?.let { (it * Limits.ASR_RATE / 1_000_000).toInt() } ?: (Limits.ASR_RATE * 60))
+            sink.begin(opusSamples?.let { (it * Limits.ASR_RATE + 24000) / 48000 }
+                ?: durationUs?.let { it * Limits.ASR_RATE / 1_000_000 } ?: (Limits.ASR_RATE * 60L))
+            val out = Skipping(sink, skip)
             val mime = requireNotNull(format.getString(MediaFormat.KEY_MIME))
             val codec = MediaCodec.createDecoderByType(mime)
             decoder = codec
@@ -174,6 +259,7 @@ object AudioDecoder {
                             inputEnded = true
                         } else {
                             codec.queueInputBuffer(index, 0, size, extractor.sampleTime, 0)
+                            out.inputUs = extractor.sampleTime
                             extractor.advance()
                         }
                         lastProgress = System.nanoTime()
@@ -208,7 +294,7 @@ object AudioDecoder {
                                 // An overlap keeps the audio already passed on: the resampler only moves forward.
                                 val skip = (count - firstFrame).coerceIn(0, playableFrames)
                                 if (playableFrames > skip) {
-                                    val stream = resampler ?: StreamingResampler(sampleRate, out::append).also { resampler = it }
+                                    val stream = resampler ?: StreamingResampler(sampleRate, out::push).also { resampler = it }
                                     if (firstFrame > count) stream.silence((firstFrame - count).toLong())
                                     buffer.position(info.offset + skip * sampleBytes * channels)
                                     if (mono.size < frames) mono = FloatArray(frames)
@@ -235,7 +321,6 @@ object AudioDecoder {
             }
             requireUser(count > 0, Failure.EMPTY)
             requireNotNull(resampler).finish()
-            return PcmAudio(out.build(), Limits.ASR_RATE)
         } finally {
             try { if (started) decoder?.stop() } finally {
                 try { decoder?.release() } finally { extractor.release() }
