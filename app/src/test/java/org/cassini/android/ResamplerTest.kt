@@ -74,6 +74,8 @@ class ResamplerTest {
             val actual = streamed(input, rate, random)
             assertEquals("$rate Hz, $n samples", expected.size, actual.size)
             for (j in expected.indices) assertEquals("$rate Hz sample $j", expected[j], actual[j], 1e-5f)
+            // The fixed-tap path for whole-multiple rates must match the general kernel exactly.
+            if (rate % 16000 == 0) assertArrayEquals("$rate Hz", expected, actual, 0f)
         }
     }
 
