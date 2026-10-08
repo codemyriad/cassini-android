@@ -41,9 +41,11 @@ object AudioDecoder {
                 }
             }
             RandomAccessFile(local, "r").use { file ->
-                val header = ByteArray(12)
+                val header = ByteArray(OggOpus.HEAD_BYTES)
                 if (file.length() >= 12) {
-                    file.readFully(header)
+                    file.readFully(header, 0, minOf(file.length(), header.size.toLong()).toInt())
+                    // Ogg Opus is kept unchanged in the document, so fail now rather than after inference.
+                    requireUser(!OggOpus.looksLikeOpus(header) || file.length() <= OggOpus.MAX_FILE_BYTES, Failure.LARGE)
                     if (String(header, 0, 4, Charsets.US_ASCII) == "RIFF" &&
                         String(header, 8, 4, Charsets.US_ASCII) == "WAVE") return decodeWav(file)
                 }

@@ -7,6 +7,10 @@ import kotlin.random.Random
 /** Small bounded Ogg packet reader/muxer. Metadata and page layout never enter the audio digest. */
 internal object OggOpus {
     const val MAX_FILE_BYTES = 64 * 1024 * 1024
+    /** The first page holds only OpusHead: a 27-byte page header, one lacing value, then the magic. */
+    const val HEAD_BYTES = 36
+    fun looksLikeOpus(head: ByteArray) = head.size >= HEAD_BYTES && String(head, 0, 4, Charsets.US_ASCII) == "OggS" &&
+        head[26].toInt() == 1 && String(head, 28, 8, Charsets.US_ASCII) == "OpusHead"
     const val MAX_HEADER_BYTES = 8 * 1024 * 1024
     data class Stream(val head: ByteArray, val tags: ByteArray, val audio: List<ByteArray>,
                       val finalGranule: Long, val validFraming: Boolean) {

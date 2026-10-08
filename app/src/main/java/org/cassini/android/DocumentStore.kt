@@ -34,17 +34,21 @@ internal class DocumentStore(private val context: Context) {
     }
     fun create(uri: Uri, audio: () -> PcmAudio, transcript: Transcript, name: String, processing: JSONObject,
                existing: CassiniDocument?, speakerLabels: Map<String, String> = emptyMap()): Pair<File, CassiniDocument> {
-        val original = context.contentResolver.openInputStream(uri)?.use { input ->
-            // Imports and current portable documents are already bounded; legacy external sessions may not be.
-            val out = java.io.ByteArrayOutputStream(); val buffer = ByteArray(65536)
+        // Only Ogg Opus is kept as is, so anything else is never buffered: it is re-encoded at 48 kb/s instead.
+        val original = (context.contentResolver.openInputStream(uri) ?: throw UserFacingException(Failure.OPEN)).use { input ->
+            val head = ByteArray(OggOpus.HEAD_BYTES); var got = 0
+            while (got < head.size) { val n = input.read(head, got, head.size - got); if (n < 0) break; got += n }
+            if (!OggOpus.looksLikeOpus(head)) return@use null
+            val out = java.io.ByteArrayOutputStream(); out.write(head, 0, got); val buffer = ByteArray(65536)
             while (true) {
                 val n = input.read(buffer); if (n < 0) break
                 requireUser(out.size().toLong() + n <= OggOpus.MAX_FILE_BYTES, Failure.LARGE)
                 out.write(buffer, 0, n)
             }
             out.toByteArray()
-        } ?: throw UserFacingException(Failure.OPEN)
-        val opus = try { OggOpus.read(original).also { it.digest() }; original } catch (_: Exception) { OpusEncoder.encode(audio()) }
+        }
+        val opus = original?.let { try { OggOpus.read(it).also { o -> o.digest() }; it } catch (_: Exception) { null } }
+            ?: OpusEncoder.encode(audio())
         val bytes = CassiniDocument.create(opus, transcript, name.substringBeforeLast('.'), processing, existing, speakerLabels)
         val temporary = File(directory, "${UUID.randomUUID()}.tmp")
         val output = File(directory, "${UUID.randomUUID()}.opus")
