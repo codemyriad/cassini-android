@@ -15,9 +15,11 @@ data class PcmAudio(val samples: FloatArray, val sampleRate: Int) {
     val durationMs: Long get() = samples.size * 1000L / sampleRate
 }
 
-/** Bounded, whole-utterance import. Reject long clips rather than silently dropping audio. */
+/**
+ * Bounded whole-recording import, decoded straight to 16 kHz mono so long audio fits the heap.
+ * Reject long recordings rather than silently dropping audio.
+ */
 object AudioDecoder {
-    const val MAX_SECONDS = 180
     fun decode(context: Context, uri: Uri): PcmAudio {
         val local = File.createTempFile("audio-", ".input", context.cacheDir)
         try {
@@ -30,16 +32,18 @@ object AudioDecoder {
                         requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
                         val n = source.read(buffer)
                         if (n < 0) break
+                        if (size / (16 shl 20) != (size + n) / (16 shl 20))
+                            requireUser(context.cacheDir.usableSpace >= Limits.MIN_FREE_BYTES, Failure.SPACE)
                         size += n
-                        requireUser(size <= 64 * 1024 * 1024, Failure.LARGE)
+                        requireUser(size <= Limits.MAX_IMPORT_BYTES, Failure.LARGE)
                         output.write(buffer, 0, n)
                     }
                 }
             }
             RandomAccessFile(local, "r").use { file ->
-                val header = ByteArray(12)
+                val header = ByteArray(OggOpus.HEAD_BYTES)
                 if (file.length() >= 12) {
-                    file.readFully(header)
+                    file.readFully(header, 0, minOf(file.length(), header.size.toLong()).toInt())
                     if (String(header, 0, 4, Charsets.US_ASCII) == "RIFF" &&
                         String(header, 8, 4, Charsets.US_ASCII) == "WAVE") return decodeWav(file)
                 }
@@ -61,11 +65,12 @@ object AudioDecoder {
         return if (next != null && kotlin.math.abs(nominal - next) <= sampleRate / 1000) next else nominal.toInt()
     }
 
-    private fun decodeWav(file: RandomAccessFile): PcmAudio {
+    internal fun decodeWav(file: RandomAccessFile): PcmAudio {
         var sampleRate = 0
         var channels = 0
         var dataOffset = -1L
         var dataSize = 0L
+        file.seek(12)
         while (file.filePointer + 8 <= file.length()) {
             val id = ByteArray(4).also(file::readFully).toString(Charsets.US_ASCII)
             val size = Integer.reverseBytes(file.readInt()).toLong() and 0xffffffffL
@@ -88,17 +93,31 @@ object AudioDecoder {
         requireUser(sampleRate in 8000..96000 && channels in 1..2 && dataOffset >= 0, Failure.AUDIO)
         requireUser(dataSize % (2 * channels) == 0L, Failure.AUDIO)
         val frames = dataSize / (2 * channels)
-        requireUser(frames in 1..(sampleRate.toLong() * MAX_SECONDS), Failure.LONG)
+        requireUser(frames >= 1, Failure.LONG)
+        Limits.requireDuration(frames * 1000 / sampleRate)
+        val out = PcmBuilder(((frames * Limits.ASR_RATE + sampleRate / 2) / sampleRate).toInt())
+        val resampler = StreamingResampler(sampleRate, out::append)
         file.seek(dataOffset)
-        val pcm = ByteArray(dataSize.toInt()).also(file::readFully)
-        val samples = FloatArray(frames.toInt())
-        val buffer = ByteBuffer.wrap(pcm).order(ByteOrder.LITTLE_ENDIAN)
-        for (i in samples.indices) {
-            var sum = 0f
-            repeat(channels) { sum += buffer.short / 32768f }
-            samples[i] = sum / channels
+        val block = ByteArray(64 * 1024)
+        val mono = FloatArray(block.size / 2)
+        val buffer = ByteBuffer.wrap(block).order(ByteOrder.LITTLE_ENDIAN)
+        var remaining = dataSize
+        while (remaining > 0) {
+            requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
+            val n = minOf(block.size.toLong(), remaining).toInt()
+            file.readFully(block, 0, n)
+            remaining -= n
+            buffer.clear()
+            val count = n / (2 * channels)
+            for (i in 0 until count) {
+                var sum = 0f
+                repeat(channels) { sum += buffer.short / 32768f }
+                mono[i] = sum / channels
+            }
+            resampler.push(mono, 0, count)
         }
-        return PcmAudio(samples, sampleRate)
+        resampler.finish()
+        return PcmAudio(out.build(), Limits.ASR_RATE)
     }
 
     private fun decodeCompressed(file: File): PcmAudio {
@@ -108,16 +127,19 @@ object AudioDecoder {
         try {
             // Android's Opus decoder removes pre-skip but can expose the final frame's padding.
             // Trust the independently verified Ogg EOS sample count, not codec buffer length.
-            val opusSamples = try { OggOpus.read(file.readBytes()).also { it.digest() }.sampleCount } catch (_: Exception) { null }
+            val opusSamples = try { OggOpus.scan(file).also { it.digest() }.sampleCount } catch (_: Exception) { null }
             extractor.setDataSource(file.absolutePath)
             val track = (0 until extractor.trackCount).firstOrNull {
                 extractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true
             } ?: throw UserFacingException(Failure.AUDIO)
             extractor.selectTrack(track)
             val format = extractor.getTrackFormat(track)
-            if (format.containsKey(MediaFormat.KEY_DURATION)) {
-                requireUser((opusSamples?.let { it * 1_000_000 / 48000 } ?: format.getLong(MediaFormat.KEY_DURATION)) <= MAX_SECONDS * 1_000_000L, Failure.LONG)
-            }
+            val durationUs = opusSamples?.let { it * 1_000_000 / 48000 }
+                ?: if (format.containsKey(MediaFormat.KEY_DURATION)) format.getLong(MediaFormat.KEY_DURATION) else null
+            durationUs?.let { Limits.requireDuration(it / 1000) }
+            // Presized exactly for Ogg Opus; a container estimate that is wrong costs one trim or growth.
+            val out = PcmBuilder(opusSamples?.let { (it * Limits.ASR_RATE + 24000) / 48000 }?.toInt()
+                ?: durationUs?.let { (it * Limits.ASR_RATE / 1_000_000).toInt() } ?: (Limits.ASR_RATE * 60))
             val mime = requireNotNull(format.getString(MediaFormat.KEY_MIME))
             val codec = MediaCodec.createDecoderByType(mime)
             decoder = codec
@@ -128,7 +150,8 @@ object AudioDecoder {
             var sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
             var channels = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
             var encoding = AudioFormat.ENCODING_PCM_16BIT
-            var pcm: FloatArray? = null
+            var resampler: StreamingResampler? = null
+            var mono = FloatArray(0)
             var count = 0
             var next: Int? = null
             var inputEnded = false
@@ -168,29 +191,36 @@ object AudioDecoder {
                             requireUser(sampleRate in 8000..96000 && channels in 1..2, Failure.AUDIO)
                             requireUser(encoding == AudioFormat.ENCODING_PCM_16BIT || encoding == AudioFormat.ENCODING_PCM_FLOAT, Failure.AUDIO)
                             if (info.size > 0) {
-                                val destination = pcm ?: FloatArray(sampleRate * MAX_SECONDS).also { pcm = it }
                                 val buffer = requireNotNull(codec.getOutputBuffer(index)).order(ByteOrder.LITTLE_ENDIAN)
                                 buffer.position(info.offset)
                                 buffer.limit(info.offset + info.size)
                                 val sampleBytes = if (encoding == AudioFormat.ENCODING_PCM_FLOAT) 4 else 2
                                 requireUser(info.size % (sampleBytes * channels) == 0, Failure.AUDIO)
                                 val frames = info.size / (sampleBytes * channels)
-                                // Keep real container gaps as silence. The player and words share a zero origin.
-                                requireUser(info.presentationTimeUs <= MAX_SECONDS * 1_000_000L + (if (opusSamples != null) 120_000 else 0), Failure.LONG)
+                                requireUser(info.presentationTimeUs <= Limits.MAX_RECORDING_MS * 1000 + (if (opusSamples != null) 120_000 else 0), Failure.LONG)
                                 val firstFrame = framePosition(info.presentationTimeUs, sampleRate, next)
                                 next = firstFrame + frames
                                 val playableFrames = opusSamples?.let { minOf(frames.toLong(), (it * sampleRate / 48000 - firstFrame).coerceAtLeast(0)).toInt() } ?: frames
-                                requireUser(playableFrames == 0 || firstFrame.toLong() + playableFrames <= destination.size, Failure.LONG)
-                                repeat(playableFrames) { frame ->
-                                    var sum = 0f
-                                    repeat(channels) {
-                                        val sample = if (sampleBytes == 4) buffer.float else buffer.short / 32768f
-                                        requireUser(sample.isFinite(), Failure.AUDIO)
-                                        sum += sample
+                                // Keep real container gaps as silence. The player and words share a zero origin.
+                                // An overlap keeps the audio already passed on: the resampler only moves forward.
+                                val skip = (count - firstFrame).coerceIn(0, playableFrames)
+                                if (playableFrames > skip) {
+                                    val stream = resampler ?: StreamingResampler(sampleRate, out::append).also { resampler = it }
+                                    if (firstFrame > count) stream.silence((firstFrame - count).toLong())
+                                    buffer.position(info.offset + skip * sampleBytes * channels)
+                                    if (mono.size < frames) mono = FloatArray(frames)
+                                    for (frame in 0 until playableFrames - skip) {
+                                        var sum = 0f
+                                        repeat(channels) {
+                                            val sample = if (sampleBytes == 4) buffer.float else buffer.short / 32768f
+                                            requireUser(sample.isFinite(), Failure.AUDIO)
+                                            sum += sample
+                                        }
+                                        mono[frame] = sum / channels
                                     }
-                                    destination[firstFrame + frame] = sum / channels
+                                    stream.push(mono, 0, playableFrames - skip)
+                                    count = firstFrame + playableFrames
                                 }
-                                if (playableFrames > 0) count = maxOf(count, firstFrame + playableFrames)
                             }
                             outputEnded = info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0
                             lastProgress = System.nanoTime()
@@ -201,7 +231,8 @@ object AudioDecoder {
                 }
             }
             requireUser(count > 0, Failure.EMPTY)
-            return PcmAudio(requireNotNull(pcm).copyOf(count), sampleRate)
+            requireNotNull(resampler).finish()
+            return PcmAudio(out.build(), Limits.ASR_RATE)
         } finally {
             try { if (started) decoder?.stop() } finally {
                 try { decoder?.release() } finally { extractor.release() }

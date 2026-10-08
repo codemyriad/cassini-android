@@ -9,7 +9,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
 
-/** Silero VAD's rate. Only the detector's copy uses it; ASR keeps the recording's own samples. */
+/** Silero VAD's and Parakeet's feature rate. Decoded audio is resampled to it once, so ASR, VAD and diarization share one array. */
 internal const val VAD_SAMPLE_RATE = 16000
 
 /** Cutoff as a fraction of min(rate, 16 kHz): 7 kHz for inputs at 16 kHz or above. */
@@ -24,7 +24,7 @@ private val kernel = FloatArray(ZERO_CROSSINGS * TABLE_STEPS + 2) { index ->
 }
 
 /**
- * Converts mono audio at [rate] (8..96 kHz) to 16 kHz for the speech detector only. Each output
+ * Converts mono audio at [rate] (8..96 kHz) to 16 kHz. Each output
  * sample is a band-limited interpolation through a Hann-windowed sinc low-pass with cutoff 7/16 of
  * min(rate, 16 kHz), 12 zero crossings each side, normalised to unit gain at every output position.
  * That keeps the speech band flat to about 6 kHz and attenuates content above 8 kHz, which would
@@ -55,4 +55,85 @@ internal fun resampleTo16k(samples: FloatArray, rate: Int): FloatArray {
         output[index] = if (weight > 0) (sum / weight).toFloat() else 0f
     }
     return output
+}
+
+/**
+ * [resampleTo16k] over audio that arrives in blocks: the same kernel and output positions, with the
+ * input history kept across block edges, so the output equals the whole-array conversion. [sink]
+ * receives a reused buffer and its valid length.
+ */
+internal class StreamingResampler(private val rate: Int, private val sink: (FloatArray, Int) -> Unit) {
+    init { require(rate in 8000..96000) { "Unsupported sample rate $rate" } }
+    private val step = rate.toDouble() / VAD_SAMPLE_RATE
+    private val crossingsPerSample = 2 * CUTOFF_FRACTION * min(rate, VAD_SAMPLE_RATE) / rate
+    private val halfWidth = ZERO_CROSSINGS / crossingsPerSample
+    private var history = FloatArray(8192)
+    private var base = 0L
+    private var size = 0
+    private val out = FloatArray(4096)
+    private var pending = 0
+    private var finished = false
+    var produced = 0L
+        private set
+    val consumed get() = base + size
+
+    fun push(samples: FloatArray, offset: Int = 0, length: Int = samples.size - offset) {
+        check(!finished)
+        if (rate == VAD_SAMPLE_RATE) {
+            var at = offset
+            while (at < offset + length) {
+                val n = min(out.size - pending, offset + length - at)
+                samples.copyInto(out, pending, at, at + n); pending += n; at += n
+                if (pending == out.size) flush()
+            }
+            base += length; produced += length
+            return
+        }
+        if (size + length > history.size) history = history.copyOf(max(history.size * 2, size + length))
+        samples.copyInto(history, size, offset, offset + length)
+        size += length
+        drain(null)
+    }
+
+    fun silence(count: Long) {
+        val zeros = FloatArray(4096)
+        var left = count
+        while (left > 0) { val n = min(left, zeros.size.toLong()).toInt(); push(zeros, 0, n); left -= n }
+    }
+
+    /** Emits the outputs that need samples past the end, and returns the output length: round(n * 16000 / rate). */
+    fun finish(): Long {
+        check(!finished)
+        finished = true
+        if (rate != VAD_SAMPLE_RATE) drain((consumed * VAD_SAMPLE_RATE + rate / 2) / rate)
+        flush()
+        return produced
+    }
+
+    private fun flush() { if (pending > 0) sink(out, pending); pending = 0 }
+
+    private fun drain(target: Long?) {
+        val end = base + size
+        while (target == null || produced < target) {
+            val time = produced * step
+            val last = floor(time + halfWidth).toLong()
+            if (target == null && last >= end) break
+            var sum = 0.0
+            var weight = 0.0
+            for (k in max(0L, ceil(time - halfWidth).toLong())..min(end - 1, last)) {
+                val position = abs(time - k) * crossingsPerSample * TABLE_STEPS
+                val cell = position.toInt()
+                val fraction = (position - cell).toFloat()
+                val tap = kernel[cell] + (kernel[cell + 1] - kernel[cell]) * fraction
+                sum += tap * history[(k - base).toInt()]
+                weight += tap
+            }
+            out[pending++] = if (weight > 0) (sum / weight).toFloat() else 0f
+            if (pending == out.size) flush()
+            produced++
+        }
+        val keep = max(0L, ceil(produced * step - halfWidth).toLong()).coerceAtMost(end)
+        val drop = (keep - base).toInt()
+        if (drop > 0) { history.copyInto(history, 0, drop, size); size -= drop; base = keep }
+    }
 }

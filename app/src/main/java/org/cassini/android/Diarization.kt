@@ -16,11 +16,12 @@ internal object Diarization {
 
     fun turns(audio: PcmAudio, model: String, threads: Int = 2, progress: (Int, Int) -> Unit = { _, _ -> }): List<SpeakerTurn> {
         require(threads > 0)
-        requireUser(audio.samples.isNotEmpty() && audio.samples.all { it.isFinite() }, Failure.AUDIO)
+        requireUser(audio.samples.isNotEmpty(), Failure.AUDIO)
         NativeInference.acquire()
         try {
             requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
-            val samples = if (audio.sampleRate == 16000) audio.samples else resampleTo16k(audio.samples, audio.sampleRate)
+            // The decoder already yields finite 16 kHz samples, so this is the same array.
+            val samples = resampleTo16k(audio.samples, audio.sampleRate)
             val diarizer = OfflineSpeakerDiarization(config = OfflineSpeakerDiarizationConfig(
                 segmentation = OfflineSpeakerSegmentationModelConfig(
                     sortformer = OfflineSpeakerSegmentationSortformerModelConfig(model = model, threshold = THRESHOLD),

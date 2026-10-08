@@ -37,7 +37,7 @@
     <string name="saving">Saving Cassini document…</string>
     <string name="saved">Cassini saved · audio and transcript together.</string>
     <string name="empty_title">Load a tape.</string>
-    <string name="empty_hint">Open a Cassini document, or transcribe WAV, MP3, M4A or Opus.\nUp to 3 minutes for transcription. All local.</string>
+    <string name="empty_hint">Open a Cassini document, or transcribe WAV, MP3, M4A or Opus.\nUp to 2 hours for transcription. All local.</string>
     <string name="loaded_title">Let’s hear it.</string>
     <string name="loaded_hint">Tap Transcribe to turn this recording into timed words.</string>
     <string name="no_speech">No speech recognized.</string>
@@ -72,12 +72,12 @@
     <string name="italian_name" translatable="false">Italiano</string>
     <string name="recognition_model">Transcription model</string>
     <string name="about">About this prototype</string>
-    <string name="about_body">Parakeet v3 on your phone. Audio stays local.\n\nRecord voice notes, search past transcriptions, and save portable Cassini Opus documents with audio and timed words.\n\nClips up to 3 minutes, one unidentified voice, automatic multilingual recognition. The current transcript language label is Italian.\n\nGPLv3. Source and dependency notices: github.com/codemyriad/cassini-android</string>
+    <string name="about_body">Parakeet v3 on your phone. Audio stays local.\n\nRecord voice notes, search past transcriptions, and save portable Cassini Opus documents with audio and timed words.\n\nAudio up to 2 hours, one unidentified voice, automatic multilingual recognition. The current transcript language label is Italian.\n\nGPLv3. Source and dependency notices: github.com/codemyriad/cassini-android</string>
     <string name="done">Done</string>
     <string name="cancel">Cancel</string>
     <string name="error_open">Could not open this recording. Choose the file again.</string>
     <string name="error_large">This prototype accepts files up to 64 MB.</string>
-    <string name="error_long">Choose a clip of 3 minutes or less.</string>
+    <string name="error_long">Choose a recording of 2 hours or less.</string>
     <string name="error_short">Choose at least 200 milliseconds of audio.</string>
     <string name="error_audio">Could not read this audio. Try PCM16 WAV, MP3, M4A or Opus.</string>
     <string name="error_wav">Use a 16-bit PCM WAV, or try MP3, M4A or Opus.</string>
@@ -134,9 +134,9 @@
     <string name="recording_preparing">New recording</string>
     <string name="recording_title">Note title</string>
     <string name="voice_note_name">Voice note %1$s</string>
-    <string name="microphone_format">Microphone · mono AAC · 48 kHz</string>
+    <string name="microphone_format">Microphone · mono Opus · 48 kHz</string>
     <string name="microphone_level">Live microphone level</string>
-    <string name="recording_hint">Your words appear after you stop. Record up to 3 minutes; Parakeet transcribes on this device. Leaving this screen stops and saves the recording.</string>
+    <string name="recording_hint">Your words appear after you stop. Record up to 2 hours; recording continues with the screen off or in another app. Parakeet transcribes on this device.</string>
     <string name="enable_microphone">Enable microphone</string>
     <string name="pause_recording">Pause</string>
     <string name="resume_recording">Resume</string>
@@ -146,7 +146,6 @@
     <string name="microphone_permission_denied">Allow microphone access in Android settings to record.</string>
     <string name="recording_saved_interrupted">Recording stopped and saved.</string>
     <string name="error_microphone">Could not record. Check microphone access and try again.</string>
-    <string name="note_clock" translatable="false">%1$02d:%2$02d</string>
     <string name="library_note_metadata">%1$s · %2$s</string>
     <string name="library_saved_document">Saved document</string>
     <string name="transcript_draft">Draft · words and timings may change</string>
@@ -160,4 +159,11 @@
     <string name="speakers_complete">%1$d speaker labels added in %2$.1f s. Check the labels against the audio.</string>
     <string name="error_speakers">No speaker turns were found. The original transcript is unchanged.</string>
     <string name="download_speaker_models">Download and identify</string>
+    <string name="microphone_format_aac">Microphone · mono AAC · 48 kHz</string>
+    <string name="recording_recovered">Recovered recording</string>
+    <string name="recording_channel">Recording</string>
+    <string name="stop_recording">Stop</string>
+    <string name="recording_near_limit">● Recording · stops automatically in 5 minutes</string>
+    <string name="recording_focus_paused">Paused: another app is using audio. Tap Resume to continue.</string>
+    <string name="recording_error_saved">Recording stopped by an error. The audio so far is saved in your library.</string>
 </resources>

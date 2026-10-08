@@ -1,12 +1,20 @@
 package org.cassini.android
 
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileOutputStream
+import java.io.InputStream
+import java.io.OutputStream
 import java.security.MessageDigest
 import kotlin.random.Random
 
-/** Small bounded Ogg packet reader/muxer. Metadata and page layout never enter the audio digest. */
+/** Streaming Ogg packet reader/muxer with bounded packets. Metadata and page layout never enter the audio digest. */
 internal object OggOpus {
-    const val MAX_FILE_BYTES = 64 * 1024 * 1024
+    /** The first page holds only OpusHead: a 27-byte page header, one lacing value, then the magic. */
+    const val HEAD_BYTES = 36
+    fun looksLikeOpus(head: ByteArray) = head.size >= HEAD_BYTES && String(head, 0, 4, Charsets.US_ASCII) == "OggS" &&
+        head[26].toInt() == 1 && String(head, 28, 8, Charsets.US_ASCII) == "OpusHead"
     const val MAX_HEADER_BYTES = 8 * 1024 * 1024
     data class Stream(val head: ByteArray, val tags: ByteArray, val audio: List<ByteArray>,
                       val finalGranule: Long, val validFraming: Boolean) {
@@ -15,67 +23,131 @@ internal object OggOpus {
         val sampleCount get() = minOf(audio.sumOf { packetSamples(it).toLong() }, finalGranule) - preSkip
         val durationMs get() = sampleCount * 1000 / 48000
         fun digest(): String {
-            require(validFraming && head.size >= 19 && (head[8].toInt() and 255) in 1..15 && channels in 1..2)
-            require(finalGranule >= preSkip && sampleCount >= 0)
-            val hash = MessageDigest.getInstance("SHA-256")
+            require(validFraming)
+            return Hasher(head).also { h -> audio.forEach(h::add) }.finish(finalGranule)
+        }
+    }
+    /** What a streaming pass learns: headers, shape, and the audio digest when framing and packets are sound. */
+    class Info(val head: ByteArray, val tags: ByteArray, val finalGranule: Long, val validFraming: Boolean,
+               val sampleCount: Long, private val audioDigest: String?) {
+        val channels get() = head[9].toInt() and 255
+        val durationMs get() = sampleCount * 1000 / 48000
+        fun digest(): String = audioDigest ?: throw IllegalArgumentException("Opus audio cannot be verified")
+    }
+    private class Hasher(head: ByteArray) {
+        private val hash = MessageDigest.getInstance("SHA-256")
+        private val preSkip = u16(head, 10)
+        private var count = 0L
+        var samples = 0L
+            private set
+        init {
+            require(head.size >= 19 && (head[8].toInt() and 255) in 1..15 && (head[9].toInt() and 255) in 1..2)
             hash.update("org.cassini.opus-packets/1\u0000".toByteArray(Charsets.US_ASCII))
-            val canonical = head.copyOf().also { for (i in 12..15) it[i] = 0 }
-            fun packet(marker: Char, bytes: ByteArray) {
-                hash.update(marker.code.toByte()); hash.update(le64(bytes.size.toLong())); hash.update(bytes)
-            }
-            packet('H', canonical)
-            audio.forEach { packet('A', it) }
-            hash.update('E'.code.toByte()); hash.update(le64(audio.size.toLong())); hash.update(le64(sampleCount))
+            packet('H', head.copyOf().also { for (i in 12..15) it[i] = 0 })
+        }
+        private fun packet(marker: Char, bytes: ByteArray) {
+            hash.update(marker.code.toByte()); hash.update(le64(bytes.size.toLong())); hash.update(bytes)
+        }
+        fun add(bytes: ByteArray) { samples += packetSamples(bytes); packet('A', bytes); count++ }
+        fun sampleCount(finalGranule: Long) = minOf(samples, finalGranule) - preSkip
+        fun finish(finalGranule: Long): String {
+            val sampleCount = sampleCount(finalGranule)
+            require(finalGranule >= preSkip && sampleCount >= 0)
+            hash.update('E'.code.toByte()); hash.update(le64(count)); hash.update(le64(sampleCount))
             return hex(hash.digest())
         }
     }
-    fun read(bytes: ByteArray, headersOnly: Boolean = false): Stream {
-        require(bytes.size <= MAX_FILE_BYTES)
-        val packets = mutableListOf<ByteArray>()
-        val partial = ByteArrayOutputStream()
-        var pos = 0; var serial: Int? = null; var seq = 0; var valid = true; var eos = false; var final = -1L
-        while (pos < bytes.size) {
-            require(pos + 27 <= bytes.size && String(bytes, pos, 4, Charsets.US_ASCII) == "OggS")
-            val count = bytes[pos + 26].toInt() and 255
-            require(pos + 27 + count <= bytes.size)
-            var end = pos + 27 + count
-            repeat(count) { end += bytes[pos + 27 + it].toInt() and 255 }
-            require(end <= bytes.size)
-            val flags = bytes[pos + 5].toInt() and 255
-            val pageSerial = u32(bytes, pos + 14)
-            val pageSeq = u32(bytes, pos + 18)
+    /** Reads one page at a time. Truncation or a broken page structure throws; framing and CRC faults clear [valid]. */
+    class Reader(private val input: InputStream) {
+        var valid = true
+            private set
+        var eos = false
+            private set
+        var finalGranule = -1L
+            private set
+        val complete get() = valid && eos && partial.size() == 0
+        private var serial: Int? = null
+        private var seq = 0
+        private var packets = 0
+        private val partial = ByteArrayOutputStream()
+        private val ready = ArrayDeque<ByteArray>()
+        private val header = ByteArray(27 + 255)
+
+        private fun fill(buffer: ByteArray, offset: Int, length: Int): Int {
+            var got = 0
+            while (got < length) { val n = input.read(buffer, offset + got, length - got); if (n < 0) break; got += n }
+            return got
+        }
+        /** The next whole page, or null at a clean end of input. */
+        fun page(): ByteArray? {
+            val got = fill(header, 0, 27)
+            if (got == 0) return null
+            require(got == 27 && String(header, 0, 4, Charsets.US_ASCII) == "OggS")
+            val count = header[26].toInt() and 255
+            require(fill(header, 27, count) == count)
+            var size = 0
+            repeat(count) { size += header[27 + it].toInt() and 255 }
+            val page = header.copyOf(27 + count + size)
+            require(fill(page, 27 + count, size) == size)
+            val flags = page[5].toInt() and 255
+            val pageSerial = u32(page, 14)
+            val pageSeq = u32(page, 18)
             if (serial == null) { serial = pageSerial; if (flags and 2 == 0 || pageSeq != 0) valid = false }
-            if (pageSerial != serial || pageSeq != seq++ || eos || bytes[pos + 4] != 0.toByte()) valid = false
+            if (pageSerial != serial || pageSeq != seq++ || eos || page[4] != 0.toByte()) valid = false
             if ((flags and 1 != 0) != (partial.size() > 0)) valid = false
-            val page = bytes.copyOfRange(pos, end)
             val expectedCrc = u32(page, 22)
             for (i in 22..25) page[i] = 0
             if (crc(page) != expectedCrc) valid = false
-            var cursor = pos + 27 + count
+            put32(page, 22, expectedCrc)
+            var cursor = 27 + count
             repeat(count) { i ->
-                val length = bytes[pos + 27 + i].toInt() and 255
-                require(partial.size() + length <= if (packets.size < 2) MAX_HEADER_BYTES else 65536)
-                partial.write(bytes, cursor, length); cursor += length
+                val length = page[27 + i].toInt() and 255
+                require(partial.size() + length <= if (packets < 2) MAX_HEADER_BYTES else 65536)
+                partial.write(page, cursor, length); cursor += length
                 if (length < 255) {
-                    packets += partial.toByteArray(); partial.reset()
+                    ready.addLast(partial.toByteArray()); partial.reset(); packets++
                     // OpusHead is alone on the BOS page; audio starts after the tags page.
-                    if ((packets.size == 1 || packets.size == 2) && i != count - 1) valid = false
+                    if ((packets == 1 || packets == 2) && i != count - 1) valid = false
                 }
             }
-            if (headersOnly && packets.size >= 2) {
-                require(packets[0].startsWith("OpusHead") && packets[1].startsWith("OpusTags"))
-                return Stream(packets[0], packets[1], emptyList(), -1, false)
-            }
-            if (flags and 4 != 0) { eos = true; final = i64(bytes, pos + 6) }
-            pos = end
+            if (flags and 4 != 0) { eos = true; finalGranule = i64(page, 6) }
+            return page
         }
-        require(packets.size >= 2 && packets[0].startsWith("OpusHead") && packets[1].startsWith("OpusTags"))
-        return Stream(packets[0], packets[1], packets.drop(2), final, valid && eos && partial.size() == 0)
+        /** The next whole packet, or null once the input ends. */
+        fun packet(): ByteArray? {
+            while (ready.isEmpty()) page() ?: return null
+            return ready.removeFirst()
+        }
+        fun headers(): Pair<ByteArray, ByteArray> {
+            val head = packet(); val tags = packet()
+            require(head != null && tags != null && head.startsWith("OpusHead") && tags.startsWith("OpusTags"))
+            return head to tags
+        }
     }
-    fun mux(stream: Stream, tags: ByteArray): ByteArray {
-        require(stream.validFraming && tags.size <= MAX_HEADER_BYTES && stream.audio.isNotEmpty())
-        val out = ByteArrayOutputStream()
-        val serial = Random.nextInt(); var seq = 0
+    fun read(bytes: ByteArray, headersOnly: Boolean = false): Stream {
+        val reader = Reader(ByteArrayInputStream(bytes))
+        val (head, tags) = reader.headers()
+        if (headersOnly) return Stream(head, tags, emptyList(), -1, false)
+        val audio = generateSequence { reader.packet() }.toList()
+        return Stream(head, tags, audio, reader.finalGranule, reader.complete)
+    }
+    fun headers(input: InputStream) = Reader(input).headers()
+    /** One pass over a whole stream, holding a single packet at a time. */
+    fun scan(input: InputStream): Info {
+        val reader = Reader(input)
+        val (head, tags) = reader.headers()
+        val hasher = try { Hasher(head) } catch (_: Exception) { null }
+        var usable = hasher != null
+        while (true) {
+            val packet = reader.packet() ?: break
+            if (usable) try { hasher!!.add(packet) } catch (_: Exception) { usable = false }
+        }
+        val digest = if (usable && reader.complete) try { hasher!!.finish(reader.finalGranule) } catch (_: Exception) { null } else null
+        return Info(head, tags, reader.finalGranule, reader.complete, hasher?.sampleCount(reader.finalGranule) ?: 0, digest)
+    }
+    /** Lays out one packet per page group, exactly as every Cassini writer does, so equal packets give equal bytes. */
+    private class Writer(private val out: OutputStream, private val serial: Int) {
+        private var seq = 0
         fun packet(bytes: ByteArray, flags: Int, granule: Long) {
             val laces = MutableList(bytes.size / 255) { 255 }.also { it += bytes.size % 255 }
             var offset = 0
@@ -83,9 +155,8 @@ internal object OggOpus {
                 val size = group.sum()
                 val page = ByteArray(27 + group.size + size)
                 "OggS".toByteArray().copyInto(page)
-                page[5] = ((if (index > 0) 1 else flags and 2) or
-                    (if (offset + size == bytes.size && group.last() < 255) flags and 4 else 0)).toByte()
                 val last = offset + size == bytes.size && group.last() < 255
+                page[5] = ((if (index > 0) 1 else flags and 2) or (if (last) flags and 4 else 0)).toByte()
                 le64(if (last) granule else -1).copyInto(page, 6)
                 put32(page, 14, serial); put32(page, 18, seq++)
                 page[26] = group.size.toByte()
@@ -94,16 +165,93 @@ internal object OggOpus {
                 put32(page, 22, crc(page)); out.write(page); offset += size
             }
         }
-        packet(stream.head, 2, 0); packet(tags, 0, 0)
+    }
+    /**
+     * [mux] as packets arrive: holds one packet back so the last one carries EOS. Packets past [finalGranule]
+     * (encoder flush) are dropped; [finish] fails unless the packets cover it.
+     */
+    class Muxer(out: OutputStream, head: ByteArray, tags: ByteArray, private val finalGranule: Long, serial: Int = Random.nextInt()) {
+        private val writer = Writer(out, serial)
+        private var pending: ByteArray? = null
+        private var granule = 0L
+        init { require(tags.size <= MAX_HEADER_BYTES && finalGranule > 0); writer.packet(head, 2, 0); writer.packet(tags, 0, 0) }
+        val full get() = granule >= finalGranule
+        fun add(packet: ByteArray) {
+            if (full) return
+            pending?.let { writer.packet(it, 0, granule) }
+            pending = packet; granule += packetSamples(packet)
+        }
+        fun finish() {
+            require(full) { "Opus packets do not cover the final granule" }
+            writer.packet(pending!!, 4, finalGranule); pending = null
+        }
+    }
+    /**
+     * Live capture: the final length is unknown until [finish]. Every page written so far is a valid prefix, so a
+     * file cut short after a flush still decodes up to its last whole page.
+     */
+    class LiveMuxer(out: OutputStream, head: ByteArray, tags: ByteArray, serial: Int = Random.nextInt()) {
+        private val writer = Writer(out, serial)
+        private var pending: ByteArray? = null
+        var granule = 0L
+            private set
+        val preSkip = u16(head, 10)
+        init { require(tags.size <= MAX_HEADER_BYTES); writer.packet(head, 2, 0); writer.packet(tags, 0, 0) }
+        val empty get() = pending == null
+        fun add(packet: ByteArray) {
+            val samples = packetSamples(packet)
+            pending?.let { writer.packet(it, 0, granule) }
+            pending = packet; granule += samples
+        }
+        /** Ends the stream at [finalGranule], clamped to what the packets cover; null keeps every sample. */
+        fun finish(finalGranule: Long? = null) {
+            val last = pending ?: throw IllegalStateException("No Opus audio packets")
+            writer.packet(last, 4, (finalGranule ?: granule).coerceIn(minOf(preSkip.toLong(), granule), granule)); pending = null
+        }
+    }
+    fun mux(stream: Stream, tags: ByteArray, serial: Int = Random.nextInt()): ByteArray {
+        require(stream.validFraming && tags.size <= MAX_HEADER_BYTES && stream.audio.isNotEmpty())
+        val out = ByteArrayOutputStream()
+        val writer = Writer(out, serial)
+        writer.packet(stream.head, 2, 0); writer.packet(tags, 0, 0)
         var granule = 0L
         stream.audio.forEachIndexed { i, bytes ->
             granule += packetSamples(bytes)
-            packet(bytes, if (i == stream.audio.lastIndex) 4 else 0,
+            writer.packet(bytes, if (i == stream.audio.lastIndex) 4 else 0,
                 if (i == stream.audio.lastIndex) stream.finalGranule else granule)
         }
-        require(out.size() <= MAX_FILE_BYTES)
         return out.toByteArray()
     }
+    /**
+     * [mux] without holding the audio: copies [input]'s packets behind new [tags], renumbering pages and
+     * recomputing CRCs. Returns what it read, digest included; a damaged source throws after partial output.
+     */
+    fun rewrite(input: InputStream, tags: ByteArray, out: OutputStream, serial: Int = Random.nextInt()): Info {
+        require(tags.size <= MAX_HEADER_BYTES)
+        val reader = Reader(input)
+        val (head, oldTags) = reader.headers()
+        val hasher = Hasher(head)
+        val writer = Writer(out, serial)
+        writer.packet(head, 2, 0); writer.packet(tags, 0, 0)
+        var previous = reader.packet() ?: throw IllegalArgumentException("No Opus audio packets")
+        var granule = 0L
+        while (true) {
+            hasher.add(previous); granule += packetSamples(previous)
+            val next = reader.packet()
+            if (next == null) { require(reader.complete); writer.packet(previous, 4, reader.finalGranule); break }
+            writer.packet(previous, 0, granule)
+            previous = next
+        }
+        return Info(head, oldTags, reader.finalGranule, true, hasher.sampleCount(reader.finalGranule), hasher.finish(reader.finalGranule))
+    }
+    fun rewrite(source: File, tags: ByteArray, target: File, serial: Int = Random.nextInt()): Info =
+        source.inputStream().buffered().use { input ->
+            FileOutputStream(target).use { file ->
+                val out = file.buffered()
+                rewrite(input, tags, out, serial).also { out.flush(); file.fd.sync() }
+            }
+        }
+    fun scan(file: File): Info = file.inputStream().buffered().use { scan(it as InputStream) }
     fun packetSamples(packet: ByteArray): Int {
         require(packet.isNotEmpty())
         val toc = packet[0].toInt() and 255

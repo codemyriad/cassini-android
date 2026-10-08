@@ -36,7 +36,7 @@
     <string name="saving">Salvataggio del documento Cassini…</string>
     <string name="saved">Cassini salvato · audio e trascrizione insieme.</string>
     <string name="empty_title">Carica un nastro.</string>
-    <string name="empty_hint">Apri un documento Cassini, oppure trascrivi WAV, MP3, M4A o Opus.\nFino a 3 minuti per la trascrizione. Tutto sul telefono.</string>
+    <string name="empty_hint">Apri un documento Cassini, oppure trascrivi WAV, MP3, M4A o Opus.\nFino a 2 ore per la trascrizione. Tutto sul telefono.</string>
     <string name="loaded_title">Sentiamo cosa dice.</string>
     <string name="loaded_hint">Tocca Trascrivi per ottenere parole e tempi da questa registrazione.</string>
     <string name="no_speech">Nessun parlato riconosciuto.</string>
@@ -69,12 +69,12 @@
     <string name="system_language">Segui la lingua del telefono</string>
     <string name="recognition_model">Modello di trascrizione</string>
     <string name="about">Informazioni sul prototipo</string>
-    <string name="about_body">Parakeet v3 sul tuo telefono. L’audio resta in locale.\n\nRegistra note vocali, cerca nelle trascrizioni e salva documenti Cassini Opus portatili con audio e parole temporizzate.\n\nClip fino a 3 minuti, una voce non identificata, riconoscimento multilingue automatico. La lingua indicata nella trascrizione è attualmente l’italiano.\n\nGPLv3. Codice sorgente e licenze: github.com/codemyriad/cassini-android</string>
+    <string name="about_body">Parakeet v3 sul tuo telefono. L’audio resta in locale.\n\nRegistra note vocali, cerca nelle trascrizioni e salva documenti Cassini Opus portatili con audio e parole temporizzate.\n\nAudio fino a 2 ore, una voce non identificata, riconoscimento multilingue automatico. La lingua indicata nella trascrizione è attualmente l’italiano.\n\nGPLv3. Codice sorgente e licenze: github.com/codemyriad/cassini-android</string>
     <string name="done">Fine</string>
     <string name="cancel">Annulla</string>
     <string name="error_open">Impossibile aprire la registrazione. Seleziona di nuovo il file.</string>
     <string name="error_large">Questo prototipo accetta file fino a 64 MB.</string>
-    <string name="error_long">Scegli una clip di massimo 3 minuti.</string>
+    <string name="error_long">Scegli una registrazione di massimo 2 ore.</string>
     <string name="error_short">Scegli almeno 200 millisecondi di audio.</string>
     <string name="error_audio">Impossibile leggere l’audio. Prova WAV PCM16, MP3, M4A o Opus.</string>
     <string name="error_wav">Usa un WAV PCM a 16 bit, oppure MP3, M4A o Opus.</string>
@@ -131,9 +131,9 @@
     <string name="recording_preparing">Nuova registrazione</string>
     <string name="recording_title">Titolo della nota</string>
     <string name="voice_note_name">Nota vocale %1$s</string>
-    <string name="microphone_format">Microfono · AAC mono · 48 kHz</string>
+    <string name="microphone_format">Microfono · Opus mono · 48 kHz</string>
     <string name="microphone_level">Livello del microfono in tempo reale</string>
-    <string name="recording_hint">Le parole appariranno dopo lo stop. Registra fino a 3 minuti; Parakeet trascrive sul dispositivo. Uscendo da questa schermata la registrazione si ferma e viene salvata.</string>
+    <string name="recording_hint">Le parole compaiono dopo lo stop. Registra fino a 2 ore; la registrazione continua anche a schermo spento o in un’altra app. Parakeet trascrive sul telefono.</string>
     <string name="enable_microphone">Abilita il microfono</string>
     <string name="pause_recording">Pausa</string>
     <string name="resume_recording">Riprendi</string>
@@ -156,4 +156,11 @@
     <string name="speakers_complete">%1$d etichette vocali aggiunte in %2$.1f s. Controllale ascoltando l’audio.</string>
     <string name="error_speakers">Nessun turno di parola trovato. La trascrizione originale è invariata.</string>
     <string name="download_speaker_models">Scarica e distingui le voci</string>
+    <string name="microphone_format_aac">Microfono · AAC mono · 48 kHz</string>
+    <string name="recording_recovered">Registrazione recuperata</string>
+    <string name="recording_channel">Registrazione</string>
+    <string name="stop_recording">Stop</string>
+    <string name="recording_near_limit">● Registrazione · si ferma da sola tra 5 minuti</string>
+    <string name="recording_focus_paused">In pausa: un’altra app usa l’audio. Tocca Riprendi per continuare.</string>
+    <string name="recording_error_saved">La registrazione si è fermata per un errore. L’audio fin qui è salvato nella libreria.</string>
 </resources>

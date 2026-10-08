@@ -56,8 +56,14 @@ class LibraryTest {
                     while (SystemClock.uptimeMillis() < deadline) { if (condition()) return; SystemClock.sleep(50) }
                     fail(description)
                 }
+                fun texts(view: android.view.View): List<String> = when (view) {
+                    is TextView -> listOf(view.text.toString())
+                    is android.view.ViewGroup -> (0 until view.childCount).flatMap { texts(view.getChildAt(it)) }
+                    else -> emptyList()
+                }
                 fun cards(activity: LibraryActivity) = activity.findViewById<android.widget.LinearLayout>(R.id.library_cards).let { container ->
-                    (0 until container.childCount).map { container.getChildAt(it) }.filter { it.isClickable }
+                    // Startup recovery catalogues the device's own captures into this temporary library; ignore them.
+                    (0 until container.childCount).map { container.getChildAt(it) }.filter { it.isClickable && !texts(it).any { t -> t.startsWith(context.getString(R.string.recording_recovered)) } }
                 }
                 await("Library should display both notes") {
                     var ready = false; scenario.onActivity { ready = cards(it).size == 2 }; ready
@@ -241,12 +247,12 @@ class LibraryTest {
             scenario.onActivity { it.findViewById<Button>(R.id.capture_done).performClick() }
             instrumentation.waitForIdleSync()
             val recorded = sessions.load()
-            assertEquals("Microphone test.m4a", recorded.name)
+            assertEquals("Microphone test." + MicrophoneRecording.extension(), recorded.name)
             assertNotNull(recorded.libraryId)
             assertNull(recorded.document)
             val audio = AudioDecoder.decode(context, Uri.parse(recorded.uri))
             assertTrue("Paused time must be excluded: ${audio.durationMs}", audio.durationMs in 1800..3200)
-            assertEquals(48000, audio.sampleRate)
+            assertEquals(16000, audio.sampleRate)
             assertEquals(1, LibraryStore(context.filesDir).load().count { it.id == recorded.libraryId })
             finishScreens()
             ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java).putExtra(MainActivity.NOTE_ID, recorded.libraryId)).use { reopened ->
@@ -267,26 +273,28 @@ class LibraryTest {
         }
     }
 
-    @Test fun leavingRecordingScreenFinalizesAudioWithoutBackgroundTranscription() {
+    @Test fun leavingRecordingScreenKeepsCapturingInTheService() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         val sessions = SessionStore(context.filesDir)
         val original = sessions.load()
         instrumentation.uiAutomation.executeShellCommand("pm grant ${context.packageName} ${Manifest.permission.RECORD_AUDIO}")
             .use { descriptor -> java.io.FileInputStream(descriptor.fileDescriptor).use { it.readBytes() } }
-        val scenario = ActivityScenario.launch(RecordingActivity::class.java)
+        val scenario = ActivityScenario.launch<RecordingActivity>(Intent(context, RecordingActivity::class.java).putExtra(RecordingActivity.AUTO_TRANSCRIBE, false))
         try {
             SystemClock.sleep(1200)
+            val before = sessions.load()
             scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
+            SystemClock.sleep(3000)
+            assertEquals("Hiding the screen must not stop or save the recording", before.libraryId, sessions.load().libraryId)
+            scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+            scenario.onActivity { it.findViewById<Button>(R.id.capture_done).performClick() }
+            instrumentation.waitForIdleSync()
             val saved = sessions.load()
             assertNotNull(saved.libraryId)
             assertNull(saved.document)
-            assertTrue(AudioDecoder.decode(context, Uri.parse(saved.uri)).durationMs >= 900)
+            assertTrue(AudioDecoder.decode(context, Uri.parse(saved.uri)).durationMs >= 3900)
             assertEquals(1, LibraryStore(context.filesDir).load().count { it.id == saved.libraryId })
-            scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
-            instrumentation.waitForIdleSync()
-            assertEquals(saved.libraryId, sessions.load().libraryId)
-            assertNull(sessions.load().document)
         } finally { scenario.close(); finishScreens(); sessions.save(original) }
     }
 

@@ -52,7 +52,7 @@ class LibraryStore(private val directory: File) {
         if (marker.exists()) return
         val existing = load()
         val recovered = linkedMapOf<String, LibraryNote>()
-        fun meeting(path: String) = try { CassiniDocument.read(File(path).readBytes()).manifest?.getJSONObject("meeting")?.getString("id") }
+        fun meeting(path: String) = try { CassiniDocument.read(File(path), verify = false).manifest?.getJSONObject("meeting")?.getString("id") }
             catch (_: Exception) { null }
         // Notes saved before this recovery keep their state. Like the current note, each stands for its meeting.
         val kept = existing.mapNotNull { it.session.document }.filter { it != latest.document }.toSet()
@@ -60,8 +60,7 @@ class LibraryStore(private val directory: File) {
         File(directory, "documents").listFiles().orEmpty().filter { it.extension == "opus" }
             .sortedBy { it.lastModified() }.forEach { source ->
                 try {
-                    if (source.length() > OggOpus.MAX_FILE_BYTES) return@forEach
-                    val doc = CassiniDocument.read(source.readBytes())
+                    val doc = CassiniDocument.read(source, verify = false)
                     val known = existing.firstOrNull { it.session.document == source.absolutePath }?.takeIf { source.absolutePath in kept }
                     if (known != null) {
                         // session.json does not carry a document's words, so a note adopted from it has no search text yet.
