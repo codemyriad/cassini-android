@@ -163,6 +163,8 @@
     <string name="speaker_person_likely">%1$s (likely)</string>
     <string name="speaker_same_person">Same person as saved “%1$s”?</string>
     <string name="speaker_same_person_yes">Same person</string>
+    <string name="speaker_rename_person">Rename “%1$s” to “%2$s” in every note?</string>
+    <string name="speaker_rename_person_yes">Rename</string>
     <string name="speaker_same_person_no">Someone else</string>
     <string name="matching_voices">Recognising voices…</string>
     <string name="speakers_menu">Speakers…</string>

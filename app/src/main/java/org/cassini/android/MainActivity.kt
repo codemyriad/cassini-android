@@ -477,6 +477,14 @@ class MainActivity : Activity() {
                 .setNegativeButton(R.string.speaker_same_person_no) { _, _ -> applySpeakerName(speakerId, name, null, true, true) }.show()
             return
         }
+        // Editing a confirmed person's name is usually a correction, not a new person.
+        val confirmed = print?.match?.takeIf { it.state == Match.State.CONFIRMED }?.let { people[it.voiceId] }
+        if (remember && confirmed != null && voiceId == null && !asked && !confirmed.name.equals(name, ignoreCase = true)) {
+            AlertDialog.Builder(this).setMessage(getString(R.string.speaker_rename_person, confirmed.name, name))
+                .setPositiveButton(R.string.speaker_rename_person_yes) { _, _ -> applySpeakerName(speakerId, name, confirmed.id, true, true) }
+                .setNegativeButton(R.string.speaker_same_person_no) { _, _ -> applySpeakerName(speakerId, name, null, true, true) }.show()
+            return
+        }
         if (existing.speakerLabel(speakerId) == name) { rememberVoice(speakerId, name, voiceId, remember); renderTranscript(); setStatus(R.string.speaker_renamed, name); return }
         runWork(R.string.saving) {
             val (file, renamed) = documents.relabel(File(path), existing, mapOf(speakerId to name))
