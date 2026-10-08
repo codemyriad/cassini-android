@@ -67,6 +67,53 @@ class CassiniDocumentTest {
         assertEquals(original.variants[0].body, next.variants[0].body)
         assertEquals(OggOpus.read(bytes).digest(), OggOpus.read(CassiniDocument.create(bytes, transcript, "Again", JSONObject(), original)).digest())
     }
+    private fun relabelled(bytes: ByteArray, labels: Map<String, String>): Pair<CassiniDocument, CassiniDocument> {
+        val dir = kotlin.io.path.createTempDirectory().toFile()
+        try {
+            val source = File(dir, "a.opus").apply { writeBytes(bytes) }
+            val before = CassiniDocument.read(source)
+            return before to CassiniDocument.relabel(source, before, labels, File(dir, "b.opus"))
+        } finally { dir.deleteRecursively() }
+    }
+    private fun tags(doc: CassiniDocument, filter: (String) -> Boolean) = doc.comments.filter { filter(it.substringBefore('=')) }
+    @Test fun relabelChangesOnlyTheLabels() {
+        val transcript = Transcript(listOf(Word("spk_1", 0, 20, "Ciao"), Word("spk_2", 20, 40, "Salve")), "it")
+        val bytes = CassiniDocument.create(silence(), transcript, "Two", JSONObject().put("engine", "sherpa-onnx"))
+        val base = CassiniDocument.read(bytes)
+        base.manifest!!.put("x", JSONObject().put("keep", true)).getJSONArray("speakers").getJSONObject(0).put("pronouns", "she")
+        val (before, after) = relabelled(CassiniDocument.create(bytes, transcript, "Ignored", JSONObject(), base), mapOf("spk_1" to "  Anna "))
+        assertEquals("ok", after.state); assertTrue(after.warnings.isEmpty())
+        assertEquals("Anna", after.speakerLabel("spk_1")); assertEquals("spk_2", after.speakerLabel("spk_2"))
+        assertEquals("she", after.manifest!!.getJSONArray("speakers").getJSONObject(0).getString("pronouns"))
+        assertTrue(after.manifest.getJSONObject("x").getBoolean("keep"))
+        assertEquals(before.manifest!!.getJSONObject("meeting").toString(), after.manifest.getJSONObject("meeting").toString())
+        assertEquals(before.manifest.getJSONObject("integrity").toString(), after.manifest.getJSONObject("integrity").toString())
+        assertEquals(before.variants.map { it.id to it.body }, after.variants.map { it.id to it.body })
+        assertEquals(tags(before) { !it.startsWith("CASSINI_PAYLOAD_") }, tags(after) { !it.startsWith("CASSINI_PAYLOAD_") })
+        assertEquals(tags(before) { it == "CASSINI_PAYLOAD_SCHEMA" || it == "CASSINI_PAYLOAD_MIME" }, tags(after) { it == "CASSINI_PAYLOAD_SCHEMA" || it == "CASSINI_PAYLOAD_MIME" })
+        assertNotEquals(tags(before) { it == "CASSINI_PAYLOAD_SHA256" }, tags(after) { it == "CASSINI_PAYLOAD_SHA256" })
+        assertNotEquals(tags(before) { it == "CASSINI_PAYLOAD_RAW_BYTES" }, tags(after) { it == "CASSINI_PAYLOAD_RAW_BYTES" })
+        before.manifest.getJSONArray("speakers").getJSONObject(0).put("label", "Anna")
+        assertEquals(before.manifest.toString(), after.manifest.toString())
+    }
+    @Test fun relabelRejectsUnknownSpeakersAndBlankLabels() {
+        val bytes = CassiniDocument.create(silence(), Transcript(listOf(Word("spk_1", 0, 20, "Ciao")), "it"), "One", JSONObject())
+        for (labels in listOf(mapOf("spk_9" to "Anna"), mapOf("spk_1" to "  "))) {
+            try { relabelled(bytes, labels); fail("$labels") } catch (_: IllegalArgumentException) {}
+        }
+    }
+    @Test fun relabelConformanceVectorWithUnknownMembers() {
+        val file = File(System.getProperty("cassini.conformance", "../cassini-format/spec/conformance")!!, "opus/014-unknown-manifest-member.opus")
+        assumeTrue("Checkout cassini-format beside this repository", file.isFile)
+        val (before, after) = relabelled(file.readBytes(), mapOf("spk_a" to "Anna"))
+        assertEquals("ok", after.state); assertEquals("Anna", after.speakerLabel("spk_a"))
+        assertEquals(before.speakerLabel("spk_b"), after.speakerLabel("spk_b"))
+        assertTrue(after.manifest!!.has("cassiniFutureField"))
+        assertEquals(before.manifest!!.getJSONArray("speakers").getJSONObject(0).get("pronouns").toString(),
+            after.manifest.getJSONArray("speakers").getJSONObject(0).get("pronouns").toString())
+        assertEquals(before.variants.map { it.id to it.body }, after.variants.map { it.id to it.body })
+        assertEquals(before.manifest.getJSONObject("integrity").getString("opusAudioSha256"), after.manifest.getJSONObject("integrity").getString("opusAudioSha256"))
+    }
     @Test fun strictPayloadRejectsDuplicatesTrailingGzipAndBadLengths() {
         for (text in listOf("{\"x\":1,\"x\":2}", "{\"a\":{\"x\":1,\"x\":2}}", "{\"x\":NaN}", "{\"x\":01}", "{'x':1}")) {
             try { CassiniPayload.json(text); fail(text) } catch (_: IllegalArgumentException) {} catch (_: org.json.JSONException) {}

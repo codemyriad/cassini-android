@@ -48,6 +48,18 @@ internal class DocumentStore(private val context: Context) {
             return output to doc
         } finally { source.delete(); temporary.delete() }
     }
+    /** Writes a new file beside [source] whose speaker labels differ; the caller retires the old one. */
+    fun relabel(source: File, existing: CassiniDocument, labels: Map<String, String>): Pair<File, CassiniDocument> {
+        val id = UUID.randomUUID()
+        val temporary = File(directory, "$id.tmp")
+        val output = File(directory, "$id.opus")
+        try {
+            requireUser(directory.usableSpace >= source.length() + Limits.MIN_FREE_BYTES, Failure.SPACE)
+            val doc = CassiniDocument.relabel(source, existing, labels, temporary)
+            check(temporary.renameTo(output))
+            return output to doc
+        } finally { temporary.delete() }
+    }
     /** Bounded by [Limits.MAX_IMPORT_BYTES] and the space left on the device rather than by the heap. */
     private fun copy(input: InputStream, output: OutputStream, hash: MessageDigest?, start: Long = 0) {
         val buffer = ByteArray(65536); var total = start
