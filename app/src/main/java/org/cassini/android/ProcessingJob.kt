@@ -9,7 +9,8 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * One background transcription (and optionally speaker identification) of a library note. Only the
- * fields that survive a process are persisted; [words] are the live interim transcript.
+ * fields that survive a process are persisted; [pending] are the live provisional words, and the
+ * settled ones are in [ProcessingJobs.settled].
  */
 data class ProcessingJob(
     val noteId: String,
@@ -29,7 +30,8 @@ data class ProcessingJob(
     val settledWords: Int = 0,
     /** Runs started for this job; a job that keeps killing the process is not resumed forever. */
     val attempts: Int = 0,
-    val words: List<Word> = emptyList(),
+    /** Words after the settled ones that a later decode may still change: a short tail, replaced each tick. */
+    val pending: List<Word> = emptyList(),
 ) {
     enum class Phase(val active: Boolean) {
         QUEUED(true), DECODE(true), ASR(true), DIARIZE(true), PACKAGE(true),
@@ -61,6 +63,12 @@ data class ProcessingJob(
  * an active job found there at start was cut short and can be resumed.
  */
 object ProcessingJobs {
+    /** Settled words of the job this process runs, appended as they settle; a screen copies only those it has not shown. */
+    @Volatile var settled = SettledWords(); private set
+
+    /** A fresh word list for a run that starts from [words]. */
+    fun beginWords(words: List<Word>): SettledWords = SettledWords().also { it.addAll(words); settled = it }
+
     fun interface Listener { fun onJobChanged(job: ProcessingJob?) }
 
     @Volatile var current: ProcessingJob? = null; private set
@@ -110,4 +118,13 @@ object ProcessingJobs {
 
     /** The job of [noteId] that is still working or stopped short, if any. */
     fun forNote(noteId: String?): ProcessingJob? = current?.takeIf { noteId != null && it.noteId == noteId }
+}
+
+/** Append-only and safe across threads: the pipeline adds, screens read the part they have not shown. */
+class SettledWords {
+    private val words = ArrayList<Word>()
+    @get:Synchronized val size: Int get() = words.size
+    @Synchronized fun addAll(more: Collection<Word>) { words.addAll(more) }
+    /** A copy of the words from [from] on. */
+    @Synchronized fun since(from: Int): List<Word> = ArrayList(words.subList(from.coerceIn(0, words.size), words.size))
 }

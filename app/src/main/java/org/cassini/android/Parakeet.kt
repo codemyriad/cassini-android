@@ -25,8 +25,14 @@ object Parakeet {
 
     internal fun cutting(detectorModel: String?) = if (detectorModel == null) Cutting.QUIET else Cutting.SPEECH
 
-    /** State after a decode: [doneMs] of [totalMs] of the recording, [elapsedMs] since decoding began, and the provisional words. */
-    internal class Progress(val doneMs: Long, val totalMs: Long, val elapsedMs: Long, val words: List<Word>)
+    /**
+     * State after a decode: [doneMs] of [totalMs] of the recording, [elapsedMs] since decoding began, the
+     * number of words handed to onSettled so far, and the provisional words after them. Only the short
+     * tail is copied, so reporting does not grow with the transcript.
+     */
+    internal class Progress(val doneMs: Long, val totalMs: Long, val elapsedMs: Long, val settled: Int, val pending: List<Word>) {
+        val hasWords: Boolean get() = settled > 0 || pending.isNotEmpty()
+    }
 
     /** What turns samples into timed words, so the cutting can be checked on the JVM with a fake. */
     internal interface Recognizer {
@@ -92,7 +98,7 @@ object Parakeet {
             requireUser(size.toLong() * 1000 / rate <= WHOLE_MAX_MS, Failure.LONG)
             val began = System.nanoTime()
             val transcript = Transcript(Session(recognizer, source, policy, null) { _, _ -> }.whole())
-            onProgress(Progress(totalMs(), totalMs(), (System.nanoTime() - began) / 1_000_000, transcript.words))
+            onProgress(Progress(totalMs(), totalMs(), (System.nanoTime() - began) / 1_000_000, 0, transcript.words))
             return transcript
         }
         // A fixed grid and a single decode have no seam a resume could join at.
@@ -106,11 +112,10 @@ object Parakeet {
         val report = { done: Int ->
             reached = maxOf(reached, done)
             val now = System.nanoTime()
-            // Each report copies every word so far: at most one a second keeps a long recording linear.
             if (reported == 0L || now - reported >= PROGRESS_INTERVAL_NS) {
                 reported = now
                 onProgress(Progress(SpeechWindows.floorMs(reached, rate).coerceAtMost(totalMs()), totalMs(),
-                    (now - began) / 1_000_000, session.words.map { it.word }))
+                    (now - began) / 1_000_000, session.emittedCount, session.unsettled()))
             }
         }
         report(reached)
@@ -132,7 +137,7 @@ object Parakeet {
         session.settleAll(size)
         val transcript = Transcript(WordGate.finalizeTranscriptWords(
             if (source is ArraySource) ArrayReader(source.audio.samples) else BlockReader(source, size), rate, session.words, paddedTailMs))
-        onProgress(Progress(totalMs(), totalMs(), (System.nanoTime() - began) / 1_000_000, transcript.words))
+        onProgress(Progress(totalMs(), totalMs(), (System.nanoTime() - began) / 1_000_000, session.emittedCount, emptyList()))
         return transcript
     }
 
@@ -198,6 +203,9 @@ object Parakeet {
         private var pending = emptyList<TimedWord>()
         val words: List<TimedWord> get() = settled + pending
         private var emitted = settled.size
+        val emittedCount: Int get() = emitted
+        /** The words not yet handed on: settled ones inside the margin, then the span being decoded. */
+        fun unsettled(): List<Word> = (settled.subList(emitted.coerceAtMost(settled.size), settled.size) + pending).map { it.word }
         private var lastEmitted = settled.lastOrNull()
         private var finalEnd = resume?.settledEnd ?: 0L
         /** A later decode starts at most this far before the end of the last one, and a seam moves a word at most the tolerance. */

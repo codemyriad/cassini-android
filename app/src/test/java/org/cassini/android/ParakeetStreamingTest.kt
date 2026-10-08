@@ -92,6 +92,19 @@ class ParakeetStreamingTest {
         }
     }
 
+    @Test fun progressCountsTheSettledWordsAndCarriesOnlyTheProvisionalTail() {
+        val samples = recording(150)
+        var handedOn = 0
+        val reports = ArrayList<Pair<Int, Parakeet.Progress>>()
+        val transcript = Parakeet.runCutting(ArraySource(PcmAudio(samples, rate)), FakeRecognizer, null, DecodePolicy.WHOLE_SPANS,
+            Parakeet.Cutting.QUIET, null, { words, _ -> handedOn += words.size }) { reports += handedOn to it }
+        assertTrue(reports.size >= 2)
+        reports.forEach { (count, progress) -> assertEquals(count, progress.settled) }
+        val last = reports.last().second
+        assertTrue(last.pending.isEmpty())
+        assertEquals(transcript.words.size, last.settled)
+    }
+
     @Test fun resumingFromAnyRecordGivesTheSameWords() {
         val samples = recording(150)
         val source = ArraySource(PcmAudio(samples, rate))

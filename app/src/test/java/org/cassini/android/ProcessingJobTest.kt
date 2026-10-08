@@ -8,9 +8,9 @@ class ProcessingJobTest {
     @Test fun persistedFieldsRoundTripAndLiveWordsDoNot() {
         val job = ProcessingJob("note-1", "Meeting.opus", speakers = true, phase = ProcessingJob.Phase.ASR, doneMs = 600_000,
             totalMs = 3_300_000, elapsedMs = 70_000, audioMs = 600_000, stageMs = 60_000, failure = Failure.STALLED,
-            settledWords = 1234, attempts = 2, words = listOf(Word("spk_1", 0, 100, "ciao")))
+            settledWords = 1234, attempts = 2, pending = listOf(Word("spk_1", 0, 100, "ciao")))
         val back = ProcessingJob.fromJson(JSONObject(job.json().toString()))
-        assertEquals(job.copy(words = emptyList()), back)
+        assertEquals(job.copy(pending = emptyList()), back)
     }
 
     @Test fun anotherVersionIsNotRead() {
@@ -39,5 +39,14 @@ class ProcessingJobTest {
         assertTrue(back.session.partial)
         assertEquals(session.transcript, back.session.transcript)
         assertNull(LibraryNote.fromJson(JSONObject(LibraryNote.update(null, session.copy(partial = false), "id", 1).json().toString())).session.transcript)
+    }
+
+    @Test fun settledWordsHandOutOnlyWhatFollows() {
+        val words = ProcessingJobs.beginWords(listOf(Word("spk_1", 0, 1, "a")))
+        assertSame(words, ProcessingJobs.settled)
+        words.addAll(listOf(Word("spk_1", 1, 2, "b"), Word("spk_1", 2, 3, "c")))
+        assertEquals(listOf("b", "c"), words.since(1).map { it.text })
+        assertEquals(emptyList<Word>(), words.since(9))
+        assertEquals(3, words.size)
     }
 }

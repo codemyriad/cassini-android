@@ -72,14 +72,14 @@ class ChunkingComparisonTest {
                 var firstWordsMs = -1L
                 val transcript = run(audio) {
                     steps += it
-                    if (firstWordsMs < 0 && it.words.isNotEmpty()) firstWordsMs = (System.nanoTime() - began) / 1_000_000
+                    if (firstWordsMs < 0 && it.hasWords) firstWordsMs = (System.nanoTime() - began) / 1_000_000
                 }
                 val elapsedMs = (System.nanoTime() - began) / 1_000_000
                 val words = tokens(transcript.words.joinToString(" ") { it.text })
                 if (mode == "whole") whole = words
                 val entry = JSONObject().put("audio", name).put("rate", audio.sampleRate).put("mode", mode).put("audioMs", audio.durationMs)
                     .put("elapsedMs", elapsedMs).put("words", words.size).put("fromWhole", distance(whole, words))
-                    .put("steps", steps.size).put("firstWordsAfterMs", steps.firstOrNull { it.words.isNotEmpty() }?.elapsedMs ?: -1)
+                    .put("steps", steps.size).put("firstWordsAfterMs", steps.firstOrNull { it.hasWords }?.elapsedMs ?: -1)
                     .put("firstWordsWaitMs", firstWordsMs)
                 if (name.startsWith("italian-smoke")) entry.put("fromReference", distance(reference, words))
                 entry.put("text", transcript.words.joinToString(" ") { it.text })

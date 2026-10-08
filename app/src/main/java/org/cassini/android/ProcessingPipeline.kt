@@ -34,7 +34,8 @@ internal class ProcessingPipeline(private val context: Context, private val publ
         val existing = session.document?.let { path ->
             try { CassiniDocument.read(File(path)) } catch (error: Exception) { Log.w(TAG, "Could not read document", error); null }
         }
-        val partialWords = ArrayList<Word>()
+        // Shared with the screens, which append what they have not shown instead of redrawing everything.
+        val partialWords = ProcessingJobs.beginWords(emptyList())
         job = job.copy(phase = ProcessingJob.Phase.DECODE, name = session.name)
         publish(job, true)
 
@@ -77,7 +78,7 @@ internal class ProcessingPipeline(private val context: Context, private val publ
                 val header = TranscriptJournal.Header(pcm.key, "parakeet-tdt-0.6b-v3", models.precision, models.revision,
                     detector?.let { File(it).name } ?: "none", cutting.name, policy.toString())
                 val resume = journal.load(header)
-                resume?.let { state -> partialWords += state.words.map { it.word } }
+                resume?.let { state -> partialWords.addAll(state.words.map { it.word }) }
                 if (resume != null) Log.i(TAG, "Resuming transcription at ${state(resume)}")
                 journal.open(header)
                 // Only audio decoded by this job counts towards its speed, so a resume does not inflate it.
@@ -90,7 +91,7 @@ internal class ProcessingPipeline(private val context: Context, private val publ
                     words = Parakeet.transcribe(source, models, detector, policy, cutting, resume, onSettled = { settled, end ->
                         if (settled.isNotEmpty()) {
                             journal.append(settled, end)
-                            partialWords += settled.map { it.word }
+                            partialWords.addAll(settled.map { it.word })
                         }
                         // The note keeps what is settled, so a stop at any point leaves words to read.
                         val now = System.nanoTime()
@@ -101,7 +102,7 @@ internal class ProcessingPipeline(private val context: Context, private val publ
                     }) { progress ->
                         // Decode time counts: the multiple is audio settled per second since the job began.
                         job = job.copy(doneMs = progress.doneMs, totalMs = progress.totalMs, elapsedMs = elapsed(),
-                            audioMs = baseAudioMs + (progress.doneMs - resumedMs).coerceAtLeast(0), stageMs = elapsed(), words = progress.words, settledWords = partialWords.size)
+                            audioMs = baseAudioMs + (progress.doneMs - resumedMs).coerceAtLeast(0), stageMs = elapsed(), pending = progress.pending, settledWords = partialWords.size)
                         publish(job, false)
                     }
                 } catch (error: Throwable) {
@@ -118,7 +119,7 @@ internal class ProcessingPipeline(private val context: Context, private val publ
             }
             val durationMs = pcm.available * 1000 / Limits.ASR_RATE
             job = job.copy(phase = ProcessingJob.Phase.PACKAGE, doneMs = durationMs, totalMs = durationMs, elapsedMs = elapsed(),
-                audioMs = durationMs, words = words.words)
+                audioMs = durationMs, pending = emptyList())
             publish(job, true)
             var document = existing
             var file: File? = null
@@ -144,7 +145,7 @@ internal class ProcessingPipeline(private val context: Context, private val publ
                         val doneMs = durationMs * done / total
                         val wall = (System.nanoTime() - diarizeBegan) / 1_000_000
                         job = job.copy(doneMs = doneMs, totalMs = durationMs, elapsedMs = elapsed(), audioMs = doneMs, stageMs = wall,
-                            words = emptyList())
+                            pending = emptyList())
                         publish(job, false)
                     }
                 }
@@ -171,7 +172,7 @@ internal class ProcessingPipeline(private val context: Context, private val publ
             // The words are in the document now; the checkpoint and the cache have done their job.
             journalFile(filesDir, job.noteId).delete()
             pcm.delete()
-            job = job.copy(phase = ProcessingJob.Phase.DONE, doneMs = job.totalMs, elapsedMs = elapsed(), failure = null, words = emptyList())
+            job = job.copy(phase = ProcessingJob.Phase.DONE, doneMs = job.totalMs, elapsedMs = elapsed(), failure = null, pending = emptyList())
             return job
         } finally {
             decoding.interrupt()
@@ -182,9 +183,9 @@ internal class ProcessingPipeline(private val context: Context, private val publ
 
     private fun state(resume: TranscriptJournal.State) = "${resume.words.size} words, sample ${resume.settledEnd}"
 
-    private fun savePartial(noteId: String, words: List<Word>) {
+    private fun savePartial(noteId: String, words: SettledWords) {
         try {
-            library.update(noteId) { it.copy(transcript = Transcript(ArrayList(words)), partial = true) }
+            library.update(noteId) { it.copy(transcript = Transcript(words.since(0)), partial = true) }
         } catch (error: Exception) { Log.e(TAG, "Could not keep the partial transcript", error) }
     }
 

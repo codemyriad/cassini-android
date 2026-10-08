@@ -60,7 +60,7 @@ class ProcessingService : Service() {
     private fun speakers(intent: Intent) = intent.getBooleanExtra(SPEAKERS, false)
 
     private fun begin(initial: ProcessingJob) {
-        val job = initial.copy(attempts = initial.attempts + 1, phase = ProcessingJob.Phase.QUEUED, words = emptyList())
+        val job = initial.copy(attempts = initial.attempts + 1, phase = ProcessingJob.Phase.QUEUED, pending = emptyList())
         startInForeground(job)
         cancelled = false
         stoppedBySystem = false
@@ -89,9 +89,9 @@ class ProcessingService : Service() {
                 if (failure != null && failure != Failure.CANCELLED) Log.e(TAG, "Processing failed: $failure", error)
                 val current = ProcessingJobs.current?.takeIf { it.noteId == job.noteId } ?: last
                 when (failure) {
-                    null -> current.copy(phase = ProcessingJob.Phase.PAUSED, failure = null, words = emptyList())
-                    Failure.CANCELLED -> current.copy(phase = ProcessingJob.Phase.CANCELLED, failure = failure, words = emptyList())
-                    else -> current.copy(phase = ProcessingJob.Phase.FAILED, failure = failure, words = emptyList())
+                    null -> current.copy(phase = ProcessingJob.Phase.PAUSED, failure = null, pending = emptyList())
+                    Failure.CANCELLED -> current.copy(phase = ProcessingJob.Phase.CANCELLED, failure = failure, pending = emptyList())
+                    else -> current.copy(phase = ProcessingJob.Phase.FAILED, failure = failure, pending = emptyList())
                 }
             }
             ProcessingJobs.update(filesDir, finished, persist = true)

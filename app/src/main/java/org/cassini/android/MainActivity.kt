@@ -47,15 +47,20 @@ class MainActivity : Activity(), ProcessingJobs.Listener {
     private var player: MediaPlayer? = null
     private var playerReady = false
     private var busy = false
-    /** Words of this note's transcription while the service runs it. Shown, never saved from here. */
-    private var interim: Transcript? = null
+    /** Settled words of this note's transcription while the service runs it. Shown, never saved from here. */
+    private var live: SettledWords? = null
+    /** Words after [live]'s that a later decode may still change, drawn muted at the end. */
+    private var livePending = emptyList<Word>()
+    /** Where the muted provisional tail begins in the shown text. */
+    private var pendingStart = -1
     /** The job of this note last seen running here, so its end is reported once. */
     private var watched: ProcessingJob? = null
     /** The finished job whose note this screen has already reloaded. */
     private var synced: ProcessingJob? = null
-    private var renderedInterimAt = 0L
     private var highlightedWord = -1
-    private var wordRanges = emptyList<IntRange>()
+    /** The shown transcript's text and word positions, extended in place while a job adds words. */
+    private var shown = TranscriptText()
+    private val searchDebounce = Runnable { renderTranscript() }
     private val activeBackground = BackgroundColorSpan(DeckViews.amber)
     private val activeForeground = ForegroundColorSpan(DeckViews.ink)
     private var touchingTranscript = false
@@ -134,7 +139,11 @@ class MainActivity : Activity(), ProcessingJobs.Listener {
         })
         ui.search.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { renderTranscript() }
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                // A full rebuild per keystroke stalls a long transcript: rebuild it once typing pauses.
+                ui.transcript.removeCallbacks(searchDebounce)
+                if (shown.size < DEBOUNCED_WORDS) renderTranscript() else ui.transcript.postDelayed(searchDebounce, SEARCH_DEBOUNCE_MS)
+            }
             override fun afterTextChanged(s: Editable?) {}
         })
         ui.clearSearch.setOnClickListener { ui.search.text.clear() }
@@ -225,7 +234,8 @@ class MainActivity : Activity(), ProcessingJobs.Listener {
         val position = if (playerReady) player?.currentPosition ?: session.positionMs else session.positionMs
         val moved = fresh.uri != session.uri
         session = fresh.copy(positionMs = position, screen = screen)
-        interim = null
+        live = null
+        livePending = emptyList()
         try { sessions.save(session) } catch (error: Exception) { Log.e(TAG, "Could not persist session", error) }
         if (moved) session.uri?.let { preparePlayer(Uri.parse(it)) }
         val path = fresh.document
@@ -447,24 +457,54 @@ class MainActivity : Activity(), ProcessingJobs.Listener {
             else -> if (speed == null || remaining == null) setStatus(R.string.transcribing)
                 else setStatus(R.string.transcribing_progress, job.percent, speed, (remaining + 999) / 1000)
         }
-        if (job.phase != ProcessingJob.Phase.ASR || job.words.isEmpty() || job.words === interim?.words) { refreshControls(); return }
-        // A full rebuild per tick grows with the transcript: a long one is refreshed less often.
-        val now = android.os.SystemClock.uptimeMillis()
-        if (interim != null && now - renderedInterimAt < (1000L + job.words.size / 4).coerceAtMost(5000)) return
-        renderedInterimAt = now
-        val first = interim == null
+        if (job.phase != ProcessingJob.Phase.ASR) { refreshControls(); return }
+        val words = ProcessingJobs.settled
         val follow = ui.scroll.getChildAt(0).height - ui.scroll.height - ui.scroll.scrollY <= ui.scroll.height / 4
-        interim = Transcript(job.words)
-        highlightedWord = -1
-        renderScreen()
+        val first = live !== words
+        if (first) {
+            // A new run (or this screen just attached): one full build from the words settled so far.
+            live = words
+            livePending = job.pending
+            highlightedWord = -1
+            renderScreen()
+        } else {
+            appendLive(words.since(shown.size), job.pending)
+            refreshControls()
+        }
         if (first || follow) ui.transcript.post {
-            if (interim != null && !isDestroyed) {
+            if (live != null && !isDestroyed) {
                 val bounds = android.graphics.Rect()
                 ui.transcript.getDrawingRect(bounds)
                 ui.scroll.offsetDescendantRectToMyCoords(ui.transcript, bounds)
                 ui.scroll.smoothScrollTo(0, if (first) bounds.top else (bounds.bottom - ui.scroll.height).coerceAtLeast(0))
             }
         }
+    }
+
+    /** Adds newly settled words and replaces the provisional tail, touching only the end of the text. */
+    private fun appendLive(fresh: List<Word>, pending: List<Word>) {
+        val text = ui.transcript.text as? android.text.Editable
+        if (text == null || pendingStart < 0 || pendingStart > text.length) { livePending = pending; renderScreen(); return }
+        if (fresh.isEmpty() && pending == livePending) return
+        val hadWords = shown.size + livePending.size > 0
+        livePending = pending
+        text.delete(pendingStart, text.length)
+        val before = shown.size
+        val from = shown.append(fresh)
+        text.append(shown.text, from, shown.text.length)
+        for (index in before until shown.size) wordSpan(text, index)
+        highlightMatches(text, from)
+        pendingStart = text.length
+        appendPending(text)
+        if (!hadWords && shown.size + livePending.size > 0) renderScreen()
+        else ui.details.text = details(shown.size + livePending.size)
+    }
+
+    private fun appendPending(text: android.text.Editable) {
+        if (livePending.isEmpty()) return
+        val start = text.length
+        text.append(shown.tail(livePending))
+        text.setSpan(ForegroundColorSpan(DeckViews.muted), start, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
     }
 
     private fun onUi(action: () -> Unit) = runOnUiThread { if (!isDestroyed) action() }
@@ -497,7 +537,7 @@ class MainActivity : Activity(), ProcessingJobs.Listener {
         ui.library.isEnabled = !busy
         ui.open.isEnabled = !busy && !processing
         ui.transcribe.isEnabled = !busy && !processing && session.uri != null && ready && (document == null || document?.state == "ok")
-        ui.speakers.visibility = if (session.transcript?.words?.isNotEmpty() == true && interim == null && !session.partial) View.VISIBLE else View.GONE
+        ui.speakers.visibility = if (session.transcript?.words?.isNotEmpty() == true && live == null && !session.partial) View.VISIBLE else View.GONE
         ui.speakers.isEnabled = !busy && !processing && session.uri != null && (document == null || document?.state == "ok")
         ui.cancelOperation.visibility = if (processing) View.VISIBLE else View.GONE
         if (!processing && !busy) ui.progress.visibility = View.GONE
@@ -514,34 +554,27 @@ class MainActivity : Activity(), ProcessingJobs.Listener {
     }
 
     private fun renderScreen() {
-        ui.draft.visibility = if (interim != null || session.partial) View.VISIBLE else View.GONE
+        ui.draft.visibility = if (live != null || session.partial) View.VISIBLE else View.GONE
         ui.filename.text = document?.title?.takeIf { it.isNotBlank() } ?: session.name.ifBlank { getString(R.string.no_file) }
         ui.caption.text = if (document == null) getString(R.string.voice_caption, getString(R.string.italian)) else "${getString(R.string.cassini_document)}\n${session.name}"
         // Words of a running transcription belong to no document yet: not to its trust state, variants or speakers.
-        ui.trust.visibility = if (document == null || interim != null || session.partial) View.GONE else View.VISIBLE
+        ui.trust.visibility = if (document == null || live != null || session.partial) View.GONE else View.VISIBLE
         document?.let {
             ui.trust.setText(trustResource(it.state))
             ui.trust.setTextColor(if (it.state == "ok") DeckViews.amber else DeckViews.warning)
         }
         ui.documentInfo.visibility = if (document == null) View.GONE else View.VISIBLE
-        ui.variant.visibility = if ((document?.variants?.size ?: 0) > 1 && interim == null) View.VISIBLE else View.GONE
+        ui.variant.visibility = if ((document?.variants?.size ?: 0) > 1 && live == null) View.VISIBLE else View.GONE
         ui.variant.text = getString(R.string.selected_transcript, session.selectedVariant.orEmpty())
         ui.open.setText(if (session.uri == null) R.string.open_audio else R.string.change_audio)
         ui.transcribe.setText(if (session.transcript == null) R.string.transcribe else R.string.transcribe_again)
         ui.seek.max = session.durationMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
         ui.position.text = getString(R.string.position, clock(session.positionMs.toLong()), clock(session.durationMs))
-        val transcript = interim ?: session.transcript
-        ui.details.visibility = if (transcript == null) View.GONE else View.VISIBLE
-        transcript?.let {
-            ui.details.text = getString(R.string.transcript_details,
-                resources.getQuantityString(R.plurals.word_count, it.words.size, it.words.size),
-                clock(session.durationMs), when {
-                    interim != null -> models.precision
-                    document == null -> session.resultPrecision
-                    else -> session.selectedVariant.orEmpty()
-                })
-        }
-        val hasWords = transcript?.words?.isNotEmpty() == true
+        val count = live?.let { it.size + livePending.size } ?: session.transcript?.words?.size
+        val transcript = if (live != null) null else session.transcript
+        ui.details.visibility = if (count == null) View.GONE else View.VISIBLE
+        count?.let { ui.details.text = details(it) }
+        val hasWords = (count ?: 0) > 0
         ui.searchRow.visibility = if (hasWords) View.VISIBLE else View.GONE
         ui.voice.visibility = if (hasWords && document == null) View.VISIBLE else View.GONE
         ui.transcript.visibility = if (hasWords) View.VISIBLE else View.GONE
@@ -562,6 +595,13 @@ class MainActivity : Activity(), ProcessingJobs.Listener {
         refreshControls()
     }
 
+    private fun details(count: Int) = getString(R.string.transcript_details,
+        resources.getQuantityString(R.plurals.word_count, count, count), clock(session.durationMs), when {
+            live != null -> models.precision
+            document == null -> session.resultPrecision
+            else -> session.selectedVariant.orEmpty()
+        })
+
     private fun updatePlayback(media: MediaPlayer, followSeek: Boolean = false) {
         val time = media.currentPosition
         if (!ui.seek.isPressed) ui.seek.progress = time
@@ -569,55 +609,30 @@ class MainActivity : Activity(), ProcessingJobs.Listener {
         if (ui.position.text.toString() != clock) ui.position.text = clock
         val playText = getString(if (media.isPlaying) R.string.pause else R.string.play)
         if (ui.play.text.toString() != playText) ui.play.text = playText
-        val active = (interim ?: session.transcript)?.words?.indexOfFirst { time >= it.startMs && time < it.endMs } ?: -1
+        val active = shown.wordAt(time.toLong())
         if (active != highlightedWord || followSeek) {
             highlightedWord = active
             highlightWord(followPausedSeek = followSeek)
         }
     }
 
+    /** A full build of the shown transcript: on a new note, a search, or a job attaching. Running jobs append instead. */
     private fun renderTranscript() {
-        val words = (interim ?: session.transcript)?.words ?: emptyList()
-        val builder = StringBuilder()
-        val ranges = mutableListOf<IntRange>()
-        words.forEachIndexed { index, word ->
-            if (index > 0) {
-                val previous = words[index - 1]
-                builder.append(if (previous.speaker != word.speaker || previous.text.lastOrNull() in listOf('.', '?', '!')) "\n\n" else " ")
-            }
-            if (document != null && interim == null && !session.partial && (index == 0 || words[index - 1].speaker != word.speaker)) {
-                builder.append(document?.speakerLabel(word.speaker)?.takeUnless { it == word.speaker } ?: getString(R.string.unknown_speaker, word.speaker)).append("\n")
-            }
-            val start = builder.length
-            builder.append(word.text)
-            ranges += start until builder.length
-        }
-        val text = builder.toString()
-        val spannable = SpannableString(text)
-        val query = ui.search.text.toString().trim()
-        var matchCount = 0
-        if (query.isNotEmpty()) {
-            var start = text.indexOf(query, ignoreCase = true)
-            while (start >= 0) {
-                spannable.setSpan(BackgroundColorSpan(android.graphics.Color.rgb(76, 86, 45)), start, start + query.length, 0)
-                matchCount++
-                start = text.indexOf(query, start + query.length, ignoreCase = true)
-            }
-        }
-        words.forEachIndexed { index, word ->
-            val range = ranges[index]
-            spannable.setSpan(object : ClickableSpan() {
-                override fun onClick(widget: View) {
-                    if (playerReady) player?.let {
-                        seekTo(word.startMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
-                        it.start()
-                    }
-                }
-                override fun updateDrawState(ds: android.text.TextPaint) { ds.isUnderlineText = false }
-            }, range.first, range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        }
-        ui.transcript.setText(spannable, TextView.BufferType.SPANNABLE)
-        wordRanges = ranges
+        ui.transcript.removeCallbacks(searchDebounce)
+        val running = live
+        val words = running?.since(0) ?: session.transcript?.words ?: emptyList()
+        val labelled = document != null && running == null && !session.partial
+        shown = TranscriptText(if (!labelled) null else { word ->
+            document?.speakerLabel(word.speaker)?.takeUnless { it == word.speaker } ?: getString(R.string.unknown_speaker, word.speaker)
+        })
+        shown.append(words)
+        val text = android.text.SpannableStringBuilder(shown.text)
+        val matchCount = highlightMatches(text, 0)
+        for (index in 0 until shown.size) wordSpan(text, index)
+        pendingStart = text.length
+        if (running != null) appendPending(text)
+        ui.transcript.setText(text, TextView.BufferType.EDITABLE)
+        val query = searchQuery()
         ui.clearSearch.isEnabled = query.isNotEmpty()
         ui.clearSearch.alpha = if (query.isEmpty()) .4f else 1f
         ui.matches.visibility = if (query.isEmpty() || words.isEmpty()) View.GONE else View.VISIBLE
@@ -626,13 +641,45 @@ class MainActivity : Activity(), ProcessingJobs.Listener {
         highlightWord()
     }
 
+    private fun searchQuery() = ui.search.text.toString().trim()
+
+    /** Marks the search matches in [text] from [from] on; returns how many. */
+    private fun highlightMatches(text: Spannable, from: Int): Int {
+        val query = searchQuery()
+        if (query.isEmpty()) return 0
+        var count = 0
+        val plain = text.toString()
+        var start = plain.indexOf(query, from, ignoreCase = true)
+        while (start >= 0) {
+            text.setSpan(BackgroundColorSpan(android.graphics.Color.rgb(76, 86, 45)), start, start + query.length, 0)
+            count++
+            start = plain.indexOf(query, start + query.length, ignoreCase = true)
+        }
+        return count
+    }
+
+    /** Tapping word [index] plays from its start. */
+    private fun wordSpan(text: Spannable, index: Int) {
+        val startMs = shown.startMs(index)
+        text.setSpan(object : ClickableSpan() {
+            override fun onClick(widget: View) {
+                if (playerReady) player?.let {
+                    seekTo(startMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
+                    it.start()
+                }
+            }
+            override fun updateDrawState(ds: android.text.TextPaint) { ds.isUnderlineText = false }
+        }, shown.start(index), shown.end(index), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+    }
+
     /** Playback moves two spans. Rebuilding every word span per spoken word stalls long documents. */
     private fun highlightWord(followPausedSeek: Boolean = false) {
         val text = ui.transcript.text as? Spannable ?: return
         // A word activated from the keyboard stays selected, drawn in the same amber as the active word.
         Selection.removeSelection(text)
         text.removeSpan(activeBackground); text.removeSpan(activeForeground)
-        val range = wordRanges.getOrNull(highlightedWord) ?: return
+        if (highlightedWord !in 0 until shown.size) return
+        val range = shown.start(highlightedWord) until shown.end(highlightedWord)
         text.setSpan(activeBackground, range.first, range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         text.setSpan(activeForeground, range.first, range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         // A rebuilt transcript may have requested a new text layout. Measure after that layout settles.
@@ -841,6 +888,8 @@ class MainActivity : Activity(), ProcessingJobs.Listener {
         /** Runs of one job before a job that keeps ending the process is given up. */
         private const val MAX_ATTEMPTS = 4
         const val OPEN_FILE = 1; const val SAVE_DOCUMENT = 2; private const val TAG = "Cassini"
+        private const val SEARCH_DEBOUNCE_MS = 250L
+        private const val DEBOUNCED_WORDS = 2_000
         const val NOTE_ID = "noteId"; const val SEARCH_QUERY = "searchQuery"
         const val REQUEST_IMPORT = "requestImport"; const val AUTO_TRANSCRIBE = "autoTranscribe"
     }
