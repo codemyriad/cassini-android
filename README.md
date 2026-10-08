@@ -21,7 +21,7 @@ I’ve tested recording and transcription on a **Pixel 8 (8 GB RAM, Android 17)*
 
 ## Try it
 
-* Install the APK, open a note, then tap **Download model** once. Transcription uses Parakeet v3 INT8. After download, audio processing works offline.
+* Install the APK, open a note, then tap **Transcribe**. The first time, the app asks to download the models once (about 700 MiB: Parakeet v3 INT8 and the speaker model). After download, audio processing works offline.
 * Tap **Record**, allow microphone access, then **Done**. You can pause and resume. Transcription starts when the model is ready. Or import WAV, MP3, M4A/AAC or Ogg Opus and tap **Transcribe**. While it works you see how far along it is, how fast it’s going and roughly how long is left, and draft words show up as each chunk is decoded.
 * Browse **Notes** or search titles and past transcriptions. Tap a word to hear that part of the recording. Each note remembers its playback position.
 * Use **Save Cassini** to keep a complete `.opus` document containing audio, timed words and metadata. You can open it again without downloading a model. This is a portable recording, not just a word-body JSON export.
@@ -36,7 +36,7 @@ The current development build transcribes after recording finishes. The earlier 
 
 There’s no transcription queue or storage cleanup UI yet. The APK is a release build signed with a stable beta key.
 
-Tap **Identify speakers** on a completed transcript to add anonymous labels. [NVIDIA Nemotron-3-Diarization](https://huggingface.co/nvidia/Nemotron-3-Diarization) detects up to 8 speakers on the phone; you don’t need to say how many. The optional model downloads separately (about 62 MiB). The original stays under **Choose transcript**. Labels can be wrong, especially with overlapping voices.
+**Transcribe** also labels speakers, in the same job. [NVIDIA Nemotron-3-Diarization](https://huggingface.co/nvidia/Nemotron-3-Diarization) detects up to 8 anonymous speakers on the phone; you don’t need to say how many. An installation that already has Parakeet fetches the speaker model (about 62 MiB) at the next transcription. If speakers cannot be told apart, or the speaker model cannot be downloaded, the words are kept as one voice. Labels can be wrong, especially with overlapping voices. **Transcribe again**, **Choose transcript**, **Save Cassini**, **Info** and **Settings** are in the **⋯** menu of a note.
 
 ## Build
 

@@ -210,12 +210,11 @@ class PortableDocumentTest {
             fail(description)
         }
         try {
-            await("Cassini must open without ASR") { it.findViewById<TextView>(R.id.transcript_text).text.contains("Benvenuti.") && it.findViewById<Button>(R.id.export_button).isEnabled }
+            await("Cassini must open without ASR") { it.findViewById<TextView>(R.id.transcript_text).text.contains("Benvenuti.") && it.findViewById<Button>(R.id.more_button).isEnabled }
             scenario.onActivity {
                 val text = it.findViewById<TextView>(R.id.transcript_text).text.toString()
                 assertTrue(text.contains("Ada")); assertTrue(text.contains("Ben"))
                 assertEquals("Cassini · audio verified", it.findViewById<TextView>(R.id.document_trust).text.toString())
-                assertTrue(it.findViewById<Button>(R.id.variant_button).isShown)
                 @Suppress("DEPRECATION")
                 MainActivity::class.java.getDeclaredMethod("onActivityResult", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, Intent::class.java)
                     .apply { isAccessible = true }.invoke(it, MainActivity.SAVE_DOCUMENT, android.app.Activity.RESULT_OK, Intent().setData(Uri.fromFile(exported)))
@@ -227,7 +226,7 @@ class PortableDocumentTest {
             fun documents() = File(context.filesDir, "documents").listFiles().orEmpty().map { it.name }.toSet()
             fun notes() = LibraryStore(context.filesDir).load().count { it.session.uri == saved.uri }
             fun shows(activity: MainActivity, word: String, clock: String) = activity.findViewById<TextView>(R.id.transcript_text).text.contains(word) &&
-                activity.findViewById<Button>(R.id.export_button).isEnabled && activity.findViewById<TextView>(R.id.playback_position).text.startsWith(clock)
+                activity.findViewById<Button>(R.id.more_button).isEnabled && activity.findViewById<TextView>(R.id.playback_position).text.startsWith(clock)
             fun seek(position: Float) = scenario.onActivity {
                 assertTrue(it.findViewById<android.widget.SeekBar>(R.id.playback_seek).performAccessibilityAction(
                     android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_PROGRESS.id,

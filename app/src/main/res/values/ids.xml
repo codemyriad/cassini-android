@@ -1,13 +1,10 @@
 <resources>
     <item name="settings_button" type="id" />
-    <item name="model_status" type="id" />
-    <item name="recording_name" type="id" />
     <item name="open_button" type="id" />
+    <item name="recording_name" type="id" />
     <item name="transcribe_button" type="id" />
-    <item name="download_button" type="id" />
     <item name="operation_status" type="id" />
     <item name="operation_progress" type="id" />
-    <item name="export_button" type="id" />
     <item name="transcript_details" type="id" />
     <item name="search_input" type="id" />
     <item name="clear_search_button" type="id" />
@@ -19,8 +16,6 @@
     <item name="play_button" type="id" />
     <item name="back_button" type="id" />
     <item name="forward_button" type="id" />
-    <item name="document_info_button" type="id"/>
-    <item name="variant_button" type="id"/>
     <item name="document_trust" type="id"/>
     <item name="notes_button" type="id" />
     <item name="library_search" type="id" />
@@ -34,6 +29,6 @@
     <item name="capture_pause" type="id" />
     <item name="capture_done" type="id" />
     <item name="transcript_draft" type="id" />
-    <item name="speakers_button" type="id" />
+    <item name="more_button" type="id" />
     <item name="cancel_operation" type="id" />
 </resources>

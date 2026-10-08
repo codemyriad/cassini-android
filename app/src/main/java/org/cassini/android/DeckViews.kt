@@ -56,22 +56,17 @@ class DeckViews(private val context: Context) {
         isFocusableInTouchMode = true
     }
     val library = button(R.string.back_to_notes).apply { id = R.id.notes_button; textSize = 12f }
-    val menu = button(R.string.settings).apply { id = R.id.settings_button; textSize = 12f }
-    val model = text(12f, amber, true).apply { id = R.id.model_status }
+    val menu = button(R.string.more_actions).apply {
+        id = R.id.more_button; text = "⋯"; textSize = 20f; contentDescription = context.getString(R.string.more_actions)
+    }
     val filename = text(18f).apply { id = R.id.recording_name; maxLines = 2; ellipsize = TextUtils.TruncateAt.MIDDLE }
     val caption = text(12f, muted)
-    val open = button(R.string.open_audio).apply { id = R.id.open_button }
     val transcribe = button(R.string.transcribe, true).apply { id = R.id.transcribe_button }
-    val speakers = button(R.string.identify_speakers).apply { id = R.id.speakers_button }
     val cancelOperation = button(R.string.cancel).apply { id = R.id.cancel_operation; visibility = View.GONE }
-    val download = button(R.string.download_model).apply { id = R.id.download_button }
     val status = text(12f, muted).apply { id = R.id.operation_status; setPadding(0, dp(8), 0, dp(8)); accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE }
     val progress = ProgressBar(context, null, android.R.attr.progressBarStyleHorizontal).apply {
         id = R.id.operation_progress; max = 100; visibility = View.GONE; contentDescription = context.getString(R.string.busy_description)
     }
-    val export = button(R.string.export).apply { id = R.id.export_button; textSize = 12f; contentDescription = context.getString(R.string.export_description) }
-    val documentInfo = button(R.string.document_info).apply { id = R.id.document_info_button; textSize = 12f }
-    val variant = button(R.string.choose_transcript).apply { id = R.id.variant_button; textSize = 12f }
     val trust = text(12f, muted).apply { id = R.id.document_trust }
     val details = text(12f, muted, true).apply { id = R.id.transcript_details }
     val search = EditText(context).apply {
@@ -118,38 +113,22 @@ class DeckViews(private val context: Context) {
         heading.add(library, LinearLayout.LayoutParams.WRAP_CONTENT)
         heading.add(Space(context), dp(12), dp(1))
         heading.add(brand, 0, weight = 1f)
-        heading.add(menu, LinearLayout.LayoutParams.WRAP_CONTENT)
+        heading.add(menu, dp(56))
         root.add(heading)
 
         val content = column().apply { setPadding(dp(20), dp(6), dp(20), dp(12)) }
-        val modelRow = row().apply { setPadding(0, dp(6), 0, dp(12)) }
-        modelRow.add(model, 0, weight = 1f)
-        modelRow.add(label(R.string.on_device).apply { setTextColor(muted) }, LinearLayout.LayoutParams.WRAP_CONTENT)
-        content.add(modelRow)
         val fileCard = column().apply { background = background(surface); setPadding(dp(14), dp(12), dp(14), dp(12)) }
         fileCard.add(filename)
         fileCard.add(caption, marginTop = 5)
         fileCard.add(trust, marginTop = 5)
         content.add(fileCard)
-        val actions = row()
-        actions.add(open, 0, weight = 1f)
-        actions.add(Space(context), dp(8), dp(1))
-        actions.add(transcribe, 0, weight = 1f)
-        content.add(actions, marginTop = 10)
-        content.add(speakers, marginTop = 8)
-        content.add(download, marginTop = 8)
+        content.add(transcribe, marginTop = 10)
         content.add(status)
         content.add(progress, height = dp(3))
         content.add(cancelOperation, marginTop = 8)
-        val transcriptHeading = row().apply { setPadding(0, dp(16), 0, dp(8)) }
-        transcriptHeading.add(label(R.string.transcript), 0, weight = 1f)
-        transcriptHeading.add(documentInfo, LinearLayout.LayoutParams.WRAP_CONTENT)
-        transcriptHeading.add(Space(context), dp(6), dp(1))
-        transcriptHeading.add(export, LinearLayout.LayoutParams.WRAP_CONTENT)
-        content.add(transcriptHeading)
+        content.add(label(R.string.transcript).apply { setPadding(0, dp(16), 0, dp(8)) })
         content.add(draft)
         content.add(details)
-        content.add(variant, marginTop = 8)
         searchRow.add(search, 0, weight = 1f)
         searchRow.add(Space(context), dp(6), dp(1))
         searchRow.add(clearSearch, dp(48))

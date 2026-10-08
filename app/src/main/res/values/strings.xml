@@ -39,7 +39,7 @@
     <string name="empty_title">Load a tape.</string>
     <string name="empty_hint">Open a Cassini document, or transcribe WAV, MP3, M4A or Opus.\nUp to 2 hours for transcription. All local.</string>
     <string name="loaded_title">Let’s hear it.</string>
-    <string name="loaded_hint">Tap Transcribe to turn this recording into timed words.</string>
+    <string name="loaded_hint">Tap Transcribe to turn this recording into timed words, with each speaker labelled.</string>
     <string name="no_speech">No speech recognized.</string>
     <string name="no_speech_hint">Try a clearer recording.</string>
     <string name="search_hint">Find a word…</string>
@@ -122,7 +122,7 @@
     <string name="library_loading">Opening your notes…</string>
     <string name="library_error">Could not save or open the library. Your audio files are still on this device.</string>
     <string name="library_local">Parakeet on this device · audio stays here</string>
-    <string name="library_needs_model">Record now · download a model in a note to transcribe</string>
+    <string name="library_needs_model">Record now · open a note and tap Transcribe</string>
     <string name="library_empty">Your words, remembered.</string>
     <string name="library_empty_hint">Record a voice note or import audio. Your recordings and transcripts will appear here.</string>
     <string name="library_search_hint">Try another word or a note title.</string>
@@ -166,4 +166,10 @@
     <string name="recording_near_limit">● Recording · stops automatically in 5 minutes</string>
     <string name="recording_focus_paused">Paused: another app is using audio. Tap Resume to continue.</string>
     <string name="recording_error_saved">Recording stopped by an error. The audio so far is saved in your library.</string>
+<string name="more_actions">More actions</string>
+    <string name="models_size">700 MiB</string>
+    <string name="models_download">Download models?</string>
+    <string name="models_download_summary">Transcription needs a one-time download of about %1$s. Speech recognition and speaker identification then run on this phone; audio never leaves it. Keep the app open.</string>
+    <string name="download_and_transcribe">Download and transcribe</string>
+    <string name="speakers_unavailable">Transcribed. Speakers could not be told apart, so the words are shown as one voice.</string>
 </resources>

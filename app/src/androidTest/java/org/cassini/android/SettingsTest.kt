@@ -46,7 +46,16 @@ class SettingsTest {
         try {
             scenario.onActivity { AppLanguage.set(it, "en") }
             instrumentation.waitForIdleSync()
-            scenario.onActivity { it.findViewById<TextView>(R.id.settings_button).performClick() }
+            scenario.onActivity { it.findViewById<TextView>(R.id.more_button).performClick() }
+            // The popup animates in; click once it is fully shown.
+            val menuDeadline = android.os.SystemClock.uptimeMillis() + 5000
+            while (true) {
+                try { onView(withText("Settings")).inRoot(androidx.test.espresso.matcher.RootMatchers.isPlatformPopup()).perform(click()); break }
+                catch (error: androidx.test.espresso.PerformException) {
+                    if (android.os.SystemClock.uptimeMillis() > menuDeadline) throw error
+                    android.os.SystemClock.sleep(100)
+                }
+            }
             awaitText("Transcription model")
             onView(withText("Transcribe while recording")).check(androidx.test.espresso.assertion.ViewAssertions.doesNotExist())
             onView(withText("Automatic · prefer full precision")).check(androidx.test.espresso.assertion.ViewAssertions.doesNotExist())
@@ -65,7 +74,6 @@ class SettingsTest {
                         .filterIsInstance<MainActivity>().firstOrNull { it.hasWindowFocus() && !it.isFinishing }
                     if (viewer != null && viewer.findViewById<TextView>(R.id.transcript_text).text.toString() == "Ciao mondo.") {
                         assertTrue(viewer.findViewById<TextView>(R.id.transcript_text).isShown)
-                        assertTrue(viewer.findViewById<TextView>(R.id.model_status).text.toString().startsWith("INT8"))
                         assertEquals("Italian sample.wav", viewer.findViewById<TextView>(R.id.recording_name).text.toString())
                         returned = true
                     }
