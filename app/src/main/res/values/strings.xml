@@ -28,7 +28,7 @@
     <string name="verifying">Checking model · %1$d%%</string>
     <string name="download_complete">Model ready. Everything runs on this phone.</string>
     <string name="decoding">Reading audio…</string>
-    <string name="transcribing">Transcribing… you can leave this screen.</string>
+    <string name="transcribing">Transcribing… you can leave this screen, open or play other notes, and record.</string>
     <string name="transcribing_progress">Transcribing · %1$d%% · %2$.1f× realtime · about %3$d s left</string>
     <string name="file_ready">Ready when you are.</string>
     <string name="transcript">TRANSCRIPT</string>

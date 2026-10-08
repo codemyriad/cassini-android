@@ -20,6 +20,7 @@ data class Session(
 class SessionStore(directory: File) {
     private val file = AtomicFile(File(directory, "session.json"))
     fun load(): Session = try {
+        SerialWriter.library.flush()
         val json = JSONObject(file.openRead().bufferedReader().use { it.readText() })
         Session(
             uri = json.optString("uri").takeIf { it.isNotEmpty() }, name = json.optString("name"),

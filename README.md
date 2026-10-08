@@ -22,7 +22,7 @@ I’ve tested recording and transcription on a **Pixel 8 (8 GB RAM, Android 17)*
 ## Try it
 
 * Install the APK, open a note, then tap **Download model** once. Transcription uses Parakeet v3 INT8. After download, audio processing works offline.
-* Tap **Record**, allow microphone access, then **Done**. You can pause and resume. Transcription starts when the model is ready. Or import WAV, MP3, M4A/AAC or Ogg Opus and tap **Transcribe**. While it works you see how far along it is, how fast it’s going and roughly how long is left, and draft words show up as each chunk is decoded.
+* Tap **Record**, allow microphone access, then **Done**. You can pause and resume. Transcription starts when the model is ready. Or import WAV, MP3, M4A/AAC or Ogg Opus and tap **Transcribe**. While it works you see how far along it is, how fast it’s going and roughly how long is left, and draft words show up as each chunk is decoded. Meanwhile you can open, play and record other notes: only the note being processed waits.
 * Browse **Notes** or search titles and past transcriptions. Tap a word to hear that part of the recording. Each note remembers its playback position.
 * Use **Save Cassini** to keep a complete `.opus` document containing audio, timed words and metadata. You can open it again without downloading a model. This is a portable recording, not just a word-body JSON export.
 

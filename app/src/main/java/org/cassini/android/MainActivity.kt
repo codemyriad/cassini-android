@@ -228,15 +228,23 @@ class MainActivity : Activity(), ProcessingJobs.Listener {
     /** Re-reads this note from the library, which the service wrote, and its document. */
     private fun reloadNote(then: () -> Unit) {
         val id = session.libraryId ?: return then()
-        val fresh = try { library.load().firstOrNull { it.id == id }?.session } catch (error: Exception) {
-            Log.e(TAG, "Could not load note", error); null
-        } ?: return then()
+        // The catalogue holds every transcript: read it behind this screen's own queued writes, off the main thread.
+        SerialWriter.library.submit {
+            val fresh = try { library.load().firstOrNull { it.id == id }?.session } catch (error: Exception) {
+                Log.e(TAG, "Could not load note", error); null
+            }
+            onUi { if (fresh == null || session.libraryId != id) then() else adoptNote(fresh, then) }
+        }
+    }
+
+    private fun adoptNote(fresh: Session, then: () -> Unit) {
         val position = if (playerReady) player?.currentPosition ?: session.positionMs else session.positionMs
         val moved = fresh.uri != session.uri
         session = fresh.copy(positionMs = position, screen = screen)
         live = null
         livePending = emptyList()
-        try { sessions.save(session) } catch (error: Exception) { Log.e(TAG, "Could not persist session", error) }
+        val saved = session
+        SerialWriter.library.submit { sessions.save(saved) }
         if (moved) session.uri?.let { preparePlayer(Uri.parse(it)) }
         val path = fresh.document
         if (path == null) { document = null; renderScreen(); then(); return }
@@ -311,13 +319,13 @@ class MainActivity : Activity(), ProcessingJobs.Listener {
         } } catch (_: Exception) { null }
         runWork(R.string.opening_document) {
             val (file, portable) = documents.import(uri)
+            val location = Uri.fromFile(file).toString()
+            // A file opened before returns to its note, with its position and chosen transcript.
+            val known = try { library.load().firstOrNull { it.session.uri == location }?.session }
+                catch (error: Exception) { Log.e(TAG, "Could not load note", error); null }
             onUi {
-                val location = Uri.fromFile(file).toString()
                 // Imports are named by content. Opening a file that is already on screen changes nothing.
                 if (session.uri != location) {
-                    // A file opened before returns to its note, with its position and chosen transcript.
-                    val known = try { library.load().firstOrNull { it.session.uri == location }?.session }
-                        catch (error: Exception) { Log.e(TAG, "Could not load note", error); null }
                     playerReady = false; player?.release(); player = null
                     session = (known ?: Session(uri = location, name = name ?: uri.lastPathSegment.orEmpty(),
                         document = file.absolutePath.takeIf { portable.state != "plain-audio" }, selectedVariant = portable.defaultId,
@@ -791,23 +799,43 @@ class MainActivity : Activity(), ProcessingJobs.Listener {
         startActivity(Intent(this, SettingsActivity::class.java))
     }
 
+    /**
+     * Saves the note. A note already in the catalogue is written on [SerialWriter.library], in order, so pausing,
+     * rotating or leaving never rewrites the whole catalogue on the main thread; only a note's first save, which
+     * gives it its id, waits here.
+     */
     private fun persistSession() {
         if (playerReady) player?.let { session = session.copy(positionMs = it.currentPosition) }
-        val preferences = sessions.load()
         session = session.copy(screen = screen)
         // An empty viewer has nothing to remember, and session.json may hold a session that exists nowhere else.
         if (session.uri == null) return
-        try {
-            // The session another screen left there, or one from before the notes library, reaches the catalogue before it is replaced.
-            if (preferences.screen != screen) library.adopt(preferences)
-            val id = session.libraryId
-            if (id != null && ProcessingJobs.current?.noteId == id && ProcessingJobs.current !== synced) {
-                // The service owns this note's transcript and document until this screen has reloaded them.
-                val position = session.positionMs
-                library.update(id) { it.copy(positionMs = position) }
-                sessions.save(session)
-            } else { sessions.save(session); session = library.save(session); sessions.save(session) }
-        } catch (error: Exception) { Log.e(TAG, "Could not persist session", error); setStatus(R.string.library_error, error = true) }
+        val snapshot = session
+        val id = snapshot.libraryId
+        // The service owns this note's transcript and document until this screen has reloaded them.
+        val serviceOwns = id != null && ProcessingJobs.current?.noteId == id && ProcessingJobs.current !== synced
+        val failed = { error: Exception ->
+            Log.e(TAG, "Could not persist session", error)
+            onUi { setStatus(R.string.library_error, error = true) }
+        }
+        if (id != null) { SerialWriter.library.submit(failed) { writeSession(snapshot, serviceOwns) }; return }
+        SerialWriter.library.flush()
+        try { session = writeSession(snapshot, serviceOwns) } catch (error: Exception) { failed(error) }
+    }
+
+    private fun writeSession(snapshot: Session, serviceOwns: Boolean): Session {
+        val preferences = sessions.load()
+        // The session another screen left there, or one from before the notes library, reaches the catalogue before it is replaced.
+        if (preferences.screen != snapshot.screen) library.adopt(preferences)
+        val id = snapshot.libraryId
+        if (serviceOwns && id != null) {
+            library.update(id) { it.copy(positionMs = snapshot.positionMs) }
+            sessions.save(snapshot)
+            return snapshot
+        }
+        sessions.save(snapshot)
+        val saved = library.save(snapshot)
+        sessions.save(saved)
+        return saved
     }
     override fun onSaveInstanceState(outState: Bundle) {
         persistSession()

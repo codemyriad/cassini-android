@@ -17,7 +17,11 @@ import kotlin.concurrent.withLock
 class LibraryStore(private val directory: File) {
     private val file = AtomicFile(File(directory, "library.json"))
 
-    fun load(): List<LibraryNote> = lock.withLock { read() }
+    /** Waits briefly for screens' queued writes ([SerialWriter.library]) so a read never misses one. */
+    fun load(): List<LibraryNote> {
+        SerialWriter.library.flush()
+        return lock.withLock { read() }
+    }
 
     private fun read(): List<LibraryNote> {
         if (!file.baseFile.exists() && !File(directory, "library.json.bak").exists()) return emptyList()

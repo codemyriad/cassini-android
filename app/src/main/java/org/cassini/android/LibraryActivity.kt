@@ -28,6 +28,7 @@ class LibraryActivity : Activity(), ProcessingJobs.Listener {
     /** The card line of the note being processed, updated in place on every progress tick. */
     private var jobLine: TextView? = null
     private var jobNote: String? = null
+    private val searchDebounce = Runnable { if (!loading) renderNotes() }
 
     override fun attachBaseContext(newBase: Context) = super.attachBaseContext(AppLanguage.wrap(newBase))
 
@@ -71,7 +72,11 @@ class LibraryActivity : Activity(), ProcessingJobs.Listener {
         setContentView(root)
         query.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { renderNotes() }
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                // Matching scans every transcript: rebuild the cards once typing pauses.
+                cards.removeCallbacks(searchDebounce)
+                cards.postDelayed(searchDebounce, SEARCH_DEBOUNCE_MS)
+            }
             override fun afterTextChanged(s: Editable?) {}
         })
         record.isEnabled = false; open.isEnabled = false
@@ -210,5 +215,7 @@ class LibraryActivity : Activity(), ProcessingJobs.Listener {
     }
 
     override fun onSaveInstanceState(outState: Bundle) { outState.putString("query", query.text.toString()); super.onSaveInstanceState(outState) }
-    override fun onDestroy() { worker.shutdownNow(); super.onDestroy() }
+    override fun onDestroy() { cards.removeCallbacks(searchDebounce); worker.shutdownNow(); super.onDestroy() }
+
+    private companion object { const val SEARCH_DEBOUNCE_MS = 150L }
 }
