@@ -157,6 +157,7 @@
     <string name="error_speakers">Nessun turno di parola trovato. La trascrizione originale è invariata.</string>
     <string name="download_speaker_models">Scarica e distingui le voci</string>
     <string name="microphone_format_aac">Microfono · AAC mono · 48 kHz</string>
+    <string name="recording_recovered">Registrazione recuperata</string>
     <string name="recording_channel">Registrazione</string>
     <string name="stop_recording">Stop</string>
     <string name="recording_near_limit">● Registrazione · si ferma da sola tra 5 minuti</string>

@@ -160,6 +160,7 @@
     <string name="error_speakers">No speaker turns were found. The original transcript is unchanged.</string>
     <string name="download_speaker_models">Download and identify</string>
     <string name="microphone_format_aac">Microphone · mono AAC · 48 kHz</string>
+    <string name="recording_recovered">Recovered recording</string>
     <string name="recording_channel">Recording</string>
     <string name="stop_recording">Stop</string>
     <string name="recording_near_limit">● Recording · stops automatically in 5 minutes</string>

@@ -79,13 +79,14 @@ class RecordingService : Service() {
         previous = SessionStore(filesDir).load()
         val directory = File(filesDir, "documents").also { check(it.mkdirs() || it.isDirectory) }
         val file = File(directory, "${UUID.randomUUID()}.rec.${MicrophoneRecording.extension()}")
+        live = file
         val recording = MicrophoneRecording.create(this, file) { handler.post { if (capture != null) finish(false, failed = true) } }
         capture = recording
         try {
             startForegroundService(Intent(this, RecordingService::class.java))
             if (Build.VERSION.SDK_INT >= 30) startForeground(NOTIFICATION, notification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
             else startForeground(NOTIFICATION, notification())
-        } catch (error: Exception) { capture = null; recording.release(); file.delete(); throw error }
+        } catch (error: Exception) { capture = null; live = null; recording.release(); file.delete(); throw error }
         wakeLock = getSystemService(PowerManager::class.java).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Cassini:recording")
             .apply { setReferenceCounted(false); acquire(Limits.MAX_RECORDING_MS + 10 * 60_000L) }
         requestFocus()
@@ -118,7 +119,7 @@ class RecordingService : Service() {
             abandonFocus()
             wakeLock?.let { if (it.isHeld) it.release() }; wakeLock = null
             stopForeground(STOP_FOREGROUND_REMOVE); stopSelf()
-            finishing = false
+            finishing = false; live = null
         }
         listener?.onRecordingFinished(noteId, autoTranscribe && !error, error)
     }
@@ -182,6 +183,8 @@ class RecordingService : Service() {
     override fun onDestroy() { if (capture != null) finish(false); handler.removeCallbacksAndMessages(null); super.onDestroy() }
 
     companion object {
+        /** The capture this process is writing; [RecoveryScanner] leaves it alone. */
+        @Volatile internal var live: File? = null
         private const val CHANNEL = "recording"
         private const val NOTIFICATION = 1
         private const val PAUSE = "org.cassini.android.recording.PAUSE"

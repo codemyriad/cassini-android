@@ -76,6 +76,7 @@ class LibraryActivity : Activity() {
         worker.execute {
             try {
                 store.migrate(SessionStore(filesDir).load())
+                RecoveryScanner.recover(filesDir, RecordingService.live, getString(R.string.recording_recovered))
                 val recovered = store.load()
                 runOnUiThread { if (!isDestroyed) { notes = recovered; loading = false; refresh() } }
             } catch (error: Exception) {
