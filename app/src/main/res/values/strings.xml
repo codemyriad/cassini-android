@@ -171,7 +171,13 @@
     <string name="recording_focus_paused">Paused: another app is using audio. Tap Resume to continue.</string>
     <string name="recording_error_saved">Recording stopped by an error. The audio so far is saved in your library.</string>
 <string name="more_actions">More actions</string>
-    <string name="models_size">700 MiB</string>
+    <string name="models_size">730 MiB</string>
+    <string name="models_size_mib">%1$d MiB</string>
+    <string name="voiceprint_model_progress">Downloading voice model… %1$d%%</string>
+    <string name="speaker_model">Speaker model</string>
+    <string name="voiceprint_model">Voice model</string>
+    <string name="speaker_model_summary">Nemotron diarization · 62 MiB</string>
+    <string name="voiceprint_model_summary">CAM++ voiceprints · 28 MiB · stays on this phone</string>
     <string name="models_download">Download models?</string>
     <string name="models_download_summary">Transcription needs a one-time download of about %1$s. Speech recognition and speaker identification then run on this phone; audio never leaves it. Keep the app open.</string>
     <string name="download_and_transcribe">Download and transcribe</string>

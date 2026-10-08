@@ -47,7 +47,10 @@ class SpeakerIdentificationTest {
         } finally { scenario.close(); file.delete() }
     }
     @Test fun downloadingModelsRequiresConsent() {
-        org.junit.Assume.assumeFalse("Requires the transcription model to be absent", ModelStore(File(context.filesDir, "parakeet-v3")).ready())
+        // Also covers existing installs that lack only the voiceprint model.
+        val bundle = ModelBundle.inFiles(context.filesDir)
+        org.junit.Assume.assumeFalse("Requires a model to be absent", bundle.ready())
+        val missing = bundle.missingBytes()
         val file = File(context.cacheDir, "speaker-consent.wav")
         instrumentation.context.assets.open("italian-smoke.wav").use { input -> file.outputStream().use { input.copyTo(it) } }
         SessionStore(context.filesDir).save(Session(uri = Uri.fromFile(file).toString(), name = file.name))
@@ -55,7 +58,7 @@ class SpeakerIdentificationTest {
         try {
             scenario.onActivity { it.findViewById<Button>(R.id.transcribe_button).performClick() }
             onView(withId(android.R.id.button2)).inRoot(isDialog()).perform(click())
-            assertFalse(DiarizationModels.inFiles(context.filesDir).ready())
+            assertEquals(missing, bundle.missingBytes())
             assertNull(SessionStore(context.filesDir).load().document)
         } finally { scenario.close(); file.delete() }
     }

@@ -60,6 +60,14 @@ class SettingsActivity : Activity() {
                 setTitle(R.string.recognition_model); summary = modelSummary(context)
                 isSelectable = false
             })
+            val bundle = ModelBundle.inFiles(context.filesDir)
+            listOf(Triple(R.string.speaker_model, R.string.speaker_model_summary, bundle.speakers.ready()),
+                Triple(R.string.voiceprint_model, R.string.voiceprint_model_summary, bundle.voiceprint.ready())).forEach { (title, detail, ready) ->
+                transcription.addPreference(Preference(context).apply {
+                    setTitle(title); summary = getString(if (ready) R.string.model_ready else R.string.model_missing, getString(detail))
+                    isSelectable = false
+                })
+            }
             transcription.addPreference(Preference(context).apply {
                 setTitle(R.string.processing_location); setSummary(R.string.processing_local_summary)
                 isSelectable = false

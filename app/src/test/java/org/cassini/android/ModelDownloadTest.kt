@@ -29,6 +29,15 @@ class ModelDownloadTest {
     }
     private fun artifact(body: ByteArray) = ModelStore.Artifact("model.onnx", body.size.toLong(),
         MessageDigest.getInstance("SHA-256").digest(body).joinToString("") { "%02x".format(it) })
+    @Test fun theVoiceprintModelIsFetchedAsIsAndVerified() {
+        val bytes = "voiceprint weights".toByteArray()
+        withServer(bytes) { url, directory ->
+            try { VoiceprintModel(directory, url).install { }; fail() }
+            catch (error: UserFacingException) { assertEquals(Failure.VERIFY, error.failure) }
+            assertFalse(VoiceprintModel(directory, url).ready())
+            assertFalse(File(directory, VoiceprintModel.FILE).exists())
+        }
+    }
     @Test fun verifiedBytesAreInstalledAndPartialFilesAreRemoved() {
         val bytes = "model weights".toByteArray()
         withServer(bytes) { url, directory ->

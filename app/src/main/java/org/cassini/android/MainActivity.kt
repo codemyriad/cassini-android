@@ -160,9 +160,12 @@ class MainActivity : Activity() {
     /** The first transcription asks once before the large download; later ones fetch only what is missing. */
     private fun confirmTranscription() {
         if (busy || session.uri == null) return
-        if (models.ready()) transcribe()
+        val bundle = ModelBundle.inFiles(filesDir)
+        if (bundle.ready()) transcribe()
         else AlertDialog.Builder(this).setTitle(R.string.models_download)
-            .setMessage(getString(R.string.models_download_summary, getString(R.string.models_size)))
+            .setMessage(getString(R.string.models_download_summary, bundle.missingBytes().let {
+                if (it == ModelBundle.totalBytes) getString(R.string.models_size)
+                else getString(R.string.models_size_mib, ModelBundle.mebibytes(it)) }))
             .setNegativeButton(R.string.cancel, null)
             .setPositiveButton(R.string.download_and_transcribe) { _, _ -> transcribe() }.show()
     }
@@ -172,10 +175,10 @@ class MainActivity : Activity() {
         returnToLibrary()
     }
 
-    private fun showDownload(progress: ModelStore.Progress) {
+    private fun showDownload(progress: ModelStore.Progress, label: Int = R.string.downloading) {
         ui.progress.isIndeterminate = false
         ui.progress.progress = progress.percent
-        setStatus(if (progress.verifying) R.string.verifying else R.string.downloading, progress.percent)
+        setStatus(if (progress.verifying) R.string.verifying else label, progress.percent)
     }
 
     /** One action: fetch missing models, recognize words, then tell speakers apart. */
@@ -184,6 +187,7 @@ class MainActivity : Activity() {
         val uri = session.uri?.let(Uri::parse) ?: return
         val chosenModel = models
         val speakerModels = DiarizationModels.inFiles(filesDir)
+        val voiceprintModel = VoiceprintModel.inFiles(filesDir)
         val cancelled = java.util.concurrent.atomic.AtomicBoolean()
         cancellation = cancelled
         ui.cancelOperation.visibility = View.VISIBLE
@@ -194,6 +198,12 @@ class MainActivity : Activity() {
             checkActive()
             val speakersReady = speakerModels.ready() || try { download(speakerModels::install); true }
                 catch (error: IOException) { Log.w(TAG, "Speaker model unavailable", error); false }
+            checkActive()
+            // Voiceprints only name speakers; without the model the transcript is unchanged.
+            if (speakersReady && !voiceprintModel.ready()) try {
+                voiceprintModel.install { progress -> onUi { if (!cancelled.get()) showDownload(progress, R.string.voiceprint_model_progress) } }
+            } catch (error: IOException) { Log.w(TAG, "Voiceprint model unavailable", error) }
+            catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error; Log.w(TAG, "Voiceprint model unavailable", error) }
             checkActive()
             onUi { ui.progress.isIndeterminate = true; setStatus(R.string.decoding) }
             val totalBegan = System.nanoTime()
@@ -867,7 +877,7 @@ class MainActivity : Activity() {
         super.onDestroy()
     }
     private fun maybeAutoTranscribe() {
-        if (autoTranscribe && !busy && models.ready() && session.uri != null) {
+        if (autoTranscribe && !busy && session.uri != null && ModelBundle.inFiles(filesDir).ready()) {
             autoTranscribe = false
             transcribe()
         }
