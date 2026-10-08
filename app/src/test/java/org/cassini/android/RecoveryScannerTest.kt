@@ -14,11 +14,11 @@ class RecoveryScannerTest {
     private val head = "OpusHead".toByteArray() + byteArrayOf(1, 1, 0x38, 1, -128, -69, 0, 0, 0, 0, 0)
 
     /** A live capture of [packets] 20 ms packets, cut before [OggOpus.LiveMuxer.finish]; sizes cross the lacing edge. */
-    private fun capture(packets: Int, finish: Boolean = false): ByteArray {
+    private fun capture(packets: Int, finish: Boolean = false, finalGranule: Long? = null): ByteArray {
         val out = ByteArrayOutputStream(); val random = Random(3)
         val muxer = OggOpus.LiveMuxer(out, head, CassiniDocument.tagsPacket(listOf("TITLE=live")), 42)
         repeat(packets) { i -> muxer.add(ByteArray(listOf(80, 255, 300, 600)[i % 4]).also { random.nextBytes(it); it[0] = -8 }) }
-        if (finish) muxer.finish()
+        if (finish) muxer.finish(finalGranule)
         return out.toByteArray()
     }
 
@@ -98,5 +98,15 @@ class RecoveryScannerTest {
         assertNull(RecoveryScanner.repair(file(capture(1))))
         assertNull(RecoveryScanner.repair(file(ByteArray(0))))
         assertNull(RecoveryScanner.repair(file(capture(1).copyOf(20))))
+    }
+
+    @Test fun trimmedEndOfStreamIsNotMistakenForCorruption() {
+        // A clean stop pads one zero frame, so the EOS granule sits below the previous page's.
+        val finished = capture(10, finish = true, finalGranule = 312L + 8 * 960 + 123)
+        val target = file(finished)
+        assertTrue(RecoveryScanner.endsCleanly(target))
+        assertEquals(false, RecoveryScanner.repair(target)!!.repaired)
+        assertArrayEquals(finished, target.readBytes())
+        assertFalse(RecoveryScanner.endsCleanly(file(capture(10))))
     }
 }
