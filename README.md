@@ -30,7 +30,7 @@ The interface supports English and Italian. Parakeet recognizes speech languages
 
 ## What’s still limited
 
-This is an early beta: microphone recordings stop at **2:59**, imports for transcription are limited to **3 minutes / 64 MiB**, and recording and transcription need the app in the foreground. Leaving the recording screen stops and saves the audio. Failed transcription retains the recording for retry.
+This is an early beta. Recordings and imports for transcription can be up to **2 hours**. Recording runs in a foreground service with a notification: it keeps going with the screen off or the app in the background, and a recording cut short by a crash is repaired the next time the app starts. Transcription and speaker identification still need the app open. If they stop, nothing is saved and they start again from the beginning. On a Pixel 8, decoding the audio of a one-hour recording alone takes about 9 minutes (about 6× realtime) before recognition starts. Failed transcription keeps the recording for a retry.
 
 The current development build transcribes after recording finishes. The earlier live transcription mode and FP32 model have been removed. Updates reclaim obsolete FP32 downloads and keep existing recordings and transcripts; installations with only FP32 need to download INT8.
 

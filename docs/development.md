@@ -12,6 +12,8 @@ python3 scripts/fetch-smoke-audio.py  # requires ffmpeg
 ./scripts/device-smoke.sh youtube
 # Optional third argument selects test classes.
 ./scripts/device-smoke.sh fleurs org.cassini.android.LibraryTest
+# Opt-in recovery check after force-stopping the app mid-recording:
+adb shell am instrument -w -r -e class org.cassini.android.RecoveryCheckTest org.cassini.android.test/androidx.test.runner.AndroidJUnitRunner
 # Three-minute viewer/seek check.
 ./scripts/fetch-youtube-audio.sh 180
 ./scripts/device-smoke.sh youtube-long
@@ -43,19 +45,25 @@ node scripts/check-portable-document.mjs DOCUMENT.opus
 
 A complete Cassini `.opus` contains the Opus audio stream plus timed words, speakers, processing provenance and integrity metadata in OpusTags. The diagnostic `*.words.json` files are only word bodies. Save Cassini copies the entire document unchanged, including unsupported variants, extensions and attachments. Retranscription adds a variant and preserves previous ones.
 
-Android uses stock sherpa-onnx 1.13.7, greedy CPU decoding and two threads. It does not use the desktop runtime’s modified Parakeet frontend; see [feasibility](feasibility.md). Recordings are cut at speech pauses with the desktop’s Silero VAD settings and decoded span by span (`Parakeet.kt`, `SpeechDetector.kt`, `SpeechWindows.kt`, `SeamMerge.kt`, `WordGate.kt`). The window arithmetic, seam alignment and word gate are ported from `gocassini` `transcribe/stt.go` with their tests; the detector loop is ported and its tests are new. The detector model (`silero_vad.onnx`, 630 KB, pinned by SHA-256) is fetched into `files/vad/` after the Parakeet model, or once per process in the background on an installation that predates it, never during a transcription. A failed fetch is only logged: without the detector the recording is cut at quiet points. A document records how it was cut in `x-segmentation` of its speech-to-text provenance. To compare cutting policies against whole-recording decoding on a device: `./scripts/device-smoke.sh cutting org.cassini.android.ChunkingComparisonTest` (several minutes; results in `files/chunking-comparison.INT8.json`).
+Android uses sherpa-onnx 1.13.7 rebuilt with Sortformer diarization (see [native runtime](native-runtime.md); speech recognition code is unchanged), greedy CPU decoding and two threads. It does not use the desktop runtime’s modified Parakeet frontend; see [feasibility](feasibility.md). Recordings are cut at speech pauses with the desktop’s Silero VAD settings and decoded span by span (`Parakeet.kt`, `SpeechDetector.kt`, `SpeechWindows.kt`, `SeamMerge.kt`, `WordGate.kt`). The window arithmetic, seam alignment and word gate are ported from `gocassini` `transcribe/stt.go` with their tests; the detector loop is ported and its tests are new. The detector model (`silero_vad.onnx`, 630 KB, pinned by SHA-256) is fetched into `files/vad/` after the Parakeet model, or once per process in the background on an installation that predates it, never during a transcription. A failed fetch is only logged: without the detector the recording is cut at quiet points. A document records how it was cut in `x-segmentation` of its speech-to-text provenance. To compare cutting policies against whole-recording decoding on a device: `./scripts/device-smoke.sh cutting org.cassini.android.ChunkingComparisonTest` (several minutes; results in `files/chunking-comparison.INT8.json`).
 
 ## Recording
 
-Microphone capture uses mono AAC at 48 kHz / 96 kbps in a private M4A file. Pause excludes paused time from the recording clock. **Done** finalizes and catalogues the raw recording, then starts the INT8 batch pipeline when the model is installed. Recording itself needs no model. Leaving the screen saves the audio without starting background transcription; recognition failure retains it for retry.
+On Android 10 and later, `RecordingService` (a foreground service of type `microphone`, with a notification and a partial wake lock) captures mono 48 kHz audio with `AudioRecord` and streams it to Ogg Opus at 48 kb/s (about 21.6 MB per hour) in `files/documents/<id>.rec.opus`. Pages are flushed every second and the file is synced every 5 s. Recording continues with the screen off, after **Home** or with the recording screen closed; **Done** in the app or the notification stops it. Losing audio focus (for example a call) pauses it. Recordings stop at the 2 h cap (`Limits.MAX_RECORDING_MS`) or when free space drops below 200 MiB, with a warning 5 minutes before the cap. Android 8 and 9 have no platform Opus encoder: there the service records AAC at 32 kb/s in an MP4 file, which a crash loses because its index is written on stop.
+
+At startup, `RecoveryScanner` repairs any `*.rec.opus` that has no end-of-stream page and is not being recorded: it truncates the file to its last valid page, writes the end page and catalogues it as a recovered note. Pause excludes paused time from the recording clock. **Done** finalizes and catalogues the recording, then starts the INT8 batch pipeline when the model is installed. Recording itself needs no model.
+
+Imports and recordings are decoded straight to 16 kHz mono, which the speech detector, Parakeet and diarization all use. Documents are read and written as streams of Ogg pages, so file size is bounded by `Limits` (2 h, 2 GiB, free space) rather than by memory. Imports that are not Ogg Opus are re-encoded to 16 kHz Opus. Decoding a long Opus file is limited by the platform decoder: a 55 min capture took about 9 min on the Pixel 8. Transcription and speaker identification still run in the activity and are not resumable.
 
 Batch processing displays draft words after each decoder call, including the final filtered words while the complete portable Opus file is being created. Transcription during capture has been removed ahead of a separate Nemotron implementation.
 
 ```sh
 ./scripts/device-smoke.sh fleurs org.cassini.android.LibraryTest
+# Opt-in recovery check after force-stopping the app mid-recording:
+adb shell am instrument -w -r -e class org.cassini.android.RecoveryCheckTest org.cassini.android.test/androidx.test.runner.AndroidJUnitRunner
 ```
 
-Upgrades ignore retired `fp32` and `modelChoice` session fields and remove them on the next session save. Existing result precision and portable provenance remain historical facts. App startup removes only `files/parakeet-v3-fp32/` and the obsolete live-recording preference. INT8, VAD and speaker downloads, saved WAV/M4A recordings, and portable documents are retained. FP32-only installations need the INT8 download for new transcription.
+Upgrades ignore retired `fp32` and `modelChoice` session fields and remove them on the next session save. Existing result precision and portable provenance remain historical facts. App startup removes only `files/parakeet-v3-fp32/` and the obsolete live-recording preference. INT8, VAD and speaker downloads, saved WAV/M4A/Opus recordings, and portable documents are retained. FP32-only installations need the INT8 download for new transcription.
 
 ## Local storage
 

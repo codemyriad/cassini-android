@@ -1,9 +1,9 @@
 [
   {
     "name": "sherpa-onnx",
-    "version": "1.13.7",
-    "url": "https://github.com/k2-fsa/sherpa-onnx/archive/refs/tags/v1.13.7.tar.gz",
-    "sha256": "ee0c20cafb34cc1f86afb2845babd941c26e46de4a9925cbe86fd55ff3557818"
+    "version": "1.13.7+nemotron-diarization (1f23907a9d345fca044d015ff4f4b3fbd58de9dc)",
+    "url": "https://github.com/codemyriad/sherpa-onnx/archive/1f23907a9d345fca044d015ff4f4b3fbd58de9dc.tar.gz",
+    "sha256": "02bb69d35e9ded18ff5039460cd19abced63185174a867b9034785992d749f28"
   },
   {
     "name": "onnxruntime",
