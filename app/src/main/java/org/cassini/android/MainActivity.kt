@@ -230,10 +230,11 @@ class MainActivity : Activity() {
             val recognition = processing(chosenModel.precision, chosenModel.revision)
                 .put("x-inferenceMs", elapsed).put("x-segmentation", Parakeet.cutting(detector).provenance)
             // Speakers are best effort: without them the words are still kept, as one unidentified voice.
+            var turns: List<SpeakerTurn>? = null
             val attributed = if (!speakersReady || transcript.words.isEmpty()) null else try {
                 onUi { ui.progress.isIndeterminate = true; setStatus(R.string.identifying_speakers) }
                 val speakersBegan = System.nanoTime()
-                val turns = Diarization.turns(audio, speakerModels.modelPath) { done, total ->
+                val found = Diarization.turns(audio, speakerModels.modelPath) { done, total ->
                     onUi {
                         if (!cancelled.get() && total > 0) {
                             val percent = (done * 100L / total).toInt().coerceIn(0, 100)
@@ -243,12 +244,22 @@ class MainActivity : Activity() {
                     }
                 }
                 checkActive()
-                SpeakerAttribution.derive(transcript, turns, recognition, null, (System.nanoTime() - speakersBegan) / 1_000_000)
+                turns = found
+                SpeakerAttribution.derive(transcript, found, recognition, null, (System.nanoTime() - speakersBegan) / 1_000_000)
             } catch (error: UserFacingException) {
                 if (error.failure == Failure.CANCELLED) throw error
                 Log.w(TAG, "Speakers not identified: ${error.failure}", error); null
             }
             checkActive()
+            val speakerTurns = turns
+            if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0 && speakerTurns != null && attributed != null && voiceprintModel.ready()) try {
+                // Tuning aid for the match thresholds: speaker-to-speaker similarity within this note.
+                val prints = Voiceprints.compute(File(voiceprintModel.modelPath), audio,
+                    Voiceprints.select(speakerTurns, attributed.transcript.words, audio.sampleRate, audio.samples.size)) { checkActive() }
+                for ((a, first) in prints) for ((b, second) in prints) if (a < b)
+                    Log.d(TAG, "Voiceprint similarity $a/$b: ${"%.3f".format(java.util.Locale.ROOT, Voiceprints.cosine(first.first, second.first))}")
+            } catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error; Log.w(TAG, "Voiceprints failed", error) }
+            catch (error: RuntimeException) { Log.w(TAG, "Voiceprints failed", error) }
             val labels = attributed?.transcript?.words?.map { it.speaker }?.distinct()?.mapIndexed { index, id ->
                 id to getString(R.string.speaker_label, index + 1)
             }?.toMap().orEmpty()
