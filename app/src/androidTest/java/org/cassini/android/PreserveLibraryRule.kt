@@ -50,6 +50,8 @@ class PreserveLibraryRule : ExternalResource() {
         catalogue.forEach { (name, bytes) -> File(directory, name).let { if (bytes == null) it.delete() else it.writeBytes(bytes) } }
         File(directory, "documents").listFiles().orEmpty().filter { it.name !in documents }.forEach { it.delete() }
         File(directory, "voiceprints").listFiles().orEmpty().filter { it.name !in voiceprints }.forEach { it.delete() }
+        // "Forget all voices" removes the whole directory.
+        if (voiceprints.isNotEmpty()) File(directory, "voiceprints").mkdirs()
         voiceprints.forEach { (name, bytes) -> File(directory, "voiceprints/$name").writeBytes(bytes) }
     }
 }

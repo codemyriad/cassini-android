@@ -20,11 +20,26 @@ import org.hamcrest.Matchers.instanceOf
 import androidx.test.espresso.Espresso.onData
 import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
-import androidx.test.espresso.matcher.PreferenceMatchers.withSummaryText
-import androidx.test.espresso.matcher.PreferenceMatchers.withTitleText
+import org.hamcrest.Description
+import org.hamcrest.TypeSafeMatcher
 import java.io.File
 
 class SettingsTest {
+    // Espresso's PreferenceMatchers call toString() on a missing title or summary; several preferences have only one.
+    private fun withTitleText(text: String) = preferenceText("title", text) { it.title }
+    private fun withSummaryText(text: String) = preferenceText("summary", text) { it.summary }
+    private fun preferenceText(what: String, text: String, read: (android.preference.Preference) -> CharSequence?) =
+        object : TypeSafeMatcher<android.preference.Preference>() {
+            override fun describeTo(description: Description) { description.appendText("preference with $what \"$text\"") }
+            override fun matchesSafely(item: android.preference.Preference) = read(item)?.toString() == text
+        }
+    private fun eventually(check: () -> Unit) {
+        val deadline = android.os.SystemClock.uptimeMillis() + 5000
+        while (true) {
+            try { check(); return } catch (error: Throwable) { if (android.os.SystemClock.uptimeMillis() > deadline) throw error; android.os.SystemClock.sleep(50) }
+        }
+    }
+
     @get:org.junit.Rule val preserveLibrary = PreserveLibraryRule()
     @Test fun languageChoiceSurvivesReturningFromSettings() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -120,7 +135,8 @@ class SettingsTest {
         fun preference(title: String) = onData(allOf(instanceOf(android.preference.Preference::class.java), withTitleText(title)))
         try {
             preference("Anna").check(matches(isDisplayed()))
-            onData(allOf(instanceOf(android.preference.Preference::class.java), withSummaryText("Heard in 1 note · 01:24 of speech"))).check(matches(isDisplayed()))
+            // Note counts are filled in once the background scan finishes.
+            eventually { onData(allOf(instanceOf(android.preference.Preference::class.java), withSummaryText("Heard in 1 note · 01:24 of speech"))).check(matches(isDisplayed())) }
             onData(allOf(instanceOf(android.preference.Preference::class.java), withSummaryText(context.getString(R.string.people_needs_reenrol)))).check(matches(isDisplayed()))
             onData(allOf(instanceOf(android.preference.Preference::class.java), withSummaryText(context.getString(R.string.people_privacy)))).check(matches(isDisplayed()))
 
@@ -146,15 +162,43 @@ class SettingsTest {
             assertTrue(voices.load().isEmpty())
             assertFalse(File(context.filesDir, "voiceprints/people_test_note.json").exists())
             // The rebuild is posted after the background forget; wait for the empty state.
-            val emptyDeadline = android.os.SystemClock.uptimeMillis() + 5000
-            while (true) {
-                try { preference(context.getString(R.string.people_empty)).check(matches(isDisplayed())); break }
-                catch (error: Throwable) { if (android.os.SystemClock.uptimeMillis() > emptyDeadline) throw error; android.os.SystemClock.sleep(50) }
-            }
+            eventually { preference(context.getString(R.string.people_empty)).check(matches(isDisplayed())) }
         } finally {
             scenario.onActivity { AppLanguage.set(it, originalLanguage) }
             instrumentation.waitForIdleSync()
             scenario.close()
+        }
+    }
+
+    @Test fun forgetFinishingAfterRecreationRefreshesTheNewScreen() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val originalLanguage = AppLanguage.selected(context)
+        val voices = VoiceStore(context.filesDir)
+        voices.clear()
+        voices.enrol(null, "Bruna", VoiceprintModel.model.sha256, FloatArray(4) { if (it == 2) 1f else 0f }, 20.0, 1L)
+        val scenario = ActivityScenario.launch(SettingsActivity::class.java)
+        scenario.onActivity { AppLanguage.set(it, "en") }
+        instrumentation.waitForIdleSync()
+        fun preference(title: String) = onData(allOf(instanceOf(android.preference.Preference::class.java), withTitleText(title)))
+        val gate = java.util.concurrent.CountDownLatch(1)
+        try {
+            preference("Bruna").perform(click())
+            onView(withText("Forget")).inRoot(isDialog()).perform(click())
+            // Hold the forget behind a blocked task until the screen has been recreated.
+            SettingsActivity.SettingsFragment.background.execute { gate.await(10, java.util.concurrent.TimeUnit.SECONDS) }
+            onView(withText("Forget")).inRoot(isDialog()).perform(click())
+            scenario.recreate()
+            preference("Bruna").check(matches(isDisplayed()))
+            gate.countDown()
+            eventually { preference(context.getString(R.string.people_empty)).check(matches(isDisplayed())) }
+            assertTrue(voices.load().isEmpty())
+        } finally {
+            gate.countDown()
+            scenario.onActivity { AppLanguage.set(it, originalLanguage) }
+            instrumentation.waitForIdleSync()
+            scenario.close()
+            voices.clear()
         }
     }
 }

@@ -34,6 +34,12 @@ class SettingsActivity : Activity() {
     }
 
     class SettingsFragment : PreferenceFragment() {
+        companion object {
+            /** Shared across fragment instances, so work started before a rotation still finishes and reaches the new screen. */
+            internal val background = Executors.newSingleThreadExecutor()
+            private val main = android.os.Handler(android.os.Looper.getMainLooper())
+            private var resumed = java.lang.ref.WeakReference<SettingsFragment>(null)
+        }
         private lateinit var people: PreferenceCategory
         private val app get() = activity.application as CassiniApplication
 
@@ -92,28 +98,44 @@ class SettingsActivity : Activity() {
             })
         }
 
-        override fun onResume() { super.onResume(); buildPeople() }
+        override fun onResume() { super.onResume(); resumed = java.lang.ref.WeakReference(this); buildPeople() }
+        override fun onPause() { if (resumed.get() === this) resumed = java.lang.ref.WeakReference(null); super.onPause() }
 
-        /** Saved voices, rebuilt on each resume so names given in a note appear here. */
+        private var counts: Map<String, Int>? = null
+        private var countRequest = 0
+
+        /** Saved voices, rebuilt on each resume so names given in a note appear here. Note counts scan every note, so they follow. */
         private fun buildPeople() {
+            showPeople()
+            val request = ++countRequest
+            background.execute {
+                val found = try { app.noteVoices.noteCounts() } catch (error: Exception) { android.util.Log.w("Settings", "Could not count notes", error); return@execute }
+                main.post { if (isAdded && !isDetached && request == countRequest) { counts = found; showPeople() } }
+            }
+        }
+
+        private fun showPeople() {
             val context = activity ?: return
             people.removeAll()
             val voices = app.voices.load().sortedBy { it.name.lowercase() }
-            val counts = if (voices.isEmpty()) emptyMap() else app.noteVoices.noteCounts()
+            val counts = counts
             if (voices.isEmpty()) people.addPreference(Preference(context).apply { setTitle(R.string.people_empty); isEnabled = false })
             voices.forEach { voice ->
                 people.addPreference(Preference(context).apply {
                     isPersistent = false; title = voice.name
-                    summary = if (voice.model != VoiceprintModel.model.sha256) getString(R.string.people_needs_reenrol)
-                        else resources.getQuantityString(R.plurals.people_summary, counts[voice.id] ?: 0, counts[voice.id] ?: 0,
-                            DateUtils.formatElapsedTime(voice.seconds.toLong()))
+                    val speech = DateUtils.formatElapsedTime(voice.seconds.toLong())
+                    summary = when {
+                        voice.model != VoiceprintModel.model.sha256 -> getString(R.string.people_needs_reenrol)
+                        counts == null -> getString(R.string.people_summary_counting, speech)
+                        else -> resources.getQuantityString(R.plurals.people_summary, counts[voice.id] ?: 0, counts[voice.id] ?: 0, speech)
+                    }
                     setOnPreferenceClickListener { editPerson(voice); true }
                 })
             }
             if (voices.isNotEmpty()) people.addPreference(Preference(context).apply {
                 isPersistent = false; setTitle(R.string.people_forget_all)
                 setOnPreferenceClickListener {
-                    confirm(getString(R.string.people_forget_all_confirm)) { app.voices.clear(); app.noteVoices.clear() }; true
+                    confirm(getString(R.string.people_forget_all_confirm)) { it.voices.clear(); it.noteVoices.clear() }; true
                 }
             })
             people.addPreference(Preference(context).apply { setSummary(R.string.people_privacy); isSelectable = false })
@@ -129,24 +151,23 @@ class SettingsActivity : Activity() {
                     if (name.isNotEmpty() && name != voice.name) { app.voices.rename(voice.id, name); buildPeople() }
                 }
                 .setNeutralButton(R.string.people_forget) { _, _ ->
-                    confirm(getString(R.string.people_forget_confirm, voice.name)) { app.voices.forget(voice.id); app.noteVoices.forget(voice.id) }
+                    confirm(getString(R.string.people_forget_confirm, voice.name)) { it.voices.forget(voice.id); it.noteVoices.forget(voice.id) }
                 }
                 .setNegativeButton(R.string.cancel, null).show()
         }
 
         /** Asks first, then runs [forget] off the main thread, since scrubbing notes scans every note file. */
-        private fun confirm(message: String, forget: () -> Unit) {
+        private fun confirm(message: String, forget: (CassiniApplication) -> Unit) {
+            val app = app
             AlertDialog.Builder(activity).setMessage(message).setNegativeButton(R.string.cancel, null)
                 .setPositiveButton(R.string.people_forget) { _, _ ->
                     background.execute {
-                        forget()
-                        activity?.runOnUiThread { if (isAdded) buildPeople() }
+                        try { forget(app) } catch (error: Exception) { android.util.Log.w("Settings", "Could not forget voices", error) }
+                        // A rotation may have replaced this fragment meanwhile: refresh whichever one is on screen.
+                        main.post { resumed.get()?.takeIf { it.isAdded }?.buildPeople() }
                     }
                 }.show()
         }
-
-        override fun onDestroy() { background.shutdown(); super.onDestroy() }
-        private val background = Executors.newSingleThreadExecutor()
 
         private fun modelSummary(context: Context): String {
             val models = ModelStore(File(context.filesDir, "parakeet-v3"))

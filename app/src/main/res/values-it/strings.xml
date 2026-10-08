@@ -187,6 +187,7 @@
         <item quantity="many">Sentita in %1$d note · %2$s di parlato</item>
         <item quantity="other">Sentita in %1$d note · %2$s di parlato</item>
     </plurals>
+    <string name="people_summary_counting">%1$s di parlato · conteggio delle note…</string>
     <string name="people_needs_reenrol">Registrata con un modello vocale precedente · dai di nuovo il nome a questa persona in una nota</string>
     <string name="people_rename">Rinomina</string>
     <string name="people_rename_note">Le note mantengono il nome con cui sono state salvate; le nuove note usano il nuovo nome.</string>

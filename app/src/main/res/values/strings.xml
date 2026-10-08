@@ -189,6 +189,7 @@
         <item quantity="one">Heard in %1$d note · %2$s of speech</item>
         <item quantity="other">Heard in %1$d notes · %2$s of speech</item>
     </plurals>
+    <string name="people_summary_counting">%1$s of speech · counting notes…</string>
     <string name="people_needs_reenrol">Recorded with an older voice model · name this person again in a note</string>
     <string name="people_rename">Rename</string>
     <string name="people_rename_note">Notes keep the name they were saved with; new notes use the new name.</string>
