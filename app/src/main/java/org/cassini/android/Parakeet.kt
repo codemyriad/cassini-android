@@ -219,7 +219,11 @@ object Parakeet {
         /** Hands on the words that end before [decodedEnd] less the margin; the final call passes everything. */
         private fun settle(decodedEnd: Int, all: Boolean = false) {
             // A seam never reaches this far back, but if it ever did, continue after the last word handed on.
-            if (emitted > 0 && settled.getOrNull(emitted - 1) != lastEmitted) emitted = settled.lastIndexOf(lastEmitted) + 1
+            val last = lastEmitted
+            if (emitted > 0 && last != null && settled.getOrNull(emitted - 1) != last) {
+                val at = settled.lastIndexOf(last)
+                emitted = if (at >= 0) at + 1 else settled.count { it.word.startMs <= last.word.startMs }
+            }
             val stableMs = ms(decodedEnd - margin)
             var end = emitted
             while (end < settled.size && (all || settled[end].word.endMs <= stableMs)) end++
@@ -235,10 +239,18 @@ object Parakeet {
 
         fun settleAll(total: Int) = settle(total, all = true)
 
-        /** Joins a first decode to words settled before it: only a resume overlaps them. */
-        private fun join(found: List<TimedWord>, start: Int): List<TimedWord> =
-            if (previousEnd > start) SeamMerge.merge(settled, found, false, ms(start), ms(previousEnd - start)) { it.word }
-            else settled + found
+        /**
+         * Joins a first decode to words settled before it: only a resume overlaps them. Words already handed
+         * on are final, so a decode never replaces them: of its words, only those centred after them are added.
+         */
+        private fun join(found: List<TimedWord>, start: Int): List<TimedWord> {
+            if (previousEnd <= start) return settled + found
+            val final = settled.subList(0, emitted.coerceAtMost(settled.size))
+            val open = settled.subList(final.size, settled.size)
+            val finalEndMs = if (final.isEmpty()) Long.MIN_VALUE else maxOf(ms(finalEnd.toInt()), final.last().word.endMs)
+            val fresh = found.filter { (it.word.startMs + it.word.endMs) / 2 >= finalEndMs }
+            return final + if (open.isEmpty()) fresh else SeamMerge.merge(open, fresh, false, ms(start), ms(previousEnd - start)) { it.word }
+        }
 
         /** The windows of one source span, each decoded, placed on the recording clock and reconciled at its seam. */
         private fun segment(span: Span, detected: Boolean, onDecoded: (Int) -> Unit = {}): List<TimedWord> {

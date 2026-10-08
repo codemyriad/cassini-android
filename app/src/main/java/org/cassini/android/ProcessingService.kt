@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
@@ -23,9 +24,13 @@ import android.util.Log
  * while Cassini is in the foreground, which every caller is: a tap, or a screen opening.
  */
 class ProcessingService : Service() {
+    /** Read and written on the main thread only; the worker hands its end back there. */
     private var worker: Thread? = null
+    private var lastStartId = 0
     @Volatile private var pipeline: ProcessingPipeline? = null
     @Volatile private var cancelled = false
+    /** The system is ending the service: the job pauses for the next app open instead of being cancelled. */
+    @Volatile private var stoppedBySystem = false
     private var wakeLock: PowerManager.WakeLock? = null
     private var notified = 0L
 
@@ -33,16 +38,20 @@ class ProcessingService : Service() {
     override fun onBind(intent: Intent): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        lastStartId = startId
         when (intent?.action) {
             START -> {
                 val noteId = intent.getStringExtra(NOTE_ID)
+                val name = intent.getStringExtra(NAME).orEmpty()
+                // startForegroundService obliges every START to reach startForeground, even one that is dropped.
                 if (worker == null && noteId != null) begin(ProcessingJobs.interrupted(filesDir)?.takeIf { it.noteId == noteId }
                     ?.copy(speakers = speakers(intent), failure = null)
-                    ?: ProcessingJob(noteId, intent.getStringExtra(NAME).orEmpty(), speakers(intent)))
-                else if (worker == null) stopSelf(startId)
+                    ?: ProcessingJob(noteId, name, speakers(intent)))
+                else if (worker != null) startInForeground(ProcessingJobs.current ?: ProcessingJob(noteId.orEmpty(), name, speakers(intent)))
+                else { startInForeground(ProcessingJob("", name, false)); stopSelfResult(startId) }
             }
             CANCEL -> cancel()
-            else -> if (worker == null) stopSelf(startId)
+            else -> if (worker == null) stopSelfResult(startId)
         }
         // A restart from the background could not call startForeground: the next app open resumes instead.
         return START_NOT_STICKY
@@ -54,6 +63,7 @@ class ProcessingService : Service() {
         val job = initial.copy(attempts = initial.attempts + 1, phase = ProcessingJob.Phase.QUEUED, words = emptyList())
         startInForeground(job)
         cancelled = false
+        stoppedBySystem = false
         ProcessingJobs.running = true
         ProcessingJobs.update(filesDir, job, persist = true)
         val power = getSystemService(PowerManager::class.java)
@@ -69,18 +79,25 @@ class ProcessingService : Service() {
                 work.run(job).also { last = it }
             } catch (error: Throwable) {
                 val failure = when {
+                    stoppedBySystem -> null
                     cancelled -> Failure.CANCELLED
                     error is UserFacingException -> error.failure
                     error is OutOfMemoryError -> Failure.MEMORY
                     error is java.io.IOException -> Failure.OPEN
                     else -> Failure.UNKNOWN
                 }
-                if (failure != Failure.CANCELLED) Log.e(TAG, "Processing failed: $failure", error)
+                if (failure != null && failure != Failure.CANCELLED) Log.e(TAG, "Processing failed: $failure", error)
                 val current = ProcessingJobs.current?.takeIf { it.noteId == job.noteId } ?: last
-                current.copy(phase = if (failure == Failure.CANCELLED) ProcessingJob.Phase.CANCELLED else ProcessingJob.Phase.FAILED,
-                    failure = failure, words = emptyList())
+                when (failure) {
+                    null -> current.copy(phase = ProcessingJob.Phase.PAUSED, failure = null, words = emptyList())
+                    Failure.CANCELLED -> current.copy(phase = ProcessingJob.Phase.CANCELLED, failure = failure, words = emptyList())
+                    else -> current.copy(phase = ProcessingJob.Phase.FAILED, failure = failure, words = emptyList())
+                }
             }
-            finish(finished)
+            ProcessingJobs.update(filesDir, finished, persist = true)
+            val self = Thread.currentThread()
+            // All service state changes on the main thread, so a START arriving now is never stopped by this end.
+            handler.post { if (worker === self) finish(finished) }
         }, "cassini-processing")
         worker?.start()
     }
@@ -101,14 +118,18 @@ class ProcessingService : Service() {
         }
     }
 
+    private val handler by lazy { Handler(mainLooper) }
+
+    /** On the main thread. */
     private fun finish(job: ProcessingJob) {
-        ProcessingJobs.update(filesDir, job, persist = true)
+        worker = null; pipeline = null
         ProcessingJobs.running = false
         wakeLock?.let { if (it.isHeld) it.release() }
         wakeLock = null
         val manager = getSystemService(NotificationManager::class.java)
         stopForeground(STOP_FOREGROUND_REMOVE)
-        manager.notify(DONE_NOTIFICATION, Notification.Builder(this, channel()).setSmallIcon(R.drawable.ic_stat_record)
+        // A job paused by the system resumes on the next app open; it has no outcome to announce yet.
+        if (job.phase != ProcessingJob.Phase.PAUSED) manager.notify(DONE_NOTIFICATION, Notification.Builder(this, channel()).setSmallIcon(R.drawable.ic_stat_record)
             .setContentTitle(job.name.ifBlank { getString(R.string.recording) })
             .setContentText(when (job.phase) {
                 ProcessingJob.Phase.DONE -> getString(R.string.processing_done, job.name.substringBeforeLast('.'))
@@ -117,8 +138,8 @@ class ProcessingService : Service() {
                     else getString(R.string.processing_failed, getString((job.failure ?: Failure.UNKNOWN).stringRes))
             })
             .setContentIntent(open(job.noteId)).setAutoCancel(true).build())
-        worker = null; pipeline = null
-        stopSelf()
+        // A START after the last one handled keeps the service for its job.
+        stopSelfResult(lastStartId)
     }
 
     private fun cancel() {
@@ -161,7 +182,7 @@ class ProcessingService : Service() {
 
     override fun onDestroy() {
         // The system ends a dataSync service only under pressure; the journal keeps what was settled.
-        if (worker != null) cancel()
+        if (worker != null) { stoppedBySystem = true; cancel() }
         wakeLock?.let { if (it.isHeld) it.release() }
         super.onDestroy()
     }

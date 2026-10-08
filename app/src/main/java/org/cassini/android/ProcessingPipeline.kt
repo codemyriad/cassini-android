@@ -138,8 +138,8 @@ internal class ProcessingPipeline(private val context: Context, private val publ
                 job = job.copy(phase = ProcessingJob.Phase.DIARIZE, doneMs = 0, elapsedMs = elapsed(), audioMs = 0, stageMs = 0)
                 publish(job, true)
                 val diarizeBegan = System.nanoTime()
-                val audio = PcmAudio(pcm.readAll(), Limits.ASR_RATE)
-                val turns = Diarization.turns(audio, speakerModels.modelPath) { done, total ->
+                // Confined to the diarization call: packaging reads the cache again and must not hold two copies.
+                val turns = Diarization.turns(PcmAudio(pcm.readAll(), Limits.ASR_RATE), speakerModels.modelPath) { done, total ->
                     if (total > 0) {
                         val doneMs = durationMs * done / total
                         val wall = (System.nanoTime() - diarizeBegan) / 1_000_000

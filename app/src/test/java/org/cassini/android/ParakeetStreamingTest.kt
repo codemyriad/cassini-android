@@ -106,6 +106,24 @@ class ParakeetStreamingTest {
         }
     }
 
+    @Test fun aResumeWhoseDecodeShiftsTheJournaledWordsNeverHandsThemOnAgain() {
+        val samples = recording(150)
+        val source = ArraySource(PcmAudio(samples, rate))
+        val records = ArrayList<Record>()
+        val reference = transcribe(source, records = records)
+        for (k in 0 until records.size - 1) {
+            val kept = records.take(k + 1)
+            if (kept.last().end <= 0) continue
+            // A real decode places the overlap words a little differently from the journal.
+            val journaled = kept.flatMap { it.words }.map { TimedWord(it.word.copy(startMs = it.word.startMs - 200, endMs = it.word.endMs - 200), it.capMs - 200) }
+            val later = ArrayList<Record>()
+            val resumed = transcribe(source, TranscriptJournal.State(journaled, kept.last().end), later)
+            val journal = journaled + later.flatMap { it.words }
+            assertEquals("journal after record $k", reference.words.map { it.text }, journal.map { it.word.text })
+            assertEquals("resumed after record $k", reference.words.map { it.text }, resumed.words.map { it.text })
+        }
+    }
+
     @Test fun aDecodeThatFailsIsAFailureNotTheEndOfTheRecording() {
         val cache = PcmCache.open(Files.createTempDirectory("pcm").toFile(), "failed-test-key")
         cache.openWriter(rate * 60L)
