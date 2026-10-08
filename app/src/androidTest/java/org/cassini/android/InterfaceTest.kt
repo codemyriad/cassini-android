@@ -217,15 +217,21 @@ class InterfaceTest {
         val transcript = Transcript(listOf(Word("spk_1", 0, 800, "Ciao"), Word("spk_1", 1500, 2500, "mondo.")), "it")
         store.save(Session(Uri.fromFile(audio).toString(), "Italian sample.wav", transcript, 15840, 500, 3500))
         val scenario = ActivityScenario.launch(MainActivity::class.java)
-        fun awaitSettingsLabel(label: String) {
-            val deadline = android.os.SystemClock.uptimeMillis() + 5000
+        // The note is read off the main thread and a locale switch recreates the screen: wait for what each step shows.
+        fun awaitScreen(description: String, ready: (MainActivity) -> Boolean) {
+            val deadline = android.os.SystemClock.uptimeMillis() + 10_000
             while (android.os.SystemClock.uptimeMillis() < deadline) {
-                var ready = false
-                scenario.onActivity { ready = it.findViewById<TextView>(R.id.settings_button).text.toString() == label }
-                if (ready) return
+                var shown = false
+                scenario.onActivity { shown = ready(it) }
+                if (shown) return
                 android.os.SystemClock.sleep(50)
             }
-            fail("Locale recreation should display $label")
+            fail("The screen should display $description")
+        }
+        fun awaitSettingsLabel(label: String) = awaitScreen("$label with the loaded note") {
+            it.findViewById<TextView>(R.id.settings_button).text.toString() == label &&
+                it.findViewById<TextView>(R.id.transcript_text).text.toString() == "Ciao mondo." &&
+                it.findViewById<TextView>(R.id.recording_name).text.toString() == "Italian sample.wav"
         }
         try {
             scenario.onActivity { AppLanguage.set(it, "en") }
@@ -239,6 +245,10 @@ class InterfaceTest {
             }
             instrumentation.waitForIdleSync()
             awaitSettingsLabel("Impostazioni")
+            awaitScreen("the restored playback position") {
+                it.findViewById<TextView>(R.id.transcribe_button).text.toString() == "Trascrivi di nuovo" &&
+                    it.findViewById<TextView>(R.id.playback_position).text.toString().contains("00:03")
+            }
             scenario.onActivity { activity ->
                 assertEquals("Impostazioni", activity.findViewById<TextView>(R.id.settings_button).text.toString())
                 assertEquals("Trascrivi di nuovo", activity.findViewById<TextView>(R.id.transcribe_button).text.toString())
