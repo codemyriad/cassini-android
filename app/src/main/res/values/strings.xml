@@ -37,7 +37,7 @@
     <string name="saving">Saving Cassini document…</string>
     <string name="saved">Cassini saved · audio and transcript together.</string>
     <string name="empty_title">Load a tape.</string>
-    <string name="empty_hint">Open a Cassini document, or transcribe WAV, MP3, M4A or Opus.\nUp to 3 minutes for transcription. All local.</string>
+    <string name="empty_hint">Open a Cassini document, or transcribe WAV, MP3, M4A or Opus.\nUp to 2 hours for transcription. All local.</string>
     <string name="loaded_title">Let’s hear it.</string>
     <string name="loaded_hint">Tap Transcribe to turn this recording into timed words.</string>
     <string name="no_speech">No speech recognized.</string>
@@ -72,7 +72,7 @@
     <string name="italian_name" translatable="false">Italiano</string>
     <string name="recognition_model">Transcription model</string>
     <string name="about">About this prototype</string>
-    <string name="about_body">Parakeet v3 on your phone. Audio stays local.\n\nRecord voice notes, search past transcriptions, and save portable Cassini Opus documents with audio and timed words.\n\nClips up to 3 minutes, one unidentified voice, automatic multilingual recognition. The current transcript language label is Italian.\n\nGPLv3. Source and dependency notices: github.com/codemyriad/cassini-android</string>
+    <string name="about_body">Parakeet v3 on your phone. Audio stays local.\n\nRecord voice notes, search past transcriptions, and save portable Cassini Opus documents with audio and timed words.\n\nAudio up to 2 hours, one unidentified voice, automatic multilingual recognition. The current transcript language label is Italian.\n\nGPLv3. Source and dependency notices: github.com/codemyriad/cassini-android</string>
     <string name="done">Done</string>
     <string name="cancel">Cancel</string>
     <string name="error_open">Could not open this recording. Choose the file again.</string>

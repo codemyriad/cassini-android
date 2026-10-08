@@ -166,6 +166,26 @@ internal object OggOpus {
             }
         }
     }
+    /**
+     * [mux] as packets arrive: holds one packet back so the last one carries EOS. Packets past [finalGranule]
+     * (encoder flush) are dropped; [finish] fails unless the packets cover it.
+     */
+    class Muxer(out: OutputStream, head: ByteArray, tags: ByteArray, private val finalGranule: Long, serial: Int = Random.nextInt()) {
+        private val writer = Writer(out, serial)
+        private var pending: ByteArray? = null
+        private var granule = 0L
+        init { require(tags.size <= MAX_HEADER_BYTES && finalGranule > 0); writer.packet(head, 2, 0); writer.packet(tags, 0, 0) }
+        val full get() = granule >= finalGranule
+        fun add(packet: ByteArray) {
+            if (full) return
+            pending?.let { writer.packet(it, 0, granule) }
+            pending = packet; granule += packetSamples(packet)
+        }
+        fun finish() {
+            require(full) { "Opus packets do not cover the final granule" }
+            writer.packet(pending!!, 4, finalGranule); pending = null
+        }
+    }
     fun mux(stream: Stream, tags: ByteArray, serial: Int = Random.nextInt()): ByteArray {
         require(stream.validFraming && tags.size <= MAX_HEADER_BYTES && stream.audio.isNotEmpty())
         val out = ByteArrayOutputStream()

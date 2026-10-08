@@ -76,6 +76,24 @@ class OggOpusStreamTest {
         }
     }
 
+    @Test fun muxerStreamsTheSameBytesAndDropsFlushPackets() {
+        val tags = CassiniDocument.tagsPacket(emptyList())
+        for (bytes in fixtures()) {
+            val stream = OggOpus.read(bytes)
+            var covered = 0L
+            val used = stream.audio.takeWhile { if (covered >= stream.finalGranule) false else { covered += OggOpus.packetSamples(it); true } }
+            if (covered < stream.finalGranule) continue
+            val out = ByteArrayOutputStream()
+            val muxer = OggOpus.Muxer(out, stream.head, tags, stream.finalGranule, 7)
+            (stream.audio + stream.audio.last()).forEach(muxer::add); muxer.finish()
+            assertArrayEquals(legacyMux(stream.copy(audio = used), tags, 7), out.toByteArray())
+        }
+        val stream = OggOpus.read(fixture())
+        val short = OggOpus.Muxer(ByteArrayOutputStream(), stream.head, tags, stream.finalGranule + 1_000_000, 7)
+        stream.audio.forEach(short::add)
+        try { short.finish(); fail() } catch (_: IllegalArgumentException) {}
+    }
+
     @Test fun scanMatchesTheWholeBufferReader() {
         for (bytes in fixtures()) {
             val stream = OggOpus.read(bytes); val info = OggOpus.scan(ByteArrayInputStream(bytes))

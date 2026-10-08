@@ -41,7 +41,7 @@ internal class DocumentStore(private val context: Context) {
                 source.outputStream().use { it.write(head); copy(input, it, null, got.toLong()) }
                 try { OggOpus.scan(source).digest(); true } catch (_: Exception) { false }
             }
-            if (!opus) source.writeBytes(OpusEncoder.encode(audio()))
+            if (!opus) OpusEncoder.encode(audio(), source)
             requireUser(directory.usableSpace >= source.length() + Limits.MIN_FREE_BYTES, Failure.SPACE)
             val doc = CassiniDocument.create(source, transcript, name.substringBeforeLast('.'), processing, existing, speakerLabels, temporary)
             check(temporary.renameTo(output))

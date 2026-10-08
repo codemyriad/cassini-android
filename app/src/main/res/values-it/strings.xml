@@ -36,7 +36,7 @@
     <string name="saving">Salvataggio del documento Cassini…</string>
     <string name="saved">Cassini salvato · audio e trascrizione insieme.</string>
     <string name="empty_title">Carica un nastro.</string>
-    <string name="empty_hint">Apri un documento Cassini, oppure trascrivi WAV, MP3, M4A o Opus.\nFino a 3 minuti per la trascrizione. Tutto sul telefono.</string>
+    <string name="empty_hint">Apri un documento Cassini, oppure trascrivi WAV, MP3, M4A o Opus.\nFino a 2 ore per la trascrizione. Tutto sul telefono.</string>
     <string name="loaded_title">Sentiamo cosa dice.</string>
     <string name="loaded_hint">Tocca Trascrivi per ottenere parole e tempi da questa registrazione.</string>
     <string name="no_speech">Nessun parlato riconosciuto.</string>
@@ -69,7 +69,7 @@
     <string name="system_language">Segui la lingua del telefono</string>
     <string name="recognition_model">Modello di trascrizione</string>
     <string name="about">Informazioni sul prototipo</string>
-    <string name="about_body">Parakeet v3 sul tuo telefono. L’audio resta in locale.\n\nRegistra note vocali, cerca nelle trascrizioni e salva documenti Cassini Opus portatili con audio e parole temporizzate.\n\nClip fino a 3 minuti, una voce non identificata, riconoscimento multilingue automatico. La lingua indicata nella trascrizione è attualmente l’italiano.\n\nGPLv3. Codice sorgente e licenze: github.com/codemyriad/cassini-android</string>
+    <string name="about_body">Parakeet v3 sul tuo telefono. L’audio resta in locale.\n\nRegistra note vocali, cerca nelle trascrizioni e salva documenti Cassini Opus portatili con audio e parole temporizzate.\n\nAudio fino a 2 ore, una voce non identificata, riconoscimento multilingue automatico. La lingua indicata nella trascrizione è attualmente l’italiano.\n\nGPLv3. Codice sorgente e licenze: github.com/codemyriad/cassini-android</string>
     <string name="done">Fine</string>
     <string name="cancel">Annulla</string>
     <string name="error_open">Impossibile aprire la registrazione. Seleziona di nuovo il file.</string>
