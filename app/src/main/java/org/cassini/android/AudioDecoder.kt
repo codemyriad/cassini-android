@@ -70,6 +70,7 @@ object AudioDecoder {
         var channels = 0
         var dataOffset = -1L
         var dataSize = 0L
+        file.seek(12)
         while (file.filePointer + 8 <= file.length()) {
             val id = ByteArray(4).also(file::readFully).toString(Charsets.US_ASCII)
             val size = Integer.reverseBytes(file.readInt()).toLong() and 0xffffffffL

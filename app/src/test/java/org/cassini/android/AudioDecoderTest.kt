@@ -49,7 +49,7 @@ class AudioDecoderTest {
             val mono = FloatArray(frames) { f -> var sum = 0f; repeat(channels) { sum += pcm[f * channels + it] / 32768f }; sum / channels }
             val expected = resampleTo16k(mono, rate)
             val file = wav(rate, channels, pcm)
-            val audio = java.io.RandomAccessFile(file, "r").use { it.seek(12); AudioDecoder.decodeWav(it) }
+            val audio = java.io.RandomAccessFile(file, "r").use { it.seek(OggOpus.HEAD_BYTES.toLong()); AudioDecoder.decodeWav(it) }
             assertEquals(16000, audio.sampleRate)
             assertArrayEquals("$rate Hz x$channels", expected, audio.samples, 1e-5f)
         }

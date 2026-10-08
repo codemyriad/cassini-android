@@ -56,7 +56,7 @@ class PortableDocumentTest {
             assertEquals(Failure.OPUS_ENCODER, failure.failure)
         }
     }
-    @Test fun threeMinuteOpusTrimsPaddingAtTheTranscriptionLimit() {
+    @Test fun threeMinuteOpusTrimsPaddingToTheExactDuration() {
         val instrumentation = InstrumentationRegistry.getInstrumentation(); val context = instrumentation.targetContext
         org.junit.Assume.assumeTrue("Fetch the optional three-minute YouTube fixture", instrumentation.context.assets.list("")!!.contains("youtube-long.wav"))
         val wav = File(context.cacheDir, "portable-long-source.wav")
@@ -67,7 +67,7 @@ class PortableDocumentTest {
         assertEquals(8640000L, OggOpus.read(file.readBytes()).sampleCount)
         val decoded = AudioDecoder.decode(context, Uri.fromFile(file))
         assertEquals(180000L, decoded.durationMs)
-        assertEquals(8640000, decoded.samples.size)
+        assertEquals(180 * Limits.ASR_RATE, decoded.samples.size)
     }
 
     @Test fun transcriptionCreatesASealedPortableDocument() {
