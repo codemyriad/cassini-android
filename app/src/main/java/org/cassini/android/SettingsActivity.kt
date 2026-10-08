@@ -10,8 +10,11 @@ import android.preference.ListPreference
 import android.preference.Preference
 import android.preference.PreferenceCategory
 import android.preference.PreferenceFragment
+import android.text.format.DateUtils
 import android.view.MenuItem
+import android.widget.TextView
 import java.io.File
+import java.util.concurrent.Executors
 
 class SettingsActivity : Activity() {
     override fun attachBaseContext(newBase: Context) = super.attachBaseContext(AppLanguage.wrap(newBase))
@@ -31,6 +34,9 @@ class SettingsActivity : Activity() {
     }
 
     class SettingsFragment : PreferenceFragment() {
+        private lateinit var people: PreferenceCategory
+        private val app get() = activity.application as CassiniApplication
+
         override fun onCreate(savedInstanceState: Bundle?) {
             super.onCreate(savedInstanceState)
             val context = activity
@@ -73,8 +79,9 @@ class SettingsActivity : Activity() {
                 isSelectable = false
             })
 
-            val app = category(R.string.settings_app)
-            app.addPreference(Preference(context).apply {
+            people = category(R.string.people_title)
+
+            category(R.string.settings_app).addPreference(Preference(context).apply {
                 setTitle(R.string.about)
                 summary = getString(R.string.app_version, context.packageManager.getPackageInfo(context.packageName, 0).versionName)
                 setOnPreferenceClickListener {
@@ -84,6 +91,62 @@ class SettingsActivity : Activity() {
                 }
             })
         }
+
+        override fun onResume() { super.onResume(); buildPeople() }
+
+        /** Saved voices, rebuilt on each resume so names given in a note appear here. */
+        private fun buildPeople() {
+            val context = activity ?: return
+            people.removeAll()
+            val voices = app.voices.load().sortedBy { it.name.lowercase() }
+            val counts = if (voices.isEmpty()) emptyMap() else app.noteVoices.noteCounts()
+            if (voices.isEmpty()) people.addPreference(Preference(context).apply { setTitle(R.string.people_empty); isEnabled = false })
+            voices.forEach { voice ->
+                people.addPreference(Preference(context).apply {
+                    isPersistent = false; title = voice.name
+                    summary = if (voice.model != VoiceprintModel.model.sha256) getString(R.string.people_needs_reenrol)
+                        else resources.getQuantityString(R.plurals.people_summary, counts[voice.id] ?: 0, counts[voice.id] ?: 0,
+                            DateUtils.formatElapsedTime(voice.seconds.toLong()))
+                    setOnPreferenceClickListener { editPerson(voice); true }
+                })
+            }
+            if (voices.isNotEmpty()) people.addPreference(Preference(context).apply {
+                isPersistent = false; setTitle(R.string.people_forget_all)
+                setOnPreferenceClickListener {
+                    confirm(getString(R.string.people_forget_all_confirm)) { app.voices.clear(); app.noteVoices.clear() }; true
+                }
+            })
+            people.addPreference(Preference(context).apply { setSummary(R.string.people_privacy); isSelectable = false })
+        }
+
+        private fun editPerson(voice: Voice) {
+            val context = activity
+            val input = SpeakerDialog.nameInput(context, voice.name).apply { id = R.id.person_name_input }
+            val note = TextView(context).apply { setText(R.string.people_rename_note) }
+            AlertDialog.Builder(context).setTitle(voice.name).setView(SpeakerDialog.frame(context, SpeakerDialog.column(context, input, note)))
+                .setPositiveButton(R.string.people_rename) { _, _ ->
+                    val name = input.text.toString().trim()
+                    if (name.isNotEmpty() && name != voice.name) { app.voices.rename(voice.id, name); buildPeople() }
+                }
+                .setNeutralButton(R.string.people_forget) { _, _ ->
+                    confirm(getString(R.string.people_forget_confirm, voice.name)) { app.voices.forget(voice.id); app.noteVoices.forget(voice.id) }
+                }
+                .setNegativeButton(R.string.cancel, null).show()
+        }
+
+        /** Asks first, then runs [forget] off the main thread, since scrubbing notes scans every note file. */
+        private fun confirm(message: String, forget: () -> Unit) {
+            AlertDialog.Builder(activity).setMessage(message).setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.people_forget) { _, _ ->
+                    background.execute {
+                        forget()
+                        activity?.runOnUiThread { if (isAdded) buildPeople() }
+                    }
+                }.show()
+        }
+
+        override fun onDestroy() { background.shutdown(); super.onDestroy() }
+        private val background = Executors.newSingleThreadExecutor()
 
         private fun modelSummary(context: Context): String {
             val models = ModelStore(File(context.filesDir, "parakeet-v3"))

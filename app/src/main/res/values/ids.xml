@@ -34,4 +34,5 @@
     <item name="speaker_name_input" type="id" />
     <item name="speaker_remember" type="id" />
     <item name="speaker_people_list" type="id" />
+    <item name="person_name_input" type="id" />
 </resources>

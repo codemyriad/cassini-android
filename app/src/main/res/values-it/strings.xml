@@ -191,4 +191,19 @@
     <string name="models_download_summary">La trascrizione richiede un unico download di circa %1$s. Riconoscimento vocale e identificazione delle voci funzionano poi su questo telefono; l’audio non lo lascia mai. Tieni l’app aperta.</string>
     <string name="download_and_transcribe">Scarica e trascrivi</string>
     <string name="speakers_unavailable">Trascritto. Non è stato possibile distinguere le voci, quindi le parole appaiono come una sola voce.</string>
+    <string name="people_title">Persone</string>
+    <string name="people_privacy">Le impronte vocali restano su questo telefono. Non vengono mai condivise né scritte nelle note esportate.</string>
+    <string name="people_empty">Nessuna voce salvata. Dai un nome a chi parla in una nota per ricordarne la voce.</string>
+    <plurals name="people_summary">
+        <item quantity="one">Sentita in %1$d nota · %2$s di parlato</item>
+        <item quantity="many">Sentita in %1$d note · %2$s di parlato</item>
+        <item quantity="other">Sentita in %1$d note · %2$s di parlato</item>
+    </plurals>
+    <string name="people_needs_reenrol">Registrata con un modello vocale precedente · dai di nuovo il nome a questa persona in una nota</string>
+    <string name="people_rename">Rinomina</string>
+    <string name="people_rename_note">Le note mantengono il nome con cui sono state salvate; le nuove note usano il nuovo nome.</string>
+    <string name="people_forget">Dimentica</string>
+    <string name="people_forget_confirm">Dimenticare %1$s? La sua voce non verrà più riconosciuta. I nomi già presenti nelle note restano.</string>
+    <string name="people_forget_all">Dimentica tutte le voci</string>
+    <string name="people_forget_all_confirm">Dimenticare tutte le voci salvate e le impronte vocali conservate per ogni nota? I nomi già presenti nelle note restano.</string>
 </resources>

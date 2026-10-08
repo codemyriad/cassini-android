@@ -46,6 +46,13 @@ internal class NoteVoiceStore(filesDir: File, private val warn: (String, Throwab
         }
     }
 
+    /** How many notes carry an applied (automatic or confirmed) match for each person. Worker thread: it scans all notes. */
+    @Synchronized fun noteCounts(): Map<String, Int> = directory.listFiles().orEmpty().filter { it.extension == "json" }
+        .flatMap { note -> read(note)?.second?.values.orEmpty().mapNotNull { p -> p.match?.takeIf { it.state == Match.State.AUTO || it.state == Match.State.CONFIRMED }?.voiceId }.distinct() }
+        .groupingBy { it }.eachCount()
+
+    @Synchronized fun clear() { directory.deleteRecursively() }
+
     private fun prefix(variantId: String): String { require(variantId.isNotEmpty() && '/' !in variantId) { "Bad variant id" }; return "$variantId/" }
 
     private fun read(file: File): Pair<String, Map<String, SpeakerPrint>>? = try {

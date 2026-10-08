@@ -194,4 +194,18 @@
     <string name="models_download_summary">Transcription needs a one-time download of about %1$s. Speech recognition and speaker identification then run on this phone; audio never leaves it. Keep the app open.</string>
     <string name="download_and_transcribe">Download and transcribe</string>
     <string name="speakers_unavailable">Transcribed. Speakers could not be told apart, so the words are shown as one voice.</string>
+    <string name="people_title">People</string>
+    <string name="people_privacy">Voiceprints stay on this phone. They are never shared or written into exported notes.</string>
+    <string name="people_empty">No saved voices yet. Name a speaker in a note to remember their voice.</string>
+    <plurals name="people_summary">
+        <item quantity="one">Heard in %1$d note · %2$s of speech</item>
+        <item quantity="other">Heard in %1$d notes · %2$s of speech</item>
+    </plurals>
+    <string name="people_needs_reenrol">Recorded with an older voice model · name this person again in a note</string>
+    <string name="people_rename">Rename</string>
+    <string name="people_rename_note">Notes keep the name they were saved with; new notes use the new name.</string>
+    <string name="people_forget">Forget</string>
+    <string name="people_forget_confirm">Forget %1$s? Their voice will no longer be recognised. Names already in notes stay.</string>
+    <string name="people_forget_all">Forget all voices</string>
+    <string name="people_forget_all_confirm">Forget every saved voice and the voiceprints kept for each note? Names already in notes stay.</string>
 </resources>

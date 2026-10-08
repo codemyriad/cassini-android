@@ -16,6 +16,13 @@ import androidx.test.runner.lifecycle.Stage
 import org.junit.Assert.*
 import org.junit.Test
 import org.hamcrest.Matchers.allOf
+import org.hamcrest.Matchers.instanceOf
+import androidx.test.espresso.Espresso.onData
+import androidx.test.espresso.action.ViewActions.replaceText
+import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
+import androidx.test.espresso.matcher.PreferenceMatchers.withSummaryText
+import androidx.test.espresso.matcher.PreferenceMatchers.withTitleText
+import java.io.File
 
 class SettingsTest {
     @get:org.junit.Rule val preserveLibrary = PreserveLibraryRule()
@@ -93,6 +100,61 @@ class SettingsTest {
             instrumentation.waitForIdleSync()
             scenario.close()
             sessions.save(original)
+        }
+    }
+
+    @Test fun peopleCanBeRenamedAndForgotten() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val originalLanguage = AppLanguage.selected(context)
+        val voices = VoiceStore(context.filesDir)
+        val notes = NoteVoiceStore(context.filesDir)
+        voices.clear()
+        val current = VoiceprintModel.model.sha256
+        val anna = voices.enrol(null, "Anna", current, FloatArray(4) { if (it == 0) 1f else 0f }, 84.0, 1L)
+        voices.enrol(null, "Old Marco", "older-model", FloatArray(4) { if (it == 1) 1f else 0f }, 12.0, 1L)
+        notes.merge("people_test_note", "v1", current, mapOf("spk_1" to SpeakerPrint(FloatArray(4) { 1f }, 30.0, Match(anna.id, 0.8f, Match.State.CONFIRMED))))
+        val scenario = ActivityScenario.launch(SettingsActivity::class.java)
+        scenario.onActivity { AppLanguage.set(it, "en") }
+        instrumentation.waitForIdleSync()
+        fun preference(title: String) = onData(allOf(instanceOf(android.preference.Preference::class.java), withTitleText(title)))
+        try {
+            preference("Anna").check(matches(isDisplayed()))
+            onData(allOf(instanceOf(android.preference.Preference::class.java), withSummaryText("Heard in 1 note · 01:24 of speech"))).check(matches(isDisplayed()))
+            onData(allOf(instanceOf(android.preference.Preference::class.java), withSummaryText(context.getString(R.string.people_needs_reenrol)))).check(matches(isDisplayed()))
+            onData(allOf(instanceOf(android.preference.Preference::class.java), withSummaryText(context.getString(R.string.people_privacy)))).check(matches(isDisplayed()))
+
+            preference("Anna").perform(click())
+            onView(withId(R.id.person_name_input)).inRoot(isDialog()).perform(replaceText("Annalisa"))
+            onView(withText("Rename")).inRoot(isDialog()).perform(click())
+            preference("Annalisa").check(matches(isDisplayed()))
+            assertEquals(listOf("Annalisa", "Old Marco"), voices.load().map { it.name })
+
+            preference("Annalisa").perform(click())
+            onView(withText("Forget")).inRoot(isDialog()).perform(click())
+            onView(withText("Forget")).inRoot(isDialog()).perform(click()) // confirm
+            val deadline = android.os.SystemClock.uptimeMillis() + 5000
+            while (voices.load().size != 1 && android.os.SystemClock.uptimeMillis() < deadline) android.os.SystemClock.sleep(25)
+            assertEquals(listOf("Old Marco"), voices.load().map { it.name })
+            assertNull(notes.load("people_test_note", "v1").getValue("spk_1").match)
+            instrumentation.waitForIdleSync()
+            onView(withText("Annalisa")).check(doesNotExist())
+
+            preference("Forget all voices").perform(click())
+            onView(withText("Forget")).inRoot(isDialog()).perform(click())
+            while (voices.load().isNotEmpty() && android.os.SystemClock.uptimeMillis() < deadline + 5000) android.os.SystemClock.sleep(25)
+            assertTrue(voices.load().isEmpty())
+            assertFalse(File(context.filesDir, "voiceprints/people_test_note.json").exists())
+            // The rebuild is posted after the background forget; wait for the empty state.
+            val emptyDeadline = android.os.SystemClock.uptimeMillis() + 5000
+            while (true) {
+                try { preference(context.getString(R.string.people_empty)).check(matches(isDisplayed())); break }
+                catch (error: Throwable) { if (android.os.SystemClock.uptimeMillis() > emptyDeadline) throw error; android.os.SystemClock.sleep(50) }
+            }
+        } finally {
+            scenario.onActivity { AppLanguage.set(it, originalLanguage) }
+            instrumentation.waitForIdleSync()
+            scenario.close()
         }
     }
 }

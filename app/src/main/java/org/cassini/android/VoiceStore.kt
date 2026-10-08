@@ -73,6 +73,8 @@ internal class VoiceStore(filesDir: File, private val warn: (String, Throwable) 
         save(voices.filter { it.id != voiceId }); return true
     }
 
+    @Synchronized fun clear() { file.delete() }
+
     /** Undoes one wrong enrolment; the last one forgets the person. */
     @Synchronized fun unenrol(voiceId: String, embedding: FloatArray) {
         val voices = load()
