@@ -83,25 +83,11 @@ class MainActivity : Activity(), ProcessingJobs.Listener {
         sessions = SessionStore(filesDir)
         library = LibraryStore(filesDir)
         documents = DocumentStore(this)
-        val preferences = sessions.load()
         val noteId = intent.getStringExtra(NOTE_ID)
         screen = savedInstanceState?.getString("screen") ?: UUID.randomUUID().toString()
-        val restored = savedInstanceState?.let { state ->
-            val notes = try { library.load() } catch (error: Exception) { Log.e(TAG, "Could not load notes", error); emptyList() }
-            LibraryNote.shown(screen, state.getString(NOTE_ID), state.getString("uri"), preferences, notes)
-        }
         val importing = intent.getBooleanExtra(REQUEST_IMPORT, false)
-        // A recreated activity keeps its launch intent. It is imported again only while this screen has no note yet.
-        val viewing = restored == null && intent.action == Intent.ACTION_VIEW && intent.data != null
-        val selected = when {
-            restored != null -> restored
-            // An import starts a new note. The last one must not sit behind the file picker or the file being opened.
-            importing || viewing -> Session()
-            noteId == null -> preferences
-            else -> try { library.load().firstOrNull { it.id == noteId }?.session ?: Session() }
-                catch (error: Exception) { Log.e(TAG, "Could not load note", error); Session() }
-        }
-        session = selected
+        val restoredId = savedInstanceState?.getString(NOTE_ID)
+        val restoredUri = savedInstanceState?.getString("uri")
         autoTranscribe = savedInstanceState == null && intent.getBooleanExtra(AUTO_TRANSCRIBE, false)
         models = ModelStore(File(filesDir, "parakeet-v3"))
         ui = DeckViews(this)
@@ -150,6 +136,35 @@ class MainActivity : Activity(), ProcessingJobs.Listener {
         ui.transcript.movementMethod = LinkMovementMethod.getInstance()
         ui.search.setText(savedInstanceState?.getString("query") ?: intent.getStringExtra(SEARCH_QUERY).orEmpty())
         renderScreen()
+        // A fresh import shows an empty note at once; anything else reads session.json and the catalogue, which holds
+        // every transcript, behind this process's queued writes and off the main thread.
+        if (savedInstanceState == null && (importing || (intent.action == Intent.ACTION_VIEW && intent.data != null))) {
+            opened(Session(), viewing = !importing, importing = importing, fresh = true)
+        } else {
+            setStatus(R.string.library_loading)
+            val fresh = savedInstanceState == null
+            SerialWriter.library.submit {
+                val preferences = sessions.load()
+                val notes by lazy { try { library.load() } catch (error: Exception) { Log.e(TAG, "Could not load notes", error); emptyList() } }
+                val restored = if (fresh) null else LibraryNote.shown(screen, restoredId, restoredUri, preferences, notes)
+                // A recreated activity keeps its launch intent. It is imported again only while this screen has no note yet.
+                val viewing = restored == null && intent.action == Intent.ACTION_VIEW && intent.data != null
+                val selected = when {
+                    restored != null -> restored
+                    viewing -> Session()
+                    noteId == null -> preferences
+                    else -> notes.firstOrNull { it.id == noteId }?.session ?: Session()
+                }
+                onUi { opened(selected, viewing, importing = false, fresh = fresh) }
+            }
+        }
+        savedInstanceState?.let { state -> ui.scroll.post { ui.scroll.scrollTo(0, state.getInt("scroll")) } }
+    }
+
+    /** Shows the note this screen opened with, once it is resolved. */
+    private fun opened(selected: Session, viewing: Boolean, importing: Boolean, fresh: Boolean) {
+        session = selected
+        renderScreen()
         defaultStatus()
         session.uri?.let { preparePlayer(Uri.parse(it)) }
         session.document?.takeIf { !viewing }?.let { path -> runWork(R.string.opening_document) {
@@ -157,8 +172,9 @@ class MainActivity : Activity(), ProcessingJobs.Listener {
             onUi { adoptDocument(loaded); renderScreen(); defaultStatus() }
         } }
         if (viewing) intent.data?.let { importFile(it) }
-        if (importing && savedInstanceState == null) chooseFile()
-        savedInstanceState?.let { state -> ui.scroll.post { ui.scroll.scrollTo(0, state.getInt("scroll")) } }
+        if (importing && fresh) chooseFile()
+        onJobChanged(ProcessingJobs.current)
+        maybeAutoTranscribe()
     }
 
     private fun chooseFile() {
@@ -185,7 +201,11 @@ class MainActivity : Activity(), ProcessingJobs.Listener {
     }
 
     private fun startProcessing(speakers: Boolean) {
-        persistSession()
+        // A new note gets its id from its first save, which runs on the writer: continue once it has one.
+        persistSession { startSaved(speakers) }
+    }
+
+    private fun startSaved(speakers: Boolean) {
         val id = session.libraryId ?: run { setStatus(R.string.library_error, error = true); return }
         val running = ProcessingJobs.current?.takeIf { ProcessingJobs.running && it.phase.active }
         if (running != null && running.noteId != id) { setStatus(R.string.processing_other_note, error = true); return }
@@ -801,14 +821,14 @@ class MainActivity : Activity(), ProcessingJobs.Listener {
 
     /**
      * Saves the note. A note already in the catalogue is written on [SerialWriter.library], in order, so pausing,
-     * rotating or leaving never rewrites the whole catalogue on the main thread; only a note's first save, which
-     * gives it its id, waits here.
+     * rotating or leaving never rewrites the whole catalogue on the main thread. A note's first save gives it its
+     * id, which reaches this screen, and then [saved] runs, on the main thread once the write is done.
      */
-    private fun persistSession() {
+    private fun persistSession(saved: (() -> Unit)? = null) {
         if (playerReady) player?.let { session = session.copy(positionMs = it.currentPosition) }
         session = session.copy(screen = screen)
         // An empty viewer has nothing to remember, and session.json may hold a session that exists nowhere else.
-        if (session.uri == null) return
+        if (session.uri == null) { saved?.invoke(); return }
         val snapshot = session
         val id = snapshot.libraryId
         // The service owns this note's transcript and document until this screen has reloaded them.
@@ -817,9 +837,14 @@ class MainActivity : Activity(), ProcessingJobs.Listener {
             Log.e(TAG, "Could not persist session", error)
             onUi { setStatus(R.string.library_error, error = true) }
         }
-        if (id != null) { SerialWriter.library.submit(failed) { writeSession(snapshot, serviceOwns) }; return }
-        SerialWriter.library.flush()
-        try { session = writeSession(snapshot, serviceOwns) } catch (error: Exception) { failed(error) }
+        SerialWriter.library.submit(failed) {
+            val written = writeSession(snapshot, serviceOwns)
+            onUi {
+                // Only the id comes back: the screen may have moved on (position, edits) while the write ran.
+                if (session.libraryId == null && session.uri == snapshot.uri) session = session.copy(libraryId = written.libraryId)
+                saved?.invoke()
+            }
+        }
     }
 
     private fun writeSession(snapshot: Session, serviceOwns: Boolean): Session {
