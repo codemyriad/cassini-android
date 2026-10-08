@@ -77,8 +77,10 @@ class DeviceSmokeTest {
         val file = File(context.cacheDir, "tone-48k.m4a")
         try {
             encodeAacTone(file)
-            val samples = AudioDecoder.decode(context, Uri.fromFile(file)).samples
-            assertTrue("Decoded ${samples.size} samples", samples.size > 48000 * 2)
+            val audio = AudioDecoder.decode(context, Uri.fromFile(file))
+            val samples = audio.samples
+            // The decoder resamples to the recognizer rate; the 3 s tone must survive whole.
+            assertTrue("Decoded ${samples.size} samples at ${audio.sampleRate} Hz", samples.size > audio.sampleRate * 2)
             // Codec timestamps are whole microseconds. Placing frames by a truncated time leaves single silent samples.
             val holes = (4096 until samples.size - 4096).filter { samples[it] == 0f && abs(samples[it - 1]) > .05f && abs(samples[it + 1]) > .05f }
             assertTrue("${holes.size} silent samples inside a continuous tone, first at ${holes.take(4)}", holes.isEmpty())

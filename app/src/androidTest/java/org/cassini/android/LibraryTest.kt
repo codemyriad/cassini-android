@@ -68,10 +68,12 @@ class LibraryTest {
                 await("Library should display both notes") {
                     var ready = false; scenario.onActivity { ready = cards(it).size == 2 }; ready
                 }
-                scenario.onActivity {
-                    it.findViewById<EditText>(R.id.library_search).setText("ritrovare")
-                    cards(it).single().performClick()
+                scenario.onActivity { it.findViewById<EditText>(R.id.library_search).setText("ritrovare") }
+                // Search is debounced and matched off the main thread.
+                await("Search should narrow the library to the matching note") {
+                    var ready = false; scenario.onActivity { ready = cards(it).size == 1 }; ready
                 }
+                scenario.onActivity { cards(it).single().performClick() }
                 await("Search result should open authoritative timed words") {
                     var ready = false
                     instrumentation.runOnMainSync {

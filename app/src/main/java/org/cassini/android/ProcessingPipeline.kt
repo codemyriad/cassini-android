@@ -117,6 +117,9 @@ internal class ProcessingPipeline(private val context: Context, private val publ
                 requireUser(durationMs >= 200, Failure.SHORT)
                 writeArtifacts(words, models, detector, durationMs, inferenceMs)
             }
+            // Without recognition nothing has waited for the decoder: measure and diarize the whole recording,
+            // and fail on a decoder error instead of reading what it left.
+            source.await(Int.MAX_VALUE)
             val durationMs = pcm.available * 1000 / Limits.ASR_RATE
             job = job.copy(phase = ProcessingJob.Phase.PACKAGE, doneMs = durationMs, totalMs = durationMs, elapsedMs = elapsed(),
                 audioMs = durationMs, pending = emptyList())
