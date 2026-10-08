@@ -14,7 +14,7 @@ class SpeakerAttributionTest {
     @Test fun derivingLabelsKeepsASRProvenanceAndWordClock() {
         val previous = JSONObject().put("engine", "Parakeet TDT").put("x-inferenceMs", 1234)
         val before = previous.toString()
-        val derived = SpeakerAttribution.derive(source, turns, previous, "words", 2, 750)
+        val derived = SpeakerAttribution.derive(source, turns, previous, "words", 750)
         assertEquals(source, derived.transcript.copy(words = derived.transcript.words.map { it.copy(speaker = "spk_1") }))
         assertEquals(before, previous.toString())
         assertEquals("Parakeet TDT", derived.processing.getString("engine"))
@@ -29,7 +29,7 @@ class SpeakerAttributionTest {
         val audit = original.manifest!!.getJSONObject("provenance").getJSONObject("attribution")
         audit.put("ran", true).put("mode", "annotate").put("wordsMeasured", 2).put("wordsFlagged", 1)
             .put("thresholdDb", 17).put("x-producer", "desktop").remove("reason")
-        val derived = SpeakerAttribution.derive(source, turns, JSONObject(), original.defaultId, -1, 500, audit)
+        val derived = SpeakerAttribution.derive(source, turns, JSONObject(), original.defaultId, 500, audit)
         val ids = derived.transcript.words.map { it.speaker }.distinct()
         val labels = ids.mapIndexed { index, id -> id to "Speaker ${index + 1}" }.toMap()
         val nextBytes = CassiniDocument.create(bytes, derived.transcript, "Ignored", derived.processing, original, labels)
@@ -47,13 +47,13 @@ class SpeakerAttributionTest {
         assertEquals(original.variants[0].body, next.variants[0].body)
     }
     @Test fun eachPassHasItsOwnAnonymousSpeakerIds() {
-        val first = SpeakerAttribution.derive(source, turns, null, null, 2, 1)
-        val second = SpeakerAttribution.derive(source, turns, null, null, 2, 1)
+        val first = SpeakerAttribution.derive(source, turns, null, null, 1)
+        val second = SpeakerAttribution.derive(source, turns, null, null, 1)
         assertTrue(first.transcript.words.map { it.speaker }.intersect(second.transcript.words.map { it.speaker }.toSet()).isEmpty())
     }
     @Test fun emptyOrInvalidDetectionsCannotReplaceTheTranscript() {
         for (bad in listOf(emptyList(), listOf(SpeakerTurn(10, 0, 0)))) {
-            try { SpeakerAttribution.derive(source, bad, null, null, -1, 1); fail() }
+            try { SpeakerAttribution.derive(source, bad, null, null, 1); fail() }
             catch (error: UserFacingException) { assertEquals(Failure.SPEAKERS, error.failure) }
         }
     }

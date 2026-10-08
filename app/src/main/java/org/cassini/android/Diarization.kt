@@ -1,20 +1,21 @@
 package org.cassini.android
 
-import com.k2fsa.sherpa.onnx.FastClusteringConfig
 import com.k2fsa.sherpa.onnx.OfflineSpeakerDiarization
 import com.k2fsa.sherpa.onnx.OfflineSpeakerDiarizationConfig
 import com.k2fsa.sherpa.onnx.OfflineSpeakerSegmentationModelConfig
-import com.k2fsa.sherpa.onnx.OfflineSpeakerSegmentationPyannoteModelConfig
-import com.k2fsa.sherpa.onnx.SpeakerEmbeddingExtractorConfig
+import com.k2fsa.sherpa.onnx.OfflineSpeakerSegmentationSortformerModelConfig
 
 internal data class SpeakerTurn(val startMs: Long, val endMs: Long, val speaker: Int)
 
-/** Offline clustering over the whole recording, after ASR has released its model. */
+/** End-to-end Sortformer diarization over the whole recording, after ASR has released its model. */
 internal object Diarization {
-    fun turns(audio: PcmAudio, segmentationModel: String, embeddingModel: String, speakerCount: Int = -1,
-              threshold: Float = 0.5f, threads: Int = 2, progress: (Int, Int) -> Unit = { _, _ -> }): List<SpeakerTurn> {
-        require(speakerCount == -1 || speakerCount in 1..8)
-        require(threshold.isFinite() && threshold > 0 && threads > 0)
+    /** Speaker activity above this probability counts as speech. The model decides the number of speakers (up to 8). */
+    const val THRESHOLD = 0.5f
+    const val MIN_DURATION_ON = 0.3f
+    const val MIN_DURATION_OFF = 0.5f
+
+    fun turns(audio: PcmAudio, model: String, threads: Int = 2, progress: (Int, Int) -> Unit = { _, _ -> }): List<SpeakerTurn> {
+        require(threads > 0)
         requireUser(audio.samples.isNotEmpty() && audio.samples.all { it.isFinite() }, Failure.AUDIO)
         NativeInference.acquire()
         try {
@@ -22,15 +23,13 @@ internal object Diarization {
             val samples = if (audio.sampleRate == 16000) audio.samples else resampleTo16k(audio.samples, audio.sampleRate)
             val diarizer = OfflineSpeakerDiarization(config = OfflineSpeakerDiarizationConfig(
                 segmentation = OfflineSpeakerSegmentationModelConfig(
-                    pyannote = OfflineSpeakerSegmentationPyannoteModelConfig(model = segmentationModel),
+                    sortformer = OfflineSpeakerSegmentationSortformerModelConfig(model = model, threshold = THRESHOLD),
                     numThreads = threads, provider = "cpu"),
-                embedding = SpeakerEmbeddingExtractorConfig(model = embeddingModel, numThreads = threads, provider = "cpu"),
-                clustering = FastClusteringConfig(numClusters = speakerCount, threshold = threshold),
-                minDurationOn = 0.2f, minDurationOff = 0.5f,
+                minDurationOn = MIN_DURATION_ON, minDurationOff = MIN_DURATION_OFF,
             ))
             try {
-                // Upstream reports embedding chunks, after segmentation; its return value does not
-                // cancel computation. Never throw across JNI. Check interruption after it returns.
+                // The callback reports each 27 s chunk; its return value does not cancel computation.
+                // Never throw across JNI. Check interruption after it returns.
                 val result = diarizer.processWithCallback(samples, { done, total, _ ->
                     if (!Thread.currentThread().isInterrupted) progress(done, total)
                     0

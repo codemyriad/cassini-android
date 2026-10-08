@@ -101,7 +101,7 @@ class MainActivity : Activity() {
         ui.menu.setOnClickListener { showSettings() }
         ui.open.setOnClickListener { chooseFile() }
         ui.transcribe.setOnClickListener { transcribe() }
-        ui.speakers.setOnClickListener { chooseSpeakerCount() }
+        ui.speakers.setOnClickListener { confirmSpeakerIdentification() }
         ui.cancelOperation.setOnClickListener { cancelSpeakerIdentification() }
         ui.download.setOnClickListener { downloadModel() }
         ui.export.setOnClickListener { saveCassiniDocument() }
@@ -210,26 +210,13 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun chooseSpeakerCount() {
+    private fun confirmSpeakerIdentification() {
         if (busy || session.transcript?.words?.isNotEmpty() != true) return
-        var count = -1
-        val choices = arrayOf(getString(R.string.speaker_automatic), getString(R.string.speaker_one)) +
-            (2..8).map { getString(R.string.speaker_number, it) }
-        AlertDialog.Builder(this).setTitle(R.string.speaker_count)
-            .setSingleChoiceItems(choices, 0) { _, index -> count = if (index == 0) -1 else index }
-            .setView(TextView(this).apply {
-                setText(R.string.speaker_count_hint)
-                val padding = (16 * resources.displayMetrics.density).toInt()
-                setPadding(padding, padding, padding, padding)
-            })
+        if (DiarizationModels.inFiles(filesDir).ready()) identifySpeakers()
+        else AlertDialog.Builder(this).setTitle(R.string.speaker_models_download)
+            .setMessage(R.string.speaker_models_summary)
             .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(R.string.identify_speakers) { _, _ ->
-                if (DiarizationModels.inFiles(filesDir).ready()) identifySpeakers(count)
-                else AlertDialog.Builder(this).setTitle(R.string.speaker_models_download)
-                    .setMessage(R.string.speaker_models_summary)
-                    .setNegativeButton(R.string.cancel, null)
-                    .setPositiveButton(R.string.download_speaker_models) { _, _ -> identifySpeakers(count) }.show()
-            }.show()
+            .setPositiveButton(R.string.download_speaker_models) { _, _ -> identifySpeakers() }.show()
     }
 
     private fun cancelSpeakerIdentification() {
@@ -237,7 +224,7 @@ class MainActivity : Activity() {
         returnToLibrary()
     }
 
-    private fun identifySpeakers(count: Int) {
+    private fun identifySpeakers() {
         if (busy || (document != null && document?.state != "ok")) return
         val source = session.transcript?.takeIf { it.words.isNotEmpty() } ?: return
         val uri = session.uri?.let(Uri::parse) ?: return
@@ -262,7 +249,7 @@ class MainActivity : Activity() {
             val began = System.nanoTime()
             val audio = AudioDecoder.decode(this, uri)
             checkActive()
-            val turns = Diarization.turns(audio, speakerModels.segmentationPath, speakerModels.embeddingPath, count) { done, total ->
+            val turns = Diarization.turns(audio, speakerModels.modelPath) { done, total ->
                 onUi {
                     if (!cancelled.get() && total > 0) {
                         val percent = (done * 100L / total).toInt().coerceIn(0, 100)
@@ -274,7 +261,7 @@ class MainActivity : Activity() {
             checkActive()
             val elapsed = (System.nanoTime() - began) / 1_000_000
             val previousProcessing = originalDocument?.manifest?.optJSONObject("provenance")?.optJSONObject("speechToText")?.optJSONObject(sourceId ?: "")
-            val result = SpeakerAttribution.derive(source, turns, previousProcessing, sourceId, count, elapsed, originalDocument?.manifest?.optJSONObject("provenance")?.optJSONObject("attribution"))
+            val result = SpeakerAttribution.derive(source, turns, previousProcessing, sourceId, elapsed, originalDocument?.manifest?.optJSONObject("provenance")?.optJSONObject("attribution"))
             val labels = result.transcript.words.map { it.speaker }.distinct().mapIndexed { index, id ->
                 id to getString(R.string.speaker_label, index + 1)
             }.toMap()

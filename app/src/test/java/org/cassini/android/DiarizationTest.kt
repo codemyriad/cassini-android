@@ -44,8 +44,8 @@ class DiarizationTest {
         assertEquals(listOf("new_1", "new_2", "new_1"), result.map { it.speaker })
     }
     @Test fun invalidNativeConfigurationIsRejectedBeforeLoadingModels() {
-        for (count in listOf(0, -2, 9)) {
-            try { Diarization.turns(PcmAudio(floatArrayOf(0f), 16000), "", "", count); fail() } catch (_: IllegalArgumentException) {}
+        for (threads in listOf(0, -1)) {
+            try { Diarization.turns(PcmAudio(floatArrayOf(0f), 16000), "", threads); fail() } catch (_: IllegalArgumentException) {}
         }
     }
 }

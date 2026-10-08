@@ -13,7 +13,7 @@ if not clip.is_file():
 PY
 remote=/data/local/tmp/cassini-diar
 adb shell mkdir -p "$remote"
-for file in segmentation.int8.onnx embedding.onnx four-speakers.wav; do
+for file in nemotron-3-diarization.int8.onnx four-speakers.wav; do
     adb push ".tools/diar/$file" "$remote/$file"
 done
 # An explicitly supplied private conversation is never fetched or included in test assets.

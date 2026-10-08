@@ -47,10 +47,23 @@ android {
 }
 
 dependencies {
-    implementation(files("libs/sherpa-onnx-1.13.7.aar"))
+    implementation(files("libs/sherpa-onnx-1.13.7-nemotron.aar"))
+    // Decompresses the speaker model download. The AAR carries the Android native libraries;
+    // the JVM unit tests use the jar, which carries the desktop ones.
+    implementation("com.github.luben:zstd-jni:1.5.7-6@aar")
+    testImplementation("com.github.luben:zstd-jni:1.5.7-6")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
     androidTestImplementation("androidx.test:runner:1.7.0")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
+}
+
+// Host evaluation (app/src/test/.../eval): writes the unit-test runtime classpath for scripts/asr-eval.sh.
+afterEvaluate {
+    tasks.register("writeEvalClasspath") {
+        val test = tasks.named<Test>("testDebugUnitTest")
+        dependsOn("compileDebugUnitTestKotlin")
+        doLast { layout.buildDirectory.file("eval-classpath.txt").get().asFile.writeText(test.get().classpath.asPath) }
+    }
 }
