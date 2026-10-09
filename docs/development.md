@@ -50,7 +50,7 @@ The dependency graph is in [`architecture.md`](architecture.md), section 2. `too
 
 ## Worktrees
 
-A git worktree shares the repository, but it does not share the ignored files. A new worktree has no `local.properties`, no submodule checkout, no AAR and no libopus source. Do these steps in the new worktree. `MAIN` is the path of a checkout that ran `scripts/setup.sh`.
+A git worktree shares the repository, but it does not share the ignored files. A new worktree has no `local.properties`, no submodule checkout, no AAR and no libopus source. Do these steps in the new worktree. `MAIN` is the absolute path of a checkout that ran `scripts/setup.sh`. A relative path gives a broken link in step 4, because a link target starts from the directory of the link.
 
 1. Make the worktree:
 
@@ -69,7 +69,11 @@ CAUTION: Do not run `scripts/setup.sh --from-source` in a linked worktree. The b
 
 CAUTION: Before you remove a worktree, remove the links with `rm .tools native/m2/org`. Do not use `rm -rf .tools/` with a slash, because it deletes the files of `MAIN`.
 
-To remove a worktree, delete its build outputs with `rm -rf build */build .gradle/configuration-cache`. Then run `git worktree remove PATH`.
+To remove a worktree, do these steps:
+
+1. In the worktree, remove the links with `rm .tools native/m2/org`.
+2. In the worktree, delete the build outputs with `rm -rf build */build engine/.cxx .gradle/configuration-cache`.
+3. In a different checkout, run `git worktree remove --force PATH`. The worktree contains a submodule, and without `--force` git does not remove it. Git deletes a link, not its target.
 
 ## Test tiers
 
@@ -86,7 +90,7 @@ The root task `ciTest` runs `:core:test`. For each Android module, it runs `veri
 | Screenshots | `:ui:verifyRoborazziDebug` | Each board compared with its golden, in light, dark, Italian and 1.5x font scale |
 | Device | `scripts/device-smoke.sh` | Instrumentation tests on an emulator or a phone (see [Device scripts](#device-scripts)) |
 | Host persistence | `scripts/device-kill-resume.sh`, `scripts/device-language-check.sh` (planned) | Process death and the app language, driven from the host |
-| Acceptance | P12 | An instrumented walk through each board on emulator-5554, with device screenshots that a reviewer compares with the design |
+| Acceptance | Planned | An instrumented walk through each board on emulator-5554, with device screenshots that a reviewer compares with the design |
 
 Robolectric runs at SDK 35. Each module that uses it has `src/test/resources/robolectric.properties` with `sdk=35`. SDK 36 and later need a JDK 21 runtime, and the build uses JDK 17. One test in each module makes sure that `Build.VERSION.SDK_INT` is 35.
 
@@ -109,7 +113,7 @@ On macOS or Windows, do not run `ciTest` or `verifyRoborazziDebug`. Do not recor
 ./gradlew :core:test :engine:testDebugUnitTest :data:testDebugUnitTest :ui:testDebugUnitTest :app:testDebugUnitTest
 ```
 
-The Compose accessibility checks (`enableAccessibilityChecks()`) do not operate under Robolectric. Thus the `:ui` tests do not have them. The device flow tests of `:app` call them on an emulator.
+The Compose accessibility checks (`enableAccessibilityChecks()`) do not operate under Robolectric. Thus the `:ui` tests do not have them. The device flow tests of `:app` will call them on an emulator. These device flow tests are planned and are not in the tree yet.
 
 ## Device safety
 
@@ -148,7 +152,7 @@ The device tests use the committed FLEURS clip as audio.
 > scripts/device-smoke.sh [AUDIO_SAMPLE] [CLASS[#METHOD][,CLASS...]]
 > ```
 >
-> `AUDIO_SAMPLE` is `fleurs` if you do not give it. If you do not give a class, the script runs all device tests. If you set `CASSINI_EXPECTED_TESTS`, the run fails when the number of tests is different. To select a device, set `ANDROID_SERIAL`, for example `ANDROID_SERIAL=emulator-5554 scripts/device-smoke.sh`.
+> `AUDIO_SAMPLE` is `fleurs` if you do not give it. If you do not give a class, the script runs all device tests. The script passes `downloadModels=true`. If the device has no models, `DeviceSmokeTest` downloads Parakeet and Silero VAD (about 640 MB). To prevent this download, give a class selection that needs no models. If you set `CASSINI_EXPECTED_TESTS`, the run fails when the number of tests is different. To select a device, set `ANDROID_SERIAL`, for example `ANDROID_SERIAL=emulator-5554 scripts/device-smoke.sh`.
 
 | Flag | Meaning |
 |---|---|
@@ -289,7 +293,7 @@ CI does not do these checks. Before the owner makes a release tag, do them by ha
 4. End the call with `adb emu gsm cancel 5551234`. Make sure that the recording stays paused until you push Resume.
 5. On an API 35 or 36 AVD, start a transcription. Make sure that `adb shell dumpsys activity services org.cassini.android` shows the type `mediaProcessing`.
 6. Make the time limit short with `adb shell device_config put activity_manager media_processing_fgs_timeout_duration 60000`.
-7. Wait for the limit. Make sure that the notification "Transcription paused by Android" shows and that the note shows Paused, not an error.
+7. Wait for the limit. Make sure that the notification "Paused by Android" ("Paused at … of …. Open to resume.") shows and that the note shows Paused, not an error.
 8. Reset the limit with `adb shell device_config delete activity_manager media_processing_fgs_timeout_duration`.
 9. Copy a document that the new engine sealed. Run `cassini-extract.py --check` and `check-portable-document.mjs` on it (see [Portable file checks](#portable-file-checks)).
 10. Write the results in a dated file in [`notes/`](notes/).

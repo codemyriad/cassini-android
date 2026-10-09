@@ -130,7 +130,9 @@ CAUTION: Do not run the Gradle `connected*` tasks or the managed-device tasks. T
 
 CAUTION: Do not run `adb uninstall org.cassini.android` or `adb shell pm clear org.cassini.android`. These commands erase the app data and the downloaded models.
 
-Use `scripts/device-smoke.sh` for the device tests. The script installs the app and the test APK with `adb install -r`. Then it runs the instrumentation with `adb shell am instrument`. This keeps the app data and the models. [`docs/development.md`](docs/development.md) gives the arguments of the script.
+Use `scripts/device-smoke.sh` for the device tests. The script installs the app and the test APK with `adb install -r`. Then it runs the instrumentation with `adb shell am instrument`. This keeps the app data and the models.
+
+The script tells the tests to download the models (`downloadModels=true`). If the device has no models, `DeviceSmokeTest` downloads Parakeet and Silero VAD (about 640 MB). To prevent this download, give a class selection that needs no models. [`docs/development.md`](docs/development.md) gives the arguments of the script.
 
 If you install an APK by hand, use `adb install -r`.
 
@@ -148,7 +150,7 @@ If you install an APK by hand, use `adb install -r`.
 
 The engine code came from Cassini 0.1.0 into `:core` and `:engine`. We changed the package names and a short list of other lines. The code is tested and the portable format depends on it. Thus each change to this code gets a review.
 
-`scripts/check-verbatim.sh` compares the code with 0.1.0 at the base commit `0ebea43`. CI runs it. The script fails in these conditions:
+`scripts/check-verbatim.sh` compares the code with the base commit `0ebea43` (0.1.0 and two later fixes). CI runs it. The script fails in these conditions:
 
 - A "package only" group has a difference.
 - The changed lines of a verbatim group are not equal to the reviewed lines in `scripts/check-verbatim.baseline`.
