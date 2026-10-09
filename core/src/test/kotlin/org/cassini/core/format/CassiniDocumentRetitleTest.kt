@@ -5,6 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
+import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -133,7 +134,30 @@ class CassiniDocumentRetitleTest {
         }
     }
 
-    @Test fun theConformanceReaderAcceptsTheResult() {
+    @Test fun theIndependentPythonReaderAcceptsTheResult() {
+        // CassiniDocument.read already checks inside retitle, so a fault shared by the writer and this reader would
+        // pass the round trip below. The format's own standard-library reader is a separate implementation.
+        val conformance = System.getProperty("cassini.conformance", "../third_party/cassini-format/spec/conformance")!!
+        val tool = File(conformance, "../../tools/cassini-read-pure.py").canonicalFile
+        assertTrue("Cassini format reader is missing: $tool. Run git submodule update --init.", tool.isFile)
+        val python = listOf("python3").firstOrNull { command ->
+            runCatching { ProcessBuilder(command, "--version").start().waitFor() == 0 }.getOrDefault(false)
+        } ?: return assumeTrue("SKIPPED: no python3 on PATH, so the independent reader check did not run", false)
+        retitle(document(), "Verifica è fatta")
+        val process = ProcessBuilder(python, "-I", "-X", "utf8", tool.path, File(folder.root, "target.opus").path)
+            .redirectErrorStream(true)
+            .start()
+        val output = process.inputStream.bufferedReader(Charsets.UTF_8).readText()
+        assertEquals(output, 0, process.waitFor())
+        val lines = output.lines()
+        // The metadata profile verifies every payload digest but never the audio, so its best state is unverified.
+        assertEquals(output, "state: unverified", lines[0])
+        assertTrue(output, lines[1].startsWith("Verifica è fatta - "))
+        assertTrue(output, lines.any { Regex("""\s+0 ms\s+spk_1\s+Ciao""").matches(it) })
+        assertTrue(output, lines.any { Regex("""\s+20 ms\s+spk_2\s+Salve""").matches(it) })
+    }
+
+    @Test fun aRetitledDocumentReadsBackAndRelabels() {
         val after = retitle(document(), "Verifica")
         val reread = CassiniDocument.readChecked(File(folder.root, "target.opus"))
         assertEquals(DocumentState.OK, reread.documentState)
