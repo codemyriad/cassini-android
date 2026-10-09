@@ -16,7 +16,8 @@ import java.security.MessageDigest
  * Downloads pinned artifacts. A file is installed only after its size and SHA-256 match, and a verified file is never
  * replaced. An interrupted download keeps its `.part` file (through failures and process death) and resumes it with
  * an HTTP Range request; a `.part` that cannot be the artifact is deleted. A transfer that ends early keeps its
- * prefix and fails with [Failure.DOWNLOAD].
+ * prefix and fails with [Failure.DOWNLOAD]. Free-space checks count only the bytes still to fetch ([bytesToFetch]),
+ * because a kept `.part` already holds the rest.
  */
 object ArtifactFetcher {
     private const val TIMEOUT_MS = 30_000
@@ -42,14 +43,25 @@ object ArtifactFetcher {
     }
 
     /**
+     * The bytes of [artifact] still to download into [directory]: its size less a `.part` that can still be its
+     * prefix. A longer `.part` is deleted by [fetch], so it saves nothing.
+     */
+    fun bytesToFetch(artifact: Artifact, directory: File): Long {
+        val kept = File(directory, "${artifact.name}.part").length()
+        return if (kept > artifact.size) artifact.size else artifact.size - kept
+    }
+
+    /**
      * Places [artifact] in [directory] unless a verified copy is already there. The download goes to a
      * `.part` file that replaces nothing until its size and SHA-256 match. [progress] receives the bytes
      * done so far and whether they are being verified rather than downloaded.
      *
      * A `.part` left by an earlier attempt is resumed with `Range: bytes=<length>-`. A `206` answer is accepted
      * only when its `Content-Range` starts at that length and its total is the pinned size; a `200` answer restarts
-     * from zero. On a size or SHA-256 mismatch the `.part` is deleted. The 30 s read timeout stays: interrupting
-     * the thread does not unblock `HttpURLConnection`.
+     * from zero. A `206` that ends before the artifact's last byte (some servers cap open-ended ranges) keeps what it
+     * brought and fails with [Failure.DOWNLOAD], so the next attempt resumes further on. On a size or SHA-256
+     * mismatch the `.part` is deleted. The 30 s read timeout stays: interrupting the thread does not unblock
+     * `HttpURLConnection`.
      */
     fun fetch(url: String, artifact: Artifact, directory: File, progress: (Long, Boolean) -> Unit) {
         val destination = File(directory, artifact.name)
@@ -77,7 +89,9 @@ object ArtifactFetcher {
         connection.readTimeout = TIMEOUT_MS
         if (offset > 0) connection.setRequestProperty("Range", "bytes=$offset-")
         try {
-            val first = if (resumes(connection, artifact, partial, offset)) offset else 0L
+            // Where a 206 answer's range ends (exclusive); null for a whole 200 answer.
+            val rangeEnd = resumes(connection, artifact, partial, offset)
+            val first = if (rangeEnd != null) offset else 0L
             // Where the answer says it ends; -1 when it does not say.
             val announced = connection.contentLengthLong.let { if (it < 0) -1 else first + it }
             val received = connection.inputStream.buffered().use { input ->
@@ -85,9 +99,11 @@ object ArtifactFetcher {
                     copy(input, output, first, artifact.size) { progress(it, false) }
                 }
             }
-            // A connection that closed before the announced end leaves a prefix: keep it for the next attempt.
-            if (received < announced) {
-                throw UserFacingException(Failure.DOWNLOAD, "Transfer ended at $received of $announced bytes")
+            // A connection that closed before the announced end leaves a prefix, and so does a range that stops
+            // short of the artifact's end: keep it for the next attempt.
+            val expected = if (rangeEnd != null) artifact.size else announced
+            if (received < expected) {
+                throw UserFacingException(Failure.DOWNLOAD, "Transfer ended at $received of $expected bytes")
             }
         } catch (error: UserFacingException) {
             // More bytes than the artifact has, or another file: the partial download cannot be finished.
@@ -99,22 +115,24 @@ object ArtifactFetcher {
     }
 
     /**
-     * Whether [connection]'s answer continues the [offset] bytes of [partial]: true for a `206` whose range starts
-     * there and whose total is the pinned size, false for a whole `200` answer. Any other answer fails; an
-     * unsatisfiable range also deletes [partial], because the server's file is shorter than it.
+     * Whether [connection]'s answer continues the [offset] bytes of [partial]: for a `206` whose range starts there,
+     * ends inside the artifact and has the pinned size as its total, the offset just past the range's last byte;
+     * null for a whole `200` answer. Any other answer fails; an unsatisfiable range also deletes [partial], because
+     * the server's file is shorter than it.
      */
-    private fun resumes(connection: HttpURLConnection, artifact: Artifact, partial: File, offset: Long): Boolean {
+    private fun resumes(connection: HttpURLConnection, artifact: Artifact, partial: File, offset: Long): Long? {
         val status = connection.responseCode
-        if (status == HttpURLConnection.HTTP_OK) return false
+        if (status == HttpURLConnection.HTTP_OK) return null
         if (status != HttpURLConnection.HTTP_PARTIAL || offset == 0L) {
             if (status == HTTP_RANGE_NOT_SATISFIABLE) partial.delete()
             throw UserFacingException(Failure.DOWNLOAD, "HTTP $status")
         }
         val header = connection.getHeaderField("Content-Range").orEmpty().trim()
-        val (start, _, total) = contentRange.matchEntire(header)?.destructured
-            ?: throw UserFacingException(Failure.VERIFY, "Content-Range $header")
-        requireUser(start.toLong() == offset && total.toLong() == artifact.size, Failure.VERIFY)
-        return true
+        val range = contentRange.matchEntire(header)?.destructured?.toList()?.map { it.toLongOrNull() }
+        val (start, end, total) = range ?: throw UserFacingException(Failure.VERIFY, "Content-Range $header")
+        val ends = end != null && end >= offset && end < artifact.size
+        requireUser(start == offset && total == artifact.size && ends, Failure.VERIFY)
+        return requireNotNull(end) + 1
     }
 
     /**
@@ -162,7 +180,9 @@ object ArtifactFetcher {
             progress(download.size, true)
             return
         }
-        requireUser(directory.usableSpace > download.size + artifact.size + SLACK_BYTES, Failure.SPACE)
+        // A kept `.part` of the compressed file already holds its share; the decompressed copy needs all of its own.
+        val needed = bytesToFetch(download, directory) + artifact.size + SLACK_BYTES
+        requireUser(directory.usableSpace > needed, Failure.SPACE)
         val compressed = File(directory, download.name)
         try {
             fetch(url, download, directory, progress)

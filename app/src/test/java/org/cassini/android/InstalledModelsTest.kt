@@ -98,7 +98,11 @@ class InstalledModelsTest {
     }
 
     /** Serves [bodies] by artifact name on a loopback server and installs through it. */
-    private fun withServer(bodies: Map<String, ByteArray>, check: (InstalledModels) -> Unit) {
+    private fun withServer(
+        bodies: Map<String, ByteArray>,
+        usableSpace: (File) -> Long = File::getUsableSpace,
+        check: (InstalledModels) -> Unit,
+    ) {
         val server = ServerSocket(0, 10, InetAddress.getByName("127.0.0.1"))
         val responder = Thread {
             while (!server.isClosed) {
@@ -127,7 +131,7 @@ class InstalledModelsTest {
             start()
         }
         try {
-            check(InstalledModels(folder.root) { "http://127.0.0.1:${server.localPort}/${it.name}" })
+            check(InstalledModels(folder.root, usableSpace) { "http://127.0.0.1:${server.localPort}/${it.name}" })
         } finally {
             server.close()
             responder.join(1000)
@@ -196,6 +200,31 @@ class InstalledModelsTest {
         assertEquals(sha256(weights), File(folder.root, "speaker-models/verified").readText())
         assertTrue(seen.last().verifying)
         assertEquals(100, seen.last().percent)
+    }
+
+    @Test fun theParakeetSpaceCheckCountsAKeptPartAsFetched() {
+        val directory = File(folder.root, "parakeet-v3")
+        val total = ModelCatalog.parakeetArtifacts.sumOf { it.size }
+        val encoder = ModelCatalog.parakeetArtifacts.first { it.name == "encoder.int8.onnx" }
+        val tokens = ModelCatalog.parakeetArtifacts.first { it.name == "tokens.txt" }
+        val models = InstalledModels(folder.root)
+        assertEquals(total, models.bytesToFetch(ModelCatalog.PARAKEET))
+        // A finished file and most of the encoder, kept from an interrupted attempt.
+        sized(File(directory, tokens.name), tokens.size)
+        val kept = encoder.size - 1024 * 1024
+        sized(File(directory, "${encoder.name}.part"), kept)
+        val remaining = total - tokens.size - kept
+        assertEquals(remaining, models.bytesToFetch(ModelCatalog.PARAKEET))
+        // Room for what is left but not for the whole model again: the install gets past the check and reaches
+        // the server, which has nothing.
+        val margin = 128 * 1024 * 1024L
+        withServer(emptyMap(), usableSpace = { remaining + margin + 1 }) { served ->
+            assertEquals(Failure.DOWNLOAD, failure { served.install(ModelCatalog.PARAKEET) { } })
+        }
+        assertEquals("A 404 keeps the part", kept, File(directory, "${encoder.name}.part").length())
+        withServer(emptyMap(), usableSpace = { remaining + margin }) { served ->
+            assertEquals(Failure.SPACE, failure { served.install(ModelCatalog.PARAKEET) { } })
+        }
     }
 
     /** Installs [model], whose file is already in place, and interrupts the thread as the fetch finishes. */

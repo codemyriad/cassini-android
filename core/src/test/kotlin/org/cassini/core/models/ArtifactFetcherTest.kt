@@ -206,6 +206,64 @@ class ArtifactFetcherTest {
         }
     }
 
+    /** The failure of one fetch of [weights] from [url] into [directory]. */
+    private fun fetching(url: String, directory: File) =
+        failure { ArtifactFetcher.fetch(url, artifact(weights), directory) { _, _ -> } }
+
+    @Test fun aRangeThatEndsBeforeTheArtifactKeepsItsBytesAndTheNextAttemptGoesOn() {
+        val cap = 100_000
+        withServer({ headers ->
+            // A server that caps every open-ended range at 100 000 bytes.
+            val from = headers.getValue("range").removePrefix("bytes=").removeSuffix("-").toInt()
+            val to = minOf(from + cap, weights.size)
+            Answer(
+                206,
+                weights.copyOfRange(from, to),
+                mapOf("Content-Range" to "bytes $from-${to - 1}/${weights.size}")
+            )
+        }) { url, directory, requests ->
+            val part = File(directory, "model.onnx.part")
+            part.writeBytes(weights.copyOf(1000))
+            assertEquals(Failure.DOWNLOAD, fetching(url, directory))
+            assertEquals(101_000L, part.length())
+            assertEquals(weights.size - 101_000L, ArtifactFetcher.bytesToFetch(artifact(weights), directory))
+            assertEquals(Failure.DOWNLOAD, fetching(url, directory))
+            assertEquals(201_000L, part.length())
+            ArtifactFetcher.fetch(url, artifact(weights), directory) { _, _ -> }
+            assertEquals(listOf("bytes=1000-", "bytes=101000-", "bytes=201000-"), requests.map { it["range"] })
+            assertArrayEquals(weights, File(directory, "model.onnx").readBytes())
+            assertFalse(part.exists())
+        }
+    }
+
+    @Test fun aRangeThatEndsPastTheArtifactDeletesThePart() {
+        withServer({
+            Answer(
+                206,
+                weights.copyOfRange(1000, weights.size),
+                mapOf("Content-Range" to "bytes 1000-${weights.size}/${weights.size}")
+            )
+        }) { url, directory, _ ->
+            File(directory, "model.onnx.part").writeBytes(weights.copyOf(1000))
+            assertEquals(Failure.VERIFY, fetching(url, directory))
+            assertFalse(File(directory, "model.onnx.part").exists())
+        }
+    }
+
+    @Test fun onlyAPartThatCanStillBeAPrefixReducesTheBytesToFetch() {
+        val directory = Files.createTempDirectory("cassini-model-test").toFile()
+        try {
+            val target = artifact(weights)
+            assertEquals(weights.size.toLong(), ArtifactFetcher.bytesToFetch(target, directory))
+            File(directory, "model.onnx.part").writeBytes(weights.copyOf(1000))
+            assertEquals(weights.size - 1000L, ArtifactFetcher.bytesToFetch(target, directory))
+            File(directory, "model.onnx.part").writeBytes(ByteArray(weights.size + 1))
+            assertEquals(weights.size.toLong(), ArtifactFetcher.bytesToFetch(target, directory))
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
     @Test fun aFullAnswerToARangeRequestRestartsFromZero() {
         withServer({ Answer(200, weights) }) { url, directory, requests ->
             // Not a prefix of the artifact: a restart must not keep any of it.

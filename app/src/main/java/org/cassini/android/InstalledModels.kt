@@ -12,9 +12,18 @@ import java.io.File
 /**
  * The models of [ModelCatalog] under [filesDir], in the 0.1.0 directories with the 0.1.0 marker files. A model is
  * installed through [ArtifactFetcher]: its marker is deleted first and written only after every file verified.
- * [url] says where each artifact is fetched from; tests point it at a loopback server.
+ * [url] says where each artifact is fetched from; tests point it at a loopback server, and [usableSpace] stands in
+ * for the free space of a model directory.
+ *
+ * An interrupted download keeps its `.part` file in the model directory so the next attempt resumes it. Nothing
+ * deletes such a file until that model installs, so up to one model's size (about 650 MB for Parakeet) can stay in
+ * filesDir after a cancelled or failed download. The space check counts it as already fetched.
  */
-class InstalledModels(private val filesDir: File, private val url: (Artifact) -> String = Artifact::url) {
+class InstalledModels(
+    private val filesDir: File,
+    private val usableSpace: (File) -> Long = File::getUsableSpace,
+    private val url: (Artifact) -> String = Artifact::url,
+) {
     data class Progress(val percent: Int, val verifying: Boolean = false)
 
     fun ready(model: ModelDescriptor) = model.ready(filesDir)
@@ -47,12 +56,21 @@ class InstalledModels(private val filesDir: File, private val url: (Artifact) ->
     /** Bytes still to fetch for the consented models, which is what the consent dialog quotes. */
     fun missingBytes() = ModelCatalog.consented.filterNot(::ready).sumOf { it.downloadBytes }
 
+    /**
+     * The bytes [install] still downloads for [model]'s uncompressed artifacts: a file of the pinned size and the
+     * kept `.part` prefix of an unfinished one are not fetched again.
+     */
+    fun bytesToFetch(model: ModelDescriptor): Long {
+        val directory = model.directory(filesDir)
+        return model.artifacts.filter { File(directory, it.name).length() != it.size }
+            .sumOf { ArtifactFetcher.bytesToFetch(it, directory) }
+    }
+
     fun install(model: ModelDescriptor, progress: (Progress) -> Unit) {
         val directory = model.directory(filesDir)
         directory.mkdirs()
         if (model == ModelCatalog.PARAKEET) {
-            val remaining = model.artifacts.filter { File(directory, it.name).length() != it.size }.sumOf { it.size }
-            requireUser(directory.usableSpace > remaining + FREE_SPACE_MARGIN, Failure.SPACE)
+            requireUser(usableSpace(directory) > bytesToFetch(model) + FREE_SPACE_MARGIN, Failure.SPACE)
         }
         val marker = File(directory, model.markerFile)
         marker.delete()
