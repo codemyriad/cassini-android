@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<title>Cassini — Library</title>
+
+</head>
+<body>
+<x-dc>
+
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F5F6F7; color: #14171A; font-family: 'Instrument Sans', system-ui, sans-serif; display: flex; flex-direction: column; position: relative; overflow: hidden">
+
+  <header style="padding: 20px 16px 8px; display: flex; align-items: center; justify-content: space-between">
+    <div style="display: flex; align-items: center; gap: 10px">
+      <svg width="28" height="28" sc-camel-view-box="0 0 28 28" fill="none" stroke="#14171A" stroke-width="1.6" aria-hidden="true"><circle cx="14" cy="14" r="5.5"></circle><ellipse cx="14" cy="14" rx="12" ry="4.2" transform="rotate(-20 14 14)"></ellipse></svg>
+      <h1 style="margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.01em">Notes</h1>
+    </div>
+    <div style="display: flex; gap: 4px">
+      <button aria-label="Trash" style="width: 44px; height: 44px; border: 0; background: transparent; border-radius: 22px; display: grid; place-items: center"><svg width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path></svg></button>
+      <button aria-label="Settings" style="width: 44px; height: 44px; border: 0; background: transparent; border-radius: 22px; display: grid; place-items: center"><svg width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"></path></svg></button>
+    </div>
+  </header>
+
+  <div style="padding: 4px 16px 0">
+    <label for="libsearch" style="display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 16px; background: #FFFFFF; border: 1px solid #E2E5E9; border-radius: 26px">
+      <svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="#4A525B" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+      <input id="libsearch" type="search" placeholder="Search titles and what was said" style="border: 0; outline: 0; background: transparent; font: inherit; font-size: 16px; flex: 1; color: #14171A">
+    </label>
+    <p style="margin: 10px 4px 0; font-size: 13px; color: #4A525B; display: flex; align-items: center; gap: 6px">
+      <svg width="14" height="14" sc-camel-view-box="0 0 24 24" fill="none" stroke="#0F766E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 4.5 3.4 8 8 9 4.6-1 8-4.5 8-9V6z"></path></svg>
+      Transcribed on this phone. Audio never leaves it.
+    </p>
+  </div>
+
+  <a href="Processing.dc.html" style="margin: 14px 16px 0; padding: 12px 14px; background: #E8EDFC; border-radius: 16px; text-decoration: none; color: #14171A; display: flex; flex-direction: column; gap: 8px">
+    <span style="display: flex; justify-content: space-between; align-items: baseline; font-size: 14px">
+      <strong style="font-weight: 600">Transcribing Weekly product sync</strong>
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px">62%</span>
+    </span>
+    <span style="height: 4px; background: #C9D4F6; border-radius: 2px; overflow: hidden; display: block"><span style="display: block; width: 62%; height: 4px; background: #2346C8"></span></span>
+    <span style="font-size: 13px; color: #3A4250">About 6–9 min left · 1 more in queue</span>
+  </a>
+
+  <main style="flex: 1; overflow: hidden; padding: 6px 0 0">
+    <h2 style="margin: 14px 20px 6px; font-size: 13px; font-weight: 600; color: #4A525B; text-transform: uppercase; letter-spacing: 0.06em">Today</h2>
+    <ul style="list-style: none; margin: 0; padding: 0 12px; display: flex; flex-direction: column; gap: 2px">
+      <li><a href="Processing.dc.html" style="display: flex; flex-direction: column; gap: 4px; padding: 12px 10px; border-radius: 14px; text-decoration: none; color: inherit; background: #FFFFFF">
+        <span style="display: flex; justify-content: space-between; gap: 8px"><strong style="font-size: 16px; font-weight: 600">Weekly product sync</strong><span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #4A525B">48:13</span></span>
+        <span style="display: flex; gap: 8px; align-items: center; font-size: 13px; color: #4A525B">10:02 <span style="padding: 2px 8px; border-radius: 10px; background: #E8EDFC; color: #1A3596; font-weight: 500">Transcribing</span></span>
+      </a></li>
+      <li><a href="Main.dc.html" style="display: flex; flex-direction: column; gap: 4px; padding: 12px 10px; border-radius: 14px; text-decoration: none; color: inherit">
+        <span style="display: flex; justify-content: space-between; gap: 8px"><strong style="font-size: 16px; font-weight: 600">Interview — Marta</strong><span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #4A525B">1:12:05</span></span>
+        <span style="display: flex; gap: 8px; align-items: center; font-size: 13px; color: #4A525B">08:40 <span style="padding: 2px 8px; border-radius: 10px; border: 1px solid #C9CED5; font-weight: 500">Queued</span></span>
+      </a></li>
+    </ul>
+
+    <h2 style="margin: 16px 20px 6px; font-size: 13px; font-weight: 600; color: #4A525B; text-transform: uppercase; letter-spacing: 0.06em">Yesterday</h2>
+    <ul style="list-style: none; margin: 0; padding: 0 12px; display: flex; flex-direction: column; gap: 2px">
+      <li><a href="Note.dc.html" style="display: flex; flex-direction: column; gap: 4px; padding: 12px 10px; border-radius: 14px; text-decoration: none; color: inherit">
+        <span style="display: flex; justify-content: space-between; gap: 8px"><strong style="font-size: 16px; font-weight: 600">Call with supplier</strong><span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #4A525B">23:50</span></span>
+        <span style="font-size: 14px; color: #3A4250; line-height: 1.4">…quindi la consegna slitta a giovedì, but the price stays as agreed in the March order…</span>
+        <span style="display: flex; gap: 8px; align-items: center; font-size: 13px; color: #4A525B">15:10 <span style="padding: 2px 8px; border-radius: 10px; background: #E3F2EF; color: #0B5A54; font-weight: 500">Transcribed</span><span>· 3 speakers</span></span>
+      </a></li>
+      <li><a href="Processing.dc.html" style="display: flex; flex-direction: column; gap: 4px; padding: 12px 10px; border-radius: 14px; text-decoration: none; color: inherit">
+        <span style="display: flex; justify-content: space-between; gap: 8px"><strong style="font-size: 16px; font-weight: 600">Board review prep</strong><span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #4A525B">34:12</span></span>
+        <span style="display: flex; gap: 8px; align-items: center; font-size: 13px; color: #4A525B">11:00 <span style="padding: 2px 8px; border-radius: 10px; background: #FCEFE3; color: #8A3B07; font-weight: 500">Paused at 12:40</span><span>· Resume</span></span>
+      </a></li>
+      <li><a href="Note.dc.html" style="display: flex; flex-direction: column; gap: 4px; padding: 12px 10px; border-radius: 14px; text-decoration: none; color: inherit">
+        <span style="display: flex; justify-content: space-between; gap: 8px"><strong style="font-size: 16px; font-weight: 600">Voice note 8 Oct, 08:14</strong><span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #4A525B">02:41</span></span>
+        <span style="display: flex; gap: 8px; align-items: center; font-size: 13px; color: #4A525B">08:14 <span style="padding: 2px 8px; border-radius: 10px; border: 1px solid #C9CED5; font-weight: 500">Audio only</span></span>
+      </a></li>
+    </ul>
+  </main>
+
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 40px 16px 24px; background: linear-gradient(to bottom, rgba(245,246,247,0), #F5F6F7 40%); display: flex; align-items: center; justify-content: space-between">
+    <button style="height: 52px; padding: 0 20px; border-radius: 26px; border: 1px solid #C9CED5; background: #FFFFFF; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600">
+      <svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"></path></svg>
+      Import audio
+    </button>
+    <a href="Recording.dc.html" style="height: 64px; padding: 0 26px 0 22px; border-radius: 32px; background: #C2410C; color: #FFFFFF; display: flex; align-items: center; gap: 10px; text-decoration: none; font-size: 17px; font-weight: 600; box-shadow: 0 6px 18px rgba(194,65,12,0.28)">
+      <span style="width: 18px; height: 18px; border-radius: 9px; background: #FFFFFF; display: block"></span>
+      Record
+    </a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;$preview&quot;:{&quot;width&quot;:390,&quot;height&quot;:844}}">
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+
+
+</body></html>

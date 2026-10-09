@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<title>Cassini — States and errors</title>
+
+</head>
+<body>
+<x-dc>
+
+<div style="width: 2270px; height: 1180px; box-sizing: border-box; background: #ECEEF0; color: #14171A; font-family: 'Instrument Sans', system-ui, sans-serif; padding: 48px; display: flex; flex-direction: column; gap: 32px">
+  <div style="display: flex; align-items: baseline; gap: 24px">
+    <h1 style="margin: 0; font-size: 32px; font-weight: 600; letter-spacing: -0.01em">States, banners and errors</h1>
+    <p style="margin: 0; font-size: 16px; color: #3A4250">Inline banners at 358 px — the width they take inside a phone screen. Tone: teal = fine, blue = info, amber = needs attention, red = failed (audio still kept).</p>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 40px; align-items: start">
+    <sc-for list="{{columns}}" as="col" hint-placeholder-count="5">
+      <section style="display: flex; flex-direction: column; gap: 12px">
+        <h2 style="margin: 0 0 4px; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #3A4250">{{col.title}}</h2>
+        <sc-for list="{{col.cards}}" as="c" hint-placeholder-count="5">
+          <div style="{{c.boxStyle}}">
+            <div style="display: flex; gap: 10px; align-items: flex-start">
+              <span style="{{c.dotStyle}}"></span>
+              <div style="flex: 1; min-width: 0">
+                <p style="{{c.titleStyle}}">{{c.title}}</p>
+                <p style="margin: 3px 0 0; font-size: 14px; line-height: 1.45; color: #3A4250">{{c.body}}</p>
+                <sc-if value="{{c.hasActions}}" hint-placeholder-val="{{ true }}">
+                  <div style="display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap">
+                    <sc-for list="{{c.actions}}" as="a" hint-placeholder-count="1">
+                      <button style="{{a.style}}">{{a.label}}</button>
+                    </sc-for>
+                  </div>
+                </sc-if>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+      </section>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;$preview&quot;:{&quot;width&quot;:2270,&quot;height&quot;:1180}}">
+class Component extends DCLogic {
+  renderVals() {
+    const tone = {
+      ok:    { bg: '#E3F2EF', fg: '#0B5A54', dot: '#0F766E' },
+      info:  { bg: '#E8EDFC', fg: '#1A3596', dot: '#2346C8' },
+      warn:  { bg: '#FCEFE3', fg: '#8A3B07', dot: '#B45309' },
+      error: { bg: '#FBE7E1', fg: '#A3330B', dot: '#C2410C' },
+      plain: { bg: '#FFFFFF', fg: '#14171A', dot: '#9AA2AC' }
+    };
+    const raw = [
+      { title: 'Document trust', cards: [
+        ['ok', 'Verified', 'Audio matches the transcript exactly. Everything works.'],
+        ['warn', 'Not verified', 'The audio could not be checked, so word timing may be off.', ['Play anyway']],
+        ['warn', 'Audio changed since transcription', 'Word timing may not match what you hear.', ['Transcribe again']],
+        ['error', 'Transcript can’t be read', 'The file’s Cassini data is damaged. The audio still plays.', ['Transcribe again']],
+        ['error', 'Newer Cassini format', 'This version can’t be read here yet. The audio still plays.'],
+        ['plain', 'Plain audio', 'No transcript yet.', ['Transcribe']]
+      ]},
+      { title: 'Recording', cards: [
+        ['warn', 'Paused — another app is using audio', 'Resume when your call ends. Nothing was lost.', ['Resume']],
+        ['warn', 'Storage almost full — about 10 min left', 'Free some space to keep going. If it runs out, the recording saves automatically.'],
+        ['warn', 'Stopped — storage almost full', 'Less than 200 MB free. The recording so far is saved.', ['Open note']],
+        ['error', 'Microphone access is off', 'Turn it on in system settings. Recording starts when you come back.', ['Open settings']],
+        ['error', 'Microphone stopped working', 'Recording ended. The audio so far is in your library.', ['Open note']],
+        ['info', '1 recording recovered', 'Cassini closed unexpectedly. We saved what was captured (05:12).', ['Open']]
+      ]},
+      { title: 'Transcription', cards: [
+        ['warn', 'Paused at 12:40 of 34:12', 'Pick up where you left off. The draft so far is kept.', ['Resume', 'Start over']],
+        ['info', 'Calculating time left…', 'An estimate appears after the first few minutes of audio.'],
+        ['info', 'Measuring battery use…', 'Plugged in — no battery estimate needed.'],
+        ['warn', 'All words shown as one voice', 'Speakers couldn’t be told apart in this recording.', ['Transcribe again']],
+        ['error', 'Saved progress no longer matches', 'The recording or models changed. Your recording is kept.', ['Start over']],
+        ['error', 'Not enough memory', 'Close other apps or try a shorter clip.', ['Try again']]
+      ]},
+      { title: 'Model download', cards: [
+        ['info', 'Downloading speech recognition — 46%', '296 of 640 MB. Keep Cassini open.', ['Cancel']],
+        ['info', 'Checking files — 80%', 'Each file is verified before it is used.'],
+        ['error', 'No connection', 'Connect to the internet and try again. Recording still works.', ['Retry']],
+        ['error', 'Not enough storage', 'Free about 860 MB and try again.', ['Retry']],
+        ['error', 'File check failed', 'The download was damaged and has been discarded.', ['Download again']],
+        ['info', 'Record now, transcribe later', 'Transcription needs a one-time download. Audio is safe meanwhile.', ['Download']]
+      ]},
+      { title: 'Library and import', cards: [
+        ['plain', 'No notes yet', 'Record something, or import an audio file.', ['Record', 'Import']],
+        ['plain', 'Nothing matches “fattura”', 'Try another word or title.'],
+        ['error', 'File too large', 'Choose a file under 2 GB.', ['Choose another']],
+        ['error', 'Not enough space to import', 'This file needs about 1.4 GB free. Free some space and try again.', ['Try again']],
+        ['error', 'Unsupported WAV', 'Use 16-bit PCM WAV, or MP3, M4A or Opus.', ['Choose another']],
+        ['warn', 'This phone can’t create Cassini files', 'It has no Opus encoder. You can still record (M4A) and open documents.']
+      ]}
+    ];
+    const columns = raw.map(col => ({
+      title: col.title,
+      cards: col.cards.map(([t, title, body, actions]) => {
+        const k = tone[t];
+        const acts = (actions || []).map((label, i) => ({
+          label,
+          style: i === 0
+            ? 'height: 36px; padding: 0 14px; border-radius: 18px; border: 0; background: #14171A; color: #FFFFFF; font-size: 14px; font-weight: 600'
+            : 'height: 36px; padding: 0 14px; border-radius: 18px; border: 1px solid #C9CED5; background: #FFFFFF; font-size: 14px'
+        }));
+        return {
+          title, body, actions: acts, hasActions: acts.length > 0,
+          boxStyle: 'width: 358px; max-width: 100%; box-sizing: border-box; padding: 14px 16px; border-radius: 16px; background: ' + k.bg + (t === 'plain' ? '; border: 1px solid #E2E5E9' : ''),
+          dotStyle: 'width: 10px; height: 10px; border-radius: 5px; margin-top: 6px; flex: none; display: block; background: ' + k.dot,
+          titleStyle: 'margin: 0; font-size: 15px; font-weight: 600; color: ' + k.fg
+        };
+      })
+    }));
+    return { columns };
+  }
+}
+</script>
+
+
+</body></html>
