@@ -74,7 +74,7 @@ groups=(
     "Parakeet|verbatim|$old/Parakeet.kt|$engine/asr/Parakeet.kt $engine/asr/IncrementalRecognizer.kt $engine/asr/ParakeetDecoder.kt $core/asr/DecodeSession.kt|Decoder -> ParakeetDecoder (WordDecoder, config(), no lease); Session -> DecodeSession; Incremental -> IncrementalRecognizer; transcribe takes ParakeetFiles"
     "CheckpointData|verbatim|$old/CheckpointData.kt|$core/checkpoint/CheckpointData.kt|package only"
     "Diarization|verbatim|$old/Diarization.kt|$core/speakers/SpeakerAssignment.kt $core/speakers/TurnHistory.kt $engine/speakers/SortformerStream.kt|assign -> SpeakerAssignment; history trimming -> TurnHistory; native lifetime -> SortformerStream over NativeBudget; config() helper; the progress callback compiled as a class (P0, 67d36b4)"
-    "VoiceMatcher|verbatim|$old/VoiceMatcher.kt|$core/speakers/VoiceMatcher.kt|package only"
+    "VoiceMatcher|verbatim|$old/VoiceMatcher.kt|$core/speakers/VoiceMatcher.kt|the excluded parameter (P3): rejected (speaker, voice) pairs leave the scores"
     "VoiceClipCache|verbatim|$old/VoiceClipCache.kt|$core/speakers/VoiceClipCache.kt|8 speakers / 45 s from SpeakerBudget"
     "Voiceprints|verbatim|$old/Voiceprints.kt|$core/speakers/VoiceprintSelection.kt $engine/speakers/VoiceprintExtractor.kt|compute() -> VoiceprintExtractor without leaseHeld; 45 s from SpeakerBudget, the model pin from ModelCatalog"
     "VoiceStore|verbatim|$old/VoiceStore.kt|$core/speakers/VoiceCodec.kt $app/VoiceStore.kt|Voice JSON and enrol/unenrol maths -> core VoiceCodec; file I/O stays in the app"

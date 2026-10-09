@@ -46,4 +46,37 @@ class VoiceMatcherTest {
     @Test fun voicesOfAnotherModelAreIgnored() {
         assertEquals(emptyMap<String, Match>(), VoiceMatcher.match(mapOf("s" to axis(0)), listOf(voice("anna", axis(0), "old")), "m", t))
     }
+
+    @Test fun anExcludedVoiceIsNeverMatchedToThatSpeaker() {
+        val voices = listOf(voice("anna", axis(0)))
+        val excluded = mapOf("s" to setOf("anna"))
+        assertEquals(emptyMap<String, Match>(), VoiceMatcher.match(mapOf("s" to near(0.95f)), voices, "m", t, excluded))
+    }
+
+    @Test fun anExclusionHoldsOnlyForItsOwnSpeaker() {
+        val voices = listOf(voice("anna", axis(0)))
+        val excluded = mapOf("b" to setOf("anna"))
+        val matches = VoiceMatcher.match(mapOf("a" to near(0.80f, 1), "b" to near(0.95f, 2)), voices, "m", t, excluded)
+        // Without the exclusion "b" would take Anna; with it "a" does, and "b" is no rival, so the match is automatic.
+        assertEquals("anna", matches["a"]?.voiceId)
+        assertEquals(Match.State.AUTO, matches["a"]?.state)
+        assertNull(matches["b"])
+    }
+
+    @Test fun anExcludedPairIsNoRival() {
+        val bruno = Voiceprints.normalised(floatArrayOf(0.9f, 0.1f, 0f, 0f))!!
+        val voices = listOf(voice("anna", axis(0)), voice("bruno", bruno))
+        val speakers = mapOf("s" to near(0.85f))
+        assertEquals(Match.State.SUGGESTED, VoiceMatcher.match(speakers, voices, "m", t)["s"]?.state)
+        val excluded = mapOf("s" to setOf("bruno"))
+        assertEquals(Match.State.AUTO, VoiceMatcher.match(speakers, voices, "m", t, excluded)["s"]?.state)
+    }
+
+    @Test fun anEmptyExclusionChangesNothing() {
+        val voices = listOf(voice("anna", axis(0)), voice("bruno", axis(1)))
+        val speakers = mapOf("a" to near(0.9f, 2), "b" to near(0.6f, 3))
+        val plain = VoiceMatcher.match(speakers, voices, "m", t)
+        val excluded = mapOf("a" to emptySet(), "x" to setOf("anna"))
+        assertEquals(plain, VoiceMatcher.match(speakers, voices, "m", t, excluded))
+    }
 }
