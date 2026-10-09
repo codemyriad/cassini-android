@@ -67,7 +67,7 @@ Requires JDK 17 and the Android SDK with platform `android-37.0`, build tools 36
 git clone --recurse-submodules https://github.com/codemyriad/cassini-android
 cd cassini-android
 ./scripts/setup.sh   # libopus source and the prebuilt sherpa-onnx AAR, both hash-pinned
-./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
+./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug detekt
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 

@@ -3,7 +3,14 @@ Uses the official Android sample's 512-point STFT / preemphasis / sample normali
 This is not the repaired desktop Cassini feature extractor.
 """
 
-import librosa, numpy as np, wave, pathlib, sys, hashlib, json
+import hashlib
+import json
+import pathlib
+import sys
+import wave
+
+import librosa
+import numpy as np
 
 source = pathlib.Path(sys.argv[1])
 destination = pathlib.Path(sys.argv[2])

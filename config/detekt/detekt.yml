@@ -1,0 +1,22 @@
+# Applied on top of detekt's default configuration (buildUponDefaultConfig = true in build.gradle.kts).
+# config/detekt/baseline.xml lists the findings in code that predates this file; new code must be clean.
+# Fix formatting with ./gradlew detekt --auto-correct.
+
+config:
+  validation: true
+
+style:
+  MaxLineLength:
+    maxLineLength: 140
+  WildcardImport:
+    excludeImports:
+      - 'java.util.*'
+      - 'org.junit.Assert.*'
+
+formatting:
+  active: true
+  autoCorrect: true
+  MaximumLineLength:
+    maxLineLength: 140
+  NoWildcardImports:
+    active: false

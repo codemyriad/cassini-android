@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Fetch the optional speaker model used by the app and native device checks."""
 import hashlib
-from pathlib import Path
 import shutil
 import subprocess
 import urllib.request
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DEST = ROOT / ".tools/diar"
