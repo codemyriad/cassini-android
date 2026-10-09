@@ -5,6 +5,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import org.cassini.core.audio.PcmFile
 import org.cassini.core.format.CassiniDocument
 import org.cassini.core.format.OggOpus
+import org.cassini.core.models.ModelCatalog
 import org.cassini.core.speakers.Match
 import org.cassini.core.speakers.SpeakerPrint
 import org.cassini.core.speakers.SpeakerTurn
@@ -43,13 +44,13 @@ class NamedVoiceRecoveryTest {
                 turns[turns.lastIndex] = last.copy(endMs = maxOf(last.endMs, word.endMs))
             else turns += SpeakerTurn(word.startMs, word.endMs, slot)
         }
-        val model = VoiceprintModel.inFiles(context.filesDir)
-        assumeTrue(model.ready())
+        val model = InstalledModels(context.filesDir)
+        assumeTrue(model.ready(ModelCatalog.VOICEPRINT))
         val pcm = File.createTempFile("voice-recovery-", ".pcm", context.cacheDir)
         val computed = PcmFile(pcm).use { audio ->
             audioDecoder(context).stream(Uri.parse(note.session.uri), audio::append)
             val selected = Voiceprints.select(turns, transcript.words, audio.sampleRate, audio.sampleCount)
-            NativeBudget.holding { VoiceprintExtractor.compute(File(model.modelPath), audio, selected) { } }
+            NativeBudget.holding { VoiceprintExtractor.compute(File(model.path(ModelCatalog.VOICEPRINT)), audio, selected) { } }
         }
         assertTrue("Each named speaker must have enough clean speech", computed.keys.containsAll(named.keys))
         val originalPrints = app.noteVoices.load(document.manifest!!.getJSONObject("meeting").getString("id"),
@@ -58,11 +59,11 @@ class NamedVoiceRecoveryTest {
             val name = named.getValue(speaker)
             val existing = app.voices.load().firstOrNull { it.name.equals(name, true) }
             val voice = if (existing != null && originalPrints[speaker]?.match?.let { it.state == Match.State.CONFIRMED && it.voiceId == existing.id } == true)
-                existing else app.voices.enrol(existing?.id, name, VoiceprintModel.model.sha256, print.first, print.second, System.currentTimeMillis())
+                existing else app.voices.enrol(existing?.id, name, ModelCatalog.voiceprintModel.sha256, print.first, print.second, System.currentTimeMillis())
             SpeakerPrint(print.first, print.second, Match(voice.id, 1f, Match.State.CONFIRMED))
         }
         app.noteVoices.merge(document.manifest!!.getJSONObject("meeting").getString("id"),
-            note.session.selectedVariant ?: document.defaultId!!, VoiceprintModel.model.sha256, confirmed)
+            note.session.selectedVariant ?: document.defaultId!!, ModelCatalog.voiceprintModel.sha256, confirmed)
         val applyTo = InstrumentationRegistry.getArguments().getString("applyNamedProfilesToNote")
         if (!applyTo.isNullOrBlank()) {
             val target = LibraryStore(context.filesDir).load().single { it.id == applyTo }
@@ -72,8 +73,8 @@ class NamedVoiceRecoveryTest {
             val variant = target.session.selectedVariant ?: targetDocument.defaultId!!
             val prints = app.noteVoices.load(meeting, variant)
             val voices = app.voices.load()
-            val matches = VoiceMatcher.match(prints.mapValues { it.value.embedding }, voices, VoiceprintModel.model.sha256,
-                Voiceprints.THRESHOLDS.getValue(VoiceprintModel.model.sha256))
+            val matches = VoiceMatcher.match(prints.mapValues { it.value.embedding }, voices, ModelCatalog.voiceprintModel.sha256,
+                Voiceprints.THRESHOLDS.getValue(ModelCatalog.voiceprintModel.sha256))
             matches.forEach { (speaker, match) -> app.noteVoices.setMatch(meeting, variant, speaker, match) }
             instrumentation.sendStatus(0, android.os.Bundle().apply {
                 putString("stream", "Existing meeting matches: ${matches.map { (speaker, match) -> "$speaker ${voices.first { it.id == match.voiceId }.name} ${match.state} ${match.score}" }.joinToString()}\n")

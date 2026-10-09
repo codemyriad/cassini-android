@@ -17,6 +17,7 @@ import org.cassini.core.format.OggOpus
 import org.cassini.core.format.Transcript
 import org.cassini.core.format.Word
 import org.cassini.core.library.Session
+import org.cassini.core.models.ModelCatalog
 import org.cassini.engine.capture.CaptureFactory
 import org.json.JSONObject
 import org.junit.Assert.*
@@ -308,8 +309,7 @@ class LibraryTest {
     @Test fun doneAutomaticallyTranscribesAndSealsTheSameLibraryNote() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
-        val model = ModelStore(File(context.filesDir, "parakeet-v3"))
-        org.junit.Assume.assumeTrue("Install INT8 for the microphone-to-document check", model.ready())
+        org.junit.Assume.assumeTrue("Install INT8 for the microphone-to-document check", ModelCatalog.PARAKEET.ready(context.filesDir))
         val sessions = SessionStore(context.filesDir)
         val original = sessions.load()
         instrumentation.uiAutomation.executeShellCommand("pm grant ${context.packageName} ${Manifest.permission.RECORD_AUDIO}")

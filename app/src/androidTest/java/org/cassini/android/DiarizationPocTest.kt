@@ -4,6 +4,7 @@ import android.net.Uri
 import android.util.Log
 import androidx.test.platform.app.InstrumentationRegistry
 import org.cassini.core.audio.PcmAudio
+import org.cassini.core.models.ModelCatalog
 import org.cassini.core.speakers.Diarization
 import org.cassini.engine.asr.Parakeet
 import org.cassini.engine.speakers.SortformerStream
@@ -55,15 +56,15 @@ class DiarizationPocTest {
     /** Two different recorded voices joined end to end, so the right answer is known: one change of speaker. */
     @Test fun transcribeThenAttributeTwoVoices() {
         assumeTrue("Push the diarization model first", ready())
-        val models = ModelStore(File(context.filesDir, "parakeet-v3"))
-        assumeTrue("Install Parakeet and the speech detector first", models.ready() && ModelStore.vadReady(context.filesDir))
+        val models = InstalledModels(context.filesDir)
+        assumeTrue("Install Parakeet and the speech detector first", models.ready(ModelCatalog.PARAKEET) && ModelCatalog.VAD.ready(context.filesDir))
         val first = assets("fleurs-it-short.wav"); val second = assets("youtube-smoke.wav")
         val gapSamples = 16000
         val joined = PcmAudio(first.samples + FloatArray(gapSamples) + second.samples, 16000)
         val boundaryMs = first.durationMs + 1000
 
         val asrBegan = System.nanoTime()
-        val transcript = Parakeet.transcribe(joined, models.files(), ModelStore.vadPath(context.filesDir))
+        val transcript = Parakeet.transcribe(joined, models.parakeet(), models.path(ModelCatalog.VAD))
         val asrMs = (System.nanoTime() - asrBegan) / 1_000_000
         val diarBegan = System.nanoTime()
         val turns = SortformerStream.turns(joined, model)
@@ -81,10 +82,10 @@ class DiarizationPocTest {
     @Test fun transcribeThenAttributeRealConversation() {
         val clip = File(directory, "conversation.wav")
         assumeTrue("Push the model and conversation.wav first", ready() && clip.canRead())
-        val models = ModelStore(File(context.filesDir, "parakeet-v3"))
-        assumeTrue("Install Parakeet and the speech detector first", models.ready() && ModelStore.vadReady(context.filesDir))
+        val models = InstalledModels(context.filesDir)
+        assumeTrue("Install Parakeet and the speech detector first", models.ready(ModelCatalog.PARAKEET) && ModelCatalog.VAD.ready(context.filesDir))
         val audio = load(clip)
-        val transcript = Parakeet.transcribe(audio, models.files(), ModelStore.vadPath(context.filesDir))
+        val transcript = Parakeet.transcribe(audio, models.parakeet(), models.path(ModelCatalog.VAD))
         run {
             val began = System.nanoTime()
             val turns = SortformerStream.turns(audio, model)

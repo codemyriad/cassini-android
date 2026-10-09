@@ -19,8 +19,6 @@
     <ID>ArgumentListWrapping:AudioDecoder.kt$AudioDecoder$(info.presentationTimeUs &lt;= Limits.MAX_RECORDING_MS * 1000 + (if (opusSamples != null) 120_000 else 0), Failure.LONG)</ID>
     <ID>ArgumentListWrapping:AudioDecoder.kt$AudioDecoder$(sampleRate, startSample)</ID>
     <ID>ArgumentListWrapping:BatteryReader.kt$BatteryReader$(elapsedMs, (level * 100 / scale).coerceIn(0, 100), intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0, charge)</ID>
-    <ID>ArgumentListWrapping:CassiniApplication.kt$CassiniApplication$("Cassini", "Could not remove obsolete speaker model downloads")</ID>
-    <ID>ArgumentListWrapping:CassiniApplication.kt$CassiniApplication$(filesDir)</ID>
     <ID>ArgumentListWrapping:CassiniDocument.kt$CassiniDocument$("label")</ID>
     <ID>ArgumentListWrapping:CassiniDocument.kt$CassiniDocument$(i)</ID>
     <ID>ArgumentListWrapping:CassiniDocument.kt$CassiniDocument.Companion$("SAMPLE_RATE" to "48000", "CHANNELS" to stream.channels.toString(), "SAMPLE_COUNT" to stream.sampleCount.toString(), "DURATION_MS" to stream.durationMs.toString(), "MATCH_POLICY" to "exact-opus-audio-v1", "OPUS_SHA256" to digest)</ID>
@@ -153,7 +151,7 @@
     <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$("$mode lost the word at the 133.58 s cut", transcript.words.any { it.startMs in 132_500..134_500 &amp;&amp; tokens(it.text) == listOf("batterica") })</ID>
     <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$("$name $mode progress went backwards", steps.zipWithNext().all { (a, b) -&gt; b.doneMs &gt;= a.doneMs &amp;&amp; b.elapsedMs &gt;= a.elapsedMs })</ID>
     <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$("(?&lt;=\\p{N})[.,](?=\\p{N})")</ID>
-    <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$("Install Parakeet and the speech detector first", models.ready() &amp;&amp; ModelStore.vadReady(context.filesDir))</ID>
+    <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$("Install Parakeet and the speech detector first", models.ready(ModelCatalog.PARAKEET) &amp;&amp; ModelCatalog.VAD.ready(context.filesDir))</ID>
     <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$("audio", name)</ID>
     <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$("audioMs", audio.durationMs)</ID>
     <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$("firstWordsAfterMs", steps.firstOrNull { it.words.isNotEmpty() }?.elapsedMs ?: -1)</ID>
@@ -164,9 +162,12 @@
     <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$("reference")</ID>
     <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$("steps", steps.size)</ID>
     <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$('\u2019', '\'')</ID>
+    <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$(2)</ID>
     <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$(JSONObject(instrumentation.context.assets.open("fleurs-it-short.json").bufferedReader().use { it.readText() }).getString("reference"))</ID>
     <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$(Regex("(?&lt;=\\p{N})[.,](?=\\p{N})"), "")</ID>
+    <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$(context.filesDir, "chunking-comparison.${ModelCatalog.PARAKEET_PRECISION}.json")</ID>
     <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$(instrumentation.context.assets.open("fleurs-it-short.json").bufferedReader().use { it.readText() })</ID>
+    <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$(report.toString(2))</ID>
     <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$(transcript.words.all { it.startMs &gt;= 0 &amp;&amp; it.endMs &gt;= it.startMs &amp;&amp; it.endMs &lt;= audio.durationMs })</ID>
     <ID>ArgumentListWrapping:DeckViews.kt$DeckViews$(0, dp(8), 0, dp(8))</ID>
     <ID>ArgumentListWrapping:DeckViews.kt$DeckViews$(12f, amber)</ID>
@@ -188,6 +189,7 @@
     <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$("$name seek preserves waveform and sample alignment: $errors", errors.getValue(0) &lt; signal * .001)</ID>
     <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$("${holes.size} silent samples inside a continuous tone, first at ${holes.take(4)}", holes.isEmpty())</ID>
     <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$("A returning voice must keep its original slot", firstSlot, dominant(returned, 1000, first.durationMs - 1000))</ID>
+    <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$("Download Parakeet in the app before running native inference test", models.ready(ModelCatalog.PARAKEET))</ID>
     <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$("Long sample should reach its final 30 seconds", transcript.words.any { it.startMs &gt;= 150000 })</ID>
     <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$("Most of this recording is speech", spans.sumOf { it.length.toLong() } * 2 &gt; audio.samples.size)</ID>
     <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$("The sole speaker in a later chunk must keep its slot", secondSlot, dominant(continued, 1000, 18000))</ID>
@@ -204,9 +206,12 @@
     <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$(26 * 16000, combined.size)</ID>
     <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$(4)</ID>
     <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$(FloatArray(speech.samples.size * 3) { speech.samples[it / 3] }, speech.sampleRate * 3)</ID>
+    <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$(ModelCatalog.PARAKEET)</ID>
+    <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$(ModelCatalog.VAD)</ID>
     <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$(PcmAudio(combined.copyOfRange(26 * 16000, combined.size), 16000), 26000)</ID>
     <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$(combined.copyOfRange(26 * 16000, combined.size), 16000)</ID>
     <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$(context.filesDir)</ID>
+    <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$(context.filesDir, "device-smoke.${ModelCatalog.PARAKEET_PRECISION}.words.json")</ID>
     <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$(continued, 1000, 18000)</ID>
     <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$(input, 0, n * 2, cursor * 1_000_000L / 48000, if (n == 0) MediaCodec.BUFFER_FLAG_END_OF_STREAM else 0)</ID>
     <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$(n)</ID>
@@ -216,12 +221,12 @@
     <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$(samples.copyOfRange(0, split), split)</ID>
     <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$(speech.samples.size * 3)</ID>
     <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$(track, codec.getOutputBuffer(output)!!, info)</ID>
+    <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$(transcript.json())</ID>
     <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$(transcript.words.all { it.startMs &gt;= 0 &amp;&amp; it.endMs &gt;= it.startMs &amp;&amp; it.endMs &lt;= audio.durationMs })</ID>
     <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$(when (sample) { "youtube-long" -&gt; "youtube-long.wav" "youtube" -&gt; "youtube-smoke.wav" else -&gt; "fleurs-it-short.wav" })</ID>
-    <ID>ArgumentListWrapping:DiarizationModels.kt$DiarizationModels.Companion$("segmentation.int8.onnx", "embedding.onnx", "segmentation.int8.onnx.part", "embedding.onnx.part")</ID>
     <ID>ArgumentListWrapping:DiarizationPocTest.kt$DiarizationPocTest$(" ${words.size} words, ${words.map { it.speaker }.toSet().size} speakers, ${wrong.size} on the wrong side of the join")</ID>
     <ID>ArgumentListWrapping:DiarizationPocTest.kt$DiarizationPocTest$(" [$current] $line")</ID>
-    <ID>ArgumentListWrapping:DiarizationPocTest.kt$DiarizationPocTest$("Install Parakeet and the speech detector first", models.ready() &amp;&amp; ModelStore.vadReady(context.filesDir))</ID>
+    <ID>ArgumentListWrapping:DiarizationPocTest.kt$DiarizationPocTest$("Install Parakeet and the speech detector first", models.ready(ModelCatalog.PARAKEET) &amp;&amp; ModelCatalog.VAD.ready(context.filesDir))</ID>
     <ID>ArgumentListWrapping:DiarizationPocTest.kt$DiarizationPocTest$("conversation: ${audio.durationMs} ms audio, diarization $elapsed ms, ${turns.size} turns, ${words.map { it.speaker }.toSet().size} speakers, peak RSS ${peakRssMb()} MB")</ID>
     <ID>ArgumentListWrapping:DiarizationPocTest.kt$DiarizationPocTest$("four-speakers: ${audio.durationMs} ms audio, $elapsed ms (${"%.2f".format(audio.durationMs / elapsed.toDouble())}x realtime), " + "${turns.size} turns, ${turns.map { it.speaker }.toSet().size} speakers, peak RSS ${peakRssMb()} MB")</ID>
     <ID>ArgumentListWrapping:DiarizationPocTest.kt$DiarizationPocTest$("two voices: ${joined.durationMs} ms audio, asr $asrMs ms, diarization $diarMs ms (${"%.0f".format(diarMs * 100.0 / asrMs)}% of asr), peak RSS ${peakRssMb()} MB")</ID>
@@ -309,7 +314,9 @@
     <ID>ArgumentListWrapping:LibraryActivity.kt$LibraryActivity$(R.string.yesterday)</ID>
     <ID>ArgumentListWrapping:LibraryActivity.kt$LibraryActivity$(cards, views.text(16f, DeckViews.muted).apply { setText(if (search.isBlank()) R.string.library_empty_hint else R.string.library_search_hint) }, top = 14)</ID>
     <ID>ArgumentListWrapping:LibraryActivity.kt$LibraryActivity$(cards, views.text(25f).apply { setText(if (search.isBlank()) R.string.library_empty else R.string.no_matches) }, top = 40)</ID>
+    <ID>ArgumentListWrapping:LibraryActivity.kt$LibraryActivity$(filesDir)</ID>
     <ID>ArgumentListWrapping:LibraryActivity.kt$LibraryActivity$(heading, views.text(36f).apply { setText(R.string.notes); typeface = android.graphics.Typeface.DEFAULT_BOLD }, 0, weight = 1f)</ID>
+    <ID>ArgumentListWrapping:LibraryActivity.kt$LibraryActivity$(if (ModelCatalog.PARAKEET.ready(filesDir)) R.string.library_local else R.string.library_needs_model)</ID>
     <ID>ArgumentListWrapping:LibraryActivity.kt$LibraryActivity$(if (search.isBlank()) R.string.library_empty else R.string.no_matches)</ID>
     <ID>ArgumentListWrapping:LibraryActivity.kt$LibraryActivity$(if (search.isBlank()) R.string.library_empty_hint else R.string.library_search_hint)</ID>
     <ID>ArgumentListWrapping:LibraryActivity.kt$LibraryActivity$(outState)</ID>
@@ -350,6 +357,7 @@
     <ID>ArgumentListWrapping:LibraryStore.kt$LibraryStore$(uri = Uri.fromFile(source).toString(), document = source.absolutePath, name = doc.title.ifBlank { source.name }, transcript = selected?.transcript, selectedVariant = selected?.id, durationMs = doc.manifest?.optJSONObject("audio")?.optLong("durationMs") ?: 0)</ID>
     <ID>ArgumentListWrapping:LibraryTest.kt$LibraryTest$("A later revision of a meeting that already has a note stays off the library", notes.none { it.session.document == newer.absolutePath })</ID>
     <ID>ArgumentListWrapping:LibraryTest.kt$LibraryTest$("Hiding the screen must not stop or save the recording", before.libraryId, sessions.load().libraryId)</ID>
+    <ID>ArgumentListWrapping:LibraryTest.kt$LibraryTest$("Install INT8 for the microphone-to-document check", ModelCatalog.PARAKEET.ready(context.filesDir))</ID>
     <ID>ArgumentListWrapping:LibraryTest.kt$LibraryTest$("Must refuse to overwrite an unreadable index")</ID>
     <ID>ArgumentListWrapping:LibraryTest.kt$LibraryTest$("Only the missing search text is filled in", before.copy(text = "Ciao."), notes.single { it.id == saved.libraryId })</ID>
     <ID>ArgumentListWrapping:LibraryTest.kt$LibraryTest$("library.json", "library-migrated")</ID>
@@ -370,6 +378,7 @@
     <ID>ArgumentListWrapping:LibraryTest.kt$LibraryTest$(bytes)</ID>
     <ID>ArgumentListWrapping:LibraryTest.kt$LibraryTest$(context, MainActivity::class.java)</ID>
     <ID>ArgumentListWrapping:LibraryTest.kt$LibraryTest$(context, RecordingActivity::class.java)</ID>
+    <ID>ArgumentListWrapping:LibraryTest.kt$LibraryTest$(context.filesDir)</ID>
     <ID>ArgumentListWrapping:LibraryTest.kt$LibraryTest$(context.filesDir, "documents")</ID>
     <ID>ArgumentListWrapping:LibraryTest.kt$LibraryTest$(context.filesDir, it)</ID>
     <ID>ArgumentListWrapping:LibraryTest.kt$LibraryTest$(context.filesDir, name)</ID>
@@ -439,14 +448,19 @@
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(5000)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(76, 86, 45)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(BackgroundColorSpan(android.graphics.Color.rgb(76, 86, 45)), start, start + query.length, 0)</ID>
+    <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(File(models.path(ModelCatalog.VOICEPRINT)), audio, SpeakerMerges.windows(voiceClips.windows, draftEdits.second))</ID>
+    <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(File(models.path(ModelCatalog.VOICEPRINT)), audio, pending)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(File(path))</ID>
-    <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(File(voiceprintModel.modelPath), audio, SpeakerMerges.windows(voiceClips.windows, draftEdits.second))</ID>
-    <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(File(voiceprintModel.modelPath), audio, pending)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(Intent(this, LibraryActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(Intent.CATEGORY_OPENABLE)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(Intent.EXTRA_MIME_TYPES, arrayOf("audio/*", "application/ogg"))</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(Intent.EXTRA_TITLE, "${session.name.ifBlank { getString(R.string.recording) }.substringBeforeLast('.')}.opus")</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)</ID>
+    <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(ModelCatalog.PARAKEET)</ID>
+    <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(ModelCatalog.PARAKEET, it)</ID>
+    <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(ModelCatalog.PARAKEET_PRECISION, ModelCatalog.PARAKEET_REVISION)</ID>
+    <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(ModelCatalog.VOICEPRINT)</ID>
+    <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(ModelCatalog.voiceprintModel.sha256)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(R.string.battery_completion, projection.percentNow, projection.percentAfter)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(R.string.checkpoint_error, error = true)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(R.string.document_contents, portable.variants.size, manifest.getJSONArray("speakers").length())</ID>
@@ -485,11 +499,10 @@
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(TranscriptionProgress.Stage.SPEAKERS, (System.nanoTime() - totalBegan) / 1_000_000, startMs, startMs + chunk.durationMs)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(Uri.fromFile(File(path)), edited, session.name, process, existing, emptyMap())</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(Uri.fromFile(file))</ID>
-    <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(VoiceprintModel.model.sha256)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(android.R.string.ok)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(android.graphics.Color.rgb(76, 86, 45))</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(checkpointDoneMs)</ID>
-    <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(chosenModel.precision, chosenModel.revision)</ID>
+    <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(chunk, found, assigned, startMs)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(computed.mapValues { it.value.first }, knownVoices, printModel, Voiceprints.THRESHOLDS.getValue(printModel))</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(contentResolver, cacheDir)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(draftSpeakerLabels)</ID>
@@ -510,18 +523,19 @@
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(java.util.Locale.ROOT, print.second)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(labels)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(labels, portable.variants.indexOfFirst { it.id == session.selectedVariant })</ID>
-    <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(livePrints.mapValues { it.value.first }, rememberedPeople, VoiceprintModel.model.sha256, Voiceprints.THRESHOLDS.getValue(VoiceprintModel.model.sha256))</ID>
+    <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(livePrints.mapValues { it.value.first }, rememberedPeople, ModelCatalog.voiceprintModel.sha256, Voiceprints.THRESHOLDS.getValue(ModelCatalog.voiceprintModel.sha256))</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(mark.first)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(match = print.match?.copy(state = Match.State.AUTO))</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(match.voiceId)</ID>
-    <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(meeting, merged.defaultId ?: return@let, VoiceprintModel.model.sha256, prints)</ID>
+    <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(meeting, merged.defaultId ?: return@let, ModelCatalog.voiceprintModel.sha256, prints)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(meeting, portable.defaultId ?: return@let, printModel, prints)</ID>
+    <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(models.path(ModelCatalog.VOICEPRINT))</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(overall, stage, getString(R.string.progress_counts, snapshot.words, clock(elapsedMs)), remaining, battery)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(path)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(portable)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(previous.id)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(printModel)</ID>
-    <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(processing(chosenModel.precision, chosenModel.revision).put("language", transcript.language) .put("durationMs", durationMs).put("inferenceMs", elapsed) .put("segmentation", Parakeet.incrementalProvenance(detector)) .toString(2))</ID>
+    <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(processing(ModelCatalog.PARAKEET_PRECISION, ModelCatalog.PARAKEET_REVISION).put("language", transcript.language) .put("durationMs", durationMs).put("inferenceMs", elapsed) .put("segmentation", Parakeet.incrementalProvenance(detector)) .toString(2))</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(progress)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(progress, R.string.voiceprint_model_progress)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(progress.doneMs, progress.totalMs, progress.words.size, (System.nanoTime() - transcriptionBeganNs) / 1_000_000)</ID>
@@ -546,7 +560,7 @@
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(speakers[index])</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(state = Match.State.AUTO)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(target)</ID>
-    <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(target, name, VoiceprintModel.model.sha256, print.embedding, print.seconds, System.currentTimeMillis())</ID>
+    <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(target, name, ModelCatalog.voiceprintModel.sha256, print.embedding, print.seconds, System.currentTimeMillis())</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(this, LibraryActivity::class.java)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(this, SpeakerDialog.column(this, input, mergeChoices(speakerId), choices, remember))</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(this, SpeakerDialog.column(this, input, mergeChoices(speakerId), list, remember))</ID>
@@ -559,18 +573,12 @@
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(uri)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(uri, { AudioDecoder(contentResolver, cacheDir).decode(uri) }, transcript, session.name, processing(session.resultPrecision).put("x-inferenceMs", session.inferenceMs), null)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(voiceClips.windows, synchronized(draftSpeakerLabels) { draftSpeakerMerges.toMap() })</ID>
-    <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(voiceprintModel.modelPath)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(when { document != null &amp;&amp; transcript == null -&gt; R.string.variant_unavailable transcript != null -&gt; R.string.no_speech session.uri != null -&gt; R.string.loaded_title else -&gt; R.string.empty_title })</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(when { document != null &amp;&amp; transcript == null -&gt; R.string.variant_unavailable_hint transcript != null -&gt; R.string.no_speech_hint session.uri != null -&gt; R.string.loaded_hint else -&gt; R.string.empty_hint })</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(words = words.words.map { it.copy(speaker = "${speakerPrefix}1") })</ID>
+    <ID>ArgumentListWrapping:MainActivity.kt$MainActivity.Companion$(ModelCatalog.VAD)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity.Companion$(TAG, "Speech detector unavailable", error)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity.Companion$(filesDir)</ID>
-    <ID>ArgumentListWrapping:ModelBundle.kt$ModelBundle.Companion$(ModelStore(ModelCatalog.PARAKEET.directory(files)), DiarizationModels.inFiles(files), VoiceprintModel.inFiles(files))</ID>
-    <ID>ArgumentListWrapping:ModelBundleTest.kt$ModelBundleTest$("""name="models_size"&gt;$stated MiB&lt;""")</ID>
-    <ID>ArgumentListWrapping:ModelBundleTest.kt$ModelBundleTest$("src/main/res/values-it/strings.xml")</ID>
-    <ID>ArgumentListWrapping:ModelBundleTest.kt$ModelBundleTest$(File("src/main/res/values-it/strings.xml").readText().contains("""name="models_size"&gt;$stated MiB&lt;"""))</ID>
-    <ID>ArgumentListWrapping:ModelBundleTest.kt$ModelBundleTest$(file, "rw")</ID>
-    <ID>ArgumentListWrapping:ModelBundleTest.kt$ModelBundleTest$(size)</ID>
     <ID>ArgumentListWrapping:ModelUpgradeTest.kt$ModelUpgradeTest$("old weights")</ID>
     <ID>ArgumentListWrapping:ModelUpgradeTest.kt$ModelUpgradeTest$("parakeet-v3/verified", "vad/verified", "speaker-models/verified", "documents/old-fp32.opus", "documents/old-live.wav", "session.json", "library.json")</ID>
     <ID>ArgumentListWrapping:ModelUpgradeTest.kt$ModelUpgradeTest$("segmentation.int8.onnx", "embedding.onnx", "embedding.onnx.part")</ID>
@@ -578,13 +586,16 @@
     <ID>ArgumentListWrapping:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$("stream", "Applied remembered names: ${labels.values.joinToString()}\n")</ID>
     <ID>ArgumentListWrapping:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$("stream", "Existing meeting matches: ${matches.map { (speaker, match) -&gt; "$speaker ${voices.first { it.id == match.voiceId }.name} ${match.state} ${match.score}" }.joinToString()}\n")</ID>
     <ID>ArgumentListWrapping:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$(0, android.os.Bundle().apply { putString("stream", "Applied remembered names: ${labels.values.joinToString()}\n") })</ID>
+    <ID>ArgumentListWrapping:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$(File(model.path(ModelCatalog.VOICEPRINT)), audio, selected)</ID>
+    <ID>ArgumentListWrapping:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$(ModelCatalog.VOICEPRINT)</ID>
     <ID>ArgumentListWrapping:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$(context.filesDir)</ID>
     <ID>ArgumentListWrapping:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$(document.manifest!!.getJSONObject("meeting").getString("id"), note.session.selectedVariant ?: document.defaultId!!)</ID>
-    <ID>ArgumentListWrapping:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$(document.manifest!!.getJSONObject("meeting").getString("id"), note.session.selectedVariant ?: document.defaultId!!, VoiceprintModel.model.sha256, confirmed)</ID>
-    <ID>ArgumentListWrapping:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$(existing?.id, name, VoiceprintModel.model.sha256, print.first, print.second, System.currentTimeMillis())</ID>
+    <ID>ArgumentListWrapping:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$(document.manifest!!.getJSONObject("meeting").getString("id"), note.session.selectedVariant ?: document.defaultId!!, ModelCatalog.voiceprintModel.sha256, confirmed)</ID>
+    <ID>ArgumentListWrapping:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$(existing?.id, name, ModelCatalog.voiceprintModel.sha256, print.first, print.second, System.currentTimeMillis())</ID>
     <ID>ArgumentListWrapping:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$(meeting, variant, speaker, match)</ID>
+    <ID>ArgumentListWrapping:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$(model.path(ModelCatalog.VOICEPRINT))</ID>
     <ID>ArgumentListWrapping:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$(next.copy(screen = session.screen))</ID>
-    <ID>ArgumentListWrapping:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$(prints.mapValues { it.value.embedding }, voices, VoiceprintModel.model.sha256, Voiceprints.THRESHOLDS.getValue(VoiceprintModel.model.sha256))</ID>
+    <ID>ArgumentListWrapping:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$(prints.mapValues { it.value.embedding }, voices, ModelCatalog.voiceprintModel.sha256, Voiceprints.THRESHOLDS.getValue(ModelCatalog.voiceprintModel.sha256))</ID>
     <ID>ArgumentListWrapping:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$(screen = session.screen)</ID>
     <ID>ArgumentListWrapping:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$(speaker)</ID>
     <ID>ArgumentListWrapping:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$(uri = Uri.fromFile(file).toString(), document = file.absolutePath, transcript = renamed.selected(variant)!!.transcript)</ID>
@@ -690,6 +701,7 @@
     <ID>ArgumentListWrapping:PortableDocumentTest.kt$PortableDocumentTest$("CassiniCompatibility", "API ${android.os.Build.VERSION.SDK_INT}: Opus encoder available=$available")</ID>
     <ID>ArgumentListWrapping:PortableDocumentTest.kt$PortableDocumentTest$("Dopo.")</ID>
     <ID>ArgumentListWrapping:PortableDocumentTest.kt$PortableDocumentTest$("Fetch the optional three-minute YouTube fixture", instrumentation.context.assets.list("")!!.contains("youtube-long.wav"))</ID>
+    <ID>ArgumentListWrapping:PortableDocumentTest.kt$PortableDocumentTest$("Install the INT8 model for the end-to-end transcription check", ModelCatalog.PARAKEET.ready(context.filesDir))</ID>
     <ID>ArgumentListWrapping:PortableDocumentTest.kt$PortableDocumentTest$("Save must complete")</ID>
     <ID>ArgumentListWrapping:PortableDocumentTest.kt$PortableDocumentTest$("Save must preserve every unknown field, variant, tag and audio packet", source.readBytes(), exported.readBytes())</ID>
     <ID>ArgumentListWrapping:PortableDocumentTest.kt$PortableDocumentTest$("Session cache must not replace the portable body", saved.transcript)</ID>
@@ -899,22 +911,27 @@
     <ID>ArgumentListWrapping:SessionUpgradeTest.kt$SessionUpgradeTest$(InstrumentationRegistry.getInstrumentation().targetContext.cacheDir, "session-upgrade-${System.nanoTime()}")</ID>
     <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$("Settings", "Could not count notes", error)</ID>
     <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$("Settings", "Could not forget voices", error)</ID>
+    <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$(ModelCatalog.DIARIZATION)</ID>
+    <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$(ModelCatalog.VOICEPRINT)</ID>
     <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$(Preference(context).apply { setSummary(R.string.people_privacy); isSelectable = false })</ID>
     <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$(Preference(context).apply { setTitle(R.string.people_empty); isEnabled = false })</ID>
     <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$(R.string.people_empty)</ID>
     <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$(R.string.people_forget_all_confirm)</ID>
     <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$(R.string.people_forget_confirm, voice.name)</ID>
     <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$(R.string.people_privacy)</ID>
-    <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$(R.string.settings_model_summary, models.precision, getString(R.string.model_size_int8), getString(if (models.ready()) R.string.model_installed else R.string.model_download_needed))</ID>
-    <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$(R.string.voiceprint_model, R.string.voiceprint_model_summary, bundle.voiceprint.ready())</ID>
+    <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$(R.string.settings_model_summary, ModelCatalog.PARAKEET_PRECISION, getString(R.string.model_size_int8), getString(if (ModelCatalog.PARAKEET.ready(context.filesDir)) R.string.model_installed else R.string.model_download_needed))</ID>
+    <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$(R.string.speaker_model, R.string.speaker_model_summary, bundle.ready(ModelCatalog.DIARIZATION))</ID>
+    <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$(R.string.voiceprint_model, R.string.voiceprint_model_summary, bundle.ready(ModelCatalog.VOICEPRINT))</ID>
     <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$(SpeakerDialog.frame(context, SpeakerDialog.column(context, input, note)))</ID>
-    <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$(Triple(R.string.speaker_model, R.string.speaker_model_summary, bundle.speakers.ready()), Triple(R.string.voiceprint_model, R.string.voiceprint_model_summary, bundle.voiceprint.ready()))</ID>
+    <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$(Triple(R.string.speaker_model, R.string.speaker_model_summary, bundle.ready(ModelCatalog.DIARIZATION)), Triple(R.string.voiceprint_model, R.string.voiceprint_model_summary, bundle.ready(ModelCatalog.VOICEPRINT)))</ID>
     <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$(app)</ID>
     <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$(context)</ID>
     <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$(context, SpeakerDialog.column(context, input, note))</ID>
     <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$(context, input, note)</ID>
+    <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$(context.filesDir)</ID>
     <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$(getString(R.string.people_forget_all_confirm))</ID>
     <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$(getString(R.string.people_forget_confirm, voice.name))</ID>
+    <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$(if (ModelCatalog.PARAKEET.ready(context.filesDir)) R.string.model_installed else R.string.model_download_needed)</ID>
     <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$(title)</ID>
     <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$(voice.id)</ID>
     <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$(voice.name)</ID>
@@ -926,6 +943,7 @@
     <ID>ArgumentListWrapping:SettingsTest.kt$SettingsTest$("spk_1" to SpeakerPrint(FloatArray(4) { 1f }, 30.0, Match(anna.id, 0.8f, Match.State.CONFIRMED)))</ID>
     <ID>ArgumentListWrapping:SettingsTest.kt$SettingsTest$(10, java.util.concurrent.TimeUnit.SECONDS)</ID>
     <ID>ArgumentListWrapping:SettingsTest.kt$SettingsTest$(25)</ID>
+    <ID>ArgumentListWrapping:SettingsTest.kt$SettingsTest$(4)</ID>
     <ID>ArgumentListWrapping:SettingsTest.kt$SettingsTest$(50)</ID>
     <ID>ArgumentListWrapping:SettingsTest.kt$SettingsTest$(R.id.recording_name)</ID>
     <ID>ArgumentListWrapping:SettingsTest.kt$SettingsTest$(R.string.people_needs_reenrol)</ID>
@@ -944,6 +962,7 @@
     <ID>ArgumentListWrapping:SettingsTest.kt$SettingsTest$(instanceOf(android.preference.Preference::class.java), withTitleText(title))</ID>
     <ID>ArgumentListWrapping:SettingsTest.kt$SettingsTest$(isDisplayed())</ID>
     <ID>ArgumentListWrapping:SettingsTest.kt$SettingsTest$(matches(isDisplayed()))</ID>
+    <ID>ArgumentListWrapping:SettingsTest.kt$SettingsTest$(null, "Bruna", ModelCatalog.voiceprintModel.sha256, FloatArray(4) { if (it == 2) 1f else 0f }, 20.0, 1L)</ID>
     <ID>ArgumentListWrapping:SettingsTest.kt$SettingsTest$(title)</ID>
     <ID>ArgumentListWrapping:SettingsTest.kt$SettingsTest$(withText("Automatic · prefer full precision"))</ID>
     <ID>ArgumentListWrapping:SettingsTest.kt$SettingsTest$(withText("Transcribe while recording"))</ID>
@@ -991,7 +1010,7 @@
     <ID>ArgumentListWrapping:SpeakerDialog.kt$SpeakerDialog$(it)</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$("An automatic name never taught the voice", 1, app.voices.load().single { it.id == voice.id }.count)</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$("Cancel must remain visible while following the transcript", activity.findViewById&lt;Button&gt;(R.id.cancel_operation).getGlobalVisibleRect(android.graphics.Rect()))</ID>
-    <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$("Install the INT8 model for the end-to-end speaker check", ModelStore(File(context.filesDir, "parakeet-v3")).ready())</ID>
+    <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$("Install the INT8 model for the end-to-end speaker check", ModelCatalog.PARAKEET.ready(context.filesDir))</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$("Merged native slots must not return in later words", 1, transcript.words.map { it.speaker }.distinct().size)</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$("Progress details must remain visible while following the transcript", status.getGlobalVisibleRect(android.graphics.Rect()))</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$("Selecting a target alone must not write a document", original.absolutePath, sessions.load().document)</ID>
@@ -1011,7 +1030,6 @@
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(100)</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(50)</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(512)</ID>
-    <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(File(context.filesDir, "parakeet-v3"))</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(FloatArray(512) { kotlin.random.Random(7).nextFloat() - .5f + it % 3 })</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(R.id.cancel_operation)</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(R.id.operation_status)</ID>
@@ -1032,7 +1050,6 @@
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(click())</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(context)</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(context.filesDir)</ID>
-    <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(context.filesDir, "parakeet-v3")</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(file)</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(isDialog())</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(it)</ID>
@@ -1040,7 +1057,7 @@
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(it.getString(R.string.speaker_renamed, "Anna"), it.findViewById&lt;TextView&gt;(R.id.operation_status).text.toString())</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(listOf(Word("spk_1", 1000, 1400, "Ciao."), Word("spk_2", 2000, 2400, "Salve.")), "it")</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(matches(androidx.test.espresso.matcher.ViewMatchers.isChecked()))</ID>
-    <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(meeting, variant, VoiceprintModel.model.sha256, mapOf("spk_1" to SpeakerPrint(print(), 12.0, Match(voice.id, .6f, state))))</ID>
+    <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(meeting, variant, ModelCatalog.voiceprintModel.sha256, mapOf("spk_1" to SpeakerPrint(print(), 12.0, Match(voice.id, .6f, state))))</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(next.defaultId!!)</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(resampleTo16k(first.samples, first.sampleRate) + FloatArray(16000) + resampleTo16k(second.samples, second.sampleRate), 16000)</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(scenario)</ID>
@@ -1193,7 +1210,9 @@
     <ID>ArgumentListWrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$("meetings/index.json")</ID>
     <ID>ArgumentListWrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$("turns")</ID>
     <ID>ArgumentListWrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$('/')</ID>
+    <ID>ArgumentListWrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$(File(model.path(ModelCatalog.VOICEPRINT)), audio, windows)</ID>
     <ID>ArgumentListWrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$(FloatArray(prints[0].size) { d -&gt; prints.sumOf { it[d].toDouble() }.toFloat() })</ID>
+    <ID>ArgumentListWrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$(ModelCatalog.VOICEPRINT)</ID>
     <ID>ArgumentListWrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$(Uri.fromFile(file))</ID>
     <ID>ArgumentListWrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$(context)</ID>
     <ID>ArgumentListWrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$(file)</ID>
@@ -1204,6 +1223,7 @@
     <ID>ArgumentListWrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$(it.samples, it.sampleRate)</ID>
     <ID>ArgumentListWrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$(it.third)</ID>
     <ID>ArgumentListWrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$(java.util.Locale.ROOT, sorted.first(), sorted[sorted.size / 2], sorted.last())</ID>
+    <ID>ArgumentListWrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$(model.path(ModelCatalog.VOICEPRINT))</ID>
     <ID>ArgumentListWrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$(name in gallery, ranked[0].key == name, ranked[0].value to ranked[0].value - (ranked.getOrNull(1)?.value ?: -1f))</ID>
     <ID>ArgumentListWrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$(name)</ID>
     <ID>ArgumentListWrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$(print, it)</ID>
@@ -1348,7 +1368,7 @@
     <ID>ComplexCondition:MainActivity.kt$MainActivity$!isDestroyed &amp;&amp; playerReady &amp;&amp; (player?.isPlaying == true || followPausedSeek) &amp;&amp; !touchingTranscript</ID>
     <ID>ComplexCondition:MainActivity.kt$MainActivity$(checkpointSaved &amp;&amp; !busy) || (session.uri != null &amp;&amp; session.transcript == null &amp;&amp; interim == null)</ID>
     <ID>ComplexCondition:MainActivity.kt$MainActivity$(document != null || interim != null) &amp;&amp; (index == 0 || words[index - 1].speaker != word.speaker)</ID>
-    <ID>ComplexCondition:MainActivity.kt$MainActivity$autoTranscribe &amp;&amp; !busy &amp;&amp; session.uri != null &amp;&amp; ModelBundle.inFiles(filesDir).consented()</ID>
+    <ID>ComplexCondition:MainActivity.kt$MainActivity$autoTranscribe &amp;&amp; !busy &amp;&amp; session.uri != null &amp;&amp; InstalledModels(filesDir).consented()</ID>
     <ID>ComplexCondition:MainActivity.kt$MainActivity$isDestroyed || isFinishing || cancelled.get() || stopRequested.get()</ID>
     <ID>ComplexCondition:MainActivity.kt$MainActivity$remember &amp;&amp; confirmed != null &amp;&amp; voiceId == null &amp;&amp; !asked &amp;&amp; !confirmed.name.equals(name, ignoreCase = true)</ID>
     <ID>ComplexCondition:MainActivity.kt$MainActivity$remember &amp;&amp; print != null &amp;&amp; voiceId == null &amp;&amp; !asked</ID>
@@ -1578,7 +1598,6 @@
     <ID>MagicNumber:DeckViews.kt$DeckViews.CassetteView$8f</ID>
     <ID>MagicNumber:DeckViews.kt$DeckViews.CassetteView$91f</ID>
     <ID>MagicNumber:DeckViews.kt$DeckViews.CassetteView$92f</ID>
-    <ID>MagicNumber:DiarizationModels.kt$DiarizationModels$100</ID>
     <ID>MagicNumber:DocumentStore.kt$DocumentStore$16</ID>
     <ID>MagicNumber:DocumentStore.kt$DocumentStore$20</ID>
     <ID>MagicNumber:DocumentStore.kt$DocumentStore$65536</ID>
@@ -1622,11 +1641,6 @@
     <ID>MagicNumber:MainActivity.kt$MainActivity$86</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity.&lt;no name provided&gt;$150</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity.&lt;no name provided&gt;$1_000_000_000</ID>
-    <ID>MagicNumber:ModelStore.kt$ModelStore$100</ID>
-    <ID>MagicNumber:ModelStore.kt$ModelStore$1024</ID>
-    <ID>MagicNumber:ModelStore.kt$ModelStore$1024L</ID>
-    <ID>MagicNumber:ModelStore.kt$ModelStore$128</ID>
-    <ID>MagicNumber:ModelStore.kt$ModelStore.Companion$100</ID>
     <ID>MagicNumber:NoteRules.kt$LibraryNote$45</ID>
     <ID>MagicNumber:NoteViews.kt$NoteViews$0x25FFFFFF</ID>
     <ID>MagicNumber:NoteViews.kt$NoteViews$103</ID>
@@ -1829,7 +1843,6 @@
     <ID>MagicNumber:TranscriptionProgress.kt$TranscriptionProgress.Companion$60000</ID>
     <ID>MagicNumber:TranscriptionProgress.kt$TranscriptionProgress.Companion$60000L</ID>
     <ID>MagicNumber:VoiceClipCache.kt$VoiceClipCache$1000</ID>
-    <ID>MagicNumber:VoiceprintModel.kt$VoiceprintModel$100</ID>
     <ID>MagicNumber:VoiceprintSelection.kt$Voiceprints$1000</ID>
     <ID>MagicNumber:VoiceprintSelection.kt$Voiceprints$1000L</ID>
     <ID>MagicNumber:VoiceprintSelection.kt$Voiceprints$3</ID>
@@ -1889,11 +1902,12 @@
     <ID>MaxLineLength:CassiniDocumentTest.kt$CassiniDocumentTest$val file = File(System.getProperty("cassini.conformance", "../third_party/cassini-format/spec/conformance")!!, "opus/014-unknown-manifest-member.opus")</ID>
     <ID>MaxLineLength:CassiniDocumentTest.kt$CassiniDocumentTest$val next = CassiniDocument.read(CassiniDocument.create(bytes, transcript.copy(language = "en"), "Ignored", JSONObject(), withPrivate))</ID>
     <ID>MaxLineLength:CassiniPayload.kt$CassiniPayload.JsonBoundary$require(token in listOf("null", "true", "false") || token.matches(Regex("-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?")))</ID>
-    <ID>MaxLineLength:ChunkingComparisonTest.kt$ChunkingComparisonTest$"fixed-15s" to { audio, progress -&gt; Parakeet.transcribe(audio, models.files(), null, cutting = Parakeet.Cutting.FIXED, onProgress = progress) }</ID>
-    <ID>MaxLineLength:ChunkingComparisonTest.kt$ChunkingComparisonTest$"speech-10s-tail" to { audio, progress -&gt; Parakeet.transcribe(audio, models.files(), detector, DecodePolicy(), onProgress = progress) }</ID>
-    <ID>MaxLineLength:ChunkingComparisonTest.kt$ChunkingComparisonTest$"speech-span-context" to { audio, progress -&gt; Parakeet.transcribe(audio, models.files(), detector, DecodePolicy.PARAKEET_V3_REFERENCE, onProgress = progress) }</ID>
-    <ID>MaxLineLength:ChunkingComparisonTest.kt$ChunkingComparisonTest$"speech-span-notail" to { audio, progress -&gt; Parakeet.transcribe(audio, models.files(), detector, DecodePolicy(preserveSpan = true, tailPaddingMs = 0), onProgress = progress) }</ID>
+    <ID>MaxLineLength:ChunkingComparisonTest.kt$ChunkingComparisonTest$"fixed-15s" to { audio, progress -&gt; Parakeet.transcribe(audio, models.parakeet(), null, cutting = Parakeet.Cutting.FIXED, onProgress = progress) }</ID>
+    <ID>MaxLineLength:ChunkingComparisonTest.kt$ChunkingComparisonTest$"speech-10s-tail" to { audio, progress -&gt; Parakeet.transcribe(audio, models.parakeet(), detector, DecodePolicy(), onProgress = progress) }</ID>
+    <ID>MaxLineLength:ChunkingComparisonTest.kt$ChunkingComparisonTest$"speech-span-context" to { audio, progress -&gt; Parakeet.transcribe(audio, models.parakeet(), detector, DecodePolicy.PARAKEET_V3_REFERENCE, onProgress = progress) }</ID>
+    <ID>MaxLineLength:ChunkingComparisonTest.kt$ChunkingComparisonTest$"speech-span-notail" to { audio, progress -&gt; Parakeet.transcribe(audio, models.parakeet(), detector, DecodePolicy(preserveSpan = true, tailPaddingMs = 0), onProgress = progress) }</ID>
     <ID>MaxLineLength:ChunkingComparisonTest.kt$ChunkingComparisonTest$assertTrue("$name $mode progress went backwards", steps.zipWithNext().all { (a, b) -&gt; b.doneMs &gt;= a.doneMs &amp;&amp; b.elapsedMs &gt;= a.elapsedMs })</ID>
+    <ID>MaxLineLength:ChunkingComparisonTest.kt$ChunkingComparisonTest$assumeTrue("Install Parakeet and the speech detector first", models.ready(ModelCatalog.PARAKEET) &amp;&amp; ModelCatalog.VAD.ready(context.filesDir))</ID>
     <ID>MaxLineLength:ChunkingComparisonTest.kt$ChunkingComparisonTest$for (j in 1..b.size) current[j] = minOf(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + if (a[i - 1] == b[j - 1]) 0 else 1)</ID>
     <ID>MaxLineLength:ChunkingComparisonTest.kt$ChunkingComparisonTest$val reference = tokens(JSONObject(instrumentation.context.assets.open("fleurs-it-short.json").bufferedReader().use { it.readText() }).getString("reference"))</ID>
     <ID>MaxLineLength:DeckViews.kt$DeckViews$private</ID>
@@ -1902,9 +1916,12 @@
     <ID>MaxLineLength:DecodeSession.kt$DecodeSession$val source = Span(if (index == 0) cut.start else cut.start - context, if (index == pieces.lastIndex) cut.end else cut.end + context)</ID>
     <ID>MaxLineLength:DeviceSmokeTest.kt$DeviceSmokeTest$(10 until expected.size - 10).sumOf { j -&gt; val d = expected[j] - found[j + shift]; d.toDouble() * d } / (expected.size - 20)</ID>
     <ID>MaxLineLength:DeviceSmokeTest.kt$DeviceSmokeTest$codec.queueInputBuffer(input, 0, n * 2, cursor * 1_000_000L / 48000, if (n == 0) MediaCodec.BUFFER_FLAG_END_OF_STREAM else 0)</ID>
+    <ID>MaxLineLength:DeviceSmokeTest.kt$DeviceSmokeTest$if (InstrumentationRegistry.getArguments().getString("downloadModels") == "true") InstalledModels(context.filesDir).install(ModelCatalog.VAD) { }</ID>
     <ID>MaxLineLength:DeviceSmokeTest.kt$DeviceSmokeTest$if (info.size &gt; 0 &amp;&amp; info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0) muxer.writeSampleData(track, codec.getOutputBuffer(output)!!, info)</ID>
+    <ID>MaxLineLength:DeviceSmokeTest.kt$DeviceSmokeTest$models.install(ModelCatalog.PARAKEET) { message -&gt; instrumentation.sendStatus(0, Bundle().apply { putString("stream", "$message\n") }) }</ID>
     <ID>MaxLineLength:DeviceSmokeTest.kt$DeviceSmokeTest$putString("stream", "Incremental: ${transcript.words.size} words, $progressCount updates, early words=$sawEarlyWords\n")</ID>
     <ID>MaxLineLength:DeviceSmokeTest.kt$DeviceSmokeTest$val holes = (4096 until samples.size - 4096).filter { samples[it] == 0f &amp;&amp; abs(samples[it - 1]) &gt; .05f &amp;&amp; abs(samples[it + 1]) &gt; .05f }</ID>
+    <ID>MaxLineLength:DiarizationPocTest.kt$DiarizationPocTest$assumeTrue("Install Parakeet and the speech detector first", models.ready(ModelCatalog.PARAKEET) &amp;&amp; ModelCatalog.VAD.ready(context.filesDir))</ID>
     <ID>MaxLineLength:DiarizationPocTest.kt$DiarizationPocTest$log</ID>
     <ID>MaxLineLength:DiarizationPocTest.kt$DiarizationPocTest$log("conversation: ${audio.durationMs} ms audio, diarization $elapsed ms, ${turns.size} turns, ${words.map { it.speaker }.toSet().size} speakers, peak RSS ${peakRssMb()} MB")</ID>
     <ID>MaxLineLength:DiarizationPocTest.kt$DiarizationPocTest$log("two voices: ${joined.durationMs} ms audio, asr $asrMs ms, diarization $diarMs ms (${"%.0f".format(diarMs * 100.0 / asrMs)}% of asr), peak RSS ${peakRssMb()} MB")</ID>
@@ -1967,11 +1984,12 @@
     <ID>MaxLineLength:MainActivity.kt$MainActivity$draftSpeakerLabels.clear()</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$durationMs = durationMs</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$else</ID>
-    <ID>MaxLineLength:MainActivity.kt$MainActivity$fun download(install: ((ModelStore.Progress) -&gt; Unit) -&gt; Unit)</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$fun download(install: ((InstalledModels.Progress) -&gt; Unit) -&gt; Unit)</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$fun validate()</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$getString(R.string.speaker_suggestion, person.name) to { applySpeakerName(speaker, person.name, person.id, remember = true) }</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$id to (draftNames[id] ?: prints[id]?.match?.takeIf { it.state == Match.State.AUTO }?.let { names[it.voiceId] } ?: getString(R.string.speaker_label, index + 1))</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$if (!canRename() || source == target || words.words.none { it.speaker == source } || words.words.none { it.speaker == target }) return</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$if (!models.ready(ModelCatalog.PARAKEET)) { download { models.install(ModelCatalog.PARAKEET, it) }; onUi { fetchSpeechDetector() } }</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$if (attributed == null &amp;&amp; transcript.words.isNotEmpty()) setStatus(R.string.speakers_unavailable) else defaultStatus()</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$if (existing.speakerLabel(speakerId) == name) { rememberVoice(speakerId, name, voiceId, remember); renderTranscript(); setStatus(R.string.speaker_renamed, name); return }</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$if (finalizationEstimateMs &gt; 0) (finalizationEstimateMs * 3 + measuredFinalizationMs) / 4 else measuredFinalizationMs</ID>
@@ -1979,12 +1997,13 @@
     <ID>MaxLineLength:MainActivity.kt$MainActivity$if (match.state == Match.State.CONFIRMED &amp;&amp; app.voices.unenrol(match.voiceId, print.embedding)) app.noteVoices.forget(match.voiceId)</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$if (name != null &amp;&amp; document?.speakerLabel(speakerId) == name) applySpeakerName(speakerId, defaultLabel(speakerId)) else renderTranscript()</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$if (portable.selected(session.selectedVariant)?.error != null) { append("\n\n"); append(getString(R.string.variant_unavailable_hint)) }</ID>
-    <ID>MaxLineLength:MainActivity.kt$MainActivity$if (resumed?.optJSONObject("diarizer") != null) streamDiarizer = SortformerStream(speakerModels.modelPath, resumed.getJSONObject("diarizer"))</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$if (resumed?.optJSONObject("diarizer") != null) streamDiarizer = SortformerStream(models.path(ModelCatalog.DIARIZATION), resumed.getJSONObject("diarizer"))</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$if (session.transcript != null) add(R.string.transcribe_again, document == null || document?.state == "ok") { confirmTranscription() }</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$listOf(variant.id, variant.descriptor.optString("language")).filter { it.isNotEmpty() }.joinToString(" · ")</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$manifest.optJSONObject("provenance")?.optJSONObject("speechToText")?.optJSONObject(session.selectedVariant.orEmpty())</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$match.state == Match.State.AUTO &amp;&amp; label == person.name -&gt; getString(R.string.speaker_auto_mark) to { showSpeakerDialog(speaker) }</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$matches.filterValues { it.state == Match.State.AUTO }.forEach { (id, match) -&gt; names[match.voiceId]?.let { draftAutomaticNames[id] = it } }</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$models.install(ModelCatalog.VOICEPRINT) { progress -&gt; onUi { if (!cancelled.get()) showDownload(progress, R.string.voiceprint_model_progress) } }</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$onUi { transcriptionProgress?.stage(TranscriptionProgress.Stage.MATCHING, (System.nanoTime() - totalBegan) / 1_000_000) }</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$portable.manifest?.optJSONObject("meeting")?.optString("id")?.takeIf { it.isNotEmpty() &amp;&amp; prints.isNotEmpty() }</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$print.match?.takeIf { it.state == Match.State.AUTO &amp;&amp; it.voiceId != target &amp;&amp; !people[it.voiceId]?.name.equals(name, ignoreCase = true) }</ID>
@@ -1999,6 +2018,8 @@
     <ID>MaxLineLength:MainActivity.kt$MainActivity$ui.transcribe.visibility = if ((checkpointSaved &amp;&amp; !busy) || (session.uri != null &amp;&amp; session.transcript == null &amp;&amp; interim == null)) View.VISIBLE else View.GONE</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$val</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$val (file, portable) = documents.create(uri, { AudioDecoder(contentResolver, cacheDir).decode(uri) }, transcript, session.name, processing(session.resultPrecision).put("x-inferenceMs", session.inferenceMs), null)</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$val computed = VoiceprintExtractor.compute(File(models.path(ModelCatalog.VOICEPRINT)), audio, pending) { checkActive() }</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$val diarizer = streamDiarizer ?: SortformerStream(models.path(ModelCatalog.DIARIZATION)).also { streamDiarizer = it }</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$val matches = VoiceMatcher.match(computed.mapValues { it.value.first }, knownVoices, printModel, Voiceprints.THRESHOLDS.getValue(printModel))</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$val resumed = try { checkpoint.load() } catch (_: Exception) { checkpoint.release(); setStatus(R.string.checkpoint_error, error = true); return }</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$val saved = try { store.load() } catch (error: Exception) { checkpointUnreadable = true; checkpointSaved = true; Log.e(TAG, "Could not read processing checkpoint", error); setStatus(R.string.checkpoint_error, error = true); return }</ID>
@@ -2007,9 +2028,9 @@
     <ID>MaxLineLength:MainActivity.kt$MainActivity$val text = listOf(overall, stage, getString(R.string.progress_counts, snapshot.words, clock(elapsedMs)), remaining, battery).joinToString("\n")</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$val windows = SpeakerMerges.windows(voiceClips.windows, synchronized(draftSpeakerLabels) { draftSpeakerMerges.toMap() })</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$val words = Transcript.fromJson(saved.getJSONObject("recognition").getJSONObject("chunks").getJSONObject("words").toString()).words</ID>
-    <ID>MaxLineLength:MainActivity.kt$MainActivity$voiceprintModel.install { progress -&gt; onUi { if (!cancelled.get()) showDownload(progress, R.string.voiceprint_model_progress) } }</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$}</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity.&lt;no name provided&gt;$pendingName = s?.toString()</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity.Companion$try { InstalledModels(filesDir).install(ModelCatalog.VAD) { } } catch (error: Exception) { Log.w(TAG, "Speech detector unavailable", error) }</ID>
     <ID>MaxLineLength:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$existing</ID>
     <ID>MaxLineLength:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$if</ID>
     <ID>MaxLineLength:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$instrumentation.sendStatus(0, android.os.Bundle().apply { putString("stream", "Applied remembered names: ${labels.values.joinToString()}\n") })</ID>
@@ -2053,6 +2074,7 @@
     <ID>MaxLineLength:PortableDocumentTest.kt$PortableDocumentTest$fun</ID>
     <ID>MaxLineLength:PortableDocumentTest.kt$PortableDocumentTest$fun open(file: File)</ID>
     <ID>MaxLineLength:PortableDocumentTest.kt$PortableDocumentTest$org.junit.Assume.assumeTrue("Fetch the optional three-minute YouTube fixture", instrumentation.context.assets.list("")!!.contains("youtube-long.wav"))</ID>
+    <ID>MaxLineLength:PortableDocumentTest.kt$PortableDocumentTest$org.junit.Assume.assumeTrue("Install the INT8 model for the end-to-end transcription check", ModelCatalog.PARAKEET.ready(context.filesDir))</ID>
     <ID>MaxLineLength:PortableDocumentTest.kt$PortableDocumentTest$recreateAfterAnotherViewer(Session(uri = Uri.fromFile(revision).toString(), document = revision.absolutePath, name = "Other note", libraryId = "other", screen = "other"))</ID>
     <ID>MaxLineLength:PortableDocumentTest.kt$PortableDocumentTest$revision.writeBytes(CassiniDocument.create(original, Transcript(listOf(Word("spk_a", 100, 600, "Revisione.")), "it"), "Ignored", JSONObject(), CassiniDocument.read(original)))</ID>
     <ID>MaxLineLength:PortableDocumentTest.kt$PortableDocumentTest$scenario.close()</ID>
@@ -2085,7 +2107,7 @@
     <ID>MaxLineLength:SeamMergeTest.kt$SeamMergeTest$val got = splice(listOf(w("di", 10_368, 10_448), w("cronometro.", 10_448, 10_928)), listOf(w("Cronometro", 10_668, 11_228), w("che", 11_228, 11_388)))</ID>
     <ID>MaxLineLength:SeamMergeTest.kt$SeamMergeTest$val got = splice(listOf(w("prima", 9_000, 9_400), w("sì", early, early + 80)), listOf(w("sì", late, late + 80), w("dopo", 12_100, 12_400)))</ID>
     <ID>MaxLineLength:SettingsActivity.kt$SettingsActivity.SettingsFragment$AlertDialog.Builder(context).setTitle(voice.name).setView(SpeakerDialog.frame(context, SpeakerDialog.column(context, input, note)))</ID>
-    <ID>MaxLineLength:SettingsActivity.kt$SettingsActivity.SettingsFragment$Triple(R.string.voiceprint_model, R.string.voiceprint_model_summary, bundle.voiceprint.ready())</ID>
+    <ID>MaxLineLength:SettingsActivity.kt$SettingsActivity.SettingsFragment$Triple(R.string.voiceprint_model, R.string.voiceprint_model_summary, bundle.ready(ModelCatalog.VOICEPRINT))</ID>
     <ID>MaxLineLength:SettingsActivity.kt$SettingsActivity.SettingsFragment$confirm(getString(R.string.people_forget_confirm, voice.name)) { it.voices.forget(voice.id); it.noteVoices.forget(voice.id) }</ID>
     <ID>MaxLineLength:SettingsActivity.kt$SettingsActivity.SettingsFragment$val found = try { app.noteVoices.noteCounts() } catch (error: Exception) { android.util.Log.w("Settings", "Could not count notes", error); return@execute }</ID>
     <ID>MaxLineLength:SettingsTest.kt$SettingsTest$eventually { onData(allOf(instanceOf(android.preference.Preference::class.java), withSummaryText("Heard in 1 note · 01:24 of speech"))).check(matches(isDisplayed())) }</ID>
@@ -2100,12 +2122,12 @@
     <ID>MaxLineLength:SpeakerDialog.kt$SpeakerDialog$names.forEach { (name, pick) -&gt; addView(TextView(context).apply { text = name; setPadding(0, pad, 0, pad); setOnClickListener { pick() } }) }</ID>
     <ID>MaxLineLength:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(0 until speakers.length()).map { speakers.getJSONObject(it).getString("id") }.firstOrNull { doc.speakerLabel(it) == "Anna" }</ID>
     <ID>MaxLineLength:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$SessionStore(context.filesDir)</ID>
-    <ID>MaxLineLength:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$app.noteVoices.merge(meeting, variant, VoiceprintModel.model.sha256, mapOf("spk_1" to SpeakerPrint(print(), 12.0, Match(voice.id, .6f, state))))</ID>
+    <ID>MaxLineLength:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$app.noteVoices.merge(meeting, variant, ModelCatalog.voiceprintModel.sha256, mapOf("spk_1" to SpeakerPrint(print(), 12.0, Match(voice.id, .6f, state))))</ID>
     <ID>MaxLineLength:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$assertEquals(before.manifest!!.getJSONObject("meeting").getString("id"), after.manifest!!.getJSONObject("meeting").getString("id"))</ID>
     <ID>MaxLineLength:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$assertTrue("Temporary decoded PCM must be removed", context.cacheDir.listFiles().orEmpty().none { it.name.startsWith("recognition-") })</ID>
     <ID>MaxLineLength:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$instrumentation.sendStatus(0, android.os.Bundle().apply { putString("stream", "Joint streaming + draft name saved; peak RSS: $peak\n") })</ID>
     <ID>MaxLineLength:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$onView(withText(R.string.transcribe_again)).inRoot(androidx.test.espresso.matcher.RootMatchers.isPlatformPopup()).perform(click())</ID>
-    <ID>MaxLineLength:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$org.junit.Assume.assumeTrue("Install the INT8 model for the end-to-end speaker check", ModelStore(File(context.filesDir, "parakeet-v3")).ready())</ID>
+    <ID>MaxLineLength:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$org.junit.Assume.assumeTrue("Install the INT8 model for the end-to-end speaker check", ModelCatalog.PARAKEET.ready(context.filesDir))</ID>
     <ID>MaxLineLength:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$private fun meeting(file: File)</ID>
     <ID>MaxLineLength:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$scenario.onActivity { assertEquals(it.getString(R.string.speaker_renamed, "Anna"), it.findViewById&lt;TextView&gt;(R.id.operation_status).text.toString()) }</ID>
     <ID>MaxLineLength:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$scenario.onActivity { matching = it.findViewById&lt;TextView&gt;(R.id.operation_status).text.toString().contains(it.getString(R.string.matching_voices)) }</ID>
@@ -2179,6 +2201,7 @@
     <ID>MaximumLineLength:LicenseAssetsTest.kt$LicenseAssetsTest$ </ID>
     <ID>MaximumLineLength:MainActivity.kt$MainActivity$ </ID>
     <ID>MaximumLineLength:MainActivity.kt$MainActivity.&lt;no name provided&gt;$ </ID>
+    <ID>MaximumLineLength:MainActivity.kt$MainActivity.Companion$ </ID>
     <ID>MaximumLineLength:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$ </ID>
     <ID>MaximumLineLength:NoteRules.kt$LibraryNote.Companion$ </ID>
     <ID>MaximumLineLength:NoteViews.kt$NoteViews$ </ID>
@@ -2257,12 +2280,12 @@
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity$" · ${getString(R.string.variant_unavailable)}"</ID>
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity$" · ${resources.getQuantityString(R.plurals.word_count, words, words)}"</ID>
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity$(snapshot.remainingHighMs ?: remaining) + finalizationEstimateMs</ID>
-    <ID>MultiLineIfElse:MainActivity.kt$MainActivity$AlertDialog.Builder(this).setTitle(R.string.models_download) .setMessage(getString(R.string.models_download_summary, bundle.missingBytes().let { getString(R.string.models_size_mib, ModelBundle.mebibytes(it)) })) .setNegativeButton(R.string.cancel, null) .setPositiveButton(R.string.download_and_transcribe) { _, _ -&gt; transcribe() }.show()</ID>
+    <ID>MultiLineIfElse:MainActivity.kt$MainActivity$AlertDialog.Builder(this).setTitle(R.string.models_download) .setMessage(getString(R.string.models_download_summary, bundle.missingBytes().let { getString(R.string.models_size_mib, ModelCatalog.mebibytes(it)) })) .setNegativeButton(R.string.cancel, null) .setPositiveButton(R.string.download_and_transcribe) { _, _ -&gt; transcribe() }.show()</ID>
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity$Diarization.assign(words.words, found, speakerPrefix, stableIds = true)</ID>
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity$ForegroundColorSpan(DeckViews.muted)</ID>
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity$Log.w(TAG, "Kept the processing checkpoint: the note could not be saved")</ID>
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity$SpeakerAttribution.Result(transcript, SpeakerAttribution.record(transcript.words, turns, recognition, null, diarizationMs) .put("x-incrementalDiarization", "28 s windows with 2 s overlap, persistent Sortformer speaker cache"))</ID>
-    <ID>MultiLineIfElse:MainActivity.kt$MainActivity$app.voices.enrol(target, name, VoiceprintModel.model.sha256, print.embedding, print.seconds, System.currentTimeMillis())</ID>
+    <ID>MultiLineIfElse:MainActivity.kt$MainActivity$app.voices.enrol(target, name, ModelCatalog.voiceprintModel.sha256, print.embedding, print.seconds, System.currentTimeMillis())</ID>
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity$applySpeakerMerge(source, target)</ID>
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity$draftRemember.forEach { (id, voice) -&gt; if (voice.isNotEmpty() &amp;&amp; voice !in people) return@forEach labels[id]?.let { name -&gt; rememberVoice(id, name, voice.takeIf { it.isNotEmpty() }, true) } }</ID>
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity$draftRememberedVoices.remove(speakerId)</ID>
@@ -2278,7 +2301,7 @@
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity$null</ID>
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity$object : ClickableSpan() { override fun onClick(widget: View) { if (canRename()) action() } override fun updateDrawState(ds: android.text.TextPaint) { ds.isUnderlineText = false; ds.color = DeckViews.muted } }</ID>
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity$people.getValue(target).also { app.voices.rename(it.id, name) }</ID>
-    <ID>MultiLineIfElse:MainActivity.kt$MainActivity$people.values.firstOrNull { it.name.equals(name, ignoreCase = true) &amp;&amp; it.model == VoiceprintModel.model.sha256 }?.let { same -&gt; AlertDialog.Builder(this).setMessage(getString(R.string.speaker_same_person, same.name)) .setPositiveButton(R.string.speaker_same_person_yes) { _, _ -&gt; applySpeakerName(speakerId, name, same.id, true, true) } .setNegativeButton(R.string.speaker_same_person_no) { _, _ -&gt; applySpeakerName(speakerId, name, null, true, true) }.show() return }</ID>
+    <ID>MultiLineIfElse:MainActivity.kt$MainActivity$people.values.firstOrNull { it.name.equals(name, ignoreCase = true) &amp;&amp; it.model == ModelCatalog.voiceprintModel.sha256 }?.let { same -&gt; AlertDialog.Builder(this).setMessage(getString(R.string.speaker_same_person, same.name)) .setPositiveButton(R.string.speaker_same_person_yes) { _, _ -&gt; applySpeakerName(speakerId, name, same.id, true, true) } .setNegativeButton(R.string.speaker_same_person_no) { _, _ -&gt; applySpeakerName(speakerId, name, null, true, true) }.show() return }</ID>
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity$player?.let { // Follow every completion, including coalesced seeks during a quick slider drag. // Initial session restoration uses a direct seek and leaves this disabled. followCompletedSeeks = true it.seekTo(position.coerceIn(0, it.duration)) }</ID>
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity$player?.let { if (it.isPlaying) it.pause() else { it.start(); highlightWord() } }</ID>
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity$resources.getQuantityString(R.plurals.search_matches, matchCount, matchCount)</ID>
@@ -2290,15 +2313,15 @@
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity$transcriptionProgress?.stage( if (loading) TranscriptionProgress.Stage.PREPARING else TranscriptionProgress.Stage.WORDS, (System.nanoTime() - totalBegan) / 1_000_000, startMs, endMs)</ID>
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity$transcriptionProgress?.stage(TranscriptionProgress.Stage.SPEAKERS, (System.nanoTime() - totalBegan) / 1_000_000, startMs, startMs + chunk.durationMs)</ID>
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity$try { app.noteVoices.load(meeting, variant) } catch (error: Exception) { Log.w(TAG, "Could not load voiceprints", error); emptyMap() }</ID>
-    <ID>MultiLineIfElse:MainActivity.kt$MainActivity$try { onUi { if (!cancelled.get()) transcriptionProgress?.stage(TranscriptionProgress.Stage.SPEAKERS, (System.nanoTime() - totalBegan) / 1_000_000, startMs, startMs + chunk.durationMs) } val diarizer = streamDiarizer ?: SortformerStream(speakerModels.modelPath).also { streamDiarizer = it } val found = diarizer.process(chunk, startMs) val assigned = if (found.isEmpty()) words.words.map { it.copy(speaker = "${speakerPrefix}1") } else Diarization.assign(words.words, found, speakerPrefix, stableIds = true) if (voiceprintModel.ready()) voiceClips.accept(chunk, found, assigned, startMs) matchLiveVoices() words.copy(words = assigned) } catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error speakerFailure = true Log.w(TAG, "Incremental speakers unavailable", error) words.copy(words = words.words.map { it.copy(speaker = "${speakerPrefix}1") }) } catch (error: Exception) { speakerFailure = true Log.w(TAG, "Incremental speakers unavailable", error) words.copy(words = words.words.map { it.copy(speaker = "${speakerPrefix}1") }) }</ID>
-    <ID>MultiLineIfElse:MainActivity.kt$MainActivity$try { onUi { transcriptionProgress?.stage(TranscriptionProgress.Stage.MATCHING, (System.nanoTime() - totalBegan) / 1_000_000) } val computed = NativeBudget.holding { VoiceprintExtractor.compute(File(voiceprintModel.modelPath), audio, SpeakerMerges.windows(voiceClips.windows, draftEdits.second)) { checkActive() } } val matches = VoiceMatcher.match(computed.mapValues { it.value.first }, knownVoices, printModel, Voiceprints.THRESHOLDS.getValue(printModel)) if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) for ((id, print) in computed) Log.d(TAG, "Voiceprint $id ${"%.1f".format(java.util.Locale.ROOT, print.second)} s: ${matches[id]?.let { "${it.state} ${"%.3f".format(java.util.Locale.ROOT, it.score)}" } ?: "no match"}") computed.mapValues { (id, print) -&gt; SpeakerPrint(print.first, print.second, matches[id]) } } catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error; Log.w(TAG, "Voiceprints failed", error); emptyMap() } catch (error: RuntimeException) { Log.w(TAG, "Voiceprints failed", error); emptyMap() } catch (error: OutOfMemoryError) { Log.w(TAG, "Voiceprints failed", error); emptyMap() }</ID>
-    <ID>MultiLineIfElse:MainActivity.kt$MainActivity$try { voiceprintModel.install { progress -&gt; onUi { if (!cancelled.get()) showDownload(progress, R.string.voiceprint_model_progress) } } } catch (error: IOException) { Log.w(TAG, "Voiceprint model unavailable", error) } catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error; Log.w(TAG, "Voiceprint model unavailable", error) }</ID>
+    <ID>MultiLineIfElse:MainActivity.kt$MainActivity$try { models.install(ModelCatalog.VOICEPRINT) { progress -&gt; onUi { if (!cancelled.get()) showDownload(progress, R.string.voiceprint_model_progress) } } } catch (error: IOException) { Log.w(TAG, "Voiceprint model unavailable", error) } catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error; Log.w(TAG, "Voiceprint model unavailable", error) }</ID>
+    <ID>MultiLineIfElse:MainActivity.kt$MainActivity$try { onUi { if (!cancelled.get()) transcriptionProgress?.stage(TranscriptionProgress.Stage.SPEAKERS, (System.nanoTime() - totalBegan) / 1_000_000, startMs, startMs + chunk.durationMs) } val diarizer = streamDiarizer ?: SortformerStream(models.path(ModelCatalog.DIARIZATION)).also { streamDiarizer = it } val found = diarizer.process(chunk, startMs) val assigned = if (found.isEmpty()) words.words.map { it.copy(speaker = "${speakerPrefix}1") } else Diarization.assign(words.words, found, speakerPrefix, stableIds = true) if (models.ready(ModelCatalog.VOICEPRINT)) voiceClips.accept(chunk, found, assigned, startMs) matchLiveVoices() words.copy(words = assigned) } catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error speakerFailure = true Log.w(TAG, "Incremental speakers unavailable", error) words.copy(words = words.words.map { it.copy(speaker = "${speakerPrefix}1") }) } catch (error: Exception) { speakerFailure = true Log.w(TAG, "Incremental speakers unavailable", error) words.copy(words = words.words.map { it.copy(speaker = "${speakerPrefix}1") }) }</ID>
+    <ID>MultiLineIfElse:MainActivity.kt$MainActivity$try { onUi { transcriptionProgress?.stage(TranscriptionProgress.Stage.MATCHING, (System.nanoTime() - totalBegan) / 1_000_000) } val computed = NativeBudget.holding { VoiceprintExtractor.compute(File(models.path(ModelCatalog.VOICEPRINT)), audio, SpeakerMerges.windows(voiceClips.windows, draftEdits.second)) { checkActive() } } val matches = VoiceMatcher.match(computed.mapValues { it.value.first }, knownVoices, printModel, Voiceprints.THRESHOLDS.getValue(printModel)) if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) for ((id, print) in computed) Log.d(TAG, "Voiceprint $id ${"%.1f".format(java.util.Locale.ROOT, print.second)} s: ${matches[id]?.let { "${it.state} ${"%.3f".format(java.util.Locale.ROOT, it.score)}" } ?: "no match"}") computed.mapValues { (id, print) -&gt; SpeakerPrint(print.first, print.second, matches[id]) } } catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error; Log.w(TAG, "Voiceprints failed", error); emptyMap() } catch (error: RuntimeException) { Log.w(TAG, "Voiceprints failed", error); emptyMap() } catch (error: OutOfMemoryError) { Log.w(TAG, "Voiceprints failed", error); emptyMap() }</ID>
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity$ui.transcript.post { if (busy &amp;&amp; !isDestroyed) { val bounds = android.graphics.Rect() ui.transcript.getDrawingRect(bounds) ui.scroll.offsetDescendantRectToMyCoords(ui.transcript, bounds) ui.scroll.smoothScrollTo(0, if (first) bounds.top else (bounds.bottom - ui.scroll.height).coerceAtLeast(0)) } }</ID>
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity$words.copy(words = words.words.map { it.copy(speaker = "${speakerPrefix}1") })</ID>
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity$words.words.map { it.copy(speaker = "${speakerPrefix}1") }</ID>
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity.&lt;no name provided&gt;$player?.let { media -&gt; updatePlayback(media) }</ID>
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity.&lt;no name provided&gt;$player?.let { seekTo(word.startMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()) it.start() }</ID>
-    <ID>MultiLineIfElse:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$app.voices.enrol(existing?.id, name, VoiceprintModel.model.sha256, print.first, print.second, System.currentTimeMillis())</ID>
+    <ID>MultiLineIfElse:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$app.voices.enrol(existing?.id, name, ModelCatalog.voiceprintModel.sha256, print.first, print.second, System.currentTimeMillis())</ID>
     <ID>MultiLineIfElse:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$existing</ID>
     <ID>MultiLineIfElse:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$null</ID>
     <ID>MultiLineIfElse:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$turns += SpeakerTurn(word.startMs, word.endMs, slot)</ID>
@@ -2399,17 +2422,16 @@
     <ID>ParameterListWrapping:LibraryStore.kt$LibraryStore$(path: String)</ID>
     <ID>ParameterListWrapping:LibraryTest.kt$LibraryTest$(_: org.json.JSONException)</ID>
     <ID>ParameterListWrapping:LibraryTest.kt$LibraryTest$(activity: LibraryActivity)</ID>
-    <ID>ParameterListWrapping:MainActivity.kt$MainActivity$((ModelStore.Progress) -&gt; Unit)</ID>
-    <ID>ParameterListWrapping:MainActivity.kt$MainActivity$(ModelStore.Progress)</ID>
+    <ID>ParameterListWrapping:MainActivity.kt$MainActivity$((InstalledModels.Progress) -&gt; Unit)</ID>
+    <ID>ParameterListWrapping:MainActivity.kt$MainActivity$(InstalledModels.Progress)</ID>
     <ID>ParameterListWrapping:MainActivity.kt$MainActivity$(_: Exception)</ID>
     <ID>ParameterListWrapping:MainActivity.kt$MainActivity$(error: Exception)</ID>
     <ID>ParameterListWrapping:MainActivity.kt$MainActivity$(error: UserFacingException)</ID>
-    <ID>ParameterListWrapping:MainActivity.kt$MainActivity$(install: ((ModelStore.Progress) -&gt; Unit) -&gt; Unit)</ID>
+    <ID>ParameterListWrapping:MainActivity.kt$MainActivity$(install: ((InstalledModels.Progress) -&gt; Unit) -&gt; Unit)</ID>
     <ID>ParameterListWrapping:MainActivity.kt$MainActivity$(speakerId: String, name: String, voiceId: String? = null, remember: Boolean = false, asked: Boolean = false)</ID>
     <ID>ParameterListWrapping:MainActivity.kt$MainActivity.&lt;no name provided&gt;$(ds: android.text.TextPaint)</ID>
     <ID>ParameterListWrapping:MainActivity.kt$MainActivity.&lt;no name provided&gt;$(s: CharSequence?, start: Int, before: Int, count: Int)</ID>
     <ID>ParameterListWrapping:MainActivity.kt$MainActivity.Companion$(error: Exception)</ID>
-    <ID>ParameterListWrapping:ModelBundleTest.kt$ModelBundleTest$(file: File, size: Long)</ID>
     <ID>ParameterListWrapping:NoteRules.kt$LibraryNote$(query: String)</ID>
     <ID>ParameterListWrapping:NoteRules.kt$Session$( val uri: String? = null, val name: String = "", val transcript: Transcript? = null, val durationMs: Long = 0, val inferenceMs: Long = 0, val positionMs: Int = 0, val resultPrecision: String = "INT8", val document: String? = null, val selectedVariant: String? = null, val processingMs: Long = 0, val processingPaused: Boolean = false, val libraryId: String? = null, /** The viewer that wrote session.json last. Not part of a note. */ val screen: String? = null, )</ID>
     <ID>ParameterListWrapping:NoteVoiceCodec.kt$NoteVoiceCodec$(variantId: String)</ID>
@@ -2474,7 +2496,6 @@
     <ID>PropertyWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$val reference = tokens(JSONObject(instrumentation.context.assets.open("fleurs-it-short.json").bufferedReader().use { it.readText() }).getString("reference"))</ID>
     <ID>PropertyWrapping:DecodeSession.kt$DecodeSession$val source = Span(if (index == 0) cut.start else cut.start - context, if (index == pieces.lastIndex) cut.end else cut.end + context)</ID>
     <ID>PropertyWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$val upsampled = PcmAudio(FloatArray(speech.samples.size * 3) { speech.samples[it / 3] }, speech.sampleRate * 3)</ID>
-    <ID>PropertyWrapping:DiarizationModels.kt$DiarizationModels.Companion$/** Files of the earlier pyannote + ERes2Net pipeline. Removing them never touches recordings. */ private val retired = listOf("segmentation.int8.onnx", "embedding.onnx", "segmentation.int8.onnx.part", "embedding.onnx.part")</ID>
     <ID>PropertyWrapping:DiarizationPocTest.kt$DiarizationPocTest$private val directory = File(InstrumentationRegistry.getArguments().getString("diarDir") ?: "/data/local/tmp/cassini-diar")</ID>
     <ID>PropertyWrapping:DiarizationTest.kt$DiarizationTest$val turns = listOf(SpeakerTurn(0, 400, 0), SpeakerTurn(200, 500, 0), SpeakerTurn(1000, 1600, 1), SpeakerTurn(1600, 1700, 1))</ID>
     <ID>PropertyWrapping:DocumentStore.kt$DocumentStore$val owned = File(directory, "${OggOpus.hex(hash.digest())}.${if (doc.state == "plain-audio") "input" else "opus"}")</ID>
@@ -2637,10 +2658,6 @@
     <ID>SpacingBetweenDeclarationsWithComments:MainActivity.kt$MainActivity$/** This note's speaker prints and matches and the saved people, app-private; reloaded when a document is adopted. */</ID>
     <ID>SpacingBetweenDeclarationsWithComments:MainActivity.kt$MainActivity$/** VoiceStore's generation when the draft remember choices were made. */</ID>
     <ID>SpacingBetweenDeclarationsWithComments:MainActivity.kt$MainActivity$// Keeping the same name still confirms an unconfirmed match.</ID>
-    <ID>SpacingBetweenDeclarationsWithComments:ModelBundle.kt$ModelBundle$/** Parakeet is fetched only after consent, so once it is here the user has agreed; a missing * optional model is retried by the run itself and must not bring the dialog back or block auto-transcribe. */</ID>
-    <ID>SpacingBetweenDeclarationsWithComments:ModelBundle.kt$ModelBundle.Companion$/** Bytes fetched over the network for each part, which is what the consent dialog quotes. */</ID>
-    <ID>SpacingBetweenDeclarationsWithComments:ModelBundle.kt$ModelBundle.Companion$/** Whole MiB, rounded to tens from 100 MiB up, as `models_size` is written. */</ID>
-    <ID>SpacingBetweenDeclarationsWithComments:ModelStore.kt$ModelStore.Companion$/** Upgrade cleanup is restricted to the retired model's private download directory. */</ID>
     <ID>SpacingBetweenDeclarationsWithComments:OggOpus.kt$OggOpus$/** * [mux] without holding the audio: copies [input]'s packets behind new [tags], renumbering pages and * recomputing CRCs. Returns what it read, digest included; a damaged source throws after partial output. */</ID>
     <ID>SpacingBetweenDeclarationsWithComments:OggOpus.kt$OggOpus$/** One pass over a whole stream, holding a single packet at a time. */</ID>
     <ID>SpacingBetweenDeclarationsWithComments:OggOpus.kt$OggOpus.Info$/** What a streaming pass learns: headers, shape, and the audio digest when framing and packets are sound. */</ID>
@@ -2787,6 +2804,7 @@
     <ID>Wrapping:DeviceSmokeTest.kt$DeviceSmokeTest$(0, Bundle().apply { putString("stream", "Incremental: ${transcript.words.size} words, $progressCount updates, early words=$sawEarlyWords\n") })</ID>
     <ID>Wrapping:DeviceSmokeTest.kt$DeviceSmokeTest$(MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, 48000, 1).apply { setInteger(MediaFormat.KEY_BIT_RATE, 96000) setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC) }, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)</ID>
     <ID>Wrapping:DeviceSmokeTest.kt$DeviceSmokeTest$;</ID>
+    <ID>Wrapping:DeviceSmokeTest.kt$DeviceSmokeTest$putString("stream", "$message\n")</ID>
     <ID>Wrapping:DeviceSmokeTest.kt$DeviceSmokeTest$samples[it] == 0f &amp;&amp; abs(samples[it - 1]) &gt; .05f &amp;&amp; abs(samples[it + 1]) &gt; .05f</ID>
     <ID>Wrapping:DiarizationPocTest.kt$DiarizationPocTest$(</ID>
     <ID>Wrapping:DiarizationPocTest.kt$DiarizationPocTest$;</ID>
@@ -2846,8 +2864,8 @@
     <ID>Wrapping:MainActivity.kt$MainActivity$("x-speakerIdentification", JSONObject() .put("model", "3dspeaker_speech_campplus_sv_en_voxceleb_16k").put("sha256", printModel).put("dim", prints.values.firstOrNull()?.embedding?.size ?: 512) .put("metric", "cosine").put("autoThreshold", t.auto.toDouble()).put("suggestThreshold", t.suggest.toDouble()).put("margin", t.margin.toDouble()) .put("speakersWithPrints", prints.size).put("autoApplied", prints.values.count { it.match?.state == Match.State.AUTO &amp;&amp; it.match?.voiceId in names }) .put("suggested", prints.values.count { it.match?.state == Match.State.SUGGESTED }))</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$(Intent(Intent.ACTION_CREATE_DOCUMENT).apply { type = "audio/ogg"; addCategory(Intent.CATEGORY_OPENABLE) putExtra(Intent.EXTRA_TITLE, "${session.name.ifBlank { getString(R.string.recording) }.substringBeforeLast('.')}.opus") }, SAVE_DOCUMENT)</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$(Intent(Intent.ACTION_OPEN_DOCUMENT).apply { type = "*/*"; putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("audio/*", "application/ogg")); addCategory(Intent.CATEGORY_OPENABLE) addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION) }, OPEN_FILE)</ID>
-    <ID>Wrapping:MainActivity.kt$MainActivity$(R.string.models_download_summary, bundle.missingBytes().let { getString(R.string.models_size_mib, ModelBundle.mebibytes(it)) })</ID>
-    <ID>Wrapping:MainActivity.kt$MainActivity$(R.string.transcript_details, resources.getQuantityString(R.plurals.word_count, it.words.size, it.words.size), clock(session.durationMs), when { interim != null -&gt; models.precision document == null -&gt; session.resultPrecision else -&gt; session.selectedVariant.orEmpty() })</ID>
+    <ID>Wrapping:MainActivity.kt$MainActivity$(R.string.models_download_summary, bundle.missingBytes().let { getString(R.string.models_size_mib, ModelCatalog.mebibytes(it)) })</ID>
+    <ID>Wrapping:MainActivity.kt$MainActivity$(R.string.transcript_details, resources.getQuantityString(R.plurals.word_count, it.words.size, it.words.size), clock(session.durationMs), when { interim != null -&gt; ModelCatalog.PARAKEET_PRECISION document == null -&gt; session.resultPrecision else -&gt; session.selectedVariant.orEmpty() })</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$(if (canRename()) object : ClickableSpan() { override fun onClick(widget: View) { if (canRename()) action() } override fun updateDrawState(ds: android.text.TextPaint) { ds.isUnderlineText = false; ds.color = DeckViews.muted } } else ForegroundColorSpan(DeckViews.muted), range.first, range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$(object : ClickableSpan() { override fun onClick(widget: View) = showSpeakerDialog(speaker) override fun updateDrawState(ds: android.text.TextPaint) { ds.isUnderlineText = false; ds.color = DeckViews.amber } }, range.first, range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$(object : ClickableSpan() { override fun onClick(widget: View) { if (playerReady) player?.let { seekTo(word.startMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()) it.start() } } override fun updateDrawState(ds: android.text.TextPaint) { ds.isUnderlineText = false } }, range.first, range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)</ID>
@@ -2864,7 +2882,8 @@
     <ID>Wrapping:MainActivity.kt$MainActivity$document?.speakerLabel(it)?.ifBlank { it } ?: it</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$draftAutomaticNames[id] = it</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$draftSpeakerLabels.clear(); draftSpeakerLabels.putAll(labels); draftSpeakerMerges = merges; draftNamingOpen = true</ID>
-    <ID>Wrapping:MainActivity.kt$MainActivity$getString(R.string.models_size_mib, ModelBundle.mebibytes(it))</ID>
+    <ID>Wrapping:MainActivity.kt$MainActivity$fetchSpeechDetector()</ID>
+    <ID>Wrapping:MainActivity.kt$MainActivity$getString(R.string.models_size_mib, ModelCatalog.mebibytes(it))</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$getString(R.string.processing_eta_range, clock(TranscriptionProgress.roundedRemaining(snapshot.remainingLowMs ?: it)), clock(TranscriptionProgress.roundedRemaining(snapshot.remainingHighMs ?: it)))</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$if (!cancelled.get()) showDownload(progress)</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$if (!cancelled.get()) showDownload(progress, R.string.voiceprint_model_progress)</ID>
@@ -2877,13 +2896,15 @@
     <ID>Wrapping:MainActivity.kt$MainActivity$it.isNotEmpty() &amp;&amp; prints.isNotEmpty()</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$it.match?.state == Match.State.AUTO &amp;&amp; it.match?.voiceId in names</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$it.model == model</ID>
-    <ID>Wrapping:MainActivity.kt$MainActivity$it.name.equals(name, ignoreCase = true) &amp;&amp; it.model == VoiceprintModel.model.sha256</ID>
+    <ID>Wrapping:MainActivity.kt$MainActivity$it.name.equals(name, ignoreCase = true) &amp;&amp; it.model == ModelCatalog.voiceprintModel.sha256</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$it.speaker == source</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$it.speaker == target</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$it.state != Match.State.REJECTED &amp;&amp; it.state != Match.State.NONE &amp;&amp; it.voiceId in people</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$it.state == Match.State.AUTO</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$it.state == Match.State.AUTO &amp;&amp; it.voiceId != target &amp;&amp; !people[it.voiceId]?.name.equals(name, ignoreCase = true)</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$it.value.first</ID>
+    <ID>Wrapping:MainActivity.kt$MainActivity$models.install(ModelCatalog.DIARIZATION, it)</ID>
+    <ID>Wrapping:MainActivity.kt$MainActivity$models.install(ModelCatalog.PARAKEET, it)</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$names[it.voiceId]</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$saveCassiniDocument()</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$showSpeakerDialog(speaker)</ID>
@@ -2891,7 +2912,7 @@
     <ID>Wrapping:MainActivity.kt$MainActivity$speakers!!.getJSONObject(it).optString("id") == speakerId</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$synchronized(draftSpeakerLabels) { if (resumed == null) { draftSpeakerLabels.clear(); draftRememberedVoices.clear(); draftAutomaticNames.clear(); draftSpeakerMerges = emptyMap() draftRememberGeneration = app.voices.generation(); checkpoint.saveNames(emptyMap(), emptyMap(), generation = draftRememberGeneration) } draftNamingOpen = true }</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$transcriptionProgress?.stage(TranscriptionProgress.Stage.MATCHING, (System.nanoTime() - totalBegan) / 1_000_000)</ID>
-    <ID>Wrapping:MainActivity.kt$MainActivity$try { if (!chosenModel.ready()) { download(chosenModel::install); onUi { fetchSpeechDetector() } } checkActive() val speakersReady = speakerModels.ready() || try { download(speakerModels::install); true } catch (error: IOException) { Log.w(TAG, "Speaker model unavailable", error); false } checkActive() // Voiceprints only name speakers; without the model the transcript is unchanged. if (speakersReady &amp;&amp; !voiceprintModel.ready()) try { voiceprintModel.install { progress -&gt; onUi { if (!cancelled.get()) showDownload(progress, R.string.voiceprint_model_progress) } } } catch (error: IOException) { Log.w(TAG, "Voiceprint model unavailable", error) } catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error; Log.w(TAG, "Voiceprint model unavailable", error) } checkActive() onUi { ui.progress.isIndeterminate = true; setStatus(R.string.decoding) } val totalBegan = System.nanoTime() - (resumed?.optLong("elapsedMs") ?: 0L) * 1_000_000 onUi { transcriptionBeganNs = totalBegan transcriptionProgress = TranscriptionProgress(session.durationMs) batteryProjection = BatteryProjection() batteryReading = null finalizationAtMs = -1L finalizationEstimateMs = getSharedPreferences("processing-estimates", MODE_PRIVATE).getLong("finalizationMs", 0) resumed?.let { saved -&gt; val words = Transcript.fromJson(saved.getJSONObject("recognition").getJSONObject("chunks").getJSONObject("words").toString()).words transcriptionProgress?.restore(saved.getLong("doneMs"), saved.getLong("durationMs"), words.size, saved.getLong("elapsedMs")) } session = session.copy(processingPaused = false) ui.status.minLines = 5 renderTranscriptionProgress() } checkpoint.directory.mkdirs() if (resumed == null) { checkpoint.audio.delete(); checkpoint.clips.delete() } PcmFile(checkpoint.clips, deleteOnClose = false).use { audio -&gt; resumed?.let { audio.truncate(it.getInt("clipSamples")) } val voiceClips = VoiceClipCache(audio, resumed?.optJSONObject("voiceClips")) val encoded = checkpoint.audio var encoder: StreamingOpusEncoder? = null var durationMs = 0L try { if (!documents.hasOpusAudio(uri)) encoder = StreamingOpusEncoder(encoded, resumed?.optJSONObject("encoder")) val speakerPrefix = resumed?.getString("speakerPrefix") ?: "diar_${UUID.randomUUID().toString().replace('-', '_')}_" var streamDiarizer: SortformerStream? = null var speakerFailure = resumed?.optBoolean("speakerFailure") ?: !speakersReady onUi { synchronized(draftSpeakerLabels) { if (resumed == null) { draftSpeakerLabels.clear(); draftRememberedVoices.clear(); draftAutomaticNames.clear(); draftSpeakerMerges = emptyMap() draftRememberGeneration = app.voices.generation(); checkpoint.saveNames(emptyMap(), emptyMap(), generation = draftRememberGeneration) } draftNamingOpen = true } } val detector = ModelStore.vadPath(filesDir).takeIf { ModelStore.vadReady(filesDir) } var lastDecodeUpdate = 0L val livePrints = mutableMapOf&lt;String, Pair&lt;FloatArray, Double&gt;&gt;() val liveAttemptSeconds = mutableMapOf&lt;String, Double&gt;() val rememberedPeople = knownVoices fun matchLiveVoices() { if (rememberedPeople.isEmpty() || !voiceprintModel.ready()) return val windows = SpeakerMerges.windows(voiceClips.windows, synchronized(draftSpeakerLabels) { draftSpeakerMerges.toMap() }) livePrints.keys.retainAll(windows.keys) val pending = windows.filter { (id, spans) -&gt; val seconds = spans.sumOf { it.endSample - it.startSample }.toDouble() / Limits.ASR_RATE val attempted = liveAttemptSeconds[id] ?: 0.0 seconds &gt;= 4 &amp;&amp; (attempted == 0.0 || seconds &gt;= attempted + 10) } if (pending.isEmpty()) return try { val computed = VoiceprintExtractor.compute(File(voiceprintModel.modelPath), audio, pending) { checkActive() } computed.forEach { (id, print) -&gt; liveAttemptSeconds[id] = print.second; livePrints[id] = print } val names = rememberedPeople.associate { it.id to it.name } val matches = VoiceMatcher.match(livePrints.mapValues { it.value.first }, rememberedPeople, VoiceprintModel.model.sha256, Voiceprints.THRESHOLDS.getValue(VoiceprintModel.model.sha256)) onUi { draftAutomaticNames.clear() matches.filterValues { it.state == Match.State.AUTO }.forEach { (id, match) -&gt; names[match.voiceId]?.let { draftAutomaticNames[id] = it } } saveDraftNames() } } catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error; Log.w(TAG, "Live voice matching unavailable", error) } catch (error: Exception) { Log.w(TAG, "Live voice matching unavailable", error) } } val rawTranscript: Transcript val elapsed: Long NativeBudget.acquire() try { if (resumed?.optJSONObject("diarizer") != null) streamDiarizer = SortformerStream(speakerModels.modelPath, resumed.getJSONObject("diarizer")) IncrementalRecognizer(chosenModel.files(), detector, restored = resumed?.getJSONObject("recognition"), onChunk = { chunk, startMs, words -&gt; checkActive() if (speakerFailure) words.copy(words = words.words.map { it.copy(speaker = "${speakerPrefix}1") }) else try { onUi { if (!cancelled.get()) transcriptionProgress?.stage(TranscriptionProgress.Stage.SPEAKERS, (System.nanoTime() - totalBegan) / 1_000_000, startMs, startMs + chunk.durationMs) } val diarizer = streamDiarizer ?: SortformerStream(speakerModels.modelPath).also { streamDiarizer = it } val found = diarizer.process(chunk, startMs) val assigned = if (found.isEmpty()) words.words.map { it.copy(speaker = "${speakerPrefix}1") } else Diarization.assign(words.words, found, speakerPrefix, stableIds = true) if (voiceprintModel.ready()) voiceClips.accept(chunk, found, assigned, startMs) matchLiveVoices() words.copy(words = assigned) } catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error speakerFailure = true Log.w(TAG, "Incremental speakers unavailable", error) words.copy(words = words.words.map { it.copy(speaker = "${speakerPrefix}1") }) } catch (error: Exception) { speakerFailure = true Log.w(TAG, "Incremental speakers unavailable", error) words.copy(words = words.words.map { it.copy(speaker = "${speakerPrefix}1") }) } }, onStage = { startMs, endMs, loading -&gt; checkActive() onUi { if (!cancelled.get()) transcriptionProgress?.stage( if (loading) TranscriptionProgress.Stage.PREPARING else TranscriptionProgress.Stage.WORDS, (System.nanoTime() - totalBegan) / 1_000_000, startMs, endMs) } }) { progress -&gt; checkActive() onUi { if (!cancelled.get()) showProgress(progress) } }.use { recognition -&gt; var previousSaved = resumed?.optLong("doneMs") ?: -1L fun saveCheckpoint() { audio.sync() val state = JSONObject().put("recognition", recognition.checkpoint()) .put("encoder", encoder?.checkpoint()).put("diarizer", streamDiarizer?.checkpoint()) .put("speakerPrefix", speakerPrefix).put("speakerFailure", speakerFailure) .put("clipSamples", audio.sampleCount).put("voiceClips", voiceClips.checkpoint()) .put("positionSamples", recognition.positionSamples).put("doneMs", recognition.doneMs) .put("durationMs", recognition.totalMs).put("elapsedMs", (System.nanoTime() - totalBegan) / 1_000_000) checkpoint.save(state) previousSaved = recognition.doneMs checkpointSaved = true } durationMs = AudioDecoder(contentResolver, cacheDir).stream(uri, onSamples = { samples, count -&gt; checkActive() encoder?.accept(samples, count) recognition.accept(samples, count) if (recognition.doneMs &gt; previousSaved || stopRequested.get()) saveCheckpoint() if (stopRequested.get()) throw ProcessingPaused() }, startSample = resumed?.optLong("positionSamples") ?: 0L) { decodedMs, durationMs -&gt; checkActive() recognition.totalMs = durationMs ?: session.durationMs val now = System.nanoTime() if (now - lastDecodeUpdate &gt;= 250_000_000L) { lastDecodeUpdate = now onUi { if (!cancelled.get()) { transcriptionProgress?.total(durationMs ?: recognition.totalMs) transcriptionProgress?.stage(TranscriptionProgress.Stage.READING, (now - totalBegan) / 1_000_000, end = decodedMs) } } } } requireUser(durationMs &gt;= 200, Failure.SHORT) rawTranscript = recognition.finish(durationMs) elapsed = recognition.inferenceMs saveCheckpoint() finishing = true checkActive() encoder?.finish() encoder?.close() } } finally { try { streamDiarizer?.close() } finally { NativeBudget.release() } } val finalizationBeganNs = System.nanoTime() val draftRemember = synchronized(draftSpeakerLabels) { draftRememberedVoices.toMap() } val draftGeneration = draftRememberGeneration val draftEdits = synchronized(draftSpeakerLabels) { draftNamingOpen = false draftSpeakerLabels.toMap() to draftSpeakerMerges.toMap() } onUi { speakerDialog?.dismiss(); renderTranscript() } val transcript = SpeakerMerges.apply(rawTranscript, draftEdits.second) val turns = streamDiarizer?.turns val diarizationMs = streamDiarizer?.elapsedMs ?: 0L checkActive() // Processing records are machine-readable provenance, independent of UI language. try { File(filesDir, "latest.words.json").writeText(transcript.json()) File(filesDir, "latest.processing.json").writeText(processing(chosenModel.precision, chosenModel.revision).put("language", transcript.language) .put("durationMs", durationMs).put("inferenceMs", elapsed) .put("segmentation", Parakeet.incrementalProvenance(detector)) .toString(2)) } catch (error: IOException) { Log.e(TAG, "Could not cache processing artifacts", error) } val recognition = processing(chosenModel.precision, chosenModel.revision).put("language", transcript.language) .put("x-inferenceMs", elapsed).put("x-segmentation", Parakeet.incrementalProvenance(detector)) .put("x-resumedFromMs", resumed?.optLong("doneMs") ?: 0L) val attributed = if (turns.isNullOrEmpty() || transcript.words.isEmpty()) null else SpeakerAttribution.Result(transcript, SpeakerAttribution.record(transcript.words, turns, recognition, null, diarizationMs) .put("x-incrementalDiarization", "28 s windows with 2 s overlap, persistent Sortformer speaker cache")) checkActive() val speakerTurns = turns val printModel = VoiceprintModel.model.sha256 // Naming speakers is best effort, like telling them apart: any failure keeps "Speaker N". val prints: Map&lt;String, SpeakerPrint&gt; = if (speakerTurns == null || attributed == null || !voiceprintModel.ready()) emptyMap() else try { onUi { transcriptionProgress?.stage(TranscriptionProgress.Stage.MATCHING, (System.nanoTime() - totalBegan) / 1_000_000) } val computed = NativeBudget.holding { VoiceprintExtractor.compute(File(voiceprintModel.modelPath), audio, SpeakerMerges.windows(voiceClips.windows, draftEdits.second)) { checkActive() } } val matches = VoiceMatcher.match(computed.mapValues { it.value.first }, knownVoices, printModel, Voiceprints.THRESHOLDS.getValue(printModel)) if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) for ((id, print) in computed) Log.d(TAG, "Voiceprint $id ${"%.1f".format(java.util.Locale.ROOT, print.second)} s: ${matches[id]?.let { "${it.state} ${"%.3f".format(java.util.Locale.ROOT, it.score)}" } ?: "no match"}") computed.mapValues { (id, print) -&gt; SpeakerPrint(print.first, print.second, matches[id]) } } catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error; Log.w(TAG, "Voiceprints failed", error); emptyMap() } catch (error: RuntimeException) { Log.w(TAG, "Voiceprints failed", error); emptyMap() } catch (error: OutOfMemoryError) { Log.w(TAG, "Voiceprints failed", error); emptyMap() } checkActive() val names = knownVoices.associate { it.id to it.name } val draftNames = draftEdits.first val labels = transcript.words.map { it.speaker }.distinct().mapIndexed { index, id -&gt; id to (draftNames[id] ?: prints[id]?.match?.takeIf { it.state == Match.State.AUTO }?.let { names[it.voiceId] } ?: getString(R.string.speaker_label, index + 1)) }.toMap() // Counts only: which person a voice resembles never enters the document. if (attributed != null &amp;&amp; speakerTurns != null &amp;&amp; voiceprintModel.ready()) { val t = Voiceprints.THRESHOLDS.getValue(printModel) attributed.processing.put("x-speakerIdentification", JSONObject() .put("model", "3dspeaker_speech_campplus_sv_en_voxceleb_16k").put("sha256", printModel).put("dim", prints.values.firstOrNull()?.embedding?.size ?: 512) .put("metric", "cosine").put("autoThreshold", t.auto.toDouble()).put("suggestThreshold", t.suggest.toDouble()).put("margin", t.margin.toDouble()) .put("speakersWithPrints", prints.size).put("autoApplied", prints.values.count { it.match?.state == Match.State.AUTO &amp;&amp; it.match?.voiceId in names }) .put("suggested", prints.values.count { it.match?.state == Match.State.SUGGESTED })) } onUi { transcriptionProgress?.stage(TranscriptionProgress.Stage.SAVING, (System.nanoTime() - totalBegan) / 1_000_000) } onUi { draftNamingOpen = false; speakerDialog?.dismiss() } val sourceUri = if (encoder != null) Uri.fromFile(encoded) else uri val finalProcessing = (attributed?.processing ?: recognition).let { if (draftEdits.second.isEmpty()) it else SpeakerMerges.processing(it, draftEdits.second) } val (file, portable) = documents.createFromOpus(sourceUri, attributed?.transcript ?: transcript, session.name, finalProcessing, document, labels) if (stopRequested.get()) { file.delete(); throw ProcessingPaused() } val processingMs = (System.nanoTime() - totalBegan) / 1_000_000 val measuredFinalizationMs = (System.nanoTime() - finalizationBeganNs) / 1_000_000 // A completed native call may outlive its screen. Never publish a cancelled result, // and remove only this job's new immutable document when it cannot be adopted. handler.post { if (isDestroyed || isFinishing || cancelled.get() || stopRequested.get()) file.delete() else { val position = if (playerReady) player?.currentPosition ?: session.positionMs else session.positionMs interim = null session = session.copy(uri = Uri.fromFile(file).toString(), document = file.absolutePath, name = "${session.name.substringBeforeLast('.')}.opus", selectedVariant = portable.defaultId, durationMs = durationMs, inferenceMs = elapsed, resultPrecision = chosenModel.precision, positionMs = position, processingMs = processingMs, processingPaused = false) getSharedPreferences("processing-estimates", MODE_PRIVATE).edit().putLong("finalizationMs", if (finalizationEstimateMs &gt; 0) (finalizationEstimateMs * 3 + measuredFinalizationMs) / 4 else measuredFinalizationMs).apply() adoptDocument(portable) preparePlayer(Uri.fromFile(file)) // Until the note points at the result, the checkpoint is the only way back to it. if (persistSession()) { checkpoint.discard(); checkpointSaved = false } else Log.w(TAG, "Kept the processing checkpoint: the note could not be saved") portable.manifest?.optJSONObject("meeting")?.optString("id")?.takeIf { it.isNotEmpty() &amp;&amp; prints.isNotEmpty() }?.let { meeting -&gt; try { app.noteVoices.merge(meeting, portable.defaultId ?: return@let, printModel, prints) } catch (error: Exception) { Log.w(TAG, "Could not save voiceprints", error) } } loadVoices() // Voices forgotten since the choice was made stay forgotten. if (draftGeneration == app.voices.generation()) draftRemember.forEach { (id, voice) -&gt; if (voice.isNotEmpty() &amp;&amp; voice !in people) return@forEach labels[id]?.let { name -&gt; rememberVoice(id, name, voice.takeIf { it.isNotEmpty() }, true) } } renderScreen() if (attributed == null &amp;&amp; transcript.words.isNotEmpty()) setStatus(R.string.speakers_unavailable) else defaultStatus() } } } finally { encoder?.close() } } } finally { checkpoint.release() }</ID>
+    <ID>Wrapping:MainActivity.kt$MainActivity$try { if (!models.ready(ModelCatalog.PARAKEET)) { download { models.install(ModelCatalog.PARAKEET, it) }; onUi { fetchSpeechDetector() } } checkActive() val speakersReady = models.ready(ModelCatalog.DIARIZATION) || try { download { models.install(ModelCatalog.DIARIZATION, it) }; true } catch (error: IOException) { Log.w(TAG, "Speaker model unavailable", error); false } checkActive() // Voiceprints only name speakers; without the model the transcript is unchanged. if (speakersReady &amp;&amp; !models.ready(ModelCatalog.VOICEPRINT)) try { models.install(ModelCatalog.VOICEPRINT) { progress -&gt; onUi { if (!cancelled.get()) showDownload(progress, R.string.voiceprint_model_progress) } } } catch (error: IOException) { Log.w(TAG, "Voiceprint model unavailable", error) } catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error; Log.w(TAG, "Voiceprint model unavailable", error) } checkActive() onUi { ui.progress.isIndeterminate = true; setStatus(R.string.decoding) } val totalBegan = System.nanoTime() - (resumed?.optLong("elapsedMs") ?: 0L) * 1_000_000 onUi { transcriptionBeganNs = totalBegan transcriptionProgress = TranscriptionProgress(session.durationMs) batteryProjection = BatteryProjection() batteryReading = null finalizationAtMs = -1L finalizationEstimateMs = getSharedPreferences("processing-estimates", MODE_PRIVATE).getLong("finalizationMs", 0) resumed?.let { saved -&gt; val words = Transcript.fromJson(saved.getJSONObject("recognition").getJSONObject("chunks").getJSONObject("words").toString()).words transcriptionProgress?.restore(saved.getLong("doneMs"), saved.getLong("durationMs"), words.size, saved.getLong("elapsedMs")) } session = session.copy(processingPaused = false) ui.status.minLines = 5 renderTranscriptionProgress() } checkpoint.directory.mkdirs() if (resumed == null) { checkpoint.audio.delete(); checkpoint.clips.delete() } PcmFile(checkpoint.clips, deleteOnClose = false).use { audio -&gt; resumed?.let { audio.truncate(it.getInt("clipSamples")) } val voiceClips = VoiceClipCache(audio, resumed?.optJSONObject("voiceClips")) val encoded = checkpoint.audio var encoder: StreamingOpusEncoder? = null var durationMs = 0L try { if (!documents.hasOpusAudio(uri)) encoder = StreamingOpusEncoder(encoded, resumed?.optJSONObject("encoder")) val speakerPrefix = resumed?.getString("speakerPrefix") ?: "diar_${UUID.randomUUID().toString().replace('-', '_')}_" var streamDiarizer: SortformerStream? = null var speakerFailure = resumed?.optBoolean("speakerFailure") ?: !speakersReady onUi { synchronized(draftSpeakerLabels) { if (resumed == null) { draftSpeakerLabels.clear(); draftRememberedVoices.clear(); draftAutomaticNames.clear(); draftSpeakerMerges = emptyMap() draftRememberGeneration = app.voices.generation(); checkpoint.saveNames(emptyMap(), emptyMap(), generation = draftRememberGeneration) } draftNamingOpen = true } } val detector = models.detector() var lastDecodeUpdate = 0L val livePrints = mutableMapOf&lt;String, Pair&lt;FloatArray, Double&gt;&gt;() val liveAttemptSeconds = mutableMapOf&lt;String, Double&gt;() val rememberedPeople = knownVoices fun matchLiveVoices() { if (rememberedPeople.isEmpty() || !models.ready(ModelCatalog.VOICEPRINT)) return val windows = SpeakerMerges.windows(voiceClips.windows, synchronized(draftSpeakerLabels) { draftSpeakerMerges.toMap() }) livePrints.keys.retainAll(windows.keys) val pending = windows.filter { (id, spans) -&gt; val seconds = spans.sumOf { it.endSample - it.startSample }.toDouble() / Limits.ASR_RATE val attempted = liveAttemptSeconds[id] ?: 0.0 seconds &gt;= 4 &amp;&amp; (attempted == 0.0 || seconds &gt;= attempted + 10) } if (pending.isEmpty()) return try { val computed = VoiceprintExtractor.compute(File(models.path(ModelCatalog.VOICEPRINT)), audio, pending) { checkActive() } computed.forEach { (id, print) -&gt; liveAttemptSeconds[id] = print.second; livePrints[id] = print } val names = rememberedPeople.associate { it.id to it.name } val matches = VoiceMatcher.match(livePrints.mapValues { it.value.first }, rememberedPeople, ModelCatalog.voiceprintModel.sha256, Voiceprints.THRESHOLDS.getValue(ModelCatalog.voiceprintModel.sha256)) onUi { draftAutomaticNames.clear() matches.filterValues { it.state == Match.State.AUTO }.forEach { (id, match) -&gt; names[match.voiceId]?.let { draftAutomaticNames[id] = it } } saveDraftNames() } } catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error; Log.w(TAG, "Live voice matching unavailable", error) } catch (error: Exception) { Log.w(TAG, "Live voice matching unavailable", error) } } val rawTranscript: Transcript val elapsed: Long NativeBudget.acquire() try { if (resumed?.optJSONObject("diarizer") != null) streamDiarizer = SortformerStream(models.path(ModelCatalog.DIARIZATION), resumed.getJSONObject("diarizer")) IncrementalRecognizer(models.parakeet(), detector, restored = resumed?.getJSONObject("recognition"), onChunk = { chunk, startMs, words -&gt; checkActive() if (speakerFailure) words.copy(words = words.words.map { it.copy(speaker = "${speakerPrefix}1") }) else try { onUi { if (!cancelled.get()) transcriptionProgress?.stage(TranscriptionProgress.Stage.SPEAKERS, (System.nanoTime() - totalBegan) / 1_000_000, startMs, startMs + chunk.durationMs) } val diarizer = streamDiarizer ?: SortformerStream(models.path(ModelCatalog.DIARIZATION)).also { streamDiarizer = it } val found = diarizer.process(chunk, startMs) val assigned = if (found.isEmpty()) words.words.map { it.copy(speaker = "${speakerPrefix}1") } else Diarization.assign(words.words, found, speakerPrefix, stableIds = true) if (models.ready(ModelCatalog.VOICEPRINT)) voiceClips.accept(chunk, found, assigned, startMs) matchLiveVoices() words.copy(words = assigned) } catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error speakerFailure = true Log.w(TAG, "Incremental speakers unavailable", error) words.copy(words = words.words.map { it.copy(speaker = "${speakerPrefix}1") }) } catch (error: Exception) { speakerFailure = true Log.w(TAG, "Incremental speakers unavailable", error) words.copy(words = words.words.map { it.copy(speaker = "${speakerPrefix}1") }) } }, onStage = { startMs, endMs, loading -&gt; checkActive() onUi { if (!cancelled.get()) transcriptionProgress?.stage( if (loading) TranscriptionProgress.Stage.PREPARING else TranscriptionProgress.Stage.WORDS, (System.nanoTime() - totalBegan) / 1_000_000, startMs, endMs) } }) { progress -&gt; checkActive() onUi { if (!cancelled.get()) showProgress(progress) } }.use { recognition -&gt; var previousSaved = resumed?.optLong("doneMs") ?: -1L fun saveCheckpoint() { audio.sync() val state = JSONObject().put("recognition", recognition.checkpoint()) .put("encoder", encoder?.checkpoint()).put("diarizer", streamDiarizer?.checkpoint()) .put("speakerPrefix", speakerPrefix).put("speakerFailure", speakerFailure) .put("clipSamples", audio.sampleCount).put("voiceClips", voiceClips.checkpoint()) .put("positionSamples", recognition.positionSamples).put("doneMs", recognition.doneMs) .put("durationMs", recognition.totalMs).put("elapsedMs", (System.nanoTime() - totalBegan) / 1_000_000) checkpoint.save(state) previousSaved = recognition.doneMs checkpointSaved = true } durationMs = AudioDecoder(contentResolver, cacheDir).stream(uri, onSamples = { samples, count -&gt; checkActive() encoder?.accept(samples, count) recognition.accept(samples, count) if (recognition.doneMs &gt; previousSaved || stopRequested.get()) saveCheckpoint() if (stopRequested.get()) throw ProcessingPaused() }, startSample = resumed?.optLong("positionSamples") ?: 0L) { decodedMs, durationMs -&gt; checkActive() recognition.totalMs = durationMs ?: session.durationMs val now = System.nanoTime() if (now - lastDecodeUpdate &gt;= 250_000_000L) { lastDecodeUpdate = now onUi { if (!cancelled.get()) { transcriptionProgress?.total(durationMs ?: recognition.totalMs) transcriptionProgress?.stage(TranscriptionProgress.Stage.READING, (now - totalBegan) / 1_000_000, end = decodedMs) } } } } requireUser(durationMs &gt;= 200, Failure.SHORT) rawTranscript = recognition.finish(durationMs) elapsed = recognition.inferenceMs saveCheckpoint() finishing = true checkActive() encoder?.finish() encoder?.close() } } finally { try { streamDiarizer?.close() } finally { NativeBudget.release() } } val finalizationBeganNs = System.nanoTime() val draftRemember = synchronized(draftSpeakerLabels) { draftRememberedVoices.toMap() } val draftGeneration = draftRememberGeneration val draftEdits = synchronized(draftSpeakerLabels) { draftNamingOpen = false draftSpeakerLabels.toMap() to draftSpeakerMerges.toMap() } onUi { speakerDialog?.dismiss(); renderTranscript() } val transcript = SpeakerMerges.apply(rawTranscript, draftEdits.second) val turns = streamDiarizer?.turns val diarizationMs = streamDiarizer?.elapsedMs ?: 0L checkActive() // Processing records are machine-readable provenance, independent of UI language. try { File(filesDir, "latest.words.json").writeText(transcript.json()) File(filesDir, "latest.processing.json").writeText(processing(ModelCatalog.PARAKEET_PRECISION, ModelCatalog.PARAKEET_REVISION).put("language", transcript.language) .put("durationMs", durationMs).put("inferenceMs", elapsed) .put("segmentation", Parakeet.incrementalProvenance(detector)) .toString(2)) } catch (error: IOException) { Log.e(TAG, "Could not cache processing artifacts", error) } val recognition = processing(ModelCatalog.PARAKEET_PRECISION, ModelCatalog.PARAKEET_REVISION).put("language", transcript.language) .put("x-inferenceMs", elapsed).put("x-segmentation", Parakeet.incrementalProvenance(detector)) .put("x-resumedFromMs", resumed?.optLong("doneMs") ?: 0L) val attributed = if (turns.isNullOrEmpty() || transcript.words.isEmpty()) null else SpeakerAttribution.Result(transcript, SpeakerAttribution.record(transcript.words, turns, recognition, null, diarizationMs) .put("x-incrementalDiarization", "28 s windows with 2 s overlap, persistent Sortformer speaker cache")) checkActive() val speakerTurns = turns val printModel = ModelCatalog.voiceprintModel.sha256 // Naming speakers is best effort, like telling them apart: any failure keeps "Speaker N". val prints: Map&lt;String, SpeakerPrint&gt; = if (speakerTurns == null || attributed == null || !models.ready(ModelCatalog.VOICEPRINT)) emptyMap() else try { onUi { transcriptionProgress?.stage(TranscriptionProgress.Stage.MATCHING, (System.nanoTime() - totalBegan) / 1_000_000) } val computed = NativeBudget.holding { VoiceprintExtractor.compute(File(models.path(ModelCatalog.VOICEPRINT)), audio, SpeakerMerges.windows(voiceClips.windows, draftEdits.second)) { checkActive() } } val matches = VoiceMatcher.match(computed.mapValues { it.value.first }, knownVoices, printModel, Voiceprints.THRESHOLDS.getValue(printModel)) if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) for ((id, print) in computed) Log.d(TAG, "Voiceprint $id ${"%.1f".format(java.util.Locale.ROOT, print.second)} s: ${matches[id]?.let { "${it.state} ${"%.3f".format(java.util.Locale.ROOT, it.score)}" } ?: "no match"}") computed.mapValues { (id, print) -&gt; SpeakerPrint(print.first, print.second, matches[id]) } } catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error; Log.w(TAG, "Voiceprints failed", error); emptyMap() } catch (error: RuntimeException) { Log.w(TAG, "Voiceprints failed", error); emptyMap() } catch (error: OutOfMemoryError) { Log.w(TAG, "Voiceprints failed", error); emptyMap() } checkActive() val names = knownVoices.associate { it.id to it.name } val draftNames = draftEdits.first val labels = transcript.words.map { it.speaker }.distinct().mapIndexed { index, id -&gt; id to (draftNames[id] ?: prints[id]?.match?.takeIf { it.state == Match.State.AUTO }?.let { names[it.voiceId] } ?: getString(R.string.speaker_label, index + 1)) }.toMap() // Counts only: which person a voice resembles never enters the document. if (attributed != null &amp;&amp; speakerTurns != null &amp;&amp; models.ready(ModelCatalog.VOICEPRINT)) { val t = Voiceprints.THRESHOLDS.getValue(printModel) attributed.processing.put("x-speakerIdentification", JSONObject() .put("model", "3dspeaker_speech_campplus_sv_en_voxceleb_16k").put("sha256", printModel).put("dim", prints.values.firstOrNull()?.embedding?.size ?: 512) .put("metric", "cosine").put("autoThreshold", t.auto.toDouble()).put("suggestThreshold", t.suggest.toDouble()).put("margin", t.margin.toDouble()) .put("speakersWithPrints", prints.size).put("autoApplied", prints.values.count { it.match?.state == Match.State.AUTO &amp;&amp; it.match?.voiceId in names }) .put("suggested", prints.values.count { it.match?.state == Match.State.SUGGESTED })) } onUi { transcriptionProgress?.stage(TranscriptionProgress.Stage.SAVING, (System.nanoTime() - totalBegan) / 1_000_000) } onUi { draftNamingOpen = false; speakerDialog?.dismiss() } val sourceUri = if (encoder != null) Uri.fromFile(encoded) else uri val finalProcessing = (attributed?.processing ?: recognition).let { if (draftEdits.second.isEmpty()) it else SpeakerMerges.processing(it, draftEdits.second) } val (file, portable) = documents.createFromOpus(sourceUri, attributed?.transcript ?: transcript, session.name, finalProcessing, document, labels) if (stopRequested.get()) { file.delete(); throw ProcessingPaused() } val processingMs = (System.nanoTime() - totalBegan) / 1_000_000 val measuredFinalizationMs = (System.nanoTime() - finalizationBeganNs) / 1_000_000 // A completed native call may outlive its screen. Never publish a cancelled result, // and remove only this job's new immutable document when it cannot be adopted. handler.post { if (isDestroyed || isFinishing || cancelled.get() || stopRequested.get()) file.delete() else { val position = if (playerReady) player?.currentPosition ?: session.positionMs else session.positionMs interim = null session = session.copy(uri = Uri.fromFile(file).toString(), document = file.absolutePath, name = "${session.name.substringBeforeLast('.')}.opus", selectedVariant = portable.defaultId, durationMs = durationMs, inferenceMs = elapsed, resultPrecision = ModelCatalog.PARAKEET_PRECISION, positionMs = position, processingMs = processingMs, processingPaused = false) getSharedPreferences("processing-estimates", MODE_PRIVATE).edit().putLong("finalizationMs", if (finalizationEstimateMs &gt; 0) (finalizationEstimateMs * 3 + measuredFinalizationMs) / 4 else measuredFinalizationMs).apply() adoptDocument(portable) preparePlayer(Uri.fromFile(file)) // Until the note points at the result, the checkpoint is the only way back to it. if (persistSession()) { checkpoint.discard(); checkpointSaved = false } else Log.w(TAG, "Kept the processing checkpoint: the note could not be saved") portable.manifest?.optJSONObject("meeting")?.optString("id")?.takeIf { it.isNotEmpty() &amp;&amp; prints.isNotEmpty() }?.let { meeting -&gt; try { app.noteVoices.merge(meeting, portable.defaultId ?: return@let, printModel, prints) } catch (error: Exception) { Log.w(TAG, "Could not save voiceprints", error) } } loadVoices() // Voices forgotten since the choice was made stay forgotten. if (draftGeneration == app.voices.generation()) draftRemember.forEach { (id, voice) -&gt; if (voice.isNotEmpty() &amp;&amp; voice !in people) return@forEach labels[id]?.let { name -&gt; rememberVoice(id, name, voice.takeIf { it.isNotEmpty() }, true) } } renderScreen() if (attributed == null &amp;&amp; transcript.words.isNotEmpty()) setStatus(R.string.speakers_unavailable) else defaultStatus() } } } finally { encoder?.close() } } } finally { checkpoint.release() }</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity${ Log.e(TAG, "Could not persist session", error); setStatus(R.string.library_error, error = true); return false }</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity${ Log.w(TAG, "Could not save voiceprints", error) }</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity${ app.noteVoices.merge(meeting, portable.defaultId ?: return@let, printModel, prints) }</ID>
@@ -2901,6 +2922,8 @@
     <ID>Wrapping:MainActivity.kt$MainActivity${ checkpoint.release(); setStatus(R.string.checkpoint_error, error = true); return }</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity${ checkpointUnreadable = true; checkpointSaved = true; Log.e(TAG, "Could not read processing checkpoint", error); setStatus(R.string.checkpoint_error, error = true); return }</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity${ contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { if (it.moveToFirst()) it.getString(0) else null } }</ID>
+    <ID>Wrapping:MainActivity.kt$MainActivity${ download { models.install(ModelCatalog.DIARIZATION, it) }; true }</ID>
+    <ID>Wrapping:MainActivity.kt$MainActivity${ download { models.install(ModelCatalog.PARAKEET, it) }; onUi { fetchSpeechDetector() } }</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity${ if (error.failure == Failure.CANCELLED) throw error; Log.w(TAG, "Live voice matching unavailable", error) }</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity${ if (error.failure == Failure.CANCELLED) throw error; Log.w(TAG, "Voiceprint model unavailable", error) }</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity${ if (error.failure == Failure.CANCELLED) throw error; Log.w(TAG, "Voiceprints failed", error); emptyMap() }</ID>
@@ -2915,12 +2938,8 @@
     <ID>Wrapping:MainActivity.kt$MainActivity.&lt;no name provided&gt;${ pendingName = s?.toString(); validate() }</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity.Companion$</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity.Companion$;</ID>
+    <ID>Wrapping:MainActivity.kt$MainActivity.Companion${ InstalledModels(filesDir).install(ModelCatalog.VAD) { } }</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity.Companion${ Log.w(TAG, "Speech detector unavailable", error) }</ID>
-    <ID>Wrapping:MainActivity.kt$MainActivity.Companion${ ModelStore.installVad(filesDir) { } }</ID>
-    <ID>Wrapping:ModelBundle.kt$ModelBundle.Companion$(</ID>
-    <ID>Wrapping:ModelBundleTest.kt$ModelBundleTest$;</ID>
-    <ID>Wrapping:ModelBundleTest.kt$ModelBundleTest$it.setLength(size)</ID>
-    <ID>Wrapping:ModelBundleTest.kt$ModelBundleTest${ file.parentFile!!.mkdirs(); RandomAccessFile(file, "rw").use { it.setLength(size) } }</ID>
     <ID>Wrapping:ModelUpgradeTest.kt$ModelUpgradeTest$(</ID>
     <ID>Wrapping:ModelUpgradeTest.kt$ModelUpgradeTest$;</ID>
     <ID>Wrapping:ModelUpgradeTest.kt$ModelUpgradeTest$File(directory, it).writeText("old weights")</ID>
@@ -3143,6 +3162,7 @@
     <ID>Wrapping:VoiceStore.kt$VoiceStore${ if (generationFile.exists()) generationFile.readText().trim().toLong() else 0 }</ID>
     <ID>Wrapping:VoiceStore.kt$VoiceStore.Companion$;</ID>
     <ID>Wrapping:VoiceStoreTest.kt$VoiceStoreTest$;</ID>
+    <ID>Wrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$</ID>
     <ID>Wrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$!it.second &amp;&amp; it.third.first &gt;= t.auto &amp;&amp; it.third.second &gt;= t.margin</ID>
     <ID>Wrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$!it.startsWith("$clip/")</ID>
     <ID>Wrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$!it.startsWith("$clip/") &amp;&amp; it.substringAfter('/') != name</ID>
@@ -3150,6 +3170,7 @@
     <ID>Wrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$;</ID>
     <ID>Wrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$PcmAudio(resampleTo16k(it.samples, it.sampleRate), 16000)</ID>
     <ID>Wrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$SpeakerTurn(it.first, it.second, ids.indexOf(it.third))</ID>
+    <ID>Wrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$VoiceprintExtractor.compute(File(model.path(ModelCatalog.VOICEPRINT)), audio, windows) { }</ID>
     <ID>Wrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$Voiceprints.cosine(print, it)</ID>
     <ID>Wrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$it.first</ID>
     <ID>Wrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$it.key.substringAfter('/')</ID>

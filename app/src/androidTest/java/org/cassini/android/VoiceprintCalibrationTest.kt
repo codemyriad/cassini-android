@@ -6,6 +6,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import org.cassini.core.audio.PcmAudio
 import org.cassini.core.audio.resampleTo16k
 import org.cassini.core.format.Word
+import org.cassini.core.models.ModelCatalog
 import org.cassini.core.speakers.SpeakerTurn
 import org.cassini.core.speakers.Voiceprints
 import org.cassini.engine.job.NativeBudget
@@ -20,7 +21,7 @@ import java.io.File
 class VoiceprintCalibrationTest {
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
     private val context get() = instrumentation.targetContext
-    private val model get() = VoiceprintModel.inFiles(context.filesDir)
+    private val model get() = InstalledModels(context.filesDir)
     private fun log(message: String) { Log.i("CassiniVoice", message); println(message) }
     private fun hasAsset(name: String) = try { instrumentation.context.assets.open(name).close(); true } catch (_: java.io.IOException) { false }
     private fun fixture(name: String): PcmAudio {
@@ -33,7 +34,7 @@ class VoiceprintCalibrationTest {
         val ids = turns.map { it.third }.distinct()
         val words = turns.map { Word(it.third, it.first, it.second, "x") }.sortedBy { it.startMs }
         val windows = Voiceprints.select(turns.map { SpeakerTurn(it.first, it.second, ids.indexOf(it.third)) }, words, audio.sampleRate, audio.samples.size)
-        return NativeBudget.holding { VoiceprintExtractor.compute(File(model.modelPath), audio, windows) { } }
+        return NativeBudget.holding { VoiceprintExtractor.compute(File(model.path(ModelCatalog.VOICEPRINT)), audio, windows) { } }
     }
     private fun summary(name: String, scores: List<Float>) {
         if (scores.isEmpty()) return
@@ -42,7 +43,7 @@ class VoiceprintCalibrationTest {
     }
 
     @Test fun sameVoiceScoresAboveDifferentVoices() {
-        assumeTrue("Install the voiceprint model first", model.ready())
+        assumeTrue("Install the voiceprint model first", model.ready(ModelCatalog.VOICEPRINT))
         // Two halves of each single-voice fixture are the same speaker; the two fixtures are different speakers.
         val halves = listOf("fleurs-it-short.wav", "youtube-smoke.wav").flatMap { name ->
             val audio = fixture(name); val half = audio.durationMs / 2
@@ -62,7 +63,7 @@ class VoiceprintCalibrationTest {
 
     /** Private multi-speaker clips with per-participant ground truth; skipped when they are not present. */
     @Test fun meetingVoicesAcrossRecordings() {
-        assumeTrue("Install the voiceprint model first", model.ready())
+        assumeTrue("Install the voiceprint model first", model.ready(ModelCatalog.VOICEPRINT))
         assumeTrue("Add the private meeting fixtures first", hasAsset("meetings/index.json"))
         val index = JSONObject(instrumentation.context.assets.open("meetings/index.json").bufferedReader().readText()).getJSONArray("clips")
         // Speaker key is clip/name/half; halves within a clip measure same-recording similarity.
@@ -120,7 +121,7 @@ class VoiceprintCalibrationTest {
             log("auto=%.2f margin=%.2f: applied ${applied.size}/${trials.count { it.first }} enrolled, wrong ${applied.count { !it.second }}"
                 .format(java.util.Locale.ROOT, auto, margin))
         }
-        val t = Voiceprints.THRESHOLDS.getValue(VoiceprintModel.model.sha256)
+        val t = Voiceprints.THRESHOLDS.getValue(ModelCatalog.voiceprintModel.sha256)
         log("auto=${t.auto} suggest=${t.suggest} margin=${t.margin}: " +
             "different>=suggest ${different.count { it >= t.suggest }}, different>=auto ${different.count { it >= t.auto }}, " +
             "across>=auto ${sameAcross.count { it >= t.auto }}/${sameAcross.size}, across>=suggest ${sameAcross.count { it >= t.suggest }}/${sameAcross.size}")

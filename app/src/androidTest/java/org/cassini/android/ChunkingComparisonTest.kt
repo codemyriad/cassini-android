@@ -6,6 +6,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import org.cassini.core.asr.DecodePolicy
 import org.cassini.core.audio.PcmAudio
 import org.cassini.core.format.Transcript
+import org.cassini.core.models.ModelCatalog
 import org.cassini.engine.asr.Parakeet
 import org.json.JSONArray
 import org.json.JSONObject
@@ -48,23 +49,23 @@ class ChunkingComparisonTest {
         val arguments = InstrumentationRegistry.getArguments()
         // Minutes of decoding per run: asked for by name, scripts/device-smoke.sh cutting org.cassini.android.ChunkingComparisonTest
         assumeTrue("Pass audioSample=cutting to measure cutting modes", arguments.getString("audioSample") == "cutting")
-        val models = ModelStore(File(context.filesDir, "parakeet-v3"))
+        val models = InstalledModels(context.filesDir)
         if (arguments.getString("downloadModels") == "true") {
-            models.install { }
-            ModelStore.installVad(context.filesDir) { }
+            models.install(ModelCatalog.PARAKEET) { }
+            InstalledModels(context.filesDir).install(ModelCatalog.VAD) { }
         }
-        assumeTrue("Install Parakeet and the speech detector first", models.ready() && ModelStore.vadReady(context.filesDir))
-        val detector = ModelStore.vadPath(context.filesDir)
+        assumeTrue("Install Parakeet and the speech detector first", models.ready(ModelCatalog.PARAKEET) && ModelCatalog.VAD.ready(context.filesDir))
+        val detector = models.path(ModelCatalog.VAD)
         val available = instrumentation.context.assets.list("")!!.toSet()
         val reference = tokens(JSONObject(instrumentation.context.assets.open("fleurs-it-short.json").bufferedReader().use { it.readText() }).getString("reference"))
         val modes = linkedMapOf<String, (PcmAudio, (Parakeet.Progress) -> Unit) -> Transcript>(
-            "whole" to { audio, _ -> Parakeet.transcribe(audio, models.files(), null, cutting = Parakeet.Cutting.WHOLE) },
-            "fixed-15s" to { audio, progress -> Parakeet.transcribe(audio, models.files(), null, cutting = Parakeet.Cutting.FIXED, onProgress = progress) },
-            "quiet-cuts" to { audio, progress -> Parakeet.transcribe(audio, models.files(), null, onProgress = progress) },
-            "speech-10s-tail" to { audio, progress -> Parakeet.transcribe(audio, models.files(), detector, DecodePolicy(), onProgress = progress) },
-            "speech-span-notail" to { audio, progress -> Parakeet.transcribe(audio, models.files(), detector, DecodePolicy(preserveSpan = true, tailPaddingMs = 0), onProgress = progress) },
-            "speech-span-context" to { audio, progress -> Parakeet.transcribe(audio, models.files(), detector, DecodePolicy.PARAKEET_V3_REFERENCE, onProgress = progress) },
-            "speech-span-tail" to { audio, progress -> Parakeet.transcribe(audio, models.files(), detector, onProgress = progress) },
+            "whole" to { audio, _ -> Parakeet.transcribe(audio, models.parakeet(), null, cutting = Parakeet.Cutting.WHOLE) },
+            "fixed-15s" to { audio, progress -> Parakeet.transcribe(audio, models.parakeet(), null, cutting = Parakeet.Cutting.FIXED, onProgress = progress) },
+            "quiet-cuts" to { audio, progress -> Parakeet.transcribe(audio, models.parakeet(), null, onProgress = progress) },
+            "speech-10s-tail" to { audio, progress -> Parakeet.transcribe(audio, models.parakeet(), detector, DecodePolicy(), onProgress = progress) },
+            "speech-span-notail" to { audio, progress -> Parakeet.transcribe(audio, models.parakeet(), detector, DecodePolicy(preserveSpan = true, tailPaddingMs = 0), onProgress = progress) },
+            "speech-span-context" to { audio, progress -> Parakeet.transcribe(audio, models.parakeet(), detector, DecodePolicy.PARAKEET_V3_REFERENCE, onProgress = progress) },
+            "speech-span-tail" to { audio, progress -> Parakeet.transcribe(audio, models.parakeet(), detector, onProgress = progress) },
         )
         val report = JSONArray()
         val clips = listOf("fleurs-it-short.wav", "fleurs-it-short.m4a", "youtube-smoke.wav", "youtube-long.wav").filter { it in available }
@@ -103,6 +104,6 @@ class ChunkingComparisonTest {
                 }
             }
         }
-        File(context.filesDir, "chunking-comparison.${models.precision}.json").writeText(report.toString(2))
+        File(context.filesDir, "chunking-comparison.${ModelCatalog.PARAKEET_PRECISION}.json").writeText(report.toString(2))
     }
 }

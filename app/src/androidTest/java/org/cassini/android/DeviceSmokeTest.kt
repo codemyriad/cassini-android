@@ -16,6 +16,7 @@ import org.cassini.core.audio.PcmFile
 import org.cassini.core.format.OggOpus
 import org.cassini.core.format.Transcript
 import org.cassini.core.format.Word
+import org.cassini.core.models.ModelCatalog
 import org.cassini.core.speakers.SpeakerTurn
 import org.cassini.engine.asr.IncrementalRecognizer
 import org.cassini.engine.asr.Parakeet
@@ -143,14 +144,14 @@ class DeviceSmokeTest {
     }
 
     @Test fun speechDetectorFindsOrderedSpansInsideTheRecording() {
-        if (InstrumentationRegistry.getArguments().getString("downloadModels") == "true") ModelStore.installVad(context.filesDir) { }
-        assumeTrue("Install the speech detector first", ModelStore.vadReady(context.filesDir))
+        if (InstrumentationRegistry.getArguments().getString("downloadModels") == "true") InstalledModels(context.filesDir).install(ModelCatalog.VAD) { }
+        assumeTrue("Install the speech detector first", ModelCatalog.VAD.ready(context.filesDir))
         val file = fixture()
         try {
             val speech = audioDecoder(context).decode(Uri.fromFile(file))
             // The same recording at the microphone's rate, so spans must come back on that clock.
             val upsampled = PcmAudio(FloatArray(speech.samples.size * 3) { speech.samples[it / 3] }, speech.sampleRate * 3)
-            SileroDetector(ModelStore.vadPath(context.filesDir)).use { detector ->
+            SileroDetector(ModelCatalog.VAD.path(context.filesDir, ModelCatalog.sileroVad.name)).use { detector ->
                 for (audio in listOf(speech, upsampled)) {
                     val spans = ArrayList<Span>()
                     val paddedTailMs = detector.detect(audio) { spans += it }
@@ -168,14 +169,14 @@ class DeviceSmokeTest {
     }
 
     @Test fun streamingDiarizationPreservesAnAbsentSpeakerSlot() {
-        val models = DiarizationModels.inFiles(context.filesDir)
-        assumeTrue("Install the speaker model", models.ready())
+        val models = InstalledModels(context.filesDir)
+        assumeTrue("Install the speaker model", models.ready(ModelCatalog.DIARIZATION))
         val first = audioDecoder(context).decode(Uri.fromFile(fixture("fleurs-it-short.wav")))
         val second = audioDecoder(context).decode(Uri.fromFile(fixture("youtube-smoke.wav")))
         val combined = first.samples + FloatArray(16000) + second.samples
         NativeBudget.acquire()
         try {
-            SortformerStream(models.modelPath).use { diarizer ->
+            SortformerStream(models.path(ModelCatalog.DIARIZATION)).use { diarizer ->
                 val initial = diarizer.process(PcmAudio(combined.copyOfRange(0, 28 * 16000), 16000), 0)
                 fun dominant(turns: List<SpeakerTurn>, start: Long, end: Long) = turns.groupBy { it.speaker }
                     .maxByOrNull { (_, runs) -> runs.sumOf { maxOf(0, minOf(end, it.endMs) - maxOf(start, it.startMs)) } }!!.key
@@ -291,8 +292,8 @@ class DeviceSmokeTest {
     }
 
     @Test fun diarizationCheckpointRestoresTheSameSpeakerSlotsAndTurns() {
-        val models = DiarizationModels.inFiles(context.filesDir)
-        assumeTrue(models.ready())
+        val models = InstalledModels(context.filesDir)
+        assumeTrue(models.ready(ModelCatalog.DIARIZATION))
         val first = audioDecoder(context).decode(Uri.fromFile(fixture("fleurs-it-short.wav")))
         val second = audioDecoder(context).decode(Uri.fromFile(fixture("youtube-smoke.wav")))
         val all = first.samples + FloatArray(16000) + second.samples
@@ -301,13 +302,13 @@ class DeviceSmokeTest {
             lateinit var saved: JSONObject
             lateinit var expected: List<SpeakerTurn>
             lateinit var history: List<SpeakerTurn>
-            SortformerStream(models.modelPath).use {
+            SortformerStream(models.path(ModelCatalog.DIARIZATION)).use {
                 it.process(PcmAudio(all.copyOfRange(0, 28 * 16000), 16000), 0)
                 saved = JSONObject(it.checkpoint().toString())
                 expected = it.process(PcmAudio(all.copyOfRange(26 * 16000, all.size), 16000), 26000)
                 history = it.turns
             }
-            SortformerStream(models.modelPath, saved).use {
+            SortformerStream(models.path(ModelCatalog.DIARIZATION), saved).use {
                 assertEquals(expected, it.process(PcmAudio(all.copyOfRange(26 * 16000, all.size), 16000), 26000))
                 assertEquals(history, it.turns)
             }
@@ -338,16 +339,16 @@ class DeviceSmokeTest {
     }
 
     @Test fun incrementalParakeetPublishesWordsBeforeAudioImportCompletes() {
-        val models = ModelStore(File(context.filesDir, "parakeet-v3"))
-        assumeTrue("Install Parakeet before running native inference", models.ready())
+        val models = InstalledModels(context.filesDir)
+        assumeTrue("Install Parakeet before running native inference", models.ready(ModelCatalog.PARAKEET))
         val file = fixture("youtube-smoke.wav")
         try {
             var imported = false
             var sawEarlyWords = false
             var progressCount = 0
-            val detector = ModelStore.vadPath(context.filesDir).takeIf { ModelStore.vadReady(context.filesDir) }
+            val detector = InstalledModels(context.filesDir).detector()
             NativeBudget.holding {
-                IncrementalRecognizer(models.files(), detector) { progress ->
+                IncrementalRecognizer(models.parakeet(), detector) { progress ->
                     progressCount++
                     if (!imported && progress.words.isNotEmpty()) sawEarlyWords = true
                 }.use { recognition ->
@@ -370,13 +371,13 @@ class DeviceSmokeTest {
 
     @Test fun nativeParakeetProducesTimedItalianWords() {
         val arguments = InstrumentationRegistry.getArguments()
-        val models = ModelStore(File(context.filesDir, "parakeet-v3"))
+        val models = InstalledModels(context.filesDir)
         if (arguments.getString("downloadModels") == "true") {
-            models.install { message -> instrumentation.sendStatus(0, Bundle().apply { putString("stream", "$message\n") }) }
-            ModelStore.installVad(context.filesDir) { }
+            models.install(ModelCatalog.PARAKEET) { message -> instrumentation.sendStatus(0, Bundle().apply { putString("stream", "$message\n") }) }
+            InstalledModels(context.filesDir).install(ModelCatalog.VAD) { }
         }
-        assumeTrue("Download Parakeet in the app before running native inference test", models.ready())
-        val detector = ModelStore.vadPath(context.filesDir).takeIf { ModelStore.vadReady(context.filesDir) }
+        assumeTrue("Download Parakeet in the app before running native inference test", models.ready(ModelCatalog.PARAKEET))
+        val detector = InstalledModels(context.filesDir).detector()
         val sample = arguments.getString("audioSample")
         val youtube = sample == "youtube" || sample == "youtube-long"
         val file = fixture(when (sample) {
@@ -389,7 +390,7 @@ class DeviceSmokeTest {
             if (sample == "youtube-long") assertEquals(180000L, audio.durationMs)
             val began = System.nanoTime()
             val steps = ArrayList<Parakeet.Progress>()
-            val transcript = Parakeet.transcribe(audio, models.files(), detector) { steps += it }
+            val transcript = Parakeet.transcribe(audio, models.parakeet(), detector) { steps += it }
             val elapsedMs = (System.nanoTime() - began) / 1_000_000
             // Pieces are decoded one after another: the position only moves forward and ends at the recording's end.
             assertTrue(steps.zipWithNext().all { (a, b) -> b.doneMs >= a.doneMs && b.elapsedMs >= a.elapsedMs })
@@ -400,17 +401,17 @@ class DeviceSmokeTest {
             val peakRssKiB = File("/proc/self/status").readLines()
                 .firstOrNull { it.startsWith("VmHWM:") }?.trim()?.split(Regex("\\s+"))?.getOrNull(1)?.toLongOrNull()
             val text = transcript.words.joinToString(" ") { it.text }
-            File(context.filesDir, "device-smoke.${models.precision}.words.json").writeText(transcript.json())
+            File(context.filesDir, "device-smoke.${ModelCatalog.PARAKEET_PRECISION}.words.json").writeText(transcript.json())
             val metrics = JSONObject()
                 .put("audioDurationMs", audio.durationMs).put("inferenceMs", elapsedMs)
-                .put("precision", models.precision).put("peakRssKiB", peakRssKiB)
+                .put("precision", ModelCatalog.PARAKEET_PRECISION).put("peakRssKiB", peakRssKiB)
                 .put("audioSample", when (sample) {
                     "youtube-long" -> "YouTube UmZwQf5TV3c, 28–208 seconds"
                     "youtube" -> "YouTube UmZwQf5TV3c, 28–58 seconds"
                     else -> "FLEURS Italian dev"
                 })
                 .put("text", text).toString(2)
-            File(context.filesDir, "device-smoke.${models.precision}.metrics.json").writeText(metrics)
+            File(context.filesDir, "device-smoke.${ModelCatalog.PARAKEET_PRECISION}.metrics.json").writeText(metrics)
             instrumentation.sendStatus(0, Bundle().apply { putString("stream", "$metrics\n") })
             assertTrue("Recognized: $text", transcript.words.size >= 10)
             if (!youtube) assertTrue("Recognized: $text", text.contains("settentrionale", ignoreCase = true))

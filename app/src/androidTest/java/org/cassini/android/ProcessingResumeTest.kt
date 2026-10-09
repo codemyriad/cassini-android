@@ -16,6 +16,7 @@ import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.platform.app.InstrumentationRegistry
 import org.cassini.core.format.CassiniDocument
 import org.cassini.core.library.Session
+import org.cassini.core.models.ModelCatalog
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -28,8 +29,8 @@ class ProcessingResumeTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext
     @Test fun stopReopenAndResumeKeepsNamesPositionAndContinuousAudio() {
-        assumeTrue(ModelStore(File(context.filesDir, "parakeet-v3")).ready())
-        assumeTrue(DiarizationModels.inFiles(context.filesDir).ready())
+        assumeTrue(ModelCatalog.PARAKEET.ready(context.filesDir))
+        assumeTrue(ModelCatalog.DIARIZATION.ready(context.filesDir))
         (context.applicationContext as CassiniApplication).voices.clear() // The rule restores the user’s exact saved profiles.
         val fixture = File(context.cacheDir, "resume-fixture.wav")
         instrumentation.context.assets.open("youtube-smoke.wav").use { input -> fixture.outputStream().use { input.copyTo(it) } }

@@ -10,7 +10,7 @@ import android.view.View
 import android.widget.*
 import org.cassini.android.ui.clock
 import org.cassini.core.library.LibraryNote
-import java.io.File
+import org.cassini.core.models.ModelCatalog
 import java.text.DateFormat
 import java.util.Calendar
 import java.util.Date
@@ -98,8 +98,7 @@ class LibraryActivity : Activity() {
 
     private fun refresh() {
         record.isEnabled = true; open.isEnabled = true
-        val model = ModelStore(File(filesDir, "parakeet-v3"))
-        summary.setText(if (model.ready()) R.string.library_local else R.string.library_needs_model)
+        summary.setText(if (ModelCatalog.PARAKEET.ready(filesDir)) R.string.library_local else R.string.library_needs_model)
         renderNotes()
     }
 

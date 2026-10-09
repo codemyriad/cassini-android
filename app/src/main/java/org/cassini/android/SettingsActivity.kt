@@ -13,8 +13,8 @@ import android.preference.PreferenceFragment
 import android.text.format.DateUtils
 import android.view.MenuItem
 import android.widget.TextView
+import org.cassini.core.models.ModelCatalog
 import org.cassini.core.speakers.Voice
-import java.io.File
 import java.util.concurrent.Executors
 
 class SettingsActivity : Activity() {
@@ -73,9 +73,9 @@ class SettingsActivity : Activity() {
                 setTitle(R.string.recognition_model); summary = modelSummary(context)
                 isSelectable = false
             })
-            val bundle = ModelBundle.inFiles(context.filesDir)
-            listOf(Triple(R.string.speaker_model, R.string.speaker_model_summary, bundle.speakers.ready()),
-                Triple(R.string.voiceprint_model, R.string.voiceprint_model_summary, bundle.voiceprint.ready())).forEach { (title, detail, ready) ->
+            val bundle = InstalledModels(context.filesDir)
+            listOf(Triple(R.string.speaker_model, R.string.speaker_model_summary, bundle.ready(ModelCatalog.DIARIZATION)),
+                Triple(R.string.voiceprint_model, R.string.voiceprint_model_summary, bundle.ready(ModelCatalog.VOICEPRINT))).forEach { (title, detail, ready) ->
                 transcription.addPreference(Preference(context).apply {
                     setTitle(title); summary = getString(if (ready) R.string.model_ready else R.string.model_missing, getString(detail))
                     isSelectable = false
@@ -129,7 +129,7 @@ class SettingsActivity : Activity() {
                     isPersistent = false; title = voice.name
                     val speech = DateUtils.formatElapsedTime(voice.seconds.toLong())
                     summary = when {
-                        voice.model != VoiceprintModel.model.sha256 -> getString(R.string.people_needs_reenrol)
+                        voice.model != ModelCatalog.voiceprintModel.sha256 -> getString(R.string.people_needs_reenrol)
                         counts == null -> getString(R.string.people_summary_counting, speech)
                         else -> resources.getQuantityString(R.plurals.people_summary, counts[voice.id] ?: 0, counts[voice.id] ?: 0, speech)
                     }
@@ -174,10 +174,9 @@ class SettingsActivity : Activity() {
         }
 
         private fun modelSummary(context: Context): String {
-            val models = ModelStore(File(context.filesDir, "parakeet-v3"))
-            return getString(R.string.settings_model_summary, models.precision,
+            return getString(R.string.settings_model_summary, ModelCatalog.PARAKEET_PRECISION,
                 getString(R.string.model_size_int8),
-                getString(if (models.ready()) R.string.model_installed else R.string.model_download_needed))
+                getString(if (ModelCatalog.PARAKEET.ready(context.filesDir)) R.string.model_installed else R.string.model_download_needed))
         }
     }
 }

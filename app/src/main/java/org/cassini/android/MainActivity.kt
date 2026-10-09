@@ -41,6 +41,7 @@ import org.cassini.core.format.SpeakerMerges
 import org.cassini.core.format.Transcript
 import org.cassini.core.library.LibraryNote
 import org.cassini.core.library.Session
+import org.cassini.core.models.ModelCatalog
 import org.cassini.core.requireUser
 import org.cassini.core.speakers.DefaultLabels
 import org.cassini.core.speakers.Diarization
@@ -68,7 +69,7 @@ class MainActivity : Activity() {
     private val worker = Executors.newSingleThreadExecutor()
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var ui: DeckViews
-    private lateinit var models: ModelStore
+    private lateinit var models: InstalledModels
     private lateinit var sessions: SessionStore
     private lateinit var library: LibraryStore
     private var autoTranscribe = false
@@ -157,7 +158,7 @@ class MainActivity : Activity() {
         }
         session = selected
         autoTranscribe = savedInstanceState == null && intent.getBooleanExtra(AUTO_TRANSCRIBE, false)
-        models = ModelStore(File(filesDir, "parakeet-v3"))
+        models = InstalledModels(filesDir)
         ui = DeckViews(this)
         setContentView(ui.root)
         ui.library.setOnClickListener { returnToLibrary() }
@@ -219,11 +220,11 @@ class MainActivity : Activity() {
     /** The first transcription asks once before the large download; later ones quietly retry any optional model still missing. */
     private fun confirmTranscription() {
         if (busy || session.uri == null) return
-        val bundle = ModelBundle.inFiles(filesDir)
+        val bundle = InstalledModels(filesDir)
         if (bundle.consented()) transcribe()
         else AlertDialog.Builder(this).setTitle(R.string.models_download)
             .setMessage(getString(R.string.models_download_summary, bundle.missingBytes().let {
-                getString(R.string.models_size_mib, ModelBundle.mebibytes(it)) }))
+                getString(R.string.models_size_mib, ModelCatalog.mebibytes(it)) }))
             .setNegativeButton(R.string.cancel, null)
             .setPositiveButton(R.string.download_and_transcribe) { _, _ -> transcribe() }.show()
     }
@@ -270,7 +271,7 @@ class MainActivity : Activity() {
             }.show()
     }
 
-    private fun showDownload(progress: ModelStore.Progress, label: Int = R.string.downloading) {
+    private fun showDownload(progress: InstalledModels.Progress, label: Int = R.string.downloading) {
         ui.progress.isIndeterminate = false
         ui.progress.progress = progress.percent
         setStatus(if (progress.verifying) R.string.verifying else label, progress.percent)
@@ -280,7 +281,6 @@ class MainActivity : Activity() {
     private fun transcribe() {
         if (busy || (document != null && document?.state != "ok")) return
         val uri = session.uri?.let(Uri::parse) ?: return
-        val chosenModel = models
         val knownVoices = voicesForRecognition()
         val checkpoint = ProcessingCheckpoint(filesDir, uri.toString())
         // Another viewer of the same source would truncate this job's files before waiting for inference.
@@ -290,8 +290,6 @@ class MainActivity : Activity() {
         ui.cancelOperation.setText(R.string.stop_processing)
         ui.cancelOperation.isEnabled = true
         var finishing = false
-        val speakerModels = DiarizationModels.inFiles(filesDir)
-        val voiceprintModel = VoiceprintModel.inFiles(filesDir)
         val cancelled = java.util.concurrent.atomic.AtomicBoolean()
         cancellation = cancelled
         ui.cancelOperation.visibility = View.VISIBLE
@@ -299,16 +297,16 @@ class MainActivity : Activity() {
             requireUser(!cancelled.get() && !Thread.currentThread().isInterrupted, Failure.CANCELLED)
             if (finishing && stopRequested.get()) throw ProcessingPaused()
         }
-        fun download(install: ((ModelStore.Progress) -> Unit) -> Unit) = install { progress -> onUi { if (!cancelled.get()) showDownload(progress) } }
-        runWork(if (chosenModel.ready()) R.string.decoding else R.string.preparing_download) { try {
-            if (!chosenModel.ready()) { download(chosenModel::install); onUi { fetchSpeechDetector() } }
+        fun download(install: ((InstalledModels.Progress) -> Unit) -> Unit) = install { progress -> onUi { if (!cancelled.get()) showDownload(progress) } }
+        runWork(if (models.ready(ModelCatalog.PARAKEET)) R.string.decoding else R.string.preparing_download) { try {
+            if (!models.ready(ModelCatalog.PARAKEET)) { download { models.install(ModelCatalog.PARAKEET, it) }; onUi { fetchSpeechDetector() } }
             checkActive()
-            val speakersReady = speakerModels.ready() || try { download(speakerModels::install); true }
+            val speakersReady = models.ready(ModelCatalog.DIARIZATION) || try { download { models.install(ModelCatalog.DIARIZATION, it) }; true }
                 catch (error: IOException) { Log.w(TAG, "Speaker model unavailable", error); false }
             checkActive()
             // Voiceprints only name speakers; without the model the transcript is unchanged.
-            if (speakersReady && !voiceprintModel.ready()) try {
-                voiceprintModel.install { progress -> onUi { if (!cancelled.get()) showDownload(progress, R.string.voiceprint_model_progress) } }
+            if (speakersReady && !models.ready(ModelCatalog.VOICEPRINT)) try {
+                models.install(ModelCatalog.VOICEPRINT) { progress -> onUi { if (!cancelled.get()) showDownload(progress, R.string.voiceprint_model_progress) } }
             } catch (error: IOException) { Log.w(TAG, "Voiceprint model unavailable", error) }
             catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error; Log.w(TAG, "Voiceprint model unavailable", error) }
             checkActive()
@@ -349,13 +347,13 @@ class MainActivity : Activity() {
                         }
                         draftNamingOpen = true
                     } }
-                    val detector = ModelStore.vadPath(filesDir).takeIf { ModelStore.vadReady(filesDir) }
+                    val detector = models.detector()
                     var lastDecodeUpdate = 0L
                     val livePrints = mutableMapOf<String, Pair<FloatArray, Double>>()
                     val liveAttemptSeconds = mutableMapOf<String, Double>()
                     val rememberedPeople = knownVoices
                     fun matchLiveVoices() {
-                        if (rememberedPeople.isEmpty() || !voiceprintModel.ready()) return
+                        if (rememberedPeople.isEmpty() || !models.ready(ModelCatalog.VOICEPRINT)) return
                         val windows = SpeakerMerges.windows(voiceClips.windows, synchronized(draftSpeakerLabels) { draftSpeakerMerges.toMap() })
                         livePrints.keys.retainAll(windows.keys)
                         val pending = windows.filter { (id, spans) ->
@@ -365,11 +363,11 @@ class MainActivity : Activity() {
                         }
                         if (pending.isEmpty()) return
                         try {
-                            val computed = VoiceprintExtractor.compute(File(voiceprintModel.modelPath), audio, pending) { checkActive() }
+                            val computed = VoiceprintExtractor.compute(File(models.path(ModelCatalog.VOICEPRINT)), audio, pending) { checkActive() }
                             computed.forEach { (id, print) -> liveAttemptSeconds[id] = print.second; livePrints[id] = print }
                             val names = rememberedPeople.associate { it.id to it.name }
                             val matches = VoiceMatcher.match(livePrints.mapValues { it.value.first }, rememberedPeople,
-                                VoiceprintModel.model.sha256, Voiceprints.THRESHOLDS.getValue(VoiceprintModel.model.sha256))
+                                ModelCatalog.voiceprintModel.sha256, Voiceprints.THRESHOLDS.getValue(ModelCatalog.voiceprintModel.sha256))
                             onUi {
                                 draftAutomaticNames.clear()
                                 matches.filterValues { it.state == Match.State.AUTO }.forEach { (id, match) -> names[match.voiceId]?.let { draftAutomaticNames[id] = it } }
@@ -382,8 +380,8 @@ class MainActivity : Activity() {
                     val elapsed: Long
                     NativeBudget.acquire()
                     try {
-                        if (resumed?.optJSONObject("diarizer") != null) streamDiarizer = SortformerStream(speakerModels.modelPath, resumed.getJSONObject("diarizer"))
-                        IncrementalRecognizer(chosenModel.files(), detector, restored = resumed?.getJSONObject("recognition"), onChunk = { chunk, startMs, words ->
+                        if (resumed?.optJSONObject("diarizer") != null) streamDiarizer = SortformerStream(models.path(ModelCatalog.DIARIZATION), resumed.getJSONObject("diarizer"))
+                        IncrementalRecognizer(models.parakeet(), detector, restored = resumed?.getJSONObject("recognition"), onChunk = { chunk, startMs, words ->
                             checkActive()
                             if (speakerFailure) words.copy(words = words.words.map { it.copy(speaker = "${speakerPrefix}1") })
                             else try {
@@ -391,11 +389,11 @@ class MainActivity : Activity() {
                                     if (!cancelled.get()) transcriptionProgress?.stage(TranscriptionProgress.Stage.SPEAKERS,
                                         (System.nanoTime() - totalBegan) / 1_000_000, startMs, startMs + chunk.durationMs)
                                 }
-                                val diarizer = streamDiarizer ?: SortformerStream(speakerModels.modelPath).also { streamDiarizer = it }
+                                val diarizer = streamDiarizer ?: SortformerStream(models.path(ModelCatalog.DIARIZATION)).also { streamDiarizer = it }
                                 val found = diarizer.process(chunk, startMs)
                                 val assigned = if (found.isEmpty()) words.words.map { it.copy(speaker = "${speakerPrefix}1") }
                                     else Diarization.assign(words.words, found, speakerPrefix, stableIds = true)
-                                if (voiceprintModel.ready()) voiceClips.accept(chunk, found, assigned, startMs)
+                                if (models.ready(ModelCatalog.VOICEPRINT)) voiceClips.accept(chunk, found, assigned, startMs)
                                 matchLiveVoices()
                                 words.copy(words = assigned)
                             } catch (error: UserFacingException) {
@@ -480,12 +478,12 @@ class MainActivity : Activity() {
                     // Processing records are machine-readable provenance, independent of UI language.
                     try {
                         File(filesDir, "latest.words.json").writeText(transcript.json())
-                        File(filesDir, "latest.processing.json").writeText(processing(chosenModel.precision, chosenModel.revision).put("language", transcript.language)
+                        File(filesDir, "latest.processing.json").writeText(processing(ModelCatalog.PARAKEET_PRECISION, ModelCatalog.PARAKEET_REVISION).put("language", transcript.language)
                             .put("durationMs", durationMs).put("inferenceMs", elapsed)
                             .put("segmentation", Parakeet.incrementalProvenance(detector))
                             .toString(2))
                     } catch (error: IOException) { Log.e(TAG, "Could not cache processing artifacts", error) }
-                    val recognition = processing(chosenModel.precision, chosenModel.revision).put("language", transcript.language)
+                    val recognition = processing(ModelCatalog.PARAKEET_PRECISION, ModelCatalog.PARAKEET_REVISION).put("language", transcript.language)
                         .put("x-inferenceMs", elapsed).put("x-segmentation", Parakeet.incrementalProvenance(detector))
                         .put("x-resumedFromMs", resumed?.optLong("doneMs") ?: 0L)
                     val attributed = if (turns.isNullOrEmpty() || transcript.words.isEmpty()) null else
@@ -493,12 +491,12 @@ class MainActivity : Activity() {
                             .put("x-incrementalDiarization", "28 s windows with 2 s overlap, persistent Sortformer speaker cache"))
                     checkActive()
                     val speakerTurns = turns
-                    val printModel = VoiceprintModel.model.sha256
+                    val printModel = ModelCatalog.voiceprintModel.sha256
                     // Naming speakers is best effort, like telling them apart: any failure keeps "Speaker N".
-                    val prints: Map<String, SpeakerPrint> = if (speakerTurns == null || attributed == null || !voiceprintModel.ready()) emptyMap() else try {
+                    val prints: Map<String, SpeakerPrint> = if (speakerTurns == null || attributed == null || !models.ready(ModelCatalog.VOICEPRINT)) emptyMap() else try {
                         onUi { transcriptionProgress?.stage(TranscriptionProgress.Stage.MATCHING, (System.nanoTime() - totalBegan) / 1_000_000) }
                         val computed = NativeBudget.holding {
-                            VoiceprintExtractor.compute(File(voiceprintModel.modelPath), audio,
+                            VoiceprintExtractor.compute(File(models.path(ModelCatalog.VOICEPRINT)), audio,
                                 SpeakerMerges.windows(voiceClips.windows, draftEdits.second)) { checkActive() }
                         }
                         val matches = VoiceMatcher.match(computed.mapValues { it.value.first }, knownVoices, printModel, Voiceprints.THRESHOLDS.getValue(printModel))
@@ -515,7 +513,7 @@ class MainActivity : Activity() {
                         id to (draftNames[id] ?: prints[id]?.match?.takeIf { it.state == Match.State.AUTO }?.let { names[it.voiceId] } ?: getString(R.string.speaker_label, index + 1))
                     }.toMap()
                     // Counts only: which person a voice resembles never enters the document.
-                    if (attributed != null && speakerTurns != null && voiceprintModel.ready()) {
+                    if (attributed != null && speakerTurns != null && models.ready(ModelCatalog.VOICEPRINT)) {
                         val t = Voiceprints.THRESHOLDS.getValue(printModel)
                         attributed.processing.put("x-speakerIdentification", JSONObject()
                             .put("model", "3dspeaker_speech_campplus_sv_en_voxceleb_16k").put("sha256", printModel).put("dim", prints.values.firstOrNull()?.embedding?.size ?: 512)
@@ -543,7 +541,7 @@ class MainActivity : Activity() {
                             interim = null
                             session = session.copy(uri = Uri.fromFile(file).toString(), document = file.absolutePath,
                                 name = "${session.name.substringBeforeLast('.')}.opus", selectedVariant = portable.defaultId,
-                                durationMs = durationMs, inferenceMs = elapsed, resultPrecision = chosenModel.precision, positionMs = position,
+                                durationMs = durationMs, inferenceMs = elapsed, resultPrecision = ModelCatalog.PARAKEET_PRECISION, positionMs = position,
                                 processingMs = processingMs, processingPaused = false)
                             getSharedPreferences("processing-estimates", MODE_PRIVATE).edit().putLong("finalizationMs",
                                 if (finalizationEstimateMs > 0) (finalizationEstimateMs * 3 + measuredFinalizationMs) / 4 else measuredFinalizationMs).apply()
@@ -654,7 +652,7 @@ class MainActivity : Activity() {
     /** Retain names when reprocessing this meeting, even if the user chose not to remember them globally. */
     private fun voicesForRecognition(): List<Voice> {
         val saved = app.voices.load()
-        val model = VoiceprintModel.model.sha256
+        val model = ModelCatalog.voiceprintModel.sha256
         val local = notePrints.mapNotNull { (id, print) ->
             val label = document?.speakerLabel(id) ?: return@mapNotNull null
             if (isDefaultLabel(id, label) || print.match?.state == Match.State.REJECTED ||
@@ -698,7 +696,7 @@ class MainActivity : Activity() {
         val match = print?.match?.takeIf { it.state != Match.State.REJECTED && it.state != Match.State.NONE && it.voiceId in people }
         // A label that already names the matched person keeps that person unless the name is changed.
         var chosen: String? = match?.voiceId?.takeIf { people[it]?.name == input.text.toString().trim() }
-        val model = VoiceprintModel.model.sha256
+        val model = ModelCatalog.voiceprintModel.sha256
         val t = Voiceprints.THRESHOLDS.getValue(model)
         val ranked = people.values.filter { it.model == model }.map { it to (print?.let { p -> Voiceprints.cosine(p.embedding, it.mean) } ?: 0f) }
             .sortedWith(compareByDescending<Pair<Voice, Float>> { it.second }.thenBy { it.first.name.lowercase() })
@@ -739,7 +737,7 @@ class MainActivity : Activity() {
         val input = SpeakerDialog.nameInput(this, draft ?: draftSpeakerLabels[speakerId] ?: draftAutomaticNames[speakerId].orEmpty())
         val savedPeople = app.voices.load().sortedBy { it.name.lowercase() }
         var chosen = draftRememberedVoices[speakerId]?.takeIf(String::isNotEmpty)
-        val remember = SpeakerDialog.remember(this, VoiceprintModel.inFiles(filesDir).ready())
+        val remember = SpeakerDialog.remember(this, models.ready(ModelCatalog.VOICEPRINT))
         if (draftSpeakerLabels.containsKey(speakerId)) remember.isChecked = speakerId in draftRememberedVoices
         val choices = SpeakerDialog.people(this, savedPeople.map { voice -> voice.name to {
             chosen = voice.id; input.setText(voice.name); input.setSelection(input.text.length)
@@ -858,7 +856,7 @@ class MainActivity : Activity() {
                 session = session.copy(uri = Uri.fromFile(file).toString(), document = file.absolutePath,
                     selectedVariant = merged.defaultId, positionMs = position)
                 merged.manifest?.optJSONObject("meeting")?.optString("id")?.let { meeting ->
-                    try { app.noteVoices.merge(meeting, merged.defaultId ?: return@let, VoiceprintModel.model.sha256, prints) }
+                    try { app.noteVoices.merge(meeting, merged.defaultId ?: return@let, ModelCatalog.voiceprintModel.sha256, prints) }
                     catch (error: Exception) { Log.w(TAG, "Could not carry voiceprints to merged transcript", error) }
                 }
                 adoptDocument(merged)
@@ -876,7 +874,7 @@ class MainActivity : Activity() {
         if (name.isEmpty() || !canRename()) return
         val print = notePrints[speakerId]
         if (remember && print != null && voiceId == null && !asked) people.values.firstOrNull {
-            it.name.equals(name, ignoreCase = true) && it.model == VoiceprintModel.model.sha256 }?.let { same ->
+            it.name.equals(name, ignoreCase = true) && it.model == ModelCatalog.voiceprintModel.sha256 }?.let { same ->
             AlertDialog.Builder(this).setMessage(getString(R.string.speaker_same_person, same.name))
                 .setPositiveButton(R.string.speaker_same_person_yes) { _, _ -> applySpeakerName(speakerId, name, same.id, true, true) }
                 .setNegativeButton(R.string.speaker_same_person_no) { _, _ -> applySpeakerName(speakerId, name, null, true, true) }.show()
@@ -925,7 +923,7 @@ class MainActivity : Activity() {
             if (remember) {
                 val score = people[target]?.let { Voiceprints.cosine(print.embedding, it.mean) } ?: 1f
                 val voice = if (previous != null && previous.voiceId == target) people.getValue(target).also { app.voices.rename(it.id, name) }
-                    else app.voices.enrol(target, name, VoiceprintModel.model.sha256, print.embedding, print.seconds, System.currentTimeMillis())
+                    else app.voices.enrol(target, name, ModelCatalog.voiceprintModel.sha256, print.embedding, print.seconds, System.currentTimeMillis())
                 app.noteVoices.setMatch(meeting, variant, speakerId, Match(voice.id, score, Match.State.CONFIRMED))
             }
         } catch (error: Exception) { Log.w(TAG, "Could not remember voice", error) }
@@ -1066,7 +1064,7 @@ class MainActivity : Activity() {
      * on an installation from before it existed, so neither the model download nor a transcription waits for it.
      */
     private fun fetchSpeechDetector() {
-        if (!models.ready() || ModelStore.vadReady(filesDir) || !detectorAttempted.compareAndSet(false, true)) return
+        if (!models.ready(ModelCatalog.PARAKEET) || models.ready(ModelCatalog.VAD) || !detectorAttempted.compareAndSet(false, true)) return
         val directory = filesDir
         Thread { installSpeechDetector(directory) }.start()
     }
@@ -1208,7 +1206,7 @@ class MainActivity : Activity() {
             ui.details.text = getString(R.string.transcript_details,
                 resources.getQuantityString(R.plurals.word_count, it.words.size, it.words.size),
                 clock(session.durationMs), when {
-                    interim != null -> models.precision
+                    interim != null -> ModelCatalog.PARAKEET_PRECISION
                     document == null -> session.resultPrecision
                     else -> session.selectedVariant.orEmpty()
                 })
@@ -1482,7 +1480,7 @@ class MainActivity : Activity() {
         super.onDestroy()
     }
     private fun maybeAutoTranscribe() {
-        if (autoTranscribe && !busy && session.uri != null && ModelBundle.inFiles(filesDir).consented()) {
+        if (autoTranscribe && !busy && session.uri != null && InstalledModels(filesDir).consented()) {
             autoTranscribe = false
             transcribe()
         }
@@ -1502,8 +1500,8 @@ class MainActivity : Activity() {
 
         /** The detector is optional (without it recordings are cut at quiet points), so a failed fetch is only logged. */
         private fun installSpeechDetector(filesDir: File) {
-            if (ModelStore.vadReady(filesDir)) return
-            try { ModelStore.installVad(filesDir) { } } catch (error: Exception) { Log.w(TAG, "Speech detector unavailable", error) }
+            if (ModelCatalog.VAD.ready(filesDir)) return
+            try { InstalledModels(filesDir).install(ModelCatalog.VAD) { } } catch (error: Exception) { Log.w(TAG, "Speech detector unavailable", error) }
         }
 
         const val OPEN_FILE = 1; const val SAVE_DOCUMENT = 2; private const val TAG = "Cassini"

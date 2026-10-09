@@ -18,6 +18,7 @@ import org.cassini.core.format.OggOpus
 import org.cassini.core.format.Transcript
 import org.cassini.core.format.Word
 import org.cassini.core.library.Session
+import org.cassini.core.models.ModelCatalog
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
@@ -84,8 +85,7 @@ class PortableDocumentTest {
 
     @Test fun transcriptionCreatesASealedPortableDocument() {
         val instrumentation = InstrumentationRegistry.getInstrumentation(); val context = instrumentation.targetContext
-        val model = ModelStore(File(context.filesDir, "parakeet-v3"))
-        org.junit.Assume.assumeTrue("Install the INT8 model for the end-to-end transcription check", model.ready())
+        org.junit.Assume.assumeTrue("Install the INT8 model for the end-to-end transcription check", ModelCatalog.PARAKEET.ready(context.filesDir))
         finishScreens()
         val sessions = SessionStore(context.filesDir); val originalSession = sessions.load()
         val wav = File(context.cacheDir, "portable-asr-source.wav")
@@ -123,7 +123,7 @@ class PortableDocumentTest {
             assertTrue(doc.selected(null)!!.transcript!!.words.size > 60)
             val step = doc.manifest!!.getJSONObject("provenance").getJSONObject("speechToText").getJSONObject(doc.defaultId!!)
             assertTrue(step.getString("model").contains("INT8"))
-            assertTrue(step.getString("version").contains(model.revision))
+            assertTrue(step.getString("version").contains(ModelCatalog.PARAKEET_REVISION))
             assertTrue(step.getLong("x-inferenceMs") > 0)
             assertTrue(saved.processingMs >= saved.inferenceMs)
             scenario.onActivity {

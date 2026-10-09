@@ -19,6 +19,7 @@ import androidx.test.runner.lifecycle.Stage
 import org.cassini.core.format.Transcript
 import org.cassini.core.format.Word
 import org.cassini.core.library.Session
+import org.cassini.core.models.ModelCatalog
 import org.cassini.core.speakers.Match
 import org.cassini.core.speakers.SpeakerPrint
 import org.hamcrest.Description
@@ -122,7 +123,7 @@ class SettingsTest {
         val voices = VoiceStore(context.filesDir)
         val notes = NoteVoiceStore(context.filesDir)
         voices.clear()
-        val current = VoiceprintModel.model.sha256
+        val current = ModelCatalog.voiceprintModel.sha256
         val anna = voices.enrol(null, "Anna", current, FloatArray(4) { if (it == 0) 1f else 0f }, 84.0, 1L)
         voices.enrol(null, "Old Marco", "older-model", FloatArray(4) { if (it == 1) 1f else 0f }, 12.0, 1L)
         notes.merge("people_test_note", "v1", current, mapOf("spk_1" to SpeakerPrint(FloatArray(4) { 1f }, 30.0, Match(anna.id, 0.8f, Match.State.CONFIRMED))))
@@ -173,7 +174,7 @@ class SettingsTest {
         val originalLanguage = AppLanguage.selected(context)
         val voices = VoiceStore(context.filesDir)
         voices.clear()
-        voices.enrol(null, "Bruna", VoiceprintModel.model.sha256, FloatArray(4) { if (it == 2) 1f else 0f }, 20.0, 1L)
+        voices.enrol(null, "Bruna", ModelCatalog.voiceprintModel.sha256, FloatArray(4) { if (it == 2) 1f else 0f }, 20.0, 1L)
         val scenario = ActivityScenario.launch(SettingsActivity::class.java)
         scenario.onActivity { AppLanguage.set(it, "en") }
         instrumentation.waitForIdleSync()

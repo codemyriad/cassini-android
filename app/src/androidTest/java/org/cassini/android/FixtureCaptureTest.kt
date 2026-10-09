@@ -25,6 +25,7 @@ import org.cassini.core.format.OggOpus
 import org.cassini.core.format.Transcript
 import org.cassini.core.format.Word
 import org.cassini.core.library.Session
+import org.cassini.core.models.ModelCatalog
 import org.cassini.core.speakers.floats
 import org.json.JSONArray
 import org.json.JSONObject
@@ -64,9 +65,9 @@ class FixtureCaptureTest {
             "Pass -e captureFixtures true",
             InstrumentationRegistry.getArguments().getString("captureFixtures") == "true"
         )
-        assumeTrue("Install the speech model", ModelStore(File(files, "parakeet-v3")).ready())
-        assumeTrue("Install the speaker model", DiarizationModels.inFiles(files).ready())
-        assumeTrue("Install the voiceprint model", VoiceprintModel.inFiles(files).ready())
+        assumeTrue("Install the speech model", ModelCatalog.PARAKEET.ready(files))
+        assumeTrue("Install the speaker model", ModelCatalog.DIARIZATION.ready(files))
+        assumeTrue("Install the voiceprint model", ModelCatalog.VOICEPRINT.ready(files))
         assumeTrue(
             "Run on a device without saved people",
             (context.applicationContext as CassiniApplication).voices.load().isEmpty()
@@ -336,9 +337,9 @@ class FixtureCaptureTest {
         listOf("encoder.int8.onnx", "decoder.int8.onnx", "joiner.int8.onnx", "tokens.txt").forEach {
             write("parakeet-v3/$it", ByteArray(0), installed)
         }
-        write("parakeet-v3/verified", ModelStore.REVISION.toByteArray(), installed)
+        write("parakeet-v3/verified", ModelCatalog.PARAKEET_REVISION.toByteArray(), installed)
         write("vad/silero_vad.onnx", ByteArray(0), installed)
-        write("vad/verified", ModelStore.sileroVad.sha256.toByteArray(), installed)
+        write("vad/verified", ModelCatalog.sileroVad.sha256.toByteArray(), installed)
         write("speaker-models/segmentation.int8.onnx", ByteArray(0), installed)
         write("speaker-models/embedding.onnx", ByteArray(0), installed)
         write("speaker-models/verified", "$PYANNOTE_SHA256\n$ERES2NET_SHA256".toByteArray(), installed)

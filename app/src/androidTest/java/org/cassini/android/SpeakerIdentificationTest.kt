@@ -23,6 +23,7 @@ import org.cassini.core.format.CassiniDocument
 import org.cassini.core.format.Transcript
 import org.cassini.core.format.Word
 import org.cassini.core.library.Session
+import org.cassini.core.models.ModelCatalog
 import org.cassini.core.speakers.Match
 import org.cassini.core.speakers.SpeakerPrint
 import org.cassini.core.speakers.Voice
@@ -58,7 +59,7 @@ class SpeakerIdentificationTest {
     }
     @Test fun downloadingModelsRequiresConsent() {
         // Once Parakeet is installed consent was given; optional models are retried without asking.
-        val bundle = ModelBundle.inFiles(context.filesDir)
+        val bundle = InstalledModels(context.filesDir)
         org.junit.Assume.assumeFalse("Requires the speech model to be absent", bundle.consented())
         val missing = bundle.missingBytes()
         val file = File(context.cacheDir, "speaker-consent.wav")
@@ -74,7 +75,7 @@ class SpeakerIdentificationTest {
     }
     /** Two different voices with a second of silence between them, as a plain recording. Returns the boundary. */
     private fun twoVoiceRecording(): Pair<File, Long> {
-        org.junit.Assume.assumeTrue("Install the INT8 model for the end-to-end speaker check", ModelStore(File(context.filesDir, "parakeet-v3")).ready())
+        org.junit.Assume.assumeTrue("Install the INT8 model for the end-to-end speaker check", ModelCatalog.PARAKEET.ready(context.filesDir))
         val first = fixture("fleurs-it-short.wav"); val second = fixture("youtube-smoke.wav")
         val audio = PcmAudio(resampleTo16k(first.samples, first.sampleRate) + FloatArray(16000) +
             resampleTo16k(second.samples, second.sampleRate), 16000)
@@ -94,8 +95,8 @@ class SpeakerIdentificationTest {
     }
     @Test fun draftSpeakersCanBeNamedBeforeRecognitionFinishes() {
         val (file, _) = twoVoiceRecording()
-        org.junit.Assume.assumeTrue(DiarizationModels.inFiles(context.filesDir).ready())
-        org.junit.Assume.assumeTrue(VoiceprintModel.inFiles(context.filesDir).ready())
+        org.junit.Assume.assumeTrue(ModelCatalog.DIARIZATION.ready(context.filesDir))
+        org.junit.Assume.assumeTrue(ModelCatalog.VOICEPRINT.ready(context.filesDir))
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         try {
             startTranscription(scenario)
@@ -143,7 +144,7 @@ class SpeakerIdentificationTest {
     }
 
     @Test fun transcribingLabelsEachVoice() {
-        DiarizationModels.inFiles(context.filesDir).install { }
+        InstalledModels(context.filesDir).install(ModelCatalog.DIARIZATION) { }
         val (file, boundary) = twoVoiceRecording()
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         try {
@@ -173,7 +174,7 @@ class SpeakerIdentificationTest {
         } finally { scenario.close(); file.delete() }
     }
     @Test fun cancellingDuringSpeakerIdentificationSavesNothing() {
-        DiarizationModels.inFiles(context.filesDir).install { }
+        InstalledModels(context.filesDir).install(ModelCatalog.DIARIZATION) { }
         val (file, _) = twoVoiceRecording()
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         try {
@@ -295,7 +296,7 @@ class SpeakerIdentificationTest {
 
     @Test fun draftSpeakerMergePersistsThroughLaterRecognitionWindows() {
         val (file, _) = twoVoiceRecording()
-        org.junit.Assume.assumeTrue(DiarizationModels.inFiles(context.filesDir).ready())
+        org.junit.Assume.assumeTrue(ModelCatalog.DIARIZATION.ready(context.filesDir))
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         try {
             startTranscription(scenario)
@@ -337,9 +338,9 @@ class SpeakerIdentificationTest {
     /** Saves [name] as a person and records how this note's first speaker matched them, as a transcription would. */
     private fun savedMatch(note: File, name: String, state: Match.State): Voice {
         File(context.filesDir, "voices.json").delete()
-        val voice = app.voices.enrol(null, name, VoiceprintModel.model.sha256, print(), 12.0, 1)
+        val voice = app.voices.enrol(null, name, ModelCatalog.voiceprintModel.sha256, print(), 12.0, 1)
         val (meeting, variant) = meeting(note)
-        app.noteVoices.merge(meeting, variant, VoiceprintModel.model.sha256, mapOf("spk_1" to SpeakerPrint(print(), 12.0, Match(voice.id, .6f, state))))
+        app.noteVoices.merge(meeting, variant, ModelCatalog.voiceprintModel.sha256, mapOf("spk_1" to SpeakerPrint(print(), 12.0, Match(voice.id, .6f, state))))
         return voice
     }
     @Test fun suggestionTapAppliesName() {
@@ -386,8 +387,8 @@ class SpeakerIdentificationTest {
         return requireNotNull(sessions.load().document) { "Transcription must save a document" }
     }
     @Test fun namedVoiceIsAutoAppliedOnSecondTranscription() {
-        DiarizationModels.inFiles(context.filesDir).install { }
-        org.junit.Assume.assumeTrue("Install the voice model", VoiceprintModel.inFiles(context.filesDir).ready())
+        InstalledModels(context.filesDir).install(ModelCatalog.DIARIZATION) { }
+        org.junit.Assume.assumeTrue("Install the voice model", ModelCatalog.VOICEPRINT.ready(context.filesDir))
         File(context.filesDir, "voices.json").delete()
         val (file, _) = twoVoiceRecording()
         val scenario = ActivityScenario.launch(MainActivity::class.java)
@@ -423,8 +424,8 @@ class SpeakerIdentificationTest {
         } finally { scenario.close(); file.delete(); made.forEach { File(it).delete() } }
     }
     @Test fun cancelDuringVoiceprintsSavesNothing() {
-        DiarizationModels.inFiles(context.filesDir).install { }
-        org.junit.Assume.assumeTrue("Install the voice model", VoiceprintModel.inFiles(context.filesDir).ready())
+        InstalledModels(context.filesDir).install(ModelCatalog.DIARIZATION) { }
+        org.junit.Assume.assumeTrue("Install the voice model", ModelCatalog.VOICEPRINT.ready(context.filesDir))
         val voices = File(context.filesDir, "voices.json").takeIf { it.exists() }?.readBytes()
         val notes = File(context.filesDir, "voiceprints").list().orEmpty().toSet()
         val (file, _) = twoVoiceRecording()
