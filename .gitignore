@@ -4,7 +4,8 @@
 local.properties
 .idea/
 *.iml
-.tools/
+# No trailing slash: a worktree may link .tools to the main checkout's copy.
+.tools
 .claude/
 .ruff_cache/
 **/__pycache__/
