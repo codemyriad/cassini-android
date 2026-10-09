@@ -71,6 +71,8 @@ cd cassini-android
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
+The code is in three Gradle modules: `:core` (plain Kotlin, the format and engine logic), `:engine` (the native wrappers and Android media code) and `:app`. The `:core` tests need only JDK 17 and the submodule: `./gradlew --configure-on-demand :core:test` ([development notes](docs/development.md)).
+
 `scripts/setup.sh --from-source` builds the sherpa-onnx AAR from source instead of downloading it (about 25 minutes; see [native runtime](docs/native-runtime.md)). In an existing clone, run `git submodule update --init` once: the format conformance vectors come from the `third_party/cassini-format` submodule and the tests fail without them.
 
 [GitHub Actions](https://github.com/codemyriad/cassini-android/actions/workflows/android.yml) builds and checks each push and pull request, including playback, recording and settings checks on Android 8, 10 and 14 emulators. Version tags publish the APK with a stable beta signing key, so updates preserve notes and downloaded models. Models and the pinned Android runtime are fetched separately.

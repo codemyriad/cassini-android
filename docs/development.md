@@ -2,6 +2,18 @@
 
 The build commands are in the [README](../README.md). Runtime downloads, weights, private or YouTube-derived audio and build outputs stay out of commits. The committed test inputs are in [`fixtures/`](../fixtures/README.md): the CC-BY-4.0 FLEURS clip and captured `filesDir` trees.
 
+## Modules
+
+| Module | What it holds | Build needs |
+|---|---|---|
+| `:core` | Plain Kotlin on the JVM, package `org.cassini.core`: the portable document format, audio arithmetic, recognition windows and seams, speaker assignment and voiceprint selection, model pins and downloads (`ModelCatalog`, `ArtifactFetcher`), the checkpoint codec (`CheckpointState`) | JDK 17 and the `third_party/cassini-format` submodule |
+| `:engine` | Android library, package `org.cassini.engine`: the sherpa-onnx wrappers (`ParakeetDecoder`, `SileroDetector`, `SortformerStream`, `VoiceprintExtractor`), the MediaCodec decoder, microphone capture, the Opus encoder and its JNI library (`libcassini_opus.so`, built with CMake), `NativeBudget` | Android SDK, NDK 28.2.13676358, CMake 3.22.1, and `scripts/setup.sh` (AAR and libopus source) |
+| `:app` | The 0.1.0 Activities and services on top of the two modules, with thin adapters (`InstalledModels`, `ProcessingCheckpoint`, `FailureMessages`) | everything `:engine` needs |
+
+Dependencies point one way: `app -> engine -> core`. `docs/architecture.md` describes the target layout and what each file came from.
+
+`tools/asr-eval/` holds a host program that runs the app's speech recognition pipeline on PCM files. Gradle does not build it; its README says how to run it.
+
 ## Engine tests without the native toolchain
 
 The `:core` module is plain Kotlin on the JVM: the portable document format, audio arithmetic, recognition windows and seams, speaker assignment and voiceprint selection, the model pins and download code, and the checkpoint codec. Its tests need JDK 17 and the `third_party/cassini-format` submodule. They need no Android SDK, NDK, native AAR, libopus source or device:
@@ -12,6 +24,17 @@ JAVA_HOME=/path/to/jdk-17 ./gradlew --configure-on-demand :core:test
 ```
 
 `--configure-on-demand` stops Gradle from configuring `:app` and `:engine`. Configuring them needs the Android SDK, and when the SDK has no NDK, the engine's native build makes the Android Gradle plugin download NDK 28.2.13676358 (more than 1 GB) before any task runs. After `scripts/setup.sh`, plain `./gradlew :core:test` works as well. The conformance vectors are required: without the submodule the tests fail, they do not skip. This command was checked on 2026-10-09 in a fresh clone with only the README in `native/m2`, no `.tools/`, no `local.properties` and no `ANDROID_HOME`: 236 tests ran and none was skipped.
+
+## What changed in the verbatim code
+
+The engine code moved from the 0.1.0 app into `:core` and `:engine` with a package rename and a short list of edits (`docs/architecture.md`, sections 2.1 and 2.2). To see every remaining difference from the 0.1.0 code at the phase-0 base commit:
+
+```sh
+scripts/check-verbatim.sh --summary   # changed line counts per file group
+scripts/check-verbatim.sh Parakeet    # the diff of one group
+```
+
+The script removes `package` and `import` lines and the `internal` modifier before it compares, and it ignores changes in the amount of white space (`--exact` shows them). It needs the base commit in the clone, so a shallow clone needs `git fetch --unshallow` first. CI prints the full output in the static-checks job.
 
 ## Device checks
 
@@ -35,7 +58,7 @@ The supplied sample is [il Pericolo Invisibile](https://www.youtube.com/watch?v=
 
 Device tests check JNI inference, timestamps, codec decoding, complete-document integrity, microphone pause/resume, catalogue recovery and interface-language restoration. They do not establish ASR accuracy. Test rules restore the previous catalogue/session and remove only their own generated documents.
 
-CI runs the static checks (Gradle wrapper validation, detekt, actionlint, shellcheck and ruff) in a job of their own, in parallel with the build. The build job fetches the pinned prebuilt AAR (`scripts/setup.sh --prebuilt-only`) and fails at once when it cannot; it never falls back to a source build. CI then installs its built app and matching test APK on Android 8, 10 and 14 (API 26, 29 and 34) x86_64 emulators. All three run playback/settings, AAC microphone pause/resume and library playback, interruption recovery, legacy session upgrades, and encoder capability checks. Android 14 also requires successful Opus encoding and decoding with preserved duration and speech timing. The Android 10 Google APIs image lacks an Opus encoder; its check requires the explicit missing-encoder failure. These checks require no models. Settings checks verify language persistence and that the removed model selector and live transcription setting are absent. CI runs 12 checks on API 26/29 and 13 on API 34. CI fails if a selected check is skipped or the expected count changes, and saves instrumentation output and logcat. Release publication waits for the static checks, the build and all three emulators. A weekly job, also available from a manual run, rebuilds the sherpa-onnx AAR from the pinned source, builds and tests the app with it, and records its SHA-256 beside the pinned release build's. A mismatch raises a warning annotation; it does not fail the job. Native inference and the complete recording/transcription flow still need the separate device checks above.
+CI runs the static checks (Gradle wrapper validation, detekt, actionlint, shellcheck, ruff and the verbatim diff) in a job of their own, in parallel with the build. Another job runs `:core:test` with only a JDK: no `scripts/setup.sh`, and the runner's Android SDK hidden. The build job fetches the pinned prebuilt AAR (`scripts/setup.sh --prebuilt-only`) and fails at once when it cannot; it never falls back to a source build. CI then installs its built app and matching test APK on Android 8, 10 and 14 (API 26, 29 and 34) x86_64 emulators. All three run playback/settings, AAC microphone pause/resume and library playback, interruption recovery, legacy session upgrades, and encoder capability checks. Android 14 also requires successful Opus encoding and decoding with preserved duration and speech timing. The Android 10 Google APIs image lacks an Opus encoder; its check requires the explicit missing-encoder failure. These checks require no models. Settings checks verify language persistence and that the removed model selector and live transcription setting are absent. CI runs 12 checks on API 26/29 and 13 on API 34. CI fails if a selected check is skipped or the expected count changes, and saves instrumentation output and logcat. Release publication waits for the static checks, the `:core` job, the build and all three emulators. A weekly job, also available from a manual run, rebuilds the sherpa-onnx AAR from the pinned source, builds and tests the app with it, and records its SHA-256 beside the pinned release build's. A mismatch raises a warning annotation; it does not fail the job. Native inference and the complete recording/transcription flow still need the separate device checks above.
 
 ```sh
 adb exec-out run-as org.cassini.android cat files/device-smoke.INT8.metrics.json
@@ -94,7 +117,7 @@ The signing key matches the existing development installation. Keep it stable fo
 
 Superseded: **Transcribe** now labels speakers in the same job, and there is no separate speaker step (`SpeakerIdentificationTest#aTranscriptLeavesNoSeparateTranscribeOrSpeakerStep`). The notes below describe the diarizer itself; P5 rewrites this section. [NVIDIA Nemotron-3-Diarization](https://huggingface.co/nvidia/Nemotron-3-Diarization), an end-to-end streaming Sortformer, labels up to 8 speakers in order of first arrival. It needs no speaker embeddings, no clustering and no speaker count; the earlier count dialog is gone. The anonymous labels do not identify people; errors and overlapping speech need listening checks.
 
-The optional model is an INT8 ONNX export (103,941,758 bytes, about 99 MiB), stored in `files/speaker-models/`. It downloads as a seekable Zstandard file from `dist.gocassini.com` (64,982,914 bytes, about 62 MiB). Both hashes are verified: the download before zstd-jni decompresses it, and the model before it replaces anything. `DiarizationModels.kt` pins sizes, hashes, the source revision and the URL. Downloads require explicit consent; ASR model downloads do not install it. App startup removes the retired pyannote and ERes2Net files. License texts and notices ship in the APK.
+The optional model is an INT8 ONNX export (103,941,758 bytes, about 99 MiB), stored in `files/speaker-models/`. It downloads as a seekable Zstandard file from `dist.gocassini.com` (64,982,914 bytes, about 62 MiB). Both hashes are verified: the download before zstd-jni decompresses it, and the model before it replaces anything. `core/.../models/ModelCatalog.kt` pins sizes, hashes, the source revision and the URL. Downloads require explicit consent; ASR model downloads do not install it. App startup removes the retired pyannote and ERes2Net files. License texts and notices ship in the APK.
 
 sherpa-onnx 1.13.7, rebuilt with the Sortformer runtime (see [native runtime](native-runtime.md)), runs the model on CPU with two threads. It processes 27.2 s chunks with the offline settings of the model card, keeps speaker identities across chunks with the Arrival-Order Speaker Cache, and reports progress per chunk. Activity above probability 0.5 is speech; turns shorter than 0.3 s are dropped and gaps shorter than 0.5 s merged. ASR and diarization share a native-model lease, so a cancelled call cannot overlap a new model load. The callback's return value does not abort computation. Cancel returns to the library immediately and discards the result; the ongoing native call finishes and releases its own model. Destroying the viewer also cancels publication. No partially attributed variant is saved.
 
