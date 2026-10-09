@@ -49,3 +49,12 @@ shutil.copyfile(output / element['outputFile'], destination / name)
 checksum = hashlib.sha256((destination / name).read_bytes()).hexdigest()
 (destination / f'{name}.sha256').write_text(f'{checksum}  {name}\n')
 shutil.copyfile('THIRD_PARTY_NOTICES.md', destination / 'THIRD_PARTY_NOTICES.md')
+# R8 renames classes in the release APK; keep its mapping so crash traces can be decoded.
+mapping = Path('app/build/outputs/mapping') / variant / 'mapping.txt'
+if variant == 'release':
+    if not mapping.is_file():
+        raise SystemExit(f'Release build has no R8 mapping at {mapping}')
+    mapping_name = f'cassini-android-{version}-mapping.txt'
+    shutil.copyfile(mapping, destination / mapping_name)
+    mapping_checksum = hashlib.sha256((destination / mapping_name).read_bytes()).hexdigest()
+    (destination / f'{mapping_name}.sha256').write_text(f'{mapping_checksum}  {mapping_name}\n')
