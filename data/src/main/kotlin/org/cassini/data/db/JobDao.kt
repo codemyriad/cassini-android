@@ -1,5 +1,6 @@
 package org.cassini.data.db
 
+import androidx.annotation.WorkerThread
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
@@ -24,6 +25,11 @@ abstract class JobDao {
 
     @Query("SELECT * FROM jobs WHERE note_id = :noteId")
     abstract suspend fun job(noteId: String): JobEntity?
+
+    /** The job of a note, for a caller that holds the note's lock. */
+    @WorkerThread
+    @Query("SELECT * FROM jobs WHERE note_id = :noteId")
+    abstract fun jobBlocking(noteId: String): JobEntity?
 
     @Query("SELECT MAX(seq) FROM jobs")
     abstract suspend fun maxSeq(): Long?

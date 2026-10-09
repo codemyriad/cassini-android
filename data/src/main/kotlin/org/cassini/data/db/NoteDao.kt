@@ -153,6 +153,16 @@ abstract class NoteDao {
         return true
     }
 
+    /** A finished capture becomes plain audio with its duration. Returns 0 unless the note was a live capture. */
+    @Query(
+        "UPDATE notes SET audio_kind = 'PLAIN', duration_ms = :durationMs, updated_at = :now " +
+            "WHERE id = :id AND audio_kind = 'LIVE_CAPTURE'",
+    )
+    abstract suspend fun finishRecording(id: String, durationMs: Long, now: Long): Int
+
+    @Query("UPDATE notes SET audio_kind = 'UNPLAYABLE', updated_at = :now WHERE id = :id")
+    abstract suspend fun markUnplayable(id: String, now: Long): Int
+
     @Query("UPDATE notes SET trust_acknowledged = 1 WHERE id = :id")
     abstract suspend fun acknowledgeTrust(id: String)
 
@@ -161,4 +171,27 @@ abstract class NoteDao {
 
     @Query("UPDATE notes SET trashed_at = NULL, trashed_job = NULL, updated_at = :now WHERE id = :id")
     abstract suspend fun restore(id: String, now: Long)
+
+    @Query("SELECT * FROM jobs WHERE note_id = :id")
+    protected abstract suspend fun jobOf(id: String): JobEntity?
+
+    /**
+     * Moves a live note to Trash and records its job's state and kind for Restore, in one transaction. Returns false
+     * when there is no live note with [id]. The job row stays: the queue skips trashed notes.
+     */
+    @Transaction
+    open suspend fun trash(id: String, at: Long): Boolean {
+        val row = note(id)
+        if (row == null || row.trashedAt != null) return false
+        moveToTrash(id, at, jobOf(id)?.let { TrashedJob(it.state, it.kind) })
+        return true
+    }
+
+    /** Restores a trashed note in one transaction and returns its row as it was in Trash; null if it was not trashed. */
+    @Transaction
+    open suspend fun untrash(id: String, now: Long): NoteEntity? {
+        val row = note(id)?.takeIf { it.trashedAt != null } ?: return null
+        restore(id, now)
+        return row
+    }
 }

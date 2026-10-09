@@ -44,10 +44,8 @@ abstract class CacheDao {
      */
     @Transaction
     open suspend fun replaceCache(cache: NoteCache) {
+        checkOwnRows(cache)
         val noteId = cache.note.id
-        require(cache.variants.all { it.noteId == noteId }) { "variants of another note" }
-        require(cache.speakers.all { it.noteId == noteId }) { "speakers of another note" }
-        require(cache.words.all { it.noteId == noteId }) { "words of another note" }
         upsertNote(cache.note)
         deleteVariants(noteId)
         insertVariants(cache.variants)
@@ -57,6 +55,68 @@ abstract class CacheDao {
             insertText(NoteTextEntity(noteId = noteId, title = cache.note.title, body = cache.body))
         }
     }
+
+    // Blocking twins of the writes above, for the repositories that hold a note's ReentrantLock: code never suspends
+    // while it holds one (docs/architecture.md, section 4), so the cache is written on the IO thread that holds it.
+
+    @Upsert
+    protected abstract fun upsertNoteBlocking(note: NoteEntity)
+
+    @Query("DELETE FROM variants WHERE note_id = :noteId")
+    protected abstract fun deleteVariantsBlocking(noteId: String)
+
+    @Insert
+    protected abstract fun insertVariantsBlocking(variants: List<VariantEntity>)
+
+    @Insert
+    protected abstract fun insertSpeakersBlocking(speakers: List<SpeakerEntity>)
+
+    @Insert
+    protected abstract fun insertWordsBlocking(words: List<WordEntity>)
+
+    @Insert
+    protected abstract fun insertTextBlocking(text: NoteTextEntity)
+
+    @Query("UPDATE note_text SET title = :title, body = :body WHERE note_id = :noteId")
+    protected abstract fun updateTextBlocking(noteId: String, title: String, body: String): Int
+
+    /** [replaceCache] for a caller on a worker thread that holds the note's lock. */
+    @WorkerThread
+    @Transaction
+    open fun replaceCacheBlocking(cache: NoteCache) {
+        checkOwnRows(cache)
+        val noteId = cache.note.id
+        upsertNoteBlocking(cache.note)
+        deleteVariantsBlocking(noteId)
+        insertVariantsBlocking(cache.variants)
+        insertSpeakersBlocking(cache.speakers)
+        insertWordsBlocking(cache.words)
+        if (updateTextBlocking(noteId, cache.note.title, cache.body) == 0) {
+            insertTextBlocking(NoteTextEntity(noteId = noteId, title = cache.note.title, body = cache.body))
+        }
+    }
+
+    private fun checkOwnRows(cache: NoteCache) {
+        val noteId = cache.note.id
+        require(cache.variants.all { it.noteId == noteId }) { "variants of another note" }
+        require(cache.speakers.all { it.noteId == noteId }) { "speakers of another note" }
+        require(cache.words.all { it.noteId == noteId }) { "words of another note" }
+    }
+
+    /**
+     * Readable variants of a note whose cached words do not match `variants.word_count`: 0 when the word cache is
+     * complete. Together with [variantCountBlocking] this is the check that lets a note open from the cache.
+     */
+    @WorkerThread
+    @Query(
+        "SELECT COUNT(*) FROM variants v WHERE v.note_id = :noteId AND v.readable = 1 AND v.word_count <> " +
+            "(SELECT COUNT(*) FROM words w WHERE w.note_id = v.note_id AND w.variant_id = v.variant_id)",
+    )
+    abstract fun incompleteVariantsBlocking(noteId: String): Int
+
+    @WorkerThread
+    @Query("SELECT COUNT(*) FROM variants WHERE note_id = :noteId")
+    abstract fun variantCountBlocking(noteId: String): Int
 
     /** Words of one variant in canonical order, [limit] from word [from] (the Note screen's first screen). */
     @Query(
