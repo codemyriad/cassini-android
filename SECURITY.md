@@ -31,7 +31,7 @@ We publish the APK only on the [GitHub Releases page](https://github.com/codemyr
 - `cassini-android-VERSION.apk`: the APK.
 - `cassini-android-VERSION.apk.sha256`: the SHA-256 of the APK.
 
-The release APKs have one stable signing key. Thus an update installs over the earlier version and keeps the notes and the models. The SHA-256 digest of the signing certificate is in [`scripts/beta-signing-cert.sha256`](scripts/beta-signing-cert.sha256):
+The release APKs have one stable signing key. Thus an update installs over the earlier version without an uninstall, and the downloaded models stay. Version 0.2 does not show the notes of 0.1.x. Before you update from 0.1.x, save each note as a Cassini document (`.opus`). Then open these files in 0.2. The SHA-256 digest of the signing certificate is in [`scripts/beta-signing-cert.sha256`](scripts/beta-signing-cert.sha256):
 
 ```text
 06b2a95b3a6e6e7cdef618999d37631a18216307def007102980db71cf2387ec
@@ -45,7 +45,7 @@ To make sure that you have a genuine APK, do these steps:
 2. Run `apksigner verify --print-certs cassini-android-VERSION.apk` (`apksigner` is in the Android SDK build tools).
 3. Compare the line `Signer #1 certificate SHA-256 digest` with the digest above.
 
-The repository does not contain the keystore or its passwords. The build reads the passwords from the environment variables `CASSINI_RELEASE_STORE_PASSWORD`, `CASSINI_RELEASE_KEY_PASSWORD` and `CASSINI_RELEASE_KEY_ALIAS`. CI gets the keystore from a repository secret. The key is a beta key. A stable release can have a different key.
+The repository does not contain the keystore. The Gradle files contain no passwords. The build reads the passwords from the environment variables `CASSINI_RELEASE_STORE_PASSWORD`, `CASSINI_RELEASE_KEY_PASSWORD` and `CASSINI_RELEASE_KEY_ALIAS`. CI gets the keystore from a repository secret. Until the owner sets new passwords, CI and `scripts/device-smoke.sh` use the standard passwords of the Android debug keystore (`android`, `androiddebugkey`) as a fallback. Thus the keystore file is the only secret. [docs/release.md](docs/release.md) gives the details. The key is a beta key. A stable release can have a different key.
 
 ## Model downloads and pinned hashes
 

@@ -11,6 +11,7 @@ Version 0.2.0 is a new build of the app. It keeps the speech engine and the port
 ### Changed
 
 - 0.2 starts with a fresh storage layout and does not read 0.1.x app data; exported .opus documents open as before.
+- The signing key does not change, so 0.2 installs over 0.1.x and the downloaded models stay. Before you update, save each 0.1.x note as a Cassini document (`.opus`). Then open these files in 0.2.
 - A new user interface, made with Jetpack Compose, replaces all screens. It uses the Instrument Sans and IBM Plex Mono fonts and has a light theme and a dark theme.
 - Transcription runs in a foreground service, so it continues when you leave the app. If Android or you stop a transcription, it continues later from the last saved point.
 - The "People" screen has the new name "Saved voices". It shows the number of notes and the minutes of confirmed speech for each saved voice.
