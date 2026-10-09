@@ -4,15 +4,20 @@
 package org.cassini.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.FlowRowScope
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
@@ -21,8 +26,10 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
@@ -37,10 +44,11 @@ private val DialogMargin = 24.dp
 private val DialogMaxWidth = 560.dp
 
 /**
- * The app's dialog: an M3 `BasicAlertDialog` showing [CassiniDialogContent]. The window takes the full width
- * (`usePlatformDefaultWidth = false`) and the content keeps a 24 dp margin on each side, so screenshots can place the
- * same content inline (`DialogBoardFrame` in test sources) exactly where the window puts it. The window dims the
- * screen with black at the scrim token's alpha.
+ * The app's dialog: an M3 `BasicAlertDialog` showing [CassiniDialogContent]. The window fills the screen
+ * (`usePlatformDefaultWidth = false`, `decorFitsSystemWindows = false`) and does not dim: the content draws the scrim
+ * token (#1F2A39 at 50 %) itself, as the sheets do, and a tap on it calls [onDismissRequest]. The card is centred in
+ * the safe area above the keyboard, with a 24 dp margin on each side, so screenshots can place the same content inline
+ * (`DialogBoardFrame` in test sources) exactly where the window puts it.
  */
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -55,14 +63,29 @@ fun CassiniDialog(
 ) {
     BasicAlertDialog(
         onDismissRequest = onDismissRequest,
-        modifier = modifier,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
-        // The window dims the screen with black; use the scrim token's alpha, as the sheets do.
         val window = (LocalView.current.parent as? DialogWindowProvider)?.window
-        val dim = CassiniTheme.colors.scrim.alpha
-        SideEffect { window?.setDimAmount(dim) }
-        CassiniDialogContent(title = title, actions = actions, body = body, content = content)
+        SideEffect { window?.setDimAmount(0f) }
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .background(CassiniTheme.colors.scrim)
+                    .pointerInput(onDismissRequest) { detectTapGestures { onDismissRequest() } }
+                    .clearAndSetSemantics {},
+            )
+            CassiniDialogContent(
+                title = title,
+                actions = actions,
+                modifier = modifier
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
+                    // Taps on the card do not reach the scrim.
+                    .pointerInput(Unit) { detectTapGestures {} },
+                body = body,
+                content = content,
+            )
+        }
     }
 }
 

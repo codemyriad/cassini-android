@@ -18,11 +18,16 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import org.cassini.ui.theme.CassiniTheme
 
 /**
@@ -31,7 +36,9 @@ import org.cassini.ui.theme.CassiniTheme
  * padding, so a focused field stays above the keyboard. Screens give the content its own padding (board 06: 10/12/20;
  * board 04: 10/20/24 with a 16 dp gap); the handle already holds the top 10 dp.
  *
- * The sheet state stays inside (its API is experimental); to close, the screen drops the sheet from its state.
+ * The sheet state stays inside (its API is experimental). To close the sheet from its content (an action row), call
+ * [SheetHider.hide] on the content's parameter: the sheet slides down, then [onDismissRequest] runs and the screen
+ * drops the sheet from its state. A swipe or a scrim tap also ends in [onDismissRequest].
  * Screenshot tests render the same content inline in `SheetBoardFrame` (test sources).
  */
 @Composable
@@ -39,13 +46,21 @@ import org.cassini.ui.theme.CassiniTheme
 fun CassiniSheet(
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
-    content: @Composable ColumnScope.() -> Unit,
+    content: @Composable ColumnScope.(SheetHider) -> Unit,
 ) {
     val c = CassiniTheme.colors
+    val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+    val dismiss by rememberUpdatedState(onDismissRequest)
+    val hider = remember(state, scope) {
+        SheetHider {
+            scope.launch { state.hide() }.invokeOnCompletion { if (!state.isVisible) dismiss() }
+        }
+    }
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         modifier = modifier,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = state,
         shape = CassiniTheme.shapes.sheet,
         containerColor = c.surface,
         contentColor = c.ink,
@@ -58,9 +73,15 @@ fun CassiniSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .imePadding(),
-            content = content,
-        )
+        ) {
+            content(hider)
+        }
     }
+}
+
+/** Closes a [CassiniSheet] with its slide-down animation, then calls the sheet's `onDismissRequest`. */
+fun interface SheetHider {
+    fun hide()
 }
 
 /**
