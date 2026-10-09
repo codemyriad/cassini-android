@@ -9,7 +9,7 @@ Use direct adb instrumentation to retain app data and downloaded models. Gradle�
 ```sh
 ./tools/fetch-youtube-audio.sh       # optional YouTube clips; uses uvx yt-dlp + ffmpeg
 ./scripts/device-smoke.sh youtube
-# Optional third argument selects test classes.
+# Optional second argument (after the audio sample) selects test classes.
 ./scripts/device-smoke.sh fleurs org.cassini.android.LibraryTest
 # Opt-in recovery check after force-stopping the app mid-recording:
 adb shell am instrument -w -r -e class org.cassini.android.RecoveryCheckTest org.cassini.android.test/androidx.test.runner.AndroidJUnitRunner
@@ -18,7 +18,7 @@ adb shell am instrument -w -r -e class org.cassini.android.RecoveryCheckTest org
 ./scripts/device-smoke.sh youtube-long
 ```
 
-Unlock the phone first. The script wakes it and dismisses an unsecured keyguard, but fails early if authentication is still required. Set `ANDROID_SERIAL` when several devices are connected. To verify the APK CI tested, set `CASSINI_APK=/absolute/path/to/downloaded.apk`; the script detects debug or `releaseTest` (any non-debuggable APK) and builds the matching instrumentation APK. A `releaseTest` build without a supplied key is signed with `~/.android/debug.keystore`, so it installs over a debug build. To use both binaries from CI, also set `CASSINI_TEST_APK=/absolute/path/to/test.apk`. The `cassini-android-device-tests` artifact contains the APK under test and its test APK. Kotlin’s internal method names differ across variants, so a debug test APK cannot reliably exercise a release app. The minified `release` APK cannot be instrumented at all, because R8 removes app and Kotlin library members that only the tests call. `releaseTest` is the release build (same signing, not debuggable) without R8. On tags CI instruments `releaseTest`, then installs the published release APK over it and checks that it launches (`scripts/launch-check.sh APK` does the same by hand).
+Unlock the phone first. The script wakes it and dismisses an unsecured keyguard, but fails early if authentication is still required. Set `ANDROID_SERIAL` when several devices are connected. To verify the APK CI tested, set `CASSINI_APK=/absolute/path/to/downloaded.apk`; the script detects debug or `releaseTest` (a non-debuggable APK that R8 did not minify) and builds the matching instrumentation APK. It refuses an R8-minified APK. A `releaseTest` build without a supplied key is signed with `~/.android/debug.keystore`, so it installs over a debug build. To use both binaries from CI, also set `CASSINI_TEST_APK=/absolute/path/to/test.apk`. The `cassini-android-device-tests` artifact contains the APK under test and its test APK. Kotlin’s internal method names differ across variants, so a debug test APK cannot reliably exercise a release app. The minified `release` APK cannot be instrumented at all, because R8 removes app and Kotlin library members that only the tests call. `releaseTest` is the release build (same signing, not debuggable) without R8. On tags CI instruments `releaseTest`, then installs the published release APK over it and checks that it launches (`scripts/launch-check.sh APK` does the same by hand).
 
 The supplied sample is [il Pericolo Invisibile](https://www.youtube.com/watch?v=UmZwQf5TV3c), 00:28–00:58 (30 seconds), or 00:28–03:28 (three minutes). The YouTube clips are not distributed here; tests that need them skip or fail without them. The FLEURS clip is committed under `fixtures/audio/` with its pinned revision, reference text and CC-BY-4.0 attribution, and the androidTest assets include it.
 
@@ -36,8 +36,9 @@ adb exec-out run-as org.cassini.android cat files/device-smoke.INT8.words.json >
 JVM tests run every published vector from the `third_party/cassini-format` submodule, pinned to the revision this app conforms to. A missing checkout fails the tests instead of skipping them (`git submodule update --init`). Use `-PcassiniConformanceDir=/path/to/spec/conformance` to run another checkout's vectors, for example `../cassini-format` at a newer revision. Synthetic integrity and round-trip tests always run.
 
 ```sh
-python3 ../cassini-format/tools/cassini-extract.py DOCUMENT.opus --check
-python3 ../cassini-format/tools/cassini-opus-digest.py DOCUMENT.opus
+python3 third_party/cassini-format/tools/cassini-extract.py DOCUMENT.opus --check
+python3 third_party/cassini-format/tools/cassini-opus-digest.py DOCUMENT.opus
+# A sibling ../cassini-format checkout has the same tools at a newer revision.
 # Node 24+, with ../gocassini checked out: use the web viewer’s reader.
 node scripts/check-portable-document.mjs DOCUMENT.opus
 ```
@@ -74,7 +75,7 @@ An imported file is stored under the SHA-256 of its bytes. Opening the same file
 
 ## Beta releases
 
-Update `versionName`, increase `versionCode`, and refresh [release notes](release-notes.md). A matching `vVERSION` tag triggers the same build/test/lint checks, then publishes the APK, checksum, notices and native source archive. Packaging checks both supported 64-bit ABIs and each native library’s 16 KB ELF/ZIP alignment. These checks catch build regressions; runtime behavior still needs testing on actual devices. Tag builds require the repository’s `ANDROID_BETA_KEYSTORE` secret; missing signing material fails the build.
+Update `versionName`, increase `versionCode`, and refresh [release notes](release-notes.md). A matching `vVERSION` tag triggers the same build/test/lint checks, then publishes the APK, checksum, notices and native source archive. Packaging checks both supported 64-bit ABIs and each native library’s 16 KB ELF/ZIP alignment. These checks catch build regressions; runtime behavior still needs testing on actual devices. Tag builds require the repository’s `ANDROID_BETA_KEYSTORE` secret; missing signing material fails the build. The keystore's secrets are the `CASSINI_RELEASE_STORE_PASSWORD`, `CASSINI_RELEASE_KEY_ALIAS` and `CASSINI_RELEASE_KEY_PASSWORD` repository secrets. Until they are set, CI falls back to the legacy debug-keystore values (`android`, `androiddebugkey`, `android`); this fallback is temporary and goes once the owner rotates the passwords. To build a signed release locally, export `CASSINI_BETA_KEYSTORE_FILE` and the three `CASSINI_RELEASE_*` variables: when the keystore is set and one of the others is missing, Gradle stops with an error.
 
 The signing key matches the existing development installation. Keep it stable for these beta updates. The beta release build disables debugging; the key comes from the earlier debug installation to allow upgrades. A production signing identity can be chosen for a future stable release. Never commit it.
 
