@@ -23,7 +23,10 @@ sealed interface JobPhase {
     /** The pipeline runs: the progress card and the draft transcript. */
     data class Transcribing(val progress: RunningProgress, val draft: DraftState) : JobPhase
 
-    /** Stop was asked; the job saves its checkpoint at its next sample block. */
+    /**
+     * Stop was asked. During the decode the job saves a checkpoint at its next sample block, if at least one window
+     * is done; after the decode the final checkpoint stays and the job ends at its next check.
+     */
     data object Stopping : JobPhase
 }
 
@@ -42,8 +45,8 @@ data class DownloadProgress(val part: ModelPart, val doneBytes: Long, val totalB
 }
 
 /**
- * Why a model install failed, as the download banners tell it (features.md section 13.4). Persisted by name in
- * `jobs.failure`: never rename.
+ * Why a model install failed, as the download banners tell it (features.md section 13.4). Persisted in `jobs.failure`
+ * as [JobFailure.DOWNLOAD_PREFIX] plus the name (a core `Failure` has names such as INSTALL too): never rename.
  */
 enum class DownloadError {
     /** No validated network, or the connection timed out ("No connection"). */
@@ -176,7 +179,10 @@ data class DraftState(
     }
 }
 
-/** Why a job failed. [code] is what `jobs.failure` stores. */
+/**
+ * Why a job failed. [code] is what `jobs.failure` stores: a core `Failure` name, [DOWNLOAD_PREFIX] plus a
+ * [DownloadError] name, or `CHECKPOINT_MISMATCH`. No two failures share a code.
+ */
 sealed interface JobFailure {
     val code: String
 
@@ -190,12 +196,21 @@ sealed interface JobFailure {
      * used: DL_NO_SPACE shows "Free about N MB" from it.
      */
     data class Download(val error: DownloadError, val part: ModelPart, val requiredFreeBytes: Long) : JobFailure {
-        override val code: String get() = error.name
+        override val code: String get() = DOWNLOAD_PREFIX + error.name
     }
 
     /** The saved checkpoint no longer matches the audio or the models ("Saved progress no longer matches"). */
     data object CheckpointMismatch : JobFailure {
         override val code: String get() = "CHECKPOINT_MISMATCH"
+    }
+
+    companion object {
+        /** The start of every [Download] code, so "DOWNLOAD_INSTALL" never reads as core `Failure.INSTALL`. */
+        const val DOWNLOAD_PREFIX = "DOWNLOAD_"
+
+        /** The [DownloadError] of a stored [code], or null when the code is not a download failure. */
+        fun downloadError(code: String): DownloadError? = code.takeIf { it.startsWith(DOWNLOAD_PREFIX) }
+            ?.let { name -> DownloadError.entries.firstOrNull { DOWNLOAD_PREFIX + it.name == name } }
     }
 }
 
