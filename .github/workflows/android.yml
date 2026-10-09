@@ -199,6 +199,10 @@ jobs:
             app/build/reports/tests/testDebugUnitTest/
             app/build/test-results/testDebugUnitTest/
             app/build/reports/lint-results-*.html
+            core/build/reports/tests/
+            core/build/test-results/test/
+            engine/build/reports/tests/testDebugUnitTest/
+            engine/build/test-results/testDebugUnitTest/
           if-no-files-found: warn
 
   emulator:
