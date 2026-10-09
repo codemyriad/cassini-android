@@ -161,7 +161,7 @@ A Cassini document is an Ogg Opus file at 48 kHz. Any audio player plays it. The
 
 Each transcription adds a transcript version (a variant). The document keeps the earlier versions. "Save a copy" copies the document byte for byte, together with the versions, extensions and attachments that Android does not use.
 
-Parakeet does not identify the language, so the Android producer writes an empty `language` (`""`). The Android producer also writes these extension keys in the provenance of a version: `x-inferenceMs`, `x-segmentation`, `x-resumedFromMs`, `x-speakerDiarization`, `x-incrementalDiarization`, `x-speakerMerges`, `x-speakerIdentification`, `x-derivedFromTranscript` and `x-sourceAttribution`.
+Parakeet does not identify the language, so the Android producer writes an empty `language` (`""`). The Android producer also writes these extension keys in the provenance of a version: `x-inferenceMs`, `x-segmentation`, `x-resumedFromMs`, `x-speakerDiarization`, `x-incrementalDiarization`, `x-speakerMerges`, `x-speakerAssignmentEditedBy` (the value `"user"`, written together with `x-speakerMerges`), `x-speakerIdentification`, `x-derivedFromTranscript` and `x-sourceAttribution`.
 
 The format code keeps four known differences from the specification, because the pinned vectors and gocassini agree with the current behavior:
 

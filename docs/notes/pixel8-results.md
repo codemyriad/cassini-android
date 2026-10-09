@@ -1,6 +1,8 @@
 # Pixel 8 prototype results — 2026-10-01
 
-> Historical note: this file records work on the 0.1.0 prototype, written from 2026-10-01 to 2026-10-09. Nobody updates it. Its statements about the app can be out of date. For the current app, read [the architecture](../architecture.md) and [the development notes](../development.md).
+> Historical note: this file records work on the 0.1.0 prototype, written from 2026-10-01 to 2026-10-09. Nobody updates it. Its statements about the app can be out of date. For the current app, read [the architecture](../architecture.md) and [the development notes](../development.md). Until 0.2, this file was `docs/pixel8-results.md`.
+
+<!-- TODO(P10): core/src/main/kotlin/org/cassini/core/asr/SpeechWindows.kt still points to docs/pixel8-results.md. The file is in a verbatim group of scripts/check-verbatim.sh, and config/detekt/baseline.xml repeats the comment. Change the three together with a reviewed verbatim edit, or keep the old path. -->
 
 These measurements describe earlier versions, including FP32 and Automatic model selection. The current app uses INT8 only and transcribes after recording; historical FP32 results and saved documents remain valid.
 
