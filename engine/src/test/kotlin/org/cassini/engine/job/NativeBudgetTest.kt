@@ -66,6 +66,46 @@ class NativeBudgetTest {
         assertEquals(true, outcome[1])
     }
 
+    @Test fun anInterruptWhileTryingEndsInCancelledAndKeepsTheFlag() {
+        NativeBudget.acquire()
+        val outcome = arrayOfNulls<Any>(2)
+        val waiting = CountDownLatch(1)
+        val waiter = Thread {
+            waiting.countDown()
+            try {
+                outcome[0] = NativeBudget.tryAcquire(timeoutMs = 60_000)
+                NativeBudget.release()
+            } catch (error: UserFacingException) {
+                outcome[0] = error.failure
+            }
+            outcome[1] = Thread.currentThread().isInterrupted
+        }
+        try {
+            waiter.start()
+            assertTrue(waiting.await(5, TimeUnit.SECONDS))
+            Thread.sleep(100)
+            waiter.interrupt()
+            waiter.join(5000)
+            assertFalse(waiter.isAlive)
+        } finally {
+            NativeBudget.release()
+        }
+        assertEquals(Failure.CANCELLED, outcome[0])
+        assertEquals(true, outcome[1])
+    }
+
+    @Test fun anAlreadyInterruptedThreadDoesNotTryForAFreeBudget() {
+        Thread.currentThread().interrupt()
+        try {
+            NativeBudget.tryAcquire(timeoutMs = 50)
+            NativeBudget.release()
+            fail()
+        } catch (error: UserFacingException) {
+            assertEquals(Failure.CANCELLED, error.failure)
+            assertTrue(Thread.interrupted())
+        }
+    }
+
     @Test fun anAlreadyInterruptedThreadDoesNotTakeAFreeBudget() {
         Thread.currentThread().interrupt()
         try {

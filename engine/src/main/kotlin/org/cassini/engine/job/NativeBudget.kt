@@ -40,9 +40,20 @@ object NativeBudget {
         }
     }
 
-    /** Takes the budget if it becomes free within [timeoutMs]; blocks the calling thread meanwhile. */
-    fun tryAcquire(timeoutMs: Long): Boolean =
-        mutex.tryLock() || runBlocking { withTimeoutOrNull(timeoutMs) { mutex.lock() } != null }
+    /**
+     * Takes the budget if it becomes free within [timeoutMs]; blocks the calling thread meanwhile. An interrupt ends
+     * in [Failure.CANCELLED] and keeps the thread's interrupt flag, as in [acquire].
+     */
+    fun tryAcquire(timeoutMs: Long): Boolean {
+        if (Thread.currentThread().isInterrupted) throw UserFacingException(Failure.CANCELLED)
+        if (mutex.tryLock()) return true
+        return try {
+            runBlocking { withTimeoutOrNull(timeoutMs) { mutex.lock() } != null }
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+            throw UserFacingException(Failure.CANCELLED)
+        }
+    }
 
     /** Gives back the budget taken by [acquire] or [tryAcquire]. */
     fun release() = mutex.unlock()
