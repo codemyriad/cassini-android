@@ -2,7 +2,7 @@
 
 Record a thought, find the words later, and keep the audio with the transcript. I’m building Cassini around that simple flow, with transcription running on your phone.
 
-**[Download 0.0.6-beta](https://github.com/codemyriad/cassini-android/releases/download/v0.0.6-beta/cassini-android-0.0.6-beta.apk)** · [Release notes](https://github.com/codemyriad/cassini-android/releases/tag/v0.0.6-beta)
+**[Download 0.1.0](https://github.com/codemyriad/cassini-android/releases/download/v0.1.0/cassini-android-0.1.0.apk)** · [Release notes](https://github.com/codemyriad/cassini-android/releases/tag/v0.1.0)
 
 <p>
   <img src="docs/screenshots/library.png" width="240" alt="Notes library with dates, transcript previews and search">
