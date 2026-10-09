@@ -75,7 +75,7 @@ What ran, tree by tree:
 
 ### Known differences from real installs
 
-- **Language tag.** The 0.1.0 trees come from this repository's code at 0.1.0 plus two later fixes (`ed73e73`, `0ebea43`), not from the `v0.1.0` tag. So the transcripts in notes 2 and 3, the checkpoint words and `latest.*.json` have no `"language":"it"`, while the tag wrote one. Note 1 and the 0.0.x trees do carry `"language":"it"`, as the old versions wrote it.
+- **Language tag.** The 0.1.0 trees come from this repository's code at 0.1.0 plus two later fixes (`ed73e73`, `0ebea43`), not from the `v0.1.0` tag. So the transcripts in notes 2 and 3, the checkpoint words and `latest.*.json` have no `"language":"it"`, while the tag wrote one. Note 1 and the 0.0.x trees do carry `"language":"it"`, as the old versions wrote it. `CheckpointGoldenTest.theReleasedTagsLanguageMemberReads` puts the member back in each of those places, as the tag wrote it, and reads the tree again, so the shape released installs hold is covered too.
 - **No 0.0.x sealed document.** The 0.0.x trees have no sealed document: 0.0.6's document writer differs from 0.1.0's. Running the old APKs on the shared emulator would have needed an uninstall, which would erase its models.
 - **Not real versions.** The 0.0.x trees are written by copies of the old writers, not by the old APKs.
 - **Synthetic crash files.** The crash files are synthesised, as described above, not left by a killed recording.

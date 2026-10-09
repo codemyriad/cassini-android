@@ -138,6 +138,45 @@ class CheckpointGoldenTest {
         assertThrows(IllegalArgumentException::class.java) { checkpoint.load() }
     }
 
+    /**
+     * The fixture comes from 0ebea43, which omits an empty language; the v0.1.0 tag that users installed wrote
+     * `"language":"it"` into every word body and into latest.processing.json (fixtures/README.md). Put it back
+     * in each of those places, as the tag wrote it, and read the tree the same way.
+     */
+    @Test fun theReleasedTagsLanguageMemberReads() {
+        val (tree, checkpoint) = captured()
+        fun edit(file: File, change: (JSONObject) -> Unit) {
+            val json = JSONObject(file.readText())
+            change(json)
+            file.writeText(json.toString())
+        }
+        edit(File(checkpoint.directory, "checkpoint.json")) {
+            it.getJSONObject("recognition").getJSONObject("chunks").getJSONObject("words").put("language", "it")
+        }
+        edit(File(tree.root, "library.json")) { library ->
+            val notes = library.getJSONArray("notes")
+            for (i in 0 until notes.length()) {
+                notes.getJSONObject(i).getJSONObject("session").optJSONObject("transcript")?.put("language", "it")
+            }
+        }
+        edit(File(tree.root, "latest.words.json")) { it.put("language", "it") }
+        edit(File(tree.root, "latest.processing.json")) { it.put("language", "it") }
+
+        val saved = checkpoint.load()!!
+        val chunks = saved.getJSONObject("recognition").getJSONObject("chunks")
+        assertEquals("it", Transcript.fromJson(chunks.getJSONObject("words").toString()).language)
+        val restored = IncrementalTranscript(chunks) { _, _ -> error("A restore must not decode") }
+        assertEquals(saved.getLong("positionSamples"), restored.positionSamples)
+        assertEquals(saved.getLong("doneMs"), restored.doneMs)
+        val transcripts = LibraryStore(tree.root).load().mapNotNull { it.session.transcript }
+        assertTrue(transcripts.isNotEmpty())
+        assertTrue(transcripts.all { it.language == "it" && it.words.isNotEmpty() })
+        val latest = Transcript.fromJson(File(tree.root, "latest.words.json").readText())
+        assertEquals("it", latest.language)
+        assertTrue(latest.words.isNotEmpty())
+        assertEquals("it", JSONObject(File(tree.root, "latest.processing.json").readText()).getString("language"))
+    }
+
     @Test fun manifestCoversEveryCommittedFile() {
         FixtureTree.directory().listFiles()!!.filter { it.isDirectory && File(it, ".mtimes").exists() }.forEach { tree ->
             val committed = tree.walkTopDown().filter { it.isFile && it.name != ".mtimes" }
