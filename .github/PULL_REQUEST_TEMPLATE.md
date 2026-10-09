@@ -6,7 +6,7 @@
 
 <!-- Put an x in each box that applies. If a check does not apply, write "not applicable" next to it. -->
 
-- [ ] `./gradlew detekt ciTest` passes.
+- [ ] `./gradlew detekt ciTest` passes. On macOS or Windows: `./gradlew detekt` and the tests without the pixel comparison pass (see `CONTRIBUTING.md`). CI does the pixel comparison.
 - [ ] `./gradlew :app:lintDebug :data:lintDebug :ui:lintDebug` passes.
 - [ ] Screenshot goldens: I recorded them on Linux x86_64 and examined each changed PNG, or no golden changed.
 - [ ] Device tests, if the change touches recording, playback, services, models or native code: I ran `scripts/device-smoke.sh` on this device and Android version: <!-- device, API level -->

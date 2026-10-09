@@ -79,6 +79,7 @@ You need NDK 28.2.13676358 in these cases:
 
 - Gradle configures `:engine` or `:app`. The `:engine` module compiles `libcassini_opus.so` with CMake and the NDK. If the SDK does not have this NDK, the Android Gradle plugin downloads it (more than 1 GB) before the first task starts.
 - You run `scripts/setup.sh --from-source`.
+- `scripts/setup.sh` cannot download the prebuilt AAR, and it builds the AAR from source. To stop with an error instead, run `scripts/setup.sh --prebuilt-only`.
 
 You do not need the NDK for `./gradlew --configure-on-demand :core:test`.
 
@@ -188,7 +189,7 @@ To add the sign-off, commit with `-s`:
 git commit -s -m "Add the export menu"
 ```
 
-Git adds a line `Signed-off-by: Your Name <you@example.com>` with your name and email from the git configuration. Each commit in a pull request must have this line. If you forgot it, run `git rebase --signoff main` and push the branch again.
+Git adds a line `Signed-off-by: Your Name <you@example.com>` with your name and email from the git configuration. Each commit in a pull request must have this line. If you forgot it, update your local `main` from the main repository, run `git rebase --signoff main`, and push the branch again with `git push --force-with-lease`. The rebase changes the commits, so a plain push fails.
 
 ## Send a pull request
 
