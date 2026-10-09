@@ -26,7 +26,7 @@ I’ve tested recording and transcription on a **Pixel 8 (8 GB RAM, Android 17)*
 * Browse **Notes** or search titles and past transcriptions. Tap a word to hear that part of the recording. Each note remembers its playback position.
 * Use **Save Cassini** to keep a complete `.opus` document containing audio, timed words and metadata. You can open it again without downloading a model. This is a portable recording, not just a word-body JSON export.
 
-The interface supports English and Italian. Parakeet recognizes speech languages automatically; the current transcript metadata labels the language as Italian.
+The interface supports English and Italian. Parakeet recognizes speech languages automatically and does not report which one; transcripts leave the language empty.
 
 ## What’s still limited
 

@@ -48,7 +48,7 @@ Initial paired measurements:
 | LiteRT GPU, all model subgraphs | 5.38 s | 6.52 s | 5.68 s | 5.28× realtime |
 | GPU encoder + CPU decoder | 6.72 s | 3.10 s | 3.05 s | 9.83× realtime |
 
-The checked-in reproduction script also passed all three modes: CPU 3.55 / 3.38 seconds (8.88× on the second pass), GPU 6.32 / 6.34 seconds (4.73×), and hybrid 3.35 / 2.99 seconds (10.02×). Compile times were 1.21 / 5.55 / 6.42 seconds respectively. Token IDs again match CPU, with a maximum 80 ms timestamp difference. The same input feature bytes were used in both experiments. The script removed the probe and its 614 MB weights afterward.
+The reproduction script (removed from the tree; see `git show 0ebea43:scripts/run-litert-gpu-probe.sh`) also passed all three modes: CPU 3.55 / 3.38 seconds (8.88× on the second pass), GPU 6.32 / 6.34 seconds (4.73×), and hybrid 3.35 / 2.99 seconds (10.02×). Compile times were 1.21 / 5.55 / 6.42 seconds respectively. Token IDs again match CPU, with a maximum 80 ms timestamp difference. The same input feature bytes were used in both experiments. The script removed the probe and its 614 MB weights afterward.
 
 The hybrid probe creates two compiled instances and copies the encoded features back to CPU once per window. This duplicates runtime/model allocations and is not yet a production memory design. Per-stage GPU submission timings are not a reliable isolated kernel benchmark; use complete pass timings, which include synchronization and transfers.
 
