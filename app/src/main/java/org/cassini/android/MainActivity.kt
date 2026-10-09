@@ -540,7 +540,7 @@ class MainActivity : Activity() {
     private fun processing(precision: String, revision: String? = null): JSONObject = JSONObject()
         .put("backend", "sherpa-onnx").put("engine", "Parakeet TDT")
         .put("model", "nvidia/parakeet-tdt-0.6b-v3 $precision")
-        .put("device", "Android CPU").put("language", "it")
+        .put("device", "Android CPU")
         .put("source", "recording").put("version", "sherpa-onnx 1.13.7${revision?.let { "; model revision $it" }.orEmpty()}")
 
     private fun saveCassiniDocument() {
@@ -939,7 +939,7 @@ class MainActivity : Activity() {
         val portable = document ?: return
         val labels = portable.variants.map { variant ->
             val words = variant.transcript?.words?.size
-            "${variant.id} · ${variant.descriptor.optString("language")}" + if (words == null) " · ${getString(R.string.variant_unavailable)}"
+            listOf(variant.id, variant.descriptor.optString("language")).filter { it.isNotEmpty() }.joinToString(" · ") + if (words == null) " · ${getString(R.string.variant_unavailable)}"
                 else " · ${resources.getQuantityString(R.plurals.word_count, words, words)}"
         }.toTypedArray()
         AlertDialog.Builder(this).setTitle(R.string.choose_transcript)

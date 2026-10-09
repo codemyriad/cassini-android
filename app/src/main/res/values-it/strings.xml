@@ -63,7 +63,7 @@
     <string name="system_language">Segui la lingua del telefono</string>
     <string name="recognition_model">Modello di trascrizione</string>
     <string name="about">Informazioni sul prototipo</string>
-    <string name="about_body">Parakeet v3 sul tuo telefono. L’audio resta in locale.\n\nRegistra note vocali, cerca nelle trascrizioni e salva documenti Cassini Opus portatili con audio e parole temporizzate.\n\nAudio fino a 2 ore, voci distinte e riconosciute sul telefono (le voci non lo lasciano mai), riconoscimento multilingue automatico. La lingua indicata nella trascrizione è attualmente l’italiano.\n\nGPLv3. Codice sorgente e licenze: github.com/codemyriad/cassini-android</string>
+    <string name="about_body">Parakeet v3 sul tuo telefono. L’audio resta in locale.\n\nRegistra note vocali, cerca nelle trascrizioni e salva documenti Cassini Opus portatili con audio e parole temporizzate.\n\nAudio fino a 2 ore, voci distinte e riconosciute sul telefono (le voci non lo lasciano mai), riconoscimento multilingue automatico.\n\nGPLv3. Codice sorgente e licenze: github.com/codemyriad/cassini-android</string>
     <string name="done">Fine</string>
     <string name="cancel">Annulla</string>
     <string name="error_open">Impossibile aprire la registrazione. Seleziona di nuovo il file.</string>

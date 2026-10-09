@@ -16,10 +16,11 @@ internal data class TimedWord(val word: Word, val capMs: Long = 0) {
 }
 
 /** Word order is canonical; never sort a Cassini transcript by time. */
-data class Transcript(val words: List<Word>, val language: String = "it") {
+/** [language] is empty unless something actually identified it: Parakeet does not report the spoken language. */
+data class Transcript(val words: List<Word>, val language: String = "") {
     fun json(): String = JSONObject()
         .put("format", "cassini.words.v1")
-        .put("language", language)
+        .apply { if (language.isNotEmpty()) put("language", language) }
         .put("wordCount", words.size)
         .put("items", JSONArray().also { items ->
             words.forEach { word ->

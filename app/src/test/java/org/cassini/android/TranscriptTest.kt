@@ -31,7 +31,8 @@ class TranscriptTest {
         assertEquals(listOf(300L, 1800L, 3200L), transcript.words.map { it.endMs })
         val json = JSONObject(transcript.json())
         assertEquals("cassini.words.v1", json.getString("format"))
-        assertEquals("it", json.getString("language"))
+        // Parakeet does not report a language; the format reads an absent tag as "nobody said".
+        assertFalse(json.has("language"))
         assertEquals(3, json.getInt("wordCount"))
         assertEquals("perché?", json.getJSONArray("items").getJSONObject(1).getString("text"))
     }

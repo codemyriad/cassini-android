@@ -66,7 +66,7 @@
     <string name="italian_name" translatable="false">Italiano</string>
     <string name="recognition_model">Transcription model</string>
     <string name="about">About this prototype</string>
-    <string name="about_body">Parakeet v3 on your phone. Audio stays local.\n\nRecord voice notes, search past transcriptions, and save portable Cassini Opus documents with audio and timed words.\n\nAudio up to 2 hours, speakers labelled and recognised on the phone (voices never leave it), automatic multilingual recognition. The current transcript language label is Italian.\n\nGPLv3. Source and dependency notices: github.com/codemyriad/cassini-android</string>
+    <string name="about_body">Parakeet v3 on your phone. Audio stays local.\n\nRecord voice notes, search past transcriptions, and save portable Cassini Opus documents with audio and timed words.\n\nAudio up to 2 hours, speakers labelled and recognised on the phone (voices never leave it), automatic multilingual recognition.\n\nGPLv3. Source and dependency notices: github.com/codemyriad/cassini-android</string>
     <string name="done">Done</string>
     <string name="cancel">Cancel</string>
     <string name="error_open">Could not open this recording. Choose the file again.</string>
