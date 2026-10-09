@@ -9,6 +9,8 @@ plugins {
     alias(libs.plugins.room)
 }
 
+val fixtures: String = rootProject.file("fixtures").absolutePath
+
 android {
     namespace = "org.cassini.data"
     compileSdk = libs.versions.compileSdk.get().toInt()
@@ -30,6 +32,8 @@ android {
         unitTests {
             isIncludeAndroidResources = true
             all {
+                // The repository tests build documents over the committed FLEURS clip.
+                it.systemProperty("cassini.fixtures", fixtures)
                 // Robolectric needs these on JDK 17.
                 it.jvmArgs(
                     "--add-opens=java.base/java.lang=ALL-UNNAMED",
@@ -54,6 +58,7 @@ room {
 dependencies {
     api(project(":core"))
     implementation(libs.bundles.room)
+    implementation(libs.annotation)
     ksp(libs.room.compiler)
     implementation(libs.datastore.preferences)
     implementation(libs.coroutines.android)
