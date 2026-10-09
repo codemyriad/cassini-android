@@ -67,10 +67,13 @@ dependencies {
     implementation(libs.compose.foundation)
     implementation(libs.compose.material3)
     implementation(libs.compose.ui.tooling.preview)
-    implementation(libs.kotlinx.collections.immutable)
+    // UiState classes expose ImmutableList (docs/design/ui.md, section 2), so :app ViewModels need the type.
+    api(libs.kotlinx.collections.immutable)
+    // Android Studio previews. It also adds the exported PreviewActivity to the debug APK of :app.
     debugImplementation(libs.compose.ui.tooling)
-    // Provides the activity that createComposeRule() launches in the Robolectric tests.
-    debugImplementation(libs.compose.ui.test.manifest)
+    // Provides the activity that createComposeRule() launches in the Robolectric tests. testImplementation, not
+    // debugImplementation, so its exported test activity does not reach the debug APK of :app.
+    testImplementation(libs.compose.ui.test.manifest)
     testImplementation(platform(libs.compose.bom))
     testImplementation(libs.compose.ui.test.junit4)
     testImplementation(libs.bundles.testing.robolectric)
