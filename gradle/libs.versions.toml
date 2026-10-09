@@ -19,7 +19,6 @@ cmake = "3.22.1"
 
 # AndroidX
 composeBom = "2026.09.00"
-materialIconsExtended = "1.7.8"
 activityCompose = "1.13.0"
 lifecycle = "2.11.0"
 navigation3 = "1.2.0"
@@ -31,6 +30,7 @@ annotation = "1.9.1"
 # Kotlin libraries
 coroutines = "1.11.0"
 serialization = "1.11.0"
+collectionsImmutable = "0.5.2"
 
 # Third party
 zstd = "1.5.7-22"
@@ -41,6 +41,8 @@ sherpaOnnx = "1.13.7-1f23907a"
 # Tests
 junit = "4.13.2"
 robolectric = "4.17"
+# Screenshot tests in :ui (Robolectric native graphics).
+roborazzi = "1.76.0"
 turbine = "1.2.1"
 androidxTestRunner = "1.7.0"
 androidxTestCore = "1.7.0"
@@ -56,10 +58,12 @@ compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
 compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
 compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+# enableAccessibilityChecks() (Accessibility Test Framework). Device tests only: under Robolectric the Compose
+# rule logs "Accessibility checks are currently not supported by Robolectric" and ATF skips Compose content.
+compose-ui-test-junit4-accessibility = { group = "androidx.compose.ui", name = "ui-test-junit4-accessibility" }
 compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 compose-foundation = { group = "androidx.compose.foundation", name = "foundation" }
 compose-material3 = { group = "androidx.compose.material3", name = "material3" }
-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended", version.ref = "materialIconsExtended" }
 
 # Activity, lifecycle, navigation
 activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
@@ -88,6 +92,7 @@ coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-
 coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serialization" }
+kotlinx-collections-immutable = { group = "org.jetbrains.kotlinx", name = "kotlinx-collections-immutable", version.ref = "collectionsImmutable" }
 
 # Native runtime and codecs
 sherpa-onnx-nemotron = { group = "org.cassini.native", name = "sherpa-onnx-nemotron", version.ref = "sherpaOnnx" }
@@ -98,6 +103,9 @@ org-json = { group = "org.json", name = "json", version.ref = "orgJson" }
 # Tests
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
+roborazzi = { group = "io.github.takahirom.roborazzi", name = "roborazzi", version.ref = "roborazzi" }
+roborazzi-compose = { group = "io.github.takahirom.roborazzi", name = "roborazzi-compose", version.ref = "roborazzi" }
+roborazzi-junit-rule = { group = "io.github.takahirom.roborazzi", name = "roborazzi-junit-rule", version.ref = "roborazzi" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
 androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
 androidx-test-core = { group = "androidx.test", name = "core", version.ref = "androidxTestCore" }
@@ -131,3 +139,4 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 room = { id = "androidx.room", version.ref = "room" }
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }

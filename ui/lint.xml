@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!-- Version freshness depends on the network and on the day of the build; Dependabot proposes updates. -->
+    <issue id="AndroidGradlePluginVersion" severity="ignore" />
+    <issue id="GradleDependency" severity="ignore" />
+    <issue id="NewerVersionAvailable" severity="ignore" />
+    <!-- Every user-visible string has an Italian translation; a missing one is a bug. -->
+    <issue id="MissingTranslation" severity="error" />
+</lint>

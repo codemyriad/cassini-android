@@ -8,6 +8,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization) apply false
     alias(libs.plugins.ksp) apply false
     alias(libs.plugins.room) apply false
+    alias(libs.plugins.roborazzi) apply false
     alias(libs.plugins.detekt)
 }
 
@@ -27,6 +28,9 @@ detekt {
             "data/src/androidTest/kotlin",
             "engine/src/main/kotlin",
             "engine/src/test/kotlin",
+            "ui/src/main/kotlin",
+            "ui/src/test/kotlin",
+            "ui/src/androidTest/kotlin",
             "tools/asr-eval",
             "build.gradle.kts",
             "settings.gradle.kts",
@@ -34,6 +38,7 @@ detekt {
             "core/build.gradle.kts",
             "data/build.gradle.kts",
             "engine/build.gradle.kts",
+            "ui/build.gradle.kts",
         ),
     )
     parallel = true

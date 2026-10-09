@@ -21,4 +21,5 @@ rootProject.name = "CassiniAndroid"
 include(":core")
 include(":data")
 include(":engine")
+include(":ui")
 include(":app")
