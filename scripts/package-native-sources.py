@@ -34,14 +34,16 @@ if __name__ == '__main__':
     destination.mkdir(exist_ok=True)
     archive = destination / 'cassini-native-sources.tar'
     with tarfile.open(archive, 'w') as output:
-        output.add(Path('scripts/streaming-diarization.patch'), arcname='streaming-diarization.patch')
-        build_files = [Path("scripts/fetch-opus-source.sh"), Path("scripts/native-common.sh"),
-                       Path("app/build.gradle.kts"), *Path("app/src/main/cpp").glob("*")]
+        # Files keep their repository paths, so the packaged scripts find the manifest and the
+        # patch where they look for them.
+        build_files = [manifest, Path('scripts/streaming-diarization.patch'),
+                       Path('scripts/build-native-aar.sh'), Path('scripts/fetch-opus-source.sh'),
+                       Path('scripts/native-common.sh'), Path('app/build.gradle.kts'),
+                       *sorted(Path('app/src/main/cpp').glob('*')),
+                       Path('docs/native-runtime.md'), Path('THIRD_PARTY_NOTICES.md')]
         for path in build_files:
             output.add(path, arcname=str(path))
         for path in paths:
             output.add(path, arcname='sources/' + path.name)
-        for path in [manifest, Path('docs/native-runtime.md'), Path('THIRD_PARTY_NOTICES.md')]:
-            output.add(path, arcname=path.name)
     checksum = hashlib.sha256(archive.read_bytes()).hexdigest()
     archive.with_suffix('.tar.sha256').write_text(f'{checksum}  {archive.name}\n')
