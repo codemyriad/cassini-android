@@ -15,7 +15,9 @@
 # --sanitise replaces model blobs (everything in parakeet-v3/, parakeet-v3-fp32/, vad/ and
 # speaker-models/ except the verified* markers) by zero-length stand-ins without copying them, and
 # drops voices.json and voiceprints/, which hold real voiceprints. Never commit a tree pulled from
-# a phone with real recordings: documents/ and processing-checkpoints/ hold the audio.
+# a phone with real recordings: documents/ and processing-checkpoints/ hold the audio. An OUTPUT
+# inside fixtures/filesdir needs --sanitise unless the source is below cache/fixture-capture/, and
+# .gitignore keeps a tree there ignored until it is listed by name.
 #
 # Set ANDROID_SERIAL when several devices are connected.
 set -euo pipefail
@@ -27,7 +29,7 @@ while [ $# -gt 0 ]; do
         --sanitise) sanitise=true; shift ;;
         --source) source_dir=${2:?--source needs a directory}; shift 2 ;;
         --package) package=${2:?--package needs a name}; shift 2 ;;
-        -h|--help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         -*) printf 'Unknown option: %s\n' "$1" >&2; exit 2 ;;
         *) break ;;
     esac
@@ -40,6 +42,12 @@ output=$1
 case "$source_dir" in
     /*|*..*|*\'*) printf 'The source must be a plain path below the app data directory.\n' >&2; exit 2 ;;
 esac
+fixtures=$(cd "$(dirname "$0")/.." && pwd)/fixtures/filesdir
+target=$(realpath -m -- "$output")
+if [[ "$target/" == "$fixtures/"* ]] && ! $sanitise && [[ "$source_dir" != cache/fixture-capture/* ]]; then
+    printf 'Refusing to copy %s unsanitised into %s: pass --sanitise.\n' "$source_dir" "$output" >&2
+    exit 2
+fi
 if [ -e "$output" ] && [ -n "$(ls -A "$output" 2>/dev/null)" ]; then
     printf '%s is not empty; choose a new directory.\n' "$output" >&2
     exit 1

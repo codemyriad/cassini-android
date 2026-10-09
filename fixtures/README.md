@@ -25,7 +25,7 @@ Each directory is the content of one `files/` directory, the app's `context.file
 - **`.mtimes`.** Git does not keep modification times, but a checkpoint's `signature` is `<length>:<mtime>` of its source file. Every tree has a `.mtimes` manifest with one line per file: `<relative path><TAB><mtime in milliseconds>`, sorted by path.
 - **Model stand-ins.** Model files (`parakeet-v3/`, `parakeet-v3-fp32/`, `vad/`, `speaker-models/`) are zero-length files with the real names. The `verified` and `verified-voiceprint` markers keep their real content. So a model directory looks installed by name, but `ready()` is false because the lengths do not match.
 - **Synthetic voiceprints.** In `voices.json` and `voiceprints/*.json`, every embedding is a random unit vector (fixed seed). A person's `mean` and the matching note print share one vector. Every other field is as the app wrote it.
-- **Materialising.** To use a tree, copy it into a scratch files root and run the steps that `FixtureTree.materialise` performs (`app/src/test/java/org/cassini/android/FixtureTree.kt`; it moves to the data module in P1):
+- **Materialising.** To use a tree, copy it into a scratch files root and run the steps that `FixtureTree.materialise` performs (`app/src/test/java/org/cassini/android/FixtureTree.kt`; it moves to the `:data` module's tests in P2):
   1. Replace the device root, in both the plain and the escaped form, in `library.json`, `library.json.new`, `session.json` and each `checkpoint.json`.
   2. Rename each `processing-checkpoints/<key>` to the SHA-256 of its rewritten `source` string. This is the key that `ProcessingCheckpoint` derives from the stored uri string.
   3. Set each file's modification time from `.mtimes`.
@@ -71,7 +71,7 @@ What ran, tree by tree:
 - **0.1.0 trees.** The real 0.1.0 code drove the screens: import by `ACTION_VIEW`, Transcribe, Stop, the naming dialog. `LibraryStore` wrote note 1. The test copied the results out of `files/`, then synthesised the voiceprints and made the stand-ins. The corrupt, pre-library and rec-crash trees are derived from `v0.1.0-basic` in the same run. The `.rec.opus` comes from the platform Opus encoder and `OggOpus.LiveMuxer`, with the same settings as `OpusRecording` but fed with the FLEURS clip instead of the microphone, so no room audio can reach the repository. The AAC captures are `MediaCodec` output in MP4 at 32 kb/s.
 - **0.0.x trees.** These are written by `LegacySession` in the capture test: verbatim copies of `SessionStore.save` and `LibraryNote.json` from v0.0.4-beta and v0.0.6-beta (the two are identical), run through Android's org.json. The word lists are the ones that note 2 recognised.
 
-`scripts/pull-filesdir-fixture.sh` can also copy a whole `files/` directory (`--sanitise` replaces model blobs with stand-ins and drops `voices.json` and `voiceprints/`). Do not commit a tree pulled from a phone that has real recordings.
+`scripts/pull-filesdir-fixture.sh` can also copy a whole `files/` directory (`--sanitise` replaces model blobs with stand-ins and drops `voices.json` and `voiceprints/`). Into `fixtures/filesdir/` it copies only from `cache/fixture-capture/` or with `--sanitise`, and `.gitignore` keeps every tree that it does not name ignored. To add a tree, review it and then add its name to `.gitignore`. Do not commit a tree pulled from a phone that has real recordings.
 
 ### Known differences from real installs
 
