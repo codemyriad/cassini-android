@@ -1,12 +1,20 @@
 package org.cassini.android
 
+import com.github.luben.zstd.Zstd
+import org.cassini.core.Failure
+import org.cassini.core.UserFacingException
+import org.cassini.core.models.Artifact
 import org.cassini.core.models.ModelCatalog
+import org.cassini.core.models.ModelDescriptor
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
 import java.io.RandomAccessFile
+import java.net.InetAddress
+import java.net.ServerSocket
+import java.security.MessageDigest
 
 class InstalledModelsTest {
     @get:Rule val folder = TemporaryFolder()
@@ -87,6 +95,140 @@ class InstalledModelsTest {
         assertNull(models.detector())
         // A Parakeet install does not depend on the detector.
         assertFalse(ModelCatalog.parakeetArtifacts.any { it.name == ModelCatalog.sileroVad.name })
+    }
+
+    /** Serves [bodies] by artifact name on a loopback server and installs through it. */
+    private fun withServer(bodies: Map<String, ByteArray>, check: (InstalledModels) -> Unit) {
+        val server = ServerSocket(0, 10, InetAddress.getByName("127.0.0.1"))
+        val responder = Thread {
+            while (!server.isClosed) {
+                try {
+                    server.accept().use { socket ->
+                        val reader = socket.getInputStream().bufferedReader()
+                        val path = reader.readLine().orEmpty().split(' ').getOrElse(1) { "" }.removePrefix("/")
+                        while (!reader.readLine().isNullOrEmpty()) { /* headers */ }
+                        val body = bodies[path]
+                        val head = when (body) {
+                            null -> "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n"
+                            else -> "HTTP/1.1 200 OK\r\nContent-Length: ${body.size}\r\n"
+                        }
+                        socket.getOutputStream().apply {
+                            write("${head}Connection: close\r\n\r\n".toByteArray())
+                            if (body != null) write(body)
+                            flush()
+                        }
+                    }
+                } catch (error: java.net.SocketException) {
+                    if (!server.isClosed) throw error
+                }
+            }
+        }.apply {
+            isDaemon = true
+            start()
+        }
+        try {
+            check(InstalledModels(folder.root) { "http://127.0.0.1:${server.localPort}/${it.name}" })
+        } finally {
+            server.close()
+            responder.join(1000)
+        }
+    }
+
+    private fun sha256(bytes: ByteArray) =
+        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+
+    private fun artifact(name: String, bytes: ByteArray) = Artifact(name, bytes.size.toLong(), sha256(bytes))
+
+    private fun failure(block: () -> Unit): Failure {
+        try { block() } catch (error: UserFacingException) { return error.failure }
+        fail("Expected a UserFacingException")
+        error("unreachable")
+    }
+
+    @Test fun aFailedInstallDeletesTheMarkerFirstAndLeavesTheModelNotReady() {
+        installVoiceprint()
+        val models = InstalledModels(folder.root)
+        assertTrue(models.ready(ModelCatalog.VOICEPRINT))
+        // The installed file is the right size but not the pinned bytes, so it is fetched again; the server sends
+        // a short file, which fails verification.
+        val wrong = "not the voiceprint model".toByteArray()
+        withServer(mapOf(ModelCatalog.voiceprintModel.name to wrong)) { served ->
+            assertEquals(Failure.VERIFY, failure { served.install(ModelCatalog.VOICEPRINT) { } })
+        }
+        assertFalse(File(folder.root, "speaker-models/verified-voiceprint").exists())
+        assertFalse(models.ready(ModelCatalog.VOICEPRINT))
+    }
+
+    @Test fun filesAreFetchedInOrderWithProgressAndMarkedLast() {
+        val bytes = listOf("first weights".toByteArray(), "second, longer weights".toByteArray())
+        val artifacts = listOf(artifact("a.onnx", bytes[0]), artifact("b.onnx", bytes[1]))
+        val model = ModelDescriptor("test-model", artifacts, "verified", "pin")
+        val seen = mutableListOf<InstalledModels.Progress>()
+        withServer(mapOf("a.onnx" to bytes[0], "b.onnx" to bytes[1])) { models ->
+            models.install(model) {
+                assertFalse("The marker is written last", File(folder.root, "test-model/verified").exists())
+                seen += it
+            }
+            assertTrue(models.ready(model))
+        }
+        assertArrayEquals(bytes[1], File(folder.root, "test-model/b.onnx").readBytes())
+        assertEquals("pin", File(folder.root, "test-model/verified").readText())
+        assertEquals(100, seen.last().percent)
+        assertEquals(seen.map { it.percent }.sorted(), seen.map { it.percent })
+    }
+
+    @Test fun theCompressedDiarizerIsVerifiedDecompressedAndMarked() {
+        val weights = ByteArray(200_000) { (it * 31 % 251).toByte() }
+        val compressed = Zstd.compress(weights)
+        val model = ModelCatalog.DIARIZATION.copy(
+            artifacts = listOf(artifact(ModelCatalog.diarizationModel.name, weights)),
+            markerValue = sha256(weights),
+            download = artifact(ModelCatalog.diarizationDownload.name, compressed),
+        )
+        val seen = mutableListOf<InstalledModels.Progress>()
+        withServer(mapOf(ModelCatalog.diarizationDownload.name to compressed)) { models ->
+            models.install(model) { seen += it }
+            assertTrue(models.ready(model))
+        }
+        val directory = File(folder.root, "speaker-models")
+        assertArrayEquals(weights, File(directory, ModelCatalog.diarizationModel.name).readBytes())
+        assertFalse("The compressed file is not kept", File(directory, ModelCatalog.diarizationDownload.name).exists())
+        assertEquals(sha256(weights), File(folder.root, "speaker-models/verified").readText())
+        assertTrue(seen.last().verifying)
+        assertEquals(100, seen.last().percent)
+    }
+
+    /** Installs [model], whose file is already in place, and interrupts the thread as the fetch finishes. */
+    private fun installInterrupted(model: ModelDescriptor, bytes: ByteArray): Failure? {
+        File(model.directory(folder.root).apply { mkdirs() }, model.artifacts.single().name).writeBytes(bytes)
+        return try {
+            InstalledModels(folder.root).install(model) { if (it.verifying) Thread.currentThread().interrupt() }
+            null
+        } catch (error: UserFacingException) {
+            error.failure
+        } finally {
+            Thread.interrupted()
+        }
+    }
+
+    @Test fun aCancelledSpeakerInstallWritesNoMarker() {
+        val bytes = "voiceprint weights".toByteArray()
+        val voiceprint = ModelCatalog.VOICEPRINT.copy(
+            artifacts = listOf(artifact(ModelCatalog.voiceprintModel.name, bytes)),
+            markerValue = sha256(bytes),
+        )
+        assertEquals(Failure.CANCELLED, installInterrupted(voiceprint, bytes))
+        assertFalse(File(folder.root, "speaker-models/verified-voiceprint").exists())
+    }
+
+    @Test fun aCancelledDetectorInstallIsStillMarkedAsIn010() {
+        val bytes = "detector weights".toByteArray()
+        val vad = ModelCatalog.VAD.copy(
+            artifacts = listOf(artifact(ModelCatalog.sileroVad.name, bytes)),
+            markerValue = sha256(bytes),
+        )
+        assertNull(installInterrupted(vad, bytes))
+        assertEquals(sha256(bytes), File(folder.root, "vad/verified").readText())
     }
 
     @Test fun theStatedDownloadSizeMatchesTheArtifacts() {

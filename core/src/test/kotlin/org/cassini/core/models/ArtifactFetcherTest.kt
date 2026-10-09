@@ -109,7 +109,7 @@ class ArtifactFetcherTest {
         }
     }
 
-    @Test fun theVoiceprintModelIsFetchedAsIsAndVerified() {
+    @Test fun bytesThatDoNotMatchTheVoiceprintPinAreNotKept() {
         val bytes = "voiceprint weights".toByteArray()
         withServer(bytes) { url, directory ->
             val failure = failure { ArtifactFetcher.fetch(url, ModelCatalog.voiceprintModel, directory) { _, _ -> } }

@@ -1,6 +1,7 @@
 package org.cassini.android
 
 import org.cassini.core.Failure
+import org.cassini.core.models.Artifact
 import org.cassini.core.models.ArtifactFetcher
 import org.cassini.core.models.ModelCatalog
 import org.cassini.core.models.ModelDescriptor
@@ -11,8 +12,9 @@ import java.io.File
 /**
  * The models of [ModelCatalog] under [filesDir], in the 0.1.0 directories with the 0.1.0 marker files. A model is
  * installed through [ArtifactFetcher]: its marker is deleted first and written only after every file verified.
+ * [url] says where each artifact is fetched from; tests point it at a loopback server.
  */
-class InstalledModels(private val filesDir: File) {
+class InstalledModels(private val filesDir: File, private val url: (Artifact) -> String = Artifact::url) {
     data class Progress(val percent: Int, val verifying: Boolean = false)
 
     fun ready(model: ModelDescriptor) = model.ready(filesDir)
@@ -57,21 +59,22 @@ class InstalledModels(private val filesDir: File) {
         val download = model.download
         if (download != null) {
             val artifact = model.artifacts.single()
-            ArtifactFetcher.fetchZstd(download.url, download, artifact, directory) { received, verifying ->
+            ArtifactFetcher.fetchZstd(url(download), download, artifact, directory) { received, verifying ->
                 progress(Progress((received * PERCENT / download.size).toInt(), verifying))
             }
         } else {
             val total = model.artifacts.sumOf { it.size }
             var completed = 0L
             model.artifacts.forEach { artifact ->
-                ArtifactFetcher.fetch(artifact.url, artifact, directory) { received, verifying ->
+                ArtifactFetcher.fetch(url(artifact), artifact, directory) { received, verifying ->
                     progress(Progress(((completed + received) * PERCENT / total).toInt(), verifying))
                 }
                 completed += artifact.size
             }
         }
-        // As in 0.1.0, a cancelled speaker download is not marked; Parakeet and the detector are.
-        if (model == ModelCatalog.DIARIZATION || model == ModelCatalog.VOICEPRINT) {
+        // As in 0.1.0, a cancelled speaker download is not marked; Parakeet and the detector are. Both speaker
+        // models, and only they, live in the diarizer's directory.
+        if (model.directory == ModelCatalog.DIARIZATION.directory) {
             requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
         }
         marker.writeText(model.markerValue)
