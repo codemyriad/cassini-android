@@ -140,8 +140,10 @@ class CheckpointGoldenTest {
 
     /**
      * The fixture comes from 0ebea43, which omits an empty language; the v0.1.0 tag that users installed wrote
-     * `"language":"it"` into every word body and into latest.processing.json (fixtures/README.md). Put it back
-     * in each of those places, as the tag wrote it, and read the tree the same way.
+     * `"language":"it"` into every word body (fixtures/README.md). Put it back in the checkpoint, the library's inline
+     * transcripts and latest.words.json, as the tag wrote it, and read them the same way. latest.processing.json is
+     * left alone: 0.1.0 only writes it, nothing reads it. [theReleasedTagsSealedDocumentReads] covers note 2's
+     * sealed document.
      */
     @Test fun theReleasedTagsLanguageMemberReads() {
         val (tree, checkpoint) = captured()
@@ -160,7 +162,6 @@ class CheckpointGoldenTest {
             }
         }
         edit(File(tree.root, "latest.words.json")) { it.put("language", "it") }
-        edit(File(tree.root, "latest.processing.json")) { it.put("language", "it") }
 
         val saved = checkpoint.load()!!
         val chunks = saved.getJSONObject("recognition").getJSONObject("chunks")
@@ -174,7 +175,44 @@ class CheckpointGoldenTest {
         val latest = Transcript.fromJson(File(tree.root, "latest.words.json").readText())
         assertEquals("it", latest.language)
         assertTrue(latest.words.isNotEmpty())
-        assertEquals("it", JSONObject(File(tree.root, "latest.processing.json").readText()).getString("language"))
+    }
+
+    /**
+     * Note 2's sealed document as the v0.1.0 tag wrote it: the same audio and words, sealed by the unchanged
+     * CassiniDocument writer with the tag's inputs (a transcript whose language is "it" and a recognition record
+     * with `"language":"it"`), in place of the 0ebea43 document. The library must still open it.
+     */
+    @Test fun theReleasedTagsSealedDocumentReads() {
+        val tree = tree()
+        val path = LibraryStore(tree.root).load().mapNotNull { it.session.document }.single()
+        val file = File(path)
+        val captured = CassiniDocument.read(file)
+        assertEquals("ok", captured.state)
+        val variant = captured.selected(null)!!
+        val words = variant.transcript!!
+        val digest = captured.manifest!!.getJSONObject("integrity").getString("opusAudioSha256")
+        val plain = File(folder.root, "plain.opus")
+        val untagged = captured.comments.filterNot { it.startsWith("CASSINI_", ignoreCase = true) }
+        OggOpus.rewrite(file, CassiniDocument.tagsPacket(untagged), plain)
+        val speechToText = captured.manifest.getJSONObject("provenance").getJSONObject("speechToText")
+        val recognition = speechToText.getJSONObject(variant.id)
+        val processing = JSONObject(recognition.toString()).put("language", "it")
+        val labels = words.words.map { it.speaker }.distinct().associateWith { captured.speakerLabel(it)!! }
+        CassiniDocument.create(plain, words.copy(language = "it"), captured.title, processing, null, labels, file)
+
+        val note = LibraryStore(tree.root).load().single { it.session.document == path }
+        val sealed = CassiniDocument.read(File(note.session.document!!))
+        assertEquals("ok", sealed.state)
+        val default = sealed.selected(note.session.selectedVariant)!!
+        assertEquals("it", default.descriptor.getString("language"))
+        assertEquals("it", default.transcript!!.language)
+        assertEquals("it", JSONObject(default.body!!).getString("language"))
+        assertEquals(words.words, default.transcript.words)
+        val provenance = sealed.manifest!!.getJSONObject("provenance").getJSONObject("speechToText")
+        assertEquals("it", provenance.getJSONObject(default.id).getString("language"))
+        assertEquals(digest, sealed.manifest.getJSONObject("integrity").getString("opusAudioSha256"))
+        assertEquals(captured.title, sealed.title)
+        labels.forEach { (id, label) -> assertEquals(label, sealed.speakerLabel(id)) }
     }
 
     @Test fun manifestCoversEveryCommittedFile() {
