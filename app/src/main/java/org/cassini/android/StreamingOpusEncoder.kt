@@ -5,23 +5,29 @@ import java.io.FileOutputStream
 import java.io.RandomAccessFile
 import org.json.JSONObject
 
-/** Position-independent libopus state allows an exact continuation after unloading the encoder. */
+/**
+ * libopus encoder state holds absolute pointers into the library's static tables, so it is never
+ * saved: a resume primes a fresh encoder with the frames encoded last instead.
+ */
 internal object NativeOpus {
     init { System.loadLibrary("cassini_opus") }
     external fun create(): Long
     external fun lookahead(ptr: Long): Int
     external fun encode(ptr: Long, frame: FloatArray): ByteArray
-    external fun save(ptr: Long): ByteArray
-    external fun restore(ptr: Long, state: ByteArray)
     external fun destroy(ptr: Long)
 }
 
-/** Same-pass 16 kHz mono encoding; checkpoints retain the codec and Ogg clocks without re-encoding. */
+/**
+ * Same-pass 16 kHz mono encoding. Checkpoints keep the Ogg clock, the unencoded tail and the last
+ * two encoded frames. A resumed encoder encodes those two frames and drops the packets, so its
+ * lookahead is filled with the same audio and the stream continues on the same clock.
+ */
 internal class StreamingOpusEncoder(private val file: File, restored: JSONObject? = null) : AutoCloseable {
     private val ptr = NativeOpus.create()
     private val output: FileOutputStream
     private val stream: java.io.BufferedOutputStream
     private val frame = FloatArray(320)
+    private val recent = FloatArray(640)
     private var pending = 0
     var sampleCount = 0L
         private set
@@ -33,10 +39,10 @@ internal class StreamingOpusEncoder(private val file: File, restored: JSONObject
         var opened: FileOutputStream? = null
         try {
             if (restored != null) {
-                require(restored.getString("runtime") == "opus-1.5.2-${android.os.Build.SUPPORTED_ABIS[0]}")
-                val codecState = CheckpointData.bytes(restored.getString("codec"))
-                require(OggOpus.hex(java.security.MessageDigest.getInstance("SHA-256").digest(codecState)) == restored.getString("codecHash"))
-                NativeOpus.restore(ptr, codecState)
+                restored.optString("history").takeIf(String::isNotEmpty)?.let { history ->
+                    CheckpointData.floats(history, 640).also { require(it.size == 640) }.copyInto(recent)
+                    NativeOpus.encode(ptr, recent.copyOfRange(0, 320)); NativeOpus.encode(ptr, recent.copyOfRange(320, 640))
+                }
                 sampleCount = restored.getLong("samples")
                 pending = restored.getInt("pending")
                 require(sampleCount in 0..Limits.MAX_SAMPLES && pending in 0..319)
@@ -68,16 +74,17 @@ internal class StreamingOpusEncoder(private val file: File, restored: JSONObject
             val n = minOf(320 - pending, count - offset)
             samples.copyInto(frame, pending, offset, offset + n)
             offset += n; pending += n
-            if (pending == 320) { muxer.add(NativeOpus.encode(ptr, frame)); pending = 0 }
+            if (pending == 320) {
+                muxer.add(NativeOpus.encode(ptr, frame)); pending = 0
+                recent.copyInto(recent, 0, 320, 640); frame.copyInto(recent, 320)
+            }
         }
     }
     fun checkpoint(): JSONObject {
         check(!closed && !finished)
         stream.flush(); output.fd.sync()
         val state = muxer.checkpoint()
-        val codecState = NativeOpus.save(ptr)
-        return JSONObject().put("runtime", "opus-1.5.2-${android.os.Build.SUPPORTED_ABIS[0]}")
-            .put("codec", CheckpointData.bytes(codecState)).put("codecHash", OggOpus.hex(java.security.MessageDigest.getInstance("SHA-256").digest(codecState))).put("frame", CheckpointData.floats(frame))
+        return JSONObject().put("history", CheckpointData.floats(recent)).put("frame", CheckpointData.floats(frame))
             .put("samples", sampleCount).put("pending", pending).put("length", file.length())
             .put("serial", state.serial).put("sequence", state.sequence).put("granule", state.granule)
             .put("packet", state.pending?.let(CheckpointData::bytes) ?: "")

@@ -28,16 +28,6 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_org_cassini_android_NativeOpus_enco
   if (out) env->SetByteArrayRegion(out, 0, n, reinterpret_cast<jbyte *>(packet));
   return out;
 }
-extern "C" JNIEXPORT jbyteArray JNICALL Java_org_cassini_android_NativeOpus_save(JNIEnv *env, jobject, jlong ptr) {
-  int n = opus_encoder_get_size(1);
-  auto out = env->NewByteArray(n);
-  if (out) env->SetByteArrayRegion(out, 0, n, reinterpret_cast<jbyte *>(ptr));
-  return out;
-}
-extern "C" JNIEXPORT void JNICALL Java_org_cassini_android_NativeOpus_restore(JNIEnv *env, jobject, jlong ptr, jbyteArray state) {
-  if (env->GetArrayLength(state) != opus_encoder_get_size(1)) { fail(env, "Incompatible Opus checkpoint"); return; }
-  env->GetByteArrayRegion(state, 0, opus_encoder_get_size(1), reinterpret_cast<jbyte *>(ptr));
-}
 extern "C" JNIEXPORT void JNICALL Java_org_cassini_android_NativeOpus_destroy(JNIEnv *, jobject, jlong ptr) {
   opus_encoder_destroy(reinterpret_cast<OpusEncoder *>(ptr));
 }
