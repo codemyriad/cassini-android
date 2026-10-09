@@ -10,8 +10,27 @@ plugins {
 }
 
 // FontAssetsTest reads the font manifest in third_party/fonts and scans every module's src for web fonts.
-val repoRoot: String = rootDir.absolutePath
 val fontManifestDir = rootProject.layout.projectDirectory.dir("third_party/fonts")
+
+/**
+ * Passes the repository root to FontAssetsTest. The root's absolute path is not an input, so the task stays
+ * relocatable and shares cache entries between checkouts. The web fonts the test looks for are an input: adding one
+ * under any src directory makes the test task out of date, so the check runs again.
+ */
+class RepoRootArgument(
+    @get:Internal val root: File,
+    @get:InputFiles @get:PathSensitive(PathSensitivity.RELATIVE) val webFonts: FileCollection,
+) : CommandLineArgumentProvider {
+    override fun asArguments(): Iterable<String> = listOf("-Dcassini.repoRoot=${root.absolutePath}")
+}
+
+val webFontPatterns = PatternSet().apply {
+    isCaseSensitive = false
+    include("**/src/**/*.woff", "**/src/**/*.woff2")
+    // The directories FontAssetsTest skips.
+    exclude("**/.git/**", "**/.gradle/**", "**/.kotlin/**", "**/.tools/**", "**/build/**", "**/node_modules/**")
+}
+val webFonts: FileCollection = rootProject.fileTree(rootDir).matching(webFontPatterns)
 
 // GlyphMarkupTest reads the design's SVG icons from the board markup.
 val designMarkupDir = rootProject.layout.projectDirectory.dir("design/reference/markup")
@@ -45,7 +64,7 @@ android {
                 it.inputs.files(fileTree("src/test/screenshots"))
                     .withPropertyName("screenshotGoldens")
                     .withPathSensitivity(PathSensitivity.RELATIVE)
-                it.systemProperty("cassini.repoRoot", repoRoot)
+                it.jvmArgumentProviders.add(RepoRootArgument(rootDir, webFonts))
                 it.inputs.dir(fontManifestDir)
                     .withPropertyName("fontManifest")
                     .withPathSensitivity(PathSensitivity.RELATIVE)
