@@ -67,7 +67,7 @@ Requires JDK 17 and the Android SDK with platform `android-37.0`, build tools 36
 git clone --recurse-submodules https://github.com/codemyriad/cassini-android
 cd cassini-android
 ./scripts/setup.sh   # libopus source and the prebuilt sherpa-onnx AAR, both hash-pinned
-./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug detekt
+./gradlew :app:assembleDebug :core:test :app:testDebugUnitTest :app:lintDebug detekt
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
@@ -77,6 +77,6 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 For device checks and format interoperability, see [development notes](docs/development.md), [Pixel 8 results](docs/pixel8-results.md) and the [Android acceleration investigation](docs/android-acceleration.md). Android uses sherpa-onnx 1.13.7 on CPU, rebuilt with Sortformer speaker diarization; desktop Cassini uses a modified runtime. Cutting recordings at speech pauses is borrowed from the desktop pipeline.
 
-Voiceprints use the [3D-Speaker](https://github.com/modelscope/3D-Speaker) CAM++ model trained on VoxCeleb (Apache-2.0), downloaded with the other models from the [sherpa-onnx release](https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx) (29,596,978 bytes, SHA-256 `357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b`). Matching uses cosine similarity: a name applies automatically at 0.72 or more and at least 0.08 above the next voice, and is suggested from 0.50. These values come from a small calibration on call recordings (see `Voiceprints.kt`) and may need tuning.
+Voiceprints use the [3D-Speaker](https://github.com/modelscope/3D-Speaker) CAM++ model trained on VoxCeleb (Apache-2.0), downloaded with the other models from the [sherpa-onnx release](https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx) (29,596,978 bytes, SHA-256 `357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b`). Matching uses cosine similarity: a name applies automatically at 0.72 or more and at least 0.08 above the next voice, and is suggested from 0.50. These values come from a small calibration on call recordings (see `core/src/main/kotlin/org/cassini/core/speakers/VoiceprintSelection.kt`) and may need tuning.
 
 Developed with AI coding assistance; recording, transcription and portable-file checks ran on a Pixel 8. [GPLv3](LICENSE). See [dependency licenses and sources](THIRD_PARTY_NOTICES.md).

@@ -2,6 +2,17 @@
 
 The build commands are in the [README](../README.md). Runtime downloads, weights, private or YouTube-derived audio and build outputs stay out of commits. The committed test inputs are in [`fixtures/`](../fixtures/README.md): the CC-BY-4.0 FLEURS clip and captured `filesDir` trees.
 
+## Engine tests without the native toolchain
+
+The `:core` module is plain Kotlin on the JVM: the portable document format, audio arithmetic, recognition windows and seams, speaker assignment and voiceprint selection, the model pins and download code, and the checkpoint codec. Its tests need JDK 17 and the `third_party/cassini-format` submodule. They need no Android SDK, NDK, native AAR, libopus source or device:
+
+```sh
+git submodule update --init
+JAVA_HOME=/path/to/jdk-17 ./gradlew --configure-on-demand :core:test
+```
+
+`--configure-on-demand` stops Gradle from configuring `:app`. Configuring `:app` needs the Android SDK, and when the SDK has no NDK, the app's native build makes the Android Gradle plugin download NDK 28.2.13676358 (more than 1 GB) before any task runs. After `scripts/setup.sh`, plain `./gradlew :core:test` works as well. The conformance vectors are required: without the submodule the tests fail, they do not skip. This command was checked on 2026-10-09 in a fresh clone with only the README in `native/m2`, no `.tools/`, no `local.properties` and no `ANDROID_HOME`: 236 tests ran and none was skipped.
+
 ## Device checks
 
 Use direct adb instrumentation to retain app data and downloaded models. Gradle’s managed connected-test cleanup can uninstall the app and erase them.
@@ -33,7 +44,7 @@ adb exec-out run-as org.cassini.android cat files/device-smoke.INT8.words.json >
 
 ## Portable files
 
-JVM tests run every published vector from the `third_party/cassini-format` submodule, pinned to the revision this app conforms to. A missing checkout fails the tests instead of skipping them (`git submodule update --init`). Use `-PcassiniConformanceDir=/path/to/spec/conformance` to run another checkout's vectors, for example `../cassini-format` at a newer revision. Synthetic integrity and round-trip tests always run.
+The `:core` JVM tests run every published vector from the `third_party/cassini-format` submodule, pinned to the revision this app conforms to. A missing checkout fails the tests instead of skipping them (`git submodule update --init`). Use `-PcassiniConformanceDir=/path/to/spec/conformance` to run another checkout's vectors, for example `../cassini-format` at a newer revision. Synthetic integrity and round-trip tests always run.
 
 ```sh
 python3 third_party/cassini-format/tools/cassini-extract.py DOCUMENT.opus --check
