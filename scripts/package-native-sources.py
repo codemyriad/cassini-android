@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Collect the pinned native dependency sources, with their upstream build files."""
-from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
-from pathlib import Path
 import subprocess
 import tarfile
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 manifest = Path('scripts/native-dependencies.json')
 cache = Path('.tools/native-sources')
@@ -27,14 +27,17 @@ def fetch(entry):
     return path
 
 if __name__ == '__main__':
-    entries = json.loads(manifest.read_text())
+    # The prebuilt AAR entry pins a binary, not a source archive.
+    entries = [entry for entry in json.loads(manifest.read_text()) if not entry['url'].endswith('.aar')]
     paths = list(ThreadPoolExecutor(max_workers=4).map(fetch, entries))
     destination = Path('dist')
     destination.mkdir(exist_ok=True)
     archive = destination / 'cassini-native-sources.tar'
     with tarfile.open(archive, 'w') as output:
         output.add(Path('scripts/streaming-diarization.patch'), arcname='streaming-diarization.patch')
-        for path in [Path("scripts/build-opus-jni.sh"), *Path("app/src/main/cpp").glob("*")]:
+        build_files = [Path("scripts/fetch-opus-source.sh"), Path("scripts/native-common.sh"),
+                       Path("app/build.gradle.kts"), *Path("app/src/main/cpp").glob("*")]
+        for path in build_files:
             output.add(path, arcname=str(path))
         for path in paths:
             output.add(path, arcname='sources/' + path.name)

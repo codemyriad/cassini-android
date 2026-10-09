@@ -61,13 +61,17 @@ The naming dialog also offers **Merge into [name]…** for already named speaker
 
 ## Build
 
-Requires JDK 17, Android SDK platform/build tools 34, CMake and Android NDK r28c (28.2.13676358). Set `ANDROID_HOME` or `sdk.dir` in `local.properties`.
+Requires JDK 17 and the Android SDK with platform `android-37.0`, build tools 36.0.0, CMake 3.22.1 and NDK r28c (28.2.13676358); Gradle installs missing SDK packages when it can. Set `ANDROID_HOME` or `sdk.dir` in `local.properties`.
 
 ```sh
-ANDROID_NDK=$ANDROID_HOME/ndk/28.2.13676358 ./scripts/setup.sh
+git clone --recurse-submodules https://github.com/codemyriad/cassini-android
+cd cassini-android
+./scripts/setup.sh   # libopus source and the prebuilt sherpa-onnx AAR, both hash-pinned
 ./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
+
+`scripts/setup.sh --from-source` builds the sherpa-onnx AAR from source instead of downloading it (about 25 minutes; see [native runtime](docs/native-runtime.md)). In an existing clone, run `git submodule update --init` once: the format conformance vectors come from the `third_party/cassini-format` submodule and the tests fail without them.
 
 [GitHub Actions](https://github.com/codemyriad/cassini-android/actions/workflows/android.yml) builds and checks each push and pull request, including playback, recording and settings checks on Android 8, 10 and 14 emulators. Version tags publish the APK with a stable beta signing key, so updates preserve notes and downloaded models. Models and the pinned Android runtime are fetched separately.
 

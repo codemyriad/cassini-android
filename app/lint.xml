@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!-- targetSdk stays below the latest level on purpose until the Compose UI lands (docs/architecture.md). -->
+    <issue id="OldTargetApi" severity="ignore" />
+    <!-- Every user-visible string has an Italian translation; a missing one is a bug. -->
+    <issue id="MissingTranslation" severity="error" />
+    <!-- Version freshness depends on the network and on the day of the build; Dependabot proposes updates. -->
+    <issue id="AndroidGradlePluginVersion" severity="ignore" />
+    <issue id="GradleDependency" severity="ignore" />
+    <issue id="NewerVersionAvailable" severity="ignore" />
+    <!-- The free-space floors (recording, imports, model downloads) compare against usable space on purpose:
+         the app never calls StorageManager.allocateBytes, so cache the system could clear is not available to it. -->
+    <issue id="UsableSpace" severity="ignore" />
+</lint>

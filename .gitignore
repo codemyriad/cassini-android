@@ -1,13 +1,18 @@
 .gradle/
 **/build/
 local.properties
-app/libs/*.aar
-app/libs/streaming-diarization.sha256
-app/src/main/jniLibs/
 .idea/
 *.iml
 .tools/
-__pycache__/
+.claude/
+.ruff_cache/
+**/__pycache__/
+# Repo-local Maven repository for the native AAR; scripts/setup.sh fills it.
+native/m2/**
+!native/m2/README.md
+# Native outputs of 0.1.0 checkouts. Gradle no longer reads them; never commit them.
+app/libs/
+app/src/main/jniLibs/
 *.pyc
 *.wav
 *.opus
@@ -18,3 +23,4 @@ dist/
 
 # Private meeting speaker fixtures (never commit)
 app/src/androidTest/assets/meetings/
+**/.cxx/
