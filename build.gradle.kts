@@ -24,6 +24,7 @@ detekt {
             "core/src/test/kotlin",
             "engine/src/main/kotlin",
             "engine/src/test/kotlin",
+            "tools/asr-eval",
             "build.gradle.kts",
             "settings.gradle.kts",
             "app/build.gradle.kts",

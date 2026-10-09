@@ -8,8 +8,6 @@
     <ID>AnnotationOnSeparateLine:TranscriptTest.kt$TranscriptTest$@Test(expected = IllegalArgumentException::class)</ID>
     <ID>ArgumentListWrapping:AsrEval.kt$AsrEval$("x-durationMs", audio.durationMs)</ID>
     <ID>ArgumentListWrapping:AsrEval.kt$AsrEval$("x-elapsedMs", elapsedMs)</ID>
-    <ID>ArgumentListWrapping:AsrEval.kt$AsrEval$(JSONObject(transcript.json()).put("x-elapsedMs", elapsedMs).put("x-durationMs", audio.durationMs).toString())</ID>
-    <ID>ArgumentListWrapping:AsrEval.kt$AsrEval$(out)</ID>
     <ID>ArgumentListWrapping:AsrEval.kt$AsrEval$(transcript.json())</ID>
     <ID>ArgumentListWrapping:AudioDecoder.kt$AudioDecoder$("Cassini", "Resume seek landed at frame $firstFrame, after ${firstNeededFrame(sampleRate, startSample)}; seeking earlier")</ID>
     <ID>ArgumentListWrapping:AudioDecoder.kt$AudioDecoder$("csd-1", ByteBuffer.allocate(8).order(ByteOrder.nativeOrder()).putLong(0).apply { flip() })</ID>
@@ -1854,7 +1852,6 @@
     <ID>MagicNumber:WordGate.kt$WordGate$999</ID>
     <ID>MatchingDeclarationName:AudioLimits.kt$Limits</ID>
     <ID>MatchingDeclarationName:NoteVoices.kt$NoteVoiceStore</ID>
-    <ID>MaxLineLength:AsrEval.kt$AsrEval$File(out).writeText(JSONObject(transcript.json()).put("x-elapsedMs", elapsedMs).put("x-durationMs", audio.durationMs).toString())</ID>
     <ID>MaxLineLength:AudioDecoder.kt$AudioDecoder$Log.w("Cassini", "Resume seek landed at frame $firstFrame, after ${firstNeededFrame(sampleRate, startSample)}; seeking earlier")</ID>
     <ID>MaxLineLength:AudioDecoder.kt$AudioDecoder$String(header, 8, 4, Charsets.US_ASCII) == "WAVE"</ID>
     <ID>MaxLineLength:AudioDecoder.kt$AudioDecoder$private</ID>
@@ -2159,7 +2156,6 @@
     <ID>MaxLineLength:WordGateTest.kt$WordGateTest$assertEquals("$rate Hz", listOf(word("Yeah.", 1000, 1150)), WordGate.filterWordsByEnergy(samples, rate, listOf(timed("Yeah.", 1000, 1150, 2500))))</ID>
     <ID>MaxLineLength:WordGateTest.kt$WordGateTest$assertEquals("$rate Hz", listOf(word("quiet", 1000, 1100), word("negative", 1500, 1600)), WordGate.filterWordsByEnergy(samples, rate, words))</ID>
     <ID>MaxLineLength:WordGateTest.kt$WordGateTest$val words = listOf(timed("max", Long.MAX_VALUE, Long.MAX_VALUE), timed("min", Long.MIN_VALUE, Long.MIN_VALUE), timed("reversed", 800, 700))</ID>
-    <ID>MaximumLineLength:AsrEval.kt$AsrEval$ </ID>
     <ID>MaximumLineLength:AudioDecoder.kt$AudioDecoder$ </ID>
     <ID>MaximumLineLength:CassiniDocument.kt$CassiniDocument$ </ID>
     <ID>MaximumLineLength:CassiniDocument.kt$CassiniDocument.Companion$ </ID>
