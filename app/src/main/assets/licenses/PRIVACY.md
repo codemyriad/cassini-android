@@ -10,7 +10,7 @@ Cassini keeps your data in its private app storage (the `filesDir` directory of 
 
 - Audio: your recordings and the audio files that you import or open with Cassini. Location: `notes/<noteId>/`. A recording is `capture.opus` or `capture.m4a`. Imported audio is `source.<ext>`. An imported Cassini document, or a note after transcription, is `document.opus`.
 - Transcripts: the words and their times, the speaker labels, the speaker names that you give, and the title. Location: `notes/<noteId>/document.opus`. The catalogue database `cassini.db` keeps a copy of the text for the library and for search.
-- Unfinished transcription: the progress of a transcription, the draft speaker names, the matches between speakers and saved voices, and short audio clips of each speaker (at most 45 seconds for each speaker). A match is the ID of a saved voice and a score. It is not a voiceprint. Location: `notes/<noteId>/work/`. Cassini deletes this directory when the transcription is complete, when you start again, or when it deletes the note.
+- Unfinished transcription: the progress of a transcription, the draft speaker names, the matches between speakers and saved voices, short audio clips of each speaker (at most 45 seconds for each speaker), and the state of the speaker model. This state is a list of numbers that the speaker model calculates from the voices in the note, so that the transcription can continue later. It is not a voiceprint, and Cassini does not use it to recognize people. A match is the ID of a saved voice and a score. It is not a voiceprint. Location: `notes/<noteId>/work/`. Cassini deletes this directory when the transcription is complete, when you start again, or when it deletes the note.
 - Voiceprints: a voiceprint is a list of numbers that Cassini calculates from the voice of one speaker. Cassini uses voiceprints to recognize the people that you name. Location: `voices/` only. The section "Voiceprints" below gives the details.
 - Settings and state: your model download decision and its time, the queue of transcriptions, the trash state of notes, the playback position, and some one-time notices. Location: `settings.preferences_pb` and `cassini.db`. On Android 13 and later, Android keeps the app language. On earlier versions, Cassini keeps the app language in a small file in its private storage.
 - Models: the downloaded speech and speaker models. They contain no personal data. Location: `parakeet-v3/`, `vad/` and `speaker-models/`.
@@ -28,7 +28,16 @@ Cassini 0.2 keeps all voiceprints in the `voices/` directory, and nowhere else:
 
 The database `cassini.db` also keeps the matches between speakers and saved voices: the ID of the saved voice and the score. An unfinished transcription keeps its matches in `notes/<noteId>/work/`. These matches are not voiceprints.
 
-If you installed Cassini 0.2 over Cassini 0.1.x, the files of 0.1.x stay in the app storage: the recordings in `documents/`, `library.json`, and `voices.json` with the voiceprints of 0.1.x. Cassini 0.2 does not read these files and does not delete them. "Forget everyone" does not delete them. Only "Clear storage" in the Android app settings, or an uninstall, deletes them.
+If you installed Cassini 0.2 over Cassini 0.1.x, all the files of 0.1.x stay in the app storage. Cassini 0.2 does not read these files and does not delete them. They include these files:
+
+- `documents/`: the recordings and the documents of 0.1.x.
+- `library.json` and `session.json`: the list of the 0.1.x notes, with their titles and transcripts.
+- `voices.json` and `voices.generation`: the saved voices of 0.1.x, with their voiceprints.
+- `voiceprints/<id>.json`: the voiceprints of the speakers in each 0.1.x note.
+- `processing-checkpoints/`: the unfinished transcriptions of 0.1.x, with short audio clips of each speaker, partial audio and words.
+- `latest.words.json` and `latest.processing.json`: the last transcript that 0.1.x made.
+
+"Forget everyone" does not delete these files. Only "Clear storage" in the Android app settings, or an uninstall, deletes them.
 
 Cassini never writes voiceprints into a Cassini document or into an export. Only the names that you give go into these files.
 
@@ -66,7 +75,7 @@ Before Cassini uses a downloaded file, it makes sure that the size and the SHA-2
 ## Permissions
 
 - Microphone: Cassini uses the microphone only while you record. Cassini shows a notification during the recording.
-- Notifications: Cassini shows the progress of recordings, downloads and transcriptions. On a secure lock screen, these notifications do not show the title of the note.
+- Notifications: Cassini shows the progress of recordings, downloads and transcriptions. If you set Android to hide sensitive notification content on the lock screen, these notifications do not show the title of the note on a secure lock screen.
 - Internet: Cassini uses the internet only for the model downloads.
 
 ## Backup and device transfer
