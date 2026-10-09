@@ -12,6 +12,8 @@ data class Session(
     val processingMs: Long = 0,
     val processingPaused: Boolean = false,
     val libraryId: String? = null,
+    /** A title the user chose; otherwise the note is known by [name], its file name. */
+    val title: String? = null,
     /** The viewer that wrote session.json last. Not part of a note. */
     val screen: String? = null,
 )
@@ -31,6 +33,7 @@ class SessionStore(directory: File) {
             processingMs = json.optLong("processingMs"), processingPaused = json.optBoolean("processingPaused"),
             libraryId = json.optString("libraryId").takeIf { it.isNotEmpty() },
             screen = json.optString("screen").takeIf { it.isNotEmpty() },
+            title = json.optString("title").takeIf { it.isNotEmpty() },
         )
     } catch (_: Exception) { Session() }
 
@@ -43,6 +46,7 @@ class SessionStore(directory: File) {
             .put("document", session.document ?: "").put("selectedVariant", session.selectedVariant ?: "")
             .put("processingMs", session.processingMs).put("processingPaused", session.processingPaused)
             .put("libraryId", session.libraryId ?: "").put("screen", session.screen ?: "")
+            .put("title", session.title ?: "")
         val stream = file.startWrite()
         try {
             stream.write(json.toString().toByteArray(Charsets.UTF_8))

@@ -10,9 +10,11 @@
         android:largeHeap="true" android:allowBackup="false" android:fullBackupContent="false" android:supportsRtl="true" android:usesCleartextTraffic="false">
         <activity android:name=".SettingsActivity" android:exported="false" android:label="@string/settings"
             android:theme="@style/Theme.Cassini.Settings" android:parentActivityName=".MainActivity" />
-        <activity android:name=".RecordingActivity" android:exported="false" android:configChanges="orientation|screenSize" />
+        <activity android:name=".RecordingActivity" android:exported="false" android:configChanges="orientation|screenSize"
+            android:theme="@style/Theme.Cassini.Recording" android:launchMode="singleTop" />
+        <activity android:name=".TrashActivity" android:exported="false" android:parentActivityName=".LibraryActivity" />
         <service android:name=".RecordingService" android:exported="false" android:foregroundServiceType="microphone" />
-        <activity android:name=".LibraryActivity" android:exported="true">
+        <activity android:name=".LibraryActivity" android:exported="true" android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

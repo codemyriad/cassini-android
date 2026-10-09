@@ -1,7 +1,5 @@
 <resources>
     <string name="app_name">Cassini</string>
-    <string name="brand" translatable="false">cassini</string>
-    <string name="prototype_badge">BETA / 0.0.6</string>
     <string name="settings">Settings</string>
     <string name="settings_general">General</string>
     <string name="settings_transcription">Transcription</string>
@@ -15,7 +13,7 @@
     <string name="transcribe">Transcribe</string>
     <string name="transcribe_again">Transcribe again</string>
     <string name="recording">Recording</string>
-    <string name="no_file">No tape loaded</string>
+    <string name="no_file">No recording</string>
     <string name="model_ready">%1$s · ready</string>
     <string name="model_missing">%1$s · download needed</string>
     <string name="model_size_int8">640 MiB</string>
@@ -26,12 +24,10 @@
     <string name="transcribing">Transcribing… keep the app open.</string>
     <string name="transcribing_progress">Words and speakers · %1$d%% · %2$s of %3$s\n%4$d words · elapsed %5$s · about %6$s left</string>
     <string name="file_ready">Ready when you are.</string>
-    <string name="transcript">TRANSCRIPT</string>
-    <string name="export">Save Cassini</string>
     <string name="saving">Saving Cassini document…</string>
     <string name="saved">Cassini saved · audio and transcript together.</string>
-    <string name="empty_title">Load a tape.</string>
-    <string name="empty_hint">Open a Cassini document, or transcribe WAV, MP3, M4A or Opus.\nUp to 2 hours for transcription. All local.</string>
+    <string name="empty_title">No note open.</string>
+    <string name="empty_hint">Open a Cassini document, or transcribe WAV, MP3, M4A or Opus. All on this phone.</string>
     <string name="loaded_title">Let’s hear it.</string>
     <string name="loaded_hint">Tap Transcribe to turn this recording into timed words, with each speaker labelled.</string>
     <string name="no_speech">No speech recognized.</string>
@@ -48,16 +44,11 @@
         <item quantity="other">%1$d words</item>
     </plurals>
     <string name="transcript_details">%1$s · %2$s · %3$s</string>
-    <string name="unidentified_voice">VOICE 01 / UNIDENTIFIED</string>
-    <string name="italian">Italian</string>
-    <string name="voice_caption">%1$s · one voice</string>
-    <string name="playback">PLAYBACK</string>
+    <string name="unidentified_voice">One voice</string>
     <string name="play">Play</string>
     <string name="pause">Pause</string>
     <string name="back_ten">Back 10 seconds</string>
     <string name="forward_ten">Forward 10 seconds</string>
-    <string name="back_ten_label" translatable="false">−10 s</string>
-    <string name="forward_ten_label" translatable="false">+10 s</string>
     <string name="seek_description">Playback position</string>
     <string name="position">%1$s / %2$s</string>
     <string name="interface_language">Interface language</string>
@@ -65,13 +56,13 @@
     <string name="english_name" translatable="false">English</string>
     <string name="italian_name" translatable="false">Italiano</string>
     <string name="recognition_model">Transcription model</string>
-    <string name="about">About this prototype</string>
-    <string name="about_body">Parakeet v3 on your phone. Audio stays local.\n\nRecord voice notes, search past transcriptions, and save portable Cassini Opus documents with audio and timed words.\n\nAudio up to 2 hours, speakers labelled and recognised on the phone (voices never leave it), automatic multilingual recognition. The current transcript language label is Italian.\n\nGPLv3. Source and dependency notices: github.com/codemyriad/cassini-android</string>
+    <string name="about">About Cassini</string>
+    <string name="about_body">Cassini turns speech into searchable, timed text on your phone. Audio stays local.\n\nRecord voice notes, search past transcriptions, and save portable Cassini Opus documents with audio and timed words.\n\nSpeakers are labelled and recognised on the phone (voices never leave it), with automatic multilingual recognition. The current transcript language label is Italian.\n\nGPLv3. Source and dependency notices: github.com/codemyriad/cassini-android</string>
     <string name="done">Done</string>
     <string name="cancel">Cancel</string>
     <string name="error_open">Could not open this recording. Choose the file again.</string>
-    <string name="error_large">This prototype accepts files up to 64 MB.</string>
-    <string name="error_long">Choose a recording of 2 hours or less.</string>
+    <string name="error_large">This file is too large. Choose one under 2 GB.</string>
+    <string name="error_long">Choose a recording of 24 hours or less.</string>
     <string name="error_short">Choose at least 200 milliseconds of audio.</string>
     <string name="error_audio">Could not read this audio. Try PCM16 WAV, MP3, M4A or Opus.</string>
     <string name="error_wav">Use a 16-bit PCM WAV, or try MP3, M4A or Opus.</string>
@@ -92,7 +83,6 @@
     <string name="error_opus_encoder">This device has no Opus encoder. It can open existing documents, but cannot create new Cassini files.</string>
     <string name="opening_document">Opening file…</string>
     <string name="packaging_document">Saving audio, timed words and speakers in a Cassini file…</string>
-    <string name="cassini_document">CASSINI / AUDIO + TRANSCRIPT</string>
     <string name="document_info">Info</string>
     <string name="choose_transcript">Choose transcript</string>
     <string name="variant_unavailable">Transcript unavailable</string>
@@ -108,14 +98,14 @@
     <string name="processing_speed">Ready in %1$.1f s · %2$.2f× realtime</string>
     <string name="transcription_speed">Transcribed in %1$.1f s · %2$.2f× realtime</string>
     <string name="notes">Notes</string>
-    <string name="back_to_notes">‹ Notes</string>
+    <string name="back_to_notes">Back to notes</string>
     <string name="library_search">Search notes and what was said</string>
     <string name="import_audio">Import audio</string>
-    <string name="record_note">● Record</string>
+    <string name="record_note">Record</string>
     <string name="library_loading">Opening your notes…</string>
     <string name="library_error">Could not save or open the library. Your audio files are still on this device.</string>
-    <string name="library_local">Parakeet on this device · audio stays here</string>
-    <string name="library_needs_model">Record now · open a note and tap Transcribe</string>
+    <string name="library_local">Transcribed on this phone. Audio never leaves it.</string>
+    <string name="library_needs_model">Record now, transcribe later. Audio stays on this phone.</string>
     <string name="library_empty">Your words, remembered.</string>
     <string name="library_empty_hint">Record a voice note or import audio. Your recordings and transcripts will appear here.</string>
     <string name="library_search_hint">Try another word or a note title.</string>
@@ -129,13 +119,13 @@
     <string name="voice_note_name">Voice note %1$s</string>
     <string name="microphone_format">Microphone · mono Opus · 48 kHz</string>
     <string name="microphone_level">Live microphone level</string>
-    <string name="recording_hint">Your words appear after you stop. Record up to 2 hours; recording continues with the screen off or in another app. Parakeet transcribes on this device.</string>
+    <string name="recording_hint">Keeps recording with the screen off or in another app. Your words appear after you finish.</string>
     <string name="enable_microphone">Enable microphone</string>
     <string name="pause_recording">Pause</string>
     <string name="resume_recording">Resume</string>
-    <string name="finish_recording">■ Done</string>
+    <string name="finish_recording">Finish</string>
     <string name="recording_paused">Paused</string>
-    <string name="recording_active">● Recording</string>
+    <string name="recording_active">Recording</string>
     <string name="microphone_permission_denied">Allow microphone access in Android settings to record.</string>
     <string name="recording_saved_interrupted">Recording stopped and saved.</string>
     <string name="error_microphone">Could not record. Check microphone access and try again.</string>
@@ -167,7 +157,7 @@
     <string name="recording_recovered">Recovered recording</string>
     <string name="recording_channel">Recording</string>
     <string name="stop_recording">Stop</string>
-    <string name="recording_near_limit">● Recording · stops automatically in 5 minutes</string>
+    <string name="recording_near_limit">Recording · stops automatically in 5 minutes</string>
     <string name="recording_focus_paused">Paused: another app is using audio. Tap Resume to continue.</string>
     <string name="recording_error_saved">Recording stopped by an error. The audio so far is saved in your library.</string>
 <string name="more_actions">More actions</string>
@@ -233,4 +223,50 @@
     <string name="battery_completion">Battery %1$d%% · ~%2$d%% at completion</string>
     <string name="battery_estimating">Battery %1$d%% · measuring use for estimate</string>
     <string name="battery_unavailable">Battery estimate unavailable</string>
+    <string name="trash">Trash</string>
+    <string name="undo">Undo</string>
+    <string name="trash_moved">“%1$s” moved to trash</string>
+    <string name="trash_empty">Empty</string>
+    <string name="trash_explained">Notes here are deleted for good after 30 days, with their audio, transcripts and the voiceprints kept for them.</string>
+    <string name="trash_none">The trash is empty.</string>
+    <string name="trash_restore">Restore</string>
+    <string name="trash_delete_now">Delete now</string>
+    <string name="trash_delete_confirm">Delete “%1$s” for good? Its audio and transcripts cannot be recovered.</string>
+    <string name="trash_empty_confirm">Delete every note in the trash for good? Their audio and transcripts cannot be recovered.</string>
+    <string name="move_to_trash">Move to trash</string>
+    <string name="recording_in_progress">Recording in progress · tap to return</string>
+    <string name="state_paused">Paused · resume</string>
+    <string name="state_transcribed">Transcribed</string>
+    <string name="state_audio">Audio only</string>
+    <string name="rename_note">Rename</string>
+    <string name="note_title_hint">Title</string>
+    <string name="save">Save</string>
+    <string name="export_choose">Save a copy</string>
+    <string name="export_cassini">Cassini document · audio and transcript (.opus)</string>
+    <string name="export_text">Transcript as text (.txt)</string>
+    <string name="export_srt">Subtitles (.srt)</string>
+    <string name="export_vtt">Subtitles (.vtt)</string>
+    <string name="export_saved">Saved a copy.</string>
+    <string name="minimise_recording">Back to notes; recording continues</string>
+    <string name="recording_space">Space for about %1$s more</string>
+    <string name="trust_verified">Verified</string>
+    <string name="trust_unverified">Not verified</string>
+    <string name="trust_stale">Audio changed</string>
+    <string name="trust_invalid">Transcript damaged</string>
+    <string name="trust_unknown">Unsupported version</string>
+    <string name="version_chip">Version %1$d of %2$d</string>
+    <string name="search_transcript">Search in transcript</string>
+    <plurals name="trash_days_left">
+        <item quantity="one">%1$d day left</item>
+        <item quantity="other">%1$d days left</item>
+    </plurals>
+    <plurals name="speaker_count">
+        <item quantity="one">%1$d speaker</item>
+        <item quantity="other">%1$d speakers</item>
+    </plurals>
+    <string name="format_opus" translatable="false">Opus 48 kHz</string>
+    <string name="format_aac" translatable="false">AAC 48 kHz</string>
+    <string name="hours_short">%1$d h</string>
+    <string name="minutes_short">%1$d min</string>
+    <string name="trash_summary">Notes kept for 30 days before they are deleted</string>
 </resources>

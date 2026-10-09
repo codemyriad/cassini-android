@@ -85,7 +85,9 @@ class AudioDecoderTest {
     }
 
     @Test fun durationCapAndMemoryGuard() {
-        assertEquals(7_200_000L, Limits.MAX_RECORDING_MS)
+        assertEquals(86_400_000L, Limits.MAX_RECORDING_MS)
+        // Sample positions are Ints: the ceiling must leave them room.
+        assertTrue(Limits.MAX_SAMPLES in 1 until Int.MAX_VALUE && Limits.MAX_SAMPLES.toLong() >= Limits.MAX_RECORDING_MS * Limits.ASR_RATE / 1000)
         assertTrue(Limits.memoryAllows(3_600_000, 400L shl 20))
         assertFalse(Limits.memoryAllows(3_600_000, 200L shl 20))
         try { Limits.requireDuration(Limits.MAX_RECORDING_MS + 1); fail() } catch (e: UserFacingException) { assertEquals(Failure.LONG, e.failure) }

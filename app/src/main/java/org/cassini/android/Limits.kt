@@ -2,7 +2,12 @@ package org.cassini.android
 
 /** Every length bound in one place. Audio for recognition is 16 kHz mono float: 64 KB per second. */
 internal object Limits {
-    const val MAX_RECORDING_MS = 2 * 60 * 60 * 1000L
+    /**
+     * Transcription streams from the decoder, so length is bounded by storage, not memory. This ceiling keeps
+     * sample positions in an Int (24 h at 16 kHz is 1.38e9, below 2^31) and a transcript within the Cassini
+     * header budget; recordings that run out of space stop earlier and are kept.
+     */
+    const val MAX_RECORDING_MS = 24 * 60 * 60 * 1000L
     const val ASR_RATE = 16000
     /** One second of slack for codec padding past the stated duration. */
     const val MAX_SAMPLES = ((MAX_RECORDING_MS + 1000) * ASR_RATE / 1000).toInt()
@@ -12,6 +17,8 @@ internal object Limits {
     /** A recording stops before the device runs out of space, and warns this long before [MAX_RECORDING_MS]. */
     const val MIN_RECORDING_FREE_BYTES = 200L shl 20
     const val RECORDING_WARNING_MS = 5 * 60 * 1000L
+    /** Mono Opus at 48 kbit/s: the space estimate before a recording has written enough to measure. */
+    const val RECORDING_BYTES_PER_SECOND = 6000L
 
     /** PCM plus 30% headroom for decode slices, words and the resampler. */
     fun memoryAllows(durationMs: Long, availableBytes: Long) = durationMs * ASR_RATE / 1000 * 4 * 13 / 10 <= availableBytes

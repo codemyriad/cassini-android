@@ -1,28 +1,55 @@
 <resources>
-    <style name="Theme.Cassini.Base" parent="android:style/Theme.Material.NoActionBar">
-        <item name="android:fontFamily">sans</item>
-        <item name="android:colorAccent">#F4C56A</item>
-        <item name="android:windowLightStatusBar">false</item>
-        <item name="android:statusBarColor">#10120F</item>
-        <item name="android:navigationBarColor">#10120F</item>
-        <item name="android:windowBackground">#10120F</item>
+    <!-- Light, quiet surfaces; one blue accent; orange-red only for recording. Colours mirror Palette.kt. -->
+    <style name="Theme.Cassini.Base" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:colorAccent">#2346C8</item>
+        <item name="android:colorPrimary">#F5F6F7</item>
+        <item name="android:colorPrimaryDark">#F5F6F7</item>
+        <item name="android:colorControlActivated">#2346C8</item>
+        <item name="android:textColorPrimary">#14171A</item>
+        <item name="android:textColorSecondary">#4A525B</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">#F5F6F7</item>
+        <item name="android:navigationBarColor">#F5F6F7</item>
+        <item name="android:windowBackground">#F5F6F7</item>
+        <item name="android:colorBackground">#F5F6F7</item>
         <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:alertDialogTheme">@style/Theme.Cassini.Dialog</item>
     </style>
     <style name="Theme.Cassini" parent="Theme.Cassini.Base" />
-    <style name="Theme.Cassini.Settings" parent="android:style/Theme.Material">
-        <item name="android:fontFamily">sans</item>
-        <item name="android:colorAccent">#F4C56A</item>
-        <item name="android:colorBackground">#10120F</item>
-        <item name="android:windowBackground">#10120F</item>
-        <item name="android:statusBarColor">#10120F</item>
-        <item name="android:navigationBarColor">#10120F</item>
+    <!-- Capture is a dark, focused screen. -->
+    <style name="Theme.Cassini.Recording" parent="Theme.Cassini">
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:textColorPrimary">#E8E5D9</item>
-        <item name="android:textColorSecondary">#A9B09F</item>
-        <item name="android:actionBarStyle">@style/Cassini.SettingsActionBar</item>
+        <item name="android:statusBarColor">#14171A</item>
+        <item name="android:navigationBarColor">#14171A</item>
+        <item name="android:windowBackground">#14171A</item>
+        <item name="android:colorAccent">#FF8A55</item>
+        <item name="android:colorControlActivated">#FF8A55</item>
+        <item name="android:textColorPrimary">#F2F3F5</item>
+        <item name="android:textColorSecondary">#A9B0B9</item>
     </style>
-    <style name="Cassini.SettingsActionBar" parent="android:style/Widget.Material.ActionBar.Solid">
-        <item name="android:background">#10120F</item>
+    <style name="Theme.Cassini.Dialog" parent="android:style/Theme.Material.Light.Dialog.Alert">
+        <item name="android:colorAccent">#2346C8</item>
+        <item name="android:textColorPrimary">#14171A</item>
+        <item name="android:textColorSecondary">#4A525B</item>
+    </style>
+    <style name="Theme.Cassini.Settings" parent="android:style/Theme.Material.Light">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:colorAccent">#2346C8</item>
+        <item name="android:colorPrimary">#F5F6F7</item>
+        <item name="android:colorPrimaryDark">#F5F6F7</item>
+        <item name="android:colorBackground">#F5F6F7</item>
+        <item name="android:windowBackground">#F5F6F7</item>
+        <item name="android:statusBarColor">#F5F6F7</item>
+        <item name="android:navigationBarColor">#F5F6F7</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:textColorPrimary">#14171A</item>
+        <item name="android:textColorSecondary">#4A525B</item>
+        <item name="android:actionBarStyle">@style/Cassini.SettingsActionBar</item>
+        <item name="android:alertDialogTheme">@style/Theme.Cassini.Dialog</item>
+    </style>
+    <style name="Cassini.SettingsActionBar" parent="android:style/Widget.Material.Light.ActionBar.Solid">
+        <item name="android:background">#F5F6F7</item>
         <item name="android:elevation">0dp</item>
     </style>
 </resources>

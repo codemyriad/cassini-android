@@ -87,7 +87,12 @@ class SettingsActivity : Activity() {
 
             people = category(R.string.people_title)
 
-            category(R.string.settings_app).addPreference(Preference(context).apply {
+            val about = category(R.string.settings_app)
+            about.addPreference(Preference(context).apply {
+                isPersistent = false; setTitle(R.string.trash); setSummary(R.string.trash_summary)
+                setOnPreferenceClickListener { startActivity(android.content.Intent(context, TrashActivity::class.java)); true }
+            })
+            about.addPreference(Preference(context).apply {
                 setTitle(R.string.about)
                 summary = getString(R.string.app_version, context.packageManager.getPackageInfo(context.packageName, 0).versionName)
                 setOnPreferenceClickListener {

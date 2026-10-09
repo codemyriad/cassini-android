@@ -71,8 +71,8 @@ class MainActivity : Activity() {
     @Volatile private var draftNamingOpen = false
     private var highlightedWord = -1
     private var wordRanges = emptyList<IntRange>()
-    private val activeBackground = BackgroundColorSpan(DeckViews.amber)
-    private val activeForeground = ForegroundColorSpan(DeckViews.ink)
+    private val activeBackground = BackgroundColorSpan(Palette.accent)
+    private val activeForeground = ForegroundColorSpan(Palette.surface)
     private var touchingTranscript = false
     private var followCompletedSeeks = false
     private var screen = ""
@@ -80,6 +80,10 @@ class MainActivity : Activity() {
     private var pendingSpeaker: String? = null
     private var pendingName: String? = null
     private var speakerDialog: AlertDialog? = null
+    /** The copy format chosen before the system file picker opened. */
+    private var pendingExport: TranscriptExport.Format? = null
+    /** Moved to the trash: this screen no longer saves its note as the current one. */
+    private var trashed = false
     /** This note's speaker prints and matches and the saved people, app-private; reloaded when a document is adopted. */
     private var notePrints: Map<String, SpeakerPrint> = emptyMap()
     private var people: Map<String, Voice> = emptyMap()
@@ -109,6 +113,7 @@ class MainActivity : Activity() {
         val noteId = intent.getStringExtra(NOTE_ID)
         screen = savedInstanceState?.getString("screen") ?: UUID.randomUUID().toString()
         pendingSpeaker = savedInstanceState?.getString("pendingSpeaker"); pendingName = savedInstanceState?.getString("pendingName")
+        pendingExport = savedInstanceState?.getString("pendingExport")?.let { name -> TranscriptExport.Format.values().firstOrNull { it.name == name } }
         val restored = savedInstanceState?.let { state ->
             val notes = try { library.load() } catch (error: Exception) { Log.e(TAG, "Could not load notes", error); emptyList() }
             LibraryNote.shown(screen, state.getString(NOTE_ID), state.getString("uri"), preferences, notes)
@@ -131,6 +136,7 @@ class MainActivity : Activity() {
         setContentView(ui.root)
         ui.library.setOnClickListener { returnToLibrary() }
         ui.menu.setOnClickListener { showMenu() }
+        ui.version.setOnClickListener { if (!busy) chooseVariant() }
         ui.transcribe.setOnClickListener { confirmTranscription() }
         ui.cancelOperation.setOnClickListener { cancelOperation() }
         ui.play.setOnClickListener {
@@ -570,6 +576,78 @@ class MainActivity : Activity() {
         }, SAVE_DOCUMENT)
     }
 
+    /** A Cassini document carries everything; text and subtitles carry the words, their times and the speaker names. */
+    private fun chooseExport() {
+        val formats = listOf<Pair<Int, TranscriptExport.Format?>>(R.string.export_cassini to null, R.string.export_text to TranscriptExport.Format.TEXT,
+            R.string.export_srt to TranscriptExport.Format.SRT, R.string.export_vtt to TranscriptExport.Format.VTT)
+            .filter { (_, format) -> format == null || session.transcript?.words?.isNotEmpty() == true }
+        AlertDialog.Builder(this).setTitle(R.string.export_choose)
+            .setItems(formats.map { getString(it.first) }.toTypedArray()) { _, index ->
+                val format = formats[index].second
+                if (format == null) saveCassiniDocument() else {
+                    pendingExport = format
+                    startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                        type = format.mime; addCategory(Intent.CATEGORY_OPENABLE)
+                        putExtra(Intent.EXTRA_TITLE, "${noteTitle()}.${format.extension}")
+                    }, SAVE_TRANSCRIPT)
+                }
+            }.setNegativeButton(R.string.cancel, null).show()
+    }
+
+    private fun noteTitle() = (session.title ?: document?.title?.takeIf { it.isNotBlank() } ?: LibraryNote.displayName(session.name))
+        .ifBlank { getString(R.string.recording) }
+
+    private fun writeTranscript(uri: Uri, format: TranscriptExport.Format) {
+        val words = session.transcript?.words ?: return
+        val portable = document
+        val single = words.map { it.speaker }.distinct().size <= 1
+        // A plain transcript of one unnamed voice has no names worth writing.
+        val label: ((String) -> String)? = if (portable == null && single) null
+            else { id -> portable?.speakerLabel(id)?.takeUnless { it.isBlank() || it == id } ?: defaultLabel(id) }
+        val content = TranscriptExport.render(format, words, label)
+        runWork(R.string.saving) {
+            val output = contentResolver.openOutputStream(uri, "wt") ?: throw UserFacingException(Failure.SAVE)
+            output.use { it.write(content.toByteArray(Charsets.UTF_8)) }
+            onUi { setStatus(R.string.export_saved) }
+        }
+    }
+
+    /** The title is the note's own; the file and its document keep their names. */
+    private fun renameNote() {
+        val input = SpeakerDialog.nameInput(this, noteTitle()).apply {
+            id = View.NO_ID; setHint(R.string.note_title_hint)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+            filters = arrayOf(android.text.InputFilter.LengthFilter(200))
+        }
+        val dialog = AlertDialog.Builder(this).setTitle(R.string.rename_note).setView(SpeakerDialog.frame(this, input))
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.save) { _, _ ->
+                val title = input.text.toString().trim()
+                if (title.isNotEmpty() && title != noteTitle()) {
+                    session = session.copy(title = title)
+                    persistSession(); renderScreen()
+                }
+            }.create()
+        dialog.show()
+        input.requestFocus(); input.selectAll()
+        dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
+    }
+
+    /** Nothing is deleted here: the library offers Undo, and the trash keeps the files for 30 days. */
+    private fun moveToTrash() {
+        if (busy || !persistSession()) return
+        val id = session.libraryId ?: return
+        try { library.trash(id, System.currentTimeMillis()) }
+        catch (error: Exception) { Log.e(TAG, "Could not move the note to the trash", error); setStatus(R.string.library_error, error = true); return }
+        // The next viewer must not reopen a note in the trash.
+        try { if (sessions.load().libraryId == id) sessions.save(Session()) } catch (error: Exception) { Log.w(TAG, "Could not clear the current note", error) }
+        trashed = true
+        player?.takeIf { playerReady && it.isPlaying }?.pause()
+        startActivity(Intent(this, LibraryActivity::class.java).putExtra(LibraryActivity.TRASHED, id)
+            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+        finish()
+    }
+
     private fun importFile(uri: Uri) {
         if (busy) return
         val name = try { contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
@@ -973,6 +1051,14 @@ class MainActivity : Activity() {
             .setPositiveButton(android.R.string.ok, null).show()
     }
 
+    private fun trustLabel(state: String) = when (state) {
+        "ok" -> R.string.trust_verified
+        "stale-audio" -> R.string.trust_stale
+        "invalid-cassini-metadata" -> R.string.trust_invalid
+        "unknown-cassini-format" -> R.string.trust_unknown
+        else -> R.string.trust_unverified
+    }
+
     private fun trustResource(state: String) = when (state) {
         "ok" -> R.string.document_verified
         "stale-audio" -> R.string.document_stale
@@ -1080,7 +1166,7 @@ class MainActivity : Activity() {
         val text = listOf(overall, stage, getString(R.string.progress_counts, snapshot.words, clock(elapsedMs)), remaining, battery).joinToString("\n")
         if (ui.status.text.toString() != text) {
             ui.status.text = text
-            ui.status.setTextColor(DeckViews.muted)
+            ui.status.setTextColor(Palette.muted)
         }
     }
 
@@ -1110,7 +1196,7 @@ class MainActivity : Activity() {
     private fun onUi(action: () -> Unit) = runOnUiThread { if (!isDestroyed) action() }
     private fun setStatus(resource: Int, vararg args: Any, error: Boolean = false) {
         ui.status.text = getString(resource, *args)
-        ui.status.setTextColor(if (error) DeckViews.warning else DeckViews.muted)
+        ui.status.setTextColor(if (error) Palette.error else Palette.muted)
     }
     private fun defaultStatus() {
         when {
@@ -1137,7 +1223,7 @@ class MainActivity : Activity() {
         ui.seek.isEnabled = playerReady
         ui.back.isEnabled = playerReady
         ui.forward.isEnabled = playerReady
-        listOf(ui.menu, ui.transcribe, ui.play, ui.back, ui.forward)
+        listOf(ui.menu, ui.library, ui.transcribe, ui.play, ui.back, ui.forward, ui.seek)
             .forEach { it.alpha = if (it.isEnabled) 1f else .4f }
     }
 
@@ -1150,13 +1236,15 @@ class MainActivity : Activity() {
             item.isEnabled = enabled
             actions[item.itemId] = action
         }
+        if (session.uri != null) add(R.string.rename_note) { renameNote() }
         if (session.transcript != null) add(R.string.transcribe_again, document == null || document?.state == "ok") { confirmTranscription() }
         if ((document?.variants?.size ?: 0) > 1) add(R.string.choose_transcript) { chooseVariant() }
-        if (session.document != null || (session.transcript != null && !checkpointSaved)) add(R.string.export) { saveCassiniDocument() }
+        if (session.document != null || (session.transcript != null && !checkpointSaved)) add(R.string.export_choose) { chooseExport() }
         if (checkpointSaved) add(R.string.discard_processing) { discardCheckpoint() }
         if ((document?.manifest?.optJSONArray("speakers")?.length() ?: 0) > 0) add(R.string.speakers_menu, canRename()) { showSpeakers() }
         if (document != null) add(R.string.document_info) { showDocumentInfo() }
         add(R.string.settings) { showSettings() }
+        if (session.uri != null) add(R.string.move_to_trash) { moveToTrash() }
         menu.setOnMenuItemClickListener { item -> actions[item.itemId]?.invoke(); true }
         menu.show()
     }
@@ -1164,14 +1252,17 @@ class MainActivity : Activity() {
     private fun renderScreen() {
         ui.draft.visibility = if (interim != null) View.VISIBLE else View.GONE
         ui.draft.setText(if (checkpointSaved && !busy) R.string.paused_draft else R.string.transcript_draft)
-        ui.filename.text = document?.title?.takeIf { it.isNotBlank() } ?: session.name.ifBlank { getString(R.string.no_file) }
-        ui.caption.text = if (document == null) getString(R.string.voice_caption, getString(R.string.italian)) else "${getString(R.string.cassini_document)}\n${session.name}"
+        ui.filename.text = session.title ?: document?.title?.takeIf { it.isNotBlank() } ?: session.name.ifBlank { getString(R.string.no_file) }
+        val speakerCount = (interim ?: session.transcript)?.words?.map { it.speaker }?.distinct()?.size ?: 0
+        ui.caption.text = listOfNotNull(clock(session.durationMs).takeIf { session.uri != null },
+            speakerCount.takeIf { it > 0 && (document != null || interim != null) }?.let { resources.getQuantityString(R.plurals.speaker_count, it, it) }).joinToString(" · ")
         // Words of a running transcription belong to no document yet: not to its trust state, variants or speakers.
         ui.trust.visibility = if (document == null || interim != null) View.GONE else View.VISIBLE
-        document?.let {
-            ui.trust.setText(trustResource(it.state))
-            ui.trust.setTextColor(if (it.state == "ok") DeckViews.amber else DeckViews.warning)
-        }
+        document?.let { ui.showTrust(it.state, trustLabel(it.state), trustResource(it.state)) }
+        val variants = document?.variants.orEmpty()
+        ui.version.visibility = if (variants.size > 1 && interim == null) View.VISIBLE else View.GONE
+        if (variants.size > 1) ui.version.text = getString(R.string.version_chip,
+            variants.indexOfFirst { it.id == session.selectedVariant }.coerceAtLeast(0) + 1, variants.size)
         ui.seek.max = session.durationMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
         ui.position.text = getString(R.string.position, clock(session.positionMs.toLong()), clock(session.durationMs))
         val transcript = interim ?: session.transcript
@@ -1211,8 +1302,7 @@ class MainActivity : Activity() {
         if (!ui.seek.isPressed) ui.seek.progress = time
         val clock = getString(R.string.position, clock(time.toLong()), clock(session.durationMs))
         if (ui.position.text.toString() != clock) ui.position.text = clock
-        val playText = getString(if (media.isPlaying) R.string.pause else R.string.play)
-        if (ui.play.text.toString() != playText) ui.play.text = playText
+        ui.showPlaying(media.isPlaying)
         val active = (interim ?: session.transcript)?.words?.indexOfFirst { time >= it.startMs && time < it.endMs } ?: -1
         if (active != highlightedWord || followSeek) {
             highlightedWord = active
@@ -1251,7 +1341,7 @@ class MainActivity : Activity() {
         if (query.isNotEmpty()) {
             var start = text.indexOf(query, ignoreCase = true)
             while (start >= 0) {
-                spannable.setSpan(BackgroundColorSpan(android.graphics.Color.rgb(76, 86, 45)), start, start + query.length, 0)
+                spannable.setSpan(BackgroundColorSpan(Palette.match), start, start + query.length, 0)
                 matchCount++
                 start = text.indexOf(query, start + query.length, ignoreCase = true)
             }
@@ -1268,17 +1358,23 @@ class MainActivity : Activity() {
                 override fun updateDrawState(ds: android.text.TextPaint) { ds.isUnderlineText = false }
             }, range.first, range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
-        if (canRename()) labels.forEach { (range, speaker) ->
-            spannable.setSpan(object : ClickableSpan() {
+        // Each voice keeps one colour: a name in bold, smaller than the words, tappable while naming is possible.
+        val order = words.map { it.speaker }.distinct()
+        labels.forEach { (range, speaker) ->
+            val color = Palette.speakerLabel(order.indexOf(speaker))
+            spannable.setSpan(android.text.style.StyleSpan(android.graphics.Typeface.BOLD), range.first, range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            spannable.setSpan(android.text.style.RelativeSizeSpan(.82f), range.first, range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            spannable.setSpan(if (canRename()) object : ClickableSpan() {
                 override fun onClick(widget: View) = showSpeakerDialog(speaker)
-                override fun updateDrawState(ds: android.text.TextPaint) { ds.isUnderlineText = false; ds.color = DeckViews.amber }
-            }, range.first, range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                override fun updateDrawState(ds: android.text.TextPaint) { ds.isUnderlineText = false; ds.color = color }
+            } else ForegroundColorSpan(color), range.first, range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
         marks.forEach { (range, action) ->
+            spannable.setSpan(android.text.style.RelativeSizeSpan(.82f), range.first, range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             spannable.setSpan(if (canRename()) object : ClickableSpan() {
                 override fun onClick(widget: View) { if (canRename()) action() }
-                override fun updateDrawState(ds: android.text.TextPaint) { ds.isUnderlineText = false; ds.color = DeckViews.muted }
-            } else ForegroundColorSpan(DeckViews.muted), range.first, range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                override fun updateDrawState(ds: android.text.TextPaint) { ds.isUnderlineText = false; ds.color = Palette.accentDeep }
+            } else ForegroundColorSpan(Palette.muted), range.first, range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
         ui.transcript.setText(spannable, TextView.BufferType.SPANNABLE)
         wordRanges = ranges
@@ -1336,6 +1432,7 @@ class MainActivity : Activity() {
         val uri = data?.data ?: return
         when (requestCode) {
             OPEN_FILE -> importFile(uri)
+            SAVE_TRANSCRIPT -> pendingExport?.let { format -> pendingExport = null; writeTranscript(uri, format) }
             SAVE_DOCUMENT -> {
                 val path = session.document ?: return
                 runWork(R.string.saving) {
@@ -1409,6 +1506,7 @@ class MainActivity : Activity() {
     }
 
     private fun persistSession(): Boolean {
+        if (trashed) return false
         if (playerReady) player?.let { session = session.copy(positionMs = it.currentPosition) }
         val preferences = sessions.load()
         session = session.copy(screen = screen)
@@ -1429,6 +1527,7 @@ class MainActivity : Activity() {
         outState.putString("uri", session.uri)
         outState.putString("screen", screen)
         outState.putString("pendingSpeaker", pendingSpeaker); outState.putString("pendingName", pendingName)
+        outState.putString("pendingExport", pendingExport?.name)
         super.onSaveInstanceState(outState)
     }
     override fun onResume() {
@@ -1478,7 +1577,7 @@ class MainActivity : Activity() {
             try { ModelStore.installVad(filesDir) { } } catch (error: Exception) { Log.w(TAG, "Speech detector unavailable", error) }
         }
 
-        const val OPEN_FILE = 1; const val SAVE_DOCUMENT = 2; private const val TAG = "Cassini"
+        const val OPEN_FILE = 1; const val SAVE_DOCUMENT = 2; const val SAVE_TRANSCRIPT = 3; private const val TAG = "Cassini"
         const val NOTE_ID = "noteId"; const val SEARCH_QUERY = "searchQuery"
         const val REQUEST_IMPORT = "requestImport"; const val AUTO_TRANSCRIBE = "autoTranscribe"
     }

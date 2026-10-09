@@ -64,6 +64,7 @@ class LiveMuxerTest {
         assertEquals("02:59", clock(179_999))
         assertEquals("59:59", clock(3_599_000))
         assertEquals("1:00:00", clock(3_600_000))
-        assertEquals("2:00:00", clock(Limits.MAX_RECORDING_MS))
+        assertEquals("2:00:00", clock(7_200_000))
+        assertEquals("24:00:00", clock(Limits.MAX_RECORDING_MS))
     }
 }

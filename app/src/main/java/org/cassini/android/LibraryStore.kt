@@ -32,6 +32,19 @@ class LibraryStore(private val directory: File) {
         return note.session
     }
 
+    /** Moves a note to the trash. Its files stay until [Trash.purge] or [Trash.delete]. */
+    fun trash(id: String, now: Long) = change(id) { it.copy(trashedAt = now) }
+    fun restore(id: String) = change(id) { it.copy(trashedAt = null) }
+    fun rename(id: String, title: String) = change(id) { it.copy(session = it.session.copy(title = title)) }
+    /** Removes the entry only; [Trash] decides which of its files no other note still uses. */
+    fun remove(id: String) { val notes = load(); if (notes.any { it.id == id }) write(notes.filter { it.id != id }) }
+
+    private fun change(id: String, edit: (LibraryNote) -> LibraryNote) {
+        val notes = load()
+        if (notes.none { it.id == id }) return
+        write(notes.map { if (it.id == id) edit(it) else it })
+    }
+
     /** Adds a session the catalogue does not hold yet. session.json alone may reference it. */
     fun adopt(session: Session) {
         if (session.uri != null && load().none { it.id == session.libraryId || it.session.uri == session.uri }) save(session)

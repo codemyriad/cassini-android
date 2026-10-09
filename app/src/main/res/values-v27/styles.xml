@@ -1,5 +1,16 @@
 <resources>
     <style name="Theme.Cassini" parent="Theme.Cassini.Base">
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+    <style name="Theme.Cassini.Recording" parent="Theme.Cassini.Base">
+        <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:statusBarColor">#14171A</item>
+        <item name="android:navigationBarColor">#14171A</item>
+        <item name="android:windowBackground">#14171A</item>
+        <item name="android:colorAccent">#FF8A55</item>
+        <item name="android:colorControlActivated">#FF8A55</item>
+        <item name="android:textColorPrimary">#F2F3F5</item>
+        <item name="android:textColorSecondary">#A9B0B9</item>
     </style>
 </resources>

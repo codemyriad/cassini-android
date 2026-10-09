@@ -30,6 +30,7 @@ class RecordingActivity : Activity(), RecordingService.Listener {
     private lateinit var done: Button
     private lateinit var start: Button
     private lateinit var format: TextView
+    private lateinit var space: TextView
     private lateinit var waveform: WaveformView
     private var service: RecordingService? = null
     private val capture get() = service?.capture
@@ -40,11 +41,13 @@ class RecordingActivity : Activity(), RecordingService.Listener {
     private val handler = Handler(Looper.getMainLooper())
     private var savedNote: String? = null
     private var permissionDenied = false
+    private var spaceCheckedMs = -1L
     private val tick = object : Runnable {
         override fun run() {
             val recording = capture ?: return
             timer.text = clock(recording.elapsedMs)
             waveform.push(recording.amplitude / 32768f)
+            if (spaceCheckedMs < 0 || recording.elapsedMs - spaceCheckedMs >= 5000) { spaceCheckedMs = recording.elapsedMs; showSpace(recording) }
             handler.postDelayed(this, 100)
         }
     }
@@ -61,38 +64,55 @@ class RecordingActivity : Activity(), RecordingService.Listener {
     override fun attachBaseContext(newBase: Context) = super.attachBaseContext(AppLanguage.wrap(newBase))
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        views = NoteViews(this)
+        views = NoteViews(this, dark = true)
         val root = views.column().apply {
-            setBackgroundColor(DeckViews.ink); setPadding(views.dp(20), views.dp(20), views.dp(20), views.dp(24))
+            setBackgroundColor(Palette.night); setPadding(views.dp(8), views.dp(12), views.dp(16), views.dp(24))
         }
-        val content = views.column()
-        status = views.text(16f, views.record).apply {
+        val header = views.row()
+        // Capture lives in RecordingService: leaving this screen keeps recording, and the library offers a way back.
+        views.add(header, views.iconButton(R.drawable.ic_chevron_down, R.string.minimise_recording, Palette.nightText).apply {
+            setOnClickListener {
+                startActivity(Intent(this@RecordingActivity, LibraryActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+            }
+        }, -2)
+        status = views.text(15f, Palette.nightRecord, medium = true).apply {
             id = R.id.capture_status; gravity = Gravity.CENTER; setText(R.string.recording_preparing)
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         }
-        views.add(content, status, top = 12)
-        title = views.input(R.string.recording_title).apply {
-            id = R.id.capture_title
+        views.add(header, status, 0, weight = 1f)
+        format = views.text(12f, Palette.nightMuted, mono = true).apply {
+            text = getString(if (MicrophoneRecording.extension() == "opus") R.string.format_opus else R.string.format_aac)
+            contentDescription = getString(if (MicrophoneRecording.extension() == "opus") R.string.microphone_format else R.string.microphone_format_aac)
+            background = views.shape(Palette.night, 8, Palette.nightLine); setPadding(views.dp(8), views.dp(4), views.dp(8), views.dp(4))
+        }
+        views.add(header, format, -2)
+        views.add(root, header)
+
+        val content = views.column().apply { setPadding(views.dp(8), 0, 0, 0) }
+        views.add(content, views.text(13f, Palette.nightMuted).apply { setText(R.string.note_title_hint) }, top = 24)
+        title = EditText(this).apply {
+            id = R.id.capture_title; setHint(R.string.recording_title); maxLines = 2
+            textSize = 22f; setTextColor(Palette.nightText); setHintTextColor(Palette.nightMuted)
+            typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+            background = views.underline(Palette.nightLine); setPadding(0, views.dp(6), 0, views.dp(10))
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
             setText(getString(R.string.voice_note_name, DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date())))
-            maxLines = 2
         }
-        views.add(content, title, top = 32)
-        format = views.text(12f, DeckViews.muted).apply {
-            gravity = Gravity.CENTER
-            setText(if (MicrophoneRecording.extension() == "opus") R.string.microphone_format else R.string.microphone_format_aac)
-        }
-        views.add(content, format, top = 12)
-        timer = views.text(64f, DeckViews.paper, true).apply { id = R.id.capture_timer; text = clock(0); gravity = Gravity.CENTER }
-        views.add(content, timer, top = 30)
+        views.add(content, title, top = 4)
+        timer = views.text(68f, Palette.nightText, mono = true).apply { id = R.id.capture_timer; text = clock(0); gravity = Gravity.CENTER }
+        views.add(content, timer, top = 40)
         waveform = WaveformView(this, views).apply { contentDescription = getString(R.string.microphone_level) }
-        views.add(content, waveform, height = views.dp(170), top = 24)
-        val hint = views.text(15f, DeckViews.muted).apply {
-            setText(R.string.recording_hint); setLineSpacing(views.dp(4).toFloat(), 1f)
-        }
-        views.add(content, hint, top = 16)
+        views.add(content, waveform, height = views.dp(110), top = 24)
+        views.add(content, views.text(14f, Palette.nightMuted).apply {
+            setText(R.string.recording_hint); gravity = Gravity.CENTER; setLineSpacing(views.dp(3).toFloat(), 1f)
+        }, top = 24)
+        space = views.text(13f, Palette.nightMuted).apply { gravity = Gravity.CENTER; visibility = View.GONE }
+        views.add(content, space, top = 6)
         val scroll = ScrollView(this).apply { isFillViewport = true; isVerticalScrollBarEnabled = false; addView(content) }
         views.add(root, scroll, height = 0, weight = 1f)
-        start = views.button(R.string.enable_microphone, views.record, DeckViews.ink).apply {
+
+        val bottom = views.column().apply { setPadding(views.dp(8), 0, 0, 0) }
+        start = views.button(R.string.enable_microphone, NoteViews.Style.RECORD).apply {
             id = R.id.capture_start
             setOnClickListener {
                 if (permissionDenied && !shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO)) {
@@ -100,23 +120,35 @@ class RecordingActivity : Activity(), RecordingService.Listener {
                 } else requestCapture()
             }
         }
-        views.add(root, start, top = 20)
+        views.add(bottom, start, top = 16)
         val controls = views.row()
-        pause = views.button(R.string.pause_recording).apply {
+        pause = views.button(R.string.pause_recording, NoteViews.Style.OUTLINE, R.drawable.ic_pause, height = 60).apply {
             id = R.id.capture_pause; isEnabled = false
             setOnClickListener { try { service?.togglePause() } catch (error: Exception) { recordingFailed(error) } }
         }
-        done = views.button(R.string.finish_recording, DeckViews.paper, DeckViews.ink).apply {
+        done = views.button(R.string.finish_recording, NoteViews.Style.RECORD, R.drawable.ic_stop, height = 60).apply {
             id = R.id.capture_done; isEnabled = false; setOnClickListener { finishRecording(true) }
         }
         views.add(controls, pause, 0, weight = 1f)
-        views.add(controls, Space(this), views.dp(12), 1)
+        views.space(controls, 12)
         views.add(controls, done, 0, weight = 1f)
-        views.add(root, controls, top = 20)
+        views.add(bottom, controls, top = 16)
+        views.add(root, bottom)
         setContentView(root)
+        refreshEnabled()
         savedNote = savedInstanceState?.getString("savedNote")
         wantCapture = savedNote == null && savedInstanceState == null
         bindService(Intent(this, RecordingService::class.java), connection, Context.BIND_AUTO_CREATE)
+    }
+
+    /** Recording continues until storage runs low; this says roughly how long that is, from the bytes written so far. */
+    private fun showSpace(recording: MicrophoneRecording) {
+        val free = (recording.file.parentFile?.usableSpace ?: return) - Limits.MIN_RECORDING_FREE_BYTES
+        val written = recording.file.length()
+        val rate = if (recording.elapsedMs >= 10_000 && written > 0) written * 1000 / recording.elapsedMs else Limits.RECORDING_BYTES_PER_SECOND
+        val seconds = free.coerceAtLeast(0) / rate.coerceAtLeast(1)
+        space.text = getString(R.string.recording_space, if (seconds >= 3600) getString(R.string.hours_short, seconds / 3600) else getString(R.string.minutes_short, seconds / 60))
+        space.visibility = View.VISIBLE
     }
 
     private fun requestCapture() {
@@ -140,14 +172,19 @@ class RecordingActivity : Activity(), RecordingService.Listener {
 
     private fun showRecording() {
         start.visibility = View.GONE; pause.isEnabled = true; done.isEnabled = true
+        refreshEnabled()
         onRecordingChanged()
         handler.removeCallbacks(tick); handler.post(tick)
     }
+
+    private fun refreshEnabled() = listOf(pause, done).forEach { it.alpha = if (it.isEnabled) 1f else .4f }
 
     override fun onRecordingChanged() {
         val bound = service ?: return
         val paused = bound.capture?.paused == true
         pause.setText(if (paused) R.string.resume_recording else R.string.pause_recording)
+        pause.setCompoundDrawablesRelative(views.icon(if (paused) R.drawable.ic_play else R.drawable.ic_pause, Palette.nightText, 20), null, null, null)
+        status.setTextColor(if (paused) Palette.nightMuted else Palette.nightRecord)
         status.setText(when {
             bound.notice == RecordingService.Notice.NEAR_LIMIT -> R.string.recording_near_limit
             bound.notice == RecordingService.Notice.FOCUS && paused -> R.string.recording_focus_paused
@@ -169,14 +206,14 @@ class RecordingActivity : Activity(), RecordingService.Listener {
         if (bound.capture == null) return
         bound.title = title.text.toString()
         handler.removeCallbacks(tick)
-        pause.isEnabled = false; done.isEnabled = false
+        pause.isEnabled = false; done.isEnabled = false; refreshEnabled()
         status.setText(R.string.recording_saving)
         bound.finish(autoTranscribe)
     }
 
     override fun onRecordingFinished(noteId: String?, autoTranscribe: Boolean, failed: Boolean) {
         handler.removeCallbacks(tick)
-        pause.isEnabled = false; done.isEnabled = false
+        pause.isEnabled = false; done.isEnabled = false; refreshEnabled()
         if (failed) {
             status.setText(if (noteId != null) R.string.recording_error_saved else R.string.error_microphone)
             start.visibility = View.VISIBLE
@@ -199,7 +236,7 @@ class RecordingActivity : Activity(), RecordingService.Listener {
         android.util.Log.e("Cassini", "Microphone recording failed", error)
         handler.removeCallbacks(tick)
         status.setText(R.string.error_microphone)
-        pause.isEnabled = false; done.isEnabled = false; start.visibility = View.VISIBLE
+        pause.isEnabled = false; done.isEnabled = false; refreshEnabled(); start.visibility = View.VISIBLE
     }
 
     override fun onResume() {
@@ -220,22 +257,22 @@ class RecordingActivity : Activity(), RecordingService.Listener {
         super.onDestroy()
     }
 
+    /** The last seven seconds of microphone level, newest on the right in the recording colour. */
     private class WaveformView(context: Context, private val views: NoteViews) : View(context) {
         private val levels = ArrayDeque<Float>()
-        private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = DeckViews.paper; strokeCap = Paint.Cap.ROUND }
-        fun push(level: Float) { levels.addLast(level.coerceIn(0f, 1f)); while (levels.size > 70) levels.removeFirst(); invalidate() }
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeCap = Paint.Cap.ROUND }
+        fun push(level: Float) { levels.addLast(level.coerceIn(0f, 1f)); while (levels.size > BARS) levels.removeFirst(); invalidate() }
         override fun onDraw(canvas: Canvas) {
             paint.strokeWidth = views.dp(3).toFloat()
-            val spacing = width / 70f
+            val spacing = width / BARS.toFloat()
             levels.forEachIndexed { i, amplitude ->
-                val half = (height * .4f * kotlin.math.sqrt(amplitude)).coerceAtLeast(views.dp(2).toFloat())
-                val x = (70 - levels.size + i) * spacing
+                val half = (height * .48f * kotlin.math.sqrt(amplitude)).coerceAtLeast(views.dp(2).toFloat())
+                val x = (BARS - levels.size + i) * spacing + spacing / 2
+                paint.color = if (i >= levels.size - 8) Palette.nightRecord else Palette.nightLine
                 canvas.drawLine(x, height / 2f - half, x, height / 2f + half, paint)
             }
-            paint.color = views.record
-            canvas.drawLine(width - spacing / 2, height * .08f, width - spacing / 2, height * .92f, paint)
-            paint.color = DeckViews.paper
         }
+        companion object { const val BARS = 70 }
     }
     companion object { private const val MICROPHONE = 10; const val AUTO_TRANSCRIBE = "captureAutoTranscribe" }
 }

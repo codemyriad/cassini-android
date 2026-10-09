@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
+import android.view.Gravity
 import android.view.View
 import android.widget.*
 import java.io.File
@@ -22,8 +23,12 @@ class LibraryActivity : Activity() {
     private lateinit var summary: TextView
     private lateinit var record: Button
     private lateinit var open: Button
+    private lateinit var live: TextView
+    private lateinit var undo: LinearLayout
+    private lateinit var undoText: TextView
     private var notes = emptyList<LibraryNote>()
     private var loading = true
+    private var trashedId: String? = null
     private val worker = Executors.newSingleThreadExecutor()
 
     override fun attachBaseContext(newBase: Context) = super.attachBaseContext(AppLanguage.wrap(newBase))
@@ -32,39 +37,73 @@ class LibraryActivity : Activity() {
         super.onCreate(savedInstanceState)
         views = NoteViews(this)
         store = LibraryStore(filesDir)
-        val root = views.column().apply { setBackgroundColor(DeckViews.ink) }
-        val heading = views.row().apply { setPadding(views.dp(20), views.dp(20), views.dp(20), views.dp(18)) }
-        views.add(heading, views.text(36f).apply { setText(R.string.notes); typeface = android.graphics.Typeface.DEFAULT_BOLD }, 0, weight = 1f)
-        views.add(heading, views.button(R.string.settings).apply {
+        val root = views.column().apply { setBackgroundColor(Palette.background) }
+        val heading = views.row().apply { setPadding(views.dp(20), views.dp(16), views.dp(8), views.dp(8)) }
+        views.add(heading, views.title(26f).apply { setText(R.string.notes) }, 0, weight = 1f)
+        views.add(heading, views.iconButton(R.drawable.ic_trash, R.string.trash).apply {
+            setOnClickListener { startActivity(Intent(this@LibraryActivity, TrashActivity::class.java)) }
+        }, -2)
+        views.add(heading, views.iconButton(R.drawable.ic_settings, R.string.settings).apply {
             id = R.id.settings_button
             setOnClickListener { startActivity(Intent(this@LibraryActivity, SettingsActivity::class.java)) }
         }, -2)
         views.add(root, heading)
         query = views.input(R.string.library_search).apply {
             id = R.id.library_search; imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH
+            setCompoundDrawablesRelative(views.icon(R.drawable.ic_search, Palette.muted, 20), null, null, null)
+            compoundDrawablePadding = views.dp(10)
             setText(savedInstanceState?.getString("query").orEmpty())
         }
-        val searchArea = views.column().apply { setPadding(views.dp(20), 0, views.dp(20), views.dp(12)) }
-        views.add(searchArea, query); views.add(root, searchArea)
-        cards = views.column().apply { id = R.id.library_cards; setPadding(views.dp(20), 0, views.dp(20), views.dp(20)) }
+        val searchArea = views.column().apply { setPadding(views.dp(16), views.dp(4), views.dp(16), 0) }
+        views.add(searchArea, query)
+        summary = views.text(13f, Palette.muted).apply {
+            id = R.id.library_status; gravity = Gravity.CENTER_VERTICAL
+            setCompoundDrawablesRelative(views.icon(R.drawable.ic_shield, Palette.ok, 15), null, null, null)
+            compoundDrawablePadding = views.dp(6); setPadding(views.dp(4), 0, 0, 0)
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+        }
+        views.add(searchArea, summary, top = 10)
+        views.add(root, searchArea)
+        // A recording running in the background is one tap away.
+        live = views.text(14f, Palette.surface, medium = true).apply {
+            setText(R.string.recording_in_progress); gravity = Gravity.CENTER_VERTICAL
+            background = views.shape(Palette.record, 16); setPadding(views.dp(16), views.dp(12), views.dp(16), views.dp(12))
+            setCompoundDrawablesRelative(null, null, views.icon(R.drawable.ic_chevron_right, Palette.surface, 18), null)
+            visibility = View.GONE
+            setOnClickListener { startActivity(Intent(this@LibraryActivity, RecordingActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)) }
+        }
+        views.clickable(live)
+        val liveArea = views.column().apply { setPadding(views.dp(16), 0, views.dp(16), 0) }
+        views.add(liveArea, live, top = 12)
+        views.add(root, liveArea)
+        cards = views.column().apply { id = R.id.library_cards; setPadding(views.dp(12), views.dp(4), views.dp(12), views.dp(16)) }
         val scroll = ScrollView(this).apply { isFillViewport = true; addView(cards) }
         views.add(root, scroll, height = 0, weight = 1f)
-        val footer = views.column().apply { setPadding(views.dp(20), views.dp(12), views.dp(20), views.dp(20)) }
-        summary = views.text(12f, DeckViews.muted).apply { id = R.id.library_status; gravity = android.view.Gravity.CENTER; accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE }
-        views.add(footer, summary)
+        undoText = views.text(14f, Palette.nightText).apply { maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END }
+        undo = views.row().apply {
+            background = views.shape(Palette.night, 14); setPadding(views.dp(16), views.dp(2), views.dp(4), views.dp(2)); visibility = View.GONE
+        }
+        views.add(undo, undoText, 0, weight = 1f)
+        views.add(undo, views.button(R.string.undo, NoteViews.Style.TEXT, height = 44).apply {
+            setTextColor(Palette.accentTrack); setOnClickListener { undoTrash() }
+        }, -2)
+        val footer = views.column().apply { setPadding(views.dp(16), views.dp(8), views.dp(16), views.dp(20)) }
+        views.add(footer, undo)
         val actions = views.row()
-        open = views.button(R.string.import_audio).apply {
+        open = views.button(R.string.import_audio, NoteViews.Style.OUTLINE, R.drawable.ic_import).apply {
             id = R.id.open_button
             setOnClickListener { startActivity(Intent(this@LibraryActivity, MainActivity::class.java).putExtra(MainActivity.REQUEST_IMPORT, true)) }
         }
-        record = views.button(R.string.record_note, views.record, DeckViews.ink).apply {
-            id = R.id.record_button
+        record = views.button(R.string.record_note, NoteViews.Style.RECORD, height = 60).apply {
+            id = R.id.record_button; textSize = 17f
+            setCompoundDrawablesRelative(views.shape(Palette.surface, 8).apply { setBounds(0, 0, views.dp(16), views.dp(16)) }, null, null, null)
+            compoundDrawablePadding = views.dp(10)
             setOnClickListener { startActivity(Intent(this@LibraryActivity, RecordingActivity::class.java)) }
         }
         views.add(actions, open, 0, weight = 1f)
-        views.add(actions, Space(this), views.dp(12), 1)
-        views.add(actions, record, 0, weight = 1.2f)
-        views.add(footer, actions, top = 16); views.add(root, footer)
+        views.space(actions, 12)
+        views.add(actions, record, 0, weight = 1f)
+        views.add(footer, actions, top = 8); views.add(root, footer)
         setContentView(root)
         query.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -73,10 +112,12 @@ class LibraryActivity : Activity() {
         })
         record.isEnabled = false; open.isEnabled = false
         summary.setText(R.string.library_loading)
+        trashedId = savedInstanceState?.getString(TRASHED) ?: intent.getStringExtra(TRASHED)
         worker.execute {
             try {
                 store.migrate(SessionStore(filesDir).load())
                 RecoveryScanner.recover(filesDir, RecordingService.live, getString(R.string.recording_recovered))
+                Trash(filesDir, store).purge(System.currentTimeMillis())
                 val recovered = store.load()
                 runOnUiThread { if (!isDestroyed) { notes = recovered; loading = false; refresh() } }
             } catch (error: Exception) {
@@ -86,8 +127,15 @@ class LibraryActivity : Activity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        intent.getStringExtra(TRASHED)?.let { trashedId = it }
+    }
+
     override fun onResume() {
         super.onResume()
+        live.visibility = if (RecordingService.live != null) View.VISIBLE else View.GONE
         if (!loading) {
             try { notes = store.load(); refresh() }
             catch (error: Exception) { android.util.Log.e("Cassini", "Library refresh failed", error); summary.setText(R.string.library_error) }
@@ -98,16 +146,31 @@ class LibraryActivity : Activity() {
         record.isEnabled = true; open.isEnabled = true
         val model = ModelStore(File(filesDir, "parakeet-v3"))
         summary.setText(if (model.ready()) R.string.library_local else R.string.library_needs_model)
+        val trashed = trashedId?.let { id -> notes.firstOrNull { it.id == id && it.trashedAt != null } }
+        if (trashed == null) trashedId = null
+        undo.visibility = if (trashed != null) View.VISIBLE else View.GONE
+        if (trashed != null) undoText.text = getString(R.string.trash_moved, trashed.title)
         renderNotes()
+    }
+
+    private fun undoTrash() {
+        val id = trashedId ?: return
+        trashedId = null
+        try { store.restore(id); notes = store.load() }
+        catch (error: Exception) { android.util.Log.e("Cassini", "Could not restore note", error); summary.setText(R.string.library_error) }
+        refresh()
     }
 
     private fun renderNotes() {
         cards.removeAllViews()
         val search = query.text.toString().trim()
-        val matches = notes.filter { it.matches(search) }
+        val matches = notes.filter { it.trashedAt == null && it.matches(search) }
         if (matches.isEmpty()) {
-            views.add(cards, views.text(25f).apply { setText(if (search.isBlank()) R.string.library_empty else R.string.no_matches) }, top = 40)
-            views.add(cards, views.text(16f, DeckViews.muted).apply { setText(if (search.isBlank()) R.string.library_empty_hint else R.string.library_search_hint) }, top = 14)
+            views.add(cards, views.title(22f).apply { setText(if (search.isBlank()) R.string.library_empty else R.string.no_matches); setPadding(views.dp(8), 0, views.dp(8), 0) }, top = 40)
+            views.add(cards, views.text(15f, Palette.muted).apply {
+                setText(if (search.isBlank()) R.string.library_empty_hint else R.string.library_search_hint)
+                setPadding(views.dp(8), 0, views.dp(8), 0); setLineSpacing(views.dp(3).toFloat(), 1f)
+            }, top = 10)
             return
         }
         var group = ""
@@ -115,35 +178,47 @@ class LibraryActivity : Activity() {
             val date = dayLabel(note.createdAt)
             if (date != group) {
                 group = date
-                views.add(cards, views.text(12f, DeckViews.muted).apply { text = date; letterSpacing = .08f }, top = 18)
+                views.add(cards, views.text(12f, Palette.muted, medium = true).apply {
+                    text = date; isAllCaps = true; letterSpacing = .06f; setPadding(views.dp(8), 0, 0, 0)
+                }, top = 18)
             }
-            val card = views.column().apply {
-                background = views.shape(DeckViews.surface)
-                setPadding(views.dp(16), views.dp(16), views.dp(16), views.dp(16))
-                isClickable = true; isFocusable = true
-                setOnClickListener {
-                    startActivity(Intent(this@LibraryActivity, MainActivity::class.java)
-                        .putExtra(MainActivity.NOTE_ID, note.id).putExtra(MainActivity.SEARCH_QUERY, search))
-                }
-            }
-            val titleRow = views.row()
-            views.add(titleRow, views.text(20f).apply { text = note.session.name; maxLines = 2; typeface = android.graphics.Typeface.DEFAULT_BOLD }, 0, weight = 1f)
-            views.add(titleRow, views.text(12f, DeckViews.muted, true).apply {
-                text = clock(note.session.durationMs)
-                setPadding(views.dp(12), 0, 0, 0)
-            }, -2)
-            views.add(card, titleRow)
-            val snippet = note.snippet(search)
-            views.add(card, views.text(15f, if (snippet.isEmpty()) views.accent else DeckViews.paper).apply {
-                text = snippet.ifEmpty { getString(if (note.session.document != null) R.string.library_document else R.string.library_audio_ready) }
-                maxLines = 3; ellipsize = android.text.TextUtils.TruncateAt.END; setLineSpacing(views.dp(3).toFloat(), 1f)
-            }, top = 10)
-            views.add(card, views.text(12f, DeckViews.muted).apply {
-                text = getString(R.string.library_note_metadata, DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(note.createdAt)),
-                    getString(if (note.session.processingPaused) R.string.paused_draft else if (note.session.document != null) R.string.library_saved_document else R.string.library_recorded))
-            }, top = 12)
-            views.add(cards, card, top = 10)
+            views.add(cards, card(note, search), top = 6)
         }
+    }
+
+    /** One tap target per note: title and length, what was said, when, and its state. */
+    private fun card(note: LibraryNote, search: String): View {
+        val card = views.column().apply {
+            background = views.shape(Palette.surface, 16, Palette.line)
+            setPadding(views.dp(14), views.dp(12), views.dp(14), views.dp(12))
+            setOnClickListener {
+                startActivity(Intent(this@LibraryActivity, MainActivity::class.java)
+                    .putExtra(MainActivity.NOTE_ID, note.id).putExtra(MainActivity.SEARCH_QUERY, search))
+            }
+        }
+        views.clickable(card)
+        val titleRow = views.row().apply { gravity = Gravity.TOP }
+        views.add(titleRow, views.text(16f, medium = true).apply { text = note.title; maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END }, 0, weight = 1f)
+        views.add(titleRow, views.text(13f, Palette.muted, mono = true).apply {
+            text = clock(note.session.durationMs); setPadding(views.dp(12), views.dp(2), 0, 0)
+        }, -2)
+        views.add(card, titleRow)
+        val snippet = note.snippet(search)
+        if (snippet.isNotEmpty()) views.add(card, views.text(14f, Palette.textSoft).apply {
+            text = snippet; maxLines = 3; ellipsize = android.text.TextUtils.TruncateAt.END; setLineSpacing(views.dp(2).toFloat(), 1f)
+        }, top = 6)
+        val meta = views.row()
+        views.add(meta, views.text(13f, Palette.muted).apply { text = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(note.createdAt)) }, -2)
+        views.space(meta, 8)
+        views.add(meta, stateChip(note), -2)
+        views.add(card, meta, top = 8)
+        return card
+    }
+
+    private fun stateChip(note: LibraryNote): TextView = when {
+        note.session.processingPaused -> views.chip(Palette.warnSoft, Palette.warn).apply { setText(R.string.state_paused) }
+        note.session.document != null || note.session.transcript != null -> views.chip(Palette.okSoft, Palette.ok).apply { setText(R.string.state_transcribed) }
+        else -> views.chip(Palette.surface, Palette.textSoft, Palette.lineStrong).apply { setText(R.string.state_audio) }
     }
 
     private fun dayLabel(time: Long): String {
@@ -154,6 +229,11 @@ class LibraryActivity : Activity() {
         return if (day(time) == day(today.timeInMillis)) getString(R.string.yesterday) else DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(time))
     }
 
-    override fun onSaveInstanceState(outState: Bundle) { outState.putString("query", query.text.toString()); super.onSaveInstanceState(outState) }
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString("query", query.text.toString()); outState.putString(TRASHED, trashedId)
+        super.onSaveInstanceState(outState)
+    }
     override fun onDestroy() { worker.shutdownNow(); super.onDestroy() }
+
+    companion object { const val TRASHED = "trashedNote" }
 }
