@@ -27,7 +27,9 @@ if [ -z "${SHERPA_ONNX_SRC:-}" ]; then
 fi
 src=$(cd "$SHERPA_ONNX_SRC" && pwd)
 
-# Keep the incremental JNI API reproducible against the pinned source archive.
+# Keep the incremental JNI API reproducible against the pinned source archive. The source sits
+# inside this repository's .tools/, where git apply would silently skip every path; stop discovery.
+export GIT_CEILING_DIRECTORIES=$(dirname "$src")
 if (cd "$src" && git apply --check "$root/scripts/streaming-diarization.patch"); then
     (cd "$src" && git apply "$root/scripts/streaming-diarization.patch")
 elif ! (cd "$src" && git apply --reverse --check "$root/scripts/streaming-diarization.patch"); then
