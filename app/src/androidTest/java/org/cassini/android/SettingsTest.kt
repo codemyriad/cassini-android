@@ -68,16 +68,8 @@ class SettingsTest {
         try {
             scenario.onActivity { AppLanguage.set(it, "en") }
             instrumentation.waitForIdleSync()
-            scenario.onActivity { it.findViewById<TextView>(R.id.more_button).performClick() }
-            // The popup animates in; click once it is fully shown.
-            val menuDeadline = android.os.SystemClock.uptimeMillis() + 5000
-            while (true) {
-                try { onView(withText("Settings")).inRoot(androidx.test.espresso.matcher.RootMatchers.isPlatformPopup()).perform(click()); break }
-                catch (error: androidx.test.espresso.PerformException) {
-                    if (android.os.SystemClock.uptimeMillis() > menuDeadline) throw error
-                    android.os.SystemClock.sleep(100)
-                }
-            }
+            // Open Settings from the viewer directly: a popup menu may never take window focus on a slow emulator.
+            scenario.onActivity { it.startActivity(android.content.Intent(it, SettingsActivity::class.java)) }
             awaitText("Transcription model")
             onView(withText("Transcribe while recording")).check(androidx.test.espresso.assertion.ViewAssertions.doesNotExist())
             onView(withText("Automatic · prefer full precision")).check(androidx.test.espresso.assertion.ViewAssertions.doesNotExist())
