@@ -19,9 +19,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -64,7 +64,9 @@ fun ProgressBannerCard(
                 role = Role.Button,
                 onClick = onClick,
             )
-            .semantics {
+            // The visible texts change every percent and every time-left update: clear them, so the live region
+            // holds only the throttled description.
+            .clearAndSetSemantics {
                 contentDescription = description
                 liveRegion = LiveRegionMode.Polite
             }

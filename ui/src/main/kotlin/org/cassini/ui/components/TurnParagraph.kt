@@ -65,6 +65,13 @@ internal val LocalTurnParagraphProbe = staticCompositionLocalOf<(() -> Unit)?> {
  * [matches] are search hits on the amberTint background; the current one is also set in weight 600.
  * [onPlayFromStart] adds the "Play from start of turn" accessibility action.
  *
+ * Known gaps against ui.md section 6 and features.md section 3.3, for the owner's review:
+ * - The word links have no "Play from here" click label. `LinkAnnotation` takes no label, and on Android Compose
+ *   hides the link nodes from accessibility (`isAccessibilityIgnoredLink`) and gives TalkBack each word as a
+ *   ClickableSpan in the paragraph's text (the Links menu), which has no action label. Our own labelled node per
+ *   word would add one TalkBack stop per word.
+ * - A link covers the word, not its following space (see [paragraph]). A tap on the space still reaches a word.
+ *
  * The annotated text is built once per words, mode, unsettled range and matches; a new [activeIndex] only adds one
  * span, so in a list only the turns with the old and the new active word recompose. The screen keys the list items
  * by turn id and passes null to every other turn.

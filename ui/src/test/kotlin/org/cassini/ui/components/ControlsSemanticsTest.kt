@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
@@ -18,6 +19,7 @@ import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
@@ -26,6 +28,7 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import org.cassini.ui.format.FIXED_ZONE
 import org.cassini.ui.format.ProgressHeadline
@@ -35,7 +38,6 @@ import org.cassini.ui.format.StageUi
 import org.cassini.ui.theme.CassiniTheme
 import org.cassini.ui.theme.Glyph
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -176,8 +178,9 @@ class ControlsSemanticsTest {
                 RecordingControls(paused = paused, onLibrary = {}, onPauseResume = { pauses++ }, onFinish = {})
             }
         }
-        rule.onNodeWithText("Recording")
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+        val status = rule.onNodeWithContentDescription("Recording status")
+        status.assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+        status.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Recording"))
         val timer = rule.onNodeWithContentDescription("24 minutes 7 seconds")
         timer.assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.LiveRegion))
         rule.onNodeWithContentDescription("Microphone level, last 7 seconds")
@@ -189,8 +192,35 @@ class ControlsSemanticsTest {
             assertEquals(1, pauses)
             paused = true
         }
-        rule.onNodeWithText("Paused").assertExists()
+        status.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Paused"))
         rule.onNodeWithContentDescription("Resume recording").assertExists()
+    }
+
+    @Test fun aSheetActionSlidesTheSheetDownThenDismissesIt() {
+        var dismissed = 0
+        setThemed {
+            CassiniSheet(onDismissRequest = { dismissed++ }) { sheet ->
+                SheetActionRow("Rename", Glyph.Pencil, onClick = { sheet.hide() })
+            }
+        }
+        rule.onNodeWithText("Rename").performClick()
+        rule.waitUntil(TIMEOUT_MS) { dismissed == 1 }
+    }
+
+    @Test fun aTapOnTheDialogScrimDismissesItButATapOnTheCardDoesNot() {
+        var dismissed = 0
+        setThemed {
+            CassiniDialog(
+                onDismissRequest = { dismissed++ },
+                title = "Delete for good?",
+                body = "This can’t be undone.",
+                actions = { DialogActions("Delete", onConfirm = {}, onCancel = {}, destructive = true) },
+            )
+        }
+        rule.onNodeWithText("This can’t be undone.").performClick()
+        rule.runOnIdle { assertEquals(0, dismissed) }
+        rule.onNodeWithText("Delete for good?").performTouchInput { click(Offset(centerX, -200.dp.toPx())) }
+        rule.runOnIdle { assertEquals(1, dismissed) }
     }
 
     @Test fun sheetRowsMenuItemsAndDialogsAreLabelledControls() {
@@ -221,17 +251,9 @@ class ControlsSemanticsTest {
         rule.onAllNodesWithContentDescription("Pencil").assertCountEquals(0)
     }
 
-    private fun SemanticsNodeInteraction.assertTouchAtLeast48(): SemanticsNodeInteraction {
-        val node = fetchSemanticsNode()
-        val touch = node.touchBoundsInRoot
-        val min = with(rule.density) { 48.dp.toPx() } - PX_TOLERANCE
-        assertTrue("${node.config} touch width ${touch.width} px", touch.width >= min)
-        assertTrue("${node.config} touch height ${touch.height} px", touch.height >= min)
-        return this
-    }
+    private fun SemanticsNodeInteraction.assertTouchAtLeast48() = assertTouchAtLeast48(rule.density)
 
     private companion object {
-        const val PX_TOLERANCE = 0.5f
         const val TIMEOUT_MS = 10_000L
         const val ONE_SECOND_MS = 1_000L
     }

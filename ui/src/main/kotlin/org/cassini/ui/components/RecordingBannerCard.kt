@@ -21,18 +21,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import org.cassini.ui.R
 import org.cassini.ui.format.Durations
+import org.cassini.ui.format.Spoken
 import org.cassini.ui.theme.CassiniTheme
 
 /**
  * The Library card of an active recording (no board): rec.bg, radius 16, padding 12/14, gap 10. A 10 dp rec.dot
  * (a 1.5 dp rec.text2 ring when [paused]), "Recording · <title>" (or "Recording paused · <title>") in `label14`
  * rec.text on one line over "Tap to return" (`caption`, rec.text2), and the elapsed time (`monoTime`, rec.text2).
- * A button; the screen places it before the progress card, 8 dp apart.
+ * A button with the click label "Return to recording"; TalkBack reads the elapsed time in words ("24 minutes
+ * 7 seconds"). The screen places it before the progress card, 8 dp apart.
  */
 @Composable
 fun RecordingBannerCard(
@@ -48,7 +52,11 @@ fun RecordingBannerCard(
             .fillMaxWidth()
             .clip(CassiniTheme.shapes.card)
             .background(rec.bg)
-            .clickable(role = Role.Button, onClick = onClick)
+            .clickable(
+                onClickLabel = stringResource(R.string.ui_library_return_to_recording),
+                role = Role.Button,
+                onClick = onClick,
+            )
             .padding(horizontal = 14.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -71,7 +79,13 @@ fun RecordingBannerCard(
                 color = rec.text2,
             )
         }
-        Text(text = Durations.clock(elapsedMs), style = CassiniTheme.type.monoTime, color = rec.text2)
+        val spoken = Spoken.duration(elapsedMs)
+        Text(
+            text = Durations.clock(elapsedMs),
+            modifier = Modifier.clearAndSetSemantics { contentDescription = spoken },
+            style = CassiniTheme.type.monoTime,
+            color = rec.text2,
+        )
     }
 }
 

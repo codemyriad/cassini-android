@@ -31,6 +31,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -59,21 +60,28 @@ fun RecordingTimer(elapsedMs: Long, modifier: Modifier = Modifier) {
 
 /**
  * The Recording header status (board 01): the 10 dp live dot (paused: a hollow ring, 1.5 dp rec.text2) and, 8 dp
- * after it, "Recording" (14/600 rec.status) or "Paused" (rec.text2). The word carries the state; a polite live
- * region announces the change.
+ * after it, "Recording" (14/600 rec.status) or "Paused" (rec.text2). TalkBack reads "Recording status" with the
+ * word as its state description; a polite live region announces the change.
  */
 @Composable
 fun RecordingStatus(paused: Boolean, modifier: Modifier = Modifier) {
     val rec = CassiniTheme.recording
+    val label = stringResource(R.string.ui_recording_status_label)
+    val state = stringResource(
+        if (paused) R.string.ui_recording_status_paused else R.string.ui_recording_status_recording,
+    )
     Row(
-        modifier = modifier.semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
+        modifier = modifier.clearAndSetSemantics {
+            contentDescription = label
+            stateDescription = state
+            liveRegion = LiveRegionMode.Polite
+        },
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RecordingDot(paused)
-        val label = if (paused) R.string.ui_recording_status_paused else R.string.ui_recording_status_recording
         Text(
-            text = stringResource(label),
+            text = state,
             style = CassiniTheme.type.label14,
             color = if (paused) rec.text2 else rec.status,
         )

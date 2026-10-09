@@ -63,12 +63,16 @@ fun PlaybackBar(
     onSeekFinished: (() -> Unit)? = null,
 ) {
     val c = CassiniTheme.colors
+    val group = stringResource(R.string.ui_player_group)
     Column(
         modifier = modifier
             .fillMaxWidth()
             .background(c.surface)
             .drawBehind { drawRect(c.line, Offset.Zero, Size(size.width, 1.dp.toPx())) }
-            .semantics { isTraversalGroup = true }
+            .semantics {
+                isTraversalGroup = true
+                contentDescription = group
+            }
             .padding(start = 16.dp, end = 16.dp, top = 1.dp, bottom = 22.dp),
     ) {
         CassiniSlider(positionMs, durationMs, onSeek, onSeekFinished = onSeekFinished)

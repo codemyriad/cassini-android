@@ -57,7 +57,7 @@ import java.util.Locale
  *
  * Accessibility Test Framework checks (`enableAccessibilityChecks()`) do not run under Robolectric (P2 finding, see
  * ScaffoldScreenshotTest); the P10 device flow tests run them on the emulator. Each transcript word is a link node
- * with a click action; `LinkAnnotation` cannot carry the "Play from here" click label. Native graphics give the text
+ * with a click action (no click label: see TurnParagraph). Native graphics give the text
  * its real geometry, which the word taps need.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -226,7 +226,8 @@ class TranscriptSemanticsTest {
                 onPlayPause = { events += "play" },
             )
         }
-        rule.onNode(SemanticsMatcher.expectValue(SemanticsProperties.IsTraversalGroup, true)).assertExists()
+        rule.onNode(SemanticsMatcher.expectValue(SemanticsProperties.IsTraversalGroup, true))
+            .assert(hasContentDescription("Playback"))
         rule.onNodeWithContentDescription("Pause")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Playing"))
             .assertTouchAtLeast48()
@@ -278,17 +279,9 @@ class TranscriptSemanticsTest {
     private fun SemanticsNodeInteraction.clickLabel(): String? =
         fetchSemanticsNode().config.getOrNull(SemanticsActions.OnClick)?.label
 
-    private fun SemanticsNodeInteraction.assertTouchAtLeast48(): SemanticsNodeInteraction {
-        val node = fetchSemanticsNode()
-        val touch = node.touchBoundsInRoot
-        val min = with(rule.density) { 48.dp.toPx() } - PX_TOLERANCE
-        assertTrue("${node.config} touch width ${touch.width} px", touch.width >= min)
-        assertTrue("${node.config} touch height ${touch.height} px", touch.height >= min)
-        return this
-    }
+    private fun SemanticsNodeInteraction.assertTouchAtLeast48() = assertTouchAtLeast48(rule.density)
 
     private companion object {
         const val PARAGRAPH = "paragraph"
-        const val PX_TOLERANCE = 0.5f
     }
 }

@@ -27,6 +27,7 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getFirstLinkBounds
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -77,14 +78,7 @@ class ComponentSemanticsTest {
         }
     }
 
-    /** The touch bounds (layout bounds widened by Compose's minimum touch target) are at least 48 x 48 dp. */
-    private fun SemanticsNodeInteraction.assertTouchAtLeast48() {
-        val node = fetchSemanticsNode()
-        val touch = node.touchBoundsInRoot
-        val min = with(rule.density) { MIN_TOUCH.toPx() } - PX_TOLERANCE
-        assertTrue("${node.config} touch width ${touch.width} px", touch.width >= min)
-        assertTrue("${node.config} touch height ${touch.height} px", touch.height >= min)
-    }
+    private fun SemanticsNodeInteraction.assertTouchAtLeast48() = assertTouchAtLeast48(rule.density)
 
     @Test fun everyControlHasA48dpTouchArea() {
         setThemed {
@@ -130,7 +124,7 @@ class ComponentSemanticsTest {
             }
         }
         val suffix = rule.onNodeWithContentDescription("Resume transcribing Board review prep")
-        suffix.assertTouchAtLeast48()
+        suffix.assertExtendedTouchAtLeast48(rule.density)
         // The text keeps its board size: the 48 dp comes from extended hit testing, not from layout.
         val bounds = suffix.getUnclippedBoundsInRoot()
         val height = bounds.bottom - bounds.top
@@ -248,16 +242,33 @@ class ComponentSemanticsTest {
             )
         }
         val first = "Transcribing Weekly product sync, 60%, About 6–9 min left"
-        rule.onNode(hasContentDescription(first))
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+        val card = rule.onNode(hasContentDescription(first))
+        card.assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+        assertEquals("Open note", card.fetchSemanticsNode().config[SemanticsActions.OnClick].label)
         rule.runOnIdle {
             percent = 64
             line = "About 5–8 min left"
         }
-        rule.onNode(hasContentDescription(first)).assertExists()
-        rule.onNodeWithText("64%").assertExists()
+        // The live region's node holds no visible text, so a new percent or time-left line changes nothing in it.
+        val node = rule.onNode(hasContentDescription(first)).fetchSemanticsNode()
+        assertTrue("visible text in the live region: ${node.config}", SemanticsProperties.Text !in node.config)
+        rule.onNodeWithText("64%").assertDoesNotExist()
+        rule.onNodeWithText("About 5–8 min left").assertDoesNotExist()
         rule.runOnIdle { percent = 65 }
         rule.onNode(hasContentDescription("Transcribing Weekly product sync, 65%, About 5–8 min left")).assertExists()
+    }
+
+    @Test fun recordingCardSpeaksTheElapsedTimeAndItsAction() {
+        var clicks = 0
+        setThemed { RecordingBannerCard("Weekly product sync", 1_447_000, paused = false, onClick = { clicks++ }) }
+        val card = rule.onNode(hasClickAction())
+        card.assert(hasContentDescription("24 minutes 7 seconds"))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+        assertEquals("Return to recording", card.fetchSemanticsNode().config[SemanticsActions.OnClick].label)
+        rule.onNodeWithText("24:07").assertDoesNotExist()
+        card.performClick()
+        rule.runOnIdle { assertEquals(1, clicks) }
     }
 
     @Test fun aboutCardLinkOpensTheSource() {
@@ -273,8 +284,6 @@ class ComponentSemanticsTest {
         fetchSemanticsNode().config.getOrNull(SemanticsActions.CustomActions).orEmpty().map { it.label }
 
     private companion object {
-        val MIN_TOUCH = 48.dp
-        const val PX_TOLERANCE = 0.5f
         const val BLOCKED_REASON = "Answer the question above first"
         val RECOVERED = BannerSpec(BannerKind.RECOVERED, BannerArgs(count = 1, ms1 = 312_000))
     }

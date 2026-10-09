@@ -167,6 +167,7 @@
     <string name="ui_recording_minimise">Riduci nella libreria (la registrazione continua)</string>
     <string name="ui_recording_status_recording">Registrazione in corso</string>
     <string name="ui_recording_status_paused">In pausa</string>
+    <string name="ui_recording_status_label">Stato della registrazione</string>
     <string name="ui_recording_starting">Avvio del microfono…</string>
     <string name="ui_recording_stopping">Salvataggio della registrazione…</string>
     <string name="ui_recording_needs_permission">Cassini ha bisogno del microfono per registrare.</string>
@@ -243,7 +244,6 @@
     <string name="ui_turn_name_action">Dai un nome a questa voce</string>
     <string name="ui_turn_auto">auto</string>
     <string name="ui_turn_play_from_start">Riproduci dall’inizio del turno</string>
-    <string name="ui_word_play_from_here">Riproduci da qui</string>
     <string name="ui_follow_playback">Segui la riproduzione</string>
     <string name="ui_player_group">Riproduzione</string>
     <string name="ui_player_position">Posizione</string>
