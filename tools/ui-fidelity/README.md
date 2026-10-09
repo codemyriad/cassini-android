@@ -20,6 +20,10 @@ python3 -I tools/ui-fidelity/compare.py --slug 00-library     # one board
 python3 -I tools/ui-fidelity/compare.py --design build/ui-fidelity/states --golden ui/src/test/screenshots/states
 ```
 
+The board goldens in `light/` and `states/` come with the P8 screen tests. Until they exist, the
+default `--golden` directory is missing and the script stops with a usage error: give `--golden`
+explicitly. The examples below that read `ui/src/test/screenshots/light/` need these goldens too.
+
 - `--design`: the design PNGs. The default is `$CASSINI_DESIGN_DIR`, else `design/reference/png`.
 - `--golden`: the golden PNGs. The default is `ui/src/test/screenshots/light`.
 - `--out`: the output root. The default is `build/ui-fidelity`. Files go to
@@ -54,8 +58,9 @@ This script cuts the five columns of `10-states-and-errors.png` (4540 x 2360 px)
 `build/ui-fidelity/states/10-states-col1.png` ... `col5.png`, and writes their geometry to
 `heights.json`. Column i (0-4) starts at x = round(2 x (48 + i x 442.8)) px and is 716 px wide (358
 CSS px, the banners' width). The top is the first row at or below 200 px that has a pixel different
-from `#ECEEF0` in the column: the top of the heading glyphs. The bottom is the last such row plus 16
-CSS px (`--bottom-margin`), but not past the board's edge.
+from `#ECEEF0` in the column: the top of the heading glyphs. The bottom is the last such row, so the crop has
+the content height of the `StatesBoardTest` golden (ui.md section 10.2). `--bottom-margin` adds CSS px
+below it, but not past the board's edge.
 
 The golden column starts at the top of the heading's line box, which is a few dp above the glyphs.
 To include that space in the crop, use `--top-margin` (CSS px). Then compare the crops with the

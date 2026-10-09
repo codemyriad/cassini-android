@@ -6,7 +6,8 @@ Geometry (ui.md section 10.2), in CSS px of the board, at 2 px per CSS px:
 - the top is the first row at or below y = 100 whose pixels in the column differ from the board
   background #ECEEF0, which is the top of the column heading's glyphs (--top-margin moves the cut up,
   for example to the heading's line box);
-- the bottom is the last such row plus a margin of 16 (--bottom-margin), clamped to the board.
+- the bottom is the last such row, as the golden's content height (--bottom-margin adds CSS px below
+  it, clamped to the board).
 
 Writes <out>/states/10-states-col1.png ... col5.png and <out>/states/heights.json. Compare them with
 the StatesBoardTest goldens with compare.py --design <out>/states --golden ui/src/test/screenshots/states.
@@ -36,7 +37,7 @@ COLUMN_X0 = 48.0
 COLUMN_PITCH = 442.8
 COLUMN_WIDTH = 358
 SEARCH_TOP = 100
-BOTTOM_MARGIN = 16
+BOTTOM_MARGIN = 0
 TOLERANCE = 2  # levels; a pixel within this distance of #ECEEF0 counts as background
 
 
@@ -145,7 +146,7 @@ def self_test() -> int:
         board_path = root / BOARD_NAME
         board.save(board_path)
 
-        report = crop_states(board_path, root / "out")
+        report = crop_states(board_path, root / "out", bottom_margin=16)
         cols = report["columns"]
         check(len(cols) == 5, f"{len(cols)} columns")
         check([c["x_px"] for c in cols] == [96, 982, 1867, 2753, 3638], f"x {[c['x_px'] for c in cols]}")
@@ -167,8 +168,8 @@ def self_test() -> int:
         saved = json.loads((root / "out" / "states" / "heights.json").read_text(encoding="utf-8"))
         check(saved["columns"] == cols, "heights.json differs from the report")
 
-        no_margin = crop_states(board_path, root / "out0", bottom_margin=0)
-        check(no_margin["columns"][0]["height_px"] == 1500 + 1 - 245, "bottom margin 0")
+        no_margin = crop_states(board_path, root / "out0")
+        check(no_margin["columns"][0]["height_px"] == 1500 + 1 - 245, "default: no bottom margin")
         raised = crop_states(board_path, root / "out-top", top_margin=3)["columns"][0]
         check((raised["top_px"], raised["heading_top_px"]) == (239, 245), f"top margin 3: {raised}")
 
