@@ -64,6 +64,8 @@ class MainActivity : Activity() {
     private var progressRenderedSecond = -1L
     private val draftSpeakerLabels = java.util.concurrent.ConcurrentHashMap<String, String>()
     private val draftRememberedVoices = mutableMapOf<String, String>()
+    /** VoiceStore's generation when the draft remember choices were made. */
+    private var draftRememberGeneration = 0L
     private val draftAutomaticNames = java.util.concurrent.ConcurrentHashMap<String, String>()
     private var draftSpeakerMerges = emptyMap<String, String>()
     @Volatile private var draftNamingOpen = false
@@ -202,7 +204,7 @@ class MainActivity : Activity() {
     }
     private fun checkpointStore() = session.uri?.let { ProcessingCheckpoint(filesDir, it) }
     private fun saveDraftNames() {
-        synchronized(draftSpeakerLabels) { checkpointStore()?.saveNames(draftSpeakerLabels.toMap(), draftSpeakerMerges, draftRememberedVoices.toMap(), draftAutomaticNames.toMap()) }
+        synchronized(draftSpeakerLabels) { checkpointStore()?.saveNames(draftSpeakerLabels.toMap(), draftSpeakerMerges, draftRememberedVoices.toMap(), draftAutomaticNames.toMap(), draftRememberGeneration) }
     }
     private fun restoreCheckpoint() {
         val store = checkpointStore() ?: return
@@ -215,7 +217,10 @@ class MainActivity : Activity() {
         interim = Transcript.fromJson(raw.toString())
         val (labels, merges) = store.loadNames()
         val (remembered, automatic) = store.nameExtras()
-        draftRememberedVoices.clear(); draftRememberedVoices.putAll(remembered)
+        draftRememberedVoices.clear()
+        draftRememberGeneration = app.voices.generation()
+        // Choices made before "forget all" must not bring the forgotten voices back.
+        if (store.rememberGeneration() == draftRememberGeneration) draftRememberedVoices.putAll(remembered)
         draftAutomaticNames.clear(); draftAutomaticNames.putAll(automatic)
         synchronized(draftSpeakerLabels) { draftSpeakerLabels.clear(); draftSpeakerLabels.putAll(labels); draftSpeakerMerges = merges; draftNamingOpen = true }
         session = session.copy(processingPaused = true, transcript = if (session.document == null) draftTranscript() else session.transcript, inferenceMs = saved.getJSONObject("recognition").getLong("inferenceMs"), processingMs = saved.getLong("elapsedMs"))
@@ -225,7 +230,10 @@ class MainActivity : Activity() {
     private fun discardCheckpoint() {
         AlertDialog.Builder(this).setTitle(R.string.discard_processing).setMessage(R.string.discard_processing_confirm)
             .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.discard_processing) { _, _ ->
-                checkpointStore()?.discard(); checkpointSaved = false; checkpointUnreadable = false; interim = null; draftNamingOpen = false
+                val store = checkpointStore()
+                if (store != null && !store.claim()) { setStatus(R.string.processing_elsewhere, error = true); return@setPositiveButton }
+                try { store?.discard() } finally { store?.release() }
+                checkpointSaved = false; checkpointUnreadable = false; interim = null; draftNamingOpen = false
                 session = session.copy(processingPaused = false, transcript = if (session.document == null) null else session.transcript)
                 persistSession(); renderScreen(); defaultStatus()
             }.show()
@@ -244,7 +252,9 @@ class MainActivity : Activity() {
         val chosenModel = models
         val knownVoices = voicesForRecognition()
         val checkpoint = ProcessingCheckpoint(filesDir, uri.toString())
-        val resumed = try { checkpoint.load() } catch (_: Exception) { setStatus(R.string.checkpoint_error, error = true); return }
+        // Another viewer of the same source would truncate this job's files before waiting for inference.
+        if (!checkpoint.claim()) { setStatus(R.string.processing_elsewhere, error = true); return }
+        val resumed = try { checkpoint.load() } catch (_: Exception) { checkpoint.release(); setStatus(R.string.checkpoint_error, error = true); return }
         stopRequested.set(false)
         ui.cancelOperation.setText(R.string.stop_processing)
         ui.cancelOperation.isEnabled = true
@@ -259,7 +269,7 @@ class MainActivity : Activity() {
             if (finishing && stopRequested.get()) throw ProcessingPaused()
         }
         fun download(install: ((ModelStore.Progress) -> Unit) -> Unit) = install { progress -> onUi { if (!cancelled.get()) showDownload(progress) } }
-        runWork(if (chosenModel.ready()) R.string.decoding else R.string.preparing_download) {
+        runWork(if (chosenModel.ready()) R.string.decoding else R.string.preparing_download) { try {
             if (!chosenModel.ready()) { download(chosenModel::install); onUi { fetchSpeechDetector() } }
             checkActive()
             val speakersReady = speakerModels.ready() || try { download(speakerModels::install); true }
@@ -302,7 +312,10 @@ class MainActivity : Activity() {
                     var streamDiarizer: Diarization.Streaming? = null
                     var speakerFailure = resumed?.optBoolean("speakerFailure") ?: !speakersReady
                     onUi { synchronized(draftSpeakerLabels) {
-                        if (resumed == null) { draftSpeakerLabels.clear(); draftRememberedVoices.clear(); draftAutomaticNames.clear(); draftSpeakerMerges = emptyMap(); checkpoint.saveNames(emptyMap(), emptyMap()) }
+                        if (resumed == null) {
+                            draftSpeakerLabels.clear(); draftRememberedVoices.clear(); draftAutomaticNames.clear(); draftSpeakerMerges = emptyMap()
+                            draftRememberGeneration = app.voices.generation(); checkpoint.saveNames(emptyMap(), emptyMap(), generation = draftRememberGeneration)
+                        }
                         draftNamingOpen = true
                     } }
                     val detector = ModelStore.vadPath(filesDir).takeIf { ModelStore.vadReady(filesDir) }
@@ -423,6 +436,7 @@ class MainActivity : Activity() {
                     }
                     val finalizationBeganNs = System.nanoTime()
                     val draftRemember = synchronized(draftSpeakerLabels) { draftRememberedVoices.toMap() }
+                    val draftGeneration = draftRememberGeneration
                     val draftEdits = synchronized(draftSpeakerLabels) {
                         draftNamingOpen = false
                         draftSpeakerLabels.toMap() to draftSpeakerMerges.toMap()
@@ -502,20 +516,25 @@ class MainActivity : Activity() {
                                 if (finalizationEstimateMs > 0) (finalizationEstimateMs * 3 + measuredFinalizationMs) / 4 else measuredFinalizationMs).apply()
                             adoptDocument(portable)
                             preparePlayer(Uri.fromFile(file))
-                            persistSession()
-                            checkpoint.discard(); checkpointSaved = false
+                            // Until the note points at the result, the checkpoint is the only way back to it.
+                            if (persistSession()) { checkpoint.discard(); checkpointSaved = false }
+                            else Log.w(TAG, "Kept the processing checkpoint: the note could not be saved")
                             portable.manifest?.optJSONObject("meeting")?.optString("id")?.takeIf { it.isNotEmpty() && prints.isNotEmpty() }?.let { meeting ->
                                 try { app.noteVoices.merge(meeting, portable.defaultId ?: return@let, printModel, prints) } catch (error: Exception) { Log.w(TAG, "Could not save voiceprints", error) }
                             }
                             loadVoices()
-                            draftRemember.forEach { (id, voice) -> labels[id]?.let { name -> rememberVoice(id, name, voice.takeIf { it.isNotEmpty() }, true) } }
+                            // Voices forgotten since the choice was made stay forgotten.
+                            if (draftGeneration == app.voices.generation()) draftRemember.forEach { (id, voice) ->
+                                if (voice.isNotEmpty() && voice !in people) return@forEach
+                                labels[id]?.let { name -> rememberVoice(id, name, voice.takeIf { it.isNotEmpty() }, true) }
+                            }
                             renderScreen()
                             if (attributed == null && transcript.words.isNotEmpty()) setStatus(R.string.speakers_unavailable) else defaultStatus()
                         }
                     }
                 } finally { encoder?.close() }
             }
-        }
+        } finally { checkpoint.release() } }
     }
 
     private fun processing(precision: String, revision: String? = null): JSONObject = JSONObject()
@@ -526,6 +545,8 @@ class MainActivity : Activity() {
 
     private fun saveCassiniDocument() {
         if (session.document == null) {
+            // A paused draft keeps its source; packaging it would orphan the checkpoint.
+            if (checkpointSaved) return
             val transcript = session.transcript ?: return
             val uri = session.uri?.let(Uri::parse) ?: return
             // Migrate prototype sessions without running speech recognition again.
@@ -699,7 +720,11 @@ class MainActivity : Activity() {
             synchronized(draftSpeakerLabels) {
                 if (draftNamingOpen && name.isNotEmpty()) {
                     draftSpeakerLabels[speakerId] = name
-                    if (remember.isChecked) draftRememberedVoices[speakerId] = target.orEmpty()
+                    if (remember.isChecked) {
+                        val generation = app.voices.generation()
+                        if (generation != draftRememberGeneration) { draftRememberedVoices.clear(); draftRememberGeneration = generation }
+                        draftRememberedVoices[speakerId] = target.orEmpty()
+                    }
                     else draftRememberedVoices.remove(speakerId)
                 }
             }
@@ -793,7 +818,9 @@ class MainActivity : Activity() {
         val edited = SpeakerMerges.apply(words, mapOf(source to target))
         val process = SpeakerMerges.processing(existing.manifest?.optJSONObject("provenance")?.optJSONObject("speechToText")?.optJSONObject(previous.id),
             mapOf(source to target), previous.id)
-        val prints = notePrints.filterKeys { it != source }
+        // One enrolment belongs to one variant: copies are automatic, so rejecting them never unenrols twice.
+        val prints = notePrints.filterKeys { it != source }.mapValues { (_, print) ->
+            if (print.match?.state == Match.State.CONFIRMED) print.copy(match = print.match.copy(state = Match.State.AUTO)) else print }
         val name = existing.speakerLabel(target) ?: target
         runWork(R.string.saving) {
             val (file, merged) = documents.createFromOpus(Uri.fromFile(File(path)), edited, session.name, process, existing, emptyMap())
@@ -861,8 +888,12 @@ class MainActivity : Activity() {
         try {
             // A voice confirmed as someone else no longer belongs to that person.
             if (previous != null && previous.voiceId != target) {
-                app.voices.unenrol(previous.voiceId, print.embedding); app.noteVoices.setMatch(meeting, variant, speakerId, null)
+                if (app.voices.unenrol(previous.voiceId, print.embedding)) app.noteVoices.forget(previous.voiceId)
+                app.noteVoices.setMatch(meeting, variant, speakerId, null)
             }
+            // An automatic match to someone this speaker is no longer called is stale.
+            print.match?.takeIf { it.state == Match.State.AUTO && it.voiceId != target && !people[it.voiceId]?.name.equals(name, ignoreCase = true) }
+                ?.let { app.noteVoices.setMatch(meeting, variant, speakerId, null) }
             if (remember) {
                 val score = people[target]?.let { Voiceprints.cosine(print.embedding, it.mean) } ?: 1f
                 val voice = if (previous != null && previous.voiceId == target) people.getValue(target).also { app.voices.rename(it.id, name) }
@@ -879,7 +910,7 @@ class MainActivity : Activity() {
         val print = notePrints[speakerId] ?: return; val match = print.match ?: return
         val name = people[match.voiceId]?.name
         try {
-            if (match.state == Match.State.CONFIRMED) app.voices.unenrol(match.voiceId, print.embedding)
+            if (match.state == Match.State.CONFIRMED && app.voices.unenrol(match.voiceId, print.embedding)) app.noteVoices.forget(match.voiceId)
             app.noteVoices.setMatch(meeting, variant, speakerId, match.copy(state = Match.State.REJECTED))
         } catch (error: Exception) { Log.w(TAG, "Could not reject voice", error) }
         loadVoices()
@@ -1121,7 +1152,7 @@ class MainActivity : Activity() {
         }
         if (session.transcript != null) add(R.string.transcribe_again, document == null || document?.state == "ok") { confirmTranscription() }
         if ((document?.variants?.size ?: 0) > 1) add(R.string.choose_transcript) { chooseVariant() }
-        if (session.document != null || session.transcript != null) add(R.string.export) { saveCassiniDocument() }
+        if (session.document != null || (session.transcript != null && !checkpointSaved)) add(R.string.export) { saveCassiniDocument() }
         if (checkpointSaved) add(R.string.discard_processing) { discardCheckpoint() }
         if ((document?.manifest?.optJSONArray("speakers")?.length() ?: 0) > 0) add(R.string.speakers_menu, canRename()) { showSpeakers() }
         if (document != null) add(R.string.document_info) { showDocumentInfo() }

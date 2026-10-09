@@ -227,6 +227,7 @@
     <string name="discard_processing">Discard saved progress</string>
     <string name="discard_processing_confirm">Discard completed processing and start again from the beginning? Your original recording is kept.</string>
     <string name="checkpoint_error">Saved progress could not be read. Discard it to start again; your recording is kept.</string>
+    <string name="processing_elsewhere">This recording is being processed in another window.</string>
     <string name="processing_eta_range">Words/voices: ~%1$s–%2$s left; then saving</string>
     <string name="battery_charging">Battery %1$d%% · plugged in</string>
     <string name="battery_completion">Battery %1$d%% · ~%2$d%% at completion</string>

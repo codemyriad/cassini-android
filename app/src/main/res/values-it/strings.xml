@@ -225,6 +225,7 @@
     <string name="discard_processing">Scarta i progressi salvati</string>
     <string name="discard_processing_confirm">Scartare il lavoro completato e ricominciare dall’inizio? La registrazione originale resta.</string>
     <string name="checkpoint_error">Impossibile leggere i progressi salvati. Scartali per ricominciare; la registrazione resta.</string>
+    <string name="processing_elsewhere">Questa registrazione è in elaborazione in un\'altra finestra.</string>
     <string name="processing_eta_range">Testo/voci: ~%1$s–%2$s; poi salvataggio</string>
     <string name="battery_charging">Batteria %1$d%% · alimentazione collegata</string>
     <string name="battery_completion">Batteria %1$d%% · ~%2$d%% al termine</string>

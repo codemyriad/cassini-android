@@ -36,6 +36,11 @@ internal fun writeAtomically(file: File, text: String) {
 /** filesDir/voices.json. One instance per process; the worker reads while the main thread writes. */
 internal class VoiceStore(filesDir: File, private val warn: (String, Throwable) -> Unit = { m, e -> android.util.Log.w("Cassini", m, e) }) {
     private val file = File(filesDir, "voices.json")
+    private val generationFile = File(filesDir, "voices.generation")
+
+    /** Advances on "forget all", so remember choices made before it are not enrolled after it. */
+    @Synchronized fun generation(): Long = try { if (generationFile.exists()) generationFile.readText().trim().toLong() else 0 }
+        catch (error: Exception) { warn("Voice generation unreadable", error); -1 }
 
     @Synchronized fun load(): List<Voice> = try {
         if (!file.exists()) emptyList() else {
@@ -73,20 +78,21 @@ internal class VoiceStore(filesDir: File, private val warn: (String, Throwable) 
         save(voices.filter { it.id != voiceId }); return true
     }
 
-    @Synchronized fun clear() { file.delete() }
+    @Synchronized fun clear() { writeAtomically(generationFile, (maxOf(generation(), 0) + 1).toString()); file.delete() }
 
-    /** Undoes one wrong enrolment; the last one forgets the person. */
-    @Synchronized fun unenrol(voiceId: String, embedding: FloatArray) {
+    /** Undoes one wrong enrolment; the last one forgets the person and returns true. */
+    @Synchronized fun unenrol(voiceId: String, embedding: FloatArray): Boolean {
         val voices = load()
-        val voice = voices.firstOrNull { it.id == voiceId } ?: return
-        if (voice.count <= 1) { forget(voiceId); return }
+        val voice = voices.firstOrNull { it.id == voiceId } ?: return false
+        if (voice.count <= 1) return forget(voiceId)
         // The mean was normalise(previous * w + e) for a unit previous; recover the length of that sum, then subtract e.
-        val e = Voiceprints.normalised(embedding)?.takeIf { it.size == voice.mean.size } ?: return
+        val e = Voiceprints.normalised(embedding)?.takeIf { it.size == voice.mean.size } ?: return false
         val w = minOf(voice.count - 1, MAX_COUNT_WEIGHT).toDouble()
         val dot = Voiceprints.cosine(voice.mean, e).toDouble()
         val length = (dot + kotlin.math.sqrt(maxOf(0.0, dot * dot - 1 + w * w))).toFloat()
         val mean = Voiceprints.normalised(FloatArray(e.size) { voice.mean[it] * length - e[it] }) ?: voice.mean
         save(voices.map { if (it.id == voiceId) it.copy(mean = mean, count = voice.count - 1) else it })
+        return false
     }
 
     private fun save(voices: List<Voice>) =

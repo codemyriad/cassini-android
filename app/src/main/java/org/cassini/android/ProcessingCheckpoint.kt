@@ -35,9 +35,14 @@ internal class ProcessingCheckpoint(files: File, private val source: String) {
             .put("model", ModelStore.REVISION).put("speakers", DiarizationModels.model.sha256)
         write(metadata, state)
     }
-    fun saveNames(labels: Map<String, String>, merges: Map<String, String>, remembered: Map<String, String> = emptyMap(), automatic: Map<String, String> = emptyMap()) {
+    /** [generation] is VoiceStore's at the time [remembered] was chosen; a later "forget all" invalidates them. */
+    fun saveNames(labels: Map<String, String>, merges: Map<String, String>, remembered: Map<String, String> = emptyMap(), automatic: Map<String, String> = emptyMap(), generation: Long = 0) {
         directory.mkdirs()
-        write(names, JSONObject().put("labels", JSONObject(labels)).put("merges", JSONObject(merges)).put("remembered", JSONObject(remembered)).put("automatic", JSONObject(automatic)))
+        write(names, JSONObject().put("labels", JSONObject(labels)).put("merges", JSONObject(merges)).put("remembered", JSONObject(remembered)).put("automatic", JSONObject(automatic)).put("generation", generation))
+    }
+    fun rememberGeneration(): Long {
+        if (!names.baseFile.exists() && !File(directory, "names.json.bak").exists()) return 0
+        return JSONObject(names.openRead().bufferedReader().use { it.readText() }).optLong("generation", 0)
     }
     fun loadNames(): Pair<Map<String, String>, Map<String, String>> {
         if (!names.baseFile.exists() && !File(directory, "names.json.bak").exists()) return emptyMap<String, String>() to emptyMap()
@@ -51,9 +56,13 @@ internal class ProcessingCheckpoint(files: File, private val source: String) {
             CheckpointData.strings(json.optJSONObject("automatic") ?: JSONObject())
     }
     fun discard() { directory.deleteRecursively() }
+    /** One job per source in this process: viewers in other tasks share the directory. Release in a finally. */
+    fun claim(): Boolean = active.add(key)
+    fun release() { active.remove(key) }
     private fun write(file: AtomicFile, json: JSONObject) {
         val output = file.startWrite()
         try { output.write(json.toString().toByteArray()); file.finishWrite(output) }
         catch (error: Throwable) { file.failWrite(output); throw error }
     }
+    private companion object { val active: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet() }
 }

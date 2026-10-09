@@ -58,10 +58,19 @@ class VoiceStoreTest {
         val store = store()
         val anna = store.enrol(null, "Anna", "m", axis(0), 1.0, 0)
         store.enrol(anna.id, "Anna", "m", axis(1), 1.0, 0)
-        store.unenrol(anna.id, axis(1))
+        assertFalse(store.unenrol(anna.id, axis(1)))
         val back = store.load().single()
         assertEquals(1, back.count); assertEquals(1f, back.mean[0], 1e-5f); assertEquals(0f, back.mean[1], 1e-5f)
-        store.unenrol(anna.id, axis(0))
+        assertTrue(store.unenrol(anna.id, axis(0)))
+        assertEquals(emptyList<Voice>(), store.load())
+    }
+
+    @Test fun forgetAllAdvancesTheGenerationAndSurvivesReload() {
+        val store = store()
+        assertEquals(0L, store.generation())
+        store.enrol(null, "Anna", "m", axis(0), 1.0, 0)
+        store.clear(); assertEquals(1L, store.generation())
+        store.clear(); assertEquals(2L, store().generation())
         assertEquals(emptyList<Voice>(), store.load())
     }
 }
