@@ -12,7 +12,8 @@ import java.nio.ByteOrder
 /**
  * Host evaluation: runs the app's own ASR pipeline (speech detector, cutting, seams, word gate) on raw
  * float PCM, one job per line: `<f32le file> <sample rate> <output json>`. Needs a host build of
- * libsherpa-onnx-jni on java.library.path. Not a unit test; started by scripts/asr-eval.sh.
+ * libsherpa-onnx-jni on java.library.path. Not a unit test. No script starts it any more: run `main` from an IDE
+ * with the testDebugUnitTest runtime classpath. It is a candidate for the :bench module.
  */
 object AsrEval {
     /** A store whose readiness check accepts the model files present, so other Parakeet exports can be compared. */

@@ -4,7 +4,7 @@ Cassini Android is licensed under [GNU GPLv3](LICENSE). Copyright © 2026 Silvio
 
 ## Native Android runtime
 
-The APK bundles a sherpa-onnx 1.13.7 AAR built by Cassini: the [upstream release](https://github.com/k2-fsa/sherpa-onnx/releases/tag/v1.13.7) plus Sortformer speaker diarization for Nemotron-3-Diarization, from the [Cassini fork](https://github.com/codemyriad/sherpa-onnx/tree/feat/nemotron3-diarization-android). Its SHA-256 is pinned in `scripts/setup.sh`; `scripts/build-native-aar.sh` rebuilds it. It includes unused text-to-speech components, including GPLv3 eSpeak NG, even though Cassini only invokes speech recognition and diarization.
+The APK bundles a sherpa-onnx 1.13.7 AAR built by Cassini: the [upstream release](https://github.com/k2-fsa/sherpa-onnx/releases/tag/v1.13.7) plus Sortformer speaker diarization for Nemotron-3-Diarization, from the [Cassini fork](https://github.com/codemyriad/sherpa-onnx/tree/feat/nemotron3-diarization-android). The build is attached to the GitHub release [`native-sherpa-onnx-1.13.7-nemotron.2`](https://github.com/codemyriad/cassini-android/releases/tag/native-sherpa-onnx-1.13.7-nemotron.2); its SHA-256 is pinned in the `sherpa-onnx-aar` entry of `scripts/native-dependencies.json`, and `scripts/build-native-aar.sh` rebuilds it from the pinned source plus `scripts/streaming-diarization.patch`. It includes unused text-to-speech components, including GPLv3 eSpeak NG, even though Cassini only invokes speech recognition and diarization.
 
 | Component | Pinned version | License |
 | --- | --- | --- |
@@ -20,9 +20,9 @@ The APK bundles a sherpa-onnx 1.13.7 AAR built by Cassini: the [upstream release
 | [piper-phonemize](https://github.com/csukuangfj/piper-phonemize/tree/f3ff95afc03640bc1399e113e83361192a2fafb4) | f3ff95afc03640bc1399e113e83361192a2fafb4 | MIT, including uni-algo notices |
 | [eSpeak NG](https://github.com/csukuangfj/espeak-ng/tree/ed530aa113046142eb5115cf2fc9157854d0ffe1) | ed530aa113046142eb5115cf2fc9157854d0ffe1 | GPL-3.0, with Apache/BSD/Unicode component notices |
 
-The APK also bundles [zstd-jni](https://github.com/luben/zstd-jni/tree/v1.5.7-6) 1.5.7-6 (BSD-2-Clause, including Zstandard under BSD-3-Clause) from Maven Central, to decompress the speaker model download.
+The APK also bundles [zstd-jni](https://central.sonatype.com/artifact/com.github.luben/zstd-jni/1.5.7-22) 1.5.7-22 (BSD-2-Clause, including Zstandard under BSD-3-Clause) from Maven Central, to decompress the speaker model download.
 
-The streaming encoder bundles unmodified [libopus 1.5.2](https://github.com/xiph/opus/tree/v1.5.2), under its BSD license. Cassini’s JNI wrapper and reproducible build script are included in the corresponding source archive.
+The streaming encoder bundles unmodified [libopus 1.5.2](https://github.com/xiph/opus/tree/v1.5.2), under its BSD license. Cassini’s JNI wrapper and its CMake build files are included in the corresponding source archive.
 
 Full texts and copyright notices are checked in under [app assets](app/src/main/assets/licenses/). The release’s `cassini-native-sources.tar` contains these pinned source archives, including native build files. [The source manifest](scripts/native-dependencies.json) provides archive URLs and SHA-256 hashes; [native build notes](docs/native-runtime.md) describe the upstream build. Apart from the sherpa-onnx diarization changes, dependency code is unmodified by Cassini.
 
@@ -36,6 +36,6 @@ Full texts and copyright notices are checked in under [app assets](app/src/main/
 
 [3D-Speaker CAM++](https://github.com/modelscope/3D-Speaker) (`3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx`, Apache-2.0) computes voiceprints for naming speakers. It downloads from the [sherpa-onnx release](https://github.com/k2-fsa/sherpa-onnx/releases/tag/speaker-recongition-models) (about 28 MiB) and is not in the APK; its size and SHA-256 are pinned in `VoiceprintModel.kt`.
 
-[Google FLEURS](https://huggingface.co/datasets/google/fleurs) is CC-BY-4.0. Its pinned source, attribution and reference text accompany locally fetched device fixtures; those files are not in the distributed APK or repository. README screenshots show an excerpt of [il Pericolo Invisibile](https://www.youtube.com/watch?v=UmZwQf5TV3c) by Dario Bressanini, used for the documented device checks. No sample audio is distributed.
+[Google FLEURS](https://huggingface.co/datasets/google/fleurs) is CC-BY-4.0 (attribution: Google FLEURS contributors). One Italian FLEURS clip, at a pinned dataset revision, is committed in the repository under `fixtures/audio/` (WAV, M4A, MP3 and Opus encodings) and is reused in the captured `fixtures/filesdir/` trees; `fixtures/README.md` and `fixtures/audio/fleurs-it-short.json` give its source, attribution, reference text and changes. It is packaged only in the device test APK, not in the app APK. README screenshots show an excerpt of [il Pericolo Invisibile](https://www.youtube.com/watch?v=UmZwQf5TV3c) by Dario Bressanini, used for the documented device checks; that audio is fetched locally and is not distributed.
 
 JUnit, AndroidX Test and the JVM JSON dependency are test-only dependencies and are not packaged in the app APK.
