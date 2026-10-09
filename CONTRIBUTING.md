@@ -31,6 +31,10 @@ You need these tools:
 
 - JDK 17. Gradle runs only with JDK 17. Set `JAVA_HOME` to a JDK 17 before you run `./gradlew`.
 - For the Android modules, the Android SDK with platform `android-37.0`, build tools 36.0.0, CMake 3.22.1 and NDK 28.2.13676358. Set `ANDROID_HOME`, or set `sdk.dir` in `local.properties`. Do not commit `local.properties`.
+- For `scripts/setup.sh` and the other scripts: `bash`, `python3`, `curl`, `tar` and the GNU coreutils `sha256sum`. On macOS, install coreutils from Homebrew.
+- For the device tests: `adb` from the Android SDK platform tools.
+
+We test the setup and device scripts on Linux. On Windows, run them in WSL.
 
 ## Run the engine tests without the native tools
 
