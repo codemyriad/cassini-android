@@ -124,8 +124,7 @@ object ModelCatalog {
 
     /**
      * The length of a CAM++ print from [voiceprintModel]. A saved voice whose mean has another length cannot be
-     * compared and is stale (`VoiceStaleness`). The `:engine` adapter refuses a print of another length; its JVM test
-     * uses a fake extraction, so no test runs the real model.
+     * compared and is stale (`VoiceStaleness`). An `:engine` test checks it against what the extractor produces.
      */
     const val VOICEPRINT_DIM = 512
 

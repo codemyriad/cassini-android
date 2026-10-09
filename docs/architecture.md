@@ -119,7 +119,7 @@ The P1 move keeps file bodies unchanged except for the listed edits. `scripts/ch
 | `capture` | `MicrophoneCapture` (interface, suspend `stop()`), `OpusCapture` (platform MediaCodec Opus, API 29+), `AacCapture`, `CaptureFactory` (the `MediaCodecList` probe runs once, off the main thread). |
 | `asr` | `ParakeetDecoder` (implements `WordDecoder`), `SileroDetector` (implements `SpeechFeed.Stream`), `IncrementalRecognizer`. |
 | `speakers` | `SortformerStream`, `VoiceprintExtractor`. |
-| `job` | `InferenceDispatcher` (one thread), `NativeBudget` (model-load `Mutex`), and from P5: the seams of section 2, `TranscriptionJob`, `ModelInstaller`, `ProgressTracker`, the ports (`JobStorage`, `JobVoices`, `ModelAccess`, `ModelStore`, `BatterySource`), `JobEngines` (the seam factories), `JobEnvironment` (dispatchers, clock, logger, placeholder label), `DraftSources` and the job state types (section 5). A JVM test makes sure that `ModelCatalog.VOICEPRINT_DIM` is the print length that the voiceprint adapter accepts. The adapter refuses a print of a different length. No test operates the real CAM++ model. |
+| `job` | `InferenceDispatcher` (one thread), `NativeBudget` (model-load `Mutex`), and from P5: the seams of section 2, `TranscriptionJob`, `ModelInstaller`, `ProgressTracker`, the port interfaces and the job state types (section 5). A JVM test checks `ModelCatalog.VOICEPRINT_DIM` against the dimension `VoiceprintExtractor` produces. |
 
 The sherpa-onnx AAR is the Maven coordinate `org.cassini.native:sherpa-onnx-nemotron:1.13.7-1f23907a` in the git-ignored repository `native/m2/` (section 8).
 
@@ -323,21 +323,13 @@ All files under `voices/`, one lock per file.
 - `rename`, `forget(voiceId)`: removes the person; scrubs their matches from every file under `voices/notes/` and `voices/pending/`, from the links, and from `live`, `remembered` and `automatic` of every `DraftNames` in memory and every `names.json` on disk.
 - `forgetEveryone()`: writes `generation` = old + 1 first, then deletes everything else under `voices/` (including `pending/`), clears links, and clears `live`, `remembered` and `automatic` in every draft as above.
 - `prints(noteId)`, `setMatch`, `enrol`, `unenrol`, `copyPrints` (merge case), `deleteForNote` (both the sealed and the pending file).
-- Blocking entry points for the job (the `JobVoices` port, section 5.4): `peopleBlocking`, `generationBlocking`, `noteVoicesBlocking(noteId)`, `savePendingBlocking(noteId, variantId, model, prints, generation)`, `discardPendingBlocking(noteId)`.
+- Blocking entry points for the job: `peopleBlocking`, `generationBlocking`, `savePendingBlocking(noteId, prints, generation)`.
 - `adoptPending(noteId)`: if the pending file's generation equals the current one, merge it into `voices/notes/<id>.json`, dropping matches to voices that no longer exist; otherwise delete it without merging. Then delete the pending file.
 - A voice file whose `version` is newer than the codec knows stays in place, read-only, and is reported. Only unparseable JSON is renamed `.corrupt-<epoch>`. The Saved voices screen then shows an error banner and disables edits.
 
 ### 4.6 `ModelRepository`
 
-`status: StateFlow<Map<ModelPart, ModelStatus>>` for `SPEECH` (Parakeet, plus VAD best effort), `SPEAKERS` (diarizer) and `VOICES` (voiceprint). `ModelStatus = Ready | Missing(consented) | Downloading(pct, bytes, total) | Verifying(pct) | Failed(error)`. Also `consented()`, `recordConsent()`, `recordDeclined()` and `plan()` (core `ModelPlan`). There is no delete API in this version: the design has no surface for it.
-
-`ModelInstaller` does not call `ModelRepository` directly. It uses the `ModelStore` port in `:engine` (`ModelInstaller.kt`), which `:app` implements over `ModelRepository` and the connectivity service. All functions of `ModelStore` block and operate on IO:
-
-- `consented()`: consent recorded, or Parakeet installed.
-- `hasValidatedNetwork()`: the active network has `NET_CAPABILITY_VALIDATED`.
-- `ready(model: ModelDescriptor)`: the model marker holds the pinned value.
-- `usableBytes()`: free bytes under `AppPaths.modelRoot`.
-- `installBlocking(model: ModelDescriptor, progress: (Long, Boolean) -> Unit)`: installs one model (not one part) through `ArtifactFetcher`. The progress gives the bytes of this model and a "verifying" flag.
+`status: StateFlow<Map<ModelPart, ModelStatus>>` for `SPEECH` (Parakeet, plus VAD best effort), `SPEAKERS` (diarizer) and `VOICES` (voiceprint). `ModelStatus = Ready | Missing(consented) | Downloading(pct, bytes, total) | Verifying(pct) | Failed(error)`. Also `consented()`, `recordConsent()`, `recordDeclined()`, `plan()` (core `ModelPlan`), and `installBlocking(part, progress)` used by `ModelInstaller`. There is no delete API in this version: the design has no surface for it.
 
 ### 4.7 `JobRepository`, `SettingsRepository`, `RecoveryRepository`
 
@@ -446,15 +438,9 @@ The queue then starts in one of two ways:
 
 Ports (interfaces in `:engine` `job/`, implemented in `:app` over `:data`):
 
-`JobPorts.kt` is the contract. Each port function has KDoc that gives its thread.
-
-- `JobStorage`: `loadCheckpoint`, `saveCheckpoint`, `names` (the `AtomicReference` of the note's `DraftNames`), `mutateNames(reducer)`, `openNames`, `closeNames`, `audioFile`, `workFiles` (`audio.opus.part` and `clips.pcm`), `sealTarget` (`work/sealed.opus`), `withNoteLockBlocking`, `existingDocumentBlocking`, `titleBlocking`, `markSealedBlocking`, `discardSealedBlocking` (deletes the marker and `work/sealed.opus`), `adopt(noteId, Adoption)` (a suspend function run in `NonCancellable`).
-- `JobVoices`: `peopleBlocking`, `generationBlocking`, `noteVoicesBlocking`, `savePendingBlocking`, `discardPendingBlocking`. The port has no `enrol`: adopt enrols the draft "Yes, Luca" choices from `Adoption.remembered`.
-- `ModelAccess`: `consented`, `ready(part)`, `plan`, `hasValidatedNetwork`, `install(parts, onProgress)` (delegates to `ModelInstallOwner`).
-
-The job seals the document itself. Under `withNoteLockBlocking` it reads the existing document and the title, and writes `sealTarget` with `CassiniDocument.create`, which verifies the file. Then it fsyncs the file, writes or discards the pending prints, and calls `markSealedBlocking`. `:app` does not implement a `sealBlocking` for the job.
-
-`JobOutcome` is `Done`, `AdoptPending`, `Paused(reason)`, `Failed(failure)`, `NeedsConsent(missingBytes)` or `Cancelled`. `AdoptPending` means that the marker and `work/sealed.opus` exist but adopt failed. The coordinator then finishes adopt as `reconcileOnStart` does (section 5.3), and the row never becomes FAILED. `JobFailure.Download` carries `requiredFreeBytes`, the figure that the space check of the installer used ("Free about N MB").
+- `JobStorage`: `loadCheckpoint`, `saveCheckpoint`, `names` (the note's `DraftNames`), `sealBlocking` (writes `work/sealed.opus` and the marker), `titleBlocking`, `audioFile`, `adopt` (a suspend function run in `NonCancellable`).
+- `JobVoices`: `peopleBlocking`, `generationBlocking`, `savePendingBlocking`, `enrol`.
+- `ModelAccess`: `consented`, `ready(part)`, `install(parts, onProgress)` (delegates to `ModelInstallOwner`), and a validated-network check.
 
 Seams (interfaces in `:engine` `job/`, section 2): `Recognizer`, `StreamingDiarizer`, `PrintExtractor`, `AudioSource`, `OpusSink`.
 
@@ -467,7 +453,7 @@ Seams (interfaces in `:engine` `job/`, section 2): `Recognizer`, `StreamingDiari
 | 4b | Parakeet decoder loads | inference | PREPARING | Preparing |
 | 4c | each window: recognition | inference | WORDS | Words & voices |
 | 4d | each window: Sortformer, assignment, clip cache, live voice matching | inference | SPEAKERS | Words & voices |
-| 4e | progress, checkpoint save (only after the first window is done: a stop before that leaves no checkpoint) | inference | – | – |
+| 4e | progress, checkpoint save | inference | – | – |
 | 5 | `finish`: last partial window, final checkpoint, encoder finish | inference | WORDS/SPEAKERS | Words & voices |
 | 6 | `attribute`: close naming, merges, attribution | inference | – | → Matching |
 | 7 | `matchVoices`: voiceprints and `VoiceMatcher.match(excluded = rejected)` | inference | MATCHING | Matching (shown as skipped without prints or model) |
@@ -483,7 +469,7 @@ Title: for a fresh document the seal uses `titleBlocking`. For Transcribe again 
 
 Live voice matching runs per window for speakers with at least 4 s of clips and at least 10 s more than the last attempt, excludes rejected voices, and skips speakers with a CONFIRMED `live` entry or a user label. AUTO results set `automatic[id]` (the label shows an "auto" badge). SUGGESTED results are shown as an inline "Is this Luca?" card only while the label is a placeholder, the voice still exists and naming is open. Matches to synthetic note-local voices (ids prefixed `note:`, used for "Speaker names carry over" in Transcribe again) are stored as no match; the label carries the name. The job changes names only through `DraftNames`: `applyLive` for the matches and automatic names, and `close()` at step 6.
 
-At step 6 the job calls `DraftNames.close()` and uses the value it returns ("Saving — you can rename when it's done"). Each run calls `openNames` at step 3, as 0.1.0 did. If a run closes naming and then ends without adopt (a stop, a failure or a cancel), the job opens naming again. Thus a PAUSED note accepts names. Final prints and matches are written to `voices/pending/<id>.json` with the voices `generation` at step 9; adopt merges them only if the generation is unchanged, dropping matches to voices that no longer exist, so "Forget" and "Forget everyone" cannot be undone by a finishing job. A draft "Yes, Luca" enrols at adopt only if the generation is unchanged and the voice still exists. A draft "Not Luca" never unenrols (nothing was enrolled).
+At step 6 the job calls `DraftNames.close()` and uses the value it returns ("Saving — you can rename when it's done"). Final prints and matches are written to `voices/pending/<id>.json` with the voices `generation` at step 9; adopt merges them only if the generation is unchanged, dropping matches to voices that no longer exist, so "Forget" and "Forget everyone" cannot be undone by a finishing job. A draft "Yes, Luca" enrols at adopt only if the generation is unchanged and the voice still exists. A draft "Not Luca" never unenrols (nothing was enrolled).
 
 ### 5.5 Progress numbers (`ProgressTracker`)
 
