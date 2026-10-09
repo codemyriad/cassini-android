@@ -119,13 +119,16 @@ jobs:
         with:
           path: ~/.m2/repository/org/robolectric
           key: robolectric-${{ hashFiles('gradle/libs.versions.toml', '**/src/test/resources/robolectric.properties') }}
+      # On tags the device tests run against releaseTest (the release build without R8), because R8
+      # removes members the tests call; the emulator job then launch-checks the published release APK.
       - name: Build APK, run unit and conformance tests, and lint
         env:
           BUILD_TYPE: ${{ startsWith(github.ref, 'refs/tags/') && 'Release' || 'Debug' }}
+          DEVICE_TEST_TYPE: ${{ startsWith(github.ref, 'refs/tags/') && 'releaseTest' || 'debug' }}
         run: |
           ./gradlew --no-daemon \
-            -PdeviceTestBuildType="${BUILD_TYPE,,}" \
-            ":app:assemble$BUILD_TYPE" ":app:assemble${BUILD_TYPE}AndroidTest" \
+            -PdeviceTestBuildType="$DEVICE_TEST_TYPE" \
+            ":app:assemble$BUILD_TYPE" ":app:assemble${DEVICE_TEST_TYPE^}" ":app:assemble${DEVICE_TEST_TYPE^}AndroidTest" \
             :app:testDebugUnitTest ":app:lint$BUILD_TYPE"
       - name: Prepare installable APK
         env:
@@ -148,7 +151,9 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: cassini-android-device-tests
-          path: app/build/outputs/apk/androidTest/*/*.apk
+          path: |
+            app/build/outputs/apk/${{ startsWith(github.ref, 'refs/tags/') && 'releaseTest' || 'debug' }}/*.apk
+            app/build/outputs/apk/androidTest/*/*.apk
           if-no-files-found: error
       - name: Upload test and lint reports
         if: always()

@@ -19,21 +19,27 @@ if [ -n "${CASSINI_APK:-}" ]; then
             sdk_path=$(python3 -c 'from pathlib import Path; print(next(line.removeprefix("sdk.dir=") for line in Path("local.properties").read_text().splitlines() if line.startswith("sdk.dir=")))')
         fi
         manifest=$("$sdk_path/build-tools/36.0.0/aapt" dump xmltree "$CASSINI_APK" AndroidManifest.xml)
+        # A non-debuggable APK is taken to be releaseTest: the minified release APK cannot be
+        # instrumented, because R8 removed members the tests call.
         if [[ "$manifest" == *'android:debuggable'*'0xffffffff'* ]]; then
             CASSINI_TEST_BUILD_TYPE=debug
         else
-            CASSINI_TEST_BUILD_TYPE=release
+            CASSINI_TEST_BUILD_TYPE=releaseTest
         fi
     fi
 else
     CASSINI_TEST_BUILD_TYPE=${CASSINI_TEST_BUILD_TYPE:-debug}
 fi
 case "$CASSINI_TEST_BUILD_TYPE" in
-    debug|release) ;;
-    *) printf 'CASSINI_TEST_BUILD_TYPE must be debug or release.\n' >&2; exit 1 ;;
+    debug|releaseTest) ;;
+    *) printf 'CASSINI_TEST_BUILD_TYPE must be debug or releaseTest.\n' >&2; exit 1 ;;
 esac
-if [ "$CASSINI_TEST_BUILD_TYPE" = release ]; then
-    export CASSINI_BETA_KEYSTORE_FILE=${CASSINI_BETA_KEYSTORE_FILE:-$HOME/.android/debug.keystore}
+if [ "$CASSINI_TEST_BUILD_TYPE" = releaseTest ] && [ -z "${CASSINI_BETA_KEYSTORE_FILE:-}" ]; then
+    # Without a supplied key, sign with the local debug key, so the APK installs over a debug build.
+    export CASSINI_BETA_KEYSTORE_FILE=$HOME/.android/debug.keystore
+    export CASSINI_RELEASE_STORE_PASSWORD=${CASSINI_RELEASE_STORE_PASSWORD:-android}
+    export CASSINI_RELEASE_KEY_PASSWORD=${CASSINI_RELEASE_KEY_PASSWORD:-android}
+    export CASSINI_RELEASE_KEY_ALIAS=${CASSINI_RELEASE_KEY_ALIAS:-androiddebugkey}
 fi
 build_type=${CASSINI_TEST_BUILD_TYPE^}
 if [ -n "${CASSINI_TEST_APK:-}" ]; then

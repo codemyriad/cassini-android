@@ -40,6 +40,7 @@ android {
             version = libs.versions.cmake.get()
         }
     }
+    // debug, or releaseTest for tag builds. The minified release build cannot be instrumented.
     testBuildType = providers.gradleProperty("deviceTestBuildType").getOrElse("debug")
     // Release signing is configured only when CI or a maintainer supplies the keystore and its secrets.
     val releaseKeystore = providers.environmentVariable("CASSINI_BETA_KEYSTORE_FILE").orNull
@@ -62,6 +63,15 @@ android {
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             if (releaseKeystore != null) signingConfig = signingConfigs.getByName("beta")
+        }
+        // The release build without R8, for device tests: they call app and Kotlin library members that
+        // R8 removes from the minified APK. Tag builds instrument this APK, then install the published
+        // release APK over it and check that it launches (scripts/ci-emulator-smoke.sh).
+        create("releaseTest") {
+            initWith(getByName("release"))
+            isMinifyEnabled = false
+            isShrinkResources = false
+            matchingFallbacks += listOf("release")
         }
     }
     compileOptions {
