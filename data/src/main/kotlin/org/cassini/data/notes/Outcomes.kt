@@ -95,3 +95,18 @@ interface JobQueueWriter {
 fun interface NoteFilesCleaner {
     suspend fun deleteForNote(noteId: String)
 }
+
+/** The result of an import (architecture 4.2). */
+sealed interface ImportOutcome {
+    /** A new note was added. */
+    data class Created(val noteId: String) : ImportOutcome
+
+    /** A live note already has these bytes; nothing was added. A trashed note with the same bytes does not count. */
+    data class Existing(val noteId: String) : ImportOutcome
+
+    /**
+     * Nothing was added: LARGE (over 2 GiB), SPACE ([neededBytes] free are needed), WAV (not 16-bit PCM), or OPEN
+     * (unreadable, or not audio that Cassini can read). [detail] is a diagnostic, never shown as is.
+     */
+    data class Rejected(val failure: Failure, val detail: String? = null, val neededBytes: Long = 0) : ImportOutcome
+}

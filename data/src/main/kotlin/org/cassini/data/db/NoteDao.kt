@@ -7,6 +7,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
+import org.cassini.core.library.AudioKind
 
 /** Reads and row writes of `notes` and `note_text` (docs/architecture.md, section 3.3). */
 // One DAO per table group; Room DAOs are flat lists of queries.
@@ -66,6 +67,46 @@ abstract class NoteDao {
     /** A live note whose imported bytes have [sha256] (import dedupe ignores trashed notes). */
     @Query("SELECT id FROM notes WHERE source_sha256 = :sha256 AND trashed_at IS NULL ORDER BY added_at LIMIT 1")
     abstract suspend fun liveWithSource(sha256: String): String?
+
+    /** [liveWithSource] for a caller that holds a note's lock or runs inside a transaction. */
+    @WorkerThread
+    @Query("SELECT id FROM notes WHERE source_sha256 = :sha256 AND trashed_at IS NULL ORDER BY added_at LIMIT 1")
+    abstract fun liveWithSourceBlocking(sha256: String): String?
+
+    /**
+     * Inserts an imported note unless a live note already has its `source_sha256`, in one transaction, so two imports
+     * of the same file cannot both be added. Returns the id of that live note, or null when [note] was inserted.
+     */
+    @Transaction
+    open suspend fun insertUnlessDuplicate(note: NoteEntity, body: String = ""): String? {
+        val existing = note.sourceSha256?.let { liveWithSource(it) }
+        if (existing == null) insert(note, body)
+        return existing
+    }
+
+    @Query("SELECT id FROM notes")
+    abstract suspend fun ids(): List<String>
+
+    @Query("SELECT COUNT(*) FROM notes")
+    abstract suspend fun noteCount(): Int
+
+    /** Notes whose capture is still marked as being written (crash recovery, architecture 4.7). */
+    @Query("SELECT * FROM notes WHERE audio_kind = 'LIVE_CAPTURE' ORDER BY created_at")
+    abstract suspend fun liveCaptures(): List<NoteEntity>
+
+    /** Finished Opus captures without a known duration: a sign that the capture file was not closed cleanly. */
+    @Query("SELECT * FROM notes WHERE audio_kind = 'PLAIN' AND duration_ms = 0 AND audio_file = 'capture.opus'")
+    abstract suspend fun plainCapturesWithoutDuration(): List<NoteEntity>
+
+    /** Ends a live capture as [kind] (PLAIN or UNPLAYABLE) with [durationMs]. Returns 0 unless it was a live capture. */
+    @Query(
+        "UPDATE notes SET audio_kind = :kind, duration_ms = :durationMs, updated_at = :now " +
+            "WHERE id = :id AND audio_kind = 'LIVE_CAPTURE'",
+    )
+    abstract suspend fun endCapture(id: String, kind: AudioKind, durationMs: Long, now: Long): Int
+
+    @Query("UPDATE notes SET duration_ms = :durationMs, updated_at = :now WHERE id = :id")
+    abstract suspend fun setDuration(id: String, durationMs: Long, now: Long)
 
     @Query(
         "SELECT (SELECT COUNT(*) FROM notes WHERE trashed_at IS NULL) AS live, " +

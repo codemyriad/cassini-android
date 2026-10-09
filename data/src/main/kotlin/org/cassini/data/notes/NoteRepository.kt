@@ -35,6 +35,12 @@ object NoteTitles {
 
     /** [input] trimmed, or null when that is blank or longer than [MAX_LENGTH]. */
     fun clean(input: String): String? = input.trim().takeIf { it.isNotEmpty() && it.length <= MAX_LENGTH }
+
+    /**
+     * A title taken from a file (a display name, a document's `meeting.title`): [input] trimmed and cut to
+     * [MAX_LENGTH], or null when nothing is left.
+     */
+    fun fit(input: String?): String? = input?.trim()?.take(MAX_LENGTH)?.trim()?.ifEmpty { null }
 }
 
 /**

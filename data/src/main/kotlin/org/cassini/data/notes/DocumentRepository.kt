@@ -30,6 +30,8 @@ import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 import java.io.OutputStream
+import java.time.Instant
+import java.time.format.DateTimeParseException
 import java.util.UUID
 import java.util.concurrent.Callable
 
@@ -96,6 +98,30 @@ class DocumentRepository(
      */
     suspend fun refreshIfStale(noteId: String): RefreshOutcome =
         locks.withNoteLock(noteId, dispatchers.io) { refreshLocked(noteId) }
+
+    /**
+     * Adds the note [row] for the `document.opus` already in its directory (import and catalogue rebuild): the
+     * document is read and verified once, and the row and every cache row are written in one transaction with its
+     * signature, so the first open reads nothing. The title, the recording time and the meeting id come from the
+     * manifest when it has them; otherwise [row]'s values stay, and a document without a manifest gets its duration
+     * from its Ogg pages. [duplicateOf] runs inside that transaction first: when it returns a note id, nothing is
+     * written and that id is returned. Returns null when the note was written.
+     */
+    internal suspend fun catalogueDocument(row: NoteEntity, duplicateOf: () -> String? = { null }): String? =
+        locks.withNoteLock(row.id, dispatchers.io) {
+            val file = documentFile(row.id)
+            val signature = DocumentSignature.of(file)
+            val document = if (signature == null) missing(file) else readLocked(file, signature)
+            val described = describedBy(row, document, file)
+            database.runInTransaction(
+                Callable<String?> {
+                    duplicateOf() ?: run {
+                        cache.replaceCacheBlocking(DocumentDerivation.derive(described, document, signature, clock()))
+                        null
+                    }
+                },
+            )
+        }
 
     /**
      * Seals [transcript] over [audio] into `work/sealed.opus` with `CassiniDocument.create` (which re-reads and verifies
@@ -452,6 +478,26 @@ class DocumentRepository(
         ExportOutcome.Failed(Failure.SAVE, error.message)
     } catch (error: SecurityException) {
         ExportOutcome.Failed(Failure.SAVE, error.message)
+    }
+
+    /** [row] as [document] describes it: its title, recording time and audio file; a duration when it has no manifest. */
+    private fun describedBy(row: NoteEntity, document: CassiniDocument, file: File): NoteEntity {
+        val meeting = document.manifest?.optJSONObject("meeting")
+        val createdAt = meeting?.optString("createdAtUtc")?.let { text ->
+            try {
+                Instant.parse(text).toEpochMilli()
+            } catch (_: DateTimeParseException) {
+                null
+            }
+        }
+        val duration = if (meeting == null && row.durationMs == 0L) AudioFiles.opusDurationMs(file) else null
+        return row.copy(
+            title = NoteTitles.fit(document.title) ?: row.title,
+            createdAt = createdAt ?: row.createdAt,
+            durationMs = duration ?: row.durationMs,
+            audioFile = NoteFiles.DOCUMENT,
+            audioKind = AudioKind.DOCUMENT,
+        )
     }
 
     private fun missing(file: File) =
