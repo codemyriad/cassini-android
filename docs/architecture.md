@@ -1,270 +1,623 @@
 # Cassini for Android: architecture (0.2)
 
-This document describes the rebuilt Cassini Android app: what it is made of, how data flows, what is kept byte-for-byte from 0.1.0, and why. It is written for contributors and for coding agents working from the phased plan. Plain statements, no marketing.
+This document describes the rebuilt Cassini Android app. It covers the modules, the storage, the background work, the UI system, and the rules that protect the portable format and the privacy promises. It is written for contributors and for the coding agents that work from the phased plan.
 
-It describes the target. The work lands in phases (P0 toolchain and native packaging, P1 `:core` and `:engine`, P2 `:data` and the migration, P3 background work, P4 Compose UI, P5 documentation, P6 tests, CI and release). Where a rule applies only until a given phase, the text says so. After P0 the app is still the single 0.1.0 module, on the new toolchain, with the native runtime packaged as described in section 6.
+Two companion documents are binding for the parts they cover:
+
+- `docs/design/features.md`: every screen, behaviour, banner and export, with its data source and acceptance criteria.
+- `docs/design/ui.md`: design tokens, fonts, components, screen contracts, navigation, accessibility and screenshot testing.
+
+When the three documents disagree, `features.md` wins for user-visible behaviour, `ui.md` wins for visuals, and this document wins for module boundaries, storage layout, threading, services and the build.
+
+## 0. Owner decisions and phases
+
+Two owner decisions of 2026-10-09 shape this version:
+
+1. **Greenfield.** Cassini Android has no current installs. Nothing is built only to read or keep 0.0.x/0.1.0 app data: no migrator, no legacy readers, no frozen `library.json`/`session.json`, no tombstones, no upgrade checks. The on-disk layout is designed fresh. Two things stay external contracts: the portable `.opus` document format (with its conformance vectors) and the privacy rules.
+2. **New visual design.** The UI is rebuilt to the boards in `design/reference/` (11 boards at 390 x 844 dp, PNG renders plus the source markup). Fonts are Instrument Sans and IBM Plex Mono.
+
+The work lands in phases. Each phase runs in one git worktree; parallel phases use separate worktrees and touch disjoint files.
+
+| Phase | Worktree (branch) | Content |
+|---|---|---|
+| P0 | `rebuild` | Toolchain, native packaging, CI, detekt. Done. |
+| P1 | `rebuild` | Pure-JVM `:core` and the `:engine` Android library. In progress. |
+| P2 | `rebuild` | Fork preparation: these documents, design references, module stubs for `:data` and `:ui`, catalog entries, the `ciTest` aggregate task, removal of migration-only fixtures. |
+| P3 | `rebuild` | Pure `:core` additions (statuses, search, trash, exports, speaker stats, model plan, `retitle`, download redirect policy). |
+| P4 | `rebuild` | `:data`: Room catalogue, DataStore, file repositories. |
+| P5 | `engine-job` | `TranscriptionJob`, `ModelInstaller`, `ProgressTracker` and the job seams in `:engine`, behind ports. Parallel with P4. |
+| P6 | `rebuild` | `:app` background: `AppGraph`, coordinators, services, controllers. |
+| P7 | `ui` | `:ui` design system: fonts, tokens, icons, components. Parallel with P3-P6. |
+| P8 | `ui` | `:ui` screens rendered from fixture `UiState`s, screenshot goldens. |
+| P9 | `docs` | Open-source citizenship documents. Parallel. |
+| P10 | `rebuild` | Integration: merge `ui` and `docs`, ViewModels, navigation, delete the legacy UI, targetSdk 36. |
+| P11 | `rebuild` | CI consolidation and `:bench`. |
+| P12 | `rebuild` | End-to-end acceptance on emulator-5554, screenshots, README. |
+
+Until P10 the old view-based app still builds and runs on its own storage (`files/documents/`, `library.json`). The new layers are built next to it and tested with JVM, Robolectric and instrumentation tests. Nothing new is wired into the old Activities, and P10 deletes them.
+
+Cutting 0.2.0, bumping `versionCode`/`versionName`, tags, GitHub releases and GitHub settings stay with the owner. The rebuild commits only on local branches.
+
+Disk: the root filesystem had 12 GB free on 2026-10-09. Every phase checks `df -h /` before it starts and keeps at least 6 GB free: remove the build directories of finished worktrees (`./gradlew clean` or `rm -rf */build build .gradle/configuration-cache` inside a worktree being removed) before creating new worktrees or AVDs.
 
 ## 1. Scope and constraints
 
-Cassini records audio, transcribes it on the phone (sherpa-onnx Parakeet TDT v3 INT8), labels speakers (Nemotron-3 Sortformer streaming diarization), recognises named voices (CAM++ voiceprints) and saves everything as one portable `.opus` document. The engine is good and tested; the app layer around it was a prototype. 0.2 keeps the engine and replaces the app layer.
+Cassini records audio and transcribes it on the phone with sherpa-onnx Parakeet TDT v3 INT8. It labels speakers with Nemotron-3 Sortformer streaming diarization, recognises named voices with CAM++ voiceprints, and saves everything as one portable `.opus` document. The engine is good and tested; 0.2 keeps it and replaces the app around it.
 
-Hard constraints, all kept:
+Hard constraints:
 
-- Existing installs keep their data. Everything under `filesDir` is migrated in place and nothing the old app wrote is deleted or rewritten (section 5).
-- The portable document format stays byte-compatible with `../cassini-format` and gocassini. Every conformance vector at the pinned `cassini-format` revision runs on every build (26 at the current pin; the number is read from the vector index, never hard-coded).
-- Privacy rules stay: voiceprints are never written into documents, backup is off, no model is downloaded before the user consents, no network except the three model hosts.
-- `minSdk 26`, ABIs `arm64-v8a` + `x86_64` (16 KB aligned), the custom sherpa-onnx AAR (built from the pinned fork plus `scripts/streaming-diarization.patch`) and `libcassini_opus.so` stay the native runtime.
-- Android stays native Kotlin. The iOS app is separate Swift code; the two share no code, only the on-disk and portable formats.
-- `applicationId`, the release signing certificate, the `.LibraryActivity` launcher component name and the `org.cassini.android.NativeOpus` JNI class name do not change. Changing any of them would break upgrades, home-screen shortcuts or native symbol binding.
+- The portable document format stays byte-compatible with `../cassini-format` and gocassini. Every conformance vector at the pinned `third_party/cassini-format` revision runs on every build. The number of vectors is read from the vector index, never hard-coded (26 at the current pin).
+- Privacy rules:
+  - Voiceprints are never written into documents or exports. All voiceprints and voice matches live under `voices/` (section 3.2).
+  - `filesDir` is excluded from backup and device transfer.
+  - No model is downloaded before the user consents.
+  - Network access only for model downloads, only to the three model hosts (huggingface.co, github.com, dist.gocassini.com) and the download hosts they redirect to, which `ArtifactFetcher` checks against an allow-list (section 5.6). `PRIVACY.md` lists both.
+- Native runtime: `minSdk 26`; ABIs `arm64-v8a` and `x86_64` (16 KB aligned); the custom sherpa-onnx AAR built from the pinned fork plus `scripts/streaming-diarization.patch`; `libcassini_opus.so`.
+- Android stays native Kotlin. The iOS app is separate Swift code and shares only the portable format.
+- `applicationId org.cassini.android` and the JNI class name `org.cassini.android.NativeOpus` do not change. The second one is bound to native symbols. The `.LibraryActivity` launcher alias of the old plan is not needed (no installed shortcuts).
+- UI stack: Jetpack Compose with Material 3 components underneath, styled entirely by the Cassini tokens (no stock Material look, no dynamic colour). ViewModel + `StateFlow` + unidirectional data flow. Coroutines. Manual dependency injection (`AppGraph`).
+- English and Italian. TalkBack support, 48 dp touch targets, state never shown by colour alone, a light theme as designed and a derived dark theme, edge-to-edge and predictive back with targetSdk 36 (from P10).
 
 ## 2. Modules
 
-Five Gradle modules. Dependency direction: `app -> engine -> data -> core`; `bench` depends on `app`.
+Six Gradle modules:
 
 ```
-:core    pure Kotlin/JVM. The verbatim engine. No android.*, no sherpa, no coroutines.
-         org.json is compileOnly (Android provides it at runtime; tests add the jar).
-:data    Android library. Room catalogue, DataStore settings, file repositories with the
-         verbatim on-disk formats, legacy readers, the in-place migrator.
+:core    Pure Kotlin/JVM. The verbatim engine plus pure app rules (statuses, search,
+         trash arithmetic, exports, speaker stats, model plan). No android.*, no sherpa,
+         no coroutines. org.json is compileOnly.
+:data    Android library. Room catalogue, DataStore settings, file repositories.
 :engine  Android library. Native wrappers (sherpa-onnx, libcassini_opus), MediaCodec
-         decoder, microphone capture, the TranscriptionJob that drives one processing run.
-:app     Android application. Compose UI, services, AppGraph (manual DI), coordinators.
-:bench   Android library with androidTest only. Experiments and calibration. Never in CI.
+         decoder, microphone capture, TranscriptionJob, ModelInstaller, ProgressTracker.
+:ui      Android library. Compose design system and stateless screens rendered from
+         UiState. Depends only on Compose and kotlinx-collections-immutable.
+:app     Android application. AppGraph, ViewModels and routes, navigation, services,
+         coordinators, controllers, notifications, the XML app theme.
+:bench   com.android.test module (from P10). Experiments and calibration on a device.
+         Never in CI.
 ```
 
-`./gradlew --configure-on-demand :core:test` runs on a machine with a JDK alone: no Android SDK, NDK, AAR or device. Without `--configure-on-demand` Gradle also configures the Android modules, which needs the SDK, and the native build in `:engine` then makes the Android Gradle plugin download the NDK when the SDK has none (`docs/development.md`). Everything that touches native code sits behind an interface in `:core` and is implemented in `:engine`. After P1 these are `WordDecoder` (implemented by `ParakeetDecoder`) and `SpeechFeed.Stream` (implemented by `SileroDetector`); `SortformerStream` and `VoiceprintExtractor` are still concrete `:engine` classes, and P3 adds the interfaces `TranscriptionJob` needs to run with fakes.
+Dependency direction:
+
+```
+app -> ui
+app -> data -> core
+app -> engine -> core
+bench -(instruments)-> app
+```
+
+`:engine` does not depend on `:data`. `TranscriptionJob` talks to storage through small ports defined in `:engine` (section 5.4), and `:app` implements them with adapters over the `:data` repositories. This keeps both modules testable with fakes and lets P4 and P5 run in parallel.
+
+`:ui` does not depend on `:core`, `:data` or `:engine`. Its screens take semantic `UiState` values (enums, numbers, user text) and format them with their own string resources. ViewModels in `:app` map domain state to these values. Every `:ui` resource name starts with `ui_` (`resourcePrefix = "ui_"`), so `:app` resources can never silently override them.
+
+`./gradlew --configure-on-demand :core:test` needs a JDK and the `third_party/cassini-format` submodule, and nothing else (no NDK, no AAR, no device).
+
+Native seams. `:core` has the interfaces the verbatim engine already uses: `WordDecoder` (`asr/DecodeSession.kt`), `SpeechFeed.Stream` and `PcmSource`. The other native pieces are concrete classes in `:engine` (`SortformerStream`, the `VoiceprintExtractor` object, `AudioDecoder`, `StreamingOpusEncoder`). P5 adds engine-owned interfaces in `org.cassini.engine.job` (`StreamingDiarizer`, `PrintExtractor`, `AudioSource`, `OpusSink`, and `Recognizer` if `IncrementalRecognizer` needs one), with thin adapters over the native classes, so `TranscriptionJob` is JVM-testable with fakes.
 
 ### 2.1 `:core` (package `org.cassini.core`)
 
-Files move with `git mv` and a package rename; bodies stay unchanged unless listed.
-
-| Package | Files | Origin and notes |
-|---|---|---|
-| `format` | `OggOpus.kt`, `CassiniPayload.kt`, `CassiniDocument.kt`, `Transcript.kt`, `OggRepair.kt`, `SpeakerAttribution.kt`, `SpeakerMerges.kt` | Verbatim. `CassiniDocument` gains a typed `DocumentState` enum (`PLAIN_AUDIO`, `UNKNOWN_FORMAT`, `INVALID_METADATA`, `UNVERIFIED`, `STALE_AUDIO`, `OK`, `UNREADABLE`) as a wrapper; the read/validate/seal/relabel code and its `JSONObject` manifest do not change. `UNREADABLE` is new: an I/O error is no longer reported as plain audio. An `UNREADABLE` note stays openable and can be transcribed again; the UI shows the read error. `OggRepair` is `RecoveryScanner` minus `recover()`. `Transcript.fromTokens` moves to `asr/TokenWords.kt`. |
-| `audio` | `Resampler.kt`, `PcmSource.kt` (+ `PcmAudio`), `AudioLimits.kt`, `PcmBuilder.kt`, `WavDecoder.kt` | `AudioLimits` and `PcmBuilder` are the two halves of `Limits.kt`; `clock()` moves to `:app`. `WavDecoder` is `AudioDecoder.framePosition/decodeWav`. |
-| `asr` | `SpeechWindows.kt`, `SeamMerge.kt`, `WordGate.kt`, `IncrementalTranscript.kt`, `SpeechFeed.kt`, `DecodeSession.kt`, `TokenWords.kt`, `TranscriptionProgress.kt`, `ProcessingSpeed.kt`, `BatteryProjection.kt` | `IncrementalTranscript` keeps its algorithm; its constructor takes a typed `IncrementalState` instead of a `JSONObject`. `SpeechFeed` is the `SpeechDetector` companion (feed/scan/recordingSpan/config) with a core `Segment(startSample, samples)` replacing the sherpa `SpeechSegment` type; this is the only edit. `DecodeSession` is `Parakeet.Session` (window/retry algorithm, lines 185-281) over a `WordDecoder` interface, which gives it its first JVM test. `ProcessingSpeed.remainingMs` is deleted (dead). `BatteryProjection.read()` moves to `:app`. |
-| `speakers` | `SpeakerAssignment.kt`, `TurnHistory.kt`, `VoiceMatcher.kt`, `VoiceprintSelection.kt`, `VoiceClipCache.kt`, `SpeakerBudget.kt`, `VoiceCodec.kt`, `NoteVoiceCodec.kt`, `DefaultLabels.kt` | `SpeakerAssignment` is `Diarization.assign` + `SpeakerTurn`; `TurnHistory` is the history trimming from `Diarization.Streaming.process` (cut at `startMs + 1000`). `VoiceprintSelection` is `Voiceprints.select/normalised/cosine/THRESHOLDS` with the calibration note. `SpeakerBudget` holds the constants 8 speakers, 45 s, 1 s overlap, 200000-float diarizer state cap (one place in Kotlin; `SpeakerBudget` documents that the JNI patch `scripts/streaming-diarization.patch` enforces the same bound, and a `:core` test fails when the two disagree. The patch itself is not edited: its hash is pinned with the AAR in `scripts/native-dependencies.json`, so a comment there waits for the next AAR rebuild). `VoiceCodec` is `VoiceStore`'s `Voice` JSON plus the enrol running-mean and unenrol maths as pure functions. `NoteVoiceCodec` is `NoteVoices` (`Match`, `SpeakerPrint`, version-2 JSON, meeting-id path guard). In both codecs a version mismatch throws `UnsupportedVersion` instead of decoding as empty. The 0.1.0 `VoiceStore` and `NoteVoiceStore` that stay in `:app` for P1 still catch every read error, so a newer or unreadable file is still treated as empty and replaced by the next write, as in 0.1.0; leaving a newer file in place read-only arrives with the P2 `:data` repositories. `DefaultLabels.isDefault(id, label)` is a pure string scan over every placeholder prefix ever shipped (English `Speaker `, Italian `Voce `; the `Relatore ` of earlier plans never shipped); a unit test asserts the prefixes match the `speaker_label` string resources (section 4). |
-| `models` | `ModelCatalog.kt`, `ArtifactFetcher.kt` | `ModelCatalog` is one `ModelDescriptor(directory, artifacts[name, size, sha256, url], markerFile, markerValue)` table that carries the exact pins, URLs, directory names and marker semantics of `ModelStore`, `DiarizationModels`, `VoiceprintModel` and `ModelBundle` (markers: `parakeet-v3/verified` = HF revision, `vad/verified` = sha256, `speaker-models/verified` = sha256, `speaker-models/verified-voiceprint` = sha256). `ArtifactFetcher` is `ModelStore.fetch/fetchZstd/decompress/digest` with HTTP Range resume added: the `.part` survives failures and process death and is resumed with `Range: bytes=<len>-`. A `206` answer is accepted only when its `Content-Range` total equals the pinned size; a `200` answer restarts from zero. The file is still verified (size + SHA-256) before rename; on a size or SHA-256 mismatch the `.part` is deleted. A verified file is never replaced. The 30 s read timeout stays, because interrupting the thread does not unblock `HttpURLConnection`. A connection that closes before its announced length keeps the `.part` and fails with `DOWNLOAD` (0.1.0 deleted it and reported `VERIFY`); so does a `206` whose range ends before the artifact's last byte, and the next attempt resumes after it. Free-space checks (`ArtifactFetcher.bytesToFetch`, and the Parakeet check in `InstalledModels`) count a kept `.part` as already fetched. A kept `.part` stays in the model directory until that model installs, so up to about 650 MB can remain in `filesDir` after a cancelled or failed Parakeet download. There is no `LegacyModelCleanup`: by the owner's greenfield decision `:core` holds no migration code, and the 0.1.0 start-up cleanup (`removeLegacyModel`, `removeRetiredModels`) stays in the app's `InstalledModels` until the old UI goes. |
-| `checkpoint` | `CheckpointData.kt`, `CheckpointState.kt` | `CheckpointData` verbatim plus a direct round-trip test. `CheckpointState` is a typed, hand-written org.json codec for `checkpoint.json` version 1 and `names.json` with exactly the key set 0.1.0 writes (section 5.2). The validation rules of `ProcessingCheckpoint.load` move here as pure functions that take the model revision and speaker sha as inputs. |
-| `library` | `NoteRules.kt` | `Session` and `LibraryNote.shown/update/matches/snippet` as pure functions. There is no `LegacyLibraryJson`: by the owner's greenfield decision nothing reads 0.1.0 catalogues in the new app, so the `library.json` and `session.json` mapping stays in the old app's `LibraryStore` and `SessionStore` and goes with them. |
-| (root) | `Failure.kt` | `Failure` enum with the same code names but no `R.string`; `UserFacingException`, `requireUser`, `ProcessingPaused`. `:app/FailureMessages.kt` is the only place a failure meets a string resource. |
-
-Where a moved body keeps its object, the object keeps its name so the body and its tests move with a package rename only: `Limits` lives in `AudioLimits.kt`, `Voiceprints` in `VoiceprintSelection.kt`, `Diarization` (with `assign` and the Sortformer thresholds) in `SpeakerAssignment.kt`, `LibraryNote` and `Session` in `NoteRules.kt`. `internal` is dropped from every `:core` declaration, because `:engine` and `:app` use them across module boundaries.
-
-27 JVM test classes moved to `:core` (package rename; `SpeechDetectorTest` became `SpeechFeedTest`, with `FakeStream` on the core `Segment`; `RecoveryScannerTest` became `OggRepairTest`, `AudioDecoderTest` `WavDecoderTest`, `ModelDownloadTest` `ArtifactFetcherTest`), and 9 are new there (`DecodeSessionTest`, `CheckpointStateTest`, `DocumentStateTest`, `ModelCatalogTest`, `DefaultLabelsTest`, `NoteVoiceCodecTest`, `TurnHistoryTest`, `VoiceCodecTest`, and `SpeakerBudgetTest`, which compares the diarizer state cap with `scripts/streaming-diarization.patch`). The tests of code that stayed in `:app` stayed there (`VoiceStoreTest`, `NoteVoiceStoreTest`, `ModelUpgradeTest`, `CheckpointGoldenTest`). `LibraryStoreJsonTest`, `ClockTest` and `InstalledModelsTest` are new in `:app`; `InstalledModelsTest` absorbed every case of `ModelBundleTest` and `ModelStoreVadTest`. `:engine` has five new test classes (`ParakeetDecoderConfigTest`, `SileroDetectorConfigTest`, `SortformerStreamTest`, `NativeBudgetTest`, `InferenceDispatcherTest`). The host ASR evaluation (`eval/AsrEval.kt`) left the unit tests for `tools/asr-eval/`. The conformance vectors come from the git submodule `third_party/cassini-format`, pinned at the commit CI already used (`e43bad1b`). The test fails, not skips, when they are missing, and `-PcassiniConformanceDir` stays as an override. The number of vectors is whatever the pinned index lists (26 today; `cassini-format` HEAD has 28).
-
-### 2.2 `:engine` (package `org.cassini.engine`, plus `org.cassini.android.NativeOpus`)
+The P1 move keeps file bodies unchanged except for the listed edits. `scripts/check-verbatim.sh` diffs every verbatim file against its 0.1.0 origin, ignoring package and import lines, and reports only the listed edits.
 
 | Package | Files | Notes |
 |---|---|---|
-| `opus` | `NativeOpus.kt` (package `org.cassini.android`), `StreamingOpusEncoder.kt`, `src/main/cpp/opus-jni.cpp`, `CMakeLists.txt` | Verbatim; the JNI gains `ptr == 0` guards, a `FindClass` null check and `opus_encoder_ctl` return checks. Bitrate stays 24 kb/s, complexity 5 (a resumed encoder must use the original settings; `docs/native-runtime.md` says what a resume guarantees: the same stream continues, but packets after the resume point need not match an uninterrupted encode byte for byte). Built by AGP `externalNativeBuild` with CMake 3.22.1 and NDK 28.2.13676358; `-DOPUS_SOURCE` points at `.tools/opus/source`, populated by `scripts/fetch-opus-source.sh`. `CMAKE_BUILD_TYPE` is forced to `Release` in every variant (section 6). |
-| `decode` | `AudioDecoder.kt` | The MediaCodec/MediaExtractor loop verbatim (gap handling, Opus EOS trim via `OggOpus.scan`, reseek back-off, `StreamingResampler` resume). Takes `ContentResolver` + `cacheDir`, not an Activity. |
-| `capture` | `MicrophoneCapture.kt` (interface, suspend `stop()`), `OpusCapture.kt`, `AacCapture.kt`, `CaptureFactory.kt` | `OpusRecording`/`AacRecording` loops verbatim; the `MediaCodecList` probe runs once, off the main thread. Until P3 replaces `RecordingService`, the service still calls `stop()` and the first probe through `runBlocking` on the main thread, as 0.1.0 did. The app's `OpusEncoder` shares the probe and stays in `:app` until P2 (section 10). |
-| `asr` | `ParakeetDecoder.kt`, `SileroDetector.kt`, `IncrementalRecognizer.kt` | `Parakeet.Decoder` config verbatim (FeatureConfig 16 kHz, nemo_transducer, cpu, 2 threads, greedy), implements `WordDecoder`. `SileroDetector` implements `SpeechFeed.Stream`. `IncrementalRecognizer` is the `Parakeet.Incremental` shell with typed callbacks over core `IncrementalTranscript` + `DecodeSession`. |
-| `speakers` | `SortformerStream.kt`, `VoiceprintExtractor.kt` | Native lifetime of `Diarization.Streaming` (`processStreamingChunk`, `saveStreamingState`, `restoreStreamingState`, 200000-float cap) over core `TurnHistory`; `Voiceprints.compute` without the `leaseHeld` flag. |
-| `job` | `InferenceDispatcher.kt`, `NativeBudget.kt`, `ModelInstaller.kt` (P3), `TranscriptionJob.kt` (P3) | One dedicated inference thread; a `Mutex` that model loaders take so a cancelled job's models are released before the next job loads (replaces `NativeInference` and `leaseHeld`). `ModelInstaller` runs the install sequence Parakeet -> diarizer (best effort) -> voiceprint (best effort) -> VAD (best effort) through `ArtifactFetcher`. `TranscriptionJob` is `MainActivity.transcribe()` (lines 249-538) as a class with named steps (`installModels`, `restore`, `decodeLoop`, `onWindow`, `finish`, `seal`, `adopt`) over the interfaces above and the `:data` repositories, so it is JVM-testable with fakes. Step order, provenance keys and label precedence (draft name, then AUTO match, then `Speaker N`) are unchanged. |
+| `format` | `OggOpus`, `CassiniPayload`, `CassiniDocument`, `Transcript`, `OggRepair`, `SpeakerAttribution`, `SpeakerMerges` | Verbatim. `CassiniDocument` has a typed `DocumentState` (`PLAIN_AUDIO`, `UNKNOWN_FORMAT`, `INVALID_METADATA`, `UNVERIFIED`, `STALE_AUDIO`, `OK`, `UNREADABLE`). `UNREADABLE` means an I/O error; such a note stays openable and can be transcribed again. `seal` with an `existing` document reuses its manifest, so the `title` argument is ignored for Transcribe again, and a fresh seal adds a `TITLE` tag only when the source has none. P3 adds `CassiniDocument.retitle` next to the verbatim `relabel` (same shape; requires `OK`; sets `meeting.title` and replaces or adds the `TITLE` tag; nothing else changes). |
+| `audio` | `Resampler`, `PcmSource`, `AudioLimits`, `PcmBuilder`, `WavDecoder` | P3 adds `RecordingSpace` and `RecordingPolicy`. |
+| `asr` | `SpeechWindows`, `SeamMerge`, `WordGate`, `IncrementalTranscript`, `SpeechFeed`, `DecodeSession`, `TokenWords`, `TranscriptionProgress`, `ProcessingSpeed`, `BatteryProjection` | Algorithms unchanged. |
+| `speakers` | `SpeakerAssignment`, `TurnHistory`, `VoiceMatcher`, `VoiceprintSelection`, `VoiceClipCache`, `SpeakerBudget`, `VoiceCodec`, `NoteVoiceCodec`, `DefaultLabels` | `DefaultLabels.PREFIXES` = `Speaker `, `Voce ` (the placeholder label in every shipped language). P3 adds `SpeakerStats`, `SpeakerTint`, `NameMatch`, `VoiceStaleness`, and an `excluded` parameter on `VoiceMatcher.match`. |
+| `models` | `ModelCatalog`, `ArtifactFetcher` | `ArtifactFetcher` resumes `.part` files with HTTP Range (section 5.6). P3 adds `ModelPart`, `ModelPlan`, a digest progress callback, `VOICEPRINT_DIM = 512`, and the redirect allow-list. |
+| `checkpoint` | `CheckpointData`, `CheckpointState` | `checkpoint.json` version 1 codec; P3 adds two optional `names.json` members (section 3.6). |
+| `library` | `NoteRules` (retired in P10) | P3 adds the shared enums (`Origin`, `AudioKind`, `JobState`, `JobKind`, `PauseReason`, `VariantKind`), `NoteStatus`, `DayGroups`, `SearchQuery`, `TrashPolicy`, `PreviewText`. |
+| `export` | new in P3 | `TranscriptTurns`, `ExportClock`, `TextExport`, `SubtitleCues`, `SrtWriter`, `VttWriter`, `ExportNames` (features.md section 9). |
+| (root) | `Failure` | Failure codes without string resources. `:app` `FailureMessages` is the only place a failure meets a string. |
 
-The sherpa-onnx AAR is consumed as a Maven coordinate `org.cassini.native:sherpa-onnx-nemotron:1.13.7-1f23907a` from the gitignored repo-local repository `native/m2/` (section 6). A library module cannot depend on a local `.aar` file directly; the coordinate is what makes `:engine` legal. `:engine`, and any other Android module whose JVM tests touch org.json, adds `testImplementation(libs.org.json)`; `unitTests.isReturnDefaultValues = true` is set only where a test needs it.
+### 2.2 `:engine` (package `org.cassini.engine`, plus `org.cassini.android.NativeOpus`)
+
+| Package | Content |
+|---|---|
+| `opus` | `NativeOpus`, `StreamingOpusEncoder`, `src/main/cpp/opus-jni.cpp`, `CMakeLists.txt`. 24 kb/s, complexity 5. JNI guards for `ptr == 0`, a null `FindClass` and `opus_encoder_ctl` return codes. |
+| `decode` | `AudioDecoder`: the MediaCodec/MediaExtractor loop verbatim, taking a `ContentResolver` and a cache directory. |
+| `capture` | `MicrophoneCapture` (interface, suspend `stop()`), `OpusCapture` (platform MediaCodec Opus, API 29+), `AacCapture`, `CaptureFactory` (the `MediaCodecList` probe runs once, off the main thread). |
+| `asr` | `ParakeetDecoder` (implements `WordDecoder`), `SileroDetector` (implements `SpeechFeed.Stream`), `IncrementalRecognizer`. |
+| `speakers` | `SortformerStream`, `VoiceprintExtractor`. |
+| `job` | `InferenceDispatcher` (one thread), `NativeBudget` (model-load `Mutex`), and from P5: the seams of section 2, `TranscriptionJob`, `ModelInstaller`, `ProgressTracker`, the port interfaces and the job state types (section 5). A JVM test checks `ModelCatalog.VOICEPRINT_DIM` against the dimension `VoiceprintExtractor` produces. |
+
+The sherpa-onnx AAR is the Maven coordinate `org.cassini.native:sherpa-onnx-nemotron:1.13.7-1f23907a` in the git-ignored repository `native/m2/` (section 8).
 
 ### 2.3 `:data` (package `org.cassini.data`)
 
-Every repository takes `AppPaths(root: File)` (production: `filesDir`; tests: a scratch directory) and `CassiniDispatchers`, exposes `suspend` functions and `Flow`s, and serialises writers to each file with its own `Mutex`. No code path reads or writes a file on the main thread; debug builds set `StrictMode.detectAll().penaltyLog()`. The Room database and the DataStore file are opened by absolute path under `AppPaths.root` (`root/cassini.db`, `root/settings.preferences_pb`), so a scratch root isolates a test completely.
+Room, DataStore and the file repositories of section 4. Every repository takes `AppPaths`, `CassiniDispatchers` and the shared `NoteLocks`. Repositories expose `suspend` functions and cold `Flow`s; functions named `…Blocking` exist only for the inference thread.
 
-- `db/`: Room database `cassini.db` version 1, `exportSchema = true`, schemas under `data/schemas/`. Table `notes(id TEXT PK, created_at INTEGER, title TEXT, source_uri TEXT, document_path TEXT NULL, selected_variant TEXT NULL, duration_ms INTEGER, position_ms INTEGER, inference_ms INTEGER, processing_ms INTEGER, processing_paused INTEGER, result_precision TEXT, origin TEXT, inline_transcript TEXT NULL, search_text TEXT)`, FTS4 `notes_fts(title, search_text)` with `contentEntity = NoteEntity`, table `meta(key TEXT PK, value TEXT)`. `inline_transcript` is set only while `document_path` is null (the 0.1.0 rule). The document file stays authoritative for transcripts; the row is the catalogue. `source_uri` is indexed, not unique: the 0.1.0 identity rule (match by id, else by uri) lives in `LibraryRepository.upsert`.
-- `LibraryRepository`: notes `Flow`, FTS search, upsert, rename, delete. Delete is new: it removes the row, records the note id as a tombstone in `meta` (section 5.3), removes the document file when no other row references it, removes the checkpoint directory, and removes `voiceprints/<meetingId>.json` only when no other row's document carries the same meeting id.
-- `DocumentRepository`: the `documents/` naming scheme unchanged (`<uuid>.opus` sealed and immutable, `<sha256>.opus|.input` content-addressed imports, `<uuid>.rec.opus|.rec.m4a` captures, transient `<uuid>.part/.src/.tmp`, and the legacy 0.0.x captures `<uuid>.wav` and `<uuid>.m4a`, which are plain-audio notes with an inline transcript); one shared temp + fsync + rename helper, directory fsync after rename, free-space check before copying a content URI. The orphan sweep deletes only names on an explicit allow-list (`.part`, `.src`, `.tmp`) that are older than one hour and owned by no running job. `retire` deletes a document only when nothing references it, counts every document named in the frozen `library.json` or `session.json` as referenced (so a downgrade still finds it), and refuses any file name it does not recognise.
-- `CheckpointRepository`: directory key = `OggOpus.hex(sha256(android.net.Uri.fromFile(file).toString()))`, computed with `android.net.Uri` exactly as today (a different normalisation would orphan every existing checkpoint). Whenever a stored `source_uri` string exists, the key is the sha256 of that string, exactly as `ProcessingCheckpoint` derives it, never re-derived from a `File`. Files `checkpoint.json` (+`.bak`, `android.util.AtomicFile`), `names.json`, `audio.opus.part`, `clips.pcm`; typed `CheckpointState`; the `claim()` set is replaced by the coordinator's single-job rule.
-- `VoiceRepository`: `voices.json` (version 1) + `voices.generation` + `voiceprints/<meetingId>.json` (version 2), formats unchanged, writes serialised per file, read errors surfaced. A voice file whose `version` is newer than the codec knows is left in place, treated as read-only and reported. Only a file that is not parseable JSON is renamed `.corrupt-<epoch>` and reported; nothing is silently overwritten.
-- `ModelRepository`: `parakeet-v3/`, `vad/`, `speaker-models/` and marker files unchanged, readiness `Flow`, consent == Parakeet installed (unchanged rule), delete-model (new). Delete is refused while a job is `Running` or `Queued`, or while a checkpoint references the model.
-- `RecoveryRepository`: `RecoveryScanner.recover` policy; skips the file `RecordingController.activeFile` names. It keeps repairing `.rec.opus` files that are already catalogued but do not end cleanly (the `RecoveryScanner.kt:98` branch).
-- `SettingsRepository`: DataStore Preferences for `finalizationMs` and UI preferences.
-- `migration/FilesDirMigrator.kt`, `migration/LegacyReaders.kt`: section 5.
+### 2.4 `:ui` (package `org.cassini.ui`)
 
-### 2.4 `:app` (package `org.cassini.android`)
+`theme/` (tokens, type, shapes, icons, fonts), `components/`, one package per screen with its `XxxScreen(state, onEvent)`, `XxxUiState` and `XxxEvent`, `format/` (durations, dates, plurals, spoken descriptions), all UI string resources in English and Italian, the bundled fonts, the logo and launcher icon drawables, colour resources for the window background, and the Roborazzi screenshot tests. `:ui` has no XML theme: `Theme.Cassini` lives in `:app` (it needs AppCompat). `ui.md` is its specification.
 
-`CassiniApplication` creates `AppGraph` (about 150 lines of constructor wiring: paths, dispatchers, repositories, engine wrappers, `ProcessingCoordinator`, `RecordingController`, `PlaybackController`) and starts the migrator in an application-scoped `CoroutineScope`. `AppGraph.ready: Deferred<Unit>` completes when the migrator finishes; starting a job, an import or a recording awaits it. No DI framework: five ViewModels and a dozen singletons do not justify an annotation processor, and the instrumentation runner swaps the graph by constructing one with a scratch root.
+### 2.5 `:app` (package `org.cassini.android`)
 
-UI: section 4. Services: section 3. Tests: section 8.
+- `CassiniApplication` creates `AppGraph`: paths, dispatchers, locks, repositories, engine wrappers, port adapters, `ProcessingCoordinator`, `ModelInstallOwner`, `RecordingController`, `PlaybackController`, `NoticeCenter`. It is about 150 lines of constructor wiring.
+- `AppGraph.ready: Deferred<Unit>` completes after the startup work of section 4.8. Starting a job, an import or a recording awaits it.
+- There is no DI framework: a handful of ViewModels and a dozen singletons do not justify an annotation processor. The instrumentation runner swaps the graph for one built on a scratch root. In debug builds only, a `files/debug-root.txt` file names a scratch root that survives process death (used by the kill-and-resume device check, section 9).
+- `processing/` (coordinator, install owner, service, notifications), `recording/` (controller, service, notification), `playback/`, `ui/<screen>/` (ViewModels and `XxxRoute` composables), `nav/` (keys, `CassiniApp`, deep links, system bars), `notices/` (`NoticeCenter`), `FailureMessages`, `BatteryReader`, `res/values{,-night}/themes.xml` (`Theme.Cassini`). Debug source set: `DebugCommandReceiver` (section 9).
 
-Until P4 replaces it, the 0.1.0 Activity UI runs on the typed `:core` and `:engine` APIs with no change in behaviour. The adapters it keeps are small:
+## 3. Storage (greenfield)
 
-- `InstalledModels`: the models of `ModelCatalog` in their 0.1.0 directories and marker files, installed through `ArtifactFetcher`. Consent is still "Parakeet is installed". It replaces `ModelStore`, `DiarizationModels`, `VoiceprintModel` and `ModelBundle`, and holds the 0.1.0 start-up cleanup.
-- `ProcessingCheckpoint`: the checkpoint directory (key = SHA-256 of the stored source uri string), `android.util.AtomicFile` writes, and `CheckpointState`/`CheckpointNames` for every read and write. The engine classes still take their `JSONObject` members, converted at the call site; a typed round trip of the captured 0.1.0 checkpoint rewrites the same bytes (`CheckpointGoldenTest`).
-- `FailureMessages.kt` (`Failure` to string resource), `ui/Format.kt` (`clock()`), `BatteryReader` (the old `BatteryProjection.read()`), `RecoveryScanner.recover` over `OggRepair`, and `VoiceStore`/`NoteVoiceStore` file I/O over the core codecs.
+### 3.1 What is authoritative where
 
-`tools/asr-eval/` holds the host ASR evaluation program that used to sit in `app/src/test`; Gradle does not build it (its README says how to run it). `scripts/check-verbatim.sh` prints, for every file kept verbatim, its differences from the 0.1.0 code at the phase-0 base, so a reviewer sees only the edits listed in sections 2.1 and 2.2. CI fails when a "package only" group shows a difference or another verbatim group's changed lines differ from the reviewed digest in `scripts/check-verbatim.baseline`.
+| Data | Authoritative | Cache or index | Lost if `cassini.db` is rebuilt |
+|---|---|---|---|
+| Audio of a note | the file in `notes/<id>/` | `notes.audio_file`, `duration_ms` | – |
+| Transcript variants, speaker labels, meeting id, created time, provenance | the sealed `notes/<id>/document.opus` | `variants`, `speakers`, `note_text`, `notes.*` | – |
+| Note title | Room `notes.title` | the document's `meeting.title` and `TITLE` tag (a copy kept in step by `retitle`) | a rename not yet written into the document; the rebuilt title comes from `meeting.title`, or "Recovered recording <date>" for plain audio |
+| Trash state and time, the job state before trashing | Room `notes.trashed_at`, `notes.trashed_job` | – | yes; trashed notes come back as live notes |
+| Playback position, selected variant, preview excerpt, "Play anyway" acknowledgement | Room | – | yes (defaults) |
+| Transcription queue, pause reason, attempts | Room `jobs` | – | yes; a note with a valid checkpoint comes back PAUSED |
+| Partial transcription (checkpoint, draft names, sealed output awaiting adopt) | `notes/<id>/work/` | `jobs.done_ms` | – |
+| Saved people (embeddings, names, counts) | `voices/people.json` | – | – |
+| Per-note voiceprints and matches | `voices/notes/<noteId>.json` (sealed), `voices/pending/<noteId>.json` (awaiting adopt) | `note_voice_links` (no embeddings; re-synced at every start) | – |
+| Model installs | model directories and marker files | `ModelRepository` state | – |
+| Consent, estimates, one-time notices, queue hold | DataStore | – | n/a (separate file) |
+| UI language | AppCompat per-app locales (system on API 33+, `autoStoreLocales` below) | – | – |
 
-## 3. Background work
+Rules:
 
-### 3.1 Transcription: `ProcessingService` + `ProcessingCoordinator` + `TranscriptionJob`
+- Whenever a document is written (adopt, relabel, retitle, merge), the repository rebuilds every cache row of that note from the document in the same Room transaction that points the row at the new file signature (`length:mtime`). When a Note screen opens, `refreshIfStale` compares `notes.document_signature` with the file and re-derives the cache when they differ. This covers a crash between the file rename and the row update. `refreshIfStale` never overwrites `notes.title`; it sets `title_dirty` when the document title differs.
+- While a job row exists for a `DOCUMENT` note (QUEUED, RUNNING, PAUSED, FAILED with a checkpoint), `document.opus` is the job's audio source and its signature is in the checkpoint. Nothing rewrites it then: relabel and merge on the sealed document are refused (the UI disables them, features.md section 3), and a rename only updates the row and sets `title_dirty`; adopt writes the title afterwards.
 
-Transcription never runs in an Activity. `ProcessingCoordinator` (AppGraph singleton) owns the running `Job` and a `StateFlow<Map<NoteId, ProcessingState>>` with states `Idle`, `NeedsConsent`, `Queued`, `Downloading(model, pct, bytes)`, `Running(stage, doneMs, totalMs, elapsedMs, draftWords, draftSpeakers, eta, battery)`, `Pausing`, `Paused(doneMs, totalMs, reason)`, `Failed(failure)`, `Done(noteId, documentPath)`. One job runs at a time on `InferenceDispatcher` (one thread, like the old executor, so every native handle lives on one thread); a second request is `Queued`.
+### 3.2 File layout under `filesDir`
 
-Consent is enforced in `ProcessingCoordinator.start()` and again in `TranscriptionJob.installModels`. If `ModelRepository.consented()` is false and the start did not come from the user confirming the consent dialog, the job ends in `NeedsConsent` without touching the network, and the app shows a "Ready to transcribe" card and notification. Tests cover two cases: a job started without Parakeet never calls `ArtifactFetcher`, and an intent redelivered after the model was deleted ends in `NeedsConsent`.
-
-`ProcessingService : LifecycleService` only holds the foreground lifetime:
-
-- Manifest: `android:foregroundServiceType="mediaProcessing|dataSync"`, permissions `FOREGROUND_SERVICE_MEDIA_PROCESSING` and `FOREGROUND_SERVICE_DATA_SYNC`.
-- `startForeground` type: the model download stage runs as `DATA_SYNC`. Inference runs as `MEDIA_PROCESSING` on API 35+ (the type Android documents for time-consuming work on media; it has a 6 h per 24 h budget), so the service calls `startForeground` again with the new type when inference begins. On API 29-34 inference stays `DATA_SYNC` (Android's own list includes "local file processing"; API 34 has no better type and no timeout callback). Below 29 the service is untyped.
-- `startForeground` inside `onStartCommand` is wrapped in a `try`/`catch` for `ForegroundServiceStartNotAllowedException`, `SecurityException` and `InvalidForegroundServiceTypeException`. On any of them the service posts "Ready to transcribe" with an Activity intent and calls `stopSelf()`. The callers keep their own catch as well.
-- `onTimeout(startId, fgsType)` (API 35+): immediately post "Processing paused by Android" with an Activity `PendingIntent` (content and Resume), call `stopForeground(STOP_FOREGROUND_REMOVE)` and `stopSelf()` synchronously without waiting for the job, ask `coordinator.systemStop(noteId)` to stop the job on a best-effort basis, and write a `system-paused` marker so every screen shows Paused. The job writes its checkpoint at the next window boundary (at most one 28 s window of audio, a few seconds of CPU). A system stop is always shown as a pause with a Resume action, never as an error. After a timeout, Resume works only from the visible Note screen.
-- Start paths: the Note screen (visible Activity), the Resume notification action, and `RecordingService` finishing with consent. Notification actions that start the service use `PendingIntent.getForegroundService`; after a timeout they use Activity intents. `POST_NOTIFICATIONS` is requested before the first Transcribe on the Note screen as well as on the Recording screen.
-- Recording to processing hand-off: `ProcessingCoordinator` exposes `serviceForeground: StateFlow<Boolean>`, which `ProcessingService` sets right after `startForeground` returns. `RecordingService` calls `startForegroundService(ProcessingService)` and stops its own foreground only after `serviceForeground` is true or 10 s have passed. An app with a running foreground service counts as foreground for the Android 12+ start restriction, so this order keeps the start legal. If the start fails, the user gets the "Ready to transcribe" notification. If a type's time budget is exhausted (also reported as `ForegroundServiceStartNotAllowedException` on 35+), the same notification says so.
-- `START_REDELIVER_INTENT` with an `attempts` counter stored in the Room `meta` table (`attempts.<checkpoint key>`), not in the checkpoint directory. After a process kill the job resumes from the last window checkpoint at most twice, then leaves a Resume notification (no crash loops). Automatic resume after process death is best effort: it is guaranteed only on API 34 and below, or while the app is visible.
-- The service collects coordinator state into a `NotificationCompat` progress notification (channel `processing`, IMPORTANCE_LOW, actions Stop and Open, 1 Hz). Notification text comes from `ContextCompat.getContextForLanguage(this)`, so it follows the app language. While `Running` the service holds a `PARTIAL_WAKE_LOCK` "Cassini:processing", re-acquired with a 10 minute timeout at every window boundary and released on `Paused`, `Failed`, `Done` and while idle in `Downloading`. It stops itself only after `job.join()`, so the foreground service outlives any native call that is still finishing.
-- `POST_NOTIFICATIONS` denied (API 33+): the service still runs; the Note and Library screens show the progress card with Stop, and Settings explains the missing notification with a deep link.
-
-Cancellation around native calls that cannot stop mid-call: `TranscriptionJob.run` executes as `withContext(inference) { runInterruptible { ... } }`. Cancelling the `Job` interrupts the inference thread; the 21 verbatim `Thread.currentThread().isInterrupted` polls turn into `Failure.CANCELLED` at the next check; a sherpa call in flight completes first (at most one 28 s window), then `finally` blocks release the Sortformer, recogniser and encoder. The old four signals collapse into `stop(noteId)` (finish the current window, save the checkpoint, throw `ProcessingPaused`, end in `Paused`) and `cancel(noteId, discard)` (`Job.cancel`; `discard` deletes the checkpoint directory after join). While a cancelled job's native call still holds `NativeBudget`, the next job shows "Waiting for the previous job" instead of appearing hung.
-
-The decode loop is a blocking function that runs on the inference thread. It uses the blocking entry points of `CheckpointRepository` and `DocumentRepository`, or sends window events over a `Channel` to a supervising coroutine. It never calls `runBlocking` inside the native loop.
-
-Memory: catching `OutOfMemoryError` at the job boundary covers only the Java heap; such an error ends in `Paused(reason = MEMORY)` with the last checkpoint intact. The real strategy for native out-of-memory kills is the window checkpoint plus intent redelivery. Before loading models the job reads `ActivityManager.MemoryInfo` and `isLowRamDevice` and warns when memory is short. `largeHeap` stays until measured.
-
-Checkpoints: unchanged on-disk contract (section 5.2), saved whenever `doneMs` advances and on stop, atomically, after `audio.opus.part` and `clips.pcm` are fsynced. Draft names, merges and remember choices made while processing go through `coordinator.setDraftName/merge/remember` into `names.json`. After `finish`, the sealed document is adopted through `LibraryRepository` first and the checkpoint discarded second; `processing_paused` on the row is derived from the existence of a valid checkpoint, which fixes the stale library card after a crash.
-
-Model downloads are the first stage of the same job (consent dialog quoting `ModelCatalog.missingBytes` unchanged; consent == Parakeet installed) and also a standalone job from the Models screen. The Silero VAD joins the install sequence (no raw `Thread`). Diarizer/voiceprint failures degrade to one speaker / no names, as today.
-
-Process-death matrix: Activity recreation (rotation, locale, dark mode, font scale) does not touch the job; a `ViewModel` resubscribes by note id. UI process trimmed while the service runs: same process, nothing happens. Process killed: the redelivered intent resumes from the checkpoint (at most 28 s of audio lost), best effort as above; the device test kills the process with `adb shell am kill`, not `force-stop`. Reboot: no auto-resume; the note shows Resume.
-
-### 3.2 Recording: `RecordingService` + `RecordingController`
-
-`RecordingController` (AppGraph singleton) owns the `MicrophoneCapture` on a dedicated single-thread dispatcher and exposes `StateFlow<RecordingState>` (`Idle`, `Starting`, `Recording(file, elapsedMs, amplitude, paused, notice)`, `Stopping`, `Finished(noteId)`, `Failed(failure)`) plus `activeFile`, which replaces the static `RecordingService.live`. The 1 s limit check is a coroutine loop applying the pure `RecordingPolicy.decide(elapsedMs, usableSpace)` (2 h cap, 5-min warning, 200 MiB floor; unit tested).
-
-`RecordingService : LifecycleService` with `foregroundServiceType="microphone"` is started only from the visible Recording screen (Android 14 rule), calls `startForeground(FOREGROUND_SERVICE_TYPE_MICROPHONE)` first, holds the partial wake lock (2 h 10 min), and renders a `NotificationCompat` notification with Pause/Resume/Stop actions and a chronometer. `finish(title)` is asynchronous: `serviceScope.launch { withContext(IO) { capture.stop() }; libraryRepository.createRecordedNote(...); state = Finished }` then `stopForeground`/`stopSelf` (after the processing hand-off in section 3.1 when transcription follows); the 10 s join and the catalogue writes leave the main thread, and the title typed on screen travels with `finish`, so edits after Done are kept. `START_NOT_STICKY` stays; crash repair stays via `RecoveryRepository` on the next library load; orphan `.rec.m4a` files are catalogued when `MediaExtractor` can open them, else listed under Storage.
-
-The recorder no longer requests audio focus on API 29+ (a recorder must not pause the user's music). It registers `AudioManager.registerAudioRecordingCallback` and treats `isClientSilenced` for its own client session id as the authoritative "paused by the system" signal (calls, privileged recorders). When `isClientSilenced` turns false again, the recording stays paused until the user resumes it, as in 0.1.0. On API 26-28 the old transient focus listener is kept as the only available signal, re-requested after every resume. `POST_NOTIFICATIONS` is requested independently of `RECORD_AUDIO` on API 33+.
-
-## 4. UI
-
-Jetpack Compose, Material 3, one `MainActivity : AppCompatActivity`. AppCompat is needed only for `AppCompatDelegate.setApplicationLocales`, which replaces `AppLanguage`; `AppLocalesMetadataHolderService` with `autoStoreLocales` is declared in the manifest. The legacy `interface/language` preference is migrated once, in `MainActivity.onCreate` on the main thread, only when `SDK_INT < 33`, and the migration is journaled in Room `meta`. The preference itself is kept, so a downgrade on API < 33 keeps the language. A Robolectric test at SDK 32 checks that notification text follows the app locale. Until P4 the old `AppLanguage` keeps working.
-
-An `<activity-alias android:name=".LibraryActivity" android:targetActivity=".MainActivity">` carries MAIN/LAUNCHER so existing home-screen shortcuts keep working. `MainActivity` keeps the exported ACTION_VIEW filter (content/file schemes, `audio/ogg`, `audio/opus`, `application/ogg`) and uses `launchMode="singleTop"`, not `singleTask`. `enableEdgeToEdge()`, `android:enableOnBackInvokedCallback="true"`, no `configChanges`. Until P4 the manifest sets `android:enableOnBackInvokedCallback="false"` explicitly, because the old Activities override `onBackPressed`; P4 flips it together with the Compose UI and targetSdk 36. The manifest attributes newer than `minSdk` (`enableOnBackInvokedCallback`, `localeConfig`, `dataExtractionRules`) carry `tools:targetApi` on `<application>` instead of a lint baseline entry.
-
-Navigation 3 (`navigation3-runtime`/`navigation3-ui` 1.2.0, `lifecycle-viewmodel-navigation3` 2.11.0). `rememberNavBackStack(Library)` with `@Serializable` keys `Library`, `Note(noteId)`, `Recording`, `Settings`, `People`, `Models`, `Storage`, `About`, `Licenses` (kotlinx-serialization is used in `:app` only, for these keys). `NavDisplay(entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator(), rememberViewModelStoreNavEntryDecorator()), entryProvider = entryProvider { entry<Note> { ... } })` (names verified against 1.2.0). An externally opened file (ACTION_VIEW) pushes `Note(id)` on top of the existing back stack; when the stack is empty, `Library` goes underneath, so back always lands in the library. A recording in progress stays reachable through a banner. Import runs `DocumentRepository.import` on IO regardless of a running job.
-
-State holders: one ViewModel per screen (`viewModel { }` factories pulling from `AppGraph`), one immutable `UiState` per screen as a `StateFlow` built with `combine` + `stateIn(WhileSubscribed(5_000))`, events as functions, `SavedStateHandle` for the note id, search query, scroll anchor and any open dialog's pending input. The speaker naming state machine from `MainActivity.applySpeakerName` (rename, pick saved person, merge with confirmation, remember voice, not this person, "same person as saved X?", "rename everywhere?") becomes a pure reducer in `ui/note/SpeakerNaming.kt` with unit tests.
-
-Default speaker labels: sealed documents and `names.json` carry only label strings, so default-label detection stays the `:core` string scan `DefaultLabels.isDefault(id, label)` over every placeholder prefix ever shipped, applied to labels from both sources. An `isDefault` flag may be used only for draft state inside a running job. The labels the engine writes do not change.
-
-Screens: Library (LazyColumn with day groups, search over FTS, state chips, swipe/long-press rename and delete, Record FAB, Import and Settings actions, "Recording..." and processing banners bound to the controllers); Note (top bar with overflow: Transcribe/Transcribe again, Choose transcript, Speakers, Save Cassini via `CreateDocument("audio/ogg")`, Info, Delete; a pinned processing card with stage, progress, ETA band, battery projection and Stop; the transcript as a `LazyColumn` of speaker turns, each turn one `Text` whose words are `LinkAnnotation.Clickable` (seek + play) so TalkBack navigates them individually, the active word highlighted by swapping one `SpanStyle`; speaker label chips with `role = Button`; "Name?" suggestion chips; bottom playback bar with slider, -10 s / play-pause / +10 s; an `UNREADABLE` document shows its read error and still offers Transcribe); Recording (permission flow via `RequestMultiplePermissions`, title field, 64 sp mono timer with `liveRegion`, waveform `Canvas`, Pause and Done, back shows "Keep recording / Stop and save"); Settings; People (rename, forget, forget all); Models (status, size, download, delete); Storage (rescan documents, discardable checkpoints, orphan captures); About; Licenses (renders `assets/licenses`). Dialogs are `AlertDialog`/`ModalBottomSheet` composables driven by ViewModel state, so they survive recreation.
-
-Playback stays on `MediaPlayer` inside `PlaybackController` (a 150 ms position flow while playing, position persisted on pause through the repository). It requests `AUDIOFOCUS_GAIN` with `USAGE_MEDIA` and `CONTENT_TYPE_SPEECH`, and pauses on focus loss and on `ACTION_AUDIO_BECOMING_NOISY`. Media3 was rejected: the current behaviour is device-validated and the use case is seeking inside one local Opus file.
-
-Theme: `CassiniTheme` with light and dark `ColorScheme`s from the brand tokens (ink `#10120F`, amber `#F4C56A`, paper `#E8E5D9`, muted `#A9B09F`), system dark mode (the old app forced dark), no dynamic colour, Material type scale, monospace for timers, the cassette drawing ported to `Canvas`; adaptive launcher icon in `mipmap-anydpi-v26` with a monochrome layer. Accessibility: `contentDescription` on every icon button, `liveRegion` on status text, `stateDescription` for paused/recording, 48 dp targets, state never shown by colour alone, every composite string a format resource, plurals for counts. `testTag`s replace `ids.xml`.
-
-## 5. Data and the in-place migration
-
-### 5.1 What stays on disk, unchanged
-
-Everything under `filesDir` of `org.cassini.android` (backup excluded as today):
+`filesDir` is excluded from backup and device transfer (`data_extraction_rules.xml`, `fullBackupContent=false`).
 
 ```
-documents/<uuid>.opus | <sha256>.opus | <sha256>.input | <uuid>.rec.opus | <uuid>.rec.m4a
-          <uuid>.wav | <uuid>.m4a                        <- legacy 0.0.x captures (plain audio, inline transcript)
-          transient .part/.src/.tmp
-processing-checkpoints/<sha256(uri)>/checkpoint.json(+.bak) names.json(+.bak) audio.opus.part clips.pcm
-voices.json  voices.generation  voiceprints/<meetingId>.json
-parakeet-v3/ (4 artifacts + verified)  vad/ (silero_vad.onnx + verified)  speaker-models/ (2 models + verified + verified-voiceprint)
-library.json(+.bak)  library-migrated  session.json(+.bak)      <- frozen read-only legacy inputs from 0.2 on
-latest.words.json latest.processing.json                        <- deleted once
-SharedPreferences interface/language (kept), processing-estimates/finalizationMs, recording (legacy key removed)
+cassini.db, cassini.db-wal, cassini.db-shm   Room catalogue (opened by absolute path under AppPaths.root)
+settings.preferences_pb                      DataStore Preferences
+notes/<noteId>/                              one directory per note; <noteId> = UUID v4 string
+    capture.opus | capture.m4a               microphone capture (live while audio_kind = LIVE_CAPTURE)
+    source.<ext>                             imported non-Cassini audio; ext sanitised to [a-z0-9]{1,5}, "bin" if unknown
+    document.opus                            sealed Cassini document; once it exists it is the note's audio
+    document.opus.tmp, source.tmp            transient writes (fsync, then rename into place)
+    work/                                    transcription state, only while a job is unfinished
+        checkpoint.json (+.bak)              CheckpointState version 1
+        names.json (+.bak)                   draft labels, merges, remembered, automatic, generation, live, rejected
+        audio.opus.part                      libopus output for non-Opus sources
+        clips.pcm                            selected voice clips (at most 8 x 45 s), raw 16 kHz f32le (audio, not voiceprints)
+        sealed.opus                          the finished document, written by the job's seal step
+        sealed                               marker: sealed.opus is complete and verified; adopt may install it
+voices/                                      all voiceprints and voice matches, and nothing else
+    people.json                              VoiceCodec version 1 (saved people)
+    generation                               integer, bumped by "Forget everyone"
+    notes/<noteId>.json                      NoteVoiceCodec version 2 (keys <variantId>/<speakerId>)
+    pending/<noteId>.json                    final prints and matches of a sealed job awaiting adopt (same codec)
+parakeet-v3/  vad/  speaker-models/          models, names and marker files exactly as ModelCatalog pins them
 ```
 
-New in 0.2: `cassini.db` (Room) and the DataStore file `settings.preferences_pb`. Nothing else is added, renamed or removed. The portable document format (OpusTags vendor `cassini-android/0.3`, manifest and payload tags, audio digest `org.cassini.opus-packets/1`, speaker ids `diar_<uuid>_N`, variant ids `words`/`words-<8hex>`, provenance keys including the `x-*` keys) is a versioned external contract and does not change.
+`cacheDir/exports/` holds transient export files and is deleted after each write and at start.
 
-### 5.2 Checkpoint contract (version 1, kept)
+Note-directory rules:
 
-`checkpoint.json`: `version`, `source`, `signature` (`length:mtime`), `model` (Parakeet revision), `speakers` (diarizer sha256), `recognition{inferenceMs, chunks[{start, end, window (b64 f32le), words (cassini.words.v1)}]}`, `encoder{...libopus history, Ogg LiveState, length}`, `diarizer{cache (b64, <= 200000 floats), elapsedMs, turns}`, `speakerPrefix`, `speakerFailure`, `clipSamples`, `voiceClips`, `positionSamples`, `doneMs`, `durationMs`, `elapsedMs`. `names.json`: `labels`, `merges`, `remembered`, `automatic`, `generation`. The typed codec reads and writes exactly these keys; a committed 0.1.0 checkpoint directory is a golden fixture (semantic equality on the JVM, byte identity in the device test, because the JVM org.json jar and Android's org.json order keys differently).
+- A note has exactly one current audio file, named by `notes.audio_file`.
+- The job never writes `document.opus`. It seals into `work/sealed.opus`, verifies it, then writes the `work/sealed` marker. Adopt (section 5.4 step 10) installs it: rename `work/sealed.opus` over `document.opus`, fsync the directory, update the row and cache in one transaction, delete the previous `capture.*`/`source.*` file, then delete `work/`. A crash at any point either leaves the old audio untouched (no marker) or leaves a marker that the next start finishes (section 5.3).
+- For a non-Opus source the document holds a 24 kb/s libopus re-encode. `PRIVACY.md` and the CHANGELOG say so.
+- Edits outside a job (relabel, retitle, merge) write `document.opus.tmp`, fsync, rename over `document.opus`, fsync the directory. `PlaybackController` re-prepares after a replace and keeps its position.
+- Writes to one note are serialised by the note's lock in `NoteLocks` (section 7).
 
-### 5.3 The migrator
+The model directories stay at the `filesDir` root with their 0.1.0 names. `ModelCatalog` pins these names and markers (`parakeet-v3/verified` = Hugging Face revision, `vad/verified`, `speaker-models/verified` and `speaker-models/verified-voiceprint` = SHA-256). `AppPaths.modelRoot` defaults to `root` but is separate, so instrumentation tests can use a scratch root while sharing the installed models, or an empty scratch model root to show the download screens.
 
-`FilesDirMigrator.run()` executes once per process on IO before the library is shown, idempotent, and journals in the Room `meta` table. Steps:
+On emulator-5554 the old app's files (`documents/`, `library.json`, `voices.json`, and so on) stay where they are. The new app neither reads nor deletes them.
 
-1. Open Room (creates `cassini.db`).
-2. Legacy model cleanup, every launch: `parakeet-v3-fp32/`, retired pyannote/ERes2Net files in `speaker-models/`, the `recording` preference key (the `CassiniApplication` work, off the main thread).
-3. Library import: read `library.json` with `AtomicFile` semantics; compute its sha256; if `meta.library.sha256` differs, parse it (version must be 1; otherwise leave the file untouched, journal the failure, and run step 5). The first import inserts every note. A later import, after the sha changed, only adds rows that are absent, whose id is not tombstoned, and whose uri still exists; it never overwrites a 0.2 row. Carried fields: `createdAt`, `session.uri`, `name` -> title, `document`, `selectedVariant`, `durationMs`, `positionMs`, `inferenceMs`, `processingMs`, `processingPaused`, `resultPrecision`, inline transcript when `document == null`, `text` -> `search_text`. Record the sha. Because the sha is compared on every launch, a 0.2 -> 0.1 -> 0.2 round trip imports the notes 0.1.0 added in between.
-4. Session adoption: same sha rule for `session.json`; a uri absent from the catalogue is inserted (the old `LibraryStore.adopt`), its `positionMs`/`selectedVariant` carried, its note id becomes the last-opened note; `screen` is dropped.
-5. Documents rescan when `library-migrated` is absent or step 3 found the index unreadable: the verbatim port of `LibraryStore.migrate` (group `documents/*.opus` by `CASSINI_MEETING_ID`, prefer the session's variant, fill search text), rows tagged `origin = recovered`. After a successful rescan it writes `library-migrated`, as 0.1.0 does. The same routine is Settings -> Storage -> "Rescan documents", the permanent safety net.
-6. Checkpoints: each `processing-checkpoints/<key>/` whose `checkpoint.json` loads and whose `source` matches a note sets `processing_paused = true`; others are listed under Storage as discardable. Nothing deleted.
-7. Capture recovery and orphan sweep: `*.rec.opus` without a note -> repair + catalogue as "Recovered recording"; `*.rec.m4a` without a note -> catalogue if playable, else list; transients on the allow-list (`.part`, `.src`, `.tmp`) older than one hour deleted.
-8. Delete `latest.words.json` and `latest.processing.json`.
-9. Copy `processing-estimates/finalizationMs` into DataStore. The `interface/language` preference is applied by `MainActivity` (section 4) and is not removed.
-10. `meta.schema = 2` after the Room transaction commits.
+### 3.3 Room schema (`org.cassini.data.db.CassiniDatabase`, version 1)
 
-Rules: `library.json` and `session.json` are frozen read-only inputs. No step rewrites, renames or deletes them, a document, a checkpoint, a voice file or a model; the one permitted mutation is `AtomicFile`'s rename of `.bak` over a damaged file when it reads. A crash between steps re-runs them on the next launch. Deleted note ids are tombstoned in `meta`, so a later re-import does not bring them back. Downgrading to 0.1.0 after an upgrade shows the catalogue as it was at upgrade time plus whatever 0.1.0 adds; notes created by 0.2 stay in `documents/` and are recovered by rescan on re-upgrade. `retire` never deletes a document that the frozen files reference. `library-migrated` is left in place.
+`exportSchema = true`, with schemas in `data/schemas/`. Enums are stored as `TEXT` through `TypeConverter`s using stable names, never ordinals. The enums are defined in `:core` `library/` so that `:data` and `:engine` share them.
 
-Fixtures: real `filesDir` trees captured on the emulator from the builds users actually run, committed under `fixtures/filesdir/`:
+**`notes`**: `id` TEXT PK (UUID; also the directory name), `title` (1-200 chars, trimmed, never blank; authoritative), `title_dirty` (the document title differs and must be rewritten), `created_at` (epoch ms the audio was recorded: capture start, the document's `meeting.createdAtUtc`, else import time), `added_at`, `origin` (`RECORDED | IMPORTED_AUDIO | IMPORTED_DOCUMENT | RECOVERED`), `audio_file`, `audio_kind` (`LIVE_CAPTURE | PLAIN | DOCUMENT | UNPLAYABLE`), `duration_ms` (0 = unknown), `source_sha256` (hex SHA-256 of imported bytes, for dedupe; null for recordings), `document_state` (core `DocumentState`, null unless `DOCUMENT`), `document_error`, `document_signature`, `meeting_id`, `selected_variant`, `position_ms`, `preview` (the Library preview excerpt, features.md section 1; null = start of the transcript), `trust_acknowledged`, `trashed_at` (null = live), `trashed_job` (the job state and kind when the note was trashed, for Restore; null = none), `updated_at`. Indices on `created_at`, `trashed_at`, `source_sha256`.
 
-- `v0.0.6-beta`: `library.json` with `fp32`/`modelChoice` session keys, `parakeet-v3-fp32/`, retired speaker files, no voices, no checkpoints.
-- A 0.0.4-style shape: `.m4a` captures only, no `library.json`, `parakeet-v3-fp32/`.
-- `v0.1.0-basic`: plain-audio note with inline transcript, sealed document note with `voiceprints/<mtg>.json` and a `voices.json` person, stopped-partial note with a small real checkpoint directory, `session.json` pointing at note 2.
-- `v0.1.0-corrupt-library`: a corrupt `library.json` with no `.bak`, and a second shape with an intact `library.json` plus a stale partial `library.json.new`. Expected result: the file is untouched, the failure is journaled, the rescan rebuilds the rows, and `.new` is left alone.
-- `v0.1.0-pre-library`: documents only, no marker.
-- `v0.1.0-rec-crash`: truncated `.rec.opus`, orphan `.rec.m4a`, stale `.part`. This fixture is excluded from the "documents/ unchanged" check, because repair truncates by design.
-- `empty`.
+**`variants`** (PK `note_id, variant_id`; cascade from `notes`): `ordinal` (manifest order), `is_default`, `created_at_utc`, `language` (`""` when not identified), `kind` (`TRANSCRIBED | MERGED`; MERGED when the provenance has `x-speakerMerges`), `derived_from` (`x-derivedFromTranscript`), `word_count`, `speaker_count`, `speakers_told_apart` (provenance has `x-speakerDiarization`), `inference_ms` (`x-inferenceMs`), `readable`, `error`.
 
-Committed trees contain uris that start with the device's files root. `FixtureTree.materialise(root)` (in `data/src/test`, and the same steps in `scripts/upgrade-check.sh`) rewrites that prefix in `library.json`, `session.json` and each `checkpoint.json` `source`, renames each `processing-checkpoints/<key>` to the sha256 of the rewritten uri string, and restores source modification times from a committed `.mtimes` manifest, so the `signature` (`length:mtime`) still validates.
+**`speakers`** (PK `note_id, variant_id, speaker_id`; cascade from `variants`): `ordinal` (first appearance in words), `label` (manifest label verbatim), `is_placeholder` (`DefaultLabels.isDefault`), `placeholder_number`, `speaking_ms`, `word_count`, `turn_count`, `first_ms`, `sample_start_ms`, `sample_end_ms` (the "Play a sample" window; null when no turn reaches 1 s).
 
-Fixtures contain no real voiceprints: `voices.json` and `voiceprints/` embeddings are random unit vectors written by `LegacyWriters` (the 0.1.0 `SessionStore`/`LibraryStore`/`ProcessingCheckpoint`/`VoiceStore` code kept verbatim under `data/src/test`), which also synthesise further shapes. Where building an old tag is impractical, a fixture may be synthesised by running these verbatim 0.1.0 writers; for `checkpoint.json`, a tree captured on a device is preferred. The owner's Pixel 8 (real 0.1.0 data) is the final manual check before release; it is never copied into the repository.
+**`note_text`** (INTEGER `rowid` PK so VACUUM cannot renumber it; unique `note_id`; cascade) with `title` and `body` (the selected variant's words joined by spaces, `""` without a transcript). **`note_fts`** is an external-content FTS4 table over it with `tokenizer = unicode61` and `remove_diacritics=1`. Room writes the sync triggers. `note_text.title` changes with `notes.title` in one transaction; `body` is rewritten whenever the selected variant or the document changes.
 
-## 6. Native runtime and build
+**`jobs`** (PK `note_id`, at most one job per note; cascade): `seq` (FIFO order, `max(seq)+1` at enqueue), `kind` (`TRANSCRIBE | TRANSCRIBE_AGAIN`), `state` (`QUEUED | RUNNING | PAUSED | FAILED | NEEDS_CONSENT`), `pause_reason` (`USER | SYSTEM | MEMORY | INTERRUPTED`), `failure` (core `Failure` name, a download error name, or `CHECKPOINT_MISMATCH`), `done_ms`, `total_ms`, `words` (from the last checkpoint), `attempts` (automatic restarts since the last user action; bumped only by `reconcileOnStart`), `enqueued_at`, `updated_at`. Indices on `state` and `seq`.
 
-- AAR: `scripts/build-native-aar.sh` keeps the pinned fork + patch + ONNX Runtime 1.27.1 build and installs the AAR and a generated POM into `native/m2/org/cassini/native/sherpa-onnx-nemotron/1.13.7-1f23907a/` (gitignored; `native/m2/README.md` is committed). `settings.gradle.kts` registers `native/m2` as a `maven { content { includeGroup("org.cassini.native") } }` repository. `scripts/fetch-native-aar.sh` downloads the AAR from the GitHub release `native-sherpa-onnx-1.13.7-nemotron.2` (the current patched build, sha256 `d376f7e25707cf6834208db297e5955c8e02117131740df7ff7fd6ca17216068`, pinned in `scripts/native-dependencies.json` under `sherpa-onnx-aar` together with the hash of the patch it was built from) and installs it the same way. The older release `.1` holds a build made before the streaming patch (sha256 `d03a06f8...`, without `processStreamingChunk`, `saveStreamingState` and `restoreStreamingState`); never use it. `scripts/setup.sh` first fetches the libopus source, then takes the AAR from the first source that works: (1) `native/m2` already holds the pinned AAR; (2) the legacy local file `app/libs/sherpa-onnx-1.13.7-nemotron.aar` matches the pin and is installed into `native/m2`; (3) `scripts/fetch-native-aar.sh`; (4) `scripts/build-native-aar.sh`. `setup.sh --from-source` goes straight to (4). `scripts/verify-native-runtime.sh` compares the installed AAR with the pin, checks that the patch has not changed since the pin was recorded, and checks that the version catalog asks for the pinned version. CI's build job runs `setup.sh --prebuilt-only`, which fails instead of falling back to (4). A weekly CI job rebuilds from source and records the source-built hash beside the pinned one; a mismatch raises a warning and does not fail the job, because the source build is not yet shown to be byte-reproducible.
-- `libcassini_opus.so`: AGP `externalNativeBuild` (CMake 3.22.1, which AGP installs from the SDK when missing; NDK 28.2.13676358; `-DOPUS_SOURCE=<root>/.tools/opus/source` from `scripts/fetch-opus-source.sh`, sha-pinned; `-DANDROID_STL=c++_static`). It is built by `:engine` since P1. `-DCMAKE_BUILD_TYPE=Release` is forced in every variant, on the command line and in `CMakeLists.txt`, so debug builds encode exactly like release builds (`-O3 -DNDEBUG`, the flags of the old hand-run build); the Gradle-built library is identical in code and data to the one the old `scripts/build-opus-jni.sh` produced. A `checkOpusSource` task fails `preBuild` with "run scripts/setup.sh" when the source is missing, and refuses a stale `src/main/jniLibs/*/libcassini_opus.so` left by a 0.1.0 checkout. AGP strips, aligns and packages the library; `jniLibs/`, `checkNativeOpus` and the hand-run CMake loop are gone.
-- ABIs: `ndk { abiFilters += listOf("arm64-v8a", "x86_64") }` stays in `:app`'s `defaultConfig` in every phase, because `abiFilters` in a library module do not filter the packaged ABIs. `scripts/apk_compatibility.py` (64-bit ABIs only, 16 KB ELF and ZIP alignment) must pass on the debug APK in every phase.
-- Toolchain (every version resolved and built together on this machine with JDK 17): Gradle 9.7.0 (wrapper with `distributionSha256Sum`), AGP 9.3.1 with `android.builtInKotlin=false` and `android.newDsl=false`, Kotlin Gradle plugin 2.4.21 (`org.jetbrains.kotlin.android`/`jvm`, `plugin.compose`, `plugin.serialization`), KSP 2.3.12, Room 2.8.5 with the Room Gradle plugin, Compose BOM 2026.09.00 (material3 1.4.0, ui 1.12.1), Navigation 3 1.2.0, compileSdk 37 (`platforms;android-37.0`, required by current AndroidX), build-tools 36.0.0, CMake 3.22.1, NDK 28.2.13676358, minSdk 26, Java 17 source/target (no toolchain download). The two `android.*` flags are deprecated and removed in AGP 10; they are a temporary opt-out. This combination sits inside the Kotlin plugin's documented support range (KGP 2.4.20-2.4.21: AGP 8.5.2-9.3.1, Gradle 7.6.3-9.7.0). AGP 9.4.1 + Gradle 9.8.1 with AGP's built-in Kotlin and the Compose plugin 2.4.21 was also verified to compile and is the documented forward path once the opt-out flags disappear. Always run Gradle with `JAVA_HOME` pointing at JDK 17.
-- targetSdk: 34 through P3, because the old view-based UI is not edge-to-edge safe; 36 in P4 together with the Compose UI.
-- Version catalog: `gradle/libs.versions.toml`. Bundles contain only artifacts with an explicit version; BOM-managed artifacts such as `compose-ui-test-junit4` are declared next to `platform(libs.compose.bom)` in each module.
-- Tests on the JVM: Robolectric 4.17 pinned to SDK 35 by `src/test/resources/robolectric.properties` (`sdk=35`) in every module that uses Robolectric, with one test asserting `Build.VERSION.SDK_INT == 35`. SDK 36+ requires a JDK 21 runtime, which this machine and CI do not have; it is one property to change later. Unit tests get the `--add-opens` jvmArgs Robolectric documents and `isIncludeAndroidResources = true`.
-- Release: R8 (`isMinifyEnabled` + `isShrinkResources`, `proguard-android-optimize.txt`). `scripts/package-apk.py` copies the R8 mapping into `dist/` as `cassini-android-VERSION-mapping.txt` with its checksum, so the tag's GitHub release carries it beside the APK and crash traces can be decoded. The minified APK cannot be instrumented (R8 removes app and Kotlin library members only the tests call), so a `releaseTest` build type (`initWith(release)`, same signing, no R8) is the tag builds' device-test target, and CI installs the published release APK over it and checks that it launches (`scripts/launch-check.sh`). The keep rules keep members, not just class names: `-keep class com.k2fsa.sherpa.onnx.** { *; }`, `-keep class com.github.luben.zstd.** { *; }`, `-keep class org.cassini.android.NativeOpus { *; }`, every class with `native` methods, and kotlinx-serialization from P4.
-- zstd-jni 1.5.7-22: the `@aar` artifact in the app, the plain jar (desktop natives) in JVM tests. It moved together with compileSdk 37.
-- Lint: `warningsAsErrors`, `abortOnError`, `checkDependencies`, `app/lint.xml`, and a committed baseline that holds only pre-existing UI issues that P4 removes. `MissingTranslation` is an error, with `translatable="false"` on the five shared keys. `OldTargetApi` is ignored while targetSdk trails the latest level. The version-freshness checks (`AndroidGradlePluginVersion`, `GradleDependency`, `NewerVersionAvailable`) are ignored because they depend on the network and the build date; Dependabot proposes updates. `UsableSpace` is ignored because the free-space floors compare against usable space on purpose (the app never calls `StorageManager.allocateBytes`).
-- Style: detekt 1.23.8 with `detekt-formatting` (one tool, one baseline in `config/detekt/baseline.xml` for code that predates it; new code must be clean), `.editorconfig` (4 spaces, 140 columns), ruff for the Python scripts (`config/ruff.toml`). detekt 1.23.8 parses Kotlin with a 2.0 parser, so the code avoids syntax that needs Kotlin 2.1 or later: guard conditions in `when`, non-local `break`/`continue`, context parameters and explicit backing fields.
-- Signing: the beta certificate stays (a new key would strand every installed user). The build creates the release signing config only when `CASSINI_BETA_KEYSTORE_FILE` is set, and reads `CASSINI_RELEASE_STORE_PASSWORD`, `CASSINI_RELEASE_KEY_PASSWORD` and `CASSINI_RELEASE_KEY_ALIAS` from the environment; there are no literals in Gradle. CI passes `${{ secrets.X || 'android' }}`-style fallbacks so tag builds keep working before the secrets exist; the fallbacks are temporary until the owner rotates the passwords offline.
-- CI: JDK 17; SDK packages `platforms;android-37.0 build-tools;36.0.0 ndk;28.2.13676358 cmake;3.22.1`; checkout with submodules; wrapper validation; `checks` (detekt, actionlint, shellcheck, ruff), `build` (all module tests, lint, debug + release assemble, prebuilt AAR), `emulator` matrix 26/29/34/35 with annotation-selected device tests, `models` (weekly/dispatch, downloads the models once into a cache and runs the model-backed suite on API 34), `native` (weekly from-source reproducibility), `release` on tags. Dependabot watches Gradle, GitHub Actions and the submodule.
+**`note_voice_links`** (PK `note_id, variant_id, speaker_id`; index on `voice_id`; cascade): a mirror of the matches in `voices/notes/<id>.json`, with `voice_id` (null for no match), `state` (`Match.State` name), `score`, `seconds`. Room never holds embeddings. Every write to a per-note voice file rewrites that note's links in the same call, and startup re-syncs all links from the files (section 4.8).
+
+Required queries: `libraryFlow` (live notes by `created_at` DESC, left-joined with `jobs` and the selected `variants` row, plus `notes.preview` or the first 160 characters of `note_text.body`), `search(fts)` (with `snippet(note_fts, char(2), char(3), '…', 1, 15)`, trashed notes excluded), `trashFlow` (by `trashed_at` ascending: the soonest to expire first), `expired(cutoff)`, `noteFlow(id)`, `queueFlow`, `voiceNoteCounts` (live notes whose selected variant links a speaker to the voice as AUTO or CONFIRMED) and `counts`.
+
+The standalone model download (from Settings or a banner, with no note) is not a `jobs` row. It is in-memory state of `ModelInstallOwner`; the `.part` files carry its resume.
+
+Schema migrations: version 1 ships. Later versions need a written `Migration` with a `MigrationTestHelper` test; `fallbackToDestructiveMigration` is forbidden. A database that fails to open or migrate is renamed `cassini.db.corrupt-<epoch>` and the catalogue is rebuilt (section 4.9).
+
+FTS prefix queries are written with the star inside the quotes (`"consegn*"`), the FTS3/4 phrase-prefix syntax; a star after a closing quote is FTS5 syntax and is never produced. The unicode61 tokenizer must work on API 26. The API 26 emulator job runs `NoteFtsDeviceTest` ("giovedi" finds "giovedì", "CONSEGNA" finds "consegna", "consegn" finds "consegna"). A SQLite without unicode61 fails to open the database; that is logged as a bug, with no silent fallback. Robolectric DAO tests fail, never skip, when its SQLite lacks the tokenizer; the device test is the authority.
+
+### 3.4 DataStore keys (`settings.preferences_pb`)
+
+| Key | Type | Meaning |
+|---|---|---|
+| `models.consentAt` | Long | The user pressed "Download and transcribe" or "Download". Consent = this key present, or Parakeet installed. |
+| `models.declinedAt` | Long | "Not now — keep the audio" was pressed; suppresses the automatic consent screen after later recordings. |
+| `processing.finalizationMs` | Long | Running estimate of matching plus saving time, `(old*3 + new)/4`. |
+| `queue.hold` | String | `USER` or `SYSTEM`, or absent (section 5.2). |
+| `recording.lastFormat` | String | Last capture format, for the format chip before the encoder probe returns. |
+| `notices.recoveredAck` | Long | Latest recovered-recording time the user has seen or dismissed. |
+| `notices.opusNativeAck` | Boolean | "This phone can't create Cassini files" dismissed. |
+| `notifications.asked` | Boolean | POST_NOTIFICATIONS requested once. |
+| `trash.lastPurgeAt` | Long | Last purge run (diagnostics only). |
+
+### 3.5 Checkpoint contract (`notes/<id>/work/`)
+
+`checkpoint.json` version 1 is the 0.1.0 key set: `version`, `source`, `signature` (`length:mtime`), `model` (Parakeet revision), `speakers` (diarizer SHA-256), `recognition{inferenceMs, chunks[{start, end, window (base64 f32le), words (cassini.words.v1)}]}`, `encoder{…libopus history, Ogg LiveState, length}`, `diarizer{cache (base64, at most 200000 floats), elapsedMs, turns}`, `speakerPrefix`, `speakerFailure`, `clipSamples`, `voiceClips`, `positionSamples`, `doneMs`, `durationMs`, `elapsedMs`. In the new layout `source` holds the note's audio file name (`capture.opus`, `source.mp3`, `document.opus`, …). `CheckpointState.validate` checks it, the signature, the Parakeet revision and the diarizer SHA against values built from the note row.
+
+The directory is keyed by note id. It is deleted at the end of adopt (row first, then directory), on "Start over", and on purge. A committed golden `checkpoint.json` (from a 0.1.0 device run) stays as a codec test in `core/src/test/resources/checkpoint/`.
+
+### 3.6 `names.json` (draft speaker state)
+
+Members: `labels`, `merges`, `remembered`, `automatic`, `generation` (0.1.0), plus two optional members added in P3:
+
+```json
+"live":     { "<speakerId>": { "voice": "<voiceId>", "score": 0.61, "state": "SUGGESTED" } },
+"rejected": { "<speakerId>": ["<voiceId>", "..."] }
+```
+
+`live` is the latest live match per speaker (AUTO, SUGGESTED or CONFIRMED). `rejected` lists the voices the user answered "Not X" to. The codec reads missing members as empty and writes them only when non-empty. The file is internal and never shipped.
+
+One owner per running or paused note: `DraftNames` (in `:data`, held by `CheckpointRepository`) keeps an `AtomicReference<CheckpointNames>`. Every change, from the UI or from the job, is `updateAndGet` with a pure reducer (`confirm`, `reject`, `rename`, `merge`, `remember`, `setLive`, `setAutomatic`, `close`); then the current value is written to `names.json` under the note's file lock, reading the reference inside the lock so the last write always holds the latest state. Nobody writes a snapshot read earlier.
+
+## 4. Repositories (`:data`)
+
+```kotlin
+class AppPaths(val root: File, val cache: File, val modelRoot: File = root) {
+    val database = File(root, "cassini.db"); val settings = File(root, "settings.preferences_pb")
+    val notes = File(root, "notes"); fun note(id: String) = File(notes, id); fun work(id: String) = File(note(id), "work")
+    val voices = File(root, "voices"); val people = File(voices, "people.json"); val generation = File(voices, "generation")
+    fun notePrints(id: String) = File(File(voices, "notes"), "$id.json")
+    fun pendingPrints(id: String) = File(File(voices, "pending"), "$id.json")
+    val exports = File(cache, "exports")
+}
+```
+
+Shared rules:
+
+- `suspend` functions run on IO; `Flow`s are cold Room or DataStore flows.
+- `…Blocking` functions are `@WorkerThread`, assert that they are not on the main thread, and exist only for the inference thread.
+- Locks are `java.util.concurrent.locks.ReentrantLock`s from `NoteLocks` (one per note, striped by note id) and one per file-backed store. Both suspend paths (inside `withContext(IO)`) and blocking paths take the same lock. Code never suspends while holding one: `withContext(io) { lock.withLock { blockingWork() } }`. Kotlin `Mutex` is used only where every holder is a coroutine (`NativeBudget`, `ModelInstallOwner`).
+- Errors reach the UI as sealed outcomes that carry a core `Failure`.
+- No file I/O on the main thread. Debug builds set `StrictMode.detectAll().penaltyLog()`.
+
+### 4.1 `NoteRepository`
+
+- Reads: `library()`, `search(query)` (via `SearchQuery.fts`; a blank query yields `library()`), `note(id)`, `trash()`, `counts()`.
+- Recording: `createRecording(title, createdAt, format)` creates the directory and a `LIVE_CAPTURE` row before capture starts; `finishRecording(id, durationMs)`; `markUnplayable(id)`.
+- Edits: `rename(id, title)` updates `notes.title` and `note_text` in one transaction. For a `DOCUMENT` note it then rewrites the document title through `DocumentRepository.retitle` in the background, but only when no job row exists and the document state is `OK`; otherwise it sets `title_dirty` (adopt applies it; a non-OK document keeps the new title in Room only and a fresh seal later uses it). Also `setPosition(id, ms, final)` (with `final = true` on pause and on leaving, it recomputes `notes.preview` with core `PreviewText` from the selected variant's words), `selectVariant` (rewrites `note_text.body` and `preview`), `acknowledgeTrust`.
+- Trash: `moveToTrash` (records `trashed_job`), `restore` (re-enqueues a QUEUED `trashed_job` at the back; PAUSED jobs were kept), `deleteNow`, `emptyTrash`, `purgeExpired(now, zone)` (section 4.10).
+- `adoptSealed(id, selectVariant)`: installs `work/sealed.opus` as in section 3.2 in one transaction for the row, variants, speakers, `note_text` and links; then deletes the previous plain file and `work/`. Idempotent: if `document.opus` already has the sealed signature, it only finishes the remaining steps.
+- `refreshIfStale(id)`; `titleBlocking(id)` (read at seal time); `rowBlocking(id)`.
+
+### 4.2 `ImportRepository`
+
+`import(uri): ImportOutcome` = `Created(noteId) | Existing(noteId) | Rejected(failure, detail)`:
+
+1. Read `OpenableColumns.SIZE` and `DISPLAY_NAME`. Reject `LARGE` above `AudioLimits.MAX_IMPORT_BYTES` (2 GiB).
+2. Require `usableSpace ≥ size + AudioLimits.MIN_FREE_BYTES`, else reject `SPACE` with the needed bytes.
+3. Stream-copy into `notes/<newId>/source.tmp` while hashing SHA-256 and enforcing the cap during the copy.
+4. If the hash matches a live note's `source_sha256`, delete the new directory and return `Existing`. A match with a trashed note is ignored.
+5. Classify: Ogg Opus with Cassini metadata → `document.opus`, `readChecked`, `IMPORTED_DOCUMENT`. Other Ogg Opus → `source.opus`. RIFF/WAVE → `WavDecoder` header check; anything but 16-bit PCM is `Rejected(WAV)`. Anything else needs an audio track in `MediaExtractor` (behind an `AudioProbe` interface for tests), else `Rejected(OPEN)`.
+6. Fill the duration (`OggOpus.scan` or `MediaExtractor`) and insert the row. Title: a document's `meeting.title`; otherwise the display name without extension (never an existing `TITLE` tag, so one source decides; the first seal then aligns `TITLE` with `retitle`).
+
+Imports run regardless of a running job.
+
+### 4.3 `DocumentRepository`
+
+- `sealBlocking(noteId, audio, transcript, title, processing, existing, labels)`: writes `work/sealed.opus` with `CassiniDocument.create`, fsyncs, re-reads and verifies, then writes the `work/sealed` marker. It never touches `document.opus`.
+- `read(noteId)`: `readChecked` with the digest verified; an in-memory LRU of 4 entries keyed by signature.
+- `relabel(noteId, labels)`, `retitle(noteId, title)` (sets `meeting.title` and `TITLE`; requires `OK`; refused while a job row exists), `mergeSpeakers(noteId, variantId, source, target)` (a new variant from `SpeakerMerges.apply` and `SpeakerMerges.processing`, which becomes the default and the selected variant; refused while a job row exists).
+- `exportCopy(noteId, dest)` (byte for byte; plain notes copy their audio file) and `exportTranscript(noteId, variantId, format, labels, header, dest)`.
+- `deleteFiles(noteId)`, `sweep()`.
+
+### 4.4 `CheckpointRepository`
+
+`loadBlocking(noteId, expected): Valid(state) | Missing | Mismatch(reason)`; `saveBlocking(noteId, state)` (AtomicFile, after `audio.opus.part` and `clips.pcm` are fsynced); `draftNames(noteId): DraftNames` (section 3.6; loads `names.json` once per process); `discard(noteId)`; `status(noteId)` (done/total, mismatch, or sealed-awaiting-adopt); `loadDraft(noteId)` (words of the saved chunks with names applied, for a paused note); `hasSealed(noteId)`.
+
+### 4.5 `VoiceRepository`
+
+All files under `voices/`, one lock per file.
+
+- `people(): Flow<List<SavedVoice>>` with note counts, confirmed seconds and the stale flag (`VoiceStaleness`).
+- `rename`, `forget(voiceId)`: removes the person; scrubs their matches from every file under `voices/notes/` and `voices/pending/`, from the links, and from `live`, `remembered` and `automatic` of every `DraftNames` in memory and every `names.json` on disk.
+- `forgetEveryone()`: writes `generation` = old + 1 first, then deletes everything else under `voices/` (including `pending/`), clears links, and clears `live`, `remembered` and `automatic` in every draft as above.
+- `prints(noteId)`, `setMatch`, `enrol`, `unenrol`, `copyPrints` (merge case), `deleteForNote` (both the sealed and the pending file).
+- Blocking entry points for the job: `peopleBlocking`, `generationBlocking`, `savePendingBlocking(noteId, prints, generation)`.
+- `adoptPending(noteId)`: if the pending file's generation equals the current one, merge it into `voices/notes/<id>.json`, dropping matches to voices that no longer exist; otherwise delete it without merging. Then delete the pending file.
+- A voice file whose `version` is newer than the codec knows stays in place, read-only, and is reported. Only unparseable JSON is renamed `.corrupt-<epoch>`. The Saved voices screen then shows an error banner and disables edits.
+
+### 4.6 `ModelRepository`
+
+`status: StateFlow<Map<ModelPart, ModelStatus>>` for `SPEECH` (Parakeet, plus VAD best effort), `SPEAKERS` (diarizer) and `VOICES` (voiceprint). `ModelStatus = Ready | Missing(consented) | Downloading(pct, bytes, total) | Verifying(pct) | Failed(error)`. Also `consented()`, `recordConsent()`, `recordDeclined()`, `plan()` (core `ModelPlan`), and `installBlocking(part, progress)` used by `ModelInstaller`. There is no delete API in this version: the design has no surface for it.
+
+### 4.7 `JobRepository`, `SettingsRepository`, `RecoveryRepository`
+
+- `JobRepository` (Room `jobs`; used only by `ProcessingCoordinator`): `queue()`, `enqueue(noteId, kind)` (no-op if QUEUED or RUNNING; PAUSED, FAILED and NEEDS_CONSENT rows are re-queued at the back with failure and pause cleared and attempts 0), `claimNext()` (one transaction; fails if a RUNNING row exists), `markRunning`, `markPaused(reason, done, total, words)`, `markFailed`, `markNeedsConsent`, `remove`, `reconcileOnStart(activeNoteId)` (section 5.3; the only place that bumps `attempts`).
+- `SettingsRepository`: typed accessors for section 3.4.
+- `RecoveryRepository.recover(activeNoteId)`: `LIVE_CAPTURE` rows that are not the active capture. `.opus` is repaired with `OggRepair` and becomes `PLAIN` with the duration from the end granule. `.m4a` becomes `PLAIN` if `MediaExtractor` opens it, else `UNPLAYABLE`. Returns the recovered ids for the "recording recovered" banner.
+
+### 4.8 Startup work
+
+`CassiniApplication` runs this on IO in the application scope, once per process (also for service-only starts), and then completes `AppGraph.ready`:
+
+1. Open Room. If that fails, rename the file and rebuild (section 4.9). Rebuild also when the DB has no notes while `notes/` has directories.
+2. `RecoveryRepository.recover(RecordingController.activeNoteId)`.
+3. `JobRepository.reconcileOnStart` (section 5.3), which finishes interrupted adopts.
+4. Re-sync `note_voice_links` from `voices/notes/*.json` in one transaction; delete per-note voice files whose note row is gone.
+5. Trash purge (section 4.10).
+6. Sweep: delete `*.tmp` older than 1 h that no job or import owns; delete `cacheDir/exports/`; delete a note directory without a row only if it holds nothing but `*.tmp` files and is older than 1 h. A sweep never deletes audio.
+
+### 4.9 Catalogue rebuild
+
+`CatalogueRepository.rebuild()` is idempotent and never deletes audio. For each `notes/<id>/`:
+
+- `document.opus` → `readChecked` → a row (`IMPORTED_DOCUMENT` unless the vendor is cassini-android, else `RECORDED`; title from `meeting.title`) plus cache rows.
+- `capture.*` or `source.*` → repair a `capture.opus` that does not end cleanly; the row gets `PLAIN` (`UNPLAYABLE` for an m4a that does not open), `title = "Recovered recording <d MMM>"`, `origin = RECOVERED`.
+- A `work/sealed` marker → a RUNNING-equivalent job that `reconcileOnStart` adopts. A `work/checkpoint.json` that decodes → a PAUSED job with `pause_reason = INTERRUPTED`.
+- `voices/notes/*.json` → `note_voice_links` rows. A file whose note directory is gone is deleted.
+
+### 4.10 Trash purge
+
+`TrashPolicy` (`:core`, `java.time` in the device zone): `daysLeft = 30 − daysBetween(localDate(trashedAt), localDate(now))`, clamped at 0. A note expires when `daysLeft == 0`.
+
+The purge runs at every process start (after the DB opens), when the Trash screen opens, and immediately for "Delete now" and "Empty". Per note, in this order:
+
+1. Cancel and remove any job.
+2. `VoiceRepository.deleteForNote`.
+3. Delete `notes/<id>/` recursively (audio, document, checkpoint, clips, sealed output).
+4. Delete the row (cascades variants, speakers, text, FTS, links, jobs).
+
+Files go before the row. A crash midway leaves an expired trashed row that the next run finishes; the reverse order would let the catalogue rebuild resurrect the audio. Saved people are not unenrolled (an open question for the owner). WorkManager is not used: the copy promises "after 30 days", the data never leaves app-private storage, every app or service start runs the purge, and WorkManager would add a scheduler and a database for one idempotent query. `PRIVACY.md` states: "Notes in Trash are deleted the first time Cassini runs on or after the 30th day."
+
+## 5. Background work
+
+### 5.1 Components
+
+| Component | Module | Owns |
+|---|---|---|
+| `JobRepository` | `:data` | The durable queue (Room `jobs`). |
+| `TranscriptionJob` | `:engine` | One run of the pipeline for one note: `MainActivity.transcribe()` of 0.1.0 as named steps. |
+| `ModelInstaller` | `:engine` | Install sequence: Parakeet, then VAD, diarizer, voiceprint (each best effort). |
+| `ModelInstallOwner` | `:app` | The only caller of `ModelInstaller`. One install at a time; jobs and the standalone download share it. |
+| `ProgressTracker` | `:engine` | Turns job events into `RunningProgress` and `DraftState` at 1 Hz. Owns `TranscriptionProgress` and `BatteryProjection`. |
+| `InferenceDispatcher`, `NativeBudget` | `:engine` | One `cassini-inference` thread; the model-load `Mutex`. |
+| `ProcessingCoordinator` | `:app` | Queue logic, drain loop, `StateFlow<ProcessingState>`, draft actions, holds. |
+| `ProcessingService` | `:app` | Foreground lifetime only: type, wake lock, notification, `onTimeout`. |
+| `RecordingController` | `:app` | `MicrophoneCapture`, `StateFlow<RecordingState>`, levels, the policy loop, `activeNoteId`. |
+| `RecordingService` | `:app` (`recording/`) | Microphone foreground lifetime, notification, the hand-off to processing. |
+| `PlaybackController` | `:app` | `MediaPlayer`, position flow, audio focus, `playRange`. |
+| `NoticeCenter` | `:app` (P10) | Merges coordinator, recorder, recovery, model and import state into the banner list of each screen. |
+
+### 5.2 The transcription queue
+
+1. One job at a time, process-wide, on the inference thread. FIFO by `seq`. No reordering in this version.
+2. Enqueue sources: Finish recording with consent (automatic); Transcribe on a plain note; Transcribe again on a document (adds a variant); Resume (PAUSED → back of the queue, starts at once if nothing runs); Try again (FAILED); Start over (discard the checkpoint, then enqueue); Restore of a trashed note whose `trashed_job` was QUEUED.
+3. A note that is recording, a trashed note or an `UNKNOWN_FORMAT` document cannot be enqueued.
+4. When a job ends (Done, Paused, Failed, NeedsConsent, Cancelled), the coordinator claims the next QUEUED job inside the same, already-foreground service. The service stops when the queue is empty or held.
+5. **Stop and keep progress** (in-app, per note): the job saves a checkpoint at its next sample block and throws `ProcessingPaused`; the row becomes PAUSED(USER) and the next queued note starts. A stop after the seal step deletes `work/sealed.opus` and the marker and keeps the complete checkpoint; `document.opus` was never touched.
+6. **Stop in the notification** (`stopAll`): stops the running note as in rule 5 and sets `queue.hold = USER`. Queued notes stay QUEUED but do not start; the Library shows "Transcription paused · N waiting" with Continue.
+7. **Remove from queue** on a QUEUED note deletes the row (the note is "Audio only" again), or returns it to PAUSED(USER) when it has a checkpoint.
+8. **Cancel** (internal: Start over, Move to trash of a RUNNING note when the user chose to stop) is `Job.cancel()`, which interrupts the inference thread; a sherpa call in flight finishes first, then `finally` blocks release native handles. After `join()`, `discard` deletes the work directory and `voices/pending/<id>.json`.
+9. **Move to trash**: the job state is stored in `notes.trashed_job`. A QUEUED job row is deleted; a RUNNING job is stopped (PAUSED/USER, checkpoint kept) before the note is trashed; a PAUSED job is kept. Restore re-enqueues a stored QUEUED job at the back; PAUSED stays PAUSED.
+10. Holds (`queue.hold`) stop the drain loop from starting the next job; they never touch a running job. `USER` is cleared by Continue or any explicit Transcribe/Resume. `SYSTEM` (set by `onTimeout`) is cleared only by Continue or Resume from a visible screen.
+11. Transcription keeps running while another note is recording. The capture thread runs at `MAX_PRIORITY`. P12 checks for capture overruns on the emulator.
+
+### 5.3 Restart and process death
+
+When the coordinator is created it runs `reconcileOnStart` on IO before emitting anything but `Loading`:
+
+| Found | Action |
+|---|---|
+| A `work/sealed` marker with a `sealed.opus` that reads OK (any job state) | Finish adopt (section 4.1 `adoptSealed`, `VoiceRepository.adoptPending`), remove the job. Never FAILED. A marker with an unreadable `sealed.opus` is deleted with the file, and the row is handled by the next rules. |
+| A RUNNING row with no checkpoint (killed during download, model load or the first window) | Becomes QUEUED, keeping its `seq`; `attempts + 1`. |
+| A RUNNING row with a valid checkpoint | Becomes QUEUED, keeping its `seq` (head of the queue); `attempts + 1`. Above 2 attempts it becomes PAUSED(INTERRUPTED) and the "Transcription stopped" notification offers Resume. |
+| A PAUSED row with no checkpoint | Stays PAUSED with `done_ms = 0`; Resume starts from the beginning. |
+| A RUNNING or PAUSED row whose checkpoint exists but fails `validate` | FAILED(`CHECKPOINT_MISMATCH`): "Saved progress no longer matches". |
+| A `work/` directory with no job row and no marker | Deleted (every work directory is created after its row). |
+
+The queue then starts in one of two ways:
+
+- A redelivered service intent (`START_REDELIVER_INTENT`) calls `coordinator.drain()`. The system restart of a crashed foreground service is best effort on every API level (Android 12+ may refuse the foreground start; section 5.7 catches it).
+- `ProcessLifecycleOwner` ON_START (the app is visible) while QUEUED rows exist, nothing runs, consent exists and no hold is set: the visible app starts the service. PAUSED jobs never resume on their own.
+
+| Event | Result |
+|---|---|
+| Activity recreation (rotation, locale, dark mode, font scale) | Nothing; ViewModels re-collect by note id. |
+| UI trimmed while the service runs | Nothing; the process stays alive. |
+| Process killed (low-memory kill, native crash; simulated with `kill -9`) | Resumes from the last window checkpoint, losing at most one 28 s window of work. At most 2 automatic attempts. |
+| Force-stop | No redelivery. On the next launch the RUNNING row becomes QUEUED and resumes at ON_START. |
+| Reboot | Nothing runs until the user opens the app; then queued work continues as above. |
+| Java `OutOfMemoryError` | Caught at the job boundary; PAUSED(MEMORY) with the checkpoint intact. Native out-of-memory kills are covered by the checkpoint plus redelivery. |
+
+`adb shell am kill` does not kill a process that runs a foreground service, so device checks use `adb shell run-as org.cassini.android kill -9 <pid>` (section 9).
+
+### 5.4 `TranscriptionJob` and its ports
+
+`TranscriptionJob` lifts 0.1.0 `MainActivity.transcribe()` (lines 249-538) into named steps. Step order, checkpoint cadence, provenance keys (`x-inferenceMs`, `x-segmentation`, `x-resumedFromMs`, `x-speakerDiarization`, `x-incrementalDiarization`, `x-speakerMerges`, `x-speakerIdentification`) and label precedence (draft name, then AUTO match, then `Speaker N`) do not change. The seal target and the adopt order change as described in section 3.2.
+
+Ports (interfaces in `:engine` `job/`, implemented in `:app` over `:data`):
+
+- `JobStorage`: `loadCheckpoint`, `saveCheckpoint`, `names` (the note's `DraftNames`), `sealBlocking` (writes `work/sealed.opus` and the marker), `titleBlocking`, `audioFile`, `adopt` (a suspend function run in `NonCancellable`).
+- `JobVoices`: `peopleBlocking`, `generationBlocking`, `savePendingBlocking`, `enrol`.
+- `ModelAccess`: `consented`, `ready(part)`, `install(parts, onProgress)` (delegates to `ModelInstallOwner`), and a validated-network check.
+
+Seams (interfaces in `:engine` `job/`, section 2): `Recognizer`, `StreamingDiarizer`, `PrintExtractor`, `AudioSource`, `OpusSink`.
+
+| # | Step | Thread | Core `Stage` | Design step |
+|---|---|---|---|---|
+| 1 | `prepare`: load and validate the checkpoint, voices and names; memory preflight | IO | – | – ("Starting…") |
+| 2 | `installModels` | IO | – | not a stage: `JobPhase.Downloading` |
+| 3 | `restore`: encoder, diarizer state, clips | inference | READING | Reading |
+| 4a | decode until the first 28 s window is full | inference | READING | Reading |
+| 4b | Parakeet decoder loads | inference | PREPARING | Preparing |
+| 4c | each window: recognition | inference | WORDS | Words & voices |
+| 4d | each window: Sortformer, assignment, clip cache, live voice matching | inference | SPEAKERS | Words & voices |
+| 4e | progress, checkpoint save | inference | – | – |
+| 5 | `finish`: last partial window, final checkpoint, encoder finish | inference | WORDS/SPEAKERS | Words & voices |
+| 6 | `attribute`: close naming, merges, attribution | inference | – | → Matching |
+| 7 | `matchVoices`: voiceprints and `VoiceMatcher.match(excluded = rejected)` | inference | MATCHING | Matching (shown as skipped without prints or model) |
+| 8 | labels and `x-speakerIdentification` | inference | – | Matching |
+| 9 | `seal` into `work/sealed.opus`; pending prints to `voices/pending/<id>.json` with the generation | inference | SAVING | Saving |
+| 10 | `adopt`: install the sealed file, row update, apply a dirty title with `retitle`, `adoptPending`, enrolment, finalization estimate, then delete `work/` | IO, `NonCancellable` | SAVING | Saving |
+
+The stepper position is monotonic: `step = max(step, map(stage))`. After a resume it starts at Reading again, because the model reload is a real Preparing.
+
+The decode loop is a blocking function on the inference thread inside `withContext(inference) { runInterruptible { … } }`. It calls the blocking port entry points directly, sends `JobEvent`s with `trySend` on an unlimited `Channel`, and never uses `runBlocking`. `stop()` sets an `AtomicBoolean` checked in `onSamples` and `checkActive()`; `cancel()` interrupts the thread. While a cancelled job still holds `NativeBudget`, the next job shows `JobPhase.WaitingForPrevious` ("Finishing the previous note…").
+
+Title: for a fresh document the seal uses `titleBlocking`. For Transcribe again the verbatim seal keeps the existing manifest, so adopt compares the sealed title (`meeting.title` and `TITLE`) with `notes.title` and calls `retitle` when they differ, then clears `title_dirty`. The same check aligns a `TITLE` tag that a fresh seal of an imported Ogg Opus kept from its source.
+
+Live voice matching runs per window for speakers with at least 4 s of clips and at least 10 s more than the last attempt, excludes rejected voices, and skips speakers with a CONFIRMED `live` entry or a user label. AUTO results set `automatic[id]` (the label shows an "auto" badge). SUGGESTED results are shown as an inline "Is this Luca?" card only while the label is a placeholder, the voice still exists and naming is open. Matches to synthetic note-local voices (ids prefixed `note:`, used for "Speaker names carry over" in Transcribe again) are stored as no match; the label carries the name. The job changes names only through `DraftNames` reducers (`setLive`, `setAutomatic`, `close`).
+
+At step 6 the job calls `DraftNames.close()` and uses the value it returns ("Saving — you can rename when it's done"). Final prints and matches are written to `voices/pending/<id>.json` with the voices `generation` at step 9; adopt merges them only if the generation is unchanged, dropping matches to voices that no longer exist, so "Forget" and "Forget everyone" cannot be undone by a finishing job. A draft "Yes, Luca" enrols at adopt only if the generation is unchanged and the voice still exists. A draft "Not Luca" never unenrols (nothing was enrolled).
+
+### 5.5 Progress numbers (`ProgressTracker`)
+
+One coroutine on `Dispatchers.Default.limitedParallelism(1)` with an injected clock. `elapsedMs = checkpoint.elapsedMs + (elapsedRealtime − runStart)`; on resume `TranscriptionProgress.restore` skips the cold first completion.
+
+- Percent: `Snapshot.percent`, monotonic; `null` gives an indeterminate bar. The UI caps it at 99 until Done.
+- Processed: `doneMs / totalMs`.
+- Words so far: size of the merged word list.
+- Headline and window range: `Snapshot.stage/startMs/endMs` (debounced 400 ms by core), mapped to `ProgressHeadline` (ui.md section 7); the headline never goes back to Reading once the step is Words & voices or later. Without a diarizer the WORDS stage reads "Finding words".
+- Time left: `Calculating` until 3 windows completed since the (re)start or while the total is unknown; `Finishing` at 0; else `Range(roundedRemaining(low + fin), roundedRemaining(high + fin))` with `fin = processing.finalizationMs`.
+- Battery: `BatteryReader` every 10 s into a new `BatteryProjection` per run. No reading → hidden; charging → PluggedIn; fewer than 120 s or less than 0.5 % drop → Measuring; else Projected.
+- Draft: `tentativeFromMs = doneMs − 2000`; words ending after it are drawn as unsettled.
+
+### 5.6 Models and consent
+
+- Consent is `models.consentAt` present or Parakeet installed. It is recorded only by the Model download screen's primary button.
+- Enforcement happens twice: in `ProcessingCoordinator.transcribe` and again in `TranscriptionJob.installModels` through `ModelAccess.consented`. Without consent the job ends NEEDS_CONSENT without any network call. JVM tests prove that `ArtifactFetcher` is never called.
+- `ModelInstallOwner` runs at most one install. A request while one runs joins it (a shared `Deferred` per part set, guarded by a `Mutex`); a job in `installModels` shows the shared progress as `JobPhase.Downloading`. Cancel from a banner cancels the shared install only when no job waits on it; otherwise it stops the job, which keeps the `.part` files.
+- Install sequence through `ArtifactFetcher` with Range resume: SPEECH (4 Parakeet artifacts, required; VAD best effort), SPEAKERS (diarizer `.zst`, best effort), VOICES (voiceprint, best effort, only with the diarizer). Without a validated network the best-effort parts are skipped at once (no 30 s timeout). A failed best-effort part never fails the job; it degrades to one speaker or no names.
+- `ArtifactFetcher` keeps the `.part` across failures and process death, resumes with `Range: bytes=<len>-`, accepts a `206` only when the `Content-Range` total equals the pinned size, restarts on a `200`, verifies size and SHA-256 before the rename (deleting the `.part` on a mismatch), never replaces a verified file, and keeps the 30 s read timeout (interrupting the thread does not unblock `HttpURLConnection`). P3 adds a digest progress callback for "Checking files — 80%".
+- Redirects: `ArtifactFetcher` sets `instanceFollowRedirects = false` and follows at most 5 HTTPS redirects itself, only to hosts in `ModelCatalog.DOWNLOAD_HOSTS`: `huggingface.co` and its subdomains, `hf.co` subdomains (the Xet/LFS CDN), `github.com`, `*.githubusercontent.com` (release assets), `dist.gocassini.com`. Any other target fails the part with a download error. P3 records the redirect hosts actually seen for every pinned URL (`curl -sIL`) in the KDoc. `PRIVACY.md` lists the same domains.
+- `ModelPlan.requiredFreeBytes` = sum over missing parts of (download bytes + installed bytes when the download is compressed) + `ArtifactFetcher.SLACK_BYTES` (32 MiB). The space check runs before the first byte.
+- Sizes are shown with `ModelCatalog.mebibytes` and labelled "MB", as in 0.1.0 and the boards (640, 62, 28). The Model download total is the sum of the rounded part sizes shown (730), so the numbers on screen add up; the free-space figure is `mebibytes(requiredFreeBytes)` rounded up to 10 (about 860).
+
+### 5.7 `ProcessingService` and Android 14-16 behaviour
+
+`ProcessingService : LifecycleService` holds only the foreground lifetime.
+
+- Manifest: `foregroundServiceType="dataSync|mediaProcessing"`; permissions `FOREGROUND_SERVICE_DATA_SYNC`, `FOREGROUND_SERVICE_MEDIA_PROCESSING`, `WAKE_LOCK`, `POST_NOTIFICATIONS`.
+- Intents: `ACTION_DRAIN` (no note id; the queue is in Room; this is the redelivered intent) and `ACTION_STOP_ALL`.
+- `onStartCommand`: call `startForeground` at once with the current notification. Every `startForeground` call (the first one and each type change) is wrapped in `try`/`catch` for `ForegroundServiceStartNotAllowedException`, `SecurityException` and `InvalidForegroundServiceTypeException`. On the first call: post "Ready to transcribe" (Activity intent), `stopSelf(startId)`, return `START_NOT_STICKY`; the rows stay QUEUED and the next ON_START restarts them. On a type change: keep the previous type and log. Otherwise `coordinator.onServiceForeground(true)`, `coordinator.drain()`, return `START_REDELIVER_INTENT`. Callers keep their own catch as well. The service does not bump `attempts` (only `reconcileOnStart` does).
+- Service type follows `coordinator.foregroundNeed`: `DATA_SYNC` while downloading; `MEDIA_PROCESSING` on API 35+ from inference on (6 h per 24 h budget), `DATA_SYNC` on API 29-34 ("local file processing"; no better type, no timeout callback), untyped below 29.
+- `onTimeout(startId, fgsType)` (API 35+), synchronously: post "Transcription paused by Android" with an Activity `PendingIntent` (content and Resume); `stopForeground(STOP_FOREGROUND_REMOVE)` and `stopSelf()` without waiting for the job; `coordinator.systemStop(noteId)` best effort (the job checkpoints at its next block); set `queue.hold = SYSTEM`; write the row as PAUSED(SYSTEM) so every screen shows Paused at once. A timeout is never shown as an error. After a timeout, Resume works only from a visible screen.
+- The service stops only after the coordinator's drain job has `join()`ed, so a finishing native call never runs outside a foreground service.
+- Wake lock `PARTIAL_WAKE_LOCK "Cassini:processing"`, not reference counted: acquired with a 10 min timeout when inference begins, re-acquired at every window, released on Paused, Failed, Done, idle download waits and service stop. Downloads hold no wake lock.
+- Memory preflight: `ActivityManager.MemoryInfo.lowMemory`, `isLowRamDevice` or `!AudioLimits.memoryAllows` sets a low-memory hint on the progress card; the job is not blocked. `largeHeap` stays until measured.
+- Start paths that Android allows: a visible screen (Transcribe, Resume, Continue, via `ContextCompat.startForegroundService`; `POST_NOTIFICATIONS` requested once on API 33+, denial does not block); a notification action `PendingIntent` (the "Transcription stopped" Resume uses `PendingIntent.getForegroundService`; the recording notification's Finish reaches `RecordingService`, whose hand-off then starts processing within the temporary allow-list); ON_START with a queue. Any other start is attempted with the catch above and falls back to "Ready to transcribe".
+- `POST_NOTIFICATIONS` denied: the service still runs; the in-app progress card and Library banner carry the information; Settings explains it with a deep link.
+
+### 5.8 Recording
+
+`RecordingController` owns the `MicrophoneCapture` on a single-thread dispatcher and exposes `StateFlow<RecordingState>` (`Idle`, `Starting`, `Active(noteId, title, format, elapsedMs, pause, space, warning)`, `Finishing`, `Ended(noteId, outcome)`), `levels` (56 values, 125 ms each, max-pooled from 100 ms samples, sampled only while subscribed) and `activeNoteId`.
+
+- `start(title)` is called from the visible Recording screen (Android 14 rule): create the note row (`LIVE_CAPTURE`, `capture.opus` or `capture.m4a`); set `activeNoteId`; start `RecordingService` (`startForeground(MICROPHONE)` first); create the capture; acquire the wake lock (2 h 10 min); start the 1 s policy loop. A failed start deletes the empty directory and row (`CouldNotStart`).
+- Title edits are written to the row 500 ms after the last keystroke; `finish(title)` writes the final value.
+- `finish(title)` is asynchronous: `capture.stop()` on the capture dispatcher (up to 10 s), row → `PLAIN` with the duration, the hand-off when transcription follows, then `Ended(Saved)`.
+- `RecordingPolicy.decide(elapsedMs, usableBytes, bytesPerSecond)` (pure, `:core`): nominal 6000 B/s for Opus 48 kb/s and 4000 B/s for AAC 32 kb/s, measured file growth after 10 s. `RecordingSpace` gives the space-limited and cap-limited remaining time; the hint shows whichever is smaller (features.md section 2). At 15 min of space or less: StorageLow. Below the 200 MiB floor: stop and save. 5 min before `MAX_RECORDING_MS` (2 h): NearTimeLimit. At the cap: stop and save.
+- Back, the chevron and the Library button leave the recording running; only Finish stops.
+- Pause causes: USER; OTHER_APP on API 29+ from `AudioManager.registerAudioRecordingCallback` matched on our own client session id (`isClientSilenced`); on API 26-28 the transient focus listener, re-requested after each resume. When the silence ends the recording stays paused until the user resumes. No audio focus is requested on 29+, so the user's music keeps playing.
+- Recording → processing hand-off: `RecordingService` writes the row QUEUED, calls `startForegroundService(ProcessingService)` inside a `try`/`catch`, waits for `coordinator.state.first { it.serviceForeground }` (10 s timeout), and only then stops its own foreground. The start is legal when Finish came from the visible screen or from the notification action (temporary allow-list). On timeout or failure (for example the 2 h cap reached in the background) the note stays QUEUED and the user gets "Ready to transcribe"; ON_START picks it up.
+- After Finish: with consent → enqueue. Without consent and without `models.declinedAt` → the Note screen opens with the Model download screen on top. Otherwise "Audio only". A storage stop or a microphone failure never enqueues automatically.
+- `RecordingService` is `START_NOT_STICKY`; crash repair happens through `RecoveryRepository` at the next start.
+
+### 5.9 Playback
+
+`PlaybackController` keeps `MediaPlayer` (Media3 rejected: the behaviour is device-validated and the use case is seeking inside one local file). A 150 ms position flow while playing; the position is persisted every 5 s, and with `final = true` on pause and on leaving (which also refreshes the Library preview). It requests `AUDIOFOCUS_GAIN` (`USAGE_MEDIA`, `CONTENT_TYPE_SPEECH`) and pauses on focus loss and `ACTION_AUDIO_BECOMING_NOISY`. `playRange(noteId, startMs, endMs)` plays a speaker sample, stops at `endMs` and restores the previous position.
+
+### 5.10 Notifications
+
+Text comes from `ContextCompat.getContextForLanguage(context)`. Each notification is `VISIBILITY_PRIVATE` with a public version without the note title. Channels: `recording` (LOW), `processing` (LOW), `results` (DEFAULT, silent). The small icon is the monochrome logo (`ui_ic_stat_logo`). PendingIntents use `FLAG_IMMUTABLE | FLAG_UPDATE_CURRENT`. Content and copy are in features.md section 12.
+
+## 6. UI architecture
+
+- One `MainActivity : AppCompatActivity` (AppCompat only for `AppCompatDelegate.setApplicationLocales`; `AppLocalesMetadataHolderService` with `autoStoreLocales` below API 33). Theme `Theme.Cassini` in `app/src/main/res/values{,-night}/themes.xml` with parent `Theme.AppCompat.DayNight.NoActionBar` and `android:windowBackground` = `@color/ui_window_bg` from `:ui`. `enableEdgeToEdge()`, `android:enableOnBackInvokedCallback="true"`, `launchMode="singleTop"`, no `configChanges`. The exported ACTION_VIEW filter stays (content and file schemes; `audio/ogg`, `audio/opus`, `application/ogg`). targetSdk 36 from P10.
+- Navigation 3 (`navigation3-runtime`/`navigation3-ui` 1.2.0, `lifecycle-viewmodel-navigation3` 2.11.0). `@Serializable` keys: `LibraryKey`, `NoteKey(noteId, query?)`, `RecordingKey`, `ModelDownloadKey(noteId?)`, `SettingsKey`, `SavedVoicesKey`, `TrashKey`, `LicensesKey`. `NavDisplay` with `rememberSaveableStateHolderNavEntryDecorator()` and `rememberViewModelStoreNavEntryDecorator()`. Sheets and dialogs are ViewModel state (in `SavedStateHandle`), not destinations. "Transcribing" is a mode of the Note screen.
+- State holders: one ViewModel per destination, built in `viewModel { }` factories from `AppGraph`. One immutable `UiState` per screen as a `StateFlow` (`combine` + `stateIn(WhileSubscribed(5_000))`). Events are a sealed interface per screen passed to `onEvent`. `XxxRoute(viewModel)` in `:app` collects with `collectAsStateWithLifecycle()` and calls the stateless `XxxScreen(state, onEvent)` in `:ui`.
+- ViewModels produce semantic values (enums, millisecond durations, `LocalDate`/`LocalTime`, counts, user text). `:ui` turns them into localized text. This keeps ViewModels free of `Resources` and makes the Italian and font-scale screenshot tests work from the same fixtures.
+- The speaker naming state machine (rename, pick a saved person, same-person prompt, rename the saved voice, merge with confirmation, remember, "Not X") is a pure reducer `ui/note/SpeakerNaming.kt` in `:app` with unit tests.
+- Back: an open sheet, dialog, search mode or rename consumes back first. On Recording, back minimises (the recording continues). Library is the root; back leaves the app with the system's predictive back-to-home.
+- Deep links go through `MainActivity` (`onCreate` with no saved state, and `onNewIntent`); a handled intent is marked so recreation does not replay it. ACTION_VIEW imports on IO and pushes `NoteKey(id)` on top of the existing stack, with Library underneath when the stack was empty. Notification intents carry `open = recording | note` and `noteId`.
+- `ModelDownloadKey` with nothing missing: entry points do not open it then; if it is opened anyway (a stale back stack), the route pops itself, enqueuing its note first when it has one.
+- After Move to trash the user lands on the Library with the Undo snackbar.
+- System bars: dark icons on light screens in the light theme; light icons on Recording always.
+- Wide screens: content is limited to 560 dp and centred; backgrounds fill the screen.
+- The visual system, components and screen contracts are in `ui.md`.
 
 ## 7. Threading rules
 
-- Main thread: Compose, `MediaPlayer` control, notification updates, the one-time locale migration (section 4). No file I/O (StrictMode logs any regression).
-- IO dispatcher: every repository call.
-- Inference thread: every sherpa call, the Opus encoder, checkpoint writes from the job. The decode loop blocks this thread and calls the repositories' blocking entry points; it never uses `runBlocking`.
-- Capture thread: the microphone loop (unchanged, MAX_PRIORITY).
-- One `Mutex` per file-backed store; `NativeBudget` around model loading.
+| Thread or dispatcher | Runs | Never |
+|---|---|---|
+| Main | Compose, `StateFlow` collection, `MediaPlayer` control, `startForeground`/`stopSelf`, notification posting | file I/O (StrictMode logs it), sherpa, `capture.stop()` |
+| `cassini-inference` (`InferenceDispatcher`, one thread) | every sherpa call, `StreamingOpusEncoder`, decoder callbacks, checkpoint and `names.json` writes from the job, seal | `runBlocking`, suspension inside the native loop |
+| IO | Room, DataStore, every repository call, `ModelInstaller` (`runInterruptible(IO)`), adopt, recovery, imports, exports | sherpa |
+| `ProgressTracker` (`Default.limitedParallelism(1)`) | `TranscriptionProgress`, `BatteryProjection`, battery reads, building `RunningProgress`/`DraftState` | blocking I/O |
+| Coordinator (`appScope`, Default) | queue transitions (each a Room transaction on IO), drain loop, holds | native calls |
+| Recording controller (single thread) | capture start/stop, policy loop, recording callback | – |
+| `cassini-recording` capture thread (MAX_PRIORITY) | `AudioRecord.read` → MediaCodec → `LiveMuxer` | – |
 
-## 8. Testing
+Locks: `NoteLocks` (a striped `ReentrantLock` per note) and one `ReentrantLock` per file-backed store, shared by suspend and blocking callers and never held across a suspension point; `NativeBudget` (coroutine `Mutex`) around model loading; `ModelInstallOwner`'s `Mutex`; and `JobRepository.claimNext` transactions for the single-RUNNING rule. Draft names have one owner, `DraftNames` (section 3.6): UI and job both change them only through its reducers.
 
-1. JVM: `:core:test` (the moved classes plus `CheckpointDataTest`, `CheckpointStateTest` with the golden 0.1.0 checkpoint, `DecodeSessionTest` with a fake decoder over whole/fixed/quiet/speech paths and retry-with-context, `ArtifactFetcherTest` with loopback Range cases including a wrong `Content-Range` total, `RecordingPolicyTest`, `SpeakerNamingTest`, `NoteRulesTest`, `DefaultLabelsTest`), `:engine:testDebugUnitTest` (`TranscriptionJobTest` with fake decoder/diarizer/extractor/audio over the real core chain: window cadence, checkpoint per window, stop -> resume continuity, cancel inside a native call, OOM -> paused, no network without consent, provenance JSON equal to 0.1.0's for the same inputs), `:app` ViewModel tests with `kotlinx-coroutines-test` + Turbine.
-2. Robolectric (SDK 35): `:data` repository and migrator tests over the materialised fixture trees (field-by-field preservation, idempotence, crash between steps, directory hash of `documents/` unchanged except in the rec-crash fixture, corrupt index never overwritten, tombstones honoured on re-import, checkpoint key derivation from the stored uri string), Room DAO/FTS tests, Compose screen tests with `createComposeRule`, `LicenseAssetsTest`, the `models_size` string check, and the SDK 32 locale test for notification text.
-3. Device (`scripts/device-smoke.sh --annotation <name> [--serial]`; a `CassiniTestRunner` points `AppPaths` at `filesDir/androidTest-<run>` so no test touches user data): `@CiSmoke` (no models; CI matrix), `@NeedsModels` (emulator-5554 and the Pixel 8, where models are installed), `@NeedsMicrophone`, `@UpgradeSmoke`, `@Manual`, `@Experiment` (`:bench` only). The expected count comes from a dry run (`am instrument -e log true`) of the same selection, not a hand-maintained number. Committed CC-BY-4.0 FLEURS clip under `fixtures/audio/`; YouTube-derived clips are gone; private meeting clips live outside the tree and are passed to `:bench` by instrumentation argument.
-4. Device safety: never run Gradle's `connected*` or managed-device tasks; they uninstall the app and erase the downloaded models (about 770 MB on emulator-5554). Install with `adb install -r` and run instrumentation with `adb shell am instrument` or `scripts/device-smoke.sh`. Never `adb uninstall org.cassini.android`, never `pm clear`. Before a test that could change app data and is not isolated by `CassiniTestRunner`, back up the `files/` metadata (not the models) with `run-as` + `tar`.
-5. Upgrade: `scripts/upgrade-check.sh` builds the v0.0.6-beta and v0.1.0 debug APKs from their tags in worktrees, installs one, materialises and pushes a fixture tree via `run-as`, installs the new debug APK over it (`adb install -r`, same debug certificate) and runs `@UpgradeSmoke`: same notes, playback position, person names, the checkpoint resumes.
-6. Pre-release gate (manual, documented in `docs/development.md`): the Pixel 8 (API 37) upgrade over real data; music playing while recording (must not pause); incoming call pauses capture; an API 35/36 AVD created locally for the `mediaProcessing`/`onTimeout` path; `node scripts/check-portable-document.mjs` and `../cassini-format` tooling accept a document sealed by the new engine.
+## 8. Native runtime and build
 
-## 9. Open-source citizenship
+- AAR: `scripts/build-native-aar.sh` builds the pinned fork plus patch with ONNX Runtime 1.27.1 and installs the AAR and a generated POM into `native/m2/org/cassini/native/sherpa-onnx-nemotron/1.13.7-1f23907a/` (git-ignored; `native/m2/README.md` is committed). `scripts/fetch-native-aar.sh` downloads it from the GitHub release `native-sherpa-onnx-1.13.7-nemotron.2` (SHA-256 `d376f7e25707cf6834208db297e5955c8e02117131740df7ff7fd6ca17216068`, pinned in `scripts/native-dependencies.json` with the hash of the patch). The older release `.1` is a pre-patch build (SHA-256 `d03a06f8…`, without `processStreamingChunk`, `saveStreamingState`, `restoreStreamingState`); never use it. `scripts/setup.sh` fetches the libopus source, then takes the AAR from the first source that works: (1) `native/m2` already holds the pinned AAR; (2) the legacy local file `app/libs/sherpa-onnx-1.13.7-nemotron.aar` matches the pin; (3) `fetch-native-aar.sh`; (4) `build-native-aar.sh`. `--from-source` goes straight to (4); `--prebuilt-only` fails instead of falling back. `scripts/verify-native-runtime.sh` compares the installed AAR, the patch and the catalog with the pin.
+- `libcassini_opus.so`: AGP `externalNativeBuild` in `:engine` (CMake 3.22.1, NDK 28.2.13676358, `-DOPUS_SOURCE=<root>/.tools/opus/source` from `scripts/fetch-opus-source.sh`, `-DANDROID_STL=c++_static`). `-DCMAKE_BUILD_TYPE=Release` in every variant, so debug builds encode exactly like release builds. `checkOpusSource` fails `preBuild` with "run scripts/setup.sh" when the source is missing and refuses a stale `app/src/main/jniLibs`.
+- ABIs: `ndk { abiFilters += listOf("arm64-v8a", "x86_64") }` stays in `:app`'s `defaultConfig` (library `abiFilters` do not filter packaged ABIs). `scripts/apk_compatibility.py` (64-bit ABIs only, 16 KB ELF and ZIP alignment) must pass on the debug APK in every phase.
+- Toolchain (verified together with JDK 17): Gradle 9.7.0 (wrapper with `distributionSha256Sum`), AGP 9.3.1 with `android.builtInKotlin=false` and `android.newDsl=false` (deprecated; removed in AGP 10; a temporary opt-out), KGP 2.4.21, KSP 2.3.12, Room 2.8.5, Compose BOM 2026.09.00 (Compose 1.12.1), Navigation 3 1.2.0, compileSdk 37, build-tools 36.0.0, CMake 3.22.1, NDK 28.2.13676358, minSdk 26, Java 17. AGP 9.4.1 + Gradle 9.8.1 with built-in Kotlin is the documented forward path. Always run Gradle with `JAVA_HOME` pointing at JDK 17.
+- targetSdk: 34 through P9; 36 in P10 with the Compose UI (edge-to-edge enforced, predictive back). Not 37: Android 17 behaviour changes are not reviewed yet.
+- Version catalog `gradle/libs.versions.toml`. Bundles contain only artifacts with an explicit version; BOM-managed artifacts (`compose-ui-test-junit4`, `compose-ui-test-junit4-accessibility`) are declared next to `platform(libs.compose.bom)` in each module. `kotlinx-collections-immutable` 0.5.2. `material-icons-extended` is not used (icons come from the design's SVG paths).
+- Screenshot testing: Roborazzi 1.76.0 with Robolectric native graphics, in `:ui` (ui.md section 10). The P2 scaffold test is the proof that it works in an AGP 9 library module with `android.newDsl=false`; the earlier spike ran in an application module only.
+- Accessibility checks: `androidx.compose.ui:ui-test-junit4-accessibility` (BOM-managed, pulls in the Accessibility Test Framework). P2 proves `enableAccessibilityChecks()` under Robolectric 4.17/SDK 35; if it does not run there, the checks move to device tests on emulator-5554 (features.md section 14).
+- Fonts: unmodified static TTFs of Instrument Sans and IBM Plex Mono, pinned in `third_party/fonts/fonts.json` and fetched by `scripts/fetch-fonts.sh` (ui.md section 3).
+- JVM tests: Robolectric 4.17 pinned to SDK 35 by `src/test/resources/robolectric.properties` in every module that uses it, with one test asserting `Build.VERSION.SDK_INT == 35` (SDK 36+ needs a JDK 21 runtime). `--add-opens` jvmArgs and `isIncludeAndroidResources = true`.
+- `ciTest` (root task): `:core:test` plus, for every Android module, `verifyRoborazziDebug` where the Roborazzi plugin is applied and `testDebugUnitTest` otherwise. CI and every phase's green check run it.
+- Release: R8 (`isMinifyEnabled`, `isShrinkResources`, `proguard-android-optimize.txt`). Keep rules keep members: `com.k2fsa.sherpa.onnx.** { *; }`, `com.github.luben.zstd.** { *; }`, `org.cassini.android.NativeOpus { *; }`, classes with `native` methods, and kotlinx-serialization for the navigation keys. `scripts/package-apk.py` copies the R8 mapping into `dist/`. A `releaseTest` build type (release without R8, same signing) is the tag builds' device-test target; `scripts/launch-check.sh` checks that the minified release APK launches.
+- zstd-jni 1.5.7-22: the `@aar` in Android modules, the plain jar in JVM tests.
+- Lint: `warningsAsErrors`, `abortOnError`, `checkDependencies`; `MissingTranslation` is an error; `OldTargetApi`, the network-dependent version checks and `UsableSpace` are ignored on purpose. Every Android module has an explicit lint block. Adaptive icons live in `mipmap-anydpi/` (not `-v26`, which raises ObsoleteSdkInt at minSdk 26). After P10 the lint baseline is empty. Attributes newer than minSdk on `<application>` carry `tools:targetApi`.
+- Style: detekt 1.23.8 with `detekt-formatting` (autocorrect off, because it would rewrite the verbatim code), `.editorconfig` (4 spaces, 140 columns), ruff for Python, shellcheck, actionlint. detekt parses with a Kotlin 2.0 parser, so the code avoids `when` guards, non-local `break`/`continue`, context parameters and explicit backing fields.
+- Signing: the build creates the release signing config only when `CASSINI_BETA_KEYSTORE_FILE` is set and reads `CASSINI_RELEASE_STORE_PASSWORD`, `CASSINI_RELEASE_KEY_PASSWORD` and `CASSINI_RELEASE_KEY_ALIAS` from the environment. No literals in Gradle. CI passes `${{ secrets.X || 'android' }}`-style fallbacks until the owner sets the secrets.
+- CI (final shape in P11): `checks` (wrapper validation, detekt, actionlint, shellcheck, ruff, Markdown link check, `fetch-fonts.sh --check`), `core-only` (`:core:test` without `setup.sh`), `build` (prebuilt AAR, `ciTest`, lint, debug assemble, release on tags, Roborazzi diffs uploaded on failure), `emulator` matrix 26/29/34/35 with annotation-selected device tests, `models` (weekly and manual; cached models; `@NeedsModels` on API 34), `native` (weekly from-source build compared with the pin), `release` on tags (notes taken from the version's `CHANGELOG.md` section; `docs/release-notes.md` stays until P11 switches the job). Dependabot watches Gradle, GitHub Actions and the submodule.
 
-`CONTRIBUTING.md` (fresh-clone steps: `git clone --recurse-submodules`, `scripts/setup.sh`, `./gradlew :core:test`, `./gradlew :app:assembleDebug`; when the NDK is needed; test tiers; fixture regeneration; style via `detekt` (formatting autocorrect stays off, because it would rewrite the verbatim code; new code is fixed by hand); DCO sign-off), `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1), `SECURITY.md` (reporting address, signing policy, model hosts), `PRIVACY.md` (data categories audio/transcripts/voiceprints, storage paths, the three hosts huggingface.co, github.com, dist.gocassini.com and why, retention, per-note and per-person deletion; linked from About and the consent dialog), `CHANGELOG.md` (Keep a Changelog; 0.0.x and 0.1.0 reconstructed; the 0.2 changes with the migration and compatibility policy under "Unreleased" until the owner cuts 0.2.0; CI reads the tag's section), `.editorconfig`, issue and PR templates, `CODEOWNERS`, `dependabot.yml`, fastlane `metadata/en-US/`. Docs: `docs/architecture.md` (this file), `docs/development.md` rewritten, `docs/native-runtime.md` (prebuilt vs source, lock, patch API), `docs/data-formats.md` (section 5 as a table plus the compatibility policy), `docs/release.md`, `docs/notes/` for the dated logs with a "historical" banner; `queued-work.md` and `release-notes.md` deleted. Notices: `THIRD_PARTY_NOTICES.md` and the APK copy say the AAR is built from the pinned source plus the patch or fetched from the named release whose SHA-256 is pinned in `scripts/native-dependencies.json`; AndroidX/Room/kotlinx notices added. The Nemotron export on dist.gocassini.com gets the OpenMDW-1.1 text, a NOTICE and provenance; the files are prepared under `tools/model-host/` and the owner uploads them. F-Droid: no proprietary SDKs, a recipe draft with `prebuild: scripts/setup.sh --from-source`; remaining blockers stated honestly (ONNX Runtime prebuilt inside sherpa's upstream scripts, zstd-jni's bundled `.so`; the zstd removal needs the raw model published next to its licence files).
+## 9. Testing
 
-Release work stays with the owner: the rebuild does not publish GitHub releases, push tags or change repository settings, does not bump `versionCode`/`versionName`, and does not create the `:bench` release tag.
+1. **JVM** (`:core:test`, `:engine:testDebugUnitTest`, `:app:testDebugUnitTest`): the moved engine tests; codec goldens; the P3 pure rules with golden strings; `TranscriptionJobTest` with fakes (window cadence, checkpoint per window, stop → resume equals the uninterrupted transcript, cancel inside a native call, OOM → paused, no network without consent, provenance equal to 0.1.0's for the same inputs, seal never touches `document.opus`); `ProgressTrackerTest`; `ProcessingCoordinatorTest`; `ModelInstallOwnerTest` (one fetch per artifact when a standalone download and a job overlap); `DraftNamesTest` (concurrent UI and job reducers lose nothing); `RecordingControllerTest`; `SpeakerNamingTest`; ViewModel tests with `kotlinx-coroutines-test` and Turbine.
+2. **Robolectric** (SDK 35): `:data` repository and DAO tests (FTS prefix and diacritics, snippet markers, cascades, purge order, catalogue rebuild, import classification, adopt crash points, reconcile rows); `ContrastTest`; font and licence asset tests; the SDK 32 test that notification text follows the app locale.
+3. **Screenshots** (`:ui`, Roborazzi): every board compared with `design/reference/png`, plus dark, Italian, 1.5x font scale, state variants and components. Goldens are committed; `verifyRoborazziDebug` gates CI.
+4. **Device** (`scripts/device-smoke.sh --annotation <name> [--class <c>] [--serial <s>]`): a `CassiniTestRunner` points `AppPaths.root` at `filesDir/androidTest-<run>` and keeps `modelRoot = filesDir` (or an empty scratch model root for download-screen tests), so tests never touch user data and still use the installed models. Annotations: `@CiSmoke` (no models; CI matrix), `@NeedsModels` (emulator-5554), `@NeedsMicrophone`, `@Manual`. The expected count comes from a dry run (`-e log true`) of the same selection. The committed CC-BY-4.0 FLEURS clip is the audio input.
+5. **Process-death and persistence checks** (host scripts, not instrumentation, because instrumentation force-stops the app when it ends and `am kill` spares foreground-service processes): `scripts/device-kill-resume.sh` writes `files/debug-root.txt` (debug builds read it; models stay at `filesDir`), seeds and starts a job through the debug-only `DebugCommandReceiver` (`adb shell am broadcast -n org.cassini.android/.debug.DebugCommandReceiver --es cmd …`), kills with `adb shell run-as org.cassini.android kill -9 $(pidof org.cassini.android)`, waits for redelivery or relaunches with `am start`, polls a debug status file, checks the sealed document, then removes the scratch root and `debug-root.txt`. `scripts/device-language-check.sh` switches the app language through the UI (uiautomator), kills with `kill -9`, relaunches and checks the language with `uiautomator dump`.
+6. **Acceptance** (P12): an instrumented walk through every board on emulator-5554 with device screenshots, compared by a reviewer with the design.
+7. **Device safety**: never run Gradle `connected*` or managed-device tasks (they uninstall the app and erase about 770 MB of models on emulator-5554). Install with `adb install -r`, run instrumentation with `adb shell am instrument` or `scripts/device-smoke.sh`. Never `adb uninstall org.cassini.android`, never `pm clear`. Before a test that is not isolated by `CassiniTestRunner` or a debug root, back up the `files/` metadata (not the models) with `run-as` and `tar`.
+8. **Pre-release gate** (manual, `docs/development.md`): Pixel 8 (API 37) end-to-end run; music playing while recording does not pause; an incoming call pauses the capture; an API 35/36 AVD for `mediaProcessing` and `onTimeout`; `node scripts/check-portable-document.mjs` and `cassini-extract.py --check` accept a document sealed by the new engine.
 
-## 10. Decisions taken and alternatives rejected
+## 10. Open-source citizenship
 
-- Foreground service, not WorkManager, for transcription: the job is interactive (draft naming, immediate Stop/Resume), WorkManager re-runs after process death start in the background where `setForeground` can throw, and Android 16 applies job quotas to workers running beside a foreground service.
-- Manual `AppGraph`, not Hilt: no annotation processor on the critical path beyond Room's KSP; Hilt's Gradle plugin would also force a different AGP line.
-- Room for the catalogue, files for everything else: indexed search, per-row transactions and a per-note delete need a database; checkpoints, voices and documents are versioned contracts shared with the iOS app and stay as files.
-- `library.json`/`session.json` frozen read-only, never rewritten, with tombstones and add-only re-import: the simplest honest downgrade story; the sha check makes re-upgrade safe.
-- org.json stays the JSON library in `:core`; kotlinx-serialization only for Navigation 3 keys. Byte-exact JSON goldens are asserted on device.
-- `MediaPlayer` stays. AppCompat is used only for locales. Dynamic colour is off. StrictMode logs, it does not kill.
-- `singleTop`, not `singleTask`, for `MainActivity`: an opened file lands on top of the user's back stack instead of clearing it.
-- Default speaker labels are detected by a string scan in `:core`, not a flag: sealed documents and `names.json` store only the label text.
-- `OpusEncoder.kt` (MediaCodec, 48 kb/s, linear resampler) goes: package-only jobs for legacy plain-audio notes go through the same 24 kb/s libopus path the transcription pass already uses for every non-Opus import; recorded in the CHANGELOG (P5). The deletion was planned for P1 but moved to P2, where `DocumentStore`, its only production caller, is rewritten as `DocumentRepository`: P1 promises no behaviour change, and 48 kb/s MediaCodec to 24 kb/s libopus is an audible format change. Until then `OpusEncoder` stays in `:app` and asks `CaptureFactory` for the platform encoder, so the `MediaCodecList` probe exists once.
-- AGP 8.13 rejected: current AndroidX requires compileSdk 37, which AGP 8.13 does not support. AGP 9.4/Gradle 9.8 rejected for now: outside the Kotlin plugin's documented range; verified as the follow-up path.
-- targetSdk 34 until P4, then 36, not 37: the old UI is not edge-to-edge safe, and Android 17 behaviour changes are not yet reviewed; lint's `OldTargetApi` is ignored until then.
-- Robolectric at SDK 35 rather than moving everyone to JDK 21.
-- Python rewrite of the device scripts rejected; the shell scripts are rewritten around annotation filters.
-- Rotating to a new signing key rejected; passwords rotate, the certificate stays.
-- Committing the AAR (or Git LFS) rejected; a hash-pinned release asset plus a weekly from-source check.
-- Vendoring the conformance vectors rejected in favour of a pinned submodule.
+`CONTRIBUTING.md` (fresh clone with submodules, `scripts/setup.sh`, `./gradlew :core:test`, `./gradlew :app:assembleDebug`; when the NDK is needed; test tiers; screenshot goldens; style; DCO sign-off), `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1), `SECURITY.md`, `PRIVACY.md` (data categories, storage paths, the three hosts and the download domains they redirect to, retention, trash, per-note and per-person deletion; shown in the Licenses screen and linked from Model download), `CHANGELOG.md` (Keep a Changelog; 0.0.x and 0.1.0 reconstructed; 0.2 under "Unreleased", including "0.2 does not read 0.1.x app data; exported documents open as before"), issue and PR templates, `CODEOWNERS`, fastlane `metadata/en-US/`. Docs: this file, `docs/design/`, `docs/development.md`, `docs/native-runtime.md`, `docs/data-formats.md` (storage tables, exports, differences from gocassini), `docs/release.md`, `docs/ui-fidelity.md`, `docs/notes/` (dated logs, historical banner). `THIRD_PARTY_NOTICES.md` and the APK copy name the AAR provenance, AndroidX/Room/kotlinx/Compose (Apache-2.0) and the fonts (SIL OFL 1.1). The Nemotron export on dist.gocassini.com gets the OpenMDW-1.1 text, a NOTICE and provenance, prepared under `tools/model-host/` for the owner to upload. F-Droid: no proprietary SDKs; remaining blockers stated honestly (ONNX Runtime prebuilt inside sherpa's scripts, zstd-jni's bundled `.so`).
 
-## 11. Known deviations kept on purpose
+## 11. Decisions taken and alternatives rejected
 
-The verbatim format code keeps its known deviations from the spec (warnings demote to unverified, pretty-printed bodies, no DATE tag, `null:null` signature for non-file URIs) because the pinned conformance vectors and gocassini agree with the current behaviour. Each is a tracked issue, not a change in this rebuild.
+- Greenfield storage: one directory per note, Room as a catalogue and cache, the sealed document authoritative for transcript content, Room authoritative for the title. Content-addressed shared `documents/`, `retire` reference counting and `sha256(uri)` checkpoint keys are gone.
+- The job seals into `work/sealed.opus` and adopt installs it, instead of sealing over `document.opus`: the old file is the job's audio source and checkpoint signature, so overwriting it before adopt would turn a crash into a false mismatch.
+- All voiceprints and matches under `voices/` (including pending ones), so "Forget everyone" is one directory delete and purge is two files per note.
+- `ReentrantLock`s shared by suspend and blocking callers instead of coroutine `Mutex`es, because the inference thread must not suspend or `runBlocking`.
+- One install owner for models, so a standalone download and a job never write the same `.part`.
+- A redirect allow-list in `ArtifactFetcher`, so the privacy promise about hosts is enforced, not just stated.
+- Model directories stay at the `filesDir` root with their 0.1.0 names: `ModelCatalog` pins them and the emulator's verified install stays valid.
+- Foreground service, not WorkManager, for transcription and downloads: the job is interactive (draft naming, immediate Stop/Resume), and WorkManager restarts after process death start in the background where `setForeground` can throw. Trash purge without WorkManager (section 4.10).
+- A persistent FIFO queue in Room with one RUNNING job, instead of 0.1.0's in-process claim set.
+- `:engine` behind ports instead of depending on `:data`, so the job is JVM-testable and P4/P5 run in parallel.
+- A separate `:ui` module with semantic `UiState` and a `ui_` resource prefix, so the design system and screens are built and screenshot-tested in parallel with the data and service layers.
+- Roborazzi over Paparazzi (alpha, layoutlib-bound) and Compose Preview Screenshot Testing (alpha, preview-only). Proven in a spike with this toolchain at 780 x 1688 px, the boards' size.
+- Unmodified static TTFs from upstream, not the design's woff2 web subsets: a subset is a Modified Version under the OFL and "Plex" is a Reserved Font Name.
+- Icons as `ImageVector`s from the design's SVG paths; `material-icons-extended` removed.
+- Manual `AppGraph`, not Hilt. org.json stays in `:core`; kotlinx-serialization only for navigation keys. `MediaPlayer` stays. AppCompat only for locales, and the XML theme lives in `:app` for that reason. Dynamic colour off. StrictMode logs, it does not kill. `singleTop`, not `singleTask`.
+- Default speaker labels detected by the `:core` string scan `DefaultLabels.isDefault`, not a stored flag; documents store only label text.
+- `OpusEncoder.kt` (MediaCodec, 48 kb/s) deleted: non-Opus sources go through the 24 kb/s libopus path.
+- AGP 8.13 rejected (cannot compile against SDK 37); AGP 9.4/Gradle 9.8 deferred. Robolectric at SDK 35 rather than JDK 21. Committing the AAR rejected; a hash-pinned release asset plus a weekly from-source check. Vendoring the conformance vectors rejected in favour of a pinned submodule.
+
+## 12. Known deviations kept on purpose
+
+- The verbatim format code keeps its known deviations from the spec (warnings demote to unverified, pretty-printed bodies, no DATE tag, `null:null` signature for non-file URIs), because the pinned conformance vectors and gocassini agree with the current behaviour. Each is a tracked issue.
+- TXT, SRT and VTT exports are word-body derivatives without integrity data; only the sealed `.opus` is a portable Cassini artifact. Android's VTT uses word-timed cues with `<v Label>` spans, while gocassini's `WriteCaptionsVTT` emits one cue per segment as `<Label> text`. `docs/data-formats.md` records both.
+- Visual deviations from the boards are listed in ui.md section 11.
