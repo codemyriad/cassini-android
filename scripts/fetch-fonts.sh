@@ -7,8 +7,17 @@
 #
 # If a download fails and CASSINI_FONTS_FALLBACK_DIR is set, the script uses the file with the same
 # upstream name from that directory. The SHA-256 must still match.
+#
+# Needs bash 4, jq, sha256sum and cmp; curl too when it downloads.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+
+for tool in jq sha256sum cmp; do
+    if ! command -v "$tool" >/dev/null; then
+        printf 'fetch-fonts.sh needs %s\n' "$tool" >&2
+        exit 2
+    fi
+done
 
 manifest=third_party/fonts/fonts.json
 font_dir=ui/src/main/res/font
@@ -70,6 +79,17 @@ if ! $check_only; then
     mkdir -p "$font_dir" "$licence_dir"
 fi
 
+# Read the whole manifest first, so that a jq error stops the script here.
+manifest_rows=$(entries)
+if [[ -z $manifest_rows ]]; then
+    printf '%s lists no fonts\n' "$manifest" >&2
+    exit 1
+fi
+if ! $check_only && ! command -v curl >/dev/null; then
+    printf 'fetch-fonts.sh needs curl\n' >&2
+    exit 2
+fi
+
 declare -A listed=()
 while IFS=$'\t' read -r file sha url name; do
     listed[$file]=1
@@ -97,7 +117,7 @@ while IFS=$'\t' read -r file sha url name; do
     fi
     mv "$dest.part" "$dest"
     printf 'Fetched %s\n' "$dest"
-done < <(entries)
+done <<<"$manifest_rows"
 
 # Every font resource must come from the manifest.
 shopt -s nullglob
