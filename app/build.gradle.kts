@@ -85,11 +85,14 @@ android {
         unitTests {
             isIncludeAndroidResources = true
             all {
-                it.systemProperty("cassini.conformance", conformanceDirectory)
-                it.systemProperty("cassini.fixtures", fixturesDirectory.absolutePath)
-                it.inputs.dir(fixturesDirectory)
-                    .withPropertyName("fixtures")
-                    .withPathSensitivity(PathSensitivity.RELATIVE)
+                it.jvmArgumentProviders.add(
+                    TestDataDirectories(
+                        conformance = fileTree(conformanceDirectory),
+                        fixtures = fileTree(fixturesDirectory),
+                        conformancePath = conformanceDirectory,
+                        fixturesPath = fixturesDirectory.absolutePath,
+                    ),
+                )
                 // Robolectric needs these on JDK 17.
                 it.jvmArgs(
                     "--add-opens=java.base/java.lang=ALL-UNNAMED",
@@ -146,3 +149,18 @@ val checkOpusSource = tasks.register("checkOpusSource") {
 }
 tasks.named("preBuild") { dependsOn(checkOpusSource) }
 tasks.matching { it.name.startsWith("configureCMake") }.configureEach { dependsOn(checkOpusSource) }
+
+/**
+ * Passes the test data directories to the JVM tests as system properties and declares their files as
+ * task inputs, relative to each directory. A changed submodule pin or a missing checkout therefore
+ * re-runs the tests (and fails them) instead of leaving them up to date or taking them from the
+ * build cache, and the absolute paths stay out of the cache key.
+ */
+class TestDataDirectories(
+    @get:InputFiles @get:PathSensitive(PathSensitivity.RELATIVE) val conformance: FileTree,
+    @get:InputFiles @get:PathSensitive(PathSensitivity.RELATIVE) val fixtures: FileTree,
+    @get:Internal val conformancePath: String,
+    @get:Internal val fixturesPath: String,
+) : CommandLineArgumentProvider {
+    override fun asArguments() = listOf("-Dcassini.conformance=$conformancePath", "-Dcassini.fixtures=$fixturesPath")
+}
