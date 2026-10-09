@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Adaptive launcher icon, foreground layer: the ink logo (docs/design/ui.md section 4.5).
+     The 28-unit logo is scaled by 2.25 and centred on the 108 dp canvas: its farthest point (the ellipse tips plus
+     half the stroke) is 28.8 dp from the centre, inside the 33 dp radius of the 66 dp safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="2.25"
+        android:scaleY="2.25"
+        android:translateX="22.5"
+        android:translateY="22.5">
+        <path
+            android:pathData="M8.5,14a5.5,5.5 0,1 0,11 0a5.5,5.5 0,1 0,-11 0z"
+            android:strokeWidth="1.6"
+            android:strokeColor="@color/ui_launcher_ink" />
+        <group
+            android:pivotX="14"
+            android:pivotY="14"
+            android:rotation="-20">
+            <path
+                android:pathData="M2,14a12,4.2 0,1 0,24 0a12,4.2 0,1 0,-24 0z"
+                android:strokeWidth="1.6"
+                android:strokeColor="@color/ui_launcher_ink" />
+        </group>
+    </group>
+</vector>
