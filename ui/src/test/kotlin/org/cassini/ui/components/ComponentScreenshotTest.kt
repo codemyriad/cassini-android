@@ -353,7 +353,7 @@ class ComponentScreenshotTest : BoardTest() {
         Padded(gap = 12) {
             for (kind in BANNER_KINDS) Banner(BannerSpec(kind, boardArgs(kind)), onAction = {})
         }
-        Label("Dismissible (close button), announce, optional track")
+        Label("Dismissible (close button), announce, no track")
         Padded(gap = 12) {
             Banner(BannerSpec(BannerKind.RECOVERED, boardArgs(BannerKind.RECOVERED)), onAction = {}, onDismiss = {})
             Banner(
@@ -367,7 +367,6 @@ class ComponentScreenshotTest : BoardTest() {
                     BannerArgs(percent = 46, bytes = 310_378_496, bytes2 = 671_088_640, part = ModelPartUi.SPEECH),
                 ),
                 onAction = {},
-                progress = 0.46f,
             )
             BannerCard(tone = Tone.Plain, title = "Queued", body = "2 ahead of this note.") {
                 SecondaryButton("Remove from queue", onClick = {})

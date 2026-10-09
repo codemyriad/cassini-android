@@ -48,17 +48,16 @@ import org.cassini.ui.theme.tone
  * A catalogue banner (features.md section 13) with its copy, tone and actions from [spec]. The first action is an
  * [InkButton], the others [SecondaryButton]s (small). When the spec is dismissible and [onDismiss] is set, a 48 dp
  * close button sits top-right; the States board renders dismissible kinds without it (ui.md section 11, item 10).
- * [progress] adds an optional 4 dp track below the body (no board shows one; the Library has its own card).
+ * A banner has no progress track (ui.md section 6): the Library's [ProgressBannerCard] has its own.
  * [colors] lets the dark Recording screen keep the light tones.
  */
 @Composable
-@Suppress("LongParameterList") // The spec, its two callbacks and three presentation options.
+@Suppress("LongParameterList") // The spec, its two callbacks and two presentation options.
 fun Banner(
     spec: BannerSpec,
     onAction: (BannerAction) -> Unit,
     modifier: Modifier = Modifier,
     onDismiss: (() -> Unit)? = null,
-    progress: Float? = null,
     colors: CassiniColors = CassiniTheme.colors,
 ) {
     CompositionLocalProvider(LocalCassiniColors provides colors) {
@@ -70,7 +69,6 @@ fun Banner(
             modifier = modifier,
             announce = spec.announce,
             onDismiss = if (spec.dismissible) onDismiss else null,
-            progress = progress,
             actions = if (actions.isEmpty()) {
                 null
             } else {
@@ -105,7 +103,6 @@ fun BannerCard(
     modifier: Modifier = Modifier,
     announce: Boolean = false,
     onDismiss: (() -> Unit)? = null,
-    progress: Float? = null,
     actions: (@Composable FlowRowScope.() -> Unit)? = null,
 ) {
     val c = CassiniTheme.colors
@@ -157,10 +154,6 @@ fun BannerCard(
                 if (body != null) {
                     Spacer(Modifier.height(3.dp))
                     Text(text = body, style = CassiniTheme.type.body14, color = c.text3)
-                }
-                if (progress != null) {
-                    Spacer(Modifier.height(10.dp))
-                    LinearTrack(progress)
                 }
                 if (actions != null) {
                     FlowRow(

@@ -49,19 +49,27 @@ fun PillSearchField(
 ) {
     val c = CassiniTheme.colors
     val shape = CassiniTheme.shapes.pill
+    // The pill is drawn behind the row, 2 dp inside the 48 dp layout when compact, so the 48 dp clear button can
+    // overflow the 44 dp pill instead of making it taller.
+    val inset = if (compact) 2.dp else 0.dp
     Box(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = if (compact) 48.dp else 52.dp),
         contentAlignment = Alignment.Center,
     ) {
+        Box(
+            Modifier
+                .matchParentSize()
+                .padding(vertical = inset)
+                .clip(shape)
+                .background(c.surface)
+                .border(1.dp, c.line, shape),
+        )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = if (compact) 44.dp else 52.dp)
-                .clip(shape)
-                .background(c.surface)
-                .border(1.dp, c.line, shape)
                 .padding(start = 16.dp, end = if (query.isEmpty()) 16.dp else 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
