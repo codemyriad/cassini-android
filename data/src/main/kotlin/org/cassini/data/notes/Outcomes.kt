@@ -110,3 +110,25 @@ sealed interface ImportOutcome {
      */
     data class Rejected(val failure: Failure, val detail: String? = null, val neededBytes: Long = 0) : ImportOutcome
 }
+
+/**
+ * Finishes the adopt of a sealed job output for the catalogue rebuild. The app passes `adoptSealed` followed by
+ * `VoiceRepository.adoptPending`, as `reconcileOnStart` does (architecture 5.3).
+ */
+fun interface SealedAdopter {
+    suspend fun adopt(noteId: String): AdoptOutcome
+}
+
+/** What `CatalogueRepository.rebuild` did. */
+data class RebuildReport(
+    /** Notes added from their directories. */
+    val created: List<String>,
+    /** Notes whose sealed job output was installed. */
+    val adopted: List<String>,
+    /** Notes that got a PAUSED(INTERRUPTED) job from a saved checkpoint. */
+    val paused: List<String>,
+    /** `note_voice_links` rows written. */
+    val links: Int,
+    /** Note ids whose `voices/notes/<id>.json` was deleted because the note directory is gone. */
+    val deletedVoiceFiles: List<String>,
+)

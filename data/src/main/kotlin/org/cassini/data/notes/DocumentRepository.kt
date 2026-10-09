@@ -124,6 +124,18 @@ class DocumentRepository(
         }
 
     /**
+     * The title of a marked sealed job output that reads back OK (`work/sealed.opus`), or null. The catalogue rebuild names a
+     * note after it before adopt; the read is remembered by signature, so adopt does not read the file again.
+     */
+    internal suspend fun sealedTitle(noteId: String): String? = locks.withNoteLock(noteId, dispatchers.io) {
+        val sealed = File(paths.work(noteId), NoteFiles.SEALED)
+        val marked = File(paths.work(noteId), NoteFiles.SEALED_MARKER).isFile
+        DocumentSignature.of(sealed)?.takeIf { marked }?.let { readLocked(sealed, it) }
+            ?.takeIf { it.documentState == DocumentState.OK }
+            ?.let { NoteTitles.fit(it.title) }
+    }
+
+    /**
      * Seals [transcript] over [audio] into `work/sealed.opus` with `CassiniDocument.create` (which re-reads and verifies
      * the written file), fsyncs it, then writes the `work/sealed` marker. It never touches `document.opus`; adopt
      * installs the output. The verified document is remembered by signature, so the adopt that follows does not read
