@@ -9,6 +9,10 @@ plugins {
     alias(libs.plugins.roborazzi)
 }
 
+// FontAssetsTest reads the font manifest in third_party/fonts and scans every module's src for web fonts.
+val repoRoot: String = rootDir.absolutePath
+val fontManifestDir = rootProject.layout.projectDirectory.dir("third_party/fonts")
+
 android {
     namespace = "org.cassini.ui"
     compileSdk = libs.versions.compileSdk.get().toInt()
@@ -37,6 +41,10 @@ android {
                 // The committed goldens: a changed golden re-runs verifyRoborazziDebug instead of leaving it up to date.
                 it.inputs.files(fileTree("src/test/screenshots"))
                     .withPropertyName("screenshotGoldens")
+                    .withPathSensitivity(PathSensitivity.RELATIVE)
+                it.systemProperty("cassini.repoRoot", repoRoot)
+                it.inputs.dir(fontManifestDir)
+                    .withPropertyName("fontManifest")
                     .withPathSensitivity(PathSensitivity.RELATIVE)
                 // Robolectric needs these on JDK 17.
                 it.jvmArgs(
@@ -80,4 +88,6 @@ dependencies {
     testImplementation(libs.roborazzi)
     testImplementation(libs.roborazzi.compose)
     testImplementation(libs.roborazzi.junit.rule)
+    // FontAssetsTest parses third_party/fonts/fonts.json on the plain JVM, where android.jar has only stubs.
+    testImplementation(libs.org.json)
 }
