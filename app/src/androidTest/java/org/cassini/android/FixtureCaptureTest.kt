@@ -156,7 +156,7 @@ class FixtureCaptureTest {
         assertNotNull("The paused job has a checkpoint", saved)
         assertTrue(
             "Stopped after a window and before the end",
-            saved!!.getLong("doneMs") in WINDOW_MS until PARTIAL_SECONDS * 1000L
+            saved!!.doneMs in WINDOW_MS until PARTIAL_SECONDS * 1000L
         )
         return uri
     }

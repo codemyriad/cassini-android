@@ -35,6 +35,7 @@ import org.cassini.core.asr.ProcessingSpeed
 import org.cassini.core.asr.TranscriptionProgress
 import org.cassini.core.audio.Limits
 import org.cassini.core.audio.PcmFile
+import org.cassini.core.checkpoint.CheckpointState
 import org.cassini.core.format.CassiniDocument
 import org.cassini.core.format.SpeakerAttribution
 import org.cassini.core.format.SpeakerMerges
@@ -244,9 +245,8 @@ class MainActivity : Activity() {
         checkpointUnreadable = false
         checkpointSaved = saved != null
         if (saved == null) return
-        checkpointDoneMs = saved.getLong("doneMs")
-        val raw = saved.getJSONObject("recognition").getJSONObject("chunks").getJSONObject("words")
-        interim = Transcript.fromJson(raw.toString())
+        checkpointDoneMs = saved.doneMs
+        interim = Transcript(saved.recognition.chunks.words)
         val (labels, merges) = store.loadNames()
         val (remembered, automatic) = store.nameExtras()
         draftRememberedVoices.clear()
@@ -255,7 +255,7 @@ class MainActivity : Activity() {
         if (store.rememberGeneration() == draftRememberGeneration) draftRememberedVoices.putAll(remembered)
         draftAutomaticNames.clear(); draftAutomaticNames.putAll(automatic)
         synchronized(draftSpeakerLabels) { draftSpeakerLabels.clear(); draftSpeakerLabels.putAll(labels); draftSpeakerMerges = merges; draftNamingOpen = true }
-        session = session.copy(processingPaused = true, transcript = if (session.document == null) draftTranscript() else session.transcript, inferenceMs = saved.getJSONObject("recognition").getLong("inferenceMs"), processingMs = saved.getLong("elapsedMs"))
+        session = session.copy(processingPaused = true, transcript = if (session.document == null) draftTranscript() else session.transcript, inferenceMs = saved.recognition.inferenceMs, processingMs = saved.elapsedMs)
         ui.cancelOperation.setText(R.string.stop_processing)
         ui.cancelOperation.isEnabled = true
     }
@@ -311,7 +311,7 @@ class MainActivity : Activity() {
             catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error; Log.w(TAG, "Voiceprint model unavailable", error) }
             checkActive()
             onUi { ui.progress.isIndeterminate = true; setStatus(R.string.decoding) }
-            val totalBegan = System.nanoTime() - (resumed?.optLong("elapsedMs") ?: 0L) * 1_000_000
+            val totalBegan = System.nanoTime() - (resumed?.elapsedMs ?: 0L) * 1_000_000
             onUi {
                 transcriptionBeganNs = totalBegan
                 transcriptionProgress = TranscriptionProgress(session.durationMs)
@@ -320,8 +320,7 @@ class MainActivity : Activity() {
                 finalizationAtMs = -1L
                 finalizationEstimateMs = getSharedPreferences("processing-estimates", MODE_PRIVATE).getLong("finalizationMs", 0)
                 resumed?.let { saved ->
-                    val words = Transcript.fromJson(saved.getJSONObject("recognition").getJSONObject("chunks").getJSONObject("words").toString()).words
-                    transcriptionProgress?.restore(saved.getLong("doneMs"), saved.getLong("durationMs"), words.size, saved.getLong("elapsedMs"))
+                    transcriptionProgress?.restore(saved.doneMs, saved.durationMs, saved.recognition.chunks.words.size, saved.elapsedMs)
                 }
                 session = session.copy(processingPaused = false)
                 ui.status.minLines = 5
@@ -330,16 +329,16 @@ class MainActivity : Activity() {
             checkpoint.directory.mkdirs()
             if (resumed == null) { checkpoint.audio.delete(); checkpoint.clips.delete() }
             PcmFile(checkpoint.clips, deleteOnClose = false).use { audio ->
-                resumed?.let { audio.truncate(it.getInt("clipSamples")) }
-                val voiceClips = VoiceClipCache(audio, resumed?.optJSONObject("voiceClips"))
+                resumed?.let { audio.truncate(it.clipSamples) }
+                val voiceClips = VoiceClipCache(audio, resumed?.voiceClips?.let(CheckpointState::json))
                 val encoded = checkpoint.audio
                 var encoder: StreamingOpusEncoder? = null
                 var durationMs = 0L
                 try {
-                    if (!documents.hasOpusAudio(uri)) encoder = StreamingOpusEncoder(encoded, resumed?.optJSONObject("encoder"))
-                    val speakerPrefix = resumed?.getString("speakerPrefix") ?: "diar_${UUID.randomUUID().toString().replace('-', '_')}_"
+                    if (!documents.hasOpusAudio(uri)) encoder = StreamingOpusEncoder(encoded, resumed?.encoder?.let(CheckpointState::json))
+                    val speakerPrefix = resumed?.speakerPrefix ?: "diar_${UUID.randomUUID().toString().replace('-', '_')}_"
                     var streamDiarizer: SortformerStream? = null
-                    var speakerFailure = resumed?.optBoolean("speakerFailure") ?: !speakersReady
+                    var speakerFailure = resumed?.speakerFailure ?: !speakersReady
                     onUi { synchronized(draftSpeakerLabels) {
                         if (resumed == null) {
                             draftSpeakerLabels.clear(); draftRememberedVoices.clear(); draftAutomaticNames.clear(); draftSpeakerMerges = emptyMap()
@@ -380,8 +379,8 @@ class MainActivity : Activity() {
                     val elapsed: Long
                     NativeBudget.acquire()
                     try {
-                        if (resumed?.optJSONObject("diarizer") != null) streamDiarizer = SortformerStream(models.path(ModelCatalog.DIARIZATION), resumed.getJSONObject("diarizer"))
-                        IncrementalRecognizer(models.parakeet(), detector, restored = resumed?.getJSONObject("recognition"), onChunk = { chunk, startMs, words ->
+                        resumed?.diarizer?.let { streamDiarizer = SortformerStream(models.path(ModelCatalog.DIARIZATION), CheckpointState.json(it)) }
+                        IncrementalRecognizer(models.parakeet(), detector, restored = resumed?.recognition?.let(CheckpointState::json), onChunk = { chunk, startMs, words ->
                             checkActive()
                             if (speakerFailure) words.copy(words = words.words.map { it.copy(speaker = "${speakerPrefix}1") })
                             else try {
@@ -417,16 +416,17 @@ class MainActivity : Activity() {
                             checkActive()
                             onUi { if (!cancelled.get()) showProgress(progress) }
                         }.use { recognition ->
-                            var previousSaved = resumed?.optLong("doneMs") ?: -1L
+                            var previousSaved = resumed?.doneMs ?: -1L
                             fun saveCheckpoint() {
                                 audio.sync()
-                                val state = JSONObject().put("recognition", recognition.checkpoint())
-                                    .put("encoder", encoder?.checkpoint()).put("diarizer", streamDiarizer?.checkpoint())
-                                    .put("speakerPrefix", speakerPrefix).put("speakerFailure", speakerFailure)
-                                    .put("clipSamples", audio.sampleCount).put("voiceClips", voiceClips.checkpoint())
-                                    .put("positionSamples", recognition.positionSamples).put("doneMs", recognition.doneMs)
-                                    .put("durationMs", recognition.totalMs).put("elapsedMs", (System.nanoTime() - totalBegan) / 1_000_000)
-                                checkpoint.save(state)
+                                checkpoint.save(checkpoint.state(
+                                    recognition = CheckpointState.recognition(recognition.checkpoint()),
+                                    encoder = encoder?.checkpoint()?.let(CheckpointState::encoder),
+                                    diarizer = streamDiarizer?.checkpoint()?.let(CheckpointState::diarizer),
+                                    speakerPrefix = speakerPrefix, speakerFailure = speakerFailure,
+                                    clipSamples = audio.sampleCount, voiceClips = CheckpointState.voiceClips(voiceClips.checkpoint()),
+                                    positionSamples = recognition.positionSamples, doneMs = recognition.doneMs,
+                                    durationMs = recognition.totalMs, elapsedMs = (System.nanoTime() - totalBegan) / 1_000_000))
                                 previousSaved = recognition.doneMs
                                 checkpointSaved = true
                             }
@@ -436,7 +436,7 @@ class MainActivity : Activity() {
                                 recognition.accept(samples, count)
                                 if (recognition.doneMs > previousSaved || stopRequested.get()) saveCheckpoint()
                                 if (stopRequested.get()) throw ProcessingPaused()
-                            }, startSample = resumed?.optLong("positionSamples") ?: 0L) { decodedMs, durationMs ->
+                            }, startSample = resumed?.positionSamples ?: 0L) { decodedMs, durationMs ->
                                 checkActive()
                                 recognition.totalMs = durationMs ?: session.durationMs
                                 val now = System.nanoTime()
@@ -485,7 +485,7 @@ class MainActivity : Activity() {
                     } catch (error: IOException) { Log.e(TAG, "Could not cache processing artifacts", error) }
                     val recognition = processing(ModelCatalog.PARAKEET_PRECISION, ModelCatalog.PARAKEET_REVISION).put("language", transcript.language)
                         .put("x-inferenceMs", elapsed).put("x-segmentation", Parakeet.incrementalProvenance(detector))
-                        .put("x-resumedFromMs", resumed?.optLong("doneMs") ?: 0L)
+                        .put("x-resumedFromMs", resumed?.doneMs ?: 0L)
                     val attributed = if (turns.isNullOrEmpty() || transcript.words.isEmpty()) null else
                         SpeakerAttribution.Result(transcript, SpeakerAttribution.record(transcript.words, turns, recognition, null, diarizationMs)
                             .put("x-incrementalDiarization", "28 s windows with 2 s overlap, persistent Sortformer speaker cache"))

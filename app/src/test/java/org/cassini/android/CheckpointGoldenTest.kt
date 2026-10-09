@@ -3,7 +3,6 @@ package org.cassini.android
 import org.cassini.core.asr.IncrementalTranscript
 import org.cassini.core.audio.PcmFile
 import org.cassini.core.checkpoint.CheckpointData
-import org.cassini.core.checkpoint.CheckpointState
 import org.cassini.core.format.CassiniDocument
 import org.cassini.core.format.OggOpus
 import org.cassini.core.format.Transcript
@@ -41,6 +40,12 @@ class CheckpointGoldenTest {
         return tree to checkpoint
     }
 
+    /** checkpoint.json as stored, after [ProcessingCheckpoint.load] accepted it. */
+    private fun raw(checkpoint: ProcessingCheckpoint): JSONObject {
+        assertNotNull("The source signature, model and clip lengths must validate", checkpoint.load())
+        return JSONObject(File(checkpoint.directory, "checkpoint.json").readText())
+    }
+
     @Test fun committedDirectoryIsKeyedByTheStoredSourceString() {
         val committed = File(FixtureTree.directory(), "v0.1.0-basic/processing-checkpoints").listFiles()!!.single()
         val stored = JSONObject(File(committed, "checkpoint.json").readText()).getString("source")
@@ -49,14 +54,13 @@ class CheckpointGoldenTest {
     }
 
     @Test fun capturedCheckpointHasExactlyTheVersionOneMembers() {
-        val saved = captured().second.load()
-        assertNotNull("The source signature, model and clip lengths must validate", saved)
+        val saved = raw(captured().second)
         assertEquals(
             setOf(
                 "version", "source", "signature", "model", "speakers", "recognition", "encoder", "diarizer", "speakerPrefix",
                 "speakerFailure", "clipSamples", "voiceClips", "positionSamples", "doneMs", "durationMs", "elapsedMs",
             ),
-            saved!!.keys().asSequence().toSet(),
+            saved.keys().asSequence().toSet(),
         )
         assertEquals(1, saved.getInt("version"))
         assertEquals(setOf("inferenceMs", "chunks"), saved.getJSONObject("recognition").keys().asSequence().toSet())
@@ -76,13 +80,18 @@ class CheckpointGoldenTest {
     }
 
     @Test fun recognitionRestoresWhereTheJobStopped() {
-        val saved = captured().second.load()!!
+        val (_, checkpoint) = captured()
+        val typed = checkpoint.load()!!
+        val saved = raw(checkpoint)
         val chunks = saved.getJSONObject("recognition").getJSONObject("chunks")
-        val state = CheckpointState.incremental(chunks)
-        val restored = IncrementalTranscript(state) { _, _ -> error("A restore must not decode") }
+        val restored = IncrementalTranscript(typed.recognition.chunks) { _, _ -> error("A restore must not decode") }
         assertEquals(saved.getLong("positionSamples"), restored.positionSamples)
         assertEquals(saved.getLong("doneMs"), restored.doneMs)
+        assertEquals(saved.getLong("positionSamples"), typed.positionSamples)
+        assertEquals(saved.getLong("doneMs"), typed.doneMs)
+        assertEquals(saved.getJSONObject("recognition").getLong("inferenceMs"), typed.recognition.inferenceMs)
         val words = Transcript.fromJson(chunks.getJSONObject("words").toString()).words
+        assertEquals(words, typed.recognition.chunks.words)
         assertTrue(words.isNotEmpty())
         assertTrue(words.any { it.text.contains("settentrionale", ignoreCase = true) })
         assertTrue(
@@ -92,8 +101,14 @@ class CheckpointGoldenTest {
 
     @Test fun encoderDiarizerAndClipStateDecode() {
         val (_, checkpoint) = captured()
-        val saved = checkpoint.load()!!
+        val typed = checkpoint.load()!!
+        val saved = raw(checkpoint)
         val encoder = saved.getJSONObject("encoder")
+        assertEquals(encoder.getLong("samples"), typed.encoder!!.samples)
+        assertEquals(encoder.getLong("length"), typed.encoder!!.length)
+        assertEquals(saved.getJSONObject("diarizer").getJSONArray("turns").length(), typed.diarizer!!.turns.size)
+        assertEquals(saved.getString("speakerPrefix"), typed.speakerPrefix)
+        assertEquals(saved.getInt("clipSamples"), typed.clipSamples)
         assertEquals(640, CheckpointData.floats(encoder.getString("history"), 640).size)
         assertEquals(320, CheckpointData.floats(encoder.getString("frame"), 320).size)
         assertEquals(saved.getLong("positionSamples"), encoder.getLong("samples"))
@@ -117,7 +132,7 @@ class CheckpointGoldenTest {
 
     @Test fun draftNamesAndTheirGenerationLoad() {
         val (_, checkpoint) = captured()
-        val prefix = checkpoint.load()!!.getString("speakerPrefix")
+        val prefix = checkpoint.load()!!.speakerPrefix
         assertEquals(mapOf("${prefix}1" to "Ada Example") to emptyMap<String, String>(), checkpoint.loadNames())
         assertEquals(mapOf("${prefix}1" to "") to emptyMap<String, String>(), checkpoint.nameExtras())
         assertEquals(4L, checkpoint.rememberGeneration())
@@ -133,11 +148,30 @@ class CheckpointGoldenTest {
         assertNotNull(checkpoint.load())
     }
 
+    /** Robolectric runs Android's org.json, which keeps member order, so the typed round trip is byte for byte. */
     @Test fun savingTheLoadedStateWritesTheSameCheckpoint() {
         val (_, checkpoint) = captured()
+        val file = File(checkpoint.directory, "checkpoint.json")
+        val stored = file.readText()
         val saved = checkpoint.load()!!
-        checkpoint.save(JSONObject(saved.toString()))
-        assertEquals(plain(saved), plain(checkpoint.load()!!))
+        checkpoint.save(saved)
+        assertEquals(plain(JSONObject(stored)), plain(JSONObject(file.readText())))
+        assertEquals(stored, file.readText())
+    }
+
+    @Test fun theJobsStateGetsThisSourcesIdentity() {
+        val (_, checkpoint) = captured()
+        val saved = checkpoint.load()!!
+        val state = checkpoint.state(
+            saved.recognition, saved.encoder, saved.diarizer, saved.speakerPrefix, saved.speakerFailure, saved.clipSamples,
+            saved.voiceClips, saved.positionSamples, saved.doneMs, saved.durationMs, saved.elapsedMs,
+        )
+        assertEquals(
+            listOf(saved.source, saved.signature, saved.model, saved.speakers),
+            listOf(state.source, state.signature, state.model, state.speakers),
+        )
+        val elsewhere = state.copy(source = "file:///elsewhere.opus")
+        assertThrows(IllegalArgumentException::class.java) { checkpoint.save(elsewhere) }
     }
 
     @Test fun aChangedSourceInvalidatesTheCheckpoint() {
@@ -172,11 +206,11 @@ class CheckpointGoldenTest {
         }
         edit(File(tree.root, "latest.words.json")) { it.put("language", "it") }
 
-        val saved = checkpoint.load()!!
+        val saved = raw(checkpoint)
         val chunks = saved.getJSONObject("recognition").getJSONObject("chunks")
         assertEquals("it", Transcript.fromJson(chunks.getJSONObject("words").toString()).language)
-        val state = CheckpointState.incremental(chunks)
-        val restored = IncrementalTranscript(state) { _, _ -> error("A restore must not decode") }
+        val typed = checkpoint.load()!!.recognition.chunks
+        val restored = IncrementalTranscript(typed) { _, _ -> error("A restore must not decode") }
         assertEquals(saved.getLong("positionSamples"), restored.positionSamples)
         assertEquals(saved.getLong("doneMs"), restored.doneMs)
         val transcripts = LibraryStore(tree.root).load().mapNotNull { it.session.transcript }

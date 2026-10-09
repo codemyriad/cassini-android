@@ -75,7 +75,7 @@ class ProcessingResumeTest {
             waitFor("Stop keeps a durable partial result") { sessions.load().processingPaused }
             val checkpoint = ProcessingCheckpoint(context.filesDir, uri)
             val saved = checkpoint.load()!!
-            val done = saved.getLong("doneMs")
+            val done = saved.doneMs
             assertTrue(done in 28000 until 90000)
             assertTrue(checkpoint.loadNames().first.values.contains("Resume Voice"))
             val partial = sessions.load().transcript!!.words

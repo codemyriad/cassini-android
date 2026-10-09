@@ -1,10 +1,13 @@
 package org.cassini.android
 
 import android.util.AtomicFile
-import org.cassini.core.checkpoint.CheckpointData
 import org.cassini.core.checkpoint.CheckpointNames
 import org.cassini.core.checkpoint.CheckpointState
+import org.cassini.core.checkpoint.DiarizerState
+import org.cassini.core.checkpoint.EncoderState
+import org.cassini.core.checkpoint.RecognitionState
 import org.cassini.core.models.ModelCatalog
+import org.cassini.core.speakers.PrintWindow
 import org.json.JSONObject
 import java.io.File
 
@@ -20,7 +23,9 @@ internal class ProcessingCheckpoint(files: File, private val source: String) {
         val file = android.net.Uri.parse(source).takeIf { it.scheme == "file" }?.path?.let(::File)
         return CheckpointState.signature(file)
     }
-    fun load(): JSONObject? {
+
+    /** The paused job's state, or null when there is none. Throws when it exists but cannot be resumed. */
+    fun load(): CheckpointState? {
         if (!metadata.baseFile.exists() && !File(directory, "checkpoint.json.bak").exists()) return null
         val expected = CheckpointState.Expected(
             source,
@@ -30,33 +35,52 @@ internal class ProcessingCheckpoint(files: File, private val source: String) {
             clips.length(),
             audio.length(),
         )
-        return JSONObject(metadata.openRead().bufferedReader().use { it.readText() }).also { CheckpointState.validate(it, expected) }
+        val json = JSONObject(metadata.openRead().bufferedReader().use { it.readText() })
+        CheckpointState.validate(json, expected)
+        return CheckpointState.decode(json)
     }
-    fun save(state: JSONObject) {
+
+    /** The job's members with this source's identity and the pinned models of this build. */
+    @Suppress("LongParameterList") // One parameter per checkpoint member the job owns.
+    fun state(
+        recognition: RecognitionState,
+        encoder: EncoderState?,
+        diarizer: DiarizerState?,
+        speakerPrefix: String,
+        speakerFailure: Boolean,
+        clipSamples: Int,
+        voiceClips: Map<String, List<PrintWindow>>?,
+        positionSamples: Long,
+        doneMs: Long,
+        durationMs: Long,
+        elapsedMs: Long,
+    ) = CheckpointState(
+        source, signature(), ModelCatalog.PARAKEET_REVISION, ModelCatalog.diarizationModel.sha256, recognition, encoder,
+        diarizer, speakerPrefix, speakerFailure, clipSamples, voiceClips, positionSamples, doneMs, durationMs, elapsedMs,
+    )
+
+    /** Commits [state] atomically, in the member order 0.1.0 writes. */
+    fun save(state: CheckpointState) {
+        require(state.source == source && state.version == CheckpointState.VERSION)
         directory.mkdirs()
-        state.put("version", 1).put("source", source).put("signature", signature())
-            .put("model", ModelCatalog.PARAKEET_REVISION).put("speakers", ModelCatalog.diarizationModel.sha256)
-        write(metadata, state)
+        write(metadata, CheckpointState.encode(state))
     }
     /** [generation] is VoiceStore's at the time [remembered] was chosen; a later "forget all" invalidates them. */
     fun saveNames(labels: Map<String, String>, merges: Map<String, String>, remembered: Map<String, String> = emptyMap(), automatic: Map<String, String> = emptyMap(), generation: Long = 0) {
         directory.mkdirs()
         write(names, CheckpointNames.encode(CheckpointNames(labels, merges, remembered, automatic, generation)))
     }
-    fun rememberGeneration(): Long {
-        if (!names.baseFile.exists() && !File(directory, "names.json.bak").exists()) return 0
-        return JSONObject(names.openRead().bufferedReader().use { it.readText() }).optLong("generation", 0)
-    }
-    fun loadNames(): Pair<Map<String, String>, Map<String, String>> {
-        if (!names.baseFile.exists() && !File(directory, "names.json.bak").exists()) return emptyMap<String, String>() to emptyMap()
-        val json = CheckpointNames.decode(JSONObject(names.openRead().bufferedReader().use { it.readText() }))
-        return json.labels to json.merges
-    }
-    fun nameExtras(): Pair<Map<String, String>, Map<String, String>> {
-        if (!names.baseFile.exists() && !File(directory, "names.json.bak").exists()) return emptyMap<String, String>() to emptyMap()
-        val json = JSONObject(names.openRead().bufferedReader().use { it.readText() })
-        return CheckpointData.strings(json.optJSONObject("remembered") ?: JSONObject()) to
-            CheckpointData.strings(json.optJSONObject("automatic") ?: JSONObject())
+    fun rememberGeneration(): Long = readNames()?.generation ?: 0
+
+    fun loadNames(): Pair<Map<String, String>, Map<String, String>> =
+        readNames()?.let { it.labels to it.merges } ?: (emptyMap<String, String>() to emptyMap())
+
+    fun nameExtras(): Pair<Map<String, String>, Map<String, String>> =
+        readNames()?.let { it.remembered to it.automatic } ?: (emptyMap<String, String>() to emptyMap())
+
+    private fun readNames(): CheckpointNames? {
+        if (!names.baseFile.exists() && !File(directory, "names.json.bak").exists()) return null
+        return CheckpointNames.decode(JSONObject(names.openRead().bufferedReader().use { it.readText() }))
     }
     fun discard() { directory.deleteRecursively() }
     /** One job per source in this process: viewers in other tasks share the directory. Release in a finally. */
