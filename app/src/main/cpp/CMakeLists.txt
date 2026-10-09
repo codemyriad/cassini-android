@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
-# AGP passes Debug or RelWithDebInfo. The encoder must produce the same bytes in every variant
-# (checkpoints store its state), so libopus and the JNI shim always use the Release flags.
+# AGP passes Debug or RelWithDebInfo. The encoder must behave identically in every variant (a
+# resumed checkpoint primes a fresh encoder and continues the same stream), so libopus and the JNI
+# shim always use the Release flags.
 set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
 project(cassini_audio LANGUAGES C CXX)
 if(NOT OPUS_SOURCE OR NOT EXISTS "${OPUS_SOURCE}/CMakeLists.txt")

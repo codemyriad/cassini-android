@@ -24,8 +24,9 @@ android {
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         externalNativeBuild {
             cmake {
-                // Release flags in every variant: checkpoints store encoder state, so a debug build
-                // must encode exactly like a release build.
+                // Release flags in every variant: the encoder must behave identically in every build
+                // (a resumed checkpoint primes a fresh encoder and continues the same stream), so
+                // libopus always gets the Release flags (-O3 -DNDEBUG) of the old hand-run build.
                 arguments += listOf(
                     "-DOPUS_SOURCE=${opusSource.absolutePath}",
                     "-DANDROID_STL=c++_static",
