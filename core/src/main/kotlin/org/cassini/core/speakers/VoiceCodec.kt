@@ -25,8 +25,9 @@ fun floats(array: JSONArray) = FloatArray(array.length()) { array.getDouble(it).
 
 /**
  * `voices.json` version 1 and the enrolment arithmetic of 0.1.0 `VoiceStore`, without the file. A file whose
- * `version` is not [VERSION] is refused with [UnsupportedVersion], so a newer file is never read as empty and then
- * overwritten.
+ * `version` is not [VERSION] is refused with [UnsupportedVersion], so that a caller can tell a newer file from an
+ * empty one. The 0.1.0 `VoiceStore` in `:app` does not use that yet: like 0.1.0, it treats any unreadable file as
+ * empty and the next write replaces it. Keeping a newer file read-only arrives with the P2 `:data` repositories.
  */
 object VoiceCodec {
     const val VERSION = 1

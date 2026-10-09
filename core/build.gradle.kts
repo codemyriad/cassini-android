@@ -1,7 +1,9 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
-// The verbatim engine as plain Kotlin/JVM: no android.*, no sherpa-onnx, no coroutines. `./gradlew :core:test`
-// needs a JDK, but no NDK, native AAR, libopus source or device (docs/development.md).
+// The verbatim engine as plain Kotlin/JVM: no android.*, no sherpa-onnx, no coroutines.
+// `./gradlew --configure-on-demand :core:test` needs only a JDK and the third_party/cassini-format submodule: no
+// Android SDK, NDK, native AAR, libopus source or device. Without --configure-on-demand Gradle also configures :app
+// and :engine, which needs the Android SDK and its NDK (docs/development.md).
 plugins {
     alias(libs.plugins.kotlin.jvm)
     // Lets :app's lint (checkDependencies) analyze this module too.

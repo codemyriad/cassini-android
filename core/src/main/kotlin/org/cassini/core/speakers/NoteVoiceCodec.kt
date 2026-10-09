@@ -10,7 +10,9 @@ data class SpeakerPrint(val embedding: FloatArray, val seconds: Double, val matc
 /**
  * `voiceprints/<meetingId>.json` version 2 of 0.1.0 `NoteVoices`: each note's speaker prints and match state keyed by
  * "<variantId>/<speakerId>", never part of a document. A file whose `version` is not [VERSION] is refused with
- * [UnsupportedVersion] instead of being read as empty, so the caller can leave a newer file alone.
+ * [UnsupportedVersion] instead of being read as empty, so that a caller can leave a newer file alone. The 0.1.0
+ * `NoteVoiceStore` in `:app` does not do that yet: like 0.1.0, it treats any unreadable file as missing and the next
+ * merge replaces it. Keeping a newer file read-only arrives with the P2 `:data` repositories.
  */
 object NoteVoiceCodec {
     const val VERSION = 2
