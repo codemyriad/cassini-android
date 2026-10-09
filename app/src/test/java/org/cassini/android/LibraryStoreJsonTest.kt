@@ -2,7 +2,6 @@ package org.cassini.android
 
 import org.cassini.core.format.Transcript
 import org.cassini.core.format.Word
-import org.cassini.core.library.LegacyLibraryJson
 import org.cassini.core.library.LibraryNote
 import org.cassini.core.library.Session
 import org.json.JSONObject
@@ -10,7 +9,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** The 0.1.0 `library.json` note writer read back by the :core parser. */
+/** The `library.json` note writer and reader. */
 class LibraryStoreJsonTest {
     private val transcript = Transcript(listOf(Word("spk_1", 0, 100, "Ciao"), Word("spk_1", 100, 300, "mondo.")), "it")
 
@@ -27,7 +26,7 @@ class LibraryStoreJsonTest {
             "one",
             100
         )
-        val restored = LegacyLibraryJson.libraryNote(JSONObject(raw.json().toString()))
+        val restored = libraryNote(JSONObject(raw.json().toString()))
         assertEquals(raw, restored)
         val portable = LibraryNote.update(
             raw,
@@ -35,7 +34,7 @@ class LibraryStoreJsonTest {
             "one",
             200
         )
-        val reopened = LegacyLibraryJson.libraryNote(JSONObject(portable.json().toString()))
+        val reopened = libraryNote(JSONObject(portable.json().toString()))
         assertNull(reopened.session.transcript)
         assertEquals("Ciao mondo.", reopened.text)
         assertEquals(200, reopened.session.positionMs)

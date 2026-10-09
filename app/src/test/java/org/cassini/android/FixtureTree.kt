@@ -1,4 +1,4 @@
-package org.cassini.core.testing
+package org.cassini.android
 
 import org.cassini.core.format.OggOpus
 import java.io.File
@@ -13,7 +13,7 @@ import java.security.MessageDigest
  * and restores modification times from the tree's .mtimes manifest so checkpoint signatures (length:mtime) validate.
  * Everything else is copied byte for byte. fixtures/README.md describes the trees.
  */
-class FixtureTree private constructor(val root: File, val checkpoints: Map<String, File>) {
+internal class FixtureTree private constructor(val root: File, val checkpoints: Map<String, File>) {
     companion object {
         const val DEVICE_ROOT = "/data/user/0/org.cassini.android/files"
         private val rewritten = setOf("library.json", "library.json.new", "session.json")

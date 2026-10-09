@@ -22,7 +22,6 @@ detekt {
             "app/src/androidTest/java",
             "core/src/main/kotlin",
             "core/src/test/kotlin",
-            "core/src/testFixtures/kotlin",
             "build.gradle.kts",
             "settings.gradle.kts",
             "app/build.gradle.kts",

@@ -8,7 +8,6 @@ import org.cassini.core.format.CassiniDocument
 import org.cassini.core.format.OggOpus
 import org.cassini.core.format.Transcript
 import org.cassini.core.speakers.VoiceClipCache
-import org.cassini.core.testing.FixtureTree
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertArrayEquals

@@ -12,6 +12,11 @@ class ModelStore(private val directory: File) {
     data class Progress(val percent: Int, val verifying: Boolean = false)
     companion object {
         const val REVISION = ModelCatalog.PARAKEET_REVISION
+        /** Upgrade cleanup is restricted to the retired model's private download directory. */
+        internal fun removeLegacyModel(filesDir: File): Boolean {
+            val legacy = File(filesDir, "parakeet-v3-fp32")
+            return !legacy.exists() || legacy.deleteRecursively()
+        }
         const val REPOSITORY = ModelCatalog.PARAKEET_REPOSITORY
         val int8Artifacts: List<Artifact> = ModelCatalog.parakeetArtifacts
 

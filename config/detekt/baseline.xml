@@ -25,7 +25,6 @@
     <ID>ArgumentListWrapping:AudioDecoder.kt$AudioDecoder$(info.presentationTimeUs &lt;= Limits.MAX_RECORDING_MS * 1000 + (if (opusSamples != null) 120_000 else 0), Failure.LONG)</ID>
     <ID>ArgumentListWrapping:AudioDecoder.kt$AudioDecoder$(sampleRate, startSample)</ID>
     <ID>ArgumentListWrapping:BatteryReader.kt$BatteryReader$(elapsedMs, (level * 100 / scale).coerceIn(0, 100), intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0, charge)</ID>
-    <ID>ArgumentListWrapping:CassiniApplication.kt$CassiniApplication$("Cassini", "Could not remove obsolete FP32 model downloads")</ID>
     <ID>ArgumentListWrapping:CassiniApplication.kt$CassiniApplication$("Cassini", "Could not remove obsolete speaker model downloads")</ID>
     <ID>ArgumentListWrapping:CassiniApplication.kt$CassiniApplication$(filesDir)</ID>
     <ID>ArgumentListWrapping:CassiniDocument.kt$CassiniDocument$("label")</ID>
@@ -225,6 +224,7 @@
     <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$(track, codec.getOutputBuffer(output)!!, info)</ID>
     <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$(transcript.words.all { it.startMs &gt;= 0 &amp;&amp; it.endMs &gt;= it.startMs &amp;&amp; it.endMs &lt;= audio.durationMs })</ID>
     <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$(when (sample) { "youtube-long" -&gt; "youtube-long.wav" "youtube" -&gt; "youtube-smoke.wav" else -&gt; "fleurs-it-short.wav" })</ID>
+    <ID>ArgumentListWrapping:DiarizationModels.kt$DiarizationModels.Companion$("segmentation.int8.onnx", "embedding.onnx", "segmentation.int8.onnx.part", "embedding.onnx.part")</ID>
     <ID>ArgumentListWrapping:DiarizationPocTest.kt$DiarizationPocTest$(" ${words.size} words, ${words.map { it.speaker }.toSet().size} speakers, ${wrong.size} on the wrong side of the join")</ID>
     <ID>ArgumentListWrapping:DiarizationPocTest.kt$DiarizationPocTest$(" [$current] $line")</ID>
     <ID>ArgumentListWrapping:DiarizationPocTest.kt$DiarizationPocTest$("Install Parakeet and the speech detector first", models.ready() &amp;&amp; ModelStore.vadReady(context.filesDir))</ID>
@@ -291,9 +291,6 @@
     <ID>ArgumentListWrapping:InterfaceTest.kt$InterfaceTest$(listOf(Word("spk_1", 0, 1500, "Inizio.")), "it")</ID>
     <ID>ArgumentListWrapping:InterfaceTest.kt$InterfaceTest$(output)</ID>
     <ID>ArgumentListWrapping:InterfaceTest.kt$InterfaceTest$(text)</ID>
-    <ID>ArgumentListWrapping:LegacyLibraryJson.kt$LegacyLibraryJson$("processingPaused")</ID>
-    <ID>ArgumentListWrapping:LegacyLibraryJson.kt$LegacyLibraryJson$("resultPrecision")</ID>
-    <ID>ArgumentListWrapping:LegacyLibraryJson.kt$LegacyLibraryJson$("text")</ID>
     <ID>ArgumentListWrapping:LibraryActivity.kt$LibraryActivity$("Cassini", "Library refresh failed", error)</ID>
     <ID>ArgumentListWrapping:LibraryActivity.kt$LibraryActivity$("query", query.text.toString())</ID>
     <ID>ArgumentListWrapping:LibraryActivity.kt$LibraryActivity$(16f, DeckViews.muted)</ID>
@@ -332,8 +329,11 @@
     <ID>ArgumentListWrapping:LibraryNoteTest.kt$LibraryNoteTest$(words = listOf(Word("spk_1", 0, 200, "Benvenuti.")))</ID>
     <ID>ArgumentListWrapping:LibraryStore.kt$("inferenceMs", session.inferenceMs)</ID>
     <ID>ArgumentListWrapping:LibraryStore.kt$("processingMs", session.processingMs)</ID>
+    <ID>ArgumentListWrapping:LibraryStore.kt$("processingPaused")</ID>
     <ID>ArgumentListWrapping:LibraryStore.kt$("processingPaused", session.processingPaused)</ID>
+    <ID>ArgumentListWrapping:LibraryStore.kt$("resultPrecision")</ID>
     <ID>ArgumentListWrapping:LibraryStore.kt$("session", JSONObject().put("uri", session.uri).put("name", session.name) .put("document", session.document).put("selectedVariant", session.selectedVariant) .put("transcript", session.transcript?.takeIf { session.document == null }?.let { JSONObject(it.json()) }) .put("durationMs", session.durationMs).put("positionMs", session.positionMs) .put("inferenceMs", session.inferenceMs).put("processingMs", session.processingMs).put("processingPaused", session.processingPaused) .put("resultPrecision", session.resultPrecision))</ID>
+    <ID>ArgumentListWrapping:LibraryStore.kt$("text")</ID>
     <ID>ArgumentListWrapping:LibraryStore.kt$LibraryStore$("id")</ID>
     <ID>ArgumentListWrapping:LibraryStore.kt$LibraryStore$("meeting")</ID>
     <ID>ArgumentListWrapping:LibraryStore.kt$LibraryStore$(File(path), verify = false)</ID>
@@ -574,8 +574,6 @@
     <ID>ArgumentListWrapping:ModelUpgradeTest.kt$ModelUpgradeTest$("old weights")</ID>
     <ID>ArgumentListWrapping:ModelUpgradeTest.kt$ModelUpgradeTest$("parakeet-v3/verified", "vad/verified", "speaker-models/verified", "documents/old-fp32.opus", "documents/old-live.wav", "session.json", "library.json")</ID>
     <ID>ArgumentListWrapping:ModelUpgradeTest.kt$ModelUpgradeTest$("segmentation.int8.onnx", "embedding.onnx", "embedding.onnx.part")</ID>
-    <ID>ArgumentListWrapping:ModelUpgradeTest.kt$ModelUpgradeTest$(ModelCatalog.voiceprintModel.sha256, File(directory, ModelCatalog.VOICEPRINT.markerFile).readText())</ID>
-    <ID>ArgumentListWrapping:ModelUpgradeTest.kt$ModelUpgradeTest$(directory, ModelCatalog.VOICEPRINT.markerFile)</ID>
     <ID>ArgumentListWrapping:ModelUpgradeTest.kt$ModelUpgradeTest$(directory, it)</ID>
     <ID>ArgumentListWrapping:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$("stream", "Applied remembered names: ${labels.values.joinToString()}\n")</ID>
     <ID>ArgumentListWrapping:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$("stream", "Existing meeting matches: ${matches.map { (speaker, match) -&gt; "$speaker ${voices.first { it.id == match.voiceId }.name} ${match.state} ${match.score}" }.joinToString()}\n")</ID>
@@ -1932,7 +1930,6 @@
     <ID>MaxLineLength:InterfaceTest.kt$InterfaceTest$assertFalse("Opening a note must not focus the search field", activity.findViewById&lt;android.widget.EditText&gt;(R.id.search_input).hasFocus())</ID>
     <ID>MaxLineLength:InterfaceTest.kt$InterfaceTest$instrumentation.context.assets.open("fleurs-it-short.wav").use { input -&gt; audio.outputStream().use { output -&gt; input.copyTo(output) } }</ID>
     <ID>MaxLineLength:InterfaceTest.kt$InterfaceTest$store.save(Session(Uri.fromFile(audio).toString(), "Leave sample.wav", Transcript(listOf(Word("spk_1", 0, 1500, "Inizio.")), "it"), durationMs = 15840))</ID>
-    <ID>MaxLineLength:LegacyLibraryJson.kt$LegacyLibraryJson$resultPrecision = value.optString("resultPrecision")</ID>
     <ID>MaxLineLength:LibraryActivity.kt$LibraryActivity$catch (error: Exception) { android.util.Log.e("Cassini", "Library refresh failed", error); summary.setText(R.string.library_error) }</ID>
     <ID>MaxLineLength:LibraryActivity.kt$LibraryActivity$fun day(value: Long)</ID>
     <ID>MaxLineLength:LibraryActivity.kt$LibraryActivity$getString(if (note.session.processingPaused) R.string.paused_draft else if (note.session.document != null) R.string.library_saved_document else R.string.library_recorded)</ID>
@@ -1950,6 +1947,7 @@
     <ID>MaxLineLength:LibraryStore.kt$LibraryStore$fun</ID>
     <ID>MaxLineLength:LibraryStore.kt$LibraryStore$recovered[key] = LibraryNote.update(previous, session, previous?.id ?: UUID.randomUUID().toString(), source.lastModified())</ID>
     <ID>MaxLineLength:LibraryStore.kt$LibraryStore$val note = LibraryNote.update(previous, latest.copy(transcript = latest.transcript ?: previous?.session?.transcript), id, System.currentTimeMillis())</ID>
+    <ID>MaxLineLength:LibraryStore.kt$resultPrecision = value.optString("resultPrecision")</ID>
     <ID>MaxLineLength:LibraryTest.kt$LibraryTest$(0 until container.childCount).map { container.getChildAt(it) }.filter { it.isClickable &amp;&amp; !texts(it).any { t -&gt; t.startsWith(context.getString(R.string.recording_recovered)) } }</ID>
     <ID>MaxLineLength:LibraryTest.kt$LibraryTest$.</ID>
     <ID>MaxLineLength:LibraryTest.kt$LibraryTest$ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance&lt;MainActivity&gt;().firstOrNull()</ID>
@@ -2189,9 +2187,9 @@
     <ID>MaximumLineLength:DocumentStore.kt$DocumentStore$ </ID>
     <ID>MaximumLineLength:IncrementalTranscript.kt$IncrementalTranscript$ </ID>
     <ID>MaximumLineLength:InterfaceTest.kt$InterfaceTest$ </ID>
-    <ID>MaximumLineLength:LegacyLibraryJson.kt$LegacyLibraryJson$ </ID>
     <ID>MaximumLineLength:LibraryActivity.kt$LibraryActivity$ </ID>
     <ID>MaximumLineLength:LibraryNoteTest.kt$LibraryNoteTest$ </ID>
+    <ID>MaximumLineLength:LibraryStore.kt$ </ID>
     <ID>MaximumLineLength:LibraryStore.kt$LibraryStore$ </ID>
     <ID>MaximumLineLength:LibraryTest.kt$LibraryTest$ </ID>
     <ID>MaximumLineLength:LicenseAssetsTest.kt$LicenseAssetsTest$ </ID>
@@ -2496,6 +2494,7 @@
     <ID>PropertyWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$val reference = tokens(JSONObject(instrumentation.context.assets.open("fleurs-it-short.json").bufferedReader().use { it.readText() }).getString("reference"))</ID>
     <ID>PropertyWrapping:DecodeSession.kt$DecodeSession$val source = Span(if (index == 0) cut.start else cut.start - context, if (index == pieces.lastIndex) cut.end else cut.end + context)</ID>
     <ID>PropertyWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$val upsampled = PcmAudio(FloatArray(speech.samples.size * 3) { speech.samples[it / 3] }, speech.sampleRate * 3)</ID>
+    <ID>PropertyWrapping:DiarizationModels.kt$DiarizationModels.Companion$/** Files of the earlier pyannote + ERes2Net pipeline. Removing them never touches recordings. */ private val retired = listOf("segmentation.int8.onnx", "embedding.onnx", "segmentation.int8.onnx.part", "embedding.onnx.part")</ID>
     <ID>PropertyWrapping:DiarizationPocTest.kt$DiarizationPocTest$private val directory = File(InstrumentationRegistry.getArguments().getString("diarDir") ?: "/data/local/tmp/cassini-diar")</ID>
     <ID>PropertyWrapping:DiarizationTest.kt$DiarizationTest$val turns = listOf(SpeakerTurn(0, 400, 0), SpeakerTurn(200, 500, 0), SpeakerTurn(1000, 1600, 1), SpeakerTurn(1600, 1700, 1))</ID>
     <ID>PropertyWrapping:DocumentStore.kt$DocumentStore$val owned = File(directory, "${OggOpus.hex(hash.digest())}.${if (doc.state == "plain-audio") "input" else "opus"}")</ID>
@@ -2663,6 +2662,7 @@
     <ID>SpacingBetweenDeclarationsWithComments:ModelBundle.kt$ModelBundle$/** Parakeet is fetched only after consent, so once it is here the user has agreed; a missing * optional model is retried by the run itself and must not bring the dialog back or block auto-transcribe. */</ID>
     <ID>SpacingBetweenDeclarationsWithComments:ModelBundle.kt$ModelBundle.Companion$/** Bytes fetched over the network for each part, which is what the consent dialog quotes. */</ID>
     <ID>SpacingBetweenDeclarationsWithComments:ModelBundle.kt$ModelBundle.Companion$/** Whole MiB, rounded to tens from 100 MiB up, as `models_size` is written. */</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:ModelStore.kt$ModelStore.Companion$/** Upgrade cleanup is restricted to the retired model's private download directory. */</ID>
     <ID>SpacingBetweenDeclarationsWithComments:OggOpus.kt$OggOpus$/** * [mux] without holding the audio: copies [input]'s packets behind new [tags], renumbering pages and * recomputing CRCs. Returns what it read, digest included; a damaged source throws after partial output. */</ID>
     <ID>SpacingBetweenDeclarationsWithComments:OggOpus.kt$OggOpus$/** One pass over a whole stream, holding a single packet at a time. */</ID>
     <ID>SpacingBetweenDeclarationsWithComments:OggOpus.kt$OggOpus.Info$/** What a streaming pass learns: headers, shape, and the audio digest when framing and packets are sound. */</ID>
@@ -2822,8 +2822,6 @@
     <ID>Wrapping:InterfaceTest.kt$InterfaceTest$(</ID>
     <ID>Wrapping:InterfaceTest.kt$InterfaceTest$("Returning to a note that was never played must leave playback available: " + activity.findViewById&lt;TextView&gt;(R.id.operation_status).text, play.isEnabled)</ID>
     <ID>Wrapping:InterfaceTest.kt$InterfaceTest$;</ID>
-    <ID>Wrapping:LegacyLibraryJson.kt$LegacyLibraryJson$(</ID>
-    <ID>Wrapping:LegacyLibraryJson.kt$LegacyLibraryJson$(id, json.getLong("createdAt"), Session( uri = optional("uri"), name = value.getString("name"), document = optional("document"), selectedVariant = optional("selectedVariant"), libraryId = id, transcript = value.optJSONObject("transcript")?.let { Transcript.fromJson(it.toString()) }, durationMs = value.optLong("durationMs"), positionMs = value.optInt("positionMs"), inferenceMs = value.optLong("inferenceMs"), processingMs = value.optLong("processingMs"), resultPrecision = value.optString("resultPrecision"), processingPaused = value.optBoolean("processingPaused")), json.optString("text"))</ID>
     <ID>Wrapping:LibraryActivity.kt$LibraryActivity$(</ID>
     <ID>Wrapping:LibraryActivity.kt$LibraryActivity$(card, views.text(12f, DeckViews.muted).apply { text = getString(R.string.library_note_metadata, DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(note.createdAt)), getString(if (note.session.processingPaused) R.string.paused_draft else if (note.session.document != null) R.string.library_saved_document else R.string.library_recorded)) }, top = 12)</ID>
     <ID>Wrapping:LibraryActivity.kt$LibraryActivity$(card, views.text(15f, if (snippet.isEmpty()) views.accent else DeckViews.paper).apply { text = snippet.ifEmpty { getString(if (note.session.document != null) R.string.library_document else R.string.library_audio_ready) } maxLines = 3; ellipsize = android.text.TextUtils.TruncateAt.END; setLineSpacing(views.dp(3).toFloat(), 1f) }, top = 10)</ID>
@@ -2845,6 +2843,7 @@
     <ID>Wrapping:LibraryNoteTest.kt$LibraryNoteTest$(portable, portable.session.copy(uri = "file:///updated.opus", document = "/updated.opus", selectedVariant = "second", transcript = transcript.copy(words = listOf(Word("spk_1", 0, 200, "Benvenuti.")))), "one", 300)</ID>
     <ID>Wrapping:LibraryStore.kt$(</ID>
     <ID>Wrapping:LibraryStore.kt$("session", JSONObject().put("uri", session.uri).put("name", session.name) .put("document", session.document).put("selectedVariant", session.selectedVariant) .put("transcript", session.transcript?.takeIf { session.document == null }?.let { JSONObject(it.json()) }) .put("durationMs", session.durationMs).put("positionMs", session.positionMs) .put("inferenceMs", session.inferenceMs).put("processingMs", session.processingMs).put("processingPaused", session.processingPaused) .put("resultPrecision", session.resultPrecision))</ID>
+    <ID>Wrapping:LibraryStore.kt$(id, json.getLong("createdAt"), Session( uri = optional("uri"), name = value.getString("name"), document = optional("document"), selectedVariant = optional("selectedVariant"), libraryId = id, transcript = value.optJSONObject("transcript")?.let { Transcript.fromJson(it.toString()) }, durationMs = value.optLong("durationMs"), positionMs = value.optInt("positionMs"), inferenceMs = value.optLong("inferenceMs"), processingMs = value.optLong("processingMs"), resultPrecision = value.optString("resultPrecision"), processingPaused = value.optBoolean("processingPaused")), json.optString("text"))</ID>
     <ID>Wrapping:LibraryStore.kt$LibraryStore$(</ID>
     <ID>Wrapping:LibraryStore.kt$LibraryStore$;</ID>
     <ID>Wrapping:LibraryStore.kt$LibraryStore${ CassiniDocument.read(File(path), verify = false).manifest?.getJSONObject("meeting")?.getString("id") }</ID>

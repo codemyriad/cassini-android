@@ -17,6 +17,15 @@ internal class DiarizationModels(private val directory: File) {
         val download = ModelCatalog.diarizationDownload
         const val URL = ModelCatalog.DIARIZATION_URL
         fun inFiles(files: File) = DiarizationModels(ModelCatalog.DIARIZATION.directory(files))
+
+        /** Files of the earlier pyannote + ERes2Net pipeline. Removing them never touches recordings. */
+        private val retired = listOf("segmentation.int8.onnx", "embedding.onnx", "segmentation.int8.onnx.part", "embedding.onnx.part")
+        internal fun removeRetiredModels(filesDir: File): Boolean {
+            val directory = File(filesDir, "speaker-models")
+            val verified = File(directory, "verified")
+            if (verified.isFile && verified.readText() != model.sha256) verified.delete()
+            return retired.map { File(directory, it) }.all { !it.exists() || it.delete() }
+        }
     }
     private val marker = File(directory, ModelCatalog.DIARIZATION.markerFile)
     val modelPath get() = File(directory, model.name).absolutePath

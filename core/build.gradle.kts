@@ -4,7 +4,6 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 // needs a JDK, but no NDK, native AAR, libopus source or device (docs/development.md).
 plugins {
     alias(libs.plugins.kotlin.jvm)
-    `java-test-fixtures`
     // Lets :app's lint (checkDependencies) analyze this module too.
     alias(libs.plugins.android.lint)
 }
@@ -31,16 +30,12 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.org.json)
     testImplementation(libs.zstd.jni)
-    // FixtureTree, shared with the Android modules' JVM tests.
-    testFixturesImplementation(libs.junit)
 }
 
 // The published conformance vectors come from the third_party/cassini-format submodule and are required:
 // a missing checkout fails the tests instead of skipping them. -PcassiniConformanceDir overrides the location.
 val conformanceDirectory: String = providers.gradleProperty("cassiniConformanceDir")
     .getOrElse(rootDir.resolve("third_party/cassini-format/spec/conformance").absolutePath)
-// Captured filesDir trees (fixtures/README.md).
-val fixturesDirectory: File = rootDir.resolve("fixtures")
 // DefaultLabelsTest compares the placeholder prefixes with the app's string resources.
 val appResources: File = rootDir.resolve("app/src/main/res")
 
@@ -48,10 +43,8 @@ tasks.test {
     jvmArgumentProviders.add(
         CoreTestData(
             conformance = fileTree(conformanceDirectory),
-            fixtures = fileTree(fixturesDirectory),
             resources = fileTree(appResources) { include("values*/strings.xml") },
             conformancePath = conformanceDirectory,
-            fixturesPath = fixturesDirectory.absolutePath,
             resourcesPath = appResources.absolutePath,
         ),
     )
@@ -64,15 +57,12 @@ tasks.test {
  */
 class CoreTestData(
     @get:InputFiles @get:PathSensitive(PathSensitivity.RELATIVE) val conformance: FileTree,
-    @get:InputFiles @get:PathSensitive(PathSensitivity.RELATIVE) val fixtures: FileTree,
     @get:InputFiles @get:PathSensitive(PathSensitivity.RELATIVE) val resources: FileTree,
     @get:Internal val conformancePath: String,
-    @get:Internal val fixturesPath: String,
     @get:Internal val resourcesPath: String,
 ) : CommandLineArgumentProvider {
     override fun asArguments() = listOf(
         "-Dcassini.conformance=$conformancePath",
-        "-Dcassini.fixtures=$fixturesPath",
         "-Dcassini.appResources=$resourcesPath",
     )
 }

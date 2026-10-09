@@ -1,4 +1,4 @@
-package org.cassini.core.models
+package org.cassini.android
 
 import org.junit.Assert.*
 import org.junit.Rule
@@ -18,9 +18,9 @@ class ModelUpgradeTest {
             "documents/old-fp32.opus", "documents/old-live.wav", "session.json", "library.json")
         kept.forEach { name -> File(directory, name).apply { parentFile!!.mkdirs(); writeText(name) } }
 
-        assertTrue(LegacyModelCleanup.removeLegacyModel(directory))
+        assertTrue(ModelStore.removeLegacyModel(directory))
         assertFalse(legacy.exists())
-        assertTrue(LegacyModelCleanup.removeLegacyModel(directory))
+        assertTrue(ModelStore.removeLegacyModel(directory))
         kept.forEach { name -> assertEquals(name, File(directory, name).readText()) }
     }
 
@@ -30,22 +30,22 @@ class ModelUpgradeTest {
         File(directory, "verified").writeText("old\nhashes")
         val recording = File(folder.root, "documents/note.opus").apply { parentFile!!.mkdirs(); writeText("audio") }
 
-        assertTrue(LegacyModelCleanup.removeRetiredModels(folder.root))
+        assertTrue(DiarizationModels.removeRetiredModels(folder.root))
         assertEquals(emptyList<String>(), directory.list()!!.toList())
         assertEquals("audio", recording.readText())
 
-        File(directory, "verified").writeText(ModelCatalog.diarizationModel.sha256)
-        assertTrue(LegacyModelCleanup.removeRetiredModels(folder.root))
-        assertEquals(ModelCatalog.diarizationModel.sha256, File(directory, "verified").readText())
-        assertTrue(LegacyModelCleanup.removeRetiredModels(File(folder.root, "absent")))
+        File(directory, "verified").writeText(DiarizationModels.model.sha256)
+        assertTrue(DiarizationModels.removeRetiredModels(folder.root))
+        assertEquals(DiarizationModels.model.sha256, File(directory, "verified").readText())
+        assertTrue(DiarizationModels.removeRetiredModels(File(folder.root, "absent")))
     }
 
     @Test fun retiredCleanupKeepsTheVoiceprintModel() {
         val directory = File(folder.root, "speaker-models").apply { mkdirs() }
-        File(directory, ModelCatalog.voiceprintModel.name).writeText("weights")
-        File(directory, ModelCatalog.VOICEPRINT.markerFile).writeText(ModelCatalog.voiceprintModel.sha256)
-        assertTrue(LegacyModelCleanup.removeRetiredModels(folder.root))
-        assertEquals("weights", File(directory, ModelCatalog.voiceprintModel.name).readText())
-        assertEquals(ModelCatalog.voiceprintModel.sha256, File(directory, ModelCatalog.VOICEPRINT.markerFile).readText())
+        File(directory, VoiceprintModel.FILE).writeText("weights")
+        File(directory, VoiceprintModel.MARKER).writeText(VoiceprintModel.model.sha256)
+        assertTrue(DiarizationModels.removeRetiredModels(folder.root))
+        assertEquals("weights", File(directory, VoiceprintModel.FILE).readText())
+        assertEquals(VoiceprintModel.model.sha256, File(directory, VoiceprintModel.MARKER).readText())
     }
 }

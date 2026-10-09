@@ -4,7 +4,7 @@ import android.net.Uri
 import android.util.AtomicFile
 import android.util.Log
 import org.cassini.core.format.CassiniDocument
-import org.cassini.core.library.LegacyLibraryJson
+import org.cassini.core.format.Transcript
 import org.cassini.core.library.LibraryNote
 import org.cassini.core.library.Session
 import org.json.JSONArray
@@ -18,7 +18,10 @@ class LibraryStore(private val directory: File) {
 
     fun load(): List<LibraryNote> {
         if (!file.baseFile.exists() && !File(directory, "library.json.bak").exists()) return emptyList()
-        return LegacyLibraryJson.library(file.openRead().bufferedReader().use { it.readText() })
+        val json = JSONObject(file.openRead().bufferedReader().use { it.readText() })
+        require(json.getInt("version") == 1)
+        val notes = json.getJSONArray("notes")
+        return (0 until notes.length()).map { libraryNote(notes.getJSONObject(it)) }.sortedByDescending { it.createdAt }
     }
 
     fun save(session: Session): Session {
@@ -95,7 +98,21 @@ class LibraryStore(private val directory: File) {
     }
 }
 
-/** The `library.json` note 0.1.0 writes; [LegacyLibraryJson.libraryNote] reads it back. */
+/** A `library.json` note as [json] writes it. */
+internal fun libraryNote(json: JSONObject): LibraryNote {
+    val id = json.getString("id")
+    val value = json.getJSONObject("session")
+    fun optional(key: String) = value.optString(key).takeIf { it.isNotEmpty() && it != "null" }
+    return LibraryNote(id, json.getLong("createdAt"), Session(
+        uri = optional("uri"), name = value.getString("name"), document = optional("document"),
+        selectedVariant = optional("selectedVariant"), libraryId = id,
+        transcript = value.optJSONObject("transcript")?.let { Transcript.fromJson(it.toString()) },
+        durationMs = value.optLong("durationMs"), positionMs = value.optInt("positionMs"),
+        inferenceMs = value.optLong("inferenceMs"), processingMs = value.optLong("processingMs"),
+        resultPrecision = value.optString("resultPrecision"), processingPaused = value.optBoolean("processingPaused")), json.optString("text"))
+}
+
+/** The `library.json` note; [libraryNote] reads it back. */
 fun LibraryNote.json(): JSONObject = JSONObject().put("id", id).put("createdAt", createdAt).put("text", text)
     .put("session", JSONObject().put("uri", session.uri).put("name", session.name)
         .put("document", session.document).put("selectedVariant", session.selectedVariant)
