@@ -57,7 +57,7 @@ The APK does not contain the speech models. The app downloads them only after th
 | Silero VAD (speech detection) and CAM++ (voiceprints) | `github.com`, from the `k2-fsa/sherpa-onnx` releases |
 | Nemotron-3-Diarization INT8 (speaker labels) | `dist.gocassini.com` |
 
-These hosts can send the download to a different download host (a redirect). The app follows a redirect only to a host in the list `ModelCatalog.DOWNLOAD_HOSTS`. `PRIVACY.md` gives this list.
+These hosts can send the download to a different download host (a redirect). The app follows a redirect only to a host in the list `ModelCatalog.DOWNLOAD_HOSTS`. [PRIVACY.md](PRIVACY.md) gives this list.
 
 <!-- TODO(P10): the redirect allow-list (ModelCatalog.DOWNLOAD_HOSTS) comes from P3 on the rebuild branch. When the docs branch merges, make sure that the list exists and that PRIVACY.md copies it. -->
 
