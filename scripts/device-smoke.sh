@@ -18,7 +18,7 @@ if [ -n "${CASSINI_APK:-}" ]; then
         if [ -z "$sdk_path" ]; then
             sdk_path=$(python3 -c 'from pathlib import Path; print(next(line.removeprefix("sdk.dir=") for line in Path("local.properties").read_text().splitlines() if line.startswith("sdk.dir=")))')
         fi
-        manifest=$("$sdk_path/build-tools/34.0.0/aapt" dump xmltree "$CASSINI_APK" AndroidManifest.xml)
+        manifest=$("$sdk_path/build-tools/36.0.0/aapt" dump xmltree "$CASSINI_APK" AndroidManifest.xml)
         if [[ "$manifest" == *'android:debuggable'*'0xffffffff'* ]]; then
             CASSINI_TEST_BUILD_TYPE=debug
         else

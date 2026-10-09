@@ -32,7 +32,7 @@ print(f'Checked {libraries} native libraries: 64-bit ABI and 16 KB ELF/ZIP align
 if os.environ.get('IS_TAG') == 'true':
     if variant != 'release':
         raise SystemExit('Tagged APK must use the release build type')
-    sdk = Path(os.environ['ANDROID_HOME']) / 'build-tools' / '34.0.0'
+    sdk = Path(os.environ['ANDROID_HOME']) / 'build-tools' / '36.0.0'
     certificate = subprocess.check_output([str(sdk / 'apksigner'), 'verify', '--print-certs',
                                            str(source)], text=True)
     expected = Path('scripts/beta-signing-cert.sha256').read_text().strip()

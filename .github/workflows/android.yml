@@ -20,19 +20,15 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Get published format conformance vectors
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: codemyriad/cassini-format
-          ref: e43bad1bd157b56a8e8f71a0620c364c4214746d
-          path: .tools/cassini-format
+          submodules: true
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
         with:
-          packages: 'platform-tools platforms;android-34 build-tools;34.0.0 ndk;28.2.13676358'
+          packages: 'platform-tools platforms;android-37.0 build-tools;36.0.0 ndk;28.2.13676358 cmake;3.22.1'
           log-accepted-android-sdk-licenses: false
       - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
@@ -47,8 +43,22 @@ jobs:
           printf '%s' "$BETA_KEYSTORE" | base64 --decode > "$HOME/.android/debug.keystore"
           chmod 600 "$HOME/.android/debug.keystore"
           echo "CASSINI_BETA_KEYSTORE_FILE=$HOME/.android/debug.keystore" >> "$GITHUB_ENV"
-      - name: Build streaming native runtime
-        run: ANDROID_NDK="$ANDROID_HOME/ndk/28.2.13676358" ./scripts/setup.sh
+      - name: Pass release signing secrets
+        if: startsWith(github.ref, 'refs/tags/')
+        # The 'android' fallbacks are temporary: they keep tag builds working until the owner rotates
+        # the keystore passwords and stores them as secrets.
+        env:
+          STORE_PASSWORD: ${{ secrets.CASSINI_RELEASE_STORE_PASSWORD || 'android' }}
+          KEY_PASSWORD: ${{ secrets.CASSINI_RELEASE_KEY_PASSWORD || 'android' }}
+          KEY_ALIAS: ${{ secrets.CASSINI_RELEASE_KEY_ALIAS || 'androiddebugkey' }}
+        run: |
+          {
+            echo "CASSINI_RELEASE_STORE_PASSWORD=$STORE_PASSWORD"
+            echo "CASSINI_RELEASE_KEY_PASSWORD=$KEY_PASSWORD"
+            echo "CASSINI_RELEASE_KEY_ALIAS=$KEY_ALIAS"
+          } >> "$GITHUB_ENV"
+      - name: Fetch the pinned native runtime
+        run: ./scripts/setup.sh
       - name: Fetch attributed device test fixtures
         run: |
           sudo apt-get update -qq
@@ -59,8 +69,6 @@ jobs:
           BUILD_TYPE: ${{ startsWith(github.ref, 'refs/tags/') && 'Release' || 'Debug' }}
         run: |
           ./gradlew --no-daemon \
-            -PcassiniConformanceDir="$GITHUB_WORKSPACE/.tools/cassini-format/spec/conformance" \
-            -PrequireCassiniConformance=true \
             -PdeviceTestBuildType="${BUILD_TYPE,,}" \
             ":app:assemble$BUILD_TYPE" ":app:assemble${BUILD_TYPE}AndroidTest" \
             :app:testDebugUnitTest ":app:lint$BUILD_TYPE"
@@ -111,7 +119,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
         with:
-          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+          packages: 'platform-tools platforms;android-37.0 build-tools;36.0.0'
           log-accepted-android-sdk-licenses: false
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:

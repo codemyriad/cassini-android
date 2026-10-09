@@ -48,3 +48,12 @@ def check_apk_compatibility(path):
                 if data_offset % PAGE_SIZE:
                     raise ValueError(f'{name}: uncompressed library is not 16 KB ZIP aligned')
     return len(libraries)
+
+
+if __name__ == '__main__':
+    import sys
+    if len(sys.argv) < 2:
+        raise SystemExit('Usage: python3 scripts/apk_compatibility.py APK...')
+    for apk_path in sys.argv[1:]:
+        count = check_apk_compatibility(apk_path)
+        print(f'{apk_path}: {count} native libraries, 64-bit ABIs, 16 KB ELF/ZIP alignment')
