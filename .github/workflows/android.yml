@@ -103,8 +103,8 @@ jobs:
             echo "CASSINI_RELEASE_KEY_PASSWORD=$KEY_PASSWORD"
             echo "CASSINI_RELEASE_KEY_ALIAS=$KEY_ALIAS"
           } >> "$GITHUB_ENV"
-      # setup.sh fetches the pinned release AAR; when the release is unreachable it builds the AAR
-      # from source (NDK above, about 40 minutes). Either way the result is cached by its pins.
+      # setup.sh fetches the pinned release AAR and fails fast when it cannot; only the weekly
+      # `native` job builds the AAR from source. The NDK above compiles libcassini_opus.so.
       - name: Cache the native runtime
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -113,7 +113,7 @@ jobs:
             .tools/opus/source.tar.gz
           key: native-${{ hashFiles('scripts/native-dependencies.json', 'scripts/streaming-diarization.patch', 'gradle/libs.versions.toml') }}
       - name: Fetch the pinned native runtime
-        run: ./scripts/setup.sh
+        run: ./scripts/setup.sh --prebuilt-only
       - name: Cache Robolectric's Android runtime
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -147,7 +147,7 @@ jobs:
           compression-level: 0
           path: dist/*
           if-no-files-found: error
-      - name: Upload matching device test APK
+      - name: Upload the APK under test and its device test APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: cassini-android-device-tests
@@ -240,24 +240,30 @@ jobs:
             .tools/native-build/sherpa-onnx.tar.gz
             .tools/opus/source.tar.gz
           key: native-source-${{ hashFiles('scripts/native-dependencies.json') }}
-      # setup.sh finds the pinned NDK inside ANDROID_HOME. A source build need not match the release
-      # byte for byte; the summary records both hashes so drift is visible.
+      # setup.sh finds the pinned NDK inside ANDROID_HOME. The job reports drift and does not fail
+      # on it: a source build is not yet known to match the release byte for byte. The summary
+      # records both hashes and a mismatch raises a warning annotation.
       - name: Build the AAR from source
         run: ./scripts/setup.sh --from-source
       - name: Record the AAR hashes
         run: |
           . scripts/native-common.sh
+          built=$(sha256_of "$aar_installed")
+          pinned=$(pin sherpa-onnx-aar sha256)
           {
-            echo "Source-built AAR: \`$(sha256_of "$aar_installed")\`"
+            echo "Source-built AAR: \`$built\`"
             echo
-            echo "Pinned release AAR: \`$(pin sherpa-onnx-aar sha256)\`"
+            echo "Pinned release AAR: \`$pinned\`"
           } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$built" != "$pinned" ]; then
+            echo "::warning title=Native AAR drift::The AAR built from source ($built) differs from the pinned release build ($pinned)."
+          fi
       - name: Build and test the app with the source-built AAR
         run: ./gradlew --no-daemon :app:assembleDebug :app:testDebugUnitTest
 
   release:
     if: startsWith(github.ref, 'refs/tags/')
-    needs: [build, emulator]
+    needs: [checks, build, emulator]
     runs-on: ubuntu-24.04
     permissions:
       contents: write

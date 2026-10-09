@@ -14,7 +14,8 @@ directory. Everything here except this README is ignored by git.
 3. the AAR attached to the GitHub release `native-sherpa-onnx-1.13.7-nemotron.2` (`scripts/fetch-native-aar.sh`);
 4. a build from the pinned source plus `scripts/streaming-diarization.patch` (`scripts/build-native-aar.sh`, needs the NDK).
 
-`scripts/setup.sh --from-source` skips straight to step 4. The pin (URL, SHA-256 and the hash of the
+`scripts/setup.sh --from-source` skips straight to step 4. `scripts/setup.sh --prebuilt-only` (used by CI) stops
+with an error instead of running step 4. The pin (URL, SHA-256 and the hash of the
 patch it was built from) is the `sherpa-onnx-aar` entry in `scripts/native-dependencies.json`;
 `scripts/verify-native-runtime.sh` checks the installed file against it.
 
