@@ -15,10 +15,13 @@ if ! printf '%s  %s\n' "$sha" "$archive" | sha256sum --check --status >/dev/null
     mv "$archive.part" "$archive"
 fi
 # The tree is unpacked beside its final place and renamed, so an existing source directory is complete.
-if [ ! -f "$work/source/CMakeLists.txt" ]; then
+# Its stamp records the archive it came from, so a changed opus pin unpacks the new source.
+stamp=$work/source/.archive-sha256
+if [ ! -f "$work/source/CMakeLists.txt" ] || [ "$(cat "$stamp" 2>/dev/null)" != "$sha" ]; then
     rm -rf "$work/source" "$work/source.partial"
     mkdir -p "$work/source.partial"
     tar xzf "$archive" -C "$work/source.partial" --strip-components=1
+    printf '%s\n' "$sha" > "$work/source.partial/.archive-sha256"
     mv "$work/source.partial" "$work/source"
 fi
 printf 'libopus source ready in %s\n' "$work/source"
