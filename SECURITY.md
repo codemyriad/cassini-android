@@ -31,7 +31,7 @@ We publish the APK only on the [GitHub Releases page](https://github.com/codemyr
 - `cassini-android-VERSION.apk`: the APK.
 - `cassini-android-VERSION.apk.sha256`: the SHA-256 of the APK.
 
-The release APKs have one stable signing key. Thus an update installs over the earlier version without an uninstall, and the downloaded models stay. Version 0.2 does not show the notes of 0.1.x. Before you update from 0.1.x, save each note as a Cassini document (`.opus`). Then open these files in 0.2. The SHA-256 digest of the signing certificate is in [`scripts/beta-signing-cert.sha256`](scripts/beta-signing-cert.sha256):
+The release APKs have one signing key, the beta key. Thus an update installs over the earlier version without an uninstall, and the downloaded models stay. Version 0.2 does not show the notes of 0.1.x. Before you update from 0.1.x, save each note as a Cassini document (`.opus`). Then open these files in 0.2. The update does not delete the files of 0.1.x, which include the 0.1.x voiceprints. [PRIVACY.md](PRIVACY.md) tells how to delete them. The SHA-256 digest of the signing certificate is in [`scripts/beta-signing-cert.sha256`](scripts/beta-signing-cert.sha256):
 
 ```text
 06b2a95b3a6e6e7cdef618999d37631a18216307def007102980db71cf2387ec
@@ -45,7 +45,9 @@ To make sure that you have a genuine APK, do these steps:
 2. Run `apksigner verify --print-certs cassini-android-VERSION.apk` (`apksigner` is in the Android SDK build tools).
 3. Compare the line `Signer #1 certificate SHA-256 digest` with the digest above.
 
-The repository does not contain the keystore. The Gradle files contain no passwords. The build reads the passwords from the environment variables `CASSINI_RELEASE_STORE_PASSWORD`, `CASSINI_RELEASE_KEY_PASSWORD` and `CASSINI_RELEASE_KEY_ALIAS`. CI gets the keystore from a repository secret. Until the owner sets new passwords, CI and `scripts/device-smoke.sh` use the standard passwords of the Android debug keystore (`android`, `androiddebugkey`) as a fallback. Thus the keystore file is the only secret. [docs/release.md](docs/release.md) gives the details. The key is a beta key. A stable release can have a different key.
+The repository does not contain the keystore. The Gradle files contain no passwords. The build reads the passwords from the environment variables `CASSINI_RELEASE_STORE_PASSWORD`, `CASSINI_RELEASE_KEY_PASSWORD` and `CASSINI_RELEASE_KEY_ALIAS`. CI gets the keystore from a repository secret. Until the owner sets new passwords, CI and `scripts/device-smoke.sh` use the standard passwords of the Android debug keystore (`android`, `androiddebugkey`) as a fallback. Thus the keystore file is the only secret. [docs/release.md](docs/release.md) gives the details.
+
+A later stable release can have a different signing key. If the key changes, Android does not install the update over the beta version. You must then uninstall the beta version, and the uninstall erases the notes and the downloaded models. Before you uninstall, save each note as a Cassini document (`.opus`).
 
 ## Model downloads and pinned hashes
 
@@ -59,7 +61,7 @@ The APK does not contain the speech models. The app downloads them only after th
 
 These hosts can send the download to a different download host (a redirect). The app follows a redirect only to a host in the list `ModelCatalog.DOWNLOAD_HOSTS`. [PRIVACY.md](PRIVACY.md) gives this list.
 
-<!-- TODO(P10): the redirect allow-list (ModelCatalog.DOWNLOAD_HOSTS) comes from P3 on the rebuild branch. When the docs branch merges, make sure that the list exists and that PRIVACY.md copies it. -->
+<!-- TODO(P10): the redirect allow-list (ModelCatalog.DOWNLOAD_HOSTS) comes from P3 on the rebuild branch. When the docs branch merges, make sure that the list exists and that PRIVACY.md copies it exactly. Keep app/src/main/assets/licenses/PRIVACY.md identical to PRIVACY.md. Add rootDir.resolve("PRIVACY.md") to the licenseSources test inputs in app/build.gradle.kts, so that LicenseAssetsTest runs again when only this file changes. Compare the "Android and Kotlin libraries" section of THIRD_PARTY_NOTICES.md with ./gradlew :app:dependencies --configuration releaseRuntimeClasspath, add each library that is missing, and keep the asset copy identical. The shipped copies under app/src/main/assets/licenses/ must contain no merge notes: these notes stay in the root files that do not ship. TODO(P11): in scripts/package-apk.py, next to the required-asset check, fail a tag build if an assets/licenses/*.md file in the APK contains "TODO(". -->
 
 [`ModelCatalog.kt`](core/src/main/kotlin/org/cassini/core/models/ModelCatalog.kt) pins the URL, the size and the SHA-256 of each model file. The app compares the size and the SHA-256 of each downloaded file with the pin before it installs the file. If they are not equal, the app deletes the partial file and does not install it. The Nemotron model is a Zstandard file. The app compares the hash of the compressed file before decompression, and the hash of the model after decompression.
 

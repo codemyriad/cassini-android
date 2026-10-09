@@ -52,8 +52,6 @@ The APK contains these libraries from Maven Central and the Google Maven reposit
 
 DataStore Preferences also contains `datastore-preferences-external-protobuf` 1.2.1, a copy of [Protocol Buffers](https://github.com/protocolbuffers/protobuf) for Java with its package names changed by the AndroidX authors. Its license is BSD-3-Clause: Copyright 2008 Google Inc. All rights reserved. The full text of this license is in `assets/licenses/protobuf/LICENSE` in the APK.
 
-<!-- TODO(P10): After the merge, compare this section with ./gradlew :app:dependencies --configuration releaseRuntimeClasspath and add each library that is missing. Keep the asset copy identical. -->
-
 ## Fonts
 
 The APK contains two font families. Their authors publish them under the SIL Open Font License, Version 1.1. The font files are unmodified copies of the upstream static TTF files. Cassini gives the files different resource names, but it does not change the fonts in the files.
