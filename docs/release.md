@@ -12,7 +12,9 @@ Each release must have a `versionCode` that is more than the `versionCode` of th
 
 [`CHANGELOG.md`](../CHANGELOG.md) uses the Keep a Changelog format. The changes for the next version collect in the "Unreleased" section.
 
-Until phase P11 of the rebuild, the release job reads the notes from [`release-notes.md`](release-notes.md). From P11, the release job takes the CHANGELOG section of the tag with `scripts/changelog-section.py`, and `docs/release-notes.md` goes away.
+At this time, the release job reads the notes from [`release-notes.md`](release-notes.md). A later change will take the notes from the CHANGELOG section of the tag, and `docs/release-notes.md` will go away.
+
+<!-- TODO(P11): add scripts/changelog-section.py, make the release job read the CHANGELOG section of the tag with it, delete docs/release-notes.md, and update this section and step 3 of "Make a release". -->
 
 ## Make a release
 
@@ -20,7 +22,7 @@ The owner does these steps:
 
 1. Do the pre-release gate in [`development.md`](development.md#pre-release-gate).
 2. In `CHANGELOG.md`, rename "Unreleased" to the new version and the date. Add a new empty "Unreleased" section and update the compare links.
-3. Until P11, copy the notes of the new version into `docs/release-notes.md`.
+3. Copy the notes of the new version into `docs/release-notes.md`.
 4. Set `versionName` and increase `versionCode` in `app/build.gradle.kts`.
 5. Commit the change on `main` and push it.
 6. Wait until CI passes on that commit.
@@ -65,7 +67,7 @@ CI uses these repository secrets on tags:
 
 Until the owner sets the three password secrets, CI uses the values of the old debug keystore (`android`, `androiddebugkey`, `android`). This fallback is temporary. It goes when the owner changes the passwords. If `ANDROID_BETA_KEYSTORE` is not set, the tag build fails.
 
-The beta key is the key of the earlier beta installations, so an update installs over them without an uninstall and the downloaded models stay. Version 0.2 does not show the notes of 0.1.x: users must save each note as a Cassini document (`.opus`) before they update. `scripts/beta-signing-cert.sha256` holds the SHA-256 digest of its certificate. The owner can choose a new signing identity for a stable release. Never commit a keystore or a password.
+The beta key is the key of the earlier beta installations, so an update installs over them without an uninstall and the downloaded models stay. Version 0.2 does not show the notes of 0.1.x: users must save each note as a Cassini document (`.opus`) before they update. `scripts/beta-signing-cert.sha256` holds the SHA-256 digest of its certificate. The owner can choose a new signing identity for a stable release. Then Android does not install the stable release over a beta installation, and users must uninstall the beta, which erases their notes and models. The release notes must say this. Never commit a keystore or a password.
 
 ## releaseTest
 

@@ -62,7 +62,13 @@ These rules apply to a note directory:
 | Voiceprints and matches of a note | `voices/notes/<id>.json`, `voices/pending/<id>.json` | `note_voice_links`, without embeddings |
 | Consent, estimates, notices, queue hold | DataStore | None |
 
-If `cassini.db` is lost, the app makes the catalogue again from the note directories. It gets the transcripts and the titles back from the documents. It loses the trash state, the playback positions and the queue. A note with a valid checkpoint comes back paused.
+If `cassini.db` is lost, the app makes the catalogue again from the note directories. It gets the transcripts and the titles back from the documents. It loses these data:
+
+- The trash state. Notes in the trash come back as live notes.
+- The playback positions and the queue.
+- A rename that the app did not write into the document yet.
+- The titles of the notes that have no document. The title of such a note becomes "Recovered recording" and the date.
+ A note with a valid checkpoint comes back paused.
 
 ## Room catalogue
 
@@ -96,7 +102,7 @@ DataStore keeps the settings in `settings.preferences_pb`:
 | `notifications.asked` | Boolean | The app asked for `POST_NOTIFICATIONS` one time |
 | `trash.lastPurgeAt` | Long | The last trash purge |
 
-The app language is not in DataStore. AppCompat keeps it as a per-app locale.
+The app language is not in DataStore. AppCompat keeps it as a per-app locale. On Android 13 (API 33) and later, Android keeps it. On earlier versions, AppCompat keeps it in a file in `filesDir` (`autoStoreLocales`).
 
 ## The work directory
 
