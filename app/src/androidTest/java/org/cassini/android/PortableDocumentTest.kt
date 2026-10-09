@@ -84,13 +84,13 @@ class PortableDocumentTest {
             scenario.onActivity { it.findViewById<Button>(R.id.transcribe_button).performClick() }
             val deadline = android.os.SystemClock.uptimeMillis() + 120000
             var success = false
-            // While it runs: a moving progress bar, the pace with the time left, and words before the document exists.
-            var progressSeen = 0; var paceSeen = ""; var interimWords = false; var draftSeen = false
+            // A short recording has too few chunks for an estimate; still show measured audio and elapsed time.
+            var progressSeen = 0; var detailsSeen = false; var interimWords = false; var draftSeen = false
             while (android.os.SystemClock.uptimeMillis() < deadline) {
                 if (sessions.load().document != null) { success = true; break }
                 scenario.onActivity {
                     val status = it.findViewById<TextView>(R.id.operation_status).text.toString()
-                    if (status.contains("×") && status.contains("%")) paceSeen = status
+                    if (status.lines().size == 5 && status.contains("%")) detailsSeen = true
                     val bar = it.findViewById<android.widget.ProgressBar>(R.id.operation_progress)
                     if (bar.isShown && !bar.isIndeterminate && bar.progress in 1..99) progressSeen = bar.progress
                     if (it.findViewById<TextView>(R.id.transcript_text).text.isNotBlank()) {
@@ -102,7 +102,7 @@ class PortableDocumentTest {
             }
             assertTrue("ASR should create a portable document automatically", success)
             assertTrue("Transcription should show measured progress before it completes", progressSeen in 1..99)
-            assertTrue("Transcription should show its pace and the time left", paceSeen.isNotEmpty())
+            assertTrue("Transcription should show audio, stage, word count, ETA and battery", detailsSeen)
             assertTrue("Words should appear while transcription is still running", interimWords)
             assertTrue("Partial results must be labelled as a draft", draftSeen)
             val saved = sessions.load()
@@ -210,12 +210,11 @@ class PortableDocumentTest {
             fail(description)
         }
         try {
-            await("Cassini must open without ASR") { it.findViewById<TextView>(R.id.transcript_text).text.contains("Benvenuti.") && it.findViewById<Button>(R.id.export_button).isEnabled }
+            await("Cassini must open without ASR") { it.findViewById<TextView>(R.id.transcript_text).text.contains("Benvenuti.") && it.findViewById<Button>(R.id.more_button).isEnabled }
             scenario.onActivity {
                 val text = it.findViewById<TextView>(R.id.transcript_text).text.toString()
                 assertTrue(text.contains("Ada")); assertTrue(text.contains("Ben"))
                 assertEquals("Cassini · audio verified", it.findViewById<TextView>(R.id.document_trust).text.toString())
-                assertTrue(it.findViewById<Button>(R.id.variant_button).isShown)
                 @Suppress("DEPRECATION")
                 MainActivity::class.java.getDeclaredMethod("onActivityResult", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, Intent::class.java)
                     .apply { isAccessible = true }.invoke(it, MainActivity.SAVE_DOCUMENT, android.app.Activity.RESULT_OK, Intent().setData(Uri.fromFile(exported)))
@@ -227,7 +226,7 @@ class PortableDocumentTest {
             fun documents() = File(context.filesDir, "documents").listFiles().orEmpty().map { it.name }.toSet()
             fun notes() = LibraryStore(context.filesDir).load().count { it.session.uri == saved.uri }
             fun shows(activity: MainActivity, word: String, clock: String) = activity.findViewById<TextView>(R.id.transcript_text).text.contains(word) &&
-                activity.findViewById<Button>(R.id.export_button).isEnabled && activity.findViewById<TextView>(R.id.playback_position).text.startsWith(clock)
+                activity.findViewById<Button>(R.id.more_button).isEnabled && activity.findViewById<TextView>(R.id.playback_position).text.startsWith(clock)
             fun seek(position: Float) = scenario.onActivity {
                 assertTrue(it.findViewById<android.widget.SeekBar>(R.id.playback_seek).performAccessibilityAction(
                     android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_PROGRESS.id,

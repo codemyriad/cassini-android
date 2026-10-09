@@ -18,9 +18,9 @@ internal object Limits {
 
     fun availableHeap(runtime: Runtime = Runtime.getRuntime()) = runtime.maxMemory() - (runtime.totalMemory() - runtime.freeMemory())
 
-    fun requireDuration(durationMs: Long) {
+    fun requireDuration(durationMs: Long, retainPcm: Boolean = true) {
         requireUser(durationMs <= MAX_RECORDING_MS, Failure.LONG)
-        requireUser(memoryAllows(durationMs, availableHeap()), Failure.MEMORY)
+        if (retainPcm) requireUser(memoryAllows(durationMs, availableHeap()), Failure.MEMORY)
     }
 }
 

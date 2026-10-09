@@ -1,9 +1,9 @@
 [
   {
     "name": "sherpa-onnx",
-    "version": "1.13.7",
-    "url": "https://github.com/k2-fsa/sherpa-onnx/archive/refs/tags/v1.13.7.tar.gz",
-    "sha256": "ee0c20cafb34cc1f86afb2845babd941c26e46de4a9925cbe86fd55ff3557818"
+    "version": "1.13.7+nemotron-diarization (1f23907a9d345fca044d015ff4f4b3fbd58de9dc)",
+    "url": "https://github.com/codemyriad/sherpa-onnx/archive/1f23907a9d345fca044d015ff4f4b3fbd58de9dc.tar.gz",
+    "sha256": "02bb69d35e9ded18ff5039460cd19abced63185174a867b9034785992d749f28"
   },
   {
     "name": "onnxruntime",
@@ -64,5 +64,11 @@
     "version": "ed530aa113046142eb5115cf2fc9157854d0ffe1",
     "url": "https://github.com/csukuangfj/espeak-ng/archive/ed530aa113046142eb5115cf2fc9157854d0ffe1.zip",
     "sha256": "e4e262cbe34f7fe21f91f1ba3397f2728e1f30eafbae7853f2b753a9ed13f0dd"
+  },
+  {
+    "name": "opus",
+    "version": "1.5.2",
+    "url": "https://codeload.github.com/xiph/opus/tar.gz/refs/tags/v1.5.2",
+    "sha256": "9480e329e989f70d69886ded470c7f8cfe6c0667cc4196d4837ac9e668fb7404"
   }
 ]

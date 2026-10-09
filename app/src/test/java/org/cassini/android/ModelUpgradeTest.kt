@@ -39,4 +39,13 @@ class ModelUpgradeTest {
         assertEquals(DiarizationModels.model.sha256, File(directory, "verified").readText())
         assertTrue(DiarizationModels.removeRetiredModels(File(folder.root, "absent")))
     }
+
+    @Test fun retiredCleanupKeepsTheVoiceprintModel() {
+        val directory = File(folder.root, "speaker-models").apply { mkdirs() }
+        File(directory, VoiceprintModel.FILE).writeText("weights")
+        File(directory, VoiceprintModel.MARKER).writeText(VoiceprintModel.model.sha256)
+        assertTrue(DiarizationModels.removeRetiredModels(folder.root))
+        assertEquals("weights", File(directory, VoiceprintModel.FILE).readText())
+        assertEquals(VoiceprintModel.model.sha256, File(directory, VoiceprintModel.MARKER).readText())
+    }
 }

@@ -146,8 +146,9 @@ internal object OggOpus {
         return Info(head, tags, reader.finalGranule, reader.complete, hasher?.sampleCount(reader.finalGranule) ?: 0, digest)
     }
     /** Lays out one packet per page group, exactly as every Cassini writer does, so equal packets give equal bytes. */
-    private class Writer(private val out: OutputStream, private val serial: Int) {
-        private var seq = 0
+    private class Writer(private val out: OutputStream, private val serial: Int, initialSequence: Int = 0) {
+        var seq = initialSequence
+            private set
         fun packet(bytes: ByteArray, flags: Int, granule: Long) {
             val laces = MutableList(bytes.size / 255) { 255 }.also { it += bytes.size % 255 }
             var offset = 0
@@ -190,13 +191,15 @@ internal object OggOpus {
      * Live capture: the final length is unknown until [finish]. Every page written so far is a valid prefix, so a
      * file cut short after a flush still decodes up to its last whole page.
      */
-    class LiveMuxer(out: OutputStream, head: ByteArray, tags: ByteArray, serial: Int = Random.nextInt()) {
-        private val writer = Writer(out, serial)
-        private var pending: ByteArray? = null
-        var granule = 0L
+    data class LiveState(val serial: Int, val sequence: Int, val pending: ByteArray?, val granule: Long)
+    class LiveMuxer(out: OutputStream, head: ByteArray, tags: ByteArray, private val serial: Int = Random.nextInt(), restored: LiveState? = null) {
+        private val writer = Writer(out, serial, restored?.sequence ?: 0)
+        private var pending: ByteArray? = restored?.pending
+        var granule = restored?.granule ?: 0L
             private set
         val preSkip = u16(head, 10)
-        init { require(tags.size <= MAX_HEADER_BYTES); writer.packet(head, 2, 0); writer.packet(tags, 0, 0) }
+        init { require(tags.size <= MAX_HEADER_BYTES); if (restored == null) { writer.packet(head, 2, 0); writer.packet(tags, 0, 0) } }
+        fun checkpoint() = LiveState(serial, writer.seq, pending?.copyOf(), granule)
         val empty get() = pending == null
         fun add(packet: ByteArray) {
             val samples = packetSamples(packet)

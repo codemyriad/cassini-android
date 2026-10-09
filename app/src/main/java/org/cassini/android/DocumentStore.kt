@@ -26,8 +26,19 @@ internal class DocumentStore(private val context: Context) {
             return owned to doc
         } catch (error: Throwable) { source.delete(); throw error }
     }
+    fun hasOpusAudio(uri: Uri): Boolean = try {
+        (context.contentResolver.openInputStream(uri) ?: throw UserFacingException(Failure.OPEN)).use {
+            OggOpus.headers(it)
+            true
+        }
+    } catch (_: Exception) { false }
+
     fun create(uri: Uri, audio: () -> PcmAudio, transcript: Transcript, name: String, processing: JSONObject,
                existing: CassiniDocument?, speakerLabels: Map<String, String> = emptyMap()): Pair<File, CassiniDocument> {
+        return createFromSource(uri, { audio().source() }, transcript, name, processing, existing, speakerLabels)
+    }
+    fun createFromSource(uri: Uri, audio: () -> PcmSource, transcript: Transcript, name: String, processing: JSONObject,
+                         existing: CassiniDocument?, speakerLabels: Map<String, String> = emptyMap()): Pair<File, CassiniDocument> {
         val id = UUID.randomUUID()
         val source = File(directory, "$id.src")
         val temporary = File(directory, "$id.tmp")
@@ -47,6 +58,36 @@ internal class DocumentStore(private val context: Context) {
             check(temporary.renameTo(output))
             return output to doc
         } finally { source.delete(); temporary.delete() }
+    }
+    /** Audio was prepared in the decode pass; only container metadata is written here. */
+    fun createFromOpus(uri: Uri, transcript: Transcript, name: String, processing: JSONObject,
+                       existing: CassiniDocument?, speakerLabels: Map<String, String>): Pair<File, CassiniDocument> {
+        val id = UUID.randomUUID()
+        val source = File(directory, "$id.src")
+        val temporary = File(directory, "$id.tmp")
+        val output = File(directory, "$id.opus")
+        try {
+            (context.contentResolver.openInputStream(uri) ?: throw UserFacingException(Failure.OPEN)).use { input ->
+                source.outputStream().use { copy(input, it, null) }
+            }
+            requireUser(directory.usableSpace >= source.length() + Limits.MIN_FREE_BYTES, Failure.SPACE)
+            val doc = CassiniDocument.create(source, transcript, name.substringBeforeLast('.'), processing, existing, speakerLabels, temporary)
+            check(temporary.renameTo(output))
+            return output to doc
+        } finally { source.delete(); temporary.delete() }
+    }
+
+    /** Writes a new file beside [source] whose speaker labels differ; the caller retires the old one. */
+    fun relabel(source: File, existing: CassiniDocument, labels: Map<String, String>): Pair<File, CassiniDocument> {
+        val id = UUID.randomUUID()
+        val temporary = File(directory, "$id.tmp")
+        val output = File(directory, "$id.opus")
+        try {
+            requireUser(directory.usableSpace >= source.length() + Limits.MIN_FREE_BYTES, Failure.SPACE)
+            val doc = CassiniDocument.relabel(source, existing, labels, temporary)
+            check(temporary.renameTo(output))
+            return output to doc
+        } finally { temporary.delete() }
     }
     /** Bounded by [Limits.MAX_IMPORT_BYTES] and the space left on the device rather than by the heap. */
     private fun copy(input: InputStream, output: OutputStream, hash: MessageDigest?, start: Long = 0) {

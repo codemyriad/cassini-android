@@ -57,12 +57,19 @@ internal fun resampleTo16k(samples: FloatArray, rate: Int): FloatArray {
     return output
 }
 
+/** The first input frame at [rate] that 16 kHz output [output] reads; a resumed decode must start at or before it. */
+internal fun firstNeededFrame(rate: Int, output: Long): Long {
+    if (rate == VAD_SAMPLE_RATE) return output
+    val halfWidth = ZERO_CROSSINGS / (2 * CUTOFF_FRACTION * min(rate, VAD_SAMPLE_RATE) / rate)
+    return max(0L, ceil(output * (rate.toDouble() / VAD_SAMPLE_RATE) - halfWidth).toLong())
+}
+
 /**
  * [resampleTo16k] over audio that arrives in blocks: the same kernel and output positions, with the
  * input history kept across block edges, so the output equals the whole-array conversion. [sink]
  * receives a reused buffer and its valid length.
  */
-internal class StreamingResampler(private val rate: Int, private val sink: (FloatArray, Int) -> Unit) {
+internal class StreamingResampler(private val rate: Int, initialFrame: Long = 0, firstOutput: Long = 0, private val sink: (FloatArray, Int) -> Unit) {
     init { require(rate in 8000..96000) { "Unsupported sample rate $rate" } }
     private val step = rate.toDouble() / VAD_SAMPLE_RATE
     private val crossingsPerSample = 2 * CUTOFF_FRACTION * min(rate, VAD_SAMPLE_RATE) / rate
@@ -77,25 +84,32 @@ internal class StreamingResampler(private val rate: Int, private val sink: (Floa
     }
     private val tapWeight = taps.fold(0.0) { sum, tap -> sum + tap }
     private var history = FloatArray(8192)
-    private var base = 0L
+    private var base = initialFrame
     private var size = 0
     private val out = FloatArray(4096)
     private var pending = 0
     private var finished = false
-    var produced = 0L
+    var produced = firstOutput
         private set
     val consumed get() = base + size
 
     fun push(samples: FloatArray, offset: Int = 0, length: Int = samples.size - offset) {
         check(!finished)
         if (rate == VAD_SAMPLE_RATE) {
-            var at = offset
+            // Input that starts after the next output keeps its clock: the gap is silence, never a shift.
+            while (produced < base) {
+                val n = min(out.size - pending.toLong(), base - produced).toInt()
+                out.fill(0f, pending, pending + n); pending += n; produced += n
+                if (pending == out.size) flush()
+            }
+            var at = offset + (produced - base).coerceIn(0, length.toLong()).toInt()
+            val emitted = offset + length - at
             while (at < offset + length) {
                 val n = min(out.size - pending, offset + length - at)
                 samples.copyInto(out, pending, at, at + n); pending += n; at += n
                 if (pending == out.size) flush()
             }
-            base += length; produced += length
+            base += length; produced += emitted
             return
         }
         if (size + length > history.size) history = history.copyOf(max(history.size * 2, size + length))
@@ -128,7 +142,8 @@ internal class StreamingResampler(private val rate: Int, private val sink: (Floa
             val last = floor(time + halfWidth).toLong()
             if (target == null && last >= end) break
             val start = produced * (rate / VAD_SAMPLE_RATE) + first
-            if (fixed && start >= 0 && last < end) {
+            // A resumed decoder can land after the history an output needs. Missing input counts as absent, never as an index.
+            if (fixed && start >= base && last < end) {
                 var sum = 0.0
                 val at = (start - base).toInt()
                 for (i in taps.indices) sum += taps[i] * history[at + i]
@@ -139,7 +154,7 @@ internal class StreamingResampler(private val rate: Int, private val sink: (Floa
             }
             var sum = 0.0
             var weight = 0.0
-            for (k in max(0L, ceil(time - halfWidth).toLong())..min(end - 1, last)) {
+            for (k in max(base, ceil(time - halfWidth).toLong())..min(end - 1, last)) {
                 val position = abs(time - k) * crossingsPerSample * TABLE_STEPS
                 val cell = position.toInt()
                 val fraction = (position - cell).toFloat()

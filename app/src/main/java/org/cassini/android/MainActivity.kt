@@ -46,10 +46,29 @@ class MainActivity : Activity() {
     private lateinit var documents: DocumentStore
     private var player: MediaPlayer? = null
     private var playerReady = false
-    private var speakerCancellation: java.util.concurrent.atomic.AtomicBoolean? = null
+    private var cancellation: java.util.concurrent.atomic.AtomicBoolean? = null
     private var busy = false
-    /** Words of a transcription still running. Shown, never saved. */
+    private val stopRequested = java.util.concurrent.atomic.AtomicBoolean()
+    private var leaveAfterStopping = false
+    @Volatile private var checkpointSaved = false
+    private var checkpointUnreadable = false
+    private var checkpointDoneMs = 0L
+    private var batteryProjection = BatteryProjection()
+    private var batteryReading: BatteryProjection.Reading? = null
+    private var finalizationEstimateMs = 0L
+    private var finalizationAtMs = -1L
+    /** Live words; durable snapshots are saved at completed chunk boundaries. */
     private var interim: Transcript? = null
+    private var transcriptionProgress: TranscriptionProgress? = null
+    private var transcriptionBeganNs = 0L
+    private var progressRenderedSecond = -1L
+    private val draftSpeakerLabels = java.util.concurrent.ConcurrentHashMap<String, String>()
+    private val draftRememberedVoices = mutableMapOf<String, String>()
+    /** VoiceStore's generation when the draft remember choices were made. */
+    private var draftRememberGeneration = 0L
+    private val draftAutomaticNames = java.util.concurrent.ConcurrentHashMap<String, String>()
+    private var draftSpeakerMerges = emptyMap<String, String>()
+    @Volatile private var draftNamingOpen = false
     private var highlightedWord = -1
     private var wordRanges = emptyList<IntRange>()
     private val activeBackground = BackgroundColorSpan(DeckViews.amber)
@@ -57,6 +76,14 @@ class MainActivity : Activity() {
     private var touchingTranscript = false
     private var followCompletedSeeks = false
     private var screen = ""
+    /** The speaker whose name is being edited, kept across recreation until the document is open again. */
+    private var pendingSpeaker: String? = null
+    private var pendingName: String? = null
+    private var speakerDialog: AlertDialog? = null
+    /** This note's speaker prints and matches and the saved people, app-private; reloaded when a document is adopted. */
+    private var notePrints: Map<String, SpeakerPrint> = emptyMap()
+    private var people: Map<String, Voice> = emptyMap()
+    private val app get() = application as CassiniApplication
 
     override fun attachBaseContext(newBase: Context) = super.attachBaseContext(AppLanguage.wrap(newBase))
 
@@ -64,6 +91,10 @@ class MainActivity : Activity() {
         override fun run() {
             if (playerReady) player?.let { media ->
                 updatePlayback(media)
+            }
+            if (transcriptionProgress != null && busy) {
+                val second = (System.nanoTime() - transcriptionBeganNs) / 1_000_000_000
+                if (second != progressRenderedSecond) renderTranscriptionProgress()
             }
             handler.postDelayed(this, 150)
         }
@@ -77,6 +108,7 @@ class MainActivity : Activity() {
         val preferences = sessions.load()
         val noteId = intent.getStringExtra(NOTE_ID)
         screen = savedInstanceState?.getString("screen") ?: UUID.randomUUID().toString()
+        pendingSpeaker = savedInstanceState?.getString("pendingSpeaker"); pendingName = savedInstanceState?.getString("pendingName")
         val restored = savedInstanceState?.let { state ->
             val notes = try { library.load() } catch (error: Exception) { Log.e(TAG, "Could not load notes", error); emptyList() }
             LibraryNote.shown(screen, state.getString(NOTE_ID), state.getString("uri"), preferences, notes)
@@ -98,15 +130,9 @@ class MainActivity : Activity() {
         ui = DeckViews(this)
         setContentView(ui.root)
         ui.library.setOnClickListener { returnToLibrary() }
-        ui.menu.setOnClickListener { showSettings() }
-        ui.open.setOnClickListener { chooseFile() }
-        ui.transcribe.setOnClickListener { transcribe() }
-        ui.speakers.setOnClickListener { confirmSpeakerIdentification() }
-        ui.cancelOperation.setOnClickListener { cancelSpeakerIdentification() }
-        ui.download.setOnClickListener { downloadModel() }
-        ui.export.setOnClickListener { saveCassiniDocument() }
-        ui.documentInfo.setOnClickListener { showDocumentInfo() }
-        ui.variant.setOnClickListener { chooseVariant() }
+        ui.menu.setOnClickListener { showMenu() }
+        ui.transcribe.setOnClickListener { confirmTranscription() }
+        ui.cancelOperation.setOnClickListener { cancelOperation() }
         ui.play.setOnClickListener {
             if (playerReady) player?.let {
                 if (it.isPlaying) it.pause() else { it.start(); highlightWord() }
@@ -136,12 +162,16 @@ class MainActivity : Activity() {
         ui.clearSearch.setOnClickListener { ui.search.text.clear() }
         ui.transcript.movementMethod = LinkMovementMethod.getInstance()
         ui.search.setText(savedInstanceState?.getString("query") ?: intent.getStringExtra(SEARCH_QUERY).orEmpty())
+        restoreCheckpoint()
         renderScreen()
         defaultStatus()
         session.uri?.let { preparePlayer(Uri.parse(it)) }
         session.document?.takeIf { !viewing }?.let { path -> runWork(R.string.opening_document) {
             val loaded = CassiniDocument.read(File(path))
-            onUi { adoptDocument(loaded); renderScreen(); defaultStatus() }
+            onUi {
+                adoptDocument(loaded); renderScreen(); defaultStatus()
+                pendingSpeaker?.let { speaker -> handler.post { if (!isDestroyed) showSpeakerDialog(speaker, pendingName) } }
+            }
         } }
         if (viewing) intent.data?.let { importFile(it) }
         if (importing && savedInstanceState == null) chooseFile()
@@ -155,138 +185,356 @@ class MainActivity : Activity() {
         }, OPEN_FILE)
     }
 
-    private fun downloadModel() = runWork(R.string.preparing_download) {
-        models.install { progress -> onUi {
-            ui.progress.isIndeterminate = false
-            ui.progress.progress = progress.percent
-            setStatus(if (progress.verifying) R.string.verifying else R.string.downloading, progress.percent)
-        } }
-        onUi { setStatus(R.string.download_complete); fetchSpeechDetector() }
+    /** The first transcription asks once before the large download; later ones quietly retry any optional model still missing. */
+    private fun confirmTranscription() {
+        if (busy || session.uri == null) return
+        val bundle = ModelBundle.inFiles(filesDir)
+        if (bundle.consented()) transcribe()
+        else AlertDialog.Builder(this).setTitle(R.string.models_download)
+            .setMessage(getString(R.string.models_download_summary, bundle.missingBytes().let {
+                getString(R.string.models_size_mib, ModelBundle.mebibytes(it)) }))
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.download_and_transcribe) { _, _ -> transcribe() }.show()
     }
 
+    private fun cancelOperation() {
+        stopRequested.set(true)
+        ui.cancelOperation.isEnabled = false
+        ui.cancelOperation.setText(R.string.stopping_processing)
+    }
+    private fun checkpointStore() = session.uri?.let { ProcessingCheckpoint(filesDir, it) }
+    private fun saveDraftNames() {
+        synchronized(draftSpeakerLabels) { checkpointStore()?.saveNames(draftSpeakerLabels.toMap(), draftSpeakerMerges, draftRememberedVoices.toMap(), draftAutomaticNames.toMap(), draftRememberGeneration) }
+    }
+    private fun restoreCheckpoint() {
+        val store = checkpointStore() ?: return
+        val saved = try { store.load() } catch (error: Exception) { checkpointUnreadable = true; checkpointSaved = true; Log.e(TAG, "Could not read processing checkpoint", error); setStatus(R.string.checkpoint_error, error = true); return }
+        checkpointUnreadable = false
+        checkpointSaved = saved != null
+        if (saved == null) return
+        checkpointDoneMs = saved.getLong("doneMs")
+        val raw = saved.getJSONObject("recognition").getJSONObject("chunks").getJSONObject("words")
+        interim = Transcript.fromJson(raw.toString())
+        val (labels, merges) = store.loadNames()
+        val (remembered, automatic) = store.nameExtras()
+        draftRememberedVoices.clear()
+        draftRememberGeneration = app.voices.generation()
+        // Choices made before "forget all" must not bring the forgotten voices back.
+        if (store.rememberGeneration() == draftRememberGeneration) draftRememberedVoices.putAll(remembered)
+        draftAutomaticNames.clear(); draftAutomaticNames.putAll(automatic)
+        synchronized(draftSpeakerLabels) { draftSpeakerLabels.clear(); draftSpeakerLabels.putAll(labels); draftSpeakerMerges = merges; draftNamingOpen = true }
+        session = session.copy(processingPaused = true, transcript = if (session.document == null) draftTranscript() else session.transcript, inferenceMs = saved.getJSONObject("recognition").getLong("inferenceMs"), processingMs = saved.getLong("elapsedMs"))
+        ui.cancelOperation.setText(R.string.stop_processing)
+        ui.cancelOperation.isEnabled = true
+    }
+    private fun discardCheckpoint() {
+        AlertDialog.Builder(this).setTitle(R.string.discard_processing).setMessage(R.string.discard_processing_confirm)
+            .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.discard_processing) { _, _ ->
+                val store = checkpointStore()
+                if (store != null && !store.claim()) { setStatus(R.string.processing_elsewhere, error = true); return@setPositiveButton }
+                try { store?.discard() } finally { store?.release() }
+                checkpointSaved = false; checkpointUnreadable = false; interim = null; draftNamingOpen = false
+                session = session.copy(processingPaused = false, transcript = if (session.document == null) null else session.transcript)
+                persistSession(); renderScreen(); defaultStatus()
+            }.show()
+    }
+
+    private fun showDownload(progress: ModelStore.Progress, label: Int = R.string.downloading) {
+        ui.progress.isIndeterminate = false
+        ui.progress.progress = progress.percent
+        setStatus(if (progress.verifying) R.string.verifying else label, progress.percent)
+    }
+
+    /** One action: stream audio through encoding, recognition and speaker attribution. */
     private fun transcribe() {
+        if (busy || (document != null && document?.state != "ok")) return
         val uri = session.uri?.let(Uri::parse) ?: return
         val chosenModel = models
-        if (!chosenModel.ready()) { refreshControls(); return }
-        runWork(R.string.decoding) {
-            val totalBegan = System.nanoTime()
-            val audio = AudioDecoder.decode(this, uri)
-            requireUser(audio.durationMs >= 200, Failure.SHORT)
-            onUi { setStatus(R.string.transcribing) }
-            val detector = ModelStore.vadPath(filesDir).takeIf { ModelStore.vadReady(filesDir) }
-            val began = System.nanoTime()
-            val transcript = Parakeet.transcribe(audio, chosenModel, detector) { progress -> onUi { showProgress(progress) } }
-            val elapsed = (System.nanoTime() - began) / 1_000_000
-            // Processing records are machine-readable provenance, independent of UI language.
-            try {
-                File(filesDir, "latest.words.json").writeText(transcript.json())
-                File(filesDir, "latest.processing.json").writeText(JSONObject()
-                    .put("model", "nvidia/parakeet-tdt-0.6b-v3").put("modelRevision", chosenModel.revision)
-                    .put("runtime", "sherpa-onnx 1.13.7, stock frontend, CPU ${chosenModel.precision}, greedy, 2 threads")
-                    .put("language", "it (user-selected; automatic multilingual recognition)")
-                    .put("durationMs", audio.durationMs).put("inferenceMs", elapsed)
-                    .put("speakerAttribution", "single recording; no diarization")
-                    .put("segmentation", Parakeet.cutting(detector).provenance)
-                    .put("wordTimings", "TDT token-derived; words over silence dropped; ends follow continuing audio up to the punctuation-inclusive end")
-                    .toString(2))
-            } catch (error: IOException) { Log.e(TAG, "Could not cache processing artifacts", error) }
-            onUi { ui.progress.isIndeterminate = true; setStatus(R.string.packaging_document) }
-            val (file, portable) = documents.create(uri, { audio }, transcript, session.name, processing(chosenModel.precision, chosenModel.revision)
-                .put("x-inferenceMs", elapsed).put("x-segmentation", Parakeet.cutting(detector).provenance), document)
-            val processingMs = (System.nanoTime() - totalBegan) / 1_000_000
-            onUi {
-                val position = if (playerReady) player?.currentPosition ?: session.positionMs else session.positionMs
-                interim = null
-                session = session.copy(uri = Uri.fromFile(file).toString(), document = file.absolutePath,
-                    name = "${session.name.substringBeforeLast('.')}.opus", selectedVariant = portable.defaultId,
-                    durationMs = audio.durationMs, inferenceMs = elapsed, resultPrecision = chosenModel.precision, positionMs = position,
-                    processingMs = processingMs)
-                adoptDocument(portable)
-                preparePlayer(Uri.fromFile(file))
-                persistSession()
-                renderScreen()
-                defaultStatus()
-            }
-        }
-    }
-
-    private fun confirmSpeakerIdentification() {
-        if (busy || session.transcript?.words?.isNotEmpty() != true) return
-        if (DiarizationModels.inFiles(filesDir).ready()) identifySpeakers()
-        else AlertDialog.Builder(this).setTitle(R.string.speaker_models_download)
-            .setMessage(R.string.speaker_models_summary)
-            .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(R.string.download_speaker_models) { _, _ -> identifySpeakers() }.show()
-    }
-
-    private fun cancelSpeakerIdentification() {
-        speakerCancellation?.set(true)
-        returnToLibrary()
-    }
-
-    private fun identifySpeakers() {
-        if (busy || (document != null && document?.state != "ok")) return
-        val source = session.transcript?.takeIf { it.words.isNotEmpty() } ?: return
-        val uri = session.uri?.let(Uri::parse) ?: return
-        val original = session
-        val originalDocument = document
-        val sourceId = original.selectedVariant
-        val cancelled = java.util.concurrent.atomic.AtomicBoolean()
-        speakerCancellation = cancelled
-        ui.cancelOperation.visibility = View.VISIBLE
+        val knownVoices = voicesForRecognition()
+        val checkpoint = ProcessingCheckpoint(filesDir, uri.toString())
+        // Another viewer of the same source would truncate this job's files before waiting for inference.
+        if (!checkpoint.claim()) { setStatus(R.string.processing_elsewhere, error = true); return }
+        val resumed = try { checkpoint.load() } catch (_: Exception) { checkpoint.release(); setStatus(R.string.checkpoint_error, error = true); return }
+        stopRequested.set(false)
+        ui.cancelOperation.setText(R.string.stop_processing)
+        ui.cancelOperation.isEnabled = true
+        var finishing = false
         val speakerModels = DiarizationModels.inFiles(filesDir)
-        fun checkActive() = requireUser(!cancelled.get() && !Thread.currentThread().isInterrupted, Failure.CANCELLED)
-        runWork(if (speakerModels.ready()) R.string.identifying_speakers else R.string.preparing_download) {
-            if (!speakerModels.ready()) speakerModels.install { progress -> onUi {
-                if (!cancelled.get()) {
-                    ui.progress.isIndeterminate = false
-                    ui.progress.progress = progress.percent
-                    setStatus(if (progress.verifying) R.string.verifying else R.string.downloading, progress.percent)
-                }
-            } }
-            checkActive()
-            onUi { ui.progress.isIndeterminate = true; setStatus(R.string.identifying_speakers) }
-            val began = System.nanoTime()
-            // Only the duration outlives diarization; a source that needs re-encoding is decoded again.
-            var audio: PcmAudio? = AudioDecoder.decode(this, uri)
-            val durationMs = audio!!.durationMs
-            checkActive()
-            val turns = Diarization.turns(audio, speakerModels.modelPath) { done, total ->
-                onUi {
-                    if (!cancelled.get() && total > 0) {
-                        val percent = (done * 100L / total).toInt().coerceIn(0, 100)
-                        ui.progress.isIndeterminate = false; ui.progress.progress = percent
-                        setStatus(R.string.identifying_speakers_progress, percent)
-                    }
-                }
-            }
-            audio = null
-            checkActive()
-            val elapsed = (System.nanoTime() - began) / 1_000_000
-            val previousProcessing = originalDocument?.manifest?.optJSONObject("provenance")?.optJSONObject("speechToText")?.optJSONObject(sourceId ?: "")
-            val result = SpeakerAttribution.derive(source, turns, previousProcessing, sourceId, elapsed, originalDocument?.manifest?.optJSONObject("provenance")?.optJSONObject("attribution"))
-            val labels = result.transcript.words.map { it.speaker }.distinct().mapIndexed { index, id ->
-                id to getString(R.string.speaker_label, index + 1)
-            }.toMap()
-            onUi { ui.progress.isIndeterminate = true; setStatus(R.string.packaging_document) }
-            checkActive()
-            val (file, portable) = documents.create(uri, { AudioDecoder.decode(this, uri) }, result.transcript, original.name,
-                result.processing, originalDocument, labels)
-            // A completed native call may outlive its screen. Never publish a cancelled result,
-            // and remove only this job's new immutable document when it cannot be adopted.
-            handler.post {
-                if (isDestroyed || isFinishing || cancelled.get()) file.delete()
-                else {
-                    val position = if (playerReady) player?.currentPosition ?: session.positionMs else session.positionMs
-                    session = original.copy(uri = Uri.fromFile(file).toString(), document = file.absolutePath,
-                        name = "${original.name.substringBeforeLast('.')}.opus", selectedVariant = portable.defaultId,
-                        durationMs = durationMs, positionMs = position,
-                        processingMs = maxOf(original.processingMs, original.inferenceMs) + elapsed)
-                    adoptDocument(portable); preparePlayer(Uri.fromFile(file)); persistSession(); renderScreen()
-                    setStatus(R.string.speakers_complete, labels.size, elapsed / 1000.0)
-                }
-            }
+        val voiceprintModel = VoiceprintModel.inFiles(filesDir)
+        val cancelled = java.util.concurrent.atomic.AtomicBoolean()
+        cancellation = cancelled
+        ui.cancelOperation.visibility = View.VISIBLE
+        fun checkActive() {
+            requireUser(!cancelled.get() && !Thread.currentThread().isInterrupted, Failure.CANCELLED)
+            if (finishing && stopRequested.get()) throw ProcessingPaused()
         }
+        fun download(install: ((ModelStore.Progress) -> Unit) -> Unit) = install { progress -> onUi { if (!cancelled.get()) showDownload(progress) } }
+        runWork(if (chosenModel.ready()) R.string.decoding else R.string.preparing_download) { try {
+            if (!chosenModel.ready()) { download(chosenModel::install); onUi { fetchSpeechDetector() } }
+            checkActive()
+            val speakersReady = speakerModels.ready() || try { download(speakerModels::install); true }
+                catch (error: IOException) { Log.w(TAG, "Speaker model unavailable", error); false }
+            checkActive()
+            // Voiceprints only name speakers; without the model the transcript is unchanged.
+            if (speakersReady && !voiceprintModel.ready()) try {
+                voiceprintModel.install { progress -> onUi { if (!cancelled.get()) showDownload(progress, R.string.voiceprint_model_progress) } }
+            } catch (error: IOException) { Log.w(TAG, "Voiceprint model unavailable", error) }
+            catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error; Log.w(TAG, "Voiceprint model unavailable", error) }
+            checkActive()
+            onUi { ui.progress.isIndeterminate = true; setStatus(R.string.decoding) }
+            val totalBegan = System.nanoTime() - (resumed?.optLong("elapsedMs") ?: 0L) * 1_000_000
+            onUi {
+                transcriptionBeganNs = totalBegan
+                transcriptionProgress = TranscriptionProgress(session.durationMs)
+                batteryProjection = BatteryProjection()
+                batteryReading = null
+                finalizationAtMs = -1L
+                finalizationEstimateMs = getSharedPreferences("processing-estimates", MODE_PRIVATE).getLong("finalizationMs", 0)
+                resumed?.let { saved ->
+                    val words = Transcript.fromJson(saved.getJSONObject("recognition").getJSONObject("chunks").getJSONObject("words").toString()).words
+                    transcriptionProgress?.restore(saved.getLong("doneMs"), saved.getLong("durationMs"), words.size, saved.getLong("elapsedMs"))
+                }
+                session = session.copy(processingPaused = false)
+                ui.status.minLines = 5
+                renderTranscriptionProgress()
+            }
+            checkpoint.directory.mkdirs()
+            if (resumed == null) { checkpoint.audio.delete(); checkpoint.clips.delete() }
+            PcmFile(checkpoint.clips, deleteOnClose = false).use { audio ->
+                resumed?.let { audio.truncate(it.getInt("clipSamples")) }
+                val voiceClips = VoiceClipCache(audio, resumed?.optJSONObject("voiceClips"))
+                val encoded = checkpoint.audio
+                var encoder: StreamingOpusEncoder? = null
+                var durationMs = 0L
+                try {
+                    if (!documents.hasOpusAudio(uri)) encoder = StreamingOpusEncoder(encoded, resumed?.optJSONObject("encoder"))
+                    val speakerPrefix = resumed?.getString("speakerPrefix") ?: "diar_${UUID.randomUUID().toString().replace('-', '_')}_"
+                    var streamDiarizer: Diarization.Streaming? = null
+                    var speakerFailure = resumed?.optBoolean("speakerFailure") ?: !speakersReady
+                    onUi { synchronized(draftSpeakerLabels) {
+                        if (resumed == null) {
+                            draftSpeakerLabels.clear(); draftRememberedVoices.clear(); draftAutomaticNames.clear(); draftSpeakerMerges = emptyMap()
+                            draftRememberGeneration = app.voices.generation(); checkpoint.saveNames(emptyMap(), emptyMap(), generation = draftRememberGeneration)
+                        }
+                        draftNamingOpen = true
+                    } }
+                    val detector = ModelStore.vadPath(filesDir).takeIf { ModelStore.vadReady(filesDir) }
+                    var lastDecodeUpdate = 0L
+                    val livePrints = mutableMapOf<String, Pair<FloatArray, Double>>()
+                    val liveAttemptSeconds = mutableMapOf<String, Double>()
+                    val rememberedPeople = knownVoices
+                    fun matchLiveVoices() {
+                        if (rememberedPeople.isEmpty() || !voiceprintModel.ready()) return
+                        val windows = SpeakerMerges.windows(voiceClips.windows, synchronized(draftSpeakerLabels) { draftSpeakerMerges.toMap() })
+                        livePrints.keys.retainAll(windows.keys)
+                        val pending = windows.filter { (id, spans) ->
+                            val seconds = spans.sumOf { it.endSample - it.startSample }.toDouble() / Limits.ASR_RATE
+                            val attempted = liveAttemptSeconds[id] ?: 0.0
+                            seconds >= 4 && (attempted == 0.0 || seconds >= attempted + 10)
+                        }
+                        if (pending.isEmpty()) return
+                        try {
+                            val computed = Voiceprints.compute(File(voiceprintModel.modelPath), audio, pending, leaseHeld = true) { checkActive() }
+                            computed.forEach { (id, print) -> liveAttemptSeconds[id] = print.second; livePrints[id] = print }
+                            val names = rememberedPeople.associate { it.id to it.name }
+                            val matches = VoiceMatcher.match(livePrints.mapValues { it.value.first }, rememberedPeople,
+                                VoiceprintModel.model.sha256, Voiceprints.THRESHOLDS.getValue(VoiceprintModel.model.sha256))
+                            onUi {
+                                draftAutomaticNames.clear()
+                                matches.filterValues { it.state == Match.State.AUTO }.forEach { (id, match) -> names[match.voiceId]?.let { draftAutomaticNames[id] = it } }
+                                saveDraftNames()
+                            }
+                        } catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error; Log.w(TAG, "Live voice matching unavailable", error) }
+                        catch (error: Exception) { Log.w(TAG, "Live voice matching unavailable", error) }
+                    }
+                    val rawTranscript: Transcript
+                    val elapsed: Long
+                    NativeInference.acquire()
+                    try {
+                        if (resumed?.optJSONObject("diarizer") != null) streamDiarizer = Diarization.Streaming(speakerModels.modelPath, resumed.getJSONObject("diarizer"))
+                        Parakeet.Incremental(chosenModel, detector, leaseHeld = true, restored = resumed?.getJSONObject("recognition"), onChunk = { chunk, startMs, words ->
+                            checkActive()
+                            if (speakerFailure) words.copy(words = words.words.map { it.copy(speaker = "${speakerPrefix}1") })
+                            else try {
+                                onUi {
+                                    if (!cancelled.get()) transcriptionProgress?.stage(TranscriptionProgress.Stage.SPEAKERS,
+                                        (System.nanoTime() - totalBegan) / 1_000_000, startMs, startMs + chunk.durationMs)
+                                }
+                                val diarizer = streamDiarizer ?: Diarization.Streaming(speakerModels.modelPath).also { streamDiarizer = it }
+                                val found = diarizer.process(chunk, startMs)
+                                val assigned = if (found.isEmpty()) words.words.map { it.copy(speaker = "${speakerPrefix}1") }
+                                    else Diarization.assign(words.words, found, speakerPrefix, stableIds = true)
+                                if (voiceprintModel.ready()) voiceClips.accept(chunk, found, assigned, startMs)
+                                matchLiveVoices()
+                                words.copy(words = assigned)
+                            } catch (error: UserFacingException) {
+                                if (error.failure == Failure.CANCELLED) throw error
+                                speakerFailure = true
+                                Log.w(TAG, "Incremental speakers unavailable", error)
+                                words.copy(words = words.words.map { it.copy(speaker = "${speakerPrefix}1") })
+                            } catch (error: Exception) {
+                                speakerFailure = true
+                                Log.w(TAG, "Incremental speakers unavailable", error)
+                                words.copy(words = words.words.map { it.copy(speaker = "${speakerPrefix}1") })
+                            }
+                        }, onStage = { startMs, endMs, loading ->
+                            checkActive()
+                            onUi {
+                                if (!cancelled.get()) transcriptionProgress?.stage(
+                                    if (loading) TranscriptionProgress.Stage.PREPARING else TranscriptionProgress.Stage.WORDS,
+                                    (System.nanoTime() - totalBegan) / 1_000_000, startMs, endMs)
+                            }
+                        }) { progress ->
+                            checkActive()
+                            onUi { if (!cancelled.get()) showProgress(progress) }
+                        }.use { recognition ->
+                            var previousSaved = resumed?.optLong("doneMs") ?: -1L
+                            fun saveCheckpoint() {
+                                audio.sync()
+                                val state = JSONObject().put("recognition", recognition.checkpoint())
+                                    .put("encoder", encoder?.checkpoint()).put("diarizer", streamDiarizer?.checkpoint())
+                                    .put("speakerPrefix", speakerPrefix).put("speakerFailure", speakerFailure)
+                                    .put("clipSamples", audio.sampleCount).put("voiceClips", voiceClips.checkpoint())
+                                    .put("positionSamples", recognition.positionSamples).put("doneMs", recognition.doneMs)
+                                    .put("durationMs", recognition.totalMs).put("elapsedMs", (System.nanoTime() - totalBegan) / 1_000_000)
+                                checkpoint.save(state)
+                                previousSaved = recognition.doneMs
+                                checkpointSaved = true
+                            }
+                            durationMs = AudioDecoder.stream(this, uri, onSamples = { samples, count ->
+                                checkActive()
+                                encoder?.accept(samples, count)
+                                recognition.accept(samples, count)
+                                if (recognition.doneMs > previousSaved || stopRequested.get()) saveCheckpoint()
+                                if (stopRequested.get()) throw ProcessingPaused()
+                            }, startSample = resumed?.optLong("positionSamples") ?: 0L) { decodedMs, durationMs ->
+                                checkActive()
+                                recognition.totalMs = durationMs ?: session.durationMs
+                                val now = System.nanoTime()
+                                if (now - lastDecodeUpdate >= 250_000_000L) {
+                                    lastDecodeUpdate = now
+                                    onUi {
+                                        if (!cancelled.get()) {
+                                            transcriptionProgress?.total(durationMs ?: recognition.totalMs)
+                                            transcriptionProgress?.stage(TranscriptionProgress.Stage.READING,
+                                                (now - totalBegan) / 1_000_000, end = decodedMs)
+                                        }
+                                    }
+                                }
+                            }
+                            requireUser(durationMs >= 200, Failure.SHORT)
+                            rawTranscript = recognition.finish(durationMs)
+                            elapsed = recognition.inferenceMs
+                            saveCheckpoint()
+                            finishing = true
+                            checkActive()
+                            encoder?.finish()
+                            encoder?.close()
+                        }
+                    } finally {
+                        try { streamDiarizer?.close() } finally { NativeInference.lease.release() }
+                    }
+                    val finalizationBeganNs = System.nanoTime()
+                    val draftRemember = synchronized(draftSpeakerLabels) { draftRememberedVoices.toMap() }
+                    val draftGeneration = draftRememberGeneration
+                    val draftEdits = synchronized(draftSpeakerLabels) {
+                        draftNamingOpen = false
+                        draftSpeakerLabels.toMap() to draftSpeakerMerges.toMap()
+                    }
+                    onUi { speakerDialog?.dismiss(); renderTranscript() }
+                    val transcript = SpeakerMerges.apply(rawTranscript, draftEdits.second)
+                    val turns = streamDiarizer?.turns
+                    val diarizationMs = streamDiarizer?.elapsedMs ?: 0L
+                    checkActive()
+                    // Processing records are machine-readable provenance, independent of UI language.
+                    try {
+                        File(filesDir, "latest.words.json").writeText(transcript.json())
+                        File(filesDir, "latest.processing.json").writeText(processing(chosenModel.precision, chosenModel.revision).put("language", transcript.language)
+                            .put("durationMs", durationMs).put("inferenceMs", elapsed)
+                            .put("segmentation", Parakeet.incrementalProvenance(detector))
+                            .toString(2))
+                    } catch (error: IOException) { Log.e(TAG, "Could not cache processing artifacts", error) }
+                    val recognition = processing(chosenModel.precision, chosenModel.revision).put("language", transcript.language)
+                        .put("x-inferenceMs", elapsed).put("x-segmentation", Parakeet.incrementalProvenance(detector))
+                        .put("x-resumedFromMs", resumed?.optLong("doneMs") ?: 0L)
+                    val attributed = if (turns.isNullOrEmpty() || transcript.words.isEmpty()) null else
+                        SpeakerAttribution.Result(transcript, SpeakerAttribution.record(transcript.words, turns, recognition, null, diarizationMs)
+                            .put("x-incrementalDiarization", "28 s windows with 2 s overlap, persistent Sortformer speaker cache"))
+                    checkActive()
+                    val speakerTurns = turns
+                    val printModel = VoiceprintModel.model.sha256
+                    // Naming speakers is best effort, like telling them apart: any failure keeps "Speaker N".
+                    val prints: Map<String, SpeakerPrint> = if (speakerTurns == null || attributed == null || !voiceprintModel.ready()) emptyMap() else try {
+                        onUi { transcriptionProgress?.stage(TranscriptionProgress.Stage.MATCHING, (System.nanoTime() - totalBegan) / 1_000_000) }
+                        val computed = Voiceprints.compute(File(voiceprintModel.modelPath), audio,
+                            SpeakerMerges.windows(voiceClips.windows, draftEdits.second)) { checkActive() }
+                        val matches = VoiceMatcher.match(computed.mapValues { it.value.first }, knownVoices, printModel, Voiceprints.THRESHOLDS.getValue(printModel))
+                        if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) for ((id, print) in computed)
+                            Log.d(TAG, "Voiceprint $id ${"%.1f".format(java.util.Locale.ROOT, print.second)} s: ${matches[id]?.let { "${it.state} ${"%.3f".format(java.util.Locale.ROOT, it.score)}" } ?: "no match"}")
+                        computed.mapValues { (id, print) -> SpeakerPrint(print.first, print.second, matches[id]) }
+                    } catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error; Log.w(TAG, "Voiceprints failed", error); emptyMap() }
+                    catch (error: RuntimeException) { Log.w(TAG, "Voiceprints failed", error); emptyMap() }
+                    catch (error: OutOfMemoryError) { Log.w(TAG, "Voiceprints failed", error); emptyMap() }
+                    checkActive()
+                    val names = knownVoices.associate { it.id to it.name }
+                    val draftNames = draftEdits.first
+                    val labels = transcript.words.map { it.speaker }.distinct().mapIndexed { index, id ->
+                        id to (draftNames[id] ?: prints[id]?.match?.takeIf { it.state == Match.State.AUTO }?.let { names[it.voiceId] } ?: getString(R.string.speaker_label, index + 1))
+                    }.toMap()
+                    // Counts only: which person a voice resembles never enters the document.
+                    if (attributed != null && speakerTurns != null && voiceprintModel.ready()) {
+                        val t = Voiceprints.THRESHOLDS.getValue(printModel)
+                        attributed.processing.put("x-speakerIdentification", JSONObject()
+                            .put("model", "3dspeaker_speech_campplus_sv_en_voxceleb_16k").put("sha256", printModel).put("dim", prints.values.firstOrNull()?.embedding?.size ?: 512)
+                            .put("metric", "cosine").put("autoThreshold", t.auto.toDouble()).put("suggestThreshold", t.suggest.toDouble()).put("margin", t.margin.toDouble())
+                            .put("speakersWithPrints", prints.size).put("autoApplied", prints.values.count { it.match?.state == Match.State.AUTO && it.match.voiceId in names })
+                            .put("suggested", prints.values.count { it.match?.state == Match.State.SUGGESTED }))
+                    }
+                    onUi { transcriptionProgress?.stage(TranscriptionProgress.Stage.SAVING, (System.nanoTime() - totalBegan) / 1_000_000) }
+                    onUi { draftNamingOpen = false; speakerDialog?.dismiss() }
+                    val sourceUri = if (encoder != null) Uri.fromFile(encoded) else uri
+                    val finalProcessing = (attributed?.processing ?: recognition).let {
+                        if (draftEdits.second.isEmpty()) it else SpeakerMerges.processing(it, draftEdits.second)
+                    }
+                    val (file, portable) = documents.createFromOpus(sourceUri, attributed?.transcript ?: transcript, session.name,
+                        finalProcessing, document, labels)
+                    if (stopRequested.get()) { file.delete(); throw ProcessingPaused() }
+                    val processingMs = (System.nanoTime() - totalBegan) / 1_000_000
+                    val measuredFinalizationMs = (System.nanoTime() - finalizationBeganNs) / 1_000_000
+                    // A completed native call may outlive its screen. Never publish a cancelled result,
+                    // and remove only this job's new immutable document when it cannot be adopted.
+                    handler.post {
+                        if (isDestroyed || isFinishing || cancelled.get() || stopRequested.get()) file.delete()
+                        else {
+                            val position = if (playerReady) player?.currentPosition ?: session.positionMs else session.positionMs
+                            interim = null
+                            session = session.copy(uri = Uri.fromFile(file).toString(), document = file.absolutePath,
+                                name = "${session.name.substringBeforeLast('.')}.opus", selectedVariant = portable.defaultId,
+                                durationMs = durationMs, inferenceMs = elapsed, resultPrecision = chosenModel.precision, positionMs = position,
+                                processingMs = processingMs, processingPaused = false)
+                            getSharedPreferences("processing-estimates", MODE_PRIVATE).edit().putLong("finalizationMs",
+                                if (finalizationEstimateMs > 0) (finalizationEstimateMs * 3 + measuredFinalizationMs) / 4 else measuredFinalizationMs).apply()
+                            adoptDocument(portable)
+                            preparePlayer(Uri.fromFile(file))
+                            // Until the note points at the result, the checkpoint is the only way back to it.
+                            if (persistSession()) { checkpoint.discard(); checkpointSaved = false }
+                            else Log.w(TAG, "Kept the processing checkpoint: the note could not be saved")
+                            portable.manifest?.optJSONObject("meeting")?.optString("id")?.takeIf { it.isNotEmpty() && prints.isNotEmpty() }?.let { meeting ->
+                                try { app.noteVoices.merge(meeting, portable.defaultId ?: return@let, printModel, prints) } catch (error: Exception) { Log.w(TAG, "Could not save voiceprints", error) }
+                            }
+                            loadVoices()
+                            // Voices forgotten since the choice was made stay forgotten.
+                            if (draftGeneration == app.voices.generation()) draftRemember.forEach { (id, voice) ->
+                                if (voice.isNotEmpty() && voice !in people) return@forEach
+                                labels[id]?.let { name -> rememberVoice(id, name, voice.takeIf { it.isNotEmpty() }, true) }
+                            }
+                            renderScreen()
+                            if (attributed == null && transcript.words.isNotEmpty()) setStatus(R.string.speakers_unavailable) else defaultStatus()
+                        }
+                    }
+                } finally { encoder?.close() }
+            }
+        } finally { checkpoint.release() } }
     }
 
     private fun processing(precision: String, revision: String? = null): JSONObject = JSONObject()
@@ -297,6 +545,8 @@ class MainActivity : Activity() {
 
     private fun saveCassiniDocument() {
         if (session.document == null) {
+            // A paused draft keeps its source; packaging it would orphan the checkpoint.
+            if (checkpointSaved) return
             val transcript = session.transcript ?: return
             val uri = session.uri?.let(Uri::parse) ?: return
             // Migrate prototype sessions without running speech recognition again.
@@ -341,7 +591,7 @@ class MainActivity : Activity() {
                     ui.search.text.clear(); ui.scroll.scrollTo(0, 0)
                     preparePlayer(Uri.fromFile(file))
                 }
-                adoptDocument(portable.takeIf { it.state != "plain-audio" })
+                adoptDocument(portable.takeIf { it.state != "plain-audio" }); restoreCheckpoint()
                 persistSession(); renderScreen(); defaultStatus()
             }
         }
@@ -355,7 +605,334 @@ class MainActivity : Activity() {
                 ?.optJSONObject(selected?.id.orEmpty())?.optLong("x-inferenceMs", session.inferenceMs) ?: session.inferenceMs
             session = session.copy(transcript = selected?.transcript, selectedVariant = selected?.id, inferenceMs = inference)
         }
+        loadVoices()
         highlightedWord = -1
+    }
+
+    private fun meetingId() = document?.manifest?.optJSONObject("meeting")?.optString("id")?.takeIf { it.isNotEmpty() }
+
+    private fun loadVoices() {
+        val meeting = meetingId(); val variant = session.selectedVariant
+        notePrints = if (meeting == null || variant == null) emptyMap() else try { app.noteVoices.load(meeting, variant) }
+            catch (error: Exception) { Log.w(TAG, "Could not load voiceprints", error); emptyMap() }
+        people = app.voices.load().associateBy { it.id }
+    }
+
+    /** Retain names when reprocessing this meeting, even if the user chose not to remember them globally. */
+    private fun voicesForRecognition(): List<Voice> {
+        val saved = app.voices.load()
+        val model = VoiceprintModel.model.sha256
+        val local = notePrints.mapNotNull { (id, print) ->
+            val label = document?.speakerLabel(id) ?: return@mapNotNull null
+            if (isDefaultLabel(id, label) || print.match?.state == Match.State.REJECTED ||
+                print.match?.voiceId in saved.map { it.id }) return@mapNotNull null
+            Voice("note_$id", label, model, print.embedding, 1, print.seconds, 0, 0)
+        }
+        return saved + local
+    }
+
+    /** The suggestion or auto mark after a speaker label: a saved person this voice resembles. */
+    private fun speakerMark(speaker: String, label: String): Pair<String, () -> Unit>? {
+        val match = notePrints[speaker]?.match ?: return null
+        val person = people[match.voiceId] ?: return null
+        return when {
+            match.state == Match.State.SUGGESTED && isDefaultLabel(speaker, label) ->
+                getString(R.string.speaker_suggestion, person.name) to { applySpeakerName(speaker, person.name, person.id, remember = true) }
+            match.state == Match.State.AUTO && label == person.name -> getString(R.string.speaker_auto_mark) to { showSpeakerDialog(speaker) }
+            else -> null
+        }
+    }
+
+    private fun canRename() = (interim != null && draftNamingOpen) || (document?.state == "ok" && interim == null && !busy)
+
+    /** "Speaker 2" in any interface language: a note sealed before the language changed still has no name. */
+    private val defaultLabels by lazy {
+        listOf("en", "it").map { tag -> createConfigurationContext(android.content.res.Configuration(resources.configuration)
+            .apply { setLocale(Locale.forLanguageTag(tag)) }).getString(R.string.speaker_label, 0).substringBefore('0') }.toSet()
+    }
+    private fun isDefaultLabel(id: String, label: String) = label == id || label.isBlank() ||
+        defaultLabels.any { label.startsWith(it) && label.removePrefix(it).toIntOrNull() != null }
+
+    private fun showSpeakers() {
+        if (document?.manifest == null) return
+        val speakers = session.transcript?.words.orEmpty().map { it.speaker }.distinct()
+        AlertDialog.Builder(this).setTitle(R.string.speakers_menu)
+            .setItems(speakers.map { document?.speakerLabel(it)?.ifBlank { it } ?: it }.toTypedArray()) { _, index -> showSpeakerDialog(speakers[index]) }
+            .setNegativeButton(android.R.string.cancel, null).show()
+    }
+
+    private fun showSpeakerDialog(speakerId: String, draft: String? = null) {
+        if (interim != null && draftNamingOpen) { showDraftSpeakerDialog(speakerId, draft); return }
+        if (!canRename()) return
+        val current = document?.speakerLabel(speakerId) ?: return
+        val input = SpeakerDialog.nameInput(this, draft ?: current.takeUnless { isDefaultLabel(speakerId, it) }.orEmpty())
+        val print = notePrints[speakerId]
+        val match = print?.match?.takeIf { it.state != Match.State.REJECTED && it.state != Match.State.NONE && it.voiceId in people }
+        // A label that already names the matched person keeps that person unless the name is changed.
+        var chosen: String? = match?.voiceId?.takeIf { people[it]?.name == input.text.toString().trim() }
+        val model = VoiceprintModel.model.sha256
+        val t = Voiceprints.THRESHOLDS.getValue(model)
+        val ranked = people.values.filter { it.model == model }.map { it to (print?.let { p -> Voiceprints.cosine(p.embedding, it.mean) } ?: 0f) }
+            .sortedWith(compareByDescending<Pair<Voice, Float>> { it.second }.thenBy { it.first.name.lowercase() })
+        val list = SpeakerDialog.people(this, ranked.map { (voice, score) ->
+            (if (score >= t.suggest) getString(R.string.speaker_person_likely, voice.name) else voice.name) to {
+                input.setText(voice.name); input.setSelection(input.text.length); chosen = voice.id }
+        })
+        val remember = SpeakerDialog.remember(this, print != null)
+        val builder = AlertDialog.Builder(this).setTitle(R.string.rename_speaker_title)
+            .setView(SpeakerDialog.frame(this, SpeakerDialog.column(this, input, mergeChoices(speakerId), list, remember)))
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(android.R.string.ok) { _, _ -> applySpeakerName(speakerId, input.text.toString().trim(), chosen, remember.isChecked) }
+        if (match != null) builder.setNeutralButton(R.string.speaker_not_this_person) { _, _ -> rejectMatch(speakerId) }
+        val dialog = builder.create()
+        // Dismissal is delivered later; only the dialog still on screen may clear the draft.
+        dialog.setOnDismissListener { if (speakerDialog === dialog && !isChangingConfigurations) { speakerDialog = null; pendingSpeaker = null; pendingName = null } }
+        speakerDialog?.dismiss()
+        speakerDialog = dialog; pendingSpeaker = speakerId; pendingName = draft
+        dialog.show()
+        val save = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+        // Keeping the same name still confirms an unconfirmed match.
+        fun validate() { save.isEnabled = input.text.isNotBlank() && (input.text.toString().trim() != current ||
+            print != null && print.match?.state != Match.State.CONFIRMED) }
+        validate()
+        input.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                pendingName = s?.toString(); if (chosen != null && people[chosen]?.name != s?.toString()?.trim()) chosen = null; validate() }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+        input.requestFocus()
+        dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
+    }
+
+    /** Draft names are keyed by the diarizer's persistent speaker ID and sealed with the result. */
+    private fun showDraftSpeakerDialog(speakerId: String, draft: String?) {
+        val current = draftSpeakerLabels[speakerId] ?: draftAutomaticNames[speakerId] ?: defaultLabel(speakerId)
+        val input = SpeakerDialog.nameInput(this, draft ?: draftSpeakerLabels[speakerId] ?: draftAutomaticNames[speakerId].orEmpty())
+        val savedPeople = app.voices.load().sortedBy { it.name.lowercase() }
+        var chosen = draftRememberedVoices[speakerId]?.takeIf(String::isNotEmpty)
+        val remember = SpeakerDialog.remember(this, VoiceprintModel.inFiles(filesDir).ready())
+        if (draftSpeakerLabels.containsKey(speakerId)) remember.isChecked = speakerId in draftRememberedVoices
+        val choices = SpeakerDialog.people(this, savedPeople.map { voice -> voice.name to {
+            chosen = voice.id; input.setText(voice.name); input.setSelection(input.text.length)
+        } })
+        fun saveName(name: String, target: String?) {
+            synchronized(draftSpeakerLabels) {
+                if (draftNamingOpen && name.isNotEmpty()) {
+                    draftSpeakerLabels[speakerId] = name
+                    if (remember.isChecked) {
+                        val generation = app.voices.generation()
+                        if (generation != draftRememberGeneration) { draftRememberedVoices.clear(); draftRememberGeneration = generation }
+                        draftRememberedVoices[speakerId] = target.orEmpty()
+                    }
+                    else draftRememberedVoices.remove(speakerId)
+                }
+            }
+            saveDraftNames(); renderTranscript()
+        }
+        val dialog = AlertDialog.Builder(this).setTitle(R.string.rename_speaker_title)
+            .setView(SpeakerDialog.frame(this, SpeakerDialog.column(this, input, mergeChoices(speakerId), choices, remember)))
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val name = input.text.toString().trim()
+                val target = chosen?.takeIf { id -> savedPeople.any { it.id == id && it.name == name } }
+                val same = savedPeople.firstOrNull { it.name.equals(name, ignoreCase = true) }
+                if (remember.isChecked && target == null && same != null) {
+                    AlertDialog.Builder(this).setMessage(getString(R.string.speaker_same_person, same.name))
+                        .setPositiveButton(R.string.speaker_same_person_yes) { _, _ -> saveName(name, same.id) }
+                        .setNegativeButton(R.string.speaker_same_person_no) { _, _ -> saveName(name, null) }.show()
+                } else saveName(name, target)
+            }.create()
+        speakerDialog?.dismiss()
+        speakerDialog = dialog; pendingSpeaker = speakerId; pendingName = draft
+        dialog.setOnDismissListener {
+            if (speakerDialog === dialog && !isChangingConfigurations) {
+                speakerDialog = null; pendingSpeaker = null; pendingName = null
+            }
+        }
+        dialog.show()
+        val save = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+        fun validate() { save.isEnabled = input.text.isNotBlank() && (input.text.toString().trim() != current || remember.isChecked || speakerId in draftRememberedVoices) }
+        validate()
+        input.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { pendingName = s?.toString(); validate() }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+        input.requestFocus()
+        dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
+    }
+
+    private fun draftTranscript(): Transcript? = interim?.let { raw ->
+        synchronized(draftSpeakerLabels) { SpeakerMerges.apply(raw, draftSpeakerMerges) }
+    }
+
+    /** Targets are already named voices used by this transcript, not saved people from other notes. */
+    private fun mergeChoices(source: String): View {
+        val live = interim != null
+        val words = (draftTranscript() ?: session.transcript)?.words.orEmpty()
+        val targets = words.map { it.speaker }.distinct().filter { it != source }.mapNotNull { id ->
+            val name = if (live) draftSpeakerLabels[id] ?: draftAutomaticNames[id] else document?.speakerLabel(id)
+            name?.takeUnless { isDefaultLabel(id, it) }?.let { id to it }
+        }
+        return SpeakerDialog.merges(this, targets.map { (id, name) -> name to { confirmSpeakerMerge(source, id) } })
+    }
+
+    /** Selecting a target never mutates a transcript. Only this dialog's second click commits it. */
+    private fun confirmSpeakerMerge(source: String, target: String) {
+        if (!canRename()) return
+        val live = interim != null
+        val sourceName = if (live) draftSpeakerLabels[source] ?: draftAutomaticNames[source] ?: defaultLabel(source) else document?.speakerLabel(source) ?: return
+        val targetName = if (live) draftSpeakerLabels[target] ?: draftAutomaticNames[target] ?: return else document?.speakerLabel(target) ?: return
+        speakerDialog?.dismiss()
+        val dialog = AlertDialog.Builder(this).setTitle(R.string.speaker_merge_title)
+            .setMessage(getString(R.string.speaker_merge_confirm, sourceName, targetName) + "\n\n" +
+                getString(if (live) R.string.speaker_merge_live else R.string.speaker_merge_saved))
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.speaker_merge_action) { _, _ ->
+                if (live) {
+                    synchronized(draftSpeakerLabels) {
+                        if (draftNamingOpen) {
+                            draftSpeakerMerges = SpeakerMerges.merge(draftSpeakerMerges, source, target)
+                            draftSpeakerLabels[target] = targetName
+                            draftSpeakerLabels.remove(source)
+                            draftRememberedVoices.remove(source)
+                            draftAutomaticNames.remove(source)
+                        }
+                    }
+                    saveDraftNames(); renderTranscript()
+                } else applySpeakerMerge(source, target)
+            }.create()
+        speakerDialog = dialog
+        dialog.setOnDismissListener { if (speakerDialog === dialog) speakerDialog = null }
+        dialog.show()
+    }
+
+    /** A saved merge creates a variant; the earlier transcript remains selectable. No voice profile is taught. */
+    private fun applySpeakerMerge(source: String, target: String) {
+        val existing = document ?: return
+        val path = session.document ?: return
+        val previous = existing.selected(session.selectedVariant) ?: return
+        val words = previous.transcript ?: return
+        if (!canRename() || source == target || words.words.none { it.speaker == source } || words.words.none { it.speaker == target }) return
+        val edited = SpeakerMerges.apply(words, mapOf(source to target))
+        val process = SpeakerMerges.processing(existing.manifest?.optJSONObject("provenance")?.optJSONObject("speechToText")?.optJSONObject(previous.id),
+            mapOf(source to target), previous.id)
+        // One enrolment belongs to one variant: copies are automatic, so rejecting them never unenrols twice.
+        val prints = notePrints.filterKeys { it != source }.mapValues { (_, print) ->
+            if (print.match?.state == Match.State.CONFIRMED) print.copy(match = print.match.copy(state = Match.State.AUTO)) else print }
+        val name = existing.speakerLabel(target) ?: target
+        runWork(R.string.saving) {
+            val (file, merged) = documents.createFromOpus(Uri.fromFile(File(path)), edited, session.name, process, existing, emptyMap())
+            handler.post {
+                if (isDestroyed || isFinishing) { file.delete(); return@post }
+                val position = if (playerReady) player?.currentPosition ?: session.positionMs else session.positionMs
+                session = session.copy(uri = Uri.fromFile(file).toString(), document = file.absolutePath,
+                    selectedVariant = merged.defaultId, positionMs = position)
+                merged.manifest?.optJSONObject("meeting")?.optString("id")?.let { meeting ->
+                    try { app.noteVoices.merge(meeting, merged.defaultId ?: return@let, VoiceprintModel.model.sha256, prints) }
+                    catch (error: Exception) { Log.w(TAG, "Could not carry voiceprints to merged transcript", error) }
+                }
+                adoptDocument(merged)
+                preparePlayer(Uri.fromFile(file))
+                if (persistSession()) retire(File(path)) else Log.w(TAG, "Kept $path: the note could not be saved")
+                loadVoices(); renderScreen(); setStatus(R.string.speaker_merged, name)
+            }
+        }
+    }
+
+    /** Seals a new file with the name and retires the old one only once the note points at the new one. */
+    private fun applySpeakerName(speakerId: String, name: String, voiceId: String? = null, remember: Boolean = false, asked: Boolean = false) {
+        val existing = document ?: return
+        val path = session.document ?: return
+        if (name.isEmpty() || !canRename()) return
+        val print = notePrints[speakerId]
+        if (remember && print != null && voiceId == null && !asked) people.values.firstOrNull {
+            it.name.equals(name, ignoreCase = true) && it.model == VoiceprintModel.model.sha256 }?.let { same ->
+            AlertDialog.Builder(this).setMessage(getString(R.string.speaker_same_person, same.name))
+                .setPositiveButton(R.string.speaker_same_person_yes) { _, _ -> applySpeakerName(speakerId, name, same.id, true, true) }
+                .setNegativeButton(R.string.speaker_same_person_no) { _, _ -> applySpeakerName(speakerId, name, null, true, true) }.show()
+            return
+        }
+        // Editing a confirmed person's name is usually a correction, not a new person.
+        val confirmed = print?.match?.takeIf { it.state == Match.State.CONFIRMED }?.let { people[it.voiceId] }
+        if (remember && confirmed != null && voiceId == null && !asked && !confirmed.name.equals(name, ignoreCase = true)) {
+            AlertDialog.Builder(this).setMessage(getString(R.string.speaker_rename_person, confirmed.name, name))
+                .setPositiveButton(R.string.speaker_rename_person_yes) { _, _ -> applySpeakerName(speakerId, name, confirmed.id, true, true) }
+                .setNegativeButton(R.string.speaker_same_person_no) { _, _ -> applySpeakerName(speakerId, name, null, true, true) }.show()
+            return
+        }
+        if (existing.speakerLabel(speakerId) == name) { rememberVoice(speakerId, name, voiceId, remember); renderTranscript(); setStatus(R.string.speaker_renamed, name); return }
+        runWork(R.string.saving) {
+            val (file, renamed) = documents.relabel(File(path), existing, mapOf(speakerId to name))
+            handler.post {
+                if (isDestroyed || isFinishing) { file.delete(); return@post }
+                rememberVoice(speakerId, name, voiceId, remember)
+                val position = if (playerReady) player?.currentPosition ?: session.positionMs else session.positionMs
+                session = session.copy(uri = Uri.fromFile(file).toString(), document = file.absolutePath, positionMs = position)
+                adoptDocument(renamed)
+                preparePlayer(Uri.fromFile(file))
+                if (persistSession()) retire(File(path)) else Log.w(TAG, "Kept $path: the note could not be saved")
+                renderScreen()
+                setStatus(R.string.speaker_renamed, name.trim())
+            }
+        }
+    }
+
+    /** Enrols a named voice. Only a person's confirmation teaches it, so a wrong automatic name never reinforces itself. */
+    private fun rememberVoice(speakerId: String, name: String, voiceId: String?, remember: Boolean) {
+        val meeting = meetingId() ?: return; val variant = session.selectedVariant ?: return
+        val print = notePrints[speakerId] ?: return
+        val previous = print.match?.takeIf { it.state == Match.State.CONFIRMED }
+        val target = voiceId ?: previous?.voiceId?.takeIf { people[it]?.name.equals(name, ignoreCase = true) }
+        try {
+            // A voice confirmed as someone else no longer belongs to that person.
+            if (previous != null && previous.voiceId != target) {
+                if (app.voices.unenrol(previous.voiceId, print.embedding)) app.noteVoices.forget(previous.voiceId)
+                app.noteVoices.setMatch(meeting, variant, speakerId, null)
+            }
+            // An automatic match to someone this speaker is no longer called is stale.
+            print.match?.takeIf { it.state == Match.State.AUTO && it.voiceId != target && !people[it.voiceId]?.name.equals(name, ignoreCase = true) }
+                ?.let { app.noteVoices.setMatch(meeting, variant, speakerId, null) }
+            if (remember) {
+                val score = people[target]?.let { Voiceprints.cosine(print.embedding, it.mean) } ?: 1f
+                val voice = if (previous != null && previous.voiceId == target) people.getValue(target).also { app.voices.rename(it.id, name) }
+                    else app.voices.enrol(target, name, VoiceprintModel.model.sha256, print.embedding, print.seconds, System.currentTimeMillis())
+                app.noteVoices.setMatch(meeting, variant, speakerId, Match(voice.id, score, Match.State.CONFIRMED))
+            }
+        } catch (error: Exception) { Log.w(TAG, "Could not remember voice", error) }
+        loadVoices()
+    }
+
+    /** "Not this person": the match is never offered again here, and an automatic or confirmed name goes back to "Speaker N". */
+    private fun rejectMatch(speakerId: String) {
+        val meeting = meetingId() ?: return; val variant = session.selectedVariant ?: return
+        val print = notePrints[speakerId] ?: return; val match = print.match ?: return
+        val name = people[match.voiceId]?.name
+        try {
+            if (match.state == Match.State.CONFIRMED && app.voices.unenrol(match.voiceId, print.embedding)) app.noteVoices.forget(match.voiceId)
+            app.noteVoices.setMatch(meeting, variant, speakerId, match.copy(state = Match.State.REJECTED))
+        } catch (error: Exception) { Log.w(TAG, "Could not reject voice", error) }
+        loadVoices()
+        if (name != null && document?.speakerLabel(speakerId) == name) applySpeakerName(speakerId, defaultLabel(speakerId)) else renderTranscript()
+    }
+
+    private fun defaultLabel(speakerId: String): String {
+        // Merging another voice must not renumber the remaining anonymous voices.
+        interim?.let {
+            return getString(R.string.speaker_label, it.words.map { word -> word.speaker }.distinct().indexOf(speakerId) + 1)
+        }
+        val speakers = document?.manifest?.optJSONArray("speakers")
+        val index = (0 until (speakers?.length() ?: 0)).indexOfFirst { speakers!!.getJSONObject(it).optString("id") == speakerId }
+        return getString(R.string.speaker_label, index + 1)
+    }
+
+    /** A document another note still opens stays. */
+    private fun retire(old: File) {
+        val location = Uri.fromFile(old).toString()
+        val used = try { library.load().any { it.session.document == old.absolutePath || it.session.uri == location } }
+            catch (error: Exception) { Log.e(TAG, "Could not load notes", error); true }
+        if (!used && !old.delete()) Log.w(TAG, "Could not delete $old")
     }
 
     private fun chooseVariant() {
@@ -407,13 +984,16 @@ class MainActivity : Activity() {
     private fun runWork(message: Int, action: () -> Unit) {
         if (busy) return
         busy = true
+        ui.pinOperation(true)
         setStatus(message)
         ui.progress.visibility = View.VISIBLE
         ui.progress.isIndeterminate = true
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         refreshControls()
         worker.execute {
-            try { action() } catch (error: UserFacingException) {
+            try { action() } catch (_: ProcessingPaused) {
+                onUi { restoreCheckpoint(); persistSession(); renderScreen(); defaultStatus() }
+            } catch (error: UserFacingException) {
                 Log.e(TAG, "Operation failed: ${error.failure}", error)
                 onUi { setStatus(error.failure.stringRes, error = true) }
             } catch (error: IOException) {
@@ -433,14 +1013,21 @@ class MainActivity : Activity() {
             } finally {
                 onUi {
                     busy = false
-                    speakerCancellation = null
+                    transcriptionProgress = null
+                    ui.status.minLines = 0
+                    draftNamingOpen = checkpointSaved
+                    cancellation = null
                     ui.cancelOperation.visibility = View.GONE
-                    // A run that failed or was cancelled leaves no partial transcript on screen.
-                    if (interim != null) { interim = null; renderScreen() }
+                    // Restore the last durable chunk after a stop or failure.
+                    if (checkpointSaved) { restoreCheckpoint(); renderScreen(); defaultStatus() }
+                    else if (interim != null) { interim = null; renderScreen() }
+                    // Speaker labels become tappable once nothing is running.
+                    else if (document != null) renderTranscript()
                     window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                     ui.progress.visibility = View.GONE
+                    ui.pinOperation(false)
                     refreshControls()
-                    maybeAutoTranscribe()
+                    if (leaveAfterStopping) { leaveAfterStopping = false; returnToLibrary() } else maybeAutoTranscribe()
                 }
             }
         }
@@ -456,17 +1043,53 @@ class MainActivity : Activity() {
         Thread { installSpeechDetector(directory) }.start()
     }
 
-    /** Progress, speed and time left come from the pieces decoded so far; their words are shown as they arrive. */
+    private fun renderTranscriptionProgress() {
+        val state = transcriptionProgress ?: return
+        val elapsedMs = (System.nanoTime() - transcriptionBeganNs) / 1_000_000
+        progressRenderedSecond = elapsedMs / 1000
+        val snapshot = state.snapshot(elapsedMs)
+        ui.progress.isIndeterminate = snapshot.percent == null
+        ui.progress.progress = snapshot.percent ?: 0
+        val overall = if (snapshot.percent == null) getString(R.string.progress_audio_unknown, clock(snapshot.doneMs))
+            else getString(R.string.progress_audio, clock(snapshot.doneMs), clock(snapshot.totalMs), snapshot.percent)
+        val stage = when (snapshot.stage) {
+            TranscriptionProgress.Stage.READING -> getString(R.string.progress_reading, clock(snapshot.endMs))
+            TranscriptionProgress.Stage.PREPARING -> getString(R.string.preparing_recognizer)
+            TranscriptionProgress.Stage.WORDS -> getString(R.string.progress_words, clock(snapshot.startMs), clock(snapshot.endMs))
+            TranscriptionProgress.Stage.SPEAKERS -> getString(R.string.progress_speakers, clock(snapshot.startMs), clock(snapshot.endMs))
+            TranscriptionProgress.Stage.MATCHING -> getString(R.string.matching_voices)
+            TranscriptionProgress.Stage.SAVING -> getString(R.string.packaging_document)
+        }
+        val remaining = if (snapshot.remainingMs == 0L) getString(R.string.progress_finishing)
+            else snapshot.remainingMs?.let { getString(R.string.processing_eta_range, clock(TranscriptionProgress.roundedRemaining(snapshot.remainingLowMs ?: it)), clock(TranscriptionProgress.roundedRemaining(snapshot.remainingHighMs ?: it))) }
+                ?: getString(R.string.progress_estimating)
+        val priorBattery = batteryReading
+        if (priorBattery == null || elapsedMs - priorBattery.elapsedMs >= 10000) batteryReading = BatteryProjection.read(this, elapsedMs)
+        if (snapshot.remainingMs == 0L && finalizationAtMs < 0) finalizationAtMs = elapsedMs
+        val batteryRemaining = snapshot.remainingMs?.let { remaining ->
+            if (remaining > 0) (snapshot.remainingHighMs ?: remaining) + finalizationEstimateMs
+            else finalizationEstimateMs.takeIf { it > 0 }?.let { (it - (elapsedMs - finalizationAtMs)).coerceAtLeast(5000) }
+        }
+        val projection = batteryReading?.let { batteryProjection.sample(it, batteryRemaining) }
+        val battery = when {
+            projection == null -> getString(R.string.battery_unavailable)
+            projection.charging -> getString(R.string.battery_charging, projection.percentNow)
+            projection.percentAfter != null -> getString(R.string.battery_completion, projection.percentNow, projection.percentAfter)
+            else -> getString(R.string.battery_estimating, projection.percentNow)
+        }
+        val text = listOf(overall, stage, getString(R.string.progress_counts, snapshot.words, clock(elapsedMs)), remaining, battery).joinToString("\n")
+        if (ui.status.text.toString() != text) {
+            ui.status.text = text
+            ui.status.setTextColor(DeckViews.muted)
+        }
+    }
+
+    /** Only a completed words-and-speakers chunk advances the overall bar. */
     private fun showProgress(progress: Parakeet.Progress) {
         if (!busy) return
-        val percent = if (progress.totalMs > 0) (progress.doneMs * 100 / progress.totalMs).toInt().coerceIn(0, 100) else 0
-        // Nothing is measured until the first piece is decoded.
-        ui.progress.isIndeterminate = progress.doneMs <= 0
-        ui.progress.progress = percent
-        val speed = ProcessingSpeed.realtime(progress.doneMs, progress.elapsedMs)
-        val remaining = ProcessingSpeed.remainingMs(progress.doneMs, progress.totalMs, progress.elapsedMs)
-        if (speed == null || remaining == null) setStatus(R.string.transcribing)
-        else setStatus(R.string.transcribing_progress, percent, speed, (remaining + 999) / 1000)
+        transcriptionProgress?.complete(progress.doneMs, progress.totalMs, progress.words.size,
+            (System.nanoTime() - transcriptionBeganNs) / 1_000_000)
+        renderTranscriptionProgress()
         if (progress.words != interim?.words && (progress.words.isNotEmpty() || interim != null)) {
             val first = interim == null
             val follow = ui.scroll.getChildAt(0).height - ui.scroll.height - ui.scroll.scrollY <= ui.scroll.height / 4
@@ -491,6 +1114,8 @@ class MainActivity : Activity() {
     }
     private fun defaultStatus() {
         when {
+            checkpointUnreadable -> setStatus(R.string.checkpoint_error, error = true)
+            checkpointSaved && !busy -> setStatus(R.string.processing_paused, clock(checkpointDoneMs), clock(session.durationMs))
             session.transcript != null && session.processingMs > 0 -> setStatus(R.string.processing_speed,
                 session.processingMs / 1000.0, ProcessingSpeed.realtime(session.durationMs, session.processingMs) ?: 0.0)
             session.transcript != null && session.inferenceMs > 0 -> setStatus(R.string.transcription_speed,
@@ -502,31 +1127,43 @@ class MainActivity : Activity() {
     }
 
     private fun refreshControls() {
-        val ready = models.ready()
-        ui.model.text = getString(if (ready) R.string.model_ready else R.string.model_missing,
-            models.precision)
-        ui.download.text = getString(R.string.download_model, getString(R.string.model_size_int8))
-        ui.download.visibility = if (ready) View.GONE else View.VISIBLE
         ui.menu.isEnabled = !busy
         ui.library.isEnabled = !busy
-        ui.open.isEnabled = !busy
-        ui.transcribe.isEnabled = !busy && session.uri != null && ready && (document == null || document?.state == "ok")
-        ui.speakers.visibility = if (session.transcript?.words?.isNotEmpty() == true && interim == null) View.VISIBLE else View.GONE
-        ui.speakers.isEnabled = !busy && session.uri != null && (document == null || document?.state == "ok")
-        ui.download.isEnabled = !busy
-        ui.export.isEnabled = !busy && (session.document != null || session.transcript != null)
-        ui.documentInfo.isEnabled = !busy
-        ui.variant.isEnabled = !busy
+        ui.transcribe.isEnabled = !busy && session.uri != null && (document == null || document?.state == "ok")
+        // Once there are words, transcribing again is a menu action.
+        ui.transcribe.setText(if (checkpointSaved && !busy) R.string.resume_processing else R.string.transcribe)
+        ui.transcribe.visibility = if ((checkpointSaved && !busy) || (session.uri != null && session.transcript == null && interim == null)) View.VISIBLE else View.GONE
         ui.play.isEnabled = playerReady
         ui.seek.isEnabled = playerReady
         ui.back.isEnabled = playerReady
         ui.forward.isEnabled = playerReady
-        listOf(ui.menu, ui.open, ui.transcribe, ui.speakers, ui.download, ui.export, ui.play, ui.back, ui.forward)
+        listOf(ui.menu, ui.transcribe, ui.play, ui.back, ui.forward)
             .forEach { it.alpha = if (it.isEnabled) 1f else .4f }
+    }
+
+    private fun showMenu() {
+        if (busy) return
+        val menu = android.widget.PopupMenu(this, ui.menu)
+        val actions = mutableMapOf<Int, () -> Unit>()
+        fun add(title: Int, enabled: Boolean = true, action: () -> Unit) {
+            val item = menu.menu.add(0, actions.size, actions.size, title)
+            item.isEnabled = enabled
+            actions[item.itemId] = action
+        }
+        if (session.transcript != null) add(R.string.transcribe_again, document == null || document?.state == "ok") { confirmTranscription() }
+        if ((document?.variants?.size ?: 0) > 1) add(R.string.choose_transcript) { chooseVariant() }
+        if (session.document != null || (session.transcript != null && !checkpointSaved)) add(R.string.export) { saveCassiniDocument() }
+        if (checkpointSaved) add(R.string.discard_processing) { discardCheckpoint() }
+        if ((document?.manifest?.optJSONArray("speakers")?.length() ?: 0) > 0) add(R.string.speakers_menu, canRename()) { showSpeakers() }
+        if (document != null) add(R.string.document_info) { showDocumentInfo() }
+        add(R.string.settings) { showSettings() }
+        menu.setOnMenuItemClickListener { item -> actions[item.itemId]?.invoke(); true }
+        menu.show()
     }
 
     private fun renderScreen() {
         ui.draft.visibility = if (interim != null) View.VISIBLE else View.GONE
+        ui.draft.setText(if (checkpointSaved && !busy) R.string.paused_draft else R.string.transcript_draft)
         ui.filename.text = document?.title?.takeIf { it.isNotBlank() } ?: session.name.ifBlank { getString(R.string.no_file) }
         ui.caption.text = if (document == null) getString(R.string.voice_caption, getString(R.string.italian)) else "${getString(R.string.cassini_document)}\n${session.name}"
         // Words of a running transcription belong to no document yet: not to its trust state, variants or speakers.
@@ -535,11 +1172,6 @@ class MainActivity : Activity() {
             ui.trust.setText(trustResource(it.state))
             ui.trust.setTextColor(if (it.state == "ok") DeckViews.amber else DeckViews.warning)
         }
-        ui.documentInfo.visibility = if (document == null) View.GONE else View.VISIBLE
-        ui.variant.visibility = if ((document?.variants?.size ?: 0) > 1 && interim == null) View.VISIBLE else View.GONE
-        ui.variant.text = getString(R.string.selected_transcript, session.selectedVariant.orEmpty())
-        ui.open.setText(if (session.uri == null) R.string.open_audio else R.string.change_audio)
-        ui.transcribe.setText(if (session.transcript == null) R.string.transcribe else R.string.transcribe_again)
         ui.seek.max = session.durationMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
         ui.position.text = getString(R.string.position, clock(session.positionMs.toLong()), clock(session.durationMs))
         val transcript = interim ?: session.transcript
@@ -589,16 +1221,24 @@ class MainActivity : Activity() {
     }
 
     private fun renderTranscript() {
-        val words = (interim ?: session.transcript)?.words ?: emptyList()
+        val words = (draftTranscript() ?: session.transcript)?.words ?: emptyList()
         val builder = StringBuilder()
         val ranges = mutableListOf<IntRange>()
+        val labels = mutableListOf<Pair<IntRange, String>>()
+        val marks = mutableListOf<Pair<IntRange, () -> Unit>>()
         words.forEachIndexed { index, word ->
             if (index > 0) {
                 val previous = words[index - 1]
                 builder.append(if (previous.speaker != word.speaker || previous.text.lastOrNull() in listOf('.', '?', '!')) "\n\n" else " ")
             }
-            if (document != null && interim == null && (index == 0 || words[index - 1].speaker != word.speaker)) {
-                builder.append(document?.speakerLabel(word.speaker)?.takeUnless { it == word.speaker } ?: getString(R.string.unknown_speaker, word.speaker)).append("\n")
+            if ((document != null || interim != null) && (index == 0 || words[index - 1].speaker != word.speaker)) {
+                val start = builder.length
+                builder.append(if (interim != null) draftSpeakerLabels[word.speaker] ?: draftAutomaticNames[word.speaker] ?: defaultLabel(word.speaker) else document?.speakerLabel(word.speaker)?.takeUnless { it == word.speaker } ?: getString(R.string.unknown_speaker, word.speaker))
+                labels += (start until builder.length) to word.speaker
+                (if (interim == null) speakerMark(word.speaker, builder.substring(start)) else null).let { mark ->
+                    if (mark != null) { builder.append("  · "); val at = builder.length; builder.append(mark.first); marks += (at until builder.length) to mark.second }
+                }
+                builder.append("\n")
             }
             val start = builder.length
             builder.append(word.text)
@@ -627,6 +1267,18 @@ class MainActivity : Activity() {
                 }
                 override fun updateDrawState(ds: android.text.TextPaint) { ds.isUnderlineText = false }
             }, range.first, range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+        if (canRename()) labels.forEach { (range, speaker) ->
+            spannable.setSpan(object : ClickableSpan() {
+                override fun onClick(widget: View) = showSpeakerDialog(speaker)
+                override fun updateDrawState(ds: android.text.TextPaint) { ds.isUnderlineText = false; ds.color = DeckViews.amber }
+            }, range.first, range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+        marks.forEach { (range, action) ->
+            spannable.setSpan(if (canRename()) object : ClickableSpan() {
+                override fun onClick(widget: View) { if (canRename()) action() }
+                override fun updateDrawState(ds: android.text.TextPaint) { ds.isUnderlineText = false; ds.color = DeckViews.muted }
+            } else ForegroundColorSpan(DeckViews.muted), range.first, range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
         ui.transcript.setText(spannable, TextView.BufferType.SPANNABLE)
         wordRanges = ranges
@@ -756,17 +1408,18 @@ class MainActivity : Activity() {
         startActivity(Intent(this, SettingsActivity::class.java))
     }
 
-    private fun persistSession() {
+    private fun persistSession(): Boolean {
         if (playerReady) player?.let { session = session.copy(positionMs = it.currentPosition) }
         val preferences = sessions.load()
         session = session.copy(screen = screen)
         // An empty viewer has nothing to remember, and session.json may hold a session that exists nowhere else.
-        if (session.uri == null) return
+        if (session.uri == null) return false
         try {
             // The session another screen left there, or one from before the notes library, reaches the catalogue before it is replaced.
             if (preferences.screen != screen) library.adopt(preferences)
             sessions.save(session); session = library.save(session); sessions.save(session)
-        } catch (error: Exception) { Log.e(TAG, "Could not persist session", error); setStatus(R.string.library_error, error = true) }
+            return true
+        } catch (error: Exception) { Log.e(TAG, "Could not persist session", error); setStatus(R.string.library_error, error = true); return false }
     }
     override fun onSaveInstanceState(outState: Bundle) {
         persistSession()
@@ -775,6 +1428,7 @@ class MainActivity : Activity() {
         outState.putString(NOTE_ID, session.libraryId)
         outState.putString("uri", session.uri)
         outState.putString("screen", screen)
+        outState.putString("pendingSpeaker", pendingSpeaker); outState.putString("pendingName", pendingName)
         super.onSaveInstanceState(outState)
     }
     override fun onResume() {
@@ -793,13 +1447,14 @@ class MainActivity : Activity() {
     }
     override fun onDestroy() {
         handler.removeCallbacks(ticker)
-        speakerCancellation?.set(true)
+        speakerDialog?.dismiss()
+        cancellation?.set(true)
         worker.shutdownNow()
         player?.release()
         super.onDestroy()
     }
     private fun maybeAutoTranscribe() {
-        if (autoTranscribe && !busy && models.ready() && session.uri != null) {
+        if (autoTranscribe && !busy && session.uri != null && ModelBundle.inFiles(filesDir).consented()) {
             autoTranscribe = false
             transcribe()
         }
@@ -811,7 +1466,7 @@ class MainActivity : Activity() {
     }
     @Deprecated("Framework back callback")
     override fun onBackPressed() {
-        if (speakerCancellation != null) cancelSpeakerIdentification() else if (!busy) returnToLibrary()
+        if (cancellation != null) { leaveAfterStopping = true; cancelOperation() } else if (!busy) returnToLibrary()
     }
     companion object {
         /** One attempt per process: a network that cannot reach the detector must not be retried at every note. */

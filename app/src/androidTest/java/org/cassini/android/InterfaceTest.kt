@@ -221,7 +221,7 @@ class InterfaceTest {
             val deadline = android.os.SystemClock.uptimeMillis() + 5000
             while (android.os.SystemClock.uptimeMillis() < deadline) {
                 var ready = false
-                scenario.onActivity { ready = it.findViewById<TextView>(R.id.settings_button).text.toString() == label }
+                scenario.onActivity { ready = it.findViewById<TextView>(R.id.more_button).contentDescription.toString() == label }
                 if (ready) return
                 android.os.SystemClock.sleep(50)
             }
@@ -230,19 +230,17 @@ class InterfaceTest {
         try {
             scenario.onActivity { AppLanguage.set(it, "en") }
             instrumentation.waitForIdleSync()
-            awaitSettingsLabel("Settings")
+            awaitSettingsLabel("More actions")
             scenario.onActivity { activity ->
-                assertEquals("Settings", activity.findViewById<TextView>(R.id.settings_button).text.toString())
+                assertEquals("More actions", activity.findViewById<TextView>(R.id.more_button).contentDescription.toString())
                 assertEquals("Ciao mondo.", activity.findViewById<TextView>(R.id.transcript_text).text.toString())
                 assertEquals("Italian sample.wav", activity.findViewById<TextView>(R.id.recording_name).text.toString())
                 AppLanguage.set(activity, "it")
             }
             instrumentation.waitForIdleSync()
-            awaitSettingsLabel("Impostazioni")
+            awaitSettingsLabel("Altre azioni")
             scenario.onActivity { activity ->
-                assertEquals("Impostazioni", activity.findViewById<TextView>(R.id.settings_button).text.toString())
-                assertEquals("Trascrivi di nuovo", activity.findViewById<TextView>(R.id.transcribe_button).text.toString())
-                assertEquals("Salva Cassini", activity.findViewById<TextView>(R.id.export_button).text.toString())
+                assertEquals("Altre azioni", activity.findViewById<TextView>(R.id.more_button).contentDescription.toString())
                 assertEquals("Ciao mondo.", activity.findViewById<TextView>(R.id.transcript_text).text.toString())
                 assertEquals("2 parole · 00:15 · INT8", activity.findViewById<TextView>(R.id.transcript_details).text.toString())
                 assertTrue(activity.findViewById<TextView>(R.id.playback_position).text.toString().contains("00:03"))
@@ -254,9 +252,9 @@ class InterfaceTest {
                 AppLanguage.set(activity, "en")
             }
             instrumentation.waitForIdleSync()
-            awaitSettingsLabel("Settings")
+            awaitSettingsLabel("More actions")
             scenario.onActivity { activity ->
-                assertEquals("Settings", activity.findViewById<TextView>(R.id.settings_button).text.toString())
+                assertEquals("More actions", activity.findViewById<TextView>(R.id.more_button).contentDescription.toString())
                 assertEquals("Ciao mondo.", activity.findViewById<TextView>(R.id.transcript_text).text.toString())
                 AppLanguage.set(activity, originalLanguage)
             }

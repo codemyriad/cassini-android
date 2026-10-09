@@ -10,6 +10,7 @@ data class Session(
     val resultPrecision: String = "INT8",
     val document: String? = null, val selectedVariant: String? = null,
     val processingMs: Long = 0,
+    val processingPaused: Boolean = false,
     val libraryId: String? = null,
     /** The viewer that wrote session.json last. Not part of a note. */
     val screen: String? = null,
@@ -27,7 +28,7 @@ class SessionStore(directory: File) {
             resultPrecision = json.optString("resultPrecision", "INT8"),
             document = json.optString("document").takeIf { it.isNotEmpty() },
             selectedVariant = json.optString("selectedVariant").takeIf { it.isNotEmpty() },
-            processingMs = json.optLong("processingMs"),
+            processingMs = json.optLong("processingMs"), processingPaused = json.optBoolean("processingPaused"),
             libraryId = json.optString("libraryId").takeIf { it.isNotEmpty() },
             screen = json.optString("screen").takeIf { it.isNotEmpty() },
         )
@@ -40,7 +41,7 @@ class SessionStore(directory: File) {
             .put("positionMs", session.positionMs)
             .put("resultPrecision", session.resultPrecision)
             .put("document", session.document ?: "").put("selectedVariant", session.selectedVariant ?: "")
-            .put("processingMs", session.processingMs)
+            .put("processingMs", session.processingMs).put("processingPaused", session.processingPaused)
             .put("libraryId", session.libraryId ?: "").put("screen", session.screen ?: "")
         val stream = file.startWrite()
         try {

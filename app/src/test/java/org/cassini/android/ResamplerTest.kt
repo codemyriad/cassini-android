@@ -87,4 +87,45 @@ class ResamplerTest {
         val expected = resampleTo16k(FloatArray(1000) { 0.25f } + FloatArray(10_000) + FloatArray(1000) { -0.25f }, 44100)
         assertArrayEquals(expected, out.toFloatArray(), 1e-6f)
     }
+    @Test fun resumingAfterTheNeededHistoryDoesNotFail() {
+        // A seek that lands 0.67 s past the frame a resumed output needs, as Android's extractor did on a phone.
+        val output = mutableListOf<Float>()
+        val stream = StreamingResampler(48000, initialFrame = 15 * 48000 + 31985, firstOutput = 15 * 16000L) { samples, size ->
+            for (i in 0 until size) output += samples[i]
+        }
+        val input = tone(440.0, 48000, 2.0)
+        stream.push(input)
+        val total = stream.finish()
+        assertEquals(total - 15 * 16000L, output.size.toLong())
+        assertTrue(output.all { it.isFinite() })
+    }
+
+    @Test fun sixteenKilohertzInputThatStartsLateKeepsItsClock() {
+        val output = mutableListOf<Float>()
+        val stream = StreamingResampler(16000, initialFrame = 1000 + 250, firstOutput = 1000) { samples, size ->
+            for (i in 0 until size) output += samples[i]
+        }
+        stream.push(FloatArray(500) { 0.5f })
+        assertEquals(1000L + 250 + 500, stream.finish())
+        assertEquals(750, output.size)
+        assertTrue(output.take(250).all { it == 0f })
+        assertTrue(output.drop(250).all { it == 0.5f })
+    }
+
+    @Test fun resumingFromTheFirstNeededFrameEqualsTheWholeConversion() {
+        val random = kotlin.random.Random(3)
+        for (rate in rates + 16000) {
+            val input = FloatArray(rate * 3) { random.nextFloat() * 2 - 1 }
+            val expected = resampleTo16k(input, rate)
+            val resumeAt = 16000L + 123
+            val from = firstNeededFrame(rate, resumeAt)
+            assertTrue(from <= resumeAt * rate / 16000)
+            val output = mutableListOf<Float>()
+            StreamingResampler(rate, from, resumeAt) { samples, size -> for (i in 0 until size) output += samples[i] }.apply {
+                push(input, from.toInt(), input.size - from.toInt()); finish()
+            }
+            assertEquals("$rate Hz", expected.size - resumeAt.toInt(), output.size)
+            for (j in output.indices) assertEquals("$rate Hz sample $j", expected[resumeAt.toInt() + j], output[j], 1e-5f)
+        }
+    }
 }

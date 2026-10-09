@@ -2,6 +2,8 @@
 **/build/
 local.properties
 app/libs/*.aar
+app/libs/streaming-diarization.sha256
+app/src/main/jniLibs/
 .idea/
 *.iml
 .tools/
@@ -13,3 +15,6 @@ app/src/androidTest/assets/*.mp3
 app/src/androidTest/assets/*.m4a
 app/src/androidTest/assets/italian-smoke.json
 dist/
+
+# Private meeting speaker fixtures (never commit)
+app/src/androidTest/assets/meetings/

@@ -10,8 +10,8 @@ android {
         applicationId = "org.cassini.android"
         minSdk = 26
         targetSdk = 34
-        versionCode = 9
-        versionName = "0.0.6-beta"
+        versionCode = 10
+        versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
     }
@@ -67,3 +67,14 @@ afterEvaluate {
         doLast { layout.buildDirectory.file("eval-classpath.txt").get().asFile.writeText(test.get().classpath.asPath) }
     }
 }
+
+// libcassini_opus.so is built by scripts/setup.sh into an ignored directory. Without it the APK
+// still packages, then every transcription crashes, so a missing library fails the build instead.
+val checkNativeOpus by tasks.registering {
+    val libraries = listOf("arm64-v8a", "x86_64").map { file("src/main/jniLibs/$it/libcassini_opus.so") }
+    doLast {
+        val missing = libraries.filterNot { it.isFile }
+        if (missing.isNotEmpty()) throw GradleException("Missing ${missing.joinToString()}. Run scripts/setup.sh with ANDROID_NDK set.")
+    }
+}
+tasks.named("preBuild") { dependsOn(checkNativeOpus) }

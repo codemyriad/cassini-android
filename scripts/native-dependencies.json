@@ -64,5 +64,11 @@
     "version": "ed530aa113046142eb5115cf2fc9157854d0ffe1",
     "url": "https://github.com/csukuangfj/espeak-ng/archive/ed530aa113046142eb5115cf2fc9157854d0ffe1.zip",
     "sha256": "e4e262cbe34f7fe21f91f1ba3397f2728e1f30eafbae7853f2b753a9ed13f0dd"
+  },
+  {
+    "name": "opus",
+    "version": "1.5.2",
+    "url": "https://codeload.github.com/xiph/opus/tar.gz/refs/tags/v1.5.2",
+    "sha256": "9480e329e989f70d69886ded470c7f8cfe6c0667cc4196d4837ac9e668fb7404"
   }
 ]

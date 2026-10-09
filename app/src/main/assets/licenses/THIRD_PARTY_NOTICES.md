@@ -22,6 +22,8 @@ The APK bundles a sherpa-onnx 1.13.7 AAR built by Cassini: the [upstream release
 
 The APK also bundles [zstd-jni](https://github.com/luben/zstd-jni/tree/v1.5.7-6) 1.5.7-6 (BSD-2-Clause, including Zstandard under BSD-3-Clause) from Maven Central, to decompress the speaker model download.
 
+The streaming encoder bundles unmodified [libopus 1.5.2](https://github.com/xiph/opus/tree/v1.5.2), under its BSD license. Cassini’s JNI wrapper and reproducible build script are included in the corresponding source archive.
+
 Full texts and copyright notices are checked in under [app assets](app/src/main/assets/licenses/). The release’s `cassini-native-sources.tar` contains these pinned source archives, including native build files. [The source manifest](scripts/native-dependencies.json) provides archive URLs and SHA-256 hashes; [native build notes](docs/native-runtime.md) describe the upstream build. Apart from the sherpa-onnx diarization changes, dependency code is unmodified by Cassini.
 
 ## Downloaded models and local test fixtures
@@ -30,7 +32,9 @@ Full texts and copyright notices are checked in under [app assets](app/src/main/
 
 [Silero VAD](https://github.com/snakers4/silero-vad) is MIT-licensed. Its ONNX model (`silero_vad.onnx`, 630 KB) is downloaded separately from the sherpa-onnx `asr-models` release and is not in the APK. Its size and SHA-256 are in `ModelStore.kt`.
 
-[NVIDIA Nemotron-3-Diarization](https://huggingface.co/nvidia/Nemotron-3-Diarization) is the optional speaker-identification model, under the [OpenMDW License Agreement 1.1](https://openmdw.ai/license/1-1/). Cassini exported it to INT8 ONNX for sherpa-onnx and publishes it Zstandard-compressed on `dist.gocassini.com` (about 62 MiB). It downloads separately and is not in the APK. The source revision, hashes and download URL are pinned in `DiarizationModels.kt`; the license text is included in the APK. Speaker labels are anonymous estimates, not voice identification.
+[NVIDIA Nemotron-3-Diarization](https://huggingface.co/nvidia/Nemotron-3-Diarization) is the optional speaker-identification model, under the [OpenMDW License Agreement 1.1](https://openmdw.ai/license/1-1/). Cassini exported it to INT8 ONNX for sherpa-onnx and publishes it Zstandard-compressed on `dist.gocassini.com` (about 62 MiB). It downloads separately and is not in the APK. The source revision, hashes and download URL are pinned in `DiarizationModels.kt`; the license text is included in the APK. Speaker labels are anonymous estimates.
+
+[3D-Speaker CAM++](https://github.com/modelscope/3D-Speaker) (`3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx`, Apache-2.0) computes voiceprints for naming speakers. It downloads from the [sherpa-onnx release](https://github.com/k2-fsa/sherpa-onnx/releases/tag/speaker-recongition-models) (about 28 MiB) and is not in the APK; its size and SHA-256 are pinned in `VoiceprintModel.kt`.
 
 [Google FLEURS](https://huggingface.co/datasets/google/fleurs) is CC-BY-4.0. Its pinned source, attribution and reference text accompany locally fetched device fixtures; those files are not in the distributed APK or repository. README screenshots show an excerpt of [il Pericolo Invisibile](https://www.youtube.com/watch?v=UmZwQf5TV3c) by Dario Bressanini, used for the documented device checks. No sample audio is distributed.
 

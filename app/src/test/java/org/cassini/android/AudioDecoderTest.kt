@@ -55,6 +55,23 @@ class AudioDecoderTest {
         }
     }
 
+    @Test fun wavProgressTracksDecodedFramesWithoutChangingAudio() {
+        val file = wav(48000, 2, ShortArray(48000 * 2 * 3))
+        val updates = mutableListOf<Pair<Long, Long?>>()
+        val emitted = PcmBuilder(48000)
+        try {
+            val audio = java.io.RandomAccessFile(file, "r").use {
+                AudioDecoder.decodeWav(it, onSamples = emitted::append) { decoded, total -> updates.add(decoded to total) }
+            }
+            assertArrayEquals(audio.samples, emitted.build(), 0f)
+            assertEquals(0L to 3000L, updates.first())
+            assertEquals(audio.durationMs to 3000L, updates.last())
+            assertTrue(updates.size > 2)
+            assertTrue(updates.zipWithNext().all { (a, b) -> a.first <= b.first })
+            assertTrue(updates.all { it.second == 3000L })
+        } finally { file.delete() }
+    }
+
     @Test fun growableBufferKeepsEverySampleAndTrimsOnlyWrongGuesses() {
         val builder = PcmBuilder(16000)
         val chunk = FloatArray(1000) { it.toFloat() }

@@ -1,13 +1,15 @@
-You can now add anonymous speaker labels to a completed transcript, including notes you already have. This is an optional pass after transcription; it does not repeat speech recognition or run while recording.
+Transcription now tells speakers apart, remembers the people you name, and survives interruptions.
 
-* Tap **Identify speakers**, then choose automatic detection or a known count (1–8). The separate speaker models download once, with your consent (about 40 MiB).
-* The result adds a transcript variant. Your original transcript, audio and imported speaker names stay available under **Choose transcript**.
-* Cancel returns to the library and keeps the original result. The native computation may take time to finish in the background before another transcription can start.
+* **One action.** **Transcribe** recognizes the words and labels each speaker in a single job. The first time, the app asks once to download the models (about 730 MiB: Parakeet v3, the speaker model and the voice model). Earlier installations download only what is missing.
+* **Name speakers.** Tap a speaker label, or use **⋯ → Speakers…**, to give it a name. The name is written into the note's Cassini document; words, timing and audio stay unchanged.
+* **Remembered voices.** When you name a speaker, the app can keep a voice fingerprint on this phone. Later transcriptions apply the name automatically when the match is strong (marked, easy to change) and suggest it with one tap when it is weaker. **Not this person** undoes a wrong match. **Settings → People** renames or forgets saved voices. Fingerprints never leave the phone and are never written into shared files.
+* **Resume processing.** If transcription is interrupted, the note keeps its progress. **Resume processing** continues from where it stopped instead of starting over.
+* **Simpler note screen.** Transcribe again, transcript choice, Save Cassini, Info and Settings are now in the **⋯** menu.
 
-Labels are estimates. Automatic detection can merge or split voices, and mixed audio does not separate people speaking at the same time. Check labels against the recording. Processing runs on CPU; keep the app open until it finishes.
+Speaker labels and automatic names are estimates. Overlapping voices are not separated, and short turns can be attributed to the wrong person. Check names against the recording.
 
-Install **cassini-android-0.0.6-beta.apk** below over an earlier beta to keep notes and downloaded models. Installation needs Android 8+ and 64-bit Android. Creating Cassini files needs Android 10+ and a working platform Opus encoder. See the [README](https://github.com/codemyriad/cassini-android/blob/v0.0.6-beta/README.md) for memory and storage recommendations.
+Install **cassini-android-0.1.0.apk** below over an earlier beta to keep notes and downloaded models. Installation needs Android 8+ and 64-bit Android. See the [README](https://github.com/codemyriad/cassini-android/blob/v0.1.0/README.md) for memory and storage recommendations.
 
-Validation: 143 JVM tests, all 26 published Cassini format vectors and Android lint. CI runs 31 playback, recording, settings and speaker-consent checks across Android 8, 10 and 14 emulators, without model inference. Native speaker identification and cancellation were checked on an Android 14 emulator with a two-voice fixture, including preservation of words, timing, previous variants and the Opus audio digest. This is a clean test fixture, not a conversational accuracy benchmark. The Pixel was unavailable for this feature's device checks.
+Validation: 204 JVM tests, the published Cassini format vectors and Android lint. CI runs the emulator checks on Android 8, 10 and 14. Transcription with speakers, naming, voice recognition and resumed processing were exercised on a Pixel during development, including private multi-speaker meeting excerpts. The voice-match thresholds were tuned on a small set of real meetings and may need adjustment.
 
 Native dependency sources and license notices are attached; model weights download separately.

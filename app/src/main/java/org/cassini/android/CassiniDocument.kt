@@ -176,22 +176,54 @@ internal data class CassiniDocument(
         /** Adds a variant while retaining existing descriptors, bodies, extensions and unrelated tags. */
         fun create(audioBytes: ByteArray, transcript: Transcript, title: String, processing: JSONObject,
                    existing: CassiniDocument? = null, speakerLabels: Map<String, String> = emptyMap()): ByteArray {
-            val (tags, digest) = seal(OggOpus.scan(ByteArrayInputStream(audioBytes)), transcript, title, processing, existing, speakerLabels)
+            val (comments, digest) = seal(OggOpus.scan(ByteArrayInputStream(audioBytes)), transcript, title, processing, existing, speakerLabels)
             val out = ByteArrayOutputStream()
-            require(OggOpus.rewrite(ByteArrayInputStream(audioBytes), tags, out).digest() == digest)
+            require(OggOpus.rewrite(ByteArrayInputStream(audioBytes), tagsPacket(comments), out).digest() == digest)
             return out.toByteArray().also { verify(read(it), transcript) }
         }
         /** Streams [audio] into [target] behind the new tags and verifies the written file from disk. */
         fun create(audio: File, transcript: Transcript, title: String, processing: JSONObject, existing: CassiniDocument?,
                    speakerLabels: Map<String, String>, target: File): CassiniDocument {
-            val (tags, digest) = seal(OggOpus.scan(audio), transcript, title, processing, existing, speakerLabels)
-            require(OggOpus.rewrite(audio, tags, target).digest() == digest)
+            val (comments, digest) = seal(OggOpus.scan(audio), transcript, title, processing, existing, speakerLabels)
+            writeWithTags(audio, comments, digest, target)
             return read(target).also { verify(it, transcript) }
+        }
+        /** Copies [source]'s audio packet for packet behind [comments]; the audio must still hash to [digest]. */
+        private fun writeWithTags(source: File, comments: List<String>, digest: String, target: File) =
+            require(OggOpus.rewrite(source, tagsPacket(comments), target).digest() == digest)
+        /**
+         * Renames speakers only: bodies, variants, unknown members and unrelated tags stay as they are, and the
+         * manifest tags are re-encoded. The written file must read back identical apart from those labels.
+         */
+        fun relabel(source: File, existing: CassiniDocument, labels: Map<String, String>, target: File): CassiniDocument {
+            require(existing.state == "ok" && existing.manifest != null)
+            val manifest = JSONObject(existing.manifest.toString())
+            val speakers = manifest.getJSONArray("speakers")
+            val byId = (0 until speakers.length()).associate { speakers.getJSONObject(it).let { s -> s.getString("id") to s } }
+            labels.forEach { (id, label) -> require(label.isNotBlank()) { "Blank label" }; (byId[id] ?: throw IllegalArgumentException("Unknown speaker $id")).put("label", label.trim()) }
+            val digest = manifest.getJSONObject("integrity").getString("opusAudioSha256")
+            val comments = existing.comments.filterNot { isManifestTag(it.substringBefore('=').uppercase(Locale.ROOT)) } +
+                CassiniPayload.encode(MANIFEST_PREFIX, CassiniPayload.MIME, manifest.toString()).second
+            try {
+                writeWithTags(source, comments, digest, target)
+                val sealed = read(target)
+                require(sealed.state == "ok" && same(sealed.manifest, manifest)) { "Relabelled document does not read back" }
+                require(sealed.variants.map { it.id to it.body } == existing.variants.map { it.id to it.body })
+                return sealed
+            } catch (error: Throwable) { target.delete(); throw error }
+        }
+        private fun isManifestTag(name: String) = name in fields.values.map { MANIFEST_PREFIX + it } || name.matches(Regex("CASSINI_PAYLOAD_[0-9]+"))
+        /** Order-insensitive structural equality; Android's org.json has no `similar`. */
+        private fun same(a: Any?, b: Any?): Boolean = when {
+            a is JSONObject && b is JSONObject -> a.keys().asSequence().toSet() == b.keys().asSequence().toSet() && a.keys().asSequence().all { same(a.get(it), b.get(it)) }
+            a is JSONArray && b is JSONArray -> a.length() == b.length() && (0 until a.length()).all { same(a.get(it), b.get(it)) }
+            a is Number && b is Number -> a.toString() == b.toString() || a.toDouble() == b.toDouble()
+            else -> a == b
         }
         private fun verify(sealed: CassiniDocument, transcript: Transcript) =
             require(sealed.state == "ok" && sealed.selected(null)?.transcript == transcript)
         private fun seal(stream: OggOpus.Info, transcript: Transcript, title: String, processing: JSONObject,
-                         existing: CassiniDocument?, speakerLabels: Map<String, String>): Pair<ByteArray, String> {
+                         existing: CassiniDocument?, speakerLabels: Map<String, String>): Pair<List<String>, String> {
             val digest = stream.digest()
             require(existing == null || existing.state == "ok") // Never rebind stale transcripts to different audio.
             val now = Instant.now().toString()
@@ -225,7 +257,7 @@ internal data class CassiniDocument(
             val comments = (existing?.comments ?: readComments(stream.tags)).filterNot {
                 val name = it.substringBefore('=').uppercase(Locale.ROOT)
                 name == "CASSINI_FORMAT" || name == "CASSINI_PROFILE" || name == "CASSINI_PAYLOAD_SCHEMA" ||
-                    name in fields.values.map { MANIFEST_PREFIX + it } || name.matches(Regex("CASSINI_PAYLOAD_[0-9]+")) ||
+                    isManifestTag(name) ||
                     name in setOf("CASSINI_TRANSCRIPT_IDS", "CASSINI_TRANSCRIPT_DEFAULT", "CASSINI_DECODE_HINT", "CASSINI_SPEAKER_COUNT", "CASSINI_MEETING_ID", "CASSINI_CREATED_AT") || name in setOf("CASSINI_AUDIO_SAMPLE_RATE", "CASSINI_AUDIO_CHANNELS", "CASSINI_AUDIO_SAMPLE_COUNT", "CASSINI_AUDIO_DURATION_MS", "CASSINI_AUDIO_MATCH_POLICY", "CASSINI_AUDIO_OPUS_SHA256")
             }.toMutableList()
             comments += listOf("CASSINI_FORMAT=$FORMAT", "CASSINI_PROFILE=ogg-opus",
@@ -240,7 +272,7 @@ internal data class CassiniDocument(
             if (existing == null && comments.none { it.substringBefore('=').equals("TITLE", true) }) comments += "TITLE=${manifest.getJSONObject("meeting").getString("title")}" 
             comments += bodyTags
             comments += CassiniPayload.encode(MANIFEST_PREFIX, CassiniPayload.MIME, manifest.toString()).second
-            return tagsPacket(comments) to digest
+            return comments to digest
         }
     }
 }

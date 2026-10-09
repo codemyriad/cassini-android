@@ -33,6 +33,9 @@ if __name__ == '__main__':
     destination.mkdir(exist_ok=True)
     archive = destination / 'cassini-native-sources.tar'
     with tarfile.open(archive, 'w') as output:
+        output.add(Path('scripts/streaming-diarization.patch'), arcname='streaming-diarization.patch')
+        for path in [Path("scripts/build-opus-jni.sh"), *Path("app/src/main/cpp").glob("*")]:
+            output.add(path, arcname=str(path))
         for path in paths:
             output.add(path, arcname='sources/' + path.name)
         for path in [manifest, Path('docs/native-runtime.md'), Path('THIRD_PARTY_NOTICES.md')]:

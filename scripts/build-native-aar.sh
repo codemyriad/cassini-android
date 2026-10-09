@@ -27,6 +27,16 @@ if [ -z "${SHERPA_ONNX_SRC:-}" ]; then
 fi
 src=$(cd "$SHERPA_ONNX_SRC" && pwd)
 
+# Keep the incremental JNI API reproducible against the pinned source archive. The source sits
+# inside this repository's .tools/, where git apply would silently skip every path; stop discovery.
+export GIT_CEILING_DIRECTORIES=$(dirname "$src")
+if (cd "$src" && git apply --check "$root/scripts/streaming-diarization.patch"); then
+    (cd "$src" && git apply "$root/scripts/streaming-diarization.patch")
+elif ! (cd "$src" && git apply --reverse --check "$root/scripts/streaming-diarization.patch"); then
+    printf 'Source does not match the pinned streaming diarization patch.\n' >&2
+    exit 1
+fi
+
 export ANDROID_NDK SHERPA_ONNX_ENABLE_C_API=ON SHERPA_ONNX_ONNXRUNTIME_VERSION=1.27.1
 jni=$src/android/SherpaOnnxAar/sherpa_onnx/src/main/jniLibs
 rm -rf "$jni"
@@ -40,4 +50,5 @@ done
 (cd "$src/android/SherpaOnnxAar" && ./gradlew --no-daemon :sherpa_onnx:assembleRelease)
 output=app/libs/sherpa-onnx-1.13.7-nemotron.aar
 cp -v "$src/android/SherpaOnnxAar/sherpa_onnx/build/outputs/aar/sherpa_onnx-release.aar" "$output"
-sha256sum "$output"
+sha256sum "$output" scripts/streaming-diarization.patch > app/libs/streaming-diarization.sha256
+cat app/libs/streaming-diarization.sha256
