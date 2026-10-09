@@ -46,8 +46,13 @@ The APK contains these libraries from Maven Central and the Google Maven reposit
 | [kotlinx-coroutines](https://github.com/Kotlin/kotlinx.coroutines) | 1.11.0 |
 | [kotlinx-serialization](https://github.com/Kotlin/kotlinx.serialization) | 1.11.0 |
 | [kotlinx-collections-immutable](https://github.com/Kotlin/kotlinx.collections.immutable) | 0.5.2 |
+| [Okio](https://github.com/square/okio), a dependency of DataStore | 3.9.1 |
 
 `gradle/libs.versions.toml` pins these versions. The libraries are unmodified.
+
+DataStore Preferences also contains `datastore-preferences-external-protobuf` 1.2.1, a copy of [Protocol Buffers](https://github.com/protocolbuffers/protobuf) for Java with its package names changed by the AndroidX authors. Its license is BSD-3-Clause: Copyright 2008 Google Inc. All rights reserved. The full text of this license is in `assets/licenses/protobuf/LICENSE` in the APK.
+
+<!-- TODO(P10): After the merge, compare this section with ./gradlew :app:dependencies --configuration releaseRuntimeClasspath and add each library that is missing. Keep the asset copy identical. -->
 
 ## Fonts
 
