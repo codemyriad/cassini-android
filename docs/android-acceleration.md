@@ -60,6 +60,6 @@ These are exploratory runs without thermal/power controls. The hybrid improvemen
 
 ## Reproduce and integration decision
 
-See [the isolated probe](../experiments/litert-gpu-probe/README.md). It pins/checks the runtime and model downloads, runs CPU/GPU/hybrid, retains local reports and delegate logs, compares token IDs/timestamps, then removes only the disposable probe APK and its weights. Cassini's downloads/documents stay intact.
+The isolated probe is archived at the tag `archive/litert-gpu-probe` (`git show archive/litert-gpu-probe:experiments/litert-gpu-probe/README.md`); it is no longer in the tree. It pins/checks the runtime and model downloads, runs CPU/GPU/hybrid, retains local reports and delegate logs, compares token IDs/timestamps, then removes only the disposable probe APK and its weights. Cassini's downloads/documents stay intact.
 
 **Decision:** keep the current sherpa CPU backend stable. The next useful prototype would be a LiteRT adapter behind the existing `PcmAudio → Transcript → CassiniDocument` pipeline, with separate encoder/decoder artifacts or explicit signature placement to avoid duplicate model allocations. Choose its backend from measured latency, memory and Italian quality. QVAC's Mali Vulkan path is a credible second experiment if LiteRT's decoder/transfer overhead remains limiting. Neither requires changing Cassini's document/viewer format.
