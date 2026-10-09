@@ -56,8 +56,21 @@ class PreviewTextTest {
     @Test fun endOfTranscript() {
         val last = board03.last()
         assertEquals("…Friday.", PreviewText.of(board03, last.startMs)!!.display)
-        val after = PreviewText.of(board03, last.endMs + 60_000)!!
-        assertEquals(Preview("Friday.", leadingEllipsis = true, trailingEllipsis = false), after)
+        // A finished playback leaves the position at or after the last word's end: the row shows the start.
+        val start = PreviewText.of(board03, 0)
+        assertEquals(start, PreviewText.of(board03, last.endMs))
+        assertEquals(start, PreviewText.of(board03, last.endMs + 60_000))
+    }
+
+    @Test fun aShortTurnContinuesIntoTheNextTurns() {
+        val words = turn("spk_0", 0, "Allora, quando arriva la seconda consegna?") +
+            turn("spk_1", 5_000, "Sì.") +
+            turn("spk_0", 6_000, "Quindi giovedì va bene per tutti, anche per il magazzino.") +
+            turn("spk_1", 12_000, "Va bene.")
+        val preview = PreviewText.of(words, 5_000)!!
+        // "Sì." alone is shorter than MIN_BEFORE_TURN_END, so the next turn follows; then the excerpt stops.
+        assertEquals("…Sì. Quindi giovedì va bene per tutti, anche per il magazzino…", preview.display)
+        assertTrue(preview.text.length >= PreviewText.MIN_BEFORE_TURN_END)
     }
 
     @Test fun cutAtAWordWithPunctuationDropped() {
@@ -76,8 +89,11 @@ class PreviewTextTest {
     }
 
     @Test fun sentencePunctuationIsDroppedOnlyWhenCut() {
+        val long = turn("spk_0", 0, "Then we agreed on the quantities for the first batch.") + turn("spk_1", 9_000, "Ok.")
+        val batch = PreviewText.of(long, long[1].startMs)!!.display
+        assertEquals("…we agreed on the quantities for the first batch…", batch)
         val words = turn("spk_0", 0, "Fine. Next.") + turn("spk_1", 2_000, "Yes!")
-        assertEquals("…Next…", PreviewText.of(words, words[1].startMs)!!.display)
+        assertEquals("…Next. Yes!", PreviewText.of(words, words[1].startMs)!!.display)
         assertEquals("…Yes!", PreviewText.of(words, words[2].startMs)!!.display)
         assertEquals("Fine. Next. Yes!", PreviewText.of(words, 0)!!.display)
     }
