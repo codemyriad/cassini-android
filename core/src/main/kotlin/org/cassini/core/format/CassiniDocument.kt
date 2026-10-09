@@ -248,6 +248,49 @@ data class CassiniDocument(
                 return sealed
             } catch (error: Throwable) { target.delete(); throw error }
         }
+
+        /**
+         * Renames the meeting only: sets `meeting.title` and the `TITLE` tag to the trimmed [title]. The first
+         * `TITLE` tag is replaced where it stands (a plain Ogg Opus import may carry one that differs from the
+         * manifest), further ones are dropped, and one is added when there is none. Bodies, variants, unknown members,
+         * other tags and the audio stay as they are, and the manifest tags are re-encoded. The written file must read
+         * back identical apart from the title.
+         */
+        fun retitle(source: File, existing: CassiniDocument, title: String, target: File): CassiniDocument {
+            require(existing.state == "ok" && existing.manifest != null)
+            val clean = title.trim()
+            require(clean.isNotEmpty()) { "Blank title" }
+            val manifest = JSONObject(existing.manifest.toString())
+            manifest.getJSONObject("meeting").put("title", clean)
+            val digest = manifest.getJSONObject("integrity").getString("opusAudioSha256")
+            val titled = withTitle(existing.comments.filterNot(::isManifestComment), clean)
+            val manifestTags = CassiniPayload.encode(MANIFEST_PREFIX, CassiniPayload.MIME, manifest.toString()).second
+            val comments = titled + manifestTags
+            var written = false
+            try {
+                writeWithTags(source, comments, digest, target)
+                val sealed = read(target)
+                require(sealed.state == "ok" && same(sealed.manifest, manifest)) { "Retitled manifest differs" }
+                require(sealed.variants.map { it.id to it.body } == existing.variants.map { it.id to it.body })
+                require(sealed.comments.filterNot(::isManifestComment) == titled) { "Retitled tags do not read back" }
+                written = true
+                return sealed
+            } finally {
+                if (!written) target.delete()
+            }
+        }
+
+        /** [comments] with the first `TITLE` tag set to [title] in place, later ones dropped, or one appended. */
+        private fun withTitle(comments: List<String>, title: String): List<String> {
+            fun isTitle(comment: String) = comment.substringBefore('=').uppercase(Locale.ROOT) == "TITLE"
+            val first = comments.indexOfFirst(::isTitle)
+            if (first < 0) return comments + "TITLE=$title"
+            return comments.filterIndexed { i, comment -> i == first || !isTitle(comment) }
+                .map { if (isTitle(it)) "TITLE=$title" else it }
+        }
+
+        private fun isManifestComment(comment: String) =
+            isManifestTag(comment.substringBefore('=').uppercase(Locale.ROOT))
         private fun isManifestTag(name: String) = name in fields.values.map { MANIFEST_PREFIX + it } || name.matches(Regex("CASSINI_PAYLOAD_[0-9]+"))
         /** Order-insensitive structural equality; Android's org.json has no `similar`. */
         private fun same(a: Any?, b: Any?): Boolean = when {

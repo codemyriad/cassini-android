@@ -54,7 +54,7 @@ app=app/src/main/java/org/cassini/android
 groups=(
     "OggOpus|verbatim|$old/OggOpus.kt|$core/format/OggOpus.kt|package only"
     "CassiniPayload|verbatim|$old/CassiniPayload.kt|$core/format/CassiniPayload.kt|package only"
-    "CassiniDocument|verbatim|$old/CassiniDocument.kt|$core/format/CassiniDocument.kt|DocumentState wrapper and readChecked (UNREADABLE); read/validate/seal/relabel unchanged"
+    "CassiniDocument|verbatim|$old/CassiniDocument.kt|$core/format/CassiniDocument.kt|DocumentState wrapper and readChecked (UNREADABLE); retitle beside relabel (P3); read/validate/seal/relabel unchanged"
     "Transcript|verbatim|$old/Transcript.kt|$core/format/Transcript.kt $core/asr/TokenWords.kt|fromTokens moved to asr/TokenWords.kt"
     "RecoveryScanner|verbatim|$old/RecoveryScanner.kt|$core/format/OggRepair.kt $app/RecoveryScanner.kt|repair/endsCleanly in core OggRepair; recover() stays in the app"
     "SpeakerAttribution|verbatim|$old/SpeakerAttribution.kt|$core/format/SpeakerAttribution.kt|the model pins come from ModelCatalog"
