@@ -127,6 +127,13 @@ interface JobVoices {
     fun generationBlocking(): Long
 
     /**
+     * The sealed prints and matches of the note's selected variant (`voices/notes/<noteId>.json`), keyed by speaker
+     * id; empty for a plain note. Transcribe again turns the named speakers among them into note-local voices, so
+     * that speaker names carry over (0.1.0 `voicesForRecognition`). Blocking.
+     */
+    fun noteVoicesBlocking(noteId: String): Map<String, SpeakerPrint>
+
+    /**
      * Writes `voices/pending/<noteId>.json`: the final [prints] and matches of [variantId] for print [model], with the
      * [generation] they were matched in. Adopt merges them only if the generation is still the same. Blocking,
      * inference thread; called before the sealed marker.
