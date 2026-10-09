@@ -1,6 +1,10 @@
 package org.cassini.ui.format
 
+import android.content.Context
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.test.core.app.ApplicationProvider
 import org.cassini.ui.banner.BannerArgs
 import org.cassini.ui.banner.BannerKind
 import org.cassini.ui.banner.BannerSpec
@@ -12,7 +16,9 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.LocalTime
+import java.time.ZoneId
 import java.util.Locale
+import java.util.TimeZone
 
 /** The composable forms read the composition's resources and [LocalFormat], and give the pure forms' text. */
 @RunWith(RobolectricTestRunner::class)
@@ -60,5 +66,30 @@ class FormatComposeTest {
         }
         compose.waitForIdle()
         assertEquals("Today, 10:02", text)
+    }
+
+    @Test
+    @Config(qualifiers = "en")
+    fun systemFormatFollowsTimeZoneAndTwentyFourHourChanges() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val defaultZone = TimeZone.getDefault()
+        try {
+            Settings.System.putString(context.contentResolver, Settings.System.TIME_12_24, "12")
+            TimeZone.setDefault(TimeZone.getTimeZone("Europe/Rome"))
+            var seen: FormatSettings? = null
+            compose.setContent { ProvideSystemFormat { seen = LocalFormat.current } }
+            compose.runOnIdle {
+                assertEquals(false, seen?.is24Hour)
+                assertEquals(ZoneId.of("Europe/Rome"), seen?.zone)
+            }
+            Settings.System.putString(context.contentResolver, Settings.System.TIME_12_24, "24")
+            context.sendBroadcast(Intent(Intent.ACTION_TIME_CHANGED))
+            compose.runOnIdle { assertEquals(true, seen?.is24Hour) }
+            TimeZone.setDefault(TimeZone.getTimeZone("America/New_York"))
+            context.sendBroadcast(Intent(Intent.ACTION_TIMEZONE_CHANGED))
+            compose.runOnIdle { assertEquals(ZoneId.of("America/New_York"), seen?.zone) }
+        } finally {
+            TimeZone.setDefault(defaultZone)
+        }
     }
 }
