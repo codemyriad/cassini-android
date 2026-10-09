@@ -31,10 +31,15 @@ internal object Diarization {
             try {
                 // The callback reports each 27 s chunk; its return value does not cancel computation.
                 // Never throw across JNI. Check interruption after it returns.
-                val result = diarizer.processWithCallback(samples, { done, total, _ ->
-                    if (!Thread.currentThread().isInterrupted) progress(done, total)
-                    0
-                })
+                // The JNI looks up `invoke(IIJ)Ljava/lang/Integer;`, which only a class-compiled lambda has:
+                // Kotlin 2 compiles plain lambdas through invokedynamic, with only the erased invoke.
+                val result = diarizer.processWithCallback(
+                    samples,
+                    @JvmSerializableLambda { done, total, _ ->
+                        if (!Thread.currentThread().isInterrupted) progress(done, total)
+                        0
+                    },
+                )
                 requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
                 return result.filter { it.start.isFinite() && it.end.isFinite() && it.speaker >= 0 }.map {
                     SpeakerTurn((it.start * 1000).toLong().coerceIn(0, audio.durationMs),
