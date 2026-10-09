@@ -1,5 +1,7 @@
 # Feasibility: native Android Cassini
 
+> Historical note: this file records work on the 0.1.0 prototype, written from 2026-10-01 to 2026-10-09. Nobody updates it. Its statements about the app can be out of date. For the current app, read [the architecture](../architecture.md) and [the development notes](../development.md).
+
 **Feasible on a recent ARM64 phone.** The native viewer is routine app work; on-device ASR quality, memory, thermal behavior and long-recording boundaries are the main uncertainties. This prototype establishes the import → native Parakeet → complete Cassini document → native-viewer path. It produces and opens portable Ogg Opus meetings.
 
 ## What the sibling projects establish
