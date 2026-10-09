@@ -112,10 +112,12 @@ class SpeakerIdentificationTest {
                 if (speaker == null) SystemClock.sleep(100)
             }
             assertNotNull("Speaker name must be editable while the job is still running", speaker)
-            onView(withId(R.id.speaker_name_input)).inRoot(isDialog()).perform(replaceText("Silvio"))
+            // The device keeps its real saved people; a name they already use asks "same person?" first.
+            val name = "Draft speaker ${SystemClock.uptimeMillis()}"
+            onView(withId(R.id.speaker_name_input)).inRoot(isDialog()).perform(replaceText(name))
             onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
             scenario.onActivity { activity ->
-                assertTrue(activity.findViewById<TextView>(R.id.transcript_text).text.toString().contains("Silvio"))
+                assertTrue(activity.findViewById<TextView>(R.id.transcript_text).text.toString().contains(name))
             }
             val sessions = SessionStore(context.filesDir)
             while (sessions.load().document == null && SystemClock.uptimeMillis() < deadline) SystemClock.sleep(100)
@@ -123,7 +125,7 @@ class SpeakerIdentificationTest {
             assertNotNull("Named draft must be saved", path)
             val saved = CassiniDocument.read(File(path!!))
             val roster = saved.manifest!!.getJSONArray("speakers")
-            assertTrue((0 until roster.length()).any { roster.getJSONObject(it).getString("label") == "Silvio" })
+            assertTrue((0 until roster.length()).any { roster.getJSONObject(it).getString("label") == name })
             assertTrue("Temporary decoded PCM must be removed", context.cacheDir.listFiles().orEmpty().none { it.name.startsWith("recognition-") })
             val peak = File("/proc/self/status").readLines().firstOrNull { it.startsWith("VmHWM:") }
             instrumentation.sendStatus(0, android.os.Bundle().apply { putString("stream", "Joint streaming + draft name saved; peak RSS: $peak\n") })
