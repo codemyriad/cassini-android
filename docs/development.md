@@ -23,7 +23,7 @@ git submodule update --init
 JAVA_HOME=/path/to/jdk-17 ./gradlew --configure-on-demand :core:test
 ```
 
-`--configure-on-demand` stops Gradle from configuring `:app` and `:engine`. Configuring them needs the Android SDK, and when the SDK has no NDK, the engine's native build makes the Android Gradle plugin download NDK 28.2.13676358 (more than 1 GB) before any task runs. After `scripts/setup.sh`, plain `./gradlew :core:test` works as well. The conformance vectors are required: without the submodule the tests fail, they do not skip. This command was checked on 2026-10-09 in a fresh clone with only the README in `native/m2`, no `.tools/`, no `local.properties` and no `ANDROID_HOME`: 236 tests ran and none was skipped.
+`--configure-on-demand` stops Gradle from configuring `:app` and `:engine`. Configuring them needs the Android SDK, and when the SDK has no NDK, the engine's native build makes the Android Gradle plugin download NDK 28.2.13676358 (more than 1 GB) before any task runs. With an Android SDK that has NDK 28.2.13676358 installed, plain `./gradlew :core:test` works as well; `scripts/setup.sh` is not needed for it. The conformance vectors are required: without the submodule the tests fail, they do not skip. This command was checked on 2026-10-09 in a fresh clone with only the README in `native/m2`, no `.tools/`, no `local.properties` and no `ANDROID_HOME`: 236 tests ran and none was skipped.
 
 ## What changed in the verbatim code
 
