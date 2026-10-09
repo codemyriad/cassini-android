@@ -54,6 +54,7 @@ room {
 dependencies {
     api(project(":core"))
     implementation(libs.bundles.room)
+    implementation(libs.annotation)
     ksp(libs.room.compiler)
     implementation(libs.datastore.preferences)
     implementation(libs.coroutines.android)
