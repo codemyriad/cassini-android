@@ -41,12 +41,13 @@ The build needs JDK 17 and the Android SDK. [`CONTRIBUTING.md`](CONTRIBUTING.md)
          decoder, microphone capture, TranscriptionJob, ModelInstaller, ProgressTracker.
 :ui      Android library. Compose design system and stateless screens.
 :app     Android application. AppGraph, ViewModels, navigation, services, notifications.
-:bench   Experiments and calibration on a device. Never in CI.
+:bench   Planned, not in the build yet. Experiments and calibration on a device.
+         Never in CI.
 
 app -> ui
 app -> data -> core
 app -> engine -> core
-bench -(instruments)-> app
+bench -(instruments)-> app    (planned)
 ```
 
 ## Documentation

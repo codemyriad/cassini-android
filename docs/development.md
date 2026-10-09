@@ -2,7 +2,9 @@
 
 This file is for contributors who build, test and examine Cassini for Android 0.2. [`CONTRIBUTING.md`](../CONTRIBUTING.md) gives the first steps and the rules for a change. [`architecture.md`](architecture.md) gives the design. [`data-formats.md`](data-formats.md) gives the files, the tables and the export formats.
 
-<!-- TODO(P10): This file describes tools that phases P6, P10 and P11 add: CassiniTestRunner, the test annotations, the device-smoke.sh flags, DebugCommandReceiver, scripts/device-kill-resume.sh and scripts/device-language-check.sh. After the merge, compare each name and flag with the code and correct this file. P11 adds the final CI jobs. -->
+> **Status.** This file describes the 0.2 target. Some tools in it are planned and are not in the tree yet: the `:bench` module, `CassiniTestRunner`, the test annotations (`@CiSmoke`, `@NeedsModels`, `@NeedsMicrophone`, `@Manual`), the `device-smoke.sh` flags, `DebugCommandReceiver`, `scripts/device-kill-resume.sh`, `scripts/device-language-check.sh`, the API 35 emulator and the weekly models job of CI. Each of these sections says so. Until they come, use the current interfaces that these sections give.
+
+<!-- TODO(P10): Phases P6, P10 and P11 add the tools in the status note. After the merge, compare each name and flag with the code, correct this file, and remove the status note and the "Planned" notes. P6 adds the long clip that device-kill-resume.sh uses: tell how to make it. -->
 
 ## Setup
 
@@ -42,7 +44,7 @@ These files stay out of commits: `local.properties`, model weights, AAR download
 | `:data` | Android library, package `org.cassini.data`. The Room catalogue, the DataStore settings and the file repositories. | The Android SDK |
 | `:ui` | Android library, package `org.cassini.ui`. The Compose design system, the stateless screens and the Roborazzi screenshot tests. | The Android SDK |
 | `:app` | The application. `AppGraph`, the ViewModels, the navigation, the services, the coordinators and the notifications. | All that `:engine` needs |
-| `:bench` | A `com.android.test` module for experiments and calibration on a device. CI does not run it. | All that `:app` needs |
+| `:bench` | Planned: `settings.gradle.kts` does not include it yet. A `com.android.test` module for experiments and calibration on a device. CI does not run it. | All that `:app` needs |
 
 The dependency graph is in [`architecture.md`](architecture.md), section 2. `tools/asr-eval/` holds a host program that runs the speech recognition pipeline on PCM files. Gradle does not build it. Its README tells how to run it.
 
@@ -83,7 +85,7 @@ The root task `ciTest` runs `:core:test`. For each Android module, it runs `veri
 | Robolectric | `:data:testDebugUnitTest` and the Robolectric tests of the other modules | The repositories and DAOs, the full-text search, the purge order, the catalogue rebuild, the font and license assets |
 | Screenshots | `:ui:verifyRoborazziDebug` | Each board compared with its golden, in light, dark, Italian and 1.5x font scale |
 | Device | `scripts/device-smoke.sh` | Instrumentation tests on an emulator or a phone (see [Device scripts](#device-scripts)) |
-| Host persistence | `scripts/device-kill-resume.sh`, `scripts/device-language-check.sh` | Process death and the app language, driven from the host |
+| Host persistence | `scripts/device-kill-resume.sh`, `scripts/device-language-check.sh` (planned) | Process death and the app language, driven from the host |
 | Acceptance | P12 | An instrumented walk through each board on emulator-5554, with device screenshots that a reviewer compares with the design |
 
 Robolectric runs at SDK 35. Each module that uses it has `src/test/resources/robolectric.properties` with `sdk=35`. SDK 36 and later need a JDK 21 runtime, and the build uses JDK 17. One test in each module makes sure that `Build.VERSION.SDK_INT` is 35.
@@ -130,13 +132,23 @@ Before you start a device run, make sure that no other run uses the device. `adb
 
 ### CassiniTestRunner
 
+> **Planned.** `CassiniTestRunner` is not in the tree yet. The current runner is `androidx.test.runner.AndroidJUnitRunner`, and the current device tests use the real app root.
+
 The instrumentation runner `org.cassini.android.CassiniTestRunner` gives each run a scratch root. It sets `AppPaths.root` to `files/androidTest-<run>` and the cache to `cacheDir/androidTest-<run>`. The model root stays `filesDir`, so the tests use the installed models. A test for the download screens can ask for an empty scratch model root. The runner deletes its scratch root at the end of the run. Thus the tests do not touch the notes of the user.
 
-The device tests use the committed FLEURS clip as audio. [`fixtures/README.md`](../fixtures/README.md) tells how to make the longer generated clip.
+The device tests use the committed FLEURS clip as audio.
 
 ### device-smoke.sh
 
 `scripts/device-smoke.sh` builds or takes the APKs, installs them with `adb install -r` and runs a selection of tests with `adb shell am instrument`.
+
+> **Planned.** The flags, the dry run and the annotations below are not in the tree yet. The current script takes two positional arguments and uses the device that `adb` selects:
+>
+> ```sh
+> scripts/device-smoke.sh [AUDIO_SAMPLE] [CLASS[#METHOD][,CLASS...]]
+> ```
+>
+> `AUDIO_SAMPLE` is `fleurs` if you do not give it. If you do not give a class, the script runs all device tests. If you set `CASSINI_EXPECTED_TESTS`, the run fails when the number of tests is different. To select a device, set `ANDROID_SERIAL`, for example `ANDROID_SERIAL=emulator-5554 scripts/device-smoke.sh`.
 
 | Flag | Meaning |
 |---|---|
@@ -173,6 +185,8 @@ The CI artifact `cassini-android-device-tests` holds both APKs. The script refus
 
 ### device-kill-resume.sh
 
+> **Planned.** This script and `DebugCommandReceiver` are not in the tree yet.
+
 `scripts/device-kill-resume.sh` makes sure that a transcription continues after the system kills the app process. It does these steps:
 
 1. It copies the long clip into the app cache with `run-as`.
@@ -195,6 +209,8 @@ A host script does this test because the two Android tools do not kill the proce
 `kill -9` from `run-as` operates with the user ID of the app. It stops the process as a low-memory kill does. The system keeps the `START_REDELIVER_INTENT` intent and starts the service again.
 
 ### device-language-check.sh
+
+> **Planned.** This script is not in the tree yet.
 
 `scripts/device-language-check.sh` makes sure that the app language stays after process death. It selects Italiano in Settings with `uiautomator`. Then it kills the process with `kill -9`, starts the app with `am start -W` and finds Italian text in a new `uiautomator dump`. At the end, it sets the language back to the phone language.
 
@@ -259,7 +275,9 @@ The script shows the restructured groups (`Models`, `ProcessingCheckpoint`) for 
 
 ## Continuous integration
 
-`.github/workflows/android.yml` runs on each push, each pull request and each tag `v*`. [`architecture.md`](architecture.md), section 8, gives the jobs. They are the static checks, a `:core` job with only a JDK, the build and an emulator matrix. A weekly job tests the models, and a weekly job builds the native runtime. On a tag, the release job publishes the release. A selected device test that skips makes the job fail. The emulator jobs save the instrumentation output and logcat.
+`.github/workflows/android.yml` runs on each push to `main`, each pull request, each tag `v*`, a weekly schedule and a manual start (`workflow_dispatch`). If you push a branch and do not open a pull request, CI does not run. [`architecture.md`](architecture.md), section 8, gives the jobs. They are the static checks, a `:core` job with only a JDK, the build and an emulator matrix. A weekly job builds the native runtime. A weekly job that tests the models is planned.
+
+> **Planned.** The current emulator matrix is API 26, 29 and 34. API 35 and the models job come with the final CI workflow. On a tag, the release job publishes the release. A selected device test that skips makes the job fail. The emulator jobs save the instrumentation output and logcat.
 
 ## Pre-release gate
 
