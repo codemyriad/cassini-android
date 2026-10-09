@@ -32,7 +32,7 @@ Five Gradle modules. Dependency direction: `app -> engine -> data -> core`; `ben
 :bench   Android library with androidTest only. Experiments and calibration. Never in CI.
 ```
 
-`./gradlew :core:test` runs on a machine with a JDK and the Android SDK platform (Gradle configures the Android modules even when they are not built) but needs no NDK, no AAR and no device. Everything that touches native code sits behind an interface in `:core` (`WordDecoder`, `StreamingDiarizer`, `VoiceprintExtractor`, `SpeechFeed.Stream`) and is implemented in `:engine`.
+`./gradlew --configure-on-demand :core:test` runs on a machine with a JDK alone: no Android SDK, NDK, AAR or device. Without `--configure-on-demand` Gradle also configures the Android modules, which needs the SDK, and the native build in `:engine` then makes the Android Gradle plugin download the NDK when the SDK has none (`docs/development.md`). Everything that touches native code sits behind an interface in `:core` (`WordDecoder`, `StreamingDiarizer`, `VoiceprintExtractor`, `SpeechFeed.Stream`) and is implemented in `:engine`.
 
 ### 2.1 `:core` (package `org.cassini.core`)
 

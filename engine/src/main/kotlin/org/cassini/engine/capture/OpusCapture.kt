@@ -1,14 +1,14 @@
-package org.cassini.android
+package org.cassini.engine.capture
 
 import android.annotation.SuppressLint
-import android.content.Context
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaCodec
 import android.media.MediaFormat
 import android.media.MediaRecorder
-import android.os.Build
 import android.os.SystemClock
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runInterruptible
 import org.cassini.core.format.CassiniDocument
 import org.cassini.core.format.OggOpus
 import java.io.File
@@ -16,78 +16,12 @@ import java.io.FileOutputStream
 import java.nio.ByteOrder
 import kotlin.math.abs
 
-/** Microphone capture owned by [RecordingService]. Audio written so far is retained on stop, error or release. */
-internal interface MicrophoneRecording {
-    val file: File
-    val elapsedMs: Long
-    val amplitude: Int
-    val paused: Boolean
-    val opus: Boolean
-    fun togglePause()
-    fun stop(): File
-    fun release()
-
-    companion object {
-        fun extension() = if (Build.VERSION.SDK_INT >= 29 && OpusEncoder.available()) "opus" else "m4a"
-        fun create(context: Context, file: File, onError: () -> Unit): MicrophoneRecording =
-            if (file.extension == "opus") OpusRecording(file, onError) else AacRecording(context, file, onError)
-    }
-}
-
-/** API 26-28: MediaRecorder AAC in MP4 at 32 kb/s. The index is written on stop, so a crash loses the clip. */
-internal class AacRecording(context: Context, override val file: File, onError: () -> Unit) : MicrophoneRecording {
-    private var recorder: MediaRecorder? = null
-    private var segmentStarted = 0L
-    private var accumulatedMs = 0L
-    override var paused = false
-        private set
-    override val opus = false
-    override val elapsedMs get() = accumulatedMs + if (paused || recorder == null) 0 else SystemClock.elapsedRealtime() - segmentStarted
-    override val amplitude get() = if (paused) 0 else try { recorder?.maxAmplitude ?: 0 } catch (_: IllegalStateException) { 0 }
-
-    init {
-        @Suppress("DEPRECATION")
-        val media = if (Build.VERSION.SDK_INT >= 31) MediaRecorder(context) else MediaRecorder()
-        recorder = media
-        try {
-            media.setAudioSource(MediaRecorder.AudioSource.MIC)
-            media.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-            media.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-            media.setAudioChannels(1)
-            media.setAudioSamplingRate(48000)
-            media.setAudioEncodingBitRate(32000)
-            media.setOutputFile(file.absolutePath)
-            media.setOnErrorListener { _, _, _ -> onError() }
-            media.prepare(); media.start()
-            segmentStarted = SystemClock.elapsedRealtime()
-        } catch (error: Exception) { media.release(); recorder = null; file.delete(); throw error }
-    }
-
-    override fun togglePause() {
-        val media = recorder ?: return
-        if (paused) { media.resume(); segmentStarted = SystemClock.elapsedRealtime(); paused = false }
-        else { media.pause(); accumulatedMs = elapsedMs; paused = true }
-    }
-
-    override fun stop(): File {
-        val media = recorder ?: error("Recording already stopped")
-        accumulatedMs = elapsedMs
-        recorder = null
-        try { media.stop() }
-        catch (error: RuntimeException) { file.delete(); throw error }
-        finally { media.release() }
-        return file
-    }
-
-    override fun release() { if (recorder != null) try { stop() } catch (_: Exception) {} }
-}
-
 /**
  * API 29+: AudioRecord 48 kHz mono into the platform Opus encoder at 48 kb/s, muxed live. Pages reach the file
  * about every second and the disk about every five, so a killed process loses only the last few seconds.
  * Elapsed time is the captured sample count.
  */
-internal class OpusRecording(override val file: File, private val onError: () -> Unit) : MicrophoneRecording {
+internal class OpusCapture(override val file: File, private val onError: () -> Unit) : MicrophoneCapture {
     private val output = FileOutputStream(file)
     private val stream = output.buffered(1 shl 16)
     private val codec = MediaCodec.createEncoderByType("audio/opus")
@@ -213,12 +147,12 @@ internal class OpusRecording(override val file: File, private val onError: () ->
 
     override fun togglePause() { paused = !paused }
 
-    override fun stop(): File {
+    override suspend fun stop(): File = runInterruptible(Dispatchers.IO) {
         running = false
         thread.join(10_000)
         check(!thread.isAlive) { "Recording thread did not stop" }
         if (!file.exists()) throw IllegalStateException("No audio captured", failure)
-        return file
+        file
     }
 
     override fun release() { running = false; thread.join(10_000) }

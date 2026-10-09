@@ -22,10 +22,13 @@ detekt {
             "app/src/androidTest/java",
             "core/src/main/kotlin",
             "core/src/test/kotlin",
+            "engine/src/main/kotlin",
+            "engine/src/test/kotlin",
             "build.gradle.kts",
             "settings.gradle.kts",
             "app/build.gradle.kts",
             "core/build.gradle.kts",
+            "engine/build.gradle.kts",
         ),
     )
     parallel = true

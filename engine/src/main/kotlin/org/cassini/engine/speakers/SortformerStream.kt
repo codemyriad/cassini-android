@@ -1,4 +1,4 @@
-package org.cassini.android
+package org.cassini.engine.speakers
 
 import com.k2fsa.sherpa.onnx.OfflineSpeakerDiarization
 import com.k2fsa.sherpa.onnx.OfflineSpeakerDiarizationConfig
@@ -14,15 +14,20 @@ import org.cassini.core.speakers.Diarization
 import org.cassini.core.speakers.SpeakerBudget
 import org.cassini.core.speakers.SpeakerTurn
 import org.cassini.core.speakers.TurnHistory
+import org.cassini.engine.job.NativeBudget
 
-/** Caller owns the inference lease. One instance preserves speaker IDs across chunks. */
-internal class SortformerStream(model: String, restored: org.json.JSONObject? = null) : AutoCloseable {
+/**
+ * Streaming Sortformer diarization: one instance preserves speaker IDs across chunks. The caller holds
+ * [NativeBudget] from construction until after [close]. [restored] and [checkpoint] are the `diarizer` member of
+ * checkpoint.json; the saved native state is capped at [SpeakerBudget.DIARIZER_STATE_FLOATS] floats.
+ */
+class SortformerStream(model: String, restored: org.json.JSONObject? = null) : AutoCloseable {
     companion object {
-        /** Speaker turns of a whole recording in one native call, under the inference lease. */
+        /** Speaker turns of a whole recording in one native call. Takes [NativeBudget] itself. */
         fun turns(audio: PcmAudio, model: String, threads: Int = 2, progress: (Int, Int) -> Unit = { _, _ -> }): List<SpeakerTurn> {
             require(threads > 0)
             requireUser(audio.samples.isNotEmpty(), Failure.AUDIO)
-            NativeInference.acquire()
+            NativeBudget.acquire()
             try {
                 requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
                 // The decoder already yields finite 16 kHz samples, so this is the same array.
@@ -46,7 +51,7 @@ internal class SortformerStream(model: String, restored: org.json.JSONObject? = 
                             (it.end * 1000).toLong().coerceIn(0, audio.durationMs), it.speaker)
                     }.filter { it.endMs > it.startMs }
                 } finally { diarizer.release() }
-            } finally { NativeInference.lease.release() }
+            } finally { NativeBudget.release() }
         }
 
         private fun config(model: String, threads: Int) = OfflineSpeakerDiarizationConfig(

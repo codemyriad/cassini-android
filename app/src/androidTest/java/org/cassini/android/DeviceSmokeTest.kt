@@ -17,6 +17,12 @@ import org.cassini.core.format.OggOpus
 import org.cassini.core.format.Transcript
 import org.cassini.core.format.Word
 import org.cassini.core.speakers.SpeakerTurn
+import org.cassini.engine.asr.IncrementalRecognizer
+import org.cassini.engine.asr.Parakeet
+import org.cassini.engine.asr.SileroDetector
+import org.cassini.engine.job.NativeBudget
+import org.cassini.engine.opus.StreamingOpusEncoder
+import org.cassini.engine.speakers.SortformerStream
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
@@ -38,11 +44,11 @@ class DeviceSmokeTest {
     }
 
     @Test fun importsCompressedAudioOnTheSameClock() {
-        val reference = AudioDecoder.decode(context, Uri.fromFile(fixture()))
+        val reference = audioDecoder(context).decode(Uri.fromFile(fixture()))
         for (name in listOf("fleurs-it-short.m4a", "fleurs-it-short.mp3", "fleurs-it-short.opus")) {
             val file = fixture(name)
             try {
-                val audio = AudioDecoder.decode(context, Uri.fromFile(file))
+                val audio = audioDecoder(context).decode(Uri.fromFile(file))
                 assertTrue("$name duration ${audio.durationMs}", kotlin.math.abs(audio.durationMs - reference.durationMs) <= 100)
                 fun onset(pcm: PcmAudio) = pcm.samples.indexOfFirst { kotlin.math.abs(it) > .1f } * 1000L / pcm.sampleRate
                 assertTrue("$name speech onset shifted", kotlin.math.abs(onset(audio) - onset(reference)) <= 100)
@@ -66,7 +72,7 @@ class DeviceSmokeTest {
                 }
                 Transcript(listOf(Word("spk_1", 0, 100, "word")))
             }
-            val audio = AudioDecoder.decode(context, Uri.fromFile(file), onSamples = { samples, count ->
+            val audio = audioDecoder(context).decode(Uri.fromFile(file), onSamples = { samples, count ->
                 emitted.append(samples, count)
                 pipeline.accept(samples, count) { _, _ -> if (firstProgressMs == null) firstProgressMs = decodedMs }
             }) { done, _ -> decodedMs = done }
@@ -118,7 +124,7 @@ class DeviceSmokeTest {
         val file = File(context.cacheDir, "tone-48k.m4a")
         try {
             encodeAacTone(file)
-            val samples = AudioDecoder.decode(context, Uri.fromFile(file)).samples
+            val samples = audioDecoder(context).decode(Uri.fromFile(file)).samples
             assertTrue("Decoded ${samples.size} samples", samples.size > Limits.ASR_RATE * 2)
             // Codec timestamps are whole microseconds. Placing frames by a truncated time leaves single silent samples.
             val holes = (4096 until samples.size - 4096).filter { samples[it] == 0f && abs(samples[it - 1]) > .05f && abs(samples[it + 1]) > .05f }
@@ -129,7 +135,7 @@ class DeviceSmokeTest {
     @Test fun importsRealItalianAudioAndPreservesItsDuration() {
         val file = fixture()
         try {
-            val audio = AudioDecoder.decode(context, Uri.fromFile(file))
+            val audio = audioDecoder(context).decode(Uri.fromFile(file))
             assertEquals(16000, audio.sampleRate)
             assertTrue(audio.durationMs in 15000..16000)
             assertTrue(audio.samples.any { kotlin.math.abs(it) > .01f })
@@ -141,10 +147,10 @@ class DeviceSmokeTest {
         assumeTrue("Install the speech detector first", ModelStore.vadReady(context.filesDir))
         val file = fixture()
         try {
-            val speech = AudioDecoder.decode(context, Uri.fromFile(file))
+            val speech = audioDecoder(context).decode(Uri.fromFile(file))
             // The same recording at the microphone's rate, so spans must come back on that clock.
             val upsampled = PcmAudio(FloatArray(speech.samples.size * 3) { speech.samples[it / 3] }, speech.sampleRate * 3)
-            SpeechDetector(ModelStore.vadPath(context.filesDir)).use { detector ->
+            SileroDetector(ModelStore.vadPath(context.filesDir)).use { detector ->
                 for (audio in listOf(speech, upsampled)) {
                     val spans = ArrayList<Span>()
                     val paddedTailMs = detector.detect(audio) { spans += it }
@@ -164,10 +170,10 @@ class DeviceSmokeTest {
     @Test fun streamingDiarizationPreservesAnAbsentSpeakerSlot() {
         val models = DiarizationModels.inFiles(context.filesDir)
         assumeTrue("Install the speaker model", models.ready())
-        val first = AudioDecoder.decode(context, Uri.fromFile(fixture("fleurs-it-short.wav")))
-        val second = AudioDecoder.decode(context, Uri.fromFile(fixture("youtube-smoke.wav")))
+        val first = audioDecoder(context).decode(Uri.fromFile(fixture("fleurs-it-short.wav")))
+        val second = audioDecoder(context).decode(Uri.fromFile(fixture("youtube-smoke.wav")))
         val combined = first.samples + FloatArray(16000) + second.samples
-        NativeInference.acquire()
+        NativeBudget.acquire()
         try {
             SortformerStream(models.modelPath).use { diarizer ->
                 val initial = diarizer.process(PcmAudio(combined.copyOfRange(0, 28 * 16000), 16000), 0)
@@ -181,7 +187,7 @@ class DeviceSmokeTest {
                 val returned = diarizer.process(first, 52000)
                 assertEquals("A returning voice must keep its original slot", firstSlot, dominant(returned, 1000, first.durationMs - 1000))
             }
-        } finally { NativeInference.lease.release() }
+        } finally { NativeBudget.release() }
     }
 
     @Test fun opusEncodingRunsInTheDecodePassAndTrimsLookahead() {
@@ -190,12 +196,12 @@ class DeviceSmokeTest {
             val opus = File(context.cacheDir, "same-pass.opus")
             try {
                 val duration = StreamingOpusEncoder(opus).use { encoder ->
-                    AudioDecoder.stream(context, Uri.fromFile(file), encoder::accept).also { encoder.finish() }
+                    audioDecoder(context).stream(Uri.fromFile(file), encoder::accept).also { encoder.finish() }
                 }
                 val info = OggOpus.scan(opus)
                 assertTrue(info.validFraming)
                 assertEquals(duration, info.durationMs)
-                val decoded = AudioDecoder.decode(context, Uri.fromFile(opus))
+                val decoded = audioDecoder(context).decode(Uri.fromFile(opus))
                 assertEquals(duration, decoded.durationMs)
             } finally { file.delete(); opus.delete() }
         }
@@ -208,7 +214,7 @@ class DeviceSmokeTest {
         val original = File(context.cacheDir, "opus-uninterrupted.opus")
         val resumed = File(context.cacheDir, "opus-resumed.opus")
         try {
-            val samples = AudioDecoder.decode(context, Uri.fromFile(file)).samples
+            val samples = audioDecoder(context).decode(Uri.fromFile(file)).samples
             StreamingOpusEncoder(original).use { it.accept(samples, samples.size); it.finish() }
             val split = 7 * 16000 + 177
             val state = StreamingOpusEncoder(resumed).use { it.accept(samples.copyOfRange(0, split), split); it.checkpoint() }
@@ -229,8 +235,8 @@ class DeviceSmokeTest {
         assertEquals(OggOpus.scan(original).digest(), OggOpus.scan(resumed).digest())
         assertEquals(OggOpus.scan(original).durationMs, OggOpus.scan(resumed).durationMs)
         assertArrayEquals(
-            AudioDecoder.decode(context, Uri.fromFile(original)).samples,
-            AudioDecoder.decode(context, Uri.fromFile(resumed)).samples,
+            audioDecoder(context).decode(Uri.fromFile(original)).samples,
+            audioDecoder(context).decode(Uri.fromFile(resumed)).samples,
             0f,
         )
     }
@@ -250,8 +256,8 @@ class DeviceSmokeTest {
             assertArrayEquals("packet $i precedes the checkpoint", whole.audio[i], continued.audio[i])
         }
         val firstDifference = whole.audio.indices.firstOrNull { !whole.audio[it].contentEquals(continued.audio[it]) }
-        val expected = AudioDecoder.decode(context, Uri.fromFile(original)).samples
-        val found = AudioDecoder.decode(context, Uri.fromFile(resumed)).samples
+        val expected = audioDecoder(context).decode(Uri.fromFile(original)).samples
+        val found = audioDecoder(context).decode(Uri.fromFile(resumed)).samples
         assertEquals(expected.size, found.size)
         val error = expected.indices.sumOf { j -> val d = expected[j] - found[j]; d.toDouble() * d } / expected.size
         val signal = expected.sumOf { it.toDouble() * it } / expected.size
@@ -265,10 +271,10 @@ class DeviceSmokeTest {
         for (name in listOf("fleurs-it-short.wav", "fleurs-it-short.m4a", "fleurs-it-short.opus")) {
             val file = fixture(name)
             try {
-                val all = AudioDecoder.decode(context, Uri.fromFile(file)).samples
+                val all = audioDecoder(context).decode(Uri.fromFile(file)).samples
                 val split = 7 * 16000 + 177
                 val suffix = PcmBuilder(all.size - split)
-                val duration = AudioDecoder.stream(context, Uri.fromFile(file), suffix::append, split.toLong())
+                val duration = audioDecoder(context).stream(Uri.fromFile(file), suffix::append, split.toLong())
                 assertEquals("$name", all.size * 1000L / 16000, duration)
                 val expected = all.copyOfRange(split, all.size)
                 val found = suffix.build()
@@ -287,10 +293,10 @@ class DeviceSmokeTest {
     @Test fun diarizationCheckpointRestoresTheSameSpeakerSlotsAndTurns() {
         val models = DiarizationModels.inFiles(context.filesDir)
         assumeTrue(models.ready())
-        val first = AudioDecoder.decode(context, Uri.fromFile(fixture("fleurs-it-short.wav")))
-        val second = AudioDecoder.decode(context, Uri.fromFile(fixture("youtube-smoke.wav")))
+        val first = audioDecoder(context).decode(Uri.fromFile(fixture("fleurs-it-short.wav")))
+        val second = audioDecoder(context).decode(Uri.fromFile(fixture("youtube-smoke.wav")))
         val all = first.samples + FloatArray(16000) + second.samples
-        NativeInference.acquire()
+        NativeBudget.acquire()
         try {
             lateinit var saved: JSONObject
             lateinit var expected: List<SpeakerTurn>
@@ -305,7 +311,7 @@ class DeviceSmokeTest {
                 assertEquals(expected, it.process(PcmAudio(all.copyOfRange(26 * 16000, all.size), 16000), 26000))
                 assertEquals(history, it.turns)
             }
-        } finally { NativeInference.lease.release() }
+        } finally { NativeBudget.release() }
     }
 
     @Test fun streamingDecodeAndDiskEncodingKeepTheAudioClock() {
@@ -313,9 +319,9 @@ class DeviceSmokeTest {
         val pcm = File.createTempFile("stream-test", ".pcm", context.cacheDir)
         val opus = File(context.cacheDir, "stream-test.opus")
         try {
-            val expected = AudioDecoder.decode(context, Uri.fromFile(file))
+            val expected = audioDecoder(context).decode(Uri.fromFile(file))
             PcmFile(pcm).use { audio ->
-                val duration = AudioDecoder.stream(context, Uri.fromFile(file), audio::append)
+                val duration = audioDecoder(context).stream(Uri.fromFile(file), audio::append)
                 assertEquals(expected.durationMs, duration)
                 assertEquals(expected.samples.size, audio.sampleCount)
                 var offset = 0
@@ -325,7 +331,7 @@ class DeviceSmokeTest {
                     offset += n
                 }
                 OpusEncoder.encode(audio, opus)
-                assertTrue(kotlin.math.abs(AudioDecoder.decode(context, Uri.fromFile(opus)).durationMs - duration) <= 1)
+                assertTrue(kotlin.math.abs(audioDecoder(context).decode(Uri.fromFile(opus)).durationMs - duration) <= 1)
             }
             assertFalse(pcm.exists())
         } finally { file.delete(); pcm.delete(); opus.delete() }
@@ -340,22 +346,24 @@ class DeviceSmokeTest {
             var sawEarlyWords = false
             var progressCount = 0
             val detector = ModelStore.vadPath(context.filesDir).takeIf { ModelStore.vadReady(context.filesDir) }
-            Parakeet.Incremental(models, detector) { progress ->
-                progressCount++
-                if (!imported && progress.words.isNotEmpty()) sawEarlyWords = true
-            }.use { recognition ->
-                recognition.totalMs = 30_000
-                val audio = AudioDecoder.decode(context, Uri.fromFile(file), onSamples = recognition::accept)
-                imported = true
-                val transcript = recognition.finish(audio.durationMs)
-                assertTrue("Draft words must appear before AudioDecoder returns", sawEarlyWords)
-                assertTrue(progressCount >= 2)
-                assertTrue(transcript.words.size >= 10)
-                assertTrue(transcript.words.all { it.startMs >= 0 && it.endMs >= it.startMs && it.endMs <= audio.durationMs })
-                assertTrue("Final chunk must be recognized", transcript.words.any { it.startMs >= 28_000 })
-                instrumentation.sendStatus(0, Bundle().apply {
-                    putString("stream", "Incremental: ${transcript.words.size} words, $progressCount updates, early words=$sawEarlyWords\n")
-                })
+            NativeBudget.holding {
+                IncrementalRecognizer(models.files(), detector) { progress ->
+                    progressCount++
+                    if (!imported && progress.words.isNotEmpty()) sawEarlyWords = true
+                }.use { recognition ->
+                    recognition.totalMs = 30_000
+                    val audio = audioDecoder(context).decode(Uri.fromFile(file), onSamples = recognition::accept)
+                    imported = true
+                    val transcript = recognition.finish(audio.durationMs)
+                    assertTrue("Draft words must appear before AudioDecoder returns", sawEarlyWords)
+                    assertTrue(progressCount >= 2)
+                    assertTrue(transcript.words.size >= 10)
+                    assertTrue(transcript.words.all { it.startMs >= 0 && it.endMs >= it.startMs && it.endMs <= audio.durationMs })
+                    assertTrue("Final chunk must be recognized", transcript.words.any { it.startMs >= 28_000 })
+                    instrumentation.sendStatus(0, Bundle().apply {
+                        putString("stream", "Incremental: ${transcript.words.size} words, $progressCount updates, early words=$sawEarlyWords\n")
+                    })
+                }
             }
         } finally { file.delete() }
     }
@@ -377,11 +385,11 @@ class DeviceSmokeTest {
             else -> "fleurs-it-short.wav"
         })
         try {
-            val audio = AudioDecoder.decode(context, Uri.fromFile(file))
+            val audio = audioDecoder(context).decode(Uri.fromFile(file))
             if (sample == "youtube-long") assertEquals(180000L, audio.durationMs)
             val began = System.nanoTime()
             val steps = ArrayList<Parakeet.Progress>()
-            val transcript = Parakeet.transcribe(audio, models, detector) { steps += it }
+            val transcript = Parakeet.transcribe(audio, models.files(), detector) { steps += it }
             val elapsedMs = (System.nanoTime() - began) / 1_000_000
             // Pieces are decoded one after another: the position only moves forward and ends at the recording's end.
             assertTrue(steps.zipWithNext().all { (a, b) -> b.doneMs >= a.doneMs && b.elapsedMs >= a.elapsedMs })

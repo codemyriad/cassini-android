@@ -8,6 +8,8 @@ import org.cassini.core.audio.resampleTo16k
 import org.cassini.core.format.Word
 import org.cassini.core.speakers.SpeakerTurn
 import org.cassini.core.speakers.Voiceprints
+import org.cassini.engine.job.NativeBudget
+import org.cassini.engine.speakers.VoiceprintExtractor
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
@@ -24,14 +26,14 @@ class VoiceprintCalibrationTest {
     private fun fixture(name: String): PcmAudio {
         val file = File(context.cacheDir, "voice-" + name.substringAfterLast('/'))
         instrumentation.context.assets.open(name).use { input -> file.outputStream().use { input.copyTo(it) } }
-        try { return AudioDecoder.decode(context, Uri.fromFile(file)).let { PcmAudio(resampleTo16k(it.samples, it.sampleRate), 16000) } }
+        try { return audioDecoder(context).decode(Uri.fromFile(file)).let { PcmAudio(resampleTo16k(it.samples, it.sampleRate), 16000) } }
         finally { file.delete() }
     }
     private fun prints(audio: PcmAudio, turns: List<Triple<Long, Long, String>>): Map<String, Pair<FloatArray, Double>> {
         val ids = turns.map { it.third }.distinct()
         val words = turns.map { Word(it.third, it.first, it.second, "x") }.sortedBy { it.startMs }
         val windows = Voiceprints.select(turns.map { SpeakerTurn(it.first, it.second, ids.indexOf(it.third)) }, words, audio.sampleRate, audio.samples.size)
-        return VoiceprintExtractor.compute(File(model.modelPath), audio, windows) { }
+        return NativeBudget.holding { VoiceprintExtractor.compute(File(model.modelPath), audio, windows) { } }
     }
     private fun summary(name: String, scores: List<Float>) {
         if (scores.isEmpty()) return

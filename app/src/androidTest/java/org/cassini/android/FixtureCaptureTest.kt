@@ -132,7 +132,7 @@ class FixtureCaptureTest {
      * holds little more than the 2 s overlap. The speaker is named afterwards, from the reopened partial note.
      */
     private fun capturePartial(): String {
-        val clip = AudioDecoder.decode(context, Uri.fromFile(asset("fleurs-it-short.wav")))
+        val clip = audioDecoder(context).decode(Uri.fromFile(asset("fleurs-it-short.wav")))
         val padded = FloatArray(PARTIAL_SECONDS * clip.sampleRate).also { clip.samples.copyInto(it) }
         val source = File(inputs, "fleurs-it-padded.m4a").also { encodeAac(PcmAudio(padded, clip.sampleRate), it) }
         val before = sessions.load().uri
@@ -280,7 +280,7 @@ class FixtureCaptureTest {
         tree.write("library.json", catalogue(File(basic.directory, "library.json")) { it == legacy.libraryId }, now())
         SessionStore(tree.directory).save(legacy)
         tree.recordTime("session.json", now())
-        val clip = AudioDecoder.decode(context, Uri.fromFile(asset("fleurs-it-short.wav")))
+        val clip = audioDecoder(context).decode(Uri.fromFile(asset("fleurs-it-short.wav")))
         val live = File(tree.directory, "documents/${UUID.randomUUID()}.rec.opus")
         writeTornCapture(live, clip)
         tree.recordTime(tree.relative(live), now())

@@ -5,6 +5,8 @@ import android.util.Log
 import androidx.test.platform.app.InstrumentationRegistry
 import org.cassini.core.audio.PcmAudio
 import org.cassini.core.speakers.Diarization
+import org.cassini.engine.asr.Parakeet
+import org.cassini.engine.speakers.SortformerStream
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -26,13 +28,13 @@ class DiarizationPocTest {
 
     private fun load(file: File): PcmAudio {
         val copy = File(context.cacheDir, file.name).also { file.copyTo(it, overwrite = true) }
-        try { return AudioDecoder.decode(context, Uri.fromFile(copy)) } finally { copy.delete() }
+        try { return audioDecoder(context).decode(Uri.fromFile(copy)) } finally { copy.delete() }
     }
 
     private fun assets(name: String): PcmAudio {
         val file = File(context.cacheDir, name)
         instrumentation.context.assets.open(name).use { input -> file.outputStream().use { input.copyTo(it) } }
-        try { return AudioDecoder.decode(context, Uri.fromFile(file)) } finally { file.delete() }
+        try { return audioDecoder(context).decode(Uri.fromFile(file)) } finally { file.delete() }
     }
 
     private fun ready() = File(model).canRead()
@@ -61,7 +63,7 @@ class DiarizationPocTest {
         val boundaryMs = first.durationMs + 1000
 
         val asrBegan = System.nanoTime()
-        val transcript = Parakeet.transcribe(joined, models, ModelStore.vadPath(context.filesDir))
+        val transcript = Parakeet.transcribe(joined, models.files(), ModelStore.vadPath(context.filesDir))
         val asrMs = (System.nanoTime() - asrBegan) / 1_000_000
         val diarBegan = System.nanoTime()
         val turns = SortformerStream.turns(joined, model)
@@ -82,7 +84,7 @@ class DiarizationPocTest {
         val models = ModelStore(File(context.filesDir, "parakeet-v3"))
         assumeTrue("Install Parakeet and the speech detector first", models.ready() && ModelStore.vadReady(context.filesDir))
         val audio = load(clip)
-        val transcript = Parakeet.transcribe(audio, models, ModelStore.vadPath(context.filesDir))
+        val transcript = Parakeet.transcribe(audio, models.files(), ModelStore.vadPath(context.filesDir))
         run {
             val began = System.nanoTime()
             val turns = SortformerStream.turns(audio, model)

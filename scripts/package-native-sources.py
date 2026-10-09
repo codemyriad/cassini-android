@@ -38,8 +38,8 @@ if __name__ == '__main__':
         # patch where they look for them.
         build_files = [manifest, Path('scripts/streaming-diarization.patch'),
                        Path('scripts/build-native-aar.sh'), Path('scripts/fetch-opus-source.sh'),
-                       Path('scripts/native-common.sh'), Path('app/build.gradle.kts'),
-                       *sorted(Path('app/src/main/cpp').glob('*')),
+                       Path('scripts/native-common.sh'), Path('engine/build.gradle.kts'),
+                       *sorted(Path('engine/src/main/cpp').glob('*')),
                        Path('docs/native-runtime.md'), Path('THIRD_PARTY_NOTICES.md')]
         for path in build_files:
             output.add(path, arcname=str(path))

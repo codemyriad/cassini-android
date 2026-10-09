@@ -18,8 +18,11 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
+import kotlinx.coroutines.runBlocking
 import org.cassini.core.audio.Limits
 import org.cassini.core.library.Session
+import org.cassini.engine.capture.CaptureFactory
+import org.cassini.engine.capture.MicrophoneCapture
 import java.io.File
 import java.util.UUID
 
@@ -36,7 +39,7 @@ class RecordingService : Service() {
     enum class Notice { NONE, FOCUS, NEAR_LIMIT }
     inner class Local : Binder() { val service get() = this@RecordingService }
 
-    internal var capture: MicrophoneRecording? = null
+    internal var capture: MicrophoneCapture? = null
         private set
     var listener: Listener? = null
     var title = ""
@@ -80,9 +83,10 @@ class RecordingService : Service() {
         title = name; notice = Notice.NONE
         previous = SessionStore(filesDir).load()
         val directory = File(filesDir, "documents").also { check(it.mkdirs() || it.isDirectory) }
-        val file = File(directory, "${UUID.randomUUID()}.rec.${MicrophoneRecording.extension()}")
+        // RecordingActivity starts the one-time format probe when it opens, so this rarely waits.
+        val file = File(directory, "${UUID.randomUUID()}.rec.${runBlocking { CaptureFactory.extension() }}")
         live = file
-        val recording = MicrophoneRecording.create(this, file) { handler.post { if (capture != null) finish(false, failed = true) } }
+        val recording = CaptureFactory.create(this, file) { handler.post { if (capture != null) finish(false, failed = true) } }
         capture = recording
         try {
             startForegroundService(Intent(this, RecordingService::class.java))
@@ -110,7 +114,7 @@ class RecordingService : Service() {
         var noteId: String? = null
         var error = failed
         try {
-            val file = try { recording.stop() } catch (e: Exception) {
+            val file = try { runBlocking { recording.stop() } } catch (e: Exception) {
                 android.util.Log.e("Cassini", "Recording did not stop cleanly", e); error = true
                 recording.file.takeIf { it.exists() && it.length() > 0 }
             }

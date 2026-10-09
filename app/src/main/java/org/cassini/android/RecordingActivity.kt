@@ -18,7 +18,9 @@ import android.os.Looper
 import android.view.Gravity
 import android.view.View
 import android.widget.*
+import kotlinx.coroutines.runBlocking
 import org.cassini.android.ui.clock
+import org.cassini.engine.capture.CaptureFactory
 import java.text.DateFormat
 import java.util.Date
 
@@ -78,10 +80,8 @@ class RecordingActivity : Activity(), RecordingService.Listener {
             maxLines = 2
         }
         views.add(content, title, top = 32)
-        format = views.text(12f, DeckViews.muted).apply {
-            gravity = Gravity.CENTER
-            setText(if (MicrophoneRecording.extension() == "opus") R.string.microphone_format else R.string.microphone_format_aac)
-        }
+        format = views.text(12f, DeckViews.muted).apply { gravity = Gravity.CENTER }
+        showCaptureFormat()
         views.add(content, format, top = 12)
         timer = views.text(64f, DeckViews.paper, true).apply { id = R.id.capture_timer; text = clock(0); gravity = Gravity.CENTER }
         views.add(content, timer, top = 30)
@@ -118,6 +118,14 @@ class RecordingActivity : Activity(), RecordingService.Listener {
         savedNote = savedInstanceState?.getString("savedNote")
         wantCapture = savedNote == null && savedInstanceState == null
         bindService(Intent(this, RecordingService::class.java), connection, Context.BIND_AUTO_CREATE)
+    }
+
+    /** The format probe asks the codec list once per process; it runs off the main thread. */
+    private fun showCaptureFormat() {
+        Thread {
+            val opus = runBlocking { CaptureFactory.extension() } == "opus"
+            runOnUiThread { format.setText(if (opus) R.string.microphone_format else R.string.microphone_format_aac) }
+        }.start()
     }
 
     private fun requestCapture() {

@@ -11,11 +11,13 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
+import kotlinx.coroutines.runBlocking
 import org.cassini.core.format.CassiniDocument
 import org.cassini.core.format.OggOpus
 import org.cassini.core.format.Transcript
 import org.cassini.core.format.Word
 import org.cassini.core.library.Session
+import org.cassini.engine.capture.CaptureFactory
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
@@ -252,10 +254,10 @@ class LibraryTest {
             scenario.onActivity { it.findViewById<Button>(R.id.capture_done).performClick() }
             instrumentation.waitForIdleSync()
             val recorded = sessions.load()
-            assertEquals("Microphone test." + MicrophoneRecording.extension(), recorded.name)
+            assertEquals("Microphone test." + runBlocking { CaptureFactory.extension() }, recorded.name)
             assertNotNull(recorded.libraryId)
             assertNull(recorded.document)
-            val audio = AudioDecoder.decode(context, Uri.parse(recorded.uri))
+            val audio = audioDecoder(context).decode(Uri.parse(recorded.uri))
             assertTrue("Paused time must be excluded: ${audio.durationMs}", audio.durationMs in 1800..3200)
             assertEquals(16000, audio.sampleRate)
             assertEquals(1, LibraryStore(context.filesDir).load().count { it.id == recorded.libraryId })
@@ -298,7 +300,7 @@ class LibraryTest {
             val saved = sessions.load()
             assertNotNull(saved.libraryId)
             assertNull(saved.document)
-            assertTrue(AudioDecoder.decode(context, Uri.parse(saved.uri)).durationMs >= 3900)
+            assertTrue(audioDecoder(context).decode(Uri.parse(saved.uri)).durationMs >= 3900)
             assertEquals(1, LibraryStore(context.filesDir).load().count { it.id == saved.libraryId })
         } finally { scenario.close(); finishScreens(); sessions.save(original) }
     }

@@ -1,5 +1,6 @@
-package org.cassini.android
+package org.cassini.engine.opus
 
+import org.cassini.android.NativeOpus
 import org.cassini.core.Failure
 import org.cassini.core.audio.Limits
 import org.cassini.core.checkpoint.CheckpointData
@@ -12,23 +13,11 @@ import java.io.FileOutputStream
 import java.io.RandomAccessFile
 
 /**
- * libopus encoder state holds absolute pointers into the library's static tables, so it is never
- * saved: a resume primes a fresh encoder with the frames encoded last instead.
- */
-internal object NativeOpus {
-    init { System.loadLibrary("cassini_opus") }
-    external fun create(): Long
-    external fun lookahead(ptr: Long): Int
-    external fun encode(ptr: Long, frame: FloatArray): ByteArray
-    external fun destroy(ptr: Long)
-}
-
-/**
  * Same-pass 16 kHz mono encoding. Checkpoints keep the Ogg clock, the unencoded tail and the last
  * two encoded frames. A resumed encoder encodes those two frames and drops the packets, so its
  * lookahead is filled with the same audio and the stream continues on the same clock.
  */
-internal class StreamingOpusEncoder(private val file: File, restored: JSONObject? = null) : AutoCloseable {
+class StreamingOpusEncoder(private val file: File, restored: JSONObject? = null) : AutoCloseable {
     private val ptr = NativeOpus.create()
     private val output: FileOutputStream
     private val stream: java.io.BufferedOutputStream

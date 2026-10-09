@@ -10,6 +10,8 @@ import org.cassini.core.speakers.SpeakerPrint
 import org.cassini.core.speakers.SpeakerTurn
 import org.cassini.core.speakers.VoiceMatcher
 import org.cassini.core.speakers.Voiceprints
+import org.cassini.engine.job.NativeBudget
+import org.cassini.engine.speakers.VoiceprintExtractor
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -45,9 +47,9 @@ class NamedVoiceRecoveryTest {
         assumeTrue(model.ready())
         val pcm = File.createTempFile("voice-recovery-", ".pcm", context.cacheDir)
         val computed = PcmFile(pcm).use { audio ->
-            AudioDecoder.stream(context, Uri.parse(note.session.uri), audio::append)
+            audioDecoder(context).stream(Uri.parse(note.session.uri), audio::append)
             val selected = Voiceprints.select(turns, transcript.words, audio.sampleRate, audio.sampleCount)
-            VoiceprintExtractor.compute(File(model.modelPath), audio, selected) { }
+            NativeBudget.holding { VoiceprintExtractor.compute(File(model.modelPath), audio, selected) { } }
         }
         assertTrue("Each named speaker must have enough clean speech", computed.keys.containsAll(named.keys))
         val originalPrints = app.noteVoices.load(document.manifest!!.getJSONObject("meeting").getString("id"),

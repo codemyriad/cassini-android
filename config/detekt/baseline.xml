@@ -8,11 +8,7 @@
     <ID>AnnotationOnSeparateLine:TranscriptTest.kt$TranscriptTest$@Test(expected = IllegalArgumentException::class)</ID>
     <ID>ArgumentListWrapping:AsrEval.kt$AsrEval$("x-durationMs", audio.durationMs)</ID>
     <ID>ArgumentListWrapping:AsrEval.kt$AsrEval$("x-elapsedMs", elapsedMs)</ID>
-    <ID>ArgumentListWrapping:AsrEval.kt$AsrEval$(File(modelDir))</ID>
     <ID>ArgumentListWrapping:AsrEval.kt$AsrEval$(JSONObject(transcript.json()).put("x-elapsedMs", elapsedMs).put("x-durationMs", audio.durationMs).toString())</ID>
-    <ID>ArgumentListWrapping:AsrEval.kt$AsrEval$(audio, store(File(modelDir)), vad.takeIf { it != "-" }, DecodePolicy.WHOLE_SPANS.copy(contextMs = contextMs))</ID>
-    <ID>ArgumentListWrapping:AsrEval.kt$AsrEval$(contextMs = contextMs)</ID>
-    <ID>ArgumentListWrapping:AsrEval.kt$AsrEval$(modelDir)</ID>
     <ID>ArgumentListWrapping:AsrEval.kt$AsrEval$(out)</ID>
     <ID>ArgumentListWrapping:AsrEval.kt$AsrEval$(transcript.json())</ID>
     <ID>ArgumentListWrapping:AudioDecoder.kt$AudioDecoder$("Cassini", "Resume seek landed at frame $firstFrame, after ${firstNeededFrame(sampleRate, startSample)}; seeking earlier")</ID>
@@ -256,6 +252,16 @@
     <ID>ArgumentListWrapping:DocumentStore.kt$DocumentStore$(hash.digest())</ID>
     <ID>ArgumentListWrapping:DocumentStore.kt$DocumentStore$(source, transcript, name.substringBeforeLast('.'), processing, existing, speakerLabels, temporary)</ID>
     <ID>ArgumentListWrapping:Failure.kt$UserFacingException$(diagnostic)</ID>
+    <ID>ArgumentListWrapping:IncrementalRecognizer.kt$IncrementalRecognizer$("chunks")</ID>
+    <ID>ArgumentListWrapping:IncrementalRecognizer.kt$IncrementalRecognizer$("chunks", CheckpointState.json(chunks.checkpoint()))</ID>
+    <ID>ArgumentListWrapping:IncrementalRecognizer.kt$IncrementalRecognizer$("inferenceMs", inferenceMs)</ID>
+    <ID>ArgumentListWrapping:IncrementalRecognizer.kt$IncrementalRecognizer$(CheckpointState::incremental)</ID>
+    <ID>ArgumentListWrapping:IncrementalRecognizer.kt$IncrementalRecognizer$(Parakeet.Progress(doneMs, totalMs.takeIf { it &gt; 0 }?.let { maxOf(it, doneMs) } ?: 0, (System.nanoTime() - began) / 1_000_000, words))</ID>
+    <ID>ArgumentListWrapping:IncrementalRecognizer.kt$IncrementalRecognizer$(audio, recognizer, detectorModel, DecodePolicy.WHOLE_SPANS, Parakeet.cutting(detectorModel))</ID>
+    <ID>ArgumentListWrapping:IncrementalRecognizer.kt$IncrementalRecognizer$(chunks.checkpoint())</ID>
+    <ID>ArgumentListWrapping:IncrementalRecognizer.kt$IncrementalRecognizer$(detectorModel)</ID>
+    <ID>ArgumentListWrapping:IncrementalRecognizer.kt$IncrementalRecognizer$(doneMs, totalMs.takeIf { it &gt; 0 }?.let { maxOf(it, doneMs) } ?: 0, (System.nanoTime() - began) / 1_000_000, words)</ID>
+    <ID>ArgumentListWrapping:IncrementalRecognizer.kt$IncrementalRecognizer$(restored?.getJSONObject("chunks")?.let(CheckpointState::incremental))</ID>
     <ID>ArgumentListWrapping:IncrementalTranscript.kt$IncrementalTranscript$(start &gt;= 0 &amp;&amp; decodedEnd in 0..Limits.MAX_SAMPLES &amp;&amp; start + samples.size &lt;= Limits.MAX_SAMPLES &amp;&amp; decodedEnd &lt;= start + samples.size &amp;&amp; decodedEnd &gt;= start)</ID>
     <ID>ArgumentListWrapping:InterfaceTest.kt$InterfaceTest$("2 parole · 00:15 · INT8", activity.findViewById&lt;TextView&gt;(R.id.transcript_details).text.toString())</ID>
     <ID>ArgumentListWrapping:InterfaceTest.kt$InterfaceTest$("A stale word selection must not look like a second active word", -1, android.text.Selection.getSelectionStart(text))</ID>
@@ -437,7 +443,7 @@
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(BackgroundColorSpan(android.graphics.Color.rgb(76, 86, 45)), start, start + query.length, 0)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(File(path))</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(File(voiceprintModel.modelPath), audio, SpeakerMerges.windows(voiceClips.windows, draftEdits.second))</ID>
-    <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(File(voiceprintModel.modelPath), audio, pending, leaseHeld = true)</ID>
+    <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(File(voiceprintModel.modelPath), audio, pending)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(Intent(this, LibraryActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(Intent.CATEGORY_OPENABLE)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(Intent.EXTRA_MIME_TYPES, arrayOf("audio/*", "application/ogg"))</ID>
@@ -487,6 +493,7 @@
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(checkpointDoneMs)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(chosenModel.precision, chosenModel.revision)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(computed.mapValues { it.value.first }, knownVoices, printModel, Voiceprints.THRESHOLDS.getValue(printModel))</ID>
+    <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(contentResolver, cacheDir)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(draftSpeakerLabels)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(draftSpeakerLabels.toMap(), draftSpeakerMerges, draftRememberedVoices.toMap(), draftAutomaticNames.toMap(), draftRememberGeneration)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(elapsedMs)</ID>
@@ -549,11 +556,10 @@
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(this, draft ?: draftSpeakerLabels[speakerId] ?: draftAutomaticNames[speakerId].orEmpty())</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(this, input, mergeChoices(speakerId), choices, remember)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(this, input, mergeChoices(speakerId), list, remember)</ID>
-    <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(this, uri)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(transcript, SpeakerAttribution.record(transcript.words, turns, recognition, null, diarizationMs) .put("x-incrementalDiarization", "28 s windows with 2 s overlap, persistent Sortformer speaker cache"))</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(transcript.words, turns, recognition, null, diarizationMs)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(uri)</ID>
-    <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(uri, { AudioDecoder.decode(this, uri) }, transcript, session.name, processing(session.resultPrecision).put("x-inferenceMs", session.inferenceMs), null)</ID>
+    <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(uri, { AudioDecoder(contentResolver, cacheDir).decode(uri) }, transcript, session.name, processing(session.resultPrecision).put("x-inferenceMs", session.inferenceMs), null)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(voiceClips.windows, synchronized(draftSpeakerLabels) { draftSpeakerMerges.toMap() })</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(voiceprintModel.modelPath)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(when { document != null &amp;&amp; transcript == null -&gt; R.string.variant_unavailable transcript != null -&gt; R.string.no_speech session.uri != null -&gt; R.string.loaded_title else -&gt; R.string.empty_title })</ID>
@@ -561,10 +567,6 @@
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity$(words = words.words.map { it.copy(speaker = "${speakerPrefix}1") })</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity.Companion$(TAG, "Speech detector unavailable", error)</ID>
     <ID>ArgumentListWrapping:MainActivity.kt$MainActivity.Companion$(filesDir)</ID>
-    <ID>ArgumentListWrapping:MicrophoneRecording.kt$OpusRecording$("csd-0")</ID>
-    <ID>ArgumentListWrapping:MicrophoneRecording.kt$OpusRecording$(MediaRecorder.AudioSource.MIC, RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, maxOf(minimum, RATE * 2))</ID>
-    <ID>ArgumentListWrapping:MicrophoneRecording.kt$OpusRecording$(b.remaining())</ID>
-    <ID>ArgumentListWrapping:MicrophoneRecording.kt$OpusRecording$(bytes)</ID>
     <ID>ArgumentListWrapping:ModelBundle.kt$ModelBundle.Companion$(ModelStore(ModelCatalog.PARAKEET.directory(files)), DiarizationModels.inFiles(files), VoiceprintModel.inFiles(files))</ID>
     <ID>ArgumentListWrapping:ModelBundleTest.kt$ModelBundleTest$("""name="models_size"&gt;$stated MiB&lt;""")</ID>
     <ID>ArgumentListWrapping:ModelBundleTest.kt$ModelBundleTest$("src/main/res/values-it/strings.xml")</ID>
@@ -666,26 +668,19 @@
     <ID>ArgumentListWrapping:OggRepairTest.kt$OggRepairTest$(it)</ID>
     <ID>ArgumentListWrapping:OggRepairTest.kt$OggRepairTest$(listOf(80, 255, 300, 600)[i % 4])</ID>
     <ID>ArgumentListWrapping:OggRepairTest.kt$OggRepairTest$(packets)</ID>
+    <ID>ArgumentListWrapping:OpusCapture.kt$OpusCapture$("csd-0")</ID>
+    <ID>ArgumentListWrapping:OpusCapture.kt$OpusCapture$(MediaRecorder.AudioSource.MIC, RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, maxOf(minimum, RATE * 2))</ID>
+    <ID>ArgumentListWrapping:OpusCapture.kt$OpusCapture$(b.remaining())</ID>
+    <ID>ArgumentListWrapping:OpusCapture.kt$OpusCapture$(bytes)</ID>
     <ID>ArgumentListWrapping:Parakeet.kt$Parakeet$(Progress(audio.durationMs, audio.durationMs, (System.nanoTime() - began) / 1_000_000, transcript.words))</ID>
     <ID>ArgumentListWrapping:Parakeet.kt$Parakeet$(SpeechWindows.floorMs(reached, audio.sampleRate), audio.durationMs, (now - began) / 1_000_000, session.words.map { it.word })</ID>
     <ID>ArgumentListWrapping:Parakeet.kt$Parakeet$(audio, decoder, detectorModel, policy, cutting, onProgress)</ID>
     <ID>ArgumentListWrapping:Parakeet.kt$Parakeet$(audio.durationMs, audio.durationMs, (System.nanoTime() - began) / 1_000_000, transcript.words)</ID>
-    <ID>ArgumentListWrapping:Parakeet.kt$Parakeet$(detectorModel)</ID>
     <ID>ArgumentListWrapping:Parakeet.kt$Parakeet$(models)</ID>
     <ID>ArgumentListWrapping:Parakeet.kt$Parakeet.Cutting.SPEECH$("Silero VAD 0.18 speech spans, cut at the quietest point with 1 s of recorded context when longer than 28 s, 0.5 s synthetic tail")</ID>
-    <ID>ArgumentListWrapping:Parakeet.kt$Parakeet.Decoder$(headPad + length + tailPad)</ID>
-    <ID>ArgumentListWrapping:Parakeet.kt$Parakeet.Decoder$(if (headPad == 0 &amp;&amp; tailPad == 0 &amp;&amp; start == 0 &amp;&amp; length == audio.samples.size) audio.samples else FloatArray(headPad + length + tailPad).also { audio.samples.copyInto(it, headPad, start, start + length) }, audio.sampleRate)</ID>
-    <ID>ArgumentListWrapping:Parakeet.kt$Parakeet.Decoder$(it, headPad, start, start + length)</ID>
-    <ID>ArgumentListWrapping:Parakeet.kt$Parakeet.Incremental$("chunks")</ID>
-    <ID>ArgumentListWrapping:Parakeet.kt$Parakeet.Incremental$("chunks", CheckpointState.json(chunks.checkpoint()))</ID>
-    <ID>ArgumentListWrapping:Parakeet.kt$Parakeet.Incremental$("inferenceMs", inferenceMs)</ID>
-    <ID>ArgumentListWrapping:Parakeet.kt$Parakeet.Incremental$(CheckpointState::incremental)</ID>
-    <ID>ArgumentListWrapping:Parakeet.kt$Parakeet.Incremental$(Progress(doneMs, totalMs.takeIf { it &gt; 0 }?.let { maxOf(it, doneMs) } ?: 0, (System.nanoTime() - began) / 1_000_000, words))</ID>
-    <ID>ArgumentListWrapping:Parakeet.kt$Parakeet.Incremental$(audio, recognizer, detectorModel, DecodePolicy.WHOLE_SPANS, cutting(detectorModel))</ID>
-    <ID>ArgumentListWrapping:Parakeet.kt$Parakeet.Incremental$(chunks.checkpoint())</ID>
-    <ID>ArgumentListWrapping:Parakeet.kt$Parakeet.Incremental$(detectorModel)</ID>
-    <ID>ArgumentListWrapping:Parakeet.kt$Parakeet.Incremental$(doneMs, totalMs.takeIf { it &gt; 0 }?.let { maxOf(it, doneMs) } ?: 0, (System.nanoTime() - began) / 1_000_000, words)</ID>
-    <ID>ArgumentListWrapping:Parakeet.kt$Parakeet.Incremental$(restored?.getJSONObject("chunks")?.let(CheckpointState::incremental))</ID>
+    <ID>ArgumentListWrapping:ParakeetDecoder.kt$ParakeetDecoder$(headPad + length + tailPad)</ID>
+    <ID>ArgumentListWrapping:ParakeetDecoder.kt$ParakeetDecoder$(if (headPad == 0 &amp;&amp; tailPad == 0 &amp;&amp; start == 0 &amp;&amp; length == audio.samples.size) audio.samples else FloatArray(headPad + length + tailPad).also { audio.samples.copyInto(it, headPad, start, start + length) }, audio.sampleRate)</ID>
+    <ID>ArgumentListWrapping:ParakeetDecoder.kt$ParakeetDecoder$(it, headPad, start, start + length)</ID>
     <ID>ArgumentListWrapping:PcmSource.kt$PcmFile$("Invalid PCM cache length")</ID>
     <ID>ArgumentListWrapping:PcmSource.kt$PcmFile$(samples * 4L)</ID>
     <ID>ArgumentListWrapping:PcmSource.kt$PcmFile$(samples &gt;= 0 &amp;&amp; samples &lt;= sampleCount)</ID>
@@ -998,7 +993,6 @@
     <ID>ArgumentListWrapping:SpeakerDialog.kt$SpeakerDialog$(it)</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$("An automatic name never taught the voice", 1, app.voices.load().single { it.id == voice.id }.count)</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$("Cancel must remain visible while following the transcript", activity.findViewById&lt;Button&gt;(R.id.cancel_operation).getGlobalVisibleRect(android.graphics.Rect()))</ID>
-    <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$("Cancelled call must release its native models", NativeInference.lease.tryAcquire(180, TimeUnit.SECONDS))</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$("Install the INT8 model for the end-to-end speaker check", ModelStore(File(context.filesDir, "parakeet-v3")).ready())</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$("Merged native slots must not return in later words", 1, transcript.words.map { it.speaker }.distinct().size)</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$("Progress details must remain visible while following the transcript", status.getGlobalVisibleRect(android.graphics.Rect()))</ID>
@@ -1017,7 +1011,6 @@
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$("stream", "Joint streaming + draft name saved; peak RSS: $peak\n")</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(0, android.os.Bundle().apply { putString("stream", "Joint streaming + draft name saved; peak RSS: $peak\n") })</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(100)</ID>
-    <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(180, TimeUnit.SECONDS)</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(50)</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(512)</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(File(context.filesDir, "parakeet-v3"))</ID>
@@ -1029,7 +1022,8 @@
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(R.string.speaker_renamed, "Anna")</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(R.string.transcribe_again)</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(Session(uri = Uri.fromFile(file).toString(), name = file.name, durationMs = audio.durationMs))</ID>
-    <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(Uri.fromFile(wav), { AudioDecoder.decode(context, Uri.fromFile(wav)) }, transcript, "rename.wav", JSONObject().put("engine", "Parakeet TDT"), null, mapOf("spk_1" to first, "spk_2" to context.getString(R.string.speaker_label, 2)))</ID>
+    <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(Uri.fromFile(wav))</ID>
+    <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(Uri.fromFile(wav), { audioDecoder(context).decode(Uri.fromFile(wav)) }, transcript, "rename.wav", JSONObject().put("engine", "Parakeet TDT"), null, mapOf("spk_1" to first, "spk_2" to context.getString(R.string.speaker_label, 2)))</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(Word("spk_1", 1000, 1400, "Ciao."), Word("spk_2", 2000, 2400, "Salve."))</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(android.graphics.Rect())</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(androidx.test.espresso.matcher.RootMatchers.isPlatformPopup())</ID>
@@ -1039,7 +1033,6 @@
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(before.selected(null)!!.transcript!!.words.map { Triple(it.startMs, it.endMs, it.text) }, edited.words.map { Triple(it.startMs, it.endMs, it.text) })</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(click())</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(context)</ID>
-    <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(context, Uri.fromFile(wav))</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(context.filesDir)</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(context.filesDir, "parakeet-v3")</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(file)</ID>
@@ -1203,7 +1196,8 @@
     <ID>ArgumentListWrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$("turns")</ID>
     <ID>ArgumentListWrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$('/')</ID>
     <ID>ArgumentListWrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$(FloatArray(prints[0].size) { d -&gt; prints.sumOf { it[d].toDouble() }.toFloat() })</ID>
-    <ID>ArgumentListWrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$(context, Uri.fromFile(file))</ID>
+    <ID>ArgumentListWrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$(Uri.fromFile(file))</ID>
+    <ID>ArgumentListWrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$(context)</ID>
     <ID>ArgumentListWrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$(file)</ID>
     <ID>ArgumentListWrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$(instrumentation.context.assets.open("meetings/" + clip.getString("groundTruth")).bufferedReader().readText())</ID>
     <ID>ArgumentListWrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$(instrumentation.context.assets.open("meetings/index.json").bufferedReader().readText())</ID>
@@ -1222,12 +1216,10 @@
     <ID>ArgumentListWrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$(turns.map { SpeakerTurn(it.first, it.second, ids.indexOf(it.third)) }, words, audio.sampleRate, audio.samples.size)</ID>
     <ID>ArgumentListWrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$({ it.key.substringAfter('/') }, { it.value })</ID>
     <ID>ArgumentListWrapping:VoiceprintExtractor.kt$VoiceprintExtractor$(0, audio.sampleCount)</ID>
-    <ID>ArgumentListWrapping:VoiceprintExtractor.kt$VoiceprintExtractor$(audio.read(s, e - s), audio.sampleRate)</ID>
     <ID>ArgumentListWrapping:VoiceprintExtractor.kt$VoiceprintExtractor$(config = SpeakerEmbeddingExtractorConfig(model = model.absolutePath, numThreads = 2, provider = "cpu"))</ID>
     <ID>ArgumentListWrapping:VoiceprintExtractor.kt$VoiceprintExtractor$(extractor.compute(stream))</ID>
     <ID>ArgumentListWrapping:VoiceprintExtractor.kt$VoiceprintExtractor$(model = model.absolutePath, numThreads = 2, provider = "cpu")</ID>
     <ID>ArgumentListWrapping:VoiceprintExtractor.kt$VoiceprintExtractor$(s, audio.sampleCount)</ID>
-    <ID>ArgumentListWrapping:VoiceprintExtractor.kt$VoiceprintExtractor$(s, e - s)</ID>
     <ID>ArgumentListWrapping:VoiceprintExtractor.kt$VoiceprintExtractor$(stream)</ID>
     <ID>ArgumentListWrapping:VoiceprintSelection.kt$Voiceprints$((s * sampleRate / 1000).toInt().coerceIn(0, totalSamples), (e * sampleRate / 1000).toInt().coerceIn(0, totalSamples))</ID>
     <ID>ArgumentListWrapping:VoiceprintSelection.kt$Voiceprints$(0, totalSamples)</ID>
@@ -1363,10 +1355,10 @@
     <ID>ComplexCondition:MainActivity.kt$MainActivity$remember &amp;&amp; confirmed != null &amp;&amp; voiceId == null &amp;&amp; !asked &amp;&amp; !confirmed.name.equals(name, ignoreCase = true)</ID>
     <ID>ComplexCondition:MainActivity.kt$MainActivity$remember &amp;&amp; print != null &amp;&amp; voiceId == null &amp;&amp; !asked</ID>
     <ID>ComplexCondition:OggOpus.kt$OggOpus.Reader$pageSerial != serial || pageSeq != seq++ || eos || page[4] != 0.toByte()</ID>
-    <ID>ComplexCondition:Parakeet.kt$Parakeet.Decoder$headPad == 0 &amp;&amp; tailPad == 0 &amp;&amp; start == 0 &amp;&amp; length == audio.samples.size</ID>
+    <ID>ComplexCondition:ParakeetDecoder.kt$ParakeetDecoder$headPad == 0 &amp;&amp; tailPad == 0 &amp;&amp; start == 0 &amp;&amp; length == audio.samples.size</ID>
     <ID>ComplexCondition:SeamMerge.kt$SeamMerge$midpointOnDisagreement &amp;&amp; matches.isEmpty() &amp;&amp; hasWordInOverlap(acc, windowStartMs, overlapEndMs) &amp;&amp; hasWordInOverlap(next, windowStartMs, overlapEndMs)</ID>
     <ID>CyclomaticComplexMethod:AudioDecoder.kt$AudioDecoder$private fun decodeCompressed(file: File, onSamples: (FloatArray, Int) -&gt; Unit, onProgress: (Long, Long?) -&gt; Unit, retainPcm: Boolean, startSample: Long): PcmAudio</ID>
-    <ID>CyclomaticComplexMethod:AudioDecoder.kt$AudioDecoder$private fun decodeInternal(context: Context, uri: Uri, retainPcm: Boolean, onSamples: (FloatArray, Int) -&gt; Unit, onProgress: (Long, Long?) -&gt; Unit, startSample: Long = 0): PcmAudio</ID>
+    <ID>CyclomaticComplexMethod:AudioDecoder.kt$AudioDecoder$private fun decodeInternal(uri: Uri, retainPcm: Boolean, onSamples: (FloatArray, Int) -&gt; Unit, onProgress: (Long, Long?) -&gt; Unit, startSample: Long = 0): PcmAudio</ID>
     <ID>CyclomaticComplexMethod:BatteryProjection.kt$BatteryProjection$fun sample(now: Reading, remainingMs: Long?): Estimate</ID>
     <ID>CyclomaticComplexMethod:CassiniDocument.kt$CassiniDocument.Companion$private fun read(verify: Boolean = true, open: () -&gt; InputStream): CassiniDocument</ID>
     <ID>CyclomaticComplexMethod:CassiniDocument.kt$CassiniDocument.Companion$private fun seal(stream: OggOpus.Info, transcript: Transcript, title: String, processing: JSONObject, existing: CassiniDocument?, speakerLabels: Map&lt;String, String&gt;): Pair&lt;List&lt;String&gt;, String&gt;</ID>
@@ -1386,10 +1378,10 @@
     <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$private fun showDraftSpeakerDialog(speakerId: String, draft: String?)</ID>
     <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$private fun showSpeakerDialog(speakerId: String, draft: String? = null)</ID>
     <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$private fun transcribe()</ID>
-    <ID>CyclomaticComplexMethod:MicrophoneRecording.kt$OpusRecording$private fun capture()</ID>
     <ID>CyclomaticComplexMethod:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$@Test fun recoverProfilesForAnExplicitlyRequestedNote()</ID>
     <ID>CyclomaticComplexMethod:OggOpus.kt$OggOpus.Reader$fun page(): ByteArray?</ID>
     <ID>CyclomaticComplexMethod:OggRepair.kt$OggRepair$fun repair(file: File): Result?</ID>
+    <ID>CyclomaticComplexMethod:OpusCapture.kt$OpusCapture$private fun capture()</ID>
     <ID>CyclomaticComplexMethod:OpusEncoder.kt$OpusEncoder$private fun encode(audio: PcmSource, out: OutputStream)</ID>
     <ID>CyclomaticComplexMethod:PortableDocumentTest.kt$PortableDocumentTest$@Test fun transcriptionCreatesASealedPortableDocument()</ID>
     <ID>CyclomaticComplexMethod:PortableDocumentTest.kt$PortableDocumentTest$@android.annotation.TargetApi(33) @androidx.test.filters.SdkSuppress(minSdkVersion = 33) @Test fun openSaveAndReopenUseDocumentAsAuthority()</ID>
@@ -1434,8 +1426,7 @@
     <ID>Indentation:OggOpus.kt$OggOpus.Info$ </ID>
     <ID>Indentation:OggOpus.kt$OggOpus.Stream$ </ID>
     <ID>Indentation:Parakeet.kt$Parakeet$ </ID>
-    <ID>Indentation:Parakeet.kt$Parakeet.Decoder$ </ID>
-    <ID>Indentation:Parakeet.kt$Parakeet.Incremental$ </ID>
+    <ID>Indentation:ParakeetDecoder.kt$ParakeetDecoder$ </ID>
     <ID>Indentation:SeamMerge.kt$SeamMerge$ </ID>
     <ID>Indentation:SpeakerAttribution.kt$SpeakerAttribution$ </ID>
     <ID>Indentation:TranscriptionProgress.kt$TranscriptionProgress$ </ID>
@@ -1455,7 +1446,6 @@
     <ID>LongMethod:ProcessingResumeTest.kt$ProcessingResumeTest$@Test fun stopReopenAndResumeKeepsNamesPositionAndContinuousAudio()</ID>
     <ID>LongMethod:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$@Test fun meetingVoicesAcrossRecordings()</ID>
     <ID>LongMethod:WavDecoder.kt$WavDecoder$fun decodeWav(file: RandomAccessFile, onSamples: (FloatArray, Int) -&gt; Unit = { _, _ -&gt; }, retainPcm: Boolean = true, startSample: Long = 0, onProgress: (Long, Long?) -&gt; Unit = { _, _ -&gt; }): PcmAudio</ID>
-    <ID>LongParameterList:AudioDecoder.kt$AudioDecoder$(context: Context, uri: Uri, retainPcm: Boolean, onSamples: (FloatArray, Int) -&gt; Unit, onProgress: (Long, Long?) -&gt; Unit, startSample: Long = 0)</ID>
     <ID>LongParameterList:CassiniDocument.kt$CassiniDocument.Companion$(audio: File, transcript: Transcript, title: String, processing: JSONObject, existing: CassiniDocument?, speakerLabels: Map&lt;String, String&gt;, target: File)</ID>
     <ID>LongParameterList:CassiniDocument.kt$CassiniDocument.Companion$(audioBytes: ByteArray, transcript: Transcript, title: String, processing: JSONObject, existing: CassiniDocument? = null, speakerLabels: Map&lt;String, String&gt; = emptyMap())</ID>
     <ID>LongParameterList:CassiniDocument.kt$CassiniDocument.Companion$(stream: OggOpus.Info, transcript: Transcript, title: String, processing: JSONObject, existing: CassiniDocument?, speakerLabels: Map&lt;String, String&gt;)</ID>
@@ -1463,22 +1453,24 @@
     <ID>LongParameterList:DocumentStore.kt$DocumentStore$(uri: Uri, audio: () -&gt; PcmSource, transcript: Transcript, name: String, processing: JSONObject, existing: CassiniDocument?, speakerLabels: Map&lt;String, String&gt; = emptyMap())</ID>
     <ID>LongParameterList:DocumentStore.kt$DocumentStore$(uri: Uri, transcript: Transcript, name: String, processing: JSONObject, existing: CassiniDocument?, speakerLabels: Map&lt;String, String&gt;)</ID>
     <ID>LongParameterList:NoteViews.kt$NoteViews$(parent: LinearLayout, view: View, width: Int = -1, height: Int = -2, weight: Float = 0f, top: Int = 0)</ID>
-    <ID>LongParameterList:Parakeet.kt$Parakeet$(audio: PcmAudio, decoder: Decoder, detectorModel: String?, policy: DecodePolicy, cutting: Cutting, onProgress: (Progress) -&gt; Unit)</ID>
-    <ID>LongParameterList:Parakeet.kt$Parakeet$(audio: PcmAudio, models: ModelStore, detectorModel: String?, policy: DecodePolicy = DecodePolicy.WHOLE_SPANS, cutting: Cutting = cutting(detectorModel), onProgress: (Progress) -&gt; Unit = {})</ID>
-    <ID>LongParameterList:Parakeet.kt$Parakeet.Incremental$(private val models: ModelStore, private val detectorModel: String?, private val leaseHeld: Boolean = false, restored: org.json.JSONObject? = null, private val onChunk: (PcmAudio, Long, Transcript) -&gt; Transcript = { _, _, transcript -&gt; transcript }, private val onStage: (Long, Long, Boolean) -&gt; Unit = { _, _, _ -&gt; }, private val onProgress: (Progress) -&gt; Unit)</ID>
+    <ID>LongParameterList:Parakeet.kt$Parakeet$(audio: PcmAudio, decoder: WordDecoder, detectorModel: String?, policy: DecodePolicy, cutting: Cutting, onProgress: (Progress) -&gt; Unit)</ID>
+    <ID>LongParameterList:Parakeet.kt$Parakeet$(audio: PcmAudio, models: ParakeetFiles, detectorModel: String?, policy: DecodePolicy = DecodePolicy.WHOLE_SPANS, cutting: Cutting = cutting(detectorModel), onProgress: (Progress) -&gt; Unit = {})</ID>
     <ID>LongParameterList:SeamMerge.kt$SeamMerge$(acc: List&lt;Word&gt;, next: List&lt;Word&gt;, firstWindow: Boolean, windowStartMs: Long, overlapMs: Long, midpointOnDisagreement: Boolean = false)</ID>
     <ID>LongParameterList:SeamMerge.kt$SeamMerge$(items: List&lt;T&gt;, more: List&lt;T&gt;, firstWindow: Boolean, windowStartMs: Long, overlapMs: Long, midpointOnDisagreement: Boolean = false, word: (T) -&gt; Word)</ID>
     <ID>LongParameterList:SpeakerAttribution.kt$SpeakerAttribution$(source: Transcript, turns: List&lt;SpeakerTurn&gt;, previousProcessing: JSONObject?, sourceId: String?, elapsedMs: Long, previousAttribution: JSONObject? = null)</ID>
     <ID>LongParameterList:SpeakerAttribution.kt$SpeakerAttribution$(words: List&lt;Word&gt;, turns: List&lt;SpeakerTurn&gt;, previousProcessing: JSONObject?, sourceId: String?, elapsedMs: Long, previousAttribution: JSONObject? = null)</ID>
     <ID>LongParameterList:VoiceCodec.kt$VoiceCodec$(voices: List&lt;Voice&gt;, voiceId: String?, name: String, model: String, embedding: FloatArray, seconds: Double, now: Long)</ID>
     <ID>LongParameterList:VoiceStore.kt$VoiceStore$(voiceId: String?, name: String, model: String, embedding: FloatArray, seconds: Double, now: Long)</ID>
-    <ID>LoopWithTooManyJumpStatements:MicrophoneRecording.kt$OpusRecording$while</ID>
     <ID>LoopWithTooManyJumpStatements:NoteVoices.kt$NoteVoiceStore$for</ID>
     <ID>LoopWithTooManyJumpStatements:OggRepair.kt$OggRepair$while</ID>
+    <ID>LoopWithTooManyJumpStatements:OpusCapture.kt$OpusCapture$while</ID>
     <ID>LoopWithTooManyJumpStatements:Resampler.kt$StreamingResampler$while</ID>
     <ID>LoopWithTooManyJumpStatements:VoiceClipCache.kt$VoiceClipCache$for</ID>
     <ID>LoopWithTooManyJumpStatements:VoiceprintSelection.kt$Voiceprints$for</ID>
     <ID>LoopWithTooManyJumpStatements:WordGate.kt$WordGate$while</ID>
+    <ID>MagicNumber:AacCapture.kt$AacCapture$31</ID>
+    <ID>MagicNumber:AacCapture.kt$AacCapture$32000</ID>
+    <ID>MagicNumber:AacCapture.kt$AacCapture$48000</ID>
     <ID>MagicNumber:AppLanguage.kt$AppLanguage$33</ID>
     <ID>MagicNumber:AudioDecoder.kt$AudioDecoder$1000</ID>
     <ID>MagicNumber:AudioDecoder.kt$AudioDecoder$1000L</ID>
@@ -1595,6 +1587,7 @@
     <ID>MagicNumber:Format.kt$1000</ID>
     <ID>MagicNumber:Format.kt$3600</ID>
     <ID>MagicNumber:Format.kt$60</ID>
+    <ID>MagicNumber:IncrementalRecognizer.kt$IncrementalRecognizer$1_000_000</ID>
     <ID>MagicNumber:IncrementalTranscript.kt$IncrementalTranscript$1000</ID>
     <ID>MagicNumber:IncrementalTranscript.kt$IncrementalTranscript$1000L</ID>
     <ID>MagicNumber:IncrementalTranscript.kt$IncrementalTranscript$28</ID>
@@ -1631,21 +1624,6 @@
     <ID>MagicNumber:MainActivity.kt$MainActivity$86</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity.&lt;no name provided&gt;$150</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity.&lt;no name provided&gt;$1_000_000_000</ID>
-    <ID>MagicNumber:MicrophoneRecording.kt$AacRecording$31</ID>
-    <ID>MagicNumber:MicrophoneRecording.kt$AacRecording$32000</ID>
-    <ID>MagicNumber:MicrophoneRecording.kt$AacRecording$48000</ID>
-    <ID>MagicNumber:MicrophoneRecording.kt$MicrophoneRecording.Companion$29</ID>
-    <ID>MagicNumber:MicrophoneRecording.kt$OpusRecording$1000</ID>
-    <ID>MagicNumber:MicrophoneRecording.kt$OpusRecording$10_000</ID>
-    <ID>MagicNumber:MicrophoneRecording.kt$OpusRecording$16</ID>
-    <ID>MagicNumber:MicrophoneRecording.kt$OpusRecording$18</ID>
-    <ID>MagicNumber:MicrophoneRecording.kt$OpusRecording$19</ID>
-    <ID>MagicNumber:MicrophoneRecording.kt$OpusRecording$1_000_000</ID>
-    <ID>MagicNumber:MicrophoneRecording.kt$OpusRecording$20</ID>
-    <ID>MagicNumber:MicrophoneRecording.kt$OpusRecording$255</ID>
-    <ID>MagicNumber:MicrophoneRecording.kt$OpusRecording$48000</ID>
-    <ID>MagicNumber:MicrophoneRecording.kt$OpusRecording$5000</ID>
-    <ID>MagicNumber:MicrophoneRecording.kt$OpusRecording$9</ID>
     <ID>MagicNumber:ModelStore.kt$ModelStore$100</ID>
     <ID>MagicNumber:ModelStore.kt$ModelStore$1024</ID>
     <ID>MagicNumber:ModelStore.kt$ModelStore$1024L</ID>
@@ -1740,6 +1718,17 @@
     <ID>MagicNumber:OggRepair.kt$OggRepair$48000</ID>
     <ID>MagicNumber:OggRepair.kt$OggRepair$5</ID>
     <ID>MagicNumber:OggRepair.kt$OggRepair$6</ID>
+    <ID>MagicNumber:OpusCapture.kt$OpusCapture$1000</ID>
+    <ID>MagicNumber:OpusCapture.kt$OpusCapture$10_000</ID>
+    <ID>MagicNumber:OpusCapture.kt$OpusCapture$16</ID>
+    <ID>MagicNumber:OpusCapture.kt$OpusCapture$18</ID>
+    <ID>MagicNumber:OpusCapture.kt$OpusCapture$19</ID>
+    <ID>MagicNumber:OpusCapture.kt$OpusCapture$1_000_000</ID>
+    <ID>MagicNumber:OpusCapture.kt$OpusCapture$20</ID>
+    <ID>MagicNumber:OpusCapture.kt$OpusCapture$255</ID>
+    <ID>MagicNumber:OpusCapture.kt$OpusCapture$48000</ID>
+    <ID>MagicNumber:OpusCapture.kt$OpusCapture$5000</ID>
+    <ID>MagicNumber:OpusCapture.kt$OpusCapture$9</ID>
     <ID>MagicNumber:OpusEncoder.kt$OpusEncoder$10</ID>
     <ID>MagicNumber:OpusEncoder.kt$OpusEncoder$1000</ID>
     <ID>MagicNumber:OpusEncoder.kt$OpusEncoder$1000000</ID>
@@ -1753,7 +1742,6 @@
     <ID>MagicNumber:OpusEncoder.kt$OpusEncoder$48000</ID>
     <ID>MagicNumber:OpusEncoder.kt$OpusEncoder$9</ID>
     <ID>MagicNumber:Parakeet.kt$Parakeet$1_000_000</ID>
-    <ID>MagicNumber:Parakeet.kt$Parakeet.Incremental$1_000_000</ID>
     <ID>MagicNumber:PcmBuilder.kt$PcmBuilder$3</ID>
     <ID>MagicNumber:PcmBuilder.kt$PcmBuilder$4L</ID>
     <ID>MagicNumber:PcmSource.kt$PcmAudio$1000L</ID>
@@ -1867,7 +1855,6 @@
     <ID>MatchingDeclarationName:AudioLimits.kt$Limits</ID>
     <ID>MatchingDeclarationName:NoteVoices.kt$NoteVoiceStore</ID>
     <ID>MaxLineLength:AsrEval.kt$AsrEval$File(out).writeText(JSONObject(transcript.json()).put("x-elapsedMs", elapsedMs).put("x-durationMs", audio.durationMs).toString())</ID>
-    <ID>MaxLineLength:AsrEval.kt$AsrEval$val transcript = Parakeet.transcribe(audio, store(File(modelDir)), vad.takeIf { it != "-" }, DecodePolicy.WHOLE_SPANS.copy(contextMs = contextMs))</ID>
     <ID>MaxLineLength:AudioDecoder.kt$AudioDecoder$Log.w("Cassini", "Resume seek landed at frame $firstFrame, after ${firstNeededFrame(sampleRate, startSample)}; seeking earlier")</ID>
     <ID>MaxLineLength:AudioDecoder.kt$AudioDecoder$String(header, 8, 4, Charsets.US_ASCII) == "WAVE"</ID>
     <ID>MaxLineLength:AudioDecoder.kt$AudioDecoder$private</ID>
@@ -1905,9 +1892,10 @@
     <ID>MaxLineLength:CassiniDocumentTest.kt$CassiniDocumentTest$val file = File(System.getProperty("cassini.conformance", "../third_party/cassini-format/spec/conformance")!!, "opus/014-unknown-manifest-member.opus")</ID>
     <ID>MaxLineLength:CassiniDocumentTest.kt$CassiniDocumentTest$val next = CassiniDocument.read(CassiniDocument.create(bytes, transcript.copy(language = "en"), "Ignored", JSONObject(), withPrivate))</ID>
     <ID>MaxLineLength:CassiniPayload.kt$CassiniPayload.JsonBoundary$require(token in listOf("null", "true", "false") || token.matches(Regex("-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?")))</ID>
-    <ID>MaxLineLength:ChunkingComparisonTest.kt$ChunkingComparisonTest$"fixed-15s" to { audio, progress -&gt; Parakeet.transcribe(audio, models, null, cutting = Parakeet.Cutting.FIXED, onProgress = progress) }</ID>
-    <ID>MaxLineLength:ChunkingComparisonTest.kt$ChunkingComparisonTest$"speech-span-context" to { audio, progress -&gt; Parakeet.transcribe(audio, models, detector, DecodePolicy.PARAKEET_V3_REFERENCE, onProgress = progress) }</ID>
-    <ID>MaxLineLength:ChunkingComparisonTest.kt$ChunkingComparisonTest$"speech-span-notail" to { audio, progress -&gt; Parakeet.transcribe(audio, models, detector, DecodePolicy(preserveSpan = true, tailPaddingMs = 0), onProgress = progress) }</ID>
+    <ID>MaxLineLength:ChunkingComparisonTest.kt$ChunkingComparisonTest$"fixed-15s" to { audio, progress -&gt; Parakeet.transcribe(audio, models.files(), null, cutting = Parakeet.Cutting.FIXED, onProgress = progress) }</ID>
+    <ID>MaxLineLength:ChunkingComparisonTest.kt$ChunkingComparisonTest$"speech-10s-tail" to { audio, progress -&gt; Parakeet.transcribe(audio, models.files(), detector, DecodePolicy(), onProgress = progress) }</ID>
+    <ID>MaxLineLength:ChunkingComparisonTest.kt$ChunkingComparisonTest$"speech-span-context" to { audio, progress -&gt; Parakeet.transcribe(audio, models.files(), detector, DecodePolicy.PARAKEET_V3_REFERENCE, onProgress = progress) }</ID>
+    <ID>MaxLineLength:ChunkingComparisonTest.kt$ChunkingComparisonTest$"speech-span-notail" to { audio, progress -&gt; Parakeet.transcribe(audio, models.files(), detector, DecodePolicy(preserveSpan = true, tailPaddingMs = 0), onProgress = progress) }</ID>
     <ID>MaxLineLength:ChunkingComparisonTest.kt$ChunkingComparisonTest$assertTrue("$name $mode progress went backwards", steps.zipWithNext().all { (a, b) -&gt; b.doneMs &gt;= a.doneMs &amp;&amp; b.elapsedMs &gt;= a.elapsedMs })</ID>
     <ID>MaxLineLength:ChunkingComparisonTest.kt$ChunkingComparisonTest$for (j in 1..b.size) current[j] = minOf(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + if (a[i - 1] == b[j - 1]) 0 else 1)</ID>
     <ID>MaxLineLength:ChunkingComparisonTest.kt$ChunkingComparisonTest$val reference = tokens(JSONObject(instrumentation.context.assets.open("fleurs-it-short.json").bufferedReader().use { it.readText() }).getString("reference"))</ID>
@@ -1918,12 +1906,15 @@
     <ID>MaxLineLength:DeviceSmokeTest.kt$DeviceSmokeTest$(10 until expected.size - 10).sumOf { j -&gt; val d = expected[j] - found[j + shift]; d.toDouble() * d } / (expected.size - 20)</ID>
     <ID>MaxLineLength:DeviceSmokeTest.kt$DeviceSmokeTest$codec.queueInputBuffer(input, 0, n * 2, cursor * 1_000_000L / 48000, if (n == 0) MediaCodec.BUFFER_FLAG_END_OF_STREAM else 0)</ID>
     <ID>MaxLineLength:DeviceSmokeTest.kt$DeviceSmokeTest$if (info.size &gt; 0 &amp;&amp; info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0) muxer.writeSampleData(track, codec.getOutputBuffer(output)!!, info)</ID>
+    <ID>MaxLineLength:DeviceSmokeTest.kt$DeviceSmokeTest$putString("stream", "Incremental: ${transcript.words.size} words, $progressCount updates, early words=$sawEarlyWords\n")</ID>
     <ID>MaxLineLength:DeviceSmokeTest.kt$DeviceSmokeTest$val holes = (4096 until samples.size - 4096).filter { samples[it] == 0f &amp;&amp; abs(samples[it - 1]) &gt; .05f &amp;&amp; abs(samples[it + 1]) &gt; .05f }</ID>
     <ID>MaxLineLength:DiarizationPocTest.kt$DiarizationPocTest$log</ID>
     <ID>MaxLineLength:DiarizationPocTest.kt$DiarizationPocTest$log("conversation: ${audio.durationMs} ms audio, diarization $elapsed ms, ${turns.size} turns, ${words.map { it.speaker }.toSet().size} speakers, peak RSS ${peakRssMb()} MB")</ID>
     <ID>MaxLineLength:DiarizationPocTest.kt$DiarizationPocTest$log("two voices: ${joined.durationMs} ms audio, asr $asrMs ms, diarization $diarMs ms (${"%.0f".format(diarMs * 100.0 / asrMs)}% of asr), peak RSS ${peakRssMb()} MB")</ID>
     <ID>MaxLineLength:DiarizationTest.kt$DiarizationTest$assertEquals(words, Diarization.assign(words, listOf(SpeakerTurn(-1, 10, 0), SpeakerTurn(10, 0, 1), SpeakerTurn(0, 0, 1), SpeakerTurn(0, 20, -1))))</ID>
     <ID>MaxLineLength:DocumentStore.kt$DocumentStore$val doc = CassiniDocument.create(source, transcript, name.substringBeforeLast('.'), processing, existing, speakerLabels, temporary)</ID>
+    <ID>MaxLineLength:IncrementalRecognizer.kt$IncrementalRecognizer$onProgress(Parakeet.Progress(doneMs, totalMs.takeIf { it &gt; 0 }?.let { maxOf(it, doneMs) } ?: 0, (System.nanoTime() - began) / 1_000_000, words))</ID>
+    <ID>MaxLineLength:IncrementalRecognizer.kt$IncrementalRecognizer$val transcript = Parakeet.transcribeWithDecoder(audio, recognizer, detectorModel, DecodePolicy.WHOLE_SPANS, Parakeet.cutting(detectorModel)) {}</ID>
     <ID>MaxLineLength:IncrementalTranscript.kt$IncrementalTranscript$require(start &gt;= 0 &amp;&amp; decodedEnd in 0..Limits.MAX_SAMPLES &amp;&amp; start + samples.size &lt;= Limits.MAX_SAMPLES &amp;&amp; decodedEnd &lt;= start + samples.size &amp;&amp; decodedEnd &gt;= start)</ID>
     <ID>MaxLineLength:InterfaceTest.kt$InterfaceTest$assertEquals("A stale word selection must not look like a second active word", -1, android.text.Selection.getSelectionStart(text))</ID>
     <ID>MaxLineLength:InterfaceTest.kt$InterfaceTest$assertEquals("Paused playback must leave manual scrolling alone", 0, activity.findViewById&lt;ScrollView&gt;(R.id.content_scroll).scrollY)</ID>
@@ -1968,8 +1959,8 @@
     <ID>MaxLineLength:LicenseAssetsTest.kt$LicenseAssetsTest$assertEquals("$asset differs from $source", File(root, source).readText(), File(root, "app/src/main/assets/licenses/$asset").readText())</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$.</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$File(filesDir, "latest.processing.json")</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$IncrementalRecognizer</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$Log.d(TAG, "Voiceprint $id ${"%.1f".format(java.util.Locale.ROOT, print.second)} s: ${matches[id]?.let { "${it.state} ${"%.3f".format(java.util.Locale.ROOT, it.score)}" } ?: "no match"}")</ID>
-    <ID>MaxLineLength:MainActivity.kt$MainActivity$Parakeet</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$SpeakerAttribution</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$append("\n\n")</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$builder.append(if (interim != null) draftSpeakerLabels[word.speaker] ?: draftAutomaticNames[word.speaker] ?: defaultLabel(word.speaker) else document?.speakerLabel(word.speaker)?.takeUnless { it == word.speaker } ?: getString(R.string.unknown_speaker, word.speaker))</ID>
@@ -2010,8 +2001,7 @@
     <ID>MaxLineLength:MainActivity.kt$MainActivity$ui.caption.text = if (document == null) getString(R.string.voice_caption, getString(R.string.italian)) else "${getString(R.string.cassini_document)}\n${session.name}"</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$ui.transcribe.visibility = if ((checkpointSaved &amp;&amp; !busy) || (session.uri != null &amp;&amp; session.transcript == null &amp;&amp; interim == null)) View.VISIBLE else View.GONE</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$val</ID>
-    <ID>MaxLineLength:MainActivity.kt$MainActivity$val (file, portable) = documents.create(uri, { AudioDecoder.decode(this, uri) }, transcript, session.name, processing(session.resultPrecision).put("x-inferenceMs", session.inferenceMs), null)</ID>
-    <ID>MaxLineLength:MainActivity.kt$MainActivity$val computed = VoiceprintExtractor.compute(File(voiceprintModel.modelPath), audio, pending, leaseHeld = true) { checkActive() }</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$val (file, portable) = documents.create(uri, { AudioDecoder(contentResolver, cacheDir).decode(uri) }, transcript, session.name, processing(session.resultPrecision).put("x-inferenceMs", session.inferenceMs), null)</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$val matches = VoiceMatcher.match(computed.mapValues { it.value.first }, knownVoices, printModel, Voiceprints.THRESHOLDS.getValue(printModel))</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$val resumed = try { checkpoint.load() } catch (_: Exception) { checkpoint.release(); setStatus(R.string.checkpoint_error, error = true); return }</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$val saved = try { store.load() } catch (error: Exception) { checkpointUnreadable = true; checkpointSaved = true; Log.e(TAG, "Could not read processing checkpoint", error); setStatus(R.string.checkpoint_error, error = true); return }</ID>
@@ -2052,8 +2042,7 @@
     <ID>MaxLineLength:OggRepairTest.kt$OggRepairTest$while (at &lt; bytes.size) { offsets += at; at += 27 + (bytes[at + 26].toInt() and 255) + (0 until (bytes[at + 26].toInt() and 255)).sumOf { bytes[at + 27 + it].toInt() and 255 } }</ID>
     <ID>MaxLineLength:Parakeet.kt$Parakeet$"Incremental container decoding: 28 s PCM windows, 2 s recorded overlap, seams aligned by word; " + cutting(detectorModel).provenance</ID>
     <ID>MaxLineLength:Parakeet.kt$Parakeet.Cutting.SPEECH$SPEECH</ID>
-    <ID>MaxLineLength:Parakeet.kt$Parakeet.Decoder$else</ID>
-    <ID>MaxLineLength:Parakeet.kt$Parakeet.Incremental$onProgress(Progress(doneMs, totalMs.takeIf { it &gt; 0 }?.let { maxOf(it, doneMs) } ?: 0, (System.nanoTime() - began) / 1_000_000, words))</ID>
+    <ID>MaxLineLength:ParakeetDecoder.kt$ParakeetDecoder$else</ID>
     <ID>MaxLineLength:PcmSource.kt$PcmFile$if (it.length() % 4 != 0L || it.length() / 4 &gt; Limits.MAX_SAMPLES) { it.close(); throw IllegalArgumentException("Invalid PCM cache length") }</ID>
     <ID>MaxLineLength:PortableDocumentTest.kt$PortableDocumentTest$.</ID>
     <ID>MaxLineLength:PortableDocumentTest.kt$PortableDocumentTest$MainActivity::class.java.getDeclaredMethod("onActivityResult", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, Intent::class.java)</ID>
@@ -2158,10 +2147,8 @@
     <ID>MaxLineLength:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$private fun hasAsset(name: String)</ID>
     <ID>MaxLineLength:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$val truth = JSONObject(instrumentation.context.assets.open("meetings/" + clip.getString("groundTruth")).bufferedReader().readText())</ID>
     <ID>MaxLineLength:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$val windows = Voiceprints.select(turns.map { SpeakerTurn(it.first, it.second, ids.indexOf(it.third)) }, words, audio.sampleRate, audio.samples.size)</ID>
-    <ID>MaxLineLength:VoiceprintExtractor.kt$VoiceprintExtractor$Voiceprints.normalised(extractor.compute(stream))?.let { prints[speaker] = it to samples.toDouble() / audio.sampleRate }</ID>
     <ID>MaxLineLength:VoiceprintExtractor.kt$VoiceprintExtractor$fun</ID>
     <ID>MaxLineLength:VoiceprintExtractor.kt$VoiceprintExtractor$val extractor = SpeakerEmbeddingExtractor(config = SpeakerEmbeddingExtractorConfig(model = model.absolutePath, numThreads = 2, provider = "cpu"))</ID>
-    <ID>MaxLineLength:VoiceprintExtractor.kt$VoiceprintExtractor$val s = window.startSample.coerceIn(0, audio.sampleCount)</ID>
     <ID>MaxLineLength:VoiceprintSelection.kt$Voiceprints$PrintWindow((s * sampleRate / 1000).toInt().coerceIn(0, totalSamples), (e * sampleRate / 1000).toInt().coerceIn(0, totalSamples))</ID>
     <ID>MaxLineLength:VoiceprintSelection.kt$Voiceprints$if</ID>
     <ID>MaxLineLength:WavDecoder.kt$WavDecoder$fun</ID>
@@ -2185,6 +2172,7 @@
     <ID>MaximumLineLength:DiarizationPocTest.kt$DiarizationPocTest$ </ID>
     <ID>MaximumLineLength:DiarizationTest.kt$DiarizationTest$ </ID>
     <ID>MaximumLineLength:DocumentStore.kt$DocumentStore$ </ID>
+    <ID>MaximumLineLength:IncrementalRecognizer.kt$IncrementalRecognizer$ </ID>
     <ID>MaximumLineLength:IncrementalTranscript.kt$IncrementalTranscript$ </ID>
     <ID>MaximumLineLength:InterfaceTest.kt$InterfaceTest$ </ID>
     <ID>MaximumLineLength:LibraryActivity.kt$LibraryActivity$ </ID>
@@ -2207,8 +2195,7 @@
     <ID>MaximumLineLength:OggRepairTest.kt$OggRepairTest$ </ID>
     <ID>MaximumLineLength:Parakeet.kt$Parakeet$ </ID>
     <ID>MaximumLineLength:Parakeet.kt$Parakeet.Cutting.SPEECH$ </ID>
-    <ID>MaximumLineLength:Parakeet.kt$Parakeet.Decoder$ </ID>
-    <ID>MaximumLineLength:Parakeet.kt$Parakeet.Incremental$ </ID>
+    <ID>MaximumLineLength:ParakeetDecoder.kt$ParakeetDecoder$ </ID>
     <ID>MaximumLineLength:PcmSource.kt$PcmFile$ </ID>
     <ID>MaximumLineLength:PortableDocumentTest.kt$PortableDocumentTest$ </ID>
     <ID>MaximumLineLength:PreserveLibraryRule.kt$PreserveLibraryRule$ </ID>
@@ -2247,10 +2234,10 @@
     <ID>MultiLineIfElse:AppLanguage.kt$AppLanguage$context.getSystemService(LocaleManager::class.java).applicationLocales.toLanguageTags()</ID>
     <ID>MultiLineIfElse:AudioDecoder.kt$AudioDecoder$AudioFormat.ENCODING_PCM_16BIT</ID>
     <ID>MultiLineIfElse:AudioDecoder.kt$AudioDecoder$PcmBuilder(opusSamples?.let { (it * Limits.ASR_RATE + 24000) / 48000 }?.toInt() ?: durationUs?.let { (it * Limits.ASR_RATE / 1_000_000).toInt() } ?: (Limits.ASR_RATE * 60))</ID>
-    <ID>MultiLineIfElse:AudioDecoder.kt$AudioDecoder$context.contentResolver.openInputStream(uri).use { input -&gt; val source = input ?: throw UserFacingException(Failure.OPEN) local.outputStream().use { output -&gt; val buffer = ByteArray(64 * 1024) var size = 0L while (true) { requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED) val n = source.read(buffer) if (n &lt; 0) break if (size / (16 shl 20) != (size + n) / (16 shl 20)) requireUser(context.cacheDir.usableSpace &gt;= Limits.MIN_FREE_BYTES, Failure.SPACE) size += n requireUser(size &lt;= Limits.MAX_IMPORT_BYTES, Failure.LARGE) output.write(buffer, 0, n) } } }</ID>
     <ID>MultiLineIfElse:AudioDecoder.kt$AudioDecoder$null</ID>
     <ID>MultiLineIfElse:AudioDecoder.kt$AudioDecoder$output.getInteger(MediaFormat.KEY_PCM_ENCODING)</ID>
-    <ID>MultiLineIfElse:AudioDecoder.kt$AudioDecoder$requireUser(context.cacheDir.usableSpace &gt;= Limits.MIN_FREE_BYTES, Failure.SPACE)</ID>
+    <ID>MultiLineIfElse:AudioDecoder.kt$AudioDecoder$requireUser(cacheDir.usableSpace &gt;= Limits.MIN_FREE_BYTES, Failure.SPACE)</ID>
+    <ID>MultiLineIfElse:AudioDecoder.kt$AudioDecoder$resolver.openInputStream(uri).use { input -&gt; val source = input ?: throw UserFacingException(Failure.OPEN) local.outputStream().use { output -&gt; val buffer = ByteArray(64 * 1024) var size = 0L while (true) { requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED) val n = source.read(buffer) if (n &lt; 0) break if (size / (16 shl 20) != (size + n) / (16 shl 20)) requireUser(cacheDir.usableSpace &gt;= Limits.MIN_FREE_BYTES, Failure.SPACE) size += n requireUser(size &lt;= Limits.MAX_IMPORT_BYTES, Failure.LARGE) output.write(buffer, 0, n) } } }</ID>
     <ID>MultiLineIfElse:AudioDecoder.kt$AudioDecoder$return WavDecoder.decodeWav(file, onSamples, retainPcm, startSample, onProgress)</ID>
     <ID>MultiLineIfElse:BatteryProjection.kt$BatteryProjection$(start.chargeUah - now.chargeUah).toDouble() * start.percent / start.chargeUah</ID>
     <ID>MultiLineIfElse:BatteryProjection.kt$BatteryProjection$(start.percent - now.percent).toDouble()</ID>
@@ -2308,24 +2295,24 @@
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity$transcriptionProgress?.stage(TranscriptionProgress.Stage.SPEAKERS, (System.nanoTime() - totalBegan) / 1_000_000, startMs, startMs + chunk.durationMs)</ID>
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity$try { app.noteVoices.load(meeting, variant) } catch (error: Exception) { Log.w(TAG, "Could not load voiceprints", error); emptyMap() }</ID>
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity$try { onUi { if (!cancelled.get()) transcriptionProgress?.stage(TranscriptionProgress.Stage.SPEAKERS, (System.nanoTime() - totalBegan) / 1_000_000, startMs, startMs + chunk.durationMs) } val diarizer = streamDiarizer ?: SortformerStream(speakerModels.modelPath).also { streamDiarizer = it } val found = diarizer.process(chunk, startMs) val assigned = if (found.isEmpty()) words.words.map { it.copy(speaker = "${speakerPrefix}1") } else Diarization.assign(words.words, found, speakerPrefix, stableIds = true) if (voiceprintModel.ready()) voiceClips.accept(chunk, found, assigned, startMs) matchLiveVoices() words.copy(words = assigned) } catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error speakerFailure = true Log.w(TAG, "Incremental speakers unavailable", error) words.copy(words = words.words.map { it.copy(speaker = "${speakerPrefix}1") }) } catch (error: Exception) { speakerFailure = true Log.w(TAG, "Incremental speakers unavailable", error) words.copy(words = words.words.map { it.copy(speaker = "${speakerPrefix}1") }) }</ID>
-    <ID>MultiLineIfElse:MainActivity.kt$MainActivity$try { onUi { transcriptionProgress?.stage(TranscriptionProgress.Stage.MATCHING, (System.nanoTime() - totalBegan) / 1_000_000) } val computed = VoiceprintExtractor.compute(File(voiceprintModel.modelPath), audio, SpeakerMerges.windows(voiceClips.windows, draftEdits.second)) { checkActive() } val matches = VoiceMatcher.match(computed.mapValues { it.value.first }, knownVoices, printModel, Voiceprints.THRESHOLDS.getValue(printModel)) if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) for ((id, print) in computed) Log.d(TAG, "Voiceprint $id ${"%.1f".format(java.util.Locale.ROOT, print.second)} s: ${matches[id]?.let { "${it.state} ${"%.3f".format(java.util.Locale.ROOT, it.score)}" } ?: "no match"}") computed.mapValues { (id, print) -&gt; SpeakerPrint(print.first, print.second, matches[id]) } } catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error; Log.w(TAG, "Voiceprints failed", error); emptyMap() } catch (error: RuntimeException) { Log.w(TAG, "Voiceprints failed", error); emptyMap() } catch (error: OutOfMemoryError) { Log.w(TAG, "Voiceprints failed", error); emptyMap() }</ID>
+    <ID>MultiLineIfElse:MainActivity.kt$MainActivity$try { onUi { transcriptionProgress?.stage(TranscriptionProgress.Stage.MATCHING, (System.nanoTime() - totalBegan) / 1_000_000) } val computed = NativeBudget.holding { VoiceprintExtractor.compute(File(voiceprintModel.modelPath), audio, SpeakerMerges.windows(voiceClips.windows, draftEdits.second)) { checkActive() } } val matches = VoiceMatcher.match(computed.mapValues { it.value.first }, knownVoices, printModel, Voiceprints.THRESHOLDS.getValue(printModel)) if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) for ((id, print) in computed) Log.d(TAG, "Voiceprint $id ${"%.1f".format(java.util.Locale.ROOT, print.second)} s: ${matches[id]?.let { "${it.state} ${"%.3f".format(java.util.Locale.ROOT, it.score)}" } ?: "no match"}") computed.mapValues { (id, print) -&gt; SpeakerPrint(print.first, print.second, matches[id]) } } catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error; Log.w(TAG, "Voiceprints failed", error); emptyMap() } catch (error: RuntimeException) { Log.w(TAG, "Voiceprints failed", error); emptyMap() } catch (error: OutOfMemoryError) { Log.w(TAG, "Voiceprints failed", error); emptyMap() }</ID>
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity$try { voiceprintModel.install { progress -&gt; onUi { if (!cancelled.get()) showDownload(progress, R.string.voiceprint_model_progress) } } } catch (error: IOException) { Log.w(TAG, "Voiceprint model unavailable", error) } catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error; Log.w(TAG, "Voiceprint model unavailable", error) }</ID>
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity$ui.transcript.post { if (busy &amp;&amp; !isDestroyed) { val bounds = android.graphics.Rect() ui.transcript.getDrawingRect(bounds) ui.scroll.offsetDescendantRectToMyCoords(ui.transcript, bounds) ui.scroll.smoothScrollTo(0, if (first) bounds.top else (bounds.bottom - ui.scroll.height).coerceAtLeast(0)) } }</ID>
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity$words.copy(words = words.words.map { it.copy(speaker = "${speakerPrefix}1") })</ID>
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity$words.words.map { it.copy(speaker = "${speakerPrefix}1") }</ID>
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity.&lt;no name provided&gt;$player?.let { media -&gt; updatePlayback(media) }</ID>
     <ID>MultiLineIfElse:MainActivity.kt$MainActivity.&lt;no name provided&gt;$player?.let { seekTo(word.startMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()) it.start() }</ID>
-    <ID>MultiLineIfElse:MicrophoneRecording.kt$OpusRecording$config(bytes)</ID>
     <ID>MultiLineIfElse:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$app.voices.enrol(existing?.id, name, VoiceprintModel.model.sha256, print.first, print.second, System.currentTimeMillis())</ID>
     <ID>MultiLineIfElse:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$existing</ID>
     <ID>MultiLineIfElse:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$null</ID>
     <ID>MultiLineIfElse:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$turns += SpeakerTurn(word.startMs, word.endMs, slot)</ID>
     <ID>MultiLineIfElse:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$turns[turns.lastIndex] = last.copy(endMs = maxOf(last.endMs, word.endMs))</ID>
     <ID>MultiLineIfElse:NamedVoiceRecoveryTest.kt$NamedVoiceRecoveryTest$voices.firstOrNull { it.id == match.voiceId }?.let { speaker to it.name }</ID>
+    <ID>MultiLineIfElse:OpusCapture.kt$OpusCapture$config(bytes)</ID>
     <ID>MultiLineIfElse:OpusEncoder.kt$OpusEncoder$config(bytes)</ID>
     <ID>MultiLineIfElse:OpusEncoder.kt$OpusEncoder$muxer = OggOpus.Muxer(out, header, CassiniDocument.tagsPacket(emptyList()), samples * (48000 / RATE) + OggOpus.u16(header, 10))</ID>
-    <ID>MultiLineIfElse:Parakeet.kt$Parakeet.Decoder$FloatArray(headPad + length + tailPad).also { audio.samples.copyInto(it, headPad, start, start + length) }</ID>
-    <ID>MultiLineIfElse:Parakeet.kt$Parakeet.Decoder$audio.samples</ID>
+    <ID>MultiLineIfElse:ParakeetDecoder.kt$ParakeetDecoder$FloatArray(headPad + length + tailPad).also { audio.samples.copyInto(it, headPad, start, start + length) }</ID>
+    <ID>MultiLineIfElse:ParakeetDecoder.kt$ParakeetDecoder$audio.samples</ID>
     <ID>MultiLineIfElse:PcmSource.kt$PcmFile$requireUser(file.parentFile!!.usableSpace &gt;= Limits.MIN_FREE_BYTES, Failure.SPACE)</ID>
     <ID>MultiLineIfElse:RecordingActivity.kt$RecordingActivity$openSavedNote(autoTranscribe &amp;&amp; intent.getBooleanExtra(AUTO_TRANSCRIBE, true))</ID>
     <ID>MultiLineIfElse:RecordingActivity.kt$RecordingActivity$openSavedNote(false)</ID>
@@ -2359,7 +2346,7 @@
     <ID>MultiLineIfElse:VoiceprintSelection.kt$Voiceprints$runs[runs.lastIndex] = Triple(last.first, last.second, maxOf(last.third, word.endMs))</ID>
     <ID>MultiLineIfElse:WordGate.kt$WordGate$null</ID>
     <ID>NestedBlockDepth:AudioDecoder.kt$AudioDecoder$private fun decodeCompressed(file: File, onSamples: (FloatArray, Int) -&gt; Unit, onProgress: (Long, Long?) -&gt; Unit, retainPcm: Boolean, startSample: Long): PcmAudio</ID>
-    <ID>NestedBlockDepth:AudioDecoder.kt$AudioDecoder$private fun decodeInternal(context: Context, uri: Uri, retainPcm: Boolean, onSamples: (FloatArray, Int) -&gt; Unit, onProgress: (Long, Long?) -&gt; Unit, startSample: Long = 0): PcmAudio</ID>
+    <ID>NestedBlockDepth:AudioDecoder.kt$AudioDecoder$private fun decodeInternal(uri: Uri, retainPcm: Boolean, onSamples: (FloatArray, Int) -&gt; Unit, onProgress: (Long, Long?) -&gt; Unit, startSample: Long = 0): PcmAudio</ID>
     <ID>NestedBlockDepth:ChunkingComparisonTest.kt$ChunkingComparisonTest$@Test fun cuttingModesAgainstTheWholeRecording()</ID>
     <ID>NestedBlockDepth:DeviceSmokeTest.kt$DeviceSmokeTest$private fun encodeAacTone(file: File, seconds: Int = 3)</ID>
     <ID>NestedBlockDepth:DiarizationPocTest.kt$DiarizationPocTest$@Test fun transcribeThenAttributeRealConversation()</ID>
@@ -2367,13 +2354,13 @@
     <ID>NestedBlockDepth:LibraryStore.kt$LibraryStore$fun migrate(latest: Session)</ID>
     <ID>NestedBlockDepth:LibraryTest.kt$LibraryTest$@Test fun librarySearchOpensTheMatchingDocumentAndKeepsQueryOnReturn()</ID>
     <ID>NestedBlockDepth:LibraryTest.kt$LibraryTest$@Test fun microphonePauseResumeSavesPlayableAudioAndReopensFromLibrary()</ID>
-    <ID>NestedBlockDepth:MicrophoneRecording.kt$OpusRecording$private fun capture()</ID>
     <ID>NestedBlockDepth:OggRepair.kt$OggRepair$fun repair(file: File): Result?</ID>
+    <ID>NestedBlockDepth:OpusCapture.kt$OpusCapture$private fun capture()</ID>
     <ID>NestedBlockDepth:OpusEncoder.kt$OpusEncoder$private fun encode(audio: PcmSource, out: OutputStream)</ID>
     <ID>NestedBlockDepth:RecoveryScanner.kt$RecoveryScanner$fun recover(filesDir: File, live: File?, name: String)</ID>
     <ID>NestedBlockDepth:SeamMerge.kt$SeamMerge$fun align(acc: List&lt;Word&gt;, next: List&lt;Word&gt;, overlapStartMs: Long, overlapEndMs: Long, toleranceMs: Long): List&lt;Match&gt;</ID>
     <ID>NestedBlockDepth:SpeechWindowsTest.kt$SpeechWindowsTest$@Test fun benchmarkPoliciesCoverTheSourceWithoutGaps()</ID>
-    <ID>NestedBlockDepth:VoiceprintExtractor.kt$VoiceprintExtractor$fun compute(model: File, audio: PcmSource, windows: Map&lt;String, List&lt;PrintWindow&gt;&gt;, leaseHeld: Boolean = false, active: () -&gt; Unit): Map&lt;String, Pair&lt;FloatArray, Double&gt;&gt;</ID>
+    <ID>NestedBlockDepth:VoiceprintExtractor.kt$VoiceprintExtractor$fun compute(model: File, audio: PcmSource, windows: Map&lt;String, List&lt;PrintWindow&gt;&gt;, active: () -&gt; Unit): Map&lt;String, Pair&lt;FloatArray, Double&gt;&gt;</ID>
     <ID>NestedBlockDepth:VoiceprintSelection.kt$Voiceprints$fun select(turns: List&lt;SpeakerTurn&gt;, words: List&lt;Word&gt;, sampleRate: Int, totalSamples: Int): Map&lt;String, List&lt;PrintWindow&gt;&gt;</ID>
     <ID>NestedBlockDepth:WordGate.kt$WordGate$fun wordEndOverContinuingAudio(samples: FloatArray, sampleRate: Int, timed: TimedWord, audioEndMs: Long): Long</ID>
     <ID>NoBlankLineBeforeRbrace:IncrementalTranscriptTest.kt$IncrementalTranscriptTest$ </ID>
@@ -2382,9 +2369,10 @@
     <ID>NoBlankLineBeforeRbrace:TranscriptionProgressTest.kt$TranscriptionProgressTest$ </ID>
     <ID>NoConsecutiveBlankLines:DeviceSmokeTest.kt$DeviceSmokeTest$ </ID>
     <ID>NoTrailingSpaces:CassiniDocument.kt$CassiniDocument.Companion$ </ID>
-    <ID>ParameterListWrapping:AudioDecoder.kt$AudioDecoder$(context: Context, uri: Uri, onSamples: (FloatArray, Int) -&gt; Unit = { _, _ -&gt; }, onProgress: (Long, Long?) -&gt; Unit = { _, _ -&gt; })</ID>
-    <ID>ParameterListWrapping:AudioDecoder.kt$AudioDecoder$(context: Context, uri: Uri, onSamples: (FloatArray, Int) -&gt; Unit, startSample: Long = 0, onProgress: (Long, Long?) -&gt; Unit = { _, _ -&gt; })</ID>
-    <ID>ParameterListWrapping:AudioDecoder.kt$AudioDecoder$(context: Context, uri: Uri, retainPcm: Boolean, onSamples: (FloatArray, Int) -&gt; Unit, onProgress: (Long, Long?) -&gt; Unit, startSample: Long = 0)</ID>
+    <ID>ParameterListWrapping:AacCapture.kt$AacCapture$(_: IllegalStateException)</ID>
+    <ID>ParameterListWrapping:AudioDecoder.kt$AudioDecoder$(uri: Uri, onSamples: (FloatArray, Int) -&gt; Unit = { _, _ -&gt; }, onProgress: (Long, Long?) -&gt; Unit = { _, _ -&gt; })</ID>
+    <ID>ParameterListWrapping:AudioDecoder.kt$AudioDecoder$(uri: Uri, onSamples: (FloatArray, Int) -&gt; Unit, startSample: Long = 0, onProgress: (Long, Long?) -&gt; Unit = { _, _ -&gt; })</ID>
+    <ID>ParameterListWrapping:AudioDecoder.kt$AudioDecoder$(uri: Uri, retainPcm: Boolean, onSamples: (FloatArray, Int) -&gt; Unit, onProgress: (Long, Long?) -&gt; Unit, startSample: Long = 0)</ID>
     <ID>ParameterListWrapping:AudioLimits.kt$Limits$(durationMs: Long, availableBytes: Long)</ID>
     <ID>ParameterListWrapping:CassiniDocument.kt$CassiniDocument$( val state: String, val manifest: JSONObject? = null, val variants: List&lt;Variant&gt; = emptyList(), val comments: List&lt;String&gt; = emptyList(), val warnings: List&lt;String&gt; = emptyList(), )</ID>
     <ID>ParameterListWrapping:CassiniDocument.kt$CassiniDocument.Companion$(_: Exception)</ID>
@@ -2425,7 +2413,6 @@
     <ID>ParameterListWrapping:MainActivity.kt$MainActivity.&lt;no name provided&gt;$(ds: android.text.TextPaint)</ID>
     <ID>ParameterListWrapping:MainActivity.kt$MainActivity.&lt;no name provided&gt;$(s: CharSequence?, start: Int, before: Int, count: Int)</ID>
     <ID>ParameterListWrapping:MainActivity.kt$MainActivity.Companion$(error: Exception)</ID>
-    <ID>ParameterListWrapping:MicrophoneRecording.kt$AacRecording$(_: IllegalStateException)</ID>
     <ID>ParameterListWrapping:ModelBundleTest.kt$ModelBundleTest$(file: File, size: Long)</ID>
     <ID>ParameterListWrapping:NoteRules.kt$LibraryNote$(query: String)</ID>
     <ID>ParameterListWrapping:NoteRules.kt$Session$( val uri: String? = null, val name: String = "", val transcript: Transcript? = null, val durationMs: Long = 0, val inferenceMs: Long = 0, val positionMs: Int = 0, val resultPrecision: String = "INT8", val document: String? = null, val selectedVariant: String? = null, val processingMs: Long = 0, val processingPaused: Boolean = false, val libraryId: String? = null, /** The viewer that wrote session.json last. Not part of a note. */ val screen: String? = null, )</ID>
@@ -2440,11 +2427,8 @@
     <ID>ParameterListWrapping:OggOpus.kt$OggOpus.LiveMuxer$(out: OutputStream, head: ByteArray, tags: ByteArray, private val serial: Int = Random.nextInt(), restored: LiveState? = null)</ID>
     <ID>ParameterListWrapping:OggOpus.kt$OggOpus.Muxer$(out: OutputStream, head: ByteArray, tags: ByteArray, private val finalGranule: Long, serial: Int = Random.nextInt())</ID>
     <ID>ParameterListWrapping:OggOpus.kt$OggOpus.Stream$(val head: ByteArray, val tags: ByteArray, val audio: List&lt;ByteArray&gt;, val finalGranule: Long, val validFraming: Boolean)</ID>
-    <ID>ParameterListWrapping:Parakeet.kt$Parakeet$(Progress)</ID>
-    <ID>ParameterListWrapping:Parakeet.kt$Parakeet$(audio: PcmAudio, decoder: Decoder, detectorModel: String?, policy: DecodePolicy, cutting: Cutting, onProgress: (Progress) -&gt; Unit)</ID>
-    <ID>ParameterListWrapping:Parakeet.kt$Parakeet$(audio: PcmAudio, models: ModelStore, detectorModel: String?, policy: DecodePolicy = DecodePolicy.WHOLE_SPANS, cutting: Cutting = cutting(detectorModel), onProgress: (Progress) -&gt; Unit = {})</ID>
-    <ID>ParameterListWrapping:Parakeet.kt$Parakeet.Incremental$(PcmAudio, Long, Transcript)</ID>
-    <ID>ParameterListWrapping:Parakeet.kt$Parakeet.Incremental$(private val models: ModelStore, private val detectorModel: String?, private val leaseHeld: Boolean = false, restored: org.json.JSONObject? = null, private val onChunk: (PcmAudio, Long, Transcript) -&gt; Transcript = { _, _, transcript -&gt; transcript }, private val onStage: (Long, Long, Boolean) -&gt; Unit = { _, _, _ -&gt; }, private val onProgress: (Progress) -&gt; Unit)</ID>
+    <ID>ParameterListWrapping:Parakeet.kt$Parakeet$(audio: PcmAudio, decoder: WordDecoder, detectorModel: String?, policy: DecodePolicy, cutting: Cutting, onProgress: (Progress) -&gt; Unit)</ID>
+    <ID>ParameterListWrapping:Parakeet.kt$Parakeet$(audio: PcmAudio, models: ParakeetFiles, detectorModel: String?, policy: DecodePolicy = DecodePolicy.WHOLE_SPANS, cutting: Cutting = cutting(detectorModel), onProgress: (Progress) -&gt; Unit = {})</ID>
     <ID>ParameterListWrapping:PortableDocumentTest.kt$PortableDocumentTest$(activity: MainActivity, word: String, clock: String)</ID>
     <ID>ParameterListWrapping:PortableDocumentTest.kt$PortableDocumentTest$(file: File)</ID>
     <ID>ParameterListWrapping:PortableDocumentTest.kt$PortableDocumentTest$(other: Session = Session(uri = "file:///elsewhere.wav", name = "Elsewhere.wav"))</ID>
@@ -2498,11 +2482,10 @@
     <ID>PropertyWrapping:DiarizationPocTest.kt$DiarizationPocTest$private val directory = File(InstrumentationRegistry.getArguments().getString("diarDir") ?: "/data/local/tmp/cassini-diar")</ID>
     <ID>PropertyWrapping:DiarizationTest.kt$DiarizationTest$val turns = listOf(SpeakerTurn(0, 400, 0), SpeakerTurn(200, 500, 0), SpeakerTurn(1000, 1600, 1), SpeakerTurn(1600, 1700, 1))</ID>
     <ID>PropertyWrapping:DocumentStore.kt$DocumentStore$val owned = File(directory, "${OggOpus.hex(hash.digest())}.${if (doc.state == "plain-audio") "input" else "opus"}")</ID>
+    <ID>PropertyWrapping:IncrementalRecognizer.kt$IncrementalRecognizer$private val chunks = IncrementalTranscript(restored?.getJSONObject("chunks")?.let(CheckpointState::incremental)) { audio, startMs -&gt; onStage(startMs, startMs + audio.durationMs, decoder == null) val recognizer = decoder ?: ParakeetDecoder(models).also { decoder = it } onStage(startMs, startMs + audio.durationMs, false) val started = System.nanoTime() val transcript = Parakeet.transcribeWithDecoder(audio, recognizer, detectorModel, DecodePolicy.WHOLE_SPANS, Parakeet.cutting(detectorModel)) {} inferenceMs += (System.nanoTime() - started) / 1_000_000 onChunk(audio, startMs, transcript) }</ID>
     <ID>PropertyWrapping:LibraryNoteTest.kt$LibraryNoteTest$val note = LibraryNote("one", 100, Session(name = "Morning meeting"), "Opening remarks. ".repeat(30) + "Choose the teal version.")</ID>
-    <ID>PropertyWrapping:MicrophoneRecording.kt$OpusRecording$val audio = AudioRecord(MediaRecorder.AudioSource.MIC, RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, maxOf(minimum, RATE * 2))</ID>
     <ID>PropertyWrapping:OggOpusStreamTest.kt$OggOpusStreamTest$val directory = File(System.getProperty("cassini.conformance", "../third_party/cassini-format/spec/conformance")!!)</ID>
-    <ID>PropertyWrapping:Parakeet.kt$Parakeet.Incremental$private val chunks = IncrementalTranscript(restored?.getJSONObject("chunks")?.let(CheckpointState::incremental)) { audio, startMs -&gt; onStage(startMs, startMs + audio.durationMs, decoder == null) val recognizer = decoder ?: Decoder(models, ownsLease = !leaseHeld).also { decoder = it } onStage(startMs, startMs + audio.durationMs, false) val started = System.nanoTime() val transcript = transcribeWithDecoder(audio, recognizer, detectorModel, DecodePolicy.WHOLE_SPANS, cutting(detectorModel)) {} inferenceMs += (System.nanoTime() - started) / 1_000_000 onChunk(audio, startMs, transcript) }</ID>
-    <ID>PropertyWrapping:Parakeet.kt$Parakeet.Incremental$val transcript = transcribeWithDecoder(audio, recognizer, detectorModel, DecodePolicy.WHOLE_SPANS, cutting(detectorModel)) {}</ID>
+    <ID>PropertyWrapping:OpusCapture.kt$OpusCapture$val audio = AudioRecord(MediaRecorder.AudioSource.MIC, RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, maxOf(minimum, RATE * 2))</ID>
     <ID>PropertyWrapping:RecordingActivity.kt$RecordingActivity$val missing = listOfNotNull(Manifest.permission.RECORD_AUDIO.takeIf { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }, Manifest.permission.POST_NOTIFICATIONS.takeIf { Build.VERSION.SDK_INT &gt;= 33 &amp;&amp; checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED &amp;&amp; !notificationsAsked })</ID>
     <ID>PropertyWrapping:RecordingService.kt$RecordingService$val captured = Session(uri = Uri.fromFile(file).toString(), libraryId = UUID.randomUUID().toString(), name = name, durationMs = elapsed)</ID>
     <ID>PropertyWrapping:ResamplerTest.kt$ResamplerTest$val expected = resampleTo16k(FloatArray(1000) { 0.25f } + FloatArray(10_000) + FloatArray(1000) { -0.25f }, 44100)</ID>
@@ -2559,15 +2542,14 @@
     <ID>ReturnCount:SpeechWindows.kt$SpeechWindows$private fun slide(total: Int, window: Int, overlap: Int): List&lt;Span&gt;</ID>
     <ID>ReturnCount:VoiceStore.kt$VoiceStore$@Synchronized fun unenrol(voiceId: String, embedding: FloatArray): Boolean</ID>
     <ID>ReturnCount:WordGate.kt$WordGate$fun wordEndOverContinuingAudio(samples: FloatArray, sampleRate: Int, timed: TimedWord, audioEndMs: Long): Long</ID>
+    <ID>SpacingAroundKeyword:AacCapture.kt$AacCapture$catch</ID>
+    <ID>SpacingAroundKeyword:AacCapture.kt$AacCapture$else</ID>
+    <ID>SpacingAroundKeyword:AacCapture.kt$AacCapture$finally</ID>
     <ID>SpacingAroundKeyword:DeviceSmokeTest.kt$DeviceSmokeTest$else</ID>
     <ID>SpacingAroundKeyword:LibraryActivity.kt$LibraryActivity$catch</ID>
     <ID>SpacingAroundKeyword:LibraryStore.kt$LibraryStore$catch</ID>
     <ID>SpacingAroundKeyword:MainActivity.kt$MainActivity$catch</ID>
     <ID>SpacingAroundKeyword:MainActivity.kt$MainActivity$else</ID>
-    <ID>SpacingAroundKeyword:MicrophoneRecording.kt$AacRecording$catch</ID>
-    <ID>SpacingAroundKeyword:MicrophoneRecording.kt$AacRecording$else</ID>
-    <ID>SpacingAroundKeyword:MicrophoneRecording.kt$AacRecording$finally</ID>
-    <ID>SpacingAroundKeyword:NativeInference.kt$NativeInference$catch</ID>
     <ID>SpacingAroundKeyword:ProcessingCheckpoint.kt$ProcessingCheckpoint$catch</ID>
     <ID>SpacingAroundKeyword:RecordingActivity.kt$RecordingActivity.&lt;no name provided&gt;$else</ID>
     <ID>SpacingAroundKeyword:RecordingService.kt$RecordingService$finally</ID>
@@ -2597,13 +2579,13 @@
     <ID>SpacingBetweenDeclarationsWithAnnotations:MainActivity.kt$MainActivity$@Deprecated("Framework back callback") override fun onBackPressed()</ID>
     <ID>SpacingBetweenDeclarationsWithAnnotations:MainActivity.kt$MainActivity$@Volatile private var checkpointSaved = false</ID>
     <ID>SpacingBetweenDeclarationsWithAnnotations:MainActivity.kt$MainActivity$@Volatile private var draftNamingOpen = false</ID>
-    <ID>SpacingBetweenDeclarationsWithAnnotations:MicrophoneRecording.kt$OpusRecording$@Volatile override var paused = false private set</ID>
-    <ID>SpacingBetweenDeclarationsWithAnnotations:MicrophoneRecording.kt$OpusRecording$@Volatile private var failure: Throwable? = null</ID>
-    <ID>SpacingBetweenDeclarationsWithAnnotations:MicrophoneRecording.kt$OpusRecording$@Volatile private var peak = 0</ID>
-    <ID>SpacingBetweenDeclarationsWithAnnotations:MicrophoneRecording.kt$OpusRecording$@Volatile private var running = true</ID>
-    <ID>SpacingBetweenDeclarationsWithAnnotations:MicrophoneRecording.kt$OpusRecording$@Volatile private var samples = 0L</ID>
     <ID>SpacingBetweenDeclarationsWithAnnotations:OggOpusHeadTest.kt$OggOpusHeadTest$@Test fun recognisesOpusFirstPage()</ID>
     <ID>SpacingBetweenDeclarationsWithAnnotations:OggOpusHeadTest.kt$OggOpusHeadTest$@Test fun rejectsVorbisWavAndShortInput()</ID>
+    <ID>SpacingBetweenDeclarationsWithAnnotations:OpusCapture.kt$OpusCapture$@Volatile override var paused = false private set</ID>
+    <ID>SpacingBetweenDeclarationsWithAnnotations:OpusCapture.kt$OpusCapture$@Volatile private var failure: Throwable? = null</ID>
+    <ID>SpacingBetweenDeclarationsWithAnnotations:OpusCapture.kt$OpusCapture$@Volatile private var peak = 0</ID>
+    <ID>SpacingBetweenDeclarationsWithAnnotations:OpusCapture.kt$OpusCapture$@Volatile private var running = true</ID>
+    <ID>SpacingBetweenDeclarationsWithAnnotations:OpusCapture.kt$OpusCapture$@Volatile private var samples = 0L</ID>
     <ID>SpacingBetweenDeclarationsWithAnnotations:PortableDocumentTest.kt$PortableDocumentTest$@Test fun opusEncoderCapabilityHasClearOutcome()</ID>
     <ID>SpacingBetweenDeclarationsWithAnnotations:PortableDocumentTest.kt$PortableDocumentTest$@Test fun platformOpusEncodingKeepsDurationAndSpeechClock()</ID>
     <ID>SpacingBetweenDeclarationsWithAnnotations:PortableDocumentTest.kt$PortableDocumentTest$@Test fun threeMinuteOpusTrimsPaddingToTheExactDuration()</ID>
@@ -2706,6 +2688,8 @@
     <ID>SpacingBetweenDeclarationsWithComments:WordGate.kt$WordGate$/** Parakeet has placed a word up to 180 ms before its PCM; the margins absorb that jitter. */</ID>
     <ID>StringTemplate:ChunkingComparisonTest.kt$ChunkingComparisonTest$${entry.toString()}</ID>
     <ID>ThrowsCount:MainActivity.kt$MainActivity$private fun transcribe()</ID>
+    <ID>TooGenericExceptionCaught:AacCapture.kt$AacCapture$error: Exception</ID>
+    <ID>TooGenericExceptionCaught:AacCapture.kt$AacCapture$error: RuntimeException</ID>
     <ID>TooGenericExceptionCaught:CassiniDocument.kt$CassiniDocument.Companion$error: Exception</ID>
     <ID>TooGenericExceptionCaught:CassiniDocument.kt$CassiniDocument.Companion$error: Throwable</ID>
     <ID>TooGenericExceptionCaught:DocumentStore.kt$DocumentStore$error: Throwable</ID>
@@ -2714,12 +2698,9 @@
     <ID>TooGenericExceptionCaught:MainActivity.kt$MainActivity$error: Exception</ID>
     <ID>TooGenericExceptionCaught:MainActivity.kt$MainActivity$error: RuntimeException</ID>
     <ID>TooGenericExceptionCaught:MainActivity.kt$MainActivity.Companion$error: Exception</ID>
-    <ID>TooGenericExceptionCaught:MicrophoneRecording.kt$AacRecording$error: Exception</ID>
-    <ID>TooGenericExceptionCaught:MicrophoneRecording.kt$AacRecording$error: RuntimeException</ID>
-    <ID>TooGenericExceptionCaught:MicrophoneRecording.kt$OpusRecording$error: Exception</ID>
-    <ID>TooGenericExceptionCaught:MicrophoneRecording.kt$OpusRecording$error: Throwable</ID>
     <ID>TooGenericExceptionCaught:NoteVoices.kt$NoteVoiceStore$error: Exception</ID>
-    <ID>TooGenericExceptionCaught:Parakeet.kt$Parakeet.Decoder$error: Throwable</ID>
+    <ID>TooGenericExceptionCaught:OpusCapture.kt$OpusCapture$error: Exception</ID>
+    <ID>TooGenericExceptionCaught:OpusCapture.kt$OpusCapture$error: Throwable</ID>
     <ID>TooGenericExceptionCaught:ProcessingCheckpoint.kt$ProcessingCheckpoint$error: Throwable</ID>
     <ID>TooGenericExceptionCaught:RecordingActivity.kt$RecordingActivity$error: Exception</ID>
     <ID>TooGenericExceptionCaught:RecordingService.kt$RecordingService$e: Exception</ID>
@@ -2744,8 +2725,10 @@
     <ID>WildcardImport:LibraryActivity.kt$import android.widget.*</ID>
     <ID>WildcardImport:NoteViews.kt$import android.widget.*</ID>
     <ID>WildcardImport:RecordingActivity.kt$import android.widget.*</ID>
+    <ID>Wrapping:AacCapture.kt$AacCapture$;</ID>
+    <ID>Wrapping:AacCapture.kt$AacCapture${ 0 }</ID>
+    <ID>Wrapping:AacCapture.kt$AacCapture${ recorder?.maxAmplitude ?: 0 }</ID>
     <ID>Wrapping:AppLanguage.kt$AppLanguage$(</ID>
-    <ID>Wrapping:AsrEval.kt$AsrEval$it != "-"</ID>
     <ID>Wrapping:AudioDecoder.kt$AudioDecoder$(</ID>
     <ID>Wrapping:AudioDecoder.kt$AudioDecoder$;</ID>
     <ID>Wrapping:AudioDecoder.kt$AudioDecoder$minOf(frames.toLong(), (it * sampleRate / 48000 - firstFrame).coerceAtLeast(0)).toInt()</ID>
@@ -2816,6 +2799,9 @@
     <ID>Wrapping:DiarizationTest.kt$DiarizationTest$it.speaker</ID>
     <ID>Wrapping:DocumentStore.kt$DocumentStore$(</ID>
     <ID>Wrapping:DocumentStore.kt$DocumentStore$;</ID>
+    <ID>Wrapping:IncrementalRecognizer.kt$IncrementalRecognizer$</ID>
+    <ID>Wrapping:IncrementalRecognizer.kt$IncrementalRecognizer$it &gt; 0</ID>
+    <ID>Wrapping:IncrementalRecognizer.kt$IncrementalRecognizer$maxOf(it, doneMs)</ID>
     <ID>Wrapping:IncrementalTranscript.kt$IncrementalTranscript$;</ID>
     <ID>Wrapping:IncrementalTranscriptTest.kt$IncrementalTranscriptTest$(</ID>
     <ID>Wrapping:IncrementalTranscriptTest.kt$IncrementalTranscriptTest$;</ID>
@@ -2874,10 +2860,9 @@
     <ID>Wrapping:MainActivity.kt$MainActivity$(transcript, SpeakerAttribution.record(transcript.words, turns, recognition, null, diarizationMs) .put("x-incrementalDiarization", "28 s windows with 2 s overlap, persistent Sortformer speaker cache"))</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$-&gt;</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$;</ID>
-    <ID>Wrapping:MainActivity.kt$MainActivity$AudioDecoder.decode(this, uri)</ID>
+    <ID>Wrapping:MainActivity.kt$MainActivity$AudioDecoder(contentResolver, cacheDir).decode(uri)</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$app.voices.rename(it.id, name)</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$applySpeakerName(speaker, person.name, person.id, remember = true)</ID>
-    <ID>Wrapping:MainActivity.kt$MainActivity$checkActive()</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$checkpointStore()?.saveNames(draftSpeakerLabels.toMap(), draftSpeakerMerges, draftRememberedVoices.toMap(), draftAutomaticNames.toMap(), draftRememberGeneration)</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$confirmTranscription()</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$document?.speakerLabel(it)?.ifBlank { it } ?: it</ID>
@@ -2910,7 +2895,7 @@
     <ID>Wrapping:MainActivity.kt$MainActivity$speakers!!.getJSONObject(it).optString("id") == speakerId</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$synchronized(draftSpeakerLabels) { if (resumed == null) { draftSpeakerLabels.clear(); draftRememberedVoices.clear(); draftAutomaticNames.clear(); draftSpeakerMerges = emptyMap() draftRememberGeneration = app.voices.generation(); checkpoint.saveNames(emptyMap(), emptyMap(), generation = draftRememberGeneration) } draftNamingOpen = true }</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity$transcriptionProgress?.stage(TranscriptionProgress.Stage.MATCHING, (System.nanoTime() - totalBegan) / 1_000_000)</ID>
-    <ID>Wrapping:MainActivity.kt$MainActivity$try { if (!chosenModel.ready()) { download(chosenModel::install); onUi { fetchSpeechDetector() } } checkActive() val speakersReady = speakerModels.ready() || try { download(speakerModels::install); true } catch (error: IOException) { Log.w(TAG, "Speaker model unavailable", error); false } checkActive() // Voiceprints only name speakers; without the model the transcript is unchanged. if (speakersReady &amp;&amp; !voiceprintModel.ready()) try { voiceprintModel.install { progress -&gt; onUi { if (!cancelled.get()) showDownload(progress, R.string.voiceprint_model_progress) } } } catch (error: IOException) { Log.w(TAG, "Voiceprint model unavailable", error) } catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error; Log.w(TAG, "Voiceprint model unavailable", error) } checkActive() onUi { ui.progress.isIndeterminate = true; setStatus(R.string.decoding) } val totalBegan = System.nanoTime() - (resumed?.optLong("elapsedMs") ?: 0L) * 1_000_000 onUi { transcriptionBeganNs = totalBegan transcriptionProgress = TranscriptionProgress(session.durationMs) batteryProjection = BatteryProjection() batteryReading = null finalizationAtMs = -1L finalizationEstimateMs = getSharedPreferences("processing-estimates", MODE_PRIVATE).getLong("finalizationMs", 0) resumed?.let { saved -&gt; val words = Transcript.fromJson(saved.getJSONObject("recognition").getJSONObject("chunks").getJSONObject("words").toString()).words transcriptionProgress?.restore(saved.getLong("doneMs"), saved.getLong("durationMs"), words.size, saved.getLong("elapsedMs")) } session = session.copy(processingPaused = false) ui.status.minLines = 5 renderTranscriptionProgress() } checkpoint.directory.mkdirs() if (resumed == null) { checkpoint.audio.delete(); checkpoint.clips.delete() } PcmFile(checkpoint.clips, deleteOnClose = false).use { audio -&gt; resumed?.let { audio.truncate(it.getInt("clipSamples")) } val voiceClips = VoiceClipCache(audio, resumed?.optJSONObject("voiceClips")) val encoded = checkpoint.audio var encoder: StreamingOpusEncoder? = null var durationMs = 0L try { if (!documents.hasOpusAudio(uri)) encoder = StreamingOpusEncoder(encoded, resumed?.optJSONObject("encoder")) val speakerPrefix = resumed?.getString("speakerPrefix") ?: "diar_${UUID.randomUUID().toString().replace('-', '_')}_" var streamDiarizer: SortformerStream? = null var speakerFailure = resumed?.optBoolean("speakerFailure") ?: !speakersReady onUi { synchronized(draftSpeakerLabels) { if (resumed == null) { draftSpeakerLabels.clear(); draftRememberedVoices.clear(); draftAutomaticNames.clear(); draftSpeakerMerges = emptyMap() draftRememberGeneration = app.voices.generation(); checkpoint.saveNames(emptyMap(), emptyMap(), generation = draftRememberGeneration) } draftNamingOpen = true } } val detector = ModelStore.vadPath(filesDir).takeIf { ModelStore.vadReady(filesDir) } var lastDecodeUpdate = 0L val livePrints = mutableMapOf&lt;String, Pair&lt;FloatArray, Double&gt;&gt;() val liveAttemptSeconds = mutableMapOf&lt;String, Double&gt;() val rememberedPeople = knownVoices fun matchLiveVoices() { if (rememberedPeople.isEmpty() || !voiceprintModel.ready()) return val windows = SpeakerMerges.windows(voiceClips.windows, synchronized(draftSpeakerLabels) { draftSpeakerMerges.toMap() }) livePrints.keys.retainAll(windows.keys) val pending = windows.filter { (id, spans) -&gt; val seconds = spans.sumOf { it.endSample - it.startSample }.toDouble() / Limits.ASR_RATE val attempted = liveAttemptSeconds[id] ?: 0.0 seconds &gt;= 4 &amp;&amp; (attempted == 0.0 || seconds &gt;= attempted + 10) } if (pending.isEmpty()) return try { val computed = VoiceprintExtractor.compute(File(voiceprintModel.modelPath), audio, pending, leaseHeld = true) { checkActive() } computed.forEach { (id, print) -&gt; liveAttemptSeconds[id] = print.second; livePrints[id] = print } val names = rememberedPeople.associate { it.id to it.name } val matches = VoiceMatcher.match(livePrints.mapValues { it.value.first }, rememberedPeople, VoiceprintModel.model.sha256, Voiceprints.THRESHOLDS.getValue(VoiceprintModel.model.sha256)) onUi { draftAutomaticNames.clear() matches.filterValues { it.state == Match.State.AUTO }.forEach { (id, match) -&gt; names[match.voiceId]?.let { draftAutomaticNames[id] = it } } saveDraftNames() } } catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error; Log.w(TAG, "Live voice matching unavailable", error) } catch (error: Exception) { Log.w(TAG, "Live voice matching unavailable", error) } } val rawTranscript: Transcript val elapsed: Long NativeInference.acquire() try { if (resumed?.optJSONObject("diarizer") != null) streamDiarizer = SortformerStream(speakerModels.modelPath, resumed.getJSONObject("diarizer")) Parakeet.Incremental(chosenModel, detector, leaseHeld = true, restored = resumed?.getJSONObject("recognition"), onChunk = { chunk, startMs, words -&gt; checkActive() if (speakerFailure) words.copy(words = words.words.map { it.copy(speaker = "${speakerPrefix}1") }) else try { onUi { if (!cancelled.get()) transcriptionProgress?.stage(TranscriptionProgress.Stage.SPEAKERS, (System.nanoTime() - totalBegan) / 1_000_000, startMs, startMs + chunk.durationMs) } val diarizer = streamDiarizer ?: SortformerStream(speakerModels.modelPath).also { streamDiarizer = it } val found = diarizer.process(chunk, startMs) val assigned = if (found.isEmpty()) words.words.map { it.copy(speaker = "${speakerPrefix}1") } else Diarization.assign(words.words, found, speakerPrefix, stableIds = true) if (voiceprintModel.ready()) voiceClips.accept(chunk, found, assigned, startMs) matchLiveVoices() words.copy(words = assigned) } catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error speakerFailure = true Log.w(TAG, "Incremental speakers unavailable", error) words.copy(words = words.words.map { it.copy(speaker = "${speakerPrefix}1") }) } catch (error: Exception) { speakerFailure = true Log.w(TAG, "Incremental speakers unavailable", error) words.copy(words = words.words.map { it.copy(speaker = "${speakerPrefix}1") }) } }, onStage = { startMs, endMs, loading -&gt; checkActive() onUi { if (!cancelled.get()) transcriptionProgress?.stage( if (loading) TranscriptionProgress.Stage.PREPARING else TranscriptionProgress.Stage.WORDS, (System.nanoTime() - totalBegan) / 1_000_000, startMs, endMs) } }) { progress -&gt; checkActive() onUi { if (!cancelled.get()) showProgress(progress) } }.use { recognition -&gt; var previousSaved = resumed?.optLong("doneMs") ?: -1L fun saveCheckpoint() { audio.sync() val state = JSONObject().put("recognition", recognition.checkpoint()) .put("encoder", encoder?.checkpoint()).put("diarizer", streamDiarizer?.checkpoint()) .put("speakerPrefix", speakerPrefix).put("speakerFailure", speakerFailure) .put("clipSamples", audio.sampleCount).put("voiceClips", voiceClips.checkpoint()) .put("positionSamples", recognition.positionSamples).put("doneMs", recognition.doneMs) .put("durationMs", recognition.totalMs).put("elapsedMs", (System.nanoTime() - totalBegan) / 1_000_000) checkpoint.save(state) previousSaved = recognition.doneMs checkpointSaved = true } durationMs = AudioDecoder.stream(this, uri, onSamples = { samples, count -&gt; checkActive() encoder?.accept(samples, count) recognition.accept(samples, count) if (recognition.doneMs &gt; previousSaved || stopRequested.get()) saveCheckpoint() if (stopRequested.get()) throw ProcessingPaused() }, startSample = resumed?.optLong("positionSamples") ?: 0L) { decodedMs, durationMs -&gt; checkActive() recognition.totalMs = durationMs ?: session.durationMs val now = System.nanoTime() if (now - lastDecodeUpdate &gt;= 250_000_000L) { lastDecodeUpdate = now onUi { if (!cancelled.get()) { transcriptionProgress?.total(durationMs ?: recognition.totalMs) transcriptionProgress?.stage(TranscriptionProgress.Stage.READING, (now - totalBegan) / 1_000_000, end = decodedMs) } } } } requireUser(durationMs &gt;= 200, Failure.SHORT) rawTranscript = recognition.finish(durationMs) elapsed = recognition.inferenceMs saveCheckpoint() finishing = true checkActive() encoder?.finish() encoder?.close() } } finally { try { streamDiarizer?.close() } finally { NativeInference.lease.release() } } val finalizationBeganNs = System.nanoTime() val draftRemember = synchronized(draftSpeakerLabels) { draftRememberedVoices.toMap() } val draftGeneration = draftRememberGeneration val draftEdits = synchronized(draftSpeakerLabels) { draftNamingOpen = false draftSpeakerLabels.toMap() to draftSpeakerMerges.toMap() } onUi { speakerDialog?.dismiss(); renderTranscript() } val transcript = SpeakerMerges.apply(rawTranscript, draftEdits.second) val turns = streamDiarizer?.turns val diarizationMs = streamDiarizer?.elapsedMs ?: 0L checkActive() // Processing records are machine-readable provenance, independent of UI language. try { File(filesDir, "latest.words.json").writeText(transcript.json()) File(filesDir, "latest.processing.json").writeText(processing(chosenModel.precision, chosenModel.revision).put("language", transcript.language) .put("durationMs", durationMs).put("inferenceMs", elapsed) .put("segmentation", Parakeet.incrementalProvenance(detector)) .toString(2)) } catch (error: IOException) { Log.e(TAG, "Could not cache processing artifacts", error) } val recognition = processing(chosenModel.precision, chosenModel.revision).put("language", transcript.language) .put("x-inferenceMs", elapsed).put("x-segmentation", Parakeet.incrementalProvenance(detector)) .put("x-resumedFromMs", resumed?.optLong("doneMs") ?: 0L) val attributed = if (turns.isNullOrEmpty() || transcript.words.isEmpty()) null else SpeakerAttribution.Result(transcript, SpeakerAttribution.record(transcript.words, turns, recognition, null, diarizationMs) .put("x-incrementalDiarization", "28 s windows with 2 s overlap, persistent Sortformer speaker cache")) checkActive() val speakerTurns = turns val printModel = VoiceprintModel.model.sha256 // Naming speakers is best effort, like telling them apart: any failure keeps "Speaker N". val prints: Map&lt;String, SpeakerPrint&gt; = if (speakerTurns == null || attributed == null || !voiceprintModel.ready()) emptyMap() else try { onUi { transcriptionProgress?.stage(TranscriptionProgress.Stage.MATCHING, (System.nanoTime() - totalBegan) / 1_000_000) } val computed = VoiceprintExtractor.compute(File(voiceprintModel.modelPath), audio, SpeakerMerges.windows(voiceClips.windows, draftEdits.second)) { checkActive() } val matches = VoiceMatcher.match(computed.mapValues { it.value.first }, knownVoices, printModel, Voiceprints.THRESHOLDS.getValue(printModel)) if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) for ((id, print) in computed) Log.d(TAG, "Voiceprint $id ${"%.1f".format(java.util.Locale.ROOT, print.second)} s: ${matches[id]?.let { "${it.state} ${"%.3f".format(java.util.Locale.ROOT, it.score)}" } ?: "no match"}") computed.mapValues { (id, print) -&gt; SpeakerPrint(print.first, print.second, matches[id]) } } catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error; Log.w(TAG, "Voiceprints failed", error); emptyMap() } catch (error: RuntimeException) { Log.w(TAG, "Voiceprints failed", error); emptyMap() } catch (error: OutOfMemoryError) { Log.w(TAG, "Voiceprints failed", error); emptyMap() } checkActive() val names = knownVoices.associate { it.id to it.name } val draftNames = draftEdits.first val labels = transcript.words.map { it.speaker }.distinct().mapIndexed { index, id -&gt; id to (draftNames[id] ?: prints[id]?.match?.takeIf { it.state == Match.State.AUTO }?.let { names[it.voiceId] } ?: getString(R.string.speaker_label, index + 1)) }.toMap() // Counts only: which person a voice resembles never enters the document. if (attributed != null &amp;&amp; speakerTurns != null &amp;&amp; voiceprintModel.ready()) { val t = Voiceprints.THRESHOLDS.getValue(printModel) attributed.processing.put("x-speakerIdentification", JSONObject() .put("model", "3dspeaker_speech_campplus_sv_en_voxceleb_16k").put("sha256", printModel).put("dim", prints.values.firstOrNull()?.embedding?.size ?: 512) .put("metric", "cosine").put("autoThreshold", t.auto.toDouble()).put("suggestThreshold", t.suggest.toDouble()).put("margin", t.margin.toDouble()) .put("speakersWithPrints", prints.size).put("autoApplied", prints.values.count { it.match?.state == Match.State.AUTO &amp;&amp; it.match?.voiceId in names }) .put("suggested", prints.values.count { it.match?.state == Match.State.SUGGESTED })) } onUi { transcriptionProgress?.stage(TranscriptionProgress.Stage.SAVING, (System.nanoTime() - totalBegan) / 1_000_000) } onUi { draftNamingOpen = false; speakerDialog?.dismiss() } val sourceUri = if (encoder != null) Uri.fromFile(encoded) else uri val finalProcessing = (attributed?.processing ?: recognition).let { if (draftEdits.second.isEmpty()) it else SpeakerMerges.processing(it, draftEdits.second) } val (file, portable) = documents.createFromOpus(sourceUri, attributed?.transcript ?: transcript, session.name, finalProcessing, document, labels) if (stopRequested.get()) { file.delete(); throw ProcessingPaused() } val processingMs = (System.nanoTime() - totalBegan) / 1_000_000 val measuredFinalizationMs = (System.nanoTime() - finalizationBeganNs) / 1_000_000 // A completed native call may outlive its screen. Never publish a cancelled result, // and remove only this job's new immutable document when it cannot be adopted. handler.post { if (isDestroyed || isFinishing || cancelled.get() || stopRequested.get()) file.delete() else { val position = if (playerReady) player?.currentPosition ?: session.positionMs else session.positionMs interim = null session = session.copy(uri = Uri.fromFile(file).toString(), document = file.absolutePath, name = "${session.name.substringBeforeLast('.')}.opus", selectedVariant = portable.defaultId, durationMs = durationMs, inferenceMs = elapsed, resultPrecision = chosenModel.precision, positionMs = position, processingMs = processingMs, processingPaused = false) getSharedPreferences("processing-estimates", MODE_PRIVATE).edit().putLong("finalizationMs", if (finalizationEstimateMs &gt; 0) (finalizationEstimateMs * 3 + measuredFinalizationMs) / 4 else measuredFinalizationMs).apply() adoptDocument(portable) preparePlayer(Uri.fromFile(file)) // Until the note points at the result, the checkpoint is the only way back to it. if (persistSession()) { checkpoint.discard(); checkpointSaved = false } else Log.w(TAG, "Kept the processing checkpoint: the note could not be saved") portable.manifest?.optJSONObject("meeting")?.optString("id")?.takeIf { it.isNotEmpty() &amp;&amp; prints.isNotEmpty() }?.let { meeting -&gt; try { app.noteVoices.merge(meeting, portable.defaultId ?: return@let, printModel, prints) } catch (error: Exception) { Log.w(TAG, "Could not save voiceprints", error) } } loadVoices() // Voices forgotten since the choice was made stay forgotten. if (draftGeneration == app.voices.generation()) draftRemember.forEach { (id, voice) -&gt; if (voice.isNotEmpty() &amp;&amp; voice !in people) return@forEach labels[id]?.let { name -&gt; rememberVoice(id, name, voice.takeIf { it.isNotEmpty() }, true) } } renderScreen() if (attributed == null &amp;&amp; transcript.words.isNotEmpty()) setStatus(R.string.speakers_unavailable) else defaultStatus() } } } finally { encoder?.close() } } } finally { checkpoint.release() }</ID>
+    <ID>Wrapping:MainActivity.kt$MainActivity$try { if (!chosenModel.ready()) { download(chosenModel::install); onUi { fetchSpeechDetector() } } checkActive() val speakersReady = speakerModels.ready() || try { download(speakerModels::install); true } catch (error: IOException) { Log.w(TAG, "Speaker model unavailable", error); false } checkActive() // Voiceprints only name speakers; without the model the transcript is unchanged. if (speakersReady &amp;&amp; !voiceprintModel.ready()) try { voiceprintModel.install { progress -&gt; onUi { if (!cancelled.get()) showDownload(progress, R.string.voiceprint_model_progress) } } } catch (error: IOException) { Log.w(TAG, "Voiceprint model unavailable", error) } catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error; Log.w(TAG, "Voiceprint model unavailable", error) } checkActive() onUi { ui.progress.isIndeterminate = true; setStatus(R.string.decoding) } val totalBegan = System.nanoTime() - (resumed?.optLong("elapsedMs") ?: 0L) * 1_000_000 onUi { transcriptionBeganNs = totalBegan transcriptionProgress = TranscriptionProgress(session.durationMs) batteryProjection = BatteryProjection() batteryReading = null finalizationAtMs = -1L finalizationEstimateMs = getSharedPreferences("processing-estimates", MODE_PRIVATE).getLong("finalizationMs", 0) resumed?.let { saved -&gt; val words = Transcript.fromJson(saved.getJSONObject("recognition").getJSONObject("chunks").getJSONObject("words").toString()).words transcriptionProgress?.restore(saved.getLong("doneMs"), saved.getLong("durationMs"), words.size, saved.getLong("elapsedMs")) } session = session.copy(processingPaused = false) ui.status.minLines = 5 renderTranscriptionProgress() } checkpoint.directory.mkdirs() if (resumed == null) { checkpoint.audio.delete(); checkpoint.clips.delete() } PcmFile(checkpoint.clips, deleteOnClose = false).use { audio -&gt; resumed?.let { audio.truncate(it.getInt("clipSamples")) } val voiceClips = VoiceClipCache(audio, resumed?.optJSONObject("voiceClips")) val encoded = checkpoint.audio var encoder: StreamingOpusEncoder? = null var durationMs = 0L try { if (!documents.hasOpusAudio(uri)) encoder = StreamingOpusEncoder(encoded, resumed?.optJSONObject("encoder")) val speakerPrefix = resumed?.getString("speakerPrefix") ?: "diar_${UUID.randomUUID().toString().replace('-', '_')}_" var streamDiarizer: SortformerStream? = null var speakerFailure = resumed?.optBoolean("speakerFailure") ?: !speakersReady onUi { synchronized(draftSpeakerLabels) { if (resumed == null) { draftSpeakerLabels.clear(); draftRememberedVoices.clear(); draftAutomaticNames.clear(); draftSpeakerMerges = emptyMap() draftRememberGeneration = app.voices.generation(); checkpoint.saveNames(emptyMap(), emptyMap(), generation = draftRememberGeneration) } draftNamingOpen = true } } val detector = ModelStore.vadPath(filesDir).takeIf { ModelStore.vadReady(filesDir) } var lastDecodeUpdate = 0L val livePrints = mutableMapOf&lt;String, Pair&lt;FloatArray, Double&gt;&gt;() val liveAttemptSeconds = mutableMapOf&lt;String, Double&gt;() val rememberedPeople = knownVoices fun matchLiveVoices() { if (rememberedPeople.isEmpty() || !voiceprintModel.ready()) return val windows = SpeakerMerges.windows(voiceClips.windows, synchronized(draftSpeakerLabels) { draftSpeakerMerges.toMap() }) livePrints.keys.retainAll(windows.keys) val pending = windows.filter { (id, spans) -&gt; val seconds = spans.sumOf { it.endSample - it.startSample }.toDouble() / Limits.ASR_RATE val attempted = liveAttemptSeconds[id] ?: 0.0 seconds &gt;= 4 &amp;&amp; (attempted == 0.0 || seconds &gt;= attempted + 10) } if (pending.isEmpty()) return try { val computed = VoiceprintExtractor.compute(File(voiceprintModel.modelPath), audio, pending) { checkActive() } computed.forEach { (id, print) -&gt; liveAttemptSeconds[id] = print.second; livePrints[id] = print } val names = rememberedPeople.associate { it.id to it.name } val matches = VoiceMatcher.match(livePrints.mapValues { it.value.first }, rememberedPeople, VoiceprintModel.model.sha256, Voiceprints.THRESHOLDS.getValue(VoiceprintModel.model.sha256)) onUi { draftAutomaticNames.clear() matches.filterValues { it.state == Match.State.AUTO }.forEach { (id, match) -&gt; names[match.voiceId]?.let { draftAutomaticNames[id] = it } } saveDraftNames() } } catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error; Log.w(TAG, "Live voice matching unavailable", error) } catch (error: Exception) { Log.w(TAG, "Live voice matching unavailable", error) } } val rawTranscript: Transcript val elapsed: Long NativeBudget.acquire() try { if (resumed?.optJSONObject("diarizer") != null) streamDiarizer = SortformerStream(speakerModels.modelPath, resumed.getJSONObject("diarizer")) IncrementalRecognizer(chosenModel.files(), detector, restored = resumed?.getJSONObject("recognition"), onChunk = { chunk, startMs, words -&gt; checkActive() if (speakerFailure) words.copy(words = words.words.map { it.copy(speaker = "${speakerPrefix}1") }) else try { onUi { if (!cancelled.get()) transcriptionProgress?.stage(TranscriptionProgress.Stage.SPEAKERS, (System.nanoTime() - totalBegan) / 1_000_000, startMs, startMs + chunk.durationMs) } val diarizer = streamDiarizer ?: SortformerStream(speakerModels.modelPath).also { streamDiarizer = it } val found = diarizer.process(chunk, startMs) val assigned = if (found.isEmpty()) words.words.map { it.copy(speaker = "${speakerPrefix}1") } else Diarization.assign(words.words, found, speakerPrefix, stableIds = true) if (voiceprintModel.ready()) voiceClips.accept(chunk, found, assigned, startMs) matchLiveVoices() words.copy(words = assigned) } catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error speakerFailure = true Log.w(TAG, "Incremental speakers unavailable", error) words.copy(words = words.words.map { it.copy(speaker = "${speakerPrefix}1") }) } catch (error: Exception) { speakerFailure = true Log.w(TAG, "Incremental speakers unavailable", error) words.copy(words = words.words.map { it.copy(speaker = "${speakerPrefix}1") }) } }, onStage = { startMs, endMs, loading -&gt; checkActive() onUi { if (!cancelled.get()) transcriptionProgress?.stage( if (loading) TranscriptionProgress.Stage.PREPARING else TranscriptionProgress.Stage.WORDS, (System.nanoTime() - totalBegan) / 1_000_000, startMs, endMs) } }) { progress -&gt; checkActive() onUi { if (!cancelled.get()) showProgress(progress) } }.use { recognition -&gt; var previousSaved = resumed?.optLong("doneMs") ?: -1L fun saveCheckpoint() { audio.sync() val state = JSONObject().put("recognition", recognition.checkpoint()) .put("encoder", encoder?.checkpoint()).put("diarizer", streamDiarizer?.checkpoint()) .put("speakerPrefix", speakerPrefix).put("speakerFailure", speakerFailure) .put("clipSamples", audio.sampleCount).put("voiceClips", voiceClips.checkpoint()) .put("positionSamples", recognition.positionSamples).put("doneMs", recognition.doneMs) .put("durationMs", recognition.totalMs).put("elapsedMs", (System.nanoTime() - totalBegan) / 1_000_000) checkpoint.save(state) previousSaved = recognition.doneMs checkpointSaved = true } durationMs = AudioDecoder(contentResolver, cacheDir).stream(uri, onSamples = { samples, count -&gt; checkActive() encoder?.accept(samples, count) recognition.accept(samples, count) if (recognition.doneMs &gt; previousSaved || stopRequested.get()) saveCheckpoint() if (stopRequested.get()) throw ProcessingPaused() }, startSample = resumed?.optLong("positionSamples") ?: 0L) { decodedMs, durationMs -&gt; checkActive() recognition.totalMs = durationMs ?: session.durationMs val now = System.nanoTime() if (now - lastDecodeUpdate &gt;= 250_000_000L) { lastDecodeUpdate = now onUi { if (!cancelled.get()) { transcriptionProgress?.total(durationMs ?: recognition.totalMs) transcriptionProgress?.stage(TranscriptionProgress.Stage.READING, (now - totalBegan) / 1_000_000, end = decodedMs) } } } } requireUser(durationMs &gt;= 200, Failure.SHORT) rawTranscript = recognition.finish(durationMs) elapsed = recognition.inferenceMs saveCheckpoint() finishing = true checkActive() encoder?.finish() encoder?.close() } } finally { try { streamDiarizer?.close() } finally { NativeBudget.release() } } val finalizationBeganNs = System.nanoTime() val draftRemember = synchronized(draftSpeakerLabels) { draftRememberedVoices.toMap() } val draftGeneration = draftRememberGeneration val draftEdits = synchronized(draftSpeakerLabels) { draftNamingOpen = false draftSpeakerLabels.toMap() to draftSpeakerMerges.toMap() } onUi { speakerDialog?.dismiss(); renderTranscript() } val transcript = SpeakerMerges.apply(rawTranscript, draftEdits.second) val turns = streamDiarizer?.turns val diarizationMs = streamDiarizer?.elapsedMs ?: 0L checkActive() // Processing records are machine-readable provenance, independent of UI language. try { File(filesDir, "latest.words.json").writeText(transcript.json()) File(filesDir, "latest.processing.json").writeText(processing(chosenModel.precision, chosenModel.revision).put("language", transcript.language) .put("durationMs", durationMs).put("inferenceMs", elapsed) .put("segmentation", Parakeet.incrementalProvenance(detector)) .toString(2)) } catch (error: IOException) { Log.e(TAG, "Could not cache processing artifacts", error) } val recognition = processing(chosenModel.precision, chosenModel.revision).put("language", transcript.language) .put("x-inferenceMs", elapsed).put("x-segmentation", Parakeet.incrementalProvenance(detector)) .put("x-resumedFromMs", resumed?.optLong("doneMs") ?: 0L) val attributed = if (turns.isNullOrEmpty() || transcript.words.isEmpty()) null else SpeakerAttribution.Result(transcript, SpeakerAttribution.record(transcript.words, turns, recognition, null, diarizationMs) .put("x-incrementalDiarization", "28 s windows with 2 s overlap, persistent Sortformer speaker cache")) checkActive() val speakerTurns = turns val printModel = VoiceprintModel.model.sha256 // Naming speakers is best effort, like telling them apart: any failure keeps "Speaker N". val prints: Map&lt;String, SpeakerPrint&gt; = if (speakerTurns == null || attributed == null || !voiceprintModel.ready()) emptyMap() else try { onUi { transcriptionProgress?.stage(TranscriptionProgress.Stage.MATCHING, (System.nanoTime() - totalBegan) / 1_000_000) } val computed = NativeBudget.holding { VoiceprintExtractor.compute(File(voiceprintModel.modelPath), audio, SpeakerMerges.windows(voiceClips.windows, draftEdits.second)) { checkActive() } } val matches = VoiceMatcher.match(computed.mapValues { it.value.first }, knownVoices, printModel, Voiceprints.THRESHOLDS.getValue(printModel)) if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) for ((id, print) in computed) Log.d(TAG, "Voiceprint $id ${"%.1f".format(java.util.Locale.ROOT, print.second)} s: ${matches[id]?.let { "${it.state} ${"%.3f".format(java.util.Locale.ROOT, it.score)}" } ?: "no match"}") computed.mapValues { (id, print) -&gt; SpeakerPrint(print.first, print.second, matches[id]) } } catch (error: UserFacingException) { if (error.failure == Failure.CANCELLED) throw error; Log.w(TAG, "Voiceprints failed", error); emptyMap() } catch (error: RuntimeException) { Log.w(TAG, "Voiceprints failed", error); emptyMap() } catch (error: OutOfMemoryError) { Log.w(TAG, "Voiceprints failed", error); emptyMap() } checkActive() val names = knownVoices.associate { it.id to it.name } val draftNames = draftEdits.first val labels = transcript.words.map { it.speaker }.distinct().mapIndexed { index, id -&gt; id to (draftNames[id] ?: prints[id]?.match?.takeIf { it.state == Match.State.AUTO }?.let { names[it.voiceId] } ?: getString(R.string.speaker_label, index + 1)) }.toMap() // Counts only: which person a voice resembles never enters the document. if (attributed != null &amp;&amp; speakerTurns != null &amp;&amp; voiceprintModel.ready()) { val t = Voiceprints.THRESHOLDS.getValue(printModel) attributed.processing.put("x-speakerIdentification", JSONObject() .put("model", "3dspeaker_speech_campplus_sv_en_voxceleb_16k").put("sha256", printModel).put("dim", prints.values.firstOrNull()?.embedding?.size ?: 512) .put("metric", "cosine").put("autoThreshold", t.auto.toDouble()).put("suggestThreshold", t.suggest.toDouble()).put("margin", t.margin.toDouble()) .put("speakersWithPrints", prints.size).put("autoApplied", prints.values.count { it.match?.state == Match.State.AUTO &amp;&amp; it.match?.voiceId in names }) .put("suggested", prints.values.count { it.match?.state == Match.State.SUGGESTED })) } onUi { transcriptionProgress?.stage(TranscriptionProgress.Stage.SAVING, (System.nanoTime() - totalBegan) / 1_000_000) } onUi { draftNamingOpen = false; speakerDialog?.dismiss() } val sourceUri = if (encoder != null) Uri.fromFile(encoded) else uri val finalProcessing = (attributed?.processing ?: recognition).let { if (draftEdits.second.isEmpty()) it else SpeakerMerges.processing(it, draftEdits.second) } val (file, portable) = documents.createFromOpus(sourceUri, attributed?.transcript ?: transcript, session.name, finalProcessing, document, labels) if (stopRequested.get()) { file.delete(); throw ProcessingPaused() } val processingMs = (System.nanoTime() - totalBegan) / 1_000_000 val measuredFinalizationMs = (System.nanoTime() - finalizationBeganNs) / 1_000_000 // A completed native call may outlive its screen. Never publish a cancelled result, // and remove only this job's new immutable document when it cannot be adopted. handler.post { if (isDestroyed || isFinishing || cancelled.get() || stopRequested.get()) file.delete() else { val position = if (playerReady) player?.currentPosition ?: session.positionMs else session.positionMs interim = null session = session.copy(uri = Uri.fromFile(file).toString(), document = file.absolutePath, name = "${session.name.substringBeforeLast('.')}.opus", selectedVariant = portable.defaultId, durationMs = durationMs, inferenceMs = elapsed, resultPrecision = chosenModel.precision, positionMs = position, processingMs = processingMs, processingPaused = false) getSharedPreferences("processing-estimates", MODE_PRIVATE).edit().putLong("finalizationMs", if (finalizationEstimateMs &gt; 0) (finalizationEstimateMs * 3 + measuredFinalizationMs) / 4 else measuredFinalizationMs).apply() adoptDocument(portable) preparePlayer(Uri.fromFile(file)) // Until the note points at the result, the checkpoint is the only way back to it. if (persistSession()) { checkpoint.discard(); checkpointSaved = false } else Log.w(TAG, "Kept the processing checkpoint: the note could not be saved") portable.manifest?.optJSONObject("meeting")?.optString("id")?.takeIf { it.isNotEmpty() &amp;&amp; prints.isNotEmpty() }?.let { meeting -&gt; try { app.noteVoices.merge(meeting, portable.defaultId ?: return@let, printModel, prints) } catch (error: Exception) { Log.w(TAG, "Could not save voiceprints", error) } } loadVoices() // Voices forgotten since the choice was made stay forgotten. if (draftGeneration == app.voices.generation()) draftRemember.forEach { (id, voice) -&gt; if (voice.isNotEmpty() &amp;&amp; voice !in people) return@forEach labels[id]?.let { name -&gt; rememberVoice(id, name, voice.takeIf { it.isNotEmpty() }, true) } } renderScreen() if (attributed == null &amp;&amp; transcript.words.isNotEmpty()) setStatus(R.string.speakers_unavailable) else defaultStatus() } } } finally { encoder?.close() } } } finally { checkpoint.release() }</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity${ Log.e(TAG, "Could not persist session", error); setStatus(R.string.library_error, error = true); return false }</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity${ Log.w(TAG, "Could not save voiceprints", error) }</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity${ app.noteVoices.merge(meeting, portable.defaultId ?: return@let, printModel, prints) }</ID>
@@ -2936,13 +2921,6 @@
     <ID>Wrapping:MainActivity.kt$MainActivity.Companion$;</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity.Companion${ Log.w(TAG, "Speech detector unavailable", error) }</ID>
     <ID>Wrapping:MainActivity.kt$MainActivity.Companion${ ModelStore.installVad(filesDir) { } }</ID>
-    <ID>Wrapping:MicrophoneRecording.kt$AacRecording$;</ID>
-    <ID>Wrapping:MicrophoneRecording.kt$AacRecording${ 0 }</ID>
-    <ID>Wrapping:MicrophoneRecording.kt$AacRecording${ recorder?.maxAmplitude ?: 0 }</ID>
-    <ID>Wrapping:MicrophoneRecording.kt$OpusRecording$(</ID>
-    <ID>Wrapping:MicrophoneRecording.kt$OpusRecording$(MediaFormat.createAudioFormat("audio/opus", RATE, 1).apply { setInteger(MediaFormat.KEY_BIT_RATE, 48000) setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, FRAME * 2) }, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)</ID>
-    <ID>Wrapping:MicrophoneRecording.kt$OpusRecording$;</ID>
-    <ID>Wrapping:MicrophoneRecording.kt$OpusRecording.Companion$;</ID>
     <ID>Wrapping:ModelBundle.kt$ModelBundle.Companion$(</ID>
     <ID>Wrapping:ModelBundleTest.kt$ModelBundleTest$;</ID>
     <ID>Wrapping:ModelBundleTest.kt$ModelBundleTest$it.setLength(size)</ID>
@@ -3011,17 +2989,17 @@
     <ID>Wrapping:OggRepairTest.kt$OggRepairTest$bytes[at + 27 + it].toInt() and 255</ID>
     <ID>Wrapping:OggRepairTest.kt$OggRepairTest$random.nextBytes(it); it[0] = -8</ID>
     <ID>Wrapping:OggRepairTest.kt$OggRepairTest${ offsets += at; at += 27 + (bytes[at + 26].toInt() and 255) + (0 until (bytes[at + 26].toInt() and 255)).sumOf { bytes[at + 27 + it].toInt() and 255 } }</ID>
+    <ID>Wrapping:OpusCapture.kt$OpusCapture$(</ID>
+    <ID>Wrapping:OpusCapture.kt$OpusCapture$(MediaFormat.createAudioFormat("audio/opus", RATE, 1).apply { setInteger(MediaFormat.KEY_BIT_RATE, 48000) setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, FRAME * 2) }, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)</ID>
+    <ID>Wrapping:OpusCapture.kt$OpusCapture$;</ID>
+    <ID>Wrapping:OpusCapture.kt$OpusCapture.Companion$;</ID>
     <ID>Wrapping:OpusEncoder.kt$OpusEncoder$(</ID>
     <ID>Wrapping:OpusEncoder.kt$OpusEncoder$(MediaFormat.createAudioFormat("audio/opus", RATE, 1).apply { setInteger(MediaFormat.KEY_BIT_RATE, 48000) setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, FRAME * 2) }, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)</ID>
     <ID>Wrapping:OpusEncoder.kt$OpusEncoder$;</ID>
     <ID>Wrapping:Parakeet.kt$Parakeet$(</ID>
-    <ID>Wrapping:Parakeet.kt$Parakeet.Decoder$(</ID>
-    <ID>Wrapping:Parakeet.kt$Parakeet.Decoder$(if (headPad == 0 &amp;&amp; tailPad == 0 &amp;&amp; start == 0 &amp;&amp; length == audio.samples.size) audio.samples else FloatArray(headPad + length + tailPad).also { audio.samples.copyInto(it, headPad, start, start + length) }, audio.sampleRate)</ID>
-    <ID>Wrapping:Parakeet.kt$Parakeet.Decoder$audio.samples.copyInto(it, headPad, start, start + length)</ID>
-    <ID>Wrapping:Parakeet.kt$Parakeet.Incremental$</ID>
-    <ID>Wrapping:Parakeet.kt$Parakeet.Incremental$(</ID>
-    <ID>Wrapping:Parakeet.kt$Parakeet.Incremental$it &gt; 0</ID>
-    <ID>Wrapping:Parakeet.kt$Parakeet.Incremental$maxOf(it, doneMs)</ID>
+    <ID>Wrapping:ParakeetDecoder.kt$ParakeetDecoder$(</ID>
+    <ID>Wrapping:ParakeetDecoder.kt$ParakeetDecoder$(if (headPad == 0 &amp;&amp; tailPad == 0 &amp;&amp; start == 0 &amp;&amp; length == audio.samples.size) audio.samples else FloatArray(headPad + length + tailPad).also { audio.samples.copyInto(it, headPad, start, start + length) }, audio.sampleRate)</ID>
+    <ID>Wrapping:ParakeetDecoder.kt$ParakeetDecoder$audio.samples.copyInto(it, headPad, start, start + length)</ID>
     <ID>Wrapping:PcmSource.kt$PcmFile$;</ID>
     <ID>Wrapping:PcmSource.kt$PcmFile${ it.close(); throw IllegalArgumentException("Invalid PCM cache length") }</ID>
     <ID>Wrapping:PcmSource.kt$PcmFile${ require(samples &gt;= 0 &amp;&amp; samples &lt;= sampleCount); data.setLength(samples * 4L); sampleCount = samples }</ID>
@@ -3065,8 +3043,6 @@
     <ID>Wrapping:RecordingService.kt$RecordingService$(</ID>
     <ID>Wrapping:RecordingService.kt$RecordingService$(this, 0, Intent(this, RecordingActivity::class.java) .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)</ID>
     <ID>Wrapping:RecordingService.kt$RecordingService$;</ID>
-    <ID>Wrapping:RecordingService.kt$RecordingService$handler.post { if (capture != null) finish(false, failed = true) }</ID>
-    <ID>Wrapping:RecordingService.kt$RecordingService$if (capture != null) finish(false, failed = true)</ID>
     <ID>Wrapping:RecordingService.kt$RecordingService${ if (capture != null) finish(false); handler.removeCallbacksAndMessages(null); super.onDestroy() }</ID>
     <ID>Wrapping:RecordingService.kt$RecordingService.&lt;no name provided&gt;$;</ID>
     <ID>Wrapping:RecoveryCheckTest.kt$RecoveryCheckTest$;</ID>
@@ -3120,9 +3096,9 @@
     <ID>Wrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$(resampleTo16k(first.samples, first.sampleRate) + FloatArray(16000) + resampleTo16k(second.samples, second.sampleRate), 16000)</ID>
     <ID>Wrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$-&gt;</ID>
     <ID>Wrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$;</ID>
-    <ID>Wrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$AudioDecoder.decode(context, Uri.fromFile(wav))</ID>
     <ID>Wrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$File(it).delete()</ID>
     <ID>Wrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$assertEquals(it.getString(R.string.speaker_renamed, "Anna"), it.findViewById&lt;TextView&gt;(R.id.operation_status).text.toString())</ID>
+    <ID>Wrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$audioDecoder(context).decode(Uri.fromFile(wav))</ID>
     <ID>Wrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$doc.speakerLabel(it) == "Anna"</ID>
     <ID>Wrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$done = condition(it)</ID>
     <ID>Wrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$it.findViewById&lt;TextView&gt;(R.id.transcript_text).text.contains(label) &amp;&amp; it.findViewById&lt;Button&gt;(R.id.more_button).isEnabled</ID>
@@ -3185,7 +3161,7 @@
     <ID>Wrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$it[d].toDouble()</ID>
     <ID>Wrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest${ false }</ID>
     <ID>Wrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest${ instrumentation.context.assets.open(name).close(); true }</ID>
-    <ID>Wrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest${ return AudioDecoder.decode(context, Uri.fromFile(file)).let { PcmAudio(resampleTo16k(it.samples, it.sampleRate), 16000) } }</ID>
+    <ID>Wrapping:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest${ return audioDecoder(context).decode(Uri.fromFile(file)).let { PcmAudio(resampleTo16k(it.samples, it.sampleRate), 16000) } }</ID>
     <ID>Wrapping:VoiceprintExtractor.kt$VoiceprintExtractor$;</ID>
     <ID>Wrapping:VoiceprintSelection.kt$Voiceprints$(</ID>
     <ID>Wrapping:VoiceprintSelection.kt$Voiceprints$-&gt;</ID>

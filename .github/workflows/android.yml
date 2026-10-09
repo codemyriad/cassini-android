@@ -130,7 +130,7 @@ jobs:
           ./gradlew --no-daemon \
             -PdeviceTestBuildType="$DEVICE_TEST_TYPE" \
             ":app:assemble$BUILD_TYPE" ":app:assemble${DEVICE_TEST_TYPE^}" ":app:assemble${DEVICE_TEST_TYPE^}AndroidTest" \
-            :core:test :app:testDebugUnitTest ":app:lint$BUILD_TYPE"
+            :core:test :engine:testDebugUnitTest :app:testDebugUnitTest ":app:lint$BUILD_TYPE"
       - name: Prepare installable APK
         env:
           TAG: ${{ github.ref_name }}
@@ -260,7 +260,7 @@ jobs:
             echo "::warning title=Native AAR drift::The AAR built from source ($built) differs from the pinned release build ($pinned)."
           fi
       - name: Build and test the app with the source-built AAR
-        run: ./gradlew --no-daemon :app:assembleDebug :core:test :app:testDebugUnitTest
+        run: ./gradlew --no-daemon :app:assembleDebug :core:test :engine:testDebugUnitTest :app:testDebugUnitTest
 
   release:
     if: startsWith(github.ref, 'refs/tags/')

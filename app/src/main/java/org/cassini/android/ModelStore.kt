@@ -5,6 +5,7 @@ import org.cassini.core.models.Artifact
 import org.cassini.core.models.ArtifactFetcher
 import org.cassini.core.models.ModelCatalog
 import org.cassini.core.requireUser
+import org.cassini.engine.asr.ParakeetFiles
 import java.io.File
 
 /** The Parakeet install in [directory] and the speech detector, over the pins of [ModelCatalog]. */
@@ -44,6 +45,9 @@ class ModelStore(private val directory: File) {
     private val artifacts = int8Artifacts
     private val marker = File(directory, ModelCatalog.PARAKEET.markerFile)
     fun modelPath(component: String) = path("$component.int8.onnx")
+
+    /** The recognizer's files in this install, for the engine's [org.cassini.engine.asr.ParakeetDecoder]. */
+    fun files() = ParakeetFiles(modelPath("encoder"), modelPath("decoder"), modelPath("joiner"), path("tokens.txt"))
 
     fun path(name: String) = File(directory, name).absolutePath
     fun ready() = artifacts.all {

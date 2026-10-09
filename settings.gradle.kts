@@ -19,4 +19,5 @@ dependencyResolutionManagement {
 }
 rootProject.name = "CassiniAndroid"
 include(":core")
+include(":engine")
 include(":app")

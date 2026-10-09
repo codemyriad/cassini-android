@@ -33,7 +33,7 @@ class ProcessingResumeTest {
         (context.applicationContext as CassiniApplication).voices.clear() // The rule restores the user’s exact saved profiles.
         val fixture = File(context.cacheDir, "resume-fixture.wav")
         instrumentation.context.assets.open("youtube-smoke.wav").use { input -> fixture.outputStream().use { input.copyTo(it) } }
-        val original = AudioDecoder.decode(context, Uri.fromFile(fixture)).samples
+        val original = audioDecoder(context).decode(Uri.fromFile(fixture)).samples
         val samples = FloatArray(90 * 16000) { original[it % original.size] }
         val file = File(context.cacheDir, "resume-long.wav")
         val header = ByteBuffer.allocate(44).order(ByteOrder.LITTLE_ENDIAN).apply {

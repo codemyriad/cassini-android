@@ -6,6 +6,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import org.cassini.core.asr.DecodePolicy
 import org.cassini.core.audio.PcmAudio
 import org.cassini.core.format.Transcript
+import org.cassini.engine.asr.Parakeet
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.*
@@ -25,7 +26,7 @@ class ChunkingComparisonTest {
     private fun fixture(name: String): PcmAudio {
         val file = File(context.cacheDir, name)
         instrumentation.context.assets.open(name).use { input -> file.outputStream().use { input.copyTo(it) } }
-        try { return AudioDecoder.decode(context, Uri.fromFile(file)) } finally { file.delete() }
+        try { return audioDecoder(context).decode(Uri.fromFile(file)) } finally { file.delete() }
     }
 
     /** Lowercase words. A curly apostrophe and digit grouping ("4.892") are spelling, not recognition, so they are folded first. */
@@ -57,13 +58,13 @@ class ChunkingComparisonTest {
         val available = instrumentation.context.assets.list("")!!.toSet()
         val reference = tokens(JSONObject(instrumentation.context.assets.open("fleurs-it-short.json").bufferedReader().use { it.readText() }).getString("reference"))
         val modes = linkedMapOf<String, (PcmAudio, (Parakeet.Progress) -> Unit) -> Transcript>(
-            "whole" to { audio, _ -> Parakeet.transcribe(audio, models, null, cutting = Parakeet.Cutting.WHOLE) },
-            "fixed-15s" to { audio, progress -> Parakeet.transcribe(audio, models, null, cutting = Parakeet.Cutting.FIXED, onProgress = progress) },
-            "quiet-cuts" to { audio, progress -> Parakeet.transcribe(audio, models, null, onProgress = progress) },
-            "speech-10s-tail" to { audio, progress -> Parakeet.transcribe(audio, models, detector, DecodePolicy(), onProgress = progress) },
-            "speech-span-notail" to { audio, progress -> Parakeet.transcribe(audio, models, detector, DecodePolicy(preserveSpan = true, tailPaddingMs = 0), onProgress = progress) },
-            "speech-span-context" to { audio, progress -> Parakeet.transcribe(audio, models, detector, DecodePolicy.PARAKEET_V3_REFERENCE, onProgress = progress) },
-            "speech-span-tail" to { audio, progress -> Parakeet.transcribe(audio, models, detector, onProgress = progress) },
+            "whole" to { audio, _ -> Parakeet.transcribe(audio, models.files(), null, cutting = Parakeet.Cutting.WHOLE) },
+            "fixed-15s" to { audio, progress -> Parakeet.transcribe(audio, models.files(), null, cutting = Parakeet.Cutting.FIXED, onProgress = progress) },
+            "quiet-cuts" to { audio, progress -> Parakeet.transcribe(audio, models.files(), null, onProgress = progress) },
+            "speech-10s-tail" to { audio, progress -> Parakeet.transcribe(audio, models.files(), detector, DecodePolicy(), onProgress = progress) },
+            "speech-span-notail" to { audio, progress -> Parakeet.transcribe(audio, models.files(), detector, DecodePolicy(preserveSpan = true, tailPaddingMs = 0), onProgress = progress) },
+            "speech-span-context" to { audio, progress -> Parakeet.transcribe(audio, models.files(), detector, DecodePolicy.PARAKEET_V3_REFERENCE, onProgress = progress) },
+            "speech-span-tail" to { audio, progress -> Parakeet.transcribe(audio, models.files(), detector, onProgress = progress) },
         )
         val report = JSONArray()
         val clips = listOf("fleurs-it-short.wav", "fleurs-it-short.m4a", "youtube-smoke.wav", "youtube-long.wav").filter { it in available }

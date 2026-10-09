@@ -1,13 +1,13 @@
-package org.cassini.android
+package org.cassini.engine.asr
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
 
 /** The native detector's configuration; its feed loop is tested in :core (SpeechFeedTest). */
-class SpeechDetectorConfigTest {
+class SileroDetectorConfigTest {
     @Test fun configMatchesTheDesktopDefaults() {
-        val config = SpeechDetector.config("/models/silero_vad.onnx")
+        val config = SileroDetector.config("/models/silero_vad.onnx")
         with(config.sileroVadModelConfig) {
             assertEquals("/models/silero_vad.onnx", model)
             assertEquals(0.18f, threshold)

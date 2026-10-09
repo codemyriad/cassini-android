@@ -50,6 +50,13 @@ import org.cassini.core.speakers.Voice
 import org.cassini.core.speakers.VoiceClipCache
 import org.cassini.core.speakers.VoiceMatcher
 import org.cassini.core.speakers.Voiceprints
+import org.cassini.engine.asr.IncrementalRecognizer
+import org.cassini.engine.asr.Parakeet
+import org.cassini.engine.decode.AudioDecoder
+import org.cassini.engine.job.NativeBudget
+import org.cassini.engine.opus.StreamingOpusEncoder
+import org.cassini.engine.speakers.SortformerStream
+import org.cassini.engine.speakers.VoiceprintExtractor
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
@@ -358,7 +365,7 @@ class MainActivity : Activity() {
                         }
                         if (pending.isEmpty()) return
                         try {
-                            val computed = VoiceprintExtractor.compute(File(voiceprintModel.modelPath), audio, pending, leaseHeld = true) { checkActive() }
+                            val computed = VoiceprintExtractor.compute(File(voiceprintModel.modelPath), audio, pending) { checkActive() }
                             computed.forEach { (id, print) -> liveAttemptSeconds[id] = print.second; livePrints[id] = print }
                             val names = rememberedPeople.associate { it.id to it.name }
                             val matches = VoiceMatcher.match(livePrints.mapValues { it.value.first }, rememberedPeople,
@@ -373,10 +380,10 @@ class MainActivity : Activity() {
                     }
                     val rawTranscript: Transcript
                     val elapsed: Long
-                    NativeInference.acquire()
+                    NativeBudget.acquire()
                     try {
                         if (resumed?.optJSONObject("diarizer") != null) streamDiarizer = SortformerStream(speakerModels.modelPath, resumed.getJSONObject("diarizer"))
-                        Parakeet.Incremental(chosenModel, detector, leaseHeld = true, restored = resumed?.getJSONObject("recognition"), onChunk = { chunk, startMs, words ->
+                        IncrementalRecognizer(chosenModel.files(), detector, restored = resumed?.getJSONObject("recognition"), onChunk = { chunk, startMs, words ->
                             checkActive()
                             if (speakerFailure) words.copy(words = words.words.map { it.copy(speaker = "${speakerPrefix}1") })
                             else try {
@@ -425,7 +432,7 @@ class MainActivity : Activity() {
                                 previousSaved = recognition.doneMs
                                 checkpointSaved = true
                             }
-                            durationMs = AudioDecoder.stream(this, uri, onSamples = { samples, count ->
+                            durationMs = AudioDecoder(contentResolver, cacheDir).stream(uri, onSamples = { samples, count ->
                                 checkActive()
                                 encoder?.accept(samples, count)
                                 recognition.accept(samples, count)
@@ -456,7 +463,7 @@ class MainActivity : Activity() {
                             encoder?.close()
                         }
                     } finally {
-                        try { streamDiarizer?.close() } finally { NativeInference.lease.release() }
+                        try { streamDiarizer?.close() } finally { NativeBudget.release() }
                     }
                     val finalizationBeganNs = System.nanoTime()
                     val draftRemember = synchronized(draftSpeakerLabels) { draftRememberedVoices.toMap() }
@@ -490,8 +497,10 @@ class MainActivity : Activity() {
                     // Naming speakers is best effort, like telling them apart: any failure keeps "Speaker N".
                     val prints: Map<String, SpeakerPrint> = if (speakerTurns == null || attributed == null || !voiceprintModel.ready()) emptyMap() else try {
                         onUi { transcriptionProgress?.stage(TranscriptionProgress.Stage.MATCHING, (System.nanoTime() - totalBegan) / 1_000_000) }
-                        val computed = VoiceprintExtractor.compute(File(voiceprintModel.modelPath), audio,
-                            SpeakerMerges.windows(voiceClips.windows, draftEdits.second)) { checkActive() }
+                        val computed = NativeBudget.holding {
+                            VoiceprintExtractor.compute(File(voiceprintModel.modelPath), audio,
+                                SpeakerMerges.windows(voiceClips.windows, draftEdits.second)) { checkActive() }
+                        }
                         val matches = VoiceMatcher.match(computed.mapValues { it.value.first }, knownVoices, printModel, Voiceprints.THRESHOLDS.getValue(printModel))
                         if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) for ((id, print) in computed)
                             Log.d(TAG, "Voiceprint $id ${"%.1f".format(java.util.Locale.ROOT, print.second)} s: ${matches[id]?.let { "${it.state} ${"%.3f".format(java.util.Locale.ROOT, it.score)}" } ?: "no match"}")
@@ -575,7 +584,7 @@ class MainActivity : Activity() {
             val uri = session.uri?.let(Uri::parse) ?: return
             // Migrate prototype sessions without running speech recognition again.
             runWork(R.string.packaging_document) {
-                val (file, portable) = documents.create(uri, { AudioDecoder.decode(this, uri) }, transcript, session.name, processing(session.resultPrecision).put("x-inferenceMs", session.inferenceMs), null)
+                val (file, portable) = documents.create(uri, { AudioDecoder(contentResolver, cacheDir).decode(uri) }, transcript, session.name, processing(session.resultPrecision).put("x-inferenceMs", session.inferenceMs), null)
                 onUi {
                     val position = if (playerReady) player?.currentPosition ?: session.positionMs else session.positionMs
                     session = session.copy(uri = Uri.fromFile(file).toString(), document = file.absolutePath,

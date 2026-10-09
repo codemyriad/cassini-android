@@ -19,7 +19,7 @@ class RecoveryCheckTest {
         captures.filter { InstrumentationRegistry.getArguments().getString("maxBytes")?.toLong()?.let { max -> it.length() <= max } ?: true }.takeLast(5).forEach { file ->
             val note = notes[Uri.fromFile(file).toString()]
             val started = android.os.SystemClock.elapsedRealtime()
-            val decoded = AudioDecoder.decode(context, Uri.fromFile(file))
+            val decoded = audioDecoder(context).decode(Uri.fromFile(file))
             val decodeMs = android.os.SystemClock.elapsedRealtime() - started
             val line = "${file.name} modified=${file.lastModified()} bytes=${file.length()} clean=${OggRepair.endsCleanly(file)} catalogued=${note?.session?.name}/${note?.session?.durationMs} decodedMs=${decoded.durationMs} decodeTookMs=$decodeMs"
             android.util.Log.i("CassiniRecoveryCheck", line)

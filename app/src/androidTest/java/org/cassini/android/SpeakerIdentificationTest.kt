@@ -27,11 +27,11 @@ import org.cassini.core.speakers.Match
 import org.cassini.core.speakers.SpeakerPrint
 import org.cassini.core.speakers.Voice
 import org.cassini.core.speakers.Voiceprints
+import org.cassini.engine.job.NativeBudget
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
 import java.io.File
-import java.util.concurrent.TimeUnit
 
 class SpeakerIdentificationTest {
     @get:org.junit.Rule val preserveLibrary = PreserveLibraryRule()
@@ -40,7 +40,7 @@ class SpeakerIdentificationTest {
     private fun fixture(name: String): PcmAudio {
         val file = File(context.cacheDir, "speaker-$name")
         instrumentation.context.assets.open(name).use { input -> file.outputStream().use { input.copyTo(it) } }
-        try { return AudioDecoder.decode(context, Uri.fromFile(file)) } finally { file.delete() }
+        try { return audioDecoder(context).decode(Uri.fromFile(file)) } finally { file.delete() }
     }
     @Test fun aTranscriptLeavesNoSeparateTranscribeOrSpeakerStep() {
         val file = File(context.cacheDir, "speaker-transcribed.wav")
@@ -192,8 +192,8 @@ class SpeakerIdentificationTest {
             }
             assertTrue("Cancel during actual native work", identifying)
             scenario.onActivity { it.findViewById<Button>(R.id.cancel_operation).performClick() }
-            assertTrue("Cancelled call must release its native models", NativeInference.lease.tryAcquire(180, TimeUnit.SECONDS))
-            NativeInference.lease.release()
+            assertTrue("Cancelled call must release its native models", NativeBudget.tryAcquire(180_000))
+            NativeBudget.release()
             instrumentation.waitForIdleSync()
             assertNull(SessionStore(context.filesDir).load().document)
         } finally { scenario.close(); file.delete() }
@@ -204,7 +204,7 @@ class SpeakerIdentificationTest {
         instrumentation.context.assets.open("fleurs-it-short.wav").use { input -> wav.outputStream().use { input.copyTo(it) } }
         try {
             val transcript = Transcript(listOf(Word("spk_1", 1000, 1400, "Ciao."), Word("spk_2", 2000, 2400, "Salve.")), "it")
-            val (file, doc) = DocumentStore(context).create(Uri.fromFile(wav), { AudioDecoder.decode(context, Uri.fromFile(wav)) }, transcript,
+            val (file, doc) = DocumentStore(context).create(Uri.fromFile(wav), { audioDecoder(context).decode(Uri.fromFile(wav)) }, transcript,
                 "rename.wav", JSONObject().put("engine", "Parakeet TDT"), null,
                 mapOf("spk_1" to first, "spk_2" to context.getString(R.string.speaker_label, 2)))
             SessionStore(context.filesDir).save(Session(uri = Uri.fromFile(file).toString(), name = "rename.opus", document = file.absolutePath,
@@ -439,8 +439,8 @@ class SpeakerIdentificationTest {
             }
             assertTrue("Cancel while voiceprints are computed", matching)
             scenario.onActivity { it.findViewById<Button>(R.id.cancel_operation).performClick() }
-            assertTrue(NativeInference.lease.tryAcquire(180, TimeUnit.SECONDS))
-            NativeInference.lease.release()
+            assertTrue(NativeBudget.tryAcquire(180_000))
+            NativeBudget.release()
             instrumentation.waitForIdleSync()
             assertNull(SessionStore(context.filesDir).load().document)
             assertEquals(notes, File(context.filesDir, "voiceprints").list().orEmpty().toSet())

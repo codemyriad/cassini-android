@@ -5,13 +5,11 @@ plugins {
     alias(libs.plugins.kotlin.android)
 }
 
-// libcassini_opus is compiled from the pinned libopus source that scripts/setup.sh unpacks here.
-val opusSource: File = rootDir.resolve(".tools/opus/source")
-
 android {
     namespace = "org.cassini.android"
     compileSdk = libs.versions.compileSdk.get().toInt()
     buildToolsVersion = libs.versions.buildTools.get()
+    // libcassini_opus is built in :engine; the app's NDK strips the packaged native libraries.
     ndkVersion = libs.versions.ndk.get()
     defaultConfig {
         applicationId = "org.cassini.android"
@@ -22,24 +20,6 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Library modules cannot filter packaged ABIs; this line must stay in :app.
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
-        externalNativeBuild {
-            cmake {
-                // Release flags in every variant: the encoder must behave identically in every build
-                // (a resumed checkpoint primes a fresh encoder and continues the same stream), so
-                // libopus always gets the Release flags (-O3 -DNDEBUG) of the old hand-run build.
-                arguments += listOf(
-                    "-DOPUS_SOURCE=${opusSource.absolutePath}",
-                    "-DANDROID_STL=c++_static",
-                    "-DCMAKE_BUILD_TYPE=Release",
-                )
-            }
-        }
-    }
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/CMakeLists.txt")
-            version = libs.versions.cmake.get()
-        }
     }
     // debug, or releaseTest for tag builds. The minified release build cannot be instrumented.
     testBuildType = providers.gradleProperty("deviceTestBuildType").getOrElse("debug")
@@ -132,10 +112,9 @@ kotlin {
 
 dependencies {
     implementation(project(":core"))
-    implementation(libs.sherpa.onnx.nemotron)
-    // Decompresses the speaker model download. The AAR carries the Android native libraries;
-    // the JVM unit tests use the jar, which carries the desktop ones.
-    implementation("${libs.zstd.jni.get()}@aar")
+    // The native wrappers, libcassini_opus, sherpa-onnx and the zstd-jni AAR (engine/build.gradle.kts).
+    implementation(project(":engine"))
+    // The JVM unit tests decompress with the zstd-jni jar, which carries the desktop natives.
     testImplementation(libs.zstd.jni)
     testImplementation(libs.junit)
     testImplementation(libs.org.json)
@@ -144,23 +123,6 @@ dependencies {
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.espresso.core)
 }
-
-// Without the libopus source CMake fails with an unhelpful error; say what to run instead. A
-// prebuilt library left in jniLibs by a 0.1.0 checkout would clash with the one Gradle builds.
-val checkOpusSource = tasks.register("checkOpusSource") {
-    val marker = opusSource.resolve("CMakeLists.txt")
-    val legacyLibraries = file("src/main/jniLibs")
-    doLast {
-        if (!marker.isFile) {
-            throw GradleException("Missing libopus source in ${marker.parentFile}. Run scripts/setup.sh.")
-        }
-        if (legacyLibraries.walk().any { it.name == "libcassini_opus.so" }) {
-            throw GradleException("Delete $legacyLibraries: Gradle now builds libcassini_opus.so from source.")
-        }
-    }
-}
-tasks.named("preBuild") { dependsOn(checkOpusSource) }
-tasks.matching { it.name.startsWith("configureCMake") }.configureEach { dependsOn(checkOpusSource) }
 
 /**
  * Passes the fixture directory to the JVM tests as a system property and declares its files as task

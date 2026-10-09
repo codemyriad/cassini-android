@@ -1,6 +1,6 @@
-package org.cassini.android
+package org.cassini.engine.decode
 
-import android.content.Context
+import android.content.ContentResolver
 import android.media.AudioFormat
 import android.media.MediaCodec
 import android.media.MediaExtractor
@@ -24,24 +24,25 @@ import java.nio.ByteOrder
 
 /**
  * Decode to 16 kHz mono, either as borrowed streaming blocks or a bounded retained recording.
- * Reject long recordings rather than silently dropping audio.
+ * Reject long recordings rather than silently dropping audio. A content uri is first copied into
+ * [cacheDir] through [resolver]; a file uri is read in place.
  */
-object AudioDecoder {
+class AudioDecoder(private val resolver: ContentResolver, private val cacheDir: File) {
     /**
      * [onSamples] receives borrowed 16 kHz mono buffers on the calling thread; consume or copy
      * them before returning. [onProgress] reports source milliseconds read and optional duration.
      * The returned PCM remains available for speaker identification and document creation.
      */
-    fun decode(context: Context, uri: Uri, onSamples: (FloatArray, Int) -> Unit = { _, _ -> },
+    fun decode(uri: Uri, onSamples: (FloatArray, Int) -> Unit = { _, _ -> },
                onProgress: (Long, Long?) -> Unit = { _, _ -> }): PcmAudio =
-        decodeInternal(context, uri, true, onSamples, onProgress)
+        decodeInternal(uri, true, onSamples, onProgress)
 
     /** Streams 16 kHz PCM without allocating a whole-recording array. Returns actual decoded duration. */
-    fun stream(context: Context, uri: Uri, onSamples: (FloatArray, Int) -> Unit, startSample: Long = 0,
+    fun stream(uri: Uri, onSamples: (FloatArray, Int) -> Unit, startSample: Long = 0,
                onProgress: (Long, Long?) -> Unit = { _, _ -> }): Long {
         require(startSample in 0..Limits.MAX_SAMPLES)
         var count = startSample
-        decodeInternal(context, uri, false, { samples, size ->
+        decodeInternal(uri, false, { samples, size ->
             count += size
             requireUser(count <= Limits.MAX_SAMPLES, Failure.LONG)
             onSamples(samples, size)
@@ -49,13 +50,13 @@ object AudioDecoder {
         return count * 1000 / Limits.ASR_RATE
     }
 
-    private fun decodeInternal(context: Context, uri: Uri, retainPcm: Boolean, onSamples: (FloatArray, Int) -> Unit,
+    private fun decodeInternal(uri: Uri, retainPcm: Boolean, onSamples: (FloatArray, Int) -> Unit,
                                onProgress: (Long, Long?) -> Unit, startSample: Long = 0): PcmAudio {
         val owned = uri.takeIf { it.scheme == "file" }?.path?.let(::File)
-        val local = owned ?: File.createTempFile("audio-", ".input", context.cacheDir)
+        val local = owned ?: File.createTempFile("audio-", ".input", cacheDir)
         try {
             requireUser(local.length() <= Limits.MAX_IMPORT_BYTES, Failure.LARGE)
-            if (owned == null) context.contentResolver.openInputStream(uri).use { input ->
+            if (owned == null) resolver.openInputStream(uri).use { input ->
                 val source = input ?: throw UserFacingException(Failure.OPEN)
                 local.outputStream().use { output ->
                     val buffer = ByteArray(64 * 1024)
@@ -65,7 +66,7 @@ object AudioDecoder {
                         val n = source.read(buffer)
                         if (n < 0) break
                         if (size / (16 shl 20) != (size + n) / (16 shl 20))
-                            requireUser(context.cacheDir.usableSpace >= Limits.MIN_FREE_BYTES, Failure.SPACE)
+                            requireUser(cacheDir.usableSpace >= Limits.MIN_FREE_BYTES, Failure.SPACE)
                         size += n
                         requireUser(size <= Limits.MAX_IMPORT_BYTES, Failure.LARGE)
                         output.write(buffer, 0, n)

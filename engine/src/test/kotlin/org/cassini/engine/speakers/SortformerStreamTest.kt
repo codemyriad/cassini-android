@@ -1,4 +1,4 @@
-package org.cassini.android
+package org.cassini.engine.speakers
 
 import org.cassini.core.audio.PcmAudio
 import org.junit.Assert.fail

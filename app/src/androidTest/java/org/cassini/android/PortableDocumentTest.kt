@@ -39,14 +39,14 @@ class PortableDocumentTest {
         instrumentation.context.assets.open("fleurs-it-short.wav").use { input ->
             source.outputStream().use { input.copyTo(it) }
         }
-        val original = AudioDecoder.decode(context, Uri.fromFile(source))
+        val original = audioDecoder(context).decode(Uri.fromFile(source))
         val file = File(context.filesDir, "portable-encoder-test.opus")
         file.writeBytes(OpusEncoder.encode(original))
         val stream = OggOpus.read(file.readBytes())
         assertEquals(original.samples.size * 48000L / original.sampleRate, stream.sampleCount)
         assertEquals(original.durationMs, stream.durationMs)
         assertTrue(stream.digest().matches(Regex("[a-f0-9]{64}")))
-        val decoded = AudioDecoder.decode(context, Uri.fromFile(file))
+        val decoded = audioDecoder(context).decode(Uri.fromFile(file))
         assertEquals(original.durationMs, decoded.durationMs)
         // Compare the beginning and end of speech after resampling, not just the container's duration.
         fun edge(audio: PcmAudio, reverse: Boolean): Long {
@@ -73,11 +73,11 @@ class PortableDocumentTest {
         org.junit.Assume.assumeTrue("Fetch the optional three-minute YouTube fixture", instrumentation.context.assets.list("")!!.contains("youtube-long.wav"))
         val wav = File(context.cacheDir, "portable-long-source.wav")
         instrumentation.context.assets.open("youtube-long.wav").use { input -> wav.outputStream().use { input.copyTo(it) } }
-        val original = AudioDecoder.decode(context, Uri.fromFile(wav))
+        val original = audioDecoder(context).decode(Uri.fromFile(wav))
         val file = File(context.filesDir, "portable-long-test.opus")
         file.writeBytes(OpusEncoder.encode(original))
         assertEquals(8640000L, OggOpus.read(file.readBytes()).sampleCount)
-        val decoded = AudioDecoder.decode(context, Uri.fromFile(file))
+        val decoded = audioDecoder(context).decode(Uri.fromFile(file))
         assertEquals(180000L, decoded.durationMs)
         assertEquals(180 * Limits.ASR_RATE, decoded.samples.size)
     }
@@ -200,7 +200,7 @@ class PortableDocumentTest {
         if (!audio.exists()) {
             val wav = File(context.cacheDir, "portable-source.wav")
             instrumentation.context.assets.open("fleurs-it-short.wav").use { input -> wav.outputStream().use { input.copyTo(it) } }
-            audio.writeBytes(OpusEncoder.encode(AudioDecoder.decode(context, Uri.fromFile(wav))))
+            audio.writeBytes(OpusEncoder.encode(audioDecoder(context).decode(Uri.fromFile(wav))))
         }
         val words = Transcript(listOf(Word("spk_a", 100, 600, "Ciao."), Word("spk_b", 8000, 8500, "Benvenuti.")), "it")
         val first = CassiniDocument.create(audio.readBytes(), words, "Portable Italian", JSONObject().put("model", "test"))

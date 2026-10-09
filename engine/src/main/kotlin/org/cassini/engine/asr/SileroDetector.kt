@@ -1,4 +1,4 @@
-package org.cassini.android
+package org.cassini.engine.asr
 
 import com.k2fsa.sherpa.onnx.SileroVadModelConfig
 import com.k2fsa.sherpa.onnx.Vad
@@ -15,7 +15,7 @@ import java.io.File
  * Silero VAD over a 16 kHz copy of the recording, fed by [SpeechFeed]. One instance owns one native detector:
  * [close] it in a finally block.
  */
-internal class SpeechDetector(modelPath: String) : AutoCloseable {
+class SileroDetector(modelPath: String) : SpeechFeed.Stream, AutoCloseable {
     companion object {
         /** Silero is a tiny stateful model run per 32 ms window: fastest on one CPU thread. */
         fun config(modelPath: String) = VadModelConfig(
@@ -41,20 +41,18 @@ internal class SpeechDetector(modelPath: String) : AutoCloseable {
         vad = Vad(config = config(modelPath))
     }
 
-    private val stream = object : SpeechFeed.Stream {
-        override fun reset() = vad.reset()
-        override fun acceptWaveform(window: FloatArray) = vad.acceptWaveform(window)
-        override fun empty() = vad.empty()
-        override fun front() = vad.front().let { SpeechFeed.Segment(it.start, it.samples) }
-        override fun pop() = vad.pop()
-        override fun flush() = vad.flush()
-    }
+    override fun reset() = vad.reset()
+    override fun acceptWaveform(window: FloatArray) = vad.acceptWaveform(window)
+    override fun empty() = vad.empty()
+    override fun front() = vad.front().let { SpeechFeed.Segment(it.start, it.samples) }
+    override fun pop() = vad.pop()
+    override fun flush() = vad.flush()
 
     /**
      * Calls [onSpan] with each speech span of [audio], in order, and returns the detector's tail padding in
      * milliseconds for the timeline clamp (see [SpeechFeed.scan]). Reusable: every call starts from a reset.
      */
-    fun detect(audio: PcmAudio, onSpan: (Span) -> Unit): Long = SpeechFeed.scan(stream, audio, onSpan)
+    fun detect(audio: PcmAudio, onSpan: (Span) -> Unit): Long = SpeechFeed.scan(this, audio, onSpan)
 
     override fun close() = vad.release()
 }
