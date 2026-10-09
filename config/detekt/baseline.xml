@@ -897,7 +897,6 @@
     <ID>ArgumentListWrapping:SeamMergeTest.kt$SeamMergeTest$(w("sì", 12_000, 12_000), w("dopo", 12_400, 12_700))</ID>
     <ID>ArgumentListWrapping:SeamMergeTest.kt$SeamMergeTest$(w("sì", late, late + 80), w("dopo", 12_100, 12_400))</ID>
     <ID>ArgumentListWrapping:SeamMergeTest.kt$SeamMergeTest$(w("wreck", 14610, 14650), w("a", 14660, 14700), w("nice", 14810, 14850), w("after", 15100, 15300))</ID>
-    <ID>ArgumentListWrapping:SessionUpgradeTest.kt$SessionUpgradeTest$(InstrumentationRegistry.getInstrumentation().targetContext.cacheDir, "session-upgrade-${System.nanoTime()}")</ID>
     <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$("Settings", "Could not count notes", error)</ID>
     <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$("Settings", "Could not forget voices", error)</ID>
     <ID>ArgumentListWrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$(ModelCatalog.DIARIZATION)</ID>
@@ -3062,7 +3061,6 @@
     <ID>Wrapping:SeamMergeTest.kt$SeamMergeTest$(</ID>
     <ID>Wrapping:SeamMergeTest.kt$SeamMergeTest$(listOf(w("hello", 1000, 1400), w("world", 5000, 5400), w("shared", 14600, 14760), w("late", 14800, 14980), w("again", 16000, 16400), w("more", 20000, 20400)), got)</ID>
     <ID>Wrapping:SeamMergeTest.kt$SeamMergeTest$;</ID>
-    <ID>Wrapping:SessionUpgradeTest.kt$SessionUpgradeTest$(</ID>
     <ID>Wrapping:SettingsActivity.kt$SettingsActivity$;</ID>
     <ID>Wrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$(</ID>
     <ID>Wrapping:SettingsActivity.kt$SettingsActivity.SettingsFragment$;</ID>

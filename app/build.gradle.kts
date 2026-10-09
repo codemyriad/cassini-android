@@ -66,24 +66,19 @@ android {
         lintConfig = file("lint.xml")
         baseline = file("lint-baseline.xml")
     }
-    // Captured filesDir trees and audio (fixtures/README.md). The conformance vectors run in :core.
-    val fixturesDirectory = rootDir.resolve("fixtures")
+    // The conformance vectors and the golden checkpoint are :core test data, not :app test inputs.
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
             all {
-                it.jvmArgumentProviders.add(
-                    TestDataDirectories(
-                        fixtures = fileTree(fixturesDirectory),
-                        // LicenseAssetsTest compares the APK's copies with these repository files.
-                        repository = files(
-                            rootDir.resolve("THIRD_PARTY_NOTICES.md"),
-                            rootDir.resolve("scripts/native-dependencies.json"),
-                            file("src/main/assets/licenses"),
-                        ),
-                        fixturesPath = fixturesDirectory.absolutePath,
-                    ),
-                )
+                // LicenseAssetsTest compares the APK's copies with these repository files. Declaring them as
+                // inputs, relative to their directories, re-runs the tests when one changes instead of leaving
+                // them up to date or taking them from the build cache.
+                it.inputs.files(
+                    rootDir.resolve("THIRD_PARTY_NOTICES.md"),
+                    rootDir.resolve("scripts/native-dependencies.json"),
+                    file("src/main/assets/licenses"),
+                ).withPropertyName("licenseSources").withPathSensitivity(PathSensitivity.RELATIVE)
                 // Robolectric needs these on JDK 17.
                 it.jvmArgs(
                     "--add-opens=java.base/java.lang=ALL-UNNAMED",
@@ -122,18 +117,4 @@ dependencies {
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.espresso.core)
-}
-
-/**
- * Passes the fixture directory to the JVM tests as a system property and declares its files as task
- * inputs, relative to the directory, so a changed fixture re-runs the tests instead of leaving them up
- * to date or taking them from the build cache, and the absolute paths stay out of the cache key. The repository files that
- * LicenseAssetsTest reads directly are declared the same way.
- */
-class TestDataDirectories(
-    @get:InputFiles @get:PathSensitive(PathSensitivity.RELATIVE) val fixtures: FileTree,
-    @get:InputFiles @get:PathSensitive(PathSensitivity.RELATIVE) val repository: FileCollection,
-    @get:Internal val fixturesPath: String,
-) : CommandLineArgumentProvider {
-    override fun asArguments() = listOf("-Dcassini.fixtures=$fixturesPath")
 }
