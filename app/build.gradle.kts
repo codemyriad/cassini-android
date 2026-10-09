@@ -36,13 +36,11 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+    // The published conformance vectors come from the third_party/cassini-format submodule and are
+    // required: a missing checkout fails the tests instead of skipping them.
     val conformanceDirectory = providers.gradleProperty("cassiniConformanceDir")
-        .getOrElse(rootProject.projectDir.parentFile.resolve("cassini-format/spec/conformance").absolutePath)
-    val requireConformance = providers.gradleProperty("requireCassiniConformance").getOrElse("false")
-    testOptions { unitTests.all {
-        it.systemProperty("cassini.conformance", conformanceDirectory)
-        it.systemProperty("cassini.conformance.required", requireConformance)
-    } }
+        .getOrElse(rootProject.projectDir.resolve("third_party/cassini-format/spec/conformance").absolutePath)
+    testOptions { unitTests.all { it.systemProperty("cassini.conformance", conformanceDirectory) } }
     bundle { language { enableSplit = false } }
 }
 

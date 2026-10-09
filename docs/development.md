@@ -34,7 +34,7 @@ adb exec-out run-as org.cassini.android cat files/device-smoke.INT8.words.json >
 
 ## Portable files
 
-JVM tests run all 26 published vectors when `../cassini-format` is checked out. CI fetches a pinned revision and explicitly requires the fixtures, so these checks cannot silently skip. Synthetic integrity and round-trip tests always run. Use `-PcassiniConformanceDir=/path/to/spec/conformance -PrequireCassiniConformance=true` to require an explicit fixture checkout locally.
+JVM tests run every published vector from the `third_party/cassini-format` submodule, pinned to the revision this app conforms to. A missing checkout fails the tests instead of skipping them (`git submodule update --init`). Use `-PcassiniConformanceDir=/path/to/spec/conformance` to run another checkout's vectors, for example `../cassini-format` at a newer revision. Synthetic integrity and round-trip tests always run.
 
 ```sh
 python3 ../cassini-format/tools/cassini-extract.py DOCUMENT.opus --check

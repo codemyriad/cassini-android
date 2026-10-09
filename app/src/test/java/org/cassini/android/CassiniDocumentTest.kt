@@ -2,17 +2,13 @@ package org.cassini.android
 
 import org.json.JSONObject
 import org.junit.Assert.*
-import org.junit.Assume.assumeTrue
 import org.junit.Test
 import java.io.File
 
 class CassiniDocumentTest {
     @Test fun publishedConformanceVectors() {
-        val directory = File(System.getProperty("cassini.conformance", "../cassini-format/spec/conformance")!!)
-        if (System.getProperty("cassini.conformance.required").toBoolean()) {
-            assertTrue("Required Cassini conformance directory is missing: $directory", directory.isDirectory)
-        }
-        assumeTrue("Checkout cassini-format beside this repository for the published conformance suite", directory.isDirectory)
+        val directory = File(System.getProperty("cassini.conformance", "../third_party/cassini-format/spec/conformance")!!)
+        assertTrue("Cassini conformance vectors are missing at $directory. Run git submodule update --init.", directory.isDirectory)
         val vectors = JSONObject(File(directory, "index.json").readText()).getJSONArray("vectors")
         val failures = mutableListOf<String>()
         for (i in 0 until vectors.length()) {
@@ -103,8 +99,8 @@ class CassiniDocumentTest {
         }
     }
     @Test fun relabelConformanceVectorWithUnknownMembers() {
-        val file = File(System.getProperty("cassini.conformance", "../cassini-format/spec/conformance")!!, "opus/014-unknown-manifest-member.opus")
-        assumeTrue("Checkout cassini-format beside this repository", file.isFile)
+        val file = File(System.getProperty("cassini.conformance", "../third_party/cassini-format/spec/conformance")!!, "opus/014-unknown-manifest-member.opus")
+        assertTrue("Cassini conformance vector is missing: $file. Run git submodule update --init.", file.isFile)
         val (before, after) = relabelled(file.readBytes(), mapOf("spk_a" to "Anna"))
         assertEquals("ok", after.state); assertEquals("Anna", after.speakerLabel("spk_a"))
         assertEquals(before.speakerLabel("spk_b"), after.speakerLabel("spk_b"))

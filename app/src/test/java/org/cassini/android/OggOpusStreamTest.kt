@@ -54,7 +54,7 @@ class OggOpusStreamTest {
     }
 
     private fun fixtures(): List<ByteArray> {
-        val directory = File(System.getProperty("cassini.conformance", "../cassini-format/spec/conformance")!!)
+        val directory = File(System.getProperty("cassini.conformance", "../third_party/cassini-format/spec/conformance")!!)
         val vectors = directory.walk().filter { it.isFile && it.extension == "opus" }.map { it.readBytes() }
             .filter { runCatching { OggOpus.read(it).validFraming && OggOpus.read(it).audio.isNotEmpty() }.getOrDefault(false) }.toList()
         return vectors + fixture()
