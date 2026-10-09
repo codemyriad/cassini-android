@@ -2,6 +2,7 @@ package org.cassini.data.voices
 
 import org.cassini.core.speakers.Match
 import org.cassini.core.speakers.NoteVoiceCodec
+import org.cassini.core.speakers.SpeakerPrint
 import org.cassini.data.db.NoteVoiceLinkEntity
 import org.json.JSONException
 
@@ -12,7 +13,15 @@ import org.json.JSONException
 internal object VoiceLinks {
     /** The links in [text], or null when the file cannot be read (a newer version or broken JSON is left alone). */
     fun decode(noteId: String, text: String): List<NoteVoiceLinkEntity>? = try {
-        val (_, prints) = NoteVoiceCodec.decode(text)
+        of(noteId, NoteVoiceCodec.decode(text).second)
+    } catch (_: JSONException) {
+        null
+    } catch (_: IllegalArgumentException) {
+        null
+    }
+
+    /** The links of [prints] (keys `<variantId>/<speakerId>`); a key without both parts gives no row. */
+    fun of(noteId: String, prints: Map<String, SpeakerPrint>): List<NoteVoiceLinkEntity> =
         prints.mapNotNull { (key, print) ->
             val variantId = key.substringBefore('/', "")
             val speakerId = key.substringAfter('/', "")
@@ -30,9 +39,4 @@ internal object VoiceLinks {
                 )
             }
         }
-    } catch (_: JSONException) {
-        null
-    } catch (_: IllegalArgumentException) {
-        null
-    }
 }

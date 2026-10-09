@@ -63,9 +63,10 @@ class RecordingPorts : JobQueueWriter, NoteFilesCleaner {
         calls += "cancel $noteId"
     }
 
-    override suspend fun deleteForNote(noteId: String) {
+    override suspend fun deleteForNote(noteId: String): Boolean {
         calls += "voices $noteId"
         onDeleteForNote(noteId)
+        return true
     }
 }
 

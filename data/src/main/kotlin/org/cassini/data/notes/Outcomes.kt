@@ -91,9 +91,12 @@ interface JobQueueWriter {
     suspend fun cancelAndRemove(noteId: String)
 }
 
-/** Deletes what a note left outside `notes/<id>/`: its voice files (`VoiceRepository.deleteForNote`, P4 step 5). */
+/**
+ * Deletes what a note left outside `notes/<id>/`: its sealed and pending voice files (`VoiceRepository`). Returns
+ * false when a file is still there; the purge then keeps the note for the next run.
+ */
 fun interface NoteFilesCleaner {
-    suspend fun deleteForNote(noteId: String)
+    suspend fun deleteForNote(noteId: String): Boolean
 }
 
 /** The result of an import (architecture 4.2). */

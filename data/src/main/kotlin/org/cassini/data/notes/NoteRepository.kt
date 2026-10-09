@@ -223,14 +223,14 @@ class NoteRepository(
     /**
      * Deletes one note in the order of architecture 4.10: the job, the voice files, the note directory, then the row.
      * Files go before the row, so a crash midway leaves a trashed row that the next run finishes, and a catalogue
-     * rebuild cannot bring the audio back. When the directory cannot be deleted the row stays for the next run.
+     * rebuild cannot bring the audio back. When a voice file or the directory cannot be deleted the row stays for the
+     * next run.
      */
     private suspend fun purge(id: String): Boolean {
         queue.cancelAndRemove(id)
-        cleaner.deleteForNote(id)
-        if (!documents.deleteFiles(id)) return false
-        notes.delete(id)
-        return true
+        val deleted = cleaner.deleteForNote(id) && documents.deleteFiles(id)
+        if (deleted) notes.delete(id)
+        return deleted
     }
 
     /** The cached words of the selected variant (else the default, else the first readable one). */
