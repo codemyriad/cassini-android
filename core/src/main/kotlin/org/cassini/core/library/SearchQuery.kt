@@ -22,22 +22,23 @@ object SearchQuery {
     /** The ellipsis FTS writes where a snippet is cut. */
     const val ELLIPSIS = '…'
 
-    private const val DROPPED = "\"*^:()-"
-
     /**
      * The FTS4 MATCH expression for what the user typed, or null when nothing searchable is left. Each
-     * whitespace-separated term loses the characters `" * ^ : ( ) -` and becomes a quoted prefix phrase with the star
-     * INSIDE the quotes (`"consegn*"`, the FTS3/4 syntax; a star after the closing quote is FTS5 syntax). The phrases
-     * are joined with spaces, an implicit AND, so AND, OR, NOT and NEAR typed by the user are plain words.
+     * whitespace-separated term becomes a quoted prefix phrase with the star INSIDE the quotes (`"consegn*"`, the
+     * FTS3/4 syntax; a star after the closing quote is FTS5 syntax). The phrases are joined with spaces, an implicit
+     * AND, so AND, OR, NOT and NEAR typed by the user are plain words.
      *
-     * A term with no letter or digit is dropped too: the unicode61 tokenizer makes no token of it, and FTS4 matches
-     * nothing at all for a query that contains such an empty phrase, so `consegna ,` would find nothing.
+     * Inside a term, every character that is not a letter, a digit or a combining mark becomes a space, as the
+     * unicode61 tokenizer splits the transcript there: `e-mail` gives `"e mail*"`, which matches the indexed tokens
+     * `e` and `mail`, and `giov.` gives `"giov*"`, so the star follows a token and stays a prefix match. That also
+     * removes `" * ^ : ( )` and `-`. A term with no letter or digit is dropped: FTS4 matches nothing at all for a query
+     * that contains an empty phrase, so `consegna ,` would find nothing.
      */
     fun fts(input: String): String? {
         val phrases = terms(input)
-            .map { term -> term.filterNot { it in DROPPED } }
-            .filter { term -> term.codePoints().anyMatch(Character::isLetterOrDigit) }
-            .map { "\"$it*\"" }
+            .map { term -> tokens(term) }
+            .filter { tokens -> tokens.isNotEmpty() }
+            .map { tokens -> "\"${tokens.joinToString(" ")}*\"" }
         return phrases.takeIf { it.isNotEmpty() }?.joinToString(" ")
     }
 
@@ -65,6 +66,30 @@ object SearchQuery {
         }
         if (openAt in 0 until text.length) ranges.add(openAt until text.length)
         return Highlighted(text.toString(), ranges, leading, trailing)
+    }
+
+    /** The pieces of [term] between characters that are not letters, digits or combining marks. */
+    private fun tokens(term: String): List<String> {
+        val tokens = mutableListOf<String>()
+        val token = StringBuilder()
+        var index = 0
+        while (index < term.length) {
+            val codePoint = term.codePointAt(index)
+            if (Character.isLetterOrDigit(codePoint) || (token.isNotEmpty() && isMark(codePoint))) {
+                token.appendCodePoint(codePoint)
+            } else if (token.isNotEmpty()) {
+                tokens.add(token.toString())
+                token.clear()
+            }
+            index += Character.charCount(codePoint)
+        }
+        if (token.isNotEmpty()) tokens.add(token.toString())
+        return tokens
+    }
+
+    private fun isMark(codePoint: Int): Boolean = when (Character.getType(codePoint).toByte()) {
+        Character.NON_SPACING_MARK, Character.COMBINING_SPACING_MARK, Character.ENCLOSING_MARK -> true
+        else -> false
     }
 
     /** Splits on any Unicode whitespace (no-break spaces included), dropping empty pieces. */

@@ -7,12 +7,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SearchQueryTest {
-    private val phrase = Regex("\"[^\"*]+\\*\"")
+    // A phrase: tokens of letters, digits and marks separated by single spaces, then the star inside the quotes.
+    private val phrase = "\"[\\p{L}\\p{N}\\p{M}]+( [\\p{L}\\p{N}\\p{M}]+)*\\*\""
+    private val query = Regex("$phrase( $phrase)*")
 
-    private fun fts(input: String): String? = SearchQuery.fts(input)?.also { query ->
+    private fun fts(input: String): String? = SearchQuery.fts(input)?.also { fts ->
         // Every phrase is "term*": the star inside the quotes, never the FTS5 form "term"*.
-        assertTrue(query, query.split(' ').all { phrase.matches(it) })
-        assertFalse(query, query.contains("\"*"))
+        assertTrue(fts, query.matches(fts))
+        assertFalse(fts, fts.contains("\"*"))
     }
 
     @Test fun golden() {
@@ -28,17 +30,36 @@ class SearchQueryTest {
 
     @Test fun ftsOperatorsAreDropped() {
         assertEquals("\"inizio*\"", fts("^inizio"))
-        assertEquals("\"bodyprezzo*\"", fts("body:prezzo"))
+        assertEquals("\"body prezzo*\"", fts("body:prezzo"))
         assertEquals("\"a*\" \"b*\"", fts("(a) (b)"))
         assertEquals("\"prezzo*\"", fts("-prezzo"))
-        assertEquals("\"email*\" \"follow*\" \"up*\"", fts("e-mail follow- -up"))
+        assertEquals("\"con segna*\"", fts("con*segna"))
         assertNull(fts("-- : () ^ \"\" *"))
+    }
+
+    @Test fun innerPunctuationSplitsTokensAsTheTokenizerDoes() {
+        // unicode61 indexes "e-mail" as the tokens "e" and "mail", so the phrase must have the same two tokens.
+        assertEquals("\"e mail*\" \"follow*\" \"up*\"", fts("e-mail follow- -up"))
+        assertEquals("\"follow up*\"", fts("follow-up"))
+        assertEquals("\"l ordine*\"", fts("l'ordine"))
+        assertEquals("\"snake case*\"", fts("snake_case"))
+    }
+
+    @Test fun trailingPunctuationKeepsThePrefixMatch() {
+        // "consegn,*" would end the phrase on a comma: the star would not follow a token and match only "consegn".
+        assertEquals("\"consegn*\"", fts("consegn,"))
+        assertEquals("\"giov*\"", fts("giov."))
+        assertEquals("\"davvero*\"", fts("¿davvero?!"))
+    }
+
+    @Test fun combiningMarksStayInTheirToken() {
+        assertEquals("\"café*\"", fts("café."))
     }
 
     @Test fun operatorWordsAreQuoted() {
         assertEquals("\"price*\" \"AND*\" \"stays*\"", fts("price AND stays"))
         assertEquals("\"a*\" \"OR*\" \"b*\" \"NOT*\" \"c*\" \"NEAR*\" \"d*\"", fts("a OR b NOT c NEAR d"))
-        assertEquals("\"NEAR/3*\"", fts("NEAR/3"))
+        assertEquals("\"NEAR 3*\"", fts("NEAR/3"))
         assertEquals("\"a*\" \"OR*\" \"b*\"", fts("(a OR b)"))
     }
 
@@ -46,7 +67,6 @@ class SearchQueryTest {
         // The unicode61 tokenizer with remove_diacritics=1 folds them; the query keeps what was typed.
         assertEquals("\"giovedì*\" \"CONSEGNA*\"", fts("giovedì CONSEGNA"))
         assertEquals("\"Élodie*\"", fts("Élodie"))
-        assertEquals("\"l'ordine*\"", fts("l'ordine"))
     }
 
     @Test fun emptyAndBlankInputs() {
