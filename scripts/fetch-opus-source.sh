@@ -9,7 +9,7 @@ sha=$(pin opus sha256)
 work=.tools/opus
 archive=$work/source.tar.gz
 mkdir -p "$work"
-if ! printf '%s  %s\n' "$sha" "$archive" | sha256sum --check --status 2>/dev/null; then
+if ! printf '%s  %s\n' "$sha" "$archive" | sha256sum --check --status >/dev/null 2>&1; then
     curl --fail --location --retry 3 --silent --show-error "$url" -o "$archive.part"
     printf '%s  %s\n' "$sha" "$archive.part" | sha256sum --check --quiet
     mv "$archive.part" "$archive"

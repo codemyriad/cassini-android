@@ -19,7 +19,7 @@ if [ -z "${SHERPA_ONNX_SRC:-}" ]; then
     url=$(pin sherpa-onnx url)
     sha=$(pin sherpa-onnx sha256)
     archive=$work/sherpa-onnx.tar.gz
-    if ! printf '%s  %s\n' "$sha" "$archive" | sha256sum --check --status 2>/dev/null; then
+    if ! printf '%s  %s\n' "$sha" "$archive" | sha256sum --check --status >/dev/null 2>&1; then
         curl --fail --location --retry 3 "$url" -o "$archive.part"
         printf '%s  %s\n' "$sha" "$archive.part" | sha256sum --check
         mv "$archive.part" "$archive"
