@@ -225,19 +225,22 @@ sealed interface JobEvent {
 
     /**
      * Inference begins. [totalMs] may be 0 (unknown). [restored] is set on a resume. [speakers]: a diarizer is
-     * installed and has not failed; [voices]: live and final matching can run (the voiceprint model and at least one
-     * saved voice). [lowMemory]: the memory preflight flagged the device.
+     * installed and has not failed; [prints]: the voiceprint model is installed, so the Matching step runs when
+     * speakers were told apart. [lowMemory]: the memory preflight flagged the device.
      */
     data class Started(
         val totalMs: Long,
         val restored: Restored?,
         val speakers: Boolean,
-        val voices: Boolean,
+        val prints: Boolean,
         val lowMemory: Boolean,
     ) : JobEvent
 
-    /** The checkpoint a resumed run starts from: done and total audio, words so far, and its elapsed time. */
-    data class Restored(val doneMs: Long, val totalMs: Long, val words: Int, val elapsedMs: Long)
+    /**
+     * The checkpoint a resumed run starts from: done and total audio, the draft [words] it holds (raw speaker ids, no
+     * merges), and its elapsed time.
+     */
+    data class Restored(val doneMs: Long, val totalMs: Long, val words: List<Word>, val elapsedMs: Long)
 
     /** The pipeline entered [stage] for the window [startMs]..[endMs] (0..0 when it has none). */
     data class StageChanged(

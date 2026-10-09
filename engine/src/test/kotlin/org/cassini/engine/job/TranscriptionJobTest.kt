@@ -1,14 +1,23 @@
+@file:OptIn(ExperimentalCoroutinesApi::class)
+
 package org.cassini.engine.job
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.toList
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import org.cassini.core.Failure
 import org.cassini.core.asr.TranscriptionProgress.Stage
+import org.cassini.core.checkpoint.CheckpointNames
 import org.cassini.core.checkpoint.CheckpointState
 import org.cassini.core.format.CassiniDocument
 import org.cassini.core.format.Transcript
@@ -116,7 +125,13 @@ class TranscriptionJobTest {
         assertTrue(stopped.storage.adoptions.isEmpty())
 
         stopped.script.beforeDecode = {}
-        assertEquals(JobOutcome.Done, stopped.run().first)
+        val checkpoint = stopped.storage.saved.last()
+        val (resumedOutcome, resumedEvents) = stopped.run()
+        assertEquals(JobOutcome.Done, resumedOutcome)
+        // The tracker starts the resumed draft from the checkpoint's words and elapsed time.
+        val restored = resumedEvents.filterIsInstance<JobEvent.Started>().single().restored!!
+        assertEquals(checkpoint.recognition.chunks.words, restored.words)
+        assertEquals(checkpoint.elapsedMs to checkpoint.doneMs, restored.elapsedMs to restored.doneMs)
         assertEquals(stopped.storage.saved.dropLast(1).last().positionSamples, stopped.audioSource.starts.last())
         assertEquals(listOf(0L, 26_000L, 52_000L), stopped.script.windows)
 
@@ -413,6 +428,42 @@ class TranscriptionJobTest {
         val actual = h.provenance()
         assertTrue("expected $golden\nactual   $actual", sameJson(golden, actual))
         assertTrue(h.script.diarizers.isEmpty())
+    }
+
+    @Test fun theTrackerTurnsTheJobEventsIntoMonotonicProgress() {
+        val events = runBlocking { Harness().run().second }
+        runTest {
+            val channel = Channel<JobEvent>(Channel.UNLIMITED)
+            val tracker = ProgressTracker(
+                DraftSources({ CheckpointNames(emptyMap(), emptyMap()) }, { emptyMap() }, { "Speaker $it" }),
+                finalizationMs = 0,
+                battery = { null },
+                clock = { testScheduler.currentTime },
+                dispatcher = StandardTestDispatcher(testScheduler),
+            )
+            val outcome = backgroundScope.async { tracker.run(channel) }
+            val seen = mutableListOf<RunningProgress>()
+            events.forEach { event ->
+                advanceTimeBy(700)
+                channel.trySend(event)
+                runCurrent()
+                (tracker.phase.value as? JobPhase.Transcribing)?.let { seen += it.progress }
+            }
+            channel.close()
+            assertEquals(JobOutcome.Done, outcome.await())
+            val percents = seen.mapNotNull { it.percent }
+            assertEquals(percents.sorted(), percents)
+            assertEquals(seen.map { it.step }.sorted(), seen.map { it.step })
+            assertEquals(100, seen.last().percent)
+            assertEquals(70, seen.last().words)
+            assertTrue(seen.dropLast(1).all { (it.percent ?: 0) <= 99 })
+            val headlines = seen.map { it.headline }.distinct()
+            assertTrue(headlines.toString(), ProgressHeadline.FINDING_WORDS_AND_SPEAKERS in headlines)
+            assertTrue(headlines.toString(), ProgressHeadline.SAVING in headlines)
+            val firstWords = headlines.indexOf(ProgressHeadline.FINDING_WORDS_AND_SPEAKERS)
+            assertTrue(ProgressHeadline.READING_AUDIO !in headlines.drop(firstWords))
+            assertFalse(seen.last().matchingSkipped)
+        }
     }
 
     // ------------------------------------------------------------------------------------------------------------

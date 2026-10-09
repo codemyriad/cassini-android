@@ -275,11 +275,10 @@ class TranscriptionJob(
         run.previousSaved = resumed?.doneMs ?: -1L
         run.diarizer = resumed?.diarizer?.let(engines.diarizers::open)
         val restored = resumed?.let {
-            JobEvent.Restored(it.doneMs, it.durationMs, it.recognition.chunks.words.size, it.elapsedMs)
+            JobEvent.Restored(it.doneMs, it.durationMs, it.recognition.chunks.words, it.elapsedMs)
         }
-        val canMatch = run.printsReady && run.prepared.people.isNotEmpty()
         val totalMs = resumed?.durationMs ?: 0L
-        emit(JobEvent.Started(totalMs, restored, !run.speakerFailure, canMatch, run.prepared.lowMemory))
+        emit(JobEvent.Started(totalMs, restored, !run.speakerFailure, run.printsReady, run.prepared.lowMemory))
     }
 
     private fun callbacks(run: Run) = Recognizer.Callbacks(
