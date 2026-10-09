@@ -51,6 +51,14 @@ Restructured groups (`Models`, `ProcessingCheckpoint`) are shown for reference a
 
 The `:ui` tests draw Compose content with Robolectric and compare it with committed PNG files (goldens) in `ui/src/test/screenshots/`. The root `ciTest` task includes `:ui:verifyRoborazziDebug`, which fails when a picture changes. We record and compare the goldens on Linux x86_64 only. On other systems, font rendering can change the pixels.
 
+On macOS or Windows, do not run `ciTest` or `verifyRoborazziDebug`. Run the tests without the pixel comparison and let CI do the pixel check:
+
+```sh
+./gradlew :core:test :engine:testDebugUnitTest :data:testDebugUnitTest :ui:testDebugUnitTest :app:testDebugUnitTest
+```
+
+`:ui:testDebugUnitTest` draws the screens but does not compare them with the goldens. Do not record or commit goldens from these systems.
+
 If you change a screen on purpose, update its goldens:
 
 ```sh

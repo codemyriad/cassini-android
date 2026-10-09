@@ -20,4 +20,4 @@ Two other sets of clips are not in the repository:
 - The `:core` tests use the published conformance vectors for the portable `.opus` format. These vectors come from the `third_party/cassini-format` submodule.
 - `core/src/test/resources/checkpoint/golden-v1/` holds one `checkpoint.json` and its `names.json`. A 0.1.0 job wrote these two files on an emulator. `CheckpointGoldenTest` uses them to test the codec (the code that reads and writes the checkpoint format).
 
-Version 0.2 does not read app data from 0.0.x or 0.1.0. Thus, no test uses data from these versions.
+The 0.2 storage layer will not read app data from 0.0.x or 0.1.0. Thus, there are no captured app-data trees (copies of an old `files/` directory). The golden checkpoint above is the only test data that a 0.1.0 job wrote. It stays on purpose, because 0.2 still reads and writes `checkpoint.json` version 1 (`docs/architecture.md`, section 3.5).
