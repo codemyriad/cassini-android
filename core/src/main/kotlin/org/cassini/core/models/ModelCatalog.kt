@@ -29,6 +29,9 @@ data class ModelDescriptor(
 
     /** Bytes fetched over the network to install this model from nothing. */
     val downloadBytes: Long get() = download?.size ?: artifacts.sumOf { it.size }
+
+    /** Bytes of the installed files. */
+    val artifactBytes: Long get() = artifacts.sumOf { it.size }
 }
 
 /**
