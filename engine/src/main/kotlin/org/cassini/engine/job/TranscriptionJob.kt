@@ -91,6 +91,9 @@ class TranscriptionJob(
     /** Set from the seal on: an I/O error is a SAVE failure, not an OPEN one. */
     @Volatile private var sealing = false
 
+    /** Set when adopt starts: from then on the note's draft names belong to adopt. */
+    @Volatile private var adopting = false
+
     /** What the job tells its `ProgressTracker`, in order; closed after [JobEvent.Ended]. */
     val events: ReceiveChannel<JobEvent> get() = channel
 
@@ -105,22 +108,28 @@ class TranscriptionJob(
         download?.cancel()
     }
 
-    /** Runs the job to its end. Call once. */
+    /**
+     * Runs the job to its end. Call once. An [Error] other than OutOfMemoryError (for example an UnsatisfiedLinkError)
+     * is thrown on; [events] closes on every path, so the tracker always ends.
+     */
     suspend fun run(): JobOutcome {
-        val outcome = try {
-            pipeline()
-        } catch (error: OutOfMemoryError) {
-            env.warn("Not enough memory", error)
-            JobOutcome.Paused(PauseReason.MEMORY)
-        } catch (
-            @Suppress("TooGenericExceptionCaught") // the job boundary: every failure becomes an outcome
-            error: Exception,
-        ) {
-            outcomeOf(error)
+        try {
+            val outcome = try {
+                pipeline()
+            } catch (error: OutOfMemoryError) {
+                env.warn("Not enough memory", error)
+                JobOutcome.Paused(PauseReason.MEMORY)
+            } catch (
+                @Suppress("TooGenericExceptionCaught") // the job boundary: every failure becomes an outcome
+                error: Exception,
+            ) {
+                outcomeOf(error)
+            }
+            emit(JobEvent.Ended(outcome))
+            return outcome
+        } finally {
+            channel.close()
         }
-        emit(JobEvent.Ended(outcome))
-        channel.close()
-        return outcome
     }
 
     private suspend fun pipeline(): JobOutcome {
@@ -138,7 +147,13 @@ class TranscriptionJob(
             return adopt(sealed, began)
         } finally {
             decoded.run.clips.close()
+            if (!adopting) reopenNames()
         }
+    }
+
+    /** Naming stays open while the note is paused (features section 3.2): step 6 closed it, and no adopt follows. */
+    private suspend fun reopenNames() = withContext(NonCancellable + env.io) {
+        bestEffort("Could not open naming again", Unit) { storage.openNames(noteId) }
     }
 
     // Step 1 ----------------------------------------------------------------------------------------------------
@@ -186,7 +201,8 @@ class TranscriptionJob(
             !models.consented() -> JobOutcome.NeedsConsent(models.plan().totalBytes)
             else -> when (val outcome = download(missing)) {
                 is InstallOutcome.Installed -> null
-                is InstallOutcome.Failed -> JobOutcome.Failed(JobFailure.Download(outcome.error, outcome.part))
+                is InstallOutcome.Failed ->
+                    JobOutcome.Failed(JobFailure.Download(outcome.error, outcome.part, outcome.requiredFreeBytes))
                 is InstallOutcome.NeedsConsent -> JobOutcome.NeedsConsent(outcome.missingBytes)
             }
         }
@@ -234,15 +250,15 @@ class TranscriptionJob(
     /** The work files: a fresh run starts them empty, a resumed one truncates them to the checkpoint. */
     private fun openRun(prepared: Prepared): Run {
         val resumed = prepared.resumed
-        val files = storage.workFiles(noteId)
+        val files = writing { storage.workFiles(noteId) }
         if (resumed == null) {
             files.encodedAudio.delete()
             files.clips.delete()
         }
-        val clips = PcmFile(files.clips, deleteOnClose = false)
+        val clips = writing { PcmFile(files.clips, deleteOnClose = false) }
         var run: Run? = null
         try {
-            resumed?.let { clips.truncate(it.clipSamples) }
+            resumed?.let { writing { clips.truncate(it.clipSamples) } }
             val cache = VoiceClipCache(clips, resumed?.voiceClips?.let(CheckpointState::json))
             val opus = isOpus(prepared.audioFile)
             run = Run(
@@ -263,13 +279,15 @@ class TranscriptionJob(
     /** Step 3: draft names, encoder and diarizer state. */
     private fun restore(run: Run) {
         val resumed = run.resumed
+        // Every run, fresh or resumed, starts with naming open (0.1.0 `draftNamingOpen = true`).
+        storage.openNames(noteId)
         if (resumed == null) {
             // A fresh run starts with no draft names (0.1.0); there are no words yet that the user could have named.
             val generation = run.prepared.generation
             storage.mutateNames(noteId) { CheckpointNames(emptyMap(), emptyMap(), generation = generation) }
         }
         if (run.sealAudio != run.prepared.audioFile) {
-            run.encoder = engines.encoders.open(run.sealAudio, resumed?.encoder)
+            run.encoder = writing { engines.encoders.open(run.sealAudio, resumed?.encoder) }
         }
         run.speakerFailure = resumed?.speakerFailure ?: !models.ready(ModelPart.SPEAKERS)
         run.previousSaved = resumed?.doneMs ?: -1L
@@ -295,7 +313,8 @@ class TranscriptionJob(
 
     /**
      * Step 4: streams the audio into the encoder and the recognizer. After each sample block that completed a window,
-     * and at a stop, the checkpoint is saved; a stop then ends the run. Returns the decoded duration.
+     * and at a stop once a window is done, the checkpoint is saved; a stop then ends the run. Returns the decoded
+     * duration.
      */
     private fun decodeLoop(run: Run, recognizer: Recognizer): Long {
         recognizer.totalMs = run.resumed?.durationMs ?: 0L
@@ -304,10 +323,12 @@ class TranscriptionJob(
             run.resumed?.positionSamples ?: 0L,
             { samples, count ->
                 checkActive()
-                run.encoder?.accept(samples, count)
+                run.encoder?.let { writing { it.accept(samples, count) } }
                 recognizer.accept(samples, count)
                 val stopping = stopReason.get() != null
-                if (recognizer.doneMs > run.previousSaved || stopping) saveCheckpoint(run, recognizer)
+                // No checkpoint before the first window is done: a stop then leaves none ("Paused before any words").
+                val progressed = recognizer.doneMs > maxOf(run.previousSaved, 0L)
+                if (progressed || (stopping && recognizer.doneMs > 0L)) saveCheckpoint(run, recognizer)
                 if (stopping) throw ProcessingPaused()
             },
         ) { readMs, totalMs ->
@@ -385,11 +406,20 @@ class TranscriptionJob(
 
     /** Step 4e: the clips and the encoded audio are fsynced before the checkpoint that counts them is written. */
     private fun saveCheckpoint(run: Run, recognizer: Recognizer) {
-        run.clips.sync()
+        writing { run.clips.sync() }
         val audio = run.prepared.audioFile
-        val state = CheckpointState(
-            source = audio.name,
-            signature = CheckpointState.signature(audio),
+        val signature = CheckpointState.signature(audio)
+        val state = writing { checkpointState(run, recognizer, audio.name, signature) }
+        writing { storage.saveCheckpoint(noteId, state) }
+        run.previousSaved = recognizer.doneMs
+        emit(JobEvent.Checkpointed(recognizer.doneMs))
+    }
+
+    /** The checkpoint of [recognizer]'s position; reading the encoder state fsyncs `audio.opus.part`. */
+    private fun checkpointState(run: Run, recognizer: Recognizer, source: String, signature: String) =
+        CheckpointState(
+            source = source,
+            signature = signature,
             model = ModelCatalog.PARAKEET_REVISION,
             speakers = ModelCatalog.diarizationModel.sha256,
             recognition = recognizer.checkpoint(),
@@ -404,10 +434,6 @@ class TranscriptionJob(
             durationMs = recognizer.totalMs,
             elapsedMs = (env.nanoTime() - run.began) / NANOS_PER_MS,
         )
-        storage.saveCheckpoint(noteId, state)
-        run.previousSaved = recognizer.doneMs
-        emit(JobEvent.Checkpointed(recognizer.doneMs))
-    }
 
     /** Step 5: the last partial window, the final (complete) checkpoint, then the end of the Opus stream. */
     private fun finish(run: Run, recognizer: Recognizer, durationMs: Long): Decoded {
@@ -418,7 +444,7 @@ class TranscriptionJob(
         finishing = true
         checkActive()
         run.encoder?.let {
-            it.finish()
+            writing { it.finish() }
             it.close()
         }
         val diarizer = run.diarizer
@@ -513,8 +539,8 @@ class TranscriptionJob(
     /**
      * Step 9: seals into `work/sealed.opus` (never `document.opus`) while holding the note's lock, re-reading the
      * existing document and the title under it. `CassiniDocument.create` verifies the written file; the job fsyncs it,
-     * saves the pending prints, then writes the marker. A stop or a failure before the marker deletes the sealed file
-     * and keeps the checkpoint.
+     * saves the pending prints (or deletes an older pending file when there are none), then writes the marker. A stop or
+     * a failure before the marker deletes the sealed file and keeps the checkpoint.
      */
     private fun seal(prepared: Prepared, decoded: Decoded, draft: Draft, matched: Matched): Sealed {
         checkActive()
@@ -538,6 +564,9 @@ class TranscriptionJob(
             val prints = matched.pending()
             if (prints.isNotEmpty() && variant != null) {
                 voices.savePendingBlocking(noteId, variant, JobProvenance.PRINT_MODEL, prints, prepared.generation)
+            } else {
+                // A pending file from an earlier run that never adopted must not reach this adopt.
+                voices.discardPendingBlocking(noteId)
             }
             if (stopReason.get() != null) throw ProcessingPaused()
             checkActive()
@@ -553,7 +582,8 @@ class TranscriptionJob(
 
     /**
      * Step 10: installs the sealed document. A stop that came after the marker still pauses: the sealed file goes,
-     * the complete checkpoint stays. Once adopt starts it runs to its end ([NonCancellable]).
+     * the complete checkpoint stays. Once adopt starts it runs to its end ([NonCancellable]). A failed adopt ends
+     * [JobOutcome.AdoptPending], never Failed: the marker and the sealed file stay for the coordinator (section 5.3).
      */
     private suspend fun adopt(sealed: Sealed, began: Long): JobOutcome {
         if (stopReason.get() != null) {
@@ -563,13 +593,37 @@ class TranscriptionJob(
         currentCoroutineContext().ensureActive()
         val finalizationMs = (env.nanoTime() - began) / NANOS_PER_MS
         val adoption = Adoption(sealed.labels, sealed.names.remembered, sealed.names.generation, finalizationMs)
-        withContext(NonCancellable + env.io) { storage.adopt(noteId, adoption) }
-        return JobOutcome.Done
+        adopting = true
+        return withContext(NonCancellable + env.io) {
+            try {
+                storage.adopt(noteId, adoption)
+                JobOutcome.Done
+            } catch (
+                @Suppress("TooGenericExceptionCaught") // any adopt failure leaves an adoptable marker
+                error: Exception,
+            ) {
+                env.warn("Adopt failed; the sealed document waits for the next try", error)
+                JobOutcome.AdoptPending
+            }
+        }
     }
 
     // Helpers ---------------------------------------------------------------------------------------------------
 
     private suspend fun <T> onInference(block: () -> T): T = runInterruptible(env.inference, block)
+
+    /**
+     * Runs a write to the work files. An IOException there is SPACE when `work/` is low on space, else SAVE; only
+     * reading the audio gives OPEN.
+     */
+    private inline fun <T> writing(block: () -> T): T = try {
+        block()
+    } catch (error: IOException) {
+        env.warn("Could not write the work files", error)
+        val free = storage.sealTarget(noteId).absoluteFile.parentFile?.usableSpace ?: 0L
+        val failure = if (free < Limits.MIN_FREE_BYTES) Failure.SPACE else Failure.SAVE
+        throw UserFacingException(failure).apply { initCause(error) }
+    }
 
     private fun emit(event: JobEvent) {
         channel.trySend(event)

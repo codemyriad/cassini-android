@@ -185,8 +185,11 @@ sealed interface JobFailure {
         override val code: String get() = failure.name
     }
 
-    /** The required speech model could not be installed. */
-    data class Download(val error: DownloadError, val part: ModelPart) : JobFailure {
+    /**
+     * The required speech model could not be installed. [requiredFreeBytes] is the figure the installer's space check
+     * used: DL_NO_SPACE shows "Free about N MB" from it.
+     */
+    data class Download(val error: DownloadError, val part: ModelPart, val requiredFreeBytes: Long) : JobFailure {
         override val code: String get() = error.name
     }
 
@@ -200,6 +203,12 @@ sealed interface JobFailure {
 sealed interface JobOutcome {
     /** The document was sealed and adopted. */
     data object Done : JobOutcome
+
+    /**
+     * The document is sealed and marked (`work/sealed`), but adopt failed. The transcript is complete: the coordinator
+     * finishes adopt as `reconcileOnStart` does (architecture section 5.3) and never shows the note as FAILED.
+     */
+    data object AdoptPending : JobOutcome
 
     /** The checkpoint is saved (when there was progress to save); the row becomes PAUSED([reason]). */
     data class Paused(val reason: PauseReason) : JobOutcome

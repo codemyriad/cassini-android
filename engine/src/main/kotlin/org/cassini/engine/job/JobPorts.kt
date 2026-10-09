@@ -75,8 +75,15 @@ interface JobStorage {
     fun mutateNames(noteId: String, reducer: (CheckpointNames) -> CheckpointNames): CheckpointNames
 
     /**
-     * Closes naming (step 6, `DraftNames.close()`): later changes from the UI are refused, and the returned value is
-     * final for this run. Blocking, inference thread.
+     * Opens naming (`DraftNames.open()`), so the UI can change the draft names again. The job calls it at the start of
+     * every run (step 3), and when a run that closed naming ends without adopt (a stop, a failure or a cancel after
+     * step 6), so a paused note accepts names. Idempotent. Blocking, worker thread.
+     */
+    fun openNames(noteId: String)
+
+    /**
+     * Closes naming (step 6, `DraftNames.close()`): later changes from the UI are refused until [openNames], and the
+     * returned value is final for this run. Blocking, inference thread.
      */
     fun closeNames(noteId: String): CheckpointNames
 
@@ -145,6 +152,12 @@ interface JobVoices {
         prints: Map<String, SpeakerPrint>,
         generation: Long,
     )
+
+    /**
+     * Deletes `voices/pending/<noteId>.json` if it exists. A seal without prints calls it before the marker, so adopt
+     * never merges the prints of an earlier run. Blocking, inference thread.
+     */
+    fun discardPendingBlocking(noteId: String)
 }
 
 /** Models as the job sees them (`ModelRepository` plus the app's one install owner). */

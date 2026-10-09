@@ -34,6 +34,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -65,11 +66,11 @@ class TranscriptionJobTest {
         val (outcome, events) = h.run()
         assertEquals(JobOutcome.Done, outcome)
         assertEquals(listOf(0L, 26_000L, 52_000L), h.script.windows)
-        // As in 0.1.0: one checkpoint at the first sample block, one after each window, and a complete one after the
-        // final partial window.
-        assertEquals(listOf(0L, 28_000L, 54_000L, 70_000L), h.storage.saved.map { it.doneMs })
+        // One checkpoint after each window and a complete one after the final partial window. Unlike 0.1.0, none at the
+        // first sample block: until the first window is done there is nothing to keep (TX_PAUSED_EARLY).
+        assertEquals(listOf(28_000L, 54_000L, 70_000L), h.storage.saved.map { it.doneMs })
         val checkpointed = events.filterIsInstance<JobEvent.Checkpointed>().map { it.doneMs }
-        assertEquals(listOf(0L, 28_000L, 54_000L, 70_000L), checkpointed)
+        assertEquals(listOf(28_000L, 54_000L, 70_000L), checkpointed)
         assertTrue(events.first() is JobEvent.Started)
         assertEquals(JobEvent.Ended(JobOutcome.Done), events.last())
         val stages = events.filterIsInstance<JobEvent.StageChanged>().map { it.stage }.distinct()
@@ -86,7 +87,7 @@ class TranscriptionJobTest {
         assertTrue(events.indexOf(JobEvent.NamingClosed) > events.indexOfLast { it is JobEvent.Checkpointed })
         val sealed = h.sealed()
         assertEquals((0 until 70).map { "w$it" }, sealed.selected(null)!!.transcript!!.words.map { it.text })
-        val checkpoints = listOf("checkpoint 0", "checkpoint 28000", "checkpoint 54000", "checkpoint 70000")
+        val checkpoints = listOf("checkpoint 28000", "checkpoint 54000", "checkpoint 70000")
         assertEquals(checkpoints + listOf("pending", "marker", "adopt"), h.log)
         assertEquals(1, h.storage.adoptions.size)
         assertFalse(File(h.noteDir, "document.opus").exists())
@@ -105,7 +106,42 @@ class TranscriptionJobTest {
         assertEquals(JobOutcome.Done, h.run().first)
         val sink = h.script.sinks.single()
         assertTrue(sink.finished && sink.closed)
-        assertEquals(4, h.storage.saved.size)
+        assertEquals(3, h.storage.saved.size)
+    }
+
+    @Test fun aStopBeforeTheFirstWindowIsDoneLeavesNoCheckpoint() = runBlocking {
+        val h = Harness()
+        val job = h.job()
+        job.stop()
+        assertEquals(JobOutcome.Paused(PauseReason.USER), h.run(job).first)
+        assertEquals(listOf(0L), h.audioSource.starts)
+        assertTrue(h.storage.saved.isEmpty())
+        assertNull(h.storage.checkpointJson)
+        assertTrue(h.script.recognizers.single().closed)
+    }
+
+    @Test fun aWorkFileWriteFailureIsASaveFailureNotAnOpenOne() = runBlocking {
+        val h = Harness()
+        h.storage.checkpointFailure = IOException("No space left on device")
+        assertEquals(JobOutcome.Failed(JobFailure.Processing(Failure.SAVE)), h.run().first)
+        assertFalse(NativeBudget.isHeld)
+    }
+
+    @Test fun anErrorThatIsNotOutOfMemoryStillClosesTheEvents() = runBlocking {
+        val h = Harness()
+        h.script.beforeDecode = { throw NotImplementedError("native library missing") }
+        val job = h.job()
+        try {
+            withTimeout(60_000) { job.run() }
+            fail("The error must reach the caller")
+        } catch (expected: NotImplementedError) {
+            assertEquals("native library missing", expected.message)
+        }
+        // toList returns only once the channel is closed.
+        val events = withTimeout(10_000) { job.events.toList() }
+        assertTrue(events.first() is JobEvent.Started)
+        assertTrue(h.script.recognizers.single().closed)
+        assertFalse(NativeBudget.isHeld)
     }
 
     @Test fun stopAtAWindowThenResumeEqualsAnUninterruptedRun() = runBlocking {
@@ -174,7 +210,7 @@ class TranscriptionJobTest {
         assertTrue(interrupted.get())
         assertTrue(finishedNativeCall.get())
         assertEquals(JobEvent.Ended(JobOutcome.Cancelled), job.events.toList().last())
-        assertEquals(listOf(0L, 28_000L), h.storage.saved.map { it.doneMs })
+        assertEquals(listOf(28_000L), h.storage.saved.map { it.doneMs })
         assertEquals(28_000L, JSONObject(h.storage.checkpointJson!!).getLong("doneMs"))
         assertTrue(h.script.recognizers.single().closed)
         assertTrue(h.script.diarizers.single().closed)
@@ -188,7 +224,7 @@ class TranscriptionJobTest {
         h.script.beforeDecode = { start -> if (start == 26_000L) throw OutOfMemoryError("test") }
         val (outcome, _) = h.run()
         assertEquals(JobOutcome.Paused(PauseReason.MEMORY), outcome)
-        assertEquals(listOf(0L, 28_000L), h.storage.saved.map { it.doneMs })
+        assertEquals(listOf(28_000L), h.storage.saved.map { it.doneMs })
         assertTrue(h.script.recognizers.single().closed)
         assertTrue(h.script.diarizers.single().closed)
         assertFalse(NativeBudget.isHeld)
@@ -217,9 +253,16 @@ class TranscriptionJobTest {
         val failed = Harness()
         failed.models.readyParts = emptySet()
         failed.models.outcome = InstallOutcome.Failed(ModelPart.SPEECH, DownloadError.NO_CONNECTION, 1)
-        val noConnection = JobFailure.Download(DownloadError.NO_CONNECTION, ModelPart.SPEECH)
+        val noConnection = JobFailure.Download(DownloadError.NO_CONNECTION, ModelPart.SPEECH, 1)
         assertEquals(JobOutcome.Failed(noConnection), failed.run().first)
         assertTrue(failed.audioSource.starts.isEmpty())
+
+        // The banner's "Free about N MB" comes from the figure the installer's space check used.
+        val full = Harness()
+        full.models.readyParts = emptySet()
+        full.models.outcome = InstallOutcome.Failed(ModelPart.SPEECH, DownloadError.NOT_ENOUGH_STORAGE, 861L shl 20)
+        val noSpace = JobFailure.Download(DownloadError.NOT_ENOUGH_STORAGE, ModelPart.SPEECH, 861L shl 20)
+        assertEquals(JobOutcome.Failed(noSpace), full.run().first)
     }
 
     @Test fun aStopDuringTheDownloadStopsWaitingAndPauses() = runBlocking {
@@ -281,7 +324,8 @@ class TranscriptionJobTest {
         h.voices.people = listOf(voice("marco", "Marco", axis(2)))
         h.storage.adoptFailure = IOException("Process died")
         val (outcome, _) = h.run()
-        assertEquals(JobOutcome.Failed(JobFailure.Processing(Failure.SAVE)), outcome)
+        // Never FAILED (architecture section 5.3): the coordinator finishes adopt.
+        assertEquals(JobOutcome.AdoptPending, outcome)
         assertTrue(h.storage.marker.isFile)
         val sealed = CassiniDocument.read(File(h.storage.work, "sealed.opus"))
         assertEquals("ok", sealed.state)
@@ -304,12 +348,34 @@ class TranscriptionJobTest {
         assertTrue(h.storage.adoptions.isEmpty())
         assertFalse(File(h.noteDir, "document.opus").exists())
 
+        // Naming is open again while the note is paused: a rename from the UI is accepted and kept by the resume.
+        assertFalse(h.storage.namingClosed)
+        h.storage.mutateNames("note-1") { it.rename(sp1, "Chiara") }
+
         // Resuming the complete checkpoint decodes nothing again.
         h.storage.duringSeal = {}
-        h.storage.namingClosed = false
         assertEquals(JobOutcome.Done, h.run().first)
         assertEquals(listOf(0L, 26_000L, 52_000L), h.script.windows)
         assertEquals(1, h.storage.adoptions.size)
+        assertEquals("Chiara", h.storage.adoptions.single().labels[sp1])
+    }
+
+    @Test fun aStopAfterTheMarkerLeavesNoStalePendingPrintsForTheNextRun() = runBlocking {
+        val h = Harness()
+        h.voices.people = listOf(voice("marco", "Marco", axis(2)))
+        val job = h.job()
+        h.storage.afterMarker = { job.stop() }
+        assertEquals(JobOutcome.Paused(PauseReason.USER), h.run(job).first)
+        assertFalse(h.storage.marker.exists())
+        assertFalse(h.storage.namingClosed)
+        assertNotNull(h.voices.pendingFile)
+
+        // The resumed run gets no prints: the earlier run's pending file must not reach its adopt.
+        h.storage.afterMarker = {}
+        h.script.beforePrints = { error("Voiceprint model removed") }
+        assertEquals(JobOutcome.Done, h.run().first)
+        assertNull(h.voices.pendingFile)
+        assertEquals(listOf("discard pending", "marker", "adopt"), h.log.takeLast(3))
     }
 
     @Test fun aNotLucaArrivingDuringAWindowIsNotOverwrittenByTheJob() = runBlocking {

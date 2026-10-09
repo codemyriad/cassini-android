@@ -273,6 +273,15 @@ class FakeStorage(
     /** Runs inside the note lock of the seal. */
     @Volatile var duringSeal: () -> Unit = {}
 
+    /** Runs right after the marker is written. */
+    @Volatile var afterMarker: () -> Unit = {}
+
+    /** Thrown by [saveCheckpoint] instead of writing, when set. */
+    @Volatile var checkpointFailure: java.io.IOException? = null
+
+    /** How many times the job opened naming. */
+    val opens = AtomicLong()
+
     /** Called with each checkpoint before it is written, to check what was fsynced. */
     @Volatile var onCheckpoint: (CheckpointState) -> Unit = {}
 
@@ -287,6 +296,7 @@ class FakeStorage(
     }
 
     override fun saveCheckpoint(noteId: String, state: CheckpointState) {
+        checkpointFailure?.let { throw it }
         onCheckpoint(state)
         // Through the codec, as CheckpointRepository writes it.
         checkpointJson = CheckpointState.encode(state).toString()
@@ -299,6 +309,11 @@ class FakeStorage(
     override fun mutateNames(noteId: String, reducer: (CheckpointNames) -> CheckpointNames): CheckpointNames {
         check(!namingClosed) { "Naming is closed" }
         return names.updateAndGet(reducer).also { jobNames += it }
+    }
+
+    override fun openNames(noteId: String) {
+        opens.incrementAndGet()
+        namingClosed = false
     }
 
     override fun closeNames(noteId: String): CheckpointNames {
@@ -328,6 +343,7 @@ class FakeStorage(
         check(sealTarget(noteId).isFile)
         marker.writeText("ok")
         log += "marker"
+        afterMarker()
     }
 
     override fun discardSealedBlocking(noteId: String) {
@@ -352,6 +368,9 @@ class FakeVoices(private val log: MutableList<String>) : JobVoices {
 
     val pending = CopyOnWriteArrayList<Pending>()
 
+    /** What `voices/pending/<id>.json` holds now: the last saved prints, or null once discarded. */
+    @Volatile var pendingFile: Pending? = null
+
     data class Pending(
         val variantId: String,
         val model: String,
@@ -373,7 +392,13 @@ class FakeVoices(private val log: MutableList<String>) : JobVoices {
         generation: Long,
     ) {
         pending += Pending(variantId, model, prints, generation)
+        pendingFile = pending.last()
         log += "pending"
+    }
+
+    override fun discardPendingBlocking(noteId: String) {
+        pendingFile = null
+        log += "discard pending"
     }
 }
 
