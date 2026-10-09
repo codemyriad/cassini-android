@@ -36,7 +36,7 @@ The release job attaches these files from `dist/`:
 - The signed APK and the R8 mapping.
 - A SHA-256 checksum file for each of the two.
 - The notices.
-- `cassini-native-sources.tar`.
+- `cassini-native-sources.tar` and its SHA-256 checksum file.
 
 Before that, `scripts/package-apk.py` makes sure that the APK is not debuggable, has no model weights and has the certificate digest in `scripts/beta-signing-cert.sha256`.
 
@@ -67,7 +67,7 @@ CI uses these repository secrets on tags:
 
 Until the owner sets the three password secrets, CI uses the values of the old debug keystore (`android`, `androiddebugkey`, `android`). This fallback is temporary. It goes when the owner changes the passwords. If `ANDROID_BETA_KEYSTORE` is not set, the tag build fails.
 
-The beta key is the key of the earlier beta installations, so an update installs over them without an uninstall and the downloaded models stay. Version 0.2 does not show the notes of 0.1.x: users must save each note as a Cassini document (`.opus`) before they update. `scripts/beta-signing-cert.sha256` holds the SHA-256 digest of its certificate. The owner can choose a new signing identity for a stable release. Then Android does not install the stable release over a beta installation, and users must uninstall the beta, which erases their notes and models. The release notes must say this. Never commit a keystore or a password.
+The beta key is the key of the earlier beta installations, so an update installs over them without an uninstall and the downloaded models stay. Version 0.2 does not show the notes of 0.1.x: before they update, users must transcribe each note that has no transcript and then save each note as a Cassini document (`.opus`). 0.1.x cannot save a recording without a transcript as a document, so such a recording cannot move to 0.2 in a different way. `scripts/beta-signing-cert.sha256` holds the SHA-256 digest of its certificate. The owner can choose a new signing identity for a stable release. Then Android does not install the stable release over a beta installation, and users must uninstall the beta, which erases their notes and models. The release notes must say this. Never commit a keystore or a password.
 
 ## releaseTest
 

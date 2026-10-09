@@ -11,8 +11,8 @@ Version 0.2.0 is a new build of the app. It keeps the speech engine and the port
 ### Changed
 
 - 0.2 starts with a fresh storage layout and does not read 0.1.x app data; exported .opus documents open as before.
-- The signing key does not change, so 0.2 installs over 0.1.x and the downloaded models stay. Before you update, save each 0.1.x note as a Cassini document (`.opus`). Then open these files in 0.2.
-- An update from 0.1.x does not delete the files of 0.1.x: the recordings, `library.json` and `voices.json` with the 0.1.x voiceprints. "Forget everyone" does not delete them. "Clear storage" in the Android app settings, or an uninstall, deletes them. [PRIVACY.md](PRIVACY.md) gives the details.
+- The signing key does not change, so 0.2 installs over 0.1.x and the downloaded models stay. Before you update, transcribe each 0.1.x note that has no transcript, then save each note as a Cassini document (`.opus`). Then open these files in 0.2. 0.1.x cannot save a recording without a transcript as a document, and there is no other way to move such a recording to 0.2.
+- An update from 0.1.x does not delete the files of 0.1.x. These include the recordings, the list of notes, the unfinished transcriptions and the last transcript, and the 0.1.x voiceprints in `voices.json` and `voiceprints/`. "Forget everyone" does not delete them. "Clear storage" in the Android app settings, or an uninstall, deletes them. [PRIVACY.md](PRIVACY.md) gives the details.
 - New transcripts do not claim Italian. Parakeet does not identify the language, so the language of a new transcript is empty.
 - A new user interface, made with Jetpack Compose, replaces all screens. It uses the Instrument Sans and IBM Plex Mono fonts and has a light theme and a dark theme.
 - Transcription runs in a foreground service, so it continues when you leave the app. If Android or you stop a transcription, it continues later from the last saved point.
