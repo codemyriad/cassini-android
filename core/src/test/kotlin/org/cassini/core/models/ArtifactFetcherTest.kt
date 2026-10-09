@@ -5,9 +5,11 @@ import org.cassini.core.UserFacingException
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 import java.io.File
+import java.io.IOException
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.nio.file.Files
@@ -87,6 +89,26 @@ class ArtifactFetcherTest {
         error("unreachable")
     }
 
+    private val weights = ByteArray(300_000) { (it * 7 % 253).toByte() }
+
+    /** Answers a Range request with the requested suffix of [body], announcing [total] as the full length. */
+    private fun ranged(
+        body: ByteArray,
+        total: Long = body.size.toLong()
+    ): (Map<String, String>) -> Answer = { headers ->
+        val range = headers["range"]
+        if (range == null) {
+            Answer(200, body)
+        } else {
+            val from = range.removePrefix("bytes=").removeSuffix("-").toInt()
+            Answer(
+                206,
+                body.copyOfRange(from, body.size),
+                mapOf("Content-Range" to "bytes $from-${body.size - 1}/$total")
+            )
+        }
+    }
+
     @Test fun theVoiceprintModelIsFetchedAsIsAndVerified() {
         val bytes = "voiceprint weights".toByteArray()
         withServer(bytes) { url, directory ->
@@ -140,6 +162,152 @@ class ArtifactFetcherTest {
                 )
                 assertFalse(File(directory, "model.onnx").exists())
             } finally { Thread.interrupted() }
+        }
+    }
+
+    @Test fun aBrokenTransferKeepsItsPartAndTheNextAttemptResumesIt() {
+        var attempts = 0
+        val respond = ranged(weights)
+        withServer({ headers ->
+            attempts++
+            // The first answer announces every byte but the connection drops after 100 000 of them.
+            if (attempts == 1) Answer(200, weights, sent = 100_000) else respond(headers)
+        }) { url, directory, requests ->
+            try {
+                ArtifactFetcher.fetch(url, artifact(weights), directory) { _, _ -> }
+                fail("A truncated body must not install")
+            } catch (error: UserFacingException) {
+                assertEquals(Failure.DOWNLOAD, error.failure)
+            } catch (_: IOException) {
+                // Some HTTP stacks report the early close as an error instead of an early end.
+            }
+            assertFalse(File(directory, "model.onnx").exists())
+            assertEquals(100_000L, File(directory, "model.onnx.part").length())
+            val reported = mutableListOf<Long>()
+            ArtifactFetcher.fetch(
+                url,
+                artifact(weights),
+                directory
+            ) { done, verifying -> if (!verifying) reported += done }
+            assertEquals("bytes=100000-", requests.last()["range"])
+            assertArrayEquals(weights, File(directory, "model.onnx").readBytes())
+            assertFalse(File(directory, "model.onnx.part").exists())
+            assertTrue("Progress continues from the resumed length", reported.all { it > 100_000 })
+        }
+    }
+
+    @Test fun aPartialAnswerResumesFromThePartLength() {
+        withServer(ranged(weights)) { url, directory, requests ->
+            File(directory, "model.onnx.part").writeBytes(weights.copyOf(123_456))
+            ArtifactFetcher.fetch(url, artifact(weights), directory) { _, _ -> }
+            assertEquals(listOf("bytes=123456-"), requests.map { it["range"] })
+            assertArrayEquals(weights, File(directory, "model.onnx").readBytes())
+            assertFalse(File(directory, "model.onnx.part").exists())
+        }
+    }
+
+    @Test fun aFullAnswerToARangeRequestRestartsFromZero() {
+        withServer({ Answer(200, weights) }) { url, directory, requests ->
+            // Not a prefix of the artifact: a restart must not keep any of it.
+            File(directory, "model.onnx.part").writeBytes(ByteArray(50_000) { 1 })
+            ArtifactFetcher.fetch(url, artifact(weights), directory) { _, _ -> }
+            assertEquals("bytes=50000-", requests.single()["range"])
+            assertArrayEquals(weights, File(directory, "model.onnx").readBytes())
+        }
+    }
+
+    @Test fun aWrongContentRangeTotalDeletesThePart() {
+        withServer(ranged(weights, total = weights.size + 1L)) { url, directory, _ ->
+            File(directory, "model.onnx.part").writeBytes(weights.copyOf(1000))
+            assertEquals(
+                Failure.VERIFY,
+                failure { ArtifactFetcher.fetch(url, artifact(weights), directory) { _, _ -> } }
+            )
+            assertFalse(File(directory, "model.onnx.part").exists())
+            assertFalse(File(directory, "model.onnx").exists())
+        }
+    }
+
+    @Test fun aContentRangeForAnotherOffsetDeletesThePart() {
+        withServer({
+            Answer(
+                206,
+                weights.copyOfRange(10, weights.size),
+                mapOf("Content-Range" to "bytes 10-${weights.size - 1}/${weights.size}")
+            )
+        }) {
+                url, directory, _ ->
+            File(directory, "model.onnx.part").writeBytes(weights.copyOf(1000))
+            assertEquals(
+                Failure.VERIFY,
+                failure { ArtifactFetcher.fetch(url, artifact(weights), directory) { _, _ -> } }
+            )
+            assertFalse(File(directory, "model.onnx.part").exists())
+        }
+    }
+
+    @Test fun aHashMismatchAfterResumingDeletesThePart() {
+        withServer(ranged(weights)) { url, directory, _ ->
+            // The right length, the wrong bytes: only the hash can tell.
+            File(directory, "model.onnx.part").writeBytes(ByteArray(1000) { 9 })
+            assertEquals(
+                Failure.VERIFY,
+                failure { ArtifactFetcher.fetch(url, artifact(weights), directory) { _, _ -> } }
+            )
+            assertFalse(File(directory, "model.onnx.part").exists())
+            assertFalse(File(directory, "model.onnx").exists())
+            // The next attempt starts over and succeeds.
+            ArtifactFetcher.fetch(url, artifact(weights), directory) { _, _ -> }
+            assertArrayEquals(weights, File(directory, "model.onnx").readBytes())
+        }
+    }
+
+    @Test fun aPartLongerThanTheArtifactIsDiscarded() {
+        withServer(ranged(weights)) { url, directory, requests ->
+            File(directory, "model.onnx.part").writeBytes(ByteArray(weights.size + 1))
+            ArtifactFetcher.fetch(url, artifact(weights), directory) { _, _ -> }
+            assertEquals(null, requests.single()["range"])
+            assertArrayEquals(weights, File(directory, "model.onnx").readBytes())
+        }
+    }
+
+    @Test fun anUnsatisfiableRangeDeletesThePart() {
+        withServer({ Answer(416, ByteArray(0)) }) { url, directory, _ ->
+            File(directory, "model.onnx.part").writeBytes(weights.copyOf(1000))
+            assertEquals(
+                Failure.DOWNLOAD,
+                failure { ArtifactFetcher.fetch(url, artifact(weights), directory) { _, _ -> } }
+            )
+            assertFalse(File(directory, "model.onnx.part").exists())
+        }
+    }
+
+    @Test fun aServerErrorKeepsThePartForTheNextAttempt() {
+        withServer({ Answer(503, ByteArray(0)) }) { url, directory, _ ->
+            File(directory, "model.onnx.part").writeBytes(weights.copyOf(1000))
+            assertEquals(
+                Failure.DOWNLOAD,
+                failure { ArtifactFetcher.fetch(url, artifact(weights), directory) { _, _ -> } }
+            )
+            assertEquals(1000L, File(directory, "model.onnx.part").length())
+        }
+    }
+
+    @Test fun aVerifiedFileIsNeverReplacedOrDownloadedAgain() {
+        withServer({ Answer(200, ByteArray(weights.size)) }) { url, directory, requests ->
+            File(directory, "model.onnx").writeBytes(weights)
+            ArtifactFetcher.fetch(url, artifact(weights), directory) { _, _ -> }
+            assertEquals(0, requests.size)
+            assertArrayEquals(weights, File(directory, "model.onnx").readBytes())
+        }
+    }
+
+    @Test fun aCompletePartIsVerifiedWithoutARequest() {
+        withServer({ Answer(500, ByteArray(0)) }) { url, directory, requests ->
+            File(directory, "model.onnx.part").writeBytes(weights)
+            ArtifactFetcher.fetch(url, artifact(weights), directory) { _, _ -> }
+            assertEquals(0, requests.size)
+            assertArrayEquals(weights, File(directory, "model.onnx").readBytes())
         }
     }
 }

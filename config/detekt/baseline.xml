@@ -6,7 +6,6 @@
     <ID>AnnotationOnSeparateLine:PortableDocumentTest.kt$PortableDocumentTest$@android.annotation.TargetApi(33) @androidx.test.filters.SdkSuppress(minSdkVersion = 33) @Test</ID>
     <ID>AnnotationOnSeparateLine:SpeakerMergesTest.kt$SpeakerMergesTest$@Test(expected = IllegalArgumentException::class)</ID>
     <ID>AnnotationOnSeparateLine:TranscriptTest.kt$TranscriptTest$@Test(expected = IllegalArgumentException::class)</ID>
-    <ID>ArgumentListWrapping:ArtifactFetcher.kt$ArtifactFetcher$(Failure.DOWNLOAD, "HTTP ${connection.responseCode}")</ID>
     <ID>ArgumentListWrapping:AsrEval.kt$AsrEval$("x-durationMs", audio.durationMs)</ID>
     <ID>ArgumentListWrapping:AsrEval.kt$AsrEval$("x-elapsedMs", elapsedMs)</ID>
     <ID>ArgumentListWrapping:AsrEval.kt$AsrEval$(File(modelDir))</ID>
@@ -1427,7 +1426,6 @@
     <ID>Filename:NoteVoices.kt$org.cassini.android.NoteVoices.kt</ID>
     <ID>ImportOrdering:CheckpointData.kt$import java.nio.ByteBuffer import java.nio.ByteOrder import java.util.Base64 import org.json.JSONObject</ID>
     <ID>ImportOrdering:SpeakerDialog.kt$import android.content.Context import android.text.InputFilter import android.text.InputType import android.view.View import android.widget.CheckBox import android.widget.EditText import android.widget.FrameLayout import android.widget.LinearLayout import android.widget.TextView import android.widget.ScrollView</ID>
-    <ID>Indentation:ArtifactFetcher.kt$ArtifactFetcher$ </ID>
     <ID>Indentation:AudioDecoder.kt$AudioDecoder$ </ID>
     <ID>Indentation:BatteryProjection.kt$BatteryProjection$ </ID>
     <ID>Indentation:CassiniDocument.kt$CassiniDocument.Companion$ </ID>
@@ -1484,12 +1482,6 @@
     <ID>LoopWithTooManyJumpStatements:VoiceprintSelection.kt$Voiceprints$for</ID>
     <ID>LoopWithTooManyJumpStatements:WordGate.kt$WordGate$while</ID>
     <ID>MagicNumber:AppLanguage.kt$AppLanguage$33</ID>
-    <ID>MagicNumber:ArtifactFetcher.kt$ArtifactFetcher$1024</ID>
-    <ID>MagicNumber:ArtifactFetcher.kt$ArtifactFetcher$128</ID>
-    <ID>MagicNumber:ArtifactFetcher.kt$ArtifactFetcher$200</ID>
-    <ID>MagicNumber:ArtifactFetcher.kt$ArtifactFetcher$30_000</ID>
-    <ID>MagicNumber:ArtifactFetcher.kt$ArtifactFetcher$32</ID>
-    <ID>MagicNumber:ArtifactFetcher.kt$ArtifactFetcher$500</ID>
     <ID>MagicNumber:AudioDecoder.kt$AudioDecoder$1000</ID>
     <ID>MagicNumber:AudioDecoder.kt$AudioDecoder$1000L</ID>
     <ID>MagicNumber:AudioDecoder.kt$AudioDecoder$1024</ID>
@@ -2368,8 +2360,6 @@
     <ID>MultiLineIfElse:VoiceprintSelection.kt$Voiceprints$runs.add(Triple(word.speaker, word.startMs, word.endMs))</ID>
     <ID>MultiLineIfElse:VoiceprintSelection.kt$Voiceprints$runs[runs.lastIndex] = Triple(last.first, last.second, maxOf(last.third, word.endMs))</ID>
     <ID>MultiLineIfElse:WordGate.kt$WordGate$null</ID>
-    <ID>NestedBlockDepth:ArtifactFetcher.kt$ArtifactFetcher$fun decompress(source: File, artifact: Artifact, directory: File)</ID>
-    <ID>NestedBlockDepth:ArtifactFetcher.kt$ArtifactFetcher$fun fetch(url: String, artifact: Artifact, directory: File, progress: (Long, Boolean) -&gt; Unit)</ID>
     <ID>NestedBlockDepth:AudioDecoder.kt$AudioDecoder$private fun decodeCompressed(file: File, onSamples: (FloatArray, Int) -&gt; Unit, onProgress: (Long, Long?) -&gt; Unit, retainPcm: Boolean, startSample: Long): PcmAudio</ID>
     <ID>NestedBlockDepth:AudioDecoder.kt$AudioDecoder$private fun decodeInternal(context: Context, uri: Uri, retainPcm: Boolean, onSamples: (FloatArray, Int) -&gt; Unit, onProgress: (Long, Long?) -&gt; Unit, startSample: Long = 0): PcmAudio</ID>
     <ID>NestedBlockDepth:ChunkingComparisonTest.kt$ChunkingComparisonTest$@Test fun cuttingModesAgainstTheWholeRecording()</ID>
@@ -2394,7 +2384,6 @@
     <ID>NoBlankLineBeforeRbrace:TranscriptionProgressTest.kt$TranscriptionProgressTest$ </ID>
     <ID>NoConsecutiveBlankLines:DeviceSmokeTest.kt$DeviceSmokeTest$ </ID>
     <ID>NoTrailingSpaces:CassiniDocument.kt$CassiniDocument.Companion$ </ID>
-    <ID>ParameterListWrapping:ArtifactFetcher.kt$ArtifactFetcher$(url: String, download: Artifact, artifact: Artifact, directory: File, progress: (Long, Boolean) -&gt; Unit)</ID>
     <ID>ParameterListWrapping:AudioDecoder.kt$AudioDecoder$(context: Context, uri: Uri, onSamples: (FloatArray, Int) -&gt; Unit = { _, _ -&gt; }, onProgress: (Long, Long?) -&gt; Unit = { _, _ -&gt; })</ID>
     <ID>ParameterListWrapping:AudioDecoder.kt$AudioDecoder$(context: Context, uri: Uri, onSamples: (FloatArray, Int) -&gt; Unit, startSample: Long = 0, onProgress: (Long, Long?) -&gt; Unit = { _, _ -&gt; })</ID>
     <ID>ParameterListWrapping:AudioDecoder.kt$AudioDecoder$(context: Context, uri: Uri, retainPcm: Boolean, onSamples: (FloatArray, Int) -&gt; Unit, onProgress: (Long, Long?) -&gt; Unit, startSample: Long = 0)</ID>
@@ -2716,7 +2705,6 @@
     <ID>SpacingBetweenDeclarationsWithComments:WordGate.kt$WordGate$/** One 10 ms feature frame, twice [MIN_ACTIVE_MS], so a single sample cannot win or lose a window. */</ID>
     <ID>SpacingBetweenDeclarationsWithComments:WordGate.kt$WordGate$/** Parakeet has placed a word up to 180 ms before its PCM; the margins absorb that jitter. */</ID>
     <ID>StringTemplate:ChunkingComparisonTest.kt$ChunkingComparisonTest$${entry.toString()}</ID>
-    <ID>SwallowedException:ArtifactFetcher.kt$ArtifactFetcher$e: java.io.IOException</ID>
     <ID>ThrowsCount:MainActivity.kt$MainActivity$private fun transcribe()</ID>
     <ID>TooGenericExceptionCaught:CassiniDocument.kt$CassiniDocument.Companion$error: Exception</ID>
     <ID>TooGenericExceptionCaught:CassiniDocument.kt$CassiniDocument.Companion$error: Throwable</ID>
@@ -2757,7 +2745,6 @@
     <ID>WildcardImport:NoteViews.kt$import android.widget.*</ID>
     <ID>WildcardImport:RecordingActivity.kt$import android.widget.*</ID>
     <ID>Wrapping:AppLanguage.kt$AppLanguage$(</ID>
-    <ID>Wrapping:ArtifactFetcher.kt$ArtifactFetcher$(</ID>
     <ID>Wrapping:AsrEval.kt$AsrEval$it != "-"</ID>
     <ID>Wrapping:AudioDecoder.kt$AudioDecoder$(</ID>
     <ID>Wrapping:AudioDecoder.kt$AudioDecoder$;</ID>
