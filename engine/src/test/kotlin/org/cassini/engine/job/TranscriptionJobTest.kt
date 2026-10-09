@@ -31,6 +31,7 @@ import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -94,12 +95,11 @@ class TranscriptionJobTest {
     }
 
     @Test fun checkpointsOnlyCountWhatWasFsynced() = runBlocking {
-        val h = Harness(source = "source.mp3")
+        val h = Harness(source = "source.mp3", recordSyncs = true)
         h.storage.onCheckpoint = { state ->
-            val sink = h.script.sinks.last()
+            // The fake encoder keeps its bytes in memory until its fsync: the file holds them only after it.
             assertEquals(state.encoder!!.length, File(h.storage.work, "audio.opus.part").length())
-            assertTrue(sink.syncs > 0)
-            assertTrue(File(h.storage.work, "clips.pcm").length() >= state.clipSamples * 4L)
+            assertEquals(state.clipSamples * 4L, File(h.storage.work, "clips.pcm").length())
             assertEquals("source.mp3", state.source)
             assertEquals(CheckpointState.signature(h.audio), state.signature)
         }
@@ -107,6 +107,47 @@ class TranscriptionJobTest {
         val sink = h.script.sinks.single()
         assertTrue(sink.finished && sink.closed)
         assertEquals(3, h.storage.saved.size)
+        // Both work files are fsynced after the previous checkpoint and before each new one.
+        var since = mutableListOf<String>()
+        h.log.toList().forEach { entry ->
+            if (entry.startsWith("checkpoint ")) {
+                assertTrue("$entry after $since", "sync clips.pcm" in since && "sync audio.opus.part" in since)
+                since = mutableListOf()
+            } else {
+                since += entry
+            }
+        }
+        // The sealed file is fsynced before the pending prints and the marker that say it is complete.
+        val sealedSync = h.log.indexOf("sync sealed.opus")
+        assertTrue(h.log.toString(), sealedSync in 0 until h.log.indexOf("pending"))
+        assertTrue(h.log.indexOf("pending") < h.log.indexOf("marker"))
+    }
+
+    @Test fun withoutAContainerDurationTheRowsDurationIsTheTotal() = runBlocking {
+        val known = Harness(reportsTotal = false)
+        known.storage.knownMs = 70_000L
+        val events = known.run().second
+        assertEquals(70_000L, events.filterIsInstance<JobEvent.Started>().single().totalMs)
+        assertTrue(events.filterIsInstance<JobEvent.Reading>().all { it.totalMs == 70_000L })
+        assertEquals(listOf(70_000L, 70_000L, 70_000L), known.storage.saved.map { it.durationMs })
+
+        val unknown = Harness(reportsTotal = false)
+        assertEquals(0L, unknown.run().second.filterIsInstance<JobEvent.Started>().single().totalMs)
+        assertEquals(0L, unknown.storage.saved.first().durationMs)
+
+        // The decoder's duration wins over the row's when the container tells it.
+        val decoded = Harness()
+        decoded.storage.knownMs = 65_000L
+        decoded.run()
+        assertEquals(70_000L, decoded.storage.saved.first().durationMs)
+    }
+
+    @Test fun aNamesWriteFailureAtTheStartIsASaveFailureNotAnOpenOne() = runBlocking {
+        val h = Harness()
+        h.storage.namesFailure = IOException("No space left on device")
+        assertEquals(JobOutcome.Failed(JobFailure.Processing(Failure.SAVE)), h.run().first)
+        assertTrue(h.audioSource.starts.isEmpty())
+        assertFalse(NativeBudget.isHeld)
     }
 
     @Test fun aStopBeforeTheFirstWindowIsDoneLeavesNoCheckpoint() = runBlocking {
@@ -280,6 +321,21 @@ class TranscriptionJobTest {
         assertTrue(h.storage.saved.isEmpty())
     }
 
+    @Test fun aMissingSpeechDetectorIsFetchedAgainOnlyOnline() = runBlocking {
+        val online = Harness()
+        online.models.detector = false
+        assertEquals(JobOutcome.Done, online.run().first)
+        assertEquals(listOf(setOf(ModelPart.SPEECH)), online.models.installs)
+
+        val offline = Harness()
+        offline.models.detector = false
+        offline.models.online = false
+        val (outcome, events) = offline.run()
+        assertEquals(JobOutcome.Done, outcome)
+        assertTrue(offline.models.installs.isEmpty())
+        assertTrue(events.none { it is JobEvent.Downloading })
+    }
+
     @Test fun aCheckpointThatNoLongerMatchesFailsTheJob() = runBlocking {
         val h = Harness()
         h.storage.mismatch = true
@@ -317,6 +373,39 @@ class TranscriptionJobTest {
         assertEquals("Anna", h.storage.adoptions.single().labels[sp1])
         assertNull(h.voices.pending.single().prints.getValue(sp1).match)
         assertTrue(h.storage.jobNames.none { sp1 in it.automatic || sp1 in it.live })
+    }
+
+    @Test fun transcribeAgainOnADocumentThatIsNotOkSealsAFreshDocument() = runBlocking {
+        val h = Harness(source = "document.opus")
+        val old = CassiniDocument.create(
+            FIXTURE_OPUS,
+            Transcript(listOf(Word("old_a", 0, 500, "ciao"))),
+            "Weekly sync",
+            JSONObject().put("source", "test"),
+            null,
+            mapOf("old_a" to "Anna"),
+            File(temp.root, "old.tmp"),
+        )
+        File(temp.root, "old.tmp").copyTo(h.audio, overwrite = true)
+        val before = sha256(h.audio)
+        // The repository reads the document as not verified: it cannot take a new variant (features "Transcribe again").
+        h.storage.existing = old.copy(state = "unverified")
+        h.voices.noteVoices = mapOf("old_a" to SpeakerPrint(axis(1), 30.0, null))
+
+        assertEquals(JobOutcome.Done, h.run().first)
+
+        assertEquals(before, sha256(h.audio))
+        val sealed = h.sealed()
+        assertEquals(1, sealed.variants.size)
+        assertEquals(70, sealed.selected(null)!!.transcript!!.words.size)
+        val meeting = { doc: CassiniDocument -> doc.manifest!!.getJSONObject("meeting").getString("id") }
+        assertNotEquals(meeting(old), meeting(sealed))
+        // No old transcript body or manifest stays beside the new one, and names do not carry over.
+        val bodies = sealed.comments.filter { it.startsWith("CASSINI_TX_WORDS_PAYLOAD_000=") }
+        assertEquals(1, bodies.size)
+        assertEquals(1, sealed.comments.count { it.startsWith("CASSINI_PAYLOAD_000=") })
+        assertEquals("Speaker 1", sealed.speakerLabel(sp1))
+        assertTrue(sealed.comments.any { it.startsWith("TITLE=") })
     }
 
     @Test fun aCrashAfterTheMarkerLeavesAnAdoptableState() = runBlocking {
@@ -395,6 +484,46 @@ class TranscriptionJobTest {
         assertNull(names.live[sp1])
         assertTrue(h.storage.jobNames.size >= 3)
         assertTrue(h.storage.jobNames.drop(2).all { it.rejected[sp1] == setOf("luca") && it.live[sp1] == null })
+    }
+
+    @Test fun aVoiceForgottenDuringTheRunIsNotRecognisedAgain() = runBlocking {
+        val h = Harness()
+        val marco = voice("marco", "Marco", axis(2))
+        h.voices.people = listOf(voice("luca", "Luca", axis(1)), marco)
+        val forgottenAt = AtomicLong(-1)
+        h.script.beforeDecode = { start ->
+            if (start == 26_000L) {
+                // VoiceRepository.forget: the person goes, and every draft loses their live and automatic entries.
+                h.voices.people = listOf(marco)
+                h.storage.names.updateAndGet { names ->
+                    names.copy(
+                        automatic = names.automatic.filterValues { it != "Luca" },
+                        live = names.live.filterValues { it.voiceId != "luca" },
+                    )
+                }
+                forgottenAt.set(h.storage.jobNames.size.toLong())
+            }
+        }
+        assertEquals(JobOutcome.Done, h.run().first)
+        val before = h.storage.jobNames.take(forgottenAt.get().toInt())
+        assertTrue(before.any { it.automatic[sp1] == "Luca" })
+        val later = h.storage.jobNames.drop(forgottenAt.get().toInt())
+        assertTrue(later.isNotEmpty())
+        assertTrue(later.all { sp1 !in it.automatic && it.live[sp1]?.voiceId != "luca" })
+        assertEquals("Speaker 1", h.storage.adoptions.single().labels[sp1])
+        assertEquals("Marco", h.storage.adoptions.single().labels[sp2])
+        assertEquals("Speaker 1", h.sealed().speakerLabel(sp1))
+        assertNull(h.voices.pending.single().prints.getValue(sp1).match)
+    }
+
+    @Test fun forgetEveryoneDuringTheRunDropsTheSavedVoices() = runBlocking {
+        val h = Harness()
+        h.voices.people = listOf(voice("luca", "Luca", axis(1)))
+        h.script.beforeDecode = { start -> if (start == 52_000L) h.voices.generation = 4L }
+        assertEquals(JobOutcome.Done, h.run().first)
+        assertEquals("Speaker 1", h.storage.adoptions.single().labels[sp1])
+        // Adopt drops these prints: they carry the generation of step 1.
+        assertEquals(3L, h.voices.pending.single().generation)
     }
 
     @Test fun aRejectedVoiceIsNeverSuggestedAgain() = runBlocking {
@@ -534,7 +663,16 @@ class TranscriptionJobTest {
 
     // ------------------------------------------------------------------------------------------------------------
 
-    private inner class Harness(source: String = "capture.opus", totalMs: Long = 70_000) {
+    /**
+     * One note and its fakes. With [recordSyncs] the log also records each fsync ("sync clips.pcm",
+     * "sync audio.opus.part", "sync sealed.opus") in order with the checkpoints and the marker.
+     */
+    private inner class Harness(
+        source: String = "capture.opus",
+        totalMs: Long = 70_000,
+        reportsTotal: Boolean = true,
+        recordSyncs: Boolean = false,
+    ) {
         val noteDir: File = temp.newFolder("notes-$source-${System.nanoTime()}", "note-1")
         val audio = File(noteDir, source)
         val log: MutableList<String> = Collections.synchronizedList(mutableListOf())
@@ -542,7 +680,8 @@ class TranscriptionJobTest {
         val storage = FakeStorage(noteDir, audio, log)
         val voices = FakeVoices(log)
         val models = FakeModels()
-        val audioSource = FakeAudio(totalMs)
+        val audioSource = FakeAudio(totalMs, reportsTotal)
+        private val syncLog = log.takeIf { recordSyncs }
         private val clock = AtomicLong(1_000_000_000L)
         private val engines = JobEngines(
             recognizers = { restored, callbacks ->
@@ -551,7 +690,7 @@ class TranscriptionJobTest {
             diarizers = { restored -> FakeDiarizer(restored, script).also { script.diarizers += it } },
             prints = FakePrints(script),
             audio = audioSource,
-            encoders = { file, restored -> FakeSink(file, restored).also { script.sinks += it } },
+            encoders = { file, restored -> FakeSink(file, restored, syncLog).also { script.sinks += it } },
         )
 
         init {
@@ -575,6 +714,10 @@ class TranscriptionJobTest {
                 nanoTime = { clock.addAndGet(1_000_000L) },
                 speakerPrefix = { "diar_test_" },
                 warn = { _, _ -> },
+                syncFile = { file, sync ->
+                    sync()
+                    syncLog?.add("sync ${file.name}")
+                },
             ),
         )
 

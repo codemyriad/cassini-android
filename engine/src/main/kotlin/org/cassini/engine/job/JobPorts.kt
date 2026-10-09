@@ -90,6 +90,12 @@ interface JobStorage {
     /** The note's current audio file (`capture.*`, `source.*` or `document.opus`), from the row (IO). */
     suspend fun audioFile(noteId: String): File
 
+    /**
+     * The note's length as the row knows it (`notes.duration_ms`), or null when unknown (IO). Progress uses it until
+     * the decoder reports the length, and when the container never does (0.1.0 `session.durationMs`).
+     */
+    suspend fun knownDurationMs(noteId: String): Long?
+
     /** Creates `work/` when needed and names its files. Blocking, inference thread. */
     fun workFiles(noteId: String): WorkFiles
 
@@ -102,7 +108,11 @@ interface JobStorage {
      */
     fun <T> withNoteLockBlocking(noteId: String, block: () -> T): T
 
-    /** The sealed document a Transcribe again adds a variant to, or null for a plain note. Blocking. */
+    /**
+     * The note's sealed document as it reads now, in any state, or null for a plain note. Blocking. The job adds a
+     * variant only to an `ok` document. Any other state (UNVERIFIED, STALE_AUDIO, INVALID_METADATA, UNREADABLE) gets
+     * a fresh document over the note's audio: earlier versions are not kept (features.md, "Transcribe again").
+     */
     fun existingDocumentBlocking(noteId: String): CassiniDocument?
 
     /** The note's title (`notes.title`), for a fresh seal. Blocking. */
@@ -171,7 +181,16 @@ interface ModelAccess {
     /** The missing parts and their sizes. Blocking file checks; not on the main thread. */
     fun plan(): ModelPlan
 
-    /** Whether the active network has `NET_CAPABILITY_VALIDATED`. Any thread. */
+    /**
+     * Whether the speech detector (`ModelCatalog.VAD`, the best-effort extra of SPEECH) is installed and verified.
+     * Blocking file check; not on the main thread.
+     */
+    fun detectorReady(): Boolean
+
+    /**
+     * Whether the active network has `NET_CAPABILITY_VALIDATED`. Any thread. The job asks for a missing speech
+     * detector only when it is true, so an offline run does not wait for a download.
+     */
     fun hasValidatedNetwork(): Boolean
 
     /**

@@ -96,8 +96,6 @@ class VoiceprintPrints(
     private val extract: (File, PcmSource, Map<String, List<PrintWindow>>, () -> Unit) -> Map<String, ExtractedPrint> =
         { file, audio, windows, active -> VoiceprintExtractor.compute(file, audio, windows, active) },
 ) : PrintExtractor {
-    override val dimension: Int get() = DIMENSION
-
     override fun compute(
         audio: PcmSource,
         windows: Map<String, List<PrintWindow>>,
@@ -138,8 +136,6 @@ class OpusEncoders : OpusSinkFactory {
 }
 
 private class OpusEncoderSeam(private val encoder: StreamingOpusEncoder) : OpusSink {
-    override val sampleCount: Long get() = encoder.sampleCount
-
     override fun accept(samples: FloatArray, count: Int) = encoder.accept(samples, count)
 
     override fun checkpoint(): EncoderState = CheckpointState.encoder(encoder.checkpoint())

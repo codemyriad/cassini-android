@@ -23,7 +23,6 @@ class VoiceprintDimensionTest {
 
     @Test fun theCatalogueDimensionIsTheAdaptersDimension() {
         assertEquals(ModelCatalog.VOICEPRINT_DIM, VoiceprintPrints.DIMENSION)
-        assertEquals(ModelCatalog.VOICEPRINT_DIM, VoiceprintPrints({ model }).dimension)
     }
 
     @Test fun printsOfTheDocumentedLengthPassThrough() {

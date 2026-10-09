@@ -2,6 +2,7 @@ package org.cassini.engine.job
 
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import java.io.File
 import java.util.UUID
 
 /** The native seams one [TranscriptionJob] runs on (JobSeams.kt). `AppGraph` builds them from the installed models. */
@@ -20,6 +21,8 @@ class JobEngines(
  * in the app language (`R.string.speaker_label`). [nanoTime] is the monotonic clock (`System.nanoTime` in the app, a
  * fake in tests). [speakerPrefix] makes the prefix of a fresh run's speaker ids. [lowMemory] is the memory preflight
  * (architecture section 5.7): it only adds a hint to the progress card. [warn] logs a best-effort failure.
+ * [syncFile] runs the fsync of a work file (`clips.pcm`, `work/sealed.opus`); tests use it to record that the fsync
+ * comes before the checkpoint or the marker that counts on it.
  */
 @Suppress("LongParameterList") // one hook per thing the app provides; all but the label have defaults
 class JobEnvironment(
@@ -30,4 +33,5 @@ class JobEnvironment(
     val speakerPrefix: () -> String = { "diar_${UUID.randomUUID().toString().replace('-', '_')}_" },
     val lowMemory: () -> Boolean = { false },
     val warn: (String, Throwable) -> Unit = { _, _ -> },
+    val syncFile: (File, () -> Unit) -> Unit = { _, sync -> sync() },
 )

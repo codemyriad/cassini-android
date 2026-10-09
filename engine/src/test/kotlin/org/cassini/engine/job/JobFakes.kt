@@ -161,8 +161,6 @@ class FakeDiarizer(restored: DiarizerState?, private val script: Script) : Strea
 
 /** Prints along the axis of the speaker number that ends the id ("diar_test_2" → axis 2). */
 class FakePrints(private val script: Script) : PrintExtractor {
-    override val dimension = DIM
-
     override fun compute(
         audio: PcmSource,
         windows: Map<String, List<PrintWindow>>,
@@ -179,8 +177,11 @@ class FakePrints(private val script: Script) : PrintExtractor {
     }
 }
 
-/** [totalMs] of quiet 16 kHz audio in 250 ms blocks, whatever the file holds. */
-class FakeAudio(private val totalMs: Long) : AudioSource {
+/**
+ * [totalMs] of quiet 16 kHz audio in 250 ms blocks, whatever the file holds. Without [reportsTotal] the container
+ * tells no duration.
+ */
+class FakeAudio(private val totalMs: Long, private val reportsTotal: Boolean = true) : AudioSource {
     val starts = CopyOnWriteArrayList<Long>()
 
     override fun stream(
@@ -199,7 +200,7 @@ class FakeAudio(private val totalMs: Long) : AudioSource {
             for (i in 0 until count) block[i] = ((position + i) % 100).toFloat() / 1000f
             onSamples(block, count)
             position += count
-            onProgress(position * 1000 / Limits.ASR_RATE, totalMs)
+            onProgress(position * 1000 / Limits.ASR_RATE, totalMs.takeIf { reportsTotal })
         }
         return totalMs
     }
@@ -209,13 +210,22 @@ class FakeAudio(private val totalMs: Long) : AudioSource {
     }
 }
 
-/** Writes 4 bytes per block; [finish] puts a real Ogg Opus clip in place so the seal can package it. */
-class FakeSink(private val file: File, restored: EncoderState?) : OpusSink {
-    override var sampleCount = restored?.samples ?: 0L
+/**
+ * Takes 4 bytes per block into a buffer that reaches the file only at [checkpoint] (the fsync), so a checkpoint
+ * taken without it would not match the file. [finish] puts a real Ogg Opus clip in place so the seal can package it.
+ * Each fsync is recorded in [log] as "sync audio.opus.part" when a log is given.
+ */
+class FakeSink(
+    private val file: File,
+    restored: EncoderState?,
+    private val log: MutableList<String>? = null,
+) : OpusSink {
+    var sampleCount = restored?.samples ?: 0L
         private set
     var syncs = 0
     var closed = false
     var finished = false
+    private val unsynced = java.io.ByteArrayOutputStream()
 
     init {
         if (restored == null) {
@@ -226,11 +236,14 @@ class FakeSink(private val file: File, restored: EncoderState?) : OpusSink {
     }
 
     override fun accept(samples: FloatArray, count: Int) {
-        file.appendBytes(byteArrayOf(1, 2, 3, 4))
+        unsynced.write(byteArrayOf(1, 2, 3, 4))
         sampleCount += count
     }
 
     override fun checkpoint(): EncoderState {
+        file.appendBytes(unsynced.toByteArray())
+        unsynced.reset()
+        log?.add("sync ${file.name}")
         syncs++
         val frame = FloatArray(CheckpointState.FRAME_FLOATS)
         return EncoderState(null, frame, sampleCount, 0, file.length(), 7, syncs, 0, null)
@@ -285,6 +298,12 @@ class FakeStorage(
     /** Called with each checkpoint before it is written, to check what was fsynced. */
     @Volatile var onCheckpoint: (CheckpointState) -> Unit = {}
 
+    /** Thrown by [mutateNames] instead of writing `names.json`, when set. */
+    @Volatile var namesFailure: java.io.IOException? = null
+
+    /** What the row knows of the note's length (`notes.duration_ms`). */
+    @Volatile var knownMs: Long? = null
+
     val work = File(noteDir, "work")
     val marker = File(work, "sealed")
     private val lock = Any()
@@ -308,6 +327,7 @@ class FakeStorage(
 
     override fun mutateNames(noteId: String, reducer: (CheckpointNames) -> CheckpointNames): CheckpointNames {
         check(!namingClosed) { "Naming is closed" }
+        namesFailure?.let { throw it }
         return names.updateAndGet(reducer).also { jobNames += it }
     }
 
@@ -322,6 +342,8 @@ class FakeStorage(
     }
 
     override suspend fun audioFile(noteId: String) = audio
+
+    override suspend fun knownDurationMs(noteId: String) = knownMs
 
     override fun workFiles(noteId: String): WorkFiles {
         work.mkdirs()
@@ -407,6 +429,11 @@ class FakeModels : ModelAccess {
 
     @Volatile var consent = true
 
+    /** The speech detector (VAD) is installed. */
+    @Volatile var detector = true
+
+    @Volatile var online = true
+
     @Volatile var outcome: InstallOutcome? = null
     val installs = CopyOnWriteArrayList<Set<ModelPart>>()
 
@@ -416,7 +443,9 @@ class FakeModels : ModelAccess {
 
     override fun plan() = ModelPlan.of { model -> ModelPart.entries.any { it.primary == model && it in readyParts } }
 
-    override fun hasValidatedNetwork() = true
+    override fun detectorReady() = detector
+
+    override fun hasValidatedNetwork() = online
 
     /** Makes [install] wait until it is cancelled, after counting down [installing]. */
     @Volatile var hang = false
@@ -428,7 +457,10 @@ class FakeModels : ModelAccess {
         installing.countDown()
         if (hang) kotlinx.coroutines.awaitCancellation()
         val result = outcome ?: InstallOutcome.Installed()
-        if (result is InstallOutcome.Installed) readyParts = readyParts + (parts - result.skipped - result.failed.keys)
+        if (result is InstallOutcome.Installed) {
+            readyParts = readyParts + (parts - result.skipped - result.failed.keys)
+            if (ModelPart.SPEECH in parts && online) detector = true
+        }
         return result
     }
 }

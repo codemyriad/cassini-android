@@ -22,6 +22,7 @@ import org.cassini.core.audio.PcmFile
 import org.cassini.core.checkpoint.CheckpointNames
 import org.cassini.core.checkpoint.CheckpointState
 import org.cassini.core.format.CassiniDocument
+import org.cassini.core.format.DocumentState
 import org.cassini.core.format.OggOpus
 import org.cassini.core.format.SpeakerMerges
 import org.cassini.core.format.Transcript
@@ -43,6 +44,7 @@ import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 import java.io.RandomAccessFile
+import java.util.Locale
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -64,7 +66,8 @@ import java.util.concurrent.atomic.AtomicReference
  *
  * Native and file work runs in `runInterruptible(inference)`: the loop blocks, calls the blocking port functions
  * directly, never uses `runBlocking`, and sends [events] with `trySend`. [stop] sets a flag the loop checks at each
- * sample block: the job saves a checkpoint and ends [JobOutcome.Paused]. Cancelling the coroutine that runs [run]
+ * sample block: the job saves a checkpoint (once a window is done) and ends [JobOutcome.Paused]; after the decode a
+ * stop keeps the final checkpoint and is honoured at the next check. Cancelling the coroutine that runs [run]
  * interrupts the inference thread: a native call in flight finishes first, then the native handles are released and
  * the job ends [JobOutcome.Cancelled] with the previous checkpoint. A Java OutOfMemoryError ends
  * `Paused(MEMORY)` with the checkpoint intact.
@@ -88,19 +91,21 @@ class TranscriptionJob(
     /** Set after the final checkpoint: from then on a stop is honoured at the next check, not at a sample block. */
     @Volatile private var finishing = false
 
-    /** Set from the seal on: an I/O error is a SAVE failure, not an OPEN one. */
-    @Volatile private var sealing = false
-
     /** Set when adopt starts: from then on the note's draft names belong to adopt. */
     @Volatile private var adopting = false
+
+    /** The open work files of this run, owned by the job so they close on every path (also a late cancel). */
+    @Volatile private var current: Run? = null
 
     /** What the job tells its `ProgressTracker`, in order; closed after [JobEvent.Ended]. */
     val events: ReceiveChannel<JobEvent> get() = channel
 
     /**
-     * "Stop and keep progress": the job saves a checkpoint at its next sample block and ends `Paused(reason)`. A stop
-     * during the download stops waiting for it (the `.part` files stay). A stop after the seal deletes
-     * `work/sealed.opus` and keeps the complete checkpoint. Any thread; only the first call counts.
+     * "Stop and keep progress": the job ends `Paused(reason)`. During the decode it saves a checkpoint at its next
+     * sample block when at least one window is done (before that it leaves none). After the decode the final
+     * checkpoint stays and the stop counts at the next check. A stop during the download stops waiting for it (the
+     * `.part` files stay). A stop after the seal deletes `work/sealed.opus` and keeps the complete checkpoint. Any
+     * thread; only the first call counts.
      */
     fun stop(reason: PauseReason = PauseReason.USER) {
         if (!stopReason.compareAndSet(null, reason)) return
@@ -138,16 +143,19 @@ class TranscriptionJob(
     }
 
     private suspend fun transcribe(prepared: Prepared): JobOutcome {
-        val decoded = decode(prepared)
+        var decodeDone = false
         try {
+            val decoded = decode(prepared)
+            decodeDone = true
             val began = env.nanoTime()
             val draft = onInference { attribute(decoded) }
             val matched = matchVoices(prepared, decoded, draft)
             val sealed = onInference { seal(prepared, decoded, draft, matched) }
             return adopt(sealed, began)
         } finally {
-            decoded.run.clips.close()
-            if (!adopting) reopenNames()
+            // The inference block has ended here (withContext waits for it), so closing the clips cannot race it.
+            current?.clips?.close()
+            if (decodeDone && !adopting) reopenNames()
         }
     }
 
@@ -168,15 +176,17 @@ class TranscriptionJob(
         // The generation first: a "Forget everyone" in between makes adopt drop these matches, never keep them.
         val generation = voices.generationBlocking()
         val saved = voices.peopleBlocking()
-        Prepared(resumed, storage.audioFile(noteId), saved + noteVoices(saved), generation, env.lowMemory())
+        val knownMs = storage.knownDurationMs(noteId)?.takeIf { it > 0 }
+        Prepared(resumed, storage.audioFile(noteId), noteVoices(saved), generation, knownMs, env.lowMemory())
     }
 
     /**
      * Named speakers of the note's sealed transcript as note-local voices ([CheckpointNames.NOTE_VOICE_PREFIX]), so a
      * Transcribe again carries their names over even when they were not remembered (0.1.0 `voicesForRecognition`).
+     * Only an `ok` document counts: any other state gets a fresh document, whose names start over.
      */
     private fun noteVoices(saved: List<Voice>): List<Voice> {
-        val document = storage.existingDocumentBlocking(noteId) ?: return emptyList()
+        val document = storage.existingDocumentBlocking(noteId)?.takeIf(::extendable) ?: return emptyList()
         val savedIds = saved.mapTo(HashSet()) { it.id }
         return voices.noteVoicesBlocking(noteId).mapNotNull { (id, print) ->
             val label = document.speakerLabel(id)
@@ -193,13 +203,19 @@ class TranscriptionJob(
 
     // Step 2 ----------------------------------------------------------------------------------------------------
 
-    /** Installs the missing models; null when the job can go on. Consent is checked again here (section 5.6). */
+    /**
+     * Installs the missing models; null when the job can go on. Consent is checked again here (section 5.6). A
+     * Parakeet without its speech detector asks for SPEECH again while online, so the installer fetches the detector
+     * alone (best effort), as 0.1.0 retried it at every start.
+     */
     private suspend fun installModels(): JobOutcome? = withContext(env.io) {
         val missing = ModelPart.entries.filterNot(models::ready).toSet()
+        val detector = ModelPart.SPEECH !in missing && !models.detectorReady() && models.hasValidatedNetwork()
+        val request = if (detector) missing + ModelPart.SPEECH else missing
         when {
-            missing.isEmpty() -> null
+            request.isEmpty() -> null
             !models.consented() -> JobOutcome.NeedsConsent(models.plan().totalBytes)
-            else -> when (val outcome = download(missing)) {
+            else -> when (val outcome = download(request)) {
                 is InstallOutcome.Installed -> null
                 is InstallOutcome.Failed ->
                     JobOutcome.Failed(JobFailure.Download(outcome.error, outcome.part, outcome.requiredFreeBytes))
@@ -259,17 +275,17 @@ class TranscriptionJob(
         var run: Run? = null
         try {
             resumed?.let { writing { clips.truncate(it.clipSamples) } }
-            val cache = VoiceClipCache(clips, resumed?.voiceClips?.let(CheckpointState::json))
             val opus = isOpus(prepared.audioFile)
             run = Run(
                 prepared = prepared,
                 clips = clips,
-                clipCache = cache,
+                files = files,
                 sealAudio = if (opus) prepared.audioFile else files.encodedAudio,
                 speakerPrefix = resumed?.speakerPrefix ?: env.speakerPrefix(),
                 began = env.nanoTime() - (resumed?.elapsedMs ?: 0L) * NANOS_PER_MS,
             )
             run.printsReady = models.ready(ModelPart.VOICES)
+            current = run
             return run
         } finally {
             if (run == null) clips.close()
@@ -280,11 +296,11 @@ class TranscriptionJob(
     private fun restore(run: Run) {
         val resumed = run.resumed
         // Every run, fresh or resumed, starts with naming open (0.1.0 `draftNamingOpen = true`).
-        storage.openNames(noteId)
+        writing { storage.openNames(noteId) }
         if (resumed == null) {
             // A fresh run starts with no draft names (0.1.0); there are no words yet that the user could have named.
             val generation = run.prepared.generation
-            storage.mutateNames(noteId) { CheckpointNames(emptyMap(), emptyMap(), generation = generation) }
+            writing { storage.mutateNames(noteId) { CheckpointNames(emptyMap(), emptyMap(), generation = generation) } }
         }
         if (run.sealAudio != run.prepared.audioFile) {
             run.encoder = writing { engines.encoders.open(run.sealAudio, resumed?.encoder) }
@@ -295,8 +311,8 @@ class TranscriptionJob(
         val restored = resumed?.let {
             JobEvent.Restored(it.doneMs, it.durationMs, it.recognition.chunks.words, it.elapsedMs)
         }
-        val totalMs = resumed?.durationMs ?: 0L
-        emit(JobEvent.Started(totalMs, restored, !run.speakerFailure, run.printsReady, run.prepared.lowMemory))
+        val speakers = !run.speakerFailure
+        emit(JobEvent.Started(run.initialTotalMs, restored, speakers, run.printsReady, run.prepared.lowMemory))
     }
 
     private fun callbacks(run: Run) = Recognizer.Callbacks(
@@ -317,8 +333,12 @@ class TranscriptionJob(
      * duration.
      */
     private fun decodeLoop(run: Run, recognizer: Recognizer): Long {
-        recognizer.totalMs = run.resumed?.durationMs ?: 0L
-        return engines.audio.stream(
+        recognizer.totalMs = run.initialTotalMs
+        return reading { decodeAudio(run, recognizer) }
+    }
+
+    private fun decodeAudio(run: Run, recognizer: Recognizer): Long =
+        engines.audio.stream(
             run.prepared.audioFile,
             run.resumed?.positionSamples ?: 0L,
             { samples, count ->
@@ -340,7 +360,6 @@ class TranscriptionJob(
                 emit(JobEvent.Reading(readMs, totalMs ?: recognizer.totalMs.takeIf { it > 0 }))
             }
         }
-    }
 
     /**
      * Step 4, per window: Sortformer, word assignment, the clip cache and live voice matching. Telling speakers apart
@@ -375,17 +394,19 @@ class TranscriptionJob(
 
     /**
      * Live voice matching for the speakers with at least 4 s of clips and 10 s more than at the last try, skipping
-     * speakers with a CONFIRMED match or a user label. Rejected voices are excluded. The result goes through the
-     * `applyLive` reducer, which re-checks the current names, so a "Not Luca" made meanwhile is never undone.
+     * speakers with a CONFIRMED match or a user label. Rejected voices are excluded. The voices are read again after
+     * the prints, so a person forgotten during the run is not matched again. The result goes through the `applyLive`
+     * reducer, which re-checks the current names, so a "Not Luca" made meanwhile is never undone.
      */
     private fun matchLive(run: Run) {
-        if (run.prepared.people.isEmpty() || !run.printsReady) return
+        if (!run.printsReady) return
         val names = storage.names(noteId).get()
         val windows = SpeakerMerges.windows(run.clipCache.windows, names.merges)
         run.livePrints.keys.retainAll(windows.keys)
         val pending = windows.filter { (id, spans) -> names.openForLive(id) && liveDue(run, id, spans) }
         if (pending.isEmpty()) return
         bestEffort("Live voice matching unavailable", Unit) {
+            if (people(run.prepared).voices.isEmpty()) return@bestEffort
             engines.prints.compute(run.clips, pending) { checkActive() }.forEach { (id, print) ->
                 run.liveAttempts[id] = print.second
                 run.livePrints[id] = print.first
@@ -393,10 +414,25 @@ class TranscriptionJob(
             val open = run.livePrints.filterKeys(names::openForLive)
             val thresholds = Voiceprints.THRESHOLDS.getValue(JobProvenance.PRINT_MODEL)
             val excluded = names.excluded(open.keys)
-            val matches = VoiceMatcher.match(open, run.prepared.people, JobProvenance.PRINT_MODEL, thresholds, excluded)
-            storage.mutateNames(noteId) { it.applyLive(matches, run.prepared.voiceNames) }
+            val people = people(run.prepared)
+            val matches = VoiceMatcher.match(open, people.voices, JobProvenance.PRINT_MODEL, thresholds, excluded)
+            storage.mutateNames(noteId) { it.applyLive(matches, people.names) }
         }
     }
+
+    /**
+     * The voices to match against now: the saved people as they are now (a Forget during the run removes a person, a
+     * rename gives the new name), none of them when "Forget everyone" changed the generation since step 1, and the
+     * note-local voices of step 1. Blocking.
+     */
+    private fun people(prepared: Prepared): People {
+        val saved = if (voices.generationBlocking() == prepared.generation) voices.peopleBlocking() else emptyList()
+        return People(saved + prepared.noteVoices)
+    }
+
+    /** [people] for the final match and labels; a failed read gives no voices ("Speaker N"), never a failed job. */
+    private fun savedVoices(prepared: Prepared): People =
+        bestEffort("Could not read the saved voices", People.NONE) { people(prepared) }
 
     private fun liveDue(run: Run, id: String, spans: List<PrintWindow>): Boolean {
         val seconds = spans.sumOf { it.endSample - it.startSample }.toDouble() / Limits.ASR_RATE
@@ -406,7 +442,7 @@ class TranscriptionJob(
 
     /** Step 4e: the clips and the encoded audio are fsynced before the checkpoint that counts them is written. */
     private fun saveCheckpoint(run: Run, recognizer: Recognizer) {
-        writing { run.clips.sync() }
+        writing { env.syncFile(run.files.clips) { run.clips.sync() } }
         val audio = run.prepared.audioFile
         val signature = CheckpointState.signature(audio)
         val state = writing { checkpointState(run, recognizer, audio.name, signature) }
@@ -490,8 +526,8 @@ class TranscriptionJob(
     }
 
     /**
-     * Step 7: one print per speaker (draft merges applied) and `VoiceMatcher.match` against the saved and note-local
-     * voices, rejected voices excluded. Best effort: any failure keeps "Speaker N".
+     * Step 7: one print per speaker (draft merges applied) and `VoiceMatcher.match` against the saved voices as they
+     * are now and the note-local voices, rejected voices excluded. Best effort: any failure keeps "Speaker N".
      */
     private suspend fun matchVoices(prepared: Prepared, decoded: Decoded, draft: Draft): Matched {
         val run = decoded.run
@@ -510,13 +546,16 @@ class TranscriptionJob(
         val thresholds = Voiceprints.THRESHOLDS.getValue(JobProvenance.PRINT_MODEL)
         val embeddings = computed.mapValues { it.value.first }
         val excluded = draft.names.excluded(computed.keys)
-        val matches = VoiceMatcher.match(embeddings, prepared.people, JobProvenance.PRINT_MODEL, thresholds, excluded)
+        val people = withContext(env.io) { savedVoices(prepared) }
+        val matches = VoiceMatcher.match(embeddings, people.voices, JobProvenance.PRINT_MODEL, thresholds, excluded)
         return Matched(computed, matches)
     }
 
-    /** Step 8: the shown label of each speaker: the draft name, else the AUTO match's name, else the placeholder. */
-    private fun labels(prepared: Prepared, draft: Draft, matched: Matched): Map<String, String> {
-        val names = prepared.voiceNames
+    /**
+     * Step 8: the shown label of each speaker: the draft name, else the AUTO match's name, else the placeholder. An
+     * AUTO match counts only while its voice is in [names] (the voices as they are at the seal).
+     */
+    private fun labels(draft: Draft, matched: Matched, names: Map<String, String>): Map<String, String> {
         return draft.transcript.words.map { it.speaker }.distinct().mapIndexed { index, id ->
             val automatic = matched.matches[id]?.takeIf { it.state == Match.State.AUTO }?.let { names[it.voiceId] }
             id to (draft.names.labels[id] ?: automatic ?: env.placeholderLabel(index + 1))
@@ -524,11 +563,11 @@ class TranscriptionJob(
     }
 
     /** The record sealed into the document, with `x-speakerIdentification` when prints could run. */
-    private fun provenance(prepared: Prepared, decoded: Decoded, draft: Draft, matched: Matched): JSONObject {
+    private fun provenance(decoded: Decoded, draft: Draft, matched: Matched, names: Map<String, String>): JSONObject {
         val diarization = draft.diarization
         if (diarization != null && decoded.turns != null && decoded.run.printsReady) {
             val prints = matched.prints.mapValues { it.value.first.size }
-            val identification = JobProvenance.identification(prints, matched.matches, prepared.voiceNames)
+            val identification = JobProvenance.identification(prints, matched.matches, names)
             diarization.put("x-speakerIdentification", identification)
         }
         return JobProvenance.sealed(diarization ?: draft.recognition, draft.names.merges)
@@ -538,28 +577,29 @@ class TranscriptionJob(
 
     /**
      * Step 9: seals into `work/sealed.opus` (never `document.opus`) while holding the note's lock, re-reading the
-     * existing document and the title under it. `CassiniDocument.create` verifies the written file; the job fsyncs it,
-     * saves the pending prints (or deletes an older pending file when there are none), then writes the marker. A stop or
-     * a failure before the marker deletes the sealed file and keeps the checkpoint.
+     * existing document and the title under it. Only an `ok` document gets a new variant; a document in any other
+     * state is replaced by a fresh one over the same audio, without its old Cassini tags. `CassiniDocument.create`
+     * verifies the written file; the job fsyncs it, saves the pending prints (or deletes an older pending file when
+     * there are none), then writes the marker. A stop or a failure before the marker deletes the sealed file and keeps
+     * the checkpoint.
      */
     private fun seal(prepared: Prepared, decoded: Decoded, draft: Draft, matched: Matched): Sealed {
         checkActive()
-        val labels = labels(prepared, draft, matched)
-        val processing = provenance(prepared, decoded, draft, matched)
+        val names = savedVoices(prepared).names
+        val labels = labels(draft, matched, names)
+        val processing = provenance(decoded, draft, matched, names)
         emit(JobEvent.StageChanged(Stage.SAVING))
-        sealing = true
         val target = storage.sealTarget(noteId)
-        val audio = decoded.run.sealAudio
         var marked = false
         try {
             val document = storage.withNoteLockBlocking(noteId) {
-                val existing = storage.existingDocumentBlocking(noteId)
+                val existing = storage.existingDocumentBlocking(noteId)?.takeIf(::extendable)
                 val title = storage.titleBlocking(noteId)
-                val space = target.absoluteFile.parentFile?.usableSpace ?: 0L
-                requireUser(space >= audio.length() + Limits.MIN_FREE_BYTES, Failure.SPACE)
+                val audio = if (existing == null) freshAudio(decoded.run, target) else decoded.run.sealAudio
+                requireSpace(target, audio.length())
                 CassiniDocument.create(audio, draft.transcript, title, processing, existing, labels, target)
             }
-            sync(target)
+            env.syncFile(target) { sync(target) }
             val variant = document.defaultId
             val prints = matched.pending()
             if (prints.isNotEmpty() && variant != null) {
@@ -608,6 +648,30 @@ class TranscriptionJob(
         }
     }
 
+    /**
+     * The audio of a fresh seal: the seal audio itself, or, when it carries Cassini tags (the `document.opus` of a
+     * document that is not `ok`), a copy in `work/` with every `CASSINI_*` tag removed, packet for packet. The old
+     * transcript bodies must not stay beside the new ones.
+     */
+    private fun freshAudio(run: Run, target: File): File {
+        val audio = run.sealAudio
+        val copy = run.files.encodedAudio
+        // The re-encode of a non-Opus source is written by the job and has no Cassini tags.
+        val comments = if (audio == copy) emptyList() else tags(audio)
+        if (comments.none(::isCassiniTag)) return audio
+        requireSpace(target, 2 * audio.length())
+        OggOpus.rewrite(audio, CassiniDocument.tagsPacket(comments.filterNot(::isCassiniTag)), copy)
+        return copy
+    }
+
+    private fun tags(audio: File): List<String> =
+        audio.inputStream().buffered().use { CassiniDocument.readComments(OggOpus.headers(it).second) }
+
+    private fun requireSpace(target: File, bytes: Long) {
+        val space = target.absoluteFile.parentFile?.usableSpace ?: 0L
+        requireUser(space >= bytes + Limits.MIN_FREE_BYTES, Failure.SPACE)
+    }
+
     // Helpers ---------------------------------------------------------------------------------------------------
 
     private suspend fun <T> onInference(block: () -> T): T = runInterruptible(env.inference, block)
@@ -620,9 +684,21 @@ class TranscriptionJob(
         block()
     } catch (error: IOException) {
         env.warn("Could not write the work files", error)
+        throw UserFacingException(writeFailure()).apply { initCause(error) }
+    }
+
+    /** Runs the read of the note's audio: an IOException there is OPEN ("couldn't open the audio"). */
+    private inline fun <T> reading(block: () -> T): T = try {
+        block()
+    } catch (error: IOException) {
+        env.warn("Could not read the audio", error)
+        throw UserFacingException(Failure.OPEN).apply { initCause(error) }
+    }
+
+    /** SPACE when `work/` is low on space, else SAVE. */
+    private fun writeFailure(): Failure {
         val free = storage.sealTarget(noteId).absoluteFile.parentFile?.usableSpace ?: 0L
-        val failure = if (free < Limits.MIN_FREE_BYTES) Failure.SPACE else Failure.SAVE
-        throw UserFacingException(failure).apply { initCause(error) }
+        return if (free < Limits.MIN_FREE_BYTES) Failure.SPACE else Failure.SAVE
     }
 
     private fun emit(event: JobEvent) {
@@ -663,9 +739,10 @@ class TranscriptionJob(
             error is ProcessingPaused || error is CancellationException ->
                 JobOutcome.Paused(stopReason.get() ?: PauseReason.USER)
             error is UserFacingException -> JobOutcome.Failed(JobFailure.Processing(error.failure))
+            // The audio read maps its own IOException to OPEN ([reading]); any other is the note's files or names.
             error is IOException -> {
                 env.warn("Transcription I/O failed", error)
-                JobOutcome.Failed(JobFailure.Processing(if (sealing) Failure.SAVE else Failure.OPEN))
+                JobOutcome.Failed(JobFailure.Processing(writeFailure()))
             }
             else -> {
                 env.warn("Transcription failed", error)
@@ -679,22 +756,34 @@ class TranscriptionJob(
 
     // State shared by the steps -----------------------------------------------------------------------------------
 
-    /** What step 1 found. [people] are the saved voices plus the note-local ones. */
+    /**
+     * What step 1 found. [noteVoices] are the note-local voices of a Transcribe again; the saved voices are read again
+     * at each match ([people]). [knownMs] is the row's duration, when known.
+     */
     private class Prepared(
         val resumed: CheckpointState?,
         val audioFile: File,
-        val people: List<Voice>,
+        val noteVoices: List<Voice>,
         val generation: Long,
+        val knownMs: Long?,
         val lowMemory: Boolean,
-    ) {
-        val voiceNames: Map<String, String> = people.associate { it.id to it.name }
+    )
+
+    /** The voices one match runs against, and their names by voice id. */
+    private class People(val voices: List<Voice>) {
+        val names: Map<String, String> = voices.associate { it.id to it.name }
+
+        companion object {
+            val NONE = People(emptyList())
+        }
     }
 
     /** One run's work files and native state, confined to the inference thread. */
     private class Run(
         val prepared: Prepared,
         val clips: PcmFile,
-        val clipCache: VoiceClipCache,
+        /** `audio.opus.part` (the re-encode, or for an Ogg Opus source the [freshAudio] copy) and `clips.pcm`. */
+        val files: WorkFiles,
         /** The audio the seal packages: the note's Ogg Opus file, or `work/audio.opus.part` for any other source. */
         val sealAudio: File,
         val speakerPrefix: String,
@@ -704,6 +793,12 @@ class TranscriptionJob(
         /** The voiceprint model is installed: clips are kept and voices matched. */
         var printsReady = false
         val resumed: CheckpointState? get() = prepared.resumed
+
+        /** The selected voice clips in [clips], restored from the checkpoint on a resume. */
+        val clipCache = VoiceClipCache(clips, resumed?.voiceClips?.let(CheckpointState::json))
+
+        /** The length progress starts from: the checkpoint's, else the row's, else unknown (0). */
+        val initialTotalMs: Long get() = resumed?.durationMs?.takeIf { it > 0 } ?: prepared.knownMs ?: 0L
         var encoder: OpusSink? = null
         var diarizer: StreamingDiarizer? = null
         var speakerFailure = false
@@ -764,5 +859,13 @@ class TranscriptionJob(
 
         /** Flushes the sealed file to disk before the marker that says it is complete. */
         fun sync(file: File) = RandomAccessFile(file, "rw").use { it.fd.sync() }
+
+        /** Only an `ok` document takes a new variant (`CassiniDocument.create` refuses any other state). */
+        fun extendable(document: CassiniDocument) = document.state == DocumentState.OK.code
+
+        fun isCassiniTag(comment: String) =
+            comment.substringBefore('=').uppercase(Locale.ROOT).startsWith(CASSINI_TAG_PREFIX)
+
+        const val CASSINI_TAG_PREFIX = "CASSINI_"
     }
 }

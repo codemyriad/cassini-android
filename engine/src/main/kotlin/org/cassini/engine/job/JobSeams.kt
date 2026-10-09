@@ -97,9 +97,6 @@ fun interface DiarizerFactory {
  * [NativeBudget] around it.
  */
 interface PrintExtractor {
-    /** The length of every print this extractor returns. */
-    val dimension: Int
-
     /**
      * The L2-normalised print and the seconds of speech behind it, per speaker, from the [windows] of [audio]. A
      * speaker without usable speech has no entry. [active] is called between native calls and throws to stop.
@@ -134,9 +131,6 @@ interface AudioSource {
  * native-budgeted (libopus is small).
  */
 interface OpusSink : AutoCloseable {
-    /** Samples encoded so far, the restored ones included. */
-    val sampleCount: Long
-
     fun accept(samples: FloatArray, count: Int)
 
     /** Flushes and fsyncs the file, then returns the `encoder` member of checkpoint.json. */
