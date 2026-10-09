@@ -14,5 +14,6 @@ compile on their own (they refer to the spike's `R` class and package `org.cassi
 
 Delete this directory at the end of P8, once `:ui` has ported what it needs.
 
-The spike's measuring scripts are in `tools/ui-fidelity/`; ruff skips them (see `config/ruff.toml`)
-until P7 rewrites them.
+P7 rewrote the spike's measuring scripts as `tools/ui-fidelity/` (`compare.py`, `crop_states.py`,
+`rows.py`, `contrast.py`). They are ruff-clean, but `config/ruff.toml` still excludes that directory
+until P10 removes the exclusion.
