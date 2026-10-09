@@ -13,6 +13,9 @@ plugins {
 val repoRoot: String = rootDir.absolutePath
 val fontManifestDir = rootProject.layout.projectDirectory.dir("third_party/fonts")
 
+// GlyphMarkupTest reads the design's SVG icons from the board markup.
+val designMarkupDir = rootProject.layout.projectDirectory.dir("design/reference/markup")
+
 android {
     namespace = "org.cassini.ui"
     compileSdk = libs.versions.compileSdk.get().toInt()
@@ -45,6 +48,9 @@ android {
                 it.systemProperty("cassini.repoRoot", repoRoot)
                 it.inputs.dir(fontManifestDir)
                     .withPropertyName("fontManifest")
+                    .withPathSensitivity(PathSensitivity.RELATIVE)
+                it.inputs.dir(designMarkupDir)
+                    .withPropertyName("designMarkup")
                     .withPathSensitivity(PathSensitivity.RELATIVE)
                 // Robolectric needs these on JDK 17.
                 it.jvmArgs(
