@@ -129,7 +129,8 @@ internal class StreamingResampler(private val rate: Int, initialFrame: Long = 0,
             val last = floor(time + halfWidth).toLong()
             if (target == null && last >= end) break
             val start = produced * (rate / VAD_SAMPLE_RATE) + first
-            if (fixed && start >= 0 && last < end) {
+            // A resumed decoder can land after the history an output needs. Missing input counts as absent, never as an index.
+            if (fixed && start >= base && last < end) {
                 var sum = 0.0
                 val at = (start - base).toInt()
                 for (i in taps.indices) sum += taps[i] * history[at + i]
@@ -140,7 +141,7 @@ internal class StreamingResampler(private val rate: Int, initialFrame: Long = 0,
             }
             var sum = 0.0
             var weight = 0.0
-            for (k in max(0L, ceil(time - halfWidth).toLong())..min(end - 1, last)) {
+            for (k in max(base, ceil(time - halfWidth).toLong())..min(end - 1, last)) {
                 val position = abs(time - k) * crossingsPerSample * TABLE_STEPS
                 val cell = position.toInt()
                 val fraction = (position - cell).toFloat()

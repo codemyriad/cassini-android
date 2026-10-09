@@ -87,4 +87,16 @@ class ResamplerTest {
         val expected = resampleTo16k(FloatArray(1000) { 0.25f } + FloatArray(10_000) + FloatArray(1000) { -0.25f }, 44100)
         assertArrayEquals(expected, out.toFloatArray(), 1e-6f)
     }
+    @Test fun resumingAfterTheNeededHistoryDoesNotFail() {
+        // A seek that lands 0.67 s past the frame a resumed output needs, as Android's extractor did on a phone.
+        val output = mutableListOf<Float>()
+        val stream = StreamingResampler(48000, initialFrame = 15 * 48000 + 31985, firstOutput = 15 * 16000L) { samples, size ->
+            for (i in 0 until size) output += samples[i]
+        }
+        val input = tone(440.0, 48000, 2.0)
+        stream.push(input)
+        val total = stream.finish()
+        assertEquals(total - 15 * 16000L, output.size.toLong())
+        assertTrue(output.all { it.isFinite() })
+    }
 }
