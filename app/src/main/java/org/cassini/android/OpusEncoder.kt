@@ -1,7 +1,6 @@
 package org.cassini.android
 
 import android.media.MediaCodec
-import android.media.MediaCodecList
 import android.media.MediaFormat
 import org.cassini.core.Failure
 import org.cassini.core.audio.Limits
@@ -11,6 +10,7 @@ import org.cassini.core.audio.source
 import org.cassini.core.format.CassiniDocument
 import org.cassini.core.format.OggOpus
 import org.cassini.core.requireUser
+import org.cassini.engine.capture.CaptureFactory
 import java.io.File
 import java.io.FileOutputStream
 import java.io.OutputStream
@@ -22,9 +22,8 @@ import kotlin.math.roundToInt
  * packets arrive. Pre-skip and EOS trimming retain the original clock.
  */
 internal object OpusEncoder {
-    fun available() = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.any {
-        it.isEncoder && it.supportedTypes.any { type -> type.equals("audio/opus", true) }
-    }
+    /** The capture code's cached platform probe; blocks on the first call, so call it from a worker. */
+    fun available() = CaptureFactory.platformOpusEncoderNow()
     const val RATE = 16000
     private const val FRAME = RATE / 50
     fun encode(audio: PcmAudio): ByteArray {

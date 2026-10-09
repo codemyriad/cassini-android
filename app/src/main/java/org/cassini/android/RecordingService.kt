@@ -83,7 +83,8 @@ class RecordingService : Service() {
         title = name; notice = Notice.NONE
         previous = SessionStore(filesDir).load()
         val directory = File(filesDir, "documents").also { check(it.mkdirs() || it.isDirectory) }
-        // RecordingActivity starts the one-time format probe when it opens, so this rarely waits.
+        // RecordingActivity starts the one-time format probe when it opens, so this rarely waits; when it does, it
+        // blocks the main thread as 0.1.0 did, until P3 replaces the service.
         val file = File(directory, "${UUID.randomUUID()}.rec.${runBlocking { CaptureFactory.extension() }}")
         live = file
         val recording = CaptureFactory.create(this, file) { handler.post { if (capture != null) finish(false, failed = true) } }
@@ -114,6 +115,7 @@ class RecordingService : Service() {
         var noteId: String? = null
         var error = failed
         try {
+            // Blocks the main thread for up to 10 s, as 0.1.0 did; P3 moves finishing off main.
             val file = try { runBlocking { recording.stop() } } catch (e: Exception) {
                 android.util.Log.e("Cassini", "Recording did not stop cleanly", e); error = true
                 recording.file.takeIf { it.exists() && it.length() > 0 }

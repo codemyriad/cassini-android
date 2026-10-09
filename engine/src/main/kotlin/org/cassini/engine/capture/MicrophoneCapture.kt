@@ -14,7 +14,12 @@ interface MicrophoneCapture {
     val opus: Boolean
     fun togglePause()
 
-    /** Ends the capture and returns the finished [file]. Waits on a background thread, never on the caller's. */
+    /**
+     * Ends the capture and returns the finished [file]. The wait (up to 10 s for the capture thread) runs on
+     * [kotlinx.coroutines.Dispatchers.IO], so a caller that suspends does not block its thread. A caller that wraps
+     * it in `runBlocking` still blocks: 0.1.0's `RecordingService.finish` does so on the main thread until P3
+     * replaces the service.
+     */
     suspend fun stop(): File
 
     /** Stops without waiting for the result; for error paths and teardown. */

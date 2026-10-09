@@ -15,11 +15,13 @@ object CaptureFactory {
      * Whether the platform has an Opus encoder. The MediaCodecList probe can take a noticeable time, so it runs
      * once, off the caller's thread, and its answer is kept for the process.
      */
-    suspend fun platformOpusEncoder(): Boolean = platformOpus ?: withContext(Dispatchers.IO) {
-        MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.any {
-            it.isEncoder && it.supportedTypes.any { type -> type.equals("audio/opus", true) }
-        }
-    }.also { platformOpus = it }
+    suspend fun platformOpusEncoder(): Boolean =
+        platformOpus ?: withContext(Dispatchers.IO) { platformOpusEncoderNow() }
+
+    /** [platformOpusEncoder] on the calling thread, for code that already runs on a worker. Never call it on main. */
+    fun platformOpusEncoderNow(): Boolean = platformOpus ?: MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos
+        .any { it.isEncoder && it.supportedTypes.any { type -> type.equals("audio/opus", true) } }
+        .also { platformOpus = it }
 
     /** `opus` on API 29+ with a platform Opus encoder ([OpusCapture]), otherwise `m4a` ([AacCapture]). */
     suspend fun extension(): String = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && platformOpusEncoder()) "opus" else "m4a"
