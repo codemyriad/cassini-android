@@ -13,7 +13,8 @@ object SpeakerBudget {
 
     /**
      * Floats a saved Sortformer streaming state may hold. The JNI side of `restoreStreamingState`
-     * (scripts/streaming-diarization.patch) accepts the same bound.
+     * (scripts/streaming-diarization.patch) enforces the same bound as a literal: the patch is pinned by hash with
+     * the AAR, so it does not name this constant, and SpeakerBudgetTest fails when the two differ.
      */
     const val DIARIZER_STATE_FLOATS = 200_000
 }

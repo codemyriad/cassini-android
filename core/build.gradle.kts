@@ -38,14 +38,18 @@ val conformanceDirectory: String = providers.gradleProperty("cassiniConformanceD
     .getOrElse(rootDir.resolve("third_party/cassini-format/spec/conformance").absolutePath)
 // DefaultLabelsTest compares the placeholder prefixes with the app's string resources.
 val appResources: File = rootDir.resolve("app/src/main/res")
+// SpeakerBudgetTest compares the diarizer state cap with the bound the pinned JNI patch enforces.
+val diarizationPatch: File = rootDir.resolve("scripts/streaming-diarization.patch")
 
 tasks.test {
     jvmArgumentProviders.add(
         CoreTestData(
             conformance = fileTree(conformanceDirectory),
             resources = fileTree(appResources) { include("values*/strings.xml") },
+            patch = files(diarizationPatch),
             conformancePath = conformanceDirectory,
             resourcesPath = appResources.absolutePath,
+            patchPath = diarizationPatch.absolutePath,
         ),
     )
 }
@@ -58,11 +62,14 @@ tasks.test {
 class CoreTestData(
     @get:InputFiles @get:PathSensitive(PathSensitivity.RELATIVE) val conformance: FileTree,
     @get:InputFiles @get:PathSensitive(PathSensitivity.RELATIVE) val resources: FileTree,
+    @get:InputFiles @get:PathSensitive(PathSensitivity.NONE) val patch: FileCollection,
     @get:Internal val conformancePath: String,
     @get:Internal val resourcesPath: String,
+    @get:Internal val patchPath: String,
 ) : CommandLineArgumentProvider {
     override fun asArguments() = listOf(
         "-Dcassini.conformance=$conformancePath",
         "-Dcassini.appResources=$resourcesPath",
+        "-Dcassini.diarizationPatch=$patchPath",
     )
 }
