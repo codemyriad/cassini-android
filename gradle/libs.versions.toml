@@ -110,9 +110,10 @@ androidx-test-espresso-core = { group = "androidx.test.espresso", name = "espres
 detekt-formatting = { group = "io.gitlab.arturbosch.detekt", name = "detekt-formatting", version.ref = "detekt" }
 
 [bundles]
-# Bundles hold only artifacts with an explicit version. Declare BOM-managed artifacts such as
-# compose-ui-test-junit4 next to platform(libs.compose.bom) in each module.
-compose = ["compose-ui", "compose-ui-graphics", "compose-ui-tooling-preview", "compose-foundation", "compose-material3", "activity-compose", "lifecycle-runtime-compose", "lifecycle-viewmodel-compose"]
+# Bundles hold only artifacts with an explicit version. Declare the BOM-managed artifacts
+# (compose-ui, compose-ui-graphics, compose-ui-tooling-preview, compose-foundation,
+# compose-material3, compose-ui-test-junit4, ...) next to platform(libs.compose.bom) in each module.
+compose = ["activity-compose", "lifecycle-runtime-compose", "lifecycle-viewmodel-compose"]
 navigation3 = ["navigation3-runtime", "navigation3-ui", "lifecycle-viewmodel-navigation3"]
 room = ["room-runtime", "room-ktx"]
 testing-jvm = ["junit", "coroutines-test", "turbine"]
