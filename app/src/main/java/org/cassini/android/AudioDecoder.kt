@@ -6,6 +6,7 @@ import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.net.Uri
+import android.util.Log
 import java.io.File
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
@@ -166,7 +167,11 @@ object AudioDecoder {
                 extractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true
             } ?: throw UserFacingException(Failure.AUDIO)
             extractor.selectTrack(track)
-            if (startSample > 0) extractor.seekTo((startSample * 1_000_000 / Limits.ASR_RATE - 1_000_000).coerceAtLeast(0), MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+            // A resume backs off before the requested position; a landing past the history the
+            // resampler needs retries further back, so no audio is ever replaced by silence or shifted.
+            var backOffUs = 1_000_000L
+            fun seekUs() = (startSample * 1_000_000 / Limits.ASR_RATE - backOffUs).coerceAtLeast(0)
+            if (startSample > 0) extractor.seekTo(seekUs(), MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
             val format = extractor.getTrackFormat(track)
             val durationUs = opusSamples?.let { it * 1_000_000 / 48000 }
                 ?: if (format.containsKey(MediaFormat.KEY_DURATION)) format.getLong(MediaFormat.KEY_DURATION) else null
@@ -196,11 +201,20 @@ object AudioDecoder {
             var next: Int? = null
             var inputEnded = false
             var outputEnded = false
+            var reseek = false
             val info = MediaCodec.BufferInfo()
             var lastProgress = System.nanoTime()
             while (!outputEnded) {
                 requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
                 requireUser(System.nanoTime() - lastProgress < 30_000_000_000L, Failure.STALLED)
+                if (reseek) {
+                    reseek = false
+                    codec.flush()
+                    backOffUs *= 2
+                    extractor.seekTo(seekUs(), MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+                    next = null; count = 0; inputEnded = false
+                    lastProgress = System.nanoTime()
+                }
                 // Block only when neither side moved: a fixed wait per packet made an hour of Opus take minutes.
                 var fed = false
                 if (!inputEnded) {
@@ -242,7 +256,15 @@ object AudioDecoder {
                                 val frames = info.size / (sampleBytes * channels)
                                 requireUser(info.presentationTimeUs <= Limits.MAX_RECORDING_MS * 1000 + (if (opusSamples != null) 120_000 else 0), Failure.LONG)
                                 val firstFrame = framePosition(info.presentationTimeUs, sampleRate, next)
-                                if (startSample > 0 && next == null) count = firstFrame
+                                if (startSample > 0 && next == null) {
+                                    if (firstFrame > firstNeededFrame(sampleRate, startSample) && seekUs() > 0) {
+                                        Log.w("Cassini", "Resume seek landed at frame $firstFrame, after ${firstNeededFrame(sampleRate, startSample)}; seeking earlier")
+                                        reseek = true
+                                        continue
+                                    }
+                                    // From the very start, a late first frame is a real leading gap, as in a full decode.
+                                    count = if (firstFrame > firstNeededFrame(sampleRate, startSample)) 0 else firstFrame
+                                }
                                 next = firstFrame + frames
                                 val playableFrames = opusSamples?.let { minOf(frames.toLong(), (it * sampleRate / 48000 - firstFrame).coerceAtLeast(0)).toInt() } ?: frames
                                 // Keep real container gaps as silence. The player and words share a zero origin.

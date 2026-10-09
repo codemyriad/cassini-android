@@ -99,4 +99,33 @@ class ResamplerTest {
         assertEquals(total - 15 * 16000L, output.size.toLong())
         assertTrue(output.all { it.isFinite() })
     }
+
+    @Test fun sixteenKilohertzInputThatStartsLateKeepsItsClock() {
+        val output = mutableListOf<Float>()
+        val stream = StreamingResampler(16000, initialFrame = 1000 + 250, firstOutput = 1000) { samples, size ->
+            for (i in 0 until size) output += samples[i]
+        }
+        stream.push(FloatArray(500) { 0.5f })
+        assertEquals(1000L + 250 + 500, stream.finish())
+        assertEquals(750, output.size)
+        assertTrue(output.take(250).all { it == 0f })
+        assertTrue(output.drop(250).all { it == 0.5f })
+    }
+
+    @Test fun resumingFromTheFirstNeededFrameEqualsTheWholeConversion() {
+        val random = kotlin.random.Random(3)
+        for (rate in rates + 16000) {
+            val input = FloatArray(rate * 3) { random.nextFloat() * 2 - 1 }
+            val expected = resampleTo16k(input, rate)
+            val resumeAt = 16000L + 123
+            val from = firstNeededFrame(rate, resumeAt)
+            assertTrue(from <= resumeAt * rate / 16000)
+            val output = mutableListOf<Float>()
+            StreamingResampler(rate, from, resumeAt) { samples, size -> for (i in 0 until size) output += samples[i] }.apply {
+                push(input, from.toInt(), input.size - from.toInt()); finish()
+            }
+            assertEquals("$rate Hz", expected.size - resumeAt.toInt(), output.size)
+            for (j in output.indices) assertEquals("$rate Hz sample $j", expected[resumeAt.toInt() + j], output[j], 1e-5f)
+        }
+    }
 }

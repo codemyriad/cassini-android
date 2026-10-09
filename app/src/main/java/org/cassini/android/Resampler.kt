@@ -57,6 +57,13 @@ internal fun resampleTo16k(samples: FloatArray, rate: Int): FloatArray {
     return output
 }
 
+/** The first input frame at [rate] that 16 kHz output [output] reads; a resumed decode must start at or before it. */
+internal fun firstNeededFrame(rate: Int, output: Long): Long {
+    if (rate == VAD_SAMPLE_RATE) return output
+    val halfWidth = ZERO_CROSSINGS / (2 * CUTOFF_FRACTION * min(rate, VAD_SAMPLE_RATE) / rate)
+    return max(0L, ceil(output * (rate.toDouble() / VAD_SAMPLE_RATE) - halfWidth).toLong())
+}
+
 /**
  * [resampleTo16k] over audio that arrives in blocks: the same kernel and output positions, with the
  * input history kept across block edges, so the output equals the whole-array conversion. [sink]
@@ -89,6 +96,12 @@ internal class StreamingResampler(private val rate: Int, initialFrame: Long = 0,
     fun push(samples: FloatArray, offset: Int = 0, length: Int = samples.size - offset) {
         check(!finished)
         if (rate == VAD_SAMPLE_RATE) {
+            // Input that starts after the next output keeps its clock: the gap is silence, never a shift.
+            while (produced < base) {
+                val n = min(out.size - pending.toLong(), base - produced).toInt()
+                out.fill(0f, pending, pending + n); pending += n; produced += n
+                if (pending == out.size) flush()
+            }
             var at = offset + (produced - base).coerceIn(0, length.toLong()).toInt()
             val emitted = offset + length - at
             while (at < offset + length) {
