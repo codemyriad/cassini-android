@@ -79,11 +79,17 @@ android {
     // required: a missing checkout fails the tests instead of skipping them.
     val conformanceDirectory = providers.gradleProperty("cassiniConformanceDir")
         .getOrElse(rootDir.resolve("third_party/cassini-format/spec/conformance").absolutePath)
+    // Captured filesDir trees and audio (fixtures/README.md).
+    val fixturesDirectory = rootDir.resolve("fixtures")
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
             all {
                 it.systemProperty("cassini.conformance", conformanceDirectory)
+                it.systemProperty("cassini.fixtures", fixturesDirectory.absolutePath)
+                it.inputs.dir(fixturesDirectory)
+                    .withPropertyName("fixtures")
+                    .withPathSensitivity(PathSensitivity.RELATIVE)
                 // Robolectric needs these on JDK 17.
                 it.jvmArgs(
                     "--add-opens=java.base/java.lang=ALL-UNNAMED",
