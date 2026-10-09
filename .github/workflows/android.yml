@@ -5,7 +5,15 @@ on:
     branches: [main]
     tags: ['v*']
   pull_request:
+  # Weekly: rebuild the sherpa-onnx AAR from the pinned source and compare it with the release build.
+  schedule:
+    - cron: '17 4 * * 1'
   workflow_dispatch:
+    inputs:
+      native-from-source:
+        description: Also rebuild the sherpa-onnx AAR from source (about 40 minutes)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -15,7 +23,45 @@ concurrency:
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
+  checks:
+    name: Wrapper, detekt, actionlint, shellcheck and ruff
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          packages: 'platforms;android-37.0 build-tools;36.0.0'
+          log-accepted-android-sdk-licenses: false
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          cache-provider: basic
+      - name: detekt
+        run: ./gradlew --no-daemon detekt
+      - name: actionlint
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl --fail --location --retry 3 --silent --show-error -o "$RUNNER_TEMP/$archive" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/$archive"
+          printf '%s  %s\n' "$ACTIONLINT_SHA256" "$RUNNER_TEMP/$archive" | sha256sum --check --quiet
+          tar xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" -color
+      - name: shellcheck
+        run: shellcheck -x scripts/*.sh tools/*.sh
+      - name: ruff
+        run: pipx run --spec ruff==0.14.0 ruff check --config config/ruff.toml scripts
+
   build:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -57,13 +103,22 @@ jobs:
             echo "CASSINI_RELEASE_KEY_PASSWORD=$KEY_PASSWORD"
             echo "CASSINI_RELEASE_KEY_ALIAS=$KEY_ALIAS"
           } >> "$GITHUB_ENV"
+      # setup.sh fetches the pinned release AAR; when the release is unreachable it builds the AAR
+      # from source (NDK above, about 40 minutes). Either way the result is cached by its pins.
+      - name: Cache the native runtime
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            native/m2/org
+            .tools/opus/source.tar.gz
+          key: native-${{ hashFiles('scripts/native-dependencies.json', 'scripts/streaming-diarization.patch', 'gradle/libs.versions.toml') }}
       - name: Fetch the pinned native runtime
         run: ./scripts/setup.sh
-      - name: Fetch attributed device test fixtures
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends ffmpeg
-          python3 scripts/fetch-smoke-audio.py
+      - name: Cache Robolectric's Android runtime
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-${{ hashFiles('gradle/libs.versions.toml', '**/src/test/resources/robolectric.properties') }}
       - name: Build APK, run unit and conformance tests, and lint
         env:
           BUILD_TYPE: ${{ startsWith(github.ref, 'refs/tags/') && 'Release' || 'Debug' }}
@@ -152,6 +207,48 @@ jobs:
           name: emulator-api-${{ matrix.api }}
           path: .tools/emulator-results/
           if-no-files-found: warn
+
+  native:
+    name: sherpa-onnx AAR from source
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.native-from-source)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          packages: 'platform-tools platforms;android-37.0 build-tools;36.0.0 ndk;28.2.13676358 cmake;3.22.1'
+          log-accepted-android-sdk-licenses: false
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          cache-provider: basic
+      - name: Cache the pinned source archives
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .tools/native-build/sherpa-onnx.tar.gz
+            .tools/opus/source.tar.gz
+          key: native-source-${{ hashFiles('scripts/native-dependencies.json') }}
+      # setup.sh finds the pinned NDK inside ANDROID_HOME. A source build need not match the release
+      # byte for byte; the summary records both hashes so drift is visible.
+      - name: Build the AAR from source
+        run: ./scripts/setup.sh --from-source
+      - name: Record the AAR hashes
+        run: |
+          . scripts/native-common.sh
+          {
+            echo "Source-built AAR: \`$(sha256_of "$aar_installed")\`"
+            echo
+            echo "Pinned release AAR: \`$(pin sherpa-onnx-aar sha256)\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Build and test the app with the source-built AAR
+        run: ./gradlew --no-daemon :app:assembleDebug :app:testDebugUnitTest
 
   release:
     if: startsWith(github.ref, 'refs/tags/')
