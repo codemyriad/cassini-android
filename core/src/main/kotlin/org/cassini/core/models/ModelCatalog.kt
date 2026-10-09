@@ -118,6 +118,13 @@ object ModelCatalog {
         "357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b",
         VOICEPRINT_URL,
     )
+
+    /**
+     * The length of a CAM++ print from [voiceprintModel]. A saved voice whose mean has another length cannot be
+     * compared and is stale (`VoiceStaleness`). An `:engine` test checks it against what the extractor produces.
+     */
+    const val VOICEPRINT_DIM = 512
+
     val VOICEPRINT =
         ModelDescriptor("speaker-models", listOf(voiceprintModel), "verified-voiceprint", voiceprintModel.sha256)
 
