@@ -164,7 +164,15 @@ jobs:
           ./gradlew --no-daemon \
             -PdeviceTestBuildType="$DEVICE_TEST_TYPE" \
             ":app:assemble$BUILD_TYPE" ":app:assemble${DEVICE_TEST_TYPE^}" ":app:assemble${DEVICE_TEST_TYPE^}AndroidTest" \
-            :core:test :engine:testDebugUnitTest :app:testDebugUnitTest ":app:lint$BUILD_TYPE"
+            ciTest ":app:lint$BUILD_TYPE" ":data:lint$BUILD_TYPE" ":ui:lint$BUILD_TYPE"
+      # verifyRoborazziDebug writes the actual image and a diff next to each golden that changed.
+      - name: Upload the screenshot diffs
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: roborazzi-diffs
+          path: '**/build/outputs/roborazzi'
+          if-no-files-found: ignore
       - name: Prepare installable APK
         env:
           TAG: ${{ github.ref_name }}
@@ -203,6 +211,12 @@ jobs:
             core/build/test-results/test/
             engine/build/reports/tests/testDebugUnitTest/
             engine/build/test-results/testDebugUnitTest/
+            data/build/reports/tests/testDebugUnitTest/
+            data/build/test-results/testDebugUnitTest/
+            data/build/reports/lint-results-*.html
+            ui/build/reports/tests/testDebugUnitTest/
+            ui/build/test-results/testDebugUnitTest/
+            ui/build/reports/lint-results-*.html
           if-no-files-found: warn
 
   emulator:

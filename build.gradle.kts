@@ -47,3 +47,27 @@ detekt {
 dependencies {
     detektPlugins(libs.detekt.formatting)
 }
+
+// The JVM checks CI and every phase run: :core:test plus, for each Android module, verifyRoborazziDebug where the
+// Roborazzi plugin is applied (it runs the unit tests and compares the screenshots with the committed goldens) and
+// testDebugUnitTest otherwise. The task paths are resolved lazily, after every module has applied its plugins.
+val ciTest = tasks.register("ciTest") {
+    group = "verification"
+    description = "Runs the JVM, Robolectric and screenshot tests of every module."
+    dependsOn(":core:test")
+}
+subprojects {
+    val module = this
+    listOf("com.android.application", "com.android.library").forEach { androidPlugin ->
+        pluginManager.withPlugin(androidPlugin) {
+            ciTest.configure {
+                dependsOn(
+                    provider {
+                        val screenshots = module.pluginManager.hasPlugin("io.github.takahirom.roborazzi")
+                        if (screenshots) "${module.path}:verifyRoborazziDebug" else "${module.path}:testDebugUnitTest"
+                    },
+                )
+            }
+        }
+    }
+}
