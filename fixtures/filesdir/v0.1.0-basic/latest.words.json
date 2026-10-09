@@ -1,0 +1,168 @@
+{
+  "format": "cassini.words.v1",
+  "wordCount": 27,
+  "items": [
+    {
+      "speaker": "diar_6fb7bfd9_1b94_4d17_a5a6_f3484584ab9b_1",
+      "startMs": 1180,
+      "endMs": 1420,
+      "text": "La"
+    },
+    {
+      "speaker": "diar_6fb7bfd9_1b94_4d17_a5a6_f3484584ab9b_1",
+      "startMs": 1420,
+      "endMs": 1660,
+      "text": "parte"
+    },
+    {
+      "speaker": "diar_6fb7bfd9_1b94_4d17_a5a6_f3484584ab9b_1",
+      "startMs": 1660,
+      "endMs": 2760,
+      "text": "settentrionale,"
+    },
+    {
+      "speaker": "diar_6fb7bfd9_1b94_4d17_a5a6_f3484584ab9b_1",
+      "startMs": 2780,
+      "endMs": 3340,
+      "text": "conosciuta"
+    },
+    {
+      "speaker": "diar_6fb7bfd9_1b94_4d17_a5a6_f3484584ab9b_1",
+      "startMs": 3340,
+      "endMs": 3580,
+      "text": "come"
+    },
+    {
+      "speaker": "diar_6fb7bfd9_1b94_4d17_a5a6_f3484584ab9b_1",
+      "startMs": 3580,
+      "endMs": 4220,
+      "text": "catena"
+    },
+    {
+      "speaker": "diar_6fb7bfd9_1b94_4d17_a5a6_f3484584ab9b_1",
+      "startMs": 4220,
+      "endMs": 4460,
+      "text": "della"
+    },
+    {
+      "speaker": "diar_6fb7bfd9_1b94_4d17_a5a6_f3484584ab9b_1",
+      "startMs": 4460,
+      "endMs": 5470,
+      "text": "sentinella,"
+    },
+    {
+      "speaker": "diar_6fb7bfd9_1b94_4d17_a5a6_f3484584ab9b_1",
+      "startMs": 5500,
+      "endMs": 6060,
+      "text": "vanta"
+    },
+    {
+      "speaker": "diar_6fb7bfd9_1b94_4d17_a5a6_f3484584ab9b_1",
+      "startMs": 6060,
+      "endMs": 6140,
+      "text": "le"
+    },
+    {
+      "speaker": "diar_6fb7bfd9_1b94_4d17_a5a6_f3484584ab9b_1",
+      "startMs": 6140,
+      "endMs": 6700,
+      "text": "montagne"
+    },
+    {
+      "speaker": "diar_6fb7bfd9_1b94_4d17_a5a6_f3484584ab9b_1",
+      "startMs": 6700,
+      "endMs": 6860,
+      "text": "più"
+    },
+    {
+      "speaker": "diar_6fb7bfd9_1b94_4d17_a5a6_f3484584ab9b_1",
+      "startMs": 6860,
+      "endMs": 7180,
+      "text": "alte"
+    },
+    {
+      "speaker": "diar_6fb7bfd9_1b94_4d17_a5a6_f3484584ab9b_1",
+      "startMs": 7180,
+      "endMs": 8350,
+      "text": "dell'Antartide,"
+    },
+    {
+      "speaker": "diar_6fb7bfd9_1b94_4d17_a5a6_f3484584ab9b_1",
+      "startMs": 8380,
+      "endMs": 8540,
+      "text": "il"
+    },
+    {
+      "speaker": "diar_6fb7bfd9_1b94_4d17_a5a6_f3484584ab9b_1",
+      "startMs": 8540,
+      "endMs": 9260,
+      "text": "massiccio"
+    },
+    {
+      "speaker": "diar_6fb7bfd9_1b94_4d17_a5a6_f3484584ab9b_1",
+      "startMs": 9340,
+      "endMs": 9500,
+      "text": "del"
+    },
+    {
+      "speaker": "diar_6fb7bfd9_1b94_4d17_a5a6_f3484584ab9b_1",
+      "startMs": 9580,
+      "endMs": 10450,
+      "text": "Winson,"
+    },
+    {
+      "speaker": "diar_6fb7bfd9_1b94_4d17_a5a6_f3484584ab9b_1",
+      "startMs": 10460,
+      "endMs": 10620,
+      "text": "che"
+    },
+    {
+      "speaker": "diar_6fb7bfd9_1b94_4d17_a5a6_f3484584ab9b_1",
+      "startMs": 10620,
+      "endMs": 11260,
+      "text": "raggiunge"
+    },
+    {
+      "speaker": "diar_6fb7bfd9_1b94_4d17_a5a6_f3484584ab9b_1",
+      "startMs": 11260,
+      "endMs": 11340,
+      "text": "i"
+    },
+    {
+      "speaker": "diar_6fb7bfd9_1b94_4d17_a5a6_f3484584ab9b_1",
+      "startMs": 11420,
+      "endMs": 13020,
+      "text": "4892"
+    },
+    {
+      "speaker": "diar_6fb7bfd9_1b94_4d17_a5a6_f3484584ab9b_1",
+      "startMs": 13020,
+      "endMs": 13340,
+      "text": "metri"
+    },
+    {
+      "speaker": "diar_6fb7bfd9_1b94_4d17_a5a6_f3484584ab9b_1",
+      "startMs": 13340,
+      "endMs": 13500,
+      "text": "con"
+    },
+    {
+      "speaker": "diar_6fb7bfd9_1b94_4d17_a5a6_f3484584ab9b_1",
+      "startMs": 13500,
+      "endMs": 13740,
+      "text": "il"
+    },
+    {
+      "speaker": "diar_6fb7bfd9_1b94_4d17_a5a6_f3484584ab9b_1",
+      "startMs": 13740,
+      "endMs": 14140,
+      "text": "monte"
+    },
+    {
+      "speaker": "diar_6fb7bfd9_1b94_4d17_a5a6_f3484584ab9b_1",
+      "startMs": 14140,
+      "endMs": 14860,
+      "text": "Vinson."
+    }
+  ]
+}

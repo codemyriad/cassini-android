@@ -1,0 +1,12 @@
+{
+  "backend": "sherpa-onnx",
+  "engine": "Parakeet TDT",
+  "model": "nvidia\/parakeet-tdt-0.6b-v3 INT8",
+  "device": "Android CPU",
+  "source": "recording",
+  "version": "sherpa-onnx 1.13.7; model revision 2bda32ec70b097a55adaa07d9a7173915b43cc78",
+  "language": "",
+  "durationMs": 15872,
+  "inferenceMs": 4707,
+  "segmentation": "Incremental container decoding: 28 s PCM windows, 2 s recorded overlap, seams aligned by word; Silero VAD 0.18 speech spans, cut at the quietest point with 1 s of recorded context when longer than 28 s, 0.5 s synthetic tail"
+}
