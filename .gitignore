@@ -23,8 +23,10 @@ dist/
 # Device test audio. The CC-BY-4.0 FLEURS clip and the fixture trees are committed; local clips
 # (tools/fetch-youtube-audio.sh) stay in app/src/androidTest/assets and are never committed.
 # Only the named trees are exempt: a new tree, perhaps pulled from a real files/ directory, stays
-# ignored until it is reviewed and listed here (fixtures/README.md).
-!fixtures/audio/*
+# ignored until it is reviewed and listed here (fixtures/README.md). The same holds for audio: only
+# the FLEURS clip is exempt, so a recording copied next to it stays ignored.
+fixtures/audio/*
+!fixtures/audio/fleurs-it-short.*
 fixtures/filesdir/*
 !fixtures/filesdir/empty/
 !fixtures/filesdir/v0.0.4-style/
