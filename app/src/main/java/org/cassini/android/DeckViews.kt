@@ -104,6 +104,28 @@ class DeckViews(private val context: Context) {
         id = R.id.forward_button; setText(R.string.forward_ten_label); contentDescription = context.getString(R.string.forward_ten)
     }
 
+    private val operation = column().apply {
+        setPadding(dp(20), 0, dp(20), dp(8)); visibility = View.GONE
+    }
+    private val content: LinearLayout
+
+    /** Running work remains visible while the transcript scrolls. Idle status returns to the file card. */
+    fun pinOperation(pinned: Boolean) {
+        val destination = if (pinned) operation else content
+        if (status.parent === destination) return
+        listOf(status, progress, cancelOperation).forEach { (it.parent as android.view.ViewGroup).removeView(it) }
+        if (pinned) {
+            operation.add(status)
+            operation.add(progress, height = dp(3))
+            operation.add(cancelOperation, marginTop = 8)
+        } else {
+            content.addView(status, 2)
+            content.addView(progress, 3)
+            content.addView(cancelOperation, 4)
+        }
+        operation.visibility = if (pinned) View.VISIBLE else View.GONE
+    }
+
     init {
         val heading = row().apply { setPadding(dp(20), dp(12), dp(20), dp(8)) }
         val brand = column().apply {
@@ -115,8 +137,9 @@ class DeckViews(private val context: Context) {
         heading.add(brand, 0, weight = 1f)
         heading.add(menu, dp(56))
         root.add(heading)
+        root.add(operation)
 
-        val content = column().apply { setPadding(dp(20), dp(6), dp(20), dp(12)) }
+        content = column().apply { setPadding(dp(20), dp(6), dp(20), dp(12)) }
         val fileCard = column().apply { background = background(surface); setPadding(dp(14), dp(12), dp(14), dp(12)) }
         fileCard.add(filename)
         fileCard.add(caption, marginTop = 5)

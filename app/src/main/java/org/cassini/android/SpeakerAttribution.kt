@@ -11,6 +11,11 @@ internal object SpeakerAttribution {
         requireUser(turns.isNotEmpty(), Failure.SPEAKERS)
         val words = Diarization.assign(source.words, turns, "diar_${UUID.randomUUID().toString().replace('-', '_')}_")
         requireUser(words.isNotEmpty() && words != source.words, Failure.SPEAKERS)
+        return Result(source.copy(words = words), record(words, turns, previousProcessing, sourceId, elapsedMs, previousAttribution))
+    }
+
+    fun record(words: List<Word>, turns: List<SpeakerTurn>, previousProcessing: JSONObject?, sourceId: String?,
+               elapsedMs: Long, previousAttribution: JSONObject? = null): JSONObject {
         val processing = previousProcessing?.let { JSONObject(it.toString()) } ?: JSONObject().put("source", "existing transcript")
         previousAttribution?.let { processing.put("x-sourceAttribution", JSONObject(it.toString())) }
         processing.put("x-derivedFromTranscript", sourceId)
@@ -25,6 +30,6 @@ internal object SpeakerAttribution {
             .put("speakerCount", words.map { it.speaker }.distinct().size)
             .put("assignment", "largest union overlap; nearest turn in gaps; one speaker per word")
             .put("sourceSeparation", false))
-        return Result(source.copy(words = words), processing)
+        return processing
     }
 }

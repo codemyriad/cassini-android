@@ -140,7 +140,7 @@ class LibraryActivity : Activity() {
             }, top = 10)
             views.add(card, views.text(12f, DeckViews.muted).apply {
                 text = getString(R.string.library_note_metadata, DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(note.createdAt)),
-                    getString(if (note.session.document != null) R.string.library_saved_document else R.string.library_recorded))
+                    getString(if (note.session.processingPaused) R.string.paused_draft else if (note.session.document != null) R.string.library_saved_document else R.string.library_recorded))
             }, top = 12)
             views.add(cards, card, top = 10)
         }

@@ -7,7 +7,7 @@ import com.k2fsa.sherpa.onnx.OfflineSpeakerSegmentationSortformerModelConfig
 
 internal data class SpeakerTurn(val startMs: Long, val endMs: Long, val speaker: Int)
 
-/** End-to-end Sortformer diarization over the whole recording, after ASR has released its model. */
+/** Sortformer speaker activity, with full-recording and stateful chunk APIs. */
 internal object Diarization {
     /** Speaker activity above this probability counts as speech. The model decides the number of speakers (up to 8). */
     const val THRESHOLD = 0.5f
@@ -44,8 +44,63 @@ internal object Diarization {
         } finally { NativeInference.lease.release() }
     }
 
+    /** Caller owns the inference lease. One instance preserves speaker IDs across chunks. */
+    class Streaming(model: String, restored: org.json.JSONObject? = null) : AutoCloseable {
+        private val diarizer = OfflineSpeakerDiarization(config = OfflineSpeakerDiarizationConfig(
+            segmentation = OfflineSpeakerSegmentationModelConfig(
+                sortformer = OfflineSpeakerSegmentationSortformerModelConfig(model = model, threshold = THRESHOLD),
+                numThreads = 2, provider = "cpu"),
+            minDurationOn = MIN_DURATION_ON, minDurationOff = MIN_DURATION_OFF,
+        ))
+        var elapsedMs = 0L
+            private set
+        private val history = mutableListOf<SpeakerTurn>()
+        init {
+            restored?.let {
+                try {
+                    require(diarizer.restoreStreamingState(CheckpointData.floats(it.getString("cache"), 200000)))
+                    elapsedMs = it.getLong("elapsedMs")
+                    val turns = it.getJSONArray("turns")
+                    for (i in 0 until turns.length()) {
+                        val turn = turns.getJSONArray(i)
+                        history += SpeakerTurn(turn.getLong(0), turn.getLong(1), turn.getInt(2))
+                    }
+                } catch (error: Throwable) { diarizer.release(); throw error }
+            }
+        }
+        fun checkpoint() = org.json.JSONObject().put("cache", CheckpointData.floats(diarizer.saveStreamingState()))
+            .put("elapsedMs", elapsedMs).put("turns", org.json.JSONArray(history.map { org.json.JSONArray(listOf(it.startMs, it.endMs, it.speaker)) }))
+        val turns: List<SpeakerTurn> get() = history.toList()
+
+        fun process(audio: PcmAudio, startMs: Long): List<SpeakerTurn> {
+            require(audio.sampleRate == Limits.ASR_RATE && audio.durationMs <= 28_000)
+            requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
+            val began = System.nanoTime()
+            val found = diarizer.processStreamingChunk(audio.samples).filter {
+                it.start.isFinite() && it.end.isFinite() && it.speaker in 0..7
+            }.map {
+                SpeakerTurn((it.start * 1000).toLong().coerceIn(0, audio.durationMs),
+                    (it.end * 1000).toLong().coerceIn(0, audio.durationMs), it.speaker)
+            }.filter { it.endMs > it.startMs }
+            elapsedMs += (System.nanoTime() - began) / 1_000_000
+            requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
+            val cut = if (startMs == 0L) 0 else startMs + 1000
+            for (index in history.indices.reversed()) {
+                val old = history[index]
+                if (old.startMs >= cut) history.removeAt(index)
+                else if (old.endMs > cut) history[index] = old.copy(endMs = cut)
+            }
+            history.addAll(found.map {
+                it.copy(startMs = maxOf(cut, startMs + it.startMs), endMs = startMs + it.endMs)
+            }.filter { it.endMs > it.startMs })
+            return found
+        }
+
+        override fun close() = diarizer.release()
+    }
+
     /** Keep word order, text and timings. Number anonymous speakers in order of first spoken word. */
-    fun assign(words: List<Word>, turns: List<SpeakerTurn>, prefix: String = "spk_"): List<Word> {
+    fun assign(words: List<Word>, turns: List<SpeakerTurn>, prefix: String = "spk_", stableIds: Boolean = false): List<Word> {
         // Union duplicate/overlapping intervals for a speaker before counting coverage. Sort to
         // make ties independent of native result order; invalid turns cannot win a nearest match.
         val valid = turns.filter { it.startMs >= 0 && it.endMs > it.startMs && it.speaker >= 0 }
@@ -68,7 +123,7 @@ internal object Diarization {
                 if (overlap > 0) overlaps[turn.speaker] = (overlaps[turn.speaker] ?: 0) + overlap
             }
             val speaker = overlaps.maxByOrNull { it.value }?.key ?: union.minBy { gap(word, it) }.speaker
-            word.copy(speaker = ids.getOrPut(speaker) { "$prefix${ids.size + 1}" })
+            word.copy(speaker = if (stableIds) "$prefix${speaker + 1}" else ids.getOrPut(speaker) { "$prefix${ids.size + 1}" })
         }
     }
 

@@ -30,7 +30,7 @@ The interface supports English and Italian. Parakeet recognizes speech languages
 
 ## What’s still limited
 
-This is an early beta. Recordings and imports for transcription can be up to **2 hours**. Recording runs in a foreground service with a notification: it keeps going with the screen off or the app in the background, and a recording cut short by a crash is repaired the next time the app starts. Transcription and speaker identification still need the app open. If they stop, nothing is saved and they start again from the beginning. On a Pixel 8, decoding the audio of a one-hour recording alone takes about 9 minutes (about 6× realtime) before recognition starts. Failed transcription keeps the recording for a retry.
+This is an early beta. Recordings and imports for transcription can be up to **2 hours**. Recording runs in a foreground service with a notification: it keeps going with the screen off or the app in the background, and a recording cut short by a crash is repaired the next time the app starts. Transcription and speaker identification still need the app open. Stop and save progress keeps the completed chunks, speaker cache, draft names and merges, and encoded audio in a durable checkpoint. Resume continues at that position, including after reopening the app; an interrupted process recovers the last completed chunk. Discarding this progress requires confirmation. Audio decoding, Opus encoding, word recognition and speaker identification run in one incremental pass. Recognition uses 28-second windows with 2 seconds of overlap; Sortformer retains its speaker cache, so draft speaker labels keep the same identities. Tap a draft speaker label to assign a name while processing continues. “Remember this voice on this phone” is available in that dialog too; confirmation teaches the named voice after the result is saved. Saved profiles are matched in the first available chunks of later recordings, without automatically reinforcing their guesses. Reprocessing an existing meeting also reuses its named voiceprints. Progress and Stop stay above the scrolling transcript. The status distinguishes reading audio, recognizing words, identifying speakers and saving, with audio positions, word counts and elapsed time. The overall bar tracks completed audio across all stages and never switches back to an animation once duration is known. Elapsed time ticks during native calls. Remaining time uses completed chunks, smooths the measured pace, and shows an approximate range after three chunks; it explicitly excludes the final voice matching and saving steps. Battery projections use measured discharge during active processing, after at least two minutes of sufficient data, and the upper audio ETA plus observed finalization time for a conservative completion estimate; plugging in or resuming starts a fresh measurement. The app keeps only an audio window in RAM and up to 45 seconds of clean voice clips per speaker on disk, rather than the full decoded recording. Failed transcription keeps the recording and its most recent checkpoint for a retry.
 
 The current development build transcribes after recording finishes. The earlier live transcription mode and FP32 model have been removed. Updates reclaim obsolete FP32 downloads and keep existing recordings and transcripts; installations with only FP32 need to download INT8.
 
@@ -40,11 +40,13 @@ There’s no transcription queue or storage cleanup UI yet. The APK is a release
 
 ## Naming speakers
 
-Tap a speaker label, or use **Speakers…**, to give the speaker a name. The app then saves that person’s voice on the phone. In later notes it recognises the voice:
+Tap a speaker label, or use **Speakers…**, to give the speaker a name. Draft names are saved with the transcript. On a saved note, **Remember this voice** saves that person’s voice on the phone. In later notes it recognises the voice:
 
 * a strong match gets the name automatically, marked as automatic; tap it to change it or choose **Not this person**;
 * a weaker match is shown as a one-tap suggestion;
 * anything else stays anonymous.
+
+The naming dialog also offers **Merge into [name]…** for already named speakers in this recording. Choosing a target opens a separate confirmation; **Merge speakers** is the second click that applies it. This assigns the source voice’s words to the target, keeping the target name. During recognition, future words from that voice follow the merge. On a saved note, merging creates a new transcript version; **Choose transcript** can select the earlier version. Merging does not teach or combine saved voice profiles.
 
 **Settings → People** lists the saved voices. You can rename or forget one, or forget all. Renaming changes future notes only; notes already named keep their names.
 
@@ -59,10 +61,10 @@ Tap a speaker label, or use **Speakers…**, to give the speaker a name. The app
 
 ## Build
 
-Requires JDK 17 and Android SDK platform/build tools 34. Set `ANDROID_HOME` or `sdk.dir` in `local.properties`.
+Requires JDK 17, Android SDK platform/build tools 34, CMake and Android NDK r28c (28.2.13676358). Set `ANDROID_HOME` or `sdk.dir` in `local.properties`.
 
 ```sh
-./scripts/setup.sh
+ANDROID_NDK=$ANDROID_HOME/ndk/28.2.13676358 ./scripts/setup.sh
 ./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```

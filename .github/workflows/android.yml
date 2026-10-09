@@ -32,7 +32,7 @@ jobs:
           java-version: '17'
       - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
         with:
-          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0 ndk;28.2.13676358'
           log-accepted-android-sdk-licenses: false
       - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
@@ -47,7 +47,8 @@ jobs:
           printf '%s' "$BETA_KEYSTORE" | base64 --decode > "$HOME/.android/debug.keystore"
           chmod 600 "$HOME/.android/debug.keystore"
           echo "CASSINI_BETA_KEYSTORE_FILE=$HOME/.android/debug.keystore" >> "$GITHUB_ENV"
-      - run: ./scripts/setup.sh
+      - name: Build streaming native runtime
+        run: ANDROID_NDK="$ANDROID_HOME/ndk/28.2.13676358" ./scripts/setup.sh
       - name: Fetch attributed device test fixtures
         run: |
           sudo apt-get update -qq

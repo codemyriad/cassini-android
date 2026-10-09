@@ -82,6 +82,54 @@ class SpeakerIdentificationTest {
         assertTrue(ready)
         scenario.onActivity { it.findViewById<Button>(R.id.transcribe_button).performClick() }
     }
+    @Test fun draftSpeakersCanBeNamedBeforeRecognitionFinishes() {
+        val (file, _) = twoVoiceRecording()
+        org.junit.Assume.assumeTrue(DiarizationModels.inFiles(context.filesDir).ready())
+        org.junit.Assume.assumeTrue(VoiceprintModel.inFiles(context.filesDir).ready())
+        val scenario = ActivityScenario.launch(MainActivity::class.java)
+        try {
+            startTranscription(scenario)
+            val deadline = SystemClock.uptimeMillis() + 180000
+            var speaker: String? = null
+            while (speaker == null && SystemClock.uptimeMillis() < deadline) {
+                scenario.onActivity { activity ->
+                    val view = activity.findViewById<TextView>(R.id.transcript_text)
+                    val text = view.text as? Spanned
+                    val label = activity.getString(R.string.speaker_label, 1)
+                    val at = text?.toString()?.indexOf(label) ?: -1
+                    if (at >= 0 && activity.findViewById<Button>(R.id.cancel_operation).visibility == View.VISIBLE) {
+                        text!!.getSpans(at, at + label.length, ClickableSpan::class.java).firstOrNull()?.let { span ->
+                            val status = activity.findViewById<TextView>(R.id.operation_status)
+                            assertTrue("Progress details must remain visible while following the transcript",
+                                status.getGlobalVisibleRect(android.graphics.Rect()))
+                            assertTrue("Cancel must remain visible while following the transcript",
+                                activity.findViewById<Button>(R.id.cancel_operation).getGlobalVisibleRect(android.graphics.Rect()))
+                            speaker = label
+                            span.onClick(view)
+                        }
+                    }
+                }
+                if (speaker == null) SystemClock.sleep(100)
+            }
+            assertNotNull("Speaker name must be editable while the job is still running", speaker)
+            onView(withId(R.id.speaker_name_input)).inRoot(isDialog()).perform(replaceText("Silvio"))
+            onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
+            scenario.onActivity { activity ->
+                assertTrue(activity.findViewById<TextView>(R.id.transcript_text).text.toString().contains("Silvio"))
+            }
+            val sessions = SessionStore(context.filesDir)
+            while (sessions.load().document == null && SystemClock.uptimeMillis() < deadline) SystemClock.sleep(100)
+            val path = sessions.load().document
+            assertNotNull("Named draft must be saved", path)
+            val saved = CassiniDocument.read(File(path!!))
+            val roster = saved.manifest!!.getJSONArray("speakers")
+            assertTrue((0 until roster.length()).any { roster.getJSONObject(it).getString("label") == "Silvio" })
+            assertTrue("Temporary decoded PCM must be removed", context.cacheDir.listFiles().orEmpty().none { it.name.startsWith("recognition-") })
+            val peak = File("/proc/self/status").readLines().firstOrNull { it.startsWith("VmHWM:") }
+            instrumentation.sendStatus(0, android.os.Bundle().apply { putString("stream", "Joint streaming + draft name saved; peak RSS: $peak\n") })
+        } finally { scenario.close(); file.delete() }
+    }
+
     @Test fun transcribingLabelsEachVoice() {
         DiarizationModels.inFiles(context.filesDir).install { }
         val (file, boundary) = twoVoiceRecording()
@@ -124,8 +172,9 @@ class SpeakerIdentificationTest {
                 scenario.onActivity {
                     val progress = it.findViewById<ProgressBar>(R.id.operation_progress)
                     val status = it.findViewById<TextView>(R.id.operation_status).text.toString()
-                    identifying = status.startsWith(it.getString(R.string.identifying_speakers_progress, 0).substringBefore(':')) &&
-                        !progress.isIndeterminate && progress.progress in 1..99
+                    identifying = status.lines().getOrNull(1)?.startsWith(
+                        it.getString(R.string.progress_speakers, "", "").substringBefore('·')) == true &&
+                        !progress.isIndeterminate && progress.progress in 0..99
                 }
                 if (!identifying) SystemClock.sleep(10)
             }
@@ -151,8 +200,8 @@ class SpeakerIdentificationTest {
             return file
         } finally { wav.delete() }
     }
-    private fun waitFor(scenario: ActivityScenario<MainActivity>, condition: (MainActivity) -> Boolean) {
-        val deadline = SystemClock.uptimeMillis() + 20000
+    private fun waitFor(scenario: ActivityScenario<MainActivity>, timeoutMs: Long = 20000, condition: (MainActivity) -> Boolean) {
+        val deadline = SystemClock.uptimeMillis() + timeoutMs
         var done = false
         while (!done && SystemClock.uptimeMillis() < deadline) { scenario.onActivity { done = condition(it) }; if (!done) SystemClock.sleep(50) }
         assertTrue(done)
@@ -196,6 +245,78 @@ class SpeakerIdentificationTest {
             onView(withId(R.id.speaker_name_input)).inRoot(isDialog()).check(matches(withText("Anna")))
             onView(withId(android.R.id.button2)).inRoot(isDialog()).perform(click())
         } finally { scenario.close(); original.delete(); renamed?.delete() }
+    }
+
+    @Test fun mergingSavedSpeakersRequiresConfirmationAndKeepsThePreviousTranscript() {
+        val original = twoSpeakerNote("Anna")
+        val before = CassiniDocument.read(original)
+        val second = context.getString(R.string.speaker_label, 2)
+        val scenario = ActivityScenario.launch(MainActivity::class.java)
+        val sessions = SessionStore(context.filesDir)
+        try {
+            waitFor(scenario) { it.findViewById<TextView>(R.id.transcript_text).text.contains(second) }
+            tapLabel(scenario, second)
+            onView(withText(context.getString(R.string.speaker_merge_into, "Anna"))).inRoot(isDialog()).perform(click())
+            assertEquals("Selecting a target alone must not write a document", original.absolutePath, sessions.load().document)
+            onView(withId(android.R.id.button2)).inRoot(isDialog()).perform(click())
+            assertEquals(original.absolutePath, sessions.load().document)
+            tapLabel(scenario, second)
+            onView(withText(context.getString(R.string.speaker_merge_into, "Anna"))).inRoot(isDialog()).perform(click())
+            onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
+            waitFor(scenario) { sessions.load().document != original.absolutePath && !it.findViewById<TextView>(R.id.transcript_text).text.contains(second) }
+            val after = CassiniDocument.read(File(sessions.load().document!!))
+            assertEquals("ok", after.state)
+            assertEquals(2, after.variants.size)
+            assertEquals(before.selected(null)?.transcript, after.selected(before.defaultId)?.transcript)
+            assertEquals(before.variants.single().body, after.selected(before.defaultId)?.body)
+            val edited = after.selected(null)!!.transcript!!
+            assertEquals(setOf("spk_1"), edited.words.map { it.speaker }.toSet())
+            assertEquals(before.selected(null)!!.transcript!!.words.map { Triple(it.startMs, it.endMs, it.text) },
+                edited.words.map { Triple(it.startMs, it.endMs, it.text) })
+            assertEquals("Anna", after.speakerLabel("spk_1"))
+            assertEquals(before.manifest!!.getJSONObject("integrity").getString("opusAudioSha256"),
+                after.manifest!!.getJSONObject("integrity").getString("opusAudioSha256"))
+            assertEquals("spk_1", after.manifest!!.getJSONObject("provenance").getJSONObject("speechToText")
+                .getJSONObject(after.defaultId!!).getJSONObject("x-speakerMerges").getString("spk_2"))
+        } finally { scenario.close(); original.delete() }
+    }
+
+    @Test fun draftSpeakerMergePersistsThroughLaterRecognitionWindows() {
+        val (file, _) = twoVoiceRecording()
+        org.junit.Assume.assumeTrue(DiarizationModels.inFiles(context.filesDir).ready())
+        val scenario = ActivityScenario.launch(MainActivity::class.java)
+        try {
+            startTranscription(scenario)
+            val first = context.getString(R.string.speaker_label, 1)
+            val second = context.getString(R.string.speaker_label, 2)
+            waitFor(scenario, 180000) {
+                val text = it.findViewById<TextView>(R.id.transcript_text).text
+                text.contains(first) && text.contains(second)
+            }
+            tapLabel(scenario, first)
+            onView(withId(R.id.speaker_name_input)).inRoot(isDialog()).perform(replaceText("Anna"))
+            onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
+            tapLabel(scenario, second)
+            onView(withText(context.getString(R.string.speaker_merge_into, "Anna"))).inRoot(isDialog()).perform(click())
+            scenario.onActivity { assertTrue(it.findViewById<TextView>(R.id.transcript_text).text.contains(second)) }
+            onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
+            scenario.onActivity { activity ->
+                assertFalse(activity.findViewById<TextView>(R.id.transcript_text).text.contains(second))
+                assertEquals(View.VISIBLE, activity.findViewById<Button>(R.id.cancel_operation).visibility)
+            }
+            val sessions = SessionStore(context.filesDir)
+            val deadline = SystemClock.uptimeMillis() + 180000
+            while (sessions.load().document == null && SystemClock.uptimeMillis() < deadline) SystemClock.sleep(100)
+            val path = sessions.load().document
+            assertNotNull(path)
+            val saved = CassiniDocument.read(File(path!!))
+            val transcript = saved.selected(null)!!.transcript!!
+            assertEquals("Merged native slots must not return in later words", 1, transcript.words.map { it.speaker }.distinct().size)
+            assertEquals("Anna", saved.speakerLabel(transcript.words.first().speaker))
+            assertTrue("The second voice must continue beyond the first window", transcript.words.any { it.startMs > 30000 })
+            assertTrue(saved.manifest!!.getJSONObject("provenance").getJSONObject("speechToText")
+                .getJSONObject(saved.defaultId!!).getJSONObject("x-speakerMerges").length() > 0)
+        } finally { scenario.close(); file.delete() }
     }
 
     private val app get() = context.applicationContext as CassiniApplication
@@ -301,7 +422,7 @@ class SpeakerIdentificationTest {
             val deadline = SystemClock.uptimeMillis() + 300000
             var matching = false
             while (!matching && SystemClock.uptimeMillis() < deadline) {
-                scenario.onActivity { matching = it.findViewById<TextView>(R.id.operation_status).text.toString() == it.getString(R.string.matching_voices) }
+                scenario.onActivity { matching = it.findViewById<TextView>(R.id.operation_status).text.toString().contains(it.getString(R.string.matching_voices)) }
                 if (!matching) SystemClock.sleep(5)
             }
             assertTrue("Cancel while voiceprints are computed", matching)

@@ -10,6 +10,7 @@ import java.io.File
 class PreserveLibraryRule : ExternalResource() {
     private var catalogue = emptyMap<String, ByteArray?>()
     private var documents = emptySet<String>()
+    private var checkpoints = emptySet<String>()
     private var voiceprints = emptyMap<String, ByteArray>()
 
     private fun finishScreens() {
@@ -39,6 +40,7 @@ class PreserveLibraryRule : ExternalResource() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val directory = context.filesDir
         catalogue = listOf("library.json", "library-migrated", "session.json", "session.json.bak", "voices.json").associateWith { File(directory, it).takeIf { file -> file.exists() }?.readBytes() }
+        checkpoints = File(directory, "processing-checkpoints").listFiles().orEmpty().map { it.name }.toSet()
         documents = File(directory, "documents").listFiles().orEmpty().map { it.name }.toSet()
         voiceprints = File(directory, "voiceprints").listFiles().orEmpty().associate { it.name to it.readBytes() }
     }
@@ -47,6 +49,7 @@ class PreserveLibraryRule : ExternalResource() {
         finishScreens()
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val directory = context.filesDir
+        File(directory, "processing-checkpoints").listFiles().orEmpty().filter { it.name !in checkpoints }.forEach { it.deleteRecursively() }
         catalogue.forEach { (name, bytes) -> File(directory, name).let { if (bytes == null) it.delete() else it.writeBytes(bytes) } }
         File(directory, "documents").listFiles().orEmpty().filter { it.name !in documents }.forEach { it.delete() }
         File(directory, "voiceprints").listFiles().orEmpty().filter { it.name !in voiceprints }.forEach { it.delete() }

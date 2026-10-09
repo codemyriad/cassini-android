@@ -46,54 +46,97 @@ object Parakeet {
                             cutting: Cutting = cutting(detectorModel), onProgress: (Progress) -> Unit = {}): Transcript {
         requireUser(models.ready(), Failure.MODEL)
         requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
-        val decoder = Decoder(models)
-        try {
-            if (cutting == Cutting.WHOLE) {
-                requireUser(audio.durationMs <= WHOLE_MAX_MS, Failure.LONG)
-                val began = System.nanoTime()
-                val transcript = Transcript(Session(decoder, audio, policy).whole())
-                onProgress(Progress(audio.durationMs, audio.durationMs, (System.nanoTime() - began) / 1_000_000, transcript.words))
-                return transcript
-            }
-            // The clock starts once the model is loaded, so speed and remaining time describe decoding alone.
-            val began = System.nanoTime()
-            val session = Session(decoder, audio, policy)
-            // Recorded context makes a decode end past its speech span, so the position only ever moves forward.
-            var reached = 0
-            var reported = 0L
-            val report = { done: Int ->
-                reached = maxOf(reached, minOf(done, audio.samples.size))
-                val now = System.nanoTime()
-                // Each report copies every word so far: at most one a second keeps a long recording linear.
-                if (reported == 0L || now - reported >= PROGRESS_INTERVAL_NS) {
-                    reported = now
-                    onProgress(Progress(SpeechWindows.floorMs(reached, audio.sampleRate), audio.durationMs,
-                        (now - began) / 1_000_000, session.words.map { it.word }))
-                }
-            }
-            report(0)
-            var paddedTailMs = 0L
-            when (cutting) {
-                Cutting.SPEECH -> SpeechDetector(requireNotNull(detectorModel)).use { detector ->
-                    paddedTailMs = detector.detect(audio) { span -> session.speech(span, report) }
-                }
-                Cutting.QUIET -> session.speech(Span(0, audio.samples.size), report)
-                else -> session.fixed(report)
-            }
-            val transcript = Transcript(WordGate.finalizeTranscriptWords(audio, session.words, paddedTailMs))
-            onProgress(Progress(audio.durationMs, audio.durationMs, (System.nanoTime() - began) / 1_000_000, transcript.words))
-            return transcript
-        } finally {
-            decoder.close()
-        }
+        return Decoder(models).use { decoder -> transcribeWithDecoder(audio, decoder, detectorModel, policy, cutting, onProgress) }
     }
 
+    private fun transcribeWithDecoder(audio: PcmAudio, decoder: Decoder, detectorModel: String?, policy: DecodePolicy,
+                                     cutting: Cutting, onProgress: (Progress) -> Unit): Transcript {
+        if (cutting == Cutting.WHOLE) {
+            requireUser(audio.durationMs <= WHOLE_MAX_MS, Failure.LONG)
+            val began = System.nanoTime()
+            val transcript = Transcript(Session(decoder, audio, policy).whole())
+            onProgress(Progress(audio.durationMs, audio.durationMs, (System.nanoTime() - began) / 1_000_000, transcript.words))
+            return transcript
+        }
+        // The clock starts once the model is loaded, so speed and remaining time describe decoding alone.
+        val began = System.nanoTime()
+        val session = Session(decoder, audio, policy)
+        // Recorded context makes a decode end past its speech span, so the position only ever moves forward.
+        var reached = 0
+        var reported = 0L
+        val report = { done: Int ->
+            reached = maxOf(reached, minOf(done, audio.samples.size))
+            val now = System.nanoTime()
+            // Each report copies every word so far: at most one a second keeps a long recording linear.
+            if (reported == 0L || now - reported >= PROGRESS_INTERVAL_NS) {
+                reported = now
+                onProgress(Progress(SpeechWindows.floorMs(reached, audio.sampleRate), audio.durationMs,
+                    (now - began) / 1_000_000, session.words.map { it.word }))
+            }
+        }
+        report(0)
+        var paddedTailMs = 0L
+        when (cutting) {
+            Cutting.SPEECH -> SpeechDetector(requireNotNull(detectorModel)).use { detector ->
+                paddedTailMs = detector.detect(audio) { span -> session.speech(span, report) }
+            }
+            Cutting.QUIET -> session.speech(Span(0, audio.samples.size), report)
+            else -> session.fixed(report)
+        }
+        val transcript = Transcript(WordGate.finalizeTranscriptWords(audio, session.words, paddedTailMs))
+        onProgress(Progress(audio.durationMs, audio.durationMs, (System.nanoTime() - began) / 1_000_000, transcript.words))
+        return transcript
+    }
+
+    /** One recognizer reused while the container decoder supplies short PCM blocks. */
+    internal class Incremental(private val models: ModelStore, private val detectorModel: String?,
+                               private val leaseHeld: Boolean = false,
+                               restored: org.json.JSONObject? = null,
+                               private val onChunk: (PcmAudio, Long, Transcript) -> Transcript = { _, _, transcript -> transcript },
+                               private val onStage: (Long, Long, Boolean) -> Unit = { _, _, _ -> },
+                               private val onProgress: (Progress) -> Unit) : AutoCloseable {
+        private var decoder: Decoder? = null
+        private val began = System.nanoTime()
+        var totalMs = 0L
+        var inferenceMs = restored?.optLong("inferenceMs") ?: 0L
+            private set
+        private val chunks = IncrementalTranscript(restored?.getJSONObject("chunks")) { audio, startMs ->
+            onStage(startMs, startMs + audio.durationMs, decoder == null)
+            val recognizer = decoder ?: Decoder(models, ownsLease = !leaseHeld).also { decoder = it }
+            onStage(startMs, startMs + audio.durationMs, false)
+            val started = System.nanoTime()
+            val transcript = transcribeWithDecoder(audio, recognizer, detectorModel, DecodePolicy.WHOLE_SPANS, cutting(detectorModel)) {}
+            inferenceMs += (System.nanoTime() - started) / 1_000_000
+            onChunk(audio, startMs, transcript)
+        }
+
+        val positionSamples get() = chunks.positionSamples
+        val doneMs get() = chunks.doneMs
+        fun checkpoint() = org.json.JSONObject().put("inferenceMs", inferenceMs).put("chunks", chunks.checkpoint())
+        fun accept(samples: FloatArray, count: Int) {
+            chunks.accept(samples, count) { doneMs, words ->
+                onProgress(Progress(doneMs, totalMs.takeIf { it > 0 }?.let { maxOf(it, doneMs) } ?: 0, (System.nanoTime() - began) / 1_000_000, words))
+            }
+        }
+
+        fun finish(durationMs: Long): Transcript {
+            val transcript = chunks.finish()
+            onProgress(Progress(durationMs, durationMs, (System.nanoTime() - began) / 1_000_000, transcript.words))
+            return transcript
+        }
+
+        override fun close() { decoder?.close() }
+    }
+
+    internal fun incrementalProvenance(detectorModel: String?) =
+        "Incremental container decoding: 28 s PCM windows, 2 s recorded overlap, seams aligned by word; " + cutting(detectorModel).provenance
+
     /** One native recognizer, owned and closed by the decoding thread. */
-    internal class Decoder(models: ModelStore) : AutoCloseable {
+    internal class Decoder(models: ModelStore, private val ownsLease: Boolean = true) : AutoCloseable {
         private val recognizer: OfflineRecognizer
         private var closed = false
         init {
-            NativeInference.acquire()
+            if (ownsLease) NativeInference.acquire()
             try {
                 requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
                 recognizer = OfflineRecognizer(config = OfflineRecognizerConfig(
@@ -111,7 +154,7 @@ object Parakeet {
                     decodingMethod = "greedy_search",
                 ))
             } catch (error: Throwable) {
-                decoderLease.release()
+                if (ownsLease) decoderLease.release()
                 throw error
             }
         }
@@ -134,7 +177,7 @@ object Parakeet {
         override fun close() {
             if (closed) return
             closed = true
-            try { recognizer.release() } finally { decoderLease.release() }
+            try { recognizer.release() } finally { if (ownsLease) decoderLease.release() }
         }
     }
 

@@ -2,6 +2,8 @@
 **/build/
 local.properties
 app/libs/*.aar
+app/libs/streaming-diarization.sha256
+app/src/main/jniLibs/
 .idea/
 *.iml
 .tools/

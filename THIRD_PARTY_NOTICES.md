@@ -22,6 +22,8 @@ The APK bundles a sherpa-onnx 1.13.7 AAR built by Cassini: the [upstream release
 
 The APK also bundles [zstd-jni](https://github.com/luben/zstd-jni/tree/v1.5.7-6) 1.5.7-6 (BSD-2-Clause, including Zstandard under BSD-3-Clause) from Maven Central, to decompress the speaker model download.
 
+The streaming encoder bundles unmodified [libopus 1.5.2](https://github.com/xiph/opus/tree/v1.5.2), under its BSD license. Cassini’s JNI wrapper and reproducible build script are included in the corresponding source archive.
+
 Full texts and copyright notices are checked in under [app assets](app/src/main/assets/licenses/). The release’s `cassini-native-sources.tar` contains these pinned source archives, including native build files. [The source manifest](scripts/native-dependencies.json) provides archive URLs and SHA-256 hashes; [native build notes](docs/native-runtime.md) describe the upstream build. Apart from the sherpa-onnx diarization changes, dependency code is unmodified by Cassini.
 
 ## Downloaded models and local test fixtures

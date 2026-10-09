@@ -62,7 +62,7 @@ internal fun resampleTo16k(samples: FloatArray, rate: Int): FloatArray {
  * input history kept across block edges, so the output equals the whole-array conversion. [sink]
  * receives a reused buffer and its valid length.
  */
-internal class StreamingResampler(private val rate: Int, private val sink: (FloatArray, Int) -> Unit) {
+internal class StreamingResampler(private val rate: Int, initialFrame: Long = 0, firstOutput: Long = 0, private val sink: (FloatArray, Int) -> Unit) {
     init { require(rate in 8000..96000) { "Unsupported sample rate $rate" } }
     private val step = rate.toDouble() / VAD_SAMPLE_RATE
     private val crossingsPerSample = 2 * CUTOFF_FRACTION * min(rate, VAD_SAMPLE_RATE) / rate
@@ -77,25 +77,26 @@ internal class StreamingResampler(private val rate: Int, private val sink: (Floa
     }
     private val tapWeight = taps.fold(0.0) { sum, tap -> sum + tap }
     private var history = FloatArray(8192)
-    private var base = 0L
+    private var base = initialFrame
     private var size = 0
     private val out = FloatArray(4096)
     private var pending = 0
     private var finished = false
-    var produced = 0L
+    var produced = firstOutput
         private set
     val consumed get() = base + size
 
     fun push(samples: FloatArray, offset: Int = 0, length: Int = samples.size - offset) {
         check(!finished)
         if (rate == VAD_SAMPLE_RATE) {
-            var at = offset
+            var at = offset + (produced - base).coerceIn(0, length.toLong()).toInt()
+            val emitted = offset + length - at
             while (at < offset + length) {
                 val n = min(out.size - pending, offset + length - at)
                 samples.copyInto(out, pending, at, at + n); pending += n; at += n
                 if (pending == out.size) flush()
             }
-            base += length; produced += length
+            base += length; produced += emitted
             return
         }
         if (size + length > history.size) history = history.copyOf(max(history.size * 2, size + length))

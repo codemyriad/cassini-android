@@ -23,10 +23,11 @@ internal object OpusEncoder {
         val file = File.createTempFile("opus", ".tmp")
         try { encode(audio, file); return file.readBytes() } finally { file.delete() }
     }
-    fun encode(audio: PcmAudio, out: File) = FileOutputStream(out).use { file ->
+    fun encode(audio: PcmAudio, out: File) = encode(audio.source(), out)
+    fun encode(audio: PcmSource, out: File) = FileOutputStream(out).use { file ->
         val stream = file.buffered(); encode(audio, stream); stream.flush(); file.fd.sync()
     }
-    private fun encode(audio: PcmAudio, out: OutputStream) {
+    private fun encode(audio: PcmSource, out: OutputStream) {
         requireUser(available(), Failure.OPUS_ENCODER)
         val codec = MediaCodec.createEncoderByType("audio/opus")
         var started = false
@@ -36,7 +37,7 @@ internal object OpusEncoder {
                 setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, FRAME * 2)
             }, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
             codec.start(); started = true
-            val samples = audio.samples.size.toLong() * RATE / audio.sampleRate
+            val samples = audio.sampleCount.toLong() * RATE / audio.sampleRate
             require(samples in 1..RATE / 1000L * Limits.MAX_RECORDING_MS)
             // Feed a silent frame after the recording to flush encoder lookahead; EOS granule
             // discards this padding. It never enters the transcript or the playable timeline.
@@ -57,6 +58,15 @@ internal object OpusEncoder {
                     head = header
                 }
             }
+            var cachedStart = -1
+            var cached = FloatArray(0)
+            fun sample(index: Int): Float {
+                if (index !in cachedStart until cachedStart + cached.size) {
+                    cachedStart = index
+                    cached = audio.read(index, minOf(4096, audio.sampleCount - index))
+                }
+                return cached[index - cachedStart]
+            }
             while (!eos) {
                 requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
                 if (!queuedEos) {
@@ -67,9 +77,9 @@ internal object OpusEncoder {
                         repeat(n) { offset ->
                             if (cursor + offset >= samples) { input.putShort(0); return@repeat }
                             val source = (cursor + offset) * audio.sampleRate / RATE.toDouble()
-                            val a = source.toInt().coerceAtMost(audio.samples.lastIndex)
+                            val a = source.toInt().coerceAtMost(audio.sampleCount - 1)
                             val fraction = (source - a).toFloat()
-                            val value = audio.samples[a] * (1 - fraction) + audio.samples[minOf(a + 1, audio.samples.lastIndex)] * fraction
+                            val value = sample(a) * (1 - fraction) + sample(minOf(a + 1, audio.sampleCount - 1)) * fraction
                             input.putShort((value.coerceIn(-1f, 1f) * 32767).roundToInt().toShort())
                         }
                         val flags = if (n == 0) MediaCodec.BUFFER_FLAG_END_OF_STREAM else 0

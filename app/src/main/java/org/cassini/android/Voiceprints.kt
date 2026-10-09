@@ -87,8 +87,12 @@ internal object Voiceprints {
 
     /** L2-normalised print and seconds of speech behind it, per speaker. Native, under the inference lease. */
     fun compute(model: File, audio: PcmAudio, windows: Map<String, List<PrintWindow>>, active: () -> Unit): Map<String, Pair<FloatArray, Double>> {
+        return compute(model, audio.source(), windows, active = active)
+    }
+
+    fun compute(model: File, audio: PcmSource, windows: Map<String, List<PrintWindow>>, leaseHeld: Boolean = false, active: () -> Unit): Map<String, Pair<FloatArray, Double>> {
         if (windows.isEmpty()) return emptyMap()
-        NativeInference.acquire()
+        if (!leaseHeld) NativeInference.acquire()
         try {
             active()
             val extractor = SpeakerEmbeddingExtractor(config = SpeakerEmbeddingExtractorConfig(model = model.absolutePath, numThreads = 2, provider = "cpu"))
@@ -101,8 +105,8 @@ internal object Voiceprints {
                         var samples = 0L
                         for (window in spans) {
                             active()
-                            val s = window.startSample.coerceIn(0, audio.samples.size); val e = window.endSample.coerceIn(s, audio.samples.size)
-                            if (e > s) { stream.acceptWaveform(audio.samples.copyOfRange(s, e), audio.sampleRate); samples += e - s }
+                            val s = window.startSample.coerceIn(0, audio.sampleCount); val e = window.endSample.coerceIn(s, audio.sampleCount)
+                            if (e > s) { stream.acceptWaveform(audio.read(s, e - s), audio.sampleRate); samples += e - s }
                         }
                         stream.inputFinished()
                         if (samples == 0L || !extractor.isReady(stream)) continue
@@ -112,7 +116,7 @@ internal object Voiceprints {
                 active()
                 return prints
             } finally { extractor.release() }
-        } finally { NativeInference.lease.release() }
+        } finally { if (!leaseHeld) NativeInference.lease.release() }
     }
 
     fun normalised(vector: FloatArray): FloatArray? {
