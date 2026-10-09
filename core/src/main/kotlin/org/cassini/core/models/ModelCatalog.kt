@@ -131,6 +131,36 @@ object ModelCatalog {
     /** The models one consented download installs, in install order. The detector is fetched separately. */
     val consented = listOf(PARAKEET, DIARIZATION, VOICEPRINT)
 
+    /**
+     * The hosts a model download may be redirected to (`RedirectPolicy`). An entry `*.example.com` matches every
+     * subdomain of example.com but not example.com itself; any other entry matches exactly. Downloads start only at
+     * the catalogue URLs (huggingface.co, github.com, dist.gocassini.com), and each redirect must be HTTPS to one of
+     * these hosts. PRIVACY.md lists the same domains.
+     *
+     * Redirects recorded on 2026-10-09 with `curl -sIL --max-redirs 5` for every catalogue URL (query strings left
+     * out):
+     * - huggingface.co/.../resolve/<rev>/encoder.int8.onnx, decoder.int8.onnx, joiner.int8.onnx: 302 to
+     *   https://us.aws.cdn.hf.co/xet-bridge-us/... (the Xet CDN, signed URL), then 200.
+     * - huggingface.co/.../resolve/<rev>/tokens.txt: 307 to the relative /api/resolve-cache/models/... on
+     *   huggingface.co, then 200.
+     * - github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx and
+     *   .../speaker-recongition-models/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx: 302 to
+     *   https://release-assets.githubusercontent.com/github-production-release-asset/..., then 200.
+     * - dist.gocassini.com/models/files/<sha>/model.int8.onnx.zst: 200, no redirect.
+     *
+     * The Hugging Face CDN host depends on the region (for example cdn-lfs.hf.co, cas-bridge.xethub.hf.co or an
+     * eu. host), and GitHub has used objects.githubusercontent.com before, so the subdomain entries are wider than
+     * the trace.
+     */
+    val DOWNLOAD_HOSTS = listOf(
+        "huggingface.co",
+        "*.huggingface.co",
+        "*.hf.co",
+        "github.com",
+        "*.githubusercontent.com",
+        "dist.gocassini.com",
+    )
+
     /** Bytes fetched over the network for each part, which is what the consent dialog quotes. */
     val parakeetBytes = PARAKEET.downloadBytes
     val speakerBytes = DIARIZATION.downloadBytes

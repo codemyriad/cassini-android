@@ -18,18 +18,39 @@ import java.security.MessageDigest
  * an HTTP Range request; a `.part` that cannot be the artifact is deleted. A transfer that ends early keeps its
  * prefix and fails with [Failure.DOWNLOAD]. Free-space checks count only the bytes still to fetch ([bytesToFetch]),
  * because a kept `.part` already holds the rest.
+ *
+ * Redirects are followed by hand, only as [RedirectPolicy] allows: HTTPS to [ModelCatalog.DOWNLOAD_HOSTS], at
+ * most five hops. Any other redirect fails the file with [Failure.DOWNLOAD] and keeps its `.part`.
  */
 object ArtifactFetcher {
     private const val TIMEOUT_MS = 30_000
-    private const val SLACK_BYTES = 32 * 1024 * 1024L
+
+    /** Space left free on top of what a download writes (32 MiB). */
+    const val SLACK_BYTES = 32 * 1024 * 1024L
     private const val BUFFER_BYTES = 128 * 1024
     private const val PROGRESS_INTERVAL_MS = 500L
     private const val HTTP_RANGE_NOT_SATISFIABLE = 416
     private val contentRange = Regex("""bytes (\d+)-(\d+)/(\d+)""")
+    private const val HTTP_TEMPORARY_REDIRECT = 307
+    private const val HTTP_PERMANENT_REDIRECT = 308
+    private val redirectCodes = setOf(
+        HttpURLConnection.HTTP_MOVED_PERM,
+        HttpURLConnection.HTTP_MOVED_TEMP,
+        HttpURLConnection.HTTP_SEE_OTHER,
+        HTTP_TEMPORARY_REDIRECT,
+        HTTP_PERMANENT_REDIRECT,
+    )
 
-    /** Hex SHA-256 of [file], checking for interruption between blocks. */
-    fun digest(file: File): String {
+    /**
+     * Hex SHA-256 of [file], checking for interruption between blocks. [onBytes] receives the bytes hashed so far:
+     * after the first block, then at most every half second, and always once at the end with the file's length (a
+     * block that reaches the end is reported only there, after the last interruption check).
+     */
+    fun digest(file: File, onBytes: (Long) -> Unit = {}): String {
         val hash = MessageDigest.getInstance("SHA-256")
+        var done = 0L
+        var lastUpdate = 0L
+        val length = file.length()
         file.inputStream().buffered().use { input ->
             val bytes = ByteArray(BUFFER_BYTES)
             while (true) {
@@ -37,8 +58,14 @@ object ArtifactFetcher {
                 val count = input.read(bytes)
                 if (count < 0) break
                 hash.update(bytes, 0, count)
+                done += count
+                if (done < length && System.currentTimeMillis() - lastUpdate > PROGRESS_INTERVAL_MS) {
+                    onBytes(done)
+                    lastUpdate = System.currentTimeMillis()
+                }
             }
         }
+        onBytes(done)
         return hash.digest().joinToString("") { "%02x".format(it) }
     }
 
@@ -54,7 +81,9 @@ object ArtifactFetcher {
     /**
      * Places [artifact] in [directory] unless a verified copy is already there. The download goes to a
      * `.part` file that replaces nothing until its size and SHA-256 match. [progress] receives the bytes
-     * done so far and whether they are being verified rather than downloaded.
+     * done so far and whether they are being verified rather than downloaded: while downloading, the bytes in the
+     * `.part`; while verifying, the bytes hashed so far (from 0 up to the artifact's size, which always comes last).
+     * [redirects] decides which redirects are followed.
      *
      * A `.part` left by an earlier attempt is resumed with `Range: bytes=<length>-`. A `206` answer is accepted
      * only when its `Content-Range` starts at that length and its total is the pinned size; a `200` answer restarts
@@ -63,9 +92,16 @@ object ArtifactFetcher {
      * mismatch the `.part` is deleted. The 30 s read timeout stays: interrupting the thread does not unblock
      * `HttpURLConnection`.
      */
-    fun fetch(url: String, artifact: Artifact, directory: File, progress: (Long, Boolean) -> Unit) {
+    fun fetch(
+        url: String,
+        artifact: Artifact,
+        directory: File,
+        redirects: RedirectPolicy = RedirectPolicy.DOWNLOADS,
+        progress: (Long, Boolean) -> Unit,
+    ) {
         val destination = File(directory, artifact.name)
-        if (destination.length() == artifact.size && digest(destination) == artifact.sha256) {
+        val checking: (Long) -> Unit = { progress(it, true) }
+        if (destination.length() == artifact.size && digest(destination, checking) == artifact.sha256) {
             progress(artifact.size, true)
             return
         }
@@ -74,20 +110,26 @@ object ArtifactFetcher {
         if (partial.length() > artifact.size) partial.delete()
         val offset = partial.length()
         requireUser(directory.usableSpace > artifact.size - offset + SLACK_BYTES, Failure.SPACE)
-        if (offset < artifact.size) download(url, artifact, partial, offset, progress)
-        progress(artifact.size, true)
-        if (partial.length() != artifact.size || digest(partial) != artifact.sha256) {
+        if (offset < artifact.size) download(url, artifact, partial, redirects, progress)
+        progress(0, true)
+        if (partial.length() != artifact.size || digest(partial, checking) != artifact.sha256) {
             partial.delete()
             throw UserFacingException(Failure.VERIFY)
         }
         requireUser(partial.renameTo(destination), Failure.INSTALL)
+        progress(artifact.size, true)
     }
 
-    private fun download(url: String, artifact: Artifact, partial: File, offset: Long, progress: (Long, Boolean) -> Unit) {
-        val connection = URL(url).openConnection() as HttpURLConnection
-        connection.connectTimeout = TIMEOUT_MS
-        connection.readTimeout = TIMEOUT_MS
-        if (offset > 0) connection.setRequestProperty("Range", "bytes=$offset-")
+    /** Downloads the rest of [artifact] into [partial], from its current length on. */
+    private fun download(
+        url: String,
+        artifact: Artifact,
+        partial: File,
+        redirects: RedirectPolicy,
+        progress: (Long, Boolean) -> Unit,
+    ) {
+        val offset = partial.length()
+        val connection = open(url, offset, redirects)
         try {
             // Where a 206 answer's range ends (exclusive); null for a whole 200 answer.
             val rangeEnd = resumes(connection, artifact, partial, offset)
@@ -111,6 +153,34 @@ object ArtifactFetcher {
             throw error
         } finally {
             connection.disconnect()
+        }
+    }
+
+    /**
+     * Connects to [url] (asking for the bytes from [offset] on, when it is not 0) and follows the redirects
+     * [policy] allows, sending the same request each time. Returns the connection of the first answer that is not a
+     * redirect, with its status read.
+     */
+    private fun open(url: String, offset: Long, policy: RedirectPolicy): HttpURLConnection {
+        var target = URL(url)
+        var hop = 0
+        while (true) {
+            val connection = target.openConnection() as HttpURLConnection
+            connection.instanceFollowRedirects = false
+            connection.connectTimeout = TIMEOUT_MS
+            connection.readTimeout = TIMEOUT_MS
+            if (offset > 0) connection.setRequestProperty("Range", "bytes=$offset-")
+            val status = try {
+                connection.responseCode
+            } catch (error: IOException) {
+                connection.disconnect()
+                throw error
+            }
+            if (status !in redirectCodes) return connection
+            val location = connection.getHeaderField("Location")
+            connection.disconnect()
+            hop += 1
+            target = policy.next(target, location, hop)
         }
     }
 
@@ -167,16 +237,25 @@ object ArtifactFetcher {
      * Like [fetch] for a Zstandard-compressed [download] of [artifact]. The compressed file is verified,
      * then decompressed to a `.part` file that replaces nothing until the decompressed size and SHA-256
      * match. The verified compressed file is not kept; its own `.part` is resumed like any other.
+     *
+     * [progress] counts in bytes of [download], as for [fetch]. While verifying, the count covers the whole check:
+     * hashing the compressed file, decompressing it and hashing the result, each share in proportion to the bytes
+     * it reads or writes, so "Checking files" rises once from 0 to the download's size.
      */
+    @Suppress("LongParameterList") // the two pins, where they go and how: no smaller shape reads better
     fun fetchZstd(
         url: String,
         download: Artifact,
         artifact: Artifact,
         directory: File,
+        redirects: RedirectPolicy = RedirectPolicy.DOWNLOADS,
         progress: (Long, Boolean) -> Unit,
     ) {
         val destination = File(directory, artifact.name)
-        if (destination.length() == artifact.size && digest(destination) == artifact.sha256) {
+        val existing = scaled(download.size, artifact.size)
+        val installed = destination.length() == artifact.size &&
+            digest(destination) { progress(existing(it), true) } == artifact.sha256
+        if (installed) {
             progress(download.size, true)
             return
         }
@@ -184,24 +263,39 @@ object ArtifactFetcher {
         val needed = bytesToFetch(download, directory) + artifact.size + SLACK_BYTES
         requireUser(directory.usableSpace > needed, Failure.SPACE)
         val compressed = File(directory, download.name)
+        // The check reads the download once and writes and reads the decompressed file once each.
+        val check = scaled(download.size, download.size + 2 * artifact.size)
         try {
-            fetch(url, download, directory, progress)
-            decompress(compressed, artifact, directory)
+            fetch(url, download, directory, redirects) { bytes, verifying ->
+                // fetch ends with the download's size once it is installed; the check is not over yet.
+                if (verifying) progress(check(minOf(bytes, download.size)), true) else progress(bytes, false)
+            }
+            decompress(compressed, artifact, directory) { progress(check(download.size + it), true) }
         } finally {
             compressed.delete()
         }
+        progress(download.size, true)
     }
 
-    /** Decompresses a verified Zstandard [source] into [directory] as [artifact], or fails without a file. */
-    fun decompress(source: File, artifact: Artifact, directory: File) {
+    /** Maps a count out of [of] to the same share of [to]. */
+    private fun scaled(to: Long, of: Long): (Long) -> Long =
+        { done -> if (of <= 0) to else (to.toDouble() * done.coerceIn(0, of) / of).toLong() }
+
+    /**
+     * Decompresses a verified Zstandard [source] into [directory] as [artifact], or fails without a file.
+     * [progress] receives the bytes written, then the artifact's size plus the bytes hashed (up to twice its size).
+     */
+    fun decompress(source: File, artifact: Artifact, directory: File, progress: (Long) -> Unit = {}) {
         val destination = File(directory, artifact.name)
         val partial = File(directory, "${artifact.name}.part")
         try {
             // Seekable Zstandard ends with a skippable seek-table frame, which the decoder skips.
             com.github.luben.zstd.ZstdInputStream(source.inputStream().buffered()).use { input ->
-                partial.outputStream().buffered().use { output -> copy(input, output, 0, artifact.size) {} }
+                partial.outputStream().buffered().use { output -> copy(input, output, 0, artifact.size, progress) }
             }
-            requireUser(partial.length() == artifact.size && digest(partial) == artifact.sha256, Failure.VERIFY)
+            val matches = partial.length() == artifact.size &&
+                digest(partial) { progress(artifact.size + it) } == artifact.sha256
+            requireUser(matches, Failure.VERIFY)
             requireUser(partial.renameTo(destination), Failure.INSTALL)
         } catch (error: IOException) {
             throw UserFacingException(Failure.VERIFY, error.message ?: "Zstandard").apply { initCause(error) }

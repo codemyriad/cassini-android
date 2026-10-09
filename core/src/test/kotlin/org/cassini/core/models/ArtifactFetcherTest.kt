@@ -368,4 +368,148 @@ class ArtifactFetcherTest {
             assertArrayEquals(weights, File(directory, "model.onnx").readBytes())
         }
     }
+
+    /** Redirects within the loopback test server: plain HTTP to 127.0.0.1 or localhost. */
+    private val loopback = RedirectPolicy(listOf("127.0.0.1", "localhost"), httpsOnly = false)
+
+    private fun redirect(location: String, status: Int = 302) =
+        Answer(status, ByteArray(0), mapOf("Location" to location))
+
+    /** The failure of fetching [weights] from [url] under [policy]. */
+    private fun fetchFailure(url: String, directory: File, policy: RedirectPolicy = RedirectPolicy.DOWNLOADS) =
+        failure { ArtifactFetcher.fetch(url, artifact(weights), directory, policy) { _, _ -> } }
+
+    private fun port(url: String) = java.net.URI(url).port
+
+    @Test fun anAllowedRedirectChainIsFollowedAndKeepsTheRange() {
+        var port = 0
+        var attempts = 0
+        val respond = ranged(weights)
+        withServer({ headers ->
+            attempts++
+            when (attempts) {
+                1 -> redirect("http://localhost:$port/cdn")
+                2 -> redirect("/resolve-cache", 307)
+                3 -> redirect("http://127.0.0.1:$port/final", 301)
+                else -> respond(headers)
+            }
+        }) { url, directory, requests ->
+            port = port(url)
+            File(directory, "model.onnx.part").writeBytes(weights.copyOf(1000))
+            ArtifactFetcher.fetch(url, artifact(weights), directory, loopback) { _, _ -> }
+            assertArrayEquals(weights, File(directory, "model.onnx").readBytes())
+            assertEquals(4, requests.size)
+            assertEquals(List(4) { "bytes=1000-" }, requests.map { it["range"] })
+            val hosts = listOf("127.0.0.1:$port", "localhost:$port", "localhost:$port", "127.0.0.1:$port")
+            assertEquals(hosts, requests.map { it["host"] })
+        }
+    }
+
+    @Test fun aRedirectToAForeignHostFailsWithoutContactingItAndKeepsThePart() {
+        withServer({ redirect("https://example.com/model.onnx") }) { url, directory, requests ->
+            File(directory, "model.onnx.part").writeBytes(weights.copyOf(1000))
+            assertEquals(Failure.DOWNLOAD, fetchFailure(url, directory))
+            assertEquals(1, requests.size)
+            assertEquals(1000L, File(directory, "model.onnx.part").length())
+            assertFalse(File(directory, "model.onnx").exists())
+        }
+    }
+
+    @Test fun aRedirectToAHostOffTheListIsNeverFollowed() {
+        // HttpURLConnection would follow this one by itself: same scheme, a host that answers.
+        val onlyLoopbackAddress = RedirectPolicy(listOf("127.0.0.1"), httpsOnly = false)
+        var port = 0
+        var attempts = 0
+        withServer({
+            if (++attempts == 1) redirect("http://localhost:$port/elsewhere") else Answer(200, weights)
+        }) { url, directory, requests ->
+            port = port(url)
+            assertEquals(Failure.DOWNLOAD, fetchFailure(url, directory, onlyLoopbackAddress))
+            assertEquals(1, requests.size)
+            assertFalse(File(directory, "model.onnx").exists())
+        }
+    }
+
+    @Test fun aRedirectToPlainHttpIsRefusedEvenForAnAllowedHost() {
+        val httpsOnly = RedirectPolicy(listOf("127.0.0.1", "huggingface.co"))
+        var port = 0
+        withServer({ redirect("http://127.0.0.1:$port/again") }) { url, directory, requests ->
+            port = port(url)
+            assertEquals(Failure.DOWNLOAD, fetchFailure(url, directory, httpsOnly))
+            assertEquals(1, requests.size)
+        }
+        withServer({ redirect("http://huggingface.co/repo/model") }) { url, directory, requests ->
+            assertEquals(Failure.DOWNLOAD, fetchFailure(url, directory))
+            assertEquals(1, requests.size)
+        }
+    }
+
+    @Test fun moreThanFiveRedirectsFail() {
+        withServer({ redirect("/again") }) { url, directory, requests ->
+            assertEquals(Failure.DOWNLOAD, fetchFailure(url, directory, loopback))
+            assertEquals(1 + RedirectPolicy.MAX_REDIRECTS, requests.size)
+            assertFalse(File(directory, "model.onnx").exists())
+        }
+    }
+
+    @Test fun fiveRedirectsAreStillFollowed() {
+        var attempts = 0
+        withServer({
+            if (++attempts <= RedirectPolicy.MAX_REDIRECTS) redirect("/hop$attempts") else Answer(200, weights)
+        }) { url, directory, requests ->
+            ArtifactFetcher.fetch(url, artifact(weights), directory, loopback) { _, _ -> }
+            assertEquals(6, requests.size)
+            assertArrayEquals(weights, File(directory, "model.onnx").readBytes())
+        }
+    }
+
+    /** Asserts that the verifying updates come after every download update, rise from 0 and end at [total]. */
+    private fun assertChecking(events: List<Pair<Long, Boolean>>, total: Long) {
+        val firstCheck = events.indexOfFirst { it.second }
+        assertTrue(events.drop(firstCheck).all { it.second })
+        val checked = events.drop(firstCheck).map { it.first }
+        assertEquals(0L, checked.first())
+        assertEquals(total, checked.last())
+        assertEquals(checked.sorted(), checked)
+        assertTrue("$checked", checked.any { it in 1 until total })
+    }
+
+    @Test fun verifyingReportsTheBytesCheckedSoFar() {
+        withServer(weights) { url, directory ->
+            val events = mutableListOf<Pair<Long, Boolean>>()
+            ArtifactFetcher.fetch(url, artifact(weights), directory) { bytes, verifying ->
+                events += bytes to verifying
+            }
+            assertFalse(events.first().second)
+            assertChecking(events, weights.size.toLong())
+        }
+    }
+
+    @Test fun theDigestReportsEachStepAndTheEnd() {
+        val file = Files.createTempFile("cassini-digest", ".bin").toFile()
+        try {
+            file.writeBytes(weights)
+            val seen = mutableListOf<Long>()
+            val hash = ArtifactFetcher.digest(file) { seen += it }
+            assertEquals(artifact(weights).sha256, hash)
+            assertEquals(128L * 1024, seen.first())
+            assertEquals(weights.size.toLong(), seen.last())
+        } finally {
+            file.delete()
+        }
+    }
+
+    @Test fun aCompressedDownloadChecksOnceFromZeroToItsSize() {
+        val compressed = com.github.luben.zstd.Zstd.compress(weights)
+        val download = artifact(compressed).copy(name = "model.onnx.zst")
+        withServer(compressed) { url, directory ->
+            val events = mutableListOf<Pair<Long, Boolean>>()
+            ArtifactFetcher.fetchZstd(url, download, artifact(weights), directory) { bytes, verifying ->
+                events += bytes to verifying
+            }
+            assertArrayEquals(weights, File(directory, "model.onnx").readBytes())
+            assertFalse(File(directory, "model.onnx.zst").exists())
+            assertChecking(events, compressed.size.toLong())
+        }
+    }
 }

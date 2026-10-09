@@ -78,14 +78,19 @@ class InstalledModels(
         if (download != null) {
             val artifact = model.artifacts.single()
             ArtifactFetcher.fetchZstd(url(download), download, artifact, directory) { received, verifying ->
-                progress(Progress((received * PERCENT / download.size).toInt(), verifying))
+                // This screen shows no checking progress: only the end of the check is passed on, as before.
+                if (!verifying || received == download.size) {
+                    progress(Progress((received * PERCENT / download.size).toInt(), verifying))
+                }
             }
         } else {
             val total = model.artifacts.sumOf { it.size }
             var completed = 0L
             model.artifacts.forEach { artifact ->
                 ArtifactFetcher.fetch(url(artifact), artifact, directory) { received, verifying ->
-                    progress(Progress(((completed + received) * PERCENT / total).toInt(), verifying))
+                    if (!verifying || received == artifact.size) {
+                        progress(Progress(((completed + received) * PERCENT / total).toInt(), verifying))
+                    }
                 }
                 completed += artifact.size
             }

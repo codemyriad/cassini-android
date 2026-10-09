@@ -85,7 +85,7 @@ groups=(
     "MicrophoneRecording|verbatim|$old/MicrophoneRecording.kt|$engine/capture/MicrophoneCapture.kt $engine/capture/OpusCapture.kt $engine/capture/AacCapture.kt $engine/capture/CaptureFactory.kt|interface with suspend stop(); Opus/Aac loops unchanged; format probe cached off the main thread and shared with the app's OpusEncoder"
     "opus-jni.cpp|verbatim|app/src/main/cpp/opus-jni.cpp|engine/src/main/cpp/opus-jni.cpp|ptr == 0 guards, FindClass null check, opus_encoder_ctl return checks"
     "CMakeLists.txt|verbatim|app/src/main/cpp/CMakeLists.txt|engine/src/main/cpp/CMakeLists.txt|built by AGP externalNativeBuild instead of a script"
-    "Models|restructured|$old/ModelStore.kt $old/DiarizationModels.kt $old/VoiceprintModel.kt $old/ModelBundle.kt|$core/models/ArtifactFetcher.kt $core/models/ModelCatalog.kt $app/InstalledModels.kt|one descriptor table; fetch/fetchZstd/decompress/digest in ArtifactFetcher with Range resume"
+    "Models|restructured|$old/ModelStore.kt $old/DiarizationModels.kt $old/VoiceprintModel.kt $old/ModelBundle.kt|$core/models/ArtifactFetcher.kt $core/models/ModelCatalog.kt $app/InstalledModels.kt|one descriptor table; fetch/fetchZstd/decompress/digest in ArtifactFetcher with Range resume; digest progress and the redirect allow-list (P3)"
     "ProcessingCheckpoint|restructured|$old/ProcessingCheckpoint.kt|$app/ProcessingCheckpoint.kt $core/checkpoint/CheckpointNames.kt|typed CheckpointState codec and validation rules in core; CheckpointNames gains live and rejected members and pure reducers (P3)"
 )
 
