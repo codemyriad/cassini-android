@@ -34,7 +34,16 @@ scripts/check-verbatim.sh --summary   # changed line counts per file group
 scripts/check-verbatim.sh Parakeet    # the diff of one group
 ```
 
-The script removes `package` and `import` lines and the `internal` modifier before it compares, and it ignores changes in the amount of white space (`--exact` shows them). It needs the base commit in the clone, so a shallow clone needs `git fetch --unshallow` first. CI prints the full output in the static-checks job.
+The script removes `package` and `import` lines and the `internal` modifier before it compares, and it ignores changes in the amount of white space (`--exact` shows them). It needs the base commit in the clone, so a shallow clone needs `git fetch --unshallow` first.
+
+The script is also a gate, and CI runs it in the static-checks job. It fails when a group whose allowed edit is "package only" shows any difference, and when the changed lines of any other verbatim group differ from the reviewed ones in `scripts/check-verbatim.baseline` (one SHA-256 per group). When you change kept engine code on purpose, read the group's diff, make sure every edit is one that `docs/architecture.md` lists (add it there if it is new), then record it and commit the baseline with the change:
+
+```sh
+scripts/check-verbatim.sh Parakeet            # read the diff
+scripts/check-verbatim.sh --update Parakeet   # record it as reviewed
+```
+
+Restructured groups (`Models`, `ProcessingCheckpoint`) are shown for reference and not checked.
 
 ## Device checks
 

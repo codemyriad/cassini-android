@@ -92,7 +92,7 @@ Until P4 replaces it, the 0.1.0 Activity UI runs on the typed `:core` and `:engi
 - `ProcessingCheckpoint`: the checkpoint directory (key = SHA-256 of the stored source uri string), `android.util.AtomicFile` writes, and `CheckpointState`/`CheckpointNames` for every read and write. The engine classes still take their `JSONObject` members, converted at the call site; a typed round trip of the captured 0.1.0 checkpoint rewrites the same bytes (`CheckpointGoldenTest`).
 - `FailureMessages.kt` (`Failure` to string resource), `ui/Format.kt` (`clock()`), `BatteryReader` (the old `BatteryProjection.read()`), `RecoveryScanner.recover` over `OggRepair`, and `VoiceStore`/`NoteVoiceStore` file I/O over the core codecs.
 
-`tools/asr-eval/` holds the host ASR evaluation program that used to sit in `app/src/test`; Gradle does not build it (its README says how to run it). `scripts/check-verbatim.sh` prints, for every file kept verbatim, its differences from the 0.1.0 code at the phase-0 base, so a reviewer sees only the edits listed in sections 2.1 and 2.2.
+`tools/asr-eval/` holds the host ASR evaluation program that used to sit in `app/src/test`; Gradle does not build it (its README says how to run it). `scripts/check-verbatim.sh` prints, for every file kept verbatim, its differences from the 0.1.0 code at the phase-0 base, so a reviewer sees only the edits listed in sections 2.1 and 2.2. CI fails when a "package only" group shows a difference or another verbatim group's changed lines differ from the reviewed digest in `scripts/check-verbatim.baseline`.
 
 ## 3. Background work
 

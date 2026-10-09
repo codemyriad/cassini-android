@@ -63,7 +63,7 @@ jobs:
         run: shellcheck -x scripts/*.sh tools/*.sh
       - name: ruff
         run: pipx run --spec ruff==0.14.0 ruff check --config config/ruff.toml scripts
-      - name: Differences from the 0.1.0 engine code
+      - name: Kept engine code has only its reviewed differences from 0.1.0
         run: scripts/check-verbatim.sh
 
   # The :core module needs only a JDK: no Android SDK, NDK, sherpa-onnx AAR or Opus source.

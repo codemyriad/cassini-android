@@ -10,23 +10,33 @@
 # Changes in the amount of white space are ignored, so a block that only moved one nesting level (for example
 # from a companion object to a top-level object) shows as unchanged; re-wrapped lines still show.
 #
-# Usage: scripts/check-verbatim.sh [--summary] [--exact] [--base <commit>] [group...]
+# The check fails when a "package only" group shows any difference, or when the changed lines of a verbatim group
+# differ from the reviewed ones recorded in scripts/check-verbatim.baseline (a SHA-256 of the group's added and
+# removed lines). A new edit to kept code therefore fails CI until someone reviews it and runs --update.
+# Restructured groups are not checked.
+#
+# Usage: scripts/check-verbatim.sh [--summary] [--exact] [--update] [--base <commit>] [group...]
 #   --summary       print only the table of changed line counts
-#   --exact         also show changes in the amount of white space
+#   --exact         also show changes in the amount of white space (not checked against the baseline)
+#   --update        record the current differences of the verbatim groups as reviewed
 #   --base          the 0.1.0 code to compare with (default 0ebea43, the phase-0 base)
 #   group...        only these groups (names from the table)
-# Exits 0 when every file was found, 2 when a file is missing. Differences alone never fail the script.
+# Exits 0 when every verbatim group matches its baseline, 1 when one does not, 2 when a file is missing.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 base=0ebea43
 summary=false
+update=false
+exact=false
 diff_flags=(-u -B -b)
+baseline=scripts/check-verbatim.baseline
 only=()
 while (($#)); do
     case "$1" in
         --summary) summary=true ;;
-        --exact) diff_flags=(-u -B) ;;
+        --exact) diff_flags=(-u -B); exact=true ;;
+        --update) update=true ;;
         --base) base="$2"; shift ;;
         -h|--help) awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"; exit 0 ;;
         *) only+=("$1") ;;
@@ -72,7 +82,7 @@ groups=(
     "LibraryNote|verbatim|$old/LibraryNote.kt|$core/library/NoteRules.kt $app/LibraryStore.kt#^internal.fun.libraryNote|rules + Session in core NoteRules; the JSON mapping stays in the app's LibraryStore"
     "UserFacingException|verbatim|$old/UserFacingException.kt|$core/Failure.kt $app/FailureMessages.kt|Failure without R.string; FailureMessages maps codes to strings"
     "StreamingOpusEncoder|verbatim|$old/StreamingOpusEncoder.kt|engine/src/main/kotlin/org/cassini/android/NativeOpus.kt $engine/opus/StreamingOpusEncoder.kt|NativeOpus split out, JNI package kept"
-    "MicrophoneRecording|verbatim|$old/MicrophoneRecording.kt|$engine/capture/MicrophoneCapture.kt $engine/capture/OpusCapture.kt $engine/capture/AacCapture.kt $engine/capture/CaptureFactory.kt|interface with suspend stop(); Opus/Aac loops unchanged; format probe cached off the main thread"
+    "MicrophoneRecording|verbatim|$old/MicrophoneRecording.kt|$engine/capture/MicrophoneCapture.kt $engine/capture/OpusCapture.kt $engine/capture/AacCapture.kt $engine/capture/CaptureFactory.kt|interface with suspend stop(); Opus/Aac loops unchanged; format probe cached off the main thread and shared with the app's OpusEncoder"
     "opus-jni.cpp|verbatim|app/src/main/cpp/opus-jni.cpp|engine/src/main/cpp/opus-jni.cpp|ptr == 0 guards, FindClass null check, opus_encoder_ctl return checks"
     "CMakeLists.txt|verbatim|app/src/main/cpp/CMakeLists.txt|engine/src/main/cpp/CMakeLists.txt|built by AGP externalNativeBuild instead of a script"
     "Models|restructured|$old/ModelStore.kt $old/DiarizationModels.kt $old/VoiceprintModel.kt $old/ModelBundle.kt|$core/models/ArtifactFetcher.kt $core/models/ModelCatalog.kt $app/InstalledModels.kt|one descriptor table; fetch/fetchZstd/decompress/digest in ArtifactFetcher with Range resume"
@@ -101,7 +111,15 @@ git rev-parse --verify --quiet "$base^{commit}" >/dev/null || { echo "Unknown ba
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 missing=0
+mismatched=0
 rows=()
+declare -A reviewed=()
+if [[ -f "$baseline" ]]; then
+    while read -r name digest; do
+        [[ -z "$name" || "$name" == \#* ]] || reviewed[$name]=$digest
+    done <"$baseline"
+fi
+declare -A current=()
 for group in "${groups[@]}"; do
     IFS='|' read -r name kind olds news edits <<<"$group"
     if ((${#only[@]})) && [[ " ${only[*]} " != *" $name "* ]]; then continue; fi
@@ -114,13 +132,42 @@ for group in "${groups[@]}"; do
     diff "${diff_flags[@]}" --label "0.1.0: $olds" --label "now: $news" "$work/old" "$work/new" >"$work/diff" || true
     removed=$(grep -c '^-[^-]' "$work/diff" || true)
     added=$(grep -c '^+[^+]' "$work/diff" || true)
-    rows+=("$(printf '%-22s %-12s %6s %6s  %s' "$name" "$kind" "-$removed" "+$added" "$edits")")
+    # Only the changed lines count, not hunk positions, so diff versions that place hunks differently agree.
+    digest=$(grep -E '^[-+]' "$work/diff" | grep -Ev '^(---|\+\+\+) ' | sha256sum | cut -c1-64 || true)
+    status=-
+    if [[ "$kind" == verbatim ]] && ! $exact; then
+        current[$name]=$digest
+        if [[ "$edits" == "package only" && -s "$work/diff" ]]; then
+            status=UNLISTED; mismatched=1
+        elif $update || [[ "${reviewed[$name]:-}" == "$digest" ]]; then
+            status=ok
+        else
+            status=CHANGED; mismatched=1
+        fi
+    fi
+    rows+=("$(printf '%-22s %-12s %-9s %6s %6s  %s' "$name" "$kind" "$status" "-$removed" "+$added" "$edits")")
     if ! $summary; then
         printf '\n==== %s (%s): %s\n' "$name" "$kind" "$edits"
         if [[ -s "$work/diff" ]]; then cat "$work/diff"; else echo "(identical apart from package, imports and internal)"; fi
     fi
 done
 
-printf '\n%-22s %-12s %6s %6s  %s\n' group kind lines lines "allowed edits"
+printf '\n%-22s %-12s %-9s %6s %6s  %s\n' group kind status lines lines "allowed edits"
 printf '%s\n' "${rows[@]}"
-exit $((missing ? 2 : 0))
+if $update; then
+    for name in "${!current[@]}"; do reviewed[$name]=${current[$name]}; done
+    {
+        echo "# Reviewed differences of the verbatim groups from 0.1.0: group, SHA-256 of the changed lines."
+        echo "# Written by scripts/check-verbatim.sh --update after a reviewer read every diff."
+        for name in "${!reviewed[@]}"; do echo "$name ${reviewed[$name]}"; done | LC_ALL=C sort
+    } >"$baseline"
+    echo "Recorded the reviewed differences in $baseline."
+    mismatched=0
+    for row in "${rows[@]}"; do [[ "$row" == *" UNLISTED "* ]] && mismatched=1; done
+fi
+if ((missing)); then exit 2; fi
+if ((mismatched)); then
+    echo "A verbatim group changed. Read its diff (scripts/check-verbatim.sh <group>); if every edit is one that" >&2
+    echo "docs/architecture.md lists, record it with scripts/check-verbatim.sh --update and commit the baseline." >&2
+    exit 1
+fi
