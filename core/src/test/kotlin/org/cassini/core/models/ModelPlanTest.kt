@@ -87,6 +87,28 @@ class ModelPlanTest {
         assertTrue(ModelPlan.of(folder.root).isEmpty)
     }
 
+    @Test fun thePlanCoversEverySpaceCheckOfTheInstallThatFollows() {
+        // A plan that passes its space check must not fail later with Not enough storage: for every set of ready
+        // models, the plan needs at least what ArtifactFetcher checks before each file, and at least one model's
+        // whole download plus the slack (the shape of the 0.1.0 Parakeet pre-check, without its 128 MiB margin).
+        val all = ModelPart.entries.flatMap { it.models }
+        for (mask in 0 until (1 shl all.size)) {
+            val ready = all.filterIndexed { index, _ -> mask and (1 shl index) != 0 }.toSet()
+            val plan = ModelPlan.of { it in ready }
+            for (model in plan.missing.flatMap { it.models }) {
+                val download = model.download
+                val perFile = if (download != null) {
+                    listOf(download.size + model.artifactBytes)
+                } else {
+                    model.artifacts.map { it.size }
+                }
+                for (need in perFile + model.downloadBytes) {
+                    assertTrue("$ready: $need", plan.requiredFreeBytes >= need + ArtifactFetcher.SLACK_BYTES)
+                }
+            }
+        }
+    }
+
     @Test fun eachPartIsLedByTheModelThatMakesItReady() {
         assertEquals(ModelCatalog.PARAKEET, ModelPart.SPEECH.primary)
         assertEquals(listOf(ModelCatalog.PARAKEET, ModelCatalog.VAD), ModelPart.SPEECH.models)

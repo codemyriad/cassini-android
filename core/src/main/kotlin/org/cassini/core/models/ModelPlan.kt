@@ -52,7 +52,10 @@ data class ModelPlan(val missing: List<Item>) {
     val requiredFreeBytes: Long
         get() = if (missing.isEmpty()) 0 else missing.sumOf { it.installBytes } + ArtifactFetcher.SLACK_BYTES
 
-    /** [requiredFreeBytes] as the "Needs about 860 MB free" figure. */
+    /**
+     * [requiredFreeBytes] as the "Needs about 860 MB free" figure, rounded to the nearest 10 like every size on the
+     * screen (a fresh install needs about 861 MiB and shows 860; the space check itself compares bytes).
+     */
     val requiredFreeMebibytes: Long get() = if (missing.isEmpty()) 0 else ModelCatalog.mebibytes(requiredFreeBytes)
 
     companion object {
