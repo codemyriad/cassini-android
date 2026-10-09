@@ -235,30 +235,3 @@ data class CheckpointState(
         }
     }
 }
-
-/** `names.json` beside a checkpoint: the draft speaker names of a paused job. */
-data class CheckpointNames(
-    val labels: Map<String, String>,
-    val merges: Map<String, String>,
-    val remembered: Map<String, String> = emptyMap(),
-    val automatic: Map<String, String> = emptyMap(),
-    /** VoiceStore's generation when [remembered] was chosen; a later "forget all" invalidates them. */
-    val generation: Long = 0,
-) {
-    companion object {
-        /** The members 0.1.0 writes. */
-        val KEYS = setOf("labels", "merges", "remembered", "automatic", "generation")
-
-        fun decode(json: JSONObject) = CheckpointNames(
-            CheckpointData.strings(json.getJSONObject("labels")),
-            CheckpointData.strings(json.getJSONObject("merges")),
-            CheckpointData.strings(json.optJSONObject("remembered") ?: JSONObject()),
-            CheckpointData.strings(json.optJSONObject("automatic") ?: JSONObject()),
-            json.optLong("generation", 0),
-        )
-
-        fun encode(names: CheckpointNames): JSONObject = JSONObject().put("labels", JSONObject(names.labels))
-            .put("merges", JSONObject(names.merges)).put("remembered", JSONObject(names.remembered))
-            .put("automatic", JSONObject(names.automatic)).put("generation", names.generation)
-    }
-}

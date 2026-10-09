@@ -86,7 +86,7 @@ groups=(
     "opus-jni.cpp|verbatim|app/src/main/cpp/opus-jni.cpp|engine/src/main/cpp/opus-jni.cpp|ptr == 0 guards, FindClass null check, opus_encoder_ctl return checks"
     "CMakeLists.txt|verbatim|app/src/main/cpp/CMakeLists.txt|engine/src/main/cpp/CMakeLists.txt|built by AGP externalNativeBuild instead of a script"
     "Models|restructured|$old/ModelStore.kt $old/DiarizationModels.kt $old/VoiceprintModel.kt $old/ModelBundle.kt|$core/models/ArtifactFetcher.kt $core/models/ModelCatalog.kt $app/InstalledModels.kt|one descriptor table; fetch/fetchZstd/decompress/digest in ArtifactFetcher with Range resume"
-    "ProcessingCheckpoint|restructured|$old/ProcessingCheckpoint.kt|$app/ProcessingCheckpoint.kt|typed CheckpointState codec and validation rules in core"
+    "ProcessingCheckpoint|restructured|$old/ProcessingCheckpoint.kt|$app/ProcessingCheckpoint.kt $core/checkpoint/CheckpointNames.kt|typed CheckpointState codec and validation rules in core; CheckpointNames gains live and rejected members and pure reducers (P3)"
 )
 
 # Prints a file from the base (old) or the working tree (new), without package/import lines and `internal`.
