@@ -165,7 +165,7 @@ jobs:
             -PdeviceTestBuildType="$DEVICE_TEST_TYPE" \
             ":app:assemble$BUILD_TYPE" ":app:assemble${DEVICE_TEST_TYPE^}" ":app:assemble${DEVICE_TEST_TYPE^}AndroidTest" \
             ciTest ":app:lint$BUILD_TYPE" ":data:lint$BUILD_TYPE" ":ui:lint$BUILD_TYPE"
-      # verifyRoborazziDebug writes the actual image and a diff next to each golden that changed.
+      # verifyRoborazziDebug writes the actual image and a diff of each changed golden to <module>/build/outputs/roborazzi.
       - name: Upload the screenshot diffs
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

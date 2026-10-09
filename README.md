@@ -67,11 +67,11 @@ Requires JDK 17 and the Android SDK with platform `android-37.0`, build tools 36
 git clone --recurse-submodules https://github.com/codemyriad/cassini-android
 cd cassini-android
 ./scripts/setup.sh   # libopus source and the prebuilt sherpa-onnx AAR, both hash-pinned
-./gradlew :app:assembleDebug :core:test :engine:testDebugUnitTest :app:testDebugUnitTest :app:lintDebug detekt
+./gradlew detekt ciTest :app:lintDebug :data:lintDebug :ui:lintDebug :app:assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-The code is in three Gradle modules: `:core` (plain Kotlin, the format and engine logic), `:engine` (the native wrappers and Android media code) and `:app`. The `:core` tests need only JDK 17 and the submodule: `./gradlew --configure-on-demand :core:test` ([development notes](docs/development.md)).
+The code is in five Gradle modules: `:core` (plain Kotlin, the format and engine logic), `:engine` (the native wrappers and Android media code), `:data` (storage), `:ui` (the Compose screens) and `:app`. The `ciTest` task runs the unit tests of all modules and the `:ui` screenshot check. The screenshot goldens are recorded on Linux x86_64 only. To update them, use `./gradlew :ui:recordRoborazziDebug` ([development notes](docs/development.md)). The `:core` tests need only JDK 17 and the submodule: `./gradlew --configure-on-demand :core:test` ([development notes](docs/development.md)).
 
 `scripts/setup.sh --from-source` builds the sherpa-onnx AAR from source instead of downloading it (about 25 minutes; see [native runtime](docs/native-runtime.md)). In an existing clone, run `git submodule update --init` once: the format conformance vectors come from the `third_party/cassini-format` submodule and the tests fail without them.
 

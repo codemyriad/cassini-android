@@ -27,13 +27,13 @@ lists every accepted deviation.
 | 09 Trash | `png/09-trash.png` | `markup/09-Trash.html` |
 | 10 States, banners & errors | `png/10-states-and-errors.png` | `markup/10-States_and_errors.html` |
 
-The PNG slugs are the names of the screenshot goldens in `ui/src/test/screenshots/light/`, so
-`tools/ui-fidelity` can pair a board with its golden by file name.
+P7 will add the board goldens in `ui/src/test/screenshots/light/` with these PNG slugs as their names.
+Thus the P7 comparison script can pair a board with its golden by file name.
 
 ## Fonts
 
 The markup names the fonts by family only (Instrument Sans, IBM Plex Mono). The design's web font
-files are not committed: they are Google Fonts `.woff2` subsets, and a subset is a Modified Version
+files are not committed: they are Google Fonts web-font subsets, and a subset is a Modified Version
 under the SIL Open Font License. The app ships the unmodified upstream TTFs instead (ui.md section 3).
 To view the markup as designed, install both families locally.
 

@@ -1,6 +1,6 @@
 # Development notes
 
-The build commands are in the [README](../README.md). Runtime downloads, weights, private or YouTube-derived audio and build outputs stay out of commits. The committed test inputs are in [`fixtures/`](../fixtures/README.md): the CC-BY-4.0 FLEURS clip and captured `filesDir` trees.
+The build commands are in the [README](../README.md). Runtime downloads, weights, private or YouTube-derived audio and build outputs stay out of commits. The committed test inputs are the CC-BY-4.0 FLEURS clip in [`fixtures/`](../fixtures/README.md), the golden checkpoint in `core/src/test/resources/checkpoint/` and the conformance vectors in the `third_party/cassini-format` submodule.
 
 ## Modules
 
@@ -8,9 +8,11 @@ The build commands are in the [README](../README.md). Runtime downloads, weights
 |---|---|---|
 | `:core` | Plain Kotlin on the JVM, package `org.cassini.core`: the portable document format, audio arithmetic, recognition windows and seams, speaker assignment and voiceprint selection, model pins and downloads (`ModelCatalog`, `ArtifactFetcher`), the checkpoint codec (`CheckpointState`) | JDK 17 and the `third_party/cassini-format` submodule |
 | `:engine` | Android library, package `org.cassini.engine`: the sherpa-onnx wrappers (`ParakeetDecoder`, `SileroDetector`, `SortformerStream`, `VoiceprintExtractor`), the MediaCodec decoder, microphone capture, the Opus encoder and its JNI library (`libcassini_opus.so`, built with CMake), `NativeBudget` | Android SDK, NDK 28.2.13676358, CMake 3.22.1, and `scripts/setup.sh` (AAR and libopus source) |
-| `:app` | The 0.1.0 Activities and services on top of the two modules, with thin adapters (`InstalledModels`, `ProcessingCheckpoint`, `FailureMessages`) | everything `:engine` needs |
+| `:data` | Android library, package `org.cassini.data`: the Room catalogue, the DataStore settings and the file repositories. At this time it has only the module skeleton. | Android SDK |
+| `:ui` | Android library, package `org.cassini.ui`: the Compose design system and the stateless screens. It has Roborazzi screenshot tests (see "Screenshot tests"). | Android SDK |
+| `:app` | The 0.1.0 Activities and services on top of `:core` and `:engine`, with thin adapters (`InstalledModels`, `ProcessingCheckpoint`, `FailureMessages`) | everything `:engine` needs |
 
-Dependencies point one way: `app -> engine -> core`. `docs/architecture.md` describes the target layout and what each file came from.
+The target dependency graph is in `docs/architecture.md`, section 2: `app -> ui`, `app -> data -> core` and `app -> engine -> core`. At this time `:app` does not use `:data` or `:ui`. `docs/architecture.md` describes the target layout.
 
 `tools/asr-eval/` holds a host program that runs the app's speech recognition pipeline on PCM files. Gradle does not build it; its README says how to run it.
 
@@ -27,7 +29,7 @@ JAVA_HOME=/path/to/jdk-17 ./gradlew --configure-on-demand :core:test
 
 ## What changed in the verbatim code
 
-The engine code moved from the 0.1.0 app into `:core` and `:engine` with a package rename and a short list of edits (`docs/architecture.md`, sections 2.1 and 2.2). To see every remaining difference from the 0.1.0 code at the phase-0 base commit:
+The engine code moved from the 0.1.0 app into `:core` and `:engine` with a package rename and a short list of edits. The last field of each row in the `groups` table of `scripts/check-verbatim.sh` gives the permitted edits for that file. To see every remaining difference from the 0.1.0 code at the phase-0 base commit:
 
 ```sh
 scripts/check-verbatim.sh --summary   # changed line counts per file group
@@ -36,7 +38,7 @@ scripts/check-verbatim.sh Parakeet    # the diff of one group
 
 The script removes `package` and `import` lines and the `internal` modifier before it compares, and it ignores changes in the amount of white space (`--exact` shows them). It needs the base commit in the clone, so a shallow clone needs `git fetch --unshallow` first.
 
-The script is also a gate, and CI runs it in the static-checks job. It fails when a group whose allowed edit is "package only" shows any difference, and when the changed lines of any other verbatim group differ from the reviewed ones in `scripts/check-verbatim.baseline` (one SHA-256 per group). When you change kept engine code on purpose, read the group's diff, make sure every edit is one that `docs/architecture.md` lists (add it there if it is new), then record it and commit the baseline with the change:
+The script is also a gate, and CI runs it in the static-checks job. It fails when a group whose allowed edit is "package only" shows any difference, and when the changed lines of any other verbatim group differ from the reviewed ones in `scripts/check-verbatim.baseline` (one SHA-256 per group). When you change kept engine code on purpose, read the group's diff, make sure that the `groups` table in `scripts/check-verbatim.sh` permits every edit (if an edit is new, add it to that table), then record it and commit the baseline with the change:
 
 ```sh
 scripts/check-verbatim.sh Parakeet            # read the diff
@@ -44,6 +46,21 @@ scripts/check-verbatim.sh --update Parakeet   # record it as reviewed
 ```
 
 Restructured groups (`Models`, `ProcessingCheckpoint`) are shown for reference and not checked.
+
+## Screenshot tests
+
+The `:ui` tests draw Compose content with Robolectric and compare it with committed PNG files (goldens) in `ui/src/test/screenshots/`. The root `ciTest` task includes `:ui:verifyRoborazziDebug`, which fails when a picture changes. We record and compare the goldens on Linux x86_64 only. On other systems, font rendering can change the pixels.
+
+If you change a screen on purpose, update its goldens:
+
+```sh
+./gradlew :ui:recordRoborazziDebug   # write new goldens
+git diff --stat ui/src/test/screenshots
+```
+
+Examine each changed PNG, then commit the goldens with the change. `:ui:compareRoborazziDebug` writes the actual pictures and the differences to `ui/build/outputs/roborazzi/`. If the check fails in CI, CI uploads that directory as the `roborazzi-diffs` artifact.
+
+The Compose accessibility checks (`enableAccessibilityChecks()`) do not operate under Robolectric. Thus they are not in the `:ui` tests. The device flow tests of `:app` will do them on an emulator.
 
 ## Device checks
 
@@ -67,7 +84,7 @@ The supplied sample is [il Pericolo Invisibile](https://www.youtube.com/watch?v=
 
 Device tests check JNI inference, timestamps, codec decoding, complete-document integrity, microphone pause/resume, catalogue recovery and interface-language restoration. They do not establish ASR accuracy. Test rules restore the previous catalogue/session and remove only their own generated documents.
 
-CI runs the static checks (Gradle wrapper validation, detekt, actionlint, shellcheck, ruff and the verbatim diff) in a job of their own, in parallel with the build. Another job runs `:core:test` with only a JDK: no `scripts/setup.sh`, and the runner's Android SDK hidden. The build job fetches the pinned prebuilt AAR (`scripts/setup.sh --prebuilt-only`) and fails at once when it cannot; it never falls back to a source build. CI then installs its built app and matching test APK on Android 8, 10 and 14 (API 26, 29 and 34) x86_64 emulators. All three run playback/settings, AAC microphone pause/resume and library playback, interruption recovery, legacy session upgrades, and encoder capability checks. Android 14 also requires successful Opus encoding and decoding with preserved duration and speech timing. The Android 10 Google APIs image lacks an Opus encoder; its check requires the explicit missing-encoder failure. These checks require no models. Settings checks verify language persistence and that the removed model selector and live transcription setting are absent. CI runs 12 checks on API 26/29 and 13 on API 34. CI fails if a selected check is skipped or the expected count changes, and saves instrumentation output and logcat. Release publication waits for the static checks, the `:core` job, the build and all three emulators. A weekly job, also available from a manual run, rebuilds the sherpa-onnx AAR from the pinned source, builds and tests the app with it, and records its SHA-256 beside the pinned release build's. A mismatch raises a warning annotation; it does not fail the job. Native inference and the complete recording/transcription flow still need the separate device checks above.
+CI runs the static checks (Gradle wrapper validation, detekt, actionlint, shellcheck, ruff and the verbatim diff) in a job of their own, in parallel with the build. Another job runs `:core:test` with only a JDK: no `scripts/setup.sh`, and the runner's Android SDK hidden. The build job fetches the pinned prebuilt AAR (`scripts/setup.sh --prebuilt-only`) and fails at once when it cannot; it never falls back to a source build. CI then installs its built app and matching test APK on Android 8, 10 and 14 (API 26, 29 and 34) x86_64 emulators. All three run playback/settings, AAC microphone pause/resume and library playback, interruption recovery and encoder capability checks. Android 14 also requires successful Opus encoding and decoding with preserved duration and speech timing. The Android 10 Google APIs image lacks an Opus encoder; its check requires the explicit missing-encoder failure. These checks require no models. Settings checks verify language persistence and that the removed model selector and live transcription setting are absent. CI runs 11 checks on API 26/29 and 12 on API 34. CI fails if a selected check is skipped or the expected count changes, and saves instrumentation output and logcat. Release publication waits for the static checks, the `:core` job, the build and all three emulators. A weekly job, also available from a manual run, rebuilds the sherpa-onnx AAR from the pinned source, builds and tests the app with it, and records its SHA-256 beside the pinned release build's. A mismatch raises a warning annotation; it does not fail the job. Native inference and the complete recording/transcription flow still need the separate device checks above.
 
 ```sh
 adb exec-out run-as org.cassini.android cat files/device-smoke.INT8.metrics.json

@@ -45,6 +45,10 @@ import org.robolectric.annotation.GraphicsMode
  * transcript paragraph can be one Text whose words are LinkAnnotation.Clickable spans with the active word
  * highlighted behind the glyphs (docs/design/ui.md, section 10.1). The screens in later phases replace these
  * placeholders; the goldens live in src/test/screenshots/scaffold.
+ *
+ * ui.md section 10.1 also asks for one enableAccessibilityChecks() test here. It cannot run: under Robolectric the
+ * Compose rule logs "Accessibility checks are currently not supported by Robolectric" and checks nothing. The
+ * fallback in features.md section 14 applies: the P10 device flow tests run the checks on an emulator.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
