@@ -1,0 +1,2 @@
+# The export goldens compare byte for byte and must keep LF line endings on every checkout.
+core/src/test/resources/export/** text eol=lf
