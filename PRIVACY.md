@@ -8,14 +8,12 @@ This file applies to Cassini for Android 0.2 and later. The app shows the same t
 
 Cassini keeps your data in its private app storage (the `filesDir` directory of the app). Other apps cannot read this storage. Each note has its own directory, `notes/<noteId>/`. The `<noteId>` is a random identifier.
 
-| Data | Contents | Location |
-|---|---|---|
-| Audio | Your recordings and the audio files that you import or open with Cassini. | `notes/<noteId>/`: `capture.opus` or `capture.m4a` (a recording), `source.<ext>` (an import), `document.opus` (after transcription). |
-| Transcripts | The words and their times, the speaker labels, the speaker names that you give, and the title. | `notes/<noteId>/document.opus`. The catalogue database `cassini.db` keeps a copy of the text for the library and for search. |
-| Unfinished transcription | The progress of a transcription, the draft speaker names, and short audio clips of each speaker (at most 45 seconds for each speaker). | `notes/<noteId>/work/`. Cassini deletes this directory when the transcription is complete, when you start again, or when it deletes the note. |
-| Voiceprints | A voiceprint is a list of numbers that Cassini calculates from the voice of one speaker. Cassini uses voiceprints to recognize the people that you name. | `voices/` only. See [Voiceprints](#voiceprints). |
-| Settings and state | Your model download decision and its time, the queue of transcriptions, the trash state of notes, the playback position, and some one-time notices. | `settings.preferences_pb` and `cassini.db`. Android keeps the app language. |
-| Models | The downloaded speech and speaker models. They contain no personal data. | `parakeet-v3/`, `vad/` and `speaker-models/`. |
+- Audio: your recordings and the audio files that you import or open with Cassini. Location: `notes/<noteId>/`. A recording is `capture.opus` or `capture.m4a`. Imported audio is `source.<ext>`. An imported Cassini document, or a note after transcription, is `document.opus`.
+- Transcripts: the words and their times, the speaker labels, the speaker names that you give, and the title. Location: `notes/<noteId>/document.opus`. The catalogue database `cassini.db` keeps a copy of the text for the library and for search.
+- Unfinished transcription: the progress of a transcription, the draft speaker names, and short audio clips of each speaker (at most 45 seconds for each speaker). Location: `notes/<noteId>/work/`. Cassini deletes this directory when the transcription is complete, when you start again, or when it deletes the note.
+- Voiceprints: a voiceprint is a list of numbers that Cassini calculates from the voice of one speaker. Cassini uses voiceprints to recognize the people that you name. Location: `voices/` only. The section "Voiceprints" below gives the details.
+- Settings and state: your model download decision and its time, the queue of transcriptions, the trash state of notes, the playback position, and some one-time notices. Location: `settings.preferences_pb` and `cassini.db`. Android keeps the app language.
+- Models: the downloaded speech and speaker models. They contain no personal data. Location: `parakeet-v3/`, `vad/` and `speaker-models/`.
 
 When you import a file, or open a file with Cassini from a different app, Cassini copies the file into its storage. The original file stays where it is.
 
@@ -42,12 +40,12 @@ Cassini connects to the internet only to download models. It sends no audio, tra
 
 Cassini downloads no model before you agree. The "Transcribe on this phone" screen shows the size of each model. A download starts only when you push "Download and transcribe" or "Download". If you push "Not now — keep the audio", Cassini downloads nothing.
 
-| Model | Host |
-|---|---|
-| Speech recognition (NVIDIA Parakeet TDT 0.6B v3, INT8) | `huggingface.co` |
-| Speech detection (Silero VAD) | `github.com` |
-| Telling speakers apart (NVIDIA Nemotron-3-Diarization, INT8) | `dist.gocassini.com` |
-| Recognising saved voices (3D-Speaker CAM++) | `github.com` |
+Cassini downloads each model from one host:
+
+- Speech recognition (NVIDIA Parakeet TDT 0.6B v3, INT8): `huggingface.co`
+- Speech detection (Silero VAD): `github.com`
+- Telling speakers apart (NVIDIA Nemotron-3-Diarization, INT8): `dist.gocassini.com`
+- Recognising saved voices (3D-Speaker CAM++): `github.com`
 
 A host can send the download to a different host (a redirect). Cassini follows a redirect only to an HTTPS host in its allow-list (a list of permitted hosts). This allow-list is the list in `ModelCatalog.DOWNLOAD_HOSTS`:
 
@@ -59,11 +57,11 @@ A host can send the download to a different host (a redirect). Cassini follows a
 
 If a redirect goes to a different host, Cassini stops the download of that model.
 
-<!-- TODO(P10): ModelCatalog.DOWNLOAD_HOSTS comes from P3 on the rebuild branch. At the merge, make sure that this list is equal to the list in the code. Then update the copy in app/src/main/assets/licenses/PRIVACY.md and remove this comment from both files. -->
+<!-- TODO(P10): ModelCatalog.DOWNLOAD_HOSTS comes from P3 on the rebuild branch. At the merge, make sure that this list is equal to the list in the code. Then update the copy in app/src/main/assets/licenses/PRIVACY.md and remove this comment from both files. Also add rootDir.resolve("PRIVACY.md") to the licenseSources test inputs in app/build.gradle.kts, so that LicenseAssetsTest runs again when only this file changes. -->
 
 A host receives the IP address of your phone and the name of the file. Android also sends a standard user agent, which gives the Android version and the phone model. The privacy policy of each host applies to these data. Cassini sends no cookies and no account data.
 
-Before Cassini uses a downloaded file, it makes sure that the size and the SHA-256 hash of the file are correct. [SECURITY.md](SECURITY.md) gives the details.
+Before Cassini uses a downloaded file, it makes sure that the size and the SHA-256 hash of the file are correct. The security policy of Cassini gives the details: https://github.com/codemyriad/cassini-android/blob/main/SECURITY.md
 
 ## Permissions
 
@@ -117,4 +115,4 @@ If you uninstall Cassini, Android deletes all Cassini data, including the models
 
 ## Questions and problems
 
-If Cassini does not do what this file says, tell us. [SECURITY.md](SECURITY.md) tells you how to send a private report.
+If Cassini does not do what this file says, tell us. The security policy of Cassini tells you how to send a private report: https://github.com/codemyriad/cassini-android/blob/main/SECURITY.md
