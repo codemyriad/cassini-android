@@ -3,9 +3,9 @@
 #
 # For every group below, the old file(s) at the phase-0 base and the new file(s) in the working tree are joined
 # and compared, after removing `package` and `import` lines and the `internal` modifier (the modules need the
-# declarations public). What remains is printed as a unified diff, so a reviewer sees only the edits that
-# docs/architecture.md (sections 2.1 and 2.2) lists for each file. A group of kind "restructured" was allowed to
-# change shape; it is shown for reference.
+# declarations public). What remains is printed as a unified diff, so a reviewer sees only the edits that the
+# last field of each row in the groups table below allows for that file. A group of kind "restructured" was
+# allowed to change shape; it is shown for reference.
 #
 # Changes in the amount of white space are ignored, so a block that only moved one nesting level (for example
 # from a companion object to a top-level object) shows as unchanged; re-wrapped lines still show.
@@ -168,6 +168,6 @@ fi
 if ((missing)); then exit 2; fi
 if ((mismatched)); then
     echo "A verbatim group changed. Read its diff (scripts/check-verbatim.sh <group>); if every edit is one that" >&2
-    echo "docs/architecture.md lists, record it with scripts/check-verbatim.sh --update and commit the baseline." >&2
+    echo "the groups table in scripts/check-verbatim.sh allows, record it with --update and commit the baseline." >&2
     exit 1
 fi
