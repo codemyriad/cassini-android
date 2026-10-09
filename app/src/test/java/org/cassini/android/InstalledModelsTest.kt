@@ -190,11 +190,19 @@ class InstalledModelsTest {
             download = artifact(ModelCatalog.diarizationDownload.name, compressed),
         )
         val seen = mutableListOf<InstalledModels.Progress>()
+        val directory = File(folder.root, "speaker-models")
+        val decompressed = File(directory, ModelCatalog.diarizationModel.name)
+        var decompressedAtFirstCheck: Boolean? = null
         withServer(mapOf(ModelCatalog.diarizationDownload.name to compressed)) { models ->
-            models.install(model) { seen += it }
+            models.install(model) {
+                if (it.verifying && decompressedAtFirstCheck == null) decompressedAtFirstCheck = decompressed.exists()
+                seen += it
+            }
             assertTrue(models.ready(model))
         }
-        val directory = File(folder.root, "speaker-models")
+        // "Verifying" shows while the download is checked and decompressed, not only once that is over.
+        assertEquals(false, decompressedAtFirstCheck)
+        assertEquals(InstalledModels.Progress(100, true), seen.first { it.verifying })
         assertArrayEquals(weights, File(directory, ModelCatalog.diarizationModel.name).readBytes())
         assertFalse("The compressed file is not kept", File(directory, ModelCatalog.diarizationDownload.name).exists())
         assertEquals(sha256(weights), File(folder.root, "speaker-models/verified").readText())

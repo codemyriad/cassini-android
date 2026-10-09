@@ -78,19 +78,19 @@ class InstalledModels(
         if (download != null) {
             val artifact = model.artifacts.single()
             ArtifactFetcher.fetchZstd(url(download), download, artifact, directory) { received, verifying ->
-                // This screen shows no checking progress: only the end of the check is passed on, as before.
-                if (!verifying || received == download.size) {
-                    progress(Progress((received * PERCENT / download.size).toInt(), verifying))
-                }
+                // As in 0.1.0, this screen shows no checking percent: it says "Verifying" at 100 % from the
+                // first checking event on, through the hash and the decompression.
+                val percent = if (verifying) PERCENT else (received * PERCENT / download.size).toInt()
+                progress(Progress(percent, verifying))
             }
         } else {
             val total = model.artifacts.sumOf { it.size }
             var completed = 0L
             model.artifacts.forEach { artifact ->
                 ArtifactFetcher.fetch(url(artifact), artifact, directory) { received, verifying ->
-                    if (!verifying || received == artifact.size) {
-                        progress(Progress(((completed + received) * PERCENT / total).toInt(), verifying))
-                    }
+                    // While a file is checked, "Verifying" at the percent of that whole file, as in 0.1.0.
+                    val done = completed + if (verifying) artifact.size else received
+                    progress(Progress((done * PERCENT / total).toInt(), verifying))
                 }
                 completed += artifact.size
             }
