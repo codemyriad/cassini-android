@@ -20,7 +20,7 @@ import kotlin.math.sin
 class DeviceSmokeTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext
-    private fun fixture(name: String = "italian-smoke.wav"): File = File(context.cacheDir, name).also { file ->
+    private fun fixture(name: String = "fleurs-it-short.wav"): File = File(context.cacheDir, name).also { file ->
         instrumentation.context.assets.open(name).use { input ->
             file.outputStream().use { output -> input.copyTo(output) }
         }
@@ -28,7 +28,7 @@ class DeviceSmokeTest {
 
     @Test fun importsCompressedAudioOnTheSameClock() {
         val reference = AudioDecoder.decode(context, Uri.fromFile(fixture()))
-        for (name in listOf("italian-smoke.m4a", "italian-smoke.mp3", "italian-smoke.opus")) {
+        for (name in listOf("fleurs-it-short.m4a", "fleurs-it-short.mp3", "fleurs-it-short.opus")) {
             val file = fixture(name)
             try {
                 val audio = AudioDecoder.decode(context, Uri.fromFile(file))
@@ -153,7 +153,7 @@ class DeviceSmokeTest {
     @Test fun streamingDiarizationPreservesAnAbsentSpeakerSlot() {
         val models = DiarizationModels.inFiles(context.filesDir)
         assumeTrue("Install the speaker model", models.ready())
-        val first = AudioDecoder.decode(context, Uri.fromFile(fixture("italian-smoke.wav")))
+        val first = AudioDecoder.decode(context, Uri.fromFile(fixture("fleurs-it-short.wav")))
         val second = AudioDecoder.decode(context, Uri.fromFile(fixture("youtube-smoke.wav")))
         val combined = first.samples + FloatArray(16000) + second.samples
         NativeInference.acquire()
@@ -174,7 +174,7 @@ class DeviceSmokeTest {
     }
 
     @Test fun opusEncodingRunsInTheDecodePassAndTrimsLookahead() {
-        for (name in listOf("italian-smoke.m4a", "italian-smoke.wav")) {
+        for (name in listOf("fleurs-it-short.m4a", "fleurs-it-short.wav")) {
             val file = fixture(name)
             val opus = File(context.cacheDir, "same-pass.opus")
             try {
@@ -192,7 +192,7 @@ class DeviceSmokeTest {
 
 
     @Test fun opusCheckpointContinuesIdenticalPacketsAfterClosingTheEncoder() {
-        val file = fixture("italian-smoke.m4a")
+        val file = fixture("fleurs-it-short.m4a")
         val original = File(context.cacheDir, "opus-uninterrupted.opus")
         val resumed = File(context.cacheDir, "opus-resumed.opus")
         try {
@@ -213,7 +213,7 @@ class DeviceSmokeTest {
     }
 
     @Test fun seekingToCheckpointKeepsTheDecodedClockAndSuffix() {
-        for (name in listOf("italian-smoke.wav", "italian-smoke.m4a", "italian-smoke.opus")) {
+        for (name in listOf("fleurs-it-short.wav", "fleurs-it-short.m4a", "fleurs-it-short.opus")) {
             val file = fixture(name)
             try {
                 val all = AudioDecoder.decode(context, Uri.fromFile(file)).samples
@@ -238,7 +238,7 @@ class DeviceSmokeTest {
     @Test fun diarizationCheckpointRestoresTheSameSpeakerSlotsAndTurns() {
         val models = DiarizationModels.inFiles(context.filesDir)
         assumeTrue(models.ready())
-        val first = AudioDecoder.decode(context, Uri.fromFile(fixture("italian-smoke.wav")))
+        val first = AudioDecoder.decode(context, Uri.fromFile(fixture("fleurs-it-short.wav")))
         val second = AudioDecoder.decode(context, Uri.fromFile(fixture("youtube-smoke.wav")))
         val all = first.samples + FloatArray(16000) + second.samples
         NativeInference.acquire()
@@ -260,7 +260,7 @@ class DeviceSmokeTest {
     }
 
     @Test fun streamingDecodeAndDiskEncodingKeepTheAudioClock() {
-        val file = fixture("italian-smoke.m4a")
+        val file = fixture("fleurs-it-short.m4a")
         val pcm = File.createTempFile("stream-test", ".pcm", context.cacheDir)
         val opus = File(context.cacheDir, "stream-test.opus")
         try {
@@ -325,7 +325,7 @@ class DeviceSmokeTest {
         val file = fixture(when (sample) {
             "youtube-long" -> "youtube-long.wav"
             "youtube" -> "youtube-smoke.wav"
-            else -> "italian-smoke.wav"
+            else -> "fleurs-it-short.wav"
         })
         try {
             val audio = AudioDecoder.decode(context, Uri.fromFile(file))

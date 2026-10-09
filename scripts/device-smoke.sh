@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-if [ -z "${CASSINI_TEST_APK:-}" ] && [ ! -f app/src/androidTest/assets/italian-smoke.wav ]; then
-    printf 'Run python3 scripts/fetch-smoke-audio.py first (requires ffmpeg).\n' >&2
+if [ -z "${CASSINI_TEST_APK:-}" ] && [ ! -f fixtures/audio/fleurs-it-short.wav ]; then
+    printf 'Missing fixtures/audio/fleurs-it-short.wav; it is committed, so check out the full tree.\n' >&2
     exit 1
 fi
 adb shell input keyevent KEYCODE_WAKEUP

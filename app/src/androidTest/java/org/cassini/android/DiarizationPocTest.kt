@@ -53,7 +53,7 @@ class DiarizationPocTest {
         assumeTrue("Push the diarization model first", ready())
         val models = ModelStore(File(context.filesDir, "parakeet-v3"))
         assumeTrue("Install Parakeet and the speech detector first", models.ready() && ModelStore.vadReady(context.filesDir))
-        val first = assets("italian-smoke.wav"); val second = assets("youtube-smoke.wav")
+        val first = assets("fleurs-it-short.wav"); val second = assets("youtube-smoke.wav")
         val gapSamples = 16000
         val joined = PcmAudio(first.samples + FloatArray(gapSamples) + second.samples, 16000)
         val boundaryMs = first.durationMs + 1000

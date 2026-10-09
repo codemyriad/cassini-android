@@ -16,11 +16,13 @@ app/src/main/jniLibs/
 *.pyc
 *.wav
 *.opus
-app/src/androidTest/assets/*.mp3
-app/src/androidTest/assets/*.m4a
-app/src/androidTest/assets/italian-smoke.json
 dist/
-
-# Private meeting speaker fixtures (never commit)
-app/src/androidTest/assets/meetings/
 **/.cxx/
+
+# Device test audio. The CC-BY-4.0 FLEURS clip and the fixture trees are committed; local clips
+# (tools/fetch-youtube-audio.sh) stay in app/src/androidTest/assets and are never committed.
+!fixtures/audio/*
+!fixtures/filesdir/**
+app/src/androidTest/assets/
+# Private meeting speaker fixtures (never commit)
+tools/private-fixtures/

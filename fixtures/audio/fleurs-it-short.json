@@ -1,0 +1,16 @@
+{
+  "source": "https://huggingface.co/datasets/google/fleurs/resolve/70bb2e84b976b7e960aa89f1c648e09c59f894dd/data/it_it",
+  "revision": "70bb2e84b976b7e960aa89f1c648e09c59f894dd",
+  "filename": "10017639081645832204.wav",
+  "reference": "La parte settentrionale, conosciuta come Catena della Sentinella, vanta le montagne più alte dell’Antartide, il Massiccio del Vinson, che raggiunge i 4892 m con il Monte Vinson.",
+  "license": "CC-BY-4.0",
+  "attribution": "Google FLEURS contributors (https://huggingface.co/datasets/google/fleurs)",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+  "modifications": "Extracted from dev.tar.gz and converted with ffmpeg to 16 kHz mono PCM16 WAV, AAC (M4A), MP3 and Opus for decoder checks. Nothing was cut or edited.",
+  "files": {
+    "fleurs-it-short.m4a": "0e100282bfd51f048dd186d0bf87e2acda8b34f3e554aa1ed2bb2e57d79855d6",
+    "fleurs-it-short.mp3": "490c3dcf33d8e654b416aaef6f68dfbd6af0d4e5e73ec3edebfb066a306d7805",
+    "fleurs-it-short.opus": "2151f3e50c6cd936b9bf7d4b769492be9bcc6e56b8f27d05e805d8bf9a8b65f9",
+    "fleurs-it-short.wav": "645193ec85e7945fe992ca287bac0f2d233ea2f7a552f3b3344596adefe8fe40"
+  }
+}

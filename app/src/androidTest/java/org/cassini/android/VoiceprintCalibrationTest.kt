@@ -37,7 +37,7 @@ class VoiceprintCalibrationTest {
     @Test fun sameVoiceScoresAboveDifferentVoices() {
         assumeTrue("Install the voiceprint model first", model.ready())
         // Two halves of each single-voice fixture are the same speaker; the two fixtures are different speakers.
-        val halves = listOf("italian-smoke.wav", "youtube-smoke.wav").flatMap { name ->
+        val halves = listOf("fleurs-it-short.wav", "youtube-smoke.wav").flatMap { name ->
             val audio = fixture(name); val half = audio.durationMs / 2
             prints(audio, listOf(Triple(0L, half, "$name/1"), Triple(half, audio.durationMs, "$name/2"))).toList()
         }.toMap()

@@ -34,7 +34,7 @@ class SpeakerIdentificationTest {
     }
     @Test fun aTranscriptLeavesNoSeparateTranscribeOrSpeakerStep() {
         val file = File(context.cacheDir, "speaker-transcribed.wav")
-        instrumentation.context.assets.open("italian-smoke.wav").use { input -> file.outputStream().use { input.copyTo(it) } }
+        instrumentation.context.assets.open("fleurs-it-short.wav").use { input -> file.outputStream().use { input.copyTo(it) } }
         SessionStore(context.filesDir).save(Session(uri = Uri.fromFile(file).toString(), name = file.name, durationMs = 15800,
             transcript = Transcript(listOf(Word("spk_1", 1000, 1200, "Ciao")))))
         val scenario = ActivityScenario.launch(MainActivity::class.java)
@@ -52,7 +52,7 @@ class SpeakerIdentificationTest {
         org.junit.Assume.assumeFalse("Requires the speech model to be absent", bundle.consented())
         val missing = bundle.missingBytes()
         val file = File(context.cacheDir, "speaker-consent.wav")
-        instrumentation.context.assets.open("italian-smoke.wav").use { input -> file.outputStream().use { input.copyTo(it) } }
+        instrumentation.context.assets.open("fleurs-it-short.wav").use { input -> file.outputStream().use { input.copyTo(it) } }
         SessionStore(context.filesDir).save(Session(uri = Uri.fromFile(file).toString(), name = file.name))
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         try {
@@ -65,7 +65,7 @@ class SpeakerIdentificationTest {
     /** Two different voices with a second of silence between them, as a plain recording. Returns the boundary. */
     private fun twoVoiceRecording(): Pair<File, Long> {
         org.junit.Assume.assumeTrue("Install the INT8 model for the end-to-end speaker check", ModelStore(File(context.filesDir, "parakeet-v3")).ready())
-        val first = fixture("italian-smoke.wav"); val second = fixture("youtube-smoke.wav")
+        val first = fixture("fleurs-it-short.wav"); val second = fixture("youtube-smoke.wav")
         val audio = PcmAudio(resampleTo16k(first.samples, first.sampleRate) + FloatArray(16000) +
             resampleTo16k(second.samples, second.sampleRate), 16000)
         val file = File(context.cacheDir, "speaker-two-voices.opus").also { OpusEncoder.encode(audio, it) }
@@ -191,7 +191,7 @@ class SpeakerIdentificationTest {
     /** A sealed two-speaker note made without the recognition models. */
     private fun twoSpeakerNote(first: String = context.getString(R.string.speaker_label, 1)): File {
         val wav = File(context.cacheDir, "speaker-rename.wav")
-        instrumentation.context.assets.open("italian-smoke.wav").use { input -> wav.outputStream().use { input.copyTo(it) } }
+        instrumentation.context.assets.open("fleurs-it-short.wav").use { input -> wav.outputStream().use { input.copyTo(it) } }
         try {
             val transcript = Transcript(listOf(Word("spk_1", 1000, 1400, "Ciao."), Word("spk_2", 2000, 2400, "Salve.")), "it")
             val (file, doc) = DocumentStore(context).create(Uri.fromFile(wav), { AudioDecoder.decode(context, Uri.fromFile(wav)) }, transcript,

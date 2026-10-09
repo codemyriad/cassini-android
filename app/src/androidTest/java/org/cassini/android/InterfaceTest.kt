@@ -35,7 +35,7 @@ class InterfaceTest {
         val originalSession = store.load()
         finishExistingScreens()
         val audio = File(context.cacheDir, "follow-playback.wav")
-        instrumentation.context.assets.open("italian-smoke.wav").use { input ->
+        instrumentation.context.assets.open("fleurs-it-short.wav").use { input ->
             audio.outputStream().use { output -> input.copyTo(output) }
         }
         val words = listOf(Word("spk_1", 0, 1500, "Inizio.")) +
@@ -157,7 +157,7 @@ class InterfaceTest {
         val originalSession = store.load()
         finishExistingScreens()
         val audio = File(context.cacheDir, "leave-before-playback.wav")
-        instrumentation.context.assets.open("italian-smoke.wav").use { input -> audio.outputStream().use { output -> input.copyTo(output) } }
+        instrumentation.context.assets.open("fleurs-it-short.wav").use { input -> audio.outputStream().use { output -> input.copyTo(output) } }
         store.save(Session(Uri.fromFile(audio).toString(), "Leave sample.wav", Transcript(listOf(Word("spk_1", 0, 1500, "Inizio.")), "it"), durationMs = 15840))
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         fun awaitCondition(description: String, condition: (MainActivity) -> Boolean) {
@@ -211,7 +211,7 @@ class InterfaceTest {
         val originalLanguage = AppLanguage.selected(context)
         finishExistingScreens()
         val audio = File(context.cacheDir, "interface-test.wav")
-        instrumentation.context.assets.open("italian-smoke.wav").use { input ->
+        instrumentation.context.assets.open("fleurs-it-short.wav").use { input ->
             audio.outputStream().use { output -> input.copyTo(output) }
         }
         val transcript = Transcript(listOf(Word("spk_1", 0, 800, "Ciao"), Word("spk_1", 1500, 2500, "mondo.")), "it")

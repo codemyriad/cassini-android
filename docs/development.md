@@ -1,27 +1,26 @@
 # Development notes
 
-The build commands are in the [README](../README.md). Runtime downloads, weights, audio fixtures and build outputs stay out of commits.
+The build commands are in the [README](../README.md). Runtime downloads, weights, private or YouTube-derived audio and build outputs stay out of commits. The committed test inputs are in [`fixtures/`](../fixtures/README.md): the CC-BY-4.0 FLEURS clip and captured `filesDir` trees.
 
 ## Device checks
 
 Use direct adb instrumentation to retain app data and downloaded models. Gradle’s managed connected-test cleanup can uninstall the app and erase them.
 
 ```sh
-python3 scripts/fetch-smoke-audio.py  # requires ffmpeg
-./scripts/fetch-youtube-audio.sh     # uses uvx yt-dlp + ffmpeg
+./tools/fetch-youtube-audio.sh       # optional YouTube clips; uses uvx yt-dlp + ffmpeg
 ./scripts/device-smoke.sh youtube
 # Optional third argument selects test classes.
 ./scripts/device-smoke.sh fleurs org.cassini.android.LibraryTest
 # Opt-in recovery check after force-stopping the app mid-recording:
 adb shell am instrument -w -r -e class org.cassini.android.RecoveryCheckTest org.cassini.android.test/androidx.test.runner.AndroidJUnitRunner
 # Three-minute viewer/seek check.
-./scripts/fetch-youtube-audio.sh 180
+./tools/fetch-youtube-audio.sh 180
 ./scripts/device-smoke.sh youtube-long
 ```
 
 Unlock the phone first. The script wakes it and dismisses an unsecured keyguard, but fails early if authentication is still required. Set `ANDROID_SERIAL` when several devices are connected. To verify CI’s actual APK, set `CASSINI_APK=/absolute/path/to/downloaded.apk`; the script detects debug/release and builds the matching instrumentation APK. To use both binaries from CI, also set `CASSINI_TEST_APK=/absolute/path/to/test.apk`. The `cassini-android-device-tests` artifact contains that test APK. Kotlin’s internal method names differ across variants, so a debug test APK cannot reliably exercise a release app.
 
-The supplied sample is [il Pericolo Invisibile](https://www.youtube.com/watch?v=UmZwQf5TV3c), 00:28–00:58 (30 seconds), or 00:28–03:28 (three minutes). Local FLEURS fixtures record the pinned revision, reference text and CC-BY-4.0 attribution. These audio files are not distributed here.
+The supplied sample is [il Pericolo Invisibile](https://www.youtube.com/watch?v=UmZwQf5TV3c), 00:28–00:58 (30 seconds), or 00:28–03:28 (three minutes). The YouTube clips are not distributed here; tests that need them skip or fail without them. The FLEURS clip is committed under `fixtures/audio/` with its pinned revision, reference text and CC-BY-4.0 attribution, and the androidTest assets include it.
 
 Device tests check JNI inference, timestamps, codec decoding, complete-document integrity, microphone pause/resume, catalogue recovery and interface-language restoration. They do not establish ASR accuracy. Test rules restore the previous catalogue/session and remove only their own generated documents.
 

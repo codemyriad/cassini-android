@@ -26,7 +26,9 @@ class PortableDocumentTest {
     @Test fun platformOpusEncodingKeepsDurationAndSpeechClock() {
         val instrumentation = InstrumentationRegistry.getInstrumentation(); val context = instrumentation.targetContext
         val source = File(context.cacheDir, "opus-source.wav")
-        instrumentation.context.assets.open("italian-smoke.wav").use { input -> source.outputStream().use { input.copyTo(it) } }
+        instrumentation.context.assets.open("fleurs-it-short.wav").use { input ->
+            source.outputStream().use { input.copyTo(it) }
+        }
         val original = AudioDecoder.decode(context, Uri.fromFile(source))
         val file = File(context.filesDir, "portable-encoder-test.opus")
         file.writeBytes(OpusEncoder.encode(original))
@@ -187,7 +189,7 @@ class PortableDocumentTest {
         val audio = File(context.filesDir, "portable-encoder-test.opus")
         if (!audio.exists()) {
             val wav = File(context.cacheDir, "portable-source.wav")
-            instrumentation.context.assets.open("italian-smoke.wav").use { input -> wav.outputStream().use { input.copyTo(it) } }
+            instrumentation.context.assets.open("fleurs-it-short.wav").use { input -> wav.outputStream().use { input.copyTo(it) } }
             audio.writeBytes(OpusEncoder.encode(AudioDecoder.decode(context, Uri.fromFile(wav))))
         }
         val words = Transcript(listOf(Word("spk_a", 100, 600, "Ciao."), Word("spk_b", 8000, 8500, "Benvenuti.")), "it")

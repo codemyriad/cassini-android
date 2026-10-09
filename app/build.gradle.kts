@@ -95,6 +95,15 @@ android {
         }
     }
     bundle { language { enableSplit = false } }
+    sourceSets {
+        // Device tests read the committed CC-BY-4.0 FLEURS clip from fixtures/audio. Local-only clips
+        // (tools/fetch-youtube-audio.sh output in src/androidTest/assets, private meeting clips in
+        // tools/private-fixtures) are packaged when present and never committed.
+        getByName("androidTest") {
+            assets.directories.add(rootDir.resolve("fixtures/audio").path)
+            assets.directories.add(rootDir.resolve("tools/private-fixtures").path)
+        }
+    }
 }
 
 kotlin {

@@ -190,16 +190,16 @@
     <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$("audio", name)</ID>
     <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$("audioMs", audio.durationMs)</ID>
     <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$("firstWordsAfterMs", steps.firstOrNull { it.words.isNotEmpty() }?.elapsedMs ?: -1)</ID>
-    <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$("italian-smoke.json")</ID>
-    <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$("italian-smoke.wav", "italian-smoke.m4a", "youtube-smoke.wav", "youtube-long.wav")</ID>
+    <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$("fleurs-it-short.json")</ID>
+    <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$("fleurs-it-short.wav", "fleurs-it-short.m4a", "youtube-smoke.wav", "youtube-long.wav")</ID>
     <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$("mode", mode)</ID>
     <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$("rate", audio.sampleRate)</ID>
     <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$("reference")</ID>
     <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$("steps", steps.size)</ID>
     <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$('\u2019', '\'')</ID>
-    <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$(JSONObject(instrumentation.context.assets.open("italian-smoke.json").bufferedReader().use { it.readText() }).getString("reference"))</ID>
+    <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$(JSONObject(instrumentation.context.assets.open("fleurs-it-short.json").bufferedReader().use { it.readText() }).getString("reference"))</ID>
     <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$(Regex("(?&lt;=\\p{N})[.,](?=\\p{N})"), "")</ID>
-    <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$(instrumentation.context.assets.open("italian-smoke.json").bufferedReader().use { it.readText() })</ID>
+    <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$(instrumentation.context.assets.open("fleurs-it-short.json").bufferedReader().use { it.readText() })</ID>
     <ID>ArgumentListWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$(transcript.words.all { it.startMs &gt;= 0 &amp;&amp; it.endMs &gt;= it.startMs &amp;&amp; it.endMs &lt;= audio.durationMs })</ID>
     <ID>ArgumentListWrapping:DeckViews.kt$DeckViews$(0, dp(8), 0, dp(8))</ID>
     <ID>ArgumentListWrapping:DeckViews.kt$DeckViews$(12f, amber)</ID>
@@ -247,7 +247,7 @@
     <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$(speech.samples.size * 3)</ID>
     <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$(track, codec.getOutputBuffer(output)!!, info)</ID>
     <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$(transcript.words.all { it.startMs &gt;= 0 &amp;&amp; it.endMs &gt;= it.startMs &amp;&amp; it.endMs &lt;= audio.durationMs })</ID>
-    <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$(when (sample) { "youtube-long" -&gt; "youtube-long.wav" "youtube" -&gt; "youtube-smoke.wav" else -&gt; "italian-smoke.wav" })</ID>
+    <ID>ArgumentListWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$(when (sample) { "youtube-long" -&gt; "youtube-long.wav" "youtube" -&gt; "youtube-smoke.wav" else -&gt; "fleurs-it-short.wav" })</ID>
     <ID>ArgumentListWrapping:Diarization.kt$Diarization$( segmentation = OfflineSpeakerSegmentationModelConfig( sortformer = OfflineSpeakerSegmentationSortformerModelConfig(model = model, threshold = THRESHOLD), numThreads = threads, provider = "cpu"), minDurationOn = MIN_DURATION_ON, minDurationOff = MIN_DURATION_OFF, )</ID>
     <ID>ArgumentListWrapping:Diarization.kt$Diarization$( sortformer = OfflineSpeakerSegmentationSortformerModelConfig(model = model, threshold = THRESHOLD), numThreads = threads, provider = "cpu")</ID>
     <ID>ArgumentListWrapping:Diarization.kt$Diarization$((it.start * 1000).toLong().coerceIn(0, audio.durationMs), (it.end * 1000).toLong().coerceIn(0, audio.durationMs), it.speaker)</ID>
@@ -314,7 +314,7 @@
     <ID>ArgumentListWrapping:InterfaceTest.kt$InterfaceTest$("Paused playback must leave manual scrolling alone", 0, activity.findViewById&lt;ScrollView&gt;(R.id.content_scroll).scrollY)</ID>
     <ID>ArgumentListWrapping:InterfaceTest.kt$InterfaceTest$("Restored paused playback must not scroll", 0, activity.findViewById&lt;ScrollView&gt;(R.id.content_scroll).scrollY)</ID>
     <ID>ArgumentListWrapping:InterfaceTest.kt$InterfaceTest$("Returning to a note that was never played must leave playback available: " + activity.findViewById&lt;TextView&gt;(R.id.operation_status).text, play.isEnabled)</ID>
-    <ID>ArgumentListWrapping:InterfaceTest.kt$InterfaceTest$("italian-smoke.wav")</ID>
+    <ID>ArgumentListWrapping:InterfaceTest.kt$InterfaceTest$("fleurs-it-short.wav")</ID>
     <ID>ArgumentListWrapping:InterfaceTest.kt$InterfaceTest$("spk_1", 0, 1500, "Inizio.")</ID>
     <ID>ArgumentListWrapping:InterfaceTest.kt$InterfaceTest$(0, text.length, android.text.style.BackgroundColorSpan::class.java)</ID>
     <ID>ArgumentListWrapping:InterfaceTest.kt$InterfaceTest$(0, text.totalPaddingTop + layout.getLineTop(layout.lineCount - 1), text.width, text.totalPaddingTop + layout.getLineBottom(layout.lineCount - 1))</ID>
@@ -767,7 +767,7 @@
     <ID>ArgumentListWrapping:PortableDocumentTest.kt$PortableDocumentTest$("Save must preserve every unknown field, variant, tag and audio packet", source.readBytes(), exported.readBytes())</ID>
     <ID>ArgumentListWrapping:PortableDocumentTest.kt$PortableDocumentTest$("Session cache must not replace the portable body", saved.transcript)</ID>
     <ID>ArgumentListWrapping:PortableDocumentTest.kt$PortableDocumentTest$("The recreated screen must return to its own document and position")</ID>
-    <ID>ArgumentListWrapping:PortableDocumentTest.kt$PortableDocumentTest$("italian-smoke.wav")</ID>
+    <ID>ArgumentListWrapping:PortableDocumentTest.kt$PortableDocumentTest$("fleurs-it-short.wav")</ID>
     <ID>ArgumentListWrapping:PortableDocumentTest.kt$PortableDocumentTest$("model", "test")</ID>
     <ID>ArgumentListWrapping:PortableDocumentTest.kt$PortableDocumentTest$("onActivityResult", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, Intent::class.java)</ID>
     <ID>ArgumentListWrapping:PortableDocumentTest.kt$PortableDocumentTest$("preserve")</ID>
@@ -1073,7 +1073,7 @@
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$("Temporary decoded PCM must be removed", context.cacheDir.listFiles().orEmpty().none { it.name.startsWith("recognition-") })</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$("The second voice must continue beyond the first window", transcript.words.any { it.startMs &gt; 30000 })</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$("id")</ID>
-    <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$("italian-smoke.wav")</ID>
+    <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$("fleurs-it-short.wav")</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$("meeting")</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$("provenance")</ID>
     <ID>ArgumentListWrapping:SpeakerIdentificationTest.kt$SpeakerIdentificationTest$("recognition-")</ID>
@@ -1971,7 +1971,7 @@
     <ID>MaxLineLength:ChunkingComparisonTest.kt$ChunkingComparisonTest$"speech-span-notail" to { audio, progress -&gt; Parakeet.transcribe(audio, models, detector, DecodePolicy(preserveSpan = true, tailPaddingMs = 0), onProgress = progress) }</ID>
     <ID>MaxLineLength:ChunkingComparisonTest.kt$ChunkingComparisonTest$assertTrue("$name $mode progress went backwards", steps.zipWithNext().all { (a, b) -&gt; b.doneMs &gt;= a.doneMs &amp;&amp; b.elapsedMs &gt;= a.elapsedMs })</ID>
     <ID>MaxLineLength:ChunkingComparisonTest.kt$ChunkingComparisonTest$for (j in 1..b.size) current[j] = minOf(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + if (a[i - 1] == b[j - 1]) 0 else 1)</ID>
-    <ID>MaxLineLength:ChunkingComparisonTest.kt$ChunkingComparisonTest$val reference = tokens(JSONObject(instrumentation.context.assets.open("italian-smoke.json").bufferedReader().use { it.readText() }).getString("reference"))</ID>
+    <ID>MaxLineLength:ChunkingComparisonTest.kt$ChunkingComparisonTest$val reference = tokens(JSONObject(instrumentation.context.assets.open("fleurs-it-short.json").bufferedReader().use { it.readText() }).getString("reference"))</ID>
     <ID>MaxLineLength:DeckViews.kt$DeckViews$private</ID>
     <ID>MaxLineLength:DeckViews.kt$DeckViews$val status = text(12f, muted).apply { id = R.id.operation_status; setPadding(0, dp(8), 0, dp(8)); accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE }</ID>
     <ID>MaxLineLength:DeviceSmokeTest.kt$DeviceSmokeTest$(10 until expected.size - 10).sumOf { j -&gt; val d = expected[j] - found[j + shift]; d.toDouble() * d } / (expected.size - 20)</ID>
@@ -1989,7 +1989,7 @@
     <ID>MaxLineLength:InterfaceTest.kt$InterfaceTest$assertEquals("A stale word selection must not look like a second active word", -1, android.text.Selection.getSelectionStart(text))</ID>
     <ID>MaxLineLength:InterfaceTest.kt$InterfaceTest$assertEquals("Paused playback must leave manual scrolling alone", 0, activity.findViewById&lt;ScrollView&gt;(R.id.content_scroll).scrollY)</ID>
     <ID>MaxLineLength:InterfaceTest.kt$InterfaceTest$assertFalse("Opening a note must not focus the search field", activity.findViewById&lt;android.widget.EditText&gt;(R.id.search_input).hasFocus())</ID>
-    <ID>MaxLineLength:InterfaceTest.kt$InterfaceTest$instrumentation.context.assets.open("italian-smoke.wav").use { input -&gt; audio.outputStream().use { output -&gt; input.copyTo(output) } }</ID>
+    <ID>MaxLineLength:InterfaceTest.kt$InterfaceTest$instrumentation.context.assets.open("fleurs-it-short.wav").use { input -&gt; audio.outputStream().use { output -&gt; input.copyTo(output) } }</ID>
     <ID>MaxLineLength:InterfaceTest.kt$InterfaceTest$store.save(Session(Uri.fromFile(audio).toString(), "Leave sample.wav", Transcript(listOf(Word("spk_1", 0, 1500, "Inizio.")), "it"), durationMs = 15840))</ID>
     <ID>MaxLineLength:LibraryActivity.kt$LibraryActivity$catch (error: Exception) { android.util.Log.e("Cassini", "Library refresh failed", error); summary.setText(R.string.library_error) }</ID>
     <ID>MaxLineLength:LibraryActivity.kt$LibraryActivity$fun day(value: Long)</ID>
@@ -2560,7 +2560,7 @@
     <ID>PropertyWrapping:CassiniDocument.kt$CassiniDocument.Companion$val mirrors = mapOf("SAMPLE_RATE" to "sampleRate", "CHANNELS" to "channels", "SAMPLE_COUNT" to "sampleCount", "DURATION_MS" to "durationMs", "MATCH_POLICY" to "matchPolicy", "OPUS_SHA256" to "opusAudioSha256")</ID>
     <ID>PropertyWrapping:CassiniDocumentTest.kt$CassiniDocumentTest$val directory = File(System.getProperty("cassini.conformance", "../third_party/cassini-format/spec/conformance")!!)</ID>
     <ID>PropertyWrapping:CassiniDocumentTest.kt$CassiniDocumentTest$val file = File(System.getProperty("cassini.conformance", "../third_party/cassini-format/spec/conformance")!!, "opus/014-unknown-manifest-member.opus")</ID>
-    <ID>PropertyWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$val reference = tokens(JSONObject(instrumentation.context.assets.open("italian-smoke.json").bufferedReader().use { it.readText() }).getString("reference"))</ID>
+    <ID>PropertyWrapping:ChunkingComparisonTest.kt$ChunkingComparisonTest$val reference = tokens(JSONObject(instrumentation.context.assets.open("fleurs-it-short.json").bufferedReader().use { it.readText() }).getString("reference"))</ID>
     <ID>PropertyWrapping:DeviceSmokeTest.kt$DeviceSmokeTest$val upsampled = PcmAudio(FloatArray(speech.samples.size * 3) { speech.samples[it / 3] }, speech.sampleRate * 3)</ID>
     <ID>PropertyWrapping:DiarizationModels.kt$DiarizationModels.Companion$/** Files of the earlier pyannote + ERes2Net pipeline. Removing them never touches recordings. */ private val retired = listOf("segmentation.int8.onnx", "embedding.onnx", "segmentation.int8.onnx.part", "embedding.onnx.part")</ID>
     <ID>PropertyWrapping:DiarizationPocTest.kt$DiarizationPocTest$private val directory = File(InstrumentationRegistry.getArguments().getString("diarDir") ?: "/data/local/tmp/cassini-diar")</ID>

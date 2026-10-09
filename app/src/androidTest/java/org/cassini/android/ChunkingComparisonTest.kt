@@ -52,7 +52,7 @@ class ChunkingComparisonTest {
         assumeTrue("Install Parakeet and the speech detector first", models.ready() && ModelStore.vadReady(context.filesDir))
         val detector = ModelStore.vadPath(context.filesDir)
         val available = instrumentation.context.assets.list("")!!.toSet()
-        val reference = tokens(JSONObject(instrumentation.context.assets.open("italian-smoke.json").bufferedReader().use { it.readText() }).getString("reference"))
+        val reference = tokens(JSONObject(instrumentation.context.assets.open("fleurs-it-short.json").bufferedReader().use { it.readText() }).getString("reference"))
         val modes = linkedMapOf<String, (PcmAudio, (Parakeet.Progress) -> Unit) -> Transcript>(
             "whole" to { audio, _ -> Parakeet.transcribe(audio, models, null, cutting = Parakeet.Cutting.WHOLE) },
             "fixed-15s" to { audio, progress -> Parakeet.transcribe(audio, models, null, cutting = Parakeet.Cutting.FIXED, onProgress = progress) },
@@ -63,7 +63,8 @@ class ChunkingComparisonTest {
             "speech-span-tail" to { audio, progress -> Parakeet.transcribe(audio, models, detector, onProgress = progress) },
         )
         val report = JSONArray()
-        for (name in listOf("italian-smoke.wav", "italian-smoke.m4a", "youtube-smoke.wav", "youtube-long.wav").filter { it in available }) {
+        val clips = listOf("fleurs-it-short.wav", "fleurs-it-short.m4a", "youtube-smoke.wav", "youtube-long.wav").filter { it in available }
+        for (name in clips) {
             val audio = fixture(name)
             var whole = emptyList<String>()
             for ((mode, run) in modes) {
@@ -81,7 +82,7 @@ class ChunkingComparisonTest {
                     .put("elapsedMs", elapsedMs).put("words", words.size).put("fromWhole", distance(whole, words))
                     .put("steps", steps.size).put("firstWordsAfterMs", steps.firstOrNull { it.words.isNotEmpty() }?.elapsedMs ?: -1)
                     .put("firstWordsWaitMs", firstWordsMs)
-                if (name.startsWith("italian-smoke")) entry.put("fromReference", distance(reference, words))
+                if (name.startsWith("fleurs-it-short")) entry.put("fromReference", distance(reference, words))
                 entry.put("text", transcript.words.joinToString(" ") { it.text })
                 entry.put("timed", transcript.words.joinToString(" ") { "${it.text}@${it.startMs}-${it.endMs}" })
                 report.put(entry)
