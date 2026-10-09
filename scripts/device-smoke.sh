@@ -13,14 +13,25 @@ if adb shell dumpsys window policy | python3 -c 'import sys; sys.exit(0 if "show
 fi
 if [ -n "${CASSINI_APK:-}" ]; then
     test -f "$CASSINI_APK"
+    # R8 marks the dex it writes with "~~R8{"; D8 (debug and releaseTest) writes "~~D8{".
+    if python3 -I - "$CASSINI_APK" <<'PY'
+import re, sys, zipfile
+with zipfile.ZipFile(sys.argv[1]) as apk:
+    dex = [name for name in apk.namelist() if re.fullmatch(r"classes\d*\.dex", name)]
+    sys.exit(0 if any(b"~~R8{" in apk.read(name) for name in dex) else 1)
+PY
+    then
+        printf '%s is minified by R8 and cannot be instrumented: R8 removed members the tests call.\n' "$CASSINI_APK" >&2
+        printf 'Instrument the releaseTest build instead; scripts/launch-check.sh checks that a release APK launches.\n' >&2
+        exit 1
+    fi
     if [ -z "${CASSINI_TEST_BUILD_TYPE:-}" ]; then
         sdk_path=${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}
         if [ -z "$sdk_path" ]; then
             sdk_path=$(python3 -c 'from pathlib import Path; print(next(line.removeprefix("sdk.dir=") for line in Path("local.properties").read_text().splitlines() if line.startswith("sdk.dir=")))')
         fi
         manifest=$("$sdk_path/build-tools/36.0.0/aapt" dump xmltree "$CASSINI_APK" AndroidManifest.xml)
-        # A non-debuggable APK is taken to be releaseTest: the minified release APK cannot be
-        # instrumented, because R8 removed members the tests call.
+        # A non-debuggable APK that R8 did not minify is releaseTest.
         if [[ "$manifest" == *'android:debuggable'*'0xffffffff'* ]]; then
             CASSINI_TEST_BUILD_TYPE=debug
         else
