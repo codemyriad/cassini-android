@@ -7,6 +7,8 @@ More detail is in these documents:
 - [`docs/development.md`](docs/development.md): the modules, the test tiers and the device checks.
 - [`docs/architecture.md`](docs/architecture.md): the modules, the storage, the background work and the build.
 - [`docs/native-runtime.md`](docs/native-runtime.md): the sherpa-onnx AAR and how to build it from source.
+- [`docs/data-formats.md`](docs/data-formats.md): the storage layout, the portable document and the exports.
+- [`docs/release.md`](docs/release.md): the release steps, the signing and the F-Droid draft.
 
 All people in this project obey the [Code of Conduct](CODE_OF_CONDUCT.md). To report a security problem, read [`SECURITY.md`](SECURITY.md). Do not open a public issue for it.
 
