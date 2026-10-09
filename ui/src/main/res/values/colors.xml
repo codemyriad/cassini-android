@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The bg token (docs/design/ui.md section 4.1). The app's Theme.Cassini sets it as android:windowBackground,
+         so the cold-start frame matches the first Compose frame. -->
+    <color name="ui_window_bg">#F5F6F7</color>
+</resources>
