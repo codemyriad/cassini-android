@@ -7,6 +7,16 @@ import android.media.MediaMuxer
 import android.net.Uri
 import android.os.Bundle
 import androidx.test.platform.app.InstrumentationRegistry
+import org.cassini.core.asr.IncrementalTranscript
+import org.cassini.core.asr.Span
+import org.cassini.core.audio.Limits
+import org.cassini.core.audio.PcmAudio
+import org.cassini.core.audio.PcmBuilder
+import org.cassini.core.audio.PcmFile
+import org.cassini.core.format.OggOpus
+import org.cassini.core.format.Transcript
+import org.cassini.core.format.Word
+import org.cassini.core.speakers.SpeakerTurn
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
@@ -159,7 +169,7 @@ class DeviceSmokeTest {
         val combined = first.samples + FloatArray(16000) + second.samples
         NativeInference.acquire()
         try {
-            Diarization.Streaming(models.modelPath).use { diarizer ->
+            SortformerStream(models.modelPath).use { diarizer ->
                 val initial = diarizer.process(PcmAudio(combined.copyOfRange(0, 28 * 16000), 16000), 0)
                 fun dominant(turns: List<SpeakerTurn>, start: Long, end: Long) = turns.groupBy { it.speaker }
                     .maxByOrNull { (_, runs) -> runs.sumOf { maxOf(0, minOf(end, it.endMs) - maxOf(start, it.startMs)) } }!!.key
@@ -285,13 +295,13 @@ class DeviceSmokeTest {
             lateinit var saved: JSONObject
             lateinit var expected: List<SpeakerTurn>
             lateinit var history: List<SpeakerTurn>
-            Diarization.Streaming(models.modelPath).use {
+            SortformerStream(models.modelPath).use {
                 it.process(PcmAudio(all.copyOfRange(0, 28 * 16000), 16000), 0)
                 saved = JSONObject(it.checkpoint().toString())
                 expected = it.process(PcmAudio(all.copyOfRange(26 * 16000, all.size), 16000), 26000)
                 history = it.turns
             }
-            Diarization.Streaming(models.modelPath, saved).use {
+            SortformerStream(models.modelPath, saved).use {
                 assertEquals(expected, it.process(PcmAudio(all.copyOfRange(26 * 16000, all.size), 16000), 26000))
                 assertEquals(history, it.turns)
             }

@@ -86,11 +86,7 @@ android {
         lintConfig = file("lint.xml")
         baseline = file("lint-baseline.xml")
     }
-    // The published conformance vectors come from the third_party/cassini-format submodule and are
-    // required: a missing checkout fails the tests instead of skipping them.
-    val conformanceDirectory = providers.gradleProperty("cassiniConformanceDir")
-        .getOrElse(rootDir.resolve("third_party/cassini-format/spec/conformance").absolutePath)
-    // Captured filesDir trees and audio (fixtures/README.md).
+    // Captured filesDir trees and audio (fixtures/README.md). The conformance vectors run in :core.
     val fixturesDirectory = rootDir.resolve("fixtures")
     testOptions {
         unitTests {
@@ -98,7 +94,6 @@ android {
             all {
                 it.jvmArgumentProviders.add(
                     TestDataDirectories(
-                        conformance = fileTree(conformanceDirectory),
                         fixtures = fileTree(fixturesDirectory),
                         // LicenseAssetsTest compares the APK's copies with these repository files.
                         repository = files(
@@ -106,7 +101,6 @@ android {
                             rootDir.resolve("scripts/native-dependencies.json"),
                             file("src/main/assets/licenses"),
                         ),
-                        conformancePath = conformanceDirectory,
                         fixturesPath = fixturesDirectory.absolutePath,
                     ),
                 )
@@ -137,6 +131,7 @@ kotlin {
 }
 
 dependencies {
+    implementation(project(":core"))
     implementation(libs.sherpa.onnx.nemotron)
     // Decompresses the speaker model download. The AAR carries the Android native libraries;
     // the JVM unit tests use the jar, which carries the desktop ones.
@@ -145,6 +140,8 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.org.json)
     testImplementation(libs.robolectric)
+    // FixtureTree, shared with :core's tests.
+    testImplementation(testFixtures(project(":core")))
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.espresso.core)
@@ -168,18 +165,15 @@ tasks.named("preBuild") { dependsOn(checkOpusSource) }
 tasks.matching { it.name.startsWith("configureCMake") }.configureEach { dependsOn(checkOpusSource) }
 
 /**
- * Passes the test data directories to the JVM tests as system properties and declares their files as
- * task inputs, relative to each directory. A changed submodule pin or a missing checkout therefore
- * re-runs the tests (and fails them) instead of leaving them up to date or taking them from the
- * build cache, and the absolute paths stay out of the cache key. The repository files that
+ * Passes the fixture directory to the JVM tests as a system property and declares its files as task
+ * inputs, relative to the directory, so a changed fixture re-runs the tests instead of leaving them up
+ * to date or taking them from the build cache, and the absolute paths stay out of the cache key. The repository files that
  * LicenseAssetsTest reads directly are declared the same way.
  */
 class TestDataDirectories(
-    @get:InputFiles @get:PathSensitive(PathSensitivity.RELATIVE) val conformance: FileTree,
     @get:InputFiles @get:PathSensitive(PathSensitivity.RELATIVE) val fixtures: FileTree,
     @get:InputFiles @get:PathSensitive(PathSensitivity.RELATIVE) val repository: FileCollection,
-    @get:Internal val conformancePath: String,
     @get:Internal val fixturesPath: String,
 ) : CommandLineArgumentProvider {
-    override fun asArguments() = listOf("-Dcassini.conformance=$conformancePath", "-Dcassini.fixtures=$fixturesPath")
+    override fun asArguments() = listOf("-Dcassini.fixtures=$fixturesPath")
 }

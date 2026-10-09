@@ -1,5 +1,9 @@
 package org.cassini.android
 
+import org.cassini.core.Failure
+import org.cassini.core.models.ArtifactFetcher
+import org.cassini.core.models.ModelCatalog
+import org.cassini.core.requireUser
 import java.io.File
 
 /**
@@ -8,12 +12,13 @@ import java.io.File
  */
 internal class VoiceprintModel(private val directory: File, private val url: String = SOURCE) {
     companion object {
-        const val FILE = "voiceprint-campplus.onnx"
-        const val MARKER = "verified-voiceprint"
-        const val SOURCE = "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx"
-        val model = ModelStore.Artifact(FILE, 29596978, "357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b")
+        val FILE = ModelCatalog.voiceprintModel.name
+        val MARKER = ModelCatalog.VOICEPRINT.markerFile
+        const val SOURCE = ModelCatalog.VOICEPRINT_URL
+        val model = ModelCatalog.voiceprintModel
+
         /** Shares the speaker-models directory, whose retired-file cleanup never lists these names. */
-        fun inFiles(files: File) = VoiceprintModel(File(files, "speaker-models"))
+        fun inFiles(files: File) = VoiceprintModel(ModelCatalog.VOICEPRINT.directory(files))
     }
     val modelPath get() = File(directory, FILE).absolutePath
     fun ready() = File(modelPath).length() == model.size &&
@@ -22,7 +27,7 @@ internal class VoiceprintModel(private val directory: File, private val url: Str
     fun install(progress: (ModelStore.Progress) -> Unit) {
         directory.mkdirs()
         File(directory, MARKER).delete()
-        ModelStore.fetch(url, model, directory) { received, verifying ->
+        ArtifactFetcher.fetch(url, model, directory) { received, verifying ->
             progress(ModelStore.Progress((received * 100 / model.size).toInt(), verifying))
         }
         requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)

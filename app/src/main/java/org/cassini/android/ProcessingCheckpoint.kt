@@ -1,15 +1,16 @@
 package org.cassini.android
 
 import android.util.AtomicFile
+import org.cassini.core.checkpoint.CheckpointData
+import org.cassini.core.checkpoint.CheckpointNames
+import org.cassini.core.checkpoint.CheckpointState
+import org.cassini.core.models.ModelCatalog
 import org.json.JSONObject
 import java.io.File
-import java.security.MessageDigest
-
-internal class ProcessingPaused : RuntimeException()
 
 /** One durable job per immutable source. Audio and clips append; metadata commits their safe lengths atomically. */
 internal class ProcessingCheckpoint(files: File, private val source: String) {
-    private val key = OggOpus.hex(MessageDigest.getInstance("SHA-256").digest(source.toByteArray()))
+    private val key = CheckpointState.key(source)
     val directory = File(files, "processing-checkpoints/$key")
     val audio = File(directory, "audio.opus.part")
     val clips = File(directory, "clips.pcm")
@@ -17,28 +18,30 @@ internal class ProcessingCheckpoint(files: File, private val source: String) {
     private val names get() = AtomicFile(File(directory, "names.json"))
     private fun signature(): String {
         val file = android.net.Uri.parse(source).takeIf { it.scheme == "file" }?.path?.let(::File)
-        return "${file?.length()}:${file?.lastModified()}"
+        return CheckpointState.signature(file)
     }
     fun load(): JSONObject? {
         if (!metadata.baseFile.exists() && !File(directory, "checkpoint.json.bak").exists()) return null
-        return JSONObject(metadata.openRead().bufferedReader().use { it.readText() }).also {
-            require(it.getInt("version") == 1 && it.getString("source") == source && it.getString("signature") == signature())
-            require(it.getString("model") == ModelStore.REVISION && it.getString("speakers") == DiarizationModels.model.sha256)
-            require(it.getInt("clipSamples") in 0..(8 * 45 * Limits.ASR_RATE) && clips.length() >= it.getInt("clipSamples") * 4L)
-            require(it.getLong("positionSamples") in 0..Limits.MAX_SAMPLES && it.getLong("doneMs") in 0..Limits.MAX_RECORDING_MS)
-            it.optJSONObject("encoder")?.let { encoder -> require(audio.length() >= encoder.getLong("length")) }
-        }
+        val expected = CheckpointState.Expected(
+            source,
+            signature(),
+            ModelCatalog.PARAKEET_REVISION,
+            ModelCatalog.diarizationModel.sha256,
+            clips.length(),
+            audio.length(),
+        )
+        return JSONObject(metadata.openRead().bufferedReader().use { it.readText() }).also { CheckpointState.validate(it, expected) }
     }
     fun save(state: JSONObject) {
         directory.mkdirs()
         state.put("version", 1).put("source", source).put("signature", signature())
-            .put("model", ModelStore.REVISION).put("speakers", DiarizationModels.model.sha256)
+            .put("model", ModelCatalog.PARAKEET_REVISION).put("speakers", ModelCatalog.diarizationModel.sha256)
         write(metadata, state)
     }
     /** [generation] is VoiceStore's at the time [remembered] was chosen; a later "forget all" invalidates them. */
     fun saveNames(labels: Map<String, String>, merges: Map<String, String>, remembered: Map<String, String> = emptyMap(), automatic: Map<String, String> = emptyMap(), generation: Long = 0) {
         directory.mkdirs()
-        write(names, JSONObject().put("labels", JSONObject(labels)).put("merges", JSONObject(merges)).put("remembered", JSONObject(remembered)).put("automatic", JSONObject(automatic)).put("generation", generation))
+        write(names, CheckpointNames.encode(CheckpointNames(labels, merges, remembered, automatic, generation)))
     }
     fun rememberGeneration(): Long {
         if (!names.baseFile.exists() && !File(directory, "names.json.bak").exists()) return 0
@@ -46,8 +49,8 @@ internal class ProcessingCheckpoint(files: File, private val source: String) {
     }
     fun loadNames(): Pair<Map<String, String>, Map<String, String>> {
         if (!names.baseFile.exists() && !File(directory, "names.json.bak").exists()) return emptyMap<String, String>() to emptyMap()
-        val json = JSONObject(names.openRead().bufferedReader().use { it.readText() })
-        return CheckpointData.strings(json.getJSONObject("labels")) to CheckpointData.strings(json.getJSONObject("merges"))
+        val json = CheckpointNames.decode(JSONObject(names.openRead().bufferedReader().use { it.readText() }))
+        return json.labels to json.merges
     }
     fun nameExtras(): Pair<Map<String, String>, Map<String, String>> {
         if (!names.baseFile.exists() && !File(directory, "names.json.bak").exists()) return emptyMap<String, String>() to emptyMap()

@@ -19,6 +19,13 @@ import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.platform.app.InstrumentationRegistry
+import org.cassini.core.audio.PcmAudio
+import org.cassini.core.format.CassiniDocument
+import org.cassini.core.format.OggOpus
+import org.cassini.core.format.Transcript
+import org.cassini.core.format.Word
+import org.cassini.core.library.Session
+import org.cassini.core.speakers.floats
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertNotNull

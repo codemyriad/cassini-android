@@ -1,9 +1,10 @@
 package org.cassini.android.eval
 
-import org.cassini.android.DecodePolicy
 import org.cassini.android.ModelStore
 import org.cassini.android.Parakeet
-import org.cassini.android.PcmAudio
+import org.cassini.core.asr.DecodePolicy
+import org.cassini.core.audio.PcmAudio
+import org.cassini.core.models.Artifact
 import org.json.JSONObject
 import java.io.File
 import java.nio.ByteBuffer
@@ -18,7 +19,7 @@ import java.nio.ByteOrder
 object AsrEval {
     /** A store whose readiness check accepts the model files present, so other Parakeet exports can be compared. */
     private fun store(directory: File) = ModelStore(directory).also { store ->
-        val present = ModelStore.int8Artifacts.map { ModelStore.Artifact(it.name, File(directory, it.name).length(), it.sha256) }
+        val present = ModelStore.int8Artifacts.map { Artifact(it.name, File(directory, it.name).length(), it.sha256) }
         ModelStore::class.java.getDeclaredField("artifacts").apply { isAccessible = true }.set(store, present)
     }
 

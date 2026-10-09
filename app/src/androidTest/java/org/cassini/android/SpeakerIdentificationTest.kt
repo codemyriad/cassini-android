@@ -2,6 +2,8 @@ package org.cassini.android
 
 import android.net.Uri
 import android.os.SystemClock
+import android.text.Spanned
+import android.text.style.ClickableSpan
 import android.view.View
 import android.widget.Button
 import android.widget.ProgressBar
@@ -11,12 +13,20 @@ import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.assertion.ViewAssertions.matches
-import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.ViewMatchers.withId
+import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.platform.app.InstrumentationRegistry
-import android.text.Spanned
-import android.text.style.ClickableSpan
+import org.cassini.core.audio.PcmAudio
+import org.cassini.core.audio.resampleTo16k
+import org.cassini.core.format.CassiniDocument
+import org.cassini.core.format.Transcript
+import org.cassini.core.format.Word
+import org.cassini.core.library.Session
+import org.cassini.core.speakers.Match
+import org.cassini.core.speakers.SpeakerPrint
+import org.cassini.core.speakers.Voice
+import org.cassini.core.speakers.Voiceprints
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test

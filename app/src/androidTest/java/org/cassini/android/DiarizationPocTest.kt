@@ -3,6 +3,8 @@ package org.cassini.android
 import android.net.Uri
 import android.util.Log
 import androidx.test.platform.app.InstrumentationRegistry
+import org.cassini.core.audio.PcmAudio
+import org.cassini.core.speakers.Diarization
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -40,7 +42,7 @@ class DiarizationPocTest {
         assumeTrue("Push the diarization model and clip first", ready() && clip.canRead())
         val audio = load(clip)
         val began = System.nanoTime()
-        val turns = Diarization.turns(audio, model)
+        val turns = SortformerStream.turns(audio, model)
         val elapsed = (System.nanoTime() - began) / 1_000_000
         log("four-speakers: ${audio.durationMs} ms audio, $elapsed ms (${"%.2f".format(audio.durationMs / elapsed.toDouble())}x realtime), " +
             "${turns.size} turns, ${turns.map { it.speaker }.toSet().size} speakers, peak RSS ${peakRssMb()} MB")
@@ -62,7 +64,7 @@ class DiarizationPocTest {
         val transcript = Parakeet.transcribe(joined, models, ModelStore.vadPath(context.filesDir))
         val asrMs = (System.nanoTime() - asrBegan) / 1_000_000
         val diarBegan = System.nanoTime()
-        val turns = Diarization.turns(joined, model)
+        val turns = SortformerStream.turns(joined, model)
         val diarMs = (System.nanoTime() - diarBegan) / 1_000_000
         val words = Diarization.assign(transcript.words, turns)
         log("two voices: ${joined.durationMs} ms audio, asr $asrMs ms, diarization $diarMs ms (${"%.0f".format(diarMs * 100.0 / asrMs)}% of asr), peak RSS ${peakRssMb()} MB")
@@ -83,7 +85,7 @@ class DiarizationPocTest {
         val transcript = Parakeet.transcribe(audio, models, ModelStore.vadPath(context.filesDir))
         run {
             val began = System.nanoTime()
-            val turns = Diarization.turns(audio, model)
+            val turns = SortformerStream.turns(audio, model)
             val elapsed = (System.nanoTime() - began) / 1_000_000
             val words = Diarization.assign(transcript.words, turns)
             log("conversation: ${audio.durationMs} ms audio, diarization $elapsed ms, ${turns.size} turns, ${words.map { it.speaker }.toSet().size} speakers, peak RSS ${peakRssMb()} MB")

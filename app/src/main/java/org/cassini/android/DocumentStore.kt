@@ -2,6 +2,16 @@ package org.cassini.android
 
 import android.content.Context
 import android.net.Uri
+import org.cassini.core.Failure
+import org.cassini.core.UserFacingException
+import org.cassini.core.audio.Limits
+import org.cassini.core.audio.PcmAudio
+import org.cassini.core.audio.PcmSource
+import org.cassini.core.audio.source
+import org.cassini.core.format.CassiniDocument
+import org.cassini.core.format.OggOpus
+import org.cassini.core.format.Transcript
+import org.cassini.core.requireUser
 import org.json.JSONObject
 import java.io.File
 import java.io.InputStream

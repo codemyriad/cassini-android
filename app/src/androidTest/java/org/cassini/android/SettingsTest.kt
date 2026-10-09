@@ -3,8 +3,11 @@ package org.cassini.android
 import android.view.KeyEvent
 import android.widget.TextView
 import androidx.test.core.app.ActivityScenario
+import androidx.test.espresso.Espresso.onData
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
+import androidx.test.espresso.action.ViewActions.replaceText
+import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
@@ -13,15 +16,17 @@ import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
-import org.junit.Assert.*
-import org.junit.Test
+import org.cassini.core.format.Transcript
+import org.cassini.core.format.Word
+import org.cassini.core.library.Session
+import org.cassini.core.speakers.Match
+import org.cassini.core.speakers.SpeakerPrint
+import org.hamcrest.Description
 import org.hamcrest.Matchers.allOf
 import org.hamcrest.Matchers.instanceOf
-import androidx.test.espresso.Espresso.onData
-import androidx.test.espresso.action.ViewActions.replaceText
-import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
-import org.hamcrest.Description
 import org.hamcrest.TypeSafeMatcher
+import org.junit.Assert.*
+import org.junit.Test
 import java.io.File
 
 class SettingsTest {

@@ -26,6 +26,30 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.SeekBar
 import android.widget.TextView
+import org.cassini.android.ui.clock
+import org.cassini.core.Failure
+import org.cassini.core.ProcessingPaused
+import org.cassini.core.UserFacingException
+import org.cassini.core.asr.BatteryProjection
+import org.cassini.core.asr.ProcessingSpeed
+import org.cassini.core.asr.TranscriptionProgress
+import org.cassini.core.audio.Limits
+import org.cassini.core.audio.PcmFile
+import org.cassini.core.format.CassiniDocument
+import org.cassini.core.format.SpeakerAttribution
+import org.cassini.core.format.SpeakerMerges
+import org.cassini.core.format.Transcript
+import org.cassini.core.library.LibraryNote
+import org.cassini.core.library.Session
+import org.cassini.core.requireUser
+import org.cassini.core.speakers.DefaultLabels
+import org.cassini.core.speakers.Diarization
+import org.cassini.core.speakers.Match
+import org.cassini.core.speakers.SpeakerPrint
+import org.cassini.core.speakers.Voice
+import org.cassini.core.speakers.VoiceClipCache
+import org.cassini.core.speakers.VoiceMatcher
+import org.cassini.core.speakers.Voiceprints
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
@@ -309,7 +333,7 @@ class MainActivity : Activity() {
                 try {
                     if (!documents.hasOpusAudio(uri)) encoder = StreamingOpusEncoder(encoded, resumed?.optJSONObject("encoder"))
                     val speakerPrefix = resumed?.getString("speakerPrefix") ?: "diar_${UUID.randomUUID().toString().replace('-', '_')}_"
-                    var streamDiarizer: Diarization.Streaming? = null
+                    var streamDiarizer: SortformerStream? = null
                     var speakerFailure = resumed?.optBoolean("speakerFailure") ?: !speakersReady
                     onUi { synchronized(draftSpeakerLabels) {
                         if (resumed == null) {
@@ -334,7 +358,7 @@ class MainActivity : Activity() {
                         }
                         if (pending.isEmpty()) return
                         try {
-                            val computed = Voiceprints.compute(File(voiceprintModel.modelPath), audio, pending, leaseHeld = true) { checkActive() }
+                            val computed = VoiceprintExtractor.compute(File(voiceprintModel.modelPath), audio, pending, leaseHeld = true) { checkActive() }
                             computed.forEach { (id, print) -> liveAttemptSeconds[id] = print.second; livePrints[id] = print }
                             val names = rememberedPeople.associate { it.id to it.name }
                             val matches = VoiceMatcher.match(livePrints.mapValues { it.value.first }, rememberedPeople,
@@ -351,7 +375,7 @@ class MainActivity : Activity() {
                     val elapsed: Long
                     NativeInference.acquire()
                     try {
-                        if (resumed?.optJSONObject("diarizer") != null) streamDiarizer = Diarization.Streaming(speakerModels.modelPath, resumed.getJSONObject("diarizer"))
+                        if (resumed?.optJSONObject("diarizer") != null) streamDiarizer = SortformerStream(speakerModels.modelPath, resumed.getJSONObject("diarizer"))
                         Parakeet.Incremental(chosenModel, detector, leaseHeld = true, restored = resumed?.getJSONObject("recognition"), onChunk = { chunk, startMs, words ->
                             checkActive()
                             if (speakerFailure) words.copy(words = words.words.map { it.copy(speaker = "${speakerPrefix}1") })
@@ -360,7 +384,7 @@ class MainActivity : Activity() {
                                     if (!cancelled.get()) transcriptionProgress?.stage(TranscriptionProgress.Stage.SPEAKERS,
                                         (System.nanoTime() - totalBegan) / 1_000_000, startMs, startMs + chunk.durationMs)
                                 }
-                                val diarizer = streamDiarizer ?: Diarization.Streaming(speakerModels.modelPath).also { streamDiarizer = it }
+                                val diarizer = streamDiarizer ?: SortformerStream(speakerModels.modelPath).also { streamDiarizer = it }
                                 val found = diarizer.process(chunk, startMs)
                                 val assigned = if (found.isEmpty()) words.words.map { it.copy(speaker = "${speakerPrefix}1") }
                                     else Diarization.assign(words.words, found, speakerPrefix, stableIds = true)
@@ -466,7 +490,7 @@ class MainActivity : Activity() {
                     // Naming speakers is best effort, like telling them apart: any failure keeps "Speaker N".
                     val prints: Map<String, SpeakerPrint> = if (speakerTurns == null || attributed == null || !voiceprintModel.ready()) emptyMap() else try {
                         onUi { transcriptionProgress?.stage(TranscriptionProgress.Stage.MATCHING, (System.nanoTime() - totalBegan) / 1_000_000) }
-                        val computed = Voiceprints.compute(File(voiceprintModel.modelPath), audio,
+                        val computed = VoiceprintExtractor.compute(File(voiceprintModel.modelPath), audio,
                             SpeakerMerges.windows(voiceClips.windows, draftEdits.second)) { checkActive() }
                         val matches = VoiceMatcher.match(computed.mapValues { it.value.first }, knownVoices, printModel, Voiceprints.THRESHOLDS.getValue(printModel))
                         if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) for ((id, print) in computed)
@@ -487,7 +511,7 @@ class MainActivity : Activity() {
                         attributed.processing.put("x-speakerIdentification", JSONObject()
                             .put("model", "3dspeaker_speech_campplus_sv_en_voxceleb_16k").put("sha256", printModel).put("dim", prints.values.firstOrNull()?.embedding?.size ?: 512)
                             .put("metric", "cosine").put("autoThreshold", t.auto.toDouble()).put("suggestThreshold", t.suggest.toDouble()).put("margin", t.margin.toDouble())
-                            .put("speakersWithPrints", prints.size).put("autoApplied", prints.values.count { it.match?.state == Match.State.AUTO && it.match.voiceId in names })
+                            .put("speakersWithPrints", prints.size).put("autoApplied", prints.values.count { it.match?.state == Match.State.AUTO && it.match?.voiceId in names })
                             .put("suggested", prints.values.count { it.match?.state == Match.State.SUGGESTED }))
                     }
                     onUi { transcriptionProgress?.stage(TranscriptionProgress.Stage.SAVING, (System.nanoTime() - totalBegan) / 1_000_000) }
@@ -646,12 +670,7 @@ class MainActivity : Activity() {
     private fun canRename() = (interim != null && draftNamingOpen) || (document?.state == "ok" && interim == null && !busy)
 
     /** "Speaker 2" in any interface language: a note sealed before the language changed still has no name. */
-    private val defaultLabels by lazy {
-        listOf("en", "it").map { tag -> createConfigurationContext(android.content.res.Configuration(resources.configuration)
-            .apply { setLocale(Locale.forLanguageTag(tag)) }).getString(R.string.speaker_label, 0).substringBefore('0') }.toSet()
-    }
-    private fun isDefaultLabel(id: String, label: String) = label == id || label.isBlank() ||
-        defaultLabels.any { label.startsWith(it) && label.removePrefix(it).toIntOrNull() != null }
+    private fun isDefaultLabel(id: String, label: String) = DefaultLabels.isDefault(id, label)
 
     private fun showSpeakers() {
         if (document?.manifest == null) return
@@ -820,7 +839,7 @@ class MainActivity : Activity() {
             mapOf(source to target), previous.id)
         // One enrolment belongs to one variant: copies are automatic, so rejecting them never unenrols twice.
         val prints = notePrints.filterKeys { it != source }.mapValues { (_, print) ->
-            if (print.match?.state == Match.State.CONFIRMED) print.copy(match = print.match.copy(state = Match.State.AUTO)) else print }
+            if (print.match?.state == Match.State.CONFIRMED) print.copy(match = print.match?.copy(state = Match.State.AUTO)) else print }
         val name = existing.speakerLabel(target) ?: target
         runWork(R.string.saving) {
             val (file, merged) = documents.createFromOpus(Uri.fromFile(File(path)), edited, session.name, process, existing, emptyMap())
@@ -1064,7 +1083,7 @@ class MainActivity : Activity() {
             else snapshot.remainingMs?.let { getString(R.string.processing_eta_range, clock(TranscriptionProgress.roundedRemaining(snapshot.remainingLowMs ?: it)), clock(TranscriptionProgress.roundedRemaining(snapshot.remainingHighMs ?: it))) }
                 ?: getString(R.string.progress_estimating)
         val priorBattery = batteryReading
-        if (priorBattery == null || elapsedMs - priorBattery.elapsedMs >= 10000) batteryReading = BatteryProjection.read(this, elapsedMs)
+        if (priorBattery == null || elapsedMs - priorBattery.elapsedMs >= 10000) batteryReading = BatteryReader.read(this, elapsedMs)
         if (snapshot.remainingMs == 0L && finalizationAtMs < 0) finalizationAtMs = elapsedMs
         val batteryRemaining = snapshot.remainingMs?.let { remaining ->
             if (remaining > 0) (snapshot.remainingHighMs ?: remaining) + finalizationEstimateMs

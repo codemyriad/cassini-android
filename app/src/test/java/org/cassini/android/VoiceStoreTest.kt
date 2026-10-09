@@ -1,5 +1,6 @@
 package org.cassini.android
 
+import org.cassini.core.speakers.Voice
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

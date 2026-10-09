@@ -14,6 +14,8 @@ import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.platform.app.InstrumentationRegistry
+import org.cassini.core.format.CassiniDocument
+import org.cassini.core.library.Session
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
 import org.junit.Test

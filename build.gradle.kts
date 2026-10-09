@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.android.library) apply false
+    alias(libs.plugins.android.lint) apply false
     alias(libs.plugins.kotlin.android) apply false
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.kotlin.compose) apply false
@@ -19,9 +20,13 @@ detekt {
             "app/src/main/java",
             "app/src/test/java",
             "app/src/androidTest/java",
+            "core/src/main/kotlin",
+            "core/src/test/kotlin",
+            "core/src/testFixtures/kotlin",
             "build.gradle.kts",
             "settings.gradle.kts",
             "app/build.gradle.kts",
+            "core/build.gradle.kts",
         ),
     )
     parallel = true

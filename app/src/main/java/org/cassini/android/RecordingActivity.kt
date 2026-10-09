@@ -18,6 +18,7 @@ import android.os.Looper
 import android.view.Gravity
 import android.view.View
 import android.widget.*
+import org.cassini.android.ui.clock
 import java.text.DateFormat
 import java.util.Date
 

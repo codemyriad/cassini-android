@@ -3,6 +3,14 @@ package org.cassini.android
 import android.media.MediaCodec
 import android.media.MediaCodecList
 import android.media.MediaFormat
+import org.cassini.core.Failure
+import org.cassini.core.audio.Limits
+import org.cassini.core.audio.PcmAudio
+import org.cassini.core.audio.PcmSource
+import org.cassini.core.audio.source
+import org.cassini.core.format.CassiniDocument
+import org.cassini.core.format.OggOpus
+import org.cassini.core.requireUser
 import java.io.File
 import java.io.FileOutputStream
 import java.io.OutputStream

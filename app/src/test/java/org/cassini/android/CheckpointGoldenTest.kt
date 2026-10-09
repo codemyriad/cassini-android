@@ -1,5 +1,14 @@
 package org.cassini.android
 
+import org.cassini.core.asr.IncrementalTranscript
+import org.cassini.core.audio.PcmFile
+import org.cassini.core.checkpoint.CheckpointData
+import org.cassini.core.checkpoint.CheckpointState
+import org.cassini.core.format.CassiniDocument
+import org.cassini.core.format.OggOpus
+import org.cassini.core.format.Transcript
+import org.cassini.core.speakers.VoiceClipCache
+import org.cassini.core.testing.FixtureTree
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertArrayEquals
@@ -70,7 +79,8 @@ class CheckpointGoldenTest {
     @Test fun recognitionRestoresWhereTheJobStopped() {
         val saved = captured().second.load()!!
         val chunks = saved.getJSONObject("recognition").getJSONObject("chunks")
-        val restored = IncrementalTranscript(chunks) { _, _ -> error("A restore must not decode") }
+        val state = CheckpointState.incremental(chunks)
+        val restored = IncrementalTranscript(state) { _, _ -> error("A restore must not decode") }
         assertEquals(saved.getLong("positionSamples"), restored.positionSamples)
         assertEquals(saved.getLong("doneMs"), restored.doneMs)
         val words = Transcript.fromJson(chunks.getJSONObject("words").toString()).words
@@ -166,7 +176,8 @@ class CheckpointGoldenTest {
         val saved = checkpoint.load()!!
         val chunks = saved.getJSONObject("recognition").getJSONObject("chunks")
         assertEquals("it", Transcript.fromJson(chunks.getJSONObject("words").toString()).language)
-        val restored = IncrementalTranscript(chunks) { _, _ -> error("A restore must not decode") }
+        val state = CheckpointState.incremental(chunks)
+        val restored = IncrementalTranscript(state) { _, _ -> error("A restore must not decode") }
         assertEquals(saved.getLong("positionSamples"), restored.positionSamples)
         assertEquals(saved.getLong("doneMs"), restored.doneMs)
         val transcripts = LibraryStore(tree.root).load().mapNotNull { it.session.transcript }
@@ -194,7 +205,7 @@ class CheckpointGoldenTest {
         val plain = File(folder.root, "plain.opus")
         val untagged = captured.comments.filterNot { it.startsWith("CASSINI_", ignoreCase = true) }
         OggOpus.rewrite(file, CassiniDocument.tagsPacket(untagged), plain)
-        val speechToText = captured.manifest.getJSONObject("provenance").getJSONObject("speechToText")
+        val speechToText = captured.manifest!!.getJSONObject("provenance").getJSONObject("speechToText")
         val recognition = speechToText.getJSONObject(variant.id)
         val processing = JSONObject(recognition.toString()).put("language", "it")
         val labels = words.words.map { it.speaker }.distinct().associateWith { captured.speakerLabel(it)!! }
@@ -207,10 +218,10 @@ class CheckpointGoldenTest {
         assertEquals("it", default.descriptor.getString("language"))
         assertEquals("it", default.transcript!!.language)
         assertEquals("it", JSONObject(default.body!!).getString("language"))
-        assertEquals(words.words, default.transcript.words)
+        assertEquals(words.words, default.transcript!!.words)
         val provenance = sealed.manifest!!.getJSONObject("provenance").getJSONObject("speechToText")
         assertEquals("it", provenance.getJSONObject(default.id).getString("language"))
-        assertEquals(digest, sealed.manifest.getJSONObject("integrity").getString("opusAudioSha256"))
+        assertEquals(digest, sealed.manifest!!.getJSONObject("integrity").getString("opusAudioSha256"))
         assertEquals(captured.title, sealed.title)
         labels.forEach { (id, label) -> assertEquals(label, sealed.speakerLabel(id)) }
     }

@@ -8,6 +8,16 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
+import org.cassini.android.ui.clock
+import org.cassini.core.Failure
+import org.cassini.core.UserFacingException
+import org.cassini.core.audio.Limits
+import org.cassini.core.audio.PcmAudio
+import org.cassini.core.format.CassiniDocument
+import org.cassini.core.format.OggOpus
+import org.cassini.core.format.Transcript
+import org.cassini.core.format.Word
+import org.cassini.core.library.Session
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
@@ -121,7 +131,7 @@ class PortableDocumentTest {
                 assertTrue("Completion shows the realtime multiplier: $status", status.contains("×"))
                 assertEquals(android.view.View.GONE, it.findViewById<TextView>(R.id.transcript_draft).visibility)
             }
-            assertEquals(30000L, doc.manifest.getJSONObject("audio").getLong("durationMs"))
+            assertEquals(30000L, doc.manifest!!.getJSONObject("audio").getLong("durationMs"))
             val playable = android.os.SystemClock.uptimeMillis() + 8000
             var enabled = false; var status = ""
             while (!enabled && android.os.SystemClock.uptimeMillis() < playable) {
@@ -196,8 +206,8 @@ class PortableDocumentTest {
         val first = CassiniDocument.create(audio.readBytes(), words, "Portable Italian", JSONObject().put("model", "test"))
         val initial = CassiniDocument.read(first)
         initial.manifest!!.getJSONArray("speakers").getJSONObject(0).put("label", "Ada")
-        initial.manifest.getJSONArray("speakers").getJSONObject(1).put("label", "Ben")
-        initial.manifest.put("x-test", JSONObject().put("preserve", true))
+        initial.manifest!!.getJSONArray("speakers").getJSONObject(1).put("label", "Ben")
+        initial.manifest!!.put("x-test", JSONObject().put("preserve", true))
         val source = File(context.cacheDir, "portable-ui-source.opus")
         source.writeBytes(CassiniDocument.create(first, words, "Ignored", JSONObject(), initial))
         val exported = File(context.filesDir, "portable-ui-export.opus")

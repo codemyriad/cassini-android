@@ -2,6 +2,7 @@ package org.cassini.android
 
 import android.net.Uri
 import androidx.test.platform.app.InstrumentationRegistry
+import org.cassini.core.format.OggRepair
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -20,10 +21,10 @@ class RecoveryCheckTest {
             val started = android.os.SystemClock.elapsedRealtime()
             val decoded = AudioDecoder.decode(context, Uri.fromFile(file))
             val decodeMs = android.os.SystemClock.elapsedRealtime() - started
-            val line = "${file.name} modified=${file.lastModified()} bytes=${file.length()} clean=${RecoveryScanner.endsCleanly(file)} catalogued=${note?.session?.name}/${note?.session?.durationMs} decodedMs=${decoded.durationMs} decodeTookMs=$decodeMs"
+            val line = "${file.name} modified=${file.lastModified()} bytes=${file.length()} clean=${OggRepair.endsCleanly(file)} catalogued=${note?.session?.name}/${note?.session?.durationMs} decodedMs=${decoded.durationMs} decodeTookMs=$decodeMs"
             android.util.Log.i("CassiniRecoveryCheck", line)
             instrumentation.sendStatus(0, android.os.Bundle().apply { putString("stream", line + "\n") })
-            assertTrue(line, RecoveryScanner.endsCleanly(file) && note != null && kotlin.math.abs(decoded.durationMs - note.session.durationMs) <= 100)
+            assertTrue(line, OggRepair.endsCleanly(file) && note != null && kotlin.math.abs(decoded.durationMs - note.session.durationMs) <= 100)
         }
     }
 }

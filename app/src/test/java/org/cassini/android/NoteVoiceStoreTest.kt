@@ -1,5 +1,7 @@
 package org.cassini.android
 
+import org.cassini.core.speakers.Match
+import org.cassini.core.speakers.SpeakerPrint
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

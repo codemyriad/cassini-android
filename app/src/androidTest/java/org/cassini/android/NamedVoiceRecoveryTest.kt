@@ -2,6 +2,14 @@ package org.cassini.android
 
 import android.net.Uri
 import androidx.test.platform.app.InstrumentationRegistry
+import org.cassini.core.audio.PcmFile
+import org.cassini.core.format.CassiniDocument
+import org.cassini.core.format.OggOpus
+import org.cassini.core.speakers.Match
+import org.cassini.core.speakers.SpeakerPrint
+import org.cassini.core.speakers.SpeakerTurn
+import org.cassini.core.speakers.VoiceMatcher
+import org.cassini.core.speakers.Voiceprints
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -39,7 +47,7 @@ class NamedVoiceRecoveryTest {
         val computed = PcmFile(pcm).use { audio ->
             AudioDecoder.stream(context, Uri.parse(note.session.uri), audio::append)
             val selected = Voiceprints.select(turns, transcript.words, audio.sampleRate, audio.sampleCount)
-            Voiceprints.compute(File(model.modelPath), audio, selected) { }
+            VoiceprintExtractor.compute(File(model.modelPath), audio, selected) { }
         }
         assertTrue("Each named speaker must have enough clean speech", computed.keys.containsAll(named.keys))
         val originalPrints = app.noteVoices.load(document.manifest!!.getJSONObject("meeting").getString("id"),

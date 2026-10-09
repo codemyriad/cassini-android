@@ -3,6 +3,11 @@ package org.cassini.android
 import android.net.Uri
 import android.util.Log
 import androidx.test.platform.app.InstrumentationRegistry
+import org.cassini.core.audio.PcmAudio
+import org.cassini.core.audio.resampleTo16k
+import org.cassini.core.format.Word
+import org.cassini.core.speakers.SpeakerTurn
+import org.cassini.core.speakers.Voiceprints
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
@@ -26,7 +31,7 @@ class VoiceprintCalibrationTest {
         val ids = turns.map { it.third }.distinct()
         val words = turns.map { Word(it.third, it.first, it.second, "x") }.sortedBy { it.startMs }
         val windows = Voiceprints.select(turns.map { SpeakerTurn(it.first, it.second, ids.indexOf(it.third)) }, words, audio.sampleRate, audio.samples.size)
-        return Voiceprints.compute(File(model.modelPath), audio, windows) { }
+        return VoiceprintExtractor.compute(File(model.modelPath), audio, windows) { }
     }
     private fun summary(name: String, scores: List<Float>) {
         if (scores.isEmpty()) return

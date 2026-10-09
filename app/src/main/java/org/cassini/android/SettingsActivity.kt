@@ -13,6 +13,7 @@ import android.preference.PreferenceFragment
 import android.text.format.DateUtils
 import android.view.MenuItem
 import android.widget.TextView
+import org.cassini.core.speakers.Voice
 import java.io.File
 import java.util.concurrent.Executors
 

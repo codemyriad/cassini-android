@@ -8,6 +8,8 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
 import android.widget.*
+import org.cassini.android.ui.clock
+import org.cassini.core.library.LibraryNote
 import java.io.File
 import java.text.DateFormat
 import java.util.Calendar

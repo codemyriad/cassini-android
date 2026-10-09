@@ -3,6 +3,9 @@ package org.cassini.android
 import android.net.Uri
 import android.os.Bundle
 import androidx.test.platform.app.InstrumentationRegistry
+import org.cassini.core.asr.DecodePolicy
+import org.cassini.core.audio.PcmAudio
+import org.cassini.core.format.Transcript
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.*

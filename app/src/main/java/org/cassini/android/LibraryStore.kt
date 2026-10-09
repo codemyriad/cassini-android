@@ -3,6 +3,10 @@ package org.cassini.android
 import android.net.Uri
 import android.util.AtomicFile
 import android.util.Log
+import org.cassini.core.format.CassiniDocument
+import org.cassini.core.library.LegacyLibraryJson
+import org.cassini.core.library.LibraryNote
+import org.cassini.core.library.Session
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -14,10 +18,7 @@ class LibraryStore(private val directory: File) {
 
     fun load(): List<LibraryNote> {
         if (!file.baseFile.exists() && !File(directory, "library.json.bak").exists()) return emptyList()
-        val json = JSONObject(file.openRead().bufferedReader().use { it.readText() })
-        require(json.getInt("version") == 1)
-        val notes = json.getJSONArray("notes")
-        return (0 until notes.length()).map { LibraryNote.fromJson(notes.getJSONObject(it)) }.sortedByDescending { it.createdAt }
+        return LegacyLibraryJson.library(file.openRead().bufferedReader().use { it.readText() })
     }
 
     fun save(session: Session): Session {
@@ -93,3 +94,12 @@ class LibraryStore(private val directory: File) {
         marker.outputStream().use { it.write(byteArrayOf(1)); it.fd.sync() }
     }
 }
+
+/** The `library.json` note 0.1.0 writes; [LegacyLibraryJson.libraryNote] reads it back. */
+fun LibraryNote.json(): JSONObject = JSONObject().put("id", id).put("createdAt", createdAt).put("text", text)
+    .put("session", JSONObject().put("uri", session.uri).put("name", session.name)
+        .put("document", session.document).put("selectedVariant", session.selectedVariant)
+        .put("transcript", session.transcript?.takeIf { session.document == null }?.let { JSONObject(it.json()) })
+        .put("durationMs", session.durationMs).put("positionMs", session.positionMs)
+        .put("inferenceMs", session.inferenceMs).put("processingMs", session.processingMs).put("processingPaused", session.processingPaused)
+        .put("resultPrecision", session.resultPrecision))

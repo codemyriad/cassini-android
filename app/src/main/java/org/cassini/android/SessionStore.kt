@@ -1,37 +1,15 @@
 package org.cassini.android
 
 import android.util.AtomicFile
+import org.cassini.core.library.LegacyLibraryJson
+import org.cassini.core.library.Session
 import org.json.JSONObject
 import java.io.File
-
-data class Session(
-    val uri: String? = null, val name: String = "", val transcript: Transcript? = null,
-    val durationMs: Long = 0, val inferenceMs: Long = 0, val positionMs: Int = 0,
-    val resultPrecision: String = "INT8",
-    val document: String? = null, val selectedVariant: String? = null,
-    val processingMs: Long = 0,
-    val processingPaused: Boolean = false,
-    val libraryId: String? = null,
-    /** The viewer that wrote session.json last. Not part of a note. */
-    val screen: String? = null,
-)
 
 class SessionStore(directory: File) {
     private val file = AtomicFile(File(directory, "session.json"))
     fun load(): Session = try {
-        val json = JSONObject(file.openRead().bufferedReader().use { it.readText() })
-        Session(
-            uri = json.optString("uri").takeIf { it.isNotEmpty() }, name = json.optString("name"),
-            transcript = json.optJSONObject("transcript")?.let { Transcript.fromJson(it.toString()) },
-            durationMs = json.optLong("durationMs"), inferenceMs = json.optLong("inferenceMs"),
-            positionMs = json.optInt("positionMs"),
-            resultPrecision = json.optString("resultPrecision", "INT8"),
-            document = json.optString("document").takeIf { it.isNotEmpty() },
-            selectedVariant = json.optString("selectedVariant").takeIf { it.isNotEmpty() },
-            processingMs = json.optLong("processingMs"), processingPaused = json.optBoolean("processingPaused"),
-            libraryId = json.optString("libraryId").takeIf { it.isNotEmpty() },
-            screen = json.optString("screen").takeIf { it.isNotEmpty() },
-        )
+        LegacyLibraryJson.session(file.openRead().bufferedReader().use { it.readText() })
     } catch (_: Exception) { Session() }
 
     fun save(session: Session) {
