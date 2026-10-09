@@ -130,7 +130,16 @@ adb exec-out run-as org.cassini.android tar c \
     --exclude=files/parakeet-v3 --exclude=files/vad --exclude=files/speaker-models files > files-backup.tar
 ```
 
-Before you start a device run, make sure that no other run uses the device. `adb shell ps | grep instrument` shows a run in progress. If a run is in progress, wait for it to end. Do not stop it.
+If the test damaged or erased your notes, restore the backup. First stop the app, then extract the backup into the app storage:
+
+```sh
+adb shell am force-stop org.cassini.android
+adb exec-in run-as org.cassini.android tar xf - < files-backup.tar
+```
+
+The restore writes back each file in the backup. It does not delete the files that the test added.
+
+Before you start a device run, make sure that no other run uses the device. `adb shell ps -A -o ARGS | grep '[i]nstrument'` shows a run in progress. Use `-o ARGS`: the process name of a run is `app_process`, and only its arguments contain `instrument`. If a run is in progress, wait for it to end. Do not stop it.
 
 ## Device scripts
 
@@ -289,7 +298,7 @@ CI does not do these checks. Before the owner makes a release tag, do them by ha
 
 1. On a Pixel 8 (API 37), record a note, transcribe it with speakers, name a speaker, export the note and transcribe it again.
 2. Play music in another app. Then start a recording. Make sure that the music continues and the recording does not pause.
-3. Start a recording on an emulator. Send a call with `adb emu gsm call 5551234`. Make sure that the recording pauses.
+3. Start a recording on an emulator. Send a call with `adb emu gsm call 5551234`, then answer it with `adb emu gsm accept 5551234`. Make sure that the recording pauses and shows "Paused — another app is using audio". Android silences the recording only when the call is active, not while the phone rings.
 4. End the call with `adb emu gsm cancel 5551234`. Make sure that the recording stays paused until you push Resume.
 5. On an API 35 or 36 AVD, start a transcription. Make sure that `adb shell dumpsys activity services org.cassini.android` shows the type `mediaProcessing`.
 6. Make the time limit short with `adb shell device_config put activity_manager media_processing_fgs_timeout_duration 60000`.

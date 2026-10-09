@@ -68,7 +68,8 @@ If `cassini.db` is lost, the app makes the catalogue again from the note directo
 - The playback positions and the queue.
 - A rename that the app did not write into the document yet.
 - The titles of the notes that have no document. The title of such a note becomes "Recovered recording" and the date.
- A note with a valid checkpoint comes back paused.
+
+A note with a valid checkpoint comes back paused.
 
 ## Room catalogue
 
