@@ -25,8 +25,10 @@ import org.cassini.core.speakers.Voiceprints
 import org.json.JSONObject
 
 /**
- * The 0.1.0 `MainActivity.transcribe()` provenance and label code, copied verbatim (only the free variables became
- * parameters and `getString(R.string.speaker_label, n)` became "Speaker n"), as the golden for the same inputs.
+ * The 0.1.0 `MainActivity.transcribe()` provenance and label code as the golden for the same inputs. It is copied from
+ * the 0.1.x line after commit ed73e73, which removed `.put("language", "it")` from `processing()`, so it does not
+ * reproduce the v0.1.0 tag byte for byte. Only the free variables became parameters and
+ * `getString(R.string.speaker_label, n)` became "Speaker n". The comparison ignores key order.
  */
 object Golden010 {
     private fun processing(precision: String, revision: String? = null): JSONObject = JSONObject()

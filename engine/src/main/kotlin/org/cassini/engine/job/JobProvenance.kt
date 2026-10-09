@@ -10,8 +10,9 @@ import org.cassini.core.speakers.Voiceprints
 import org.json.JSONObject
 
 /**
- * The `provenance.speechToText.<variant>` record of a transcription, built as 0.1.0 `MainActivity.transcribe()` built
- * it: the same keys, values and order. Machine-readable, independent of the UI language. The keys `x-inferenceMs`,
+ * The `provenance.speechToText.<variant>` record of a transcription, with the keys and values that 0.1.x
+ * `MainActivity.transcribe()` wrote after commit ed73e73 (no fixed "it" language). The key order is not part of the
+ * contract and the golden test does not check it. Machine-readable, independent of the UI language. The keys `x-inferenceMs`,
  * `x-segmentation`, `x-resumedFromMs`, `x-speakerDiarization`, `x-incrementalDiarization`, `x-speakerMerges` and
  * `x-speakerIdentification` are a contract with the desktop pipeline and the Room cache: never rename them.
  */

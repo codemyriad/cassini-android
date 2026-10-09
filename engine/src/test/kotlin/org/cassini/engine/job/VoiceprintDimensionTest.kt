@@ -12,8 +12,9 @@ import java.io.File
 
 /**
  * `ModelCatalog.VOICEPRINT_DIM` decides which saved voices are stale; the voiceprint adapter is what produces prints.
- * The native CAM++ model cannot run in a JVM test, so a fake extraction stands in for it and the adapter's own check is
- * what is tested.
+ * The native CAM++ model cannot run in a JVM test, so a fake extraction stands in for it: this test checks the
+ * constants and the adapter's guard, not the real model's output length. A model that gives another length fails
+ * the guard at run time, which the job logs as "Voiceprints failed".
  */
 class VoiceprintDimensionTest {
     private val audio = PcmAudio(FloatArray(16_000), 16_000).source()
