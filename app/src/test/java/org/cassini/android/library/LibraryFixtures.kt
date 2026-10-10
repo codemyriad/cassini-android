@@ -99,6 +99,7 @@ internal class FakeLibraryPorts : LibraryPorts {
     override val processing = MutableStateFlow(ProcessingState(loading = false))
     override val recording: MutableStateFlow<RecordingState> = MutableStateFlow(RecordingState.Idle)
     override val notices = MutableStateFlow(NoticeFacts())
+    override val voiceModelReady = MutableStateFlow(true)
     var transcribeOutcome: TranscribeOutcome = TranscribeOutcome.Queued(changed = true)
     val actions = mutableListOf<String>()
     val searches = mutableListOf<String>()

@@ -21,6 +21,8 @@
     <string name="error_playback">Playback is unavailable for this file.</string>
     <string name="error_opus_encoder">This device has no Opus encoder. It can open existing documents, but cannot create new Cassini files.</string>
     <string name="error_speakers">No speaker turns were found. The original transcript is unchanged.</string>
+    <string name="error_document_unverified">The audio of this document could not be checked, so a new version cannot be added.</string>
+    <string name="error_document_unknown_format">This document has a newer Cassini format, so a new version cannot be added here.</string>
     <string name="recording_channel">Recording</string>
     <string name="import_fallback_title">Imported audio</string>
     <!-- The body of a TXT export without words (features.md section 9). -->

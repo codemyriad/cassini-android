@@ -132,9 +132,12 @@ class LibraryViewModel(
         if (id == null) flowOf(null) else ports.details(id).catch { emit(null) }
     }
 
-    private val live: Flow<Live> = combine(ports.processing, ports.recording, ports.notices) { processing, rec, facts ->
-        Live(processing, rec, facts)
-    }
+    private val live: Flow<Live> = combine(
+        ports.processing,
+        ports.recording,
+        ports.notices,
+        ports.voiceModelReady.onStart { emit(false) }.distinctUntilChanged(),
+    ) { processing, rec, facts, voices -> Live(processing, rec, facts, voices) }
 
     val state: StateFlow<LibraryUiState> = combine(
         combine(rows, search, query, ::Listing),
@@ -162,7 +165,12 @@ class LibraryViewModel(
         val query: String,
     )
 
-    private data class Live(val processing: ProcessingState, val recording: RecordingState, val facts: NoticeFacts)
+    private data class Live(
+        val processing: ProcessingState,
+        val recording: RecordingState,
+        val facts: NoticeFacts,
+        val voiceModelReady: Boolean,
+    )
 
     private fun build(
         listing: Listing,
@@ -200,7 +208,9 @@ class LibraryViewModel(
             sections = if (searching) persistentListOf() else LibraryMapping.sections(rows, context, now, zone),
             results = results ?: if (searching) persistentListOf() else null,
             snackbar = snackbar,
-            sheet = details?.let { LibrarySheet.Actions(LibraryMapping.actions(it, context.activeNoteId, now, zone)) },
+            sheet = details?.let {
+                LibrarySheet.Actions(LibraryMapping.actions(it, context.activeNoteId, now, zone, live.voiceModelReady))
+            },
             dialog = dialogKey?.let { dialogOf(it) },
         )
     }
@@ -326,7 +336,9 @@ class LibraryViewModel(
             }
             NoteAction.TRANSCRIBE_AGAIN -> {
                 closeSheet()
-                if (LibraryMapping.needsFreshConfirmation(details)) {
+                if (LibraryMapping.transcribeAgainRefused(details)) {
+                    Log.w(TAG, "Transcribe again is not possible for this document")
+                } else if (LibraryMapping.needsFreshConfirmation(details)) {
                     saved[KEY_DIALOG] = dialogKey(DIALOG_TRANSCRIBE_FRESH, id)
                 } else {
                     transcribe(id, JobKind.TRANSCRIBE_AGAIN)

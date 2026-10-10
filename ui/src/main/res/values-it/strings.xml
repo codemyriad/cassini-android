@@ -342,6 +342,7 @@
     <string name="ui_actions_rename_title">Rinomina</string>
     <string name="ui_actions_adds_version">Aggiunge la versione %1$d.</string>
     <string name="ui_actions_names_carry">I nomi delle voci vengono mantenuti.</string>
+    <string name="ui_actions_no_new_version">Questo file non può avere una nuova versione qui.</string>
     <string name="ui_actions_fresh_title">Trascrivere di nuovo?</string>
     <string name="ui_actions_fresh_body">Le versioni precedenti non si possono conservare perché l’audio è cambiato.</string>
     <string name="ui_actions_document_info">Informazioni sul documento</string>

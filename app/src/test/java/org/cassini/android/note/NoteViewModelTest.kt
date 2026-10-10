@@ -513,6 +513,25 @@ class NoteViewModelTest {
     }
 
     @Test
+    fun anUnverifiedDocumentOffersNoTranscribeAgainAndItsFailureClears() = runTest(dispatcher) {
+        ports.details.value = documentNote(DocumentState.UNVERIFIED)
+        val viewModel = viewModel()
+        ports.setJob(job(JobState.FAILED, JobKind.TRANSCRIBE_AGAIN, failure = "DOCUMENT_UNVERIFIED"))
+        advanceUntilIdle()
+        send(viewModel, NoteEvent.More)
+        val row = (viewModel.now().sheet as NoteSheet.Actions).ui.transcribeRow
+        assertEquals(TranscribeRowUi.TranscribeAgainUnavailable, row)
+        send(viewModel, NoteEvent.SheetAction(NoteAction.TRANSCRIBE_AGAIN))
+        assertFalse(ports.calls.any { it.startsWith("transcribe") })
+
+        val failed = viewModel.now().banners.single { it.kind == BannerKind.TX_FAILED }
+        assertEquals("failed: DOCUMENT_UNVERIFIED", failed.args.text)
+        assertTrue("no Try again: it fails the same way", failed.actions.isEmpty())
+        send(viewModel, NoteEvent.DismissBanner(failed.id))
+        assertEquals("clearFailed", ports.calls.last())
+    }
+
+    @Test
     fun pausedRowsResumeOrStartOverWithConfirmation() = runTest(dispatcher) {
         val viewModel = viewModel()
         ports.setJob(job(JobState.PAUSED, JobKind.TRANSCRIBE_AGAIN, doneMs = 1_000))

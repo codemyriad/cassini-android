@@ -371,6 +371,7 @@
     <string name="ui_actions_rename_title">Rename</string>
     <string name="ui_actions_adds_version">Adds version %1$d.</string>
     <string name="ui_actions_names_carry">Speaker names carry over.</string>
+    <string name="ui_actions_no_new_version">This file can’t take a new version here.</string>
     <string name="ui_actions_fresh_title">Transcribe again?</string>
     <string name="ui_actions_fresh_body">Earlier versions can’t be kept because the audio changed.</string>
     <string name="ui_actions_document_info">Document info</string>

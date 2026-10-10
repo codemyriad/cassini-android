@@ -179,6 +179,13 @@ private fun TranscribeRows(row: TranscribeRowUi, onAction: (NoteAction) -> Unit)
                 },
             )
         }
+        TranscribeRowUi.TranscribeAgainUnavailable -> SheetActionRow(
+            label = stringResource(R.string.ui_action_transcribe_again),
+            glyph = Glyph.Retranscribe,
+            onClick = {},
+            subtitle = stringResource(R.string.ui_actions_no_new_version),
+            enabled = false,
+        )
         TranscribeRowUi.Stop -> SheetActionRow(
             label = stringResource(R.string.ui_action_stop_keep_progress),
             glyph = Glyph.Pause,

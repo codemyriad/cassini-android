@@ -26,6 +26,7 @@ import org.cassini.ui.banner.BannerKind
 import org.cassini.ui.banner.BannerSpec
 import org.cassini.ui.format.ModelPartUi
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -147,6 +148,19 @@ class NoticeCenterTest {
             only(Notices.job(job(JobState.FAILED, doneMs = 9, failure = "AUDIO"))).actions,
         )
         assertEquals(BannerKind.TX_ONE_VOICE, only(Notices.job(null, oneVoice = true)).kind)
+
+        // A refused document fails the same way on every try: no Try again, and the banner can be dismissed.
+        val refused = job(JobState.FAILED, doneMs = 9, failure = "DOCUMENT_UNVERIFIED")
+        val final = only(Notices.job(refused, failureText = "Not checked."))
+        assertEquals(BannerKind.TX_FAILED, final.kind)
+        assertTrue(final.actions.isEmpty())
+        assertTrue(final.dismissible)
+        assertTrue(Notices.finalFailure(refused, noNewVersion = false))
+        val again = job(JobState.FAILED, failure = "AUDIO").copy(kind = JobKind.TRANSCRIBE_AGAIN)
+        assertTrue(Notices.finalFailure(again, noNewVersion = true))
+        assertFalse(Notices.finalFailure(again, noNewVersion = false))
+        assertTrue(only(Notices.job(again, noNewVersion = true)).actions.isEmpty())
+        assertTrue(only(Notices.job(null, oneVoice = true, noNewVersion = true)).actions.isEmpty())
         assertTrue(Notices.job(job(JobState.QUEUED)).isEmpty())
         assertTrue(Notices.job(job(JobState.RUNNING)).isEmpty())
 

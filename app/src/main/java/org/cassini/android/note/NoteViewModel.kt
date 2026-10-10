@@ -425,7 +425,8 @@ class NoteViewModel(
         if (overDocument) trustBanner(details, ui)?.let { list += it }
         val phase = core.job?.phase.takeIf { mode !is NoteMode.Processing }
         val failure = details.job?.failure?.let { ports.failureText(it) }
-        list += Notices.job(details.job, phase, NoteMapping.oneVoice(details), failure, freeBytes)
+        val refused = LibraryMapping.transcribeAgainRefused(details)
+        list += Notices.job(details.job, phase, NoteMapping.oneVoice(details), failure, freeBytes, refused)
         if (mode is NoteMode.Paused && facts.hold && facts.queued > 0) {
             list += BannerSpec(BannerKind.TX_QUEUE_HELD, BannerArgs(count = facts.queued))
         }
@@ -453,7 +454,8 @@ class NoteViewModel(
             null -> null
             SheetKind.ACTIONS -> {
                 val active = activeNoteId(live.recording)
-                NoteSheet.Actions(LibraryMapping.actions(details, active, now, clock.zone).copy(busyRow = ui.busyRow))
+                val actions = LibraryMapping.actions(details, active, now, clock.zone, live.voiceModelReady)
+                NoteSheet.Actions(actions.copy(busyRow = ui.busyRow))
             }
             SheetKind.VERSIONS -> NoteSheet.Versions(NoteMapping.versions(details, now, clock.zone))
             SheetKind.SUBTITLES -> NoteSheet.SubtitleFormat
@@ -528,7 +530,7 @@ class NoteViewModel(
             is NoteEvent.NameSheet -> nameSheet(event.event)
             is NoteEvent.Merge -> mergeSheet(event.event)
             is NoteEvent.BannerAction -> launch { bannerAction(event.id, event.action) }
-            is NoteEvent.DismissBanner -> local.update { it.copy(dismissed = it.dismissed + event.id) }
+            is NoteEvent.DismissBanner -> dismissBanner(event.id)
             NoteEvent.DismissSheet -> closeSheet()
             NoteEvent.DismissDialog -> local.update { it.copy(dialog = null) }
             NoteEvent.SnackbarTimeout -> local.update { it.copy(snackbar = null) }
@@ -750,9 +752,24 @@ class NoteViewModel(
         if (outcome == TranscribeOutcome.NeedsConsent) emit(NoteEffect.OpenModelDownload(ModelDownloadKey(noteId)))
     }
 
+    /** Hides the banner [id]; a dismissed final failure also removes its job row, so the document shows again. */
+    private fun dismissBanner(id: String) {
+        val details = details.value?.details
+        val job = details?.job
+        val final = id == BannerKind.TX_FAILED.name && job != null &&
+            Notices.finalFailure(job, LibraryMapping.transcribeAgainRefused(details))
+        if (final) {
+            launch { ports.clearFailed(noteId) }
+        } else {
+            local.update { it.copy(dismissed = it.dismissed + id) }
+        }
+    }
+
     /** Transcribe again: a document that is not OK asks first ("Earlier versions can't be kept…"). */
     private suspend fun transcribeAgain(details: NoteDetails) {
-        if (LibraryMapping.needsFreshConfirmation(details)) {
+        if (LibraryMapping.transcribeAgainRefused(details)) {
+            Log.w(TAG, "Transcribe again is not possible for this document")
+        } else if (LibraryMapping.needsFreshConfirmation(details)) {
             local.update { it.copy(dialog = NoteDialog.TranscribeFresh) }
         } else {
             transcribe(JobKind.TRANSCRIBE_AGAIN)

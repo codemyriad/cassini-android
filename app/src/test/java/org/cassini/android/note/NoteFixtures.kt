@@ -238,6 +238,10 @@ internal class FakeNotePorts : NotePorts {
         calls += "dequeue"
     }
 
+    override suspend fun clearFailed(id: String) {
+        calls += "clearFailed"
+    }
+
     override suspend fun continueQueue() {
         calls += "continue"
     }

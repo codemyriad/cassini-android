@@ -29,6 +29,7 @@ import org.cassini.android.recording.RecordingState
 import org.cassini.android.stringRes
 import org.cassini.core.Failure
 import org.cassini.core.checkpoint.CheckpointNames
+import org.cassini.core.format.DocumentState
 import org.cassini.core.library.JobKind
 import org.cassini.core.models.ModelPart
 import org.cassini.core.speakers.Match
@@ -47,6 +48,7 @@ import org.cassini.data.notes.TranscriptExport
 import org.cassini.data.voices.SavedVoices
 import org.cassini.data.voices.UnenrolOutcome
 import org.cassini.data.voices.VoiceEdit
+import org.cassini.engine.job.JobFailure
 import org.cassini.ui.format.Counts
 import org.cassini.ui.format.Dates
 import org.cassini.ui.format.Durations
@@ -136,6 +138,9 @@ interface NotePorts {
     fun stop(id: String)
 
     suspend fun dequeue(id: String)
+
+    /** Removes a FAILED job row (a dismissed final failure). */
+    suspend fun clearFailed(id: String)
 
     suspend fun continueQueue()
 
@@ -290,6 +295,8 @@ class GraphNotePorts(private val graph: AppGraph, context: Context) : NotePorts 
 
     override suspend fun dequeue(id: String) = library.dequeue(id)
 
+    override suspend fun clearFailed(id: String) = graph.processing.clearFailed(id)
+
     override suspend fun continueQueue() = library.continueQueue()
 
     override fun cancelDownload() = graph.processing.cancelDownload()
@@ -388,8 +395,14 @@ class GraphNotePorts(private val graph: AppGraph, context: Context) : NotePorts 
 
     override fun exportEmptyText(): String = localized().getString(R.string.export_no_words)
 
-    override fun failureText(code: String): String? = Failure.entries.firstOrNull { it.name == code }
-        ?.let { localized().getString(it.stringRes) }
+    override fun failureText(code: String): String? {
+        val res = Failure.entries.firstOrNull { it.name == code }?.stringRes ?: when (code) {
+            JobFailure.DocumentRefused(DocumentState.UNVERIFIED).code -> R.string.error_document_unverified
+            JobFailure.DocumentRefused(DocumentState.UNKNOWN_FORMAT).code -> R.string.error_document_unknown_format
+            else -> return null
+        }
+        return localized().getString(res)
+    }
 
     // Notices. -----------------------------------------------------------------------------------------------------
 

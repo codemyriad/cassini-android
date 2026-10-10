@@ -49,6 +49,12 @@ sealed interface TranscribeRowUi {
     @Immutable
     data class TranscribeAgain(val nextVersion: Int, val namesCarry: Boolean) : TranscribeRowUi
 
+    /**
+     * A document that cannot take a new version here (UNVERIFIED or UNKNOWN_FORMAT, architecture 12): "Transcribe
+     * again", disabled, with the reason.
+     */
+    data object TranscribeAgainUnavailable : TranscribeRowUi
+
     /** A running job: "Stop and keep progress". */
     data object Stop : TranscribeRowUi
 

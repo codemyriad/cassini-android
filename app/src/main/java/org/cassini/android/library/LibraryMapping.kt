@@ -233,15 +233,26 @@ object LibraryMapping {
 
     // The Note actions sheet. ---------------------------------------------------------------------------------
 
-    /** The Note actions sheet of [details] (features.md section 6) as the Library opens it. */
-    fun actions(details: NoteDetails, activeNoteId: String?, now: Instant, zone: ZoneId): NoteActionsUi {
+    /**
+     * The Note actions sheet of [details] (features.md section 6) as the Library opens it. Names carry over to a new
+     * version only through note voiceprints, so "Speaker names carry over." needs [voiceModelReady] and a named
+     * speaker.
+     */
+    fun actions(
+        details: NoteDetails,
+        activeNoteId: String?,
+        now: Instant,
+        zone: ZoneId,
+        voiceModelReady: Boolean,
+    ): NoteActionsUi {
         val note = details.note
         val selected = details.variants.firstOrNull { it.variantId == note.selectedVariant }
             ?: details.variants.firstOrNull { it.isDefault }
             ?: details.variants.minByOrNull { it.ordinal }
         val document = note.audioKind == AudioKind.DOCUMENT
         val readable = note.documentState !in UNREADABLE_STATES
-        val namesCarry = details.speakers.any { it.variantId == selected?.variantId && !it.isPlaceholder }
+        val namesCarry = voiceModelReady &&
+            details.speakers.any { it.variantId == selected?.variantId && !it.isPlaceholder }
         return NoteActionsUi(
             noteId = note.id,
             title = note.title,
@@ -265,12 +276,21 @@ object LibraryMapping {
         JobState.RUNNING -> TranscribeRowUi.Stop
         JobState.QUEUED -> TranscribeRowUi.RemoveFromQueue
         JobState.PAUSED -> TranscribeRowUi.ResumeOrStartOver
-        JobState.FAILED, JobState.NEEDS_CONSENT, null -> if (details.note.audioKind == AudioKind.DOCUMENT) {
-            TranscribeRowUi.TranscribeAgain(details.variants.size + 1, namesCarry)
-        } else {
-            TranscribeRowUi.Transcribe
+        JobState.FAILED, JobState.NEEDS_CONSENT, null -> when {
+            transcribeAgainRefused(details) -> TranscribeRowUi.TranscribeAgainUnavailable
+            details.note.audioKind == AudioKind.DOCUMENT ->
+                TranscribeRowUi.TranscribeAgain(details.variants.size + 1, namesCarry)
+            else -> TranscribeRowUi.Transcribe
         }
     }
+
+    /**
+     * Whether the job refuses Transcribe again on [details]: an UNVERIFIED or UNKNOWN_FORMAT document cannot take a
+     * new version, and features.md section 6 does not let a fresh document replace it (architecture 12). The sheet
+     * shows the row disabled, and the banners do not offer it.
+     */
+    fun transcribeAgainRefused(details: NoteDetails): Boolean =
+        details.note.audioKind == AudioKind.DOCUMENT && details.note.documentState in REFUSED_STATES
 
     /** Whether Transcribe again on [details] makes a fresh document, which needs a confirmation first. */
     fun needsFreshConfirmation(details: NoteDetails): Boolean =
@@ -278,6 +298,8 @@ object LibraryMapping {
 
     private val UNREADABLE_STATES =
         setOf(DocumentState.UNREADABLE, DocumentState.INVALID_METADATA, DocumentState.UNKNOWN_FORMAT)
+
+    private val REFUSED_STATES = setOf(DocumentState.UNVERIFIED, DocumentState.UNKNOWN_FORMAT)
 
     /** Documents that Transcribe again replaces with a fresh one (features.md section 6). */
     private val FRESH_STATES =

@@ -239,7 +239,7 @@ class LibraryMappingTest {
     @Test
     fun actionsSheetRows() {
         val plain = details(libraryRow("p"))
-        val plainUi = LibraryMapping.actions(plain, null, NOW, ROME)
+        val plainUi = LibraryMapping.actions(plain, null, NOW, ROME, voiceModelReady = true)
         assertEquals(TranscribeRowUi.Transcribe, plainUi.transcribeRow)
         assertEquals(DocumentKindUi.Plain("m4a"), plainUi.documentKind)
         assertFalse(plainUi.textExportEnabled)
@@ -254,8 +254,23 @@ class LibraryMappingTest {
                 SpeakerEntity("d", "v1", "s2", 1, label = "Speaker 2", isPlaceholder = true, placeholderNumber = 2),
             ),
         )
-        val docUi = LibraryMapping.actions(doc, null, NOW, ROME)
+        val docUi = LibraryMapping.actions(doc, null, NOW, ROME, voiceModelReady = true)
         assertEquals(TranscribeRowUi.TranscribeAgain(nextVersion = 2, namesCarry = true), docUi.transcribeRow)
+        assertEquals(
+            "names carry over only through voiceprints",
+            TranscribeRowUi.TranscribeAgain(nextVersion = 2, namesCarry = false),
+            LibraryMapping.actions(doc, null, NOW, ROME, voiceModelReady = false).transcribeRow,
+        )
+        for (state in listOf(DocumentState.UNVERIFIED, DocumentState.UNKNOWN_FORMAT)) {
+            val refused = doc.copy(note = doc.note.copy(documentState = state))
+            assertTrue(state.name, LibraryMapping.transcribeAgainRefused(refused))
+            assertEquals(
+                state.name,
+                TranscribeRowUi.TranscribeAgainUnavailable,
+                LibraryMapping.actions(refused, null, NOW, ROME, voiceModelReady = true).transcribeRow,
+            )
+        }
+        assertFalse(LibraryMapping.transcribeAgainRefused(doc))
         assertEquals(DocumentKindUi.Document, docUi.documentKind)
         assertTrue(docUi.textExportEnabled)
         assertEquals(2, docUi.speakers)
@@ -267,17 +282,18 @@ class LibraryMappingTest {
             JobState.FAILED to TranscribeRowUi.Transcribe,
         )
         for ((state, row) in states) {
-            val ui = LibraryMapping.actions(plain.copy(job = jobOf("p", state)), null, NOW, ROME)
+            val job = plain.copy(job = jobOf("p", state))
+            val ui = LibraryMapping.actions(job, null, NOW, ROME, voiceModelReady = true)
             assertEquals(state.name, row, ui.transcribeRow)
         }
 
         val unreadable = details(docRow("u", DocumentState.UNREADABLE))
-        assertFalse(LibraryMapping.actions(unreadable, null, NOW, ROME).textExportEnabled)
+        assertFalse(LibraryMapping.actions(unreadable, null, NOW, ROME, voiceModelReady = true).textExportEnabled)
         assertTrue(LibraryMapping.needsFreshConfirmation(unreadable))
         assertFalse(LibraryMapping.needsFreshConfirmation(doc))
 
         val recording = details(libraryRow("r", audioKind = AudioKind.LIVE_CAPTURE))
-        assertTrue(LibraryMapping.actions(recording, "r", NOW, ROME).recording)
+        assertTrue(LibraryMapping.actions(recording, "r", NOW, ROME, voiceModelReady = true).recording)
         assertEquals(JobKind.TRANSCRIBE, jobOf("x", JobState.QUEUED).kind)
     }
 }

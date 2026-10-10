@@ -259,6 +259,14 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
         }
     }
 
+    /** Removes the FAILED row of [noteId] (a dismissed final failure); the note shows its document again. */
+    suspend fun clearFailed(noteId: String) {
+        val catalogue = graph.awaitCatalogue()
+        queueLock.withLock {
+            if (catalogue.jobs.job(noteId)?.state == JobState.FAILED) catalogue.jobs.remove(noteId)
+        }
+    }
+
     /** Start over: cancels the job if it runs, discards the checkpoint and the pending prints, then enqueues. */
     suspend fun startOver(noteId: String, origin: StartOrigin = StartOrigin.SCREEN): TranscribeOutcome {
         val kind = graph.awaitCatalogue().jobs.job(noteId)?.kind ?: JobKind.TRANSCRIBE

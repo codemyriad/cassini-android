@@ -5,8 +5,10 @@ import android.os.Build
 import android.view.accessibility.AccessibilityManager
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import org.cassini.android.AppGraph
 import org.cassini.android.notices.NoticeFacts
 import org.cassini.android.notices.TrashedNote
@@ -14,9 +16,11 @@ import org.cassini.android.processing.ProcessingState
 import org.cassini.android.processing.TranscribeOutcome
 import org.cassini.android.recording.RecordingState
 import org.cassini.core.library.JobKind
+import org.cassini.core.models.ModelPart
 import org.cassini.data.db.LibraryRow
 import org.cassini.data.db.NoteDetails
 import org.cassini.data.db.SearchRow
+import org.cassini.data.models.ModelStatus
 import org.cassini.data.notes.RenameOutcome
 import org.cassini.ui.banner.BannerKind
 
@@ -36,6 +40,9 @@ interface LibraryPorts {
     val processing: Flow<ProcessingState>
     val recording: StateFlow<RecordingState>
     val notices: Flow<NoticeFacts>
+
+    /** The voiceprint model is installed: speaker names can carry over to a new version. */
+    val voiceModelReady: Flow<Boolean>
 
     suspend fun transcribe(id: String, kind: JobKind): TranscribeOutcome
 
@@ -88,6 +95,9 @@ class GraphLibraryPorts(private val graph: AppGraph, context: Context) : Library
     override val processing: Flow<ProcessingState> get() = graph.processing.state
     override val recording: StateFlow<RecordingState> get() = graph.recording.state
     override val notices: Flow<NoticeFacts> get() = graph.notices.facts
+
+    override val voiceModelReady: Flow<Boolean>
+        get() = graph.models.status.map { it[ModelPart.VOICES] == ModelStatus.Ready }.distinctUntilChanged()
 
     override suspend fun transcribe(id: String, kind: JobKind): TranscribeOutcome =
         graph.processing.transcribe(id, kind)

@@ -21,6 +21,8 @@
     <string name="error_playback">Riproduzione non disponibile per questo file.</string>
     <string name="error_opus_encoder">Questo dispositivo non ha un codificatore Opus. Può aprire documenti esistenti, ma non creare nuovi file Cassini.</string>
     <string name="error_speakers">Nessun turno di parola trovato. La trascrizione originale è invariata.</string>
+    <string name="error_document_unverified">Non è stato possibile verificare l’audio di questo documento, quindi non si può aggiungere una nuova versione.</string>
+    <string name="error_document_unknown_format">Questo documento ha un formato Cassini più recente, quindi qui non si può aggiungere una nuova versione.</string>
     <string name="recording_channel">Registrazione</string>
     <string name="import_fallback_title">Audio importato</string>
     <!-- The body of a TXT export without words (features.md section 9). -->

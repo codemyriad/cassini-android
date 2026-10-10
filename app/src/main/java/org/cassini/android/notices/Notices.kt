@@ -9,6 +9,7 @@ import org.cassini.android.recording.RecordingState
 import org.cassini.android.recording.RecordingWarning
 import org.cassini.core.Failure
 import org.cassini.core.audio.Limits
+import org.cassini.core.library.JobKind
 import org.cassini.core.library.JobState
 import org.cassini.core.library.PauseReason
 import org.cassini.core.models.ModelPart
@@ -184,22 +185,34 @@ object Notices {
      * The banners of one note's [job]: paused, failed and download banners, and the download progress while [phase]
      * downloads. [oneVoice] is the rule of features.md section 3.3 (the Note ViewModel decides it). [failureText] is
      * the FailureMessages text of a failed job; [requiredFreeBytes] the free space the model plan needs.
+     * [noNewVersion] is true when the document cannot take a new version (`LibraryMapping.transcribeAgainRefused`):
+     * then no banner offers Transcribe again, and a failed Transcribe again offers no Try again.
      */
+    @Suppress("LongParameterList") // the facts of one note's job banners
     fun job(
         job: JobEntity?,
         phase: JobPhase? = null,
         oneVoice: Boolean = false,
         failureText: String? = null,
         requiredFreeBytes: Long = 0,
+        noNewVersion: Boolean = false,
     ): ImmutableList<BannerSpec> {
         val notices = mutableListOf<Notice>()
         (phase as? JobPhase.Downloading)?.progress?.let { notices += Notice(downloading(it)) }
-        if (job != null) notices += listOfNotNull(jobNotice(job, failureText, requiredFreeBytes))
-        if (oneVoice && job == null) notices += Notice(BannerSpec(BannerKind.TX_ONE_VOICE))
+        if (job != null) notices += listOfNotNull(jobNotice(job, failureText, requiredFreeBytes, noNewVersion))
+        if (oneVoice && job == null) {
+            val actions = if (noNewVersion) persistentListOf() else BannerKind.TX_ONE_VOICE.actions
+            notices += Notice(BannerSpec(BannerKind.TX_ONE_VOICE, actions = actions))
+        }
         return ordered(notices)
     }
 
-    private fun jobNotice(job: JobEntity, failureText: String?, requiredFreeBytes: Long): Notice? {
+    private fun jobNotice(
+        job: JobEntity,
+        failureText: String?,
+        requiredFreeBytes: Long,
+        noNewVersion: Boolean,
+    ): Notice? {
         val checkpoint = job.doneMs > 0
         val spec = when (job.state) {
             JobState.PAUSED -> when {
@@ -207,13 +220,32 @@ object Notices {
                 checkpoint -> BannerSpec(BannerKind.TX_PAUSED, BannerArgs(ms1 = job.doneMs, ms2 = job.totalMs))
                 else -> BannerSpec(BannerKind.TX_PAUSED_EARLY)
             }
-            JobState.FAILED -> failed(job.failure.orEmpty(), checkpoint, failureText, requiredFreeBytes)
+            JobState.FAILED -> {
+                val final = finalFailure(job, noNewVersion)
+                failed(job.failure.orEmpty(), checkpoint, failureText, requiredFreeBytes, final)
+            }
             JobState.QUEUED, JobState.RUNNING, JobState.NEEDS_CONSENT -> null
         } ?: return null
         return Notice(spec, job.updatedAt)
     }
 
-    private fun failed(code: String, checkpoint: Boolean, failureText: String?, requiredFreeBytes: Long): BannerSpec {
+    /**
+     * Whether [job] failed in a way that every new try repeats: the document was refused, or it cannot take a new
+     * version (architecture 12). Its TX_FAILED banner offers no Try again, and its dismissal removes the job row.
+     */
+    fun finalFailure(job: JobEntity, noNewVersion: Boolean): Boolean {
+        if (job.state != JobState.FAILED) return false
+        val refused = job.failure.orEmpty().startsWith(JobFailure.DOCUMENT_PREFIX)
+        return refused || (noNewVersion && job.kind == JobKind.TRANSCRIBE_AGAIN)
+    }
+
+    private fun failed(
+        code: String,
+        checkpoint: Boolean,
+        failureText: String?,
+        requiredFreeBytes: Long,
+        final: Boolean,
+    ): BannerSpec {
         JobFailure.downloadError(code)?.let { return download(it, requiredFreeBytes) }
         return when (code) {
             JobFailure.CheckpointMismatch.code -> BannerSpec(BannerKind.TX_CHECKPOINT_MISMATCH)
@@ -221,10 +253,12 @@ object Notices {
             else -> BannerSpec(
                 BannerKind.TX_FAILED,
                 BannerArgs(text = failureText),
-                actions = if (checkpoint) {
-                    persistentListOf(BannerAction.TRY_AGAIN, BannerAction.START_OVER)
-                } else {
-                    BannerKind.TX_FAILED.actions
+                // A final failure has nothing to try, so the user can dismiss it.
+                dismissible = final,
+                actions = when {
+                    final -> persistentListOf()
+                    checkpoint -> persistentListOf(BannerAction.TRY_AGAIN, BannerAction.START_OVER)
+                    else -> BannerKind.TX_FAILED.actions
                 },
             )
         }
