@@ -247,6 +247,7 @@
     <string name="notif_processing_matching">Riconoscimento delle voci…</string>
     <string name="notif_processing_saving">Salvataggio…</string>
     <string name="notif_processing_downloading">Download: %1$s — %2$d%%</string>
+    <string name="notif_processing_download_models">Download dei modelli…</string>
     <string name="notif_processing_download_bytes">%1$d di %2$d MB</string>
     <string name="notif_processing_checking">Verifica dei file — %1$d%%</string>
     <string name="notif_processing_public">Trascrizione di una nota</string>
@@ -286,6 +287,7 @@
     <string name="notif_ready_public">Una nota è in attesa. Apri Cassini per iniziare.</string>
     <string name="notif_paused_title">Trascrizione sospesa da Android</string>
     <string name="notif_paused_text">In pausa a %1$s di %2$s. Apri per riprendere.</string>
+    <string name="notif_paused_text_early">In pausa prima di trovare parole. Apri per riprendere.</string>
     <string name="notif_paused_public">Apri Cassini per riprendere.</string>
     <string name="notif_stopped_title">Trascrizione interrotta</string>
     <string name="notif_stopped_text">Cassini si è chiuso durante la trascrizione di %1$s.</string>

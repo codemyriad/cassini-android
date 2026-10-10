@@ -95,10 +95,15 @@ class ProcessingService : LifecycleService() {
      * (SYSTEM) and writes the row PAUSED(SYSTEM). It is never shown as an error.
      */
     override fun onTimeout(startId: Int, fgsType: Int) {
-        val running = coordinator.state.value.running
-        val progress = (running?.phase as? JobPhase.Transcribing)?.progress
+        val state = coordinator.state.value
+        val running = state.running
         if (running != null) {
-            notifications.pausedByAndroid(running.noteId, running.title, progress?.doneMs ?: 0, progress?.totalMs ?: 0)
+            // Outside inference (Starting, a download, Stopping) the row has the numbers of the saved checkpoint.
+            val progress = (running.phase as? JobPhase.Transcribing)?.progress
+            val row = state.notes[running.noteId]?.job
+            val doneMs = progress?.doneMs ?: row?.doneMs ?: 0
+            val totalMs = progress?.totalMs ?: row?.totalMs ?: 0
+            notifications.pausedByAndroid(running.noteId, running.title, doneMs, totalMs)
         }
         leaveForeground()
         stopSelf()

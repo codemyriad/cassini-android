@@ -62,6 +62,19 @@ class ProcessingNotificationsTest {
             running(JobPhase.Downloading(DownloadProgress(ModelPart.SPEECH, 4, 5, verifying = true))),
         )
         assertEquals("Checking files — 80%", checking.title)
+        val unknownPart = notifications.content(running(JobPhase.Downloading(null)))
+        assertEquals("before the first progress the part is not named", "Downloading models…", unknownPart.title)
+        assertEquals(true, unknownPart.cancel)
+    }
+
+    @Test fun pausedByAndroidWithoutWordsDoesNotShowZeroTimes() {
+        shadowOf(context as android.app.Application).grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
+        val manager = shadowOf(context.getSystemService(NotificationManager::class.java))
+        val text = { manager.allNotifications.single().extras.getCharSequence(Notification.EXTRA_TEXT).toString() }
+        notifications.pausedByAndroid(NOTE, "Riunione", 0, 0)
+        assertEquals("Paused before any words were found. Open to resume.", text())
+        notifications.pausedByAndroid(NOTE, "Riunione", 760_000, 2_052_000)
+        assertEquals("Paused at 12:40 of 34:12. Open to resume.", text())
     }
 
     @Test fun resultsAreReplacedPerNoteAndHideTheTitleInPublic() {

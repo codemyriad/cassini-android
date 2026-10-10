@@ -110,9 +110,9 @@ class ProcessingNotifications(context: Context) : ProcessingNotices {
     }
 
     private fun download(res: Context, progress: DownloadProgress?, waiting: String?): Content {
+        // Before the first progress report the part is not known yet.
         if (progress == null) {
-            val part = res.getString(partName(ModelPart.SPEECH))
-            return Content(res.getString(R.string.notif_processing_downloading, part, 0), null, waiting, null, true)
+            return Content(res.getString(R.string.notif_processing_download_models), null, waiting, null, true)
         }
         val title = if (progress.verifying) {
             res.getString(R.string.notif_processing_checking, progress.percent)
@@ -196,11 +196,16 @@ class ProcessingNotifications(context: Context) : ProcessingNotices {
 
     override fun pausedByAndroid(noteId: String, title: String, doneMs: Long, totalMs: Long) {
         val res = localized()
-        val text = res.getString(
-            R.string.notif_paused_text,
-            ExportClock.clock(doneMs, totalMs),
-            ExportClock.clock(totalMs, totalMs),
-        )
+        // Without words yet, "Paused at 00:00 of 00:00" says nothing (features.md 3.2, "Paused before any words").
+        val text = if (doneMs <= 0 || totalMs <= 0) {
+            res.getString(R.string.notif_paused_text_early)
+        } else {
+            res.getString(
+                R.string.notif_paused_text,
+                ExportClock.clock(doneMs, totalMs),
+                ExportClock.clock(totalMs, totalMs),
+            )
+        }
         val heading = res.getString(R.string.notif_paused_title)
         val notification = resultBuilder(res, heading, text, R.string.notif_paused_public, noteId)
             .addAction(0, res.getString(R.string.notif_action_resume), openIntent(noteId, resume = true))
