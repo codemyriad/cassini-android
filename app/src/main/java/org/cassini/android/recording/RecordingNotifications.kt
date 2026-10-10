@@ -14,6 +14,7 @@ import org.cassini.android.R
 import org.cassini.android.processing.NotificationChannels
 import org.cassini.android.processing.ProcessingNotifications
 import org.cassini.core.export.ExportClock
+import org.cassini.data.notes.NoteTitles
 
 /**
  * The recording notification (id [RECORDING_ID]) and the recording results notifications (features.md section 12).
@@ -36,7 +37,7 @@ class RecordingNotifications(context: Context) {
                 val heading = res.getString(if (paused) R.string.notif_rec_paused_title else R.string.notif_rec_title)
                 Content(
                     title = heading,
-                    text = warningText(res, state) ?: state.title,
+                    text = warningText(res, state) ?: NoteTitles.clean(state.title) ?: state.defaultTitle,
                     pausedAtMs = state.elapsedMs.takeIf { paused },
                     chronometer = !paused,
                 )

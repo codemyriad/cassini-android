@@ -203,6 +203,7 @@ class RecordingController(private val parts: Parts) {
             mutableState.value = RecordingState.Active(
                 noteId = id,
                 title = typed,
+                defaultTitle = fallbackTitle,
                 format = format,
                 sampleRateHz = format.sampleRateHz,
                 elapsedMs = mic.elapsedMs,

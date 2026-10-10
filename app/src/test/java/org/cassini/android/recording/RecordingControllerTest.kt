@@ -140,6 +140,12 @@ class RecordingControllerTest {
     @Test fun aBlankTitleBecomesTheDefault() = runBlocking {
         val active = startRecording("")
         assertTrue(row(active.noteId)?.title.orEmpty().startsWith("Voice note "))
+        assertEquals(row(active.noteId)?.title, active.defaultTitle)
+        assertEquals(
+            "the notification shows the row title",
+            active.defaultTitle,
+            RecordingNotifications(context).content(active).text,
+        )
 
         controller.finish("   ")
         awaitEnded()

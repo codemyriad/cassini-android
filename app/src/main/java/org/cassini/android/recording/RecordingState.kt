@@ -70,11 +70,13 @@ sealed interface RecordingState {
 
     /**
      * The microphone records into [noteId]'s capture file. [title] is what the user typed (written to the row 500 ms
-     * after the last change); [elapsedMs] and [space] change once a second.
+     * after the last change); [defaultTitle] is the row's title while [title] is blank ("Voice note 8 Oct, 08:14").
+     * [elapsedMs] and [space] change once a second.
      */
     data class Active(
         val noteId: String,
         val title: String,
+        val defaultTitle: String,
         val format: CaptureFormat,
         val sampleRateHz: Int,
         val elapsedMs: Long,
