@@ -8,6 +8,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.util.Log
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.contract.ActivityResultContracts
@@ -59,9 +60,12 @@ fun NoteRoute(viewModel: NoteViewModel, navigator: NoteNavigator, modifier: Modi
             }
         }
     }
+    val activity = LocalActivity.current
     DisposableEffect(viewModel) {
         viewModel.onVisible(true)
-        onDispose { viewModel.onVisible(false) }
+        // A configuration change (rotation, dark theme, font scale) recreates the activity: the screen stays, and so
+        // does the player, which keeps playing.
+        onDispose { if (activity?.isChangingConfigurations != true) viewModel.onVisible(false) }
     }
     LifecycleResumeEffect(viewModel) {
         viewModel.onResume()

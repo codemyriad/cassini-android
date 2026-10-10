@@ -25,6 +25,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.espresso.Espresso
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.cassini.android.AppGraph
@@ -58,6 +59,7 @@ import org.robolectric.annotation.Config
 import org.w3c.dom.Element
 import java.io.File
 import java.util.Properties
+import java.util.concurrent.CopyOnWriteArrayList
 import javax.xml.parsers.DocumentBuilderFactory
 import kotlin.math.abs
 
@@ -244,6 +246,32 @@ class AppShellTest {
         rule.waitForIdle()
         val window = rule.activity.window
         return WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars
+    }
+
+    @Test fun aViewedFileOpensItsNoteInTheRecreatedActivity() {
+        val uri = Uri.fromFile(writeDocument()).toString()
+        app.graph.viewedImports.start(uri)
+        // A rotation or a language change while the file imports: the new activity opens the note.
+        rule.activityRule.scenario.recreate()
+        waitFor(hasContentDescription("Search in transcript"))
+        rule.waitUntil(TIMEOUT_MS) { app.graph.viewedImports.ready.value.isEmpty() }
+    }
+
+    @Test fun aConfigurationChangeKeepsTheNotePlayer() {
+        importDocument()
+        rule.onNodeWithText(TITLE).performClick()
+        waitFor(hasContentDescription("Search in transcript"))
+        val playback = app.graph.playback
+        rule.waitUntil(TIMEOUT_MS) { playback.state.value.noteId != null }
+        val noteId = playback.state.value.noteId
+        val seen = CopyOnWriteArrayList<String?>()
+        val watch = app.graph.appScope.launch { playback.state.collect { seen += it.noteId } }
+
+        rule.activityRule.scenario.recreate()
+        waitFor(hasContentDescription("Search in transcript"))
+        rule.waitForIdle()
+        watch.cancel()
+        assertTrue("the player was not left: $seen", seen.all { it == noteId })
     }
 
     /** A sealed two-speaker document over the FLEURS clip, imported as ACTION_VIEW does; Library shows its row. */
