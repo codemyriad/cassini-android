@@ -20,10 +20,12 @@ data class SavedVoice(
 
 /**
  * The Saved voices list, sorted by notes, then confirmed seconds, then name. [problem] is set when `people.json`
- * could not be used as it is; [readOnly] means it stays untouched and every edit is refused.
+ * could not be used as it is; [readOnly] means it stays untouched and every edit is refused ("Saved voices can't be
+ * read", features.md section 10). [canForgetEveryone] is true for a damaged list: "Forget everyone" starts it again.
  */
 data class SavedVoices(val voices: List<SavedVoice>, val problem: VoiceProblem?) {
-    val readOnly: Boolean get() = problem == VoiceProblem.NEWER || problem == VoiceProblem.UNREADABLE
+    val readOnly: Boolean get() = problem != null
+    val canForgetEveryone: Boolean get() = problem == null || problem == VoiceProblem.DAMAGED
 }
 
 /** The result of an edit of the saved people. */
@@ -32,7 +34,7 @@ sealed interface VoiceEdit {
 
     data object NotFound : VoiceEdit
 
-    /** `people.json` is from a newer Cassini or cannot be read; nothing was changed. */
+    /** `people.json` is from a newer Cassini, cannot be read or is damaged; nothing was changed. */
     data object ReadOnly : VoiceEdit
 
     /** The name is blank or longer than [VoiceRepository.MAX_NAME_LENGTH] after trimming. */

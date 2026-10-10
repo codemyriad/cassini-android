@@ -19,7 +19,10 @@ enum class VoiceProblem {
     /** The file could not be read (an I/O error). It stays as it is, read-only, and the next start tries again. */
     UNREADABLE,
 
-    /** The file was not valid JSON for its codec. It was renamed `<name>.corrupt-<epoch ms>` and reads as empty. */
+    /**
+     * The file was not valid JSON for its codec. It was renamed `<name>.corrupt-<epoch ms>` and reads as empty. A
+     * damaged `people.json` keeps the saved people read-only until "Forget everyone".
+     */
     DAMAGED,
 }
 

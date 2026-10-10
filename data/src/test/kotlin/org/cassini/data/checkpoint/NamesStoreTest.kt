@@ -150,7 +150,7 @@ class NamesStoreTest {
 
         // The release comes between the change in memory and the file write.
         repo.draftNames(id).mutate { names ->
-            repo.release(id)
+            repo.names.releaseBlocking(id)
             names.rename("S1", "Bruno")
         }
 

@@ -103,13 +103,20 @@ class NamesStore internal constructor(
     /**
      * Forgets the in-memory names of [noteId], so the next use reads `names.json` again. Called after adopt, on purge
      * and when the work directory is discarded, so a later job of the same note starts from what is on disk. Observers
-     * get [EMPTY]: the draft they showed is gone.
+     * get [EMPTY]: the draft they showed is gone. It takes the note's lock on the IO dispatcher, because the inference
+     * thread can hold that lock for a long time (a seal).
      */
-    fun release(noteId: String) {
-        locks.lockFor(noteId).withLock {
-            open.remove(noteId)
-            states[noteId]?.value = EMPTY
-        }
+    suspend fun release(noteId: String) = locks.withNoteLock(noteId, dispatchers.io) { releaseLocked(noteId) }
+
+    /** [release] for a worker thread. */
+    @WorkerThread
+    fun releaseBlocking(noteId: String) = locks.withNoteLockBlocking(noteId) { releaseLocked(noteId) }
+
+    /** [release] for a caller that holds the note's lock already. */
+    internal fun releaseLocked(noteId: String) {
+        check(locks.lockFor(noteId).isHeldByCurrentThread) { "The lock of $noteId is not held" }
+        open.remove(noteId)
+        states[noteId]?.value = EMPTY
     }
 
     private fun mutateNow(noteId: String, reducer: (CheckpointNames) -> CheckpointNames): CheckpointNames {

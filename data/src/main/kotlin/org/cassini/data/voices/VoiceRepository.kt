@@ -49,7 +49,9 @@ import kotlin.concurrent.withLock
  * only after every voice lock is released, so a voice lock is never held while a note lock is taken.
  *
  * A file whose `version` is newer than its codec stays in place and is never written ([VoiceProblem.NEWER]); a
- * file that does not parse is renamed `<name>.corrupt-<epoch ms>` and reads as empty ([VoiceProblem.DAMAGED]).
+ * file that does not parse is renamed `<name>.corrupt-<epoch ms>` and reads as empty ([VoiceProblem.DAMAGED]). The
+ * saved people are read-only with any of these problems. A damaged `people.json` stays reported, also after a
+ * restart, while its set-aside copy exists: only "Forget everyone" deletes that copy and makes the list editable.
  */
 // One store with one API, as architecture 4.5 lists it; each entry point is a few lines over the locked helpers.
 @Suppress("TooManyFunctions")
@@ -69,7 +71,8 @@ class VoiceRepository(
     private val book = MutableStateFlow<Book?>(null)
 
     private data class Book(val voices: List<Voice>, val problem: VoiceProblem?) {
-        val readOnly: Boolean get() = problem == VoiceProblem.NEWER || problem == VoiceProblem.UNREADABLE
+        /** Every problem makes the people read-only; only "Forget everyone" clears a damaged list. */
+        val readOnly: Boolean get() = problem != null
     }
 
     // Saved people.
@@ -143,7 +146,8 @@ class VoiceRepository(
      * "Forget everyone": writes `generation` = old + 1 first, then deletes everything else under `voices/` (people,
      * sealed and pending prints, set-aside copies), clears every link, and clears the live matches, Remember choices
      * and automatic names of every draft. A running job's pending prints carry the old generation, so its adopt
-     * keeps no print and no match.
+     * keeps no print and no match. It is refused while `people.json` is newer or cannot be read, but it runs on a
+     * damaged list: that is how the user starts again.
      */
     suspend fun forgetEveryone(): VoiceEdit {
         var next: Long? = null
@@ -231,8 +235,24 @@ class VoiceRepository(
                 }
             }
         }
+        // After the voice locks are released; it takes the note's lock on the IO dispatcher.
         names.release(noteId)
         return deleted
+    }
+
+    /** Forgets the in-memory draft names of [noteId] after an adopt deleted `work/` (`SealedAdopter.of`). */
+    internal suspend fun releaseDraftNames(noteId: String) = names.release(noteId)
+
+    /**
+     * Deletes only `voices/pending/<noteId>.json` and its leftovers: "Start over" and the end of a cancelled job
+     * (architecture 5.2 rule 8). The sealed prints of the note and its links stay. Returns false when a file could
+     * not be deleted.
+     */
+    suspend fun discardPending(noteId: String): Boolean {
+        val pending = pendingFile(noteId)
+        return withContext(dispatchers.io) {
+            locked(pending) { leftovers(pending).all { !it.exists() || it.delete() } }
+        }
     }
 
     // A sealed note's prints, for the Note screen.
@@ -318,7 +338,8 @@ class VoiceRepository(
         book.value?.takeIf { it.problem != VoiceProblem.UNREADABLE } ?: readPeopleLocked().also { book.value = it }
 
     private fun readPeopleLocked(): Book = when (val read = files.readPeople(paths.people)) {
-        FileRead.Missing -> Book(emptyList(), null)
+        // A set-aside copy without a new list: the list was damaged, and only "Forget everyone" starts it again.
+        FileRead.Missing -> Book(emptyList(), if (setAside(paths.people)) VoiceProblem.DAMAGED else null)
         is FileRead.Loaded -> Book(read.value, null)
         is FileRead.Kept -> Book(emptyList(), read.problem)
         is FileRead.Damaged -> Book(emptyList(), VoiceProblem.DAMAGED)
@@ -330,7 +351,7 @@ class VoiceRepository(
     }
 
     private fun forgetEveryoneLocked(): Long? {
-        if (peopleLocked().readOnly) return null
+        if (peopleLocked().problem.let { it == VoiceProblem.NEWER || it == VoiceProblem.UNREADABLE }) return null
         val next = files.readGeneration(paths.generation) + 1
         files.writeGeneration(paths.generation, next)
         for (entry in paths.voices.listFiles().orEmpty()) {
@@ -491,8 +512,10 @@ class VoiceRepository(
         val target = voiceId?.takeIf { id -> people.voices.any { it.id == id } } ?: newVoiceId()
         val result = if (read != null && print != null) enrolOne(people.voices, target, name, print) else null
         if (result != null && read != null && print != null) {
-            savePeopleLocked(result.first)
+            // The match first: when the people.json write fails after it, a retry enrols the print once. In the other
+            // order a retry would enrol it twice.
             writeNoteLocked(noteId, read.model, read.prints + (key to print.copy(match = result.second)))
+            savePeopleLocked(result.first)
         }
         return result?.first?.firstOrNull { it.id == target }
     }
@@ -507,15 +530,23 @@ class VoiceRepository(
         return when {
             people.readOnly -> UnenrolOutcome.ReadOnly to null
             read == null || print == null || match == null -> UnenrolOutcome.NothingToUndo to null
+            // The person first, the match last: when the note write fails, the match stays and a retry finds no
+            // person, so it only clears the match. The scrub runs again for the match's voice id; it is idempotent.
             voice == null || voice.count <= 1 -> {
-                writeNoteLocked(noteId, read.value.model, read.value.prints + (key to print.copy(match = null)))
                 if (voice != null) savePeopleLocked(people.voices.filter { it.id != voice.id })
-                UnenrolOutcome.Forgotten to voice?.id
+                writeNoteLocked(noteId, read.value.model, read.value.prints + (key to print.copy(match = null)))
+                UnenrolOutcome.Forgotten to match.voiceId
             }
             else -> {
                 val undone = VoiceCodec.unenrol(voice, print.embedding) ?: voice
                 savePeopleLocked(people.voices.map { if (it.id == voice.id) undone else it })
-                writeNoteLocked(noteId, read.value.model, read.value.prints + (key to print.copy(match = null)))
+                try {
+                    writeNoteLocked(noteId, read.value.model, read.value.prints + (key to print.copy(match = null)))
+                } catch (error: IOException) {
+                    // The match stays CONFIRMED, so put the enrolment back: a retry then takes it back once only.
+                    savePeopleLocked(people.voices)
+                    throw error
+                }
                 UnenrolOutcome.Unenrolled to null
             }
         }
@@ -592,6 +623,10 @@ class VoiceRepository(
     private fun jsonFiles(dir: File): List<File> = dir.listFiles().orEmpty()
         .filter { it.isFile && it.name.endsWith(JSON) && NoteIds.isValid(it.name.removeSuffix(JSON)) }
         .sortedBy { it.name }
+
+    /** Whether a `<name>.corrupt-<epoch ms>` copy of [file] exists beside it. */
+    private fun setAside(file: File): Boolean =
+        file.parentFile?.list().orEmpty().any { it.startsWith(file.name + VoiceFiles.CORRUPT) }
 
     /** [file] and every file beside it that starts with its name (`.bak`, `.new`, `.corrupt-…`). */
     private fun leftovers(file: File): List<File> =

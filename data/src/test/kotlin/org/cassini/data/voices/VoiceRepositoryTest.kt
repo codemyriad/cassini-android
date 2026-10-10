@@ -344,7 +344,8 @@ class VoiceRepositoryTest {
 
         val list = people()
         assertEquals(VoiceProblem.DAMAGED, list.problem)
-        assertFalse(list.readOnly)
+        assertTrue(list.readOnly)
+        assertTrue(list.canForgetEveryone)
         assertFalse(h.paths.people.exists())
         assertEquals("{not json", File(h.paths.people.path + ".corrupt-${h.now}").readText())
         assertEquals(VoiceProblem.DAMAGED, voices.syncLinks().problems[sealedId])
@@ -352,12 +353,22 @@ class VoiceRepositoryTest {
         assertEquals(PendingOutcome.NothingPending, voices.adoptPending(draftId))
         assertTrue(File(pendingFile().path + ".corrupt-${h.now}").isFile)
 
-        // Saving people again replaces the set-aside list and clears the problem.
+        // A damaged list is read-only: no edit and no enrolment writes a new people.json over it.
         checkpoints.names.mutate(draftId) { it.rename("S1", "Bea").remember("S1", "", 0) }
         offMain { voices.savePendingBlocking(draftId, mapOf("new/S1" to print(21)), 0) }
-        voices.adoptPending(draftId)
+        assertTrue((voices.adoptPending(draftId) as PendingOutcome.Merged).enrolled.isEmpty())
+        writeSealed(sealedId, mapOf("v1/S1" to print(10)))
+        assertNull(voices.enrol(sealedId, "v1", "S1", null, "Bea"))
+        assertFalse(h.paths.people.exists())
+
+        // The problem stays after a restart, while the set-aside copy exists.
+        assertEquals(VoiceProblem.DAMAGED, newRepository().people().first().problem)
+
+        // "Forget everyone" deletes the copy and starts the list again.
+        assertEquals(VoiceEdit.Done, voices.forgetEveryone())
         assertNull(people().problem)
-        assertEquals(listOf("Bea"), people().voices.map { it.name })
+        assertNull(newRepository().people().first().problem)
+        assertEquals("1", h.paths.generation.readText())
     }
 
     @Test fun savedVoicesAreSortedAndMarkedStale() = runTest {
@@ -440,6 +451,64 @@ class VoiceRepositoryTest {
         assertTrue(voices.setMatch(sealedId, "v1", "S2", Match(luca.id, 0.6f, Match.State.REJECTED)))
         val rejected = h.db.voiceLinks().links(sealedId).first { it.speakerId == "S2" && it.variantId == "v1" }
         assertEquals(Match.State.REJECTED, rejected.state)
+    }
+
+    @Test fun aWriteErrorDuringEnrolOrUnenrolCanBeRetried() = runTest {
+        writePeople(luca)
+        writeSealed(sealedId, mapOf("v1/S1" to print(10), "v1/S2" to print(11)))
+        voices.syncLinks()
+        val people = checkNotNull(h.paths.people.parentFile)
+        val notes = File(h.paths.voices, "notes")
+        fun count() = VoiceCodec.decode(h.paths.people.readText()).single { it.id == luca.id }.count
+
+        // The match is written, people.json is not: a retry enrols the print once.
+        assertTrue(people.setWritable(false))
+        try {
+            assertNull(voices.enrol(sealedId, "v1", "S1", luca.id, "Luca"))
+        } finally {
+            people.setWritable(true)
+        }
+        assertEquals(1, count())
+        assertEquals(2, voices.enrol(sealedId, "v1", "S1", luca.id, "Luca")?.count)
+        assertEquals(2, count())
+
+        // people.json is written, the match is not: the enrolment is put back, so a retry takes it back once.
+        assertTrue(notes.setWritable(false))
+        try {
+            assertEquals(UnenrolOutcome.Failed(Failure.SAVE), voices.unenrol(sealedId, "v1", "S1"))
+        } finally {
+            notes.setWritable(true)
+        }
+        assertEquals(2, count())
+        assertEquals(Match.State.CONFIRMED, voices.prints(sealedId, "v1").getValue("S1").match?.state)
+        assertEquals(UnenrolOutcome.Unenrolled, voices.unenrol(sealedId, "v1", "S1"))
+        assertEquals(1, count())
+
+        // A person with one print goes first; a retry finds no person and clears the match.
+        val bea = checkNotNull(voices.enrol(sealedId, "v1", "S2", null, "Bea"))
+        assertTrue(notes.setWritable(false))
+        try {
+            assertEquals(UnenrolOutcome.Failed(Failure.SAVE), voices.unenrol(sealedId, "v1", "S2"))
+        } finally {
+            notes.setWritable(true)
+        }
+        assertEquals(UnenrolOutcome.Forgotten, voices.unenrol(sealedId, "v1", "S2"))
+        assertTrue(people().voices.none { it.id == bea.id })
+        assertNull(voices.prints(sealedId, "v1").getValue("S2").match)
+        assertEquals(mapOf("v1/S1" to null, "v1/S2" to null), links(sealedId))
+    }
+
+    @Test fun discardPendingKeepsTheSealedPrints() = runTest {
+        writeSealed(draftId, mapOf("v1/S1" to print(10)))
+        offMain { voices.savePendingBlocking(draftId, mapOf("v2/S1" to print(11)), 0) }
+        voices.syncLinks()
+
+        assertTrue(voices.discardPending(draftId))
+
+        assertFalse(pendingFile().exists())
+        assertTrue(sealedFile(draftId).isFile)
+        assertEquals(1, links(draftId).size)
+        assertTrue(voices.discardPending(draftId))
     }
 
     @Test fun aNoteIdThatIsNotAUuidIsRefused() = runTest {

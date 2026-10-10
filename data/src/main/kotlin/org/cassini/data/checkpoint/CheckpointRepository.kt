@@ -99,7 +99,7 @@ class CheckpointRepository(
     /**
      * Deletes the whole work directory of [noteId] (checkpoint, names, clips, audio part and any sealed output) and
      * forgets its draft names in memory: "Start over", the end of a cancelled job, and purge. `voices/pending/` is
-     * `VoiceRepository`'s.
+     * `VoiceRepository`'s: the caller also runs `VoiceRepository.discardPending` (architecture 5.2 rule 8).
      *
      * The `sealed` marker goes first and durably: a marker without `sealed.opus` means "the rename happened" to adopt,
      * so a crash after `sealed.opus` went but before the marker went would install the old document as the output.
@@ -107,7 +107,7 @@ class CheckpointRepository(
     suspend fun discard(noteId: String) {
         require(NoteIds.isValid(noteId)) { "Not a note id: $noteId" }
         locks.withNoteLock(noteId, dispatchers.io) {
-            names.release(noteId)
+            names.releaseLocked(noteId)
             val work = work(noteId)
             if (File(work, WorkFiles.SEALED_MARKER).delete()) NoteFiles.syncDirectory(work)
             work.deleteRecursively()
@@ -115,7 +115,7 @@ class CheckpointRepository(
     }
 
     /** Forgets the in-memory draft names of [noteId] after adopt deleted `work/`. */
-    fun release(noteId: String) = names.release(noteId)
+    suspend fun release(noteId: String) = names.release(noteId)
 
     /** Whether `work/sealed` marks a finished `sealed.opus` that waits for adopt. */
     suspend fun sealedMarker(noteId: String): Boolean =

@@ -127,8 +127,9 @@ fun interface SealedAdopter {
     companion object {
         /**
          * `adoptSealed` (the document, the row and the job row), then `VoiceRepository.adoptPending`, then
-         * `deleteAdoptedWork` (marker last). A crash or an I/O error at any point leaves the marker, so the next
-         * start runs it again.
+         * `deleteAdoptedWork` (marker last), then the release of the draft names in memory, so the next job of the
+         * note starts with no labels, merges or live matches of this run. A crash or an I/O error at any point leaves
+         * the marker, so the next start runs it again.
          */
         fun of(documents: DocumentRepository, voices: VoiceRepository): SealedAdopter = SealedAdopter { noteId ->
             documents.adoptSealed(noteId).also { outcome ->
@@ -136,6 +137,7 @@ fun interface SealedAdopter {
                     try {
                         voices.adoptPending(noteId)
                         documents.deleteAdoptedWork(noteId)
+                        voices.releaseDraftNames(noteId)
                     } catch (error: IOException) {
                         Log.w("SealedAdopter", "Cannot finish the voices of $noteId; the next start tries again", error)
                     }
