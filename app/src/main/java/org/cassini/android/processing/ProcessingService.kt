@@ -28,8 +28,9 @@ import org.cassini.engine.job.JobPhase
  * queue itself is [ProcessingCoordinator]'s; this service only keeps the process in the foreground while the
  * coordinator works, and stops after its drain loop has joined.
  *
- * - Intents: [ACTION_DRAIN] (no note id; the queue is in Room; also the redelivered intent), [ACTION_STOP_ALL],
- *   [ACTION_RESUME] (the "Transcription stopped" notification) and [ACTION_CANCEL_DOWNLOAD].
+ * - Intents: [ACTION_DRAIN] (no note id; the queue is in Room), [ACTION_STOP_ALL], [ACTION_RESUME] (the
+ *   "Transcription stopped" notification) and [ACTION_CANCEL_DOWNLOAD]. An intent with START_FLAG_REDELIVERY (or a
+ *   null one) is only a drain: its command ran before the process died, and running it again would undo later state.
  * - Every `startForeground` call is wrapped in a catch of the refusals of Android 12-16. When the first one fails the
  *   rows stay QUEUED, "Ready to transcribe" is posted and the service stops (START_NOT_STICKY); a refused type change
  *   keeps the previous type.
@@ -65,12 +66,15 @@ class ProcessingService : LifecycleService() {
             foregroundType = type
         }
         if (first) coordinator.onServiceForeground(true)
-        when (intent?.action) {
+        // After process death Android sends every pending intent again. The queue and the holds are in Room and the
+        // settings, so a sent-again command only drains: it must not queue, stop or hold anything a second time.
+        val redelivered = intent == null || (flags and START_FLAG_REDELIVERY) != 0
+        when (if (redelivered) ACTION_DRAIN else intent.action) {
             // No drain here: the hold must be written before the loop looks at the queue again.
             ACTION_STOP_ALL -> command { coordinator.stopAll() }
             ACTION_CANCEL_DOWNLOAD -> coordinator.cancelDownload()
             ACTION_RESUME -> {
-                val noteId = intent.getStringExtra(EXTRA_NOTE_ID)
+                val noteId = intent?.getStringExtra(EXTRA_NOTE_ID)
                 command {
                     if (noteId != null) {
                         coordinator.transcribe(noteId, origin = StartOrigin.NOTIFICATION, startService = false)
@@ -78,7 +82,7 @@ class ProcessingService : LifecycleService() {
                     coordinator.drain()
                 }
             }
-            // ACTION_DRAIN, and a redelivered intent after process death.
+            // ACTION_DRAIN, and any intent sent again after process death.
             else -> coordinator.drain()
         }
         if (watcher?.isActive != true) watcher = lifecycleScope.launch { watch() }

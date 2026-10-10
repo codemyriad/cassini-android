@@ -145,6 +145,28 @@ class ProcessingServiceTest {
         assertEquals(1, created.size)
     }
 
+    @Test fun aRedeliveredResumeOrStopOnlyDrains() {
+        val id = queuedNote()
+        runBlocking {
+            val jobs = graph.awaitCatalogue().jobs
+            assertTrue(jobs.markPaused(id, PauseReason.INTERRUPTED, doneMs = 0, totalMs = 4_000, words = 0))
+        }
+        val attempts = row(id)?.attempts
+        val service = Robolectric.buildService(ProcessingService::class.java).create().get()
+
+        // After process death Android sends both commands again, with START_FLAG_REDELIVERY.
+        service.onStartCommand(ProcessingService.resumeIntent(app, id), Service.START_FLAG_REDELIVERY, 1)
+        val stopAll = processingIntent(app, ProcessingService.ACTION_STOP_ALL)
+        service.onStartCommand(stopAll, Service.START_FLAG_REDELIVERY, 2)
+        until { shadowOf(service).isStoppedBySelf }
+
+        assertEquals("PAUSED jobs never resume on their own", JobState.PAUSED, row(id)?.state)
+        assertEquals(PauseReason.INTERRUPTED, row(id)?.pauseReason)
+        assertEquals(attempts, row(id)?.attempts)
+        assertEquals(null, runBlocking { graph.settings.snapshot().queueHold })
+        assertTrue(created.isEmpty())
+    }
+
     private fun queuedNote(): String = runBlocking {
         graph.ready.await()
         graph.models.recordConsent()

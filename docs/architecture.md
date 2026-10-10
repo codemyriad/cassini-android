@@ -425,7 +425,7 @@ When the coordinator is created it runs `reconcileOnStart` on IO before emitting
 
 The queue then starts in one of two ways:
 
-- A redelivered service intent (`START_REDELIVER_INTENT`) calls `coordinator.drain()`. The system restart of a crashed foreground service is best effort on every API level (Android 12+ may refuse the foreground start; section 5.7 catches it).
+- A redelivered service intent (`START_REDELIVER_INTENT`) calls `coordinator.drain()`, whatever its action. Android sends every pending intent again, and Room and the settings already keep the queue and the holds. Thus the service does not do a Resume, a Stop or a Cancel a second time. The system restart of a crashed foreground service is best effort on every API level (Android 12+ may refuse the foreground start; section 5.7 catches it).
 - `ProcessLifecycleOwner` ON_START (the app is visible) while QUEUED rows exist, nothing runs, consent exists and no hold is set: the visible app starts the service. PAUSED jobs never resume on their own.
 
 | Event | Result |
