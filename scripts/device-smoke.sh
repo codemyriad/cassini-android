@@ -123,7 +123,9 @@ if [ -n "${CASSINI_TEST_APK:-}" ]; then
     test -f "$CASSINI_TEST_APK"
 else
     # The long clip of the background tests is made on the host and is not committed (fixtures/README.md).
-    scripts/make-long-clip.sh
+    if ! scripts/make-long-clip.sh; then
+        printf 'Warning: no long clip; the background tests that use it will fail.\n' >&2
+    fi
     tasks=(":app:assemble${build_type}AndroidTest")
     if [ -z "${CASSINI_APK:-}" ]; then tasks+=(":app:assemble${build_type}"); fi
     ./gradlew --console=plain "-PdeviceTestBuildType=$CASSINI_TEST_BUILD_TYPE" "${tasks[@]}"

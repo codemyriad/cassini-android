@@ -8,11 +8,11 @@ The build commands are in the [README](../README.md). Runtime downloads, weights
 |---|---|---|
 | `:core` | Plain Kotlin on the JVM, package `org.cassini.core`: the portable document format, audio arithmetic, recognition windows and seams, speaker assignment and voiceprint selection, model pins and downloads (`ModelCatalog`, `ArtifactFetcher`), the checkpoint codec (`CheckpointState`) | JDK 17 and the `third_party/cassini-format` submodule |
 | `:engine` | Android library, package `org.cassini.engine`: the sherpa-onnx wrappers (`ParakeetDecoder`, `SileroDetector`, `SortformerStream`, `VoiceprintExtractor`), the MediaCodec decoder, microphone capture, the Opus encoder and its JNI library (`libcassini_opus.so`, built with CMake), `NativeBudget` | Android SDK, NDK 28.2.13676358, CMake 3.22.1, and `scripts/setup.sh` (AAR and libopus source) |
-| `:data` | Android library, package `org.cassini.data`: the Room catalogue, the DataStore settings and the file repositories. At this time it has only the module skeleton. | Android SDK |
+| `:data` | Android library, package `org.cassini.data`: the Room catalogue, the DataStore settings and the file repositories: notes, jobs, voices, models and checkpoints | Android SDK |
 | `:ui` | Android library, package `org.cassini.ui`: the Compose design system and the stateless screens. It has Roborazzi screenshot tests (see "Screenshot tests"). | Android SDK |
-| `:app` | The 0.1.0 Activities and services on top of `:core` and `:engine`, with thin adapters (`InstalledModels`, `ProcessingCheckpoint`, `FailureMessages`) | everything `:engine` needs |
+| `:app` | The 0.2 background layer on top of `:data`, `:core` and `:engine`: `AppGraph`, the processing coordinator and service, the recording controller and service, the playback controller and the job port adapters. It also holds the 0.1.0 Activities and services, with thin adapters (`InstalledModels`, `ProcessingCheckpoint`, `FailureMessages`) | everything `:engine` needs |
 
-The target dependency graph is in `docs/architecture.md`, section 2: `app -> ui`, `app -> data -> core` and `app -> engine -> core`. At this time `:app` does not use `:data` or `:ui`. `docs/architecture.md` describes the target layout.
+The target dependency graph is in `docs/architecture.md`, section 2: `app -> ui`, `app -> data -> core` and `app -> engine -> core`. At this time `:app` does not use `:ui`. `docs/architecture.md` describes the target layout.
 
 `tools/asr-eval/` holds a host program that runs the app's speech recognition pipeline on PCM files. Gradle does not build it; its README says how to run it.
 
@@ -79,19 +79,23 @@ Use direct adb instrumentation to retain app data and downloaded models. Gradleâ
 # The 0.2 background tests (scratch root, installed models):
 ./scripts/device-smoke.sh --serial emulator-5554 --annotation NeedsModels
 ./scripts/device-smoke.sh --serial emulator-5554 --annotation NeedsMicrophone
-# Process death: kill -9 during a job, resume, and a check of the sealed document.
+# Process death: kill -9 during a job, resume, and a check of the sealed document (needs ffmpeg on the host).
 ./scripts/device-kill-resume.sh --serial emulator-5554
 ./tools/fetch-youtube-audio.sh       # optional YouTube clips; uses uvx yt-dlp + ffmpeg
-./scripts/device-smoke.sh --sample youtube --class org.cassini.android.DeviceSmokeTest
-./scripts/device-smoke.sh --class org.cassini.android.LibraryTest
+./scripts/device-smoke.sh --sample youtube --class org.cassini.android.DeviceSmokeTest \
+    --arg notClass=org.cassini.android.DeviceSmokeTest#opusCheckpointContinuesIdenticalPacketsAfterClosingTheEncoder
+./scripts/device-smoke.sh --class org.cassini.android.LibraryTest   # needs the INT8 model
 # Opt-in recovery check after force-stopping the app mid-recording:
 adb shell am instrument -w -r -e class org.cassini.android.RecoveryCheckTest org.cassini.android.test/org.cassini.android.CassiniTestRunner
 # Three-minute viewer/seek check.
 ./tools/fetch-youtube-audio.sh 180
-./scripts/device-smoke.sh --sample youtube-long --class org.cassini.android.DeviceSmokeTest
+./scripts/device-smoke.sh --sample youtube-long --class org.cassini.android.DeviceSmokeTest \
+    --arg notClass=org.cassini.android.DeviceSmokeTest#opusCheckpointContinuesIdenticalPacketsAfterClosingTheEncoder
 ```
 
-The script makes a dry run of the selection first. It fails when a selected test fails or is skipped, or when the real run has a different count. Thus, select only the tests that apply to the device: `SpeakerIdentificationTest#downloadingModelsRequiresConsent` is skipped on a device that has the models. `CassiniTestRunner` puts the notes, voices and settings of the 0.2 graph in a scratch root (`files/androidTest-<run>`) and removes it at the end. The 0.1.0 tests still use `filesDir`.
+The script makes a dry run of the selection first. It fails when a selected test fails or is skipped, or when the real run has a different count. Thus, select only the tests that apply to the device: `SpeakerIdentificationTest#downloadingModelsRequiresConsent` is skipped on a device that has the models. `LibraryTest` and some `DeviceSmokeTest` methods are skipped on a device without the models. `DeviceSmokeTest#opusCheckpointContinuesIdenticalPacketsAfterClosingTheEncoder` is always ignored (`@Ignore`). Thus, the commands above remove it with `--arg notClass=...`.
+
+The script builds the test APK with the long clip of the background tests (`fixtures/README.md`). To make the clip, the host needs ffmpeg. If ffmpeg is missing, the script gives a warning and builds the test APK without the clip. Then the background tests that use the clip fail. The test APK from CI does not contain the long clip. Thus, with `CASSINI_TEST_APK` from CI, do not select the background tests (`NeedsModels`). `CassiniTestRunner` puts the notes, voices and settings of the 0.2 graph in a scratch root (`files/androidTest-<run>`) and removes it at the end. The 0.1.0 tests still use `filesDir`.
 
 Unlock the phone first. The script wakes it and dismisses an unsecured keyguard, but fails early if authentication is still required. Set `ANDROID_SERIAL` when several devices are connected. To verify the APK CI tested, set `CASSINI_APK=/absolute/path/to/downloaded.apk`; the script detects debug or `releaseTest` (a non-debuggable APK that R8 did not minify) and builds the matching instrumentation APK. It refuses an R8-minified APK. A `releaseTest` build without a supplied key is signed with `~/.android/debug.keystore`, so it installs over a debug build. To use both binaries from CI, also set `CASSINI_TEST_APK=/absolute/path/to/test.apk`. The `cassini-android-device-tests` artifact contains the APK under test and its test APK. Kotlinâ€™s internal method names differ across variants, so a debug test APK cannot reliably exercise a release app. The minified `release` APK cannot be instrumented at all, because R8 removes app and Kotlin library members that only the tests call. `releaseTest` is the release build (same signing, not debuggable) without R8. On tags CI instruments `releaseTest`, then installs the published release APK over it and checks that it launches (`scripts/launch-check.sh APK` does the same by hand).
 

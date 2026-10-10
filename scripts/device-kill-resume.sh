@@ -12,8 +12,8 @@ usage() {
 Usage: scripts/device-kill-resume.sh [--serial SERIAL] [--keep DIR] [--help]
 
 Needs the debug build of the app on the device (adb install -r app/build/outputs/apk/debug/app-debug.apk), its
-models installed in files/, ffmpeg and ffprobe on the host, and python3. When ../gocassini exists, the document is
-also read with the web viewer's reader (node 24+).
+models installed in files/, ffmpeg on the host (for scripts/make-long-clip.sh), and python3. When ../gocassini
+exists, the document is also read with the web viewer's reader (node 24+).
 
   --serial SERIAL   The adb serial of the device (default: $ANDROID_SERIAL, or the only device).
   --keep DIR        Keeps the pulled document in DIR.
