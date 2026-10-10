@@ -15,7 +15,10 @@ import java.time.LocalTime
  * The Note screen (boards 02 and 03, features.md section 3; ui.md section 7). One destination with modes.
  *
  * - [subtitle] is "Today, 10:02 · 48:13"; null in Reading mode (board 03 has none).
- * - [readOnlyReason] is set while the sealed transcript cannot be renamed, merged or switched.
+ * - [readOnlyReason] is set while the sealed transcript cannot be renamed, merged or switched (and, for SAVING,
+ *   while the draft cannot be named). The screen does not draw it and does not block anything for it: the speaker
+ *   headers, the suggestion card buttons and the version chip stay active and send their events. The ViewModel
+ *   answers a blocked event with [NoteDialog.ReadOnly] and this reason, which shows the reason's message.
  * - [chips], [turns], [activeWord], [playback] and [search] belong to the transcript; [banners] come before it
  *   (trust, failure, pause and download banners).
  * - [sheet] and [dialog] are the open overlay; [notificationsOff] switches the progress footnote.

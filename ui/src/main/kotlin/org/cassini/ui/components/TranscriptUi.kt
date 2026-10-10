@@ -72,6 +72,10 @@ data class SuggestionUi(val voiceId: String, val name: String)
  * One transcript turn (ui.md section 7): the words of one speaker in a row. [startMs] is the turn header time.
  * [auto] shows the "auto" badge; [renamable] makes the header a button that opens the Name sheet. In the draft,
  * the words from [unsettledFrom] on may still change. [suggestion] puts the inline suggestion card at this turn.
+ *
+ * [renamable] = false makes the header a plain label, with no tap and no message. Keep it true while a rename is
+ * only blocked for a time (`NoteUiState.readOnlyReason`: a pending job, a trust state other than OK, the save
+ * step). The tap then reaches the ViewModel, which shows `NoteDialog.ReadOnly` with the reason.
  */
 @Immutable
 data class TurnUi(
