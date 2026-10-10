@@ -57,8 +57,20 @@ class JobRepository(
      * Puts the note's job in the queue (architecture 5.2): a QUEUED or RUNNING job is left as it is; a PAUSED, FAILED
      * or NEEDS_CONSENT job, or a note without a job, goes to the back of the queue with the failure and pause reason
      * cleared and attempts 0. A recording note, a trashed note and an UNKNOWN_FORMAT document are refused.
+     *
+     * A `work/sealed` marker without a job row is an adopt that did not finish (an I/O error in its voice step). It
+     * is finished first, so a new job never starts over the old output, its checkpoint and its marker. When it
+     * still cannot finish, the enqueue is refused with [EnqueueRefusal.ADOPT_PENDING].
      */
-    suspend fun enqueue(noteId: String, kind: JobKind): EnqueueOutcome = database.withTransaction {
+    suspend fun enqueue(noteId: String, kind: JobKind): EnqueueOutcome {
+        if (NoteIds.isValid(noteId) && jobs.job(noteId) == null && checkpoints.sealedMarker(noteId)) {
+            adopter.adopt(noteId)
+            if (checkpoints.sealedMarker(noteId)) return EnqueueOutcome.Refused(EnqueueRefusal.ADOPT_PENDING)
+        }
+        return enqueueRow(noteId, kind)
+    }
+
+    private suspend fun enqueueRow(noteId: String, kind: JobKind): EnqueueOutcome = database.withTransaction {
         val note = notes.note(noteId)
         val existing = jobs.job(noteId)
         when {
@@ -75,12 +87,17 @@ class JobRepository(
 
     /**
      * Restore of a note that was QUEUED when it was trashed: back to the queue at the back, creating the row when it
-     * is missing. A RUNNING job is left alone.
+     * is missing. A new row takes the numbers of a valid checkpoint, which stayed in `work/` while the note was in
+     * Trash. A RUNNING job is left alone.
      */
     override suspend fun requeueAtBack(noteId: String, kind: JobKind) {
+        val load = checkpoints.load(noteId)
         database.withTransaction {
             val existing = jobs.job(noteId)
-            if (existing?.state != JobState.RUNNING && notes.note(noteId) != null) putAtBack(noteId, kind, existing)
+            if (existing?.state != JobState.RUNNING && notes.note(noteId) != null) {
+                val job = putAtBack(noteId, kind, existing)
+                if (existing == null && load is CheckpointLoad.Valid) jobs.update(job.withCheckpoint(load))
+            }
         }
     }
 
@@ -154,7 +171,8 @@ class JobRepository(
      *   checkpoint (model load, first window) cannot restart forever ("at most 2 automatic attempts", section 5.3).
      * - PAUSED without a checkpoint: stays PAUSED with `done_ms` 0.
      * - RUNNING or PAUSED whose checkpoint fails validation: FAILED(CHECKPOINT_MISMATCH).
-     * - A `work/` directory without a job row and without a marker: deleted.
+     * - A `work/` directory without a job row and without a marker: deleted, unless the note is in Trash. Trash
+     *   deletes the row of a QUEUED job, and its checkpoint must stay for Restore.
      */
     suspend fun reconcileOnStart(activeNoteId: String?): ReconcileReport {
         val rows = jobs.all().associateBy { it.noteId }
@@ -238,9 +256,10 @@ class JobRepository(
     private suspend fun deleteOrphanWork(noteId: String, report: Report) {
         val deleted = locks.withNoteLock(noteId, dispatchers.io) {
             val work = paths.work(noteId)
-            // A marker left by an adopt that could not run (no row) is kept for the catalogue rebuild.
+            // A marker left by an adopt that could not run (no row) is kept for the catalogue rebuild. A trashed note
+            // keeps the checkpoint of its QUEUED job (Trash deleted the row) for Restore.
             val orphan = work.isDirectory && jobs.jobBlocking(noteId) == null &&
-                !File(work, WorkFiles.SEALED_MARKER).isFile
+                !File(work, WorkFiles.SEALED_MARKER).isFile && notes.noteBlocking(noteId)?.trashedAt == null
             orphan && work.deleteRecursively()
         }
         if (deleted) {

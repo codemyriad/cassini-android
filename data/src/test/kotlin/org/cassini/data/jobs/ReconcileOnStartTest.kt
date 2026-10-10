@@ -275,4 +275,71 @@ class ReconcileOnStartTest {
 
         assertTrue(checkpoints.draftNames(sealed).current().labels.isEmpty())
     }
+
+    @Test fun theAdopterAloneForgetsTheDraftNames() = runTest {
+        row(sealed, JobState.RUNNING)
+        save(sealed)
+        checkpoints.draftNames(sealed).mutate { it.rename("S1", "Anna") }
+        seal(sealed, documentBytes(transcript("la seduta è aperta"), "Verbale"))
+
+        SealedAdopter.of(h.documents, voices).adopt(sealed)
+
+        assertTrue(checkpoints.draftNames(sealed).current().labels.isEmpty())
+    }
+
+    @Test fun aTrashedQueuedNoteKeepsItsCheckpointForRestore() = runTest {
+        row(queued, JobState.QUEUED, doneMs = 28_000)
+        save(queued)
+        assertTrue(h.db.notes().trash(queued, h.now))
+        assertNull("Trash deletes a QUEUED row", jobs.job(queued))
+
+        val report = jobs.reconcileOnStart(null)
+
+        assertTrue(report.deletedWork.isEmpty())
+        assertTrue(checkpoints.load(queued) is CheckpointLoad.Valid)
+        // Restore puts the job back with the numbers of the checkpoint.
+        assertTrue(h.db.notes().untrash(queued, h.now) != null)
+        jobs.requeueAtBack(queued, JobKind.TRANSCRIBE)
+        job(queued).let {
+            assertEquals(JobState.QUEUED, it.state)
+            assertEquals(28_000L to 3, it.doneMs to it.words)
+        }
+        assertTrue(checkpoints.load(queued) is CheckpointLoad.Valid)
+    }
+
+    @Test fun aNewJobNeverStartsOverAnAdoptThatDidNotFinish() = runTest {
+        row(sealed, JobState.RUNNING)
+        save(sealed)
+        seal(sealed, documentBytes(transcript("la seduta è aperta"), "Verbale"))
+        val print = SpeakerPrint(FloatArray(ModelCatalog.VOICEPRINT_DIM) { 0.5f }, 10.0, null)
+        assertTrue(offMain { voices.savePendingBlocking(sealed, mapOf("words/S1" to print), 0) })
+        // The voice step of the adopt fails: the document is in place, the job row is gone, the marker stays.
+        val notes = File(h.paths.voices, "notes").apply { mkdirs() }
+        assertTrue(notes.setWritable(false))
+        try {
+            SealedAdopter.of(h.documents, voices).adopt(sealed)
+            assertNull(jobs.job(sealed))
+            assertTrue(File(h.paths.work(sealed), "sealed").isFile)
+
+            assertEquals(
+                EnqueueOutcome.Refused(EnqueueRefusal.ADOPT_PENDING),
+                jobs.enqueue(sealed, JobKind.TRANSCRIBE_AGAIN),
+            )
+        } finally {
+            notes.setWritable(true)
+        }
+
+        // The enqueue finishes the adopt first, so the new job starts with an empty work directory.
+        assertTrue(jobs.enqueue(sealed, JobKind.TRANSCRIBE_AGAIN) is EnqueueOutcome.Queued)
+        assertFalse(h.paths.work(sealed).exists())
+        assertTrue(File(h.paths.voices, "notes/$sealed.json").isFile)
+        // The new job reads the adopted document.
+        offMain { checkpoints.saveBlocking(sealed, h.checkpoint(sealed, source = "document.opus")) }
+
+        val report = jobs.reconcileOnStart(null)
+
+        assertTrue(report.adopted.isEmpty())
+        assertEquals(JobState.QUEUED, job(sealed).state)
+        assertTrue(checkpoints.load(sealed) is CheckpointLoad.Valid)
+    }
 }

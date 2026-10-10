@@ -28,6 +28,9 @@ enum class EnqueueRefusal {
 
     /** The note's document has a format version this build cannot read. */
     UNKNOWN_FORMAT,
+
+    /** The output of the last transcription is not fully saved yet (an I/O error); try again later. */
+    ADOPT_PENDING,
 }
 
 /** The result of `JobRepository.claimNext`. */
@@ -59,6 +62,6 @@ data class ReconcileReport(
     val restarted: List<String> = emptyList(),
     /** The checkpoint fails validation: FAILED(CHECKPOINT_MISMATCH). */
     val mismatched: List<String> = emptyList(),
-    /** A `work/` directory without a job row and without a marker was deleted. */
+    /** A `work/` directory without a job row and without a marker was deleted (never one of a note in Trash). */
     val deletedWork: List<String> = emptyList(),
 )

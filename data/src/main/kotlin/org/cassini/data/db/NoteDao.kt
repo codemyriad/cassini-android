@@ -222,7 +222,7 @@ abstract class NoteDao {
     /**
      * Moves a live note to Trash and records its job's state and kind for Restore, in one transaction. Returns false
      * when there is no live note with [id]. A QUEUED job row is deleted (Restore puts it back at the end of the
-     * queue); other job rows stay (architecture 5.2 rule 9).
+     * queue, and its checkpoint in `work/` stays); other job rows stay (architecture 5.2 rule 9).
      */
     @Transaction
     open suspend fun trash(id: String, at: Long): Boolean {
