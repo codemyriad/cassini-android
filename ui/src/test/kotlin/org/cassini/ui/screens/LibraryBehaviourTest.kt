@@ -138,7 +138,7 @@ class LibraryBehaviourTest {
         assertEvents(LibraryEvent.Undo)
     }
 
-    /** BannerSpec.id defaults to the kind, so two imports in a row give two banners with one id. */
+    /** Ids must be unique (BannerSpec), but a duplicate id still shows both banners and does not crash the list. */
     @Test fun twoBannersOfOneKindShowSideBySide() {
         val importing = BannerSpec(BannerKind.IMPORTING)
         show(BoardFixtures.library.copy(banners = persistentListOf(importing, importing)))

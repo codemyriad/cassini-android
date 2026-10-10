@@ -8,7 +8,11 @@ import org.cassini.ui.format.ModelPartUi
 
 /**
  * One banner to show (ui.md section 7). [actions] default to the kind's catalogue actions; [dismissible] adds the
- * trailing close button; [announce] makes the banner a polite live region; [id] tells banners of one kind apart.
+ * trailing close button; [announce] makes the banner a polite live region.
+ *
+ * [id] names the banner in the screen's BannerAction and DismissBanner events, so it must be unique in one list.
+ * It defaults to the kind; when two banners of one kind can show together, the ViewModel sets a per-notice id (for
+ * example the note id or the notice key).
  */
 @Immutable
 data class BannerSpec(

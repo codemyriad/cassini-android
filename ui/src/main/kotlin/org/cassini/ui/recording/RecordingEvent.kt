@@ -12,7 +12,10 @@ sealed interface RecordingEvent {
 
     data object Finish : RecordingEvent
 
-    /** Back and the header chevron: go to the Library, the recording continues. */
+    /**
+     * The header chevron: go to the Library, the recording continues. System back is handled by the navigation in
+     * :app (docs/ui-fidelity.md, contract change 3).
+     */
     data object Minimise : RecordingEvent
 
     /** The Library control: the same as [Minimise]. */

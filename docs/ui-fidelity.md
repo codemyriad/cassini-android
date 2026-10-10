@@ -10,8 +10,8 @@ The rules for the review are in `docs/design/ui.md` sections 10.3 and 11, and in
 ## How to make the figures again
 
 The figures use only the committed goldens in `ui/src/test/screenshots/light` and `ui/src/test/screenshots/states`.
-Do not record the goldens again to make the figures. If you must record them, do it only on Linux x86_64 (see
-`README.md`).
+Do not record the goldens again to make the figures. If you must record them, do it only on Linux x86_64 (see the
+root `README.md` and "Screenshot tests" in `docs/development.md`).
 
 1. Compare the phone boards: `python3 -I tools/ui-fidelity/compare.py`.
 2. Cut the States references: `python3 -I tools/ui-fidelity/crop_states.py --top-margin 3`.
@@ -318,7 +318,9 @@ board, and in KDoc or a code comment.
 ## Changes to the screen contracts
 
 These changes are in addition to ui.md sections 1 and 7. P10 must use them when it writes the ViewModels and the
-navigation. Each one has its reason in the KDoc.
+navigation. Each one has its reason in the KDoc. This list names the changes that P10 can miss. The full contract
+is the code: read the KDoc of each `UiState`, `Event`, `Sheet` and `Dialog` type in `:ui` before you write its
+ViewModel.
 
 1. `:ui` has `activity-compose` as a main dependency, not only for previews (ui.md section 1). It supplies
    `BackHandler`. Three screens use it: Library (back clears the search), Note (back closes the in-note search) and
@@ -329,16 +331,35 @@ navigation. Each one has its reason in the KDoc.
 3. The Recording screen does not handle system back. The navigation in `:app` must pop `RecordingKey` with the
    predictive pop of ui.md section 9, and that pop minimises the recording. The chevron and the Library button
    send `Minimise` and `OpenLibrary`.
-4. The text fields (Library search, in-note search, Recording title, the Name field) get their text from the UI
-   state. The ViewModel must apply each change synchronously, in Compose snapshot state, not through a collected
-   flow. Otherwise the field can lose typed characters.
+4. The text fields (Library search, in-note search, Recording title, the Name field) keep their own copy of the
+   text and send each change as an event (`SyncedText` in `:ui`). A state text that the field sent and that the
+   state has not passed yet does not change the field. Any other state text replaces the field text, for example
+   Clear or a length limit. Thus the ViewModels can use the `StateFlow` of architecture.md section 6.
 5. `LicensesUiState.backTo` (Settings or Model download) selects the label of the back button.
 6. `MergeUi.sealed` holds the version on screen and the version that the merge adds. On version 1 of 2, the merge
    adds version 3.
 7. `VersionRowUi.withYear` adds the year to the date of a version from an earlier year.
-8. `NoteEvent` has no `Resume`, `StartOver`, `Transcribe`, `TranscribeAgain` or `Trash`. These actions come as
-   `SheetAction` or `BannerAction`.
-9. A Library or Note banner list can hold two banners with the same id. The list key adds the position.
+8. `NoteEvent` has no `Resume`, `StartOver`, `Rename`, `Transcribe`, `TranscribeAgain` or `Trash`. These actions
+   come as `SheetAction` or `BannerAction`.
+9. `BannerSpec.id` must be unique in one banner list, because the `BannerAction` and `DismissBanner` events carry
+   only the id. The id defaults to the kind. When two banners of one kind can show together, the ViewModel sets a
+   per-notice id. The list key also adds the position, so a duplicate does not crash the list.
+10. `LibraryDialog` also has `StartOver(id)` and `StopAndTrash(id)`. `LibraryEvent` also has `Rename(id)`,
+    `Trash(id)`, `SnackbarTimeout`, `ConfirmDialog` and `DismissDialog`.
+11. `NoteRowUi` has `day: DayLabel?` in place of `date: LocalDate?`.
+12. `NoteUiState` has `noteId` and `snackbar`. `ReadOnlyReason` also has `SAVING`. `TranscriptSearchUi` has
+    `matches`. `NoteDialog` (not in ui.md) is `Rename`, `StartOver`, `TranscribeFresh`, `StopAndTrash` or
+    `ReadOnly(reason)`. `NoteEvent` also has `PlayTurn`, `SeekFinished`, `PauseFollowing`, `TrustChip`,
+    `RenameConfirmed`, `ConfirmDialog`, `Merge(event)`, `DismissBanner` and `SnackbarTimeout`.
+13. `NoteActionsUi` has `noteId`, and `recordedDay: DayLabel` with `recordedAt: LocalTime` in place of one
+    `recordedAt`.
+14. `MergeUi` has `sourceId` and `source` (speaker A) and `sealed` in place of `sealedVersion` (change 6).
+    `MergeEvent` is `PickTarget(speakerId)`, `Confirm` or `CancelConfirm`.
+15. `NameSheetEvent` has `SaveBlocked`: a Save press while a question is open.
+16. `ModelDownloadUiState` has no total. The screen shows the sum of the rounded part sizes (features.md
+    section 0).
+17. The Library list and the Note screen with its search open add the IME inset (ui.md section 9). `:app` must
+    set `android:windowSoftInputMode="adjustResize"` on the activity, so that the keyboard insets arrive.
 
 ## Items for the owner to review
 

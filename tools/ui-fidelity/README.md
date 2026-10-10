@@ -95,8 +95,9 @@ token pairs of ui.md section 11. Use this script for one-off checks on a board o
 
 Do these steps for each board, and record the results in `docs/ui-fidelity.md`:
 
-1. Record the goldens: `./gradlew :ui:recordRoborazziDebug`. For the States board, also run
-   `crop_states.py`.
+1. Use the committed goldens. Do not record them again for the review. Record them only after an
+   intended screen change, and only on Linux x86_64 (see "Screenshot tests" in
+   `docs/development.md`). For the States board, run `crop_states.py --top-margin 3`.
 2. Run `compare.py`.
 3. Read three images with an image viewer (agents: the Read tool): the design PNG, the golden and the
    blend. Read the heat map to find the areas that differ. For a tall image, read crops.
