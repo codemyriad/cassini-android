@@ -41,8 +41,10 @@ private const val NAME_PLACEHOLDER = "%1\$s"
  * The inline voice suggestion (board 02): surface, 1 dp line, radius 14, padding 10/12. The header is the speaker's
  * turn line ([speaker], [tone], [timeMs]); it is a 48 dp button across the top of the card that opens the Name sheet
  * ([onSpeaker], click label "Name this speaker"; null when naming is closed). Then "Is this **Luca**?" (14 sp, the
- * [name] in 700; 6 dp above, 8 below, 2 in layout because the 36 dp buttons sit in 48 dp) and the buttons, 8 dp apart:
- * "Yes, Luca" ([onYes], ink) and "Not Luca" ([onNo]). The paragraph after the card starts 6 dp below it.
+ * [name] in 700; 6 dp above, 8 below) and the buttons, 8 dp apart: "Yes, Luca" ([onYes], ink) and "Not Luca"
+ * ([onNo]). The paragraph after the card starts 6 dp below it. The paddings in layout are measured on board 02:
+ * 7.5 dp above the question (the board's speaker line is 17 dp, ours 16, and its 1.55 line box centres the text
+ * lower), 3 dp below it (the 36 dp buttons sit in 48 dp) and 4 dp below the buttons' layout.
  */
 @Composable
 @Suppress("LongParameterList", "LongMethod") // ui.md section 6: the speaker line, the voice and three callbacks.
@@ -77,12 +79,12 @@ fun SuggestionCard(
                     onClick = onSpeaker,
                 ),
         )
-        // The board's padding sits inside its 1 dp CSS border; 4 dp at the bottom below the 48 dp button layout.
-        Column(Modifier.padding(start = 13.dp, end = 13.dp, top = 11.dp, bottom = 5.dp)) {
+        // The board's padding sits inside its 1 dp CSS border; at the bottom, 4 dp below the 48 dp button layout.
+        Column(Modifier.padding(start = 13.dp, end = 13.dp, top = 11.dp, bottom = 4.dp)) {
             TurnHeaderLine(speaker, tone, timeMs, auto = false)
             Text(
                 text = question(stringResource(R.string.ui_suggestion_question), name),
-                modifier = Modifier.padding(top = 6.dp, bottom = 2.dp),
+                modifier = Modifier.padding(top = 7.5.dp, bottom = 3.dp),
                 style = QuestionStyle,
                 color = c.ink,
             )

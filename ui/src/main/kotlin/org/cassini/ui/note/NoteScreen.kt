@@ -8,7 +8,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
@@ -45,8 +44,8 @@ import org.cassini.ui.theme.Glyph
  * system back then closes the search first ([NoteEvent.CloseSearch]) and only a second back leaves the screen
  * (the navigation in :app handles that one). The player sits at the bottom whenever [NoteUiState.playback] is set.
  *
- * This step draws Reading mode (board 03). P8 step 3 draws the other modes, which show the top bar with the
- * subtitle and, for now, an empty body; P8 step 4 adds the remaining sheets and dialogs.
+ * Reading mode (board 03) is [ReadAndListenBody]; every other mode shows the top bar with the subtitle and the
+ * body of [NoteModeBody] (board 02 and the modes without a board). P8 step 4 adds the remaining sheets and dialogs.
  */
 @Composable
 fun NoteScreen(
@@ -76,7 +75,7 @@ fun NoteScreen(
             Column(Modifier.fillMaxSize()) {
                 when (state.mode) {
                     NoteMode.Reading -> ReadAndListenBody(state, listState, onEvent)
-                    else -> Spacer(Modifier.weight(1f))
+                    else -> NoteModeBody(state, onEvent)
                 }
             }
             val playback = state.playback
@@ -153,7 +152,7 @@ private fun NoteTopBar(state: NoteUiState, onEvent: (NoteEvent) -> Unit) {
 
 /** Read & listen (board 03): the chips row, the banners (margin 16 horizontal, 10 below) and the transcript pane. */
 @Composable
-private fun ColumnScope.ReadAndListenBody(
+internal fun ColumnScope.ReadAndListenBody(
     state: NoteUiState,
     listState: LazyListState,
     onEvent: (NoteEvent) -> Unit,
