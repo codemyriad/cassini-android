@@ -10,8 +10,9 @@ import org.cassini.core.speakers.Voice
 import java.io.File
 import java.util.concurrent.atomic.AtomicReference
 
-// The storage ports of TranscriptionJob (architecture section 5.4). :engine does not depend on :data: :app implements
-// these interfaces with adapters over the :data repositories, and JVM tests use fakes.
+// The storage ports of TranscriptionJob. :engine does not depend on :data: :app implements these interfaces with
+// adapters over the :data repositories, and JVM tests use fakes. This file is the contract: architecture section 5.4
+// gives the steps, and where its list of port functions differs from this file, this file is correct.
 //
 // Threading: a `suspend` function may be called from any coroutine and moves to IO itself. Every other function blocks
 // and is called from a worker thread only, in practice the inference thread (InferenceDispatcher); functions named
@@ -110,8 +111,9 @@ interface JobStorage {
 
     /**
      * The note's sealed document as it reads now, in any state, or null for a plain note. Blocking. The job adds a
-     * variant only to an `ok` document. Any other state (UNVERIFIED, STALE_AUDIO, INVALID_METADATA, UNREADABLE) gets
-     * a fresh document over the note's audio: earlier versions are not kept (features.md, "Transcribe again").
+     * variant only to an `ok` document. STALE_AUDIO, INVALID_METADATA and UNREADABLE get a fresh document over the
+     * note's audio, and earlier versions are not kept (features.md section 6, "Transcribe again"). The job refuses
+     * UNVERIFIED and UNKNOWN_FORMAT with [JobFailure.DocumentRefused]: features.md does not list them.
      */
     fun existingDocumentBlocking(noteId: String): CassiniDocument?
 
@@ -120,9 +122,12 @@ interface JobStorage {
 
     /**
      * Writes the `work/sealed` marker, fsynced, after the job verified [sealTarget]. From then on adopt may install it,
-     * also after a crash. Blocking, inference thread.
+     * also after a crash. [document] is the verified read of [sealTarget] that `CassiniDocument.create` returned: the
+     * adapter records it by file signature in the verified-document cache, so adopt does not read and hash the file
+     * again (amendment FAST NOTE OPENING, item 1). `DocumentRepository.sealBlocking` also writes the file, so :data
+     * needs a call that writes only the marker and seeds the cache. Blocking, inference thread.
      */
-    fun markSealedBlocking(noteId: String)
+    fun markSealedBlocking(noteId: String, document: CassiniDocument)
 
     /** Deletes the marker, then [sealTarget] (a stop during finalization); the checkpoint stays. Blocking. */
     fun discardSealedBlocking(noteId: String)

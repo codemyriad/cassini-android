@@ -58,7 +58,9 @@ class DraftSources(
  *   of [TranscriptionProgress.snapshot] applies within a step.
  * - The WORDS and SPEAKERS stages read "Finding words and speakers", or "Finding words" without a diarizer (none
  *   installed, or [JobEvent.SpeakersUnavailable]).
- * - Matching is drawn as skipped without speakers or without the voiceprint model, and when Saving began without it.
+ * - Matching is drawn as skipped when the job will not match voices: [JobEvent.Started] says it can not
+ *   (`matching`), [JobEvent.NamingClosed] says it will not, or Saving began without it. [JobEvent.SpeakersUnavailable]
+ *   alone does not skip it, because the windows before the failure keep their speakers.
  * - The percent is capped at 99 until [JobOutcome.Done], which publishes 100.
  * - Time left is Calculating until 3 windows completed since this run started, or while the total is unknown; Finishing
  *   when no audio is left; else the rounded range plus [finalizationMs].
@@ -136,10 +138,10 @@ class ProgressTracker(
             progress = progress,
             startedAt = clock(),
             checkpointElapsedMs = restored?.elapsedMs ?: 0L,
-            prints = event.prints,
             lowMemory = event.lowMemory,
         ).apply {
             speakers = event.speakers
+            matching = event.matching
             words = restored?.words.orEmpty()
         }
         publish(done = false)
@@ -161,7 +163,10 @@ class ProgressTracker(
                 run.words = event.words
             }
             event is JobEvent.SpeakersUnavailable -> run.speakers = false
-            event is JobEvent.NamingClosed -> run.decoded = true
+            event is JobEvent.NamingClosed -> {
+                run.decoded = true
+                run.matching = event.matching
+            }
             else -> Unit
         }
     }
@@ -198,7 +203,7 @@ class ProgressTracker(
             rangeEndMs = shown.endMs,
             percent = if (done) FULL else snapshot.percent?.coerceAtMost(CAP),
             step = if (done) Step.SAVING else run.step,
-            matchingSkipped = !run.matched && (run.step == Step.SAVING || done || !run.speakers || !run.prints),
+            matchingSkipped = !run.matched && (run.step == Step.SAVING || done || !run.matching),
             timeLeft = if (done) TimeLeft.Finishing else timeLeft(snapshot, finalizationMs),
             doneMs = snapshot.doneMs,
             totalMs = snapshot.totalMs,
@@ -239,7 +244,6 @@ class ProgressTracker(
         val progress: TranscriptionProgress,
         val startedAt: Long,
         val checkpointElapsedMs: Long,
-        val prints: Boolean,
         val lowMemory: Boolean,
     ) {
         val projection = BatteryProjection()
@@ -250,6 +254,9 @@ class ProgressTracker(
 
         /** The MATCHING stage began. */
         var matched = false
+
+        /** The job can still match voices in this run (from [JobEvent.Started], then [JobEvent.NamingClosed]). */
+        var matching = false
 
         /** Naming closed: the decode is complete. */
         var decoded = false

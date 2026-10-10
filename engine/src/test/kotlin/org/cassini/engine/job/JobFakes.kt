@@ -361,8 +361,12 @@ class FakeStorage(
 
     override fun titleBlocking(noteId: String) = "Weekly sync"
 
-    override fun markSealedBlocking(noteId: String) {
+    /** The verified document the job passed with the marker. */
+    @Volatile var markedDocument: CassiniDocument? = null
+
+    override fun markSealedBlocking(noteId: String, document: CassiniDocument) {
         check(sealTarget(noteId).isFile)
+        markedDocument = document
         marker.writeText("ok")
         log += "marker"
         afterMarker()

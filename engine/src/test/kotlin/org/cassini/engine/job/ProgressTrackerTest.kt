@@ -217,7 +217,37 @@ class ProgressTrackerTest {
         t.send(JobEvent.StageChanged(Stage.WORDS, 26_000, 54_000))
         tick()
         assertEquals(ProgressHeadline.FINDING_WORDS, t.progress.headline)
+        // The first window kept its speakers: the job decides at the end of the decode.
+        assertFalse(t.progress.matchingSkipped)
+        t.send(JobEvent.NamingClosed(matching = false))
+        tick()
         assertTrue(t.progress.matchingSkipped)
+        t.close()
+    }
+
+    @Test fun matchingAfterAMidRunSpeakerFailureIsNeverDrawnAsSkipped() = runTest {
+        val t = Tracked(this)
+        t.send(started(totalMs = 70_000))
+        t.send(JobEvent.StageChanged(Stage.SPEAKERS, 0, 28_000))
+        t.send(JobEvent.SpeakersUnavailable)
+        t.send(JobEvent.StageChanged(Stage.WORDS, 26_000, 54_000))
+        tick()
+        assertFalse(t.progress.matchingSkipped)
+        t.send(JobEvent.NamingClosed(matching = true))
+        tick()
+        assertFalse(t.progress.matchingSkipped)
+        t.send(JobEvent.StageChanged(Stage.MATCHING))
+        tick()
+        assertEquals(ProgressHeadline.MATCHING_VOICES, t.progress.headline)
+        assertFalse(t.progress.matchingSkipped)
+        t.close()
+    }
+
+    @Test fun aRestoredDiarizerKeepsMatchingPossibleAfterAnEarlierFailure() = runTest {
+        val t = Tracked(this)
+        t.send(JobEvent.Started(70_000, null, speakers = false, prints = true, lowMemory = false, matching = true))
+        tick()
+        assertFalse(t.progress.matchingSkipped)
         t.close()
     }
 
@@ -417,7 +447,7 @@ class ProgressTrackerTest {
         windows(t, 54_000)
         assertEquals(52_000L, t.draft.tentativeFromMs)
         windows(t, 70_000)
-        t.send(JobEvent.NamingClosed)
+        t.send(JobEvent.NamingClosed(true))
         tick()
         assertEquals(Long.MAX_VALUE, t.draft.tentativeFromMs)
         assertFalse(t.draft.namingOpen)
@@ -470,7 +500,7 @@ class ProgressTrackerTest {
         t.send(JobEvent.WindowDone(28_000, 70_000, words(0, 28)))
         tick()
         assertEquals(1, t.draft.suggestions.size)
-        t.send(JobEvent.NamingClosed)
+        t.send(JobEvent.NamingClosed(true))
         tick()
         assertTrue(t.draft.suggestions.isEmpty())
         assertFalse(t.draft.namingOpen)

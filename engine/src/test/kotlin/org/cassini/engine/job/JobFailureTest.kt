@@ -1,6 +1,7 @@
 package org.cassini.engine.job
 
 import org.cassini.core.Failure
+import org.cassini.core.format.DocumentState
 import org.cassini.core.models.ModelPart
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -9,6 +10,7 @@ import org.junit.Test
 class JobFailureTest {
     private val codes = Failure.entries.map { JobFailure.Processing(it).code } +
         DownloadError.entries.map { JobFailure.Download(it, ModelPart.SPEECH, 0).code } +
+        DocumentState.entries.map { JobFailure.DocumentRefused(it).code } +
         JobFailure.CheckpointMismatch.code
 
     @Test fun noTwoFailuresShareAStoredCode() {

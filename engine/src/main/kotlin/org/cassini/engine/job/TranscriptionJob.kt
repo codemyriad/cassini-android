@@ -177,16 +177,18 @@ class TranscriptionJob(
         val generation = voices.generationBlocking()
         val saved = voices.peopleBlocking()
         val knownMs = storage.knownDurationMs(noteId)?.takeIf { it > 0 }
-        Prepared(resumed, storage.audioFile(noteId), noteVoices(saved), generation, knownMs, env.lowMemory())
+        // Transcribe again over a document that can neither take a version nor be replaced stops here, before any work.
+        val existing = storage.existingDocumentBlocking(noteId)?.also(::requireReplaceable)?.takeIf(::extendable)
+        val noteVoices = existing?.let { noteVoices(it, saved) }.orEmpty()
+        Prepared(resumed, storage.audioFile(noteId), noteVoices, generation, knownMs, env.lowMemory())
     }
 
     /**
      * Named speakers of the note's sealed transcript as note-local voices ([CheckpointNames.NOTE_VOICE_PREFIX]), so a
      * Transcribe again carries their names over even when they were not remembered (0.1.0 `voicesForRecognition`).
-     * Only an `ok` document counts: any other state gets a fresh document, whose names start over.
+     * Only an `ok` [document] counts: any other state gets a fresh document, whose names start over.
      */
-    private fun noteVoices(saved: List<Voice>): List<Voice> {
-        val document = storage.existingDocumentBlocking(noteId)?.takeIf(::extendable) ?: return emptyList()
+    private fun noteVoices(document: CassiniDocument, saved: List<Voice>): List<Voice> {
         val savedIds = saved.mapTo(HashSet()) { it.id }
         return voices.noteVoicesBlocking(noteId).mapNotNull { (id, print) ->
             val label = document.speakerLabel(id)
@@ -312,7 +314,10 @@ class TranscriptionJob(
             JobEvent.Restored(it.doneMs, it.durationMs, it.recognition.chunks.words, it.elapsedMs)
         }
         val speakers = !run.speakerFailure
-        emit(JobEvent.Started(run.initialTotalMs, restored, speakers, run.printsReady, run.prepared.lowMemory))
+        // A diarizer restored from the checkpoint has turns, so matching can run even after an earlier failure.
+        val matching = run.printsReady && (speakers || run.diarizer != null)
+        val lowMemory = run.prepared.lowMemory
+        emit(JobEvent.Started(run.initialTotalMs, restored, speakers, run.printsReady, lowMemory, matching))
     }
 
     private fun callbacks(run: Run) = Recognizer.Callbacks(
@@ -364,6 +369,10 @@ class TranscriptionJob(
     /**
      * Step 4, per window: Sortformer, word assignment, the clip cache and live voice matching. Telling speakers apart
      * is best effort: a failure gives every later word one voice (Failure.SPEAKERS degrades, never fails the job).
+     * The windows before the failure keep their speakers, as in 0.1.0: the seal still records
+     * `x-speakerDiarization`, and matching runs on their clips. So `speakersSeparated = false` follows only from a
+     * failure at the first window (no turns). This is a deliberate choice: the earlier speakers and their draft names
+     * stay.
      */
     private fun onWindow(run: Run, chunk: PcmAudio, startMs: Long, words: Transcript): Transcript {
         checkActive()
@@ -502,11 +511,13 @@ class TranscriptionJob(
 
     // Steps 6 to 8 ----------------------------------------------------------------------------------------------
 
-    /** Step 6: closes naming and applies the draft merges; builds the recognition and diarization records. */
+    /**
+     * Step 6: closes naming and applies the draft merges; builds the recognition and diarization records. The
+     * diarization record is kept when the diarizer failed after some windows (0.1.0): those words were told apart.
+     */
     private fun attribute(decoded: Decoded): Draft {
         checkActive()
         val names = storage.closeNames(noteId)
-        emit(JobEvent.NamingClosed)
         val transcript = SpeakerMerges.apply(decoded.transcript, names.merges)
         val turns = decoded.turns
         checkActive()
@@ -522,7 +533,9 @@ class TranscriptionJob(
             JobProvenance.diarization(transcript.words, turns, recognition, decoded.diarizationMs)
         }
         checkActive()
-        return Draft(names, transcript, recognition, diarization)
+        val matching = turns != null && diarization != null && decoded.run.printsReady
+        emit(JobEvent.NamingClosed(matching))
+        return Draft(names, transcript, recognition, diarization, matching)
     }
 
     /**
@@ -531,7 +544,7 @@ class TranscriptionJob(
      */
     private suspend fun matchVoices(prepared: Prepared, decoded: Decoded, draft: Draft): Matched {
         val run = decoded.run
-        if (decoded.turns == null || draft.diarization == null || !run.printsReady) return Matched.NONE
+        if (!draft.matching) return Matched.NONE
         emit(JobEvent.StageChanged(Stage.MATCHING))
         val windows = SpeakerMerges.windows(run.clipCache.windows, draft.names.merges)
         val computed = try {
@@ -577,8 +590,9 @@ class TranscriptionJob(
 
     /**
      * Step 9: seals into `work/sealed.opus` (never `document.opus`) while holding the note's lock, re-reading the
-     * existing document and the title under it. Only an `ok` document gets a new variant; a document in any other
-     * state is replaced by a fresh one over the same audio, without its old Cassini tags. `CassiniDocument.create`
+     * existing document and the title under it. Only an `ok` document gets a new variant; a STALE_AUDIO,
+     * INVALID_METADATA or UNREADABLE document is replaced by a fresh one over the same audio, without its old Cassini
+     * tags, and any other state is refused ([requireReplaceable]). `CassiniDocument.create`
      * verifies the written file; the job fsyncs it, saves the pending prints (or deletes an older pending file when
      * there are none), then writes the marker. A stop or a failure before the marker deletes the sealed file and keeps
      * the checkpoint.
@@ -593,7 +607,8 @@ class TranscriptionJob(
         var marked = false
         try {
             val document = storage.withNoteLockBlocking(noteId) {
-                val existing = storage.existingDocumentBlocking(noteId)?.takeIf(::extendable)
+                val current = storage.existingDocumentBlocking(noteId)?.also(::requireReplaceable)
+                val existing = current?.takeIf(::extendable)
                 val title = storage.titleBlocking(noteId)
                 val audio = if (existing == null) freshAudio(decoded.run, target) else decoded.run.sealAudio
                 requireSpace(target, audio.length())
@@ -610,7 +625,7 @@ class TranscriptionJob(
             }
             if (stopReason.get() != null) throw ProcessingPaused()
             checkActive()
-            storage.markSealedBlocking(noteId)
+            storage.markSealedBlocking(noteId, document)
             marked = true
         } finally {
             if (!marked) storage.discardSealedBlocking(noteId)
@@ -736,6 +751,7 @@ class TranscriptionJob(
             (error is CancellationException && stopReason.get() == null)
         return when {
             cancelled -> JobOutcome.Cancelled
+            error is DocumentRefusal -> JobOutcome.Failed(JobFailure.DocumentRefused(error.state))
             error is ProcessingPaused || error is CancellationException ->
                 JobOutcome.Paused(stopReason.get() ?: PauseReason.USER)
             error is UserFacingException -> JobOutcome.Failed(JobFailure.Processing(error.failure))
@@ -824,6 +840,8 @@ class TranscriptionJob(
         val transcript: Transcript,
         val recognition: JSONObject,
         val diarization: JSONObject?,
+        /** Step 7 runs: a diarizer, a diarization record and the voiceprint model. */
+        val matching: Boolean,
     )
 
     /** Step 7: the final prints and their raw matches (note-local voices included). */
@@ -840,6 +858,9 @@ class TranscriptionJob(
     }
 
     private class Sealed(val labels: Map<String, String>, val names: CheckpointNames)
+
+    /** Transcribe again over a document in [state], which the job must not replace (features.md section 6). */
+    private class DocumentRefusal(val state: DocumentState) : RuntimeException("Document is ${state.code}")
 
     private companion object {
         const val NANOS_PER_MS = 1_000_000L
@@ -862,6 +883,26 @@ class TranscriptionJob(
 
         /** Only an `ok` document takes a new variant (`CassiniDocument.create` refuses any other state). */
         fun extendable(document: CassiniDocument) = document.state == DocumentState.OK.code
+
+        /**
+         * The states that get a fresh document (features.md section 6, "Transcribe again"), plus plain audio, which has
+         * no transcript to lose.
+         */
+        val REPLACEABLE = setOf(
+            DocumentState.PLAIN_AUDIO,
+            DocumentState.STALE_AUDIO,
+            DocumentState.INVALID_METADATA,
+            DocumentState.UNREADABLE,
+        )
+
+        /**
+         * Refuses an UNVERIFIED or UNKNOWN_FORMAT document: it can not take a new variant, and the spec does not let a
+         * fresh document drop its versions (0.1.0 refused every state but `ok`).
+         */
+        fun requireReplaceable(document: CassiniDocument) {
+            val state = document.documentState
+            if (state != DocumentState.OK && state !in REPLACEABLE) throw DocumentRefusal(state)
+        }
 
         fun isCassiniTag(comment: String) =
             comment.substringBefore('=').uppercase(Locale.ROOT).startsWith(CASSINI_TAG_PREFIX)

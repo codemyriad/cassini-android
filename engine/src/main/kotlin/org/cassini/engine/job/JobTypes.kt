@@ -2,6 +2,7 @@ package org.cassini.engine.job
 
 import org.cassini.core.Failure
 import org.cassini.core.asr.TranscriptionProgress
+import org.cassini.core.format.DocumentState
 import org.cassini.core.format.Word
 import org.cassini.core.library.PauseReason
 import org.cassini.core.models.ModelPart
@@ -131,7 +132,7 @@ sealed interface BatteryLine {
 /**
  * The numbers of the progress card at one tick. [percent] is null for an indeterminate bar and at most 99 until the
  * job is done. [rangeStartMs]..[rangeEndMs] is the window being worked on (hidden when both are 0).
- * [matchingSkipped] draws the Matching step as skipped (no prints or no voiceprint model).
+ * [matchingSkipped] draws the Matching step as skipped: the job will not match voices in this run.
  */
 data class RunningProgress(
     val headline: ProgressHeadline,
@@ -181,7 +182,8 @@ data class DraftState(
 
 /**
  * Why a job failed. [code] is what `jobs.failure` stores: a core `Failure` name, [DOWNLOAD_PREFIX] plus a
- * [DownloadError] name, or `CHECKPOINT_MISMATCH`. No two failures share a code.
+ * [DownloadError] name, [DOCUMENT_PREFIX] plus a [DocumentState] name, or `CHECKPOINT_MISMATCH`. No two failures
+ * share a code.
  */
 sealed interface JobFailure {
     val code: String
@@ -204,9 +206,21 @@ sealed interface JobFailure {
         override val code: String get() = "CHECKPOINT_MISMATCH"
     }
 
+    /**
+     * Transcribe again was refused before any work: the note's document is in [state], so it can not take a new
+     * version, and features.md section 6 does not let a fresh document replace it (only STALE_AUDIO, UNREADABLE and
+     * INVALID_METADATA). Seen for UNVERIFIED and UNKNOWN_FORMAT.
+     */
+    data class DocumentRefused(val state: DocumentState) : JobFailure {
+        override val code: String get() = DOCUMENT_PREFIX + state.name
+    }
+
     companion object {
         /** The start of every [Download] code, so "DOWNLOAD_INSTALL" never reads as core `Failure.INSTALL`. */
         const val DOWNLOAD_PREFIX = "DOWNLOAD_"
+
+        /** The start of every [DocumentRefused] code. */
+        const val DOCUMENT_PREFIX = "DOCUMENT_"
 
         /** The [DownloadError] of a stored [code], or null when the code is not a download failure. */
         fun downloadError(code: String): DownloadError? = code.takeIf { it.startsWith(DOWNLOAD_PREFIX) }
@@ -249,8 +263,9 @@ sealed interface JobEvent {
 
     /**
      * Inference begins. [totalMs] may be 0 (unknown). [restored] is set on a resume. [speakers]: a diarizer is
-     * installed and has not failed; [prints]: the voiceprint model is installed, so the Matching step runs when
-     * speakers were told apart. [lowMemory]: the memory preflight flagged the device.
+     * installed and has not failed; [prints]: the voiceprint model is installed. [matching]: the Matching step can
+     * still run in this run (prints, and a diarizer installed or restored from the checkpoint); [NamingClosed] gives
+     * the final answer. [lowMemory]: the memory preflight flagged the device.
      */
     data class Started(
         val totalMs: Long,
@@ -258,6 +273,7 @@ sealed interface JobEvent {
         val speakers: Boolean,
         val prints: Boolean,
         val lowMemory: Boolean,
+        val matching: Boolean = prints && speakers,
     ) : JobEvent
 
     /**
@@ -282,11 +298,14 @@ sealed interface JobEvent {
     /** A checkpoint covering [doneMs] was saved. */
     data class Checkpointed(val doneMs: Long) : JobEvent
 
-    /** Speakers could not be told apart (Failure.SPEAKERS): every word is one voice from now on. */
+    /**
+     * Speakers could not be told apart (Failure.SPEAKERS): every word is one voice from now on. The windows before
+     * keep their speakers, so the Matching step can still run.
+     */
     data object SpeakersUnavailable : JobEvent
 
-    /** Step 6 closed naming. */
-    data object NamingClosed : JobEvent
+    /** Step 6 closed naming. [matching]: the Matching step runs next; when false, it is skipped. */
+    data class NamingClosed(val matching: Boolean) : JobEvent
 
     data object Stopping : JobEvent
 

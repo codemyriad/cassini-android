@@ -20,6 +20,7 @@ import org.cassini.core.asr.TranscriptionProgress.Stage
 import org.cassini.core.checkpoint.CheckpointNames
 import org.cassini.core.checkpoint.CheckpointState
 import org.cassini.core.format.CassiniDocument
+import org.cassini.core.format.DocumentState
 import org.cassini.core.format.Transcript
 import org.cassini.core.format.Word
 import org.cassini.core.library.PauseReason
@@ -48,6 +49,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 class TranscriptionJobTest {
     @get:Rule val temp = TemporaryFolder()
@@ -85,7 +87,7 @@ class TranscriptionJobTest {
             ),
             stages,
         )
-        assertTrue(events.indexOf(JobEvent.NamingClosed) > events.indexOfLast { it is JobEvent.Checkpointed })
+        assertTrue(events.indexOf(JobEvent.NamingClosed(true)) > events.indexOfLast { it is JobEvent.Checkpointed })
         val sealed = h.sealed()
         assertEquals((0 until 70).map { "w$it" }, sealed.selected(null)!!.transcript!!.words.map { it.text })
         val checkpoints = listOf("checkpoint 28000", "checkpoint 54000", "checkpoint 70000")
@@ -229,17 +231,23 @@ class TranscriptionJobTest {
     @Test fun cancelInsideASlowNativeCallKeepsThePreviousCheckpointAndReleasesHandles() = runBlocking {
         val h = Harness()
         val entered = CountDownLatch(1)
+        val cancelSent = CountDownLatch(1)
         val interrupted = AtomicBoolean()
         val finishedNativeCall = AtomicBoolean()
+        // Sampled at the end of the native call: recognizer closed, diarizer closed, budget held.
+        val atTheEnd = AtomicReference<List<Boolean>>()
         h.script.beforeDecode = { start ->
             if (start == 26_000L) {
                 entered.countDown()
-                // A native call cannot be interrupted: it notices nothing and runs to its end.
+                // A native call cannot be interrupted: it ignores the interrupt and runs to its end, here 300 ms after
+                // the cancel. A latch await would notice the interrupt, so the call spins.
                 val began = System.nanoTime()
-                while (!Thread.currentThread().isInterrupted && System.nanoTime() - began < 10_000_000_000L) {
-                    Thread.onSpinWait()
-                }
+                while (cancelSent.count > 0L && System.nanoTime() - began < 10_000_000_000L) Thread.onSpinWait()
+                val cancelled = System.nanoTime()
+                while (System.nanoTime() - cancelled < 300_000_000L) Thread.onSpinWait()
                 interrupted.set(Thread.currentThread().isInterrupted)
+                val recognizer = h.script.recognizers.single().closed
+                atTheEnd.set(listOf(recognizer, h.script.diarizers.single().closed, NativeBudget.isHeld))
                 finishedNativeCall.set(true)
             }
         }
@@ -247,9 +255,12 @@ class TranscriptionJobTest {
         val running = async(Dispatchers.Default) { job.run() }
         assertTrue(entered.await(10, TimeUnit.SECONDS))
         running.cancel()
+        cancelSent.countDown()
         withTimeout(10_000) { running.join() }
         assertTrue(interrupted.get())
         assertTrue(finishedNativeCall.get())
+        // While the call ran, the job closed nothing and kept the budget.
+        assertEquals(listOf(false, false, true), atTheEnd.get())
         assertEquals(JobEvent.Ended(JobOutcome.Cancelled), job.events.toList().last())
         assertEquals(listOf(28_000L), h.storage.saved.map { it.doneMs })
         assertEquals(28_000L, JSONObject(h.storage.checkpointJson!!).getLong("doneMs"))
@@ -346,15 +357,7 @@ class TranscriptionJobTest {
     @Test fun theJobNeverWritesDocumentOpus() = runBlocking {
         val h = Harness(source = "document.opus")
         // Transcribe again: the note's audio is a sealed document whose speaker "old_a" the user called Anna.
-        val document = CassiniDocument.create(
-            FIXTURE_OPUS,
-            Transcript(listOf(Word("old_a", 0, 500, "ciao"))),
-            "Weekly sync",
-            JSONObject().put("source", "test"),
-            null,
-            mapOf("old_a" to "Anna"),
-            File(temp.root, "document.tmp"),
-        )
+        val document = oldDocument("document.tmp", anna = true)
         File(temp.root, "document.tmp").copyTo(h.audio, overwrite = true)
         h.audio.setLastModified(1_700_000_000_000L)
         h.storage.existing = document
@@ -375,21 +378,13 @@ class TranscriptionJobTest {
         assertTrue(h.storage.jobNames.none { sp1 in it.automatic || sp1 in it.live })
     }
 
-    @Test fun transcribeAgainOnADocumentThatIsNotOkSealsAFreshDocument() = runBlocking {
+    @Test fun transcribeAgainOnAStaleDocumentSealsAFreshDocument() = runBlocking {
         val h = Harness(source = "document.opus")
-        val old = CassiniDocument.create(
-            FIXTURE_OPUS,
-            Transcript(listOf(Word("old_a", 0, 500, "ciao"))),
-            "Weekly sync",
-            JSONObject().put("source", "test"),
-            null,
-            mapOf("old_a" to "Anna"),
-            File(temp.root, "old.tmp"),
-        )
+        val old = oldDocument("old.tmp", anna = true)
         File(temp.root, "old.tmp").copyTo(h.audio, overwrite = true)
         val before = sha256(h.audio)
-        // The repository reads the document as not verified: it cannot take a new variant (features "Transcribe again").
-        h.storage.existing = old.copy(state = "unverified")
+        // The audio changed under the transcript: it can not take a new variant (features.md section 6).
+        h.storage.existing = old.copy(state = "stale-audio")
         h.voices.noteVoices = mapOf("old_a" to SpeakerPrint(axis(1), 30.0, null))
 
         assertEquals(JobOutcome.Done, h.run().first)
@@ -408,6 +403,37 @@ class TranscriptionJobTest {
         assertTrue(sealed.comments.any { it.startsWith("TITLE=") })
     }
 
+    @Test fun transcribeAgainOnAnUnverifiedOrNewerDocumentIsRefusedBeforeAnyWork() = runBlocking {
+        for (state in listOf(DocumentState.UNVERIFIED, DocumentState.UNKNOWN_FORMAT)) {
+            val h = Harness(source = "document.opus")
+            val old = oldDocument("old-${state.name}.tmp")
+            File(temp.root, "old-${state.name}.tmp").copyTo(h.audio, overwrite = true)
+            h.storage.existing = old.copy(state = state.code)
+            val before = sha256(h.audio)
+
+            val outcome = h.run().first
+
+            assertEquals(JobOutcome.Failed(JobFailure.DocumentRefused(state)), outcome)
+            assertEquals("DOCUMENT_${state.name}", (outcome as JobOutcome.Failed).failure.code)
+            assertTrue(h.audioSource.starts.isEmpty())
+            assertTrue(h.storage.saved.isEmpty())
+            assertFalse(File(h.storage.work, "sealed.opus").exists())
+            assertTrue(h.storage.adoptions.isEmpty())
+            assertEquals(before, sha256(h.audio))
+        }
+    }
+
+    @Test fun aDocumentThatBecomesUnverifiedBeforeTheSealIsNotReplaced() = runBlocking {
+        val h = Harness()
+        val other = oldDocument("other.tmp")
+        h.storage.duringSeal = { h.storage.existing = other.copy(state = DocumentState.UNVERIFIED.code) }
+
+        assertEquals(JobOutcome.Failed(JobFailure.DocumentRefused(DocumentState.UNVERIFIED)), h.run().first)
+        assertFalse(h.storage.marker.exists())
+        assertFalse(File(h.storage.work, "sealed.opus").exists())
+        assertNotNull(h.storage.checkpointJson)
+    }
+
     @Test fun aCrashAfterTheMarkerLeavesAnAdoptableState() = runBlocking {
         val h = Harness()
         h.voices.people = listOf(voice("marco", "Marco", axis(2)))
@@ -423,6 +449,11 @@ class TranscriptionJobTest {
         assertEquals(listOf("pending", "marker", "adopt"), h.log.takeLast(3))
         assertEquals(sealed.defaultId, h.voices.pending.single().variantId)
         assertEquals(3L, h.voices.pending.single().generation)
+        // The marker gets the verified document, so adopt does not read and hash the file again.
+        val marked = h.storage.markedDocument!!
+        assertEquals("ok", marked.state)
+        assertEquals(sealed.defaultId, marked.defaultId)
+        assertEquals(sealed.selected(null)!!.transcript, marked.selected(null)!!.transcript)
         assertNotNull(h.storage.checkpointJson)
     }
 
@@ -568,6 +599,23 @@ class TranscriptionJobTest {
         assertTrue(h.storage.saved.last().speakerFailure)
         val words = h.sealed().selected(null)!!.transcript!!.words
         assertTrue(words.filter { it.startMs >= 30_000 }.all { it.speaker == sp1 })
+        // The first window was told apart, so its speakers stay: the record is sealed and matching still runs
+        // (0.1.0). Only a failure at the first window leaves the note "All words shown as one voice".
+        assertTrue(words.filter { it.endMs <= 26_000 }.map { it.speaker }.distinct().size > 1)
+        assertTrue(h.provenance().has("x-speakerDiarization"))
+        assertTrue(JobEvent.NamingClosed(true) in events)
+        assertTrue(events.any { it is JobEvent.StageChanged && it.stage == Stage.MATCHING })
+    }
+
+    @Test fun aDiarizerFailureAtTheFirstWindowSealsOneVoiceWithoutTheRecord() = runBlocking {
+        val h = Harness()
+        h.script.diarizerFailsFrom = 0L
+        val (outcome, events) = h.run()
+        assertEquals(JobOutcome.Done, outcome)
+        assertTrue(h.sealed().selected(null)!!.transcript!!.words.all { it.speaker == sp1 })
+        assertFalse(h.provenance().has("x-speakerDiarization"))
+        assertTrue(JobEvent.NamingClosed(false) in events)
+        assertTrue(events.none { it is JobEvent.StageChanged && it.stage == Stage.MATCHING })
     }
 
     @Test fun provenanceEqualsThe010Record() = runBlocking {
@@ -735,6 +783,17 @@ class TranscriptionJobTest {
             return speech.getJSONObject(document.defaultId!!)
         }
     }
+
+    /** A sealed document of one word by "old_a" (called Anna when [anna]), written as [name] in the temp folder. */
+    private fun oldDocument(name: String, anna: Boolean = false): CassiniDocument = CassiniDocument.create(
+        FIXTURE_OPUS,
+        Transcript(listOf(Word("old_a", 0, 500, "ciao"))),
+        "Weekly sync",
+        JSONObject().put("source", "test"),
+        null,
+        if (anna) mapOf("old_a" to "Anna") else emptyMap(),
+        File(temp.root, name),
+    )
 
     /** Order-insensitive structural equality; the android.jar org.json the tests compile against has no `similar`. */
     private fun sameJson(a: Any?, b: Any?): Boolean = when {
