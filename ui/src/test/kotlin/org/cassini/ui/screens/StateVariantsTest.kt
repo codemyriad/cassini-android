@@ -7,6 +7,7 @@ import org.cassini.ui.fixtures.VariantFixtures
 import org.cassini.ui.library.LibraryDialog
 import org.cassini.ui.library.LibraryScreen
 import org.cassini.ui.note.NoteScreen
+import org.cassini.ui.recording.RecordingScreen
 import org.junit.Test
 
 /**
@@ -16,6 +17,14 @@ import org.junit.Test
 class StateVariantsTest : BoardTest() {
     private fun library(name: String) = board("variants", name) {
         LibraryScreen(VariantFixtures.library.getValue(name), onEvent = {})
+    }
+
+    private fun recording(name: String) = board("variants", name) {
+        RecordingScreen(VariantFixtures.recording.getValue(name), onEvent = {})
+    }
+
+    private fun note(name: String) = board("variants", name) {
+        NoteScreen(VariantFixtures.transcribing.getValue(name), onEvent = {})
     }
 
     private fun read(name: String) = board("variants", name) {
@@ -59,7 +68,61 @@ class StateVariantsTest : BoardTest() {
         }
     }
 
+    // Recording (features.md section 2).
+
+    @Test fun recordingPaused() = recording("recording-paused")
+
+    @Test fun recordingPausedOtherApp() = recording("recording-paused-other-app")
+
+    @Test fun recordingPermissionOff() = recording("recording-permission-off")
+
+    @Test fun recordingStarting() = recording("recording-starting")
+
+    @Test fun recordingStorageLow() = recording("recording-storage-low")
+
+    @Test fun recordingNearLimit() = recording("recording-near-limit")
+
+    @Test fun recordingCapHint() = recording("recording-cap-hint")
+
+    // Note modes other than Read & listen (features.md sections 3, 3.1 and 3.2).
+
+    @Test fun transcribingQueued() = note("transcribing-queued")
+
+    @Test fun transcribingPaused() = note("transcribing-paused")
+
+    @Test fun transcribingPausedEarly() = note("transcribing-paused-early")
+
+    @Test fun transcribingQueueHeld() = note("transcribing-queue-held")
+
+    @Test fun transcribingDownloading() = note("transcribing-downloading")
+
+    @Test fun transcribingChecking() = note("transcribing-checking")
+
+    @Test fun transcribingWaiting() = note("transcribing-waiting")
+
+    @Test fun transcribingStartingLowMemory() = note("transcribing-starting-low-memory")
+
+    @Test fun transcribingSaving() = note("transcribing-saving")
+
+    @Test fun transcribingNoConnection() = note("transcribing-no-connection")
+
+    @Test fun transcribingFailed() = note("transcribing-failed")
+
+    @Test fun transcribingFailedCheckpoint() = note("transcribing-failed-checkpoint")
+
+    @Test fun transcribingMemory() = note("transcribing-memory")
+
+    @Test fun transcribingCheckpointMismatch() = note("transcribing-checkpoint-mismatch")
+
+    @Test fun noteAudioOnly() = note("note-audio-only")
+
+    @Test fun noteUnplayable() = note("note-unplayable")
+
     // Read & listen (features.md section 3.3).
+
+    @Test fun readQueuedOverDocument() = read("read-queued-over-document")
+
+    @Test fun readFailedOverDocument() = read("read-failed-over-document")
 
     @Test fun readNotVerified() = read("read-not-verified")
 
