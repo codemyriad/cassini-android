@@ -11,10 +11,8 @@ import androidx.compose.ui.unit.DpRect
 import org.cassini.ui.BoardTest
 import org.cassini.ui.components.DialogBoardFrame
 import org.cassini.ui.components.MenuBoardFrame
-import org.cassini.ui.components.RenameDialogContent
 import org.cassini.ui.components.SheetBoardFrame
 import org.cassini.ui.fixtures.VariantFixtures
-import org.cassini.ui.library.LibraryDialog
 import org.cassini.ui.library.LibraryScreen
 import org.cassini.ui.licenses.LicensesScreen
 import org.cassini.ui.models.ModelDownloadScreen
@@ -131,16 +129,16 @@ class StateVariantsTest : BoardTest() {
 
     @Test fun libraryOtherStatuses() = library("library-other-statuses")
 
-    @Test fun libraryActionsSheet() = board("variants", "library-actions-sheet") {
-        val sheet = requireNotNull(VariantFixtures.library.getValue("library-actions-sheet").sheet)
-        SheetBoardFrame { NoteActionsSheetContent(sheet, onAction = {}) }
+    /**
+     * The Library's own overlays, drawn by LibraryScreen in their windows over the list (the whole screen is
+     * captured), so the goldens check that the Library state opens them.
+     */
+    @Test fun libraryActionsSheet() = board("variants", "library-actions-sheet", window = true) {
+        LibraryScreen(VariantFixtures.library.getValue("library-actions-sheet"), onEvent = {})
     }
 
-    @Test fun libraryRename() = board("variants", "library-rename") {
-        val dialog = VariantFixtures.library.getValue("library-rename").dialog as LibraryDialog.Rename
-        DialogBoardFrame {
-            RenameDialogContent(dialog.title, dialog.title, onValueChange = {}, onConfirm = {}, onDismiss = {})
-        }
+    @Test fun libraryRename() = board("variants", "library-rename", window = true) {
+        LibraryScreen(VariantFixtures.library.getValue("library-rename"), onEvent = {})
     }
 
     // Recording (features.md section 2).
@@ -153,6 +151,10 @@ class StateVariantsTest : BoardTest() {
 
     @Test fun recordingStarting() = recording("recording-starting")
 
+    @Test fun recordingStopping() = recording("recording-stopping")
+
+    @Test fun recordingM4a() = recording("recording-m4a")
+
     @Test fun recordingStorageLow() = recording("recording-storage-low")
 
     @Test fun recordingNearLimit() = recording("recording-near-limit")
@@ -162,6 +164,10 @@ class StateVariantsTest : BoardTest() {
     // Note modes other than Read & listen (features.md sections 3, 3.1 and 3.2).
 
     @Test fun transcribingQueued() = note("transcribing-queued")
+
+    @Test fun transcribingQueuedNext() = note("transcribing-queued-next")
+
+    @Test fun transcribingNotificationsOff() = note("transcribing-notifications-off")
 
     @Test fun transcribingPaused() = note("transcribing-paused")
 
@@ -369,9 +375,5 @@ class StateVariantsTest : BoardTest() {
 
     @Test fun licensesText() = board("variants", "licenses-text") {
         LicensesScreen(VariantFixtures.licenses.getValue("licenses-text"), onEvent = {})
-    }
-
-    private companion object {
-        const val CLOCK_STEP_MS = 1_000L
     }
 }

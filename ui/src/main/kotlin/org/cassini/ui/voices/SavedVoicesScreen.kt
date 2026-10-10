@@ -62,7 +62,7 @@ private val UnreadableBanner = BannerSpec(BannerKind.VOICES_UNREADABLE, announce
  * footnote; at the bottom "Forget everyone…" (hidden when empty, disabled when read-only).
  *
  * Each row's options button opens its [CassiniMenu] (Rename…, Forget… in redInk) while
- * [SavedVoicesUiState.menuFor] names the row. Read-only rows have no options button.
+ * [SavedVoicesUiState.menuFor] names the row. On read-only rows the options button shows but is disabled.
  */
 @Composable
 fun SavedVoicesScreen(

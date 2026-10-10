@@ -25,6 +25,7 @@ import org.cassini.ui.note.ExportKind
 import org.cassini.ui.note.MergeConfirmContent
 import org.cassini.ui.note.MergeEvent
 import org.cassini.ui.note.MergeSheetContent
+import org.cassini.ui.note.MergeVersionsUi
 import org.cassini.ui.note.NameSheetEvent
 import org.cassini.ui.note.NameSpeakerSheetContent
 import org.cassini.ui.note.NoteAction
@@ -77,6 +78,29 @@ class SheetBehaviourTest {
             .performClick()
         rule.runOnIdle { assertEquals(listOf(NameSheetEvent.SaveBlocked), events) }
         rule.onNode(isFocused()).assert(answerFirst)
+    }
+
+    /**
+     * Every blocked press says "Answer the question above first" again: the question card's polite live region clears
+     * its state description and sets it again, so TalkBack sees a change on each press (features.md section 4).
+     */
+    @Test fun everyBlockedSaveAnnouncesTheQuestionAgain() {
+        val events = mutableListOf<NameSheetEvent>()
+        setThemed { NameSpeakerSheetContent(BoardFixtures.nameSpeaker, onEvent = { events += it }) }
+        // The question card: the sheet's only focusable live region.
+        val card = SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion) and
+            SemanticsMatcher.keyIsDefined(SemanticsProperties.Focused)
+        rule.onNode(card).assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.StateDescription))
+        rule.mainClock.autoAdvance = false
+        repeat(2) {
+            rule.onNodeWithText("Save name").performClick()
+            rule.mainClock.advanceTimeBy(FRAME_MS)
+            rule.onNode(card).assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.StateDescription))
+            rule.mainClock.advanceTimeBy(ANNOUNCE_MS)
+            rule.onNode(card).assert(answerFirst)
+        }
+        rule.mainClock.autoAdvance = true
+        rule.runOnIdle { assertEquals(listOf(NameSheetEvent.SaveBlocked, NameSheetEvent.SaveBlocked), events) }
     }
 
     @Test fun theNameSheetControlsSendTheirEvents() {
@@ -218,6 +242,14 @@ class SheetBehaviourTest {
         rule.runOnIdle { assertEquals(listOf(MergeEvent.PickTarget("s4"), MergeEvent.Confirm), events) }
     }
 
+    /** On version 1 of 2 a merge adds version 3, not 2 (features.md section 4, item 8). */
+    @Test fun aMergeOnAnEarlierVersionNamesTheNewLastVersion() {
+        val sealed = VariantFixtures.merges.getValue("merge-confirm-sealed")
+        val merge = sealed.copy(sealed = MergeVersionsUi(shown = 1, added = 3))
+        setThemed { MergeConfirmContent(merge, requireNotNull(merge.confirm), onEvent = {}) }
+        rule.onNodeWithText("This adds version 3; version 1 stays available.", substring = true).assertExists()
+    }
+
     @Test fun theSubtitleChooserExportsEitherFormat() {
         val kinds = mutableListOf<ExportKind>()
         setThemed { SubtitleFormatSheetContent(onExport = { kinds += it }) }
@@ -242,5 +274,10 @@ class SheetBehaviourTest {
                 events,
             )
         }
+    }
+
+    private companion object {
+        const val FRAME_MS = 32L
+        const val ANNOUNCE_MS = 400L
     }
 }

@@ -27,6 +27,7 @@ import org.cassini.ui.format.StageUi
 import org.cassini.ui.format.TimeLeftUi
 import org.cassini.ui.library.DaySection
 import org.cassini.ui.library.LibraryDialog
+import org.cassini.ui.library.LibrarySheet
 import org.cassini.ui.library.LibraryUiState
 import org.cassini.ui.library.ProgressBannerUi
 import org.cassini.ui.library.ProgressLine
@@ -40,6 +41,7 @@ import org.cassini.ui.note.DocumentKindUi
 import org.cassini.ui.note.InfoUi
 import org.cassini.ui.note.MergeTargetUi
 import org.cassini.ui.note.MergeUi
+import org.cassini.ui.note.MergeVersionsUi
 import org.cassini.ui.note.NameSheetUi
 import org.cassini.ui.note.NoteAction
 import org.cassini.ui.note.NoteActionsUi
@@ -178,7 +180,7 @@ internal object VariantFixtures {
         "library-snackbar" to b.library.copy(
             snackbar = SnackbarSpec(SnackbarKind.MOVED_TO_TRASH, text = "Call with supplier", undo = true, durationMs = 10_000),
         ),
-        "library-actions-sheet" to b.library.copy(sheet = b.noteActions),
+        "library-actions-sheet" to b.library.copy(sheet = LibrarySheet.Actions(b.noteActions)),
         "library-rename" to b.library.copy(dialog = LibraryDialog.Rename(b.supplier.id, b.supplier.title)),
         "library-other-statuses" to b.library.copy(
             progress = null,
@@ -543,13 +545,13 @@ internal object VariantFixtures {
         source = SpeakerNameUi.Placeholder(3),
         sourceTone = SpeakerTone.Amber,
         targets = mergeTargets,
-        sealedVersion = 2,
+        sealed = MergeVersionsUi(shown = 2, added = 3),
     )
 
     val merges: Map<String, MergeUi> = mapOf(
         "merge-sheet" to merge,
         "merge-confirm-sealed" to merge.copy(confirm = mergeTargets[1]),
-        "merge-confirm-draft" to merge.copy(confirm = mergeTargets[0], sealedVersion = null),
+        "merge-confirm-draft" to merge.copy(confirm = mergeTargets[0], sealed = null),
     )
 
     // Versions sheet (no board; features.md section 3.4) and Document info (no board; features.md section 6).

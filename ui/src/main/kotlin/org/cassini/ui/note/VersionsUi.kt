@@ -24,7 +24,8 @@ enum class VersionKindUi {
 /**
  * One row: "Version [number]" and its detail, "Transcribed 8 Oct, 15:40 · 4,812 words" or "Speakers merged · from
  * version [fromVersion] · 8 Oct, 16:02", then [language] (a BCP 47 tag, shown in the app language; null when
- * empty). An unreadable variant ([readable] false) is disabled with "Can't be read".
+ * empty). An unreadable variant ([readable] false) is disabled with "Can't be read". [withYear] adds the year to the
+ * date; the ViewModel sets it with its clock when [date] is not in the current year (ui.md section 2).
  */
 @Immutable
 data class VersionRowUi(
@@ -37,4 +38,5 @@ data class VersionRowUi(
     val fromVersion: Int? = null,
     val language: String? = null,
     val readable: Boolean = true,
+    val withYear: Boolean = false,
 )

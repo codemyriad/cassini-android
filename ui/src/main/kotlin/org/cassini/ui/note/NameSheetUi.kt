@@ -20,6 +20,9 @@ import org.cassini.ui.theme.SpeakerTone
  *   "Also rename the saved voice?" question, [notName] the voice name of the "Not <name>?" button; null hides each.
  * - [remember] is the checkbox; [rememberEnabled] false disables it with [rememberReason].
  * - [canMerge] shows "Merge into…"; [save] is the Save name state; [draft] is true while the job runs.
+ *
+ * [name] is a text field value: the ViewModel must apply [NameSheetEvent.NameChanged] synchronously, in Compose
+ * snapshot state, not through a collected flow, or the field can drop typed characters and break IME composition.
  */
 @Immutable
 data class NameSheetUi(

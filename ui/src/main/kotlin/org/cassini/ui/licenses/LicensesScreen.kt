@@ -72,7 +72,9 @@ fun LicensesScreen(
         CassiniTopBar(
             title = stringResource(R.string.ui_licenses_title),
             onBack = { onEvent(LicensesEvent.Back) },
-            backLabel = stringResource(R.string.ui_back_to_settings),
+            backLabel = stringResource(
+                if (state.backTo == LicensesBackTo.SETTINGS) R.string.ui_back_to_settings else R.string.ui_back,
+            ),
         )
         GroupCard(Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)) {
             state.entries.forEach { entry ->

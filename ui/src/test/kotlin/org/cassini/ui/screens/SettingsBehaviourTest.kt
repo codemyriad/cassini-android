@@ -25,6 +25,7 @@ import org.cassini.ui.format.FIXED_ZONE
 import org.cassini.ui.format.ModelPartUi
 import org.cassini.ui.format.ProvideFixedFormat
 import org.cassini.ui.licenses.LicenseEntry
+import org.cassini.ui.licenses.LicensesBackTo
 import org.cassini.ui.licenses.LicensesEvent
 import org.cassini.ui.licenses.LicensesScreen
 import org.cassini.ui.models.ModelDownloadEvent
@@ -226,5 +227,13 @@ class SettingsBehaviourTest {
         rule.runOnIdle { back.onBackPressed() }
         rule.onNodeWithContentDescription("Back").performClick()
         rule.runOnIdle { assertEquals(listOf(LicensesEvent.CloseText, LicensesEvent.CloseText), events) }
+    }
+
+    /** Licenses opened from Model download does not name Settings as the back destination. */
+    @Test fun licensesFromModelDownloadSaysBack() {
+        val state = VariantFixtures.licenses.getValue("licenses").copy(backTo = LicensesBackTo.MODEL_DOWNLOAD)
+        setThemed { LicensesScreen(state, onEvent = {}) }
+        rule.onNodeWithContentDescription("Back").assertExists()
+        rule.onNodeWithContentDescription("Back to settings").assertDoesNotExist()
     }
 }

@@ -16,7 +16,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
@@ -30,6 +33,8 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.cassini.ui.R
 import org.cassini.ui.components.InkButton
 import org.cassini.ui.components.InkButtonSize
@@ -39,6 +44,12 @@ import org.cassini.ui.theme.CassiniTheme
 
 /** How long the question card's border pulses after a blocked Save. */
 private const val PULSE_MS = 600
+
+/**
+ * How long the question card's state description stays clear after a blocked Save: longer than the 100 ms in which
+ * Compose merges accessibility changes, so the clear and the new value both reach TalkBack.
+ */
+private const val ANNOUNCE_GAP_MS = 250L
 
 /** An open question of the sheet: the bold [saved] sentence, the question, and its two answers. */
 internal data class Question(
@@ -74,7 +85,8 @@ internal fun question(ui: NameSheetUi): Question? {
  * The question card: amberWash, radius 14, padding 12/14 (bottom 8: the buttons' 48 dp layout holds 4 dp below
  * their 40 dp visual), `body14` ink with the first sentence bold, then the answers 4 dp below (8 on the board,
  * less the same slack): `InkButton` medium and `SecondaryButton` medium plain "Someone else". The card is focusable,
- * so a blocked Save can move focus to it; [pulses] counts the blocked presses.
+ * so a blocked Save can move focus to it; [pulses] counts the blocked presses, and each one says "Answer the
+ * question above first" (features.md section 4).
  */
 @Composable
 internal fun QuestionCard(
@@ -86,8 +98,16 @@ internal fun QuestionCard(
     val c = CassiniTheme.colors
     val shape = CassiniTheme.shapes.row
     val pulse = remember { Animatable(0f) }
+    // The live region speaks when its state description changes. A second blocked press would leave it unchanged,
+    // so each press clears it first and sets it again a moment later: TalkBack then speaks it on every press.
+    var announced by remember { mutableStateOf(false) }
     LaunchedEffect(pulses) {
         if (pulses > 0) {
+            launch {
+                announced = false
+                delay(ANNOUNCE_GAP_MS)
+                announced = true
+            }
             pulse.snapTo(1f)
             pulse.animateTo(0f, tween(PULSE_MS))
         }
@@ -101,7 +121,7 @@ internal fun QuestionCard(
             .border(2.dp, c.amberInk.copy(alpha = pulse.value), shape)
             .semantics {
                 liveRegion = LiveRegionMode.Polite
-                if (pulses > 0) stateDescription = answerFirst
+                if (announced) stateDescription = answerFirst
             }
             .focusable()
             .padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 8.dp),

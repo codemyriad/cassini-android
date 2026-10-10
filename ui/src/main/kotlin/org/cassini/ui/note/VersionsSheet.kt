@@ -130,12 +130,12 @@ private fun Radio(selected: Boolean) {
 
 /**
  * "Transcribed 8 Oct, 15:40 · 4,812 words" or "Speakers merged · from version 1 · 8 Oct, 16:02", then " · Italian"
- * when the language is known; "Can’t be read" for an unreadable variant. The year is left out: the row has no
- * "today" to compare with (ui.md section 2), and variants of one note are close in time.
+ * when the language is known; "Can’t be read" for an unreadable variant. The date has the year only when
+ * [VersionRowUi.withYear] (a variant of an earlier year).
  */
 @Composable
 private fun versionDetail(row: VersionRowUi): String {
-    val at = Dates.shortDateTime(row.date, row.time, withYear = false)
+    val at = Dates.shortDateTime(row.date, row.time, withYear = row.withYear)
     val from = row.fromVersion
     val detail = when {
         !row.readable -> stringResource(R.string.ui_versions_unreadable)

@@ -110,16 +110,16 @@ fun MergeConfirmContent(ui: MergeUi, target: MergeTargetUi, onEvent: (MergeEvent
 }
 
 /**
- * "Merge <A> into <B>?" — "Everything <A> said will be shown as <B>." then "This adds version N+1; version N stays
- * available." (sealed) or "This changes the draft." (draft); the primary button is "Merge".
+ * "Merge <A> into <B>?" — "Everything <A> said will be shown as <B>." then "This adds version 3; version 2 stays
+ * available." (sealed, [MergeVersionsUi]) or "This changes the draft." (draft); the primary button is "Merge".
  */
 @Composable
 private fun mergeConfirmSpec(ui: MergeUi, target: MergeTargetUi): ConfirmSpec {
     val a = ui.source.display()
     val b = target.label.display()
-    val version = ui.sealedVersion
-    val effect = if (version != null) {
-        stringResource(R.string.ui_merge_confirm_sealed, version + 1, version)
+    val versions = ui.sealed
+    val effect = if (versions != null) {
+        stringResource(R.string.ui_merge_confirm_sealed, versions.added, versions.shown)
     } else {
         stringResource(R.string.ui_merge_confirm_draft)
     }
