@@ -227,7 +227,7 @@ Required queries: `libraryFlow` (live notes by `created_at` DESC, left-joined wi
 
 The standalone model download (from Settings or a banner, with no note) is not a `jobs` row. It is in-memory state of `ModelInstallOwner`; the `.part` files carry its resume.
 
-Schema migrations: version 1 ships. Later versions need a written `Migration` with a `MigrationTestHelper` test; `fallbackToDestructiveMigration` is forbidden. A database that fails to open or migrate is renamed `cassini.db.corrupt-<epoch>` and the catalogue is rebuilt (section 4.9).
+Schema migrations: version 1 ships. Later versions need a written `Migration` with a `MigrationTestHelper` test; `fallbackToDestructiveMigration` is forbidden. A database that fails to open or migrate is renamed `cassini.db.corrupt-<epoch>` and the catalogue is rebuilt (section 4.9). Some errors do not show a damaged file: a full disk, an I/O error, a locked database, a file that cannot be opened, a permission error, no memory, or a read-only database. For these errors, `CassiniDatabaseOpener` does not rename the file. It throws the error, and the file stays. The startup (P5) then shows an error and does not rebuild the catalogue. The next start tries to open the file again.
 
 FTS prefix queries are written with the star inside the quotes (`"consegn*"`), the FTS3/4 phrase-prefix syntax; a star after a closing quote is FTS5 syntax and is never produced. The unicode61 tokenizer must work on API 26. `NoteFtsDeviceTest` is a `:data` device test ("giovedi" finds "giovedì", "CONSEGNA" finds "consegna", "consegn" finds "consegna"). At this time, CI does not run it. The CI phase (P11) adds it to the API 26 emulator job. To run it on a device, build it with `./gradlew :data:assembleDebugAndroidTest`, install `data/build/outputs/apk/androidTest/debug/data-debug-androidTest.apk` with `adb install -r`, and start `adb shell am instrument -w org.cassini.data.test/androidx.test.runner.AndroidJUnitRunner`. The test APK instruments itself and does not touch the data of the app. A SQLite without unicode61 fails to open the database; that is logged as a bug, with no silent fallback. Robolectric DAO tests fail, never skip, when its SQLite lacks the tokenizer; the device test is the authority.
 
@@ -291,7 +291,7 @@ Shared rules:
 - Recording: `createRecording(title, createdAt, format)` creates the directory and a `LIVE_CAPTURE` row before capture starts; `finishRecording(id, durationMs)`; `markUnplayable(id)`.
 - Edits: `rename(id, title)` updates `notes.title` and `note_text` in one transaction. For a `DOCUMENT` note it then rewrites the document title through `DocumentRepository.retitle` in the background, but only when no job row exists and the document state is `OK`; otherwise it sets `title_dirty` (adopt applies it; a non-OK document keeps the new title in Room only and a fresh seal later uses it). Also `setPosition(id, ms, final)` (with `final = true` on pause and on leaving, it recomputes `notes.preview` with core `PreviewText` from the selected variant's words), `selectVariant` (rewrites `note_text.body` and `preview`), `acknowledgeTrust`.
 - Trash: `moveToTrash` (records `trashed_job`), `restore` (re-enqueues a QUEUED `trashed_job` at the back; PAUSED jobs were kept), `deleteNow`, `emptyTrash`, `purgeExpired(now, zone)` (section 4.10).
-- `adoptSealed(id, selectVariant)`: installs `work/sealed.opus` as in section 3.2 in one transaction for the row, variants, speakers, `note_text`, links and the removal of the job row; then deletes the previous plain file. `work/` and its `sealed` marker stay. Idempotent: if `document.opus` already has the sealed signature, it only finishes the remaining steps. `deleteAdoptedWork(id)` is the last step of an adopt: it deletes `work/`, and the marker is the last file that it deletes. `SealedAdopter.of` does `adoptSealed`, `VoiceRepository.adoptPending` and `deleteAdoptedWork` in this sequence. If a crash occurs before the end, the marker stays and the next start does the adopt again.
+- `adoptSealed(id, selectVariant)`: installs `work/sealed.opus` as in section 3.2 in one transaction for the row, variants, speakers, `note_text` and the removal of the job row; then deletes the previous plain file. If the note title and the document title or its first `TITLE` tag are different, it writes the note title into the document. The links are not in this transaction: `VoiceRepository.adoptPending` writes them after it. `work/` and its `sealed` marker stay. Idempotent: if `document.opus` already has the sealed signature, it only finishes the remaining steps. `deleteAdoptedWork(id)` is the last step of an adopt: it deletes `work/`, and the marker is the last file that it deletes. `SealedAdopter.of` does `adoptSealed`, `VoiceRepository.adoptPending` and `deleteAdoptedWork` in this sequence. Then it releases the draft names in memory, so that the next job of the note starts with no names. If a crash or an I/O error occurs before the end, the marker stays and the next start does the adopt again. `JobRepository.enqueue` also finishes such an adopt before it adds a job (section 4.7).
 - `refreshIfStale(id)`; `titleBlocking(id)` (read at seal time); `rowBlocking(id)`.
 
 ### 4.2 `ImportRepository`
@@ -299,11 +299,11 @@ Shared rules:
 `import(uri): ImportOutcome` = `Created(noteId) | Existing(noteId) | Rejected(failure, detail)`:
 
 1. Read `OpenableColumns.SIZE` and `DISPLAY_NAME`. Reject `LARGE` above `AudioLimits.MAX_IMPORT_BYTES` (2 GiB).
-2. Require `usableSpace ≥ size + AudioLimits.MIN_FREE_BYTES`, else reject `SPACE` with the needed bytes.
+2. Require `usableSpace ≥ size + AudioLimits.MIN_FREE_BYTES`, else reject `SPACE` with the needed bytes. If the space goes during the copy, `SPACE` also gives `size + MIN_FREE_BYTES`, because the import deletes the copied part.
 3. Stream-copy into `notes/<newId>/source.tmp` while hashing SHA-256 and enforcing the cap during the copy.
 4. If the hash matches a live note's `source_sha256`, delete the new directory and return `Existing`. A match with a trashed note is ignored.
 5. Classify: Ogg Opus with Cassini metadata → `document.opus`, `readChecked`, `IMPORTED_DOCUMENT`. Other Ogg Opus → `source.opus`. RIFF/WAVE → `WavDecoder` header check; anything but 16-bit PCM is `Rejected(WAV)`. Anything else needs an audio track in `MediaExtractor` (behind an `AudioProbe` interface for tests), else `Rejected(OPEN)`.
-6. Fill the duration (`OggOpus.scan` or `MediaExtractor`) and insert the row. Title: a document's `meeting.title`; otherwise the display name without extension (never an existing `TITLE` tag, so one source decides; the first seal then aligns `TITLE` with `retitle`).
+6. Fill the duration (`OggOpus.scan` or `MediaExtractor`) and insert the row. Title: a document's `meeting.title`; otherwise the display name without extension (never an existing `TITLE` tag, so one source decides). If a `content://` Uri has no display name, the note gets the fallback title ("Imported audio", localized). The last path segment of such a Uri is an id, not a name. The adopt of the first seal writes the note title into the `TITLE` tag (section 4.1).
 
 Imports run regardless of a running job.
 
@@ -311,25 +311,26 @@ Imports run regardless of a running job.
 
 - `sealBlocking(noteId, audio, transcript, title, processing, existing, labels)`: writes `work/sealed.opus` with `CassiniDocument.create`, fsyncs, re-reads and verifies, then writes the `work/sealed` marker. It never touches `document.opus`.
 - `read(noteId)`: `readChecked` with the digest verified; an in-memory LRU of 4 entries keyed by signature.
-- `relabel(noteId, labels)`, `retitle(noteId, title)` (sets `meeting.title` and `TITLE`; requires `OK`; refused while a job row exists), `mergeSpeakers(noteId, variantId, source, target)` (a new variant from `SpeakerMerges.apply` and `SpeakerMerges.processing`, which becomes the default and the selected variant; refused while a job row exists).
-- `exportCopy(noteId, dest)` (byte for byte; plain notes copy their audio file) and `exportTranscript(noteId, variantId, format, labels, header, dest)`.
+- `relabel(noteId, labels)`, `retitle(noteId)` (reads the title from the row; sets `meeting.title` and `TITLE`; requires `OK`; refused while a job row exists), `mergeSpeakers(noteId, variantId, source, target)` (a new variant from `SpeakerMerges.apply` and `SpeakerMerges.processing`, which becomes the default and the selected variant; refused while a job row exists).
+- `exportCopy(noteId, dest)` (byte for byte; plain notes copy their audio file) and `exportTranscript(noteId, request: TranscriptExport, dest)` (`TranscriptExport` holds the variant, the format, the labels and the header).
 - `deleteFiles(noteId)`, `sweep()`.
 
 ### 4.4 `CheckpointRepository`
 
-`loadBlocking(noteId, expected): Valid(state) | Missing | Mismatch(reason)`; `saveBlocking(noteId, state)` (AtomicFile, after `audio.opus.part` and `clips.pcm` are fsynced); `draftNames(noteId): DraftNames` (section 3.6; loads `names.json` once per process); `discard(noteId)`; `status(noteId)` (done/total, mismatch, or sealed-awaiting-adopt); `loadDraft(noteId)` (words of the saved chunks with names applied, for a paused note); `hasSealed(noteId)`.
+`loadBlocking(noteId, expected): Valid(state) | Missing | Mismatch(reason)`; `saveBlocking(noteId, state)` (AtomicFile, after `audio.opus.part` and `clips.pcm` are fsynced); `draftNames(noteId): DraftNames` (section 3.6; loads `names.json` once per process); `discard(noteId)`; `status(noteId)` (done/total, mismatch, or sealed-awaiting-adopt); `loadDraft(noteId)` (words of the saved chunks with names applied, for a paused note); `load(noteId)` and `identity(noteId)` (the identity comes from the note row); `sealedMarker(noteId)` (true when `work/sealed` exists); `hasWork(noteId)`; `release(noteId)` (forgets the draft names in memory; it takes the note lock on IO).
 
 ### 4.5 `VoiceRepository`
 
 All files under `voices/`, one lock per file.
 
-- `people(): Flow<List<SavedVoice>>` with note counts, confirmed seconds and the stale flag (`VoiceStaleness`).
+- `people(): Flow<SavedVoices>`: the list of `SavedVoice` with note counts, confirmed seconds and the stale flag (`VoiceStaleness`), and the problem of `people.json` if there is one.
 - `rename`, `forget(voiceId)`: removes the person; scrubs their matches from every file under `voices/notes/` and `voices/pending/`, from the links, and from `live`, `remembered` and `automatic` of every `DraftNames` in memory and every `names.json` on disk.
 - `forgetEveryone()`: writes `generation` = old + 1 first, then deletes everything else under `voices/` (including `pending/`), clears links, and clears `live`, `remembered` and `automatic` in every draft as above.
-- `prints(noteId)`, `setMatch`, `enrol`, `unenrol`, `copyPrints` (merge case), `deleteForNote` (both the sealed and the pending file).
+- `prints(noteId, variantId)`, `setMatch`, `enrol`, `unenrol`, `copyPrints` (merge case), `deleteForNote` (both the sealed and the pending file, and the links), `discardPending(noteId)` (only the pending file; the sealed file and the links stay).
+- `enrol` writes the match in the note file first and `people.json` second. `unenrol` writes `people.json` first and clears the match second; if the second write fails, it puts the enrolment back. Thus, after a write error, a retry changes the person one time only.
 - Blocking entry points for the job: `peopleBlocking`, `generationBlocking`, `savePendingBlocking(noteId, prints, generation)`.
 - `adoptPending(noteId)`: if the pending file's generation equals the current one, merge it into `voices/notes/<id>.json`, dropping matches to voices that no longer exist; otherwise delete it without merging. Then delete the pending file.
-- A voice file whose `version` is newer than the codec knows stays in place, read-only, and is reported. Only unparseable JSON is renamed `.corrupt-<epoch>`. The Saved voices screen then shows an error banner and disables edits.
+- A voice file whose `version` is newer than the codec knows stays in place, read-only, and is reported. Only unparseable JSON is renamed `.corrupt-<epoch>`. The Saved voices screen then shows an error banner and disables edits. A damaged `people.json` is read-only too. No edit and no enrolment writes a new list over it. The problem stays, also after a restart, while the `people.json.corrupt-<epoch>` copy exists. Only "Forget everyone" deletes that copy and makes the list editable again (`SavedVoices.canForgetEveryone`).
 
 ### 4.6 `ModelRepository`
 
@@ -337,7 +338,7 @@ All files under `voices/`, one lock per file.
 
 ### 4.7 `JobRepository`, `SettingsRepository`, `RecoveryRepository`
 
-- `JobRepository` (Room `jobs`; used only by `ProcessingCoordinator`): `queue()`, `enqueue(noteId, kind)` (no-op if QUEUED or RUNNING; PAUSED, FAILED and NEEDS_CONSENT rows are re-queued at the back with failure and pause cleared and attempts 0), `claimNext()` (one transaction; fails if a RUNNING row exists), `markRunning`, `markPaused(reason, done, total, words)`, `markFailed`, `markNeedsConsent`, `remove`, `reconcileOnStart(activeNoteId)` (section 5.3; the only place that bumps `attempts`).
+- `JobRepository` (Room `jobs`; used only by `ProcessingCoordinator`): `queue()`, `enqueue(noteId, kind)` (no-op if QUEUED or RUNNING; PAUSED, FAILED and NEEDS_CONSENT rows are re-queued at the back with failure and pause cleared and attempts 0. If the note has no job row but has a `work/sealed` marker, an adopt did not finish. `enqueue` then runs `SealedAdopter` first. If the marker stays, it refuses with `ADOPT_PENDING`.), `claimNext()` (one transaction; fails if a RUNNING row exists), `markRunning`, `markPaused(reason, done, total, words)`, `markFailed`, `markNeedsConsent`, `remove`, `reconcileOnStart(activeNoteId)` (section 5.3; the only place that bumps `attempts`).
 - `SettingsRepository`: typed accessors for section 3.4.
 - `RecoveryRepository.recover(activeNoteId)`: `LIVE_CAPTURE` rows that are not the active capture. `.opus` is repaired with `OggRepair` and becomes `PLAIN` with the duration from the end granule. `.m4a` becomes `PLAIN` if `MediaExtractor` opens it, else `UNPLAYABLE`. Returns the recovered ids for the "recording recovered" banner.
 
@@ -345,7 +346,7 @@ All files under `voices/`, one lock per file.
 
 `CassiniApplication` runs this on IO in the application scope, once per process (also for service-only starts), and then completes `AppGraph.ready`:
 
-1. Open Room. If that fails, rename the file and rebuild (section 4.9). Rebuild also when the DB has no notes while `notes/` has directories.
+1. Open Room. If that fails, rename the file and rebuild (section 4.9). Rebuild also when the DB has no notes while `notes/` has directories. A full disk, an I/O, lock or permission error, or a read-only database is thrown, and the file stays (section 3.3). Then show an error and do not rebuild.
 2. `RecoveryRepository.recover(RecordingController.activeNoteId)`.
 3. `JobRepository.reconcileOnStart` (section 5.3), which finishes interrupted adopts.
 4. Re-sync `note_voice_links` from `voices/notes/*.json` in one transaction; delete per-note voice files whose note row is gone.
@@ -358,7 +359,7 @@ All files under `voices/`, one lock per file.
 
 - `document.opus` → `readChecked` → a row (`IMPORTED_DOCUMENT` unless the vendor is cassini-android, else `RECORDED`; title from `meeting.title`) plus cache rows.
 - `capture.*` or `source.*` → repair a `capture.opus` that does not end cleanly; the row gets `PLAIN` (`UNPLAYABLE` for an m4a that does not open), `title = "Recovered recording <d MMM>"`, `origin = RECOVERED`.
-- A `work/sealed` marker → a RUNNING-equivalent job that `reconcileOnStart` adopts. A `work/checkpoint.json` that decodes → a PAUSED job with `pause_reason = INTERRUPTED`.
+- A `work/sealed` marker → the rebuild finishes the adopt (`SealedAdopter.of`) and makes no job row. If the sealed output is unreadable, the checkpoint rule applies. A `work/checkpoint.json` that decodes → a PAUSED job with `pause_reason = INTERRUPTED`.
 - `voices/notes/*.json` → `note_voice_links` rows. A file whose note directory is gone is deleted.
 
 ### 4.10 Trash purge
@@ -402,8 +403,8 @@ Files go before the row. A crash midway leaves an expired trashed row that the n
 5. **Stop and keep progress** (in-app, per note): the job saves a checkpoint at its next sample block and throws `ProcessingPaused`; the row becomes PAUSED(USER) and the next queued note starts. A stop after the seal step deletes `work/sealed.opus` and the marker and keeps the complete checkpoint; `document.opus` was never touched.
 6. **Stop in the notification** (`stopAll`): stops the running note as in rule 5 and sets `queue.hold = USER`. Queued notes stay QUEUED but do not start; the Library shows "Transcription paused · N waiting" with Continue.
 7. **Remove from queue** on a QUEUED note deletes the row (the note is "Audio only" again), or returns it to PAUSED(USER) when it has a checkpoint.
-8. **Cancel** (internal: Start over, Move to trash of a RUNNING note when the user chose to stop) is `Job.cancel()`, which interrupts the inference thread; a sherpa call in flight finishes first, then `finally` blocks release native handles. After `join()`, `discard` deletes the work directory and `voices/pending/<id>.json`.
-9. **Move to trash**: the job state is stored in `notes.trashed_job`. A QUEUED job row is deleted; a RUNNING job is stopped (PAUSED/USER, checkpoint kept) before the note is trashed; a PAUSED job is kept. Restore re-enqueues a stored QUEUED job at the back; PAUSED stays PAUSED.
+8. **Cancel** (internal: Start over, Move to trash of a RUNNING note when the user chose to stop) is `Job.cancel()`, which interrupts the inference thread; a sherpa call in flight finishes first, then `finally` blocks release native handles. After `join()`, `CheckpointRepository.discard` deletes the work directory, and `VoiceRepository.discardPending` deletes `voices/pending/<id>.json`. The coordinator calls the two functions.
+9. **Move to trash**: the job state is stored in `notes.trashed_job`. A QUEUED job row is deleted, but its `work/` stays; a RUNNING job is stopped (PAUSED/USER, checkpoint kept) before the note is trashed; a PAUSED job is kept. Restore re-enqueues a stored QUEUED job at the back, with the numbers of its checkpoint; PAUSED stays PAUSED.
 10. Holds (`queue.hold`) stop the drain loop from starting the next job; they never touch a running job. `USER` is cleared by Continue or any explicit Transcribe/Resume. `SYSTEM` (set by `onTimeout`) is cleared only by Continue or Resume from a visible screen.
 11. Transcription keeps running while another note is recording. The capture thread runs at `MAX_PRIORITY`. P12 checks for capture overruns on the emulator.
 
@@ -418,7 +419,7 @@ When the coordinator is created it runs `reconcileOnStart` on IO before emitting
 | A RUNNING row with a valid checkpoint | Becomes QUEUED, keeping its `seq` (head of the queue); `attempts + 1`. Above 2 attempts it becomes PAUSED(INTERRUPTED) and the "Transcription stopped" notification offers Resume. |
 | A PAUSED row with no checkpoint | Stays PAUSED with `done_ms = 0`; Resume starts from the beginning. |
 | A RUNNING or PAUSED row whose checkpoint exists but fails `validate` | FAILED(`CHECKPOINT_MISMATCH`): "Saved progress no longer matches". |
-| A `work/` directory with no job row and no marker | Deleted (every work directory is created after its row). |
+| A `work/` directory with no job row and no marker | Deleted (every work directory is created after its row). The `work/` of a note in Trash stays: Trash deleted the row of its QUEUED job, and Restore needs the checkpoint. |
 
 The queue then starts in one of two ways:
 
