@@ -138,7 +138,9 @@ class NoteViewModel(
     /** One-shot navigation, picker and permission requests; the route collects them. */
     val effects: Flow<NoteEffect> = effectChannel.receiveAsFlow()
 
-    private val local = MutableStateFlow(Local(search = searchAtOpen(key.query)))
+    private val local = MutableStateFlow(
+        Local(search = searchAtOpen(key.query), sheet = savedSheet(), dialog = savedDialog()),
+    )
     private val printsVersion = MutableStateFlow(0)
     private val visible = MutableStateFlow(false)
     private var snackbarCount = 0L
@@ -269,6 +271,10 @@ class NoteViewModel(
         launch { closeWhenGone() }
         launch { followPlayer() }
         saved.get<String>(KEY_NAME_SHEET)?.let { speaker -> launch { openNaming(speaker, restoring = true) } }
+        if (local.value.sheet == SheetKind.INFO) {
+            launch { details.filterNotNull().first().details?.let { openInfo(it) } }
+        }
+        launch { saveOverlays() }
         key.start?.takeIf { saved.get<Boolean>(KEY_STARTED) != true }?.let { row ->
             saved[KEY_STARTED] = true
             launch { startRow(row) }
@@ -619,6 +625,42 @@ class NoteViewModel(
         val total = state.value.search?.total ?: 0
         if (total == 0) return
         local.update { it.copy(current = Math.floorMod(it.current + delta, total)) }
+    }
+
+    /**
+     * Keeps the open sheet and dialog in [saved] (architecture 6), so that they come back after process death. The
+     * Name sheet has its own keys (KEY_NAME_SHEET).
+     */
+    private suspend fun saveOverlays() {
+        local.map { it.sheet to it.dialog }.distinctUntilChanged().collect { (sheet, dialog) ->
+            saved[KEY_SHEET] = sheet?.takeIf { it != SheetKind.NAME }?.name
+            saved[KEY_DIALOG] = when (dialog) {
+                null -> null
+                is NoteDialog.Rename -> DIALOG_RENAME
+                NoteDialog.StartOver -> DIALOG_START_OVER
+                NoteDialog.TranscribeFresh -> DIALOG_FRESH
+                NoteDialog.StopAndTrash -> DIALOG_STOP_AND_TRASH
+                is NoteDialog.ReadOnly -> DIALOG_READ_ONLY + dialog.reason.name
+            }
+            saved[KEY_DIALOG_TITLE] = (dialog as? NoteDialog.Rename)?.title
+        }
+    }
+
+    private fun savedSheet(): SheetKind? =
+        saved.get<String>(KEY_SHEET)?.let { name -> SheetKind.entries.firstOrNull { it.name == name } }
+
+    private fun savedDialog(): NoteDialog? {
+        val key = saved.get<String>(KEY_DIALOG) ?: return null
+        return when {
+            key == DIALOG_RENAME -> saved.get<String>(KEY_DIALOG_TITLE)?.let(NoteDialog::Rename)
+            key == DIALOG_START_OVER -> NoteDialog.StartOver
+            key == DIALOG_FRESH -> NoteDialog.TranscribeFresh
+            key == DIALOG_STOP_AND_TRASH -> NoteDialog.StopAndTrash
+            key.startsWith(DIALOG_READ_ONLY) -> ReadOnlyReason.entries
+                .firstOrNull { it.name == key.removePrefix(DIALOG_READ_ONLY) }
+                ?.let(NoteDialog::ReadOnly)
+            else -> null
+        }
     }
 
     private fun searchAtOpen(query: String?): String? {
@@ -1229,5 +1271,13 @@ class NoteViewModel(
         private const val KEY_NAME_SHEET = "nameSheet"
         private const val KEY_NAME_TEXT = "nameText"
         private const val KEY_STARTED = "started"
+        private const val KEY_SHEET = "sheet"
+        private const val KEY_DIALOG = "dialog"
+        private const val KEY_DIALOG_TITLE = "dialogTitle"
+        private const val DIALOG_RENAME = "rename"
+        private const val DIALOG_START_OVER = "startOver"
+        private const val DIALOG_FRESH = "transcribeFresh"
+        private const val DIALOG_STOP_AND_TRASH = "stopAndTrash"
+        private const val DIALOG_READ_ONLY = "readOnly:"
     }
 }

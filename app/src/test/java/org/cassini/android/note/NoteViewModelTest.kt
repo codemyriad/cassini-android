@@ -513,6 +513,20 @@ class NoteViewModelTest {
     }
 
     @Test
+    fun sheetsAndDialogsComeBackAfterProcessDeath() = runTest(dispatcher) {
+        val first = viewModel()
+        send(first, NoteEvent.More)
+        assertTrue(first.now().sheet is NoteSheet.Actions)
+        assertTrue("a new ViewModel over the same saved state", viewModel().now().sheet is NoteSheet.Actions)
+
+        send(first, NoteEvent.SheetAction(NoteAction.RENAME))
+        assertEquals(NoteDialog.Rename("Weekly sync"), first.now().dialog)
+        val restored = viewModel()
+        assertEquals(NoteDialog.Rename("Weekly sync"), restored.now().dialog)
+        assertNull(restored.now().sheet)
+    }
+
+    @Test
     fun anUnverifiedDocumentOffersNoTranscribeAgainAndItsFailureClears() = runTest(dispatcher) {
         ports.details.value = documentNote(DocumentState.UNVERIFIED)
         val viewModel = viewModel()
