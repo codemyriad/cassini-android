@@ -335,6 +335,30 @@ class ReconcileOnStartTest {
         assertEquals(setOf("old/S1", "words/S1"), NoteVoiceCodec.decode(notePrints.readText()).second.keys)
     }
 
+    @Test fun dropSealedKeepsTheProgressAtEveryStep() = runTest {
+        row(pausedSaved, JobState.PAUSED, reason = PauseReason.USER, doneMs = 28_000)
+        save(pausedSaved)
+        checkpoints.clips(pausedSaved).writeBytes(ByteArray(64))
+        seal(pausedSaved, documentBytes(transcript("la seduta è aperta"), "Verbale"))
+        val work = h.paths.work(pausedSaved)
+        // The process died after the first step of dropSealed: the marker is gone, sealed.opus is not.
+        assertTrue(File(work, "sealed").delete())
+
+        val report = jobs.reconcileOnStart(null)
+
+        assertTrue(report.adopted.isEmpty())
+        assertTrue(report.deletedWork.isEmpty())
+        assertEquals(JobState.PAUSED to PauseReason.USER, job(pausedSaved).state to job(pausedSaved).pauseReason)
+        assertEquals(AudioKind.PLAIN, h.row(pausedSaved).audioKind)
+        assertTrue(checkpoints.load(pausedSaved) is CheckpointLoad.Valid)
+
+        assertTrue(checkpoints.dropSealed(pausedSaved))
+        assertFalse(File(work, "sealed.opus").exists())
+        assertEquals(64L, checkpoints.clips(pausedSaved).length())
+        assertTrue(checkpoints.load(pausedSaved) is CheckpointLoad.Valid)
+        assertTrue(checkpoints.dropSealed(pausedSaved))
+    }
+
     @Test fun aNewJobNeverStartsOverAnAdoptThatDidNotFinish() = runTest {
         row(sealed, JobState.RUNNING)
         save(sealed)

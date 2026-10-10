@@ -114,6 +114,30 @@ class CheckpointRepository(
         }
     }
 
+    /**
+     * Drops a sealed output that was not adopted and keeps the job's progress: "Stop and keep progress" after the seal
+     * step (architecture 5.2 rule 5). The `sealed` marker goes first and durably, then `sealed.opus`; the checkpoint,
+     * `names.json`, `clips.pcm` and `audio.opus.part` stay. In the other order, a crash between the two deletes would
+     * leave a marker without `sealed.opus`, which adopt reads as "the rename happened". True when both files are gone.
+     */
+    suspend fun dropSealed(noteId: String): Boolean =
+        locks.withNoteLock(noteId, dispatchers.io) { dropSealedLocked(noteId) }
+
+    /** [dropSealed] for the inference thread. */
+    @WorkerThread
+    fun dropSealedBlocking(noteId: String): Boolean {
+        Threads.assertOffMain("CheckpointRepository.dropSealedBlocking")
+        return locks.withNoteLockBlocking(noteId) { dropSealedLocked(noteId) }
+    }
+
+    private fun dropSealedLocked(noteId: String): Boolean {
+        val work = work(noteId)
+        val marker = File(work, WorkFiles.SEALED_MARKER)
+        val sealed = File(work, WorkFiles.SEALED)
+        if (marker.delete()) NoteFiles.syncDirectory(work)
+        return !marker.exists() && (!sealed.exists() || sealed.delete())
+    }
+
     /** Forgets the in-memory draft names of [noteId] after adopt deleted `work/`. */
     suspend fun release(noteId: String) = names.release(noteId)
 
