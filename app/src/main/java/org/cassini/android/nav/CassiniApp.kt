@@ -1,5 +1,6 @@
 package org.cassini.android.nav
 
+import android.content.Context
 import android.util.Log
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.ContentTransform
@@ -14,24 +15,15 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
+import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
@@ -39,28 +31,46 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.scene.Scene
 import androidx.navigation3.ui.NavDisplay
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
 import org.cassini.android.AppGraph
 import org.cassini.android.library.GraphLibraryPorts
 import org.cassini.android.library.LibraryRoute
 import org.cassini.android.library.LibraryViewModel
+import org.cassini.android.licenses.AssetLicensesPorts
+import org.cassini.android.licenses.LicensesRoute
+import org.cassini.android.licenses.LicensesViewModel
+import org.cassini.android.models.GraphModelDownloadPorts
+import org.cassini.android.models.ModelDownloadRoute
+import org.cassini.android.models.ModelDownloadViewModel
 import org.cassini.android.note.GraphNotePorts
 import org.cassini.android.note.NoteRoute
 import org.cassini.android.note.NoteViewModel
+import org.cassini.android.processing.StartOrigin
 import org.cassini.android.recording.GraphRecordingPorts
 import org.cassini.android.recording.RecordingRoute
 import org.cassini.android.recording.RecordingViewModel
+import org.cassini.android.settings.GraphSettingsPorts
+import org.cassini.android.settings.SettingsRoute
+import org.cassini.android.settings.SettingsViewModel
+import org.cassini.android.trash.GraphTrashPorts
+import org.cassini.android.trash.TrashRoute
+import org.cassini.android.trash.TrashViewModel
+import org.cassini.android.voices.GraphSavedVoicesPorts
+import org.cassini.android.voices.SavedVoicesRoute
+import org.cassini.android.voices.SavedVoicesViewModel
+import org.cassini.core.library.JobState
 import org.cassini.data.notes.ImportOutcome
+import org.cassini.ui.licenses.LicensesBackTo
 import org.cassini.ui.theme.CassiniTheme
+import org.cassini.ui.trash.TrashBackTo
 
 /**
  * The app's navigation (docs/architecture.md section 6, docs/design/ui.md section 9): one [NavDisplay] over the
  * saved back stack, with the Library at the bottom. Each entry keeps its saveable state and its own ViewModels.
  * [links] are the deep links that [org.cassini.android.MainActivity] receives; each one changes the back stack as
  * [DeepLinks] says.
- *
- * The Library, Recording and Note have their routes; the other destinations are placeholders until their
- * ViewModels and routes land (P10 step 5).
  */
 @Composable
 @Suppress("FunctionNaming") // Composables are nouns in PascalCase.
@@ -99,26 +109,53 @@ fun CassiniApp(graph: AppGraph, links: Flow<DeepLink>, modifier: Modifier = Modi
                 val viewModel = viewModel { RecordingViewModel(createSavedStateHandle(), GraphRecordingPorts(graph)) }
                 RecordingRoute(viewModel, recordingNavigator(backStack))
             }
-            entry<ModelDownloadKey> { Placeholder("Model download") }
-            entry<SettingsKey> {
-                Placeholder("Settings") {
-                    Destination("Saved voices") { backStack.add(SavedVoicesKey) }
-                    Destination("Model download") { backStack.add(ModelDownloadKey()) }
-                    Destination("Licenses") { backStack.add(LicensesKey) }
-                }
-            }
-            entry<SavedVoicesKey> { Placeholder("Saved voices") }
-            entry<TrashKey> { Placeholder("Trash") }
-            entry<LicensesKey> { Placeholder("Licenses") }
+            screenEntries(graph, backStack, context)
         },
     )
+}
+
+/** Model download, Settings, Saved voices, Trash and Licenses, each with its ViewModel over [graph]. */
+private fun EntryProviderScope<NavKey>.screenEntries(
+    graph: AppGraph,
+    backStack: NavBackStack<NavKey>,
+    context: Context,
+) {
+    entry<ModelDownloadKey> { key ->
+        val viewModel = viewModel { ModelDownloadViewModel(key.noteId, GraphModelDownloadPorts(graph, context)) }
+        ModelDownloadRoute(viewModel, screenNavigator(backStack, key))
+    }
+    entry<SettingsKey> {
+        val viewModel = viewModel { SettingsViewModel(GraphSettingsPorts(graph)) }
+        SettingsRoute(viewModel, screenNavigator(backStack, SettingsKey))
+    }
+    entry<SavedVoicesKey> {
+        val viewModel = viewModel { SavedVoicesViewModel(createSavedStateHandle(), GraphSavedVoicesPorts(graph)) }
+        SavedVoicesRoute(viewModel, screenNavigator(backStack, SavedVoicesKey))
+    }
+    entry<TrashKey> {
+        val backTo = if (backStack.below(TrashKey) is SettingsKey) TrashBackTo.SETTINGS else TrashBackTo.LIBRARY
+        val viewModel = viewModel {
+            TrashViewModel(createSavedStateHandle(), GraphTrashPorts(graph), backTo, graph.clock())
+        }
+        TrashRoute(viewModel, screenNavigator(backStack, TrashKey))
+    }
+    entry<LicensesKey> {
+        val below = backStack.below(LicensesKey)
+        val backTo = if (below is ModelDownloadKey) LicensesBackTo.MODEL_DOWNLOAD else LicensesBackTo.SETTINGS
+        val viewModel = viewModel { LicensesViewModel(createSavedStateHandle(), AssetLicensesPorts(context), backTo) }
+        LicensesRoute(viewModel, screenNavigator(backStack, LicensesKey))
+    }
 }
 
 /** Changes [backStack] for [link]. An import runs first; a failed one leaves the stack as it is. */
 private suspend fun open(graph: AppGraph, backStack: NavBackStack<NavKey>, link: DeepLink) {
     val target = when (link) {
         DeepLink.Recording -> DeepLinks.recording(backStack)
-        is DeepLink.Note -> DeepLinks.note(backStack, link.noteId)
+        is DeepLink.Note -> {
+            // "Resume" of the paused-by-Android notification: the app is visible now, so the note can start again.
+            if (link.resume) graph.appScope.launch { resume(graph, link.noteId) }
+            DeepLinks.note(backStack, link.noteId)
+        }
         is DeepLink.Import -> {
             // Through the import tracker, so the Library shows "Importing <name>…" and a failure's banner.
             val noteId = when (val outcome = graph.notices.imports.start(link.uri).await()) {
@@ -132,6 +169,25 @@ private suspend fun open(graph: AppGraph, backStack: NavBackStack<NavKey>, link:
     backStack.replaceWith(target)
 }
 
+/**
+ * Puts a paused note in the queue again with its job's kind, from a visible screen (it clears a SYSTEM hold). A note
+ * that is no longer paused (resumed already, or the intent is old) is left as it is.
+ */
+@Suppress("TooGenericExceptionCaught") // a failed resume is logged; the note screen still offers Resume
+private suspend fun resume(graph: AppGraph, noteId: String) {
+    try {
+        val job = graph.awaitCatalogue().jobs.job(noteId)?.takeIf { it.state == JobState.PAUSED } ?: return
+        graph.processing.transcribe(noteId, job.kind, StartOrigin.SCREEN)
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Exception) {
+        Log.w(TAG, "Cannot resume $noteId from the notification", error)
+    }
+}
+
+/** The key under the last [key] in this stack, or null. */
+internal fun List<NavKey>.below(key: NavKey): NavKey? = getOrNull(lastIndexOf(key) - 1)
+
 /** Makes [this] equal to [target], keeping the entries the two share at the bottom. */
 internal fun MutableList<NavKey>.replaceWith(target: List<NavKey>) {
     val shared = zip(target).takeWhile { (a, b) -> a == b }.size
@@ -142,10 +198,6 @@ internal fun MutableList<NavKey>.replaceWith(target: List<NavKey>) {
 private const val TAG = "CassiniNav"
 private const val PUSH_MS = 250
 private const val SLIDE_FRACTION = 0.3f
-
-// Wide screens: the content stays at most 560 dp wide and centred (docs/architecture.md section 6).
-private const val MAX_CONTENT_WIDTH_DP = 560
-private const val GAP_DP = 8
 
 private fun <T> pushSpec() = tween<T>(PUSH_MS, easing = FastOutSlowInEasing)
 
@@ -166,30 +218,3 @@ private val recordingTransitions: Map<String, Any> =
     NavDisplay.transitionSpec { slideInVertically { it } togetherWith fadeOut() } +
         NavDisplay.popTransitionSpec { fadeIn() togetherWith slideOutVertically { it } } +
         NavDisplay.predictivePopTransitionSpec { _ -> fadeIn() togetherWith slideOutVertically { it } }
-
-/** A stand-in screen: the destination's name and the destinations it leads to. */
-@Composable
-@Suppress("FunctionNaming") // Composables are nouns in PascalCase.
-private fun Placeholder(
-    title: String,
-    background: Color = CassiniTheme.colors.bg,
-    ink: Color = CassiniTheme.colors.ink,
-    links: @Composable () -> Unit = {},
-) {
-    Box(Modifier.fillMaxSize().background(background).safeDrawingPadding(), contentAlignment = Alignment.Center) {
-        Column(
-            Modifier.widthIn(max = MAX_CONTENT_WIDTH_DP.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(GAP_DP.dp),
-        ) {
-            Text(title, style = CassiniTheme.type.screenTitle, color = ink)
-            links()
-        }
-    }
-}
-
-@Composable
-@Suppress("FunctionNaming") // Composables are nouns in PascalCase.
-private fun Destination(label: String, onClick: () -> Unit) {
-    TextButton(onClick = onClick) { Text(label) }
-}

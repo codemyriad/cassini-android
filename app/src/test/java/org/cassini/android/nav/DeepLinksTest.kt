@@ -66,6 +66,15 @@ class DeepLinksTest {
         assertEquals(listOf<NavKey>(LibraryKey), stack)
     }
 
+    @Test fun theKeyBelowAScreenPicksItsBackLabel() {
+        assertEquals(SettingsKey, listOf(LibraryKey, SettingsKey, TrashKey).below(TrashKey))
+        assertEquals(LibraryKey, listOf<NavKey>(LibraryKey, TrashKey).below(TrashKey))
+        val consent = listOf(LibraryKey, NoteKey("n"), ModelDownloadKey("n"), LicensesKey)
+        assertEquals(ModelDownloadKey("n"), consent.below(LicensesKey))
+        assertNull(listOf<NavKey>(LicensesKey).below(LicensesKey))
+        assertNull(listOf<NavKey>(LibraryKey).below(TrashKey))
+    }
+
     private companion object {
         const val MAIN = "android.intent.action.MAIN"
     }

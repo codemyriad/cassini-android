@@ -44,7 +44,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun deliver(intent: Intent) {
-        if (intent.getBooleanExtra(DeepLinks.EXTRA_HANDLED, false)) return
+        // Recents starts the task again with its first intent: an import or a notification must not run twice.
+        val fromHistory = intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0
+        if (fromHistory || intent.getBooleanExtra(DeepLinks.EXTRA_HANDLED, false)) return
         val link = DeepLinks.parse(
             action = intent.action,
             data = intent.dataString,

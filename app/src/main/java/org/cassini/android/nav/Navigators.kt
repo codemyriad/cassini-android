@@ -44,3 +44,15 @@ internal fun recordingNavigator(backStack: NavBackStack<NavKey>) = object : Reco
         backStack.replaceWith(DeepLinks.rooted(below) + keys)
     }
 }
+
+/** The navigation of Model download, Settings, Saved voices, Trash and Licenses: push, and back pops [own]. */
+internal fun screenNavigator(backStack: NavBackStack<NavKey>, own: NavKey) = object : ScreenNavigator {
+    override fun open(key: NavKey) {
+        if (backStack.lastOrNull() != key) backStack.add(key)
+    }
+
+    override fun close() {
+        val index = backStack.lastIndexOf(own)
+        if (index > 0) backStack.removeAt(index)
+    }
+}
