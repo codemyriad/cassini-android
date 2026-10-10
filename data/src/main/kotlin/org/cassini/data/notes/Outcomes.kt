@@ -157,6 +157,8 @@ data class RebuildReport(
     val paused: List<String>,
     /** `note_voice_links` rows written. */
     val links: Int,
-    /** Note ids whose voice files were deleted because the note has no row. */
+    /** Note ids whose voice files were deleted because the note has no row and no directory. */
     val deletedVoiceFiles: List<String>,
+    /** Note directories that a storage error stopped; the next start tries those without a row again. */
+    val failed: List<String> = emptyList(),
 )

@@ -104,11 +104,15 @@ internal object AudioFiles {
     fun vendor(file: File): String? = try {
         val (_, tags) = file.inputStream().buffered().use(OggOpus::headers)
         val length = OggOpus.u32(tags, OPUS_TAGS_MAGIC)
-        val fits = length >= 0 && VENDOR_START + length <= tags.size
+        // In Long: a length near Int.MAX_VALUE must not wrap round and pass the check.
+        val fits = length >= 0 && VENDOR_START.toLong() + length <= tags.size
         if (fits) String(tags, VENDOR_START, length, Charsets.UTF_8) else null
     } catch (_: IOException) {
         null
     } catch (_: IllegalArgumentException) {
+        null
+    } catch (_: IndexOutOfBoundsException) {
+        // An OpusTags packet too short to hold the vendor length.
         null
     }
 

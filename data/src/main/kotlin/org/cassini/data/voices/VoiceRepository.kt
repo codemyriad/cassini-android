@@ -212,8 +212,9 @@ class VoiceRepository(
 
     /**
      * Rebuilds `note_voice_links` from every `voices/notes/<noteId>.json` at start (architecture 4.8 item 4), and deletes the
-     * sealed and pending voice files of notes that have no row. A newer or unreadable file stays and gives no links;
-     * a damaged one is renamed.
+     * sealed and pending voice files of notes that have no row and no `notes/<id>/` directory. A directory without a
+     * row waits for the catalogue rebuild, so its voice files stay. A newer or unreadable file stays and gives no
+     * links; a damaged one is renamed.
      */
     suspend fun syncLinks(): LinkSync {
         val rows = notes.ids().toHashSet()
@@ -582,7 +583,8 @@ class VoiceRepository(
             val noteId = file.name.removeSuffix(JSON)
             locked(file) {
                 if (noteId !in rows) {
-                    if (leftovers(file).all { !it.exists() || it.delete() }) deleted += noteId
+                    val gone = !paths.note(noteId).exists() && leftovers(file).all { !it.exists() || it.delete() }
+                    if (gone) deleted += noteId
                     return@locked
                 }
                 when (val read = files.readNote(file)) {
@@ -595,7 +597,9 @@ class VoiceRepository(
         }
         for (file in jsonFiles(File(paths.voices, PENDING))) {
             val noteId = file.name.removeSuffix(JSON)
-            if (noteId !in rows) locked(file) { leftovers(file).forEach { it.delete() } }
+            if (noteId !in rows && !paths.note(noteId).exists()) {
+                locked(file) { leftovers(file).forEach { it.delete() } }
+            }
         }
         return found to LinkSync(found.size, deleted, problems)
     }

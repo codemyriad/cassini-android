@@ -171,8 +171,9 @@ class JobRepository(
      *   checkpoint (model load, first window) cannot restart forever ("at most 2 automatic attempts", section 5.3).
      * - PAUSED without a checkpoint: stays PAUSED with `done_ms` 0.
      * - RUNNING or PAUSED whose checkpoint fails validation: FAILED(CHECKPOINT_MISMATCH).
-     * - A `work/` directory without a job row and without a marker: deleted, unless the note is in Trash. Trash
-     *   deletes the row of a QUEUED job, and its checkpoint must stay for Restore.
+     * - A `work/` directory without a job row and without a marker: deleted, unless the note is in Trash or has no
+     *   row. Trash deletes the row of a QUEUED job, and its checkpoint must stay for Restore; a note without a row
+     *   waits for the catalogue rebuild.
      */
     suspend fun reconcileOnStart(activeNoteId: String?): ReconcileReport {
         val rows = jobs.all().associateBy { it.noteId }
@@ -256,10 +257,12 @@ class JobRepository(
     private suspend fun deleteOrphanWork(noteId: String, report: Report) {
         val deleted = locks.withNoteLock(noteId, dispatchers.io) {
             val work = paths.work(noteId)
-            // A marker left by an adopt that could not run (no row) is kept for the catalogue rebuild. A trashed note
-            // keeps the checkpoint of its QUEUED job (Trash deleted the row) for Restore.
-            val orphan = work.isDirectory && jobs.jobBlocking(noteId) == null &&
-                !File(work, WorkFiles.SEALED_MARKER).isFile && notes.noteBlocking(noteId)?.trashedAt == null
+            // A note without a row waits for the catalogue rebuild, which turns its marker or checkpoint into an adopt
+            // or a PAUSED job. A trashed note keeps the checkpoint of its QUEUED job (Trash deleted the row) for
+            // Restore.
+            val row = notes.noteBlocking(noteId)
+            val orphan = work.isDirectory && row != null && row.trashedAt == null && jobs.jobBlocking(noteId) == null &&
+                !File(work, WorkFiles.SEALED_MARKER).isFile
             orphan && work.deleteRecursively()
         }
         if (deleted) {

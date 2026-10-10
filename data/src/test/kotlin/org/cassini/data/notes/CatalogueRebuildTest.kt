@@ -19,6 +19,8 @@ import org.cassini.data.checkpoint.CheckpointRepository
 import org.cassini.data.db.CassiniDatabase
 import org.cassini.data.db.CassiniDatabaseOpener
 import org.cassini.data.db.offMain
+import org.cassini.data.jobs.JobRepository
+import org.cassini.data.jobs.RunningJobCanceller
 import org.cassini.data.voices.VoiceRepository
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -315,6 +317,73 @@ class CatalogueRebuildTest {
         assertNotNull(report)
         assertEquals(6, report!!.created.size)
         assertNull(repository.rebuildIfNeeded(setAside = null)) // Rows exist now.
+    }
+
+    @Test fun aRebuildThatStoppedPartwayIsFinishedByTheNextStart() = runTest {
+        // The process died after the rebuild added the first note: the catalogue is not empty any more.
+        file(documentId, "document.opus").writeBytes(documentBytes(meetingWords, "Seduta del consiglio"))
+        catalogue().rebuild()
+        writeTree()
+
+        val report = catalogue().rebuildIfNeeded(setAside = null)
+
+        assertEquals(listOf(captureId, importId, pausedId, sealedId, badSealId), report?.created)
+        assertEquals(JobState.PAUSED, h.db.jobs().job(pausedId)?.state)
+        assertNull(catalogue().rebuildIfNeeded(setAside = null))
+    }
+
+    @Test fun aDirectoryThatFailsKeepsItsFilesAndIsCataloguedAtTheNextStart() = runTest {
+        writeTree()
+        val voiceFile = File(h.paths.voices, "notes/$importId.json")
+        voiceFile.writeText(prints("words/S1" to Match("voice-anna", 0.9f, Match.State.CONFIRMED)))
+        val checkpointFile = file(importId, "work/checkpoint.json")
+        checkpointFile.writeText(CheckpointState.encode(checkpoint("source.mp3")).toString())
+        probe.error = java.io.IOException("I/O error") // Reading the import fails once.
+
+        val first = catalogue().rebuild()
+
+        assertEquals(listOf(importId), first.failed)
+        assertEquals(listOf(documentId, captureId, pausedId, sealedId, badSealId), first.created)
+        assertNull(h.db.notes().note(importId))
+        // The later start steps keep what the note without a row has.
+        val checkpoints = CheckpointRepository(h.db, h.paths, h.dispatchers, h.locks)
+        val voices = VoiceRepository(h.db, h.paths, h.dispatchers, checkpoints.names)
+        val jobs = JobRepository(
+            h.db,
+            h.paths,
+            h.dispatchers,
+            h.locks,
+            checkpoints,
+            SealedAdopter.of(h.documents, voices),
+            RunningJobCanceller {},
+        ) { h.now }
+        assertTrue(jobs.reconcileOnStart(null).deletedWork.isEmpty())
+        assertTrue(voices.syncLinks().deleted.isEmpty())
+        assertTrue(voiceFile.isFile)
+        assertTrue(checkpointFile.isFile)
+
+        probe.error = null
+        val next = catalogue().rebuildIfNeeded(setAside = null)
+
+        assertEquals(listOf(importId), next?.created)
+        assertEquals(listOf(importId), next?.paused)
+        assertEquals("source.mp3", h.row(importId).audioFile)
+        assertEquals(JobState.PAUSED, h.db.jobs().job(importId)?.state)
+        assertEquals(listOf("S1" to "voice-anna"), h.db.voiceLinks().links(importId).map { it.speakerId to it.voiceId })
+    }
+
+    @Test fun aDocumentWithAShortTagsPacketIsCatalogued() = runTest {
+        val stream = org.cassini.core.format.OggOpus.read(documentBytes(meetingWords, "Seduta"))
+        val document = file(documentId, "document.opus")
+        // "OpusTags" and two bytes: too short for the vendor length.
+        document.writeBytes(org.cassini.core.format.OggOpus.mux(stream, "OpusTags".toByteArray() + byteArrayOf(1, 0)))
+        assertNull(AudioFiles.vendor(document))
+
+        val report = catalogue().rebuild()
+
+        assertEquals(listOf(documentId), report.created)
+        assertTrue(report.failed.isEmpty())
+        assertEquals(Origin.IMPORTED_DOCUMENT, h.row(documentId).origin)
     }
 
     @Test fun aCorruptDatabaseIsSetAsideAndRebuilt() = runTest {

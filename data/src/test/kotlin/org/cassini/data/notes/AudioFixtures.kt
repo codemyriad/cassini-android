@@ -2,6 +2,7 @@ package org.cassini.data.notes
 
 import android.net.Uri
 import java.io.File
+import java.io.IOException
 import java.io.InputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -22,8 +23,12 @@ const val FLEURS_WAV_MS = 15_840L
 class FakeProbe(private val durationMs: Long = FLEURS_WAV_MS) : AudioProbe {
     val calls = AtomicInteger()
 
+    /** When set, every probe throws it: an I/O error while the file is read. */
+    @Volatile var error: IOException? = null
+
     override fun probe(file: File): ProbedAudio? {
         calls.incrementAndGet()
+        error?.let { throw it }
         val bytes = file.readBytes()
         val text = String(bytes, Charsets.ISO_8859_1)
         return when {

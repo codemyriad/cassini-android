@@ -1,5 +1,6 @@
 package org.cassini.data.notes
 
+import android.database.SQLException
 import android.util.AtomicFile
 import android.util.Log
 import kotlinx.coroutines.withContext
@@ -42,7 +43,8 @@ fun interface RecoveredTitle {
 
 /**
  * Rebuilds the Room catalogue from the note directories and voice files (docs/architecture.md, sections 3.1, 4.8
- * step 1 and 4.9) when the database was missing or set aside as corrupt, or is empty while `notes/` has directories.
+ * step 1 and 4.9) when the database was set aside as corrupt, or when a note directory with audio has no row (a
+ * missing or emptied database, or a rebuild that stopped partway).
  *
  * For each `notes/<id>/` without a row:
  * - `document.opus` gives a DOCUMENT row with every cache row, verified once (RECORDED when the Opus vendor is
@@ -53,9 +55,9 @@ fun interface RecoveredTitle {
  *   job with reason INTERRUPTED (`reconcileOnStart` validates it later).
  *
  * Then `VoiceRepository.syncLinks` rebuilds `note_voice_links` from `voices/notes/<noteId>.json` and deletes the
- * voice files of notes that have no row. The rebuild is idempotent (notes that have a row are left alone) and never
- * deletes audio. What only Room held is lost: a rename not yet written into a document, trash state, playback
- * positions and the queue.
+ * voice files of notes that have neither a row nor a directory. The rebuild is idempotent (notes that have a row are
+ * left alone), never deletes audio, and a storage error in one directory does not stop the others. What only Room
+ * held is lost: a rename not yet written into a document, trash state, playback positions and the queue.
  */
 // Manual DI: the repositories take their collaborators explicitly.
 @Suppress("LongParameterList")
@@ -76,11 +78,13 @@ class CatalogueRepository(
     private val adopter = SealedAdopter.of(documents, voices)
 
     /**
-     * Rebuilds when the database at start was set aside ([setAside], from `CassiniDatabaseOpener`) or was missing,
-     * which shows as no notes while `notes/` has directories. Returns null when no rebuild was needed.
+     * Rebuilds when the database at start was set aside ([setAside], from `CassiniDatabaseOpener`), and whenever a
+     * note directory that holds audio has no row: a missing or emptied database, a rebuild that a crash or an error
+     * stopped partway, or an import that died between its rename and its insert. A rebuild only adds what is missing,
+     * so the next start finishes an unfinished one. Returns null when no rebuild was needed.
      */
     suspend fun rebuildIfNeeded(setAside: File?): RebuildReport? {
-        val needed = setAside != null || (notes.noteCount() == 0 && noteDirectories().isNotEmpty())
+        val needed = setAside != null || uncatalogued().isNotEmpty()
         return if (needed) rebuild() else null
     }
 
@@ -89,22 +93,41 @@ class CatalogueRepository(
         val created = mutableListOf<String>()
         val adopted = mutableListOf<String>()
         val paused = mutableListOf<String>()
-        for (dir in noteDirectories()) {
+        val failed = mutableListOf<String>()
+        for (dir in noteDirectories().filter { it.name !in known }) {
             val id = dir.name
-            if (id in known || !catalogue(dir)) continue
+            // One bad directory must not stop the others. Without a row it keeps its files and the next start tries it
+            // again; with a row, `reconcileOnStart` handles what is left in its work directory.
+            val added = attempt(dir) { catalogue(dir) }
+            if (added == null) failed += id
+            if (added != true) continue
             created += id
-            when (finishWork(id)) {
+            when (attempt(dir) { finishWork(id) }) {
                 Work.ADOPTED -> adopted += id
                 Work.PAUSED -> paused += id
                 Work.NONE -> Unit
+                null -> failed += id
             }
         }
         val links = voices.syncLinks()
-        return RebuildReport(created, adopted, paused, links.links, links.deleted)
+        return RebuildReport(created, adopted, paused, links.links, links.deleted, failed)
     }
 
     private suspend fun noteDirectories(): List<File> = withContext(dispatchers.io) {
         paths.notes.listFiles().orEmpty().filter { it.isDirectory && NoteIds.isValid(it.name) }.sortedBy { it.name }
+    }
+
+    /** The note directories that hold audio (a document, a capture or an import) and have no row. */
+    private suspend fun uncatalogued(): List<File> {
+        val directories = noteDirectories()
+        if (directories.isEmpty()) return emptyList()
+        val known = notes.ids().toHashSet()
+        return withContext(dispatchers.io) {
+            directories.filter { dir ->
+                dir.name !in known &&
+                    dir.list().orEmpty().any { it == NoteFiles.DOCUMENT || NoteFiles.isPreviousAudio(it) }
+            }
+        }
     }
 
     /** Adds the row of one note directory; false when it holds no audio (an interrupted import, an empty folder). */
@@ -225,4 +248,15 @@ class CatalogueRepository(
         const val CAPTURE_PREFIX = "capture."
         const val CHECKPOINT = "checkpoint.json"
     }
+}
+
+/** [block]'s result, or null after a storage error in [dir], which is logged. */
+private suspend fun <T : Any> attempt(dir: File, block: suspend () -> T): T? = try {
+    block()
+} catch (error: IOException) {
+    Log.w("CatalogueRepository", "Cannot catalogue $dir", error)
+    null
+} catch (error: SQLException) {
+    Log.w("CatalogueRepository", "Cannot catalogue $dir", error)
+    null
 }
