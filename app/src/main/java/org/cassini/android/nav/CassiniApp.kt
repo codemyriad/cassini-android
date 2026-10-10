@@ -27,8 +27,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.core.net.toUri
+import androidx.lifecycle.createSavedStateHandle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
@@ -37,9 +39,16 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.scene.Scene
 import androidx.navigation3.ui.NavDisplay
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import org.cassini.android.AppGraph
+import org.cassini.android.library.GraphLibraryPorts
+import org.cassini.android.library.LibraryNavigator
+import org.cassini.android.library.LibraryRoute
+import org.cassini.android.library.LibraryViewModel
+import org.cassini.android.recording.GraphRecordingPorts
+import org.cassini.android.recording.RecordingNavigator
+import org.cassini.android.recording.RecordingRoute
+import org.cassini.android.recording.RecordingViewModel
 import org.cassini.data.notes.ImportOutcome
 import org.cassini.ui.theme.CassiniTheme
 
@@ -49,12 +58,14 @@ import org.cassini.ui.theme.CassiniTheme
  * [links] are the deep links that [org.cassini.android.MainActivity] receives; each one changes the back stack as
  * [DeepLinks] says.
  *
- * The destinations are placeholders until their ViewModels and routes land (P10 steps 3 to 5).
+ * The Library and Recording have their routes; the other destinations are placeholders until their ViewModels and
+ * routes land (P10 steps 4 and 5).
  */
 @Composable
 @Suppress("FunctionNaming") // Composables are nouns in PascalCase.
 fun CassiniApp(graph: AppGraph, links: Flow<DeepLink>, modifier: Modifier = Modifier) {
     val backStack = rememberNavBackStack(LibraryKey)
+    val context = LocalContext.current
     LaunchedEffect(links) {
         links.collect { link -> open(graph, backStack, link) }
     }
@@ -72,15 +83,15 @@ fun CassiniApp(graph: AppGraph, links: Flow<DeepLink>, modifier: Modifier = Modi
         popTransitionSpec = { pop() },
         entryProvider = entryProvider {
             entry<LibraryKey> {
-                Placeholder("Library") {
-                    Destination("Record") { backStack.add(RecordingKey) }
-                    Destination("Settings") { backStack.add(SettingsKey) }
-                    Destination("Trash") { backStack.add(TrashKey) }
+                val viewModel = viewModel {
+                    LibraryViewModel(createSavedStateHandle(), GraphLibraryPorts(graph, context), graph.clock())
                 }
+                LibraryRoute(viewModel, libraryNavigator(backStack))
             }
             entry<NoteKey> { key -> Placeholder("Note ${key.noteId}") }
             entry<RecordingKey>(metadata = recordingTransitions) {
-                Placeholder("Recording", background = CassiniTheme.recording.bg, ink = CassiniTheme.recording.text2)
+                val viewModel = viewModel { RecordingViewModel(createSavedStateHandle(), GraphRecordingPorts(graph)) }
+                RecordingRoute(viewModel, recordingNavigator(backStack))
             }
             entry<ModelDownloadKey> { Placeholder("Model download") }
             entry<SettingsKey> {
@@ -103,23 +114,39 @@ private suspend fun open(graph: AppGraph, backStack: NavBackStack<NavKey>, link:
         DeepLink.Recording -> DeepLinks.recording(backStack)
         is DeepLink.Note -> DeepLinks.note(backStack, link.noteId)
         is DeepLink.Import -> {
-            // TODO(P10 step 5): the "Importing…" banner and the import error banners (features.md section 13).
-            val noteId = try {
-                when (val outcome = graph.awaitCatalogue().imports.import(link.uri.toUri())) {
-                    is ImportOutcome.Created -> outcome.noteId
-                    is ImportOutcome.Existing -> outcome.noteId
-                    else -> null.also { Log.w(TAG, "Import of a viewed file ended with $outcome") }
-                }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-                Log.w(TAG, "Import of a viewed file failed", error)
-                null
+            // Through the import tracker, so the Library shows "Importing <name>…" and a failure's banner.
+            val noteId = when (val outcome = graph.notices.imports.start(link.uri).await()) {
+                is ImportOutcome.Created -> outcome.noteId
+                is ImportOutcome.Existing -> outcome.noteId
+                else -> null.also { Log.w(TAG, "Import of a viewed file ended with $outcome") }
             }
             noteId?.let { DeepLinks.imported(backStack, it) } ?: return
         }
     }
     backStack.replaceWith(target)
+}
+
+/** The Library's navigation: pushes, and the one Recording entry (pop to it when it is in the stack). */
+private fun libraryNavigator(backStack: NavBackStack<NavKey>) = object : LibraryNavigator {
+    override fun open(key: NavKey) {
+        if (backStack.lastOrNull() != key) backStack.add(key)
+    }
+
+    override fun openRecording() = backStack.replaceWith(DeepLinks.recording(backStack))
+}
+
+/** The Recording screen's navigation: minimise pops it; Finish puts the note (and Model download) in its place. */
+private fun recordingNavigator(backStack: NavBackStack<NavKey>) = object : RecordingNavigator {
+    override fun close() {
+        val index = backStack.lastIndexOf(RecordingKey)
+        if (index > 0) backStack.removeAt(index)
+    }
+
+    override fun replaceWith(keys: List<NavKey>) {
+        val index = backStack.lastIndexOf(RecordingKey)
+        val below = if (index >= 0) backStack.take(index) else backStack.toList()
+        backStack.replaceWith(DeepLinks.rooted(below) + keys)
+    }
 }
 
 /** Makes [this] equal to [target], keeping the entries the two share at the bottom. */
