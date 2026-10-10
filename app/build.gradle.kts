@@ -55,6 +55,8 @@ android {
             matchingFallbacks += listOf("release")
         }
     }
+    // BuildConfig.DEBUG gates StrictMode and the files/debug-root.txt override (architecture 2.5).
+    buildFeatures { buildConfig = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -79,6 +81,13 @@ android {
                     rootDir.resolve("scripts/native-dependencies.json"),
                     file("src/main/assets/licenses"),
                 ).withPropertyName("licenseSources").withPathSensitivity(PathSensitivity.RELATIVE)
+                // The AppGraph tests seal the committed FLEURS clip, as the :data tests do.
+                it.inputs.dir(rootDir.resolve("fixtures/audio"))
+                    .withPropertyName("fixtures")
+                    .withPathSensitivity(PathSensitivity.RELATIVE)
+                // A local copy: the lambda must not capture the script object (configuration cache).
+                val fixturesPath = rootDir.resolve("fixtures").absolutePath
+                it.jvmArgumentProviders.add(CommandLineArgumentProvider { listOf("-Dcassini.fixtures=$fixturesPath") })
                 // Robolectric needs these on JDK 17.
                 it.jvmArgs(
                     "--add-opens=java.base/java.lang=ALL-UNNAMED",
@@ -109,11 +118,18 @@ dependencies {
     implementation(project(":core"))
     // The native wrappers, libcassini_opus, sherpa-onnx and the zstd-jni AAR (engine/build.gradle.kts).
     implementation(project(":engine"))
+    // The Room catalogue, DataStore settings and file repositories that AppGraph wires (architecture 2.3 and 2.5).
+    implementation(project(":data"))
+    // Catalogue exposes the Room database (it closes it in tests); :data keeps Room as an implementation detail.
+    implementation(libs.room.runtime)
+    implementation(libs.coroutines.android)
     // The JVM unit tests decompress with the zstd-jni jar, which carries the desktop natives.
     testImplementation(libs.zstd.jni)
     testImplementation(libs.junit)
     testImplementation(libs.org.json)
     testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.coroutines.test)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.espresso.core)
