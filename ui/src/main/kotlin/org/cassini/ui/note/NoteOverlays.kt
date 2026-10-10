@@ -93,11 +93,7 @@ fun NoteDialogContent(dialog: NoteDialog, onEvent: (NoteEvent) -> Unit) {
 @Composable
 internal fun noteConfirmSpec(dialog: NoteDialog): ConfirmSpec = when (dialog) {
     NoteDialog.StartOver -> startOverSpec()
-    NoteDialog.TranscribeFresh -> ConfirmSpec(
-        title = stringResource(R.string.ui_actions_fresh_title),
-        body = stringResource(R.string.ui_actions_fresh_body),
-        confirm = stringResource(R.string.ui_action_transcribe_again),
-    )
+    NoteDialog.TranscribeFresh -> transcribeFreshSpec()
     NoteDialog.StopAndTrash -> stopAndTrashSpec()
     is NoteDialog.ReadOnly -> ConfirmSpec(title = readOnlyMessage(dialog.reason))
     // Rename has its own dialog; this copy is never shown.
@@ -111,6 +107,14 @@ internal fun startOverSpec(): ConfirmSpec = ConfirmSpec(
     body = stringResource(R.string.ui_note_start_over_body),
     confirm = stringResource(R.string.ui_action_start_over),
     destructive = true,
+)
+
+/** "Transcribe again?" — "Earlier versions can't be kept because the audio changed." (also from the Library). */
+@Composable
+internal fun transcribeFreshSpec(): ConfirmSpec = ConfirmSpec(
+    title = stringResource(R.string.ui_actions_fresh_title),
+    body = stringResource(R.string.ui_actions_fresh_body),
+    confirm = stringResource(R.string.ui_action_transcribe_again),
 )
 
 /** "Stop transcription and move to trash?" — "Kept for 30 days, then deleted." [Move to trash] (also the Library). */

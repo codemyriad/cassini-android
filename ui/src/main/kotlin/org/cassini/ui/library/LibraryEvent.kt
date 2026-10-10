@@ -1,6 +1,7 @@
 package org.cassini.ui.library
 
 import androidx.compose.runtime.Immutable
+import org.cassini.ui.note.ExportKind
 import org.cassini.ui.note.NoteAction
 import org.cassini.ui.banner.BannerAction as BannerButton
 
@@ -61,12 +62,16 @@ sealed interface LibraryEvent {
     @Immutable
     data class SheetAction(val action: NoteAction) : LibraryEvent
 
+    /** A row of the subtitle chooser ([LibrarySheet.SubtitleFormat]): export note [id] as [kind]. */
+    @Immutable
+    data class Export(val id: String, val kind: ExportKind) : LibraryEvent
+
     data object DismissSheet : LibraryEvent
 
     @Immutable
     data class RenameConfirmed(val id: String, val title: String) : LibraryEvent
 
-    /** The confirm button of [LibraryUiState.dialog] (Start over, Stop and move to trash). */
+    /** The confirm button of [LibraryUiState.dialog] (Start over, Transcribe again, Stop and move to trash). */
     data object ConfirmDialog : LibraryEvent
 
     data object DismissDialog : LibraryEvent

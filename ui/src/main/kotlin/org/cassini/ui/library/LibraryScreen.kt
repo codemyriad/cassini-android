@@ -3,6 +3,7 @@
 
 package org.cassini.ui.library
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,7 +15,6 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -24,15 +24,22 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.max
 import org.cassini.ui.R
 import org.cassini.ui.components.Banner
 import org.cassini.ui.components.CassiniSnackbarHost
-import org.cassini.ui.components.ConfirmDialog
 import org.cassini.ui.components.DayHeader
 import org.cassini.ui.components.LibraryBottomBar
 import org.cassini.ui.components.LibraryTopBar
@@ -43,28 +50,32 @@ import org.cassini.ui.components.PillSearchField
 import org.cassini.ui.components.PrivacyLine
 import org.cassini.ui.components.ProgressBannerCard
 import org.cassini.ui.components.RecordingBannerCard
-import org.cassini.ui.components.RenameDialog
 import org.cassini.ui.format.Counts
 import org.cassini.ui.format.Dates
 import org.cassini.ui.format.DayLabel
 import org.cassini.ui.format.Progress
-import org.cassini.ui.note.NoteActionsSheet
-import org.cassini.ui.note.startOverSpec
-import org.cassini.ui.note.stopAndTrashSpec
 import org.cassini.ui.theme.CassiniTheme
 
-/** The list's bottom padding: the bottom bar (40 + 64 + 24 dp) plus the navigation bar. */
+/**
+ * The bottom bar's height on the board (40 + 64 + 24 dp), the least bottom padding of the list before the bar is
+ * measured. The bar grows when the Record label wraps (large font scales, a recording), and the list then uses the
+ * measured height.
+ */
 private val BottomBarHeight = 128.dp
 
-/** The snackbar sits 24 dp above the Record button: the button and its 24 dp bottom padding. */
-private val SnackbarLift = 88.dp
+/** The bar's top padding: the snackbar sits 24 dp above the Record button, so the bar's height less this. */
+private val BarTopPadding = 40.dp
 
 /**
  * The Library (board 00, features.md section 1; ui.md section 8). A `Box` on bg holds one `LazyColumn`: the header,
  * the search field (padding 16 horizontal, top 4) with the privacy line, the activity area (recording card, progress
  * card, banners), then either the day sections (list padding top 6) or, while searching, the flat results. The
- * bottom bar with Import and Record lies over the list, the snackbar 24 dp above Record. The actions sheet and the
- * dialogs open in their own windows from [LibraryUiState.sheet] and [LibraryUiState.dialog].
+ * bottom bar with Import and Record lies over the list, the snackbar 24 dp above Record; the list's bottom padding
+ * and the snackbar follow the bar's measured height. The sheets and the dialogs open in their own windows from
+ * [LibraryUiState.sheet] and [LibraryUiState.dialog].
+ *
+ * While a search is open (a query or results), system back clears it ([LibraryEvent.ClearQuery]) before it leaves
+ * the app (architecture.md section 6).
  *
  * While [LibraryUiState.loading] the list shows nothing below the privacy line, so the empty banner does not flash
  * before the first rows arrive. The empty and no-match states arrive as banners (LIB_EMPTY, LIB_NO_MATCH).
@@ -75,7 +86,13 @@ fun LibraryScreen(
     onEvent: (LibraryEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + BottomBarHeight
+    BackHandler(enabled = state.query.isNotEmpty() || state.results != null) { onEvent(LibraryEvent.ClearQuery) }
+    val density = LocalDensity.current
+    var barPx by remember { mutableIntStateOf(0) }
+    val bar: Dp = max(
+        with(density) { barPx.toDp() },
+        WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + BottomBarHeight,
+    )
     Box(
         modifier
             .fillMaxSize()
@@ -85,7 +102,7 @@ fun LibraryScreen(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             state = rememberLazyListState(),
-            contentPadding = PaddingValues(bottom = bottom),
+            contentPadding = PaddingValues(bottom = bar),
         ) {
             item(key = "header") {
                 LibraryTopBar(
@@ -105,7 +122,9 @@ fun LibraryScreen(
             onRecord = {
                 onEvent(if (state.recording != null) LibraryEvent.ReturnToRecording else LibraryEvent.Record)
             },
-            modifier = Modifier.align(Alignment.BottomCenter),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .onSizeChanged { barPx = it.height },
             recordingElapsedMs = state.recording?.elapsedMs,
         )
         CassiniSnackbarHost(
@@ -113,18 +132,11 @@ fun LibraryScreen(
             onTimeout = { onEvent(LibraryEvent.SnackbarTimeout) },
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .navigationBarsPadding()
-                .padding(bottom = SnackbarLift),
+                .padding(bottom = bar - BarTopPadding),
             onUndo = { onEvent(LibraryEvent.Undo) },
         )
     }
-    state.sheet?.let { sheet ->
-        NoteActionsSheet(
-            ui = sheet,
-            onAction = { onEvent(LibraryEvent.SheetAction(it)) },
-            onDismiss = { onEvent(LibraryEvent.DismissSheet) },
-        )
-    }
+    state.sheet?.let { LibrarySheetWindow(it, onEvent) }
     state.dialog?.let { LibraryDialogWindow(it, onEvent) }
 }
 
@@ -171,9 +183,10 @@ private fun LazyListScope.activity(state: LibraryUiState, onEvent: (LibraryEvent
         val modifier = top()
         item(key = "progress") { ProgressCard(progress, onEvent, modifier) }
     }
-    state.banners.forEach { spec ->
+    state.banners.forEachIndexed { index, spec ->
         val modifier = top()
-        item(key = "banner-${spec.id}") {
+        // The index keeps the key unique when two banners share an id (BannerSpec.id defaults to the kind).
+        item(key = "banner-$index-${spec.id}") {
             Banner(
                 spec = spec,
                 onAction = { onEvent(LibraryEvent.BannerAction(spec.id, it)) },
@@ -250,27 +263,4 @@ private fun NoteRowUi.event(action: NoteRowAction): LibraryEvent = when (action)
     NoteRowAction.TRY_AGAIN -> LibraryEvent.TryAgain(id)
     NoteRowAction.RENAME -> LibraryEvent.Rename(id)
     NoteRowAction.TRASH -> LibraryEvent.Trash(id)
-}
-
-/** A Library dialog in its window: Rename, or a confirmation from the actions sheet. */
-@Composable
-private fun LibraryDialogWindow(dialog: LibraryDialog, onEvent: (LibraryEvent) -> Unit) {
-    val dismiss = { onEvent(LibraryEvent.DismissDialog) }
-    when (dialog) {
-        is LibraryDialog.Rename -> RenameDialog(
-            title = dialog.title,
-            onConfirm = { onEvent(LibraryEvent.RenameConfirmed(dialog.id, it)) },
-            onDismiss = dismiss,
-        )
-        is LibraryDialog.StartOver -> ConfirmDialog(
-            spec = startOverSpec(),
-            onConfirm = { onEvent(LibraryEvent.ConfirmDialog) },
-            onDismiss = dismiss,
-        )
-        is LibraryDialog.StopAndTrash -> ConfirmDialog(
-            spec = stopAndTrashSpec(),
-            onConfirm = { onEvent(LibraryEvent.ConfirmDialog) },
-            onDismiss = dismiss,
-        )
-    }
 }

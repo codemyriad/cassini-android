@@ -9,6 +9,7 @@ import org.cassini.ui.components.SnackbarSpec
 import org.cassini.ui.format.DayLabel
 import org.cassini.ui.format.ModelPartUi
 import org.cassini.ui.format.TimeLeftUi
+import org.cassini.ui.note.InfoUi
 import org.cassini.ui.note.NoteActionsUi
 
 /**
@@ -17,8 +18,11 @@ import org.cassini.ui.note.NoteActionsUi
  * - [query] is the search field text. While searching, [results] (the flat list, newest first, possibly empty)
  *   replaces [sections]; null means no search.
  * - The activity area shows [recording], then [progress], then [banners] (the empty and no-match banners too).
- * - [snackbar] is the "moved to trash" snackbar; [sheet] the Note actions sheet of a long-pressed row; [dialog] a
- *   rename or a confirmation from that sheet.
+ * - [snackbar] is the "moved to trash" snackbar; [sheet] the Note actions sheet of a long-pressed row, or the
+ *   subtitle chooser or Document info that a row of it opens; [dialog] a rename or a confirmation from that sheet.
+ *
+ * [query] is a text field value: the ViewModel must apply [LibraryEvent.Query] synchronously, in Compose snapshot
+ * state, not through a collected flow, or the field can drop typed characters and break IME composition.
  */
 @Immutable
 data class LibraryUiState(
@@ -30,7 +34,7 @@ data class LibraryUiState(
     val sections: ImmutableList<DaySection> = persistentListOf(),
     val results: ImmutableList<NoteRowUi>? = null,
     val snackbar: SnackbarSpec? = null,
-    val sheet: NoteActionsUi? = null,
+    val sheet: LibrarySheet? = null,
     val dialog: LibraryDialog? = null,
 )
 
@@ -77,8 +81,27 @@ sealed interface ProgressLine {
 data class DaySection(val label: DayLabel, val rows: ImmutableList<NoteRowUi>)
 
 /**
- * A Library dialog. ui.md section 7 lists [Rename]; [StartOver] and [StopAndTrash] are the confirmations of the
- * actions sheet rows (features.md sections 3.2 and 6), added here because the sheet also opens from the Library.
+ * The open sheet of the Library. ui.md section 7 gives only the actions sheet; the Library shows the full Note actions
+ * sheet (features.md section 1), so the rows that open a second overlay on the Note screen open it here too:
+ * Subtitles opens [SubtitleFormat] and Document info opens [Info] (drawn as a dialog, as on the Note screen).
+ */
+sealed interface LibrarySheet {
+    @Immutable
+    data class Actions(val ui: NoteActionsUi) : LibrarySheet
+
+    /** The SubRip / WebVTT chooser for note [id]; a row sends [LibraryEvent.Export]. */
+    @Immutable
+    data class SubtitleFormat(val id: String) : LibrarySheet
+
+    /** Document info of note [id]. */
+    @Immutable
+    data class Info(val id: String, val ui: InfoUi) : LibrarySheet
+}
+
+/**
+ * A Library dialog. ui.md section 7 lists [Rename]; [StartOver], [TranscribeFresh] and [StopAndTrash] are the
+ * confirmations of the actions sheet rows (features.md sections 3.2 and 6), added here because the sheet also opens
+ * from the Library.
  */
 sealed interface LibraryDialog {
     @Immutable
@@ -87,6 +110,10 @@ sealed interface LibraryDialog {
     @Immutable
     data class StartOver(val id: String) : LibraryDialog
 
+    /** "Transcribe again? Earlier versions can't be kept because the audio changed." (a non-OK document). */
     @Immutable
-    data class StopAndTrash(val id: String, val title: String) : LibraryDialog
+    data class TranscribeFresh(val id: String) : LibraryDialog
+
+    @Immutable
+    data class StopAndTrash(val id: String) : LibraryDialog
 }
