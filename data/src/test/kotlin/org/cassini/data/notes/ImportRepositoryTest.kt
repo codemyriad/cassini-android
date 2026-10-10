@@ -258,6 +258,38 @@ class ImportRepositoryTest {
         assertEquals(emptyList<String>(), noteDirs())
     }
 
+    @Test fun spaceRunningOutDuringTheCopyNeedsTheWholeFile() = runTest {
+        val big = File(inputs, "long.mp3")
+        big.outputStream().use { out ->
+            out.write(fleurs("mp3").readBytes())
+            out.write(ByteArray(9 shl 20))
+        }
+        // Enough space before the copy; somebody else uses it while the copy runs.
+        val reads = java.util.concurrent.atomic.AtomicInteger()
+        val limits = ImportLimits(
+            usableSpace = { if (reads.getAndIncrement() == 0) Long.MAX_VALUE else Limits.MIN_FREE_BYTES - 1 },
+        )
+
+        val outcome = importer(FakeSizeSource(resolverSource, big.length()), limits).import(Uri.fromFile(big))
+
+        // The copied part is deleted, so a retry needs the whole file plus the margin.
+        assertEquals(ImportOutcome.Rejected(Failure.SPACE, neededBytes = big.length() + Limits.MIN_FREE_BYTES), outcome)
+        assertEquals(emptyList<String>(), noteDirs())
+    }
+
+    @Test fun aContentUriWithoutADisplayNameGetsTheFallbackTitle() = runTest {
+        val unnamed = object : ImportSource {
+            override fun describe(uri: Uri) = ImportSource.Description(null, null)
+
+            override fun open(uri: Uri) = fleurs("opus").inputStream()
+        }
+        val uri = Uri.parse("content://com.android.providers.downloads.documents/document/msf%3A24")
+
+        val id = created(importer(unnamed).import(uri))
+
+        assertEquals(ImportRepository.FALLBACK_TITLE, h.row(id).title)
+    }
+
     @Test fun aCancelledImportLeavesNothingBehind() = runTest {
         lateinit var job: Job
         // The cancel arrives while the file is classified, so the import stops just after the rename to source.mp3.

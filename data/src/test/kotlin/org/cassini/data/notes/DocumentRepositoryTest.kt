@@ -8,6 +8,7 @@ import org.cassini.core.export.TextExport
 import org.cassini.core.export.VttWriter
 import org.cassini.core.format.CassiniDocument
 import org.cassini.core.format.DocumentState
+import org.cassini.core.format.OggOpus
 import org.cassini.core.format.Transcript
 import org.cassini.core.library.AudioKind
 import org.cassini.core.library.JobKind
@@ -86,6 +87,25 @@ class DocumentRepositoryTest {
         h.documents.deleteAdoptedWork("a")
         assertFalse(work("a").exists())
         assertEquals(AdoptOutcome.NothingToAdopt, h.notes.adoptSealed("a"))
+    }
+
+    @Test fun theFirstAdoptWritesTheNoteTitleIntoTheTitleTag() = runTest {
+        // A plain Ogg Opus import keeps its own TITLE tag in source.opus; the note is named by the display name.
+        h.plainNote("a", title = "registrazione", audioFile = "source.opus")
+        val source = File(h.dir("a"), "source.opus")
+        val stream = OggOpus.read(source.readBytes())
+        source.writeBytes(OggOpus.mux(stream, CassiniDocument.tagsPacket(listOf("TITLE=Altro titolo"))))
+        seal("a", source, first, "registrazione")
+
+        assertEquals(AdoptOutcome.Adopted(DocumentState.OK), h.notes.adoptSealed("a"))
+
+        val written = h.readFile("a")
+        assertEquals("registrazione", written.title)
+        val titles = written.comments.filter { it.startsWith("TITLE=", ignoreCase = true) }
+        assertEquals(listOf("TITLE=registrazione"), titles)
+        assertTrue(h.isOk("a"))
+        assertFalse(h.row("a").titleDirty)
+        assertEquals(DocumentSignature.of(h.document("a")), h.row("a").documentSignature)
     }
 
     @Test fun adoptRemovesTheJobRowBeforeWorkGoes() = runTest {

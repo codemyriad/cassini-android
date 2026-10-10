@@ -55,15 +55,23 @@ private class ResolverImportSource(private val resolver: ContentResolver) : Impo
                     displayName = if (name >= 0 && !cursor.isNull(name)) cursor.getString(name) else null,
                     size = if (size >= 0 && !cursor.isNull(size)) cursor.getLong(size) else null,
                 )
-            } ?: ImportSource.Description(uri.lastPathSegment, null)
+            } ?: UNKNOWN
         } catch (_: SecurityException) {
-            ImportSource.Description(uri.lastPathSegment, null)
+            UNKNOWN
         } catch (_: IllegalArgumentException) {
-            ImportSource.Description(uri.lastPathSegment, null)
+            UNKNOWN
         }
     }
 
     override fun open(uri: Uri): InputStream? = resolver.openInputStream(uri)
+
+    private companion object {
+        /**
+         * A content Uri without a display name. Its last path segment is an opaque id (`msf:24`, `audio:1234`), not a
+         * name, so the note gets the fallback title.
+         */
+        val UNKNOWN = ImportSource.Description(null, null)
+    }
 }
 
 /** The size and space limits of an import; tests pass a small cap and a fake free-space reading. */
@@ -85,7 +93,8 @@ class ImportLimits(
  *    the first open is cheap), other Ogg Opus `source.opus`, a 16-bit PCM WAV `source.wav` (any other WAV is
  *    rejected as WAV), and anything else `source.<ext>` when [probe] finds an audio track (else OPEN);
  * 6. inserts the row with the duration and a title: the document's `meeting.title`, else the display name without
- *    its extension. A plain Ogg Opus file's own TITLE tag is not used; the first seal writes the note title into it.
+ *    its extension (a content Uri without a display name gets the fallback title). A plain Ogg Opus file's own TITLE
+ *    tag is not used; the adopt of the first seal writes the note title into it.
  *
  * Imports run while a job runs. Nothing is left behind when an import fails.
  */
@@ -147,7 +156,7 @@ class ImportRepository(
             is Copy.Done -> notes.liveWithSource(copied.sha256)?.let { ImportOutcome.Existing(it) }
                 ?: when (val staged = locks.withNoteLock(id, dispatchers.io) { classify(tmp, description) }) {
                     is Classified.Rejected -> staged.outcome
-                    is Classified.Audio -> insert(id, description.displayName ?: uri.lastPathSegment, staged, copied.sha256)
+                    is Classified.Audio -> insert(id, description.displayName, staged, copied.sha256)
                 }
         }
     }
@@ -225,7 +234,8 @@ class ImportRepository(
     private fun lowSpace(size: Long?, copied: Long): ImportOutcome.Rejected? {
         val left = limits.usableSpace(paths.notes)
         return if (left < limits.minFreeBytes) {
-            val needed = maxOf(size ?: copied, copied) - copied + limits.minFreeBytes
+            // The copied part is deleted, so a retry needs the whole file plus the margin, as the check before the copy.
+            val needed = maxOf(size ?: copied, copied) + limits.minFreeBytes
             ImportOutcome.Rejected(Failure.SPACE, neededBytes = needed)
         } else {
             null

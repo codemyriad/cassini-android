@@ -416,23 +416,33 @@ class DocumentRepository(
             if (selectNewDefault) document.defaultId else null,
             removeJob = true,
         ) ?: return AdoptOutcome.NoNote
-        // A rename made while the job ran set title_dirty; adopt writes that title into the document.
-        if (written.note.titleDirty && document.documentState == DocumentState.OK) {
+        // A rename made while the job ran set title_dirty; adopt writes that title into the document. The first seal of
+        // a plain Ogg Opus file keeps the file's own TITLE tag, so adopt also aligns a tag that differs.
+        val tagDiffers = titleTag(document) != written.note.title
+        if ((written.note.titleDirty || tagDiffers) && document.documentState == DocumentState.OK) {
             guarded { retitleDocument(noteId, written.note, document) }
         }
         dir.listFiles().orEmpty().filter { it.isFile && NoteFiles.isPreviousAudio(it.name) }.forEach { it.delete() }
         return AdoptOutcome.Adopted(document.documentState)
     }
 
-    /** Writes [row]'s title into [document] when they differ; otherwise only clears a stale `title_dirty`. */
+    /**
+     * Writes [row]'s title into [document] when its `meeting.title` or its first `TITLE` tag differs; otherwise only
+     * clears a stale `title_dirty`.
+     */
     private fun retitleDocument(noteId: String, row: NoteEntity, document: CassiniDocument): EditOutcome {
-        if (document.title != row.title) {
+        if (document.title != row.title || titleTag(document) != row.title) {
             rewrite(noteId) { source, target -> CassiniDocument.retitle(source, document, row.title, target) }
         } else if (row.titleDirty) {
             writeCache(noteId, document, DocumentSignature.of(documentFile(noteId)))
         }
         return EditOutcome.Done()
     }
+
+    /** The value of the first `TITLE` tag of [document], or null without one. */
+    private fun titleTag(document: CassiniDocument): String? = document.comments
+        .firstOrNull { it.substringBefore('=').equals(TITLE_TAG, ignoreCase = true) }
+        ?.substringAfter('=')
 
     /**
      * Runs an edit of an OK document under the note's lock. Refused while a job row exists: the document is then the
@@ -563,5 +573,8 @@ class DocumentRepository(
 
         /** Document states whose transcript cannot be exported (features.md section 6). */
         val NOT_EXPORTABLE = setOf(DocumentState.UNREADABLE, DocumentState.UNKNOWN_FORMAT)
+
+        /** The Vorbis comment that names the recording; players show it. */
+        const val TITLE_TAG = "TITLE"
     }
 }
