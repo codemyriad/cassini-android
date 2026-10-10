@@ -61,7 +61,10 @@ sealed interface PendingOutcome {
     /** The note has no row any more; the pending file was deleted. */
     data object NoNote : PendingOutcome
 
-    /** A voice file of the note is newer or cannot be read; it stays as it is and the pending file is kept. */
+    /**
+     * A voice file of the note is newer or cannot be read, or `people.json` or `generation` cannot be read now; the
+     * files stay as they are and the pending file is kept for a retry.
+     */
     data class Kept(val problem: VoiceProblem) : PendingOutcome
 }
 

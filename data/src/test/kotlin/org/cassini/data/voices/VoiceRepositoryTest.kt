@@ -507,6 +507,38 @@ class VoiceRepositoryTest {
         assertEquals(mapOf("v1/S1" to null, "v1/S2" to null), links(sealedId))
     }
 
+    @Test fun anAdoptKeepsThePendingFileWhilePeopleOrGenerationCannotBeRead() = runTest {
+        writePeople(luca)
+        checkpoints.names.mutate(draftId) { it.confirm("S1", luca.id, "Luca", 0, 0.8f) }
+        offMain { voices.savePendingBlocking(draftId, mapOf("new/S1" to print(21)), 0) }
+        val pending = pendingFile().readText()
+        voices.syncLinks()
+
+        // people.json cannot be read now: the Remember choice is not dropped.
+        assertTrue(h.paths.people.setReadable(false))
+        try {
+            assertEquals(PendingOutcome.Kept(VoiceProblem.UNREADABLE), newRepository().adoptPending(draftId))
+        } finally {
+            h.paths.people.setReadable(true)
+        }
+        assertEquals(pending, pendingFile().readText())
+
+        // The generation cannot be read now: it says nothing about "Forget everyone", so nothing is discarded.
+        h.paths.generation.writeText("0")
+        assertTrue(h.paths.generation.setReadable(false))
+        try {
+            assertEquals(PendingOutcome.Kept(VoiceProblem.UNREADABLE), newRepository().adoptPending(draftId))
+        } finally {
+            h.paths.generation.setReadable(true)
+        }
+        assertEquals(pending, pendingFile().readText())
+
+        val merged = newRepository().adoptPending(draftId) as PendingOutcome.Merged
+        assertEquals(listOf(luca.id), merged.enrolled)
+        assertEquals(2, VoiceCodec.decode(h.paths.people.readText()).single().count)
+        assertFalse(pendingFile().exists())
+    }
+
     @Test fun discardPendingKeepsTheSealedPrints() = runTest {
         writeSealed(draftId, mapOf("v1/S1" to print(10)))
         offMain { voices.savePendingBlocking(draftId, mapOf("v2/S1" to print(11)), 0) }

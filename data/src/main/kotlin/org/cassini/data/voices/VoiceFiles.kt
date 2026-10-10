@@ -115,14 +115,20 @@ internal class VoiceFiles(private val clock: () -> Long) {
         writeText(file, json.toString())
     }
 
-    /** The generation in [file]; 0 when there is none. A file that does not hold a number also reads as 0. */
-    fun readGeneration(file: File): Long {
+    /** The generation in [file]; 0 when there is none, when it cannot be read, or when it does not hold a number. */
+    fun readGeneration(file: File): Long = readGenerationOrNull(file) ?: 0
+
+    /**
+     * The generation in [file]: 0 when there is none or when it does not hold a number, null when it cannot be read now
+     * (an I/O error). Adopt keeps a pending file for a retry on null.
+     */
+    fun readGenerationOrNull(file: File): Long? {
         if (!exists(file)) return 0
         return try {
             String(AtomicFile(file).readFully(), Charsets.UTF_8).trim().toLong()
         } catch (error: IOException) {
             Log.w(TAG, "Cannot read $file", error)
-            0
+            null
         } catch (error: NumberFormatException) {
             Log.w(TAG, "Cannot parse $file", error)
             0

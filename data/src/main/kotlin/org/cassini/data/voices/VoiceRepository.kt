@@ -400,9 +400,16 @@ class VoiceRepository(
             // A damaged pending file was set aside; there is nothing left to merge.
             is FileRead.Damaged -> PendingOutcome.NothingPending
             is FileRead.Loaded -> {
+                // A generation file that cannot be read now says nothing about "Forget everyone": keep the file.
+                val generation = files.readGenerationOrNull(paths.generation)
                 val outcome = when {
                     !links.hasNoteBlocking(noteId) -> PendingOutcome.NoNote
-                    read.value.generation != files.readGeneration(paths.generation) -> PendingOutcome.Discarded
+                    generation == null -> PendingOutcome.Kept(VoiceProblem.UNREADABLE)
+                    read.value.generation != generation -> PendingOutcome.Discarded
+                    // The draft's Remember choices need people.json. When it cannot be read now, keep them for a
+                    // retry; a newer or damaged list stays read-only, so they cannot be enrolled later either.
+                    read.value.confirmations.isNotEmpty() && peopleLocked().problem == VoiceProblem.UNREADABLE ->
+                        PendingOutcome.Kept(VoiceProblem.UNREADABLE)
                     else -> mergeLocked(noteId, read.value)
                 }
                 if (outcome !is PendingOutcome.Kept) files.delete(file)

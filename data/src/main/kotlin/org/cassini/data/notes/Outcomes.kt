@@ -4,6 +4,8 @@ import android.util.Log
 import org.cassini.core.Failure
 import org.cassini.core.format.DocumentState
 import org.cassini.core.library.JobKind
+import org.cassini.data.voices.PendingOutcome
+import org.cassini.data.voices.VoiceProblem
 import org.cassini.data.voices.VoiceRepository
 import java.io.IOException
 
@@ -130,21 +132,30 @@ fun interface SealedAdopter {
          * `adoptSealed` (the document, the row and the job row), then `VoiceRepository.adoptPending`, then
          * `deleteAdoptedWork` (marker last), then the release of the draft names in memory, so the next job of the
          * note starts with no labels, merges or live matches of this run. A crash or an I/O error at any point leaves
-         * the marker, so the next start runs it again.
+         * the marker, so the next start (or `JobRepository.enqueue`) runs it again. A voice file that cannot be read
+         * now (`PendingOutcome.Kept` with UNREADABLE) also leaves the marker, because the voices are not merged yet.
+         * A voice file from a newer Cassini (NEWER) never becomes writable for this version: the adopt finishes, and
+         * the pending file stays as it is until the next job of the note writes a new one.
          */
         fun of(documents: DocumentRepository, voices: VoiceRepository): SealedAdopter = SealedAdopter { noteId ->
             documents.adoptSealed(noteId).also { outcome ->
                 if (outcome is AdoptOutcome.Adopted) {
                     try {
-                        voices.adoptPending(noteId)
-                        documents.deleteAdoptedWork(noteId)
-                        voices.releaseDraftNames(noteId)
+                        val pending = voices.adoptPending(noteId)
+                        if (pending == PendingOutcome.Kept(VoiceProblem.UNREADABLE)) {
+                            Log.w(TAG, "Cannot read the voice files of $noteId; the next start tries again")
+                        } else {
+                            documents.deleteAdoptedWork(noteId)
+                            voices.releaseDraftNames(noteId)
+                        }
                     } catch (error: IOException) {
-                        Log.w("SealedAdopter", "Cannot finish the voices of $noteId; the next start tries again", error)
+                        Log.w(TAG, "Cannot finish the voices of $noteId; the next start tries again", error)
                     }
                 }
             }
         }
+
+        private const val TAG = "SealedAdopter"
     }
 }
 

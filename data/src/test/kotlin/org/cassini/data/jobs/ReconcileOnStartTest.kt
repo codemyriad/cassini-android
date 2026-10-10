@@ -6,6 +6,7 @@ import org.cassini.core.library.JobKind
 import org.cassini.core.library.JobState
 import org.cassini.core.library.PauseReason
 import org.cassini.core.models.ModelCatalog
+import org.cassini.core.speakers.NoteVoiceCodec
 import org.cassini.core.speakers.SpeakerPrint
 import org.cassini.data.checkpoint.CheckpointLoad
 import org.cassini.data.checkpoint.CheckpointRepository
@@ -305,6 +306,33 @@ class ReconcileOnStartTest {
             assertEquals(28_000L to 3, it.doneMs to it.words)
         }
         assertTrue(checkpoints.load(queued) is CheckpointLoad.Valid)
+    }
+
+    @Test fun aVoiceFileThatCannotBeReadKeepsTheMarkerForTheNextStart() = runTest {
+        row(sealed, JobState.RUNNING)
+        save(sealed)
+        seal(sealed, documentBytes(transcript("la seduta è aperta"), "Verbale"))
+        val print = SpeakerPrint(FloatArray(ModelCatalog.VOICEPRINT_DIM) { 0.5f }, 10.0, null)
+        assertTrue(offMain { voices.savePendingBlocking(sealed, mapOf("words/S1" to print), 0) })
+        val model = ModelCatalog.voiceprintModel.sha256
+        val notePrints = File(h.paths.voices, "notes/$sealed.json").apply { parentFile!!.mkdirs() }
+        notePrints.writeText(NoteVoiceCodec.encode(model, mapOf("old/S1" to print)))
+        val pending = File(h.paths.voices, "pending/$sealed.json")
+
+        assertTrue(notePrints.setReadable(false))
+        try {
+            assertEquals(listOf(sealed), jobs.reconcileOnStart(null).adopted)
+            assertEquals(AudioKind.DOCUMENT, h.row(sealed).audioKind)
+            assertTrue("the marker stays for a retry", File(h.paths.work(sealed), "sealed").isFile)
+            assertTrue(pending.isFile)
+        } finally {
+            notePrints.setReadable(true)
+        }
+
+        assertEquals(listOf(sealed), jobs.reconcileOnStart(null).adopted)
+        assertFalse(h.paths.work(sealed).exists())
+        assertFalse(pending.exists())
+        assertEquals(setOf("old/S1", "words/S1"), NoteVoiceCodec.decode(notePrints.readText()).second.keys)
     }
 
     @Test fun aNewJobNeverStartsOverAnAdoptThatDidNotFinish() = runTest {
