@@ -47,7 +47,8 @@ class ChunkingComparisonTest {
 
     @Test fun cuttingModesAgainstTheWholeRecording() {
         val arguments = InstrumentationRegistry.getArguments()
-        // Minutes of decoding per run: asked for by name, scripts/device-smoke.sh cutting org.cassini.android.ChunkingComparisonTest
+        // Minutes of decoding per run: asked for by name,
+        // scripts/device-smoke.sh --sample cutting --class org.cassini.android.ChunkingComparisonTest
         assumeTrue("Pass audioSample=cutting to measure cutting modes", arguments.getString("audioSample") == "cutting")
         val models = InstalledModels(context.filesDir)
         if (arguments.getString("downloadModels") == "true") {

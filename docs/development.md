@@ -75,16 +75,23 @@ The Compose accessibility checks (`enableAccessibilityChecks()`) do not operate 
 Use direct adb instrumentation to retain app data and downloaded models. Gradle’s managed connected-test cleanup can uninstall the app and erase them.
 
 ```sh
+./scripts/device-smoke.sh --help
+# The 0.2 background tests (scratch root, installed models):
+./scripts/device-smoke.sh --serial emulator-5554 --annotation NeedsModels
+./scripts/device-smoke.sh --serial emulator-5554 --annotation NeedsMicrophone
+# Process death: kill -9 during a job, resume, and a check of the sealed document.
+./scripts/device-kill-resume.sh --serial emulator-5554
 ./tools/fetch-youtube-audio.sh       # optional YouTube clips; uses uvx yt-dlp + ffmpeg
-./scripts/device-smoke.sh youtube
-# Optional second argument (after the audio sample) selects test classes.
-./scripts/device-smoke.sh fleurs org.cassini.android.LibraryTest
+./scripts/device-smoke.sh --sample youtube --class org.cassini.android.DeviceSmokeTest
+./scripts/device-smoke.sh --class org.cassini.android.LibraryTest
 # Opt-in recovery check after force-stopping the app mid-recording:
-adb shell am instrument -w -r -e class org.cassini.android.RecoveryCheckTest org.cassini.android.test/androidx.test.runner.AndroidJUnitRunner
+adb shell am instrument -w -r -e class org.cassini.android.RecoveryCheckTest org.cassini.android.test/org.cassini.android.CassiniTestRunner
 # Three-minute viewer/seek check.
 ./tools/fetch-youtube-audio.sh 180
-./scripts/device-smoke.sh youtube-long
+./scripts/device-smoke.sh --sample youtube-long --class org.cassini.android.DeviceSmokeTest
 ```
+
+The script makes a dry run of the selection first. It fails when a selected test fails or is skipped, or when the real run has a different count. Thus, select only the tests that apply to the device: `SpeakerIdentificationTest#downloadingModelsRequiresConsent` is skipped on a device that has the models. `CassiniTestRunner` puts the notes, voices and settings of the 0.2 graph in a scratch root (`files/androidTest-<run>`) and removes it at the end. The 0.1.0 tests still use `filesDir`.
 
 Unlock the phone first. The script wakes it and dismisses an unsecured keyguard, but fails early if authentication is still required. Set `ANDROID_SERIAL` when several devices are connected. To verify the APK CI tested, set `CASSINI_APK=/absolute/path/to/downloaded.apk`; the script detects debug or `releaseTest` (a non-debuggable APK that R8 did not minify) and builds the matching instrumentation APK. It refuses an R8-minified APK. A `releaseTest` build without a supplied key is signed with `~/.android/debug.keystore`, so it installs over a debug build. To use both binaries from CI, also set `CASSINI_TEST_APK=/absolute/path/to/test.apk`. The `cassini-android-device-tests` artifact contains the APK under test and its test APK. Kotlin’s internal method names differ across variants, so a debug test APK cannot reliably exercise a release app. The minified `release` APK cannot be instrumented at all, because R8 removes app and Kotlin library members that only the tests call. `releaseTest` is the release build (same signing, not debuggable) without R8. On tags CI instruments `releaseTest`, then installs the published release APK over it and checks that it launches (`scripts/launch-check.sh APK` does the same by hand).
 
@@ -113,7 +120,7 @@ node scripts/check-portable-document.mjs DOCUMENT.opus
 
 A complete Cassini `.opus` contains the Opus audio stream plus timed words, speakers, processing provenance and integrity metadata in OpusTags. The diagnostic `*.words.json` files are only word bodies. Save Cassini copies the entire document unchanged, including unsupported variants, extensions and attachments. Retranscription adds a variant and preserves previous ones.
 
-Android uses sherpa-onnx 1.13.7 rebuilt with Sortformer diarization (see [native runtime](native-runtime.md); speech recognition code is unchanged), greedy CPU decoding and two threads. It does not use the desktop runtime’s modified Parakeet frontend; see [feasibility](feasibility.md). Recordings are cut at speech pauses with the desktop’s Silero VAD settings and decoded span by span (`engine/.../asr/Parakeet.kt` and `SileroDetector.kt`; `core/.../asr/SpeechFeed.kt`, `SpeechWindows.kt`, `SeamMerge.kt`, `WordGate.kt`). The window arithmetic, seam alignment and word gate are ported from `gocassini` `transcribe/stt.go` with their tests; the detector loop is ported and its tests are new. The detector model (`silero_vad.onnx`, 630 KB, pinned by SHA-256) is fetched into `files/vad/` after the Parakeet model, or once per process in the background on an installation that predates it, never during a transcription. A failed fetch is only logged: without the detector the recording is cut at quiet points. A document records how it was cut in `x-segmentation` of its speech-to-text provenance. To compare cutting policies against whole-recording decoding on a device: `./scripts/device-smoke.sh cutting org.cassini.android.ChunkingComparisonTest` (several minutes; results in `files/chunking-comparison.INT8.json`).
+Android uses sherpa-onnx 1.13.7 rebuilt with Sortformer diarization (see [native runtime](native-runtime.md); speech recognition code is unchanged), greedy CPU decoding and two threads. It does not use the desktop runtime’s modified Parakeet frontend; see [feasibility](feasibility.md). Recordings are cut at speech pauses with the desktop’s Silero VAD settings and decoded span by span (`engine/.../asr/Parakeet.kt` and `SileroDetector.kt`; `core/.../asr/SpeechFeed.kt`, `SpeechWindows.kt`, `SeamMerge.kt`, `WordGate.kt`). The window arithmetic, seam alignment and word gate are ported from `gocassini` `transcribe/stt.go` with their tests; the detector loop is ported and its tests are new. The detector model (`silero_vad.onnx`, 630 KB, pinned by SHA-256) is fetched into `files/vad/` after the Parakeet model, or once per process in the background on an installation that predates it, never during a transcription. A failed fetch is only logged: without the detector the recording is cut at quiet points. A document records how it was cut in `x-segmentation` of its speech-to-text provenance. To compare cutting policies against whole-recording decoding on a device: `./scripts/device-smoke.sh --sample cutting --class org.cassini.android.ChunkingComparisonTest` (several minutes; results in `files/chunking-comparison.INT8.json`).
 
 ## Recording
 
@@ -126,9 +133,9 @@ Imports and recordings are decoded straight to 16 kHz mono, which the speech det
 Batch processing displays draft words after each decoder call, including the final filtered words while the complete portable Opus file is being created. Transcription during capture has been removed ahead of a separate Nemotron implementation.
 
 ```sh
-./scripts/device-smoke.sh fleurs org.cassini.android.LibraryTest
+./scripts/device-smoke.sh --class org.cassini.android.LibraryTest
 # Opt-in recovery check after force-stopping the app mid-recording:
-adb shell am instrument -w -r -e class org.cassini.android.RecoveryCheckTest org.cassini.android.test/androidx.test.runner.AndroidJUnitRunner
+adb shell am instrument -w -r -e class org.cassini.android.RecoveryCheckTest org.cassini.android.test/org.cassini.android.CassiniTestRunner
 ```
 
 Upgrades ignore retired `fp32` and `modelChoice` session fields and remove them on the next session save. Existing result precision and portable provenance remain historical facts. App startup removes only `files/parakeet-v3-fp32/` and the obsolete live-recording preference. INT8, VAD and speaker downloads, saved WAV/M4A/Opus recordings, and portable documents are retained. FP32-only installations need the INT8 download for new transcription.
