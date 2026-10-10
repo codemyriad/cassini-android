@@ -24,6 +24,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -33,6 +34,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import org.cassini.ui.R
 import org.cassini.ui.theme.CassiniTheme
 
 /**
@@ -68,6 +70,36 @@ fun CassiniSnackbarHost(
             CassiniSnackbar(message = message, actionLabel = actionLabel, onAction = onAction)
         }
     }
+}
+
+/**
+ * [CassiniSnackbarHost] for a screen's [SnackbarSpec]: the copy of its kind ("“Call with supplier” moved to trash",
+ * "Saved “<file>”", "Couldn't save the file") and, when [SnackbarSpec.undo], the Undo action ([onUndo]). The
+ * spec's id restarts the timer for a second snackbar with the same text.
+ */
+@Composable
+fun CassiniSnackbarHost(
+    spec: SnackbarSpec?,
+    onTimeout: () -> Unit,
+    modifier: Modifier = Modifier,
+    onUndo: () -> Unit = {},
+) {
+    val message = spec?.let {
+        when (it.kind) {
+            SnackbarKind.MOVED_TO_TRASH -> stringResource(R.string.ui_library_moved_to_trash, it.text.orEmpty())
+            SnackbarKind.SAVED_FILE -> stringResource(R.string.ui_actions_saved_file, it.text.orEmpty())
+            SnackbarKind.SAVE_FAILED -> stringResource(R.string.ui_actions_save_failed)
+        }
+    }
+    CassiniSnackbarHost(
+        message = message,
+        durationMs = spec?.durationMs ?: 0L,
+        onTimeout = onTimeout,
+        modifier = modifier,
+        actionLabel = if (spec?.undo == true) stringResource(R.string.ui_action_undo) else null,
+        onAction = onUndo,
+        key = spec,
+    )
 }
 
 /**
