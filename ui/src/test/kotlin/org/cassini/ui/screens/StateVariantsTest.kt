@@ -1,20 +1,35 @@
 package org.cassini.ui.screens
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.unit.DpRect
 import org.cassini.ui.BoardTest
 import org.cassini.ui.components.DialogBoardFrame
+import org.cassini.ui.components.MenuBoardFrame
 import org.cassini.ui.components.RenameDialogContent
 import org.cassini.ui.components.SheetBoardFrame
 import org.cassini.ui.fixtures.VariantFixtures
 import org.cassini.ui.library.LibraryDialog
 import org.cassini.ui.library.LibraryScreen
+import org.cassini.ui.licenses.LicensesScreen
+import org.cassini.ui.models.ModelDownloadScreen
 import org.cassini.ui.note.MergeConfirmContent
 import org.cassini.ui.note.MergeSheetContent
 import org.cassini.ui.note.NameSpeakerSheetContent
 import org.cassini.ui.note.NoteActionsSheetContent
 import org.cassini.ui.note.NoteScreen
 import org.cassini.ui.recording.RecordingScreen
+import org.cassini.ui.settings.SettingsScreen
 import org.cassini.ui.trash.TrashDialogContent
+import org.cassini.ui.trash.TrashScreen
+import org.cassini.ui.voices.SavedVoiceMenuItems
 import org.cassini.ui.voices.SavedVoicesDialogContent
+import org.cassini.ui.voices.SavedVoicesScreen
 import org.junit.Test
 
 /**
@@ -58,6 +73,22 @@ class StateVariantsTest : BoardTest() {
     private fun mergeConfirm(name: String) = board("variants", name) {
         val merge = VariantFixtures.merges.getValue(name)
         DialogBoardFrame { MergeConfirmContent(merge, requireNotNull(merge.confirm), onEvent = {}) }
+    }
+
+    private fun models(name: String) = board("variants", name) {
+        ModelDownloadScreen(VariantFixtures.modelDownload.getValue(name), onEvent = {})
+    }
+
+    private fun settings(name: String) = board("variants", name) {
+        SettingsScreen(VariantFixtures.settings.getValue(name), onEvent = {})
+    }
+
+    private fun voices(name: String) = board("variants", name) {
+        SavedVoicesScreen(VariantFixtures.savedVoices.getValue(name), onEvent = {})
+    }
+
+    private fun trash(name: String) = board("variants", name) {
+        TrashScreen(VariantFixtures.trash.getValue(name), onEvent = {})
     }
 
     private fun trashDialog(name: String) = board("variants", name) {
@@ -254,15 +285,93 @@ class StateVariantsTest : BoardTest() {
 
     @Test fun actionsNoNamesCarry() = actions("actions-no-names-carry")
 
-    // Trash and Saved voices confirmations (features.md sections 8 and 10); their screens come in P8 step 5.
+    // Model download (features.md section 5).
 
-    @Test fun trashDelete() = trashDialog("trash-delete")
+    @Test fun modelsNoSpace() = models("models-no-space")
 
-    @Test fun trashEmptyAll() = trashDialog("trash-empty-all")
+    @Test fun modelsNoConnection() = models("models-no-connection")
+
+    @Test fun modelsWithoutNote() = models("models-without-note")
+
+    @Test fun modelsBusy() = models("models-busy")
+
+    @Test fun modelsVoicesOnly() = models("models-voices-only")
+
+    // Settings (features.md section 11).
+
+    @Test fun settingsNotificationsOff() = settings("settings-notifications-off")
+
+    @Test fun settingsDownloading() = settings("settings-downloading")
+
+    @Test fun settingsModelStatuses() = settings("settings-model-statuses")
+
+    @Test fun settingsItalianNone() = settings("settings-italian-none")
+
+    // Saved voices (features.md section 10).
+
+    @Test fun voicesEmpty() = voices("voices-empty")
+
+    @Test fun voicesStale() = voices("voices-stale")
+
+    @Test fun voicesError() = voices("voices-error")
+
+    @Test fun voicesUnderAMinute() = voices("voices-under-a-minute")
+
+    /** The person menu, drawn inline by `MenuBoardFrame` at the options button of the row it belongs to. */
+    @Test fun voicesMenu() {
+        val state = VariantFixtures.savedVoices.getValue("voices-menu")
+        val id = requireNotNull(state.menuFor)
+        val name = state.people.first { it.id == id }.name
+        var anchor by mutableStateOf<DpRect?>(null)
+        show {
+            val screen = @Composable { SavedVoicesScreen(state.copy(menuFor = null), onEvent = {}) }
+            val at = anchor
+            if (at == null) {
+                screen()
+            } else {
+                MenuBoardFrame(anchor = at, screen = screen) { SavedVoiceMenuItems(id, onEvent = {}) }
+            }
+        }
+        val bounds = rule.onNodeWithContentDescription("Options for $name").getBoundsInRoot()
+        rule.runOnUiThread { anchor = bounds }
+        rule.mainClock.autoAdvance = true
+        rule.waitForIdle()
+        rule.mainClock.autoAdvance = false
+        rule.onNodeWithText("Rename…").assertExists()
+        capture("variants", "voices-menu")
+    }
 
     @Test fun voicesRename() = voicesDialog("voices-rename")
 
     @Test fun voicesForget() = voicesDialog("voices-forget")
 
     @Test fun voicesForgetEveryone() = voicesDialog("voices-forget-everyone")
+
+    // Trash (features.md section 8).
+
+    @Test fun trashEmpty() = trash("trash-empty")
+
+    @Test fun trashPlain() = trash("trash-plain")
+
+    @Test fun trashFromSettings() = trash("trash-from-settings")
+
+    @Test fun trashYesterday() = trash("trash-yesterday")
+
+    @Test fun trashDelete() = trashDialog("trash-delete")
+
+    @Test fun trashEmptyAll() = trashDialog("trash-empty-all")
+
+    // Licenses (no board; features.md section 11).
+
+    @Test fun licenses() = board("variants", "licenses") {
+        LicensesScreen(VariantFixtures.licenses.getValue("licenses"), onEvent = {})
+    }
+
+    @Test fun licensesText() = board("variants", "licenses-text") {
+        LicensesScreen(VariantFixtures.licenses.getValue("licenses-text"), onEvent = {})
+    }
+
+    private companion object {
+        const val CLOCK_STEP_MS = 1_000L
+    }
 }
