@@ -37,6 +37,7 @@ import org.cassini.ui.format.Counts
 import org.cassini.ui.format.Dates
 import org.cassini.ui.format.DayLabel
 import org.cassini.ui.format.Durations
+import org.cassini.ui.format.LocalFormat
 import org.cassini.ui.format.Spoken
 import org.cassini.ui.theme.CassiniTheme
 import org.cassini.ui.theme.Tone
@@ -51,8 +52,9 @@ import java.time.LocalTime
  *
  * "· Resume" and "· Try again" are inline text buttons: they keep the board's text layout, and Compose's extended
  * hit testing gives them a 48 dp touch area (ui.md section 5). The row is one merged node described as
- * "Weekly product sync, 48 minutes 13 seconds, today 10:02, transcribing", opens on click, reports a long press,
- * and offers Rename, Move to trash and Resume / Try again as TalkBack custom actions.
+ * "Weekly product sync, 48 minutes 13 seconds, today 10:02, transcribing", followed by a suffix that is not a
+ * button ("3 speakers") and the preview text; it opens on click, reports a long press, and offers Rename, Move to
+ * trash and Resume / Try again as TalkBack custom actions.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -61,7 +63,14 @@ fun NoteRow(row: NoteRowUi, day: DayLabel, onAction: (NoteRowAction) -> Unit, mo
     val c = CassiniTheme.colors
     val t = CassiniTheme.type
     val status = rowStatus(row.status)
-    val description = Spoken.noteRow(row.title, row.durationMs, day, row.time, status.text)
+    // The explicit description replaces the merged texts for TalkBack, so it also carries what they add: a suffix
+    // that is not a button ("3 speakers", "No speech") and the preview, which tells why a search result matched.
+    val locale = LocalFormat.current.locale
+    val description = listOfNotNull(
+        Spoken.noteRow(row.title, row.durationMs, day, row.time, status.text),
+        status.suffix?.takeIf { status.suffixAction == null }?.trimStart('·', ' ', '\u00A0')?.lowercase(locale),
+        row.preview?.text,
+    ).joinToString(", ")
     val actions = customActions(row, onAction)
     val match = SpanStyle(fontWeight = FontWeight.W600, color = c.ink, background = c.accentTint)
     Column(

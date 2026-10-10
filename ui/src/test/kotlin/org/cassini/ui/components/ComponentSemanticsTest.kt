@@ -184,6 +184,23 @@ class ComponentSemanticsTest {
         assertEquals(listOf(NoteRowAction.RESUME, NoteRowAction.RENAME, NoteRowAction.TRASH), actions)
     }
 
+    @Test fun aSearchResultRowSpeaksItsSuffixAndPreview() {
+        val (result, day) = ComponentFixtures.otherRows.first { it.first.id == "result" }
+        setThemed {
+            Column(Modifier.width(390.dp)) {
+                NoteRow(result, day, onAction = {})
+                NoteRow(ComponentFixtures.otherRows.first { it.first.id == "silent" }.first, day, onAction = {})
+            }
+        }
+        rule.onNode(
+            hasContentDescription(
+                "Call with supplier, 23 minutes 50 seconds, yesterday 15:10, transcribed, 3 speakers, " +
+                    "quindi la consegna slitta a giovedì, but the price stays as agreed",
+            ),
+        ).assertExists()
+        rule.onNode(hasContentDescription("no speech", substring = true)).assertExists()
+    }
+
     @Test fun bannerTitleIsAHeadingAndAnnounceMakesALiveRegion() {
         var dismissed = 0
         setThemed {
