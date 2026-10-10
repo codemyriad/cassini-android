@@ -19,6 +19,7 @@ import org.cassini.data.db.offMain
 import org.cassini.data.notes.NotesHarness
 import org.json.JSONObject
 import org.junit.After
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -461,7 +462,9 @@ class VoiceRepositoryTest {
         val notes = File(h.paths.voices, "notes")
         fun count() = VoiceCodec.decode(h.paths.people.readText()).single { it.id == luca.id }.count
 
-        // The match is written, people.json is not: a retry enrols the print once.
+        // people.json is not written: the match is cleared again, so "Not this person" takes nothing back and a retry
+        // enrols the print once.
+        val before = VoiceCodec.decode(h.paths.people.readText()).single()
         assertTrue(people.setWritable(false))
         try {
             assertNull(voices.enrol(sealedId, "v1", "S1", luca.id, "Luca"))
@@ -469,6 +472,12 @@ class VoiceRepositoryTest {
             people.setWritable(true)
         }
         assertEquals(1, count())
+        assertNull(voices.prints(sealedId, "v1").getValue("S1").match)
+        assertEquals(mapOf("v1/S1" to null, "v1/S2" to null), links(sealedId))
+        assertEquals(UnenrolOutcome.NothingToUndo, voices.unenrol(sealedId, "v1", "S1"))
+        val after = VoiceCodec.decode(h.paths.people.readText()).single()
+        assertEquals(before.count, after.count)
+        assertArrayEquals(before.mean, after.mean, 0f)
         assertEquals(2, voices.enrol(sealedId, "v1", "S1", luca.id, "Luca")?.count)
         assertEquals(2, count())
 

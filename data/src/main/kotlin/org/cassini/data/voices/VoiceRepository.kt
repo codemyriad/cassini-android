@@ -513,10 +513,16 @@ class VoiceRepository(
         val target = voiceId?.takeIf { id -> people.voices.any { it.id == id } } ?: newVoiceId()
         val result = if (read != null && print != null) enrolOne(people.voices, target, name, print) else null
         if (result != null && read != null && print != null) {
-            // The match first: when the people.json write fails after it, a retry enrols the print once. In the other
-            // order a retry would enrol it twice.
+            // The match first: when the people.json write fails after it, the match is put back, so the note never
+            // shows a CONFIRMED match that people.json does not count ("Not this person" would then take back a print
+            // that was never added). A retry enrols the print once.
             writeNoteLocked(noteId, read.model, read.prints + (key to print.copy(match = result.second)))
-            savePeopleLocked(result.first)
+            try {
+                savePeopleLocked(result.first)
+            } catch (error: IOException) {
+                writeNoteLocked(noteId, read.model, read.prints)
+                throw error
+            }
         }
         return result?.first?.firstOrNull { it.id == target }
     }
