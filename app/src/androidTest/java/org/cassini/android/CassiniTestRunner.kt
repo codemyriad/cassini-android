@@ -15,21 +15,27 @@ import java.io.File
  * empty directory inside the scratch root instead (the download screen tests). The scratch root is deleted when the
  * run ends, and roots that an earlier run left behind (a crash) are deleted when a run starts. So is the database
  * lock file that androidx.sqlite keeps at `cacheDir/<absolute database path>.lck`.
+ *
+ * With `-e keepRoot NAME` the run uses `filesDir/androidTest-kept-NAME` instead and keeps it when it ends, so a
+ * later run with the same argument opens the same notes in a new process (scripts/note-opening-timing.sh). Other
+ * runs leave kept roots alone; the script that made one removes it.
  */
 class CassiniTestRunner : AndroidJUnitRunner() {
     private var root: File? = null
     private var cache: File? = null
     private var locks: File? = null
+    private var kept: String? = null
 
     @Volatile private var graph: AppGraph? = null
 
     override fun onCreate(arguments: Bundle?) {
         emptyModelRoot = arguments?.getString(ARG_EMPTY_MODEL_ROOT) == "true"
+        kept = arguments?.getString(ARG_KEEP_ROOT)?.takeIf { it.matches(KEPT_NAME) }
         super.onCreate(arguments)
     }
 
     override fun callApplicationOnCreate(app: Application) {
-        val run = "$PREFIX${System.currentTimeMillis()}-${android.os.Process.myPid()}"
+        val run = kept?.let { "$KEPT_PREFIX$it" } ?: "$PREFIX${System.currentTimeMillis()}-${android.os.Process.myPid()}"
         removeLeftovers(app.filesDir)
         removeLeftovers(app.cacheDir)
         removeLeftovers(File(app.cacheDir, app.filesDir.path))
@@ -47,20 +53,29 @@ class CassiniTestRunner : AndroidJUnitRunner() {
 
     override fun finish(resultCode: Int, results: Bundle?) {
         graph?.close()
-        root?.deleteRecursively()
-        cache?.deleteRecursively()
-        locks?.deleteRecursively()
+        if (kept == null) {
+            root?.deleteRecursively()
+            cache?.deleteRecursively()
+            locks?.deleteRecursively()
+        }
         super.finish(resultCode, results)
     }
 
     private fun removeLeftovers(directory: File) {
-        directory.listFiles { file -> file.isDirectory && file.name.startsWith(PREFIX) }.orEmpty()
+        directory.listFiles { file ->
+            file.isDirectory && file.name.startsWith(PREFIX) && !file.name.startsWith(KEPT_PREFIX)
+        }.orEmpty()
             .forEach { it.deleteRecursively() }
     }
 
     companion object {
         private const val TAG = "CassiniTestRunner"
         private const val PREFIX = "androidTest-"
+        private const val KEPT_PREFIX = "androidTest-kept-"
+        private val KEPT_NAME = Regex("[a-z0-9-]{1,32}")
+
+        /** The instrumentation argument that names a kept scratch root (see the class comment). */
+        const val ARG_KEEP_ROOT = "keepRoot"
 
         /** The instrumentation argument that gives the run an empty model root. */
         const val ARG_EMPTY_MODEL_ROOT = "emptyModelRoot"
