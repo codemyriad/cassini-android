@@ -159,10 +159,19 @@ internal object AudioFiles {
         return if (duration == null) AudioKind.UNPLAYABLE to 0L else AudioKind.PLAIN to duration
     }
 
-    private fun repairOpus(file: File): Long? = try {
-        OggRepair.repair(file)?.durationMs
-    } catch (_: IOException) {
-        null
+    /**
+     * The repair rewrites the file, but its time stays the time the recording ended: a later catalogue rebuild takes
+     * the note's recording time from it.
+     */
+    private fun repairOpus(file: File): Long? {
+        val modified = file.lastModified()
+        return try {
+            OggRepair.repair(file)?.durationMs
+        } catch (_: IOException) {
+            null
+        } finally {
+            if (modified > 0 && file.isFile && file.lastModified() != modified) file.setLastModified(modified)
+        }
     }
 
     private fun readUpTo(input: InputStream, count: Int): ByteArray {

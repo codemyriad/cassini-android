@@ -169,6 +169,8 @@ class CatalogueRebuildTest {
         assertTrue(capture.durationMs > 1_000)
         assertEquals(recordedAt - capture.durationMs, capture.createdAt)
         assertTrue(OggRepair.endsCleanly(File(h.dir(captureId), "capture.opus")))
+        // The repair keeps the file's time, so a later rebuild gives the same recording time.
+        assertEquals(recordedAt, File(h.dir(captureId), "capture.opus").lastModified())
 
         val import = h.row(importId)
         assertEquals(AudioKind.PLAIN, import.audioKind)
