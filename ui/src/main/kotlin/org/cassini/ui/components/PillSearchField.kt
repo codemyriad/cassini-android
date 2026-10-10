@@ -31,10 +31,13 @@ import org.cassini.ui.theme.CassiniTheme
 import org.cassini.ui.theme.Glyph
 
 /**
- * The pill search field: 52 dp, surface, 1 dp line, padding 16; Search 20/1.8 in text2, 10 dp, then a
+ * The pill search field: 54 dp, surface, 1 dp line, padding 16; Search 20/1.8 in text2, 10 dp, then a
  * [BasicTextField] (`body16` ink, 2 dp extra start inset, accent cursor, IME action Search) with [placeholder] in
  * text4. A 48 dp "Clear search" button ends the pill while [query] is not empty. [compact] is the in-note variant:
  * visual 44 / layout 48.
+ *
+ * ui.md section 6 gives 52 dp: that is the board's CSS content height, and its 1 dp border sits outside it
+ * (content-box), so board 00 draws the pill 54 dp high.
  */
 @Composable
 @Suppress("LongParameterList", "LongMethod") // Query, its callbacks, placeholder and the compact variant.
@@ -55,7 +58,7 @@ fun PillSearchField(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = if (compact) 48.dp else 52.dp),
+            .heightIn(min = if (compact) 48.dp else 54.dp),
         contentAlignment = Alignment.Center,
     ) {
         Box(
@@ -69,7 +72,7 @@ fun PillSearchField(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = if (compact) 44.dp else 52.dp)
+                .heightIn(min = if (compact) 44.dp else 54.dp)
                 .padding(start = 16.dp, end = if (query.isEmpty()) 16.dp else 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

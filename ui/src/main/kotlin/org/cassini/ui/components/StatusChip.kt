@@ -27,6 +27,9 @@ import org.cassini.ui.theme.colors
  * The Library row's status chip (`chip` style, radius 10, padding 8/2): the tone's fill and text; [Tone.Outline] is
  * a 1 dp line2 border with ink text. The CSS border sits outside the padding, so an outlined chip is 2 dp larger,
  * as on the board. [dot] adds a 6 dp dot in the tone's dot colour ("Recording"). Not interactive.
+ *
+ * The top padding is 0.5 dp less than the board's: Android never sets one line of 13 sp below the font's own 32 px
+ * at 2x, where the browser's line is 31 px, so the chip keeps the board's 19.5 dp (21.5 dp outlined).
  */
 @Composable
 fun StatusChip(text: String, tone: Tone, modifier: Modifier = Modifier, dot: Boolean = false) {
@@ -39,7 +42,12 @@ fun StatusChip(text: String, tone: Tone, modifier: Modifier = Modifier, dot: Boo
             .clip(shape)
             .background(colors.bg)
             .then(if (outlined && border != null) Modifier.border(1.dp, border, shape) else Modifier)
-            .padding(horizontal = if (outlined) 9.dp else 8.dp, vertical = if (outlined) 3.dp else 2.dp),
+            .padding(
+                start = if (outlined) 9.dp else 8.dp,
+                end = if (outlined) 9.dp else 8.dp,
+                top = if (outlined) 2.5.dp else 1.5.dp,
+                bottom = if (outlined) 3.dp else 2.dp,
+            ),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
