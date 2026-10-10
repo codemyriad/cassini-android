@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -93,6 +94,8 @@ fun LibraryScreen(
         with(density) { barPx.toDp() },
         WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + BottomBarHeight,
     )
+    // The keyboard covers the bottom bar: the results end above whichever is taller (ui.md section 9).
+    val listBottom = max(bar, WindowInsets.ime.asPaddingValues().calculateBottomPadding())
     Box(
         modifier
             .fillMaxSize()
@@ -102,7 +105,7 @@ fun LibraryScreen(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             state = rememberLazyListState(),
-            contentPadding = PaddingValues(bottom = bar),
+            contentPadding = PaddingValues(bottom = listBottom),
         ) {
             item(key = "header") {
                 LibraryTopBar(
@@ -185,7 +188,7 @@ private fun LazyListScope.activity(state: LibraryUiState, onEvent: (LibraryEvent
     }
     state.banners.forEachIndexed { index, spec ->
         val modifier = top()
-        // The index keeps the key unique when two banners share an id (BannerSpec.id defaults to the kind).
+        // Ids are unique in a list (BannerSpec); the index only keeps a duplicate from crashing the list.
         item(key = "banner-$index-${spec.id}") {
             Banner(
                 spec = spec,

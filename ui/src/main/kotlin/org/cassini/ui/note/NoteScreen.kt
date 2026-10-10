@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -60,7 +61,9 @@ fun NoteScreen(
         modifier
             .fillMaxSize()
             .background(CassiniTheme.colors.bg)
-            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)),
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+            // While the search is open, the keyboard pushes the transcript and the player up (ui.md section 9).
+            .then(if (search != null) Modifier.imePadding() else Modifier),
     ) {
         if (search != null) {
             TranscriptSearchHeader(search, onEvent)
@@ -75,7 +78,7 @@ fun NoteScreen(
             Column(Modifier.fillMaxSize()) {
                 when (state.mode) {
                     NoteMode.Reading -> ReadAndListenBody(state, listState, onEvent)
-                    else -> NoteModeBody(state, onEvent)
+                    else -> NoteModeBody(state, listState, onEvent)
                 }
             }
             NoteFloating(state, onEvent)
@@ -100,12 +103,13 @@ fun NoteScreen(
 
 /**
  * What floats at the bottom of the content box: the Follow playback chip, 16 dp above the player, while playback runs
- * with auto-follow paused (only then does it resume by itself), and the snackbar host.
+ * with auto-follow paused (only then does it resume by itself), and the snackbar host, above the chip while it shows.
  */
 @Composable
 private fun BoxScope.NoteFloating(state: NoteUiState, onEvent: (NoteEvent) -> Unit) {
     val playback = state.playback
-    if (playback != null && !playback.following && playback.playing) {
+    val chip = playback != null && !playback.following && playback.playing
+    if (chip) {
         FollowChip(
             text = stringResource(R.string.ui_follow_playback),
             onClick = { onEvent(NoteEvent.FollowPlayback) },
@@ -119,11 +123,16 @@ private fun BoxScope.NoteFloating(state: NoteUiState, onEvent: (NoteEvent) -> Un
         spec = state.snackbar,
         onTimeout = { onEvent(NoteEvent.SnackbarTimeout) },
         // Without the player the box reaches the bottom of the window, so it keeps clear of the navigation bar.
+        // Over the chip, the snackbar sits 8 dp above the chip's 48 dp layout (the host adds 24 dp of its own).
         modifier = Modifier
             .align(Alignment.BottomCenter)
-            .then(if (playback == null) Modifier.navigationBarsPadding() else Modifier),
+            .then(if (playback == null) Modifier.navigationBarsPadding() else Modifier)
+            .then(if (chip) Modifier.padding(bottom = SnackbarOverChip) else Modifier),
     )
 }
+
+/** The chip's 8 dp gap and 48 dp layout, plus 8 dp, less the snackbar host's own 24 dp. */
+private val SnackbarOverChip = 40.dp
 
 /**
  * The top bar. Reading mode (board 03): no subtitle, Search ("Search in transcript", 21/1.8) and More ("Share and

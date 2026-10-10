@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
@@ -82,13 +83,28 @@ private val TopItemPadding = Modifier.padding(start = 16.dp, top = 8.dp, end = 1
  * - Failed: the failure banner and the draft so far; over a document, the Read & listen content follows.
  *
  * Without a player, the content keeps clear of the navigation bar.
+ *
+ * Processing, Paused and Failed without a document share one [DraftList] call, so a change between them (Stop,
+ * Resume, a failure) keeps the draft's scroll position and its auto-follow. The Read & listen content below a card
+ * uses the screen's [listState], as Reading does, so Remove from queue keeps the position too.
  */
 @Composable
-internal fun ColumnScope.NoteModeBody(state: NoteUiState, onEvent: (NoteEvent) -> Unit) {
+internal fun ColumnScope.NoteModeBody(state: NoteUiState, listState: LazyListState, onEvent: (NoteEvent) -> Unit) {
     val navigationBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val bottom = if (state.playback == null) navigationBar else 0.dp
+    val mode = state.mode
+    val draft = mode is NoteMode.Processing || mode is NoteMode.Paused || (mode is NoteMode.Failed && !mode.overDocument)
+    if (draft) {
+        DraftList(state, card = (mode as? NoteMode.Processing)?.card, bottom = bottom, onEvent = onEvent)
+    } else {
+        OtherModeBody(state, listState, onEvent)
+    }
+}
+
+/** The modes without a draft: banners, the Queued card, and the document below a card or a failure banner. */
+@Composable
+private fun ColumnScope.OtherModeBody(state: NoteUiState, listState: LazyListState, onEvent: (NoteEvent) -> Unit) {
     when (val mode = state.mode) {
-        NoteMode.Loading, NoteMode.Reading -> Spacer(Modifier.weight(1f))
         NoteMode.AudioOnly, NoteMode.Unplayable -> {
             TopBanners(state.banners, onEvent)
             Spacer(Modifier.weight(1f))
@@ -96,20 +112,17 @@ internal fun ColumnScope.NoteModeBody(state: NoteUiState, onEvent: (NoteEvent) -
         is NoteMode.Queued -> {
             QueuedCard(ahead = mode.ahead, onRemove = { onEvent(NoteEvent.RemoveFromQueue) }, modifier = TopItemPadding)
             if (mode.overDocument) {
-                DocumentBelow(state, banners = true, onEvent)
+                DocumentBelow(state, banners = true, listState, onEvent)
             } else {
                 TopBanners(state.banners, onEvent)
                 Spacer(Modifier.weight(1f))
             }
         }
-        is NoteMode.Failed -> if (mode.overDocument) {
+        is NoteMode.Failed -> {
             TopBanners(state.banners, onEvent)
-            DocumentBelow(state, banners = false, onEvent)
-        } else {
-            DraftList(state, card = null, bottom = bottom, onEvent = onEvent)
+            DocumentBelow(state, banners = false, listState, onEvent)
         }
-        is NoteMode.Processing -> DraftList(state, card = mode.card, bottom = bottom, onEvent = onEvent)
-        is NoteMode.Paused -> DraftList(state, card = null, bottom = bottom, onEvent = onEvent)
+        else -> Spacer(Modifier.weight(1f))
     }
 }
 
@@ -134,9 +147,13 @@ private fun NoteBanner(spec: BannerSpec, onEvent: (NoteEvent) -> Unit, modifier:
  * chips row is drawn 4 dp up into what is above it (see [NoteChipsRow]); 8 dp more keep it clear of the card.
  */
 @Composable
-private fun ColumnScope.DocumentBelow(state: NoteUiState, banners: Boolean, onEvent: (NoteEvent) -> Unit) {
+private fun ColumnScope.DocumentBelow(
+    state: NoteUiState,
+    banners: Boolean,
+    listState: LazyListState,
+    onEvent: (NoteEvent) -> Unit,
+) {
     Spacer(Modifier.height(8.dp))
-    val listState = rememberLazyListState()
     ReadAndListenBody(state = if (banners) state else state.copy(banners = persistentListOf()), listState, onEvent)
 }
 
@@ -196,7 +213,7 @@ private fun ColumnScope.DraftList(
                 )
             }
         }
-        // The index keeps the key unique when two banners share an id (BannerSpec.id defaults to the kind).
+        // Ids are unique in a list (BannerSpec); the index only keeps a duplicate from crashing the list.
         state.banners.forEachIndexed { index, spec ->
             item(key = "banner-$index-${spec.id}") { NoteBanner(spec, onEvent, TopItemPadding) }
         }
