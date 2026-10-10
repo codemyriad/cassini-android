@@ -4,7 +4,6 @@ import android.app.ActivityManager
 import android.content.Context
 import android.util.Log
 import androidx.core.content.ContextCompat
-import org.cassini.android.R
 import org.cassini.core.audio.Limits
 import org.cassini.core.models.ModelCatalog
 import org.cassini.core.models.ModelDescriptor
@@ -18,6 +17,7 @@ import org.cassini.engine.job.ParakeetRecognizers
 import org.cassini.engine.job.SortformerDiarizers
 import org.cassini.engine.job.VoiceprintPrints
 import java.io.File
+import org.cassini.ui.R as UiR
 
 /**
  * The native seams of a job over the models installed in [modelRoot] (architecture 2.2 and 5.4). The paths are read
@@ -63,11 +63,12 @@ object InstalledEngines {
     }
 
     /**
-     * "Speaker 2" in the app language. It is read at each call, so it follows a language change, and below API 33 it
-     * comes from `getContextForLanguage` because the application context keeps the system language there.
+     * "Speaker 2" in the app language: `ui_speaker_label` of :ui, the label that the transcript shows. It is read at
+     * each call, so it follows a language change, and below API 33 it comes from `getContextForLanguage` because the
+     * application context keeps the system language there.
      */
     fun speakerLabel(context: Context, number: Int): String =
-        ContextCompat.getContextForLanguage(context).getString(R.string.speaker_label, number)
+        ContextCompat.getContextForLanguage(context).getString(UiR.string.ui_speaker_label, number)
 
     /**
      * `MemoryInfo.lowMemory`, a low-RAM device, or a known [durationMs] whose PCM does not fit the free heap

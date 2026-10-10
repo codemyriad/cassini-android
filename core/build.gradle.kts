@@ -38,8 +38,8 @@ dependencies {
 // a missing checkout fails the tests instead of skipping them. -PcassiniConformanceDir overrides the location.
 val conformanceDirectory: String = providers.gradleProperty("cassiniConformanceDir")
     .getOrElse(rootDir.resolve("third_party/cassini-format/spec/conformance").absolutePath)
-// DefaultLabelsTest compares the placeholder prefixes with the app's string resources.
-val appResources: File = rootDir.resolve("app/src/main/res")
+// DefaultLabelsTest compares the placeholder prefixes with the :ui string resources (ui_speaker_label).
+val appResources: File = rootDir.resolve("ui/src/main/res")
 // SpeakerBudgetTest compares the diarizer state cap with the bound the pinned JNI patch enforces.
 val diarizationPatch: File = rootDir.resolve("scripts/streaming-diarization.patch")
 

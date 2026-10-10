@@ -7,16 +7,16 @@ import org.junit.Test
 import java.io.File
 
 class DefaultLabelsTest {
-    /** `speaker_label` in every values directory of the app, up to its number placeholder. */
+    /** `ui_speaker_label` in every values directory of :ui, up to its number placeholder. */
     private fun resourcePrefixes(): Set<String> {
-        val res = File(System.getProperty("cassini.appResources", "../app/src/main/res")!!)
+        val res = File(System.getProperty("cassini.appResources", "../ui/src/main/res")!!)
         val files = res.listFiles().orEmpty().filter {
             it.name.startsWith("values")
         }.map { File(it, "strings.xml") }.filter { it.isFile }
         assertTrue("No string resources under $res", files.isNotEmpty())
-        val pattern = Regex("""<string name="speaker_label">([^<]*)</string>""")
+        val pattern = Regex("""<string name="ui_speaker_label">([^<]*)</string>""")
         return files.mapNotNull { pattern.find(it.readText())?.groupValues?.get(1) }.map {
-            assertTrue("speaker_label must end with its number: $it", it.endsWith("%1\$d"))
+            assertTrue("ui_speaker_label must end with its number: $it", it.endsWith("%1\$d"))
             it.removeSuffix("%1\$d")
         }.toSet()
     }
