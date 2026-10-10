@@ -16,13 +16,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.isTraversalGroup
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import org.cassini.ui.R
 import org.cassini.ui.format.Progress
 import org.cassini.ui.format.StageState
 import org.cassini.ui.format.StageUi
@@ -47,14 +51,23 @@ fun stageStates(current: StageUi, skippedMatching: Boolean): List<StageState> =
  * rule (accent when done or in progress, line2 otherwise), 4 dp padding and its label in `stage` text2, centred and
  * free to wrap. The current step is `stageCurrent` (600) in ink; a skipped step is struck through (no board). Each
  * step is one accessibility node, "Step 3 of 5: Words and voices", with the state "done", "in progress",
- * "not started" or "skipped".
+ * "not started" or "skipped". The row is a traversal group labelled "Stages", as the board's aria-label.
  */
 @Composable
 fun StageTracker(current: StageUi, skippedMatching: Boolean, modifier: Modifier = Modifier) {
     val c = CassiniTheme.colors
     val t = CassiniTheme.type
     val states = stageStates(current, skippedMatching)
-    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+    val label = stringResource(R.string.ui_stages)
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .semantics {
+                contentDescription = label
+                isTraversalGroup = true
+            },
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
         StageUi.entries.forEachIndexed { index, stage ->
             val state = states[index]
             val rule = if (state == StageState.DONE || state == StageState.IN_PROGRESS) c.accent else c.line2

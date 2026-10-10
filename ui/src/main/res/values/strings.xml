@@ -227,6 +227,7 @@
     <string name="ui_headline_words">Finding words</string>
     <string name="ui_headline_matching">Matching saved voices</string>
     <string name="ui_headline_saving">Saving</string>
+    <string name="ui_stages">Stages</string>
     <string name="ui_stage_reading">Reading</string>
     <string name="ui_stage_preparing">Preparing</string>
     <string name="ui_stage_words_and_voices">Words &amp; voices</string>

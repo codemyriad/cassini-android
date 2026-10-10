@@ -26,6 +26,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onChildren
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -82,6 +83,11 @@ class ControlsSemanticsTest {
             rule.onNodeWithContentDescription(description)
                 .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, state))
         }
+        // The board's aria-label="Stages": one labelled group around the five steps.
+        rule.onNodeWithContentDescription("Stages")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.IsTraversalGroup, true))
+            .onChildren()
+            .assertCountEquals(StageUi.entries.size)
         // Matching is skipped wherever the job is, and in progress only if it runs after all.
         assertEquals(
             listOf(
