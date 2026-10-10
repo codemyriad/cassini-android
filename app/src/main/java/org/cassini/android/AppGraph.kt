@@ -5,6 +5,7 @@ import android.os.Build
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -17,12 +18,15 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.cassini.android.adapters.InstalledEngines
 import org.cassini.android.adapters.NamingGate
 import org.cassini.android.adapters.NetworkCheck
 import org.cassini.android.adapters.RepositoryJobStorage
 import org.cassini.android.adapters.RepositoryJobVoices
 import org.cassini.android.adapters.RepositoryModelAccess
+import org.cassini.android.notices.ImportTracker
+import org.cassini.android.notices.NoticeCenter
 import org.cassini.android.playback.AndroidPlaybackPlatform
 import org.cassini.android.playback.MediaAudioPlayer
 import org.cassini.android.playback.PlaybackController
@@ -79,6 +83,7 @@ import org.cassini.engine.job.JobVoices
 import org.cassini.engine.job.ModelAccess
 import java.io.File
 import java.io.IOException
+import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -187,6 +192,22 @@ class AppGraph(context: Context, val config: Config) {
     /** The one recording of the process (architecture 5.8), created on first use. */
     val recording: RecordingController by recordingHolder
 
+    /**
+     * The banners' facts (architecture 5.1, `NoticeCenter`) and the imports they report, created on first use. The
+     * Library's picker and ACTION_VIEW both import through [NoticeCenter.imports].
+     */
+    val notices: NoticeCenter by lazy {
+        val source = ImportSource.of(app.contentResolver)
+        val imports = ImportTracker(
+            scope = appScope,
+            describe = { uri -> withContext(dispatchers.io) { source.describe(uri.toUri()).displayName } },
+            run = { uri -> awaitCatalogue().imports.import(uri.toUri()) },
+            clock = config.clock,
+            fallbackName = { ContextCompat.getContextForLanguage(app).getString(R.string.import_fallback_title) },
+        )
+        NoticeCenter(this, app, imports)
+    }
+
     /** The Note screen's player (architecture 5.9). Main thread only. */
     val playback: PlaybackController by lazy {
         PlaybackController(
@@ -241,6 +262,9 @@ class AppGraph(context: Context, val config: Config) {
      * reconcile leave that note alone. Bind it before the first use of [ready]; until then there is none.
      */
     fun bindActiveRecording(noteId: () -> String?) = activeRecording.set(noteId)
+
+    /** A [Clock] over [Config.clock] and [Config.zone], read at each call (the ViewModels' day labels). */
+    fun clock(): Clock = ConfigClock(config.clock, config.zone)
 
     /** The catalogue, waiting until the database is open. */
     suspend fun awaitCatalogue(): Catalogue = opened.await()
@@ -503,4 +527,15 @@ object AppRoots {
         val top = generateSequence(target) { it.parentFile }.firstOrNull { it.parentFile == base }
         return target.takeIf { top != null && top.name !in reserved && top.name != DEBUG_ROOT_FILE }
     }
+}
+
+/** A [Clock] that reads [millis] and [zone] at every call, so a zone change takes effect at once. */
+private class ConfigClock(private val millis: () -> Long, private val zone: () -> ZoneId) : Clock() {
+    override fun getZone(): ZoneId = zone()
+
+    override fun withZone(zone: ZoneId): Clock = ConfigClock(millis) { zone }
+
+    override fun instant(): Instant = Instant.ofEpochMilli(millis())
+
+    override fun millis(): Long = millis.invoke()
 }
