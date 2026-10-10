@@ -1,0 +1,549 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Italian copy in the register of docs/design/ui.md section 12. Same names and arguments as values/strings.xml. -->
+<resources>
+    <!-- Shared buttons and labels. -->
+    <string name="ui_action_cancel">Annulla</string>
+    <string name="ui_action_close">Chiudi</string>
+    <string name="ui_action_dismiss">Chiudi</string>
+    <string name="ui_action_undo">Annulla</string>
+    <string name="ui_action_rename">Rinomina</string>
+    <string name="ui_action_rename_more">Rinomina…</string>
+    <string name="ui_action_delete">Elimina</string>
+    <string name="ui_action_save">Salva</string>
+    <string name="ui_action_move_to_trash">Sposta nel cestino</string>
+    <string name="ui_action_resume">Riprendi</string>
+    <string name="ui_action_start_over">Ricomincia</string>
+    <string name="ui_action_try_again">Riprova</string>
+    <string name="ui_action_transcribe">Trascrivi</string>
+    <string name="ui_action_transcribe_again">Trascrivi di nuovo</string>
+    <string name="ui_action_play_anyway">Riproduci comunque</string>
+    <string name="ui_action_open">Apri</string>
+    <string name="ui_action_open_note">Apri la nota</string>
+    <string name="ui_action_open_settings">Apri le impostazioni</string>
+    <string name="ui_action_turn_on">Attiva</string>
+    <string name="ui_action_download">Scarica</string>
+    <string name="ui_action_download_again">Scarica di nuovo</string>
+    <string name="ui_action_retry">Riprova</string>
+    <string name="ui_action_choose_another">Scegline un altro</string>
+    <string name="ui_action_record">Registra</string>
+    <string name="ui_action_import">Importa</string>
+    <string name="ui_action_continue">Continua</string>
+    <string name="ui_action_allow">Consenti</string>
+    <string name="ui_action_remove_from_queue">Togli dalla coda</string>
+    <string name="ui_action_stop_keep_progress">Ferma e conserva i progressi</string>
+    <string name="ui_back_to_library">Torna alla libreria</string>
+    <string name="ui_back_to_settings">Torna alle impostazioni</string>
+    <string name="ui_back">Indietro</string>
+    <string name="ui_title_label">Titolo</string>
+    <string name="ui_name_label">Nome</string>
+    <string name="ui_error_title_blank">Inserisci un titolo.</string>
+    <string name="ui_error_name_blank">Inserisci un nome.</string>
+
+    <string name="ui_speaker_label">Voce %1$d</string>
+
+    <!-- Durate. -->
+    <string name="ui_duration_s">%1$d s</string>
+    <string name="ui_duration_min">%1$d min</string>
+    <string name="ui_duration_min_s">%1$d min %2$d s</string>
+    <string name="ui_duration_h">%1$d h</string>
+    <string name="ui_duration_h_min">%1$d h %2$d min</string>
+    <string name="ui_duration_under_minute">meno di 1 min</string>
+    <string name="ui_duration_spoken_pair">%1$s e %2$s</string>
+    <string name="ui_duration_spoken_triple">%1$s, %2$s e %3$s</string>
+    <plurals name="ui_duration_spoken_hours">
+        <item quantity="one">%1$s ora</item>
+        <item quantity="many">%1$s ore</item>
+        <item quantity="other">%1$s ore</item>
+    </plurals>
+    <plurals name="ui_duration_spoken_minutes">
+        <item quantity="one">%1$s minuto</item>
+        <item quantity="many">%1$s minuti</item>
+        <item quantity="other">%1$s minuti</item>
+    </plurals>
+    <plurals name="ui_duration_spoken_seconds">
+        <item quantity="one">%1$s secondo</item>
+        <item quantity="many">%1$s secondi</item>
+        <item quantity="other">%1$s secondi</item>
+    </plurals>
+
+    <!-- Giorni e orari. -->
+    <string name="ui_day_today">Oggi</string>
+    <string name="ui_day_yesterday">Ieri</string>
+    <string name="ui_day_today_inline">oggi</string>
+    <string name="ui_day_yesterday_inline">ieri</string>
+    <string name="ui_day_time">%1$s, %2$s</string>
+    <string name="ui_day_time_spoken">%1$s alle %2$s</string>
+    <string name="ui_voice_note_title">Nota vocale %1$s</string>
+
+    <!-- Conteggi. -->
+    <plurals name="ui_count_speakers">
+        <item quantity="one">%1$s voce</item>
+        <item quantity="many">%1$s voci</item>
+        <item quantity="other">%1$s voci</item>
+    </plurals>
+    <plurals name="ui_count_notes">
+        <item quantity="one">%1$s nota</item>
+        <item quantity="many">%1$s note</item>
+        <item quantity="other">%1$s note</item>
+    </plurals>
+    <plurals name="ui_count_people">
+        <item quantity="one">%1$s persona</item>
+        <item quantity="many">%1$s persone</item>
+        <item quantity="other">%1$s persone</item>
+    </plurals>
+    <plurals name="ui_count_words">
+        <item quantity="one">%1$s parola</item>
+        <item quantity="many">%1$s parole</item>
+        <item quantity="other">%1$s parole</item>
+    </plurals>
+    <plurals name="ui_count_versions">
+        <item quantity="one">%1$s versione</item>
+        <item quantity="many">%1$s versioni</item>
+        <item quantity="other">%1$s versioni</item>
+    </plurals>
+    <plurals name="ui_count_days_left">
+        <item quantity="one">%1$s giorno rimasto</item>
+        <item quantity="many">%1$s giorni rimasti</item>
+        <item quantity="other">%1$s giorni rimasti</item>
+    </plurals>
+    <plurals name="ui_count_more_in_queue">
+        <item quantity="one">%1$s altra in coda</item>
+        <item quantity="many">altre %1$s in coda</item>
+        <item quantity="other">altre %1$s in coda</item>
+    </plurals>
+    <plurals name="ui_count_ahead_of_note">
+        <item quantity="one">%1$s nota prima di questa.</item>
+        <item quantity="many">%1$s note prima di questa.</item>
+        <item quantity="other">%1$s note prima di questa.</item>
+    </plurals>
+    <plurals name="ui_count_names_from_voices">
+        <item quantity="one">%1$s nome dalle voci salvate</item>
+        <item quantity="many">%1$s nomi dalle voci salvate</item>
+        <item quantity="other">%1$s nomi dalle voci salvate</item>
+    </plurals>
+
+    <!-- Libreria. -->
+    <string name="ui_library_title">Note</string>
+    <string name="ui_library_trash">Cestino</string>
+    <string name="ui_library_settings">Impostazioni</string>
+    <string name="ui_library_search_placeholder">Cerca nei titoli e in ciò che è stato detto</string>
+    <string name="ui_search_clear">Cancella la ricerca</string>
+    <string name="ui_library_privacy">Trascritto su questo telefono. L’audio non lo lascia mai.</string>
+    <string name="ui_library_recording_card">Registrazione · %1$s</string>
+    <string name="ui_library_recording_paused_card">Registrazione in pausa · %1$s</string>
+    <string name="ui_library_recording_tap">Tocca per tornare</string>
+    <string name="ui_progress_transcribing">Trascrizione di %1$s</string>
+    <string name="ui_progress_getting_ready">Preparazione per trascrivere %1$s</string>
+    <string name="ui_progress_downloading_models">Download dei modelli</string>
+    <string name="ui_library_import">Importa audio</string>
+    <string name="ui_library_record">Registra</string>
+    <string name="ui_library_record_description">Registra una nuova nota</string>
+    <string name="ui_library_recording_fab">Registrazione · %1$s</string>
+    <string name="ui_library_return_to_recording">Torna alla registrazione</string>
+    <string name="ui_library_moved_to_trash">“%1$s” spostata nel cestino</string>
+
+    <string name="ui_status_recording">Registrazione in corso</string>
+    <string name="ui_status_transcribing">In trascrizione</string>
+    <string name="ui_status_queued">In coda</string>
+    <string name="ui_status_paused_at">In pausa a %1$s</string>
+    <string name="ui_status_failed">Trascrizione non riuscita</string>
+    <string name="ui_status_unplayable">Non riproducibile</string>
+    <string name="ui_status_unreadable">Trascrizione illeggibile</string>
+    <string name="ui_status_newer_format">Formato più recente</string>
+    <string name="ui_status_transcribed">Trascritta</string>
+    <string name="ui_status_audio_only">Solo audio</string>
+    <string name="ui_status_suffix_resume">· Riprendi</string>
+    <string name="ui_status_suffix_try_again">· Riprova</string>
+    <string name="ui_status_suffix_no_speech">· Nessun parlato</string>
+    <plurals name="ui_status_suffix_speakers">
+        <item quantity="one">· %1$s voce</item>
+        <item quantity="many">· %1$s voci</item>
+        <item quantity="other">· %1$s voci</item>
+    </plurals>
+    <string name="ui_row_resume_description">Riprendi la trascrizione di %1$s</string>
+    <string name="ui_row_try_again_description">Riprova a trascrivere %1$s</string>
+
+    <!-- Registrazione. -->
+    <string name="ui_recording_minimise">Riduci nella libreria (la registrazione continua)</string>
+    <string name="ui_recording_status_recording">Registrazione in corso</string>
+    <string name="ui_recording_status_paused">In pausa</string>
+    <string name="ui_recording_status_label">Stato della registrazione</string>
+    <string name="ui_recording_starting">Avvio del microfono…</string>
+    <string name="ui_recording_stopping">Salvataggio della registrazione…</string>
+    <string name="ui_recording_needs_permission">Cassini ha bisogno del microfono per registrare.</string>
+    <string name="ui_recording_waveform">Livello del microfono, ultimi 7 secondi</string>
+    <string name="ui_recording_hint">Continua a registrare a schermo spento o in un’altra app.</string>
+    <string name="ui_recording_hint_space">Spazio per circa %1$s ancora.</string>
+    <string name="ui_recording_hint_cap">Si ferma a 2 ore, tra circa %1$s.</string>
+    <string name="ui_recording_library">Libreria</string>
+    <string name="ui_recording_pause">Metti in pausa la registrazione</string>
+    <string name="ui_recording_resume">Riprendi la registrazione</string>
+    <string name="ui_recording_finish">Termina</string>
+
+    <!-- Schermata della nota. -->
+    <string name="ui_note_search">Cerca nella trascrizione</string>
+    <string name="ui_note_share_more">Condividi e altro</string>
+    <string name="ui_note_more_actions">Altre azioni</string>
+    <string name="ui_note_wait_for_transcription">Attendi la fine della trascrizione</string>
+    <string name="ui_note_naming_closed">Salvataggio — potrai rinominare alla fine</string>
+    <string name="ui_note_fix_transcript_first">Prima sistema la trascrizione: Trascrivi di nuovo</string>
+    <string name="ui_note_queued">In coda</string>
+    <string name="ui_note_queued_after_current">Parte dopo la trascrizione in corso.</string>
+    <string name="ui_note_start_over_title">Ricominciare?</string>
+    <string name="ui_note_start_over_body">La bozza fin qui viene scartata. La registrazione resta.</string>
+
+    <!-- Avanzamento. -->
+    <string name="ui_headline_starting">Avvio…</string>
+    <string name="ui_headline_waiting">Completamento della nota precedente…</string>
+    <string name="ui_headline_reading_audio">Lettura dell’audio</string>
+    <string name="ui_headline_preparing">Preparazione</string>
+    <string name="ui_headline_words_and_speakers">Ricerca di parole e voci</string>
+    <string name="ui_headline_words">Ricerca delle parole</string>
+    <string name="ui_headline_matching">Abbinamento delle voci salvate</string>
+    <string name="ui_headline_saving">Salvataggio</string>
+    <string name="ui_stages">Fasi</string>
+    <string name="ui_stage_reading">Lettura</string>
+    <string name="ui_stage_preparing">Preparazione</string>
+    <string name="ui_stage_words_and_voices">Parole e voci</string>
+    <string name="ui_stage_words_and_voices_spoken">Parole e voci</string>
+    <string name="ui_stage_matching">Abbinamento</string>
+    <string name="ui_stage_saving">Salvataggio</string>
+    <string name="ui_stage_description">Passo %1$d di %2$d: %3$s</string>
+    <string name="ui_stage_done">completato</string>
+    <string name="ui_stage_in_progress">in corso</string>
+    <string name="ui_stage_not_started">non iniziato</string>
+    <string name="ui_stage_skipped">saltato</string>
+    <string name="ui_stat_time_left">Tempo rimasto</string>
+    <string name="ui_stat_processed">Elaborato</string>
+    <string name="ui_stat_battery">Batteria alla fine</string>
+    <string name="ui_stat_words">Parole finora</string>
+    <string name="ui_time_left_minutes_range">%1$d–%2$d min</string>
+    <string name="ui_time_left_about">Circa %1$s</string>
+    <string name="ui_time_left_under_minute">Meno di 1 min</string>
+    <string name="ui_time_left_calculating">Calcolo…</string>
+    <string name="ui_time_left_finishing">Completamento…</string>
+    <string name="ui_time_left_line_about">Circa %1$s rimanenti</string>
+    <string name="ui_time_left_line_under_minute">Meno di 1 min rimanente</string>
+    <string name="ui_time_left_line_calculating">Calcolo del tempo rimanente…</string>
+    <string name="ui_battery_projected">%1$d%% → circa %2$d%%</string>
+    <string name="ui_battery_plugged_in">In carica</string>
+    <string name="ui_battery_measuring">Misurazione…</string>
+    <string name="ui_progress_footnote">Continua anche se esci dall’app. Una notifica mostra i progressi e permette di fermare.</string>
+    <string name="ui_progress_footnote_no_notifications">Le notifiche sono disattivate, quindi i progressi si vedono solo qui.</string>
+    <string name="ui_progress_low_memory">Il telefono ha poca memoria. Chiudi altre app se la trascrizione si ferma.</string>
+
+    <!-- Bozza e suggerimenti. -->
+    <string name="ui_draft_title">Bozza della trascrizione</string>
+    <string name="ui_draft_tag">Le parole possono ancora cambiare</string>
+    <string name="ui_suggestion_question">È %1$s?</string>
+    <string name="ui_suggestion_yes">Sì, %1$s</string>
+    <string name="ui_suggestion_no">Non è %1$s</string>
+
+    <!-- Turni, parole e lettore. -->
+    <string name="ui_turn_description">%1$s, a %2$s</string>
+    <string name="ui_turn_description_auto">%1$s, nome assegnato automaticamente, a %2$s</string>
+    <string name="ui_turn_name_action">Dai un nome a questa voce</string>
+    <string name="ui_turn_auto">auto</string>
+    <string name="ui_turn_play_from_start">Riproduci dall’inizio del turno</string>
+    <string name="ui_follow_playback">Segui la riproduzione</string>
+    <string name="ui_player_group">Riproduzione</string>
+    <string name="ui_player_position">Posizione</string>
+    <string name="ui_player_position_state">%1$s di %2$s</string>
+    <string name="ui_player_back_10">Indietro di 10 secondi</string>
+    <string name="ui_player_forward_10">Avanti di 10 secondi</string>
+    <string name="ui_player_play">Riproduci</string>
+    <string name="ui_player_pause">Pausa</string>
+    <string name="ui_player_playing">In riproduzione</string>
+    <string name="ui_player_paused">In pausa</string>
+
+    <string name="ui_trust_verified">Verificata</string>
+    <string name="ui_trust_not_verified">Non verificata</string>
+    <string name="ui_trust_audio_changed">Audio cambiato</string>
+    <string name="ui_trust_unreadable">Trascrizione illeggibile</string>
+    <string name="ui_trust_newer_format">Formato più recente</string>
+    <string name="ui_version_chip">Versione %1$d di %2$d</string>
+    <string name="ui_version_suffix_merged">· voci unite</string>
+    <string name="ui_version_suffix_again">· trascritta di nuovo</string>
+
+    <string name="ui_search_counter">%1$d di %2$d</string>
+    <string name="ui_search_no_matches">Nessun risultato</string>
+    <string name="ui_search_close">Chiudi la ricerca</string>
+    <string name="ui_search_previous">Risultato precedente</string>
+    <string name="ui_search_next">Risultato successivo</string>
+
+    <string name="ui_versions_title">Versioni</string>
+    <string name="ui_versions_row">Versione %1$d</string>
+    <string name="ui_versions_transcribed">Trascritta %1$s · %2$s</string>
+    <string name="ui_versions_merged">Voci unite · dalla versione %1$d · %2$s</string>
+    <string name="ui_versions_unreadable">Non leggibile</string>
+
+    <!-- Dai un nome a una voce. -->
+    <string name="ui_name_speaks_for">Parla per %1$s in questa nota</string>
+    <string name="ui_name_play_sample">Riproduci un campione di questa voce</string>
+    <string name="ui_name_stop_sample">Ferma il campione</string>
+    <string name="ui_name_voices_ranked">Voci salvate, dalla più simile</string>
+    <string name="ui_name_voices">Voci salvate</string>
+    <string name="ui_name_likely">Probabile</string>
+    <string name="ui_name_show_all">Mostra tutte</string>
+    <string name="ui_name_same_person_saved">“%1$s” è già una voce salvata.</string>
+    <string name="ui_name_same_person_question">È la stessa persona?</string>
+    <string name="ui_name_same_person">Stessa persona</string>
+    <string name="ui_name_someone_else">Un’altra persona</string>
+    <string name="ui_name_answer_first">Prima rispondi alla domanda qui sopra</string>
+    <string name="ui_name_rename_saved_saved_as">Questa voce è salvata come “%1$s”.</string>
+    <string name="ui_name_rename_saved_question">Rinominare anche la voce salvata?</string>
+    <string name="ui_name_rename_saved">Rinomina la voce salvata</string>
+    <string name="ui_name_not">Non è %1$s?</string>
+    <string name="ui_name_remember">Ricorda questa voce su questo telefono</string>
+    <string name="ui_name_remember_body">Le prossime note riconosceranno %1$s automaticamente. L’impronta vocale non lascia mai il telefono.</string>
+    <string name="ui_name_remember_body_unnamed">Le prossime note riconosceranno questa persona automaticamente. L’impronta vocale non lascia mai il telefono.</string>
+    <string name="ui_name_remember_too_little">Troppo poco parlato per ricordare questa voce.</string>
+    <string name="ui_name_remember_no_model">Il riconoscimento delle voci salvate non è ancora installato.</string>
+    <string name="ui_name_merge_into">Unisci a…</string>
+    <string name="ui_name_save">Salva il nome</string>
+
+    <string name="ui_merge_sheet_title">Unisci %1$s a…</string>
+    <string name="ui_merge_confirm_title">Unire %1$s a %2$s?</string>
+    <string name="ui_merge_confirm_body">Tutto ciò che ha detto %1$s sarà mostrato come %2$s.</string>
+    <string name="ui_merge_confirm_sealed">Viene aggiunta la versione %1$d; la versione %2$d resta disponibile.</string>
+    <string name="ui_merge_confirm_draft">Questo modifica la bozza.</string>
+    <string name="ui_merge_action">Unisci</string>
+
+    <!-- Download dei modelli. -->
+    <string name="ui_models_title">Trascrivi su questo telefono</string>
+    <string name="ui_models_body">Cassini ha bisogno di un unico download di circa %1$s. Dopo, il riconoscimento delle parole e la distinzione delle voci avvengono su questo telefono, anche offline. Il tuo audio resta qui.</string>
+    <string name="ui_models_footnote">Servono circa %1$s liberi durante l’installazione. Ogni file viene verificato prima dell’uso.</string>
+    <string name="ui_models_sources">Da dove vengono i modelli</string>
+    <string name="ui_models_privacy">Privacy</string>
+    <string name="ui_models_download_and_transcribe">Scarica e trascrivi</string>
+    <string name="ui_models_download">Scarica</string>
+    <string name="ui_models_not_now">Non ora — tieni l’audio</string>
+    <string name="ui_part_speech">Riconoscimento vocale</string>
+    <string name="ui_part_speakers">Distinzione delle voci</string>
+    <string name="ui_part_voices">Riconoscimento delle voci salvate</string>
+    <string name="ui_part_downloading_speech">Download del riconoscimento vocale — %1$d%%</string>
+    <string name="ui_part_downloading_speakers">Download della distinzione delle voci — %1$d%%</string>
+    <string name="ui_part_downloading_voices">Download del riconoscimento delle voci — %1$d%%</string>
+
+    <!-- Azioni della nota ed esportazione. -->
+    <string name="ui_actions_save_copy">Salva una copia</string>
+    <string name="ui_actions_document">Documento Cassini</string>
+    <string name="ui_actions_document_body">Audio con la trascrizione dentro. Si riproduce ovunque.</string>
+    <string name="ui_actions_audio_file">File audio</string>
+    <string name="ui_actions_audio_file_body">La registrazione così com’è. Ancora nessuna trascrizione.</string>
+    <string name="ui_actions_text">Trascrizione come testo</string>
+    <string name="ui_actions_subtitles">Sottotitoli</string>
+    <string name="ui_actions_after_transcription">Disponibile dopo la trascrizione</string>
+    <string name="ui_actions_not_readable">Non disponibile per questa trascrizione</string>
+    <string name="ui_actions_subrip_body">funziona nella maggior parte dei lettori video</string>
+    <string name="ui_actions_webvtt_body">per i lettori web</string>
+    <string name="ui_actions_saved_file">Salvato “%1$s”</string>
+    <string name="ui_actions_save_failed">Impossibile salvare il file</string>
+    <string name="ui_actions_saving">Salvataggio…</string>
+    <string name="ui_actions_rename_title">Rinomina</string>
+    <string name="ui_actions_adds_version">Aggiunge la versione %1$d.</string>
+    <string name="ui_actions_names_carry">I nomi delle voci vengono mantenuti.</string>
+    <string name="ui_actions_fresh_title">Trascrivere di nuovo?</string>
+    <string name="ui_actions_fresh_body">Le versioni precedenti non si possono conservare perché l’audio è cambiato.</string>
+    <string name="ui_actions_document_info">Informazioni sul documento</string>
+    <string name="ui_actions_trash_body">Conservata per 30 giorni, poi eliminata.</string>
+    <string name="ui_actions_trash_running">Fermare la trascrizione e spostare nel cestino?</string>
+
+    <string name="ui_info_trust">Stato</string>
+    <string name="ui_info_title">Titolo</string>
+    <string name="ui_info_recorded">Registrata</string>
+    <string name="ui_info_duration">Durata</string>
+    <string name="ui_info_contents">Contenuto</string>
+    <string name="ui_info_version">Versione selezionata</string>
+    <string name="ui_info_language">Lingua</string>
+    <string name="ui_info_transcription">Trascrizione</string>
+    <string name="ui_info_transcribed_in">Trascritta su questo telefono in %1$s · %2$s il tempo reale</string>
+    <string name="ui_info_model">Modello</string>
+    <string name="ui_info_speakers">Voci</string>
+    <string name="ui_info_speakers_apart">Voci distinte su questo telefono</string>
+    <string name="ui_info_one_voice">Tutte le parole come una sola voce</string>
+    <string name="ui_info_resumed_from">Ripresa da %1$s</string>
+    <string name="ui_info_file_size">Dimensione del file</string>
+    <string name="ui_info_meeting_id">ID della riunione</string>
+    <string name="ui_info_read_error">Errore di lettura</string>
+
+    <!-- Cestino. -->
+    <string name="ui_trash_title">Cestino</string>
+    <string name="ui_trash_empty_action">Svuota</string>
+    <string name="ui_trash_intro">Le note qui vengono eliminate per sempre dopo 30 giorni, con il loro audio, le trascrizioni e le impronte vocali di quelle note.</string>
+    <string name="ui_trash_deleted_on">Eliminata %1$s</string>
+    <string name="ui_trash_deleted_today">Eliminata oggi</string>
+    <string name="ui_trash_deleted_yesterday">Eliminata ieri</string>
+    <string name="ui_trash_restore">Ripristina</string>
+    <string name="ui_trash_delete_now">Elimina ora</string>
+    <string name="ui_trash_delete_title">Eliminare “%1$s” per sempre?</string>
+    <string name="ui_trash_delete_body">L’audio, le trascrizioni e le impronte vocali di questa nota vengono eliminati. Non si può annullare.</string>
+    <plurals name="ui_trash_delete_all_title">
+        <item quantity="one">Eliminare %1$s nota per sempre?</item>
+        <item quantity="many">Eliminare %1$s note per sempre?</item>
+        <item quantity="other">Eliminare %1$s note per sempre?</item>
+    </plurals>
+    <string name="ui_trash_delete_all_body">L’audio, le trascrizioni e le impronte vocali vengono eliminati. Non si può annullare.</string>
+    <string name="ui_trash_is_empty">Il cestino è vuoto</string>
+    <string name="ui_trash_is_empty_body">Le note che elimini restano qui per 30 giorni.</string>
+
+    <!-- Voci salvate. -->
+    <string name="ui_voices_title">Voci salvate</string>
+    <string name="ui_voices_privacy">Le impronte vocali restano su questo telefono. Non vengono mai caricate né scritte nei file condivisi — solo i nomi che scegli.</string>
+    <string name="ui_voices_confirmed_speech">%1$s di parlato confermato</string>
+    <string name="ui_voices_options">Opzioni per %1$s</string>
+    <string name="ui_voices_forget">Dimentica…</string>
+    <string name="ui_voices_forget_title">Dimenticare %1$s?</string>
+    <string name="ui_voices_forget_body">Cassini smette di riconoscere questa voce. I nomi già presenti nelle note restano.</string>
+    <string name="ui_voices_forget_action">Dimentica</string>
+    <string name="ui_voices_rename_title">Rinomina la voce salvata</string>
+    <string name="ui_voices_stale">Dai di nuovo il nome in una nota per continuare a riconoscerla</string>
+    <string name="ui_voices_footnote">Per aggiungere qualcuno, dai un nome a una voce in una nota e lascia attivo “Ricorda questa voce”.</string>
+    <string name="ui_voices_forget_everyone">Dimentica tutti…</string>
+    <string name="ui_voices_forget_everyone_title">Dimenticare tutti?</string>
+    <plurals name="ui_voices_forget_everyone_body">
+        <item quantity="one">Cassini smette di riconoscere %1$s voce salvata ed elimina le impronte vocali da ogni nota. I nomi già presenti nelle note restano.</item>
+        <item quantity="many">Cassini smette di riconoscere tutte le %1$s voci salvate ed elimina le impronte vocali da ogni nota. I nomi già presenti nelle note restano.</item>
+        <item quantity="other">Cassini smette di riconoscere tutte le %1$s voci salvate ed elimina le impronte vocali da ogni nota. I nomi già presenti nelle note restano.</item>
+    </plurals>
+    <string name="ui_voices_forget_everyone_action">Dimentica tutti</string>
+    <string name="ui_voices_empty">Ancora nessuna voce salvata</string>
+
+    <!-- Impostazioni. -->
+    <string name="ui_settings_title">Impostazioni</string>
+    <string name="ui_settings_language">Lingua dell’app</string>
+    <string name="ui_settings_language_phone">Telefono</string>
+    <string name="ui_settings_language_footnote">Il parlato viene riconosciuto in qualsiasi lingua, automaticamente.</string>
+    <string name="ui_settings_models">Modelli sul dispositivo</string>
+    <string name="ui_settings_model_ready">Pronto</string>
+    <string name="ui_settings_model_downloading">Download %1$d%%</string>
+    <string name="ui_settings_model_checking">Verifica dei file</string>
+    <string name="ui_settings_model_pending">Si scarica con la prossima trascrizione</string>
+    <string name="ui_settings_model_not_downloaded">Non scaricato</string>
+    <string name="ui_settings_model_failed">Download non riuscito — riprova la prossima volta</string>
+    <string name="ui_settings_models_footnote">La trascrizione avviene su questo telefono. L’audio non lo lascia mai.</string>
+    <string name="ui_settings_privacy">Privacy</string>
+    <string name="ui_settings_voices">Voci salvate</string>
+    <string name="ui_settings_voices_none">Ancora nessuna</string>
+    <string name="ui_settings_trash">Cestino</string>
+    <string name="ui_settings_trash_empty">Vuoto</string>
+    <string name="ui_settings_about">Informazioni</string>
+    <string name="ui_settings_about_body">— trasforma il parlato in testo ricercabile e con i tempi, sul tuo telefono.</string>
+    <string name="ui_settings_free_software">Software libero con licenza GPLv3.</string>
+    <string name="ui_settings_source_and_notices">Codice sorgente e avvisi</string>
+
+    <string name="ui_licenses_title">Codice sorgente e avvisi</string>
+    <string name="ui_licenses_third_party">Avvisi di terze parti</string>
+    <string name="ui_licenses_third_party_body">Le librerie che Cassini usa e le loro licenze</string>
+    <string name="ui_licenses_native">Librerie native</string>
+    <string name="ui_licenses_native_body">Librerie per il riconoscimento vocale, l’audio e i file incluse nell’app</string>
+    <string name="ui_licenses_models">Avvisi dei modelli</string>
+    <string name="ui_licenses_models_body">Licenze dei modelli vocali</string>
+    <string name="ui_licenses_sources">Da dove vengono i modelli</string>
+    <string name="ui_licenses_sources_body">I server da cui Cassini scarica i modelli</string>
+    <string name="ui_licenses_privacy">Privacy</string>
+    <string name="ui_licenses_privacy_body">Cosa Cassini conserva su questo telefono e cosa invia</string>
+    <string name="ui_licenses_source_code">Codice sorgente su GitHub</string>
+
+    <!-- Catalogo dei banner. -->
+    <string name="ui_banner_trust_verified_title">Verificata</string>
+    <string name="ui_banner_trust_verified_body">L’audio corrisponde esattamente alla trascrizione. Tutto funziona.</string>
+    <string name="ui_banner_trust_not_verified_title">Non verificata</string>
+    <string name="ui_banner_trust_not_verified_body">Non è stato possibile controllare l’audio, quindi i tempi delle parole potrebbero non corrispondere.</string>
+    <string name="ui_banner_trust_audio_changed_title">Audio cambiato dopo la trascrizione</string>
+    <string name="ui_banner_trust_audio_changed_body">I tempi delle parole potrebbero non corrispondere a ciò che senti.</string>
+    <string name="ui_banner_trust_unreadable_title">Trascrizione illeggibile</string>
+    <string name="ui_banner_trust_unreadable_body">I dati Cassini del file sono danneggiati. L’audio si riproduce comunque.</string>
+    <string name="ui_banner_trust_newer_format_title">Formato Cassini più recente</string>
+    <string name="ui_banner_trust_newer_format_body">Questa versione non si può ancora leggere qui. L’audio si riproduce comunque.</string>
+    <string name="ui_banner_plain_audio_title">Solo audio</string>
+    <string name="ui_banner_plain_audio_body">Ancora nessuna trascrizione.</string>
+    <string name="ui_banner_unplayable_title">Questa registrazione non si può riprodurre</string>
+    <string name="ui_banner_unplayable_body">Cassini si è chiusa prima di salvare la registrazione. Puoi comunque salvare il file.</string>
+
+    <string name="ui_banner_rec_paused_other_app_title">In pausa — un’altra app sta usando l’audio</string>
+    <string name="ui_banner_rec_paused_other_app_body">Riprendi quando finisce la chiamata. Non si è perso nulla.</string>
+    <string name="ui_banner_rec_storage_low_title">Memoria quasi piena — restano circa %1$s</string>
+    <string name="ui_banner_rec_storage_low_body">Libera spazio per continuare. Se si esaurisce, la registrazione viene salvata automaticamente.</string>
+    <plurals name="ui_banner_rec_near_limit_title">
+        <item quantity="one">Si ferma automaticamente tra %1$s minuto</item>
+        <item quantity="many">Si ferma automaticamente tra %1$s minuti</item>
+        <item quantity="other">Si ferma automaticamente tra %1$s minuti</item>
+    </plurals>
+    <string name="ui_banner_rec_near_limit_body">La registrazione fin qui è salvata.</string>
+    <string name="ui_banner_rec_stopped_storage_title">Fermata — memoria quasi piena</string>
+    <string name="ui_banner_rec_stopped_storage_body">Meno di %1$s liberi. La registrazione fin qui è salvata.</string>
+    <string name="ui_banner_rec_mic_off_title">L’accesso al microfono è disattivato</string>
+    <string name="ui_banner_rec_mic_off_body">Attivalo nelle impostazioni di sistema. La registrazione parte quando torni.</string>
+    <string name="ui_banner_rec_mic_failed_title">Il microfono ha smesso di funzionare</string>
+    <string name="ui_banner_rec_mic_failed_body">La registrazione è terminata. L’audio fin qui è nella libreria.</string>
+    <string name="ui_banner_rec_could_not_start_title">Impossibile avviare il microfono</string>
+    <string name="ui_banner_rec_could_not_start_body">Forse lo sta usando un’altra app. Riprova.</string>
+    <plurals name="ui_banner_recovered_title">
+        <item quantity="one">%1$s registrazione recuperata</item>
+        <item quantity="many">%1$s registrazioni recuperate</item>
+        <item quantity="other">%1$s registrazioni recuperate</item>
+    </plurals>
+    <string name="ui_banner_recovered_body">Cassini si è chiusa inaspettatamente. Abbiamo salvato ciò che era stato registrato (%1$s).</string>
+
+    <string name="ui_banner_tx_paused_title">In pausa a %1$s di %2$s</string>
+    <string name="ui_banner_tx_paused_body">Riprendi da dove avevi lasciato. La bozza fin qui è conservata.</string>
+    <string name="ui_banner_tx_paused_early_title">In pausa prima di trovare parole</string>
+    <string name="ui_banner_tx_paused_early_body">Riprendi per iniziare la trascrizione.</string>
+    <plurals name="ui_banner_tx_queue_held_title">
+        <item quantity="one">Trascrizione in pausa · %1$s in attesa</item>
+        <item quantity="many">Trascrizione in pausa · %1$s in attesa</item>
+        <item quantity="other">Trascrizione in pausa · %1$s in attesa</item>
+    </plurals>
+    <string name="ui_banner_tx_queue_held_body">Continua quando vuoi.</string>
+    <string name="ui_banner_tx_calculating_title">Calcolo del tempo rimanente…</string>
+    <string name="ui_banner_tx_calculating_body">Una stima compare dopo i primi minuti di audio.</string>
+    <string name="ui_banner_tx_battery_title">Misurazione del consumo di batteria…</string>
+    <string name="ui_banner_tx_battery_body">In carica — non serve una stima della batteria.</string>
+    <string name="ui_banner_tx_one_voice_title">Tutte le parole come una sola voce</string>
+    <string name="ui_banner_tx_one_voice_body">Non è stato possibile distinguere le voci in questa registrazione.</string>
+    <string name="ui_banner_tx_checkpoint_mismatch_title">I progressi salvati non corrispondono più</string>
+    <string name="ui_banner_tx_checkpoint_mismatch_body">La registrazione o i modelli sono cambiati. La registrazione resta.</string>
+    <string name="ui_banner_tx_memory_title">Memoria insufficiente</string>
+    <string name="ui_banner_tx_memory_body">Chiudi altre app o prova una clip più breve.</string>
+    <string name="ui_banner_tx_failed_title">Trascrizione non riuscita</string>
+    <string name="ui_banner_tx_failed_body">%1$s La registrazione resta.</string>
+    <string name="ui_banner_tx_failed_body_plain">La registrazione resta.</string>
+
+    <string name="ui_banner_dl_downloading_body">%1$s di %2$s.</string>
+    <string name="ui_banner_dl_checking_title">Verifica dei file — %1$d%%</string>
+    <string name="ui_banner_dl_checking_body">Ogni file viene verificato prima dell’uso.</string>
+    <string name="ui_banner_dl_no_connection_title">Nessuna connessione</string>
+    <string name="ui_banner_dl_no_connection_body">Connettiti a internet e riprova. La registrazione funziona comunque.</string>
+    <string name="ui_banner_dl_stopped_title">Download interrotto</string>
+    <string name="ui_banner_dl_stopped_body">La connessione si è interrotta. Riprova per continuare da dove si è fermato.</string>
+    <string name="ui_banner_dl_no_space_title">Spazio insufficiente</string>
+    <string name="ui_banner_dl_no_space_body">Libera circa %1$s e riprova.</string>
+    <string name="ui_banner_dl_file_check_title">Verifica del file non riuscita</string>
+    <string name="ui_banner_dl_file_check_body">Il download era danneggiato ed è stato scartato.</string>
+    <string name="ui_banner_dl_install_failed_title">Impossibile completare l’installazione</string>
+    <string name="ui_banner_dl_install_failed_body">Riprova. Le registrazioni sono al sicuro.</string>
+    <string name="ui_banner_dl_record_now_title">Registra ora, trascrivi dopo</string>
+    <string name="ui_banner_dl_record_now_body">La trascrizione richiede un unico download. Intanto l’audio è al sicuro.</string>
+
+    <string name="ui_banner_lib_empty_title">Ancora nessuna nota</string>
+    <string name="ui_banner_lib_empty_body">Registra qualcosa o importa un file audio.</string>
+    <string name="ui_banner_lib_no_match_title">Nessun risultato per “%1$s”</string>
+    <string name="ui_banner_lib_no_match_body">Prova un’altra parola o un titolo.</string>
+    <string name="ui_banner_importing_title">Importazione di %1$s…</string>
+    <string name="ui_banner_import_too_large_title">File troppo grande</string>
+    <string name="ui_banner_import_too_large_body">Scegli un file sotto i 2 GB.</string>
+    <string name="ui_banner_import_no_space_title">Spazio insufficiente per importare</string>
+    <string name="ui_banner_import_no_space_body">Questo file richiede circa %1$s liberi. Libera spazio e riprova.</string>
+    <string name="ui_banner_import_wav_title">WAV non supportato</string>
+    <string name="ui_banner_import_wav_body">Usa un WAV PCM a 16 bit, oppure MP3, M4A o Opus.</string>
+    <string name="ui_banner_import_open_title">Impossibile aprire questo file</string>
+    <string name="ui_banner_import_open_body">Non sembra un audio che Cassini può leggere.</string>
+    <string name="ui_banner_no_encoder_title">Questo telefono non può creare file Cassini</string>
+    <string name="ui_banner_no_encoder_body_m4a">Non ha un codificatore Opus. Puoi comunque registrare (M4A) e aprire documenti.</string>
+    <string name="ui_banner_no_encoder_body">Non ha un codificatore Opus. Puoi comunque registrare e aprire documenti.</string>
+    <string name="ui_banner_notifications_off_title">Le notifiche sono disattivate</string>
+    <string name="ui_banner_notifications_off_body">I progressi si vedono solo nell’app.</string>
+    <string name="ui_banner_voices_unreadable_title">Impossibile leggere le voci salvate</string>
+    <string name="ui_banner_voices_unreadable_body">Sono state create da una versione più recente di Cassini o sono danneggiate. Non è stato modificato nulla.</string>
+</resources>

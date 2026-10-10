@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The dark bg token (docs/design/ui.md section 4.1). -->
+    <color name="ui_window_bg">#0F1214</color>
+    <!-- The dark ink token. -->
+    <color name="ui_logo_ink">#ECEEF1</color>
+</resources>
