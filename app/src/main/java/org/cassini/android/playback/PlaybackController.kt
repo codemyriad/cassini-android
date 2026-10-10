@@ -122,9 +122,14 @@ class PlaybackController(private val parts: Parts) {
             throw error
         } catch (_: Exception) {
             created.release()
+            if (noteId != id) return leftDuringReload(id, positionMs)
             release()
             mutableState.value = PlaybackState(noteId = id, failed = true)
             return false
+        }
+        if (noteId != id) {
+            created.release()
+            return leftDuringReload(id, positionMs)
         }
         created.seekTo(positionMs.coerceIn(0, created.durationMs))
         created.onCompletion(::onCompletion)
@@ -222,6 +227,16 @@ class PlaybackController(private val parts: Parts) {
     }
 
     // Helpers. ----------------------------------------------------------------------------------------------------
+
+    /**
+     * The note [id] was left (or another note opened) while [reload] prepared its file. That leave found no player,
+     * so it kept the focus and saved no position: do both here. The note keeps no player.
+     */
+    private fun leftDuringReload(id: String, positionMs: Long): Boolean {
+        if (player == null) release()
+        parts.scope.launch(parts.main) { saveNow(id, positionMs, final = true) }
+        return false
+    }
 
     private fun onCompletion() {
         val active = player ?: return

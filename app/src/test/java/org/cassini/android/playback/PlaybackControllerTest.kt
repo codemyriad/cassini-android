@@ -1,6 +1,8 @@
 package org.cassini.android.playback
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -23,6 +25,9 @@ class PlaybackControllerTest {
     private val platform = FakePlaybackPlatform()
     private val saves = mutableListOf<Save>()
 
+    /** When set, prepare waits for it (a long file). */
+    private var prepareGate: CompletableDeferred<Unit>? = null
+
     private data class Save(val noteId: String, val positionMs: Long, val final: Boolean)
 
     private fun TestScope.controller(): PlaybackController {
@@ -32,7 +37,7 @@ class PlaybackControllerTest {
             PlaybackController.Parts(
                 scope = backgroundScope,
                 main = dispatcher,
-                player = { FakePlayer(clock, DURATION_MS).also(players::add) },
+                player = { FakePlayer(clock, DURATION_MS) { prepareGate }.also(players::add) },
                 platform = platform,
                 store = { noteId, positionMs, final -> saves += Save(noteId, positionMs, final) },
                 clock = clock,
@@ -178,6 +183,27 @@ class PlaybackControllerTest {
         assertEquals(3_600L, playback.state.value.positionMs)
     }
 
+    @Test fun aNoteLeftWhileItsFileIsPreparedAgainKeepsNoPlayer() = runTest {
+        val playback = controller()
+        playback.open(NOTE, audio, positionMs = 0)
+        playback.play()
+        advanceTimeBy(3_000)
+        val gate = CompletableDeferred<Unit>()
+        prepareGate = gate
+        val reloaded = backgroundScope.async { playback.reload(File("document.opus")) }
+        runCurrent()
+
+        playback.leave()
+        gate.complete(Unit)
+        assertFalse(reloaded.await())
+        runCurrent()
+        assertTrue("the new player is released", players[1].released)
+        assertEquals(PlaybackState(), playback.state.value)
+        assertFalse(platform.focused)
+        assertFalse(platform.noisyWatched)
+        assertEquals(Save(NOTE, 3_000, final = true), saves.last())
+    }
+
     @Test fun aFileThatCannotBePlayedFails() = runTest {
         val playback = controller()
         assertFalse(playback.open(NOTE, File(FakePlayer.BROKEN), positionMs = 0))
@@ -194,7 +220,11 @@ class PlaybackControllerTest {
 }
 
 /** A player whose position advances with the virtual clock while it plays. */
-private class FakePlayer(private val clock: () -> Long, override val durationMs: Long) : AudioPlayer {
+private class FakePlayer(
+    private val clock: () -> Long,
+    override val durationMs: Long,
+    private val gate: () -> CompletableDeferred<Unit>? = { null },
+) : AudioPlayer {
     private var base = 0L
     private var startedAt: Long? = null
     private var completion: (() -> Unit)? = null
@@ -206,6 +236,7 @@ private class FakePlayer(private val clock: () -> Long, override val durationMs:
     override val playing: Boolean get() = startedAt != null
 
     override suspend fun prepare(file: File) {
+        gate()?.await()
         check(file.name != BROKEN) { "Cannot play $file" }
         this.file = file
     }
