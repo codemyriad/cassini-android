@@ -2,9 +2,12 @@ package org.cassini.data.notes
 
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import org.cassini.core.Failure
@@ -255,12 +258,40 @@ class ImportRepositoryTest {
         assertEquals(emptyList<String>(), noteDirs())
     }
 
+    @Test fun aCancelledImportLeavesNothingBehind() = runTest {
+        lateinit var job: Job
+        // The cancel arrives while the file is classified, so the import stops just after the rename to source.mp3.
+        val cancelling = AudioProbe { file ->
+            job.cancel()
+            probe.probe(file)
+        }
+        val importer = ImportRepository(
+            h.db,
+            h.paths,
+            h.dispatchers,
+            h.locks,
+            h.documents,
+            resolverSource,
+            cancelling,
+        ) { h.now }
+        val uri = input(fleurs("mp3"), "podcast.mp3")
+        job = launch(Dispatchers.Default, start = CoroutineStart.LAZY) { importer.import(uri) }
+
+        job.start()
+        job.join()
+
+        assertTrue(job.isCancelled)
+        assertEquals(emptyList<String>(), noteDirs())
+        assertEquals(0, h.db.notes().noteCount())
+    }
+
     @Test fun titlesAndExtensionsFollowTheDisplayName() {
         assertEquals("Meeting.final", ImportRepository.titleOf("Meeting.final.MP3"))
         assertEquals(".opus", ImportRepository.titleOf(".opus"))
         assertEquals("riunione", ImportRepository.titleOf("  riunione  "))
         assertEquals(ImportRepository.FALLBACK_TITLE, ImportRepository.titleOf(null))
         assertEquals(ImportRepository.FALLBACK_TITLE, ImportRepository.titleOf("   "))
+        assertEquals("Audio importato", ImportRepository.titleOf(null, "Audio importato"))
         assertEquals(200, ImportRepository.titleOf("x".repeat(300) + ".mp3").length)
         assertEquals("mp3", ImportRepository.extensionOf("Meeting.final.MP3", "audio/mpeg"))
         assertEquals("m4a", ImportRepository.extensionOf("voice", "audio/mp4a-latm"))

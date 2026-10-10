@@ -3,6 +3,7 @@ package org.cassini.data.notes
 import android.content.ContentResolver
 import android.net.Uri
 import android.provider.OpenableColumns
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import org.cassini.core.Failure
 import org.cassini.core.audio.Limits
@@ -99,6 +100,8 @@ class ImportRepository(
     private val source: ImportSource,
     private val probe: AudioProbe = AudioProbe.Extractor,
     private val limits: ImportLimits = ImportLimits(),
+    /** The title of a file without a usable name; the app passes its localized string. */
+    private val fallbackTitle: String = FALLBACK_TITLE,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val notes = database.notes()
@@ -124,7 +127,14 @@ class ImportRepository(
             // other notes, and a long copy must not hold up their writes.
             if (dir.mkdirs()) outcome = stage(uri, id, description, size)
         } finally {
-            if (outcome !is ImportOutcome.Created) locks.withNoteLock(id, dispatchers.io) { dir.deleteRecursively() }
+            // NonCancellable: a cancelled import must still delete what it copied. A row means the insert committed.
+            if (outcome !is ImportOutcome.Created) {
+                withContext(NonCancellable) {
+                    locks.withNoteLock(id, dispatchers.io) {
+                        if (notes.noteBlocking(id) == null) dir.deleteRecursively()
+                    }
+                }
+            }
         }
         return outcome
     }
@@ -147,7 +157,7 @@ class ImportRepository(
         val now = clock()
         val row = NoteEntity(
             id = id,
-            title = titleOf(name),
+            title = titleOf(name, fallbackTitle),
             createdAt = now,
             addedAt = now,
             origin = staged.origin,
@@ -254,7 +264,7 @@ class ImportRepository(
     private fun rejected(failure: Failure) = Classified.Rejected(ImportOutcome.Rejected(failure))
 
     companion object {
-        /** The title when the file has no usable name. */
+        /** The English title when the file has no usable name. */
         const val FALLBACK_TITLE = "Imported audio"
 
         private const val SOURCE_TMP = "source.tmp"
@@ -279,11 +289,14 @@ class ImportRepository(
             "audio/amr-wb" to "awb",
         )
 
-        /** The note title from a display name: the name without its extension, trimmed and cut to 200 characters. */
-        fun titleOf(displayName: String?): String {
+        /**
+         * The note title from a display name: the name without its extension, trimmed and cut to 200 characters;
+         * [fallback] when nothing is left.
+         */
+        fun titleOf(displayName: String?, fallback: String = FALLBACK_TITLE): String {
             val name = displayName?.trim().orEmpty()
             val stem = name.substringBeforeLast('.', name).ifBlank { name }
-            return NoteTitles.fit(stem) ?: FALLBACK_TITLE
+            return NoteTitles.fit(stem) ?: fallback
         }
 
         /**
