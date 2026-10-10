@@ -1,12 +1,12 @@
 # Test fixtures
 
-The `audio/` directory holds a short Italian speech clip. The device tests read this clip. No file in this directory comes from a real user. The directory has no voiceprints and no private recordings.
+The `audio/` directory holds a short Italian speech clip. The device tests and the `:data` unit tests read this clip. No file in this directory comes from a real user. The directory has no voiceprints and no private recordings.
 
 ## audio/
 
 `fleurs-it-short.{wav,m4a,mp3,opus}` is one recording from the Italian dev split of Google FLEURS (file `10017639081645832204.wav`, dataset revision `70bb2e84b976b7e960aa89f1c648e09c59f894dd`), licensed [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/). Attribution: Google FLEURS contributors. `fleurs-it-short.json` records the source, the reference text, the licence, the conversion and the SHA-256 of each file. The WAV is 16 kHz mono PCM; the other three are ffmpeg re-encodings of it. Nothing was cut or edited.
 
-`app/build.gradle.kts` adds this directory to the androidTest assets. Thus, a test opens `fleurs-it-short.wav` and the other files by name. `scripts/fetch-smoke-audio.py` makes the files again from the pinned revision. This script needs ffmpeg. The output of ffmpeg can change between versions. Before you commit new files, examine the diff.
+`app/build.gradle.kts` adds this directory to the androidTest assets. Thus, a test opens `fleurs-it-short.wav` and the other files by name. The `:data` unit tests (Robolectric) also read these files, through the `cassini.fixtures` property that `data/build.gradle.kts` sets. These tests use the length of the WAV: 253,440 frames (15.84 s). If you make the files again, do the `:data:testDebugUnitTest` tests again. `scripts/fetch-smoke-audio.py` makes the files again from the pinned revision. This script needs ffmpeg. The output of ffmpeg can change between versions. Before you commit new files, examine the diff.
 
 `.gitignore` ignores all other files in `audio/`. Thus, a recording that you copy into `audio/` does not go into a commit.
 
