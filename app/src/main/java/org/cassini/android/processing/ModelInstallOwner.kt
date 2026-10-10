@@ -138,13 +138,15 @@ class ModelInstallOwner(
     /**
      * Joins or starts the install of [parts]. False with the current install when another part set runs, or when the
      * current install is being cancelled: its fetch can block until the read timeout, and a new install must not fetch
-     * the same files at the same time. [current] is cleared only when that task has ended.
+     * the same files at the same time. [current] is cleared only when that task has ended. A task that was cancelled
+     * before its body ran never clears [current] itself: it is cleared here and on its completion.
      */
     private fun attach(
         parts: Set<ModelPart>,
         listener: (DownloadProgress) -> Unit,
         standalone: Boolean,
     ): Pair<Shared, Boolean> {
+        current?.takeIf { it.task.isCompleted }?.let(::release)
         val running = current
         if (running != null && (!running.task.isActive || running.parts != parts)) return running to false
         val shared = running ?: Shared(parts)
@@ -154,6 +156,8 @@ class ModelInstallOwner(
         if (running == null) {
             shared.task = scope.async(io, CoroutineStart.LAZY) { run(shared) }
             current = shared
+            // A LAZY task cancelled before its dispatch never enters run(): its finally does not clear the owner.
+            shared.task.invokeOnCompletion { scope.launch(NonCancellable) { mutex.withLock { release(shared) } } }
             shared.task.start()
         }
         publishState(shared)
@@ -190,14 +194,16 @@ class ModelInstallOwner(
         } finally {
             withContext(NonCancellable) {
                 models.refresh()
-                mutex.withLock {
-                    if (current === shared) {
-                        current = null
-                        mutableState.value = InstallState.Idle
-                    }
-                }
+                mutex.withLock { release(shared) }
             }
         }
+    }
+
+    /** Clears [current] when it is [shared] (under the mutex): the owner is Idle until the next install. */
+    private fun release(shared: Shared) {
+        if (current !== shared) return
+        current = null
+        mutableState.value = InstallState.Idle
     }
 
     private fun publishState(shared: Shared) {

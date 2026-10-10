@@ -4,6 +4,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
@@ -38,6 +39,7 @@ import java.io.File
 import java.io.RandomAccessFile
 import java.util.Collections
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -185,6 +187,31 @@ class ModelInstallOwnerTest {
         withTimeout(WAIT_MS) { owner.state.first { it == InstallState.Idle } }
         assertTrue(interrupted.get())
         assertEquals(listOf(key(ModelCatalog.PARAKEET)), fetched.toList())
+    }
+
+    @Test fun anInstallCancelledBeforeItsBodyRunsLeavesTheOwnerIdle() = runBlocking<Unit> {
+        // The only IO thread is busy, so the install is cancelled before its body is dispatched.
+        val gate = CountDownLatch(1)
+        val io = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+        io.executor.execute { gate.await(WAIT_S, TimeUnit.SECONDS) }
+        try {
+            val gated = ModelInstallOwner(models, paths.modelRoot, { true }, scope, io)
+            val download = gated.startDownload(setOf(ModelPart.SPEECH))
+            withTimeout(WAIT_MS) { gated.state.first { it is InstallState.Installing } }
+            gated.cancel()
+            gate.countDown()
+            withTimeout(WAIT_MS) { download.join() }
+            withTimeout(WAIT_MS) { gated.state.first { it == InstallState.Idle } }
+            assertTrue("the cancelled install fetched nothing", fetched.isEmpty())
+
+            release.countDown()
+            assertEquals(InstallOutcome.Installed(), withTimeout(WAIT_MS) { gated.install(setOf(ModelPart.SPEECH)) })
+            assertEquals(ModelPart.SPEECH.models.map(::key).sorted(), fetched.sorted())
+            withTimeout(WAIT_MS) { gated.state.first { it == InstallState.Idle } }
+        } finally {
+            gate.countDown()
+            io.close()
+        }
     }
 
     @Test fun downloadErrorsAndProgressMapToTheModelStatus() {
