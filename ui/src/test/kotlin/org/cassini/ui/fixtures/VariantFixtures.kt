@@ -543,7 +543,6 @@ internal object VariantFixtures {
     private val merge = MergeUi(
         sourceId = b.readSpeaker3.speakerId,
         source = SpeakerNameUi.Placeholder(3),
-        sourceTone = SpeakerTone.Amber,
         targets = mergeTargets,
         sealed = MergeVersionsUi(shown = 2, added = 3),
     )

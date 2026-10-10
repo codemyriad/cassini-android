@@ -11,13 +11,12 @@ import org.cassini.ui.theme.SpeakerTone
  * for that target. [sealed] names the versions of a sealed document ("This adds version <added>; version <shown>
  * stays available."); null means the draft ("This changes the draft.").
  *
- * [source] and [sourceTone] are additions to ui.md section 7: the sheet title and the confirmation name speaker A.
+ * [sourceId] and [source] are additions to ui.md section 7: the sheet title and the confirmation name speaker A.
  */
 @Immutable
 data class MergeUi(
     val sourceId: String,
     val source: SpeakerNameUi,
-    val sourceTone: SpeakerTone,
     val targets: ImmutableList<MergeTargetUi>,
     val confirm: MergeTargetUi? = null,
     val sealed: MergeVersionsUi? = null,
