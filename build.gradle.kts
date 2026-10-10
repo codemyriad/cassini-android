@@ -19,6 +19,7 @@ detekt {
     source.setFrom(
         files(
             "app/src/main/java",
+            "app/src/debug/java",
             "app/src/test/java",
             "app/src/androidTest/java",
             "core/src/main/kotlin",

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds only: the entry points of scripts/device-kill-resume.sh (docs/architecture.md section 9). -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Exported so that adb shell am start reaches it; a release build has no such entry point. A visible
+             start is also what lets it start the processing service on Android 12 and later. -->
+        <activity android:name=".debug.DebugCommandActivity" android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" android:excludeFromRecents="true" />
+        <!-- Starts the status writer in every process of a debug-root run, also one that Android starts for a
+             redelivered service intent. -->
+        <provider android:name=".debug.DebugStatusProvider" android:authorities="org.cassini.android.debugstatus"
+            android:exported="false" />
+    </application>
+</manifest>
