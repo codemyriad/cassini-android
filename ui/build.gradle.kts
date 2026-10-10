@@ -1,7 +1,8 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
-// The Compose design system and the stateless screens (docs/design/ui.md). Depends only on Compose and
-// kotlinx-collections-immutable: never on :core, :data, :engine or :app.
+// The Compose design system and the stateless screens (docs/design/ui.md). Depends only on Compose,
+// activity-compose (BackHandler; docs/ui-fidelity.md, contract change 1) and kotlinx-collections-immutable:
+// never on :core, :data, :engine or :app.
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)

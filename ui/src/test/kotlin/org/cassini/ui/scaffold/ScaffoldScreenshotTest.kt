@@ -43,8 +43,9 @@ import org.robolectric.annotation.GraphicsMode
 /**
  * The P2 proof that Roborazzi with Robolectric native graphics works in this AGP 9 library module, and that a
  * transcript paragraph can be one Text whose words are LinkAnnotation.Clickable spans with the active word
- * highlighted behind the glyphs (docs/design/ui.md, section 10.1). The screens in later phases replace these
- * placeholders; the goldens live in src/test/screenshots/scaffold.
+ * highlighted behind the glyphs (docs/design/ui.md, section 10.1). It stays as the smallest check of that set-up:
+ * when a Roborazzi, Robolectric or AGP update breaks capture, this test fails first and is easy to read. The
+ * screens have their own goldens; these live in src/test/screenshots/scaffold.
  *
  * ui.md section 10.1 also asks for one enableAccessibilityChecks() test here. It cannot run: under Robolectric the
  * Compose rule logs "Accessibility checks are currently not supported by Robolectric" and checks nothing. The

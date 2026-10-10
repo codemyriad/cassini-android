@@ -17,7 +17,8 @@ import org.cassini.ui.theme.Glyph
 
 /*
  * Content shown in the sheet, dialog and menu frames and in their real windows (OverlayScreenshotTest). The sheet is
- * board 06's Note actions copy; its own screen comes in P8.
+ * a fixed copy of board 06's Note actions. It tests only the generic frames: the production sheet is
+ * note/NoteActionsSheet.kt, which NoteScreen and library/LibraryOverlays.kt open.
  */
 
 /** Board 06's sheet content: padding 10/12/20 (the handle holds the 10), title, meta and the rows. */
