@@ -76,8 +76,9 @@ enum class DestructiveTextButtonSize(val visual: Dp, val padding: Dp) { Header(4
 
 /**
  * The pill every button of the table draws. The clickable node is laid out at 48 dp at least ([touchTarget]); the
- * board visual of [visual] dp is centred inside and carries the clipped ripple. Disabled draws at 38 % alpha; [busy]
- * hides the label behind a 16 dp spinner and keeps the width. [fillWidth] stretches the visual to the full width.
+ * board visual of [visual] dp is centred inside and carries the clipped ripple in [textColor]. Disabled draws at
+ * 38 % alpha; [busy] hides the label behind a 16 dp spinner and keeps the width. [fillWidth] stretches the visual to the
+ * full width.
  */
 @Composable
 @Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod") // One shared body for the whole table.
@@ -127,7 +128,7 @@ private fun PillButton(
                 .clip(shape)
                 .background(fill)
                 .then(if (border != null) Modifier.border(BorderStroke(1.dp, border), shape) else Modifier)
-                .indication(interaction, ripple())
+                .indication(interaction, ripple(color = textColor))
                 .padding(horizontal = padding),
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically,

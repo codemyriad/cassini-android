@@ -87,7 +87,7 @@ private fun OutlineChip(text: String, onClick: () -> Unit, modifier: Modifier, g
                 .clip(shape)
                 .background(c.surface)
                 .border(1.dp, c.line2, shape)
-                .indication(interaction, ripple())
+                .indication(interaction, ripple(color = c.ink))
                 .padding(start = if (leading) 10.dp else 12.dp, end = if (leading) 12.dp else 10.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,

@@ -111,7 +111,7 @@ fun RecordingControls(
                         .size(56.dp)
                         .clip(CircleShape)
                         .border(1.dp, rec.line, CircleShape)
-                        .indication(interaction, ripple()),
+                        .indication(interaction, ripple(color = rec.text)),
                     contentAlignment = Alignment.Center,
                 ) {
                     CassiniIcon(Glyph.List, 22.dp, 1.8f, rec.text, null)
@@ -128,7 +128,7 @@ fun RecordingControls(
                         .size(56.dp)
                         .clip(CircleShape)
                         .background(rec.finish)
-                        .indication(interaction, ripple()),
+                        .indication(interaction, ripple(color = rec.text)),
                     contentAlignment = Alignment.Center,
                 ) {
                     Box(
@@ -170,7 +170,12 @@ private fun PauseResumeButton(paused: Boolean, onClick: () -> Unit) {
             .size(88.dp)
             .clip(CircleShape)
             .background(rec.pauseFill)
-            .clickable(role = Role.Button, onClick = onClick)
+            .clickable(
+                interactionSource = null,
+                indication = ripple(color = rec.onPause),
+                role = Role.Button,
+                onClick = onClick,
+            )
             .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) {

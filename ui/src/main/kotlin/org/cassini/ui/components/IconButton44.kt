@@ -67,7 +67,7 @@ fun IconButton44(
             modifier = Modifier
                 .size(visual)
                 .clip(CircleShape)
-                .indication(interaction, ripple()),
+                .indication(interaction, ripple(color = color)),
             contentAlignment = Alignment.Center,
         ) {
             CassiniIcon(glyph, iconSize, stroke, color, contentDescription)

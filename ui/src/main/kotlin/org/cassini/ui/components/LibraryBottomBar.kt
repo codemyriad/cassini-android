@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,28 +76,18 @@ fun RecordFab(onClick: () -> Unit, modifier: Modifier = Modifier, recordingElaps
             )
             .clip(shape)
             .background(c.red)
-            .clickable(role = Role.Button, onClick = onClick)
+            .clickable(
+                interactionSource = null,
+                indication = ripple(color = c.onRed),
+                role = Role.Button,
+                onClick = onClick,
+            )
             .clearAndSetSemantics { contentDescription = description }
             .padding(start = 22.dp, end = 26.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            Modifier
-                .size(18.dp)
-                .clip(CircleShape)
-                .background(c.onRed),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (recordingElapsedMs != null) {
-                Box(
-                    Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(c.red),
-                )
-            }
-        }
+        FabDot(live = recordingElapsedMs != null)
         Text(
             text = label,
             style = CassiniTheme.type.fab,
@@ -104,6 +95,28 @@ fun RecordFab(onClick: () -> Unit, modifier: Modifier = Modifier, recordingElaps
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+    }
+}
+
+/** The Record button's 18 dp white circle; while a recording runs ([live]) it holds an 8 dp red dot. */
+@Composable
+private fun FabDot(live: Boolean) {
+    val c = CassiniTheme.colors
+    Box(
+        Modifier
+            .size(18.dp)
+            .clip(CircleShape)
+            .background(c.onRed),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (live) {
+            Box(
+                Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(c.red),
+            )
+        }
     }
 }
 

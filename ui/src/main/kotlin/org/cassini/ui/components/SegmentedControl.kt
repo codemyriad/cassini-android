@@ -75,7 +75,7 @@ fun SegmentedControl(
                         .heightIn(min = 44.dp)
                         .clip(CassiniTheme.shapes.segment)
                         .background(if (selected) c.inkFill else Color.Transparent)
-                        .indication(interaction, ripple())
+                        .indication(interaction, ripple(color = if (selected) c.onInkFill else c.ink))
                         .padding(horizontal = 4.dp),
                     contentAlignment = Alignment.Center,
                 ) {

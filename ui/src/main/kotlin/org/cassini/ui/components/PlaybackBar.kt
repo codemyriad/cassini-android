@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -143,7 +144,12 @@ fun PlayPauseButton(playing: Boolean, onClick: () -> Unit, modifier: Modifier = 
             .size(64.dp)
             .clip(CircleShape)
             .background(c.inkFill)
-            .clickable(role = Role.Button, onClick = onClick)
+            .clickable(
+                interactionSource = null,
+                indication = ripple(color = c.onInkFill),
+                role = Role.Button,
+                onClick = onClick,
+            )
             .semantics {
                 contentDescription = description
                 stateDescription = state

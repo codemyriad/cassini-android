@@ -125,7 +125,7 @@ fun CassiniSnackbar(
                     modifier = Modifier
                         .height(44.dp)
                         .clip(CassiniTheme.shapes.pill)
-                        .indication(interaction, ripple())
+                        .indication(interaction, ripple(color = c.snackbarAction))
                         .padding(horizontal = 14.dp),
                     contentAlignment = Alignment.Center,
                 ) {

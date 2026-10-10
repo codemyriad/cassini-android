@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +54,9 @@ fun RecordingBannerCard(
             .clip(CassiniTheme.shapes.card)
             .background(rec.bg)
             .clickable(
+                interactionSource = null,
+                // rec.bg is dark in both themes: the theme's ink ripple would not show.
+                indication = ripple(color = rec.text),
                 onClickLabel = stringResource(R.string.ui_library_return_to_recording),
                 role = Role.Button,
                 onClick = onClick,
