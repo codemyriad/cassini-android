@@ -88,6 +88,40 @@ class DocumentRepository(
     }
 
     /**
+     * [read] for a worker thread (the job's `JobStorage.existingDocumentBlocking`): the document in any state, or null
+     * when the note has no `document.opus`. Reentrant: the job calls it while it holds the note's lock for the seal.
+     */
+    @WorkerThread
+    fun readBlocking(noteId: String): CassiniDocument? {
+        Threads.assertOffMain("DocumentRepository.readBlocking")
+        return locks.withNoteLockBlocking(noteId) {
+            val file = documentFile(noteId)
+            DocumentSignature.of(file)?.let { readLocked(file, it) }
+        }
+    }
+
+    /**
+     * Marks the job output `work/sealed.opus`, which the job wrote and verified itself, as complete: writes the
+     * `work/sealed` marker, fsynced with the directory. [document] is the verified read that `CassiniDocument.create`
+     * returned for that file; it is remembered by signature, so the adopt that follows does not read and hash the
+     * file again. Fails when `sealed.opus` is missing. For the inference thread.
+     */
+    @WorkerThread
+    fun markSealedBlocking(noteId: String, document: CassiniDocument) {
+        Threads.assertOffMain("DocumentRepository.markSealedBlocking")
+        locks.withNoteLockBlocking(noteId) {
+            val work = paths.work(noteId)
+            val sealed = File(work, NoteFiles.SEALED)
+            val signature = DocumentSignature.of(sealed) ?: throw IOException("${sealed.name} is missing")
+            lru.put(signature, document)
+            val marker = File(work, NoteFiles.SEALED_MARKER)
+            marker.createNewFile()
+            NoteFiles.syncFile(marker)
+            NoteFiles.syncDirectory(work)
+        }
+    }
+
+    /**
      * Brings the cache rows of a note in step with its document. When the file's signature equals
      * `notes.document_signature` and every readable variant has its words cached, nothing is read ([RefreshOutcome.Fresh]).
      * Otherwise the document is read once and every cache row is written in one transaction with the new signature.

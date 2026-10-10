@@ -224,8 +224,15 @@ class ModelRepository(
         return InstallResult(part, skipped)
     }
 
-    /** Installs one model; false when a best-effort extra failed (and was skipped). */
-    private fun installOne(part: ModelPart, model: ModelDescriptor, progress: (Long, Boolean) -> Unit): Boolean = try {
+    /**
+     * Installs one [model] through the [fetcher], with no status update: deletes its marker, fetches and verifies its
+     * files (resuming `.part` files), then writes the marker. [progress] gets the bytes of the model's download and
+     * whether they are being checked. Any failure is thrown: a [UserFacingException] (an I/O error becomes DOWNLOAD).
+     * For the app's `ModelInstaller` store, which decides itself what is best effort, on an IO thread.
+     */
+    @WorkerThread
+    fun installModelBlocking(model: ModelDescriptor, progress: (Long, Boolean) -> Unit) {
+        Threads.assertOffMain("ModelRepository.installModelBlocking")
         val directory = model.directory(paths.modelRoot)
         directory.mkdirs()
         val marker = File(directory, model.markerFile)
@@ -236,6 +243,11 @@ class ModelRepository(
             throw UserFacingException(Failure.DOWNLOAD, error.message ?: "I/O").apply { initCause(error) }
         }
         marker.writeText(model.markerValue)
+    }
+
+    /** Installs one model; false when a best-effort extra failed (and was skipped). */
+    private fun installOne(part: ModelPart, model: ModelDescriptor, progress: (Long, Boolean) -> Unit): Boolean = try {
+        installModelBlocking(model, progress)
         true
     } catch (error: UserFacingException) {
         if (model == part.primary || error.failure == Failure.CANCELLED) throw error

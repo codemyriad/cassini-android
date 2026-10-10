@@ -249,25 +249,33 @@ class VoiceRepository(
      * (architecture 5.2 rule 8). The sealed prints of the note and its links stay. Returns false when a file could
      * not be deleted.
      */
-    suspend fun discardPending(noteId: String): Boolean {
+    suspend fun discardPending(noteId: String): Boolean =
+        withContext(dispatchers.io) { discardPendingBlocking(noteId) }
+
+    /** [discardPending] for the inference thread: a seal without prints deletes an older pending file. */
+    @WorkerThread
+    fun discardPendingBlocking(noteId: String): Boolean {
+        Threads.assertOffMain("VoiceRepository.discardPendingBlocking")
         val pending = pendingFile(noteId)
-        return withContext(dispatchers.io) {
-            locked(pending) { leftovers(pending).all { !it.exists() || it.delete() } }
-        }
+        return locked(pending) { leftovers(pending).all { !it.exists() || it.delete() } }
+    }
+
+    /** [prints] for the inference thread (Transcribe again carries the sealed names over). */
+    @WorkerThread
+    fun printsBlocking(noteId: String, variantId: String): Map<String, SpeakerPrint> {
+        Threads.assertOffMain("VoiceRepository.printsBlocking")
+        val file = notesFile(noteId)
+        val prefix = NoteVoiceCodec.prefix(variantId)
+        return locked(file) { (files.readNote(file) as? FileRead.Loaded)?.value?.prints.orEmpty() }
+            .filterKeys { it.startsWith(prefix) }
+            .mapKeys { it.key.removePrefix(prefix) }
     }
 
     // A sealed note's prints, for the Note screen.
 
     /** The prints of [variantId] of [noteId] by speaker id; empty without a readable file. */
-    suspend fun prints(noteId: String, variantId: String): Map<String, SpeakerPrint> {
-        val file = notesFile(noteId)
-        val prefix = NoteVoiceCodec.prefix(variantId)
-        return withContext(dispatchers.io) {
-            locked(file) { (files.readNote(file) as? FileRead.Loaded)?.value?.prints.orEmpty() }
-                .filterKeys { it.startsWith(prefix) }
-                .mapKeys { it.key.removePrefix(prefix) }
-        }
-    }
+    suspend fun prints(noteId: String, variantId: String): Map<String, SpeakerPrint> =
+        withContext(dispatchers.io) { printsBlocking(noteId, variantId) }
 
     /** Sets (or with null clears) the match of one speaker print. False when there is no such print to change. */
     suspend fun setMatch(noteId: String, variantId: String, speakerId: String, match: Match?): Boolean {
