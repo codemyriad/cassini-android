@@ -8,7 +8,8 @@ import org.cassini.android.R
 
 /**
  * The notification channels (architecture 5.10): [RECORDING] and [PROCESSING] are LOW, [RESULTS] is DEFAULT and
- * silent. Created at every process start, which also renames them after a language change. The names come from
+ * silent. [RESULTS] carries the transcription results and the recording alerts, and its name says both. Created at
+ * every process start, which also renames them after a language change. The names come from
  * `ContextCompat.getContextForLanguage`, so they follow the app language also below API 33.
  */
 object NotificationChannels {

@@ -235,7 +235,7 @@
     <string name="battery_unavailable">Battery estimate unavailable</string>
     <string name="import_fallback_title">Imported audio</string>
     <string name="notif_channel_processing">Transcription</string>
-    <string name="notif_channel_results">Finished transcriptions</string>
+    <string name="notif_channel_results">Transcription and recording updates</string>
     <!-- Processing notifications (features.md section 12). -->
     <string name="notif_processing_title">Transcribing “%1$s”</string>
     <string name="notif_processing_idle">Preparing transcription…</string>

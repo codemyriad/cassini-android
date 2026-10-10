@@ -152,7 +152,10 @@ class ProcessingNotificationsLocaleTest {
         NotificationChannels.create(context)
         val manager = context.getSystemService(NotificationManager::class.java)
         assertEquals("Trascrizione", manager.getNotificationChannel(NotificationChannels.PROCESSING).name)
-        assertEquals("Trascrizioni completate", manager.getNotificationChannel(NotificationChannels.RESULTS).name)
+        assertEquals(
+            "Aggiornamenti su trascrizioni e registrazioni",
+            manager.getNotificationChannel(NotificationChannels.RESULTS).name,
+        )
     }
 
     /** What `AppCompatDelegate.setApplicationLocales` writes below API 33 (`AppLocalesStorageHelper`). */

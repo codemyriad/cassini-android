@@ -233,7 +233,7 @@
     <string name="battery_unavailable">Stima batteria non disponibile</string>
     <string name="import_fallback_title">Audio importato</string>
     <string name="notif_channel_processing">Trascrizione</string>
-    <string name="notif_channel_results">Trascrizioni completate</string>
+    <string name="notif_channel_results">Aggiornamenti su trascrizioni e registrazioni</string>
     <!-- Notifiche dell'elaborazione (features.md sezione 12). -->
     <string name="notif_processing_title">Trascrizione di “%1$s”</string>
     <string name="notif_processing_idle">Preparazione della trascrizione…</string>
