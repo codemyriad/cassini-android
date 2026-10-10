@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
+import org.cassini.core.Failure
 import org.cassini.core.checkpoint.CheckpointNames
 import org.cassini.core.models.ModelCatalog
 import org.cassini.core.speakers.Match
@@ -98,7 +99,7 @@ class VoiceRepository(
     /** Renames a saved person. Names already written into notes stay as they are. */
     suspend fun rename(voiceId: String, name: String): VoiceEdit {
         val clean = name.trim().takeIf { it.isNotEmpty() && it.length <= MAX_NAME_LENGTH } ?: return VoiceEdit.Invalid
-        return withContext(dispatchers.io) {
+        return writing(VoiceEdit.Failed(Failure.SAVE)) {
             locked(paths.people) {
                 val current = peopleLocked()
                 when {
@@ -116,18 +117,19 @@ class VoiceRepository(
     /**
      * Forgets one person: removes them from `people.json`, removes their matches from every sealed and pending
      * per-note file (and so from the links), and from the live matches, Remember choices and automatic names of every
-     * draft. Names already in notes stay.
+     * draft. Names already in notes stay. The matches go before the person, so a failed write leaves the person
+     * saved and Forget can run again.
      */
     suspend fun forget(voiceId: String): VoiceEdit {
-        val edit = withContext(dispatchers.io) {
+        val edit = writing(VoiceEdit.Failed(Failure.SAVE)) {
             locked(paths.people) {
                 val current = peopleLocked()
                 when {
                     current.readOnly -> VoiceEdit.ReadOnly
                     current.voices.none { it.id == voiceId } -> VoiceEdit.NotFound
                     else -> {
-                        savePeopleLocked(current.voices.filter { it.id != voiceId })
                         scrubLocked(voiceId)
+                        savePeopleLocked(current.voices.filter { it.id != voiceId })
                         VoiceEdit.Done
                     }
                 }
@@ -144,19 +146,23 @@ class VoiceRepository(
      * keeps no print and no match.
      */
     suspend fun forgetEveryone(): VoiceEdit {
-        val next = withContext(dispatchers.io) {
-            locked(paths.generation) { locked(paths.people) { forgetEveryoneLocked() } }
-        } ?: return VoiceEdit.ReadOnly
-        names.mutateAll { draft ->
-            draft.copy(
-                remembered = emptyMap(),
-                automatic = emptyMap(),
-                live = emptyMap(),
-                rejected = emptyMap(),
-                generation = next,
-            )
+        var next: Long? = null
+        val edit = writing<VoiceEdit>(VoiceEdit.Failed(Failure.SAVE)) {
+            next = locked(paths.generation) { locked(paths.people) { forgetEveryoneLocked() } }
+            if (next == null) VoiceEdit.ReadOnly else VoiceEdit.Done
         }
-        return VoiceEdit.Done
+        next?.let { generation ->
+            names.mutateAll { draft ->
+                draft.copy(
+                    remembered = emptyMap(),
+                    automatic = emptyMap(),
+                    live = emptyMap(),
+                    rejected = emptyMap(),
+                    generation = generation,
+                )
+            }
+        }
+        return edit
     }
 
     // The job and adopt.
@@ -268,12 +274,12 @@ class VoiceRepository(
     /**
      * "Remember this voice" on a sealed note: enrols the print of [speakerId] into [voiceId] (a new person when null
      * or unknown) called [name], and marks the print CONFIRMED. Returns the saved person, or null when there is no
-     * print or `people.json` is read-only.
+     * print, `people.json` is read-only or a file could not be written.
      */
     suspend fun enrol(noteId: String, variantId: String, speakerId: String, voiceId: String?, name: String): Voice? {
         val file = notesFile(noteId)
         val key = NoteVoiceCodec.prefix(variantId) + speakerId
-        return withContext(dispatchers.io) {
+        return writing(null) {
             locked(paths.people) { locked(file) { enrolLocked(noteId, key, voiceId, name.trim()) } }
         }
     }
@@ -285,7 +291,7 @@ class VoiceRepository(
     suspend fun unenrol(noteId: String, variantId: String, speakerId: String): UnenrolOutcome {
         val file = notesFile(noteId)
         val key = NoteVoiceCodec.prefix(variantId) + speakerId
-        val (outcome, forgotten) = withContext(dispatchers.io) {
+        val (outcome, forgotten) = writing(UnenrolOutcome.Failed(Failure.SAVE) to null) {
             locked(paths.people) {
                 // The scrub takes pending locks, so it runs after the note's file lock is released.
                 locked(file) { unenrolLocked(noteId, key) }.also { (_, gone) -> gone?.let(::scrubLocked) }
@@ -297,12 +303,26 @@ class VoiceRepository(
 
     // Locked helpers. Each runs with the locks its caller took, in the documented order.
 
-    private fun peopleLocked(): Book = book.value ?: when (val read = files.readPeople(paths.people)) {
+    /** Runs [block] on IO; an I/O error while it writes a voice file gives [failed] (architecture 4, shared rules). */
+    private suspend fun <T> writing(failed: T, block: () -> T): T = withContext(dispatchers.io) {
+        try {
+            block()
+        } catch (error: IOException) {
+            Log.w(TAG, "Cannot write a voice file", error)
+            failed
+        }
+    }
+
+    /** `people.json` as cached; a file that could not be read is read again, as the error may have passed. */
+    private fun peopleLocked(): Book =
+        book.value?.takeIf { it.problem != VoiceProblem.UNREADABLE } ?: readPeopleLocked().also { book.value = it }
+
+    private fun readPeopleLocked(): Book = when (val read = files.readPeople(paths.people)) {
         FileRead.Missing -> Book(emptyList(), null)
         is FileRead.Loaded -> Book(read.value, null)
         is FileRead.Kept -> Book(emptyList(), read.problem)
         is FileRead.Damaged -> Book(emptyList(), VoiceProblem.DAMAGED)
-    }.also { book.value = it }
+    }
 
     private fun savePeopleLocked(voices: List<Voice>) {
         files.writePeople(paths.people, voices)

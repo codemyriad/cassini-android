@@ -1,5 +1,6 @@
 package org.cassini.data.voices
 
+import org.cassini.core.Failure
 import org.cassini.core.speakers.Voice
 
 /** One saved person as Saved voices lists it (features.md section 10). */
@@ -36,6 +37,9 @@ sealed interface VoiceEdit {
 
     /** The name is blank or longer than [VoiceRepository.MAX_NAME_LENGTH] after trimming. */
     data object Invalid : VoiceEdit
+
+    /** A voice file could not be written (full disk, I/O error); try again. */
+    data class Failed(val failure: Failure) : VoiceEdit
 }
 
 /** The result of `adoptPending`. */
@@ -71,4 +75,7 @@ sealed interface UnenrolOutcome {
     data object NothingToUndo : UnenrolOutcome
 
     data object ReadOnly : UnenrolOutcome
+
+    /** A voice file could not be written (full disk, I/O error); try again. */
+    data class Failed(val failure: Failure) : UnenrolOutcome
 }

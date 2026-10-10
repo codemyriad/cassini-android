@@ -2,6 +2,7 @@ package org.cassini.data.voices
 
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import org.cassini.core.Failure
 import org.cassini.core.library.JobKind
 import org.cassini.core.library.JobState
 import org.cassini.core.models.ModelCatalog
@@ -278,6 +279,28 @@ class VoiceRepositoryTest {
         assertEquals(1, stale.droppedMatches)
         assertNull(sealedPrints(sealedId).getValue("new/S1").match)
         assertEquals(listOf(anna.id), people().voices.map { it.id })
+    }
+
+    @Test fun anUnreadablePeopleFileIsReadAgainAndAWriteErrorIsAnOutcome() = runTest {
+        writePeople(luca)
+        assertTrue(h.paths.people.setReadable(false))
+        assertEquals(VoiceProblem.UNREADABLE, people().problem)
+        assertEquals(VoiceEdit.ReadOnly, voices.rename(luca.id, "Luca B."))
+
+        // The error passed: the next edit reads the file again.
+        assertTrue(h.paths.people.setReadable(true))
+        // AtomicFile cannot write in a directory that is read-only.
+        val directory = checkNotNull(h.paths.people.parentFile)
+        assertTrue(directory.setWritable(false))
+        try {
+            assertEquals(VoiceEdit.Failed(Failure.SAVE), voices.rename(luca.id, "Luca B."))
+            assertEquals(VoiceEdit.Failed(Failure.SAVE), voices.forget(luca.id))
+        } finally {
+            directory.setWritable(true)
+        }
+
+        assertEquals(VoiceEdit.Done, voices.rename(luca.id, "Luca B."))
+        assertEquals(listOf("Luca B."), people().voices.map { it.name })
     }
 
     @Test fun aNewerPeopleFileStaysReadOnly() = runTest {
