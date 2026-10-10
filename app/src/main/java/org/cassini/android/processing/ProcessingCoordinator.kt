@@ -274,12 +274,13 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
     suspend fun cancel(noteId: String, discard: Boolean): Boolean {
         val catalogue = graph.awaitCatalogue()
         val current = queueLock.withLock {
-            active?.takeIf { it.noteId == noteId } ?: run {
-                if (discard) discardWork(catalogue, noteId)
-                null
-            }
+            // The flag is set under the lock: the outcome is written under it too, so it always sees the flag.
+            active?.takeIf { it.noteId == noteId }?.also { it.cancel = if (discard) Cancel.DISCARD else Cancel.KEEP }
+                ?: run {
+                    if (discard) discardWork(catalogue, noteId)
+                    null
+                }
         } ?: return false
-        current.cancel = if (discard) Cancel.DISCARD else Cancel.KEEP
         current.run.cancel(CancellationException("Cancelled by the coordinator"))
         current.finished.await()
         return true
