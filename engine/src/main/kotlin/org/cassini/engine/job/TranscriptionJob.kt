@@ -869,7 +869,7 @@ class TranscriptionJob(
         const val LIVE_MIN_SECONDS = 4.0
         const val LIVE_STEP_SECONDS = 10.0
 
-        /** Any header that does not read as Ogg Opus means "re-encode", as 0.1.0 `DocumentStore.hasOpusAudio`. */
+        /** Any header that does not read as Ogg Opus means "re-encode", as in the 0.1.0 document store. */
         @Suppress("TooGenericExceptionCaught", "SwallowedException")
         fun isOpus(file: File): Boolean = try {
             file.inputStream().use { OggOpus.headers(it) }

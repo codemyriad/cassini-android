@@ -356,7 +356,7 @@ The script fails in two conditions. A "package only" group has a difference, or 
 3. Record the diff as reviewed with `scripts/check-verbatim.sh --update GROUP`.
 4. Commit the baseline together with the change.
 
-The script shows the restructured groups (`Models`, `ProcessingCheckpoint`) for reference, but it does not compare them.
+The script shows the restructured groups (the models and the checkpoint) for reference, but it does not compare them.
 
 ## Continuous integration
 

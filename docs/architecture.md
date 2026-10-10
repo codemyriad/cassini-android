@@ -54,7 +54,7 @@ Hard constraints:
   - Network access only for model downloads, only to the three model hosts (huggingface.co, github.com, dist.gocassini.com) and the download hosts they redirect to, which `ArtifactFetcher` checks against an allow-list (section 5.6). `PRIVACY.md` lists both.
 - Native runtime: `minSdk 26`; ABIs `arm64-v8a` and `x86_64` (16 KB aligned); the custom sherpa-onnx AAR built from the pinned fork plus `scripts/streaming-diarization.patch`; `libcassini_opus.so`.
 - Android stays native Kotlin. The iOS app is separate Swift code and shares only the portable format.
-- `applicationId org.cassini.android` and the JNI class name `org.cassini.android.NativeOpus` do not change. The second one is bound to native symbols. The `.LibraryActivity` launcher alias of the old plan is not needed (no installed shortcuts).
+- `applicationId org.cassini.android` and the JNI class name `org.cassini.android.NativeOpus` do not change. The second one is bound to native symbols. The old plan kept a launcher alias for the 0.1.0 library activity. It is not needed (no installed shortcuts).
 - UI stack: Jetpack Compose with Material 3 components underneath, styled entirely by the Cassini tokens (no stock Material look, no dynamic colour). ViewModel + `StateFlow` + unidirectional data flow. Coroutines. Manual dependency injection (`AppGraph`).
 - English and Italian. TalkBack support, 48 dp touch targets, state never shown by colour alone, a light theme as designed and a derived dark theme, edge-to-edge and predictive back with targetSdk 36 (from P10).
 

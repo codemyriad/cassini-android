@@ -90,7 +90,7 @@ data class CheckpointState(
         fun signature(file: File?): String = "${file?.length()}:${file?.lastModified()}"
 
         /**
-         * The rules 0.1.0 `ProcessingCheckpoint.load` applies before a checkpoint is resumed. Throws
+         * The rules that the 0.1.0 checkpoint loader applies before a checkpoint is resumed. Throws
          * [IllegalArgumentException] (or org.json's exception for a missing member) when one fails.
          */
         fun validate(json: JSONObject, expected: Expected) = validate(
