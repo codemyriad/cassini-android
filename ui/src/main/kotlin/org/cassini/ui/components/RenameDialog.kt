@@ -89,7 +89,7 @@ private fun RenameField(
     val max = if (voice) NAME_MAX_LENGTH else TITLE_MAX_LENGTH
     CassiniTextField(
         value = value,
-        onValueChange = { onValueChange(it.take(max)) },
+        onValueChange = onValueChange,
         label = stringResource(if (voice) R.string.ui_name_label else R.string.ui_title_label),
         error = when {
             !blank -> null
@@ -102,6 +102,7 @@ private fun RenameField(
             imeAction = ImeAction.Done,
         ),
         keyboardActions = KeyboardActions(onDone = { if (canSave(title, value)) onConfirm(value.trim()) }),
+        maxLength = max,
     )
 }
 

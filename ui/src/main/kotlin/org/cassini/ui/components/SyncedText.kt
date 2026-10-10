@@ -18,8 +18,12 @@ import androidx.compose.ui.text.input.TextFieldValue
  *
  * [sync] receives the text of the UI state. When that text is one that this field sent and that the state has
  * not passed yet, the field keeps its own text, so a late state does not remove typed characters, move the caret
- * or reset the IME composition. Any other text is an external change (Clear, a prefilled query, a length limit):
- * the field takes it and puts the caret at its end.
+ * or reset the IME composition. Any other text is an external change (Clear, a prefilled query): the field takes it
+ * and puts the caret at its end.
+ *
+ * A length limit applies in [edit], before the field keeps the change. A limit in the event handler cannot work:
+ * when the field is full, the cut text is equal to the state text, so the state does not change and [sync] does
+ * not run.
  */
 @Stable
 internal class SyncedText(initial: String) {
@@ -29,13 +33,18 @@ internal class SyncedText(initial: String) {
     /** The texts sent to the ViewModel that its state has not shown yet, oldest first. */
     private val pending = ArrayDeque<String>()
 
-    /** A change from the field: keep it, and send the text to [send] when the text (not only the caret) changed. */
-    fun edit(next: TextFieldValue, send: (String) -> Unit) {
-        val changed = next.text != value.text
-        value = next
+    /**
+     * A change from the field: keep it, and send the text to [send] when the text (not only the caret) changed.
+     * A text longer than [maxLength] loses the characters just before the caret (the ones the user typed or
+     * pasted last), as Android's length filter does.
+     */
+    fun edit(next: TextFieldValue, maxLength: Int = Int.MAX_VALUE, send: (String) -> Unit) {
+        val kept = next.limitTo(maxLength)
+        val changed = kept.text != value.text
+        value = kept
         if (changed) {
-            expect(next.text)
-            send(next.text)
+            expect(kept.text)
+            send(kept.text)
         }
     }
 
@@ -48,18 +57,23 @@ internal class SyncedText(initial: String) {
 
     /** The text of the latest UI state. */
     fun sync(external: String) {
-        if (external == value.text) {
-            pending.clear()
-            return
-        }
         val at = pending.indexOf(external)
         if (at >= 0) {
-            // An older text of this field: the state has not caught up yet.
+            // A text this field sent: the state has caught up to it, and maybe not yet to the texts after it. This
+            // check comes first, because a text the user typed again (after a backspace) is also equal to the field.
             repeat(at + 1) { pending.removeFirst() }
             return
         }
         pending.clear()
-        value = TextFieldValue(external, TextRange(external.length))
+        if (external != value.text) value = TextFieldValue(external, TextRange(external.length))
+    }
+
+    private fun TextFieldValue.limitTo(max: Int): TextFieldValue {
+        val excess = text.length - max
+        if (excess <= 0) return this
+        val caret = selection.end.coerceIn(excess, text.length)
+        val cut = caret - excess
+        return TextFieldValue(text.removeRange(cut, caret), TextRange(cut))
     }
 
     private fun expect(text: String) {

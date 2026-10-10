@@ -116,7 +116,7 @@ fun NameSpeakerSheetContent(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit, 
         SheetHeader(ui, onEvent)
         CassiniTextField(
             value = ui.name,
-            onValueChange = { onEvent(NameSheetEvent.NameChanged(it.take(NAME_MAX_LENGTH))) },
+            onValueChange = { onEvent(NameSheetEvent.NameChanged(it)) },
             label = stringResource(R.string.ui_name_label),
             showFocus = if (ui.nameFieldFocused) true else null,
             keyboardOptions = KeyboardOptions(
@@ -126,6 +126,7 @@ fun NameSpeakerSheetContent(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit, 
             // Board 04 sets the 13 sp label in a 16 px line box (19.5 dp): 3 dp more than Android's own line.
             modifier = Modifier.padding(top = 3.dp),
             keyboardActions = KeyboardActions(onDone = { save() }),
+            maxLength = NAME_MAX_LENGTH,
         )
         if (ui.voices.isNotEmpty()) VoicesCard(ui, onEvent)
         ui.notName?.let { name ->

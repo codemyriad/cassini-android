@@ -87,7 +87,7 @@ fun PillSearchField(
             Spacer(Modifier.width(10.dp))
             BasicTextField(
                 value = text.value,
-                onValueChange = { text.edit(it, onQueryChange) },
+                onValueChange = { text.edit(it, send = onQueryChange) },
                 modifier = Modifier
                     .weight(1f)
                     .padding(start = 2.dp, top = 8.dp, bottom = 8.dp),

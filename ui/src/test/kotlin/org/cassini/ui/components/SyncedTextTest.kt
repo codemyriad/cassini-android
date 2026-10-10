@@ -34,11 +34,48 @@ class SyncedTextTest {
         assertEquals(TextFieldValue("Call", TextRange(4)), field.value)
     }
 
-    @Test fun aLengthLimitFromTheStateReplacesTheText() {
+    @Test fun aShorterTextFromTheStateReplacesTheText() {
         val field = SyncedText("")
         field.type("abcdef")
         field.sync("abcd")
         assertEquals("abcd", field.value.text)
+    }
+
+    @Test fun aTextTypedAgainAfterABackspaceStaysWhileTheStateIsLate() {
+        val field = SyncedText("")
+        field.type("a")
+        field.type("ab")
+        field.type("a")
+        field.sync("a")
+        assertEquals(TextFieldValue("a", TextRange(1)), field.value)
+        field.sync("ab")
+        assertEquals(TextFieldValue("a", TextRange(1)), field.value)
+        field.sync("a")
+        assertEquals(TextFieldValue("a", TextRange(1)), field.value)
+    }
+
+    @Test fun aCharacterTypedAtTheLimitDoesNotShowOrSend() {
+        val field = SyncedText("abcd")
+        field.edit(TextFieldValue("abcde", TextRange(5)), maxLength = 4) { sent += it }
+        assertEquals(TextFieldValue("abcd", TextRange(4)), field.value)
+        assertEquals(emptyList<String>(), sent)
+        // The state does not change, so no sync comes; the field stays at the limit.
+        field.edit(TextFieldValue("abcdf", TextRange(5)), maxLength = 4) { sent += it }
+        assertEquals("abcd", field.value.text)
+    }
+
+    @Test fun aCharacterTypedInTheMiddleAtTheLimitIsDropped() {
+        val field = SyncedText("abcd")
+        field.edit(TextFieldValue("abXcd", TextRange(3)), maxLength = 4) { sent += it }
+        assertEquals(TextFieldValue("abcd", TextRange(2)), field.value)
+        assertEquals(emptyList<String>(), sent)
+    }
+
+    @Test fun aPasteKeepsWhatFitsUnderTheLimit() {
+        val field = SyncedText("ab")
+        field.edit(TextFieldValue("ab12345", TextRange(7)), maxLength = 4) { sent += it }
+        assertEquals(TextFieldValue("ab12", TextRange(4)), field.value)
+        assertEquals(listOf("ab12"), sent)
     }
 
     @Test fun aCaretMoveSendsNothing() {

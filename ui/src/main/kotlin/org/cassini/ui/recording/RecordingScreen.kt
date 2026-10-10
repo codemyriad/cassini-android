@@ -42,6 +42,7 @@ import org.cassini.ui.components.IconButton44
 import org.cassini.ui.components.RecordingControls
 import org.cassini.ui.components.RecordingStatus
 import org.cassini.ui.components.RecordingTimer
+import org.cassini.ui.components.TITLE_MAX_LENGTH
 import org.cassini.ui.components.Waveform
 import org.cassini.ui.components.rememberSyncedText
 import org.cassini.ui.format.Counts
@@ -50,9 +51,6 @@ import org.cassini.ui.theme.CassiniIcon
 import org.cassini.ui.theme.CassiniTheme
 import org.cassini.ui.theme.Glyph
 import org.cassini.ui.theme.LightColors
-
-/** The longest title (features.md section 2). */
-private const val TITLE_MAX = 200
 
 /**
  * The Recording screen (board 01, features.md section 2; ui.md section 8). It is dark in both app themes: every
@@ -86,7 +84,7 @@ fun RecordingScreen(
             .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 28.dp),
     ) {
         RecordingHeader(state, onEvent)
-        TitleField(state.title, onTitle = { onEvent(RecordingEvent.Title(it.take(TITLE_MAX))) })
+        TitleField(state.title, onTitle = { onEvent(RecordingEvent.Title(it)) })
         state.banner?.let { spec ->
             Banner(
                 spec = spec,
@@ -181,7 +179,7 @@ private fun TitleField(title: String, onTitle: (String) -> Unit) {
     val text = rememberSyncedText(title)
     BasicTextField(
         value = text.value,
-        onValueChange = { text.edit(it, onTitle) },
+        onValueChange = { text.edit(it, TITLE_MAX_LENGTH, onTitle) },
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 28.dp),

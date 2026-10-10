@@ -41,7 +41,8 @@ import org.cassini.ui.theme.CassiniTheme
  * null (the app) follows the real focus. The label and the error belong to the field's accessibility node.
  *
  * [value] is the text of the UI state; the field shows its own copy and sends each change to [onValueChange] (see
- * [SyncedText]), so a state that arrives late does not drop typed characters.
+ * [SyncedText]), so a state that arrives late does not drop typed characters. The field stops at [maxLength]
+ * characters itself: [onValueChange] never gets a longer text.
  */
 @Composable
 @Suppress("LongParameterList", "LongMethod") // ui.md section 6 plus the usual keyboard options of a text field.
@@ -55,6 +56,7 @@ fun CassiniTextField(
     enabled: Boolean = true,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
+    maxLength: Int = Int.MAX_VALUE,
 ) {
     val c = CassiniTheme.colors
     val t = CassiniTheme.type
@@ -70,7 +72,7 @@ fun CassiniTextField(
     val text = rememberSyncedText(value)
     BasicTextField(
         value = text.value,
-        onValueChange = { text.edit(it, onValueChange) },
+        onValueChange = { text.edit(it, maxLength, onValueChange) },
         modifier = modifier
             .fillMaxWidth()
             .semantics { if (error != null) error(error) },
