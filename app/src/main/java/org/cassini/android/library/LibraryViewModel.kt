@@ -102,7 +102,13 @@ class LibraryViewModel(
 
     private val query: StateFlow<String> = saved.getStateFlow(KEY_QUERY, "")
     private val sheetId: StateFlow<String?> = saved.getStateFlow(KEY_SHEET, null)
-    private val dialog: StateFlow<String?> = saved.getStateFlow(KEY_DIALOG, null)
+    private val dialogKey: StateFlow<String?> = saved.getStateFlow(KEY_DIALOG, null)
+    private val dialogTitle: StateFlow<String?> = saved.getStateFlow(KEY_DIALOG_TITLE, null)
+
+    /** Built from StateFlows only: [state] runs on [compute], and SavedStateHandle.get is main-thread only. */
+    private val dialog: Flow<LibraryDialog?> = combine(dialogKey, dialogTitle) { key, title ->
+        key?.let { dialogOf(it, title) }
+    }
     private val snackbar = MutableStateFlow<SnackbarSpec?>(null)
     private var trashed: String? = null
     private var snackbarCount = 0L
@@ -187,7 +193,7 @@ class LibraryViewModel(
         listing: Listing,
         live: Live,
         details: NoteDetails?,
-        dialogKey: String?,
+        dialog: LibraryDialog?,
         snackbar: SnackbarSpec?,
     ): LibraryUiState {
         val now = Instant.now(clock)
@@ -223,7 +229,7 @@ class LibraryViewModel(
             sheet = details?.let {
                 LibrarySheet.Actions(LibraryMapping.actions(it, context.activeNoteId, now, zone, live.voiceModelReady))
             },
-            dialog = dialogKey?.let { dialogOf(it) },
+            dialog = dialog,
         )
     }
 
@@ -400,7 +406,7 @@ class LibraryViewModel(
     }
 
     private fun confirmDialog() {
-        val key = dialog.value ?: return
+        val key = dialogKey.value ?: return
         saved[KEY_DIALOG] = null
         val (kind, id) = key.split(DIALOG_SEPARATOR, limit = 2).takeIf { it.size == 2 } ?: return
         launch {
@@ -449,10 +455,10 @@ class LibraryViewModel(
         saved[KEY_SHEET] = null
     }
 
-    private fun dialogOf(key: String): LibraryDialog? {
+    private fun dialogOf(key: String, title: String?): LibraryDialog? {
         val (kind, id) = key.split(DIALOG_SEPARATOR, limit = 2).takeIf { it.size == 2 } ?: return null
         return when (kind) {
-            DIALOG_RENAME -> LibraryDialog.Rename(id, saved.get<String>(KEY_DIALOG_TITLE).orEmpty())
+            DIALOG_RENAME -> LibraryDialog.Rename(id, title.orEmpty())
             DIALOG_START_OVER -> LibraryDialog.StartOver(id)
             DIALOG_TRANSCRIBE_FRESH -> LibraryDialog.TranscribeFresh(id)
             DIALOG_STOP_AND_TRASH -> LibraryDialog.StopAndTrash(id)
