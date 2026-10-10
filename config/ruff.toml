@@ -1,11 +1,6 @@
-# Lint settings for the Python helper scripts: ruff check --config config/ruff.toml scripts
+# Lint settings for the Python helper scripts: ruff check --config config/ruff.toml scripts tools
 target-version = "py310"
 line-length = 120
-# tools/ui-fidelity holds the throwaway measuring scripts from the UI spike (diff.py, rows.py,
-# contrast.py). They are excluded until P7 rewrites them as compare.py and crop_states.py.
-# With --config, ruff resolves these paths against the working directory: run it from the repo root.
-extend-exclude = ["tools/ui-fidelity"]
-force-exclude = true
 
 [lint]
 select = ["E", "F", "W", "B", "UP", "I"]

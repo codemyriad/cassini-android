@@ -62,7 +62,7 @@ jobs:
       - name: shellcheck
         run: shellcheck -x scripts/*.sh tools/*.sh
       - name: ruff
-        run: pipx run --spec ruff==0.14.0 ruff check --config config/ruff.toml scripts
+        run: pipx run --spec ruff==0.14.0 ruff check --config config/ruff.toml scripts tools
       - name: Kept engine code has only its reviewed differences from 0.1.0
         run: scripts/check-verbatim.sh
 
