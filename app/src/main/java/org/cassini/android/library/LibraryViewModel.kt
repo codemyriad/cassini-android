@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -27,6 +28,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.cassini.android.nav.ModelDownloadKey
 import org.cassini.android.nav.NoteKey
+import org.cassini.android.nav.NoteStart
 import org.cassini.android.notices.LibraryFacts
 import org.cassini.android.notices.NoticeFacts
 import org.cassini.android.notices.Notices
@@ -48,6 +50,7 @@ import org.cassini.ui.library.LibraryDialog
 import org.cassini.ui.library.LibraryEvent
 import org.cassini.ui.library.LibrarySheet
 import org.cassini.ui.library.LibraryUiState
+import org.cassini.ui.note.ExportKind
 import org.cassini.ui.note.NoteAction
 import java.time.Clock
 import java.time.Instant
@@ -143,6 +146,16 @@ class LibraryViewModel(
         build(listing, live, sheet, dialog, snackbar)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), LibraryUiState(loading = true))
 
+    init {
+        // Move to trash on the Note screen lands here with the Undo snackbar (architecture section 6).
+        viewModelScope.launch {
+            ports.trashed.filterNotNull().collect { note ->
+                ports.takeTrashed(note)
+                showTrashed(note.noteId, note.title)
+            }
+        }
+    }
+
     private data class Listing(
         val rows: List<LibraryRow>?,
         val search: Pair<String, List<SearchRow>?>,
@@ -216,9 +229,9 @@ class LibraryViewModel(
             LibraryEvent.SnackbarTimeout -> snackbar.value = null
             is LibraryEvent.SheetAction -> sheetId.value?.let { id -> launch { sheetAction(id, event.action) } }
             is LibraryEvent.Export -> {
-                // TODO(P10 step 4): the exports share the Note screen's writers; until then the Note screen does it.
+                // The Note screen owns the exports: it opens and starts this one (NoteKey.start).
                 closeSheet()
-                emit(LibraryEffect.OpenNote(NoteKey(event.id)))
+                emit(LibraryEffect.OpenNote(NoteKey(event.id, start = start(event.kind))))
             }
             LibraryEvent.DismissSheet -> closeSheet()
             is LibraryEvent.RenameConfirmed -> {
@@ -277,7 +290,10 @@ class LibraryViewModel(
     }
 
     private suspend fun moveToTrash(id: String, title: String) {
-        if (!ports.moveToTrash(id)) return
+        if (ports.moveToTrash(id)) showTrashed(id, title)
+    }
+
+    private fun showTrashed(id: String, title: String) {
         trashed = id
         snackbar.value = SnackbarSpec(
             kind = SnackbarKind.MOVED_TO_TRASH,
@@ -337,12 +353,26 @@ class LibraryViewModel(
                 trash(id)
             }
             NoteAction.SAVE_DOCUMENT, NoteAction.SAVE_TEXT, NoteAction.SAVE_SUBTITLES, NoteAction.DOCUMENT_INFO -> {
-                // TODO(P10 step 4): the exports and Document info share the Note screen's code; until then they
-                // open the note, where its sheet offers them.
+                // The exports and Document info are the Note screen's: it opens and starts the row.
                 closeSheet()
-                emit(LibraryEffect.OpenNote(NoteKey(id)))
+                emit(LibraryEffect.OpenNote(NoteKey(id, start = start(action))))
             }
         }
+    }
+
+    private fun start(kind: ExportKind): NoteStart = when (kind) {
+        ExportKind.DOCUMENT -> NoteStart.SAVE_DOCUMENT
+        ExportKind.TEXT -> NoteStart.SAVE_TEXT
+        ExportKind.SRT -> NoteStart.SAVE_SRT
+        ExportKind.VTT -> NoteStart.SAVE_VTT
+    }
+
+    private fun start(action: NoteAction): NoteStart? = when (action) {
+        NoteAction.SAVE_DOCUMENT -> NoteStart.SAVE_DOCUMENT
+        NoteAction.SAVE_TEXT -> NoteStart.SAVE_TEXT
+        NoteAction.SAVE_SUBTITLES -> NoteStart.CHOOSE_SUBTITLES
+        NoteAction.DOCUMENT_INFO -> NoteStart.DOCUMENT_INFO
+        else -> null
     }
 
     private fun confirmDialog() {

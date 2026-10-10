@@ -11,9 +11,16 @@ import kotlinx.serialization.Serializable
 @Serializable
 data object LibraryKey : NavKey
 
-/** One note. [query] is the Library search that opened it; the in-note search starts with it. */
+/**
+ * One note. [query] is the Library search that opened it; the in-note search starts with it. [start] is a row of the
+ * Library's Note actions sheet that the Note screen carries out once when it opens (an export or Document info).
+ */
 @Serializable
-data class NoteKey(val noteId: String, val query: String? = null) : NavKey
+data class NoteKey(val noteId: String, val query: String? = null, val start: NoteStart? = null) : NavKey
+
+/** A Library actions sheet row that the Note screen does for it: the exports and Document info. */
+@Serializable
+enum class NoteStart { SAVE_DOCUMENT, SAVE_TEXT, SAVE_SRT, SAVE_VTT, CHOOSE_SUBTITLES, DOCUMENT_INFO }
 
 /** The active recording. Back minimises it; the recording continues. */
 @Serializable

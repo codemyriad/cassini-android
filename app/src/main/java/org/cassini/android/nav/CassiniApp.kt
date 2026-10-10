@@ -42,11 +42,12 @@ import androidx.navigation3.ui.NavDisplay
 import kotlinx.coroutines.flow.Flow
 import org.cassini.android.AppGraph
 import org.cassini.android.library.GraphLibraryPorts
-import org.cassini.android.library.LibraryNavigator
 import org.cassini.android.library.LibraryRoute
 import org.cassini.android.library.LibraryViewModel
+import org.cassini.android.note.GraphNotePorts
+import org.cassini.android.note.NoteRoute
+import org.cassini.android.note.NoteViewModel
 import org.cassini.android.recording.GraphRecordingPorts
-import org.cassini.android.recording.RecordingNavigator
 import org.cassini.android.recording.RecordingRoute
 import org.cassini.android.recording.RecordingViewModel
 import org.cassini.data.notes.ImportOutcome
@@ -58,8 +59,8 @@ import org.cassini.ui.theme.CassiniTheme
  * [links] are the deep links that [org.cassini.android.MainActivity] receives; each one changes the back stack as
  * [DeepLinks] says.
  *
- * The Library and Recording have their routes; the other destinations are placeholders until their ViewModels and
- * routes land (P10 steps 4 and 5).
+ * The Library, Recording and Note have their routes; the other destinations are placeholders until their
+ * ViewModels and routes land (P10 step 5).
  */
 @Composable
 @Suppress("FunctionNaming") // Composables are nouns in PascalCase.
@@ -88,7 +89,12 @@ fun CassiniApp(graph: AppGraph, links: Flow<DeepLink>, modifier: Modifier = Modi
                 }
                 LibraryRoute(viewModel, libraryNavigator(backStack))
             }
-            entry<NoteKey> { key -> Placeholder("Note ${key.noteId}") }
+            entry<NoteKey> { key ->
+                val viewModel = viewModel {
+                    NoteViewModel(createSavedStateHandle(), key, GraphNotePorts(graph, context), graph.clock())
+                }
+                NoteRoute(viewModel, noteNavigator(backStack))
+            }
             entry<RecordingKey>(metadata = recordingTransitions) {
                 val viewModel = viewModel { RecordingViewModel(createSavedStateHandle(), GraphRecordingPorts(graph)) }
                 RecordingRoute(viewModel, recordingNavigator(backStack))
@@ -124,29 +130,6 @@ private suspend fun open(graph: AppGraph, backStack: NavBackStack<NavKey>, link:
         }
     }
     backStack.replaceWith(target)
-}
-
-/** The Library's navigation: pushes, and the one Recording entry (pop to it when it is in the stack). */
-private fun libraryNavigator(backStack: NavBackStack<NavKey>) = object : LibraryNavigator {
-    override fun open(key: NavKey) {
-        if (backStack.lastOrNull() != key) backStack.add(key)
-    }
-
-    override fun openRecording() = backStack.replaceWith(DeepLinks.recording(backStack))
-}
-
-/** The Recording screen's navigation: minimise pops it; Finish puts the note (and Model download) in its place. */
-private fun recordingNavigator(backStack: NavBackStack<NavKey>) = object : RecordingNavigator {
-    override fun close() {
-        val index = backStack.lastIndexOf(RecordingKey)
-        if (index > 0) backStack.removeAt(index)
-    }
-
-    override fun replaceWith(keys: List<NavKey>) {
-        val index = backStack.lastIndexOf(RecordingKey)
-        val below = if (index >= 0) backStack.take(index) else backStack.toList()
-        backStack.replaceWith(DeepLinks.rooted(below) + keys)
-    }
 }
 
 /** Makes [this] equal to [target], keeping the entries the two share at the bottom. */

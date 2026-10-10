@@ -24,6 +24,8 @@
     <string name="error_speakers">Nessun turno di parola trovato. La trascrizione originale è invariata.</string>
     <string name="recording_channel">Registrazione</string>
     <string name="import_fallback_title">Audio importato</string>
+    <!-- The body of a TXT export without words (features.md section 9). -->
+    <string name="export_no_words">Non sono state trovate parole in questa registrazione.</string>
     <string name="notif_channel_processing">Trascrizione</string>
     <string name="notif_channel_results">Aggiornamenti su trascrizioni e registrazioni</string>
     <!-- Notifiche dell'elaborazione (features.md sezione 12). -->

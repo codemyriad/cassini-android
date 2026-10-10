@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import org.cassini.android.AppGraph
 import org.cassini.android.notices.NoticeFacts
+import org.cassini.android.notices.TrashedNote
 import org.cassini.android.processing.ProcessingState
 import org.cassini.android.processing.TranscribeOutcome
 import org.cassini.android.recording.RecordingState
@@ -65,6 +66,11 @@ interface LibraryPorts {
 
     /** The snackbar time: 10 s, or longer when accessibility settings ask for it. */
     fun snackbarTimeoutMs(): Long
+
+    /** A note that the Note screen moved to trash: the Library shows its Undo snackbar, then [takeTrashed]. */
+    val trashed: StateFlow<TrashedNote?>
+
+    fun takeTrashed(note: TrashedNote)
 }
 
 /** [LibraryPorts] over the app's graph. */
@@ -116,6 +122,10 @@ class GraphLibraryPorts(private val graph: AppGraph, context: Context) : Library
     override fun dismissNotice(kind: BannerKind) = graph.notices.dismiss(kind)
 
     override fun refreshNotices() = graph.notices.refreshNotifications()
+
+    override val trashed: StateFlow<TrashedNote?> get() = graph.trashUndo.pending
+
+    override fun takeTrashed(note: TrashedNote) = graph.trashUndo.take(note)
 
     override fun snackbarTimeoutMs(): Long {
         val manager = app.getSystemService(AccessibilityManager::class.java)

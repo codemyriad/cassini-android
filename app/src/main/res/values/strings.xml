@@ -24,6 +24,8 @@
     <string name="error_speakers">No speaker turns were found. The original transcript is unchanged.</string>
     <string name="recording_channel">Recording</string>
     <string name="import_fallback_title">Imported audio</string>
+    <!-- The body of a TXT export without words (features.md section 9). -->
+    <string name="export_no_words">No words were found in this recording.</string>
     <string name="notif_channel_processing">Transcription</string>
     <string name="notif_channel_results">Transcription and recording updates</string>
     <!-- Processing notifications (features.md section 12). -->

@@ -16,6 +16,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.cassini.android.nav.ModelDownloadKey
 import org.cassini.android.nav.NoteKey
+import org.cassini.android.nav.NoteStart
 import org.cassini.android.notices.NoticeFacts
 import org.cassini.android.notices.RecoveredNotice
 import org.cassini.android.processing.ProcessingState
@@ -40,6 +41,7 @@ import org.cassini.ui.library.LibraryEvent
 import org.cassini.ui.library.LibrarySheet
 import org.cassini.ui.library.LibraryUiState
 import org.cassini.ui.library.RecordingPillUi
+import org.cassini.ui.note.ExportKind
 import org.cassini.ui.note.NoteAction
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -274,6 +276,26 @@ class LibraryViewModelTest {
         viewModel.onEvent(LibraryEvent.ConfirmDialog)
         advanceUntilIdle()
         assertEquals("startOver q", ports.actions.last())
+    }
+
+    @Test
+    fun exportRowsOpenTheNoteScreenWithTheRowToStart() = runTest(dispatcher) {
+        ports.add(docRow("d", DocumentState.OK, words = 3))
+        val viewModel = viewModel()
+        viewModel.effects.test {
+            viewModel.onEvent(LibraryEvent.LongPress("d"))
+            advanceUntilIdle()
+            viewModel.onEvent(LibraryEvent.SheetAction(NoteAction.SAVE_TEXT))
+            assertEquals(LibraryEffect.OpenNote(NoteKey("d", start = NoteStart.SAVE_TEXT)), awaitItem())
+            viewModel.onEvent(LibraryEvent.LongPress("d"))
+            advanceUntilIdle()
+            viewModel.onEvent(LibraryEvent.SheetAction(NoteAction.DOCUMENT_INFO))
+            assertEquals(LibraryEffect.OpenNote(NoteKey("d", start = NoteStart.DOCUMENT_INFO)), awaitItem())
+            viewModel.onEvent(LibraryEvent.Export("d", ExportKind.VTT))
+            assertEquals(LibraryEffect.OpenNote(NoteKey("d", start = NoteStart.SAVE_VTT)), awaitItem())
+        }
+        advanceUntilIdle()
+        assertNull(viewModel.now().sheet)
     }
 
     @Test

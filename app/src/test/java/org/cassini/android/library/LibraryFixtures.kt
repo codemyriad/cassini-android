@@ -4,6 +4,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import org.cassini.android.notices.NoticeFacts
+import org.cassini.android.notices.TrashedNote
 import org.cassini.android.processing.ProcessingState
 import org.cassini.android.processing.TranscribeOutcome
 import org.cassini.android.recording.RecordingState
@@ -165,6 +166,12 @@ internal class FakeLibraryPorts : LibraryPorts {
     }
 
     override fun snackbarTimeoutMs(): Long = 12_000
+
+    override val trashed = MutableStateFlow<TrashedNote?>(null)
+
+    override fun takeTrashed(note: TrashedNote) {
+        trashed.compareAndSet(note, null)
+    }
 
     /** Puts [row] in the library and its details in [detailsById]. */
     fun add(row: LibraryRow, job: JobEntity? = null) {
