@@ -699,6 +699,7 @@ internal object VariantFixtures {
             people = b.savedVoices.people.map { if (it.id == "paolo") it.copy(stale = true) else it }.toImmutableList(),
         ),
         "voices-error" to b.savedVoices.copy(readOnly = true),
+        "voices-error-empty" to b.savedVoices.copy(readOnly = true, people = persistentListOf()),
         "voices-menu" to b.savedVoices.copy(menuFor = "anna"),
         "voices-rename" to b.savedVoices.copy(dialog = SavedVoicesDialog.Rename("anna", "Anna Ricci")),
         "voices-forget" to b.savedVoices.copy(dialog = SavedVoicesDialog.Forget("giulia", "Giulia")),

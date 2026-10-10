@@ -323,6 +323,8 @@ class StateVariantsTest : BoardTest() {
 
     @Test fun voicesError() = voices("voices-error")
 
+    @Test fun voicesErrorEmpty() = voices("voices-error-empty")
+
     @Test fun voicesUnderAMinute() = voices("voices-under-a-minute")
 
     /** The person menu, drawn inline by `MenuBoardFrame` at the options button of the row it belongs to. */

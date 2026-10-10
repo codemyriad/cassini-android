@@ -60,7 +60,9 @@ private val UnreadableBanner = BannerSpec(BannerKind.VOICES_UNREADABLE, announce
  * Saved voices (board 07, features.md section 10; ui.md section 8). A Column on bg: the top bar ("Back to
  * settings"), then a scrolling part with the privacy line, the VOICES_UNREADABLE banner when
  * [SavedVoicesUiState.readOnly], the list card (or the "No saved voices yet" card when there is nobody) and the
- * footnote; at the bottom "Forget everyone…" (hidden when empty, disabled when read-only).
+ * footnote; at the bottom "Forget everyone…" (hidden when empty, disabled when read-only). While read-only, the
+ * empty card and the footnote do not show: the file can't be read, so the list is not known to be empty, and no
+ * voice can be added.
  *
  * Each row's options button opens its [CassiniMenu] (Rename…, Forget… in redInk) while
  * [SavedVoicesUiState.menuFor] names the row. On read-only rows the options button shows but is disabled.
@@ -117,12 +119,8 @@ private fun SavedVoicesContent(state: SavedVoicesUiState, onEvent: (SavedVoicesE
         )
     }
     if (state.people.isEmpty()) {
-        BannerCard(
-            tone = Tone.Plain,
-            title = stringResource(R.string.ui_voices_empty),
-            body = null,
-            modifier = Modifier.padding(horizontal = 16.dp),
-        )
+        // A file that cannot be read is not an empty list: the banner above says so, and nothing contradicts it.
+        if (!state.readOnly) EmptyCard()
     } else {
         GroupCard(
             modifier = Modifier.padding(horizontal = 16.dp),
@@ -140,11 +138,25 @@ private fun SavedVoicesContent(state: SavedVoicesUiState, onEvent: (SavedVoicesE
             }
         }
     }
-    Text(
-        text = stringResource(R.string.ui_voices_footnote),
-        modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp),
-        style = FootnoteStyle,
-        color = c.text2,
+    // "To add someone, name a speaker…": while read-only, no voice can be added.
+    if (!state.readOnly) {
+        Text(
+            text = stringResource(R.string.ui_voices_footnote),
+            modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp),
+            style = FootnoteStyle,
+            color = c.text2,
+        )
+    }
+}
+
+/** "No saved voices yet". */
+@Composable
+private fun EmptyCard() {
+    BannerCard(
+        tone = Tone.Plain,
+        title = stringResource(R.string.ui_voices_empty),
+        body = null,
+        modifier = Modifier.padding(horizontal = 16.dp),
     )
 }
 
