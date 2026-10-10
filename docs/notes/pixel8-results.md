@@ -1,5 +1,9 @@
 # Pixel 8 prototype results — 2026-10-01
 
+> Historical note: this file records work on the 0.1.0 prototype, written from 2026-10-01 to 2026-10-09. Nobody updates it. Its statements about the app can be out of date. For the current app, read [the architecture](../architecture.md) and [the development notes](../development.md). Until 0.2, this file was `docs/pixel8-results.md`.
+
+<!-- TODO(P10): core/src/main/kotlin/org/cassini/core/asr/SpeechWindows.kt still points to docs/pixel8-results.md. The file is in a verbatim group of scripts/check-verbatim.sh, and config/detekt/baseline.xml repeats the comment. Change the three together with a reviewed verbatim edit, or keep the old path. -->
+
 These measurements describe earlier versions, including FP32 and Automatic model selection. The current app uses INT8 only and transcribes after recording; historical FP32 results and saved documents remain valid.
 
 **Both INT8 and FP32 ran successfully on the connected Pixel 8.** The tested recording is the requested [YouTube video](https://www.youtube.com/watch?v=UmZwQf5TV3c), cut from **00:28 to 00:58** with `uvx yt-dlp` and ffmpeg. The resulting input has exactly 480,000 mono PCM16 samples at 16 kHz (30.000 seconds).
@@ -23,7 +27,7 @@ Initial prototype validation completed:
 - Manual UI check on the unlocked Pixel: selected the supplied WAV through Android's file picker, transcribed it in the activity (5.674 seconds in this later run), tapped a word to seek/start playback, paused playback, and verified the active word and search match highlights.
 - Debug APK build and Android lint completed with no errors. Lint reports prototype warnings about localization, icon/backup configuration and storage-space API choice.
 
-The generated bodies and metrics remain in the phone's private app storage and in local ignored `.tools/` artifacts. Reproduce the checks with the commands in [README.md](../README.md). Both model bundles remain installed; the supplied WAV is in the phone's Downloads directory as `cassini-italian-28-58.wav`.
+The generated bodies and metrics remain in the phone's private app storage and in local ignored `.tools/` artifacts. Reproduce the checks with the commands in the README of that time (`git show v0.1.0:README.md`). Both model bundles remain installed; the supplied WAV is in the phone's Downloads directory as `cassini-italian-28-58.wav`.
 
 Storage cleanup removed the two explicitly approved Gemma/Qwen downloads and requested Android cache trimming. About 5.5 GB was recovered. After retaining both Parakeet bundles, the phone reports approximately **4.5 GB free**. Photos, recordings, Maps data and the Linux Terminal environment were retained.
 
@@ -163,7 +167,7 @@ That streaming milestone passed 193 JVM tests, lint and nine selected Pixel chec
 
 Progress and Cancel stay above the transcript. The overall percentage tracks completed words-and-speakers chunks; native stage changes cannot reset it or restart the animation. Four fixed lines show processed audio, the current stage, words and elapsed time, and an approximate remaining time once three chunks establish a pace. Short reading transitions are suppressed and the estimated pace is smoothed.
 
-The earlier whole-recording pipeline processed a 64-minute recording in 34 minutes 35 seconds. The streaming Parakeet run of the same recording completed in 35 minutes 46 seconds (2,145,802 ms total; 844,503 ms in ASR). This single trial was about 3.4% slower overall than the earlier 34 minutes 35 seconds run; it establishes no speed improvement. These timings predate durable checkpoints and the libopus encoder. At that milestone, Cancel discarded the draft; the follow-up below implements the stop/resume and estimate requests in [queued work](queued-work.md).
+The earlier whole-recording pipeline processed a 64-minute recording in 34 minutes 35 seconds. The streaming Parakeet run of the same recording completed in 35 minutes 46 seconds (2,145,802 ms total; 844,503 ms in ASR). This single trial was about 3.4% slower overall than the earlier 34 minutes 35 seconds run; it establishes no speed improvement. These timings predate durable checkpoints and the libopus encoder. At that milestone, Cancel discarded the draft; the follow-up below implements the stop/resume and estimate requests of the queued-work list of 2026-10-08 (removed in 0.2).
 
 ## Durable resume, estimates and remembered draft voices (2026-10-08)
 

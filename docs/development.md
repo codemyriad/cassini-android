@@ -1,179 +1,312 @@
 # Development notes
 
-The build commands are in the [README](../README.md). Runtime downloads, weights, private or YouTube-derived audio and build outputs stay out of commits. The committed test inputs are the CC-BY-4.0 FLEURS clip in [`fixtures/`](../fixtures/README.md), the golden checkpoint in `core/src/test/resources/checkpoint/` and the conformance vectors in the `third_party/cassini-format` submodule.
+This file is for contributors who build, test and examine Cassini for Android 0.2. [`CONTRIBUTING.md`](../CONTRIBUTING.md) gives the first steps and the rules for a change. [`architecture.md`](architecture.md) gives the design. [`data-formats.md`](data-formats.md) gives the files, the tables and the export formats.
+
+> **Status.** This file describes the 0.2 target. Some tools in it are planned and are not in the tree yet: the `:bench` module, tests with `@CiSmoke` or `@Manual`, `scripts/device-language-check.sh`, the API 35 emulator and the weekly models job of CI. Each of these sections says so. Until the 0.1.0 Activities are removed, `:app` also holds them.
+
+<!-- TODO(P10): Phases P10 and P11 add the tools in the status note. When they are in the tree, compare each name and flag with the code, correct this file, and remove the status note and the "Planned" notes. -->
+
+## Setup
+
+Do these steps one time for each clone:
+
+1. Clone the repository with its submodules:
+
+   ```sh
+   git clone --recurse-submodules https://github.com/codemyriad/cassini-android
+   ```
+
+2. If the clone has no submodules, run `git submodule update --init`.
+3. Install JDK 17. Set `JAVA_HOME` to it before you run `./gradlew`.
+4. Install the Android SDK packages: platform `android-37.0`, build tools 36.0.0, CMake 3.22.1 and NDK 28.2.13676358.
+5. Set `ANDROID_HOME`, or write `sdk.dir` in `local.properties`.
+6. Get the native inputs with `./scripts/setup.sh`.
+7. Build the debug APK with `./gradlew :app:assembleDebug`.
+
+`scripts/setup.sh` writes two inputs. The libopus source goes into `.tools/opus/source`. The sherpa-onnx AAR goes into `native/m2/org/`. [`native-runtime.md`](native-runtime.md) tells how the script gets the AAR.
+
+The `:core` tests need only JDK 17 and the submodule:
+
+```sh
+./gradlew --configure-on-demand :core:test
+```
+
+The flag `--configure-on-demand` stops Gradle from configuring the Android modules. If Gradle configures them, it needs the Android SDK, and it can download the NDK (more than 1 GB). If the submodule is not there, the `:core` tests fail. They do not skip.
+
+These files stay out of commits: `local.properties`, model weights, AAR downloads, recordings, private or YouTube-derived audio, build outputs and SDK paths. Their paths are in `.gitignore`. The committed test inputs are the CC-BY-4.0 FLEURS clip ([`fixtures/README.md`](../fixtures/README.md)), the golden checkpoint in `core/src/test/resources/checkpoint/` and the conformance vectors in the `third_party/cassini-format` submodule.
 
 ## Modules
 
-| Module | What it holds | Build needs |
+| Module | Content | Build needs |
 |---|---|---|
-| `:core` | Plain Kotlin on the JVM, package `org.cassini.core`: the portable document format, audio arithmetic, recognition windows and seams, speaker assignment and voiceprint selection, model pins and downloads (`ModelCatalog`, `ArtifactFetcher`), the checkpoint codec (`CheckpointState`) | JDK 17 and the `third_party/cassini-format` submodule |
-| `:engine` | Android library, package `org.cassini.engine`: the sherpa-onnx wrappers (`ParakeetDecoder`, `SileroDetector`, `SortformerStream`, `VoiceprintExtractor`), the MediaCodec decoder, microphone capture, the Opus encoder and its JNI library (`libcassini_opus.so`, built with CMake), `NativeBudget` | Android SDK, NDK 28.2.13676358, CMake 3.22.1, and `scripts/setup.sh` (AAR and libopus source) |
-| `:data` | Android library, package `org.cassini.data`: the Room catalogue, the DataStore settings and the file repositories: notes, jobs, voices, models and checkpoints | Android SDK |
-| `:ui` | Android library, package `org.cassini.ui`: the Compose design system and the stateless screens. It has Roborazzi screenshot tests (see "Screenshot tests"). | Android SDK |
-| `:app` | The 0.2 background layer on top of `:data`, `:core` and `:engine`: `AppGraph`, the processing coordinator and service, the recording controller and service, the playback controller and the job port adapters. It also holds the 0.1.0 Activities and services, with thin adapters (`InstalledModels`, `ProcessingCheckpoint`, `FailureMessages`) | everything `:engine` needs |
+| `:core` | Plain Kotlin on the JVM, package `org.cassini.core`. The portable format, the audio arithmetic, the recognition windows and the speaker rules. The model pins and downloads, the checkpoint codec, the library rules and the export writers. | JDK 17 and the submodule |
+| `:engine` | Android library, package `org.cassini.engine`. The sherpa-onnx wrappers, the MediaCodec decoder, the microphone capture, the Opus encoder with its JNI library `libcassini_opus.so`, and `TranscriptionJob` behind its ports. | The Android SDK, the NDK, CMake and `scripts/setup.sh` |
+| `:data` | Android library, package `org.cassini.data`. The Room catalogue, the DataStore settings and the file repositories. | The Android SDK |
+| `:ui` | Android library, package `org.cassini.ui`. The Compose design system, the stateless screens and the Roborazzi screenshot tests. | The Android SDK |
+| `:app` | The application. `AppGraph`, the ViewModels, the navigation, the services, the coordinators and the notifications. | All that `:engine` needs |
+| `:bench` | Planned: `settings.gradle.kts` does not include it yet. A `com.android.test` module for experiments and calibration on a device. CI does not run it. | All that `:app` needs |
 
-The target dependency graph is in `docs/architecture.md`, section 2: `app -> ui`, `app -> data -> core` and `app -> engine -> core`. At this time `:app` does not use `:ui`. `docs/architecture.md` describes the target layout.
+The dependency graph is in [`architecture.md`](architecture.md), section 2. `tools/asr-eval/` holds a host program that runs the speech recognition pipeline on PCM files. Gradle does not build it. Its README tells how to run it.
 
-`tools/asr-eval/` holds a host program that runs the app's speech recognition pipeline on PCM files. Gradle does not build it; its README says how to run it.
+## Worktrees
 
-## Engine tests without the native toolchain
+A git worktree shares the repository, but it does not share the ignored files. A new worktree has no `local.properties`, no submodule checkout, no AAR and no libopus source. Do these steps in the new worktree. `MAIN` is the absolute path of a checkout that ran `scripts/setup.sh`. A relative path gives a broken link in step 4, because a link target starts from the directory of the link.
 
-The `:core` module is plain Kotlin on the JVM: the portable document format, audio arithmetic, recognition windows and seams, speaker assignment and voiceprint selection, the model pins and download code, and the checkpoint codec. Its tests need JDK 17 and the `third_party/cassini-format` submodule. They need no Android SDK, NDK, native AAR, libopus source or device:
+1. Make the worktree:
+
+   ```sh
+   git worktree add ../cassini-android-NAME -b BRANCH
+   cd ../cassini-android-NAME
+   ```
+
+2. Copy the SDK path with `cp MAIN/local.properties .`.
+3. Get the submodule with `git submodule update --init`. Each worktree has its own submodule checkout.
+4. Link the AAR with `ln -s MAIN/native/m2/org native/m2/org`. Git tracks `native/m2/README.md`, so link only the `org` directory.
+5. Link the tools directory with `ln -s MAIN/.tools .tools`. The `.gitignore` entry `.tools` has no slash, so git ignores the link.
+6. Run `scripts/verify-native-runtime.sh`. It must say that the AAR matches the pin.
+
+CAUTION: Do not run `scripts/setup.sh --from-source` in a linked worktree. The build writes through the link and replaces the AAR of all worktrees.
+
+CAUTION: Before you remove a worktree, remove the links with `rm .tools native/m2/org`. Do not use `rm -rf .tools/` with a slash, because it deletes the files of `MAIN`.
+
+To remove a worktree, do these steps:
+
+1. In the worktree, remove the links with `rm .tools native/m2/org`.
+2. In the worktree, delete the build outputs with `rm -rf build */build engine/.cxx .gradle/configuration-cache`.
+3. In a different checkout, run `git worktree remove --force PATH`. The worktree contains a submodule, and without `--force` git does not remove it. Git deletes a link, not its target.
+
+## Test tiers
+
+The root task `ciTest` runs `:core:test`. For each Android module, it runs `verifyRoborazziDebug` if the module has the Roborazzi plugin, else `testDebugUnitTest`. CI runs this command:
 
 ```sh
-git submodule update --init
-JAVA_HOME=/path/to/jdk-17 ./gradlew --configure-on-demand :core:test
+./gradlew detekt ciTest :app:lintDebug :data:lintDebug :ui:lintDebug
 ```
 
-`--configure-on-demand` stops Gradle from configuring `:app` and `:engine`. Configuring them needs the Android SDK, and when the SDK has no NDK, the engine's native build makes the Android Gradle plugin download NDK 28.2.13676358 (more than 1 GB) before any task runs. With an Android SDK that has NDK 28.2.13676358 installed, plain `./gradlew :core:test` works as well; `scripts/setup.sh` is not needed for it. The conformance vectors are required: without the submodule the tests fail, they do not skip. This command was checked on 2026-10-09 in a fresh clone with only the README in `native/m2`, no `.tools/`, no `local.properties` and no `ANDROID_HOME`: every `:core` test ran and none was skipped.
+| Tier | Command | Content |
+|---|---|---|
+| JVM | `:core:test`, `:engine:testDebugUnitTest`, `:app:testDebugUnitTest` | The engine tests, the codec goldens, the pure rules, `TranscriptionJob` with fakes, the coordinators and the ViewModels |
+| Robolectric | `:data:testDebugUnitTest` and the Robolectric tests of the other modules | The repositories and DAOs, the full-text search, the purge order, the catalogue rebuild, the font and license assets |
+| Screenshots | `:ui:verifyRoborazziDebug` | Each board compared with its golden, in light, dark, Italian and 1.5x font scale |
+| Device | `scripts/device-smoke.sh` | Instrumentation tests on an emulator or a phone (see [Device scripts](#device-scripts)) |
+| Host persistence | `scripts/device-kill-resume.sh`, `scripts/device-language-check.sh` (planned) | Process death and the app language, driven from the host |
+| Acceptance | Planned | An instrumented walk through each board on emulator-5554, with device screenshots that a reviewer compares with the design |
 
-## What changed in the verbatim code
+Robolectric runs at SDK 35. Each module that uses it has `src/test/resources/robolectric.properties` with `sdk=35`. SDK 36 and later need a JDK 21 runtime, and the build uses JDK 17. One test in each module makes sure that `Build.VERSION.SDK_INT` is 35.
 
-The engine code moved from the 0.1.0 app into `:core` and `:engine` with a package rename and a short list of edits. The last field of each row in the `groups` table of `scripts/check-verbatim.sh` gives the permitted edits for that file. To see every remaining difference from the 0.1.0 code at the phase-0 base commit:
+### Screenshot tests
 
-```sh
-scripts/check-verbatim.sh --summary   # changed line counts per file group
-scripts/check-verbatim.sh Parakeet    # the diff of one group
-```
+The `:ui` tests draw the screens with Robolectric. They compare each picture with a committed PNG file (a golden) in `ui/src/test/screenshots/`. We record and compare the goldens on Linux x86_64 only, because font rendering on other systems can change the pixels.
 
-The script removes `package` and `import` lines and the `internal` modifier before it compares, and it ignores changes in the amount of white space (`--exact` shows them). It needs the base commit in the clone, so a shallow clone needs `git fetch --unshallow` first.
+If you change a screen on purpose, do these steps on Linux x86_64:
 
-The script is also a gate, and CI runs it in the static-checks job. It fails when a group whose allowed edit is "package only" shows any difference, and when the changed lines of any other verbatim group differ from the reviewed ones in `scripts/check-verbatim.baseline` (one SHA-256 per group). When you change kept engine code on purpose, read the group's diff, make sure that the `groups` table in `scripts/check-verbatim.sh` permits every edit (if an edit is new, add it to that table), then record it and commit the baseline with the change:
+1. Run `./gradlew :ui:recordRoborazziDebug`.
+2. Run `git diff --stat ui/src/test/screenshots` to find the changed goldens.
+3. Examine each changed PNG.
+4. Commit the goldens together with the change.
 
-```sh
-scripts/check-verbatim.sh Parakeet            # read the diff
-scripts/check-verbatim.sh --update Parakeet   # record it as reviewed
-```
+`./gradlew :ui:compareRoborazziDebug` writes the pictures and the differences to `ui/build/outputs/roborazzi/`. If the pixel check fails in CI, CI uploads that directory as the `roborazzi-diffs` artifact.
 
-Restructured groups (`Models`, `ProcessingCheckpoint`) are shown for reference and not checked.
-
-## Screenshot tests
-
-The `:ui` tests draw Compose content with Robolectric and compare it with committed PNG files (goldens) in `ui/src/test/screenshots/`. The root `ciTest` task includes `:ui:verifyRoborazziDebug`, which fails when a picture changes. We record and compare the goldens on Linux x86_64 only. On other systems, font rendering can change the pixels.
-
-On macOS or Windows, do not run `ciTest` or `verifyRoborazziDebug`. Run the tests without the pixel comparison and let CI do the pixel check:
+On macOS or Windows, do not run `ciTest` or `verifyRoborazziDebug`. Do not record or commit goldens there. Run the same tests without the pixel check:
 
 ```sh
 ./gradlew :core:test :engine:testDebugUnitTest :data:testDebugUnitTest :ui:testDebugUnitTest :app:testDebugUnitTest
 ```
 
-`:ui:testDebugUnitTest` draws the screens but does not compare them with the goldens. Do not record or commit goldens from these systems.
+The Compose accessibility checks (`enableAccessibilityChecks()`) do not operate under Robolectric. Thus the `:ui` tests do not have them. The device flow tests of `:app` will call them on an emulator. These device flow tests are planned and are not in the tree yet.
 
-If you change a screen on purpose, update its goldens:
+## Device safety
+
+CAUTION: Do not run the Gradle `connected*` tasks or the managed-device tasks. Their cleanup can uninstall the app, and the uninstall erases the app data and the models (about 770 MB).
+
+CAUTION: Do not run `adb uninstall org.cassini.android` or `adb shell pm clear org.cassini.android`. These commands erase the app data and the models.
+
+Install an APK with `adb install -r`. Run instrumentation with `scripts/device-smoke.sh` or `adb shell am instrument`.
+
+Most device tests use a scratch root (see [CassiniTestRunner](#cassinitestrunner)), and the host scripts use a debug root. Before you run a test that has no scratch root, make a backup of the app files without the models:
 
 ```sh
-./gradlew :ui:recordRoborazziDebug   # write new goldens
-git diff --stat ui/src/test/screenshots
+adb exec-out run-as org.cassini.android tar c \
+    --exclude=files/parakeet-v3 --exclude=files/vad --exclude=files/speaker-models files > files-backup.tar
 ```
 
-Examine each changed PNG, then commit the goldens with the change. `:ui:compareRoborazziDebug` writes the actual pictures and the differences to `ui/build/outputs/roborazzi/`. If the check fails in CI, CI uploads that directory as the `roborazzi-diffs` artifact.
-
-The Compose accessibility checks (`enableAccessibilityChecks()`) do not operate under Robolectric. Thus they are not in the `:ui` tests. The device flow tests of `:app` will do them on an emulator.
-
-## Device checks
-
-Use direct adb instrumentation to retain app data and downloaded models. Gradle’s managed connected-test cleanup can uninstall the app and erase them.
+If the test damaged or erased your notes, restore the backup. First stop the app, then extract the backup into the app storage:
 
 ```sh
-./scripts/device-smoke.sh --help
-# The 0.2 background tests (scratch root, installed models):
-./scripts/device-smoke.sh --serial emulator-5554 --annotation NeedsModels
-./scripts/device-smoke.sh --serial emulator-5554 --annotation NeedsMicrophone
-# Process death: kill -9 during a job, resume, and a check of the sealed document (needs ffmpeg on the host).
-./scripts/device-kill-resume.sh --serial emulator-5554
-./tools/fetch-youtube-audio.sh       # optional YouTube clips; uses uvx yt-dlp + ffmpeg
-./scripts/device-smoke.sh --sample youtube --class org.cassini.android.DeviceSmokeTest \
+adb shell am force-stop org.cassini.android
+adb exec-in run-as org.cassini.android tar xf - < files-backup.tar
+```
+
+The restore writes back each file in the backup. It does not delete the files that the test added.
+
+Before you start a device run, make sure that no other run uses the device. `adb shell ps -A -o ARGS | grep '[i]nstrument'` shows a run in progress. Use `-o ARGS`: the process name of a run is `app_process`, and only its arguments contain `instrument`. If a run is in progress, wait for it to end. Do not stop it.
+
+## Device scripts
+
+### CassiniTestRunner
+
+The instrumentation runner `org.cassini.android.CassiniTestRunner` gives each run a scratch root. It sets `AppPaths.root` to `files/androidTest-<run>` and the cache to `cacheDir/androidTest-<run>`. The model root stays `filesDir`, so the tests use the installed models. A test for the download screens can ask for an empty scratch model root with `-e emptyModelRoot true`. The runner deletes its scratch root at the end of the run. At the start of a run, it deletes the scratch roots that an earlier run did not delete. Thus the tests do not touch the notes of the user. The 0.1.0 device tests still use `filesDir`.
+
+The device tests use the committed FLEURS clip as audio.
+
+### device-smoke.sh
+
+`scripts/device-smoke.sh` builds or takes the APKs, installs them with `adb install -r` and runs a selection of tests with `adb shell am instrument`.
+
+| Flag | Meaning |
+|---|---|
+| `--annotation NAME` | Run the tests with this annotation, for example `NeedsModels` |
+| `--class CLASS[#METHOD]` | Run this class or method. You can give the flag more than one time. |
+| `--serial SERIAL` | Use this device. If you do not give it, the script uses `ANDROID_SERIAL` or the only device. |
+| `--sample NAME` | The audio sample of the 0.1.0 tests: `fleurs` (the default), `youtube`, `youtube-long` or `cutting` |
+| `--arg KEY=VALUE` | Give one more instrumentation argument. You can give the flag more than one time. |
+| `--help` | Show the usage |
+
+The script first does a dry run (`am instrument -e log true`) of the same selection to get the expected count. The run fails if a test fails or skips, or if the count is different. If you set `CASSINI_EXPECTED_TESTS`, the run also fails when the count is not equal to it.
+
+The script gives `downloadModels=true` to the 0.1.0 tests. If the device has no Parakeet model or no speech detector, `DeviceSmokeTest` and `ChunkingComparisonTest` download them (several hundred MB). To prevent this download, select only the tests that need no models.
+
+The test APK holds the long clip of the background tests ([`fixtures/README.md`](../fixtures/README.md)). The script runs `scripts/make-long-clip.sh` before it builds the test APK. That script needs ffmpeg on the host. If ffmpeg is not there, the script shows a warning and builds the test APK without the clip. Then the tests that use the clip fail. The test APK from CI does not hold the clip.
+
+| Annotation | Tests | Where they run |
+|---|---|---|
+| `@CiSmoke` | Tests that need no models. No test has it yet. | The CI emulators, API 26, 29, 34 and 35 |
+| `@NeedsModels` | Tests that need the installed models | emulator-5554, and the weekly CI models job on API 34 |
+| `@NeedsMicrophone` | Tests that record from the microphone | An emulator or a phone. Emulator audio can be silence, so these tests examine the files and the states. |
+| `@Manual` | Tests that CI does not run. No test has it yet. | By hand, with `--class` |
+
+Examples:
+
+```sh
+scripts/device-smoke.sh --serial emulator-5554 --annotation NeedsModels
+scripts/device-smoke.sh --serial emulator-5554 --annotation NeedsMicrophone
+scripts/device-smoke.sh --serial emulator-5554 --class org.cassini.android.LibraryTest
+```
+
+The YouTube samples are not in the repository. `tools/fetch-youtube-audio.sh` gets them (it needs `uvx yt-dlp` and ffmpeg). `DeviceSmokeTest#opusCheckpointContinuesIdenticalPacketsAfterClosingTheEncoder` always has `@Ignore`, and an ignored test makes the run fail. Thus remove it from a class selection:
+
+```sh
+tools/fetch-youtube-audio.sh
+scripts/device-smoke.sh --sample youtube --class org.cassini.android.DeviceSmokeTest \
     --arg notClass=org.cassini.android.DeviceSmokeTest#opusCheckpointContinuesIdenticalPacketsAfterClosingTheEncoder
-./scripts/device-smoke.sh --class org.cassini.android.LibraryTest   # needs the INT8 model
-# The 0.1.0 end-to-end checks with the 30-second YouTube clip (they need the models):
-./scripts/device-smoke.sh \
-    --class org.cassini.android.PortableDocumentTest#transcriptionCreatesASealedPortableDocument \
-    --class org.cassini.android.SpeakerIdentificationTest#transcribingLabelsEachVoice \
-    --class org.cassini.android.ProcessingResumeTest
-# Opt-in recovery check after force-stopping the app mid-recording:
-adb shell am instrument -w -r -e class org.cassini.android.RecoveryCheckTest org.cassini.android.test/org.cassini.android.CassiniTestRunner
-# Three-minute viewer/seek check.
-./tools/fetch-youtube-audio.sh 180
-./scripts/device-smoke.sh --sample youtube-long --class org.cassini.android.DeviceSmokeTest \
-    --class org.cassini.android.PortableDocumentTest#threeMinuteOpusTrimsPaddingToTheExactDuration \
-    --arg notClass=org.cassini.android.DeviceSmokeTest#opusCheckpointContinuesIdenticalPacketsAfterClosingTheEncoder
 ```
 
-The script makes a dry run of the selection first. It fails when a selected test fails or is skipped, or when the real run has a different count. Thus, select only the tests that apply to the device: `SpeakerIdentificationTest#downloadingModelsRequiresConsent` is skipped on a device that has the models. The script gives `downloadModels=true` to the tests. Thus, if Parakeet and the speech detector are missing, `DeviceSmokeTest` and `ChunkingComparisonTest` download them (several hundred MB) into the app data. `LibraryTest` and the speaker-model methods of `DeviceSmokeTest` do not download. They are skipped on a device without the models. `DeviceSmokeTest#opusCheckpointContinuesIdenticalPacketsAfterClosingTheEncoder` is always ignored (`@Ignore`). Thus, the commands above remove it with `--arg notClass=...`.
+Unlock the phone before a run. The script wakes the phone and dismisses a keyguard without security. If the phone asks for authentication, the script stops.
 
-The script builds the test APK with the long clip of the background tests (`fixtures/README.md`). To make the clip, the host needs ffmpeg. If ffmpeg is missing, the script gives a warning and builds the test APK without the clip. Then the background tests that use the clip fail. The test APK from CI does not contain the long clip. Thus, with `CASSINI_TEST_APK` from CI, do not select the background tests (`NeedsModels`). `CassiniTestRunner` puts the notes, voices and settings of the 0.2 graph in a scratch root (`files/androidTest-<run>`) and removes it at the end. The 0.1.0 tests still use `filesDir`.
+To test the APKs from CI, set these variables:
 
-Unlock the phone first. The script wakes it and dismisses an unsecured keyguard, but fails early if authentication is still required. Set `ANDROID_SERIAL` when several devices are connected. To verify the APK CI tested, set `CASSINI_APK=/absolute/path/to/downloaded.apk`; the script detects debug or `releaseTest` (a non-debuggable APK that R8 did not minify) and builds the matching instrumentation APK. It refuses an R8-minified APK. A `releaseTest` build without a supplied key is signed with `~/.android/debug.keystore`, so it installs over a debug build. To use both binaries from CI, also set `CASSINI_TEST_APK=/absolute/path/to/test.apk`. The `cassini-android-device-tests` artifact contains the APK under test and its test APK. Kotlin’s internal method names differ across variants, so a debug test APK cannot reliably exercise a release app. The minified `release` APK cannot be instrumented at all, because R8 removes app and Kotlin library members that only the tests call. `releaseTest` is the release build (same signing, not debuggable) without R8. On tags CI instruments `releaseTest`, then installs the published release APK over it and checks that it launches (`scripts/launch-check.sh APK` does the same by hand).
+- `CASSINI_APK=/absolute/path/app.apk`: the APK under test. The script finds out if it is `debug` or `releaseTest` and builds the matching test APK.
+- `CASSINI_TEST_APK=/absolute/path/test.apk`: the test APK from the same CI run.
 
-The supplied sample is [il Pericolo Invisibile](https://www.youtube.com/watch?v=UmZwQf5TV3c), 00:28–00:58 (30 seconds), or 00:28–03:28 (three minutes). We do not distribute the YouTube clips here. Without them, the tests that need them are skipped or fail, and a skipped test also fails the script. The FLEURS clip is committed under `fixtures/audio/` with its pinned revision, reference text and CC-BY-4.0 attribution, and the androidTest assets include it.
+The CI artifact `cassini-android-device-tests` holds both APKs. The script refuses an APK that R8 minified. R8 removes the members that only the tests call, so the minified `release` APK cannot be instrumented. Kotlin internal names are different in each variant, so use a test APK of the same variant. [`release.md`](release.md) describes `releaseTest`.
 
-Device tests check JNI inference, timestamps, codec decoding, complete-document integrity, microphone pause/resume, catalogue recovery and interface-language restoration. The commands in this section select only some of these tests. Only the two YouTube selections and the CI selection include methods of `PortableDocumentTest`. They do not establish ASR accuracy. Test rules restore the previous catalogue/session and remove only their own generated documents.
+### device-kill-resume.sh
 
-CI runs the static checks (Gradle wrapper validation, detekt, actionlint, shellcheck, ruff and the verbatim diff) in a job of their own, in parallel with the build. Another job runs `:core:test` with only a JDK: no `scripts/setup.sh`, and the runner's Android SDK hidden. The build job fetches the pinned prebuilt AAR (`scripts/setup.sh --prebuilt-only`) and fails at once when it cannot; it never falls back to a source build. CI then installs its built app and matching test APK on Android 8, 10 and 14 (API 26, 29 and 34) x86_64 emulators. All three run playback/settings, AAC microphone pause/resume and library playback, interruption recovery and encoder capability checks. Android 14 also requires successful Opus encoding and decoding with preserved duration and speech timing. The Android 10 Google APIs image lacks an Opus encoder; its check requires the explicit missing-encoder failure. These checks require no models. Settings checks verify language persistence and that the removed model selector and live transcription setting are absent. CI runs 11 checks on API 26/29 and 12 on API 34. CI fails if a selected check is skipped or the expected count changes, and saves instrumentation output and logcat. Release publication waits for the static checks, the `:core` job, the build and all three emulators. A weekly job, also available from a manual run, rebuilds the sherpa-onnx AAR from the pinned source, builds and tests the app with it, and records its SHA-256 beside the pinned release build's. A mismatch raises a warning annotation; it does not fail the job. Native inference and the complete recording/transcription flow still need the separate device checks above.
+`scripts/device-kill-resume.sh` makes sure that a transcription continues after the system kills the app process. It does these steps:
+
+1. It makes the long clip with `scripts/make-long-clip.sh` (this needs ffmpeg) and copies it into the app cache with `run-as`.
+2. It writes `files/debug-root.txt`. This file names a scratch root `files/killtest-<time>`. Only debug builds read it. The models stay in `files/`.
+3. It imports the clip through the debug-only `DebugCommandActivity`. The import starts a transcription job.
+4. It reads a debug status file in the scratch root until the job saved a checkpoint.
+5. It kills the process with `adb shell run-as org.cassini.android kill -9 <pid>`.
+6. It waits for the system to deliver the service intent again. If the system does not do this in time, it opens `DebugCommandActivity` with `am start`.
+7. It reads the status file until the job is done.
+8. It copies the document to the host and runs `cassini-extract.py --check` on it. If `../gocassini` exists, it also runs `check-portable-document.mjs`.
+9. It deletes `files/debug-root.txt` and the scratch root.
+
+CAUTION: If the script stops before step 9, delete the debug root file with `adb shell run-as org.cassini.android rm files/debug-root.txt`. Until you delete it, the debug app uses the scratch root and does not show your notes.
+
+A host script does this test because the two Android tools do not kill the process in the same way as the system:
+
+- An instrumentation test runs in the app process. If the test kills the process, the test also stops. At the end of each run, the system force-stops the app. A force-stop cancels the service intent, so the system does not start the job again.
+- `adb shell am kill` kills only a process that is safe to kill. It does not kill a process that has a foreground service, and `ProcessingService` is a foreground service.
+
+`kill -9` from `run-as` operates with the user ID of the app. It stops the process as a low-memory kill does. The system keeps the `START_REDELIVER_INTENT` intent and starts the service again.
+
+### device-language-check.sh
+
+> **Planned.** This script is not in the tree yet.
+
+`scripts/device-language-check.sh` makes sure that the app language stays after process death. It selects Italiano in Settings with `uiautomator`. Then it kills the process with `kill -9`, starts the app with `am start -W` and finds Italian text in a new `uiautomator dump`. At the end, it sets the language back to the phone language.
+
+## Portable file checks
+
+The `:core` JVM tests run each conformance vector of the `third_party/cassini-format` submodule. The submodule is pinned to the revision that this app conforms to. To run the vectors of another checkout, for example a newer `../cassini-format`, add `-PcassiniConformanceDir=/path/to/spec/conformance`.
+
+To examine a document from a device, do these steps:
+
+1. Copy the document to the host. Use **Save a copy** in the app, or copy the file of a debug build:
+
+   ```sh
+   adb exec-out run-as org.cassini.android cat files/notes/NOTE_ID/document.opus > note.opus
+   ```
+
+2. Run the reference reader and the digest tool:
+
+   ```sh
+   python3 third_party/cassini-format/tools/cassini-extract.py note.opus --check
+   python3 third_party/cassini-format/tools/cassini-opus-digest.py note.opus
+   ```
+
+3. If `../gocassini` exists, run the reader of the web viewer with Node 24 or later:
+
+   ```sh
+   node scripts/check-portable-document.mjs note.opus
+   ```
+
+[`data-formats.md`](data-formats.md) tells which files are portable. Only the sealed `.opus` document is a complete portable artifact. A `*.words.json` file from a device test, and a TXT, SRT or VTT export, holds only the words.
+
+## Differences from the desktop runtime
+
+The desktop pipeline is in `../gocassini`. The Android app is different in these ways:
+
+- Android uses sherpa-onnx 1.13.7 with the Sortformer patch ([`native-runtime.md`](native-runtime.md)), on the CPU, with two threads and greedy decoding. It uses only the INT8 Parakeet model.
+- Android does not use the modified Parakeet feature frontend of the desktop runtime. [`notes/feasibility.md`](notes/feasibility.md) gives the history.
+- Android cuts a recording at speech pauses with the Silero VAD values of the desktop. It cuts a span of more than 28 s at its quietest 30 ms, between 20 s and 25 s after the previous cut. The window arithmetic, the seam alignment and the word gate come from `gocassini` `transcribe/stt.go`, together with their tests.
+- The desktop takes the speaker names from the call signaling and does no voice analysis. Android finds the speakers in the audio with Nemotron-3 Sortformer (at most 8, in the order of arrival). It compares them with CAM++ voiceprints that stay on the phone.
+- A saved voice gets its name automatically at a cosine similarity of 0.72 or more and at least 0.08 more than the next voice. Android suggests the name from 0.50. These values come from a small calibration on call recordings (`core/src/main/kotlin/org/cassini/core/speakers/VoiceprintSelection.kt`).
+
+[`data-formats.md`](data-formats.md) gives the differences in the documents and the exports.
+
+## Verbatim engine code
+
+The engine code came from 0.1.0 into `:core` and `:engine` with a package rename and a short list of edits. The last field of each row in the `groups` table of `scripts/check-verbatim.sh` gives the permitted edits for that file group. CI runs the script as a gate.
 
 ```sh
-adb exec-out run-as org.cassini.android cat files/device-smoke.INT8.metrics.json
-adb exec-out run-as org.cassini.android cat files/device-smoke.INT8.words.json > transcript.words.json
+scripts/check-verbatim.sh --summary   # changed line counts for each file group
+scripts/check-verbatim.sh Parakeet    # the diff of one group
 ```
 
-## Portable files
+The script removes `package` lines, `import` lines and the `internal` modifier before it compares. It ignores changes in white space (`--exact` shows them). It needs the base commit, so a shallow clone needs `git fetch --unshallow`.
 
-The `:core` JVM tests run every published vector from the `third_party/cassini-format` submodule, pinned to the revision this app conforms to. A missing checkout fails the tests instead of skipping them (`git submodule update --init`). Use `-PcassiniConformanceDir=/path/to/spec/conformance` to run another checkout's vectors, for example `../cassini-format` at a newer revision. Synthetic integrity and round-trip tests always run.
+The script fails in two conditions. A "package only" group has a difference, or the changed lines of a group are not equal to the reviewed lines in `scripts/check-verbatim.baseline`. If you change verbatim code on purpose, do these steps:
 
-```sh
-python3 third_party/cassini-format/tools/cassini-extract.py DOCUMENT.opus --check
-python3 third_party/cassini-format/tools/cassini-opus-digest.py DOCUMENT.opus
-# A sibling ../cassini-format checkout has the same tools at a newer revision.
-# Node 24+, with ../gocassini checked out: use the web viewer’s reader.
-node scripts/check-portable-document.mjs DOCUMENT.opus
-```
+1. Read the diff of the group with `scripts/check-verbatim.sh GROUP`.
+2. Make sure that the `groups` table permits each edit. If an edit is new, add it to the table.
+3. Record the diff as reviewed with `scripts/check-verbatim.sh --update GROUP`.
+4. Commit the baseline together with the change.
 
-A complete Cassini `.opus` contains the Opus audio stream plus timed words, speakers, processing provenance and integrity metadata in OpusTags. The diagnostic `*.words.json` files are only word bodies. Save Cassini copies the entire document unchanged, including unsupported variants, extensions and attachments. Retranscription adds a variant and preserves previous ones.
+The script shows the restructured groups (`Models`, `ProcessingCheckpoint`) for reference, but it does not compare them.
 
-Android uses sherpa-onnx 1.13.7 rebuilt with Sortformer diarization (see [native runtime](native-runtime.md); speech recognition code is unchanged), greedy CPU decoding and two threads. It does not use the desktop runtime’s modified Parakeet frontend; see [feasibility](feasibility.md). Recordings are cut at speech pauses with the desktop’s Silero VAD settings and decoded span by span (`engine/.../asr/Parakeet.kt` and `SileroDetector.kt`; `core/.../asr/SpeechFeed.kt`, `SpeechWindows.kt`, `SeamMerge.kt`, `WordGate.kt`). The window arithmetic, seam alignment and word gate are ported from `gocassini` `transcribe/stt.go` with their tests; the detector loop is ported and its tests are new. The detector model (`silero_vad.onnx`, 630 KB, pinned by SHA-256) is fetched into `files/vad/` after the Parakeet model, or once per process in the background on an installation that predates it, never during a transcription. A failed fetch is only logged: without the detector the recording is cut at quiet points. A document records how it was cut in `x-segmentation` of its speech-to-text provenance. To compare cutting policies against whole-recording decoding on a device: `./scripts/device-smoke.sh --sample cutting --class org.cassini.android.ChunkingComparisonTest` (several minutes; results in `files/chunking-comparison.INT8.json`).
+## Continuous integration
 
-## Recording
+`.github/workflows/android.yml` runs on each push to `main`, each pull request, each tag `v*`, a weekly schedule and a manual start (`workflow_dispatch`). If you push a branch and do not open a pull request, CI does not run. [`architecture.md`](architecture.md), section 8, gives the jobs. They are the static checks, a `:core` job with only a JDK, the build and an emulator matrix. A weekly job builds the native runtime. A weekly job that tests the models is planned.
 
-On Android 10 and later, `RecordingService` (a foreground service of type `microphone`, with a notification and a partial wake lock) captures mono 48 kHz audio with `AudioRecord` and streams it to Ogg Opus at 48 kb/s (about 21.6 MB per hour) in `files/documents/<id>.rec.opus`. Pages are flushed every second and the file is synced every 5 s. Recording continues with the screen off, after **Home** or with the recording screen closed; **Done** in the app or the notification stops it. Losing audio focus (for example a call) pauses it. Recordings stop at the 2 h cap (`Limits.MAX_RECORDING_MS`) or when free space drops below 200 MiB, with a warning 5 minutes before the cap. Android 8 and 9 have no platform Opus encoder: there the service records AAC at 32 kb/s in an MP4 file, which a crash loses because its index is written on stop.
+> **Planned.** The current emulator matrix is API 26, 29 and 34. API 35 and the models job come with the final CI workflow. On a tag, the release job publishes the release. A selected device test that skips makes the job fail. The emulator jobs save the instrumentation output and logcat.
 
-At startup, `RecoveryScanner` repairs any `*.rec.opus` that has no end-of-stream page and is not being recorded: it truncates the file to its last valid page, writes the end page and catalogues it as a recovered note. Pause excludes paused time from the recording clock. **Done** finalizes and catalogues the recording, then starts the INT8 batch pipeline when the model is installed. Recording itself needs no model.
+## Pre-release gate
 
-Imports and recordings are decoded straight to 16 kHz mono, which the speech detector, Parakeet and diarization all use. Documents are read and written as streams of Ogg pages, so file size is bounded by `Limits` (2 h, 2 GiB, free space) rather than by memory. Imports that are not Ogg Opus are re-encoded to 16 kHz Opus. Decoding a long Opus file is limited by the platform decoder: a 55 min capture took about 9 min on the Pixel 8. Transcription and speaker identification still run in the activity and are not resumable.
+CI does not do these checks. Before the owner makes a release tag, do them by hand with the release candidate:
 
-Batch processing displays draft words after each decoder call, including the final filtered words while the complete portable Opus file is being created. Transcription during capture has been removed ahead of a separate Nemotron implementation.
+1. On a Pixel 8 (API 37), record a note, transcribe it with speakers, name a speaker, export the note and transcribe it again.
+2. Play music in another app. Then start a recording. Make sure that the music continues and the recording does not pause.
+3. Start a recording on an emulator. Send a call with `adb emu gsm call 5551234`, then answer it with `adb emu gsm accept 5551234`. Make sure that the recording pauses and shows "Paused — another app is using audio". Android silences the recording only when the call is active, not while the phone rings.
+4. End the call with `adb emu gsm cancel 5551234`. Make sure that the recording stays paused until you push Resume.
+5. On an API 35 or 36 AVD, start a transcription. Make sure that `adb shell dumpsys activity services org.cassini.android` shows the type `mediaProcessing`.
+6. Make the time limit short with `adb shell device_config put activity_manager media_processing_fgs_timeout_duration 60000`.
+7. Wait for the limit. Make sure that the notification "Paused by Android" ("Paused at … of …. Open to resume.") shows and that the note shows Paused, not an error.
+8. Reset the limit with `adb shell device_config delete activity_manager media_processing_fgs_timeout_duration`.
+9. Copy a document that the new engine sealed. Run `cassini-extract.py --check` and `check-portable-document.mjs` on it (see [Portable file checks](#portable-file-checks)).
+10. Write the results in a dated file in [`notes/`](notes/).
 
-```sh
-./scripts/device-smoke.sh --class org.cassini.android.LibraryTest
-# Opt-in recovery check after force-stopping the app mid-recording:
-adb shell am instrument -w -r -e class org.cassini.android.RecoveryCheckTest org.cassini.android.test/org.cassini.android.CassiniTestRunner
-```
-
-Upgrades ignore retired `fp32` and `modelChoice` session fields and remove them on the next session save. Existing result precision and portable provenance remain historical facts. App startup removes only `files/parakeet-v3-fp32/` and the obsolete live-recording preference. INT8, VAD and speaker downloads, saved WAV/M4A/Opus recordings, and portable documents are retained. FP32-only installations need the INT8 download for new transcription.
-
-## Local storage
-
-Owned recordings/documents live in private `files/documents/`. Atomic `session.json` stores the current document reference, selected variant and playback position. Atomic `library.json` stores stable note IDs, dates, per-note state and a disposable text cache for search. The portable document is authoritative when opened.
-
-An imported file is stored under the SHA-256 of its bytes. Opening the same file again reuses that copy and returns to its note with its playback position and selected variant. This applies to copies imported from this version on: earlier imports and documents created by transcription have random names, so opening the original of one of those starts a new note. A recreated screen returns to the note it was showing and imports its launch intent only when no note can be found for it. `session.json` records which screen wrote it last and is used when that is the recreated screen, because work that finished while the screen was stopped makes it newer than Android’s saved state (unless that last save failed). Otherwise the note is found in the catalogue by its saved ID, or by its file reference when it has none. One case is not recovered: if work finished after the state was saved and another screen then replaced `session.json`, the screen returns to the note it showed earlier; the newer note or revision is still in the library.
-
-`library-migrated` marks recovery of older retained documents, grouped by meeting ID. Notes saved before that recovery keep their state and receive any missing search text, and no further card is made for other revisions of their meetings. A screen with no note does not write `session.json`, and a screen replaces a `session.json` it did not write only after that session is in the catalogue, so a session from before the library is never dropped. Previous owned revisions remain on disk. Legacy `latest.words.json` and `latest.processing.json` are diagnostic caches.
-
-## Beta releases
-
-Update `versionName`, increase `versionCode`, and refresh [release notes](release-notes.md). A matching `vVERSION` tag triggers the same build/test/lint checks, then publishes the APK, checksum, notices and native source archive. Packaging checks both supported 64-bit ABIs and each native library’s 16 KB ELF/ZIP alignment. These checks catch build regressions; runtime behavior still needs testing on actual devices. Tag builds require the repository’s `ANDROID_BETA_KEYSTORE` secret; missing signing material fails the build. The keystore's secrets are the `CASSINI_RELEASE_STORE_PASSWORD`, `CASSINI_RELEASE_KEY_ALIAS` and `CASSINI_RELEASE_KEY_PASSWORD` repository secrets. Until they are set, CI falls back to the legacy debug-keystore values (`android`, `androiddebugkey`, `android`); this fallback is temporary and goes once the owner rotates the passwords. To build a signed release locally, export `CASSINI_BETA_KEYSTORE_FILE` and the three `CASSINI_RELEASE_*` variables: when the keystore is set and one of the others is missing, Gradle stops with an error.
-
-The signing key matches the existing development installation. Keep it stable for these beta updates. The beta release build disables debugging; the key comes from the earlier debug installation to allow upgrades. A production signing identity can be chosen for a future stable release. Never commit it.
-
-## Speaker identification
-
-Superseded: **Transcribe** now labels speakers in the same job, and there is no separate speaker step (`SpeakerIdentificationTest#aTranscriptLeavesNoSeparateTranscribeOrSpeakerStep`). The notes below describe the diarizer itself; P5 rewrites this section. [NVIDIA Nemotron-3-Diarization](https://huggingface.co/nvidia/Nemotron-3-Diarization), an end-to-end streaming Sortformer, labels up to 8 speakers in order of first arrival. It needs no speaker embeddings, no clustering and no speaker count; the earlier count dialog is gone. The anonymous labels do not identify people; errors and overlapping speech need listening checks.
-
-The optional model is an INT8 ONNX export (103,941,758 bytes, about 99 MiB), stored in `files/speaker-models/`. It downloads as a seekable Zstandard file from `dist.gocassini.com` (64,982,914 bytes, about 62 MiB). Both hashes are verified: the download before zstd-jni decompresses it, and the model before it replaces anything. `core/.../models/ModelCatalog.kt` pins sizes, hashes, the source revision and the URL. Downloads require explicit consent; ASR model downloads do not install it. App startup removes the retired pyannote and ERes2Net files. License texts and notices ship in the APK.
-
-sherpa-onnx 1.13.7, rebuilt with the Sortformer runtime (see [native runtime](native-runtime.md)), runs the model on CPU with two threads. It processes 27.2 s chunks with the offline settings of the model card, keeps speaker identities across chunks with the Arrival-Order Speaker Cache, and reports progress per chunk. Activity above probability 0.5 is speech; turns shorter than 0.3 s are dropped and gaps shorter than 0.5 s merged. ASR and diarization share a native-model lease, so a cancelled call cannot overlap a new model load. The callback's return value does not abort computation. Cancel returns to the library immediately and discards the result; the ongoing native call finishes and releases its own model. Destroying the viewer also cancels publication. No partially attributed variant is saved.
-
-Word labels use the greatest overlap with a speaker's union of time intervals, or the nearest interval in a gap. Ties are deterministic. Text, word order and timestamps are retained. A mixed recording supplies one label per recognized word; this does not recover simultaneous voices or reproduce desktop attribution from separate participant tracks.
-
-Each pass appends a portable word variant with new speaker IDs, preserving the audio digest, original variants and imported speaker names. The new variant's `provenance.speechToText` entry retains the ASR record and adds `x-derivedFromTranscript`, `x-sourceAttribution` and `x-speakerDiarization` (model, revision, hash, threshold, duration settings and elapsed time). The document-wide attribution record describes the desktop cross-track audit and is preserved unchanged. Speaker diarization does not claim that audit ran. The export is a complete portable Opus document, not a word-body JSON file.
-
-Fetch the pinned speaker model for native experiments with `python3 scripts/fetch-diarization-models.py`. `ANDROID_SERIAL=<serial> scripts/diarization-poc.sh` runs the public four-speaker fixture through `scripts/device-smoke.sh`, preserving app data. Existing optional two-voice/real-conversation diagnostics are in `DiarizationPocTest`; private audio stays in `.tools/` and is never included in an APK. Full UI/native checks are `SpeakerIdentificationTest#transcribingLabelsEachVoice` and `#cancellingDuringSpeakerIdentificationSavesNothing`; they need the downloaded models. CI runs two speaker checks without models: consent before downloading, and no separate Transcribe or speaker step.
+The `device_config` key comes from the Android 15 documentation of the foreground service timeouts. If the AVD does not accept it, read the documentation for the current key.

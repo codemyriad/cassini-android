@@ -1,5 +1,6 @@
 # Working in this repository
 
+- People who contribute: read [`CONTRIBUTING.md`](CONTRIBUTING.md) first. This file is for coding agents.
 - Commit and push completed, reviewable milestones to `origin` when appropriate, as requested by the user. The remote is `git@github.com:codemyriad/cassini-android`.
 - Clone with `--recurse-submodules` (or run `git submodule update --init`): the pinned conformance vectors come from the `third_party/cassini-format` submodule, and the `:core` tests, which run them, fail without it. Use `./scripts/setup.sh` to fetch the pinned Android runtime. Run Gradle with JDK 17. Build with `./gradlew :app:assembleDebug`; verify relevant changes with `./gradlew detekt ciTest :app:lintDebug :data:lintDebug :ui:lintDebug`, as CI does (`ciTest` runs every module's unit tests and the `:ui` screenshot check). The engine and format tests live in `:core`; `./gradlew --configure-on-demand :core:test` needs only a JDK and the submodule (`docs/development.md`).
 - Device checks use `scripts/device-smoke.sh`. Its direct adb instrumentation retains app data; Gradle's managed connected-test cleanup can uninstall the app and erase downloaded models.

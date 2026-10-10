@@ -1,5 +1,7 @@
 # Android Parakeet acceleration investigation — 2026-10-01
 
+> Historical note: this file records work on the 0.1.0 prototype, written from 2026-10-01 to 2026-10-09. Nobody updates it. Its statements about the app can be out of date. For the current app, read [the architecture](../architecture.md) and [the development notes](../development.md).
+
 **GPU execution is possible on the connected Pixel 8, including a quantized Parakeet TDT 0.6B v3 model.** An isolated LiteRT experiment compiled all three model subgraphs for OpenCL and transcribed the supplied Italian recording. This needs a different model conversion/runtime from the current sherpa AAR. Full GPU execution was slower than LiteRT CPU in this experiment; a GPU encoder with CPU decoding was modestly faster after loading.
 
 The production app continues to use sherpa CPU and to record CPU in Cassini provenance. No experimental backend is selected automatically.
