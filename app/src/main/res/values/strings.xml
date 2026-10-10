@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">Cassini</string>
     <string name="error_open">Could not open this recording. Choose the file again.</string>
-    <string name="error_large">This prototype accepts files up to 64 MB.</string>
+    <string name="error_large">This file is too large. Choose a file under 2 GB.</string>
     <string name="error_long">Choose a recording of 2 hours or less.</string>
     <string name="error_short">Choose at least 200 milliseconds of audio.</string>
     <string name="error_audio">Could not read this audio. Try PCM16 WAV, MP3, M4A or Opus.</string>
