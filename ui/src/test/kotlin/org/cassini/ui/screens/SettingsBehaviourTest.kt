@@ -30,7 +30,7 @@ import org.cassini.ui.licenses.LicensesEvent
 import org.cassini.ui.licenses.LicensesScreen
 import org.cassini.ui.models.ModelDownloadEvent
 import org.cassini.ui.models.ModelDownloadScreen
-import org.cassini.ui.settings.AppLanguage
+import org.cassini.ui.settings.LanguageChoice
 import org.cassini.ui.settings.SettingsEvent
 import org.cassini.ui.settings.SettingsScreen
 import org.cassini.ui.theme.CassiniTheme
@@ -123,7 +123,7 @@ class SettingsBehaviourTest {
         rule.runOnIdle {
             assertEquals(
                 listOf(
-                    SettingsEvent.Language(AppLanguage.ITALIAN),
+                    SettingsEvent.Language(LanguageChoice.ITALIAN),
                     SettingsEvent.TurnOnNotifications,
                     SettingsEvent.OpenModel(ModelPartUi.VOICES),
                     SettingsEvent.OpenVoices,

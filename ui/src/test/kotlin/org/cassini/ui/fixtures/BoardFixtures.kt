@@ -50,7 +50,7 @@ import org.cassini.ui.recording.CaptureFormat
 import org.cassini.ui.recording.RecordingHint
 import org.cassini.ui.recording.RecordingPhase
 import org.cassini.ui.recording.RecordingUiState
-import org.cassini.ui.settings.AppLanguage
+import org.cassini.ui.settings.LanguageChoice
 import org.cassini.ui.settings.ModelRowUi
 import org.cassini.ui.settings.ModelStatusUi
 import org.cassini.ui.settings.SettingsUiState
@@ -338,7 +338,7 @@ internal object BoardFixtures {
     // Board 08: Settings (the board's About card reads "Cassini 0.1.0").
 
     val settings = SettingsUiState(
-        language = AppLanguage.PHONE,
+        language = LanguageChoice.PHONE,
         models = persistentListOf(
             ModelRowUi(ModelPartUi.SPEECH, ModelBytes.SPEECH, ModelStatusUi.Ready),
             ModelRowUi(ModelPartUi.SPEAKERS, ModelBytes.SPEAKERS, ModelStatusUi.Ready),

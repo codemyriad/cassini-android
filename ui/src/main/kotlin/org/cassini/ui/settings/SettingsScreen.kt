@@ -79,7 +79,7 @@ fun SettingsScreen(
         SegmentedControl(
             options = languages,
             selectedIndex = state.language.ordinal,
-            onSelect = { onEvent(SettingsEvent.Language(AppLanguage.entries[it])) },
+            onSelect = { onEvent(SettingsEvent.Language(LanguageChoice.entries[it])) },
             modifier = Modifier.padding(horizontal = 16.dp),
         )
         HelperText(stringResource(R.string.ui_settings_language_footnote), normalLineHeight = true)

@@ -66,7 +66,7 @@ import org.cassini.ui.note.VoiceOptionUi
 import org.cassini.ui.recording.CaptureFormat
 import org.cassini.ui.recording.RecordingHint
 import org.cassini.ui.recording.RecordingPhase
-import org.cassini.ui.settings.AppLanguage
+import org.cassini.ui.settings.LanguageChoice
 import org.cassini.ui.settings.ModelRowUi
 import org.cassini.ui.settings.ModelStatusUi
 import org.cassini.ui.theme.SpeakerTone
@@ -688,7 +688,7 @@ internal object VariantFixtures {
                 ModelRowUi(ModelPartUi.VOICES, ModelBytes.VOICES, ModelStatusUi.NotDownloaded),
             ),
         ),
-        "settings-italian-none" to b.settings.copy(language = AppLanguage.ITALIAN, voices = 0, trash = 0, version = "0.2.0"),
+        "settings-italian-none" to b.settings.copy(language = LanguageChoice.ITALIAN, voices = 0, trash = 0, version = "0.2.0"),
     )
 
     // Saved voices (features.md section 10).

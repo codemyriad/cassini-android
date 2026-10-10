@@ -8,7 +8,7 @@ sealed interface SettingsEvent {
     data object Back : SettingsEvent
 
     @Immutable
-    data class Language(val language: AppLanguage) : SettingsEvent
+    data class Language(val language: LanguageChoice) : SettingsEvent
 
     /** A model row; only a Not downloaded row opens Model download. */
     @Immutable

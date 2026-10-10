@@ -11,7 +11,7 @@ import org.cassini.ui.format.ModelPartUi
  */
 @Immutable
 data class SettingsUiState(
-    val language: AppLanguage,
+    val language: LanguageChoice,
     val models: ImmutableList<ModelRowUi>,
     val voices: Int,
     val trash: Int,
@@ -20,7 +20,7 @@ data class SettingsUiState(
 )
 
 /** The App language segments: Phone (follow the system), English, Italiano. */
-enum class AppLanguage { PHONE, ENGLISH, ITALIAN }
+enum class LanguageChoice { PHONE, ENGLISH, ITALIAN }
 
 /** One On-device models row: the part, its size in bytes and its status text. */
 @Immutable

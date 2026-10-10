@@ -1477,7 +1477,6 @@
     <ID>MagicNumber:AacCapture.kt$AacCapture$31</ID>
     <ID>MagicNumber:AacCapture.kt$AacCapture$32000</ID>
     <ID>MagicNumber:AacCapture.kt$AacCapture$48000</ID>
-    <ID>MagicNumber:AppLanguage.kt$AppLanguage$33</ID>
     <ID>MagicNumber:AudioDecoder.kt$AudioDecoder$1000</ID>
     <ID>MagicNumber:AudioDecoder.kt$AudioDecoder$1000L</ID>
     <ID>MagicNumber:AudioDecoder.kt$AudioDecoder$1024</ID>
@@ -2235,8 +2234,6 @@
     <ID>MaximumLineLength:WavDecoderTest.kt$WavDecoderTest$ </ID>
     <ID>MaximumLineLength:WordGate.kt$WordGate$ </ID>
     <ID>MaximumLineLength:WordGateTest.kt$WordGateTest$ </ID>
-    <ID>MultiLineIfElse:AppLanguage.kt$AppLanguage$context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).getString(KEY, "") ?: ""</ID>
-    <ID>MultiLineIfElse:AppLanguage.kt$AppLanguage$context.getSystemService(LocaleManager::class.java).applicationLocales.toLanguageTags()</ID>
     <ID>MultiLineIfElse:AudioDecoder.kt$AudioDecoder$AudioFormat.ENCODING_PCM_16BIT</ID>
     <ID>MultiLineIfElse:AudioDecoder.kt$AudioDecoder$PcmBuilder(opusSamples?.let { (it * Limits.ASR_RATE + 24000) / 48000 }?.toInt() ?: durationUs?.let { (it * Limits.ASR_RATE / 1_000_000).toInt() } ?: (Limits.ASR_RATE * 60))</ID>
     <ID>MultiLineIfElse:AudioDecoder.kt$AudioDecoder$null</ID>
@@ -2519,7 +2516,6 @@
     <ID>PropertyWrapping:WavDecoderTest.kt$WavDecoderTest$val mono = FloatArray(frames) { f -&gt; var sum = 0f; repeat(channels) { sum += pcm[f * channels + it] / 32768f }; sum / channels }</ID>
     <ID>PropertyWrapping:WordGateTest.kt$WordGateTest$val want = listOf(word("straddles", 900, 1000), word("boundary", 1000, 1000), word("inside-vad-padding", 1000, 1000))</ID>
     <ID>PropertyWrapping:WordGateTest.kt$WordGateTest$val words = listOf(timed("max", Long.MAX_VALUE, Long.MAX_VALUE), timed("min", Long.MIN_VALUE, Long.MIN_VALUE), timed("reversed", 800, 700))</ID>
-    <ID>ReturnCount:AppLanguage.kt$AppLanguage$fun wrap(context: Context): Context</ID>
     <ID>ReturnCount:BatteryReader.kt$BatteryReader$fun read(context: Context, elapsedMs: Long): BatteryProjection.Reading?</ID>
     <ID>ReturnCount:CassiniDocument.kt$CassiniDocument$fun speakerLabel(id: String): String?</ID>
     <ID>ReturnCount:CassiniDocument.kt$CassiniDocument.Companion$private fun read(verify: Boolean = true, open: () -&gt; InputStream): CassiniDocument</ID>
@@ -2727,7 +2723,6 @@
     <ID>Wrapping:AacCapture.kt$AacCapture$;</ID>
     <ID>Wrapping:AacCapture.kt$AacCapture${ 0 }</ID>
     <ID>Wrapping:AacCapture.kt$AacCapture${ recorder?.maxAmplitude ?: 0 }</ID>
-    <ID>Wrapping:AppLanguage.kt$AppLanguage$(</ID>
     <ID>Wrapping:AudioDecoder.kt$AudioDecoder$(</ID>
     <ID>Wrapping:AudioDecoder.kt$AudioDecoder$;</ID>
     <ID>Wrapping:AudioDecoder.kt$AudioDecoder$minOf(frames.toLong(), (it * sampleRate / 48000 - firstFrame).coerceAtLeast(0)).toInt()</ID>
