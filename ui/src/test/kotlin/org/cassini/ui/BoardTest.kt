@@ -105,7 +105,9 @@ abstract class BoardTest {
         private const val CLOCK_ADVANCE_MS = 1_000L
         private const val FONT_SCALE_DELTA = 0.001f
         private const val CHANGE_THRESHOLD = 0.0005f
-        private val OPTIONS = RoborazziOptions(
+
+        /** The compare options of every golden. */
+        val OPTIONS: RoborazziOptions = RoborazziOptions(
             compareOptions = RoborazziOptions.CompareOptions(changeThreshold = CHANGE_THRESHOLD),
         )
     }
