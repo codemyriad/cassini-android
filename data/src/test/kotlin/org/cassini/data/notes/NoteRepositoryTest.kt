@@ -65,6 +65,20 @@ class NoteRepositoryTest {
         assertEquals(AudioKind.UNPLAYABLE, h.row(id).audioKind)
     }
 
+    @Test fun aRecordingThatCouldNotStartIsDiscarded() = runTest {
+        val id = h.notes.createRecording("Nota", createdAt = 1, format = "m4a")
+        File(h.dir(id), "capture.m4a").writeBytes(ByteArray(3))
+
+        assertTrue(h.notes.discardRecording(id))
+        assertFalse(h.dir(id).exists())
+        assertNull(h.db.notes().note(id))
+
+        val kept = h.notes.createRecording("Tenuta", createdAt = 2, format = "opus")
+        h.notes.finishRecording(kept, 1_000)
+        assertFalse("only a live capture is discarded", h.notes.discardRecording(kept))
+        assertTrue(h.dir(kept).isDirectory)
+    }
+
     @Test fun aRenameOfAnOkDocumentIsWrittenIntoItInTheBackground() = runTest {
         h.documentNote("a", words, title = "Riunione")
         h.notes.refreshIfStale("a")

@@ -124,6 +124,17 @@ class NoteRepository(
     suspend fun finishRecording(id: String, durationMs: Long): Boolean =
         notes.finishRecording(id, durationMs, clock()) > 0
 
+    /**
+     * A recording that could not start (architecture 5.8, `CouldNotStart`), or that captured nothing: deletes
+     * `notes/<id>/`, then the row. It touches only a LIVE_CAPTURE row and returns false for any other note. When the
+     * directory cannot be deleted the row stays, and recovery repairs it at the next start.
+     */
+    suspend fun discardRecording(id: String): Boolean {
+        val deleted = notes.note(id)?.audioKind == AudioKind.LIVE_CAPTURE && documents.deleteFiles(id)
+        if (deleted) notes.delete(id)
+        return deleted
+    }
+
     suspend fun markUnplayable(id: String): Boolean = notes.markUnplayable(id, clock()) > 0
 
     // Edits.
