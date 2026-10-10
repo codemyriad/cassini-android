@@ -2,9 +2,9 @@
 
 This file is for contributors who build, test and examine Cassini for Android 0.2. [`CONTRIBUTING.md`](../CONTRIBUTING.md) gives the first steps and the rules for a change. [`architecture.md`](architecture.md) gives the design. [`data-formats.md`](data-formats.md) gives the files, the tables and the export formats.
 
-> **Status.** This file describes the 0.2 target. Some tools in it are planned and are not in the tree yet: tests with `@Manual`, `scripts/device-language-check.sh`, the API 35 emulator and the weekly models job of CI. Each of these sections says so.
+> **Status.** This file describes the 0.2 target. Some tools in it are planned and are not in the tree yet: the API 35 emulator and the weekly models job of CI. Each of these sections says so.
 
-<!-- TODO(P10): Phases P10 and P11 add the tools in the status note. When they are in the tree, compare each name and flag with the code, correct this file, and remove the status note and the "Planned" notes. -->
+<!-- TODO(P11): Phase P11 adds the tools in the status note. When they are in the tree, compare each name and flag with the code, correct this file, and remove the status note and the "Planned" notes. -->
 
 ## Setup
 
@@ -89,7 +89,7 @@ The root task `ciTest` runs `:core:test`. For each Android module, it runs `veri
 | Robolectric | `:data:testDebugUnitTest` and the Robolectric tests of the other modules | The repositories and DAOs, the full-text search, the purge order, the catalogue rebuild, the font and license assets |
 | Screenshots | `:ui:verifyRoborazziDebug` | Each board compared with its golden, in light, dark, Italian and 1.5x font scale |
 | Device | `scripts/device-smoke.sh` | Instrumentation tests on an emulator or a phone (see [Device scripts](#device-scripts)) |
-| Host persistence | `scripts/device-kill-resume.sh`, `scripts/device-language-check.sh` (planned) | Process death and the app language, driven from the host |
+| Host persistence | `scripts/device-kill-resume.sh`, `scripts/device-language-check.sh`, `scripts/note-opening-timing.sh` | Process death, the app language and the time to open a note, driven from the host |
 | Acceptance | Planned | An instrumented walk through each board on emulator-5554, with device screenshots that a reviewer compares with the design |
 
 Robolectric runs at SDK 35. Each module that uses it has `src/test/resources/robolectric.properties` with `sdk=35`. SDK 36 and later need a JDK 21 runtime, and the build uses JDK 17. One test in each module makes sure that `Build.VERSION.SDK_INT` is 35.
@@ -121,6 +121,30 @@ The Compose accessibility checks (`enableAccessibilityChecks()`) do not operate 
 Each ERROR or WARNING of the checks fails the test, with three exceptions. The exceptions are the small touch targets of inline word links and of the Library row suffixes, and the low contrast of the old waveform bars (`rec.barIdle`, permitted in `docs/design/ui.md` section 11). The tests write each finding to logcat with the tag `CassiniA11y`.
 
 `app/src/test/.../nav/AppShellTest` runs the whole app under Robolectric on a scratch root. It tests the back order (a sheet, then the search, then the screen), the minimised recording, the predictive back callback, the edge-to-edge insets, the system bar icons of each screen and the TalkBack semantics of the Note screen.
+
+### Device flow tests
+
+The tests in `app/src/androidTest/.../flows/` start the real `MainActivity` on the scratch root of `CassiniTestRunner`. They wait for the state flows of the graph or for the screen, and they do not use fixed delays. `FlowSupport.kt` holds the shared parts.
+
+| Test | Annotation | What it does |
+|---|---|---|
+| `LibraryFlowTest` | `@CiSmoke` | It shows the empty Library. It opens the FLEURS clip through ACTION_VIEW, from a `file://` copy in the scratch cache. The Note screen opens, with the Library under it. The same file again gives the same note. The row is Audio only or Queued. Search finds a word of another note. A long press opens the actions sheet. Move to trash and Undo restore the note. |
+| `PortableDocumentTest` | `@CiSmoke` | It writes the encoder capability of the device to logcat (tag `CassiniCompatibility`). It makes a document with the libopus encoder of the app and reads it again. On API 34 only (`@SdkSuppress`), it encodes the clip with the platform Opus encoder and makes sure that the duration and the speech times stay the same. |
+| `RecordingFlowTest` | `@NeedsMicrophone` | It records for 5 s and minimises the recording with back. The Library shows the recording card. It sends the Finish action of the notification, and the note shows in the Library. |
+| `NoteFlowTest` | `@NeedsModels` | It transcribes the FLEURS clip from its note and shows the progress card, the words and a seek on a word tap. Transcribe again adds version 2 to the Versions sheet. Save a copy gives the same bytes as `notes/<id>/document.opus`. The TXT, SRT and VTT exports are equal to the goldens. |
+| `SpeakerNamingFlowTest` | `@NeedsModels` | It saves a voice from a first transcription. The draft of a second transcription asks "Is this Luca?". "Yes, Luca" names the speaker. The sealed document has the label, and Saved voices shows Luca with 1 note. |
+| `NoteOpeningTimingTest` | `@Manual` | The timing check of [note-opening-timing.sh](#note-opening-timingsh). |
+
+An `Instrumentation.ActivityMonitor` gives the result of the system file picker (`ACTION_CREATE_DOCUMENT`) in `NoteFlowTest`. The result is a file in the scratch cache, so no picker opens.
+
+`SpeakerNamingFlowTest` saves the same voiceprint as two persons, Luca and Marco. The two scores are equal, so `VoiceMatcher` makes a suggestion and does not name the speaker automatically. The second transcription is the second half of the clip, twelve times. Thus the draft stays on the screen for some time.
+
+The export goldens are in `app/src/androidTest/assets/goldens/`. We recorded them on emulator-5554 (API 34, x86_64). In the TXT golden, the second line is `<date> · 00:15`, because the date of the note changes at each run. If a golden is not there or is different, `NoteFlowTest` fails. Then it writes the export to `cache/goldens-candidate/` of the app. To record a golden again, do these steps:
+
+1. Run `scripts/device-smoke.sh --serial emulator-5554 --class org.cassini.android.flows.NoteFlowTest`.
+2. Copy the candidate with `adb exec-out run-as org.cassini.android cat cache/goldens-candidate/fleurs-it-short.txt`.
+3. Examine the candidate, and then put it in `app/src/androidTest/assets/goldens/`.
+4. Delete `cache/goldens-candidate/` on the device with `run-as`.
 
 ## Device safety
 
@@ -181,7 +205,7 @@ The test APK holds the long clip of the background tests ([`fixtures/README.md`]
 | `@CiSmoke` | Tests that need no models and no microphone. `scripts/ci-emulator-smoke.sh` selects them. | The CI emulators, API 26, 29, 34 and 35 |
 | `@NeedsModels` | Tests that need the installed models | emulator-5554, and the weekly CI models job on API 34 |
 | `@NeedsMicrophone` | Tests that record from the microphone | An emulator or a phone. Emulator audio can be silence, so these tests examine the files and the states. |
-| `@Manual` | Tests that CI does not run. No test has it yet. | By hand, with `--class` |
+| `@Manual` | Tests that CI does not run, and that need their own script. `NoteOpeningTimingTest` has it. Without the arguments of its script, it skips. | By hand, with the script of the test |
 
 Examples:
 
@@ -191,6 +215,8 @@ scripts/device-smoke.sh --serial emulator-5554 --annotation NeedsMicrophone
 scripts/device-smoke.sh --serial emulator-5554 --annotation CiSmoke
 scripts/device-smoke.sh --serial emulator-5554 --bench --class org.cassini.bench.DiarizationPocTest
 ```
+
+On emulator-5554 (API 34, with the models), the dry runs select 17 `CiSmoke` tests, 9 `NeedsModels` tests and 2 `NeedsMicrophone` tests. `PortableDocumentTest#platformOpusKeepsTheDurationAndTheSpeechClock` operates on API 34 only. Thus the `CiSmoke` count is 16 on the other API levels.
 
 The YouTube samples are not in the repository. `tools/fetch-youtube-audio.sh` gets them (it needs `uvx yt-dlp` and ffmpeg). `DeviceSmokeTest#opusCheckpointContinuesIdenticalPacketsAfterClosingTheEncoder` always has `@Ignore`, and an ignored test makes the run fail. Thus remove it from a class selection:
 
@@ -234,9 +260,34 @@ A host script does this test because the two Android tools do not kill the proce
 
 ### device-language-check.sh
 
-> **Planned.** This script is not in the tree yet.
+`scripts/device-language-check.sh` makes sure that the app language stays after process death. It selects Italiano in Settings with `uiautomator dump` and `input tap`. Then it kills the process with `run-as org.cassini.android kill -9`, starts the app with `am start -W` and finds Italian text in a new `uiautomator dump`. At the end, it sets the language back to Phone.
 
-`scripts/device-language-check.sh` makes sure that the app language stays after process death. It selects Italiano in Settings with `uiautomator`. Then it kills the process with `kill -9`, starts the app with `am start -W` and finds Italian text in a new `uiautomator dump`. At the end, it sets the language back to the phone language.
+```sh
+scripts/device-language-check.sh --serial emulator-5554
+```
+
+The script uses the installed debug app and its own data. It does not change notes or models. Before you start it, set the device to a language that is not Italian, and set the app language to Phone. An instrumentation test cannot do this check, because the test stops when its process stops.
+
+### note-opening-timing.sh
+
+`scripts/note-opening-timing.sh` measures the time from a tap on a Library row to the first transcript turn on the screen. It uses a document of about one hour (the FLEURS clip 227 times, 6129 words, 25.6 MB) and the 15 s FLEURS document. It measures the first open, later opens and the opens after process death.
+
+The script operates `NoteOpeningTimingTest` two times with `-e keepRoot timing`. With this argument, `CassiniTestRunner` keeps the scratch root `files/androidTest-kept-timing` after the run. The first run imports the two documents and opens each document four times. Then the script force-stops the app. The second run opens each document three times in a new process. At the end, the script deletes the scratch root. Install the debug app and its test APK before you start the script.
+
+```sh
+scripts/note-opening-timing.sh --serial emulator-5554
+```
+
+Results on emulator-5554 (API 34, x86_64), 10 Oct 2026, in milliseconds:
+
+| Note | Audio | First open | Later opens | After process death | Later opens after process death |
+|---|---|---|---|---|---|
+| `timing-one-hour` | 3600 s | 1245 | 1037, 921, 837 | 1380 | 1156, 987 |
+| `timing-fleurs` | 15 s | 603 | 569, 536, 552 | 596 | 651, 602 |
+
+The times include the 250 ms screen transition and the time of the test to find the turn. The first open of the one-hour document is fast, because the import keeps the result of the check and the words in Room. The app does not read the document again at the first open.
+
+A later open of the one-hour document takes about 0.4 s more than a later open of the short document (median 987 ms against 569 ms). Thus a part of the open time still increases with the length of the transcript. We did not find the cause yet. Examine the Note ViewModel first. It loads the first page of 400 words and then all the words, and the screen can get only the second result. This item is open for P12.
 
 ## Portable file checks
 
