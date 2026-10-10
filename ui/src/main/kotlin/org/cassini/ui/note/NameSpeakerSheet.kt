@@ -55,6 +55,7 @@ import org.cassini.ui.components.SecondaryButtonSize
 import org.cassini.ui.components.SpeakerNameUi
 import org.cassini.ui.components.TextButton
 import org.cassini.ui.components.display
+import org.cassini.ui.components.firstGrapheme
 import org.cassini.ui.components.overhang
 import org.cassini.ui.components.touchTarget
 import org.cassini.ui.format.Durations
@@ -62,7 +63,6 @@ import org.cassini.ui.format.LocalFormat
 import org.cassini.ui.theme.CassiniIcon
 import org.cassini.ui.theme.CassiniTheme
 import org.cassini.ui.theme.Glyph
-import java.text.BreakIterator
 
 /**
  * The Name a speaker sheet (board 04; features.md section 4) in its [CassiniSheet] window. Every control sends a
@@ -177,10 +177,7 @@ private fun SheetHeader(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit) {
 @Composable
 private fun avatarText(name: SpeakerNameUi, label: String): String {
     if (name is SpeakerNameUi.Placeholder) return name.number.toString()
-    val locale = LocalFormat.current.locale
-    val breaks = BreakIterator.getCharacterInstance(locale).apply { setText(label) }
-    val end = breaks.next()
-    return if (end == BreakIterator.DONE) "" else label.substring(0, end).uppercase(locale)
+    return firstGrapheme(label, LocalFormat.current.locale)
 }
 
 /**

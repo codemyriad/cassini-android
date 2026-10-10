@@ -58,6 +58,11 @@ abstract class BoardTest {
         content: @Composable () -> Unit,
     ) {
         show(dark, content)
+        capture(dir, name, window)
+    }
+
+    /** Captures what is on screen now to `src/test/screenshots/<dir>/<name>.png`, as [board] does after [show]. */
+    fun capture(dir: String, name: String, window: Boolean = false) {
         val path = "src/test/screenshots/$dir/$name.png"
         if (window) {
             captureScreenRoboImage(path, roborazziOptions = OPTIONS)

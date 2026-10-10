@@ -153,7 +153,14 @@ fun SettingsRow(
         content = {
             Column {
                 Text(text = title, style = CassiniTheme.type.button, color = c.ink)
-                if (subtitle != null) Text(text = subtitle, style = CassiniTheme.type.caption, color = c.text2)
+                if (subtitle != null) {
+                    // The board's subtitle is an inline 13 px span in a 16 px line box (19.5 dp).
+                    Text(
+                        text = subtitle,
+                        style = CassiniTheme.type.caption.copy(lineHeight = CassiniTheme.type.body16.lineHeight),
+                        color = c.text2,
+                    )
+                }
             }
             when (trailing) {
                 SettingsTrailing.None -> Unit
@@ -195,13 +202,17 @@ fun SettingsRow(
     }
 }
 
-/** The helper line under a settings group: `caption` in text2, line height 1.4, margin top 6, horizontal 20. */
+/**
+ * The helper line under a settings group: `caption` in text2, line height 1.4 (the board's models helper) or the
+ * normal one with [normalLineHeight] (the App language helper), margin top 6, horizontal 20.
+ */
 @Composable
-fun HelperText(text: String, modifier: Modifier = Modifier) {
+fun HelperText(text: String, modifier: Modifier = Modifier, normalLineHeight: Boolean = false) {
+    val caption = CassiniTheme.type.caption
     Text(
         text = text,
         modifier = modifier.padding(start = 20.dp, end = 20.dp, top = 6.dp),
-        style = CassiniTheme.type.caption.copy(lineHeight = CassiniTheme.type.caption.fontSize * 1.4f),
+        style = if (normalLineHeight) caption else caption.copy(lineHeight = caption.fontSize * 1.4f),
         color = CassiniTheme.colors.text2,
     )
 }

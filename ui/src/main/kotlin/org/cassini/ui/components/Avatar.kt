@@ -21,6 +21,8 @@ import androidx.compose.ui.unit.dp
 import org.cassini.ui.theme.CassiniTheme
 import org.cassini.ui.theme.SpeakerTone
 import org.cassini.ui.theme.colors
+import java.text.BreakIterator
+import java.util.Locale
 
 /**
  * A round avatar of [size] dp (boards 04 and 07): the speaker tone's tint with [text] (an initial or a number) in
@@ -53,4 +55,11 @@ internal fun AvatarPreview() {
             Avatar("L", SpeakerTone.Violet)
         }
     }
+}
+
+/** The first character (grapheme) of [text] in upper case, as an avatar shows a name; empty for an empty text. */
+internal fun firstGrapheme(text: String, locale: Locale): String {
+    val breaks = BreakIterator.getCharacterInstance(locale).apply { setText(text) }
+    val end = breaks.next()
+    return if (end == BreakIterator.DONE) "" else text.substring(0, end).uppercase(locale)
 }
