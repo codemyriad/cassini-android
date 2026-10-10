@@ -138,7 +138,7 @@ object ModelCatalog {
      * The hosts a model download may be redirected to (`RedirectPolicy`). An entry `*.example.com` matches every
      * subdomain of example.com but not example.com itself; any other entry matches exactly. Downloads start only at
      * the catalogue URLs (huggingface.co, github.com, dist.gocassini.com), and each redirect must be HTTPS to one of
-     * these hosts. PRIVACY.md (added in P10) must list the same domains.
+     * these hosts. PRIVACY.md lists the same entries (LicenseAssetsTest checks it).
      *
      * Redirects recorded on 2026-10-09 with `curl -sIL --max-redirs 5` for every catalogue URL (query strings left
      * out):

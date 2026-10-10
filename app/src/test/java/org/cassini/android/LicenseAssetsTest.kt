@@ -1,5 +1,6 @@
 package org.cassini.android
 
+import org.cassini.core.models.ModelCatalog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -17,9 +18,14 @@ class LicenseAssetsTest {
 
     @Test fun thirdPartyNoticesMatchTheRepository() = same("THIRD_PARTY_NOTICES.md", "THIRD_PARTY_NOTICES.md")
 
-    // TODO(P10): app/build.gradle.kts must list the root PRIVACY.md in the licenseSources test inputs,
-    // or an edit of only that file leaves this test up to date or takes it from the build cache.
     @Test fun privacyPolicyMatchesTheRepository() = same("PRIVACY.md", "PRIVACY.md")
+
+    @Test fun privacyPolicyListsEachDownloadHost() {
+        val privacy = File(root, "PRIVACY.md").readText()
+        for (host in ModelCatalog.DOWNLOAD_HOSTS) {
+            assertTrue("PRIVACY.md does not list $host", "- `$host`" in privacy)
+        }
+    }
 
     @Test fun nativeDependenciesMatchTheBuildManifest() = same("scripts/native-dependencies.json", "native-dependencies.json")
 

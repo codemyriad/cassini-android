@@ -79,6 +79,7 @@ android {
                 // them up to date or taking them from the build cache.
                 it.inputs.files(
                     rootDir.resolve("THIRD_PARTY_NOTICES.md"),
+                    rootDir.resolve("PRIVACY.md"),
                     rootDir.resolve("scripts/native-dependencies.json"),
                     file("src/main/assets/licenses"),
                 ).withPropertyName("licenseSources").withPathSensitivity(PathSensitivity.RELATIVE)

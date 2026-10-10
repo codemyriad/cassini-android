@@ -60,10 +60,11 @@ Cassini downloads each model from one host:
 
 A host can send the download to a different host (a redirect). Cassini follows a redirect only to an HTTPS host in its allow-list (a list of permitted hosts). This allow-list is the list in `ModelCatalog.DOWNLOAD_HOSTS`:
 
-- `huggingface.co` and its subdomains
-- The subdomains of `hf.co` (the file storage of Hugging Face)
+- `huggingface.co`
+- `*.huggingface.co`: the subdomains of `huggingface.co`
+- `*.hf.co`: the subdomains of `hf.co` (the file storage of Hugging Face)
 - `github.com`
-- The subdomains of `githubusercontent.com` (the file storage of GitHub releases)
+- `*.githubusercontent.com`: the subdomains of `githubusercontent.com` (the file storage of GitHub releases)
 - `dist.gocassini.com`
 
 If a redirect goes to a different host, Cassini stops the download of that model.
