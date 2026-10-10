@@ -253,8 +253,29 @@ class DocumentRepository(
             }
         }
 
-    /** "Save a copy": the note's audio file byte for byte (the document, or the plain capture or import). */
-    suspend fun exportCopy(noteId: String, dest: Uri): ExportOutcome = withContext(dispatchers.io) {
+    /**
+     * Writes the title of every OK document note that has `title_dirty` set and no job row into its document: the
+     * background write after a rename did not run or failed (process death, a full disk). A startup step
+     * (architecture 4.8). Returns the notes whose document was written.
+     */
+    suspend fun retitleDirty(): List<String> {
+        // retitle refuses a note with a job row: adopt writes the title then.
+        return notes.all().filter(::needsRetitle).map { it.id }.filter { retitle(it) == EditOutcome.Done() }
+    }
+
+    /**
+     * "Save a copy": the note's audio file byte for byte (the document, or the plain capture or import). A dirty
+     * title is written into an OK document first, so the copy carries the note's title.
+     */
+    suspend fun exportCopy(noteId: String, dest: Uri): ExportOutcome {
+        notes.note(noteId)?.takeIf(::needsRetitle)?.let { retitle(noteId) }
+        return copyAudio(noteId, dest)
+    }
+
+    private fun needsRetitle(row: NoteEntity): Boolean =
+        row.titleDirty && row.audioKind == AudioKind.DOCUMENT && row.documentState == DocumentState.OK
+
+    private suspend fun copyAudio(noteId: String, dest: Uri): ExportOutcome = withContext(dispatchers.io) {
         val row = notes.note(noteId)
         val file = row?.let { File(paths.note(noteId), it.audioFile) }
         when {

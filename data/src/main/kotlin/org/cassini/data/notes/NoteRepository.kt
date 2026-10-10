@@ -131,7 +131,8 @@ class NoteRepository(
     /**
      * Renames a note: `notes.title` and `note_text.title` change in one transaction. A DOCUMENT note is marked
      * `title_dirty`; when no job row exists and the document is OK, the title is then written into the document in
-     * the background, which clears the mark. Otherwise adopt writes it after the job, and a document that is not OK
+     * the background, which clears the mark. If that write does not run or fails, `DocumentRepository.retitleDirty` at
+     * the next start or `exportCopy` writes it. Otherwise adopt writes it after the job, and a document that is not OK
      * keeps the new title in Room only (it is never sealed again; a fresh seal later uses the row's title).
      */
     suspend fun rename(id: String, title: String): RenameOutcome {

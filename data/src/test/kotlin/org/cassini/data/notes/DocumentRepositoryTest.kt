@@ -220,6 +220,38 @@ class DocumentRepositoryTest {
         assertEquals(DocumentSignature.of(h.document("a")), h.row("a").documentSignature)
     }
 
+    @Test fun aTitleThatNoBackgroundWriteWroteIsWrittenBeforeACopyAndAtStart() = runTest {
+        h.documentNote("a", first, title = "Riunione")
+        h.documentNote("b", first, title = "Telefonata")
+        h.documentNote("c", first, title = "Intervista")
+        listOf("a", "b", "c").forEach { h.notes.refreshIfStale(it) }
+        // A job row stops the background write; then the job goes without an adopt (removed from the queue).
+        listOf("a", "b", "c").forEach { insertJob(it, JobState.QUEUED) }
+        h.notes.rename("a", "Riunione di lunedì")
+        h.notes.rename("b", "Telefonata con Marco")
+        h.notes.rename("c", "Intervista a Bea")
+        h.awaitBackground()
+        h.db.jobs().delete("a")
+        h.db.jobs().delete("b")
+        assertTrue(h.row("a").titleDirty)
+
+        val copy = File(folder.newFolder("out"), "copy.opus")
+        assertTrue(h.documents.exportCopy("a", Uri.fromFile(copy)) is ExportOutcome.Saved)
+
+        assertEquals("Riunione di lunedì", CassiniDocument.read(copy).title)
+        assertArrayEquals(h.document("a").readBytes(), copy.readBytes())
+        assertFalse(h.row("a").titleDirty)
+
+        // At the next start: "b" is written; "c" still has a job, whose adopt writes the title.
+        h.restart()
+        assertEquals(listOf("b"), h.documents.retitleDirty())
+        assertEquals("Telefonata con Marco", h.readFile("b").title)
+        assertFalse(h.row("b").titleDirty)
+        assertEquals("Intervista", h.readFile("c").title)
+        assertTrue(h.row("c").titleDirty)
+        assertEquals(emptyList<String>(), h.documents.retitleDirty())
+    }
+
     @Test fun aRenameOfAnUnverifiedDocumentStaysInRoomAndSurvivesRefreshIfStale() = runTest {
         h.documentNote("a", first, title = "Riunione")
         val file = h.document("a")
