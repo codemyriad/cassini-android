@@ -3,6 +3,9 @@ package org.cassini.android
 import android.app.Application
 import android.os.StrictMode
 import android.util.Log
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
 import org.cassini.android.processing.NotificationChannels
 import org.cassini.data.AppPaths
 
@@ -20,8 +23,9 @@ class CassiniApplication : Application() {
     private lateinit var paths: AppPaths
 
     /**
-     * The process's graph, created on first use. Creating it starts the startup work of architecture 4.8 on IO, so
-     * that work runs once per process, also when only a service starts.
+     * The process's graph, created on first use: a service start, or the first ON_START of the process (see
+     * [onCreate]). Creating it starts the startup work of architecture 4.8 on IO, so that work runs once per process,
+     * also when only a service starts.
      */
     val graph: AppGraph by lazy {
         (graphFactory ?: GraphFactory { app, paths -> AppGraph(app, AppGraph.Config(paths)) }).create(this, paths)
@@ -36,6 +40,16 @@ class CassiniApplication : Application() {
             StrictMode.setVmPolicy(StrictMode.VmPolicy.Builder().detectAll().penaltyLog().build())
         }
         NotificationChannels.create(this)
+        // The first ON_START creates the graph: its startup work runs, and its coordinator starts a waiting queue
+        // (architecture 4.8 and 5.3). Not at once: a JVM test installs its graphFactory after onCreate.
+        ProcessLifecycleOwner.get().lifecycle.addObserver(
+            object : DefaultLifecycleObserver {
+                override fun onStart(owner: LifecycleOwner) {
+                    owner.lifecycle.removeObserver(this)
+                    graph
+                }
+            },
+        )
         // The old model directory contains only downloads. Retry on launch if deletion failed.
         if (!InstalledModels.removeLegacyModel(filesDir)) {
             Log.w(TAG, "Could not remove obsolete FP32 model downloads")

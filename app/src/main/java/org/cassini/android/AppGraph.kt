@@ -15,6 +15,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.cassini.android.adapters.InstalledEngines
 import org.cassini.android.adapters.NamingGate
@@ -87,8 +88,8 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
 
 /**
- * The app's manual dependency graph (architecture 2.5): one instance per process, created lazily by
- * [CassiniApplication]. Tests and the instrumentation runner build one on a scratch [Config.paths].
+ * The app's manual dependency graph (architecture 2.5): one instance per process, created by [CassiniApplication]
+ * at the first ON_START or at the first service start. Tests and the instrumentation runner build one on a scratch [Config.paths].
  *
  * The parts that need no database exist at once: paths, dispatchers, locks, settings, models and the install owner,
  * the engine seams. The parts over Room are in [Catalogue], which exists once the database is open ([catalogue]).
@@ -166,8 +167,9 @@ class AppGraph(context: Context, val config: Config) {
     val namingGate = NamingGate()
 
     /**
-     * The transcription queue (architecture 5.1-5.3), created on first use. It binds itself as the canceller of a
-     * RUNNING job for the purge and starts following the app's visibility (ON_START starts a waiting queue).
+     * The transcription queue (architecture 5.1-5.3), created on first use or when the app is first visible. It binds
+     * itself as the canceller of a RUNNING job for the purge and follows the app's visibility (ON_START starts a
+     * waiting queue).
      */
     val processing: ProcessingCoordinator by lazy { createProcessing() }
 
@@ -220,6 +222,12 @@ class AppGraph(context: Context, val config: Config) {
     init {
         bindActiveRecording { if (recordingHolder.isInitialized()) recording.activeNoteId.value else null }
         appScope.launch(dispatchers.io) { runStartup() }
+        // ON_START (architecture 5.3): the first time the app is visible the coordinator exists, so a waiting queue
+        // starts also when no screen reads `processing` first.
+        appScope.launch {
+            visibility.visible.first { it }
+            processing
+        }
     }
 
     /**

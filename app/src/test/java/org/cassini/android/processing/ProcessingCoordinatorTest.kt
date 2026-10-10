@@ -412,6 +412,24 @@ class ProcessingCoordinatorTest {
         assertEquals("PAUSED jobs never resume on their own", 2, created.size)
     }
 
+    @Test fun aVisibleAppStartsAWaitingQueueWithoutAnyReadOfTheCoordinator() = runBlocking {
+        val first = graph()
+        consent()
+        val id = note("Waiting")
+        catalogue().database.jobs().insert(row(id, seq = 1, JobState.QUEUED))
+        first.close()
+        graphs.remove(first)
+
+        // A new process that the launcher opens: nothing here reads graph.processing before the start.
+        visibility.state.value = true
+        val fresh = graph(paths)
+        waitUntil { starts.get() == 1 }
+        assertEquals(id, job(0).noteId)
+        job(0).finish(JobOutcome.Done)
+        fresh.processing.awaitIdle()
+        assertEquals(1, starts.get())
+    }
+
     // Consent (architecture 5.6). --------------------------------------------------------------------------------
 
     @Test fun withoutConsentTranscribeEndsNeedsConsentWithoutAnyJobOrNetwork() = runBlocking {
