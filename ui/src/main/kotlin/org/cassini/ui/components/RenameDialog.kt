@@ -18,55 +18,87 @@ import org.cassini.ui.R
 /** The longest note title a rename accepts (features.md section 6). */
 const val TITLE_MAX_LENGTH = 200
 
+/** The longest saved-voice name (features.md sections 4 and 10). */
+const val NAME_MAX_LENGTH = 80
+
 /**
- * The note Rename dialog (features.md section 6) in its [CassiniDialog] window: the title field prefilled with
- * [title], Cancel and Save. Save is disabled until the title changes; a blank title shows "Enter a title." and
- * disables it too. Input stops at [TITLE_MAX_LENGTH] characters. Save calls [onConfirm] with the trimmed title.
+ * What a rename dialog edits: a note title (the default: "Rename", label "Title", 200 characters, sentence case) or
+ * a saved voice's name ([RenameKind.Voice]: "Rename saved voice", label "Name", 80 characters, words capitalised).
+ */
+enum class RenameKind { Title, Voice }
+
+/**
+ * The Rename dialog (features.md sections 6 and 10) in its [CassiniDialog] window: the field prefilled with [title],
+ * Cancel and Save. Save is disabled until the text changes; a blank text shows "Enter a title." ("Enter a name.")
+ * and disables it too. Input stops at the [kind]'s length limit. Save calls [onConfirm] with the trimmed text.
  */
 @Composable
-fun RenameDialog(title: String, onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
+fun RenameDialog(
+    title: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+    kind: RenameKind = RenameKind.Title,
+) {
     var value by rememberSaveable(title) { mutableStateOf(title) }
     CassiniDialog(
         onDismissRequest = onDismiss,
-        title = stringResource(R.string.ui_actions_rename_title),
+        title = dialogTitle(kind),
         actions = { RenameActions(title, value, onConfirm, onDismiss) },
-        content = { RenameField(title, value, onValueChange = { value = it }, onConfirm = onConfirm) },
+        content = { RenameField(kind, title, value, onValueChange = { value = it }, onConfirm = onConfirm) },
     )
 }
 
 /** The same dialog drawn inline, for screenshots (`DialogBoardFrame`); [value] is the field text, [title] the old one. */
 @Composable
+@Suppress("LongParameterList") // The old and new text, the three callbacks and the kind.
 fun RenameDialogContent(
     title: String,
     value: String,
     onValueChange: (String) -> Unit,
     onConfirm: (String) -> Unit,
     onDismiss: () -> Unit,
+    kind: RenameKind = RenameKind.Title,
 ) {
     CassiniDialogContent(
-        title = stringResource(R.string.ui_actions_rename_title),
+        title = dialogTitle(kind),
         actions = { RenameActions(title, value, onConfirm, onDismiss) },
-        content = { RenameField(title, value, onValueChange, onConfirm, showFocus = true) },
+        content = { RenameField(kind, title, value, onValueChange, onConfirm, showFocus = true) },
     )
 }
 
 @Composable
+private fun dialogTitle(kind: RenameKind): String = stringResource(
+    when (kind) {
+        RenameKind.Title -> R.string.ui_actions_rename_title
+        RenameKind.Voice -> R.string.ui_voices_rename_title
+    },
+)
+
+@Composable
+@Suppress("LongParameterList") // The kind, the old and new text, both callbacks and the forced focus look.
 private fun RenameField(
+    kind: RenameKind,
     title: String,
     value: String,
     onValueChange: (String) -> Unit,
     onConfirm: (String) -> Unit,
     showFocus: Boolean? = null,
 ) {
+    val voice = kind == RenameKind.Voice
     val blank = value.isBlank()
+    val max = if (voice) NAME_MAX_LENGTH else TITLE_MAX_LENGTH
     CassiniTextField(
         value = value,
-        onValueChange = { onValueChange(it.take(TITLE_MAX_LENGTH)) },
-        label = stringResource(R.string.ui_title_label),
-        error = if (blank) stringResource(R.string.ui_error_title_blank) else null,
+        onValueChange = { onValueChange(it.take(max)) },
+        label = stringResource(if (voice) R.string.ui_name_label else R.string.ui_title_label),
+        error = when {
+            !blank -> null
+            voice -> stringResource(R.string.ui_error_name_blank)
+            else -> stringResource(R.string.ui_error_title_blank)
+        },
         showFocus = showFocus,
         keyboardOptions = KeyboardOptions(
-            capitalization = KeyboardCapitalization.Sentences,
+            capitalization = if (voice) KeyboardCapitalization.Words else KeyboardCapitalization.Sentences,
             imeAction = ImeAction.Done,
         ),
         keyboardActions = KeyboardActions(onDone = { if (canSave(title, value)) onConfirm(value.trim()) }),
