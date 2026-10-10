@@ -16,5 +16,5 @@ Delete this directory at the end of P8, once `:ui` has ported what it needs.
 
 P7 rewrote the spike's measuring scripts as `tools/ui-fidelity/` (`compare.py`, `crop_states.py`,
 `rows.py`, `contrast.py`). They are ruff-clean, but `config/ruff.toml` still excludes that directory
-and CI's ruff step checks only `scripts`. P10 removes the exclusion and adds the directory to the CI
+and CI's ruff step checks only `scripts`. P10 removes the exclusion. P11 adds the directory to the CI
 step (see `tools/ui-fidelity/README.md`).
