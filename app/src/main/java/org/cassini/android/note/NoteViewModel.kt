@@ -597,7 +597,8 @@ class NoteViewModel(
     /**
      * Opens the player while the screen is shown and the mode has one; prepares again after a document replace. A
      * newer key cancels only the wait for the first turns: a screen left in that time does not open the player. The
-     * player calls are not cancelled, so [opened] always tells what is open.
+     * player calls are not cancelled, so [opened] always tells what is open. A ViewModel cleared during an open
+     * leaves the player when the open ends.
      */
     private suspend fun followPlayer() {
         var opened: String? = null
@@ -619,6 +620,11 @@ class NoteViewModel(
                     file != opened -> {
                         ports.openPlayer(noteId, file, key.positionMs)
                         opened = file
+                        // Cleared while the file prepared: onCleared found no player to leave, so leave it here.
+                        if (!viewModelScope.isActive) {
+                            ports.leavePlayer(noteId)
+                            opened = null
+                        }
                     }
                     key.signature != signature -> ports.reloadPlayer(noteId, file)
                 }

@@ -1,6 +1,10 @@
 package org.cassini.android.note
 
 import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -190,6 +194,32 @@ class NoteViewModelTest {
         viewModel.onTurnsShown()
         advanceUntilIdle()
         assertEquals(1, ports.calls.count { it.startsWith("openPlayer") })
+    }
+
+    @Test
+    fun aScreenClearedWhileThePlayerPreparesLeavesThePlayer() = runTest(dispatcher) {
+        val gate = CompletableDeferred<Unit>()
+        ports.openGate = gate
+        val store = ViewModelStore()
+        val created = NoteViewModel(saved, NoteKey(NOTE), ports, CLOCK, dispatcher, recentWords)
+        val factory = object : ViewModelProvider.Factory {
+            override fun <T : ViewModel> create(modelClass: Class<T>): T = modelClass.cast(created)
+        }
+        val viewModel = ViewModelProvider(store, factory)[NoteViewModel::class.java]
+        backgroundScope.launch { viewModel.state.collect {} }
+        viewModel.onVisible(true)
+        viewModel.onTurnsShown()
+        runCurrent()
+        assertEquals(1, ports.calls.count { it.startsWith("openPlayer") })
+
+        // Back during the prepare: the ViewModel is cleared, and onCleared finds no player yet.
+        viewModel.onVisible(false)
+        store.clear()
+        runCurrent()
+        ports.calls.clear()
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertEquals("the open that ends after the clear leaves the player", listOf("leavePlayer"), ports.calls)
     }
 
     // Modes. ----------------------------------------------------------------------------------------------------

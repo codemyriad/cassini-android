@@ -1,5 +1,6 @@
 package org.cassini.android.note
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.cassini.android.library.daysAgo
@@ -143,6 +144,9 @@ internal class FakeNotePorts : NotePorts {
     var draft: DraftTranscript? = null
 
     val calls = mutableListOf<String>()
+
+    /** When set, openPlayer waits for it (a long file that prepares). */
+    var openGate: CompletableDeferred<Unit>? = null
     val relabels = mutableListOf<Map<String, String>>()
     val exports = mutableListOf<TranscriptExport>()
     val undo = mutableListOf<TrashedNote>()
@@ -185,6 +189,7 @@ internal class FakeNotePorts : NotePorts {
 
     override suspend fun openPlayer(id: String, audioFile: String, positionMs: Long): Boolean {
         calls += "openPlayer:$audioFile"
+        openGate?.await()
         playback.value = PlaybackState(noteId = id, durationMs = 4_000, positionMs = positionMs)
         return true
     }
