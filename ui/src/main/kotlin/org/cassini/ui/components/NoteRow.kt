@@ -190,7 +190,10 @@ internal fun rowStatus(status: NoteStatusUi): RowStatus = when (status) {
     NoteStatusUi.AudioOnly -> RowStatus(stringResource(R.string.ui_status_audio_only), Tone.Outline)
 }
 
-/** Rename and Move to trash always; Resume when paused; Try again when failed. */
+/**
+ * Rename always; Move to trash except on the note being recorded (features.md section 6, as the actions sheet);
+ * Resume when paused; Try again when failed.
+ */
 @Composable
 private fun customActions(row: NoteRowUi, onAction: (NoteRowAction) -> Unit): List<CustomAccessibilityAction> {
     val rename = stringResource(R.string.ui_action_rename)
@@ -204,7 +207,7 @@ private fun customActions(row: NoteRowUi, onAction: (NoteRowAction) -> Unit): Li
             else -> Unit
         }
         add(action(rename, NoteRowAction.RENAME, onAction))
-        add(action(trash, NoteRowAction.TRASH, onAction))
+        if (row.status != NoteStatusUi.Recording) add(action(trash, NoteRowAction.TRASH, onAction))
     }
 }
 

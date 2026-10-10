@@ -184,6 +184,16 @@ class ComponentSemanticsTest {
         assertEquals(listOf(NoteRowAction.RESUME, NoteRowAction.RENAME, NoteRowAction.TRASH), actions)
     }
 
+    /** The note being recorded cannot move to trash (features.md section 6): its row offers only Rename. */
+    @Test fun theRecordingRowHasNoTrashAction() {
+        val (recording, day) = ComponentFixtures.otherRows.first { it.first.id == "rec" }
+        setThemed {
+            Column(Modifier.width(390.dp)) { NoteRow(recording, day, onAction = {}) }
+        }
+        val row = rule.onNode(hasContentDescription("Standup,", substring = true))
+        assertEquals(listOf("Rename"), row.customActionLabels())
+    }
+
     @Test fun aSearchResultRowSpeaksItsSuffixAndPreview() {
         val (result, day) = ComponentFixtures.otherRows.first { it.first.id == "result" }
         setThemed {
