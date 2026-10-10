@@ -357,6 +357,14 @@ enum class BannerKind(
         R.string.ui_banner_voices_unreadable_title,
         R.string.ui_banner_voices_unreadable_body,
     ),
+
+    /** The database did not open (a full disk, an I/O or permission error): the Library cannot list the notes. */
+    LIB_UNAVAILABLE(
+        ERROR,
+        LIB,
+        R.string.ui_banner_lib_unavailable_title,
+        R.string.ui_banner_lib_unavailable_body,
+    ),
     ;
 
     /** The catalogue actions, the default of [BannerSpec.actions]. */

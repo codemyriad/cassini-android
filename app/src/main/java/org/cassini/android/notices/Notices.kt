@@ -73,6 +73,8 @@ data class LibraryFacts(
     val query: String = "",
     val results: Int? = null,
     val audioOnly: Boolean = false,
+    /** The database did not open (architecture 4.8 step 1): LIB_UNAVAILABLE, not the empty Library. */
+    val unavailable: Boolean = false,
 )
 
 /**
@@ -131,6 +133,7 @@ object Notices {
     }
 
     private fun listState(library: LibraryFacts): List<Notice> = when {
+        library.unavailable -> listOf(Notice(BannerSpec(BannerKind.LIB_UNAVAILABLE, announce = true)))
         library.query.isNotBlank() && library.results == 0 ->
             listOf(Notice(BannerSpec(BannerKind.LIB_NO_MATCH, BannerArgs(text = library.query.trim()))))
         library.query.isBlank() && library.liveNotes == 0 -> listOf(Notice(BannerSpec(BannerKind.LIB_EMPTY)))

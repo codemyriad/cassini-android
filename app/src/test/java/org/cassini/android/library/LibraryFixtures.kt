@@ -2,6 +2,7 @@ package org.cassini.android.library
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import org.cassini.android.notices.NoticeFacts
 import org.cassini.android.notices.TrashedNote
@@ -104,7 +105,10 @@ internal class FakeLibraryPorts : LibraryPorts {
     val actions = mutableListOf<String>()
     val searches = mutableListOf<String>()
 
-    override fun library(): Flow<List<LibraryRow>> = rows
+    /** Set: the catalogue cannot be read, as when the database did not open. */
+    var libraryError: Exception? = null
+
+    override fun library(): Flow<List<LibraryRow>> = libraryError?.let { error -> flow { throw error } } ?: rows
 
     override fun search(query: String): Flow<List<SearchRow>> {
         searches += query

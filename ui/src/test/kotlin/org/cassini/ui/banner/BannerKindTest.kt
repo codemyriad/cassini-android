@@ -181,6 +181,11 @@ private val ENGLISH: Map<BannerKind, Triple<String, String?, List<String>>> = ma
         "They were made by a newer Cassini or are damaged. Nothing was changed.",
         listOf(),
     ),
+    BannerKind.LIB_UNAVAILABLE to Triple(
+        "Your notes can’t be opened",
+        "Your files are kept. Free some storage, then open Cassini again.",
+        listOf(),
+    ),
 )
 
 /** A value of each [BannerArgs] field that differs from the default, to check [BannerKind.uses]. */
@@ -271,7 +276,7 @@ class BannerKindTest {
                 BannerGroup.RECORDING to 8,
                 BannerGroup.TRANSCRIPTION to 9,
                 BannerGroup.DOWNLOAD to 8,
-                BannerGroup.LIBRARY to 10,
+                BannerGroup.LIBRARY to 11,
             ),
             BannerKind.entries.groupingBy { it.group }.eachCount(),
         )

@@ -46,7 +46,11 @@ class NoticeCenter(private val graph: AppGraph, context: Context, val imports: I
 
     private val library: Flow<List<LibraryRow>> = flow {
         emitAll(graph.awaitCatalogue().notes.library())
-    }.catch { error -> Log.w(TAG, "The library cannot be read for the notices", error) }
+    }.catch { error ->
+        // The other facts must still flow: the Library shows LIB_UNAVAILABLE itself.
+        Log.w(TAG, "The library cannot be read for the notices", error)
+        emit(emptyList())
+    }
 
     private val voicesProblem: Flow<VoiceProblem?> = flow {
         emitAll(graph.awaitCatalogue().voices.people().map { it.problem })

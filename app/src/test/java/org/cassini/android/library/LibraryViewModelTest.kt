@@ -90,6 +90,16 @@ class LibraryViewModelTest {
     }
 
     @Test
+    fun aCatalogueThatCannotBeReadIsNotAnEmptyLibrary() = runTest(dispatcher) {
+        ports.libraryError = java.io.IOException("disk full")
+        val viewModel = viewModel()
+        advanceUntilIdle()
+        val state = viewModel.now()
+        assertEquals(listOf(BannerKind.LIB_UNAVAILABLE), state.banners.map { it.kind })
+        assertTrue(state.sections.isEmpty())
+    }
+
+    @Test
     fun searchesAfterTheDebounceAndKeepsTheQuery() = runTest(dispatcher) {
         ports.add(libraryRow("a"))
         val row = libraryRow("hit", title = "Fattura")

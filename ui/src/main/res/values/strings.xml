@@ -572,4 +572,6 @@
     <string name="ui_banner_notifications_off_body">Progress shows only in the app.</string>
     <string name="ui_banner_voices_unreadable_title">Saved voices can’t be read</string>
     <string name="ui_banner_voices_unreadable_body">They were made by a newer Cassini or are damaged. Nothing was changed.</string>
+    <string name="ui_banner_lib_unavailable_title">Your notes can’t be opened</string>
+    <string name="ui_banner_lib_unavailable_body">Your files are kept. Free some storage, then open Cassini again.</string>
 </resources>

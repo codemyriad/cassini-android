@@ -546,4 +546,6 @@
     <string name="ui_banner_notifications_off_body">I progressi si vedono solo nell’app.</string>
     <string name="ui_banner_voices_unreadable_title">Impossibile leggere le voci salvate</string>
     <string name="ui_banner_voices_unreadable_body">Sono state create da una versione più recente di Cassini o sono danneggiate. Non è stato modificato nulla.</string>
+    <string name="ui_banner_lib_unavailable_title">Impossibile aprire le note</string>
+    <string name="ui_banner_lib_unavailable_body">I file sono al sicuro. Libera spazio, poi apri di nuovo Cassini.</string>
 </resources>

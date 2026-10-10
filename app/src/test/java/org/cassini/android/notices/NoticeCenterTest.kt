@@ -336,6 +336,7 @@ class NoticeCenterTest {
             ),
         )
         addAll(Notices.library(NoticeFacts(), LibraryFacts(liveNotes = 1, query = "q", results = 0)))
+        addAll(Notices.library(NoticeFacts(), LibraryFacts(unavailable = true)))
         listOf(Failure.LARGE, Failure.SPACE, Failure.WAV, Failure.OPEN).forEach { failure ->
             val facts = NoticeFacts(imports = ImportState(failure = ImportFailure(failure)))
             addAll(Notices.library(facts, LibraryFacts()))

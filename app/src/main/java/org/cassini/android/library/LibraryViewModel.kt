@@ -107,11 +107,15 @@ class LibraryViewModel(
     private var trashed: String? = null
     private var snackbarCount = 0L
 
+    /** The catalogue cannot be read (the database did not open): the Library says so, it is not empty. */
+    private val unavailable = MutableStateFlow(false)
+
     private val rows: Flow<List<LibraryRow>?> = ports.library()
         .map<List<LibraryRow>, List<LibraryRow>?> { it }
         .onStart { emit(null) }
         .catch { error ->
             Log.e(TAG, "The library cannot be read", error)
+            unavailable.value = true
             emit(emptyList())
         }
 
@@ -145,7 +149,7 @@ class LibraryViewModel(
     ) { processing, rec, facts, voices -> Live(processing, rec, facts, voices) }
 
     val state: StateFlow<LibraryUiState> = combine(
-        combine(rows, search, query, ::Listing),
+        combine(rows, search, query, unavailable, ::Listing),
         live,
         sheet,
         dialog,
@@ -169,6 +173,7 @@ class LibraryViewModel(
         val rows: List<LibraryRow>?,
         val search: Pair<String, List<SearchRow>?>,
         val query: String,
+        val unavailable: Boolean,
     )
 
     private data class Live(
@@ -204,6 +209,7 @@ class LibraryViewModel(
             query = if (searching) searched else "",
             results = results?.size,
             audioOnly = audioOnly,
+            unavailable = listing.unavailable,
         )
         return LibraryUiState(
             loading = listing.rows == null,
