@@ -231,4 +231,7 @@
     <string name="battery_completion">Batteria %1$d%% · ~%2$d%% al termine</string>
     <string name="battery_estimating">Batteria %1$d%% · misurazione dei consumi</string>
     <string name="battery_unavailable">Stima batteria non disponibile</string>
+    <string name="import_fallback_title">Audio importato</string>
+    <string name="notif_channel_processing">Trascrizione</string>
+    <string name="notif_channel_results">Trascrizioni completate</string>
 </resources>
