@@ -119,8 +119,10 @@ Do these steps for each board, and record the results in `docs/ui-fidelity.md`:
 ## Ruff
 
 The P2 spike scripts were excluded from ruff in `config/ruff.toml` (`extend-exclude`). These scripts
-replace them and pass `ruff check`. P7 does not own `config/`, so the exclusion is still there and P10
-must remove it. Until then, check them explicitly:
+replace them and pass `ruff check`. P7 does not own `config/` or CI, so P10 must make two changes:
+remove the exclusion (and its stale comment, which still names `diff.py`), and add `tools/ui-fidelity`
+to the ruff step of `.github/workflows/android.yml`, which checks only `scripts` today. Until then,
+check them explicitly:
 
 ```sh
 ruff check --config config/ruff.toml --no-cache --no-force-exclude tools/ui-fidelity/*.py
