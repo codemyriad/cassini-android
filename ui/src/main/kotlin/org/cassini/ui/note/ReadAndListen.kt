@@ -126,7 +126,7 @@ internal fun NoteChipsRow(chips: NoteChipsUi, onEvent: (NoteEvent) -> Unit) {
 
 /** The trust chip's copy and tone (features.md section 3.3). */
 @Composable
-private fun trustChip(trust: TrustUi): Pair<String, Tone> = when (trust) {
+internal fun trustChip(trust: TrustUi): Pair<String, Tone> = when (trust) {
     TrustUi.VERIFIED -> stringResource(R.string.ui_trust_verified) to Tone.Ok
     TrustUi.NOT_VERIFIED -> stringResource(R.string.ui_trust_not_verified) to Tone.Warn
     TrustUi.AUDIO_CHANGED -> stringResource(R.string.ui_trust_audio_changed) to Tone.Warn

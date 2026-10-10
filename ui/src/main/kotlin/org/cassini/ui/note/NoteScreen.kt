@@ -31,7 +31,6 @@ import org.cassini.ui.components.CassiniTopBar
 import org.cassini.ui.components.FollowChip
 import org.cassini.ui.components.IconButton44
 import org.cassini.ui.components.PlaybackBar
-import org.cassini.ui.components.RenameDialog
 import org.cassini.ui.components.TopBarStyle
 import org.cassini.ui.format.Dates
 import org.cassini.ui.format.Durations
@@ -45,7 +44,7 @@ import org.cassini.ui.theme.Glyph
  * (the navigation in :app handles that one). The player sits at the bottom whenever [NoteUiState.playback] is set.
  *
  * Reading mode (board 03) is [ReadAndListenBody]; every other mode shows the top bar with the subtitle and the
- * body of [NoteModeBody] (board 02 and the modes without a board). P8 step 4 adds the remaining sheets and dialogs.
+ * body of [NoteModeBody] (board 02 and the modes without a board). The sheets and dialogs are [NoteOverlays].
  */
 @Composable
 fun NoteScreen(
@@ -176,26 +175,4 @@ internal fun ColumnScope.ReadAndListenBody(
         onEvent = onEvent,
         modifier = Modifier.weight(1f),
     )
-}
-
-/** The open sheet and dialog. This step draws the actions sheet and Rename; P8 step 4 draws the others. */
-@Composable
-private fun NoteOverlays(state: NoteUiState, onEvent: (NoteEvent) -> Unit) {
-    val dismissSheet = { onEvent(NoteEvent.DismissSheet) }
-    when (val sheet = state.sheet) {
-        is NoteSheet.Actions -> NoteActionsSheet(
-            ui = sheet.ui,
-            onAction = { onEvent(NoteEvent.SheetAction(it)) },
-            onDismiss = dismissSheet,
-        )
-        else -> Unit
-    }
-    when (val dialog = state.dialog) {
-        is NoteDialog.Rename -> RenameDialog(
-            title = dialog.title,
-            onConfirm = { onEvent(NoteEvent.RenameConfirmed(it)) },
-            onDismiss = { onEvent(NoteEvent.DismissDialog) },
-        )
-        else -> Unit
-    }
 }

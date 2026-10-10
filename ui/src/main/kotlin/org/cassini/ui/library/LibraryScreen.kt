@@ -31,10 +31,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.cassini.ui.R
 import org.cassini.ui.components.Banner
-import org.cassini.ui.components.CassiniDialog
 import org.cassini.ui.components.CassiniSnackbarHost
+import org.cassini.ui.components.ConfirmDialog
 import org.cassini.ui.components.DayHeader
-import org.cassini.ui.components.DialogActions
 import org.cassini.ui.components.LibraryBottomBar
 import org.cassini.ui.components.LibraryTopBar
 import org.cassini.ui.components.NoteRow
@@ -50,6 +49,8 @@ import org.cassini.ui.format.Dates
 import org.cassini.ui.format.DayLabel
 import org.cassini.ui.format.Progress
 import org.cassini.ui.note.NoteActionsSheet
+import org.cassini.ui.note.startOverSpec
+import org.cassini.ui.note.stopAndTrashSpec
 import org.cassini.ui.theme.CassiniTheme
 
 /** The list's bottom padding: the bottom bar (40 + 64 + 24 dp) plus the navigation bar. */
@@ -261,31 +262,15 @@ private fun LibraryDialogWindow(dialog: LibraryDialog, onEvent: (LibraryEvent) -
             onConfirm = { onEvent(LibraryEvent.RenameConfirmed(dialog.id, it)) },
             onDismiss = dismiss,
         )
-        is LibraryDialog.StartOver -> CassiniDialog(
-            onDismissRequest = dismiss,
-            title = stringResource(R.string.ui_note_start_over_title),
-            body = stringResource(R.string.ui_note_start_over_body),
-            actions = {
-                DialogActions(
-                    confirmLabel = stringResource(R.string.ui_action_start_over),
-                    onConfirm = { onEvent(LibraryEvent.ConfirmDialog) },
-                    onCancel = dismiss,
-                    destructive = true,
-                )
-            },
+        is LibraryDialog.StartOver -> ConfirmDialog(
+            spec = startOverSpec(),
+            onConfirm = { onEvent(LibraryEvent.ConfirmDialog) },
+            onDismiss = dismiss,
         )
-        is LibraryDialog.StopAndTrash -> CassiniDialog(
-            onDismissRequest = dismiss,
-            title = stringResource(R.string.ui_actions_trash_running),
-            body = stringResource(R.string.ui_actions_trash_body),
-            actions = {
-                DialogActions(
-                    confirmLabel = stringResource(R.string.ui_action_move_to_trash),
-                    onConfirm = { onEvent(LibraryEvent.ConfirmDialog) },
-                    onCancel = dismiss,
-                    destructive = true,
-                )
-            },
+        is LibraryDialog.StopAndTrash -> ConfirmDialog(
+            spec = stopAndTrashSpec(),
+            onConfirm = { onEvent(LibraryEvent.ConfirmDialog) },
+            onDismiss = dismiss,
         )
     }
 }
