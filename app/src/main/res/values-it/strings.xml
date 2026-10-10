@@ -290,4 +290,20 @@
     <string name="notif_stopped_title">Trascrizione interrotta</string>
     <string name="notif_stopped_text">Cassini si è chiuso durante la trascrizione di %1$s.</string>
     <string name="notif_stopped_public">Cassini si è chiuso durante la trascrizione di una nota.</string>
+    <!-- Registrazione (features.md sezioni 2, 12 e 13.2). -->
+    <string name="rec_default_title">Nota vocale %1$s</string>
+    <string name="notif_rec_title">Registrazione</string>
+    <string name="notif_rec_paused_title">Registrazione in pausa</string>
+    <string name="notif_rec_paused_at">In pausa a %1$s</string>
+    <string name="notif_rec_starting">Avvio del microfono…</string>
+    <string name="notif_rec_saving">Salvataggio della registrazione…</string>
+    <string name="notif_rec_other_app">In pausa — un\'altra app sta usando l\'audio</string>
+    <string name="notif_rec_storage_low">Spazio quasi esaurito — circa %1$d min rimasti</string>
+    <string name="notif_rec_near_limit">Si ferma automaticamente tra 5 minuti</string>
+    <string name="notif_action_pause">Pausa</string>
+    <string name="notif_action_finish">Termina</string>
+    <string name="notif_rec_stopped_title">Registrazione interrotta</string>
+    <string name="notif_rec_stopped_text">Meno di 200 MB liberi. La registrazione fatta finora è salvata.</string>
+    <string name="notif_rec_failed_title">Il microfono ha smesso di funzionare</string>
+    <string name="notif_rec_failed_text">Registrazione terminata. L\'audio registrato finora è nella libreria.</string>
 </resources>

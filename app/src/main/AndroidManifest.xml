@@ -19,6 +19,9 @@
             android:theme="@style/Theme.Cassini.Settings" android:parentActivityName=".MainActivity" />
         <activity android:name=".RecordingActivity" android:exported="false" android:configChanges="orientation|screenSize" />
         <service android:name=".RecordingService" android:exported="false" android:foregroundServiceType="microphone" />
+        <!-- The 0.2 recording service (architecture 5.8); the 0.1.0 one above goes in P10. -->
+        <service android:name=".recording.RecordingService" android:exported="false"
+            android:foregroundServiceType="microphone" />
         <service android:name=".processing.ProcessingService" android:exported="false"
             android:foregroundServiceType="dataSync|mediaProcessing" />
         <activity android:name=".LibraryActivity" android:exported="true">

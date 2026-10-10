@@ -290,4 +290,20 @@
     <string name="notif_stopped_title">Transcription stopped</string>
     <string name="notif_stopped_text">Cassini closed while transcribing %1$s.</string>
     <string name="notif_stopped_public">Cassini closed while transcribing a note.</string>
+    <!-- Recording (features.md sections 2, 12 and 13.2). -->
+    <string name="rec_default_title">Voice note %1$s</string>
+    <string name="notif_rec_title">Recording</string>
+    <string name="notif_rec_paused_title">Recording paused</string>
+    <string name="notif_rec_paused_at">Paused at %1$s</string>
+    <string name="notif_rec_starting">Starting the microphone…</string>
+    <string name="notif_rec_saving">Saving the recording…</string>
+    <string name="notif_rec_other_app">Paused — another app is using audio</string>
+    <string name="notif_rec_storage_low">Storage almost full — about %1$d min left</string>
+    <string name="notif_rec_near_limit">Stops automatically in 5 minutes</string>
+    <string name="notif_action_pause">Pause</string>
+    <string name="notif_action_finish">Finish</string>
+    <string name="notif_rec_stopped_title">Recording stopped</string>
+    <string name="notif_rec_stopped_text">Less than 200 MB free. The recording so far is saved.</string>
+    <string name="notif_rec_failed_title">Microphone stopped working</string>
+    <string name="notif_rec_failed_text">Recording ended. The audio so far is in your library.</string>
 </resources>

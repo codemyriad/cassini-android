@@ -2,12 +2,15 @@ package org.cassini.android
 
 import android.content.Context
 import android.os.Build
+import android.os.SystemClock
 import android.util.Log
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,6 +22,10 @@ import org.cassini.android.adapters.NetworkCheck
 import org.cassini.android.adapters.RepositoryJobStorage
 import org.cassini.android.adapters.RepositoryJobVoices
 import org.cassini.android.adapters.RepositoryModelAccess
+import org.cassini.android.playback.AndroidPlaybackPlatform
+import org.cassini.android.playback.MediaAudioPlayer
+import org.cassini.android.playback.PlaybackController
+import org.cassini.android.playback.RepositoryPositionStore
 import org.cassini.android.processing.AppVisibility
 import org.cassini.android.processing.ForegroundServiceStarter
 import org.cassini.android.processing.ModelInstallOwner
@@ -29,6 +36,17 @@ import org.cassini.android.processing.ProcessingNotices
 import org.cassini.android.processing.ProcessingNotifications
 import org.cassini.android.processing.ServiceStarter
 import org.cassini.android.processing.TranscriptionJobFactory
+import org.cassini.android.recording.AndroidRecordingPlatform
+import org.cassini.android.recording.CaptureSource
+import org.cassini.android.recording.FactoryCaptureSource
+import org.cassini.android.recording.ProcessingHandoff
+import org.cassini.android.recording.RecordingConsent
+import org.cassini.android.recording.RecordingController
+import org.cassini.android.recording.RecordingNotes
+import org.cassini.android.recording.RecordingPlatform
+import org.cassini.android.recording.RepositoryRecordingNotes
+import org.cassini.android.recording.SettingsConsent
+import org.cassini.android.recording.TranscriptionHandoff
 import org.cassini.core.models.ModelPart
 import org.cassini.data.AppPaths
 import org.cassini.data.CassiniDispatchers
@@ -62,6 +80,10 @@ import java.io.File
 import java.io.IOException
 import java.time.Instant
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -79,8 +101,8 @@ class AppGraph(context: Context, val config: Config) {
     /**
      * What a graph is built from. [fetcher] fetches model files (tests and the download screen checks pass a scripted
      * one, so nothing is downloaded); [network] answers the validated-network check (null: the connectivity
-     * service); [onStartupStep] sees the name of each startup step before it runs, for tests. [processing] replaces
-     * parts of the coordinator in tests.
+     * service); [onStartupStep] sees the name of each startup step before it runs, for tests. [processing] and
+     * [recording] replace parts of the coordinator and the recording controller in tests.
      */
     data class Config(
         val paths: AppPaths,
@@ -91,6 +113,7 @@ class AppGraph(context: Context, val config: Config) {
         val zone: () -> ZoneId = ZoneId::systemDefault,
         val onStartupStep: (String) -> Unit = {},
         val processing: ProcessingHooks = ProcessingHooks(),
+        val recording: RecordingHooks = RecordingHooks(),
     )
 
     /**
@@ -103,6 +126,19 @@ class AppGraph(context: Context, val config: Config) {
         val notices: ProcessingNotices? = null,
         val visibility: AppVisibility? = null,
         val sdkInt: Int = Build.VERSION.SDK_INT,
+    )
+
+    /**
+     * The seams of [RecordingController] for tests: the capture, the Android services, the rows, the hand-off, the
+     * consent and the intervals. Null means the app's implementation.
+     */
+    data class RecordingHooks(
+        val capture: CaptureSource? = null,
+        val platform: RecordingPlatform? = null,
+        val notes: ((Catalogue) -> RecordingNotes)? = null,
+        val handoff: ((AppGraph) -> TranscriptionHandoff)? = null,
+        val consent: RecordingConsent? = null,
+        val timing: RecordingController.Timing = RecordingController.Timing(),
     )
 
     private val app: Context = context.applicationContext
@@ -134,6 +170,34 @@ class AppGraph(context: Context, val config: Config) {
      */
     val processing: ProcessingCoordinator by lazy { createProcessing() }
 
+    /** Whether a screen of the app is visible; results notifications are posted only while it is not. */
+    val visibility: AppVisibility by lazy {
+        config.processing.visibility ?: ProcessVisibility().also(ProcessVisibility::attach)
+    }
+
+    /** The single thread of the recording controller (architecture 7). */
+    private val recorderThread: ExecutorService = Executors.newSingleThreadExecutor { task ->
+        Thread(task, "cassini-recorder").apply { isDaemon = true }
+    }
+    private val recordingHolder = lazy { createRecording() }
+
+    /** The one recording of the process (architecture 5.8), created on first use. */
+    val recording: RecordingController by recordingHolder
+
+    /** The Note screen's player (architecture 5.9). Main thread only. */
+    val playback: PlaybackController by lazy {
+        PlaybackController(
+            PlaybackController.Parts(
+                scope = appScope,
+                main = dispatchers.main,
+                player = { MediaAudioPlayer(dispatchers.io) },
+                platform = AndroidPlaybackPlatform(app),
+                store = RepositoryPositionStore { awaitCatalogue().notes },
+                clock = SystemClock::elapsedRealtime,
+            ),
+        )
+    }
+
     private val runningJobCanceller = AtomicReference(RunningJobCanceller { })
     private val activeRecording = AtomicReference<() -> String?> { null }
 
@@ -153,6 +217,7 @@ class AppGraph(context: Context, val config: Config) {
     val startupReport: StateFlow<StartupReport?> = report.asStateFlow()
 
     init {
+        bindActiveRecording { if (recordingHolder.isInitialized()) recording.activeNoteId.value else null }
         appScope.launch(dispatchers.io) { runStartup() }
     }
 
@@ -174,6 +239,7 @@ class AppGraph(context: Context, val config: Config) {
     /** Stops the graph's work and closes the database. For tests; the app's graph lives as long as the process. */
     fun close() {
         appScope.cancel()
+        recorderThread.shutdownNow()
         openedCatalogue?.database?.close()
     }
 
@@ -248,7 +314,7 @@ class AppGraph(context: Context, val config: Config) {
             jobs = hooks.jobs?.invoke(this) ?: TranscriptionJobFactory(this),
             starter = starter,
             notices = hooks.notices ?: ProcessingNotifications(app),
-            visibility = hooks.visibility ?: ProcessVisibility().also(ProcessVisibility::attach),
+            visibility = visibility,
             battery = BatterySource { elapsedMs -> BatteryReader.read(app, elapsedMs) },
             placeholderLabel = { number -> app.getString(R.string.speaker_label, number) },
             sdkInt = hooks.sdkInt,
@@ -259,8 +325,45 @@ class AppGraph(context: Context, val config: Config) {
         return coordinator
     }
 
+    private fun createRecording(): RecordingController {
+        val hooks = config.recording
+        val handoff = hooks.handoff?.invoke(this) ?: ProcessingHandoff(
+            coordinator = { processing },
+            settings = settings,
+            starter = ForegroundServiceStarter(app) { processing.onServiceRefused() },
+            main = dispatchers.main,
+        )
+        val parts = RecordingController.Parts(
+            scope = appScope,
+            dispatcher = recorderThread.asCoroutineDispatcher(),
+            ready = { ready.await() },
+            notes = {
+                val catalogue = awaitCatalogue()
+                hooks.notes?.invoke(catalogue) ?: RepositoryRecordingNotes(catalogue.notes, paths::note)
+            },
+            capture = hooks.capture ?: FactoryCaptureSource(app),
+            platform = hooks.platform ?: AndroidRecordingPlatform(app),
+            handoff = handoff,
+            consent = hooks.consent ?: SettingsConsent(models, settings),
+            defaultTitle = ::defaultTitle,
+            clock = config.clock,
+            timing = hooks.timing,
+        )
+        return RecordingController(parts)
+    }
+
+    /** "Voice note 8 Oct, 08:14" in the app language (features.md section 2). */
+    private fun defaultTitle(createdAt: Long): String {
+        val localized = ContextCompat.getContextForLanguage(app)
+        val locale = localized.resources.configuration.locales[0] ?: Locale.getDefault()
+        val time = Instant.ofEpochMilli(createdAt).atZone(config.zone())
+        val date = DateTimeFormatter.ofPattern(TITLE_DATE_PATTERN, locale).format(time).replace(".", "")
+        return localized.getString(R.string.rec_default_title, date)
+    }
+
     companion object {
         private const val TAG = "AppGraph"
+        private const val TITLE_DATE_PATTERN = "d MMM, HH:mm"
 
         // The startup steps in their order (architecture 4.8), as Config.onStartupStep names them.
         const val STEP_DATABASE = "database"
