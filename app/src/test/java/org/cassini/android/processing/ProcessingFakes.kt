@@ -16,7 +16,10 @@ import java.util.concurrent.atomic.AtomicReference
 
 // The fakes of the coordinator and service tests.
 
-/** A job the test ends with [finish]; [stop] pauses it at once unless [pauseOnStop] is false. */
+/**
+ * A job the test ends with [finish]; [stop] pauses it at once unless [pauseOnStop] is false. With [holdEvents] its
+ * events stay open after run() until [closeEvents], so the coordinator waits for the tracker meanwhile.
+ */
 internal class FakeJob(override val noteId: String, private val graph: AppGraph) : ProcessingJob {
     private val channel = Channel<JobEvent>(Channel.UNLIMITED)
     private val result = CompletableDeferred<JobOutcome>()
@@ -24,12 +27,26 @@ internal class FakeJob(override val noteId: String, private val graph: AppGraph)
     val stopReason = AtomicReference<PauseReason?>(null)
     val cancelled = AtomicBoolean(false)
 
+    /** Completes when run() returned. */
+    val ended = CompletableDeferred<Unit>()
+
     @Volatile var pauseOnStop = true
+
+    @Volatile var holdEvents = false
 
     override val events: ReceiveChannel<JobEvent> get() = channel
 
     fun finish(outcome: JobOutcome) {
         result.complete(outcome)
+    }
+
+    /** Sends [event] to the job's tracker. */
+    fun send(event: JobEvent) {
+        channel.trySend(event)
+    }
+
+    fun closeEvents() {
+        channel.close()
     }
 
     override fun stop(reason: PauseReason) {
@@ -52,7 +69,8 @@ internal class FakeJob(override val noteId: String, private val graph: AppGraph)
             channel.trySend(JobEvent.Ended(outcome))
             return outcome
         } finally {
-            channel.close()
+            if (!holdEvents) channel.close()
+            ended.complete(Unit)
         }
     }
 }

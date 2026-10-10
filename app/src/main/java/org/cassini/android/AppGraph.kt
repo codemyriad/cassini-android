@@ -118,13 +118,14 @@ class AppGraph(context: Context, val config: Config) {
 
     /**
      * The seams of [ProcessingCoordinator] for tests: the job each claim runs, how the service starts, the results
-     * notifications, the app's visibility and the API level. Null means the app's implementation.
+     * notifications, the app's visibility, the battery reading and the API level. Null means the app's implementation.
      */
     data class ProcessingHooks(
         val jobs: ((AppGraph) -> ProcessingJobFactory)? = null,
         val starter: ((AppGraph) -> ServiceStarter)? = null,
         val notices: ProcessingNotices? = null,
         val visibility: AppVisibility? = null,
+        val battery: BatterySource? = null,
         val sdkInt: Int = Build.VERSION.SDK_INT,
     )
 
@@ -315,7 +316,7 @@ class AppGraph(context: Context, val config: Config) {
             starter = starter,
             notices = hooks.notices ?: ProcessingNotifications(app),
             visibility = visibility,
-            battery = BatterySource { elapsedMs -> BatteryReader.read(app, elapsedMs) },
+            battery = hooks.battery ?: BatterySource { elapsedMs -> BatteryReader.read(app, elapsedMs) },
             placeholderLabel = { number -> app.getString(R.string.speaker_label, number) },
             sdkInt = hooks.sdkInt,
         )

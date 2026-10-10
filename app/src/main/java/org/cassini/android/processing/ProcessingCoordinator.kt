@@ -126,7 +126,11 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
         val sdkInt: Int = Build.VERSION.SDK_INT,
     )
 
-    private enum class Cancel { DISCARD, KEEP }
+    /**
+     * How an interrupted job ends. DISCARD: Start over (the work goes, for any outcome but a sealed one). KEEP:
+     * PAUSED(USER) with the checkpoint. RESTORE: Cancel of a download, the note goes back to its state from before.
+     */
+    private enum class Cancel { DISCARD, KEEP, RESTORE }
 
     /** The job that runs now. [run] starts when it is claimed; [finished] completes after its outcome is written. */
     private class Active(val noteId: String, val title: String, val job: ProcessingJob, val run: Deferred<JobOutcome>) {
@@ -348,12 +352,14 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
     }
 
     /**
-     * Cancel in the download banner or notification: a job that downloads is stopped (its `.part` files stay);
-     * otherwise the shared install is cancelled.
+     * Cancel in the download banner or notification (features.md 13.4 DL_DOWNLOADING): a job that downloads is
+     * stopped, its `.part` files stay, and the note goes back to its state from before: PAUSED(USER) when it has a
+     * checkpoint, else the row goes ("Audio only" for a first Transcribe). Otherwise the shared install is cancelled.
      */
     fun cancelDownload() {
         val current = active
         if (current != null && running.value?.phase is JobPhase.Downloading) {
+            if (current.cancel == null) current.cancel = Cancel.RESTORE
             current.job.stop(PauseReason.USER)
         } else {
             graph.installOwner.cancel()
@@ -396,8 +402,11 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
     /** Android refused the service start: the queue waits, and the user is told ("Ready to transcribe"). */
     fun onServiceRefused() {
         scope.launch {
-            val head = state.value.queue.firstOrNull() ?: return@launch
-            notifyHidden { readyToTranscribe(head.noteId, head.title) }
+            guarded("tell that the queue waits") {
+                // A refused first start in a new process comes before the startup work has read the queue.
+                val head = state.first { !it.loading }.queue.firstOrNull() ?: return@guarded
+                notifyHidden { readyToTranscribe(head.noteId, head.title) }
+            }
         }
     }
 
@@ -523,7 +532,52 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
         return Active(noteId, title, processing, run).also { active = it }
     }
 
-    private suspend fun runOne(catalogue: Catalogue, current: Active) = coroutineScope {
+    /**
+     * Follows the job of [current] to its end, then writes its outcome, clears [active] and completes
+     * [Active.finished]. These last steps run on every path, so a failure around the job never blocks the queue.
+     */
+    private suspend fun runOne(catalogue: Catalogue, current: Active) {
+        var outcome: JobOutcome? = null
+        try {
+            outcome = follow(catalogue, current)
+        } catch (cancelled: CancellationException) {
+            // The application scope ends: the row stays RUNNING, and the next start reconciles it.
+            current.run.cancel(cancelled)
+            throw cancelled
+        } catch (
+            @Suppress("TooGenericExceptionCaught") // a failed step around the job ends the job; the queue goes on
+            error: Exception,
+        ) {
+            Log.e(TAG, "Cannot follow the job of ${current.noteId}", error)
+            outcome = withContext(NonCancellable) { endAfterFailure(current) }
+        } finally {
+            val result = outcome
+            withContext(NonCancellable) {
+                queueLock.withLock {
+                    if (result != null) {
+                        guarded("write the outcome of ${current.noteId}") { record(catalogue, current, result) }
+                    }
+                    running.value = null
+                    active = null
+                }
+                current.finished.complete(Unit)
+                if (result != null) {
+                    guarded("tell the outcome of ${current.noteId}") { announce(catalogue, current, result) }
+                }
+            }
+        }
+    }
+
+    /** Stops the job after a failure around it; the outcome is the job's own, or FAILED(UNKNOWN) when cancelled. */
+    private suspend fun endAfterFailure(current: Active): JobOutcome {
+        current.run.cancel(CancellationException("The job could not be followed"))
+        val outcome = outcomeOf(current)
+        val unexpected = outcome == JobOutcome.Cancelled && current.cancel == null
+        return if (unexpected) JobOutcome.Failed(JobFailure.Processing(Failure.UNKNOWN)) else outcome
+    }
+
+    /** Runs the tracker and the names watcher of [current] until its job ends; returns the job's outcome. */
+    private suspend fun follow(catalogue: Catalogue, current: Active): JobOutcome = coroutineScope {
         val noteId = current.noteId
         val names = AtomicReference(catalogue.checkpoints.names.current(noteId))
         val tracker = ProgressTracker(
@@ -547,15 +601,7 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
         withTimeoutOrNull(TRACKER_END_MS) { tracked.await() } ?: tracked.cancel()
         phases.cancelAndJoin()
         watchNames.cancelAndJoin()
-        withContext(NonCancellable) {
-            queueLock.withLock {
-                guarded("write the outcome of $noteId") { record(catalogue, current, outcome) }
-                running.value = null
-                active = null
-            }
-            current.finished.complete(Unit)
-            guarded("tell the outcome of $noteId") { announce(catalogue, current, outcome) }
-        }
+        outcome
     }
 
     private suspend fun outcomeOf(current: Active): JobOutcome = try {
@@ -574,6 +620,7 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
 
     /** Writes the row for [outcome] (under the queue lock). */
     private suspend fun record(catalogue: Catalogue, current: Active, outcome: JobOutcome) {
+        if (recordCancel(catalogue, current, outcome)) return
         val noteId = current.noteId
         val jobs = catalogue.jobs
         when (outcome) {
@@ -589,10 +636,31 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
             is JobOutcome.Failed -> jobs.markFailed(noteId, outcome.failure.code)
             is JobOutcome.NeedsConsent -> jobs.markNeedsConsent(noteId)
             JobOutcome.Cancelled -> when (current.cancel) {
-                Cancel.DISCARD -> discardWork(catalogue, noteId)
+                Cancel.DISCARD, Cancel.RESTORE -> Unit // handled above
                 Cancel.KEEP -> markPaused(catalogue, noteId, PauseReason.USER)
                 null -> markPaused(catalogue, noteId, PauseReason.INTERRUPTED)
             }
+        }
+    }
+
+    /**
+     * Writes the row for a Start over (DISCARD) or a Cancel of a download (RESTORE); false when [outcome] is not for
+     * them. Start over can come after the job's run ended but before this write: it still discards the work.
+     */
+    private suspend fun recordCancel(catalogue: Catalogue, current: Active, outcome: JobOutcome): Boolean {
+        val noteId = current.noteId
+        val sealed = outcome == JobOutcome.Done || outcome == JobOutcome.AdoptPending
+        val stopped = outcome is JobOutcome.Paused || outcome == JobOutcome.Cancelled
+        return when {
+            current.cancel == Cancel.DISCARD && !sealed -> {
+                discardWork(catalogue, noteId)
+                true
+            }
+            current.cancel == Cancel.RESTORE && stopped -> {
+                if (!markPausedIfSaved(catalogue, noteId, PauseReason.USER)) catalogue.jobs.remove(noteId)
+                true
+            }
+            else -> false
         }
     }
 

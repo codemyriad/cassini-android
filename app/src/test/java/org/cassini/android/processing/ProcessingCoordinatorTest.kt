@@ -25,6 +25,8 @@ import org.cassini.data.CassiniDispatchers
 import org.cassini.data.db.JobEntity
 import org.cassini.data.models.ModelFetcher
 import org.cassini.data.settings.QueueHold
+import org.cassini.engine.job.BatterySource
+import org.cassini.engine.job.JobEvent
 import org.cassini.engine.job.JobOutcome
 import org.cassini.engine.job.JobPhase
 import org.junit.After
@@ -69,6 +71,8 @@ class ProcessingCoordinatorTest {
     private fun graph(
         root: AppPaths = AppPaths(folder.newFolder(), folder.newFolder(), modelRoot = folder.newFolder()),
         realJobs: Boolean = false,
+        battery: BatterySource? = null,
+        awaitReady: Boolean = true,
     ): AppGraph {
         paths = root
         val hooks = AppGraph.ProcessingHooks(
@@ -82,6 +86,7 @@ class ProcessingCoordinatorTest {
             },
             notices = notices,
             visibility = visibility,
+            battery = battery,
         )
         val config = AppGraph.Config(
             paths = root,
@@ -93,7 +98,7 @@ class ProcessingCoordinatorTest {
         return AppGraph(context, config).also {
             graphs += it
             graph = it
-            runBlocking { withTimeout(TIMEOUT_MS) { it.ready.await() } }
+            if (awaitReady) runBlocking { withTimeout(TIMEOUT_MS) { it.ready.await() } }
         }
     }
 
@@ -240,6 +245,77 @@ class ProcessingCoordinatorTest {
         assertEquals(0L, catalogue().jobs.job(a)?.doneMs)
     }
 
+    @Test fun startOverAfterTheRunEndedButBeforeItsOutcomeIsWrittenStillDiscards() = runBlocking {
+        graph()
+        consent()
+        val a = note("A")
+        coordinator.transcribe(a)
+        val first = job(0)
+        first.holdEvents = true
+        checkpoint(a, doneMs = 28_000)
+
+        // Stop: the run ends Paused, but its events stay open, so the outcome is not written yet.
+        assertTrue(coordinator.stop(a))
+        withTimeout(TIMEOUT_MS) { first.ended.await() }
+        val over = async { coordinator.startOver(a) }
+        delay(SETTLE_MS)
+        first.closeEvents()
+
+        assertEquals(TranscribeOutcome.Queued(changed = true), withTimeout(TIMEOUT_MS) { over.await() })
+        assertFalse("the checkpoint is discarded", paths.work(a).exists())
+        assertEquals(a, job(1).noteId)
+        assertEquals(0L, catalogue().jobs.job(a)?.doneMs)
+    }
+
+    // Cancel of a download (features.md 13.4). -----------------------------------------------------------------
+
+    @Test fun cancelDuringTheDownloadOfAJobPutsTheNoteBackToItsStateFromBefore() = runBlocking {
+        graph()
+        consent()
+        val fresh = note("Fresh")
+        val resumed = note("Resumed")
+        coordinator.transcribe(fresh)
+        coordinator.transcribe(resumed)
+        checkpoint(resumed, doneMs = 28_000)
+
+        // A first Transcribe goes back to "Audio only": the row goes.
+        job(0).send(JobEvent.Downloading(null))
+        coordinator.state.first { it.running?.noteId == fresh && it.running?.phase is JobPhase.Downloading }
+        coordinator.cancelDownload()
+        assertEquals(PauseReason.USER, job(0).stopReason.get())
+        assertEquals(resumed, job(1).noteId)
+        assertNull(catalogue().jobs.job(fresh))
+
+        // A note with a checkpoint goes back to PAUSED and keeps it.
+        job(1).send(JobEvent.Downloading(null))
+        coordinator.state.first { it.running?.noteId == resumed && it.running?.phase is JobPhase.Downloading }
+        coordinator.cancelDownload()
+        waitUntil { catalogue().jobs.job(resumed)?.state == JobState.PAUSED }
+        val paused = requireNotNull(catalogue().jobs.job(resumed))
+        assertEquals(PauseReason.USER, paused.pauseReason)
+        assertEquals(28_000L, paused.doneMs)
+        assertTrue(paths.work(resumed).isDirectory)
+    }
+
+    // A failure around the job. ------------------------------------------------------------------------------------
+
+    @Test fun aFailureAroundTheJobEndsItAndTheQueueGoesOn() = runBlocking {
+        graph(battery = BatterySource { error("No battery here") })
+        consent()
+        val a = note("A")
+        val b = note("B")
+        coordinator.transcribe(a)
+        coordinator.transcribe(b)
+        val first = job(0)
+
+        // The tracker reads the battery when inference begins, and fails.
+        first.send(JobEvent.Started(4_000, restored = null, speakers = true, prints = true, lowMemory = false))
+        assertEquals(b, job(1).noteId)
+        assertTrue("the job was stopped", first.cancelled.get())
+        assertEquals(JobState.FAILED, catalogue().jobs.job(a)?.state)
+        assertTrue("the coordinator is not stuck", withTimeout(TIMEOUT_MS) { coordinator.moveToTrash(a) })
+    }
+
     // Move to trash (rule 9). ------------------------------------------------------------------------------------
 
     @Test fun trashDeletesAQueuedRowButKeepsItsWork() = runBlocking {
@@ -348,6 +424,21 @@ class ProcessingCoordinatorTest {
         assertEquals(0, created.size)
         coordinator.drain().join()
         assertEquals(0, created.size)
+    }
+
+    @Test fun aRefusedStartBeforeTheStartupWorkEndedStillPostsReadyToTranscribe() = runBlocking {
+        val first = graph()
+        val a = note("A")
+        catalogue().jobs.enqueue(a, JobKind.TRANSCRIBE)
+        first.close()
+        graphs.remove(first)
+
+        // A new process: the service is refused at once, while the startup work still reads the queue.
+        graph(paths, awaitReady = false)
+        coordinator.onServiceRefused()
+        waitUntil { notices.ready.isNotEmpty() }
+        assertEquals(listOf(a), notices.ready.toList())
+        assertEquals(JobState.QUEUED, catalogue().jobs.job(a)?.state)
     }
 
     @Test fun aQueuedJobWithoutConsentEndsNeedsConsentInTheRealJob() = runBlocking {
