@@ -2,7 +2,7 @@
 
 This file is for contributors who build, test and examine Cassini for Android 0.2. [`CONTRIBUTING.md`](../CONTRIBUTING.md) gives the first steps and the rules for a change. [`architecture.md`](architecture.md) gives the design. [`data-formats.md`](data-formats.md) gives the files, the tables and the export formats.
 
-> **Status.** This file describes the 0.2 target. Some tools in it are planned and are not in the tree yet: the `:bench` module, tests with `@CiSmoke` or `@Manual`, `scripts/device-language-check.sh`, the API 35 emulator and the weekly models job of CI. Each of these sections says so. Until the 0.1.0 Activities are removed, `:app` also holds them.
+> **Status.** This file describes the 0.2 target. Some tools in it are planned and are not in the tree yet: tests with `@Manual`, `scripts/device-language-check.sh`, the API 35 emulator and the weekly models job of CI. Each of these sections says so.
 
 <!-- TODO(P10): Phases P10 and P11 add the tools in the status note. When they are in the tree, compare each name and flag with the code, correct this file, and remove the status note and the "Planned" notes. -->
 
@@ -44,7 +44,7 @@ These files stay out of commits: `local.properties`, model weights, AAR download
 | `:data` | Android library, package `org.cassini.data`. The Room catalogue, the DataStore settings and the file repositories. | The Android SDK |
 | `:ui` | Android library, package `org.cassini.ui`. The Compose design system, the stateless screens and the Roborazzi screenshot tests. | The Android SDK |
 | `:app` | The application. `AppGraph`, the ViewModels, the navigation, the services, the coordinators and the notifications. | All that `:engine` needs |
-| `:bench` | Planned: `settings.gradle.kts` does not include it yet. A `com.android.test` module for experiments and calibration on a device. CI does not run it. | All that `:app` needs |
+| `:bench` | A `com.android.test` module, package `org.cassini.bench`, for experiments and calibration on a device. It instruments the debug build of `:app` and uses the models that the app installed. `ciTest` and CI do not run it. | All that `:app` needs |
 
 The dependency graph is in [`architecture.md`](architecture.md), section 2. `tools/asr-eval/` holds a host program that runs the speech recognition pipeline on PCM files. Gradle does not build it. Its README tells how to run it.
 
@@ -160,17 +160,18 @@ The device tests use the committed FLEURS clip as audio.
 | `--serial SERIAL` | Use this device. If you do not give it, the script uses `ANDROID_SERIAL` or the only device. |
 | `--sample NAME` | The audio sample of the 0.1.0 tests: `fleurs` (the default), `youtube`, `youtube-long` or `cutting` |
 | `--arg KEY=VALUE` | Give one more instrumentation argument. You can give the flag more than one time. |
+| `--bench` | Operate the `:bench` experiments, not the app tests. Select them with `--class`. The script builds and installs the debug build only. |
 | `--help` | Show the usage |
 
 The script first does a dry run (`am instrument -e log true`) of the same selection to get the expected count. The run fails if a test fails or skips, or if the count is different. If you set `CASSINI_EXPECTED_TESTS`, the run also fails when the count is not equal to it.
 
-The script gives `downloadModels=true` to the 0.1.0 tests. If the device has no Parakeet model or no speech detector, `DeviceSmokeTest` and `ChunkingComparisonTest` download them (several hundred MB). To prevent this download, select only the tests that need no models.
+The script gives `downloadModels=true` to the tests. If the device has no Parakeet model or no speech detector, `DeviceSmokeTest` downloads them (several hundred MB) through `ModelRepository`. To prevent this download, select only the tests that need no models, for example `--annotation CiSmoke`. The `:bench` experiments do not download models.
 
 The test APK holds the long clip of the background tests ([`fixtures/README.md`](../fixtures/README.md)). The script runs `scripts/make-long-clip.sh` before it builds the test APK. That script needs ffmpeg on the host. If ffmpeg is not there, the script shows a warning and builds the test APK without the clip. Then the tests that use the clip fail. The test APK from CI does not hold the clip.
 
 | Annotation | Tests | Where they run |
 |---|---|---|
-| `@CiSmoke` | Tests that need no models. No test has it yet. | The CI emulators, API 26, 29, 34 and 35 |
+| `@CiSmoke` | Tests that need no models and no microphone. `scripts/ci-emulator-smoke.sh` selects them. | The CI emulators, API 26, 29, 34 and 35 |
 | `@NeedsModels` | Tests that need the installed models | emulator-5554, and the weekly CI models job on API 34 |
 | `@NeedsMicrophone` | Tests that record from the microphone | An emulator or a phone. Emulator audio can be silence, so these tests examine the files and the states. |
 | `@Manual` | Tests that CI does not run. No test has it yet. | By hand, with `--class` |
@@ -180,7 +181,8 @@ Examples:
 ```sh
 scripts/device-smoke.sh --serial emulator-5554 --annotation NeedsModels
 scripts/device-smoke.sh --serial emulator-5554 --annotation NeedsMicrophone
-scripts/device-smoke.sh --serial emulator-5554 --class org.cassini.android.LibraryTest
+scripts/device-smoke.sh --serial emulator-5554 --annotation CiSmoke
+scripts/device-smoke.sh --serial emulator-5554 --bench --class org.cassini.bench.DiarizationPocTest
 ```
 
 The YouTube samples are not in the repository. `tools/fetch-youtube-audio.sh` gets them (it needs `uvx yt-dlp` and ffmpeg). `DeviceSmokeTest#opusCheckpointContinuesIdenticalPacketsAfterClosingTheEncoder` always has `@Ignore`, and an ignored test makes the run fail. Thus remove it from a class selection:
