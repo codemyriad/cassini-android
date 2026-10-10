@@ -1,6 +1,8 @@
 package org.cassini.data.notes
 
 import android.content.ContentResolver
+import android.database.SQLException
+import android.database.sqlite.SQLiteFullException
 import android.net.Uri
 import android.provider.OpenableColumns
 import kotlinx.coroutines.NonCancellable
@@ -96,7 +98,8 @@ class ImportLimits(
  *    its extension (a content Uri without a display name gets the fallback title). A plain Ogg Opus file's own TITLE
  *    tag is not used; the adopt of the first seal writes the note title into it.
  *
- * Imports run while a job runs. Nothing is left behind when an import fails.
+ * Imports run while a job runs. Nothing is left behind when an import fails. A storage error after the copy (a full
+ * disk, a failed rename, read or insert) gives SPACE or SAVE, not an exception.
  */
 // Manual DI: the repositories take their collaborators explicitly.
 @Suppress("LongParameterList")
@@ -153,11 +156,20 @@ class ImportRepository(
         val tmp = File(paths.note(id), SOURCE_TMP)
         return when (val copied = copy(uri, tmp, size)) {
             is Copy.Failed -> copied.outcome
-            is Copy.Done -> notes.liveWithSource(copied.sha256)?.let { ImportOutcome.Existing(it) }
-                ?: when (val staged = locks.withNoteLock(id, dispatchers.io) { classify(tmp, description) }) {
-                    is Classified.Rejected -> staged.outcome
-                    is Classified.Audio -> insert(id, description.displayName, staged, copied.sha256)
-                }
+            is Copy.Done -> try {
+                notes.liveWithSource(copied.sha256)?.let { ImportOutcome.Existing(it) }
+                    ?: when (val staged = locks.withNoteLock(id, dispatchers.io) { classify(tmp, description) }) {
+                        is Classified.Rejected -> staged.outcome
+                        is Classified.Audio -> insert(id, description.displayName, staged, copied.sha256)
+                    }
+            } catch (error: SQLiteFullException) {
+                ImportOutcome.Rejected(Failure.SPACE, error.message, neededBytes = copied.bytes + limits.minFreeBytes)
+            } catch (error: SQLException) {
+                ImportOutcome.Rejected(Failure.SAVE, error.message)
+            } catch (error: IOException) {
+                // A rename or a read after the copy failed; `importNew` deletes the copied file.
+                lowSpace(size, copied.bytes) ?: ImportOutcome.Rejected(Failure.SAVE, error.message)
+            }
         }
     }
 
@@ -185,7 +197,7 @@ class ImportRepository(
     }
 
     private sealed interface Copy {
-        class Done(val sha256: String) : Copy
+        class Done(val sha256: String, val bytes: Long) : Copy
 
         class Failed(val outcome: ImportOutcome.Rejected) : Copy
     }
@@ -195,7 +207,7 @@ class ImportRepository(
         val input = source.open(uri) ?: throw FileNotFoundException("no stream")
         val digest = MessageDigest.getInstance("SHA-256")
         val failed = input.use { tmp.outputStream().use { out -> pump(input, out, size, digest) } }
-        failed ?: Copy.Done(Sha256.hex(digest))
+        failed ?: Copy.Done(Sha256.hex(digest), tmp.length())
     } catch (error: FileNotFoundException) {
         Copy.Failed(ImportOutcome.Rejected(Failure.OPEN, error.message))
     } catch (error: SecurityException) {

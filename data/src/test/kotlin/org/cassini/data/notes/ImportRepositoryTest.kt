@@ -31,6 +31,7 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.io.File
+import java.io.IOException
 import java.time.Instant
 
 /**
@@ -275,6 +276,16 @@ class ImportRepositoryTest {
         // The copied part is deleted, so a retry needs the whole file plus the margin.
         assertEquals(ImportOutcome.Rejected(Failure.SPACE, neededBytes = big.length() + Limits.MIN_FREE_BYTES), outcome)
         assertEquals(emptyList<String>(), noteDirs())
+    }
+
+    @Test fun aStorageErrorAfterTheCopyIsAnOutcomeAndLeavesNothingBehind() = runTest {
+        probe.error = IOException("I/O error")
+
+        val outcome = importer().import(input(fleurs("mp3"), "podcast.mp3"))
+
+        assertEquals(Failure.SAVE, (outcome as ImportOutcome.Rejected).failure)
+        assertEquals(emptyList<String>(), noteDirs())
+        assertTrue(h.db.notes().all().isEmpty())
     }
 
     @Test fun aContentUriWithoutADisplayNameGetsTheFallbackTitle() = runTest {
