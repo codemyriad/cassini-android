@@ -32,6 +32,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import kotlinx.collections.immutable.toImmutableList
 import org.cassini.ui.R
+import org.cassini.ui.banner.BannerAction
 import org.cassini.ui.format.BatteryUi
 import org.cassini.ui.format.Counts
 import org.cassini.ui.format.Durations
@@ -48,8 +49,9 @@ private const val ANNOUNCE_STEP = 5
  * The Transcribing card (board 02): surface, 1 dp line, radius 20, padding 16, 12 dp between parts. The header row
  * (bottom-aligned) holds the headline (`caption` text2) over the window range (`monoTime` text3, 2 dp below; hidden
  * at 0–0) and the percentage ("62" in `percent`, "%" in `percentSign`). Then the 6 dp track, the [StageTracker], the
- * [StatGrid] ([download] replaces it while models download), the amber low-memory hint, "Stop and keep progress"
- * ([onStop]) and the footnote (`caption12` text2; [notificationsOff] picks the "only here" variant).
+ * [StatGrid] (the [ProcessingCardUi.download] banner replaces it while models download; its Cancel calls
+ * [onDownloadAction]), the amber low-memory hint, "Stop and keep progress" ([onStop]) and the footnote (`caption12`
+ * text2; [notificationsOff] picks the "only here" variant).
  *
  * The header is a polite live region whose text changes only when the headline changes or the percentage crosses a
  * 5 % step. The screen gives the margins (top 8, horizontal 16).
@@ -62,7 +64,7 @@ fun ProcessingCard(
     modifier: Modifier = Modifier,
     notificationsOff: Boolean = false,
     stopBusy: Boolean = false,
-    download: (@Composable () -> Unit)? = null,
+    onDownloadAction: (BannerAction) -> Unit = {},
 ) {
     val c = CassiniTheme.colors
     val t = CassiniTheme.type
@@ -115,7 +117,8 @@ fun ProcessingCard(
         Spacer(Modifier.height(12.dp))
         StageTracker(state.stage, state.skippedMatching)
         Spacer(Modifier.height(12.dp))
-        if (download != null) download() else StatGrid(stats(state))
+        val download = state.download
+        if (download != null) Banner(download.banner(), onAction = onDownloadAction) else StatGrid(stats(state))
         if (state.lowMemory) {
             Spacer(Modifier.height(12.dp))
             Text(text = stringResource(R.string.ui_progress_low_memory), style = t.caption, color = c.amberInk)

@@ -32,6 +32,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
+import org.cassini.ui.banner.BannerAction
 import org.cassini.ui.format.FIXED_ZONE
 import org.cassini.ui.format.ProgressHeadline
 import org.cassini.ui.format.ProvideFixedFormat
@@ -115,6 +116,22 @@ class ControlsSemanticsTest {
         rule.runOnIdle { card = card.copy(headline = ProgressHeadline.SAVING) }
         rule.onNode(hasContentDescription("Saving, 65%")).assertExists()
         rule.onNodeWithText("Stop and keep progress").assertTouchAtLeast48()
+    }
+
+    @Test fun aDownloadReplacesTheStatsWithItsBannerAndReportsCancel() {
+        val actions = mutableListOf<BannerAction>()
+        var card by mutableStateOf(TranscriptFixtures.downloadingCard)
+        setThemed { ProcessingCard(card, onStop = {}, onDownloadAction = { actions += it }) }
+        rule.onNodeWithText("Downloading speech recognition — 46%").assert(isHeading())
+        rule.onNodeWithText("296 of 640 MB.").assertExists()
+        rule.onNodeWithText("Words so far").assertDoesNotExist()
+        rule.onNodeWithText("Cancel").performClick()
+        rule.runOnIdle { assertEquals(listOf(BannerAction.CANCEL), actions) }
+        rule.runOnIdle { card = card.copy(download = card.download?.copy(percent = 80, checking = true)) }
+        rule.onNodeWithText("Checking files — 80%").assertExists()
+        rule.onNodeWithText("Cancel").assertDoesNotExist()
+        rule.runOnIdle { card = card.copy(download = null) }
+        rule.onNodeWithText("Words so far").assertExists()
     }
 
     @Test fun theSnackbarIsALiveRegionWithAnUndoActionAndATimeout() {

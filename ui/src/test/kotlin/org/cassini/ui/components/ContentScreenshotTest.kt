@@ -14,9 +14,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.cassini.ui.BoardTest
-import org.cassini.ui.banner.BannerKind
-import org.cassini.ui.banner.BannerSpec
-import org.cassini.ui.banner.boardArgs
 import org.cassini.ui.format.StageUi
 import org.cassini.ui.theme.CassiniTheme
 import org.cassini.ui.theme.SpeakerTone
@@ -129,9 +126,7 @@ class ContentScreenshotTest : BoardTest() {
         Label("Saving with Matching skipped (busy stop); downloading replaces the stats")
         Padded(gap = 12) {
             ProcessingCard(TranscriptFixtures.savingCard, onStop = {}, stopBusy = true)
-            ProcessingCard(TranscriptFixtures.startingCard.copy(lowMemory = false), onStop = {}) {
-                Banner(BannerSpec(BannerKind.DL_DOWNLOADING, boardArgs(BannerKind.DL_DOWNLOADING)), onAction = {})
-            }
+            ProcessingCard(TranscriptFixtures.downloadingCard, onStop = {})
         }
         StepperSection()
     }

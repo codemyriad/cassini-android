@@ -2,6 +2,8 @@ package org.cassini.ui.components
 
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
+import org.cassini.ui.banner.BannerKind
+import org.cassini.ui.banner.boardArgs
 import org.cassini.ui.format.BatteryUi
 import org.cassini.ui.format.ProgressHeadline
 import org.cassini.ui.format.StageUi
@@ -100,4 +102,17 @@ internal object TranscriptFixtures {
         words = 12_345,
         lowMemory = false,
     )
+
+    /** Starting while the speech model downloads: the board copy of the DL_DOWNLOADING banner. */
+    val downloadingCard = boardArgs(BannerKind.DL_DOWNLOADING).let { args ->
+        startingCard.copy(
+            lowMemory = false,
+            download = DownloadUi(
+                part = requireNotNull(args.part),
+                percent = requireNotNull(args.percent),
+                bytes = args.bytes,
+                totalBytes = args.bytes2,
+            ),
+        )
+    }
 }
