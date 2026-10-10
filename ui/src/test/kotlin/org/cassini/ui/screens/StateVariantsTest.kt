@@ -3,16 +3,24 @@ package org.cassini.ui.screens
 import org.cassini.ui.BoardTest
 import org.cassini.ui.components.DialogBoardFrame
 import org.cassini.ui.components.RenameDialogContent
+import org.cassini.ui.components.SheetBoardFrame
 import org.cassini.ui.fixtures.VariantFixtures
 import org.cassini.ui.library.LibraryDialog
 import org.cassini.ui.library.LibraryScreen
+import org.cassini.ui.note.MergeConfirmContent
+import org.cassini.ui.note.MergeSheetContent
+import org.cassini.ui.note.NameSpeakerSheetContent
+import org.cassini.ui.note.NoteActionsSheetContent
 import org.cassini.ui.note.NoteScreen
 import org.cassini.ui.recording.RecordingScreen
+import org.cassini.ui.trash.TrashDialogContent
+import org.cassini.ui.voices.SavedVoicesDialogContent
 import org.junit.Test
 
 /**
  * The screen variants of docs/design/features.md (acceptance lists) and their states without a board, as goldens
- * only (`variants/<name>.png`, ui.md section 10.2). Dialogs render inline in `DialogBoardFrame`.
+ * only (`variants/<name>.png`, ui.md section 10.2). Sheets render inline in `SheetBoardFrame` and dialogs in
+ * `DialogBoardFrame`, over the plain scrim as boards 04 and 06 show them.
  */
 class StateVariantsTest : BoardTest() {
     private fun library(name: String) = board("variants", name) {
@@ -29,6 +37,37 @@ class StateVariantsTest : BoardTest() {
 
     private fun read(name: String) = board("variants", name) {
         NoteScreen(VariantFixtures.read.getValue(name), onEvent = {})
+    }
+
+    private fun readOverlay(name: String) = board("variants", name) {
+        NoteOverlayFrame(VariantFixtures.read.getValue(name))
+    }
+
+    private fun noteSheet(name: String) = board("variants", name) {
+        NoteOverlayFrame(VariantFixtures.noteSheets.getValue(name))
+    }
+
+    private fun nameSheet(name: String) = board("variants", name) {
+        SheetBoardFrame { NameSpeakerSheetContent(VariantFixtures.nameSheet.getValue(name), onEvent = {}) }
+    }
+
+    private fun actions(name: String) = board("variants", name) {
+        SheetBoardFrame { NoteActionsSheetContent(VariantFixtures.noteActions.getValue(name), onAction = {}) }
+    }
+
+    private fun mergeConfirm(name: String) = board("variants", name) {
+        val merge = VariantFixtures.merges.getValue(name)
+        DialogBoardFrame { MergeConfirmContent(merge, requireNotNull(merge.confirm), onEvent = {}) }
+    }
+
+    private fun trashDialog(name: String) = board("variants", name) {
+        val dialog = requireNotNull(VariantFixtures.trash.getValue(name).dialog)
+        DialogBoardFrame { TrashDialogContent(dialog, onEvent = {}) }
+    }
+
+    private fun voicesDialog(name: String) = board("variants", name) {
+        val dialog = requireNotNull(VariantFixtures.savedVoices.getValue(name).dialog)
+        DialogBoardFrame { SavedVoicesDialogContent(dialog, onEvent = {}) }
     }
 
     // Library (features.md section 1).
@@ -60,6 +99,11 @@ class StateVariantsTest : BoardTest() {
     @Test fun librarySnackbar() = library("library-snackbar")
 
     @Test fun libraryOtherStatuses() = library("library-other-statuses")
+
+    @Test fun libraryActionsSheet() = board("variants", "library-actions-sheet") {
+        val sheet = requireNotNull(VariantFixtures.library.getValue("library-actions-sheet").sheet)
+        SheetBoardFrame { NoteActionsSheetContent(sheet, onAction = {}) }
+    }
 
     @Test fun libraryRename() = board("variants", "library-rename") {
         val dialog = VariantFixtures.library.getValue("library-rename").dialog as LibraryDialog.Rename
@@ -143,4 +187,82 @@ class StateVariantsTest : BoardTest() {
     @Test fun readFollowPaused() = read("read-follow-paused")
 
     @Test fun readSnackbarSaved() = read("read-snackbar-saved")
+
+    // Read & listen sheets and dialogs (features.md sections 3.2, 3.4 and 6).
+
+    @Test fun readSubtitleFormat() = readOverlay("read-subtitle-format")
+
+    @Test fun readRename() = readOverlay("read-rename")
+
+    @Test fun readTranscribeFresh() = readOverlay("read-transcribe-fresh")
+
+    @Test fun readReadOnly() = readOverlay("read-read-only")
+
+    @Test fun pausedStartOver() = readOverlay("paused-start-over")
+
+    @Test fun transcribingStopAndTrash() = readOverlay("transcribing-stop-and-trash")
+
+    @Test fun readVersions() = noteSheet("read-versions")
+
+    @Test fun readDocumentInfo() = noteSheet("read-document-info")
+
+    @Test fun readMerge() = noteSheet("read-merge")
+
+    // Name a speaker (features.md section 4).
+
+    @Test fun nameRenameSaved() = nameSheet("name-rename-saved")
+
+    @Test fun nameNotAuto() = nameSheet("name-not-auto")
+
+    @Test fun nameNoVoices() = nameSheet("name-no-voices")
+
+    @Test fun nameNoPrint() = nameSheet("name-no-print")
+
+    @Test fun nameNoModel() = nameSheet("name-no-model")
+
+    @Test fun nameShowAll() = nameSheet("name-show-all")
+
+    @Test fun nameDraft() = nameSheet("name-draft")
+
+    @Test fun nameSampling() = nameSheet("name-sampling")
+
+    // Merge sheet and its confirmation (features.md section 4, item 8).
+
+    @Test fun mergeSheet() = board("variants", "merge-sheet") {
+        SheetBoardFrame { MergeSheetContent(VariantFixtures.merges.getValue("merge-sheet"), onEvent = {}) }
+    }
+
+    @Test fun mergeConfirmSealed() = mergeConfirm("merge-confirm-sealed")
+
+    @Test fun mergeConfirmDraft() = mergeConfirm("merge-confirm-draft")
+
+    // Note actions (features.md section 6).
+
+    @Test fun actionsPlain() = actions("actions-plain")
+
+    @Test fun actionsUnreadable() = actions("actions-unreadable")
+
+    @Test fun actionsStop() = actions("actions-stop")
+
+    @Test fun actionsRemoveFromQueue() = actions("actions-remove-from-queue")
+
+    @Test fun actionsResumeOrStartOver() = actions("actions-resume-or-start-over")
+
+    @Test fun actionsBusy() = actions("actions-busy")
+
+    @Test fun actionsRecording() = actions("actions-recording")
+
+    @Test fun actionsNoNamesCarry() = actions("actions-no-names-carry")
+
+    // Trash and Saved voices confirmations (features.md sections 8 and 10); their screens come in P8 step 5.
+
+    @Test fun trashDelete() = trashDialog("trash-delete")
+
+    @Test fun trashEmptyAll() = trashDialog("trash-empty-all")
+
+    @Test fun voicesRename() = voicesDialog("voices-rename")
+
+    @Test fun voicesForget() = voicesDialog("voices-forget")
+
+    @Test fun voicesForgetEveryone() = voicesDialog("voices-forget-everyone")
 }
