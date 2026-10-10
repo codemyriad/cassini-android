@@ -17,7 +17,8 @@ android {
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = 10
         versionName = "0.1.0"
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // Builds the graph on a scratch root (docs/architecture.md section 9).
+        testInstrumentationRunner = "org.cassini.android.CassiniTestRunner"
         // Library modules cannot filter packaged ABIs; this line must stay in :app.
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
     }
