@@ -62,7 +62,7 @@ object JobProvenance {
 
     private fun processing(): JSONObject = JSONObject()
         .put("backend", "sherpa-onnx").put("engine", "Parakeet TDT")
-        .put("model", "nvidia/parakeet-tdt-0.6b-v3 ${ModelCatalog.PARAKEET_PRECISION}")
+        .put("model", "${ModelCatalog.PARAKEET_MODEL_ID} ${ModelCatalog.PARAKEET_PRECISION}")
         .put("device", "Android CPU")
         .put("source", "recording")
         .put("version", "sherpa-onnx 1.13.7; model revision ${ModelCatalog.PARAKEET_REVISION}")

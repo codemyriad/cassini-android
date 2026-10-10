@@ -46,6 +46,10 @@ object ModelCatalog {
     const val PARAKEET_REPOSITORY = "csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8"
     const val PARAKEET_PRECISION = "INT8"
 
+    /** The model id that a document's provenance names (`<id> <precision>`), and the name the app shows for it. */
+    const val PARAKEET_MODEL_ID = "nvidia/parakeet-tdt-0.6b-v3"
+    const val PARAKEET_DISPLAY_NAME = "Parakeet TDT 0.6B v3"
+
     private fun huggingFace(name: String) = "https://huggingface.co/$PARAKEET_REPOSITORY/resolve/$PARAKEET_REVISION/$name"
 
     val parakeetArtifacts = listOf(

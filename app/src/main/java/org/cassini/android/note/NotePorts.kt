@@ -249,7 +249,7 @@ class GraphNotePorts(private val graph: AppGraph, context: Context) : NotePorts 
         }
         return DocumentFacts(
             fileBytes = bytes,
-            model = processing?.optString("model")?.ifEmpty { null },
+            model = processing?.optString("model")?.ifEmpty { null }?.let(NoteMapping::modelName),
             resumedFromMs = processing?.optLong(RESUMED_FROM, 0)?.takeIf { it > 0 },
             namesFromVoices = processing?.optJSONObject(IDENTIFICATION)?.optInt("autoApplied", 0) ?: 0,
         )
@@ -423,6 +423,7 @@ class GraphNotePorts(private val graph: AppGraph, context: Context) : NotePorts 
 
     private companion object {
         const val SEPARATOR = " · "
+
         const val RESUMED_FROM = "x-resumedFromMs"
         const val IDENTIFICATION = "x-speakerIdentification"
     }

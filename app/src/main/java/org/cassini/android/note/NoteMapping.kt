@@ -9,6 +9,7 @@ import org.cassini.core.library.AudioKind
 import org.cassini.core.library.DayGroups
 import org.cassini.core.library.JobState
 import org.cassini.core.library.VariantKind
+import org.cassini.core.models.ModelCatalog
 import org.cassini.data.db.NoteDetails
 import org.cassini.data.db.NoteEntity
 import org.cassini.data.db.VariantEntity
@@ -43,6 +44,18 @@ import org.cassini.engine.job.ProgressHeadline as EngineHeadline
  */
 @Suppress("TooManyFunctions") // one mapping per UiState part of the Note screen
 object NoteMapping {
+    /**
+     * The name that Document info shows for a provenance [model] id (features.md section 6): "Parakeet TDT 0.6B v3,
+     * INT8" for the speech model of this app, and the id as it is for a model that this app does not know.
+     */
+    fun modelName(model: String): String {
+        val id = ModelCatalog.PARAKEET_MODEL_ID
+        if (model != id && !model.startsWith("$id ")) return model
+        val precision = model.removePrefix(id).trim()
+        val name = ModelCatalog.PARAKEET_DISPLAY_NAME
+        return if (precision.isEmpty()) name else "$name, $precision"
+    }
+
     /** The variant on screen: the selected one, else the default, else the first. */
     fun selected(details: NoteDetails): VariantEntity? {
         val variants = details.variants
