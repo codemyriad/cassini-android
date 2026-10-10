@@ -276,9 +276,8 @@ class AppShellTest {
 
     /** A sealed two-speaker document over the FLEURS clip, imported as ACTION_VIEW does; Library shows its row. */
     private fun importDocument() {
-        val outcome = runBlocking {
-            withTimeout(TIMEOUT_MS) { app.graph.notices.imports.start(Uri.fromFile(writeDocument()).toString()).await() }
-        }
+        val uri = Uri.fromFile(writeDocument()).toString()
+        val outcome = runBlocking { withTimeout(TIMEOUT_MS) { app.graph.notices.imports.start(uri).await() } }
         assertTrue("imported: $outcome", outcome is ImportOutcome.Created)
         waitFor(hasText(TITLE))
     }

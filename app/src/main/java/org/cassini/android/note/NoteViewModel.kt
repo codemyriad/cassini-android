@@ -684,14 +684,13 @@ class NoteViewModel(
 
     private fun savedDialog(): NoteDialog? {
         val key = saved.get<String>(KEY_DIALOG) ?: return null
+        val readOnly = key.takeIf { it.startsWith(DIALOG_READ_ONLY) }?.removePrefix(DIALOG_READ_ONLY)
         return when {
             key == DIALOG_RENAME -> saved.get<String>(KEY_DIALOG_TITLE)?.let(NoteDialog::Rename)
             key == DIALOG_START_OVER -> NoteDialog.StartOver
             key == DIALOG_FRESH -> NoteDialog.TranscribeFresh
             key == DIALOG_STOP_AND_TRASH -> NoteDialog.StopAndTrash
-            key.startsWith(DIALOG_READ_ONLY) -> ReadOnlyReason.entries
-                .firstOrNull { it.name == key.removePrefix(DIALOG_READ_ONLY) }
-                ?.let(NoteDialog::ReadOnly)
+            readOnly != null -> ReadOnlyReason.entries.firstOrNull { it.name == readOnly }?.let(NoteDialog::ReadOnly)
             else -> null
         }
     }

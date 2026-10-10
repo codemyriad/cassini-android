@@ -51,7 +51,11 @@ class DeepLinksTest {
         assertEquals(listOf(LibraryKey, RecordingKey, NoteKey("c")), DeepLinks.imported(recording, "c"))
         assertEquals(listOf(LibraryKey, NoteKey("c")), DeepLinks.imported(listOf(LibraryKey, NoteKey("c")), "c"))
         val lower = listOf(LibraryKey, NoteKey("c"), ModelDownloadKey("c"))
-        assertEquals("no second entry with the same key", listOf(LibraryKey, NoteKey("c")), DeepLinks.imported(lower, "c"))
+        assertEquals(
+            "no second entry with the same key",
+            listOf(LibraryKey, NoteKey("c")),
+            DeepLinks.imported(lower, "c"),
+        )
     }
 
     @Test fun theLibraryIsAlwaysAtTheBottom() {
