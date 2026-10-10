@@ -110,7 +110,7 @@ class GraphLibraryPorts(private val graph: AppGraph, context: Context) : Library
 
     override suspend fun moveToTrash(id: String): Boolean = graph.processing.moveToTrash(id)
 
-    override suspend fun restore(id: String): Boolean = graph.awaitCatalogue().notes.restore(id)
+    override suspend fun restore(id: String): Boolean = graph.processing.restore(id)
 
     override suspend fun rename(id: String, title: String): RenameOutcome =
         graph.awaitCatalogue().notes.rename(id, title)

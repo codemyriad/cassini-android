@@ -335,6 +335,25 @@ class ProcessingCoordinatorTest {
         assertNull("the running note is untouched", job(0).stopReason.get())
     }
 
+    @Test fun restoreOfAQueuedNoteStartsTheQueue() = runBlocking {
+        graph()
+        consent()
+        val running = note("Running")
+        val queued = note("Queued")
+        coordinator.transcribe(running)
+        coordinator.transcribe(queued)
+        job(0)
+        assertTrue(coordinator.moveToTrash(queued))
+        job(0).finish(JobOutcome.Done)
+        coordinator.awaitIdle()
+        val before = starts.get()
+
+        assertTrue(coordinator.restore(queued))
+        assertEquals(JobState.QUEUED, catalogue().jobs.job(queued)?.state)
+        assertEquals("the restore starts the service", before + 1, starts.get())
+        assertEquals(queued, job(1).noteId)
+    }
+
     @Test fun trashStopsARunningJobAndKeepsItsProgress() = runBlocking {
         graph()
         consent()

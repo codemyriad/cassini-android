@@ -33,7 +33,7 @@ class GraphTrashPorts(private val graph: AppGraph) : TrashPorts {
     override suspend fun purgeExpired(now: Instant, zone: ZoneId): Int =
         graph.awaitCatalogue().notes.purgeExpired(now, zone).also { graph.settings.recordPurge(now.toEpochMilli()) }
 
-    override suspend fun restore(id: String): Boolean = graph.awaitCatalogue().notes.restore(id)
+    override suspend fun restore(id: String): Boolean = graph.processing.restore(id)
 
     override suspend fun deleteNow(id: String): Boolean = graph.awaitCatalogue().notes.deleteNow(id)
 

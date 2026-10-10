@@ -315,6 +315,19 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
     }
 
     /**
+     * Undo and Restore of a trashed note (rule 2): `NoteRepository.restore` under the queue lock. A job that was
+     * QUEUED when the note was trashed is QUEUED again, and the queue starts as after a Transcribe.
+     */
+    suspend fun restore(noteId: String): Boolean {
+        val catalogue = graph.awaitCatalogue()
+        val restored = queueLock.withLock { catalogue.notes.restore(noteId) }
+        if (restored && catalogue.jobs.job(noteId)?.state == JobState.QUEUED && graph.models.consented()) {
+            startService()
+        }
+        return restored
+    }
+
+    /**
      * `onTimeout` of the service (architecture 5.7): holds the queue (SYSTEM), stops the running job (it saves a
      * checkpoint at its next block) and writes its row PAUSED(SYSTEM) at once, so every screen shows Paused.
      */
