@@ -6,7 +6,6 @@ package org.cassini.ui.note
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,6 +21,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.inset
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -50,6 +55,28 @@ private const val PULSE_MS = 600
  * Compose merges accessibility changes, so the clear and the new value both reach TalkBack.
  */
 private const val ANNOUNCE_GAP_MS = 250L
+
+/** The width of the pulsing border. */
+private val PulseWidth = 2.dp
+
+/**
+ * The 2 dp border in [color] at the [alpha] of the pulse. The alpha is read while drawing, so the animation redraws
+ * the border without recomposing the card.
+ */
+private fun Modifier.pulseBorder(color: Color, shape: Shape, alpha: () -> Float): Modifier = drawWithContent {
+    drawContent()
+    val a = alpha()
+    if (a > 0f) {
+        val width = PulseWidth.toPx()
+        inset(width / 2) {
+            drawOutline(
+                outline = shape.createOutline(size, layoutDirection, this),
+                color = color.copy(alpha = a),
+                style = Stroke(width),
+            )
+        }
+    }
+}
 
 /** An open question of the sheet: the bold [saved] sentence, the question, and its two answers. */
 internal data class Question(
@@ -118,7 +145,7 @@ internal fun QuestionCard(
             .fillMaxWidth()
             .clip(shape)
             .background(c.amberWash)
-            .border(2.dp, c.amberInk.copy(alpha = pulse.value), shape)
+            .pulseBorder(c.amberInk, shape) { pulse.value }
             .semantics {
                 liveRegion = LiveRegionMode.Polite
                 if (announced) stateDescription = answerFirst
