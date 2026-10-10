@@ -123,7 +123,7 @@ class ModelInstallOwner(
         while (true) {
             val (shared, joined) = mutex.withLock { attach(parts, onProgress, standalone) }
             if (!joined) {
-                // Another part set installs now: wait for its end, then try again.
+                // Another part set installs, or a cancelled install has not ended: wait for its end, then try again.
                 shared.task.join()
                 continue
             }
@@ -135,14 +135,18 @@ class ModelInstallOwner(
         }
     }
 
-    /** Joins or starts the install of [parts]; false with the running install when another part set runs. */
+    /**
+     * Joins or starts the install of [parts]. False with the current install when another part set runs, or when the
+     * current install is being cancelled: its fetch can block until the read timeout, and a new install must not fetch
+     * the same files at the same time. [current] is cleared only when that task has ended.
+     */
     private fun attach(
         parts: Set<ModelPart>,
         listener: (DownloadProgress) -> Unit,
         standalone: Boolean,
     ): Pair<Shared, Boolean> {
-        val running = current?.takeIf { it.task.isActive }
-        if (running != null && running.parts != parts) return running to false
+        val running = current
+        if (running != null && (!running.task.isActive || running.parts != parts)) return running to false
         val shared = running ?: Shared(parts)
         shared.waiters++
         if (standalone) shared.standalone++

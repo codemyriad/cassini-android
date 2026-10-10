@@ -56,6 +56,11 @@ class ModelInstallOwnerTest {
     private val started = CountDownLatch(1)
     private val release = CountDownLatch(1)
     private val interrupted = AtomicBoolean(false)
+
+    /** The fetch ignores an interrupt, as a socket read blocked until its timeout does. */
+    private val stubborn = AtomicBoolean(false)
+    private val inFlight = AtomicInteger()
+    private val mostInFlight = AtomicInteger()
     private lateinit var paths: AppPaths
     private lateinit var models: ModelRepository
     private lateinit var owner: ModelInstallOwner
@@ -63,21 +68,33 @@ class ModelInstallOwnerTest {
     /** Blocks the fetch of Parakeet until [release], after it wrote a `.part` file; records every fetch. */
     private val fetcher = ModelFetcher { model, directory, progress ->
         fetched += key(model)
-        if (model == ModelCatalog.PARAKEET) {
-            File(directory, "encoder.int8.onnx.part").writeBytes(ByteArray(PART_BYTES))
-            started.countDown()
+        mostInFlight.accumulateAndGet(inFlight.incrementAndGet(), ::maxOf)
+        try {
+            if (model == ModelCatalog.PARAKEET) {
+                File(directory, "encoder.int8.onnx.part").writeBytes(ByteArray(PART_BYTES))
+                started.countDown()
+                awaitRelease()
+                File(directory, "encoder.int8.onnx.part").delete()
+            }
+            model.artifacts.forEach { artifact ->
+                RandomAccessFile(File(directory, artifact.name), "rw").use { it.setLength(artifact.size) }
+            }
+            progress(model.downloadBytes, false)
+        } finally {
+            inFlight.decrementAndGet()
+        }
+    }
+
+    private fun awaitRelease() {
+        while (true) {
             try {
                 check(release.await(WAIT_S, TimeUnit.SECONDS)) { "The test never released the fetch" }
+                return
             } catch (error: InterruptedException) {
                 interrupted.set(true)
-                throw error
+                if (!stubborn.get()) throw error
             }
-            File(directory, "encoder.int8.onnx.part").delete()
         }
-        model.artifacts.forEach { artifact ->
-            RandomAccessFile(File(directory, artifact.name), "rw").use { it.setLength(artifact.size) }
-        }
-        progress(model.downloadBytes, false)
     }
 
     @Before fun setUp() = runBlocking {
@@ -141,6 +158,23 @@ class ModelInstallOwnerTest {
         assertTrue(interrupted.get())
         assertTrue(File(ModelCatalog.PARAKEET.directory(paths.modelRoot), "encoder.int8.onnx.part").isFile)
         assertEquals(ModelStatus.Missing(consented = true), models.status.value[ModelPart.SPEECH])
+    }
+
+    @Test fun aRequestRightAfterACancelWaitsForTheCancelledFetchToEnd() = runBlocking {
+        stubborn.set(true)
+        owner.startDownload()
+        assertTrue(started.await(WAIT_S, TimeUnit.SECONDS))
+
+        owner.cancel()
+        val again = async { owner.install(ModelPart.entries.toSet()) }
+        delay(SETTLE_MS)
+        assertTrue(interrupted.get())
+        assertEquals("no second fetch while the first one runs", listOf(key(ModelCatalog.PARAKEET)), fetched.toList())
+
+        release.countDown()
+        assertEquals(InstallOutcome.Installed(), withTimeout(WAIT_MS) { again.await() })
+        assertEquals("one fetch at a time", 1, mostInFlight.get())
+        assertEquals(ModelPart.entries.associateWith { ModelStatus.Ready }, models.status.value)
     }
 
     @Test fun theInstallStopsWhenItsLastWaiterLeaves() = runBlocking {
