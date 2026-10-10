@@ -16,6 +16,12 @@ internal class AacCapture(context: Context, override val file: File, onError: ()
     override var paused = false
         private set
     override val opus = false
+    override val sessionId: Int?
+        get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            recorder?.activeRecordingConfiguration?.clientAudioSessionId
+        } else {
+            null
+        }
     override val elapsedMs get() = accumulatedMs + if (paused || recorder == null) 0 else SystemClock.elapsedRealtime() - segmentStarted
     override val amplitude get() = if (paused) 0 else try { recorder?.maxAmplitude ?: 0 } catch (_: IllegalStateException) { 0 }
 

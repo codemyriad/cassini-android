@@ -12,6 +12,12 @@ interface MicrophoneCapture {
     val amplitude: Int
     val paused: Boolean
     val opus: Boolean
+
+    /**
+     * The audio session of the running capture, which `AudioRecordingConfiguration.getClientAudioSessionId` names
+     * (API 29+); null when it is not known yet.
+     */
+    val sessionId: Int? get() = null
     fun togglePause()
 
     /**

@@ -35,6 +35,7 @@ internal class OpusCapture(override val file: File, private val onError: () -> U
     private var muxer: OggOpus.LiveMuxer? = null
     private val thread: Thread
     override val opus = true
+    override val sessionId: Int get() = record.audioSessionId
     override val elapsedMs get() = samples * 1000 / RATE
     override val amplitude get() = if (paused) 0 else peak
 
