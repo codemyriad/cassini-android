@@ -284,6 +284,21 @@ class ComponentSemanticsTest {
         rule.onNode(hasContentDescription("Transcribing Weekly product sync, 65%, About 5–8 min left")).assertExists()
     }
 
+    @Test fun aStandaloneDownloadBannerOpensSettings() {
+        setThemed {
+            ProgressBannerCard(
+                title = "Downloading speech recognition",
+                percent = 46,
+                progress = 0.46f,
+                line = "296 of 640 MB",
+                onClick = {},
+                onClickLabel = "Open settings",
+            )
+        }
+        val card = rule.onNode(hasClickAction()).fetchSemanticsNode()
+        assertEquals("Open settings", card.config[SemanticsActions.OnClick].label)
+    }
+
     @Test fun recordingCardSpeaksTheElapsedTimeAndItsAction() {
         var clicks = 0
         setThemed { RecordingBannerCard("Weekly product sync", 1_447_000, paused = false, onClick = { clicks++ }) }

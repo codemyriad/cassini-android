@@ -35,7 +35,8 @@ private const val ANNOUNCE_STEP = 5
 /**
  * The Library transcription banner (board 00): accentTint, radius 16, padding 12/14, gap 8. Row 1 is [title]
  * (`label14`, one line) baseline-aligned with [percent] (`monoTime`); then a 4 dp track filled to [progress]
- * (hidden when null) and [line] (`caption`, text3). A button with the click label "Open note" and a polite live
+ * (hidden when null) and [line] (`caption`, text3). A button with the click label [onClickLabel] ("Open note"; the
+ * Library passes "Open settings" for a standalone model download, features.md section 1) and a polite live
  * region. Its description changes only when [title] changes (a new stage or note) or [percent] crosses a 5 % step;
  * [line] is read with the description of that moment. The screen gives the margins (top 14, horizontal 16).
  */
@@ -48,6 +49,7 @@ fun ProgressBannerCard(
     line: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onClickLabel: String = stringResource(R.string.ui_action_open_note),
 ) {
     val c = CassiniTheme.colors
     val step = percent?.let { it / ANNOUNCE_STEP * ANNOUNCE_STEP }
@@ -60,7 +62,7 @@ fun ProgressBannerCard(
             .clip(CassiniTheme.shapes.card)
             .background(c.accentTint)
             .clickable(
-                onClickLabel = stringResource(R.string.ui_action_open_note),
+                onClickLabel = onClickLabel,
                 role = Role.Button,
                 onClick = onClick,
             )
