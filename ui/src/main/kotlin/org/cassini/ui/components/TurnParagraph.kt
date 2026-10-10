@@ -63,7 +63,9 @@ internal val LocalTurnParagraphProbe = staticCompositionLocalOf<(() -> Unit)?> {
  * [TurnMode.Draft] (`draft`, text3; words from [unsettledFrom] on in text4): plain text, the words are not links.
  *
  * [matches] are search hits on the amberTint background; the current one is also set in weight 600.
- * [onPlayFromStart] adds the "Play from start of turn" accessibility action.
+ * [onPlayFromStart] adds the "Play from start of turn" accessibility action. [onActiveLine] receives the top of the
+ * active word's line (px, in this paragraph's coordinates) on every text layout, so also when the word changes.
+ * The Note screen passes it only to the turn that holds the active word, to follow playback.
  *
  * Known gaps against ui.md section 6 and features.md section 3.3, for the owner's review:
  * - The word links have no "Play from here" click label. `LinkAnnotation` takes no label, and on Android Compose
@@ -88,6 +90,7 @@ fun TurnParagraph(
     unsettledFrom: Int? = null,
     matches: TurnMatches = TurnMatches.None,
     onPlayFromStart: (() -> Unit)? = null,
+    onActiveLine: ((top: Float) -> Unit)? = null,
 ) {
     val probe = LocalTurnParagraphProbe.current
     if (probe != null) SideEffect { probe() }
@@ -135,8 +138,19 @@ fun TurnParagraph(
             },
         style = style,
         color = color,
-        onTextLayout = { layout = it },
+        onTextLayout = { result ->
+            layout = result
+            reportActiveLine(result, active, onActiveLine)
+        },
     )
+}
+
+/** Gives [onActiveLine] the top of the line that holds [active] in [layout]; nothing without either. */
+private fun reportActiveLine(layout: TextLayoutResult, active: IntRange?, onActiveLine: ((Float) -> Unit)?) {
+    if (onActiveLine == null || active == null || active.isEmpty()) return
+    if (active.first < layout.layoutInput.text.length) {
+        onActiveLine(layout.getLineTop(layout.getLineForOffset(active.first)))
+    }
 }
 
 /** The paragraph text with its links (Read), its unsettled colour (Draft) and its search highlights. */

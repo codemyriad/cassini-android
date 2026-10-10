@@ -100,6 +100,8 @@ dependencies {
     implementation(libs.compose.foundation)
     implementation(libs.compose.material3)
     implementation(libs.compose.ui.tooling.preview)
+    // BackHandler: the Note screen's system back closes the in-note search before it leaves the screen.
+    implementation(libs.activity.compose)
     // UiState classes expose ImmutableList (docs/design/ui.md, section 2), so :app ViewModels need the type.
     api(libs.kotlinx.collections.immutable)
     // Android Studio previews. It also adds the exported PreviewActivity to the debug APK of :app.
