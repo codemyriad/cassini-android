@@ -136,7 +136,8 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
     private class Active(val noteId: String, val title: String, val job: ProcessingJob, val run: Deferred<JobOutcome>) {
         val finished = CompletableDeferred<Unit>()
 
-        @Volatile var cancel: Cancel? = null
+        /** How the job ends when it is interrupted; null for a plain stop. Read once per outcome, in [record]. */
+        val cancel = AtomicReference<Cancel?>(null)
 
         @Volatile var tracker: ProgressTracker? = null
     }
@@ -275,7 +276,7 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
         val catalogue = graph.awaitCatalogue()
         val current = queueLock.withLock {
             // The flag is set under the lock: the outcome is written under it too, so it always sees the flag.
-            active?.takeIf { it.noteId == noteId }?.also { it.cancel = if (discard) Cancel.DISCARD else Cancel.KEEP }
+            active?.takeIf { it.noteId == noteId }?.also { it.cancel.set(if (discard) Cancel.DISCARD else Cancel.KEEP) }
                 ?: run {
                     if (discard) discardWork(catalogue, noteId)
                     null
@@ -322,8 +323,12 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
         val current = active?.takeIf { noteId == null || it.noteId == noteId } ?: return
         current.job.stop(PauseReason.SYSTEM)
         val catalogue = graph.awaitCatalogue()
-        val job = catalogue.jobs.job(current.noteId) ?: return
-        catalogue.jobs.markPaused(current.noteId, PauseReason.SYSTEM, job.doneMs, job.totalMs, job.words)
+        // Under the lock, and only while the job runs: an outcome that record() wrote meanwhile stays.
+        queueLock.withLock {
+            if (active === current && catalogue.jobs.job(current.noteId)?.state == JobState.RUNNING) {
+                markPaused(catalogue, current.noteId, PauseReason.SYSTEM)
+            }
+        }
     }
 
     /** [systemStop] from `onTimeout`, which must return at once. */
@@ -360,7 +365,8 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
     fun cancelDownload() {
         val current = active
         if (current != null && running.value?.phase is JobPhase.Downloading) {
-            if (current.cancel == null) current.cancel = Cancel.RESTORE
+            // Atomic: a Start over at the same moment keeps its DISCARD.
+            current.cancel.compareAndSet(null, Cancel.RESTORE)
             current.job.stop(PauseReason.USER)
         } else {
             graph.installOwner.cancel()
@@ -573,7 +579,7 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
     private suspend fun endAfterFailure(current: Active): JobOutcome {
         current.run.cancel(CancellationException("The job could not be followed"))
         val outcome = outcomeOf(current)
-        val unexpected = outcome == JobOutcome.Cancelled && current.cancel == null
+        val unexpected = outcome == JobOutcome.Cancelled && current.cancel.get() == null
         return if (unexpected) JobOutcome.Failed(JobFailure.Processing(Failure.UNKNOWN)) else outcome
     }
 
@@ -621,7 +627,9 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
 
     /** Writes the row for [outcome] (under the queue lock). */
     private suspend fun record(catalogue: Catalogue, current: Active, outcome: JobOutcome) {
-        if (recordCancel(catalogue, current, outcome)) return
+        // One read: a Cancel of a download can set the flag outside the lock while this runs.
+        val cancel = current.cancel.get()
+        if (recordCancel(catalogue, current.noteId, cancel, outcome)) return
         val noteId = current.noteId
         val jobs = catalogue.jobs
         when (outcome) {
@@ -636,7 +644,7 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
             is JobOutcome.Paused -> markPaused(catalogue, noteId, outcome.reason)
             is JobOutcome.Failed -> jobs.markFailed(noteId, outcome.failure.code)
             is JobOutcome.NeedsConsent -> jobs.markNeedsConsent(noteId)
-            JobOutcome.Cancelled -> when (current.cancel) {
+            JobOutcome.Cancelled -> when (cancel) {
                 Cancel.DISCARD, Cancel.RESTORE -> Unit // handled above
                 Cancel.KEEP -> markPaused(catalogue, noteId, PauseReason.USER)
                 null -> markPaused(catalogue, noteId, PauseReason.INTERRUPTED)
@@ -648,16 +656,20 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
      * Writes the row for a Start over (DISCARD) or a Cancel of a download (RESTORE); false when [outcome] is not for
      * them. Start over can come after the job's run ended but before this write: it still discards the work.
      */
-    private suspend fun recordCancel(catalogue: Catalogue, current: Active, outcome: JobOutcome): Boolean {
-        val noteId = current.noteId
+    private suspend fun recordCancel(
+        catalogue: Catalogue,
+        noteId: String,
+        cancel: Cancel?,
+        outcome: JobOutcome,
+    ): Boolean {
         val sealed = outcome == JobOutcome.Done || outcome == JobOutcome.AdoptPending
         val stopped = outcome is JobOutcome.Paused || outcome == JobOutcome.Cancelled
         return when {
-            current.cancel == Cancel.DISCARD && !sealed -> {
+            cancel == Cancel.DISCARD && !sealed -> {
                 discardWork(catalogue, noteId)
                 true
             }
-            current.cancel == Cancel.RESTORE && stopped -> {
+            cancel == Cancel.RESTORE && stopped -> {
                 if (!markPausedIfSaved(catalogue, noteId, PauseReason.USER)) catalogue.jobs.remove(noteId)
                 true
             }

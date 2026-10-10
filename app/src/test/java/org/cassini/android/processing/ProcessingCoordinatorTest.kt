@@ -481,6 +481,7 @@ class ProcessingCoordinatorTest {
         coordinator.transcribe(b)
         val first = job(0)
         first.pauseOnStop = false
+        checkpoint(a, doneMs = 28_000)
 
         coordinator.systemStop(a)
         assertEquals(PauseReason.SYSTEM, first.stopReason.get())
@@ -488,6 +489,7 @@ class ProcessingCoordinatorTest {
         val row = requireNotNull(catalogue().jobs.job(a))
         assertEquals("every screen shows Paused at once", JobState.PAUSED, row.state)
         assertEquals(PauseReason.SYSTEM, row.pauseReason)
+        assertEquals("the row has the numbers of the saved checkpoint", 28_000L, row.doneMs)
 
         first.finish(JobOutcome.Paused(PauseReason.SYSTEM))
         coordinator.awaitIdle()
