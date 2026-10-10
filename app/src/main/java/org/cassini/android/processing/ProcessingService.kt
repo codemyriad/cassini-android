@@ -53,6 +53,9 @@ class ProcessingService : LifecycleService() {
     private val commands = mutableSetOf<Job>()
     private var wakeLock: PowerManager.WakeLock? = null
 
+    /** The last ongoing notification that [followNotification] built; null before the first one (main thread). */
+    private var lastNotification: Notification? = null
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
         lastStartId = startId
@@ -154,6 +157,7 @@ class ProcessingService : LifecycleService() {
                 if (wait > 0) delay(wait)
                 posted = SystemClock.elapsedRealtime()
                 val notification = withContext(Dispatchers.Default) { notifications.ongoing(coordinator.state.value) }
+                lastNotification = notification
                 if (foregroundType != null) {
                     getSystemService(NotificationManager::class.java)
                         ?.notify(ProcessingNotifications.PROCESSING_ID, notification)
@@ -176,14 +180,28 @@ class ProcessingService : LifecycleService() {
     }
 
     /**
-     * PARTIAL_WAKE_LOCK while inference runs: acquired with a 10 min timeout and again at every window, released on
-     * any other phase (downloads hold none) and when the service stops.
+     * PARTIAL_WAKE_LOCK while inference runs: acquired with a 10 min timeout and again at every window, and while a
+     * cancelled job still decodes (WaitingForPrevious). Stopping keeps the lock as it is: after a Stop the job decodes
+     * up to its next block, but a stopped download holds none. Released on any other phase and when the service stops.
      */
     private suspend fun followWakeLock() {
         coordinator.state
-            .map { state -> (state.running?.phase as? JobPhase.Transcribing)?.progress?.doneMs }
+            .map { state ->
+                when (val phase = state.running?.phase) {
+                    is JobPhase.Transcribing -> phase.progress.doneMs
+                    JobPhase.WaitingForPrevious -> WAKE_HOLD
+                    JobPhase.Stopping -> WAKE_KEEP
+                    else -> null
+                }
+            }
             .distinctUntilChanged()
-            .collect { doneMs -> if (doneMs != null) acquireWakeLock() else releaseWakeLock() }
+            .collect { tick ->
+                when (tick) {
+                    null -> releaseWakeLock()
+                    WAKE_KEEP -> Unit
+                    else -> acquireWakeLock()
+                }
+            }
     }
 
     private fun acquireWakeLock() {
@@ -200,9 +218,14 @@ class ProcessingService : LifecycleService() {
         wakeLock?.takeIf { it.isHeld }?.release()
     }
 
-    /** `startForeground` with [type] inside the catch of architecture 5.7; false when Android refused it. */
+    /**
+     * `startForeground` with [type] inside the catch of architecture 5.7; false when Android refused it. It takes the
+     * last notification that [followNotification] built, which updates it within a second. Only the first call of a
+     * start builds one here, on the main thread, because `startForeground` must come at once; below API 33 this
+     * build reads the app locale from a file.
+     */
     private fun enterForeground(type: Int): Boolean {
-        val notification: Notification = notifications.ongoing(coordinator.state.value)
+        val notification: Notification = lastNotification ?: notifications.ongoing(coordinator.state.value)
         return try {
             ServiceCompat.startForeground(this, ProcessingNotifications.PROCESSING_ID, notification, type)
             true
@@ -219,6 +242,7 @@ class ProcessingService : LifecycleService() {
     private fun leaveForeground() {
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         foregroundType = null
+        lastNotification = null
         coordinator.onServiceForeground(false)
         releaseWakeLock()
     }
@@ -234,6 +258,10 @@ class ProcessingService : LifecycleService() {
         private const val WAKE_LOCK_TAG = "Cassini:processing"
         private const val WAKE_LOCK_TIMEOUT_MS = 10 * 60 * 1000L
         private const val MIN_UPDATE_MS = 1_000L
+
+        /** [followWakeLock] ticks that are no window position: acquire the lock, or keep it as it is. */
+        private const val WAKE_HOLD = -1L
+        private const val WAKE_KEEP = -2L
 
         fun drainIntent(context: Context): Intent = processingIntent(context, ACTION_DRAIN)
 
