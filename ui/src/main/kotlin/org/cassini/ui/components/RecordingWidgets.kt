@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -93,14 +94,19 @@ fun RecordingStatus(paused: Boolean, modifier: Modifier = Modifier) {
  * border and List 22/1.8, the label 13 sp 6 dp below), Pause/Resume ([onPauseResume]: an 88 dp rec.pauseFill circle
  * with Pause 30, or a 26 dp rec.dot disc when [paused]; "Pause recording" / "Resume recording") and "Finish"
  * ([onFinish]: a 56 dp rec.finish circle with an 18 dp white square, radius 4).
+ *
+ * When [captureEnabled] is false (no capture yet, or it is being saved), Pause/Resume and Finish are disabled at
+ * 38 %; Library stays enabled.
  */
 @Composable
+@Suppress("LongParameterList") // The three controls, their state and the modifier.
 fun RecordingControls(
     paused: Boolean,
     onLibrary: () -> Unit,
     onPauseResume: () -> Unit,
     onFinish: () -> Unit,
     modifier: Modifier = Modifier,
+    captureEnabled: Boolean = true,
 ) {
     val rec = CassiniTheme.recording
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -119,10 +125,10 @@ fun RecordingControls(
             }
         }
         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-            PauseResumeButton(paused, onPauseResume)
+            PauseResumeButton(paused, onPauseResume, captureEnabled)
         }
         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-            LabelledCircle(stringResource(R.string.ui_recording_finish), onFinish) { interaction ->
+            LabelledCircle(stringResource(R.string.ui_recording_finish), onFinish, captureEnabled) { interaction ->
                 Box(
                     Modifier
                         .size(56.dp)
@@ -148,11 +154,14 @@ fun RecordingControls(
 private fun LabelledCircle(
     label: String,
     onClick: () -> Unit,
+    enabled: Boolean = true,
     circle: @Composable (MutableInteractionSource) -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
     Column(
-        modifier = Modifier.clickable(interaction, indication = null, role = Role.Button, onClick = onClick),
+        modifier = Modifier
+            .alpha(if (enabled) 1f else DISABLED_ALPHA)
+            .clickable(interaction, indication = null, enabled = enabled, role = Role.Button, onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -162,17 +171,19 @@ private fun LabelledCircle(
 }
 
 @Composable
-private fun PauseResumeButton(paused: Boolean, onClick: () -> Unit) {
+private fun PauseResumeButton(paused: Boolean, onClick: () -> Unit, enabled: Boolean) {
     val rec = CassiniTheme.recording
     val description = stringResource(if (paused) R.string.ui_recording_resume else R.string.ui_recording_pause)
     Box(
         modifier = Modifier
             .size(88.dp)
+            .alpha(if (enabled) 1f else DISABLED_ALPHA)
             .clip(CircleShape)
             .background(rec.pauseFill)
             .clickable(
                 interactionSource = null,
                 indication = ripple(color = rec.onPause),
+                enabled = enabled,
                 role = Role.Button,
                 onClick = onClick,
             )
