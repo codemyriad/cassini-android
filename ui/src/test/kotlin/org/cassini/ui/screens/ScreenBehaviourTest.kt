@@ -1,23 +1,34 @@
 package org.cassini.ui.screens
 
+import android.view.View
 import androidx.activity.OnBackPressedDispatcher
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.dp
+import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import org.cassini.ui.components.WordRef
 import org.cassini.ui.components.turnText
 import org.cassini.ui.fixtures.BoardFixtures
@@ -30,6 +41,7 @@ import org.cassini.ui.note.NoteEvent
 import org.cassini.ui.note.NoteScreen
 import org.cassini.ui.theme.CassiniTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -104,9 +116,68 @@ class ScreenBehaviourTest {
         rule.runOnIdle { assertEquals(listOf<NoteEvent>(NoteEvent.CloseSearch), events) }
     }
 
+    /** With playback paused a drag does not pause auto-follow, so no Follow playback chip appears and stays. */
+    @Test fun aDragWithPlaybackPausedLeavesFollowingOn() {
+        val events = mutableListOf<NoteEvent>()
+        val base = BoardFixtures.readAndListen
+        var state by mutableStateOf(base.copy(playback = base.playback?.copy(playing = false)))
+        setThemed {
+            NoteScreen(state, onEvent = {
+                events += it
+                if (it == NoteEvent.PauseFollowing) state = state.copy(playback = state.playback?.copy(following = false))
+            })
+        }
+        rule.onNode(hasScrollAction()).performTouchInput { swipeUp() }
+        rule.runOnIdle { assertEquals(emptyList<NoteEvent>(), events.filter { it == NoteEvent.PauseFollowing }) }
+        rule.onNodeWithText("Follow playback").assertDoesNotExist()
+    }
+
+    @Test fun aDragDuringPlaybackPausesFollowingAndShowsTheChip() {
+        val events = mutableListOf<NoteEvent>()
+        var state by mutableStateOf(BoardFixtures.readAndListen)
+        setThemed {
+            NoteScreen(state, onEvent = {
+                events += it
+                if (it == NoteEvent.PauseFollowing) state = state.copy(playback = state.playback?.copy(following = false))
+            })
+        }
+        rule.onNode(hasScrollAction()).performTouchInput { swipeUp() }
+        rule.runOnIdle { assertTrue(NoteEvent.PauseFollowing in events) }
+        rule.onNodeWithText("Follow playback").assertExists()
+    }
+
+    /**
+     * Without a player (here Processing) the snackbar keeps clear of a 48 dp navigation bar: the box under the
+     * top bar reaches the bottom of the window.
+     */
+    @Test fun theSnackbarKeepsClearOfTheNavigationBarWithoutAPlayer() {
+        val snackbar = VariantFixtures.read.getValue("read-snackbar-saved").snackbar
+        lateinit var view: View
+        setThemed {
+            view = LocalView.current
+            NoteScreen(BoardFixtures.transcribing.copy(snackbar = snackbar), onEvent = {})
+        }
+        val insets = WindowInsetsCompat.Builder()
+            .setInsets(WindowInsetsCompat.Type.navigationBars(), Insets.of(0, 0, 0, NAV_BAR_PX))
+            .build()
+        rule.runOnUiThread { ViewCompat.dispatchApplyWindowInsets(view, insets) }
+        rule.waitForIdle()
+        val root = rule.onRoot().getBoundsInRoot()
+        val bar = rule.onNodeWithText("Saved", substring = true).getBoundsInRoot()
+        val gap = root.bottom - bar.bottom
+        assertTrue("the snackbar is $gap above the window bottom", gap >= NAV_BAR_DP.dp + SNACKBAR_MARGIN_DP.dp)
+    }
+
     private fun SemanticsNodeInteraction.textLayout(): TextLayoutResult {
         val results = mutableListOf<TextLayoutResult>()
         fetchSemanticsNode().config[SemanticsActions.GetTextLayoutResult].action?.invoke(results)
         return results.single()
+    }
+
+    private companion object {
+        /** 48 dp at xhdpi. */
+        const val NAV_BAR_PX = 96
+        const val NAV_BAR_DP = 48
+        const val SNACKBAR_MARGIN_DP = 16
     }
 }

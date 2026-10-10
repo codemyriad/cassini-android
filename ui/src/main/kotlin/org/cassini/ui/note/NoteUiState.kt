@@ -106,6 +106,9 @@ data class PlaybackUi(val positionMs: Long, val durationMs: Long, val playing: B
  * In-note search: the [query] and its [matches] in text order; [current] indexes [matches] ("2 of 7" shows
  * `current + 1` of [total]; 0 matches show "No matches"). [matches] is an addition to ui.md section 7, which gives
  * only (query, current, total): the screen needs the ranges to draw the hits.
+ *
+ * [query] is a text field value: the ViewModel must apply [NoteEvent.SearchQuery] synchronously, in Compose snapshot
+ * state, not through a collected flow, or the field can drop typed characters and break IME composition.
  */
 @Immutable
 data class TranscriptSearchUi(

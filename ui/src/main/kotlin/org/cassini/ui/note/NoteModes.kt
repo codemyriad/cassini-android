@@ -25,6 +25,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -144,8 +145,9 @@ private fun ColumnScope.DocumentBelow(state: NoteUiState, banners: Boolean, onEv
  * large font scales. Items: the progress [card] (margin 8/16; null in Paused and Failed), the banners, the
  * "Draft transcript" header and one item per turn, keyed by its id.
  *
- * Auto-follow: once the user scrolls to the end of the draft, new text keeps the end in view; a scroll that ends
- * above the end stops it. Opening the screen does not scroll, so the card stays in view.
+ * Auto-follow (features.md section 3.1): new text scrolls the end of the draft into view. A scroll that ends above
+ * the end pauses it, and a scroll back to the end resumes it. Opening the screen does not scroll, so the card stays
+ * in view until the first new text arrives.
  */
 @Composable
 private fun ColumnScope.DraftList(
@@ -155,18 +157,24 @@ private fun ColumnScope.DraftList(
     onEvent: (NoteEvent) -> Unit,
 ) {
     val listState = rememberLazyListState()
-    var stick by remember { mutableStateOf(false) }
+    var stick by remember { mutableStateOf(true) }
     LaunchedEffect(listState) {
         snapshotFlow { listState.isScrollInProgress }
             .drop(1)
             .collect { scrolling -> if (!scrolling) stick = !listState.canScrollForward }
     }
     val turns = state.turns
-    LaunchedEffect(turns) {
-        if (stick && turns.isNotEmpty()) {
-            listState.scrollToItem(listState.layoutInfo.totalItemsCount - 1)
-            listState.scrollBy(TO_END_PX)
-        }
+    val currentTurns by rememberUpdatedState(turns)
+    LaunchedEffect(listState) {
+        // drop(1): the turns shown on opening do not scroll; only new text does.
+        snapshotFlow { currentTurns }
+            .drop(1)
+            .collect { latest ->
+                if (stick && latest.isNotEmpty()) {
+                    listState.scrollToItem(listState.layoutInfo.totalItemsCount - 1)
+                    listState.scrollBy(TO_END_PX)
+                }
+            }
     }
     LazyColumn(
         modifier = Modifier
@@ -188,8 +196,9 @@ private fun ColumnScope.DraftList(
                 )
             }
         }
-        state.banners.forEach { spec ->
-            item(key = "banner-${spec.id}") { NoteBanner(spec, onEvent, TopItemPadding) }
+        // The index keeps the key unique when two banners share an id (BannerSpec.id defaults to the kind).
+        state.banners.forEachIndexed { index, spec ->
+            item(key = "banner-$index-${spec.id}") { NoteBanner(spec, onEvent, TopItemPadding) }
         }
         if (turns.isNotEmpty()) {
             item(key = "draft-header") { DraftHeader() }

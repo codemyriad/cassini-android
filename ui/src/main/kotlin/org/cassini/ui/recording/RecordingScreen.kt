@@ -3,7 +3,6 @@
 
 package org.cassini.ui.recording
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -62,8 +61,10 @@ private const val TITLE_MAX = 200
  * format badge, spaced as the board), the title block 28 dp below, the banner slot 8 dp below that, the centre
  * (timer, waveform and caption, 28 dp apart and centred in the free height) and the controls.
  *
- * System back and the header chevron send [RecordingEvent.Minimise]: the recording continues. The banner's "Open
- * settings" sends [RecordingEvent.OpenSettings]; its other actions send [RecordingEvent.BannerAction].
+ * The header chevron sends [RecordingEvent.Minimise]: the recording continues. System back is not handled here: the
+ * navigation in :app pops `RecordingKey` with the predictive pop of ui.md section 9, and that pop minimises too.
+ * The banner's "Open settings" sends [RecordingEvent.OpenSettings]; its other actions send
+ * [RecordingEvent.BannerAction].
  *
  * The status shows only while the capture runs or is paused. Before the capture starts and while it is saved, the
  * caption tells why ("Cassini needs the microphone to record.", "Starting the microphone…", "Saving the
@@ -76,7 +77,6 @@ fun RecordingScreen(
     modifier: Modifier = Modifier,
 ) {
     val rec = CassiniTheme.recording
-    BackHandler { onEvent(RecordingEvent.Minimise) }
     Column(
         modifier
             .fillMaxSize()

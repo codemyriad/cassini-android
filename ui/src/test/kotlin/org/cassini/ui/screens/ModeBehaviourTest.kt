@@ -33,8 +33,8 @@ import java.util.Locale
 
 /**
  * What the Recording screen and the Transcribing mode send and announce (features.md sections 2, 3.1 and 14):
- * system back and the chevron minimise the recording; the suggestion card's buttons and header; the progress card's
- * live region and the stepper's state descriptions.
+ * the chevron minimises the recording and system back is left to the navigation; the suggestion card's buttons and
+ * header; the progress card's live region and the stepper's state descriptions.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -53,10 +53,14 @@ class ModeBehaviourTest {
         }
     }
 
-    @Test fun backAndTheChevronMinimiseTheRecording() {
+    /**
+     * System back stays with the navigation in :app, which pops `RecordingKey` with the predictive pop (ui.md section
+     * 9); that pop minimises. The screen registers no back callback that would take it away.
+     */
+    @Test fun theChevronMinimisesTheRecordingAndBackIsLeftToNavigation() {
         val events = mutableListOf<RecordingEvent>()
         setThemed { RecordingScreen(BoardFixtures.recording, onEvent = { events += it }) }
-        rule.runOnIdle { back.onBackPressed() }
+        rule.runOnIdle { assertEquals(false, back.hasEnabledCallbacks()) }
         rule.onNodeWithContentDescription("Minimise to library (recording continues)").performClick()
         rule.onNodeWithText("Library").performClick()
         rule.onNodeWithContentDescription("Pause recording").performClick()
@@ -64,7 +68,6 @@ class ModeBehaviourTest {
         rule.runOnIdle {
             assertEquals(
                 listOf(
-                    RecordingEvent.Minimise,
                     RecordingEvent.Minimise,
                     RecordingEvent.OpenLibrary,
                     RecordingEvent.PauseResume,

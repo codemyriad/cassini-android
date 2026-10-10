@@ -4,19 +4,21 @@ import androidx.compose.runtime.Immutable
 import org.cassini.ui.components.WordRef
 import org.cassini.ui.banner.BannerAction as BannerButton
 
-/** What the Note screen asks for (features.md section 3). */
+/**
+ * What the Note screen asks for (features.md section 3). Stop and Remove from queue come from the cards; Resume,
+ * Start over, Transcribe, Transcribe again and Move to trash arrive as [SheetAction] (the actions sheet) or
+ * [BannerAction] (the pause and failure banners), so they have no event of their own.
+ */
 sealed interface NoteEvent {
     data object Back : NoteEvent
 
     /** The top bar More button: open the Note actions sheet. */
     data object More : NoteEvent
 
+    /** The progress card's Stop. */
     data object Stop : NoteEvent
 
-    data object Resume : NoteEvent
-
-    data object StartOver : NoteEvent
-
+    /** The Queued card's Remove from queue. */
     data object RemoveFromQueue : NoteEvent
 
     /** A word tap: seek to the word and play. */
@@ -84,12 +86,6 @@ sealed interface NoteEvent {
 
     @Immutable
     data class RenameConfirmed(val title: String) : NoteEvent
-
-    data object Transcribe : NoteEvent
-
-    data object TranscribeAgain : NoteEvent
-
-    data object Trash : NoteEvent
 
     /** The confirm button of [NoteUiState.dialog]. */
     data object ConfirmDialog : NoteEvent

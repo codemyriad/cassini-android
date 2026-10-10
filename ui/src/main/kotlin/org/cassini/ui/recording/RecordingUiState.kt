@@ -9,6 +9,9 @@ import org.cassini.ui.banner.BannerSpec
  * The Recording screen (board 01, features.md section 2; ui.md section 7). [levels] are the 56 waveform bars
  * (0–1, oldest first); [format] and [sampleRateHz] make the format chip ("Opus 48 kHz"); [hint] follows the
  * fixed hint sentence; [banner] sits below the title (light tones on the dark surface).
+ *
+ * [title] is a text field value: the ViewModel must apply [RecordingEvent.Title] synchronously, in Compose snapshot
+ * state, not through a collected flow, or the field can drop typed characters and break IME composition.
  */
 @Immutable
 data class RecordingUiState(

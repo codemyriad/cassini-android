@@ -6,6 +6,7 @@ package org.cassini.ui.note
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.WindowInsets
@@ -77,22 +78,7 @@ fun NoteScreen(
                     else -> NoteModeBody(state, onEvent)
                 }
             }
-            val playback = state.playback
-            if (playback != null && !playback.following) {
-                FollowChip(
-                    text = stringResource(R.string.ui_follow_playback),
-                    onClick = { onEvent(NoteEvent.FollowPlayback) },
-                    // 16 dp above the player: the chip's 48 dp layout holds 8 dp of it.
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 8.dp),
-                )
-            }
-            CassiniSnackbarHost(
-                spec = state.snackbar,
-                onTimeout = { onEvent(NoteEvent.SnackbarTimeout) },
-                modifier = Modifier.align(Alignment.BottomCenter),
-            )
+            NoteFloating(state, onEvent)
         }
         val playback = state.playback
         if (playback != null) {
@@ -110,6 +96,33 @@ fun NoteScreen(
         }
     }
     NoteOverlays(state, onEvent)
+}
+
+/**
+ * What floats at the bottom of the content box: the Follow playback chip, 16 dp above the player, while playback runs
+ * with auto-follow paused (only then does it resume by itself), and the snackbar host.
+ */
+@Composable
+private fun BoxScope.NoteFloating(state: NoteUiState, onEvent: (NoteEvent) -> Unit) {
+    val playback = state.playback
+    if (playback != null && !playback.following && playback.playing) {
+        FollowChip(
+            text = stringResource(R.string.ui_follow_playback),
+            onClick = { onEvent(NoteEvent.FollowPlayback) },
+            // The chip's 48 dp layout holds 8 dp of the 16 dp gap.
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 8.dp),
+        )
+    }
+    CassiniSnackbarHost(
+        spec = state.snackbar,
+        onTimeout = { onEvent(NoteEvent.SnackbarTimeout) },
+        // Without the player the box reaches the bottom of the window, so it keeps clear of the navigation bar.
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .then(if (playback == null) Modifier.navigationBarsPadding() else Modifier),
+    )
 }
 
 /**

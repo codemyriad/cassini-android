@@ -299,9 +299,11 @@ private fun FollowEffects(
     onEvent: (NoteEvent) -> Unit,
 ) {
     val event by rememberUpdatedState(onEvent)
+    val follows by rememberUpdatedState(following)
     LaunchedEffect(listState) {
         listState.interactionSource.interactions.collect {
-            if (it is DragInteraction.Start) event(NoteEvent.PauseFollowing)
+            // Only a drag during playback pauses auto-follow: with playback paused there is nothing to follow.
+            if (it is DragInteraction.Start && follows) event(NoteEvent.PauseFollowing)
         }
     }
     if (followPaused) {
