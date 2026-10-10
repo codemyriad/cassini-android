@@ -21,6 +21,8 @@ Options:
                       Repeat it to select more than one.
   --serial SERIAL     The adb serial of the device (default: $ANDROID_SERIAL, or the only device).
   --sample NAME       The audioSample argument of the 0.1.0 tests (default: fleurs).
+                      The script also gives downloadModels=true. Thus, if Parakeet and the speech detector are
+                      missing, DeviceSmokeTest and ChunkingComparisonTest download them (several hundred MB).
   --arg KEY=VALUE     One more instrumentation argument (-e KEY VALUE). Repeat it for more.
   --help              Shows this text.
 
