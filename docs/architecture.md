@@ -649,6 +649,6 @@ Locks: `NoteLocks` (a striped `ReentrantLock` per note) and one `ReentrantLock` 
 - TXT, SRT and VTT exports are word-body derivatives without integrity data; only the sealed `.opus` is a portable Cassini artifact. Android's VTT uses word-timed cues with `<v Label>` spans, while gocassini's `WriteCaptionsVTT` emits one cue per segment as `<Label> text`. `docs/data-formats.md` records both.
 - Visual deviations from the boards are listed in ui.md section 11.
 - Checkpoint cadence: 0.1.0 saved a checkpoint at the first sample block. The job saves none before the first window is done, so a stop before that leaves no checkpoint ("Paused before any words", features.md TX_PAUSED_EARLY).
-- Transcribe again over an UNVERIFIED or UNKNOWN_FORMAT document is refused (`DOCUMENT_<state>`), as 0.1.0 refused every state except `ok` (section 5.4).
+- Transcribe again over an UNVERIFIED or UNKNOWN_FORMAT document is refused (`DOCUMENT_<state>`), as 0.1.0 refused every state except `ok` (section 5.4). The UI does not offer it: the actions sheet shows Transcribe again disabled ("This file can't take a new version here."), and no banner offers it. A `DOCUMENT_<state>` failure shows its message with no Try again. When the user dismisses it, its job row goes.
 - A diarizer failure after the first window keeps the earlier speakers and the diarization record, as 0.1.0 did, though the plan reads "Failure.SPEAKERS degrades to speakersSeparated = false" (section 5.4).
 - The model installer checks free space per part, not once for the whole plan (section 5.6).
