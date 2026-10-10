@@ -36,7 +36,8 @@ data class PlaybackState(
  * - [play] requests AUDIOFOCUS_GAIN (USAGE_MEDIA, CONTENT_TYPE_SPEECH); a focus loss and ACTION_AUDIO_BECOMING_NOISY
  *   pause.
  * - [reload] prepares the file again after a document replace and keeps the position.
- * - [playRange] plays a speaker sample, stops at its end and restores the previous position and play state.
+ * - [playRange] plays a speaker sample, stops at its end and restores the previous position and play state. A pause,
+ *   a focus loss or unplugged headphones during a sample restore the previous position and stay paused.
  */
 // The player API of architecture 5.9: one function per control of the Note screen, each with guard clauses.
 @Suppress("TooManyFunctions", "ReturnCount")
@@ -151,11 +152,14 @@ class PlaybackController(private val parts: Parts) {
         publish()
     }
 
-    /** Pauses and saves the position (final). A speaker sample ends instead and restores the previous position. */
+    /**
+     * Pauses and saves the position (final). It is also the focus-loss and noisy callback. During a speaker sample,
+     * the sample ends, the previous position returns and playback stays paused.
+     */
     fun pause() {
         val active = player ?: return
         if (sample != null) {
-            endSample(resume = false)
+            endSample(interrupted = true)
             return
         }
         if (active.playing) active.pause()
@@ -222,7 +226,7 @@ class PlaybackController(private val parts: Parts) {
     private fun onCompletion() {
         val active = player ?: return
         if (sample != null) {
-            endSample(resume = false)
+            endSample(interrupted = false)
             return
         }
         stopTicker()
@@ -231,7 +235,11 @@ class PlaybackController(private val parts: Parts) {
         save(active.durationMs, final = true)
     }
 
-    private fun endSample(resume: Boolean) {
+    /**
+     * Ends the sample at the position from before. At the sample's end ([interrupted] false), playback goes on if it
+     * played before. A pause, a focus loss or unplugged headphones ([interrupted] true) keep it paused.
+     */
+    private fun endSample(interrupted: Boolean) {
         val active = player ?: return
         val ended = sample ?: return
         sample = null
@@ -239,7 +247,12 @@ class PlaybackController(private val parts: Parts) {
         active.seekTo(ended.restoreMs)
         stopTicker()
         release()
-        if (resume || ended.wasPlaying) play() else publish()
+        if (!interrupted && ended.wasPlaying) {
+            play()
+            return
+        }
+        publish()
+        if (interrupted) save(ended.restoreMs, final = true)
     }
 
     private fun startTicker() {
@@ -262,7 +275,7 @@ class PlaybackController(private val parts: Parts) {
         val positionMs = active.positionMs
         val current = sample
         if (current != null && positionMs >= current.endMs) {
-            endSample(resume = false)
+            endSample(interrupted = false)
             return
         }
         publish()

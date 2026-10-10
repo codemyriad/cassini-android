@@ -123,6 +123,34 @@ class PlaybackControllerTest {
         assertFalse("another note", playback.playRange("other", 0, 1_000))
     }
 
+    @Test fun aPauseDuringASampleThatInterruptedPlaybackStaysPaused() = runTest {
+        val playback = controller()
+        playback.open(NOTE, audio, positionMs = 10_000)
+
+        // Unplugged headphones, a focus loss and the Pause button: each one restores the position and stays paused.
+        val interruptions = listOf(platform::unplug, platform::loseFocus, playback::pause)
+        interruptions.forEachIndexed { index, interrupt ->
+            playback.play()
+            advanceTimeBy(1_000)
+            // The player's position, not the last 150 ms tick.
+            val before = players.single().positionMs
+            assertTrue(playback.playRange(NOTE, startMs = 40_000, endMs = 45_000))
+            advanceTimeBy(500)
+            interrupt()
+            runCurrent()
+            val state = playback.state.value
+            assertFalse("interruption $index: paused", state.playing)
+            assertFalse("interruption $index: no sample", state.sample)
+            assertEquals("interruption $index: position from before", before, state.positionMs)
+            assertFalse("interruption $index: focus given back", platform.focused)
+            assertFalse("interruption $index: noisy not watched", platform.noisyWatched)
+            assertEquals(Save(NOTE, before, final = true), saves.last())
+            advanceTimeBy(5_000)
+            runCurrent()
+            assertFalse("interruption $index: still paused", playback.state.value.playing)
+        }
+    }
+
     @Test fun leavingDuringASampleSavesThePositionFromBefore() = runTest {
         val playback = controller()
         playback.open(NOTE, audio, positionMs = 5_000)
