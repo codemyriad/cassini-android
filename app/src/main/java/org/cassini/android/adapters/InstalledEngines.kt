@@ -3,7 +3,9 @@ package org.cassini.android.adapters
 import android.app.ActivityManager
 import android.content.Context
 import android.util.Log
+import androidx.core.content.ContextCompat
 import org.cassini.android.R
+import org.cassini.core.audio.Limits
 import org.cassini.core.models.ModelCatalog
 import org.cassini.core.models.ModelDescriptor
 import org.cassini.engine.asr.ParakeetFiles
@@ -54,17 +56,29 @@ object InstalledEngines {
     fun environment(context: Context): JobEnvironment {
         val app = context.applicationContext
         return JobEnvironment(
-            placeholderLabel = { number -> app.getString(R.string.speaker_label, number) },
-            lowMemory = { lowMemory(app) },
+            placeholderLabel = { number -> speakerLabel(app, number) },
+            lowMemory = { durationMs -> lowMemory(app, durationMs) },
             warn = { message, error -> Log.w(TAG, message, error) },
         )
     }
 
-    /** `MemoryInfo.lowMemory` or a low-RAM device. It only adds a hint to the progress card. */
-    fun lowMemory(context: Context): Boolean {
-        val manager = context.getSystemService(ActivityManager::class.java) ?: return false
-        val info = ActivityManager.MemoryInfo().also(manager::getMemoryInfo)
-        return info.lowMemory || manager.isLowRamDevice
+    /**
+     * "Speaker 2" in the app language. It is read at each call, so it follows a language change, and below API 33 it
+     * comes from `getContextForLanguage` because the application context keeps the system language there.
+     */
+    fun speakerLabel(context: Context, number: Int): String =
+        ContextCompat.getContextForLanguage(context).getString(R.string.speaker_label, number)
+
+    /**
+     * `MemoryInfo.lowMemory`, a low-RAM device, or a known [durationMs] whose PCM does not fit the free heap
+     * (`Limits.memoryAllows`, architecture 5.7). It only adds a hint to the progress card.
+     */
+    fun lowMemory(context: Context, durationMs: Long?, availableBytes: Long = Limits.availableHeap()): Boolean {
+        val manager = context.getSystemService(ActivityManager::class.java)
+        val info = manager?.let { ActivityManager.MemoryInfo().also(it::getMemoryInfo) }
+        val system = info?.lowMemory == true || manager?.isLowRamDevice == true
+        val heap = durationMs != null && !Limits.memoryAllows(durationMs, availableBytes)
+        return system || heap
     }
 
     private const val TAG = "CassiniJob"

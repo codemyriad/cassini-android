@@ -180,7 +180,7 @@ class TranscriptionJob(
         // Transcribe again over a document that can neither take a version nor be replaced stops here, before any work.
         val existing = storage.existingDocumentBlocking(noteId)?.also(::requireReplaceable)?.takeIf(::extendable)
         val noteVoices = existing?.let { noteVoices(it, saved) }.orEmpty()
-        Prepared(resumed, storage.audioFile(noteId), noteVoices, generation, knownMs, env.lowMemory())
+        Prepared(resumed, storage.audioFile(noteId), noteVoices, generation, knownMs, env.lowMemory(knownMs))
     }
 
     /**

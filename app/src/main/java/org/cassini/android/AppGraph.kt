@@ -325,7 +325,7 @@ class AppGraph(context: Context, val config: Config) {
             notices = hooks.notices ?: ProcessingNotifications(app),
             visibility = visibility,
             battery = hooks.battery ?: BatterySource { elapsedMs -> BatteryReader.read(app, elapsedMs) },
-            placeholderLabel = { number -> app.getString(R.string.speaker_label, number) },
+            placeholderLabel = { number -> InstalledEngines.speakerLabel(app, number) },
             sdkInt = hooks.sdkInt,
         )
         val coordinator = ProcessingCoordinator(this, parts)
@@ -426,7 +426,8 @@ class Catalogue internal constructor(
         locks,
         documents,
         ImportSource.of(context.contentResolver),
-        fallbackTitle = context.getString(R.string.import_fallback_title),
+        // Read at each import, in the app language of that moment (also below API 33).
+        fallbackTitle = { ContextCompat.getContextForLanguage(context).getString(R.string.import_fallback_title) },
         clock = clock,
     )
     val recovery = RecoveryRepository(database, paths, dispatchers, locks, clock = clock)

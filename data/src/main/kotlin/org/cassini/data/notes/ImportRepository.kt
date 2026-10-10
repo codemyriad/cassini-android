@@ -112,8 +112,8 @@ class ImportRepository(
     private val source: ImportSource,
     private val probe: AudioProbe = AudioProbe.Extractor,
     private val limits: ImportLimits = ImportLimits(),
-    /** The title of a file without a usable name; the app passes its localized string. */
-    private val fallbackTitle: String = FALLBACK_TITLE,
+    /** The title of a file without a usable name, read at each import; the app passes its localized string. */
+    private val fallbackTitle: () -> String = { FALLBACK_TITLE },
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val notes = database.notes()
@@ -178,7 +178,7 @@ class ImportRepository(
         val now = clock()
         val row = NoteEntity(
             id = id,
-            title = titleOf(name, fallbackTitle),
+            title = titleOf(name, fallbackTitle()),
             createdAt = now,
             addedAt = now,
             origin = staged.origin,
