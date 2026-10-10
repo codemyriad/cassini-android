@@ -51,6 +51,7 @@ import org.cassini.ui.components.PillSearchField
 import org.cassini.ui.components.PrivacyLine
 import org.cassini.ui.components.ProgressBannerCard
 import org.cassini.ui.components.RecordingBannerCard
+import org.cassini.ui.components.screenContentWidth
 import org.cassini.ui.format.Counts
 import org.cassini.ui.format.Dates
 import org.cassini.ui.format.DayLabel
@@ -100,7 +101,8 @@ fun LibraryScreen(
         modifier
             .fillMaxSize()
             .background(CassiniTheme.colors.bg)
-            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)),
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+            .screenContentWidth(),
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),

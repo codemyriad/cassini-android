@@ -41,6 +41,7 @@ import org.cassini.ui.components.DestructiveTextButton
 import org.cassini.ui.components.DestructiveTextButtonSize
 import org.cassini.ui.components.SecondaryButton
 import org.cassini.ui.components.SecondaryButtonSize
+import org.cassini.ui.components.screenContentWidth
 import org.cassini.ui.format.Dates
 import org.cassini.ui.format.Durations
 import org.cassini.ui.format.Spoken
@@ -64,7 +65,8 @@ fun TrashScreen(
         modifier
             .fillMaxSize()
             .background(CassiniTheme.colors.bg)
-            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)),
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+            .screenContentWidth(),
     ) {
         Column(Modifier.fillMaxSize()) {
             CassiniTopBar(

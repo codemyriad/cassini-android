@@ -33,6 +33,7 @@ import org.cassini.ui.components.SectionHeader
 import org.cassini.ui.components.SegmentedControl
 import org.cassini.ui.components.SettingsRow
 import org.cassini.ui.components.SettingsTrailing
+import org.cassini.ui.components.screenContentWidth
 import org.cassini.ui.format.Counts
 import org.cassini.ui.format.ModelPartUi
 import org.cassini.ui.format.Sizes
@@ -65,6 +66,7 @@ fun SettingsScreen(
             .background(CassiniTheme.colors.bg)
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
             .verticalScroll(rememberScrollState())
+            .screenContentWidth()
             .navigationBarsPadding()
             .padding(bottom = 24.dp),
     ) {

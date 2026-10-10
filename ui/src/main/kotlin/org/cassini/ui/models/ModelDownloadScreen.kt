@@ -37,6 +37,7 @@ import org.cassini.ui.components.PrimaryButton
 import org.cassini.ui.components.PrimaryButtonSize
 import org.cassini.ui.components.TextButton
 import org.cassini.ui.components.TextButtonSize
+import org.cassini.ui.components.screenContentWidth
 import org.cassini.ui.format.Sizes
 import org.cassini.ui.theme.CassiniIcon
 import org.cassini.ui.theme.CassiniTheme
@@ -64,6 +65,7 @@ fun ModelDownloadScreen(
             .fillMaxSize()
             .background(c.bg)
             .windowInsetsPadding(WindowInsets.safeDrawing)
+            .screenContentWidth()
             .padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 24.dp),
     ) {
         IconButton44(
@@ -100,24 +102,30 @@ fun ModelDownloadScreen(
             GroupCard(bordered = true) {
                 state.parts.forEach { PartRow(it) }
             }
-            Text(
-                text = stringResource(R.string.ui_models_footnote, Sizes.storage(state.requiredFreeBytes)),
-                style = CassiniTheme.type.body14,
-                color = c.text2,
-            )
-            TextButton(
-                text = stringResource(
-                    R.string.ui_join_dot,
-                    stringResource(R.string.ui_models_sources),
-                    stringResource(R.string.ui_models_privacy),
-                ),
-                onClick = { onEvent(ModelDownloadEvent.OpenSources) },
-                // The text lines up with the content: the button's own 14 dp padding goes to the start.
-                modifier = Modifier.offset(x = (-14).dp),
-            )
+            ModelDownloadFootnote(state, onEvent)
         }
         ModelDownloadActions(state, onEvent)
     }
+}
+
+/** The free-space footnote and the "Sources · Privacy" link under the parts. */
+@Composable
+private fun ModelDownloadFootnote(state: ModelDownloadUiState, onEvent: (ModelDownloadEvent) -> Unit) {
+    Text(
+        text = stringResource(R.string.ui_models_footnote, Sizes.storage(state.requiredFreeBytes)),
+        style = CassiniTheme.type.body14,
+        color = CassiniTheme.colors.text2,
+    )
+    TextButton(
+        text = stringResource(
+            R.string.ui_join_dot,
+            stringResource(R.string.ui_models_sources),
+            stringResource(R.string.ui_models_privacy),
+        ),
+        onClick = { onEvent(ModelDownloadEvent.OpenSources) },
+        // The text lines up with the content: the button's own 14 dp padding goes to the start.
+        modifier = Modifier.offset(x = (-14).dp),
+    )
 }
 
 /** What the title gives back above and below: see the comment at its use. */

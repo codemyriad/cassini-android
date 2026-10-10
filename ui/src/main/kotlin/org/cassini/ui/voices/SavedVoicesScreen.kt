@@ -41,6 +41,7 @@ import org.cassini.ui.components.IconButton44
 import org.cassini.ui.components.PrivacyLine
 import org.cassini.ui.components.PrivacyLineStyle
 import org.cassini.ui.components.firstGrapheme
+import org.cassini.ui.components.screenContentWidth
 import org.cassini.ui.format.Counts
 import org.cassini.ui.format.Durations
 import org.cassini.ui.format.LocalFormat
@@ -75,6 +76,7 @@ fun SavedVoicesScreen(
             .fillMaxSize()
             .background(CassiniTheme.colors.bg)
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+            .screenContentWidth()
             .navigationBarsPadding(),
     ) {
         CassiniTopBar(

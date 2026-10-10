@@ -45,6 +45,7 @@ import org.cassini.ui.components.RecordingTimer
 import org.cassini.ui.components.TITLE_MAX_LENGTH
 import org.cassini.ui.components.Waveform
 import org.cassini.ui.components.rememberSyncedText
+import org.cassini.ui.components.screenContentWidth
 import org.cassini.ui.format.Counts
 import org.cassini.ui.format.Durations
 import org.cassini.ui.theme.CassiniIcon
@@ -81,6 +82,7 @@ fun RecordingScreen(
             .fillMaxSize()
             .background(rec.bg)
             .windowInsetsPadding(WindowInsets.safeDrawing)
+            .screenContentWidth()
             .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 28.dp),
     ) {
         RecordingHeader(state, onEvent)

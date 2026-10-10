@@ -34,6 +34,7 @@ import org.cassini.ui.components.FollowChip
 import org.cassini.ui.components.IconButton44
 import org.cassini.ui.components.PlaybackBar
 import org.cassini.ui.components.TopBarStyle
+import org.cassini.ui.components.screenContentWidth
 import org.cassini.ui.format.Dates
 import org.cassini.ui.format.Durations
 import org.cassini.ui.theme.CassiniTheme
@@ -63,7 +64,8 @@ fun NoteScreen(
             .background(CassiniTheme.colors.bg)
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
             // While the search is open, the keyboard pushes the transcript and the player up (ui.md section 9).
-            .then(if (search != null) Modifier.imePadding() else Modifier),
+            .then(if (search != null) Modifier.imePadding() else Modifier)
+            .screenContentWidth(),
     ) {
         if (search != null) {
             TranscriptSearchHeader(search, onEvent)

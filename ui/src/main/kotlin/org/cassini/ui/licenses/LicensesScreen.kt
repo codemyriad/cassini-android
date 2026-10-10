@@ -35,6 +35,7 @@ import org.cassini.ui.components.CassiniTopBar
 import org.cassini.ui.components.GroupCard
 import org.cassini.ui.components.SettingsRow
 import org.cassini.ui.components.SettingsTrailing
+import org.cassini.ui.components.screenContentWidth
 import org.cassini.ui.theme.CassiniTheme
 
 /** The repository the "Source code on GitHub" row opens (features.md section 11). */
@@ -59,6 +60,7 @@ fun LicensesScreen(
         .fillMaxSize()
         .background(CassiniTheme.colors.bg)
         .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+        .screenContentWidth()
     if (open != null) {
         LicenseTextPane(open, onEvent, base)
         return
