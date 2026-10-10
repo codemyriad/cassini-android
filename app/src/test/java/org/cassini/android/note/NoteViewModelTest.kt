@@ -9,6 +9,7 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.cassini.android.library.CLOCK
@@ -24,6 +25,7 @@ import org.cassini.core.library.AudioKind
 import org.cassini.core.library.JobKind
 import org.cassini.core.library.JobState
 import org.cassini.data.checkpoint.DraftTranscript
+import org.cassini.data.db.WordEntity
 import org.cassini.data.notes.TranscriptFormat
 import org.cassini.engine.job.BatteryLine
 import org.cassini.engine.job.DraftState
@@ -71,6 +73,7 @@ class NoteViewModelTest {
     private val ports = FakeNotePorts()
     private val saved = SavedStateHandle()
     private val effects = mutableListOf<NoteEffect>()
+    private val recentWords = RecentWords()
 
     @Before
     fun setUp() = Dispatchers.setMain(dispatcher)
@@ -83,7 +86,7 @@ class NoteViewModelTest {
         visible: Boolean = true,
         start: NoteStart? = null,
     ): NoteViewModel {
-        val viewModel = NoteViewModel(saved, NoteKey(NOTE, query, start), ports, CLOCK, dispatcher)
+        val viewModel = NoteViewModel(saved, NoteKey(NOTE, query, start), ports, CLOCK, dispatcher, recentWords)
         backgroundScope.launch { viewModel.state.collect {} }
         // Unconfined: advanceUntilIdle does not wait for background work, so the effects are taken at once.
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.effects.collect { effects += it } }
@@ -119,6 +122,44 @@ class NoteViewModelTest {
         assertEquals("one page of words is enough for six words", 1, ports.calls.count { it.startsWith("words") })
         assertFalse("Document info reads the file only when asked", "documentFacts" in ports.calls)
         assertEquals(4_000L, state.playback?.durationMs)
+    }
+
+    @Test
+    fun theRestOfALongTranscriptLoadsAfterTheFirstTurnsAreShown() = runTest(dispatcher) {
+        ports.wordRows.value = List(NoteViewModel.FIRST_PAGE + 50) { i ->
+            WordEntity(NOTE, "v1", i, i * 100L, i * 100L + 80, if (i / 30 % 2 == 0) "a" else "c", "w$i")
+        }
+        val viewModel = NoteViewModel(saved, NoteKey(NOTE), ports, CLOCK, dispatcher, recentWords)
+        backgroundScope.launch { viewModel.state.collect {} }
+        viewModel.onVisible(true)
+        runCurrent()
+        assertEquals("the first page only", 1, ports.calls.count { it.startsWith("words") })
+        assertFalse("the player waits for the first turns", ports.calls.any { it.startsWith("openPlayer") })
+        val firstWords = viewModel.now().turns.sumOf { it.words.size }
+        assertEquals(NoteViewModel.FIRST_PAGE, firstWords)
+
+        viewModel.onTurnsShown()
+        runCurrent()
+        assertEquals(2, ports.calls.count { it.startsWith("words") })
+        assertEquals(NoteViewModel.FIRST_PAGE + 50, viewModel.now().turns.sumOf { it.words.size })
+        assertTrue(ports.calls.any { it.startsWith("openPlayer") })
+    }
+
+    @Test
+    fun aLaterOpenOfTheSameVersionReadsNoWords() = runTest(dispatcher) {
+        val first = viewModel()
+        assertEquals(1, ports.calls.count { it.startsWith("words") })
+        val turns = first.now().turns.map { it.id }
+        ports.calls.clear()
+
+        val later = viewModel()
+        assertEquals(turns, later.now().turns.map { it.id })
+        assertFalse("the words come from the process memory", ports.calls.any { it.startsWith("words") })
+
+        // A changed document (a new signature) reads its words again.
+        ports.details.value = ports.details.value?.let { it.copy(note = it.note.copy(documentSignature = "1:3:def")) }
+        advanceUntilIdle()
+        assertTrue(ports.calls.any { it.startsWith("words") })
     }
 
     @Test

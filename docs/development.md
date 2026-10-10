@@ -273,24 +273,31 @@ The script uses the installed debug app and its own data. It does not change not
 
 ### note-opening-timing.sh
 
-`scripts/note-opening-timing.sh` measures the time from a tap on a Library row to the first transcript turn on the screen. It uses a document of about one hour (the FLEURS clip 227 times, 6129 words, 25.6 MB) and the 15 s FLEURS document. It measures the first open, later opens and the opens after process death.
+`scripts/note-opening-timing.sh` measures the time from a tap on a Library row to the first transcript turn on the screen. It uses three documents: about one hour (the FLEURS clip 227 times, 6129 words, 25.6 MB), about ten minutes (the clip 37 times, 999 words) and the 15 s FLEURS clip (one turn). It measures the first open, later opens and the opens after process death. The notes take turns in each round, so that the warm-up of the process does not help one note more than the others.
 
-The script operates `NoteOpeningTimingTest` two times with `-e keepRoot timing`. With this argument, `CassiniTestRunner` keeps the scratch root `files/androidTest-kept-timing` after the run. The first run imports the two documents and opens each document four times. Then the script force-stops the app. The second run opens each document three times in a new process. At the end, the script deletes the scratch root. Install the debug app and its test APK before you start the script.
+The script operates `NoteOpeningTimingTest` two times with `-e keepRoot timing`. With this argument, `CassiniTestRunner` keeps the scratch root `files/androidTest-kept-timing` after the run. The first run imports the documents and opens each document four times. Then the script force-stops the app. The second run opens each document three times in a new process. At the end, the script deletes the scratch root. Install the debug app and its test APK before you start the script.
 
 ```sh
 scripts/note-opening-timing.sh --serial emulator-5554
 ```
 
-Results on emulator-5554 (API 34, x86_64), 10 Oct 2026, in milliseconds:
+Results on emulator-5554 (API 34, x86_64), 11 Oct 2026, in milliseconds:
 
 | Note | Audio | First open | Later opens | After process death | Later opens after process death |
 |---|---|---|---|---|---|
-| `timing-one-hour` | 3600 s | 1245 | 1037, 921, 837 | 1380 | 1156, 987 |
-| `timing-fleurs` | 15 s | 603 | 569, 536, 552 | 596 | 651, 602 |
+| `timing-one-hour` | 3600 s | 1257 | 740, 641, 575 | 1290 | 776, 690 |
+| `timing-ten-minutes` | 586 s | 821 | 840, 765, 673 | 877 | 740, 636 |
+| `timing-fleurs` | 15 s | 655 | 503, 442, 405 | 653 | 679, 541 |
 
-The times include the 250 ms screen transition and the time of the test to find the turn. The first open of the one-hour document is fast, because the import keeps the result of the check and the words in Room. The app does not read the document again at the first open.
+The times include the 250 ms screen transition and the time of the test to find the turn. The test finds the turn when the main thread has no more work, so the time includes the drawing of the first screen. The first open of the one-hour document is fast, because the import keeps the result of the check and the words in Room. The app does not read the document again at the first open.
 
-A later open of the one-hour document takes about 0.4 s more than a later open of the short document (median 987 ms against 569 ms). Thus a part of the open time still increases with the length of the transcript. We did not find the cause yet. Examine the Note ViewModel first. It loads the first page of 400 words and then all the words, and the screen can get only the second result. This item is open for P12.
+Later opens do not increase with the length of the audio: the median of the later opens is 690 ms for one hour and 740 ms for ten minutes. The 15 s note is faster (503 ms), because its screen has only one turn to draw. The Note screen does these steps to get this result:
+
+- It shows the first page of 400 words first. It loads the other words after the frame that draws the first turns.
+- It prepares the player after that frame, because `MediaPlayer.prepare` of a long file takes about 0.5 s.
+- `AppGraph.recentWords` keeps the full word lists of the two notes that were opened last. A later open of the same version reads no word rows.
+
+On 10 Oct 2026, before these steps, a later open of the one-hour document took about 0.4 s more than a later open of the 15 s document (median 987 ms against 569 ms).
 
 ## Portable file checks
 

@@ -28,6 +28,7 @@ import org.cassini.android.adapters.RepositoryModelAccess
 import org.cassini.android.notices.ImportTracker
 import org.cassini.android.notices.NoticeCenter
 import org.cassini.android.nav.ViewedImports
+import org.cassini.android.note.RecentWords
 import org.cassini.android.notices.TrashUndo
 import org.cassini.android.playback.AndroidPlaybackPlatform
 import org.cassini.android.playback.MediaAudioPlayer
@@ -209,6 +210,9 @@ class AppGraph(context: Context, val config: Config) {
         )
         NoticeCenter(this, app, imports)
     }
+
+    /** The last full word lists that the Note screen showed (FAST NOTE OPENING: later opens skip the word cache). */
+    val recentWords = RecentWords()
 
     /** "Moved to trash" from the Note screen, for the Library's Undo snackbar. */
     val trashUndo = TrashUndo()

@@ -109,7 +109,13 @@ fun CassiniApp(graph: AppGraph, links: Flow<DeepLink>, modifier: Modifier = Modi
             }
             entry<NoteKey> { key ->
                 val viewModel = viewModel {
-                    NoteViewModel(createSavedStateHandle(), key, GraphNotePorts(graph, context), graph.clock())
+                    NoteViewModel(
+                        createSavedStateHandle(),
+                        key,
+                        GraphNotePorts(graph, context),
+                        graph.clock(),
+                        recentWords = graph.recentWords,
+                    )
                 }
                 NoteRoute(viewModel, noteNavigator(backStack))
             }

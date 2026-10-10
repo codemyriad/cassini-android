@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
@@ -66,6 +67,14 @@ fun NoteRoute(viewModel: NoteViewModel, navigator: NoteNavigator, modifier: Modi
         // A configuration change (rotation, dark theme, font scale) recreates the activity: the screen stays, and so
         // does the player, which keeps playing.
         onDispose { if (activity?.isChangingConfigurations != true) viewModel.onVisible(false) }
+    }
+    val turnsShown = state.turns.isNotEmpty()
+    LaunchedEffect(viewModel, turnsShown) {
+        if (turnsShown) {
+            // The next frame starts when the frame that draws them has ended.
+            withFrameNanos { }
+            viewModel.onTurnsShown()
+        }
     }
     LifecycleResumeEffect(viewModel) {
         viewModel.onResume()

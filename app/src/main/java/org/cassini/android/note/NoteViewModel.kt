@@ -8,6 +8,7 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -32,6 +33,8 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.cassini.android.library.LibraryMapping
 import org.cassini.android.nav.ModelDownloadKey
 import org.cassini.android.nav.NoteKey
@@ -130,6 +133,8 @@ class NoteViewModel(
     private val ports: NotePorts,
     private val clock: Clock = Clock.systemDefaultZone(),
     private val compute: CoroutineDispatcher = Dispatchers.Default,
+    /** The process's last full word lists: a later open of a note skips the word cache (`AppGraph.recentWords`). */
+    private val recentWords: RecentWords = RecentWords(),
 ) : ViewModel() {
     val noteId: String = key.noteId
 
@@ -142,6 +147,7 @@ class NoteViewModel(
         Local(search = searchAtOpen(key.query), sheet = savedSheet(), dialog = savedDialog()),
     )
     private val printsVersion = MutableStateFlow(0)
+    private val firstTurnsShown = CompletableDeferred<Unit>()
     private val visible = MutableStateFlow(false)
     private var snackbarCount = 0L
     private var closing = false
@@ -175,9 +181,20 @@ class NoteViewModel(
                 flowOf(null)
             } else {
                 flow {
-                    val first = ports.words(noteId, key.variantId, 0, FIRST_PAGE).map(::word)
+                    val recent = RecentWords.Key(noteId, key.variantId, key.signature, key.words)
+                    val known = recentWords.get(recent)
+                    val first = known?.take(FIRST_PAGE) ?: ports.words(noteId, key.variantId, 0, FIRST_PAGE).map(::word)
                     emit(first)
-                    if (first.size == FIRST_PAGE) emit(ports.words(noteId, key.variantId).map(::word))
+                    if (first.size == FIRST_PAGE) {
+                        // The first screen of turns is built from the first page only, so its time does not grow
+                        // with the length of the note; the rest follows once it is on the screen.
+                        awaitFirstTurns()
+                        val all = known ?: ports.words(noteId, key.variantId).map(::word)
+                        emit(all)
+                        recentWords.put(recent, all)
+                    } else {
+                        recentWords.put(recent, first)
+                    }
                 }.catch { error ->
                     Log.w(TAG, "The transcript cannot be read", error)
                     emit(emptyList())
@@ -543,6 +560,19 @@ class NoteViewModel(
         }
     }
 
+    /**
+     * Waits until the screen drew its first turns, or [FIRST_TURNS_WAIT_MS] (a screen that does not draw them). The
+     * time runs on [compute], so a main thread that is busy or paused does not hold it.
+     */
+    private suspend fun awaitFirstTurns() {
+        withContext(compute) { withTimeoutOrNull(FIRST_TURNS_WAIT_MS) { firstTurnsShown.await() } }
+    }
+
+    /** The screen drew its first transcript turns: the rest of a long transcript may follow (FAST NOTE OPENING). */
+    fun onTurnsShown() {
+        firstTurnsShown.complete(Unit)
+    }
+
     /** The screen is shown (the player may open) or left (the player saves its position and releases). */
     fun onVisible(shown: Boolean) {
         visible.value = shown
@@ -572,6 +602,7 @@ class NoteViewModel(
                 file = details?.note?.audioFile?.takeIf { shown && mode != null && NoteMapping.hasPlayer(mode) },
                 signature = details?.note?.documentSignature,
                 positionMs = details?.note?.positionMs ?: 0,
+                hasWords = details?.let(::wordsKey)?.let { it.words > 0 } == true,
             )
         }.distinctUntilChanged { a, b -> a.file == b.file && a.signature == b.signature }.collect { key ->
             val file = key.file
@@ -581,6 +612,8 @@ class NoteViewModel(
                     opened = null
                 }
                 file != opened -> {
+                    // Preparing a long file takes a while: the first turns come first (FAST NOTE OPENING).
+                    if (opened == null && key.hasWords) awaitFirstTurns()
                     ports.openPlayer(noteId, file, key.positionMs)
                     opened = file
                 }
@@ -590,7 +623,7 @@ class NoteViewModel(
         }
     }
 
-    private data class PlayerKey(val file: String?, val signature: String?, val positionMs: Long)
+    private data class PlayerKey(val file: String?, val signature: String?, val positionMs: Long, val hasWords: Boolean)
 
     private fun wordTap(word: WordRef) {
         val start = core.value?.shown()?.wordStart(word) ?: return
@@ -1260,6 +1293,9 @@ class NoteViewModel(
     companion object {
         /** The words loaded before the rest: more than a screen of turns. */
         const val FIRST_PAGE = 400
+
+        /** How long the rest of the words waits for the first turns on the screen (a screen that is not shown). */
+        const val FIRST_TURNS_WAIT_MS = 1_000L
 
         const val SKIP_MS = 10_000L
         private const val STOP_TIMEOUT_MS = 5_000L

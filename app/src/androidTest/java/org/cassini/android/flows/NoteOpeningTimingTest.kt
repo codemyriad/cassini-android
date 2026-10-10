@@ -29,10 +29,10 @@ import java.io.File
 
 /**
  * The FAST NOTE OPENING timing check (docs/development.md): the time from a tap on a Library row to the first
- * transcript turn on screen, for a document of about one hour and for the 15 s FLEURS document. [firstAndLaterOpens]
- * builds and imports both, then opens each one four times (the first open, then later opens). The instrumentation
- * then ends, which kills the process; [opensAfterProcessDeath], in a new process on the same root, opens each one
- * three times again. Later opens must not grow with the length of the audio.
+ * transcript turn on screen, for documents of about one hour and ten minutes and for the 15 s FLEURS document.
+ * [firstAndLaterOpens] builds and imports them, then opens each one four times (the first open, then later opens).
+ * The instrumentation then ends, which kills the process; [opensAfterProcessDeath], in a new process on the same
+ * root, opens each one three times again. Later opens must not grow with the length of the audio.
  *
  * Both run only from scripts/note-opening-timing.sh, which gives `-e keepRoot`, so the second run opens the notes of
  * the first. They log one line per open with the tag CassiniTiming.
@@ -54,34 +54,40 @@ class NoteOpeningTimingTest {
         runBlocking {
             if (rows().none { it.title == LONG }) import(document(LONG, HOUR_MS, "Ada", "Ben"))
             if (rows().none { it.title == SHORT }) import(document(SHORT, 0, "Carla", "Dario"))
+            if (rows().none { it.title == MEDIUM }) import(document(MEDIUM, TEN_MINUTES_MS, "Elsa", "Fabio"))
         }
-        measure(LONG, "Ada", "first", "later", "later", "later")
-        measure(SHORT, "Carla", "first", "later", "later", "later")
+        measure("first", "later", "later", "later")
     }
 
     @Test fun opensAfterProcessDeath() {
-        assumeTrue("Run firstAndLaterOpens first", runBlocking { rows().count { it.title in setOf(LONG, SHORT) } } == 2)
-        measure(LONG, "Ada", "after process death", "later", "later")
-        measure(SHORT, "Carla", "after process death", "later", "later")
+        val titles = setOf(LONG, SHORT, MEDIUM)
+        assumeTrue("Run firstAndLaterOpens first", runBlocking { rows().count { it.title in titles } } == titles.size)
+        measure("after process death", "later", "later")
     }
 
-    /** Opens the note [title] once per label and logs the time to its first turn (headed by [speaker]). */
-    private fun measure(title: String, speaker: String, vararg labels: String) {
+    /**
+     * Opens each note once per label, in rounds (the notes take turns, so the warm-up of the process does not favour
+     * one of them), and logs the time to its first turn.
+     */
+    private fun measure(vararg labels: String) {
+        labels.forEach { label -> NOTES.forEach { (title, speaker) -> open(title, speaker, label) } }
+    }
+
+    /** Opens the note [title] once and logs the time to its first turn (headed by [speaker]). */
+    private fun open(title: String, speaker: String, label: String) {
         val row = hasContentDescription(title, substring = true)
         val turn = hasContentDescription("$speaker, ", substring = true)
         val audioMs = runBlocking { rows().single { it.title == title }.durationMs }
-        labels.forEach { label ->
-            rule.waitShown(row, timeoutMs = IMPORT_MS)
-            rule.waitForIdle()
-            val started = SystemClock.elapsedRealtime()
-            rule.onNode(row).performClick()
-            rule.waitShown(turn, timeoutMs = OPEN_MS)
-            val ms = SystemClock.elapsedRealtime() - started
-            val line = JSONObject().put("note", title).put("audioMs", audioMs).put("open", label).put("ms", ms)
-            Log.i(TAG, line.toString())
-            Espresso.pressBack()
-            rule.waitGone(turn)
-        }
+        rule.waitShown(row, timeoutMs = IMPORT_MS)
+        rule.waitForIdle()
+        val started = SystemClock.elapsedRealtime()
+        rule.onNode(row).performClick()
+        rule.waitShown(turn, timeoutMs = OPEN_MS)
+        val ms = SystemClock.elapsedRealtime() - started
+        val line = JSONObject().put("note", title).put("audioMs", audioMs).put("open", label).put("ms", ms)
+        Log.i(TAG, line.toString())
+        Espresso.pressBack()
+        rule.waitGone(turn)
     }
 
     /**
@@ -123,7 +129,17 @@ class NoteOpeningTimingTest {
         const val TAG = "CassiniTiming"
         const val LONG = "timing-one-hour"
         const val SHORT = "timing-fleurs"
+
+        /**
+         * The reference for the one-hour note: more words than the first page (FIRST_PAGE) that the Note screen
+         * shows first. The 15 s note has one turn, so its screen has less to draw.
+         */
+        const val MEDIUM = "timing-ten-minutes"
         const val HOUR_MS = 3_600_000L
+        const val TEN_MINUTES_MS = 600_000L
+
+        /** Each note with the speaker of its first turn. */
+        val NOTES = listOf(LONG to "Ada", SHORT to "Carla", MEDIUM to "Elsa")
         const val WORD_GAP_MS = 40L
         const val IMPORT_MS = 180_000L
         const val OPEN_MS = 60_000L
