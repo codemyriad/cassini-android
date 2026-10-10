@@ -72,8 +72,8 @@ android {
         warningsAsErrors = true
         abortOnError = true
         checkDependencies = true
+        // No baseline: every finding is fixed or, in lint.xml, ignored with its reason.
         lintConfig = file("lint.xml")
-        baseline = file("lint-baseline.xml")
     }
     // The conformance vectors and the golden checkpoint are :core test data, not :app test inputs.
     testOptions {

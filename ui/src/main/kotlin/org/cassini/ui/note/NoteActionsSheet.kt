@@ -117,7 +117,11 @@ private fun ColumnScope.SaveACopy(ui: NoteActionsUi, document: Boolean, onAction
         label = stringResource(if (document) R.string.ui_actions_document else R.string.ui_actions_audio_file),
         glyph = Glyph.Music,
         onClick = { onAction(NoteAction.SAVE_DOCUMENT) },
-        extension = "." + (plain?.ext ?: DOCUMENT_EXT),
+        extension = if (plain != null) {
+            stringResource(R.string.ui_ext_any, plain.ext)
+        } else {
+            stringResource(R.string.ui_ext_opus)
+        },
         subtitle = stringResource(
             if (document) R.string.ui_actions_document_body else R.string.ui_actions_audio_file_body,
         ),
@@ -133,7 +137,7 @@ private fun ColumnScope.SaveACopy(ui: NoteActionsUi, document: Boolean, onAction
         label = stringResource(R.string.ui_actions_text),
         glyph = Glyph.TextFile,
         onClick = { onAction(NoteAction.SAVE_TEXT) },
-        extension = TEXT_EXT,
+        extension = stringResource(R.string.ui_ext_txt),
         subtitle = reason,
         enabled = ui.textExportEnabled,
         busy = ui.busyRow == NoteAction.SAVE_TEXT,
@@ -142,7 +146,7 @@ private fun ColumnScope.SaveACopy(ui: NoteActionsUi, document: Boolean, onAction
         label = stringResource(R.string.ui_actions_subtitles),
         glyph = Glyph.Subtitles,
         onClick = { onAction(NoteAction.SAVE_SUBTITLES) },
-        extension = SUBTITLE_EXTS,
+        extension = stringResource(R.string.ui_ext_subtitles),
         subtitle = reason,
         enabled = ui.textExportEnabled,
         busy = ui.busyRow == NoteAction.SAVE_SUBTITLES,
@@ -199,7 +203,3 @@ private fun TranscribeRows(row: TranscribeRowUi, onAction: (NoteAction) -> Unit)
         }
     }
 }
-
-private const val DOCUMENT_EXT = "opus"
-private const val TEXT_EXT = ".txt"
-private const val SUBTITLE_EXTS = ".srt · .vtt"

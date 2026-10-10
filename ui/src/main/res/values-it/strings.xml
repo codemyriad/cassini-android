@@ -28,7 +28,6 @@
     <string name="ui_action_record">Registra</string>
     <string name="ui_action_import">Importa</string>
     <string name="ui_action_continue">Continua</string>
-    <string name="ui_action_allow">Consenti</string>
     <string name="ui_action_remove_from_queue">Togli dalla coda</string>
     <string name="ui_action_stop_keep_progress">Ferma e conserva i progressi</string>
     <string name="ui_back_to_library">Torna alla libreria</string>

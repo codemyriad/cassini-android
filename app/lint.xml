@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <lint>
-    <!-- lint-baseline.xml holds only :ui strings that no code uses yet: the export, model, licence and permission
-         labels that the ViewModels and routes of P10 steps 3 to 5 use. P10 step 6 empties the baseline. -->
     <!-- targetSdk 36, not 37, on purpose: the Android 17 behaviour changes are not reviewed yet (docs/architecture.md). -->
     <issue id="OldTargetApi" severity="ignore" />
     <!-- Every user-visible string has an Italian translation; a missing one is a bug. -->
