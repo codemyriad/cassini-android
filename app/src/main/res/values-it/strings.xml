@@ -246,13 +246,13 @@
     <string name="notif_processing_stopping">Interruzione, i progressi restano salvati…</string>
     <string name="notif_processing_matching">Riconoscimento delle voci…</string>
     <string name="notif_processing_saving">Salvataggio…</string>
-    <string name="notif_processing_downloading">Download di %1$s — %2$d%%</string>
+    <string name="notif_processing_downloading">Download: %1$s — %2$d%%</string>
     <string name="notif_processing_download_bytes">%1$d di %2$d MB</string>
     <string name="notif_processing_checking">Verifica dei file — %1$d%%</string>
     <string name="notif_processing_public">Trascrizione di una nota</string>
     <string name="notif_part_speech">riconoscimento vocale</string>
-    <string name="notif_part_speakers">separazione delle voci</string>
-    <string name="notif_part_voices">riconoscimento delle voci salvate</string>
+    <string name="notif_part_speakers">distinguere chi parla</string>
+    <string name="notif_part_voices">riconoscere le voci salvate</string>
     <plurals name="notif_queue_more">
         <item quantity="one">ancora %d in coda</item>
         <item quantity="many">ancora %d in coda</item>

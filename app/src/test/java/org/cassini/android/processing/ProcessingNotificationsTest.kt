@@ -135,6 +135,11 @@ class ProcessingNotificationsLocaleTest {
             "Una nota è in attesa. Apri Cassini per iniziare.",
             posted.publicVersion.extras.getCharSequence(Notification.EXTRA_TITLE).toString(),
         )
+
+        NotificationChannels.create(context)
+        val manager = context.getSystemService(NotificationManager::class.java)
+        assertEquals("Trascrizione", manager.getNotificationChannel(NotificationChannels.PROCESSING).name)
+        assertEquals("Trascrizioni completate", manager.getNotificationChannel(NotificationChannels.RESULTS).name)
     }
 
     /** What `AppCompatDelegate.setApplicationLocales` writes below API 33 (`AppLocalesStorageHelper`). */

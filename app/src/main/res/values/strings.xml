@@ -253,8 +253,8 @@
     <string name="notif_processing_checking">Checking files — %1$d%%</string>
     <string name="notif_processing_public">Transcribing a note</string>
     <string name="notif_part_speech">speech recognition</string>
-    <string name="notif_part_speakers">speaker separation</string>
-    <string name="notif_part_voices">voice recognition</string>
+    <string name="notif_part_speakers">telling speakers apart</string>
+    <string name="notif_part_voices">recognising saved voices</string>
     <plurals name="notif_queue_more">
         <item quantity="one">%d more in queue</item>
         <item quantity="other">%d more in queue</item>
