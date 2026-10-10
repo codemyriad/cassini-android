@@ -139,6 +139,8 @@ class FormatTest {
         assertEquals("62%", Counts.percent(res, 62))
         assertEquals("11×", Counts.speed(res, 11.3, f))
         assertEquals("2.5×", Counts.speed(res, 2.46, f))
+        // Slower than realtime (a slow phone): the decimal keeps it from reading "0×".
+        assertEquals("0.3×", Counts.speed(res, 0.34, f))
         assertEquals("Opus 48 kHz", Counts.captureFormat(res, m4a = false, sampleRateHz = 48_000, format = f))
         assertEquals("M4A 44.1 kHz", Counts.captureFormat(res, m4a = true, sampleRateHz = 44_100, format = f))
         assertEquals("Speaker 3", Counts.speakerLabel(res, 3))

@@ -119,7 +119,7 @@ private fun transcriptionLine(ui: InfoUi): String? {
             stringResource(
                 R.string.ui_info_transcribed_in,
                 Durations.compact(processing),
-                Counts.speed(factor.toDouble()),
+                Counts.speed(factor),
             )
         } else {
             null

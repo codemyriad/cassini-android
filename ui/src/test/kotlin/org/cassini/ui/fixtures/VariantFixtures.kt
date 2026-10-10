@@ -578,7 +578,7 @@ internal object VariantFixtures {
         speakers = 3,
         language = "it",
         processingMs = clock(4, 12),
-        realtimeFactor = 11,
+        realtimeFactor = 11.3,
         model = "Parakeet TDT 0.6B v3, INT8",
         speakersToldApart = true,
         namesFromVoices = 2,
