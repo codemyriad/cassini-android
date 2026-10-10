@@ -134,6 +134,7 @@ The tests in `app/src/androidTest/.../flows/` start the real `MainActivity` on t
 | `NoteFlowTest` | `@NeedsModels` | It transcribes the FLEURS clip from its note and shows the progress card, the words and a seek on a word tap. Transcribe again adds version 2 to the Versions sheet. Save a copy gives the same bytes as `notes/<id>/document.opus`. The TXT, SRT and VTT exports are equal to the goldens. |
 | `SpeakerNamingFlowTest` | `@NeedsModels` | It saves a voice from a first transcription. The draft of a second transcription asks "Is this Luca?". "Yes, Luca" names the speaker. The sealed document has the label, and Saved voices shows Luca with 1 note. |
 | `NoteOpeningTimingTest` | `@Manual` | The timing check of [note-opening-timing.sh](#note-opening-timingsh). |
+| `ModelDownloadFlowTest` | `@Manual` | On an empty model root, Settings shows "Not downloaded". The row opens the consent screen, its sources row opens Licenses, and "Not now" goes back to Settings. Nothing is downloaded. Run it with `scripts/device-smoke.sh --class org.cassini.android.flows.ModelDownloadFlowTest --arg emptyModelRoot=true`. |
 
 An `Instrumentation.ActivityMonitor` gives the result of the system file picker (`ACTION_CREATE_DOCUMENT`) in `NoteFlowTest`. The result is a file in the scratch cache, so no picker opens.
 
@@ -205,7 +206,7 @@ The test APK holds the long clip of the background tests ([`fixtures/README.md`]
 | `@CiSmoke` | Tests that need no models and no microphone. `scripts/ci-emulator-smoke.sh` selects them. | The CI emulators, API 26, 29, 34 and 35 |
 | `@NeedsModels` | Tests that need the installed models | emulator-5554, and the weekly CI models job on API 34 |
 | `@NeedsMicrophone` | Tests that record from the microphone | An emulator or a phone. Emulator audio can be silence, so these tests examine the files and the states. |
-| `@Manual` | Tests that CI does not run, and that need their own script. `NoteOpeningTimingTest` has it. Without the arguments of its script, it skips. | By hand, with the script of the test |
+| `@Manual` | Tests that CI does not run, and that need their own inputs. `NoteOpeningTimingTest` needs the arguments of its script. `ModelDownloadFlowTest` needs `--arg emptyModelRoot=true`. Three `DeviceSmokeTest` tests need the models and the local YouTube clip. Without their inputs, they skip. | By hand, with the command of the test |
 
 Examples:
 
@@ -214,9 +215,11 @@ scripts/device-smoke.sh --serial emulator-5554 --annotation NeedsModels
 scripts/device-smoke.sh --serial emulator-5554 --annotation NeedsMicrophone
 scripts/device-smoke.sh --serial emulator-5554 --annotation CiSmoke
 scripts/device-smoke.sh --serial emulator-5554 --bench --class org.cassini.bench.DiarizationPocTest
+scripts/device-smoke.sh --serial emulator-5554 --class org.cassini.android.flows.ModelDownloadFlowTest \
+    --arg emptyModelRoot=true
 ```
 
-On emulator-5554 (API 34, with the models), the dry runs select 17 `CiSmoke` tests, 9 `NeedsModels` tests and 2 `NeedsMicrophone` tests. `PortableDocumentTest#platformOpusKeepsTheDurationAndTheSpeechClock` operates on API 34 only. Thus the `CiSmoke` count is 16 on the other API levels.
+On emulator-5554 (API 34, with the models), the dry runs select 17 `CiSmoke` tests, 6 `NeedsModels` tests and 2 `NeedsMicrophone` tests. `PortableDocumentTest#platformOpusKeepsTheDurationAndTheSpeechClock` operates on API 34 only. Thus the `CiSmoke` count is 16 on the other API levels.
 
 The YouTube samples are not in the repository. `tools/fetch-youtube-audio.sh` gets them (it needs `uvx yt-dlp` and ffmpeg). `DeviceSmokeTest#opusCheckpointContinuesIdenticalPacketsAfterClosingTheEncoder` always has `@Ignore`, and an ignored test makes the run fail. Thus remove it from a class selection:
 

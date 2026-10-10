@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import org.cassini.android.CassiniTestRunner
 import org.cassini.android.MainActivity
+import org.cassini.test.Manual
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Rule
@@ -17,8 +18,10 @@ import org.cassini.ui.R as UiR
 /**
  * Settings, Model download and Licenses on an empty model root (features.md sections 5 and 11): a "Not downloaded"
  * row opens the consent screen, its sources row opens Licenses with a plain Back, and "Not now" goes back to
- * Settings. Nothing is downloaded. Run it with `-e emptyModelRoot true`; without that argument it is skipped.
+ * Settings. Nothing is downloaded. Run it with `-e emptyModelRoot true`; without that argument it is skipped, so it is
+ * Manual (docs/development.md, Device flow tests).
  */
+@Manual
 class ModelDownloadFlowTest {
     @get:Rule
     val compose = createAndroidComposeRule<MainActivity>()

@@ -26,6 +26,7 @@ import org.cassini.engine.job.NativeBudget
 import org.cassini.engine.opus.StreamingOpusEncoder
 import org.cassini.engine.speakers.SortformerStream
 import org.cassini.test.CiSmoke
+import org.cassini.test.Manual
 import org.cassini.test.NeedsModels
 import org.json.JSONObject
 import org.junit.Assert.*
@@ -45,6 +46,16 @@ class DeviceSmokeTest {
         instrumentation.context.assets.open(name).use { input ->
             file.outputStream().use { output -> input.copyTo(output) }
         }
+    }
+
+    /**
+     * The YouTube clip that tools/fetch-youtube-audio.sh writes. It is never committed, so the tests that read it are
+     * Manual, and they skip when it is not in the test APK.
+     */
+    private fun youtubeFixture(): File {
+        val present = instrumentation.context.assets.list("").orEmpty().contains(YOUTUBE_SMOKE)
+        assumeTrue("Fetch $YOUTUBE_SMOKE with tools/fetch-youtube-audio.sh", present)
+        return fixture(YOUTUBE_SMOKE)
     }
 
     @CiSmoke
@@ -176,12 +187,12 @@ class DeviceSmokeTest {
         } finally { file.delete() }
     }
 
-    @NeedsModels
+    @Manual // needs the models and the local YouTube clip
     @Test fun streamingDiarizationPreservesAnAbsentSpeakerSlot() {
         val models = InstalledModels(context.filesDir)
         assumeTrue("Install the speaker model", models.ready(ModelCatalog.DIARIZATION))
         val first = audioDecoder(context).decode(Uri.fromFile(fixture("fleurs-it-short.wav")))
-        val second = audioDecoder(context).decode(Uri.fromFile(fixture("youtube-smoke.wav")))
+        val second = audioDecoder(context).decode(Uri.fromFile(youtubeFixture()))
         val combined = first.samples + FloatArray(16000) + second.samples
         NativeBudget.acquire()
         try {
@@ -303,12 +314,12 @@ class DeviceSmokeTest {
         }
     }
 
-    @NeedsModels
+    @Manual // needs the models and the local YouTube clip
     @Test fun diarizationCheckpointRestoresTheSameSpeakerSlotsAndTurns() {
         val models = InstalledModels(context.filesDir)
         assumeTrue(models.ready(ModelCatalog.DIARIZATION))
         val first = audioDecoder(context).decode(Uri.fromFile(fixture("fleurs-it-short.wav")))
-        val second = audioDecoder(context).decode(Uri.fromFile(fixture("youtube-smoke.wav")))
+        val second = audioDecoder(context).decode(Uri.fromFile(youtubeFixture()))
         val all = first.samples + FloatArray(16000) + second.samples
         NativeBudget.acquire()
         try {
@@ -363,11 +374,11 @@ class DeviceSmokeTest {
         encoder.finish()
     }
 
-    @NeedsModels
+    @Manual // needs the models and the local YouTube clip
     @Test fun incrementalParakeetPublishesWordsBeforeAudioImportCompletes() {
         val models = InstalledModels(context.filesDir)
         assumeTrue("Install Parakeet before running native inference", models.ready(ModelCatalog.PARAKEET))
-        val file = fixture("youtube-smoke.wav")
+        val file = youtubeFixture()
         try {
             var imported = false
             var sawEarlyWords = false
@@ -446,3 +457,5 @@ class DeviceSmokeTest {
         } finally { file.delete() }
     }
 }
+
+private const val YOUTUBE_SMOKE = "youtube-smoke.wav"
