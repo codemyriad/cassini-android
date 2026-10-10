@@ -3,6 +3,7 @@ package org.cassini.android
 import android.app.Application
 import android.os.StrictMode
 import android.util.Log
+import androidx.core.content.edit
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
@@ -57,7 +58,7 @@ class CassiniApplication : Application() {
         if (!InstalledModels.removeRetiredModels(filesDir)) {
             Log.w(TAG, "Could not remove obsolete speaker model downloads")
         }
-        getSharedPreferences("recording", MODE_PRIVATE).edit().remove("transcribe_while_recording").apply()
+        getSharedPreferences("recording", MODE_PRIVATE).edit { remove("transcribe_while_recording") }
     }
 
     companion object {

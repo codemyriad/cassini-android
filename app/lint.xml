@@ -11,10 +11,9 @@
     <!-- The free-space floors (recording, imports, model downloads) compare against usable space on purpose:
          the app never calls StorageManager.allocateBytes, so cache the system could clear is not available to it. -->
     <issue id="UsableSpace" severity="ignore" />
-    <!-- core-ktx (lifecycle-service needs it) asks for KTX calls in the 0.1.0 screens, which P10 deletes. -->
+    <!-- core-ktx (lifecycle-service needs it) asks for KTX calls in the 0.1.0 code that P10 deletes or rewrites. -->
     <issue id="UseKtx">
         <ignore path="src/main/java/org/cassini/android/AppLanguage.kt" />
-        <ignore path="src/main/java/org/cassini/android/CassiniApplication.kt" />
         <ignore path="src/main/java/org/cassini/android/DeckViews.kt" />
         <ignore path="src/main/java/org/cassini/android/MainActivity.kt" />
         <ignore path="src/main/java/org/cassini/android/ProcessingCheckpoint.kt" />
