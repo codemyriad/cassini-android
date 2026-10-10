@@ -19,6 +19,7 @@ esac
 mkdir -p .tools/emulator-results
 trap 'adb logcat -d > .tools/emulator-results/logcat.txt 2>&1 || true' EXIT
 # The tests that need no models and no microphone. The dry run of the same selection gives the expected count.
+# PortableDocumentTest's platform Opus check has @SdkSuppress for API 34, so the count is one less on 26 and 29.
 ./scripts/device-smoke.sh --sample fleurs --annotation CiSmoke | tee .tools/emulator-results/instrumentation.txt
 # The published APK (minified on tags) is not instrumented; install it over the tested build and check
 # that it starts and stays up.

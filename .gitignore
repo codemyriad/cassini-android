@@ -26,6 +26,8 @@ dist/
 # app/src/androidTest/assets and are never committed.
 fixtures/audio/*
 !fixtures/audio/fleurs-it-short.*
-app/src/androidTest/assets/
+app/src/androidTest/assets/*
+# The export goldens of NoteFlowTest are committed.
+!app/src/androidTest/assets/goldens/
 # Private meeting speaker fixtures (never commit)
 tools/private-fixtures/
