@@ -1,7 +1,14 @@
 package org.cassini.data.db
 
 import android.content.Context
+import android.database.sqlite.SQLiteAccessPermException
+import android.database.sqlite.SQLiteCantOpenDatabaseException
+import android.database.sqlite.SQLiteDatabaseLockedException
+import android.database.sqlite.SQLiteDiskIOException
 import android.database.sqlite.SQLiteException
+import android.database.sqlite.SQLiteFullException
+import android.database.sqlite.SQLiteOutOfMemoryException
+import android.database.sqlite.SQLiteReadOnlyDatabaseException
 import android.util.Log
 import androidx.annotation.WorkerThread
 import androidx.room.Room
@@ -25,7 +32,8 @@ class OpenedDatabase(val database: CassiniDatabase, val setAside: File?)
  * A database that fails to open (corrupt, a version without a migration, a schema Room cannot verify) is never
  * deleted and never wiped by a destructive migration: its files are renamed to `cassini.db.corrupt-<epoch>` (plus the
  * same suffix on `-wal`, `-shm` and `-journal`) and a new, empty database is created. SQLite's own corruption handler,
- * which deletes the file, is replaced by the same rename.
+ * which deletes the file, is replaced by the same rename. A full disk, an I/O error, a lock or a permission error
+ * is thrown as it is and the file stays: these do not show that the file is damaged.
  */
 class CassiniDatabaseOpener(
     private val context: Context,
@@ -42,6 +50,11 @@ class CassiniDatabaseOpener(
             first.openHelper.writableDatabase
             null
         } catch (error: SQLiteException) {
+            // A full disk, an I/O error or a lock says nothing about the file: it stays for the next start.
+            if (passing(error)) {
+                first.close()
+                throw error
+            }
             error
         } catch (error: IllegalStateException) {
             // Room's missing-migration, downgrade and identity-hash failures.
@@ -55,6 +68,11 @@ class CassiniDatabaseOpener(
         second.openHelper.writableDatabase
         return OpenedDatabase(second, moved ?: setAside)
     }
+
+    private fun passing(error: SQLiteException): Boolean =
+        error is SQLiteFullException || error is SQLiteDiskIOException || error is SQLiteDatabaseLockedException ||
+            error is SQLiteCantOpenDatabaseException || error is SQLiteAccessPermException ||
+            error is SQLiteOutOfMemoryException || error is SQLiteReadOnlyDatabaseException
 
     private fun build(onSetAside: (File) -> Unit): CassiniDatabase =
         Room.databaseBuilder(context, CassiniDatabase::class.java, paths.database.absolutePath)
