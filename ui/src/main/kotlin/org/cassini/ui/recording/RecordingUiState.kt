@@ -10,8 +10,9 @@ import org.cassini.ui.banner.BannerSpec
  * (0–1, oldest first); [format] and [sampleRateHz] make the format chip ("Opus 48 kHz"); [hint] follows the
  * fixed hint sentence; [banner] sits below the title (light tones on the dark surface).
  *
- * [title] is a text field value: the ViewModel must apply [RecordingEvent.Title] synchronously, in Compose snapshot
- * state, not through a collected flow, or the field can drop typed characters and break IME composition.
+ * [title] is the text of a field. The field keeps its own copy and sends each change as [RecordingEvent.Title]; it
+ * takes a different text from the state only when that text is not one it sent (SyncedText). Thus the
+ * ViewModel can update this value through its StateFlow.
  */
 @Immutable
 data class RecordingUiState(

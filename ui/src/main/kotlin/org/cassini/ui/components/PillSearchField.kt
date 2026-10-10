@@ -35,8 +35,11 @@ import org.cassini.ui.theme.Glyph
  * The pill search field: 54 dp, surface, 1 dp line, padding 16; Search 20/1.8 in text2, 10 dp, then a
  * [BasicTextField] (`body16` ink, 2 dp extra start inset, accent cursor, IME action Search) with [placeholder] in
  * text4 (up to two lines, so a large font scale grows the pill instead of cutting the placeholder; the field keeps
- * 8 dp above and below it). A 48 dp "Clear search" button ends the pill while [query] is not empty. [compact] is the in-note variant:
- * visual 44 / layout 48.
+ * 8 dp above and below it). A 48 dp "Clear search" button ends the pill while the text is not empty. [compact] is
+ * the in-note variant: visual 44 / layout 48.
+ *
+ * [query] is the text of the screen's UI state. The field shows its own copy, which changes at each keystroke, and
+ * sends each change to [onQueryChange]: see [SyncedText].
  *
  * ui.md section 6 gives 52 dp: that is the board's CSS content height, and its 1 dp border sits outside it
  * (content-box), so board 00 draws the pill 54 dp high.
@@ -57,6 +60,8 @@ fun PillSearchField(
     // The pill is drawn behind the row, 2 dp inside the 48 dp layout when compact, so the 48 dp clear button can
     // overflow the 44 dp pill instead of making it taller.
     val inset = if (compact) 2.dp else 0.dp
+    val text = rememberSyncedText(query)
+    val shown = text.value.text
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -75,14 +80,14 @@ fun PillSearchField(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = if (compact) 44.dp else 54.dp)
-                .padding(start = 16.dp, end = if (query.isEmpty()) 16.dp else 2.dp),
+                .padding(start = 16.dp, end = if (shown.isEmpty()) 16.dp else 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             CassiniIcon(Glyph.Search, 20.dp, 1.8f, c.text2, null)
             Spacer(Modifier.width(10.dp))
             BasicTextField(
-                value = query,
-                onValueChange = onQueryChange,
+                value = text.value,
+                onValueChange = { text.edit(it, onQueryChange) },
                 modifier = Modifier
                     .weight(1f)
                     .padding(start = 2.dp, top = 8.dp, bottom = 8.dp),
@@ -93,7 +98,7 @@ fun PillSearchField(
                 keyboardActions = KeyboardActions(onSearch = { onSearch() }),
                 decorationBox = { inner ->
                     Box(contentAlignment = Alignment.CenterStart) {
-                        if (query.isEmpty()) {
+                        if (shown.isEmpty()) {
                             Text(
                                 text = placeholder,
                                 style = CassiniTheme.type.body16,
@@ -106,11 +111,14 @@ fun PillSearchField(
                     }
                 },
             )
-            if (query.isNotEmpty()) {
+            if (shown.isNotEmpty()) {
                 IconButton44(
                     glyph = Glyph.Close,
                     contentDescription = stringResource(R.string.ui_search_clear),
-                    onClick = onClear,
+                    onClick = {
+                        text.set("")
+                        onClear()
+                    },
                     iconSize = 20.dp,
                     stroke = 1.8f,
                     tint = c.text2,

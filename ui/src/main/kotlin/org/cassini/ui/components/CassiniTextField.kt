@@ -39,6 +39,9 @@ import org.cassini.ui.theme.CassiniTheme
  *
  * [showFocus] = true draws the focused border without focusing the field, so no caret blinks (screenshot fixtures);
  * null (the app) follows the real focus. The label and the error belong to the field's accessibility node.
+ *
+ * [value] is the text of the UI state; the field shows its own copy and sends each change to [onValueChange] (see
+ * [SyncedText]), so a state that arrives late does not drop typed characters.
  */
 @Composable
 @Suppress("LongParameterList", "LongMethod") // ui.md section 6 plus the usual keyboard options of a text field.
@@ -64,9 +67,10 @@ fun CassiniTextField(
         looksFocused -> 2.dp to c.accent
         else -> 1.dp to c.line2
     }
+    val text = rememberSyncedText(value)
     BasicTextField(
-        value = value,
-        onValueChange = onValueChange,
+        value = text.value,
+        onValueChange = { text.edit(it, onValueChange) },
         modifier = modifier
             .fillMaxWidth()
             .semantics { if (error != null) error(error) },

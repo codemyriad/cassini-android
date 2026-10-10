@@ -107,8 +107,9 @@ data class PlaybackUi(val positionMs: Long, val durationMs: Long, val playing: B
  * `current + 1` of [total]; 0 matches show "No matches"). [matches] is an addition to ui.md section 7, which gives
  * only (query, current, total): the screen needs the ranges to draw the hits.
  *
- * [query] is a text field value: the ViewModel must apply [NoteEvent.SearchQuery] synchronously, in Compose snapshot
- * state, not through a collected flow, or the field can drop typed characters and break IME composition.
+ * [query] is the text of a field. The field keeps its own copy and sends each change as [NoteEvent.SearchQuery]; it
+ * takes a different text from the state only when that text is not one it sent (SyncedText). Thus the
+ * ViewModel can update this value through its StateFlow.
  */
 @Immutable
 data class TranscriptSearchUi(

@@ -21,8 +21,9 @@ import org.cassini.ui.theme.SpeakerTone
  * - [remember] is the checkbox; [rememberEnabled] false disables it with [rememberReason].
  * - [canMerge] shows "Merge into…"; [save] is the Save name state; [draft] is true while the job runs.
  *
- * [name] is a text field value: the ViewModel must apply [NameSheetEvent.NameChanged] synchronously, in Compose
- * snapshot state, not through a collected flow, or the field can drop typed characters and break IME composition.
+ * [name] is the text of a field. The field keeps its own copy and sends each change as [NameSheetEvent.NameChanged]; it
+ * takes a different text from the state only when that text is not one it sent (SyncedText). Thus the
+ * ViewModel can update this value through its StateFlow.
  */
 @Immutable
 data class NameSheetUi(

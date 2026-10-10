@@ -43,6 +43,7 @@ import org.cassini.ui.components.RecordingControls
 import org.cassini.ui.components.RecordingStatus
 import org.cassini.ui.components.RecordingTimer
 import org.cassini.ui.components.Waveform
+import org.cassini.ui.components.rememberSyncedText
 import org.cassini.ui.format.Counts
 import org.cassini.ui.format.Durations
 import org.cassini.ui.theme.CassiniIcon
@@ -176,9 +177,11 @@ private fun TitleField(title: String, onTitle: (String) -> Unit) {
     val rec = CassiniTheme.recording
     val t = CassiniTheme.type
     val focus = LocalFocusManager.current
+    // The field shows its own copy of the title and sends each change; a late state keeps the typed text.
+    val text = rememberSyncedText(title)
     BasicTextField(
-        value = title,
-        onValueChange = onTitle,
+        value = text.value,
+        onValueChange = { text.edit(it, onTitle) },
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 28.dp),

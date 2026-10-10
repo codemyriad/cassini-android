@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -22,6 +23,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.text.input.ImeAction
 import kotlinx.collections.immutable.persistentListOf
@@ -77,6 +79,24 @@ class LibraryBehaviourTest {
     private fun show(state: LibraryUiState) = setThemed { LibraryScreen(state, onEvent = { events += it }) }
 
     private fun assertEvents(vararg expected: LibraryEvent) = rule.runOnIdle { assertEquals(expected.toList(), events) }
+
+    /** A query state that arrives late does not remove typed text; a clear from the state empties the field. */
+    @Test fun theSearchFieldKeepsTypedTextWhileTheStateIsLate() {
+        var state by mutableStateOf(BoardFixtures.library)
+        setThemed { LibraryScreen(state, onEvent = { events += it }) }
+        val field = rule.onNode(hasSetTextAction())
+        field.performTextInput("su")
+        field.performTextInput("p")
+        field.assert(hasText("sup"))
+        // The state passes the first keystroke after the field has the second one.
+        state = state.copy(query = "su")
+        field.assert(hasText("sup"))
+        state = state.copy(query = "sup")
+        field.assert(hasText("sup"))
+        state = state.copy(query = "")
+        field.assert(!hasText("sup"))
+        assertEvents(LibraryEvent.Query("su"), LibraryEvent.Query("sup"))
+    }
 
     @Test fun backClearsTheSearchBeforeLeaving() {
         var state by mutableStateOf(VariantFixtures.library.getValue("library-search"))

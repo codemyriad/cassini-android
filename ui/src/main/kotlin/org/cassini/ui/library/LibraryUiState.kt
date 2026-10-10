@@ -21,8 +21,9 @@ import org.cassini.ui.note.NoteActionsUi
  * - [snackbar] is the "moved to trash" snackbar; [sheet] the Note actions sheet of a long-pressed row, or the
  *   subtitle chooser or Document info that a row of it opens; [dialog] a rename or a confirmation from that sheet.
  *
- * [query] is a text field value: the ViewModel must apply [LibraryEvent.Query] synchronously, in Compose snapshot
- * state, not through a collected flow, or the field can drop typed characters and break IME composition.
+ * [query] is the text of a field. The field keeps its own copy and sends each change as [LibraryEvent.Query]; it
+ * takes a different text from the state only when that text is not one it sent (SyncedText). Thus the
+ * ViewModel can update this value through its StateFlow.
  */
 @Immutable
 data class LibraryUiState(
