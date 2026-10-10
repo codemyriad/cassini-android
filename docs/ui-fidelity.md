@@ -285,6 +285,14 @@ After these corrections, the reviewer found no clipped text. The rows become tal
 items end with an ellipsis, as the design specifies for long user content: the title in the progress banner
 ("Transcribing Weekly prod…") and the second line of the excerpt preview in the Library.
 
+### Wide window (`wide/`)
+
+`WideScreenTest` records Library, Recording and Read and listen in a window of 900 x 700 dp. Each screen limits
+its content to 560 dp and centres it (architecture.md section 6). The screen background (bg, or rec.bg on
+Recording) fills the window. The transcript pane and the player of Read and listen are surface parts of the
+content, so they also stop at 560 dp. The test also checks, on eight board screens, that every text is inside the
+centred 560 dp band. The sheets of boards 04 and 06 are not part of this check.
+
 ## New deviations from the boards
 
 These deviations are in addition to the list in ui.md section 11. Each one has its reason in the section of its
@@ -334,7 +342,10 @@ ViewModel.
 4. The text fields (Library search, in-note search, Recording title, the Name field) keep their own copy of the
    text and send each change as an event (`SyncedText` in `:ui`). A state text that the field sent and that the
    state has not passed yet does not change the field. Any other state text replaces the field text, for example
-   Clear or a length limit. Thus the ViewModels can use the `StateFlow` of architecture.md section 6.
+   Clear. Thus the ViewModels can use the `StateFlow` of architecture.md section 6. The fields apply the length
+   limits themselves (title 200, name 80) and never send a longer text. A ViewModel must not cut the text: when
+   the field is full, the cut text is equal to the state, so the state does not change and the field does not
+   follow it.
 5. `LicensesUiState.backTo` (Settings or Model download) selects the label of the back button.
 6. `MergeUi.sealed` holds the version on screen and the version that the merge adds. On version 1 of 2, the merge
    adds version 3.
@@ -360,12 +371,20 @@ ViewModel.
     section 0).
 17. The Library list and the Note screen with its search open add the IME inset (ui.md section 9). `:app` must
     set `android:windowSoftInputMode="adjustResize"` on the activity, so that the keyboard insets arrive.
+18. The Note screen does not read `NoteUiState.readOnlyReason`. The speaker headers, the suggestion card buttons
+    and the version chip stay active while the transcript is read-only, and send their events. The ViewModel
+    answers a blocked event with `NoteDialog.ReadOnly(reason)`, which shows "Wait until transcription finishes",
+    "Fix the transcript first: Transcribe again" or "Saving — you can rename when it's done". Thus
+    `TurnUi.renamable` must stay true while a rename is only blocked (features.md sections 3.1 and 3.3). When it
+    is false, the header is a plain label and the user gets no message.
+19. Each screen limits its content to 560 dp and centres it on a wide window; the screen's background fills the
+    window (architecture.md section 6). `:app` must not add a second limit.
 
 ## Items for the owner to review
 
 - The arrow in the battery cell of board 02 is larger and heavier than on the board.
 - The checkmark of the checkbox on board 04 is thinner than on the board.
-- All goldens without a board: `dark/`, `it/`, `fontscale/` and `variants/`.
+- All goldens without a board: `dark/`, `it/`, `fontscale/`, `wide/` and `variants/`.
 - The notifications banner in Settings. features.md section 11 gives the body "Progress of long transcriptions
   shows only in the app." features.md section 13.5 gives "Progress shows only in the app." for the same kind. The
   screen uses the catalogue kind NOTIFICATIONS_OFF, with the short body, on the Library and in Settings.
