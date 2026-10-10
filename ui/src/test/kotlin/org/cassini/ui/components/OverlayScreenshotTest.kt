@@ -16,7 +16,7 @@ import org.robolectric.annotation.Config
 /**
  * Sheets, dialogs and menus (docs/design/ui.md section 10.1). The frames draw the content inline at the phone's size
  * (components/{sheet,dialogs,menu}-{light,dark}.png); the window tests show the same content in a real
- * `ModalBottomSheet`, `BasicAlertDialog` and `DropdownMenu`, captured with every window
+ * `ModalBottomSheet`, the `Dialog` window of [CassiniDialog] and `DropdownMenu`, captured with every window
  * (components/window-{sheet,dialog,menu}.png), to check that the frames place the content as the windows do.
  */
 class OverlayScreenshotTest : BoardTest() {

@@ -18,8 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material3.BasicAlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
@@ -31,9 +29,11 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import org.cassini.ui.R
@@ -44,14 +44,14 @@ private val DialogMargin = 24.dp
 private val DialogMaxWidth = 560.dp
 
 /**
- * The app's dialog: an M3 `BasicAlertDialog` showing [CassiniDialogContent]. The window fills the screen
+ * The app's dialog: a Compose `Dialog` window showing [CassiniDialogContent]. The window fills the screen
  * (`usePlatformDefaultWidth = false`, `decorFitsSystemWindows = false`) and does not dim: the content draws the scrim
  * token (#1F2A39 at 50 %) itself, as the sheets do, and a tap on it calls [onDismissRequest]. The card is centred in
  * the safe area above the keyboard, with a 24 dp margin on each side, so screenshots can place the same content inline
- * (`DialogBoardFrame` in test sources) exactly where the window puts it.
+ * (`DialogBoardFrame` in test sources) exactly where the window puts it. M3's `BasicAlertDialog` is not used: it caps
+ * its content at 560 dp, so the scrim would not cover a wider window (landscape, tablets). The pane title is [title].
  */
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
 @Suppress("LongParameterList") // ui.md section 6: title, body or content slot, actions and the dismiss request.
 fun CassiniDialog(
     onDismissRequest: () -> Unit,
@@ -61,13 +61,18 @@ fun CassiniDialog(
     body: String? = null,
     content: (@Composable ColumnScope.() -> Unit)? = null,
 ) {
-    BasicAlertDialog(
+    Dialog(
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
         val window = (LocalView.current.parent as? DialogWindowProvider)?.window
         SideEffect { window?.setDimAmount(0f) }
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .semantics { paneTitle = title },
+            contentAlignment = Alignment.Center,
+        ) {
             Box(
                 Modifier
                     .matchParentSize()
