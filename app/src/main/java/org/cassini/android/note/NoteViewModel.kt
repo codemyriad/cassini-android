@@ -12,12 +12,14 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
@@ -32,6 +34,7 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -591,36 +594,48 @@ class NoteViewModel(
 
     // Playback. ------------------------------------------------------------------------------------------------------
 
-    /** Opens the player while the screen is shown and the mode has one; prepares again after a document replace. */
+    /**
+     * Opens the player while the screen is shown and the mode has one; prepares again after a document replace. A
+     * newer key cancels only the wait for the first turns: a screen left in that time does not open the player. The
+     * player calls are not cancelled, so [opened] always tells what is open.
+     */
     private suspend fun followPlayer() {
         var opened: String? = null
         var signature: String? = null
-        combine(details, job, visible) { loaded, job, shown ->
-            val details = loaded?.details
-            val mode = details?.let { NoteMapping.mode(it, job, null) }
-            PlayerKey(
-                file = details?.note?.audioFile?.takeIf { shown && mode != null && NoteMapping.hasPlayer(mode) },
-                signature = details?.note?.documentSignature,
-                positionMs = details?.note?.positionMs ?: 0,
-                hasWords = details?.let(::wordsKey)?.let { it.words > 0 } == true,
-            )
-        }.distinctUntilChanged { a, b -> a.file == b.file && a.signature == b.signature }.collect { key ->
+        val keys = combine(details, job, visible, ::playerKey)
+            .distinctUntilChanged { a, b -> a.file == b.file && a.signature == b.signature }
+        keys.collectLatest { key ->
             val file = key.file
-            when {
-                file == null -> if (opened != null) {
-                    ports.leavePlayer(noteId)
-                    opened = null
+            // Preparing a long file takes a while: the first turns come first (FAST NOTE OPENING).
+            if (file != null && opened == null && key.hasWords) awaitFirstTurns()
+            withContext(NonCancellable) {
+                when {
+                    file == null -> if (opened != null) {
+                        ports.leavePlayer(noteId)
+                        opened = null
+                    }
+                    // A cleared ViewModel already left the player (onCleared): it must not open it again.
+                    !viewModelScope.isActive -> Unit
+                    file != opened -> {
+                        ports.openPlayer(noteId, file, key.positionMs)
+                        opened = file
+                    }
+                    key.signature != signature -> ports.reloadPlayer(noteId, file)
                 }
-                file != opened -> {
-                    // Preparing a long file takes a while: the first turns come first (FAST NOTE OPENING).
-                    if (opened == null && key.hasWords) awaitFirstTurns()
-                    ports.openPlayer(noteId, file, key.positionMs)
-                    opened = file
-                }
-                key.signature != signature -> ports.reloadPlayer(noteId, file)
+                signature = key.signature
             }
-            signature = key.signature
         }
+    }
+
+    private fun playerKey(loaded: Loaded?, job: NoteJobState?, shown: Boolean): PlayerKey {
+        val details = loaded?.details
+        val mode = details?.let { NoteMapping.mode(it, job, null) }
+        return PlayerKey(
+            file = details?.note?.audioFile?.takeIf { shown && mode != null && NoteMapping.hasPlayer(mode) },
+            signature = details?.note?.documentSignature,
+            positionMs = details?.note?.positionMs ?: 0,
+            hasWords = details?.let(::wordsKey)?.let { it.words > 0 } == true,
+        )
     }
 
     private data class PlayerKey(val file: String?, val signature: String?, val positionMs: Long, val hasWords: Boolean)

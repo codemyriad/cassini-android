@@ -173,6 +173,25 @@ class NoteViewModelTest {
         assertEquals("openPlayer:document.opus", ports.calls.last())
     }
 
+    @Test
+    fun aScreenLeftBeforeItsFirstTurnsDoesNotOpenThePlayer() = runTest(dispatcher) {
+        val viewModel = viewModel(visible = false)
+        ports.calls.clear()
+        viewModel.onVisible(true)
+        runCurrent()
+        assertFalse("the player waits for the first turns", ports.calls.any { it.startsWith("openPlayer") })
+
+        viewModel.onVisible(false)
+        advanceUntilIdle()
+        assertFalse("the left screen does not open the player", ports.calls.any { it.startsWith("openPlayer") })
+        assertFalse("no player was open, so none is left", "leavePlayer" in ports.calls)
+
+        viewModel.onVisible(true)
+        viewModel.onTurnsShown()
+        advanceUntilIdle()
+        assertEquals(1, ports.calls.count { it.startsWith("openPlayer") })
+    }
+
     // Modes. ----------------------------------------------------------------------------------------------------
 
     @Test
