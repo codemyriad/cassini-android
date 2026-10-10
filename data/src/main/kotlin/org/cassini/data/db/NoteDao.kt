@@ -216,15 +216,20 @@ abstract class NoteDao {
     @Query("SELECT * FROM jobs WHERE note_id = :id")
     protected abstract suspend fun jobOf(id: String): JobEntity?
 
+    @Query("DELETE FROM jobs WHERE note_id = :id AND state = 'QUEUED'")
+    protected abstract suspend fun deleteQueuedJob(id: String)
+
     /**
      * Moves a live note to Trash and records its job's state and kind for Restore, in one transaction. Returns false
-     * when there is no live note with [id]. The job row stays: the queue skips trashed notes.
+     * when there is no live note with [id]. A QUEUED job row is deleted (Restore puts it back at the end of the
+     * queue); other job rows stay (architecture 5.2 rule 9).
      */
     @Transaction
     open suspend fun trash(id: String, at: Long): Boolean {
         val row = note(id)
         if (row == null || row.trashedAt != null) return false
         moveToTrash(id, at, jobOf(id)?.let { TrashedJob(it.state, it.kind) })
+        deleteQueuedJob(id)
         return true
     }
 

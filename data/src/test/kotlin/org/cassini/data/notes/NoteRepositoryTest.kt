@@ -153,6 +153,8 @@ class NoteRepositoryTest {
 
         assertEquals(TrashedJob(JobState.QUEUED, JobKind.TRANSCRIBE), h.row("q").trashedJob)
         assertEquals(TrashedJob(JobState.PAUSED, JobKind.TRANSCRIBE_AGAIN), h.row("p").trashedJob)
+        assertNull("a queued job row is deleted", h.db.jobs().job("q"))
+        assertEquals("a paused job row stays", JobState.PAUSED, h.db.jobs().job("p")!!.state)
         assertTrue(h.notes.library().first().isEmpty())
         assertEquals(listOf("q", "p"), h.notes.trash().first().map { it.id })
 
