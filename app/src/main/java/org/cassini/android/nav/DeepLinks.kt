@@ -57,11 +57,11 @@ object DeepLinks {
         return if (index >= 0) rooted.take(index + 1) else rooted + NoteKey(noteId)
     }
 
-    /** An imported file: its note goes on top of [stack], with the Library under it when the stack was empty. */
-    fun imported(stack: List<NavKey>, noteId: String): List<NavKey> {
-        val rooted = rooted(stack)
-        return if (rooted.last() == NoteKey(noteId)) rooted else rooted + NoteKey(noteId)
-    }
+    /**
+     * An imported file: its note goes on top of [stack], with the Library under it when the stack was empty. A note
+     * that is in [stack] already is popped to, as [note] does, so that no two entries have the same key.
+     */
+    fun imported(stack: List<NavKey>, noteId: String): List<NavKey> = note(stack, noteId)
 
     /** [stack] with [LibraryKey] at the bottom. */
     fun rooted(stack: List<NavKey>): List<NavKey> =

@@ -248,6 +248,15 @@ class AppShellTest {
 
     /** A sealed two-speaker document over the FLEURS clip, imported as ACTION_VIEW does; Library shows its row. */
     private fun importDocument() {
+        val outcome = runBlocking {
+            withTimeout(TIMEOUT_MS) { app.graph.notices.imports.start(Uri.fromFile(writeDocument()).toString()).await() }
+        }
+        assertTrue("imported: $outcome", outcome is ImportOutcome.Created)
+        waitFor(hasText(TITLE))
+    }
+
+    /** The document of [importDocument], written to a scratch folder. */
+    private fun writeDocument(): File {
         val fixture = File(checkNotNull(System.getProperty("cassini.fixtures")), "audio/fleurs-it-short.opus")
         val document = File(folder.newFolder(), "riunione.opus")
         val words = listOf(
@@ -267,11 +276,7 @@ class AppShellTest {
             mapOf("S1" to "Ada"),
             document,
         )
-        val outcome = runBlocking {
-            withTimeout(TIMEOUT_MS) { app.graph.notices.imports.start(Uri.fromFile(document).toString()).await() }
-        }
-        assertTrue("imported: $outcome", outcome is ImportOutcome.Created)
-        waitFor(hasText(TITLE))
+        return document
     }
 
     private companion object {

@@ -27,6 +27,7 @@ import org.cassini.android.adapters.RepositoryJobVoices
 import org.cassini.android.adapters.RepositoryModelAccess
 import org.cassini.android.notices.ImportTracker
 import org.cassini.android.notices.NoticeCenter
+import org.cassini.android.nav.ViewedImports
 import org.cassini.android.notices.TrashUndo
 import org.cassini.android.playback.AndroidPlaybackPlatform
 import org.cassini.android.playback.MediaAudioPlayer
@@ -211,6 +212,9 @@ class AppGraph(context: Context, val config: Config) {
 
     /** "Moved to trash" from the Note screen, for the Library's Undo snackbar. */
     val trashUndo = TrashUndo()
+
+    /** ACTION_VIEW imports, through [NoticeCenter.imports]; the navigation opens each note when its import ends. */
+    val viewedImports: ViewedImports by lazy { ViewedImports(appScope) { uri -> notices.imports.start(uri) } }
 
     /** The Note screen's player (architecture 5.9). Main thread only. */
     val playback: PlaybackController by lazy {

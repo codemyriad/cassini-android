@@ -61,7 +61,6 @@ import org.cassini.android.voices.GraphSavedVoicesPorts
 import org.cassini.android.voices.SavedVoicesRoute
 import org.cassini.android.voices.SavedVoicesViewModel
 import org.cassini.core.library.JobState
-import org.cassini.data.notes.ImportOutcome
 import org.cassini.ui.licenses.LicensesBackTo
 import org.cassini.ui.theme.CassiniTheme
 import org.cassini.ui.trash.TrashBackTo
@@ -79,6 +78,15 @@ fun CassiniApp(graph: AppGraph, links: Flow<DeepLink>, modifier: Modifier = Modi
     val context = LocalContext.current
     LaunchedEffect(links) {
         links.collect { link -> open(graph, backStack, link) }
+    }
+    // A viewed file's note opens when its import ends, also in an activity that was recreated meanwhile.
+    LaunchedEffect(graph) {
+        graph.viewedImports.ready.collect { ready ->
+            for (noteId in ready) {
+                backStack.replaceWith(DeepLinks.imported(backStack, noteId))
+                graph.viewedImports.take(noteId)
+            }
+        }
     }
     // The screen on top sets the bar icons; during a back gesture they stay those of that screen until it pops.
     SystemBarsAppearance(darkIcons = darkBarIcons(backStack.lastOrNull(), isSystemInDarkTheme()))
@@ -147,8 +155,11 @@ private fun EntryProviderScope<NavKey>.screenEntries(
     }
 }
 
-/** Changes [backStack] for [link]. An import runs first; a failed one leaves the stack as it is. */
-private suspend fun open(graph: AppGraph, backStack: NavBackStack<NavKey>, link: DeepLink) {
+/**
+ * Changes [backStack] for [link]. An import only starts here ([AppGraph.viewedImports]); its note opens when it ends,
+ * and a failed one leaves the stack as it is.
+ */
+private fun open(graph: AppGraph, backStack: NavBackStack<NavKey>, link: DeepLink) {
     val target = when (link) {
         DeepLink.Recording -> DeepLinks.recording(backStack)
         is DeepLink.Note -> {
@@ -158,12 +169,8 @@ private suspend fun open(graph: AppGraph, backStack: NavBackStack<NavKey>, link:
         }
         is DeepLink.Import -> {
             // Through the import tracker, so the Library shows "Importing <name>…" and a failure's banner.
-            val noteId = when (val outcome = graph.notices.imports.start(link.uri).await()) {
-                is ImportOutcome.Created -> outcome.noteId
-                is ImportOutcome.Existing -> outcome.noteId
-                else -> null.also { Log.w(TAG, "Import of a viewed file ended with $outcome") }
-            }
-            noteId?.let { DeepLinks.imported(backStack, it) } ?: return
+            graph.viewedImports.start(link.uri)
+            return
         }
     }
     backStack.replaceWith(target)
