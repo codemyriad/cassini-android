@@ -47,6 +47,10 @@ The APK contains these libraries from Maven Central and the Google Maven reposit
 | [kotlinx-serialization](https://github.com/Kotlin/kotlinx.serialization) | 1.11.0 |
 | [kotlinx-collections-immutable](https://github.com/Kotlin/kotlinx.collections.immutable) | 0.5.2 |
 | [Okio](https://github.com/square/okio), a dependency of DataStore | 3.9.1 |
+| AndroidX Arch Core, Autofill, Collection, Concurrent Futures, CursorAdapter, CustomView, DrawerLayout, Emoji2, Fragment, Graphics, Interpolator, Loader, NavigationEvent, ProfileInstaller, ResourceInspection, SavedState, SQLite, Startup, Tracing, VectorDrawable, VersionedParcelable, ViewPager and WindowManager, dependencies of the libraries above | The versions that these libraries ask for |
+| [Guava ListenableFuture](https://github.com/google/guava), a dependency of AndroidX | 1.0 |
+| [JetBrains Java Annotations](https://github.com/JetBrains/java-annotations), a dependency of the Kotlin standard library | 23.0.0 |
+| [JSpecify](https://github.com/jspecify/jspecify) annotations, a dependency of AndroidX | 1.0.0 |
 
 `gradle/libs.versions.toml` pins these versions. The libraries are unmodified.
 
