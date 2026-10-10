@@ -162,7 +162,11 @@ dependencies {
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.compose.ui.test.junit4.accessibility)
-    // ScreenAccessibilityTest shows :ui screens in the empty ComponentActivity of this manifest (debug builds only).
+    // ScreenAccessibilityTest shows :ui screens in the empty ComponentActivity of this manifest. It is in both device
+    // test build types (tag builds instrument releaseTest), and their manifests make it not exported. The release
+    // build does not have it.
     debugImplementation(platform(libs.compose.bom))
     debugImplementation(libs.compose.ui.test.manifest)
+    "releaseTestImplementation"(platform(libs.compose.bom))
+    "releaseTestImplementation"(libs.compose.ui.test.manifest)
 }

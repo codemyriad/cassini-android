@@ -16,5 +16,9 @@
              and ui-tooling is only on the debug runtime classpath. -->
         <activity android:name="androidx.compose.ui.tooling.PreviewActivity" tools:node="remove"
             tools:ignore="MissingClass" />
+        <!-- compose-ui-test-manifest brings an exported, empty activity for the device tests that show :ui screens
+             (ScreenAccessibilityTest). The tests start it from the app's own process, so it need not be exported. -->
+        <activity android:name="androidx.activity.ComponentActivity" android:exported="false"
+            tools:replace="android:exported" />
     </application>
 </manifest>
