@@ -56,7 +56,10 @@ sealed interface InstallOutcome {
         val failed: Map<ModelPart, DownloadError> = emptyMap(),
     ) : InstallOutcome
 
-    /** The required [part] could not be installed. [requiredFreeBytes] is the space figure for NOT_ENOUGH_STORAGE. */
+    /**
+     * The required [part] could not be installed. [requiredFreeBytes] is the space figure for NOT_ENOUGH_STORAGE: what
+     * [part] alone needs.
+     */
     data class Failed(val part: ModelPart, val error: DownloadError, val requiredFreeBytes: Long) : InstallOutcome
 
     /** No consent: nothing was fetched and no network call made. [missingBytes] is what the download would fetch. */
@@ -75,8 +78,10 @@ sealed interface InstallOutcome {
  * - Without a validated network the best-effort parts are skipped at once (no 30 s timeout). SPEECH is still tried:
  *   the check can be stale, and its failure says "No connection".
  * - Consent is checked again on entry: without it nothing is fetched.
- * - Free space for everything to be fetched is checked once before the first byte, against
- *   `ModelPlan.requiredFreeBytes`. `ArtifactFetcher` checks each file again.
+ * - Free space is checked before the first byte of each part, against that part's `ModelPlan.requiredFreeBytes`
+ *   and the space free at that time. So a disk with room for speech alone installs SPEECH, and a best-effort part
+ *   without room goes into `failed` with NOT_ENOUGH_STORAGE: it never fails the job (architecture section 5.6).
+ *   `ArtifactFetcher` checks each file again.
  *
  * The work runs in `runInterruptible` on [io]: cancelling the caller interrupts the fetch, which keeps its `.part`
  * files, and ends in a CancellationException.
@@ -108,20 +113,27 @@ class ModelInstaller(private val store: ModelStore, private val io: CoroutineDis
         val attempted = missing.filter { it.part == ModelPart.SPEECH || online }
         val skipped = missing.map { it.part }.filter { part -> attempted.none { it.part == part } }.toMutableSet()
         val failed = LinkedHashMap<ModelPart, DownloadError>()
-        val requiredFreeBytes = ModelPlan(attempted).requiredFreeBytes
-        val space = store.usableBytes() >= requiredFreeBytes
         // SPEECH comes first; when it fails nothing else is tried. A failed best-effort part does not stop the next.
         var speechError: DownloadError? = null
+        var speechFreeBytes = 0L
         for (item in attempted) {
             if (speechError != null) break
             checkActive()
+            // Each part is checked against what is free now, after the parts installed before it.
+            val requiredFreeBytes = ModelPlan(listOf(item)).requiredFreeBytes
+            val space = store.usableBytes() >= requiredFreeBytes
             val error = if (space) attempt(item, skipped, onProgress) else DownloadError.NOT_ENOUGH_STORAGE
-            if (item.part == ModelPart.SPEECH) speechError = error else if (error != null) failed[item.part] = error
+            if (item.part == ModelPart.SPEECH) {
+                speechError = error
+                speechFreeBytes = requiredFreeBytes
+            } else if (error != null) {
+                failed[item.part] = error
+            }
         }
         if (speechError == null && online && detectorOnly) {
             installPart(ModelPlan.Item(ModelPart.SPEECH, listOf(ModelCatalog.VAD)), onProgress)
         }
-        return speechError?.let { InstallOutcome.Failed(ModelPart.SPEECH, it, requiredFreeBytes) }
+        return speechError?.let { InstallOutcome.Failed(ModelPart.SPEECH, it, speechFreeBytes) }
             ?: InstallOutcome.Installed(skipped, failed)
     }
 

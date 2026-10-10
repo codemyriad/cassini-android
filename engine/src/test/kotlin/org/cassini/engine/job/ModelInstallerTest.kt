@@ -98,14 +98,27 @@ class ModelInstallerTest {
     }
 
     @Test fun notEnoughSpaceFailsSpeechBeforeTheFirstByte() = runBlocking {
-        val required = ModelPlan.of { false }.requiredFreeBytes
-        val store = FakeStore(usable = required - 1)
+        val speech = ModelPlan(ModelPlan.of { false }.missing.filter { it.part == ModelPart.SPEECH }).requiredFreeBytes
+        val store = FakeStore(usable = speech - 1)
         val outcome = ModelInstaller(store).install(all) {}
-        assertEquals(InstallOutcome.Failed(ModelPart.SPEECH, DownloadError.NOT_ENOUGH_STORAGE, required), outcome)
+        // The figure is what speech alone needs: the best-effort parts never make the job fail.
+        assertEquals(InstallOutcome.Failed(ModelPart.SPEECH, DownloadError.NOT_ENOUGH_STORAGE, speech), outcome)
         assertEquals(emptyList<ModelDescriptor>(), store.attempts)
 
-        val enough = FakeStore(usable = required)
+        val enough = FakeStore(usable = ModelPlan.of { false }.requiredFreeBytes)
         assertEquals(InstallOutcome.Installed(), ModelInstaller(enough).install(all) {})
+    }
+
+    @Test fun roomForSpeechAloneInstallsSpeechAndDegradesTheRest() = runBlocking {
+        val speech = ModelPlan(ModelPlan.of { false }.missing.filter { it.part == ModelPart.SPEECH }).requiredFreeBytes
+        val store = FakeStore(usable = speech)
+        val outcome = ModelInstaller(store).install(all) {}
+        val expected = mapOf(
+            ModelPart.SPEAKERS to DownloadError.NOT_ENOUGH_STORAGE,
+            ModelPart.VOICES to DownloadError.NOT_ENOUGH_STORAGE,
+        )
+        assertEquals(InstallOutcome.Installed(failed = expected), outcome)
+        assertEquals(listOf(ModelCatalog.PARAKEET, ModelCatalog.VAD), store.attempts)
     }
 
     @Test fun notEnoughSpaceOnlyDegradesTheBestEffortParts() = runBlocking {
@@ -232,8 +245,10 @@ class ModelInstallerTest {
         ready: Set<ModelDescriptor> = emptySet(),
         private val consent: Boolean = true,
         private val online: Boolean = true,
-        private val usable: Long = Long.MAX_VALUE,
+        usable: Long = Long.MAX_VALUE,
     ) : ModelStore {
+        /** Free bytes now: each install takes what `ModelPlan.Item.installBytes` counts for its model. */
+        @Volatile private var free = usable
         private val installed = ready.toMutableSet()
         val attempts = mutableListOf<ModelDescriptor>()
         val failures = mutableMapOf<ModelDescriptor, Exception>()
@@ -256,7 +271,7 @@ class ModelInstallerTest {
 
         override fun usableBytes(): Long {
             spaceChecks++
-            return usable
+            return free
         }
 
         override fun installBlocking(model: ModelDescriptor, progress: (Long, Boolean) -> Unit) {
@@ -264,6 +279,7 @@ class ModelInstallerTest {
             failures[model]?.let { throw it }
             onInstall(model, progress)
             installed += model
+            free -= ModelPlan.Item(ModelPart.SPEECH, listOf(model)).installBytes
         }
     }
 }
