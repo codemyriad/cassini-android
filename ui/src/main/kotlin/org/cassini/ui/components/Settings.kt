@@ -17,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
@@ -108,7 +109,9 @@ fun GroupCard(
             }
             y += placeable.height
         }
-        if (lines != dividers) dividers = lines
+        // Only the draw phase reads the offsets: the write must not make this measure block observe them, or every
+        // change would measure the card a second time.
+        Snapshot.withoutReadObservation { if (lines != dividers) dividers = lines }
         layout(constraints.maxWidth, height) {
             var top = 0
             placeables.forEachIndexed { index, placeable ->
@@ -131,7 +134,8 @@ sealed interface SettingsTrailing {
 
 /**
  * A row in a [GroupCard]: padding 14/16, gap 12; [title] (`button`, ink) over [subtitle] (`caption`, text2), then
- * the [trailing] part. Clickable (a button) when [onClick] is set.
+ * the [trailing] part. Clickable (a button) when [onClick] is set. Clickable or not, the row is one accessibility
+ * node, so a status is read with the thing it describes ("Speech recognition, INT8 · 640 MB, Ready").
  *
  * As the board's flex row, the trailing part keeps its natural width while the title column can still fit its
  * longest word; beyond that the trailing text wraps (end-aligned) instead of breaking the title inside a word.
@@ -164,7 +168,13 @@ fun SettingsRow(
         },
         modifier = modifier
             .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable(role = Role.Button, onClick = onClick)
+                } else {
+                    Modifier.semantics(mergeDescendants = true) {}
+                },
+            )
             .padding(horizontal = 16.dp, vertical = 14.dp),
     ) { measurables, constraints ->
         val width = constraints.maxWidth

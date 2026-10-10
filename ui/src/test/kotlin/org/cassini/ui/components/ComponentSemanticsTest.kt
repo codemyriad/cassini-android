@@ -316,6 +316,26 @@ class ComponentSemanticsTest {
         assertEquals("Open settings", card.config[SemanticsActions.OnClick].label)
     }
 
+    @Test fun aSettingsRowWithoutAClickIsStillOneNode() {
+        setThemed {
+            GroupCard {
+                SettingsRow(
+                    "Speech recognition",
+                    subtitle = "INT8 · 640 MB",
+                    trailing = SettingsTrailing.Status("Ready", Tone.Ok),
+                )
+                SettingsRow("Trash", subtitle = "2 notes", trailing = SettingsTrailing.Chevron, onClick = {})
+            }
+        }
+        val row = rule.onNodeWithText("Speech recognition").fetchSemanticsNode()
+        assertEquals(
+            listOf("Speech recognition", "INT8 · 640 MB", "Ready"),
+            row.config[SemanticsProperties.Text].map { it.text },
+        )
+        rule.onAllNodesWithText("Ready").assertCountEquals(1)
+        rule.onNodeWithText("Trash").assertHasClickAction()
+    }
+
     @Test fun recordingCardSpeaksTheElapsedTimeAndItsAction() {
         var clicks = 0
         setThemed { RecordingBannerCard("Weekly product sync", 1_447_000, paused = false, onClick = { clicks++ }) }
