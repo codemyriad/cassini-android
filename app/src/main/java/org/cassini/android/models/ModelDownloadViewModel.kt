@@ -1,6 +1,7 @@
 package org.cassini.android.models
 
 import android.util.Log
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.collections.immutable.toImmutableList
@@ -49,6 +50,8 @@ sealed interface ModelDownloadEffect {
 class ModelDownloadViewModel(
     private val noteId: String?,
     private val ports: ModelDownloadPorts,
+    /** Holds the open POST_NOTIFICATIONS request, so that a ViewModel after process death still starts the download. */
+    private val saved: SavedStateHandle = SavedStateHandle(),
 ) : ViewModel() {
     private val effectChannel = Channel<ModelDownloadEffect>(Channel.BUFFERED)
 
@@ -60,10 +63,9 @@ class ModelDownloadViewModel(
         val busy: Boolean = false,
         /** The bytes the no-space banner asks for; null when there is no such banner. */
         val noSpace: Long? = null,
-        val awaitingNotifications: Boolean = false,
     )
 
-    private val local = MutableStateFlow(Local())
+    private val local = MutableStateFlow(Local(busy = saved.get<Boolean>(KEY_AWAITING) == true))
     private var closing = false
 
     /** Null until the plan is read, and when nothing is missing (the screen is never shown with no parts). */
@@ -89,8 +91,8 @@ class ModelDownloadViewModel(
 
     /** The POST_NOTIFICATIONS dialog closed, granted or not: the download goes on. A denial blocks nothing. */
     fun onNotificationsAnswered() {
-        if (!local.value.awaitingNotifications) return
-        local.update { it.copy(awaitingNotifications = false) }
+        if (saved.get<Boolean>(KEY_AWAITING) != true) return
+        saved[KEY_AWAITING] = false
         viewModelScope.launch { start() }
     }
 
@@ -126,7 +128,7 @@ class ModelDownloadViewModel(
     private suspend fun askNotificationsOrStart() {
         if (guarded("read the notification permission") { ports.shouldAskNotifications() } == true) {
             guarded("record the notification request") { ports.markNotificationsAsked() }
-            local.update { it.copy(awaitingNotifications = true) }
+            saved[KEY_AWAITING] = true
             effectChannel.trySend(ModelDownloadEffect.RequestNotifications)
         } else {
             start()
@@ -135,7 +137,12 @@ class ModelDownloadViewModel(
 
     /** Consent, then the note's job or the standalone download, then back. */
     private suspend fun start() {
-        val plan = local.value.plan ?: return
+        // After process death the answer can come before the plan is read again.
+        val plan = local.value.plan ?: guarded("read the model plan") { ports.plan() }
+        if (plan == null) {
+            local.update { it.copy(busy = false) }
+            return
+        }
         if (guarded("record the consent") { ports.recordConsent() } == null) {
             local.update { it.copy(busy = false) }
             return
@@ -182,5 +189,6 @@ class ModelDownloadViewModel(
     private companion object {
         const val TAG = "CassiniModels"
         const val STOP_TIMEOUT_MS = 5_000L
+        const val KEY_AWAITING = "awaitingNotifications"
     }
 }

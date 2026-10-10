@@ -1,5 +1,6 @@
 package org.cassini.android.models
 
+import androidx.lifecycle.SavedStateHandle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -41,8 +42,10 @@ class ModelDownloadViewModelTest {
     @After
     fun tearDown() = Dispatchers.resetMain()
 
+    private val saved = SavedStateHandle()
+
     private fun TestScope.viewModel(noteId: String? = NOTE): ModelDownloadViewModel {
-        val viewModel = ModelDownloadViewModel(noteId, ports)
+        val viewModel = ModelDownloadViewModel(noteId, ports, saved)
         backgroundScope.launch { viewModel.state.collect {} }
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.effects.collect { effects += it } }
         advanceUntilIdle()
@@ -121,6 +124,23 @@ class ModelDownloadViewModelTest {
         assertEquals(1, ports.consents)
         assertEquals(listOf(NOTE), ports.transcribed)
         assertEquals(listOf<ModelDownloadEffect>(ModelDownloadEffect.Close), effects)
+    }
+
+    @Test
+    fun theDownloadStartsAfterTheAnswerInANewProcess() = runTest(dispatcher) {
+        ports.askNotifications = true
+        viewModel().onEvent(ModelDownloadEvent.Download)
+        advanceUntilIdle()
+        assertEquals(0, ports.consents)
+
+        // Process death while the system dialog is open: a new ViewModel over the saved state gets the answer.
+        val restored = viewModel()
+        assertTrue(restored.state.value!!.busy)
+        restored.onNotificationsAnswered()
+        advanceUntilIdle()
+        assertEquals(1, ports.consents)
+        assertEquals(listOf(NOTE), ports.transcribed)
+        assertEquals(ModelDownloadEffect.Close, effects.last())
     }
 
     @Test
