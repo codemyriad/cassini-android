@@ -15,6 +15,7 @@ import org.cassini.android.processing.NotificationChannels
 import org.cassini.android.processing.ProcessingNotifications
 import org.cassini.core.export.ExportClock
 import org.cassini.data.notes.NoteTitles
+import org.cassini.ui.R as UiR
 
 /**
  * The recording notification (id [RECORDING_ID]) and the recording results notifications (features.md section 12).
@@ -58,11 +59,11 @@ class RecordingNotifications(context: Context) {
         val res = localized()
         val content = content(state)
         val public = NotificationCompat.Builder(res, NotificationChannels.RECORDING)
-            .setSmallIcon(R.drawable.ic_stat_logo)
+            .setSmallIcon(UiR.drawable.ui_ic_stat_logo)
             .setContentTitle(content.title)
             .build()
         val builder = NotificationCompat.Builder(res, NotificationChannels.RECORDING)
-            .setSmallIcon(R.drawable.ic_stat_logo)
+            .setSmallIcon(UiR.drawable.ui_ic_stat_logo)
             .setContentTitle(content.title)
             .setContentText(content.text)
             .setOngoing(true)
@@ -117,11 +118,11 @@ class RecordingNotifications(context: Context) {
 
     private fun result(res: Context, title: Int, text: Int, noteId: String): Notification {
         val public = NotificationCompat.Builder(res, NotificationChannels.RESULTS)
-            .setSmallIcon(R.drawable.ic_stat_logo)
+            .setSmallIcon(UiR.drawable.ui_ic_stat_logo)
             .setContentTitle(res.getString(title))
             .build()
         return NotificationCompat.Builder(res, NotificationChannels.RESULTS)
-            .setSmallIcon(R.drawable.ic_stat_logo)
+            .setSmallIcon(UiR.drawable.ui_ic_stat_logo)
             .setContentTitle(res.getString(title))
             .setContentText(res.getString(text))
             .setStyle(NotificationCompat.BigTextStyle().bigText(res.getString(text)))

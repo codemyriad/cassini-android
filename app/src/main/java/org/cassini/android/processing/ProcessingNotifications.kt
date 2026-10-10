@@ -24,6 +24,7 @@ import org.cassini.engine.job.ProgressHeadline
 import org.cassini.engine.job.RunningProgress
 import org.cassini.engine.job.TimeLeft
 import kotlin.math.roundToLong
+import org.cassini.ui.R as UiR
 
 /**
  * The processing notification and the results notifications (architecture 5.10, features.md section 12).
@@ -77,11 +78,11 @@ class ProcessingNotifications(context: Context) : ProcessingNotices {
         val res = localized()
         val content = content(state)
         val public = NotificationCompat.Builder(res, NotificationChannels.PROCESSING)
-            .setSmallIcon(R.drawable.ic_stat_logo)
+            .setSmallIcon(UiR.drawable.ui_ic_stat_logo)
             .setContentTitle(res.getString(R.string.notif_processing_public))
             .build()
         val builder = NotificationCompat.Builder(res, NotificationChannels.PROCESSING)
-            .setSmallIcon(R.drawable.ic_stat_logo)
+            .setSmallIcon(UiR.drawable.ui_ic_stat_logo)
             .setContentTitle(content.title)
             .setContentText(content.text)
             .setSubText(content.subText)
@@ -254,11 +255,11 @@ class ProcessingNotifications(context: Context) : ProcessingNotices {
         noteId: String,
     ): NotificationCompat.Builder {
         val public = NotificationCompat.Builder(res, NotificationChannels.RESULTS)
-            .setSmallIcon(R.drawable.ic_stat_logo)
+            .setSmallIcon(UiR.drawable.ui_ic_stat_logo)
             .setContentTitle(res.getString(publicTitle))
             .build()
         return NotificationCompat.Builder(res, NotificationChannels.RESULTS)
-            .setSmallIcon(R.drawable.ic_stat_logo)
+            .setSmallIcon(UiR.drawable.ui_ic_stat_logo)
             .setContentTitle(title)
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))

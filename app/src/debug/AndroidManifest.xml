@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Debug builds only: the entry points of scripts/device-kill-resume.sh (docs/architecture.md section 9). -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <application>
         <!-- Exported so that adb shell am start reaches it; a release build has no such entry point. A visible
              start is also what lets it start the processing service on Android 12 and later. -->
@@ -10,5 +11,10 @@
              redelivered service intent. -->
         <provider android:name=".debug.DebugStatusProvider" android:authorities="org.cassini.android.debugstatus"
             android:exported="false" />
+        <!-- compose-ui-tooling (the :ui previews) brings an exported activity that would start any composable of the
+             app from outside. The app does not need it on a device. MissingClass: lint reads the compile classpath,
+             and ui-tooling is only on the debug runtime classpath. -->
+        <activity android:name="androidx.compose.ui.tooling.PreviewActivity" tools:node="remove"
+            tools:ignore="MissingClass" />
     </application>
 </manifest>

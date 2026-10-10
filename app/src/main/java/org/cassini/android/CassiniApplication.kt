@@ -3,7 +3,6 @@ package org.cassini.android
 import android.app.Application
 import android.os.StrictMode
 import android.util.Log
-import androidx.core.content.edit
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
@@ -16,10 +15,6 @@ fun interface GraphFactory {
 }
 
 class CassiniApplication : Application() {
-    /** One instance each, so their synchronized methods serialize every reader and writer. */
-    internal val voices by lazy { VoiceStore(filesDir) }
-    internal val noteVoices by lazy { NoteVoiceStore(filesDir) }
-
     /** Resolved once at process start, before StrictMode, so `files/debug-root.txt` is read only then. */
     private lateinit var paths: AppPaths
 
@@ -51,14 +46,6 @@ class CassiniApplication : Application() {
                 }
             },
         )
-        // The old model directory contains only downloads. Retry on launch if deletion failed.
-        if (!InstalledModels.removeLegacyModel(filesDir)) {
-            Log.w(TAG, "Could not remove obsolete FP32 model downloads")
-        }
-        if (!InstalledModels.removeRetiredModels(filesDir)) {
-            Log.w(TAG, "Could not remove obsolete speaker model downloads")
-        }
-        getSharedPreferences("recording", MODE_PRIVATE).edit { remove("transcribe_while_recording") }
     }
 
     companion object {

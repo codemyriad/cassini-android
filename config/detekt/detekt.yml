@@ -7,6 +7,19 @@ config:
   validation: true
 
 style:
+  MagicNumber:
+    # detekt's default test paths, plus :bench, whose experiments are test code in a main source set.
+    excludes:
+      - '**/test/**'
+      - '**/androidTest/**'
+      - '**/commonTest/**'
+      - '**/jvmTest/**'
+      - '**/androidUnitTest/**'
+      - '**/androidInstrumentedTest/**'
+      - '**/jsTest/**'
+      - '**/iosTest/**'
+      - '**/*.kts'
+      - '**/bench/src/**'
   MaxLineLength:
     maxLineLength: 140
   WildcardImport:

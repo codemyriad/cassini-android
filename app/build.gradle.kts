@@ -3,6 +3,9 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
+    // The @Serializable navigation keys (nav/Dest.kt).
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -57,7 +60,10 @@ android {
         }
     }
     // BuildConfig.DEBUG gates StrictMode and the files/debug-root.txt override (architecture 2.5).
-    buildFeatures { buildConfig = true }
+    buildFeatures {
+        buildConfig = true
+        compose = true
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -102,12 +108,11 @@ android {
     }
     bundle { language { enableSplit = false } }
     sourceSets {
-        // Device tests read the committed CC-BY-4.0 FLEURS clip from fixtures/audio. Local-only clips
-        // (tools/fetch-youtube-audio.sh output in src/androidTest/assets, private meeting clips in
-        // tools/private-fixtures) are packaged when present and never committed.
+        // Device tests read the committed CC-BY-4.0 FLEURS clip from fixtures/audio. The local-only YouTube clips
+        // (tools/fetch-youtube-audio.sh output in src/androidTest/assets) are packaged when present and never
+        // committed. The private meeting clips (tools/private-fixtures) go into the :bench APK only.
         getByName("androidTest") {
             assets.directories.add(rootDir.resolve("fixtures/audio").path)
-            assets.directories.add(rootDir.resolve("tools/private-fixtures").path)
         }
     }
 }
@@ -117,6 +122,8 @@ kotlin {
 }
 
 dependencies {
+    // The design system and the stateless screens (docs/design/ui.md).
+    implementation(project(":ui"))
     implementation(project(":core"))
     // The native wrappers, libcassini_opus, sherpa-onnx and the zstd-jni AAR (engine/build.gradle.kts).
     implementation(project(":engine"))
@@ -130,14 +137,27 @@ dependencies {
     implementation(libs.core.ktx)
     implementation(libs.lifecycle.service)
     implementation(libs.lifecycle.process)
+    // MainActivity is an AppCompatActivity only for AppCompatDelegate.setApplicationLocales (architecture 6).
+    implementation(libs.appcompat)
+    // The Compose UI: one activity, Navigation 3 destinations, one ViewModel per destination.
+    implementation(platform(libs.compose.bom))
+    implementation(libs.compose.ui)
+    implementation(libs.compose.foundation)
+    implementation(libs.compose.material3)
+    implementation(libs.bundles.compose)
+    implementation(libs.bundles.navigation3)
+    implementation(libs.serialization.json)
     // The JVM unit tests decompress with the zstd-jni jar, which carries the desktop natives.
     testImplementation(libs.zstd.jni)
-    testImplementation(libs.junit)
     testImplementation(libs.org.json)
-    testImplementation(libs.robolectric)
-    testImplementation(libs.androidx.test.core)
-    testImplementation(libs.coroutines.test)
+    testImplementation(libs.bundles.testing.robolectric)
+    testImplementation(platform(libs.compose.bom))
+    testImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.espresso.core)
+    // enableAccessibilityChecks() runs only on a device: under Robolectric ATF skips Compose content (P2 outcome).
+    androidTestImplementation(platform(libs.compose.bom))
+    androidTestImplementation(libs.compose.ui.test.junit4)
+    androidTestImplementation(libs.compose.ui.test.junit4.accessibility)
 }

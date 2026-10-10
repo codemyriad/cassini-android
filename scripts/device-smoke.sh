@@ -15,14 +15,17 @@ real run differs from the dry run (or from CASSINI_EXPECTED_TESTS, when that is 
 
 Options:
   --annotation NAME   A test annotation in org.cassini.test: CiSmoke, NeedsModels, NeedsMicrophone or Manual.
-                      No test has CiSmoke or Manual yet, so these two selections fail with no tests.
-  --class CLASS       A test class or method, for example org.cassini.android.SettingsTest or
-                      org.cassini.android.LibraryTest#leavingRecordingScreenKeepsCapturingInTheService.
+                      No test has Manual yet, so that selection fails with no tests.
+  --class CLASS       A test class or method, for example org.cassini.android.background.RecordingServiceTest or
+                      org.cassini.android.DeviceSmokeTest#importsRealItalianAudioAndPreservesItsDuration.
                       Repeat it to select more than one.
+  --bench             Run the :bench experiments (org.cassini.bench) instead of the app's device tests. Select them
+                      with --class, for example org.cassini.bench.DiarizationPocTest. Debug builds only. The bench
+                      uses the models the app installed and never downloads one.
   --serial SERIAL     The adb serial of the device (default: $ANDROID_SERIAL, or the only device).
   --sample NAME       The audioSample argument of the 0.1.0 tests (default: fleurs).
                       The script also gives downloadModels=true. Thus, if Parakeet and the speech detector are
-                      missing, DeviceSmokeTest and ChunkingComparisonTest download them (several hundred MB).
+                      missing, DeviceSmokeTest downloads them (several hundred MB).
   --arg KEY=VALUE     One more instrumentation argument (-e KEY VALUE). Repeat it for more.
   --help              Shows this text.
 
@@ -35,6 +38,7 @@ EOF
 }
 
 annotation=
+bench=false
 classes=()
 sample=fleurs
 extra=()
@@ -42,6 +46,7 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --annotation) annotation=${2:?--annotation needs a name}; shift 2 ;;
         --class) classes+=("${2:?--class needs a class name}"); shift 2 ;;
+        --bench) bench=true; shift ;;
         --serial) export ANDROID_SERIAL=${2:?--serial needs a serial}; shift 2 ;;
         --sample) sample=${2:?--sample needs a name}; shift 2 ;;
         --arg)
@@ -58,6 +63,10 @@ case "$annotation" in
     ''|CiSmoke|NeedsModels|NeedsMicrophone|Manual) ;;
     *) printf 'Unknown annotation: %s (use CiSmoke, NeedsModels, NeedsMicrophone or Manual)\n' "$annotation" >&2; exit 2 ;;
 esac
+if $bench && { [ -n "$annotation" ] || [ "${#classes[@]}" -eq 0 ]; }; then
+    printf 'Select the bench experiments with --class, not --annotation.\n' >&2
+    exit 2
+fi
 if [ -z "$annotation" ] && [ "${#classes[@]}" -eq 0 ]; then
     printf 'Select tests with --annotation or --class.\n\n' >&2
     usage >&2
@@ -114,6 +123,10 @@ case "$CASSINI_TEST_BUILD_TYPE" in
     debug|releaseTest) ;;
     *) printf 'CASSINI_TEST_BUILD_TYPE must be debug or releaseTest.\n' >&2; exit 1 ;;
 esac
+if $bench && [ "$CASSINI_TEST_BUILD_TYPE" != debug ]; then
+    printf 'The bench instruments the debug build only.\n' >&2
+    exit 1
+fi
 if [ "$CASSINI_TEST_BUILD_TYPE" = releaseTest ] && [ -z "${CASSINI_BETA_KEYSTORE_FILE:-}" ]; then
     # Without a supplied key, sign with the local debug key, so the APK installs over a debug build.
     export CASSINI_BETA_KEYSTORE_FILE=$HOME/.android/debug.keystore
@@ -130,13 +143,19 @@ else
         printf 'Warning: no long clip; the background tests that use it will fail.\n' >&2
     fi
     tasks=(":app:assemble${build_type}AndroidTest")
+    if $bench; then tasks=(":bench:assembleDebug"); fi
     if [ -z "${CASSINI_APK:-}" ]; then tasks+=(":app:assemble${build_type}"); fi
     ./gradlew --console=plain "-PdeviceTestBuildType=$CASSINI_TEST_BUILD_TYPE" "${tasks[@]}"
 fi
 adb install -r "${CASSINI_APK:-app/build/outputs/apk/$CASSINI_TEST_BUILD_TYPE/app-$CASSINI_TEST_BUILD_TYPE.apk}"
-adb install -r "${CASSINI_TEST_APK:-app/build/outputs/apk/androidTest/$CASSINI_TEST_BUILD_TYPE/app-$CASSINI_TEST_BUILD_TYPE-androidTest.apk}"
-
-runner=org.cassini.android.test/org.cassini.android.CassiniTestRunner
+if $bench; then
+    adb install -r "${CASSINI_TEST_APK:-bench/build/outputs/apk/debug/bench-debug.apk}"
+    # The bench has no scratch root: it reads the models and files of the installed app.
+    runner=org.cassini.bench/androidx.test.runner.AndroidJUnitRunner
+else
+    adb install -r "${CASSINI_TEST_APK:-app/build/outputs/apk/androidTest/$CASSINI_TEST_BUILD_TYPE/app-$CASSINI_TEST_BUILD_TYPE-androidTest.apk}"
+    runner=org.cassini.android.test/org.cassini.android.CassiniTestRunner
+fi
 arguments=("${selection[@]}" -e downloadModels true -e audioSample "$sample")
 if [ "${#extra[@]}" -gt 0 ]; then arguments+=("${extra[@]}"); fi
 dry=$(mktemp)

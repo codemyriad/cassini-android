@@ -1369,7 +1369,7 @@
     <ID>CyclomaticComplexMethod:CassiniDocument.kt$CassiniDocument.Companion$private fun read(verify: Boolean = true, open: () -&gt; InputStream): CassiniDocument</ID>
     <ID>CyclomaticComplexMethod:CassiniDocument.kt$CassiniDocument.Companion$private fun seal(stream: OggOpus.Info, transcript: Transcript, title: String, processing: JSONObject, existing: CassiniDocument?, speakerLabels: Map&lt;String, String&gt;): Pair&lt;List&lt;String&gt;, String&gt;</ID>
     <ID>CyclomaticComplexMethod:ChunkingComparisonTest.kt$ChunkingComparisonTest$@Test fun cuttingModesAgainstTheWholeRecording()</ID>
-    <ID>CyclomaticComplexMethod:DeviceSmokeTest.kt$DeviceSmokeTest$@Test fun nativeParakeetProducesTimedItalianWords()</ID>
+    <ID>CyclomaticComplexMethod:DeviceSmokeTest.kt$DeviceSmokeTest$@NeedsModels @Test fun nativeParakeetProducesTimedItalianWords()</ID>
     <ID>CyclomaticComplexMethod:InterfaceTest.kt$InterfaceTest$@Test fun playbackFollowsOffscreenWordsAndLeavesPausedReadingAlone()</ID>
     <ID>CyclomaticComplexMethod:LibraryActivity.kt$LibraryActivity$override fun onCreate(savedInstanceState: Bundle?)</ID>
     <ID>CyclomaticComplexMethod:LibraryActivity.kt$LibraryActivity$private fun renderNotes()</ID>

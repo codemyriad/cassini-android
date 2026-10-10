@@ -17,6 +17,7 @@ import org.cassini.core.format.OggOpus
 import org.cassini.core.format.Transcript
 import org.cassini.core.format.Word
 import org.cassini.core.models.ModelCatalog
+import org.cassini.core.models.ModelPart
 import org.cassini.core.speakers.SpeakerTurn
 import org.cassini.engine.asr.IncrementalRecognizer
 import org.cassini.engine.asr.Parakeet
@@ -24,6 +25,8 @@ import org.cassini.engine.asr.SileroDetector
 import org.cassini.engine.job.NativeBudget
 import org.cassini.engine.opus.StreamingOpusEncoder
 import org.cassini.engine.speakers.SortformerStream
+import org.cassini.test.CiSmoke
+import org.cassini.test.NeedsModels
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
@@ -44,6 +47,7 @@ class DeviceSmokeTest {
         }
     }
 
+    @CiSmoke
     @Test fun importsCompressedAudioOnTheSameClock() {
         val reference = audioDecoder(context).decode(Uri.fromFile(fixture()))
         for (name in listOf("fleurs-it-short.m4a", "fleurs-it-short.mp3", "fleurs-it-short.opus")) {
@@ -57,6 +61,7 @@ class DeviceSmokeTest {
         }
     }
 
+    @CiSmoke
     @Test fun compressedAudioFeedsRecognitionBeforeEndOfFile() {
         val file = File(context.cacheDir, "incremental-tone.m4a")
         try {
@@ -121,6 +126,7 @@ class DeviceSmokeTest {
         } finally { codec.release(); muxer.release() }
     }
 
+    @CiSmoke
     @Test fun compressedFramesStayContiguousAtTheRecordingRate() {
         val file = File(context.cacheDir, "tone-48k.m4a")
         try {
@@ -133,6 +139,7 @@ class DeviceSmokeTest {
         } finally { file.delete() }
     }
 
+    @CiSmoke
     @Test fun importsRealItalianAudioAndPreservesItsDuration() {
         val file = fixture()
         try {
@@ -143,8 +150,9 @@ class DeviceSmokeTest {
         } finally { file.delete() }
     }
 
+    @NeedsModels
     @Test fun speechDetectorFindsOrderedSpansInsideTheRecording() {
-        if (InstrumentationRegistry.getArguments().getString("downloadModels") == "true") InstalledModels(context.filesDir).install(ModelCatalog.VAD) { }
+        installModelsIfAsked(context, ModelPart.SPEECH)
         assumeTrue("Install the speech detector first", ModelCatalog.VAD.ready(context.filesDir))
         val file = fixture()
         try {
@@ -168,6 +176,7 @@ class DeviceSmokeTest {
         } finally { file.delete() }
     }
 
+    @NeedsModels
     @Test fun streamingDiarizationPreservesAnAbsentSpeakerSlot() {
         val models = InstalledModels(context.filesDir)
         assumeTrue("Install the speaker model", models.ready(ModelCatalog.DIARIZATION))
@@ -191,6 +200,7 @@ class DeviceSmokeTest {
         } finally { NativeBudget.release() }
     }
 
+    @CiSmoke
     @Test fun opusEncodingRunsInTheDecodePassAndTrimsLookahead() {
         for (name in listOf("fleurs-it-short.m4a", "fleurs-it-short.wav")) {
             val file = fixture(name)
@@ -243,6 +253,7 @@ class DeviceSmokeTest {
     }
 
     /** What a resume does guarantee: the packets before the checkpoint, the clock, and the same audio. */
+    @CiSmoke
     @Test
     fun opusCheckpointContinuesTheSameStreamAfterClosingTheEncoder() = encodeAcrossACheckpoint { split, original, resumed ->
         val whole = OggOpus.read(original.readBytes())
@@ -268,6 +279,7 @@ class DeviceSmokeTest {
         assertTrue("resumed audio departs from the uninterrupted encode: $report", error < signal * .01)
     }
 
+    @CiSmoke
     @Test fun seekingToCheckpointKeepsTheDecodedClockAndSuffix() {
         for (name in listOf("fleurs-it-short.wav", "fleurs-it-short.m4a", "fleurs-it-short.opus")) {
             val file = fixture(name)
@@ -291,6 +303,7 @@ class DeviceSmokeTest {
         }
     }
 
+    @NeedsModels
     @Test fun diarizationCheckpointRestoresTheSameSpeakerSlotsAndTurns() {
         val models = InstalledModels(context.filesDir)
         assumeTrue(models.ready(ModelCatalog.DIARIZATION))
@@ -315,6 +328,7 @@ class DeviceSmokeTest {
         } finally { NativeBudget.release() }
     }
 
+    @CiSmoke
     @Test fun streamingDecodeAndDiskEncodingKeepTheAudioClock() {
         val file = fixture("fleurs-it-short.m4a")
         val pcm = File.createTempFile("stream-test", ".pcm", context.cacheDir)
@@ -331,13 +345,25 @@ class DeviceSmokeTest {
                     assertArrayEquals(expected.samples.copyOfRange(offset, offset + n), audio.read(offset, n), 0f)
                     offset += n
                 }
-                OpusEncoder.encode(audio, opus)
+                encodeOpus(audio, opus)
                 assertTrue(kotlin.math.abs(audioDecoder(context).decode(Uri.fromFile(opus)).durationMs - duration) <= 1)
             }
             assertFalse(pcm.exists())
         } finally { file.delete(); pcm.delete(); opus.delete() }
     }
 
+    /** The 0.2 encoder over a PCM file, a second at a time. */
+    private fun encodeOpus(audio: PcmFile, opus: File) = StreamingOpusEncoder(opus).use { encoder ->
+        var at = 0
+        while (at < audio.sampleCount) {
+            val n = minOf(Limits.ASR_RATE, audio.sampleCount - at)
+            encoder.accept(audio.read(at, n), n)
+            at += n
+        }
+        encoder.finish()
+    }
+
+    @NeedsModels
     @Test fun incrementalParakeetPublishesWordsBeforeAudioImportCompletes() {
         val models = InstalledModels(context.filesDir)
         assumeTrue("Install Parakeet before running native inference", models.ready(ModelCatalog.PARAKEET))
@@ -369,13 +395,11 @@ class DeviceSmokeTest {
         } finally { file.delete() }
     }
 
+    @NeedsModels
     @Test fun nativeParakeetProducesTimedItalianWords() {
         val arguments = InstrumentationRegistry.getArguments()
         val models = InstalledModels(context.filesDir)
-        if (arguments.getString("downloadModels") == "true") {
-            models.install(ModelCatalog.PARAKEET) { message -> instrumentation.sendStatus(0, Bundle().apply { putString("stream", "$message\n") }) }
-            InstalledModels(context.filesDir).install(ModelCatalog.VAD) { }
-        }
+        installModelsIfAsked(context, ModelPart.SPEECH)
         assumeTrue("Download Parakeet in the app before running native inference test", models.ready(ModelCatalog.PARAKEET))
         val detector = InstalledModels(context.filesDir).detector()
         val sample = arguments.getString("audioSample")

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Install an APK over the installed app (same signing key and version, so app data stays) and check
-# that the library screen starts and the process is still running a few seconds later, without a crash.
+# that the app starts and the process is still running a few seconds later, without a crash.
 #   scripts/launch-check.sh APK
 set -euo pipefail
 apk=${1:?Usage: scripts/launch-check.sh APK}
@@ -8,7 +8,7 @@ package=org.cassini.android
 adb install -r "$apk"
 adb shell am force-stop "$package"
 adb logcat -c
-start=$(adb shell am start -W -n "$package/.LibraryActivity" | tr -d '\r')
+start=$(adb shell am start -W -n "$package/.MainActivity" | tr -d '\r')
 printf '%s\n' "$start"
 if [[ "$start" != *'Status: ok'* ]]; then
     printf 'The app did not start.\n' >&2

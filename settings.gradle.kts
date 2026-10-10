@@ -23,3 +23,5 @@ include(":data")
 include(":engine")
 include(":ui")
 include(":app")
+// Device experiments and calibration (com.android.test, instruments :app). Not part of ciTest.
+include(":bench")

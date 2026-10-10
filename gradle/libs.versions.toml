@@ -9,9 +9,10 @@ room = "2.8.5"
 detekt = "1.23.8"
 
 # Android SDK. compileSdk 37 is required by the AndroidX versions below (AGP 8.13 cannot compile against 37).
-# targetSdk stays 34 until the Compose UI replaces the view-based screens, which are not edge-to-edge safe.
+# targetSdk 36 with the Compose UI (edge to edge and predictive back). Not 37: the Android 17 behaviour changes are
+# not reviewed yet (docs/architecture.md section 8).
 compileSdk = "37"
-targetSdk = "34"
+targetSdk = "36"
 minSdk = "26"
 buildTools = "36.0.0"
 ndk = "28.2.13676358"
@@ -131,6 +132,8 @@ testing-android = ["androidx-test-runner", "androidx-test-core", "androidx-test-
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
+# :bench, the device experiments that instrument :app (never in CI).
+android-test = { id = "com.android.test", version.ref = "agp" }
 android-lint = { id = "com.android.lint", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

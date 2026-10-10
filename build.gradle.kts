@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.android.library) apply false
+    alias(libs.plugins.android.test) apply false
     alias(libs.plugins.android.lint) apply false
     alias(libs.plugins.kotlin.android) apply false
     alias(libs.plugins.kotlin.jvm) apply false
@@ -22,6 +23,7 @@ detekt {
             "app/src/debug/java",
             "app/src/test/java",
             "app/src/androidTest/java",
+            "bench/src/main/java",
             "core/src/main/kotlin",
             "core/src/test/kotlin",
             "data/src/main/kotlin",
@@ -36,6 +38,7 @@ detekt {
             "build.gradle.kts",
             "settings.gradle.kts",
             "app/build.gradle.kts",
+            "bench/build.gradle.kts",
             "core/build.gradle.kts",
             "data/build.gradle.kts",
             "engine/build.gradle.kts",
