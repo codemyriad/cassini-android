@@ -3,6 +3,7 @@ package org.cassini.android.nav
 import android.Manifest
 import android.app.Application
 import android.net.Uri
+import android.os.Looper
 import android.view.ViewGroup
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
@@ -138,6 +139,8 @@ class AppShellTest {
 
     @Test fun backOnRecordingMinimisesItAndTheLibraryShowsTheCard() {
         shadowOf(app as Application).grantPermissions(Manifest.permission.RECORD_AUDIO)
+        // The Library state is built off the main thread: wait for the loaded Library.
+        waitFor(hasText("Record"))
         rule.onNodeWithText("Record").performClick()
         rule.waitUntil(TIMEOUT_MS) { app.graph.recording.state.value is RecordingState.Active }
         rule.onNodeWithText("Finish").assertExists()
@@ -262,7 +265,12 @@ class AppShellTest {
         rule.onNodeWithText(TITLE).performClick()
         waitFor(hasContentDescription("Search in transcript"))
         val playback = app.graph.playback
-        rule.waitUntil(TIMEOUT_MS) { playback.state.value.noteId != null }
+        // The player opens after the first turns are drawn (or after a timeout on another thread): run the main
+        // looper while waiting, so that the resumption posted there runs.
+        rule.waitUntil(TIMEOUT_MS) {
+            shadowOf(Looper.getMainLooper()).idle()
+            playback.state.value.noteId != null
+        }
         val noteId = playback.state.value.noteId
         val seen = CopyOnWriteArrayList<String?>()
         val watch = app.graph.appScope.launch { playback.state.collect { seen += it.noteId } }

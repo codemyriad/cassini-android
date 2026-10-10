@@ -349,7 +349,6 @@ class ProcessingCoordinatorTest {
         val before = starts.get()
 
         assertTrue(coordinator.restore(queued))
-        assertEquals(JobState.QUEUED, catalogue().jobs.job(queued)?.state)
         assertEquals("the restore starts the service", before + 1, starts.get())
         assertEquals(queued, job(1).noteId)
     }

@@ -51,7 +51,7 @@ class ModelDownloadViewModel(
     private val noteId: String?,
     private val ports: ModelDownloadPorts,
     /** Holds the open POST_NOTIFICATIONS request, so that a ViewModel after process death still starts the download. */
-    private val saved: SavedStateHandle = SavedStateHandle(),
+    private val saved: SavedStateHandle,
 ) : ViewModel() {
     private val effectChannel = Channel<ModelDownloadEffect>(Channel.BUFFERED)
 
