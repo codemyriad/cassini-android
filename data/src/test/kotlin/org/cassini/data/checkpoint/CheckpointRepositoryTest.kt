@@ -96,11 +96,17 @@ class CheckpointRepositoryTest {
     }
 
     @Test fun saveSyncsTheAppendOnlyFilesFirst() {
+        val synced = mutableListOf<String>()
+        repo = CheckpointRepository(h.db, h.paths, h.dispatchers, h.locks) { file ->
+            assertFalse("synced before checkpoint.json is written", checkpointFile.exists())
+            synced += file.name
+        }
         val clips = repo.clips(id).apply { parentFile!!.mkdirs() }
         clips.writeBytes(ByteArray(4 * 16_000))
         repo.audioPart(id).writeBytes(ByteArray(500))
         save(h.checkpoint(id, clipSamples = 16_000, encoderLength = 500))
 
+        assertEquals(listOf("audio.opus.part", "clips.pcm"), synced)
         assertTrue(load() is CheckpointLoad.Valid)
     }
 
@@ -178,6 +184,31 @@ class CheckpointRepositoryTest {
         assertEquals(mapOf("S1" to "Anna", "S2" to "Luca"), draft.labels)
         assertEquals(28_000L, draft.doneMs)
         assertNull(repo.loadDraft(noteId(2)))
+    }
+
+    @Test fun draftTreatsAStoredPlaceholderAsNoName() = runTest {
+        save(h.checkpoint(id, words = draftWords("S1", "S2", "S3")))
+        // As a names.json written elsewhere could hold them: placeholders are not names.
+        repo.draftNames(id).mutate { names ->
+            names.copy(
+                labels = mapOf("S1" to "Speaker 1", "S2" to "Voce 2", "S3" to "Anna"),
+                automatic = mapOf("S1" to "Luca"),
+            )
+        }
+
+        assertEquals(mapOf("S1" to "Luca", "S3" to "Anna"), requireNotNull(repo.loadDraft(id)).labels)
+    }
+
+    @Test fun discardDeletesASealedOutputAndItsMarker() = runTest {
+        save(h.checkpoint(id))
+        val work = h.paths.work(id)
+        File(work, "sealed.opus").writeBytes(ByteArray(8))
+        File(work, "sealed").createNewFile()
+
+        repo.discard(id)
+
+        assertFalse(work.exists())
+        assertFalse(repo.sealedMarker(id))
     }
 
     @Test fun discardDeletesTheWorkDirectoryAndTheNamesInMemory() = runTest {

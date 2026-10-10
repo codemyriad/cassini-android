@@ -1,6 +1,10 @@
 package org.cassini.data.checkpoint
 
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.test.runTest
 import org.cassini.core.checkpoint.CheckpointNames
 import org.cassini.core.library.JobKind
@@ -122,6 +126,36 @@ class NamesStoreTest {
         assertEquals(NamesStore.EMPTY, draft.observe().first())
         draft.mutate { it.rename("S1", "Anna") }
         assertEquals("Anna", draft.observe().first().labels["S1"])
+    }
+
+    @Test fun anObserverKeepsGettingValuesAfterRelease() = runTest {
+        val draft = repo.draftNames(id)
+        draft.mutate { it.rename("S1", "Anna") }
+        val subscribed = CompletableDeferred<Unit>()
+        val seen = async(Dispatchers.Default) {
+            draft.observe()
+                .onEach { if (it.labels["S1"] == "Anna") subscribed.complete(Unit) }
+                .first { it.labels["S1"] == "Bruno" }
+        }
+        subscribed.await()
+
+        repo.discard(id) // "Start over": the old draft is gone, the job row stays.
+        draft.mutate { it.rename("S1", "Bruno") }
+
+        assertEquals(mapOf("S1" to "Bruno"), seen.await().labels)
+    }
+
+    @Test fun aChangeToAReleasedDraftIsNotWritten() = runTest {
+        repo.draftNames(id).mutate { it.rename("S1", "Anna") }
+
+        // The release comes between the change in memory and the file write.
+        repo.draftNames(id).mutate { names ->
+            repo.release(id)
+            names.rename("S1", "Bruno")
+        }
+
+        assertEquals("Anna", JSONObject(namesFile.readText()).getJSONObject("labels").getString("S1"))
+        assertEquals("Anna", repo.draftNames(id).current().labels["S1"])
     }
 
     @Test fun mutateAllReachesOpenAndSavedDrafts() = runTest {

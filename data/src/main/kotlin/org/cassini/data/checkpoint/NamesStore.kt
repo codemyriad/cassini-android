@@ -39,6 +39,8 @@ import kotlin.concurrent.withLock
  * `names.json` is written only while the note has a job row or a `work/` directory: every work directory is created
  * after its job row (architecture 5.3), so a late UI change after adopt never creates a stray `work/`.
  */
+// One owner with an entry point per kind of caller (blocking, suspend, observe, all drafts); each is a few lines.
+@Suppress("TooManyFunctions")
 class NamesStore internal constructor(
     private val paths: AppPaths,
     private val dispatchers: CassiniDispatchers,
@@ -47,10 +49,12 @@ class NamesStore internal constructor(
 ) {
     private class Entry(initial: CheckpointNames) {
         val ref = AtomicReference(initial)
-        val state = MutableStateFlow(initial)
     }
 
     private val open = ConcurrentHashMap<String, Entry>()
+
+    /** One flow per note for the life of the process: a collector keeps getting values after [release]. */
+    private val states = ConcurrentHashMap<String, MutableStateFlow<CheckpointNames>>()
 
     /** The current draft names of [noteId], loading `names.json` once per process. */
     @WorkerThread
@@ -63,7 +67,8 @@ class NamesStore internal constructor(
 
     /** The draft names of [noteId] after every write; the first value is the current one. */
     fun observe(noteId: String): Flow<CheckpointNames> = flow<CheckpointNames> {
-        val state: StateFlow<CheckpointNames> = entry(noteId).state
+        entry(noteId) // Loads names.json, which sets the first value.
+        val state: StateFlow<CheckpointNames> = stateOf(noteId)
         emitAll(state)
     }.flowOn(dispatchers.io)
 
@@ -96,26 +101,40 @@ class NamesStore internal constructor(
     }
 
     /**
-     * Forgets the in-memory names of [noteId], so the next use reads `names.json` again. Called after adopt and when
-     * the work directory is discarded, so a later job of the same note starts from what is on disk.
+     * Forgets the in-memory names of [noteId], so the next use reads `names.json` again. Called after adopt, on purge
+     * and when the work directory is discarded, so a later job of the same note starts from what is on disk. Observers
+     * get [EMPTY]: the draft they showed is gone.
      */
     fun release(noteId: String) {
-        open.remove(noteId)
+        locks.lockFor(noteId).withLock {
+            open.remove(noteId)
+            states[noteId]?.value = EMPTY
+        }
     }
 
     private fun mutateNow(noteId: String, reducer: (CheckpointNames) -> CheckpointNames): CheckpointNames {
         val entry = entry(noteId)
         val result = entry.ref.updateAndGet(reducer)
         locks.lockFor(noteId).withLock {
+            // A change to a draft that was released meanwhile is dropped: it must not bring the old names back.
+            if (open[noteId] !== entry) return result
             // Read inside the lock: a later change that already wrote is never overwritten by an older value.
             val latest = entry.ref.get()
             if (writable(noteId)) {
-                WorkFiles.write(File(paths.work(noteId), WorkFiles.NAMES), CheckpointNames.encode(latest))
+                try {
+                    WorkFiles.write(File(paths.work(noteId), WorkFiles.NAMES), CheckpointNames.encode(latest))
+                } catch (error: IOException) {
+                    // The value in memory stays the truth; the next change writes it again.
+                    Log.w(NAMES_TAG, "Cannot write the draft names of $noteId", error)
+                }
             }
-            entry.state.value = latest
+            stateOf(noteId).value = latest
         }
         return result
     }
+
+    private fun stateOf(noteId: String): MutableStateFlow<CheckpointNames> =
+        states.computeIfAbsent(noteId) { MutableStateFlow(EMPTY) }
 
     /** Every work directory is created after its job row (architecture 5.3). */
     private fun writable(noteId: String): Boolean =
@@ -125,7 +144,13 @@ class NamesStore internal constructor(
         require(NoteIds.isValid(noteId)) { "Not a note id: $noteId" }
         open[noteId]?.let { return it }
         val file = File(paths.work(noteId), WorkFiles.NAMES)
-        return locks.lockFor(noteId).withLock { open.getOrPut(noteId) { Entry(readNames(file, noteId)) } }
+        return locks.lockFor(noteId).withLock {
+            open.getOrPut(noteId) {
+                val names = readNames(file, noteId)
+                stateOf(noteId).value = names
+                Entry(names)
+            }
+        }
     }
 
     companion object {

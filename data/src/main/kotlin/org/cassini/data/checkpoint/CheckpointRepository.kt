@@ -6,6 +6,7 @@ import org.cassini.core.audio.Limits
 import org.cassini.core.checkpoint.CheckpointState
 import org.cassini.core.format.SpeakerMerges
 import org.cassini.core.format.Transcript
+import org.cassini.core.speakers.DefaultLabels
 import org.cassini.data.AppPaths
 import org.cassini.data.CassiniDispatchers
 import org.cassini.data.NoteIds
@@ -37,6 +38,8 @@ class CheckpointRepository(
     private val paths: AppPaths,
     private val dispatchers: CassiniDispatchers,
     private val locks: NoteLocks,
+    /** Flushes a file to the disk; a seam for the test of the order in [saveBlocking]. */
+    private val syncFile: (File) -> Unit = NoteFiles::syncFile,
 ) {
     private val notes = database.notes()
 
@@ -88,7 +91,7 @@ class CheckpointRepository(
         locks.withNoteLockBlocking(noteId) {
             val work = work(noteId).apply { mkdirs() }
             listOf(WorkFiles.AUDIO_PART, WorkFiles.CLIPS).map { File(work, it) }.filter { it.isFile }
-                .forEach(NoteFiles::syncFile)
+                .forEach(syncFile)
             WorkFiles.write(File(work, WorkFiles.CHECKPOINT), CheckpointState.encode(state))
         }
     }
@@ -97,12 +100,17 @@ class CheckpointRepository(
      * Deletes the whole work directory of [noteId] (checkpoint, names, clips, audio part and any sealed output) and
      * forgets its draft names in memory: "Start over", the end of a cancelled job, and purge. `voices/pending/` is
      * `VoiceRepository`'s.
+     *
+     * The `sealed` marker goes first and durably: a marker without `sealed.opus` means "the rename happened" to adopt,
+     * so a crash after `sealed.opus` went but before the marker went would install the old document as the output.
      */
     suspend fun discard(noteId: String) {
         require(NoteIds.isValid(noteId)) { "Not a note id: $noteId" }
         locks.withNoteLock(noteId, dispatchers.io) {
             names.release(noteId)
-            work(noteId).deleteRecursively()
+            val work = work(noteId)
+            if (File(work, WorkFiles.SEALED_MARKER).delete()) NoteFiles.syncDirectory(work)
+            work.deleteRecursively()
         }
     }
 
@@ -142,8 +150,11 @@ class CheckpointRepository(
         val state = locks.withNoteLock(noteId, dispatchers.io) { decodeLocked(noteId) } ?: return null
         val names = names.current(noteId)
         val words = SpeakerMerges.apply(Transcript(state.recognition.chunks.words), names.merges).words
+        // A stored placeholder ("Speaker 2", "Voce 2") is not a name: the screen shows its own localized placeholder.
         val labels = words.map { it.speaker }.distinct().mapNotNull { id ->
-            (names.labels[id] ?: names.automatic[id])?.let { id to it }
+            listOfNotNull(names.labels[id], names.automatic[id])
+                .firstOrNull { !DefaultLabels.isDefault(id, it) }
+                ?.let { id to it }
         }.toMap()
         return DraftTranscript(words, labels, names, state.doneMs, state.durationMs)
     }
