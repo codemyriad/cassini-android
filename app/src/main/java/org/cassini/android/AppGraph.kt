@@ -1,6 +1,7 @@
 package org.cassini.android
 
 import android.content.Context
+import android.os.Build
 import android.util.Log
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -18,7 +19,16 @@ import org.cassini.android.adapters.NetworkCheck
 import org.cassini.android.adapters.RepositoryJobStorage
 import org.cassini.android.adapters.RepositoryJobVoices
 import org.cassini.android.adapters.RepositoryModelAccess
+import org.cassini.android.processing.AppVisibility
+import org.cassini.android.processing.ForegroundServiceStarter
 import org.cassini.android.processing.ModelInstallOwner
+import org.cassini.android.processing.ProcessVisibility
+import org.cassini.android.processing.ProcessingCoordinator
+import org.cassini.android.processing.ProcessingJobFactory
+import org.cassini.android.processing.ProcessingNotices
+import org.cassini.android.processing.ProcessingNotifications
+import org.cassini.android.processing.ServiceStarter
+import org.cassini.android.processing.TranscriptionJobFactory
 import org.cassini.core.models.ModelPart
 import org.cassini.data.AppPaths
 import org.cassini.data.CassiniDispatchers
@@ -42,6 +52,7 @@ import org.cassini.data.notes.SealedAdopter
 import org.cassini.data.notes.SweepReport
 import org.cassini.data.settings.SettingsRepository
 import org.cassini.data.voices.VoiceRepository
+import org.cassini.engine.job.BatterySource
 import org.cassini.engine.job.JobEngines
 import org.cassini.engine.job.JobEnvironment
 import org.cassini.engine.job.JobStorage
@@ -68,7 +79,8 @@ class AppGraph(context: Context, val config: Config) {
     /**
      * What a graph is built from. [fetcher] fetches model files (tests and the download screen checks pass a scripted
      * one, so nothing is downloaded); [network] answers the validated-network check (null: the connectivity
-     * service); [onStartupStep] sees the name of each startup step before it runs, for tests.
+     * service); [onStartupStep] sees the name of each startup step before it runs, for tests. [processing] replaces
+     * parts of the coordinator in tests.
      */
     data class Config(
         val paths: AppPaths,
@@ -78,6 +90,19 @@ class AppGraph(context: Context, val config: Config) {
         val clock: () -> Long = System::currentTimeMillis,
         val zone: () -> ZoneId = ZoneId::systemDefault,
         val onStartupStep: (String) -> Unit = {},
+        val processing: ProcessingHooks = ProcessingHooks(),
+    )
+
+    /**
+     * The seams of [ProcessingCoordinator] for tests: the job each claim runs, how the service starts, the results
+     * notifications, the app's visibility and the API level. Null means the app's implementation.
+     */
+    data class ProcessingHooks(
+        val jobs: ((AppGraph) -> ProcessingJobFactory)? = null,
+        val starter: ((AppGraph) -> ServiceStarter)? = null,
+        val notices: ProcessingNotices? = null,
+        val visibility: AppVisibility? = null,
+        val sdkInt: Int = Build.VERSION.SDK_INT,
     )
 
     private val app: Context = context.applicationContext
@@ -102,6 +127,12 @@ class AppGraph(context: Context, val config: Config) {
 
     /** Whether the UI may change the draft names of a note; the job closes it at step 6. */
     val namingGate = NamingGate()
+
+    /**
+     * The transcription queue (architecture 5.1-5.3), created on first use. It binds itself as the canceller of a
+     * RUNNING job for the purge and starts following the app's visibility (ON_START starts a waiting queue).
+     */
+    val processing: ProcessingCoordinator by lazy { createProcessing() }
 
     private val runningJobCanceller = AtomicReference(RunningJobCanceller { })
     private val activeRecording = AtomicReference<() -> String?> { null }
@@ -207,6 +238,26 @@ class AppGraph(context: Context, val config: Config) {
     }
 
     private fun currentCanceller(): RunningJobCanceller = runningJobCanceller.get()
+
+    private fun createProcessing(): ProcessingCoordinator {
+        val hooks = config.processing
+        val created = AtomicReference<ProcessingCoordinator?>(null)
+        val starter = hooks.starter?.invoke(this)
+            ?: ForegroundServiceStarter(app) { created.get()?.onServiceRefused() }
+        val parts = ProcessingCoordinator.Parts(
+            jobs = hooks.jobs?.invoke(this) ?: TranscriptionJobFactory(this),
+            starter = starter,
+            notices = hooks.notices ?: ProcessingNotifications(app),
+            visibility = hooks.visibility ?: ProcessVisibility().also(ProcessVisibility::attach),
+            battery = BatterySource { elapsedMs -> BatteryReader.read(app, elapsedMs) },
+            placeholderLabel = { number -> app.getString(R.string.speaker_label, number) },
+            sdkInt = hooks.sdkInt,
+        )
+        val coordinator = ProcessingCoordinator(this, parts)
+        created.set(coordinator)
+        bindRunningJobCanceller { noteId -> coordinator.cancelAndJoin(noteId) }
+        return coordinator
+    }
 
     companion object {
         private const val TAG = "AppGraph"

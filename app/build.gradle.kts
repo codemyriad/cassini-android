@@ -123,6 +123,11 @@ dependencies {
     // Catalogue exposes the Room database (it closes it in tests); :data keeps Room as an implementation detail.
     implementation(libs.room.runtime)
     implementation(libs.coroutines.android)
+    // ProcessingService: LifecycleService, ServiceCompat, NotificationCompat, getContextForLanguage; ProcessLifecycleOwner
+    // for ON_START (architecture 5.3 and 5.7).
+    implementation(libs.core.ktx)
+    implementation(libs.lifecycle.service)
+    implementation(libs.lifecycle.process)
     // The JVM unit tests decompress with the zstd-jni jar, which carries the desktop natives.
     testImplementation(libs.zstd.jni)
     testImplementation(libs.junit)
