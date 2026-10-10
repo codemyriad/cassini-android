@@ -91,6 +91,15 @@ class SettingsBehaviourTest {
         }
     }
 
+    /** features.md section 0: the body total is the sum of the rounded rows (640 + 62), not the rounded byte sum (700). */
+    @Test fun modelDownloadTotalIsTheSumOfTheRoundedRows() {
+        val state = VariantFixtures.modelDownload.getValue("models-speech-speakers")
+        setThemed { ModelDownloadScreen(state, onEvent = {}) }
+        rule.onNodeWithText("640 MB").assertExists()
+        rule.onNodeWithText("62 MB").assertExists()
+        rule.onNodeWithText("about 702\u00A0MB", substring = true).assertExists()
+    }
+
     @Test fun modelDownloadWithoutANoteOnlyDownloads() {
         setThemed { ModelDownloadScreen(VariantFixtures.modelDownload.getValue("models-without-note"), onEvent = {}) }
         rule.onNodeWithText("Download").assertExists()

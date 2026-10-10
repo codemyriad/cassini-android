@@ -303,6 +303,8 @@ class StateVariantsTest : BoardTest() {
 
     @Test fun modelsVoicesOnly() = models("models-voices-only")
 
+    @Test fun modelsSpeechSpeakers() = models("models-speech-speakers")
+
     // Settings (features.md section 11).
 
     @Test fun settingsNotificationsOff() = settings("settings-notifications-off")

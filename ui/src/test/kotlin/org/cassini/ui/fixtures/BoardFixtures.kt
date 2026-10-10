@@ -306,7 +306,6 @@ internal object BoardFixtures {
             ModelPartSizeUi(ModelPartUi.SPEAKERS, ModelBytes.SPEAKERS),
             ModelPartSizeUi(ModelPartUi.VOICES, ModelBytes.VOICES),
         ),
-        totalBytes = (640 + 62 + 28) * MIB,
         requiredFreeBytes = ModelBytes.REQUIRED_FREE,
         withNote = true,
     )

@@ -55,9 +55,8 @@ class FixturesTest {
     }
 
     @Test
-    fun modelTotalIsTheSumOfTheRoundedParts() {
-        val parts = b.modelDownload.parts.sumOf { Sizes.mebibytes(it.bytes) }
-        assertEquals(parts, Sizes.mebibytes(b.modelDownload.totalBytes))
+    fun modelPartsRoundToTheBoardFigures() {
+        assertEquals(listOf(640L, 62L, 28L), b.modelDownload.parts.map { Sizes.mebibytes(it.bytes) })
     }
 
     @Test

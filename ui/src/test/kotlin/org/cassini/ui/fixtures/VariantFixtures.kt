@@ -659,8 +659,14 @@ internal object VariantFixtures {
         "models-busy" to b.modelDownload.copy(busy = true),
         "models-voices-only" to b.modelDownload.copy(
             parts = persistentListOf(ModelPartSizeUi(ModelPartUi.VOICES, ModelBytes.VOICES)),
-            totalBytes = 28 * MIB,
             requiredFreeBytes = 60 * MIB,
+        ),
+        // 640 + 62 MB: the body says "about 702 MB", not the 700 MB of the rounded byte sum.
+        "models-speech-speakers" to b.modelDownload.copy(
+            parts = persistentListOf(
+                ModelPartSizeUi(ModelPartUi.SPEECH, ModelBytes.SPEECH),
+                ModelPartSizeUi(ModelPartUi.SPEAKERS, ModelBytes.SPEAKERS),
+            ),
         ),
     )
 
