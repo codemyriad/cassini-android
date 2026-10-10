@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import org.cassini.ui.R
@@ -33,7 +34,8 @@ import org.cassini.ui.theme.Glyph
 /**
  * The pill search field: 54 dp, surface, 1 dp line, padding 16; Search 20/1.8 in text2, 10 dp, then a
  * [BasicTextField] (`body16` ink, 2 dp extra start inset, accent cursor, IME action Search) with [placeholder] in
- * text4. A 48 dp "Clear search" button ends the pill while [query] is not empty. [compact] is the in-note variant:
+ * text4 (up to two lines, so a large font scale grows the pill instead of cutting the placeholder; the field keeps
+ * 8 dp above and below it). A 48 dp "Clear search" button ends the pill while [query] is not empty. [compact] is the in-note variant:
  * visual 44 / layout 48.
  *
  * ui.md section 6 gives 52 dp: that is the board's CSS content height, and its 1 dp border sits outside it
@@ -83,7 +85,7 @@ fun PillSearchField(
                 onValueChange = onQueryChange,
                 modifier = Modifier
                     .weight(1f)
-                    .padding(start = 2.dp),
+                    .padding(start = 2.dp, top = 8.dp, bottom = 8.dp),
                 textStyle = CassiniTheme.type.body16.copy(color = c.ink),
                 cursorBrush = SolidColor(c.accent),
                 singleLine = true,
@@ -92,7 +94,13 @@ fun PillSearchField(
                 decorationBox = { inner ->
                     Box(contentAlignment = Alignment.CenterStart) {
                         if (query.isEmpty()) {
-                            Text(text = placeholder, style = CassiniTheme.type.body16, color = c.text4, maxLines = 1)
+                            Text(
+                                text = placeholder,
+                                style = CassiniTheme.type.body16,
+                                color = c.text4,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
                         inner()
                     }

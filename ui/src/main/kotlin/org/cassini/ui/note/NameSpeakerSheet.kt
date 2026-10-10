@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -314,19 +315,25 @@ private fun Footer(
     onSave: () -> Unit,
     onBlocked: () -> Unit,
 ) {
-    Row(
+    // Flow rows: at large font scales Cancel and Save go below "Merge into…", and then below each other, instead
+    // of squeezing "Save name" into a column of letters.
+    FlowRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        itemVerticalAlignment = Alignment.CenterVertically,
     ) {
         if (ui.canMerge) {
             TextButton(stringResource(R.string.ui_name_merge_into), onClick = { onEvent(NameSheetEvent.MergeInto) })
         } else {
             Spacer(Modifier)
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             SecondaryButton(
                 text = stringResource(R.string.ui_action_cancel),
                 onClick = { onEvent(NameSheetEvent.Cancel) },

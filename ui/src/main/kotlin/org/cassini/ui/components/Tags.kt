@@ -66,7 +66,6 @@ fun DashedTag(text: String, modifier: Modifier = Modifier) {
             .padding(horizontal = 9.dp, vertical = 3.dp),
         style = CassiniTheme.type.tag12Plain,
         color = c.text2,
-        maxLines = 1,
     )
 }
 

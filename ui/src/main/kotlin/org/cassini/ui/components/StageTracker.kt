@@ -5,6 +5,7 @@ package org.cassini.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,16 +13,21 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
@@ -83,18 +89,64 @@ fun StageTracker(current: StageUi, skippedMatching: Boolean, modifier: Modifier 
                         stateDescription = stateText
                     },
             ) {
-                Text(
+                StageLabel(
                     text = Progress.stage(stage),
-                    modifier = Modifier.fillMaxWidth(),
                     style = if (state == StageState.IN_PROGRESS) t.stageCurrent else t.stage,
                     color = if (state == StageState.IN_PROGRESS) c.ink else c.text2,
-                    textAlign = TextAlign.Center,
-                    textDecoration = if (state == StageState.SKIPPED) TextDecoration.LineThrough else null,
+                    decoration = if (state == StageState.SKIPPED) TextDecoration.LineThrough else null,
                 )
             }
         }
     }
 }
+
+/**
+ * A stage label, centred and free to wrap between words. A column is about 66 dp wide, so a long word (Italian
+ * "Preparazione", or any label at a large font scale) would break inside the word; then the label shrinks until its
+ * longest word fits ([fitLongestWord]).
+ */
+@Composable
+private fun StageLabel(text: String, style: TextStyle, color: Color, decoration: TextDecoration?) {
+    val measurer = rememberTextMeasurer()
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val maxWidthPx = constraints.maxWidth
+        val fitted = remember(text, style, maxWidthPx, measurer) { fitLongestWord(measurer, text, style, maxWidthPx) }
+        Text(
+            text = text,
+            modifier = Modifier.fillMaxWidth(),
+            style = fitted,
+            color = color,
+            textAlign = TextAlign.Center,
+            textDecoration = decoration,
+        )
+    }
+}
+
+/**
+ * [style], or a smaller copy of it (font size and line height scaled by the same factor, in 5 % steps) in which
+ * the longest word of [text] fits in [maxWidthPx] on one line.
+ */
+internal fun fitLongestWord(measurer: TextMeasurer, text: String, style: TextStyle, maxWidthPx: Int): TextStyle {
+    val words = text.split(' ').filter { it.isNotEmpty() }
+    if (words.isEmpty() || maxWidthPx <= 0) return style
+    fun widest(candidate: TextStyle): Int =
+        words.maxOf { measurer.measure(it, candidate, softWrap = false, maxLines = 1).size.width }
+    var fitted = style
+    var factor = 1f
+    while (widest(fitted) > maxWidthPx && factor > MIN_LABEL_SCALE) {
+        factor -= LABEL_SCALE_STEP
+        fitted = style.copy(
+            fontSize = style.fontSize * factor,
+            lineHeight = if (style.lineHeight.isSp) style.lineHeight * factor else style.lineHeight,
+        )
+    }
+    return fitted
+}
+
+private const val LABEL_SCALE_STEP = 0.05f
+
+/** The smallest label scale; below it a word may break, as before. */
+private const val MIN_LABEL_SCALE = 0.5f
 
 @Preview
 @Composable

@@ -7,8 +7,8 @@ import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -202,16 +202,18 @@ private fun ColumnScope.DraftList(
 
 /**
  * The draft header (board 02): padding 16/20/6, "Draft transcript" (`button`, a heading) and the dashed tag
- * "Words may still change" at the end.
+ * "Words may still change" at the end. When both do not fit on one line (Italian, large fonts) the tag goes to a
+ * second line, 4 dp below.
  */
 @Composable
 private fun DraftHeader() {
-    Row(
+    FlowRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = 20.dp, top = 16.dp, end = 20.dp, bottom = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        itemVerticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = stringResource(R.string.ui_draft_title),
