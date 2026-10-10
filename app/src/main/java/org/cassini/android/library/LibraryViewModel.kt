@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.channels.Channel
@@ -17,6 +19,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
@@ -89,6 +92,8 @@ class LibraryViewModel(
     private val saved: SavedStateHandle,
     private val ports: LibraryPorts,
     private val clock: Clock = Clock.systemDefaultZone(),
+    /** Where [state] is built: every row is mapped again on each recording tick and progress update. */
+    private val compute: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
     private val effectChannel = Channel<LibraryEffect>(Channel.BUFFERED)
 
@@ -147,7 +152,8 @@ class LibraryViewModel(
         snackbar,
     ) { listing, live, sheet, dialog, snackbar ->
         build(listing, live, sheet, dialog, snackbar)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), LibraryUiState(loading = true))
+    }.flowOn(compute)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), LibraryUiState(loading = true))
 
     init {
         // Move to trash on the Note screen lands here with the Undo snackbar (architecture section 6).

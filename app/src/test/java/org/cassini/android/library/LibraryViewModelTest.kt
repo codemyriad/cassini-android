@@ -67,7 +67,7 @@ class LibraryViewModelTest {
     fun tearDown() = Dispatchers.resetMain()
 
     private fun TestScope.viewModel(): LibraryViewModel {
-        val viewModel = LibraryViewModel(saved, ports, CLOCK)
+        val viewModel = LibraryViewModel(saved, ports, CLOCK, dispatcher)
         backgroundScope.launch { viewModel.state.collect {} }
         runCurrent()
         return viewModel
