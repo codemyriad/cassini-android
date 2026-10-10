@@ -20,9 +20,9 @@ python3 -I tools/ui-fidelity/compare.py --slug 00-library     # one board
 python3 -I tools/ui-fidelity/compare.py --design build/ui-fidelity/states --golden ui/src/test/screenshots/states
 ```
 
-The board goldens in `light/` and `states/` come with the P8 screen tests. Until they exist, the
-default `--golden` directory is missing and the script stops with a usage error: give `--golden`
-explicitly. The examples below that read `ui/src/test/screenshots/light/` need these goldens too.
+The default `--golden` directory holds the committed board goldens of the P8 screen tests
+(`ui/src/test/screenshots/light/`, named by the board slugs). The States columns are in
+`ui/src/test/screenshots/states/`.
 
 - `--design`: the design PNGs. The default is `$CASSINI_DESIGN_DIR`, else `design/reference/png`.
 - `--golden`: the golden PNGs. The default is `ui/src/test/screenshots/light`.

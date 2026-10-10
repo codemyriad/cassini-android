@@ -9,12 +9,15 @@ The rules for the review are in `docs/design/ui.md` sections 10.3 and 11, and in
 
 ## How to make the figures again
 
-1. Record the goldens: `./gradlew :ui:recordRoborazziDebug`.
-2. Compare the phone boards: `python3 -I tools/ui-fidelity/compare.py`.
-3. Cut the States references: `python3 -I tools/ui-fidelity/crop_states.py --top-margin 3`.
-4. Compare the States columns:
+The figures use only the committed goldens in `ui/src/test/screenshots/light` and `ui/src/test/screenshots/states`.
+Do not record the goldens again to make the figures. If you must record them, do it only on Linux x86_64 (see
+`README.md`).
+
+1. Compare the phone boards: `python3 -I tools/ui-fidelity/compare.py`.
+2. Cut the States references: `python3 -I tools/ui-fidelity/crop_states.py --top-margin 3`.
+3. Compare the States columns:
    `python3 -I tools/ui-fidelity/compare.py --design build/ui-fidelity/states --golden ui/src/test/screenshots/states`.
-5. For vertical offsets, use `rows.py`, for example:
+4. For vertical offsets, use `rows.py`, for example:
    `python3 -I tools/ui-fidelity/rows.py design/reference/png/00-library.png ui/src/test/screenshots/light/00-library.png --x0 32 --x1 700`.
 
 The golden of a States column starts at the top of the line box of the heading. The glyphs of the heading start
@@ -255,6 +258,9 @@ The first review found two problems. P8 step 6 corrected them:
 After these corrections, the reviewer found no clipped text in the six Italian goldens. In Settings, the row title
 "Riconoscimento delle voci salvate" wraps to three lines and the status wraps to two lines.
 
+`BannerItalianScreenshotTest` records every banner kind in Italian, in three strips
+(`components/banners-it-{1,2,3}.png`). The reviewer read the three strips and found no clipped text.
+
 ### Font scale 1.5 (`fontscale/`)
 
 `FontScaleScreenshotTest` records Library, Read and listen, Name a speaker and Settings at font scale 1.5. Name a
@@ -271,8 +277,9 @@ The first review found four problems. P8 step 6 corrected them:
   label of the Record button can now wrap to two lines.
 - In the footer of Name a speaker, "Save name" became a column of letters. The footer is now a flow row: Cancel and
   Save name go below "Merge into…", and they can also go below each other.
-- The labels of the stage tracker can break inside a word at large font scales too. The correction for Italian
-  applies.
+- The labels of the stage tracker can break inside a word at large font scales too. Above font scale 1.15 a label
+  becomes smaller only to 85 % of its size. If the labels then do not fit in five columns, the steps go on more
+  rows (3 + 2, then pairs). Thus the labels keep the font scale of the user.
 
 After these corrections, the reviewer found no clipped text. The rows become taller and the screens scroll. These
 items end with an ellipsis, as the design specifies for long user content: the title in the progress banner
@@ -301,10 +308,46 @@ board, and in KDoc or a code comment.
 10. The Read pane has a top padding of 0.5 dp, and the paragraph is 1.5 dp below the speaker header.
 11. Large text: the search placeholder can use two lines, the Library Import button becomes an icon when the two
     buttons do not fit, the Record label can wrap, the Name sheet footer and the draft header are flow rows, and
-    stage labels become smaller until their longest word fits.
+    stage labels become smaller until their longest word fits. At large font scales the stage tracker uses more
+    rows. The Library list and its snackbar use the measured height of the bottom bar, because the bar becomes
+    taller when the Record label wraps.
+12. The draft of a running transcription does not scroll when the screen opens, so the progress card stays in view.
+    When new text comes, the list scrolls to the end. A scroll that stops above the end pauses this, and a scroll
+    back to the end starts it again (features.md section 3.1).
+
+## Changes to the screen contracts
+
+These changes are in addition to ui.md sections 1 and 7. P10 must use them when it writes the ViewModels and the
+navigation. Each one has its reason in the KDoc.
+
+1. `:ui` has `activity-compose` as a main dependency, not only for previews (ui.md section 1). It supplies
+   `BackHandler`. Three screens use it: Library (back clears the search), Note (back closes the in-note search) and
+   Licenses (back closes the text pane). Each handler is enabled only while its search or pane is open.
+2. The Library shows the full Note actions sheet. Thus `LibraryUiState.sheet` is a `LibrarySheet`: `Actions`,
+   `SubtitleFormat` or `Info` (Info shows as a dialog). `LibraryDialog` has `TranscribeFresh`, and `LibraryEvent`
+   has `Export(id, kind)`. ui.md section 7 gives only the actions sheet and Rename.
+3. The Recording screen does not handle system back. The navigation in `:app` must pop `RecordingKey` with the
+   predictive pop of ui.md section 9, and that pop minimises the recording. The chevron and the Library button
+   send `Minimise` and `OpenLibrary`.
+4. The text fields (Library search, in-note search, Recording title, the Name field) get their text from the UI
+   state. The ViewModel must apply each change synchronously, in Compose snapshot state, not through a collected
+   flow. Otherwise the field can lose typed characters.
+5. `LicensesUiState.backTo` (Settings or Model download) selects the label of the back button.
+6. `MergeUi.sealed` holds the version on screen and the version that the merge adds. On version 1 of 2, the merge
+   adds version 3.
+7. `VersionRowUi.withYear` adds the year to the date of a version from an earlier year.
+8. `NoteEvent` has no `Resume`, `StartOver`, `Transcribe`, `TranscribeAgain` or `Trash`. These actions come as
+   `SheetAction` or `BannerAction`.
+9. A Library or Note banner list can hold two banners with the same id. The list key adds the position.
 
 ## Items for the owner to review
 
 - The arrow in the battery cell of board 02 is larger and heavier than on the board.
 - The checkmark of the checkbox on board 04 is thinner than on the board.
 - All goldens without a board: `dark/`, `it/`, `fontscale/` and `variants/`.
+- The notifications banner in Settings. features.md section 11 gives the body "Progress of long transcriptions
+  shows only in the app." features.md section 13.5 gives "Progress shows only in the app." for the same kind. The
+  screen uses the catalogue kind NOTIFICATIONS_OFF, with the short body, on the Library and in Settings.
+  The owner must select one text.
+- The Recording screen, the Library and the Note screen depend on back handling in `:app` (see the contract
+  changes 1 and 3). The owner of ui.md must decide if section 1 changes to name `BackHandler`.

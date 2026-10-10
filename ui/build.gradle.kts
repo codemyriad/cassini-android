@@ -100,7 +100,9 @@ dependencies {
     implementation(libs.compose.foundation)
     implementation(libs.compose.material3)
     implementation(libs.compose.ui.tooling.preview)
-    // BackHandler: the Note screen's system back closes the in-note search before it leaves the screen.
+    // BackHandler: system back clears the Library search, closes the in-note search and closes the Licenses text
+    // pane before the navigation in :app takes it. A change to ui.md section 1 ("only for previews"); see
+    // docs/ui-fidelity.md, "Changes to the screen contracts".
     implementation(libs.activity.compose)
     // UiState classes expose ImmutableList (docs/design/ui.md, section 2), so :app ViewModels need the type.
     api(libs.kotlinx.collections.immutable)
