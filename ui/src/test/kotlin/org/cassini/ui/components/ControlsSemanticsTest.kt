@@ -20,6 +20,7 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
@@ -38,6 +39,7 @@ import org.cassini.ui.format.StageUi
 import org.cassini.ui.theme.CassiniTheme
 import org.cassini.ui.theme.Glyph
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -203,8 +205,20 @@ class ControlsSemanticsTest {
                 SheetActionRow("Rename", Glyph.Pencil, onClick = { sheet.hide() })
             }
         }
-        rule.onNodeWithText("Rename").performClick()
-        rule.waitUntil(TIMEOUT_MS) { dismissed == 1 }
+        rule.waitForIdle()
+        rule.mainClock.autoAdvance = false
+        val row = rule.onNodeWithText("Rename")
+        val shownTop = row.getUnclippedBoundsInRoot().top
+        row.performClick()
+        rule.mainClock.advanceTimeBy(SLIDE_PROBE_MS)
+        // Part way through the slide: the sheet is moving down and is not dismissed yet.
+        rule.runOnIdle { assertEquals(0, dismissed) }
+        val slidingTop = row.getUnclippedBoundsInRoot().top
+        assertTrue("sheet top $slidingTop did not move below $shownTop", slidingTop > shownTop)
+        rule.mainClock.advanceTimeBy(SLIDE_DONE_MS)
+        rule.runOnIdle { assertEquals(1, dismissed) }
+        rule.mainClock.advanceTimeBy(SLIDE_DONE_MS)
+        rule.runOnIdle { assertEquals(1, dismissed) }
     }
 
     @Test fun aTapOnTheDialogScrimDismissesItButATapOnTheCardDoesNot() {
@@ -256,5 +270,9 @@ class ControlsSemanticsTest {
     private companion object {
         const val TIMEOUT_MS = 10_000L
         const val ONE_SECOND_MS = 1_000L
+
+        /** Into the sheet's hide animation, and well past its end. */
+        const val SLIDE_PROBE_MS = 64L
+        const val SLIDE_DONE_MS = 2_000L
     }
 }
