@@ -31,22 +31,51 @@ import org.cassini.ui.theme.colors
 
 /**
  * A 32 dp trust chip on Read & listen (radius 16, padding 12, gap 6, 13 sp 600): "Verified" is [Tone.Ok] with
- * Check 14/2.2; the other trust states use [Tone.Warn] or [Tone.Error] with the Warn glyph (14/2). Not interactive.
+ * Check 14/2.2; the other trust states use [Tone.Warn] or [Tone.Error] with the Warn glyph (14/2). With [onClick]
+ * the chip is a button (features.md section 3.3: a tap toggles the trust banner) laid out at 48 dp, the 32 dp visual
+ * centred with a clipped ripple, and [onClickLabel] names the action. Without [onClick] it is a plain label.
  */
 @Composable
-fun LargeChip(text: String, tone: Tone, modifier: Modifier = Modifier, glyph: Glyph = defaultGlyph(tone)) {
+@Suppress("LongParameterList") // The optional click and its label.
+fun LargeChip(
+    text: String,
+    tone: Tone,
+    modifier: Modifier = Modifier,
+    glyph: Glyph = defaultGlyph(tone),
+    onClick: (() -> Unit)? = null,
+    onClickLabel: String? = null,
+) {
     val colors = tone.colors
-    Row(
-        modifier = modifier
-            .heightIn(min = 32.dp)
-            .clip(CassiniTheme.shapes.card)
-            .background(colors.bg)
-            .padding(horizontal = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    val interaction = remember { MutableInteractionSource() }
+    Box(
+        modifier = if (onClick == null) {
+            modifier
+        } else {
+            modifier
+                .touchTarget()
+                .clickable(
+                    interactionSource = interaction,
+                    indication = null,
+                    onClickLabel = onClickLabel,
+                    role = Role.Button,
+                    onClick = onClick,
+                )
+        },
+        contentAlignment = Alignment.Center,
     ) {
-        CassiniIcon(glyph, 14.dp, if (glyph == Glyph.Check) 2.2f else 2f, colors.fg, null)
-        Text(text = text, style = CassiniTheme.type.speaker, color = colors.fg, maxLines = 1)
+        Row(
+            modifier = Modifier
+                .heightIn(min = 32.dp)
+                .clip(CassiniTheme.shapes.card)
+                .background(colors.bg)
+                .then(if (onClick != null) Modifier.indication(interaction, ripple(color = colors.fg)) else Modifier)
+                .padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CassiniIcon(glyph, 14.dp, if (glyph == Glyph.Check) 2.2f else 2f, colors.fg, null)
+            Text(text = text, style = CassiniTheme.type.speaker, color = colors.fg, maxLines = 1)
+        }
     }
 }
 

@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -23,7 +24,8 @@ import org.cassini.ui.theme.colors
 
 /**
  * A round avatar of [size] dp (boards 04 and 07): the speaker tone's tint with [text] (an initial or a number) in
- * the tone's ink colour, `avatar` style (16 sp, 700). Decorative: the row or header names the person.
+ * the tone's ink colour, `avatar` style (16 sp, 700). Decorative and hidden from TalkBack: the row or header
+ * names the person.
  */
 @Composable
 fun Avatar(text: String, tone: SpeakerTone, modifier: Modifier = Modifier, size: Dp = 40.dp) {
@@ -32,7 +34,8 @@ fun Avatar(text: String, tone: SpeakerTone, modifier: Modifier = Modifier, size:
         modifier = modifier
             .size(size)
             .clip(CircleShape)
-            .background(colors.tint),
+            .background(colors.tint)
+            .clearAndSetSemantics {},
         contentAlignment = Alignment.Center,
     ) {
         Text(text = text, style = CassiniTheme.type.avatar, color = colors.ink, maxLines = 1)

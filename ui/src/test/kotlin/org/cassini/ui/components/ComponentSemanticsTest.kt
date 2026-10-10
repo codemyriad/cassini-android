@@ -2,7 +2,9 @@ package org.cassini.ui.components
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -48,6 +50,8 @@ import org.cassini.ui.format.FIXED_ZONE
 import org.cassini.ui.format.ProvideFixedFormat
 import org.cassini.ui.theme.CassiniTheme
 import org.cassini.ui.theme.Glyph
+import org.cassini.ui.theme.SpeakerTone
+import org.cassini.ui.theme.Tone
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -101,19 +105,40 @@ class ComponentSemanticsTest {
                 DestructiveButton("Delete", onClick = {})
                 VersionChip("Version 2 of 2", onClick = {})
                 FollowChip("Follow playback", onClick = {})
+                LargeChip("Not verified", Tone.Warn, onClick = {}, onClickLabel = "Show details")
                 RecordFab(onClick = {})
             }
         }
         val labels = listOf(
             "Ink small", "Ink medium", "Secondary small", "Secondary medium", "Secondary block", "Cancel",
             "Merge into…", "Delete now", "Empty", "Save name", "Delete", "Version 2 of 2", "Follow playback",
-            "Phone", "English", "Italiano", "Open",
+            "Phone", "English", "Italiano", "Open", "Not verified",
         )
         for (label in labels) rule.onNodeWithText(label).assertTouchAtLeast48()
         for (description in listOf("Back to library", "Clear search", "Dismiss", "Record a new note")) {
             rule.onNodeWithContentDescription(description).assertTouchAtLeast48()
         }
         rule.onNodeWithContentDescription("Record a new note").assertHasClickAction()
+        val chip = rule.onNodeWithText("Not verified").fetchSemanticsNode().config
+        assertEquals("Show details", chip[SemanticsActions.OnClick].label)
+        assertEquals(Role.Button, chip[SemanticsProperties.Role])
+    }
+
+    @Test fun aLargeChipWithoutAClickIsAPlainLabel() {
+        setThemed { LargeChip("Verified", Tone.Ok) }
+        rule.onNodeWithText("Verified").assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
+        rule.onAllNodes(hasClickAction()).assertCountEquals(0)
+    }
+
+    @Test fun theAvatarIsHiddenSoTheRowReadsOnlyTheName() {
+        setThemed {
+            Row {
+                Avatar("G", SpeakerTone.Blue)
+                Text("Giulia")
+            }
+        }
+        rule.onAllNodesWithText("G").assertCountEquals(0)
+        rule.onNodeWithText("Giulia").assertExists()
     }
 
     @Test fun rowSuffixKeepsItsLayoutAndTakesTapsWithin48dp() {
