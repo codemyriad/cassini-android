@@ -142,7 +142,7 @@ If you install an APK by hand, use `adb install -r`.
 - Kotlin: [detekt](https://detekt.dev) 1.23.8 with the `detekt-formatting` rules. Run `./gradlew detekt`. Autocorrect is off, because it changes the verbatim engine code. Correct each finding by hand.
 - Kotlin syntax: detekt reads the code with a Kotlin 2.0 parser. Do not use guard conditions in `when`, non-local `break` or `continue`, context parameters or explicit backing fields.
 - Format: `.editorconfig` sets 4 spaces and 140 columns.
-- Python: [ruff](https://docs.astral.sh/ruff/). From the repository root, run `ruff check --config config/ruff.toml scripts`.
+- Python: [ruff](https://docs.astral.sh/ruff/). From the repository root, run `ruff check --config config/ruff.toml scripts tools`.
 - Shell: [ShellCheck](https://www.shellcheck.net). Run `shellcheck -x scripts/*.sh tools/*.sh`.
 - Markdown: run `scripts/check-links.sh`. It finds broken relative links.
 - Code comments and KDoc are in plain English. The documentation follows ASD-STE100 Simplified Technical English: short sentences, active voice and simple tenses.

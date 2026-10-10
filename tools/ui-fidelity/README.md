@@ -119,12 +119,9 @@ Do these steps for each board, and record the results in `docs/ui-fidelity.md`:
 
 ## Ruff
 
-The P2 spike scripts were excluded from ruff in `config/ruff.toml` (`extend-exclude`). These scripts
-replace them and pass `ruff check`. P7 does not own `config/` or CI, so two later phases make the
-changes. P10 removes the exclusion and its stale comment, which still names `diff.py`. P11 adds
-`tools/ui-fidelity` to the ruff step of `.github/workflows/android.yml`, which checks only `scripts`
-today. Until then, check the scripts explicitly:
+The scripts pass `ruff check`. CI checks them in the ruff step of `.github/workflows/android.yml`. To
+check them by hand, run this command from the repository root:
 
 ```sh
-ruff check --config config/ruff.toml --no-cache --no-force-exclude tools/ui-fidelity/*.py
+ruff check --config config/ruff.toml scripts tools
 ```
