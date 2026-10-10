@@ -41,7 +41,6 @@ import org.cassini.ui.format.LocalFormat
 import org.cassini.ui.format.Spoken
 import org.cassini.ui.theme.CassiniTheme
 import org.cassini.ui.theme.Tone
-import java.time.LocalDate
 import java.time.LocalTime
 
 /**
@@ -67,7 +66,7 @@ fun NoteRow(row: NoteRowUi, day: DayLabel, onAction: (NoteRowAction) -> Unit, mo
     // that is not a button ("3 speakers", "No speech") and the preview, which tells why a search result matched.
     val locale = LocalFormat.current.locale
     val description = listOfNotNull(
-        Spoken.noteRow(row.title, row.durationMs, day, row.time, status.text),
+        Spoken.noteRow(row.title, row.durationMs, row.day ?: day, row.time, status.text),
         status.suffix?.takeIf { status.suffixAction == null }?.trimStart('·', ' ', '\u00A0')?.lowercase(locale),
         row.preview?.text,
     ).joinToString(", ")
@@ -119,7 +118,7 @@ fun NoteRow(row: NoteRowUi, day: DayLabel, onAction: (NoteRowAction) -> Unit, mo
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = if (row.date != null) Dates.dayTime(day, row.time) else Dates.time(row.time),
+                text = row.day?.let { Dates.dayTime(it, row.time) } ?: Dates.time(row.time),
                 style = t.caption,
                 color = c.text2,
             )
@@ -258,7 +257,7 @@ internal fun NoteRowPreview() {
                     title = "Call with supplier",
                     durationMs = 1_430_000,
                     time = LocalTime.of(15, 10),
-                    date = LocalDate.of(2026, 10, 8),
+                    day = DayLabel.Yesterday,
                     status = NoteStatusUi.Transcribed(speakers = 3, words = 4_812),
                     preview = Highlighted(
                         text = "quindi la consegna slitta a giovedì, but the price stays as agreed",

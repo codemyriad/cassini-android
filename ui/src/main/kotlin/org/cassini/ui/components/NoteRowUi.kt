@@ -3,7 +3,7 @@ package org.cassini.ui.components
 import androidx.compose.runtime.Immutable
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
-import java.time.LocalDate
+import org.cassini.ui.format.DayLabel
 import java.time.LocalTime
 
 /**
@@ -49,9 +49,12 @@ data class Highlighted(
 )
 
 /**
- * One Library row (ui.md section 7). [titleRanges] highlight a title match. [date] is set in the flat search
- * results, where the meta line shows the day too; in day sections it is null. [highlighted] puts the row on
- * surface (the running note).
+ * One Library row (ui.md section 7). [titleRanges] highlight a title match. [day] is set in the flat search
+ * results, where the meta line shows the day too; in day sections it is null (the section header names the day).
+ * [highlighted] puts the row on surface (the running note).
+ *
+ * ui.md section 7 gives this field as `date: LocalDate?`. It is a [DayLabel] here, which the ViewModel classifies
+ * with its clock (ui.md section 2: the UI never asks what today is), so a result from today reads "Today, 09:12".
  */
 @Immutable
 data class NoteRowUi(
@@ -60,7 +63,7 @@ data class NoteRowUi(
     val titleRanges: ImmutableList<IntRange> = persistentListOf(),
     val durationMs: Long,
     val time: LocalTime,
-    val date: LocalDate? = null,
+    val day: DayLabel? = null,
     val status: NoteStatusUi,
     val preview: Highlighted? = null,
     val highlighted: Boolean = false,

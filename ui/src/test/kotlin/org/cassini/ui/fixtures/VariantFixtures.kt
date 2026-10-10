@@ -109,11 +109,11 @@ internal object VariantFixtures {
                 titleRanges = rangesOf("Consegne di ottobre", "consegn"),
                 durationMs = clock(6, 3),
                 time = LocalTime.of(9, 12),
-                date = LocalDate.of(2026, 10, 9),
+                day = DayLabel.Today,
                 status = NoteStatusUi.AudioOnly,
             ),
             b.supplier.copy(
-                date = LocalDate.of(2026, 10, 8),
+                day = DayLabel.Yesterday,
                 preview = Highlighted(
                     text = snippet,
                     ranges = rangesOf(snippet, "consegn"),

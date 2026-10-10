@@ -119,7 +119,7 @@ internal object ComponentFixtures {
             titleRanges = persistentListOf(10..17),
             durationMs = 1_430_000,
             time = LocalTime.of(15, 10),
-            date = LocalDate.of(2026, 10, 8),
+            day = DayLabel.Yesterday,
             status = NoteStatusUi.Transcribed(speakers = 3, words = 4_812),
             preview = Highlighted(
                 text = "quindi la consegna slitta a giovedì, but the price stays as agreed",
