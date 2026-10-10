@@ -113,7 +113,14 @@ On macOS or Windows, do not run `ciTest` or `verifyRoborazziDebug`. Do not recor
 ./gradlew :core:test :engine:testDebugUnitTest :data:testDebugUnitTest :ui:testDebugUnitTest :app:testDebugUnitTest
 ```
 
-The Compose accessibility checks (`enableAccessibilityChecks()`) do not operate under Robolectric. Thus the `:ui` tests do not have them. The device flow tests of `:app` will call them on an emulator. These device flow tests are planned and are not in the tree yet.
+The Compose accessibility checks (`enableAccessibilityChecks()`) do not operate under Robolectric. Thus the `:ui` tests do not have them. Two `@CiSmoke` device tests of `:app` run them on an emulator:
+
+- `flows/ScreenAccessibilityTest` checks the Library, the Note screen (reading and processing), Recording and Settings in board states.
+- `flows/AppAccessibilityTest` checks the Library and Settings of the real app.
+
+Each ERROR or WARNING of the checks fails the test, with three exceptions. The exceptions are the small touch targets of inline word links and of the Library row suffixes, and the low contrast of the old waveform bars (`rec.barIdle`, permitted in `docs/design/ui.md` section 11). The tests write each finding to logcat with the tag `CassiniA11y`.
+
+`app/src/test/.../nav/AppShellTest` runs the whole app under Robolectric on a scratch root. It tests the back order (a sheet, then the search, then the screen), the minimised recording, the predictive back callback, the edge-to-edge insets, the system bar icons of each screen and the TalkBack semantics of the Note screen.
 
 ## Device safety
 

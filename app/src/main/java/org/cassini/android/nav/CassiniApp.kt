@@ -80,8 +80,8 @@ fun CassiniApp(graph: AppGraph, links: Flow<DeepLink>, modifier: Modifier = Modi
     LaunchedEffect(links) {
         links.collect { link -> open(graph, backStack, link) }
     }
-    // Light screens have dark icons in the light theme; Recording has light icons always.
-    SystemBarsAppearance(darkIcons = backStack.lastOrNull() != RecordingKey && !isSystemInDarkTheme())
+    // The screen on top sets the bar icons; during a back gesture they stay those of that screen until it pops.
+    SystemBarsAppearance(darkIcons = darkBarIcons(backStack.lastOrNull(), isSystemInDarkTheme()))
     NavDisplay(
         backStack = backStack,
         modifier = modifier.fillMaxSize().background(CassiniTheme.colors.bg),

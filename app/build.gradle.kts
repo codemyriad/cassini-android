@@ -153,6 +153,8 @@ dependencies {
     testImplementation(libs.bundles.testing.robolectric)
     testImplementation(platform(libs.compose.bom))
     testImplementation(libs.compose.ui.test.junit4)
+    // Espresso.pressBack in AppShellTest: it reaches the focused window, so a sheet gets back first.
+    testImplementation(libs.androidx.test.espresso.core)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.espresso.core)
@@ -160,4 +162,7 @@ dependencies {
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.compose.ui.test.junit4.accessibility)
+    // ScreenAccessibilityTest shows :ui screens in the empty ComponentActivity of this manifest (debug builds only).
+    debugImplementation(platform(libs.compose.bom))
+    debugImplementation(libs.compose.ui.test.manifest)
 }

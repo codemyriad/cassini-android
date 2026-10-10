@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import androidx.navigation3.runtime.NavKey
 
 /**
  * Sets the icon colour of the status and navigation bars (docs/design/ui.md section 9): [darkIcons] on light screens
@@ -25,6 +26,17 @@ fun SystemBarsAppearance(darkIcons: Boolean) {
             isAppearanceLightNavigationBars = darkIcons
         }
     }
+}
+
+/**
+ * Whether the screen of [key] wants dark bar icons in a [darkTheme] or light theme (docs/design/ui.md section 9).
+ * Recording is a dark screen in both themes, so its icons are always light. Every other destination (Library, Note,
+ * Model download, Settings, Saved voices, Trash, Licenses) is a light screen in the light theme and a dark one in the
+ * dark theme. A sheet or a dialog keeps the bars of the screen under it.
+ */
+internal fun darkBarIcons(key: NavKey?, darkTheme: Boolean): Boolean = when (key) {
+    RecordingKey -> false
+    else -> !darkTheme
 }
 
 private tailrec fun Context.activity(): Activity? = when (this) {
