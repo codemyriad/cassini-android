@@ -88,7 +88,8 @@ class ProcessingServiceTest {
         assertEquals(Service.START_REDELIVER_INTENT, result)
         val shadow = shadowOf(service)
         assertEquals(ProcessingNotifications.PROCESSING_ID, shadow.lastForegroundNotificationId)
-        assertTrue(graph.processing.state.value.serviceForeground)
+        // The state is a stateIn of the coordinator scope: it follows the foreground flag a moment later.
+        until { graph.processing.state.value.serviceForeground }
         assertEquals(ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC, ProcessingService.typeOf(ForegroundNeed.DATA_SYNC))
         assertEquals(
             ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING,
@@ -101,7 +102,7 @@ class ProcessingServiceTest {
         job.finish(JobOutcome.Done)
         until { shadow.isStoppedBySelf }
         assertTrue(shadow.isForegroundStopped)
-        assertFalse(graph.processing.state.value.serviceForeground)
+        until { !graph.processing.state.value.serviceForeground }
     }
 
     @Test fun aRefusedFirstStartLeavesTheQueueAndPostsReadyToTranscribe() {
