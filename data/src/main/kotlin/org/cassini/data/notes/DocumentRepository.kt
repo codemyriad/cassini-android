@@ -175,13 +175,32 @@ class DocumentRepository(
 
     /**
      * Installs `work/sealed.opus` (architecture 3.2): renames it over `document.opus`, fsyncs the directory, rebuilds
-     * the row and every cache row in one transaction, writes a dirty title into the document, deletes the previous
-     * `capture.*`/`source.*` file, then deletes `work/` with the marker last. Safe to run again after a crash at any
-     * point: a marker without `sealed.opus` means the rename happened, and the remaining steps run.
-     * [selectNewDefault] selects the document's default variant (the new one); otherwise the selection is kept.
+     * the row and every cache row and deletes the job row in one transaction, writes a dirty title into the document
+     * and deletes the previous `capture.*`/`source.*` file. `work/` and its marker stay: the caller runs
+     * `VoiceRepository.adoptPending` and then [deleteAdoptedWork] (architecture 3.5: the row first, then the
+     * directory). Safe to run again after a crash at any point: a marker without `sealed.opus` means the rename
+     * happened, and the remaining steps run. [selectNewDefault] selects the document's default variant (the new one);
+     * otherwise the selection is kept. [SealedAdopter.of] runs the whole sequence.
      */
     suspend fun adoptSealed(noteId: String, selectNewDefault: Boolean = true): AdoptOutcome =
         locks.withNoteLock(noteId, dispatchers.io) { adoptLocked(noteId, selectNewDefault) }
+
+    /**
+     * The last step of an adopt: deletes `work/` with the `sealed` marker last, so a crash before the end leaves a
+     * marker and the next start runs the adopt again. Does nothing without a marker: the directory then belongs to a
+     * newer job.
+     */
+    suspend fun deleteAdoptedWork(noteId: String) {
+        locks.withNoteLock(noteId, dispatchers.io) {
+            val work = paths.work(noteId)
+            val marker = File(work, NoteFiles.SEALED_MARKER)
+            if (marker.isFile) {
+                work.listFiles().orEmpty().filter { it != marker }.forEach { it.deleteRecursively() }
+                marker.delete()
+                work.delete()
+            }
+        }
+    }
 
     /** Renames speakers in the document ([labels] by speaker id). Refused while a job row exists or unless OK. */
     suspend fun relabel(noteId: String, labels: Map<String, String>): EditOutcome = edit(noteId) { _, document ->
@@ -340,10 +359,12 @@ class DocumentRepository(
         document: CassiniDocument,
         signature: String?,
         select: String? = null,
+        removeJob: Boolean = false,
     ): NoteCache? =
         database.runInTransaction(
             Callable {
                 notes.noteBlocking(noteId)?.let { row ->
+                    if (removeJob) jobs.deleteBlocking(noteId)
                     DocumentDerivation.derive(row, document, signature, clock(), select)
                         .also(cache::replaceCacheBlocking)
                 }
@@ -363,7 +384,7 @@ class DocumentRepository(
             !document.isFile -> AdoptOutcome.Unreadable.also { marker.delete() }
             else -> null
         }
-        return blocked ?: finishAdopt(noteId, dir, work, selectNewDefault)
+        return blocked ?: finishAdopt(noteId, dir, selectNewDefault)
     }
 
     /** Moves a sealed output that reads back OK over `document.opus`; drops it with its marker otherwise. */
@@ -382,21 +403,24 @@ class DocumentRepository(
         return ok
     }
 
-    private fun finishAdopt(noteId: String, dir: File, work: File, selectNewDefault: Boolean): AdoptOutcome {
+    private fun finishAdopt(noteId: String, dir: File, selectNewDefault: Boolean): AdoptOutcome {
         val file = File(dir, NoteFiles.DOCUMENT)
         val signature = DocumentSignature.of(file)
         val document = if (signature == null) missing(file) else readLocked(file, signature)
-        val written = writeCache(noteId, document, signature, if (selectNewDefault) document.defaultId else null)
-            ?: return AdoptOutcome.NoNote
-        // The job row still exists during adopt; adopt itself writes the title the job kept from the document.
+        // The job row goes with the row update, before anything in work/: a crash later leaves a marker and no job,
+        // and the next start finishes this adopt instead of queueing the finished note again.
+        val written = writeCache(
+            noteId,
+            document,
+            signature,
+            if (selectNewDefault) document.defaultId else null,
+            removeJob = true,
+        ) ?: return AdoptOutcome.NoNote
+        // A rename made while the job ran set title_dirty; adopt writes that title into the document.
         if (written.note.titleDirty && document.documentState == DocumentState.OK) {
             guarded { retitleDocument(noteId, written.note, document) }
         }
         dir.listFiles().orEmpty().filter { it.isFile && NoteFiles.isPreviousAudio(it.name) }.forEach { it.delete() }
-        val marker = File(work, NoteFiles.SEALED_MARKER)
-        work.listFiles().orEmpty().filter { it != marker }.forEach { it.deleteRecursively() }
-        marker.delete()
-        work.delete()
         return AdoptOutcome.Adopted(document.documentState)
     }
 

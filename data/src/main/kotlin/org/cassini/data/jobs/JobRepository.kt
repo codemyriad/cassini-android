@@ -39,9 +39,10 @@ class JobRepository(
     private val dispatchers: CassiniDispatchers,
     private val locks: NoteLocks,
     private val checkpoints: CheckpointRepository,
-    /** Finishes an interrupted adopt: the app passes `adoptSealed` then `VoiceRepository.adoptPending`. */
+    /** Finishes an interrupted adopt: the app passes [SealedAdopter.of]. */
     private val adopter: SealedAdopter,
-    private val canceller: RunningJobCanceller = RunningJobCanceller {},
+    /** Stops a RUNNING job before its files go (purge step 1); the app passes the coordinator's cancel. */
+    private val canceller: RunningJobCanceller,
     private val clock: () -> Long = System::currentTimeMillis,
 ) : JobQueueWriter {
     private val jobs = database.jobs()
@@ -171,6 +172,7 @@ class JobRepository(
         if (checkpoints.sealedMarker(noteId)) {
             when (adopter.adopt(noteId)) {
                 is AdoptOutcome.Adopted -> {
+                    // Adopt removed the job row already; this covers an adopter that does not.
                     jobs.delete(noteId)
                     checkpoints.release(noteId)
                     report.adopted += noteId

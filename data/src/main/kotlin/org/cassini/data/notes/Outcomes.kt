@@ -1,8 +1,11 @@
 package org.cassini.data.notes
 
+import android.util.Log
 import org.cassini.core.Failure
 import org.cassini.core.format.DocumentState
 import org.cassini.core.library.JobKind
+import org.cassini.data.voices.VoiceRepository
+import java.io.IOException
 
 // The results the note and document repositories return instead of throwing (docs/architecture.md, section 4).
 
@@ -115,11 +118,31 @@ sealed interface ImportOutcome {
 }
 
 /**
- * Finishes the adopt of a sealed job output for the catalogue rebuild. The app passes `adoptSealed` followed by
- * `VoiceRepository.adoptPending`, as `reconcileOnStart` does (architecture 5.3).
+ * Finishes the adopt of a sealed job output after a crash, for `reconcileOnStart` and the catalogue rebuild
+ * (architecture 5.3). [of] builds the production one; tests can pass a fake.
  */
 fun interface SealedAdopter {
     suspend fun adopt(noteId: String): AdoptOutcome
+
+    companion object {
+        /**
+         * `adoptSealed` (the document, the row and the job row), then `VoiceRepository.adoptPending`, then
+         * `deleteAdoptedWork` (marker last). A crash or an I/O error at any point leaves the marker, so the next
+         * start runs it again.
+         */
+        fun of(documents: DocumentRepository, voices: VoiceRepository): SealedAdopter = SealedAdopter { noteId ->
+            documents.adoptSealed(noteId).also { outcome ->
+                if (outcome is AdoptOutcome.Adopted) {
+                    try {
+                        voices.adoptPending(noteId)
+                        documents.deleteAdoptedWork(noteId)
+                    } catch (error: IOException) {
+                        Log.w("SealedAdopter", "Cannot finish the voices of $noteId; the next start tries again", error)
+                    }
+                }
+            }
+        }
+    }
 }
 
 /** What `CatalogueRepository.rebuild` did. */
@@ -132,6 +155,6 @@ data class RebuildReport(
     val paused: List<String>,
     /** `note_voice_links` rows written. */
     val links: Int,
-    /** Note ids whose `voices/notes/<id>.json` was deleted because the note directory is gone. */
+    /** Note ids whose voice files were deleted because the note has no row. */
     val deletedVoiceFiles: List<String>,
 )

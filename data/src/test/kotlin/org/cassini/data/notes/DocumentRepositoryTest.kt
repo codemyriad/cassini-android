@@ -70,7 +70,7 @@ class DocumentRepositoryTest {
         assertEquals(AdoptOutcome.Adopted(DocumentState.OK), h.notes.adoptSealed("a"))
 
         assertFalse(capture.exists())
-        assertFalse(work("a").exists())
+        assertTrue("the marker stays until the voices are adopted", File(work("a"), "sealed").isFile)
         assertTrue(h.isOk("a"))
         val row = h.row("a")
         assertEquals(AudioKind.DOCUMENT, row.audioKind)
@@ -83,7 +83,32 @@ class DocumentRepositoryTest {
         assertEquals(0, h.reader.reads.get()) // The seal's verified read is reused: the adopt reads nothing.
         assertEquals(RefreshOutcome.Fresh, h.notes.refreshIfStale("a"))
 
+        h.documents.deleteAdoptedWork("a")
+        assertFalse(work("a").exists())
         assertEquals(AdoptOutcome.NothingToAdopt, h.notes.adoptSealed("a"))
+    }
+
+    @Test fun adoptRemovesTheJobRowBeforeWorkGoes() = runTest {
+        h.plainNote("a")
+        insertJob("a", JobState.RUNNING)
+        seal("a", File(h.dir("a"), "capture.opus"), first, "Registrazione")
+
+        assertEquals(AdoptOutcome.Adopted(DocumentState.OK), h.notes.adoptSealed("a"))
+
+        // A crash here leaves a marker without a job: the next start adopts again and never queues the note.
+        assertNull(h.db.jobs().job("a"))
+        assertTrue(File(work("a"), "sealed").isFile)
+        assertEquals(AdoptOutcome.Adopted(DocumentState.OK), h.notes.adoptSealed("a"))
+        assertNull(h.db.jobs().job("a"))
+    }
+
+    @Test fun deleteAdoptedWorkLeavesTheWorkOfANewerJob() = runTest {
+        h.plainNote("a")
+        File(work("a").apply { mkdirs() }, "checkpoint.json").writeText("{}")
+
+        h.documents.deleteAdoptedWork("a")
+
+        assertTrue(File(work("a"), "checkpoint.json").isFile)
     }
 
     @Test fun aCrashAfterTheRenameIsRepairedByRunningAdoptAgain() = runTest {
@@ -98,6 +123,7 @@ class DocumentRepositoryTest {
         assertEquals(AudioKind.DOCUMENT, h.row("a").audioKind)
         assertEquals(DocumentSignature.of(h.document("a")), h.row("a").documentSignature)
         assertFalse(File(h.dir("a"), "capture.opus").exists())
+        h.documents.deleteAdoptedWork("a")
         assertFalse(work("a").exists())
         assertEquals(AdoptOutcome.NothingToAdopt, h.notes.adoptSealed("a"))
     }
@@ -117,6 +143,7 @@ class DocumentRepositoryTest {
         // The adopt that the next start runs still finishes the clean-up.
         assertEquals(AdoptOutcome.Adopted(DocumentState.OK), h.notes.adoptSealed("a"))
         assertFalse(File(h.dir("a"), "capture.opus").exists())
+        h.documents.deleteAdoptedWork("a")
         assertFalse(work("a").exists())
     }
 

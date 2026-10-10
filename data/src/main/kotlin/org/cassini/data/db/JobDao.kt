@@ -53,6 +53,10 @@ abstract class JobDao {
     @Query("DELETE FROM jobs WHERE note_id = :noteId")
     abstract suspend fun delete(noteId: String)
 
+    /** [delete] inside a transaction that runs under a note lock (adopt). */
+    @Query("DELETE FROM jobs WHERE note_id = :noteId")
+    abstract fun deleteBlocking(noteId: String)
+
     @Query("UPDATE jobs SET state = :state, updated_at = :now WHERE note_id = :noteId")
     protected abstract suspend fun setState(noteId: String, state: JobState, now: Long)
 

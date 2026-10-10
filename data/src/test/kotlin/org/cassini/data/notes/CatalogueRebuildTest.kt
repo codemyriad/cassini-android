@@ -15,9 +15,11 @@ import org.cassini.core.library.PauseReason
 import org.cassini.core.speakers.Match
 import org.cassini.core.speakers.NoteVoiceCodec
 import org.cassini.core.speakers.SpeakerPrint
+import org.cassini.data.checkpoint.CheckpointRepository
 import org.cassini.data.db.CassiniDatabase
 import org.cassini.data.db.CassiniDatabaseOpener
 import org.cassini.data.db.offMain
+import org.cassini.data.voices.VoiceRepository
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -70,6 +72,12 @@ class CatalogueRebuildTest {
             h.dispatchers,
             h.locks,
             documents,
+            VoiceRepository(
+                db,
+                h.paths,
+                h.dispatchers,
+                CheckpointRepository(db, h.paths, h.dispatchers, h.locks).names,
+            ),
             probe,
             recoveredTitle = RecoveredTitle.english(ZoneOffset.UTC),
         ) { h.now }
@@ -227,7 +235,12 @@ class CatalogueRebuildTest {
         assertEquals(Match.State.CONFIRMED, links.first().state)
         assertEquals(Match.State.NONE, links.last().state)
         assertFalse(File(h.paths.voices, "notes/$goneId.json").exists())
-        assertTrue(File(h.paths.voices, "notes/$importId.json").exists()) // Unreadable files stay.
+        // A damaged file is set aside, never deleted.
+        assertFalse(File(h.paths.voices, "notes/$importId.json").exists())
+        assertEquals(
+            1,
+            File(h.paths.voices, "notes").list()!!.count { it.startsWith("$importId.json.corrupt-") },
+        )
     }
 
     @Test fun rebuildIsIdempotent() = runTest {

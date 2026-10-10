@@ -17,8 +17,7 @@ import org.cassini.data.Sha256
 import org.cassini.data.db.CassiniDatabase
 import org.cassini.data.db.JobEntity
 import org.cassini.data.db.NoteEntity
-import org.cassini.data.db.NoteVoiceLinkEntity
-import org.cassini.data.voices.VoiceLinks
+import org.cassini.data.voices.VoiceRepository
 import org.json.JSONException
 import org.json.JSONObject
 import java.io.File
@@ -50,12 +49,13 @@ fun interface RecoveredTitle {
  *   cassini-android, else IMPORTED_DOCUMENT; the title is `meeting.title`);
  * - otherwise `capture.*` or `source.*` gives a RECOVERED row titled "Recovered recording <d MMM>": a capture that
  *   did not end cleanly is repaired, and the row is PLAIN, or UNPLAYABLE when nothing plays;
- * - a `work/sealed` marker is finished by [adopter]; a `work/checkpoint.json` that decodes gives a PAUSED job with
- *   reason INTERRUPTED (`reconcileOnStart` validates it later).
+ * - a `work/sealed` marker is finished by [SealedAdopter.of]; a `work/checkpoint.json` that decodes gives a PAUSED
+ *   job with reason INTERRUPTED (`reconcileOnStart` validates it later).
  *
- * Then `note_voice_links` are rebuilt from `voices/notes/<noteId>.json`, and a voice file whose note directory is gone is
- * deleted. The rebuild is idempotent (notes that have a row are left alone) and never deletes audio. What only Room
- * held is lost: a rename not yet written into a document, trash state, playback positions and the queue.
+ * Then `VoiceRepository.syncLinks` rebuilds `note_voice_links` from `voices/notes/<noteId>.json` and deletes the
+ * voice files of notes that have no row. The rebuild is idempotent (notes that have a row are left alone) and never
+ * deletes audio. What only Room held is lost: a rename not yet written into a document, trash state, playback
+ * positions and the queue.
  */
 // Manual DI: the repositories take their collaborators explicitly.
 @Suppress("LongParameterList")
@@ -65,14 +65,15 @@ class CatalogueRepository(
     private val dispatchers: CassiniDispatchers,
     private val locks: NoteLocks,
     private val documents: DocumentRepository,
+    /** Finishes the voices of a sealed job and rebuilds `note_voice_links` from the voice files. */
+    private val voices: VoiceRepository,
     private val probe: AudioProbe = AudioProbe.Extractor,
-    private val adopter: SealedAdopter = SealedAdopter { documents.adoptSealed(it) },
     private val recoveredTitle: RecoveredTitle = RecoveredTitle.english(),
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val notes = database.notes()
     private val jobs = database.jobs()
-    private val links = database.voiceLinks()
+    private val adopter = SealedAdopter.of(documents, voices)
 
     /**
      * Rebuilds when the database at start was set aside ([setAside], from `CassiniDatabaseOpener`) or was missing,
@@ -98,8 +99,8 @@ class CatalogueRepository(
                 Work.NONE -> Unit
             }
         }
-        val (linkCount, deleted) = syncLinks()
-        return RebuildReport(created, adopted, paused, linkCount, deleted)
+        val links = voices.syncLinks()
+        return RebuildReport(created, adopted, paused, links.links, links.deleted)
     }
 
     private suspend fun noteDirectories(): List<File> = withContext(dispatchers.io) {
@@ -212,31 +213,6 @@ class CatalogueRepository(
         }
     }
 
-    /**
-     * Rewrites `note_voice_links` from `voices/notes/<noteId>.json`. A file whose note directory is gone is deleted; a file
-     * that cannot be read stays as it is (VoiceRepository reports newer and broken files). Returns the link count
-     * and the note ids whose file was deleted.
-     */
-    private suspend fun syncLinks(): Pair<Int, List<String>> {
-        val (found, deleted) = withContext(dispatchers.io) {
-            val found = mutableListOf<NoteVoiceLinkEntity>()
-            val deleted = mutableListOf<String>()
-            val files = File(paths.voices, VOICE_NOTES).listFiles().orEmpty()
-                .filter { it.isFile && it.name.endsWith(JSON) }.sortedBy { it.name }
-            for (file in files) {
-                val noteId = file.name.removeSuffix(JSON)
-                when {
-                    !NoteIds.isValid(noteId) -> Unit
-                    !paths.note(noteId).isDirectory -> if (file.delete()) deleted += noteId
-                    else -> VoiceLinks.decode(noteId, file.readText())?.let(found::addAll)
-                }
-            }
-            found to deleted
-        }
-        val skipped = links.replaceAll(found)
-        return found.count { it.noteId !in skipped } to deleted
-    }
-
     private fun sha256(file: File): String? = try {
         Sha256.of(file)
     } catch (_: IOException) {
@@ -248,7 +224,5 @@ class CatalogueRepository(
         const val APP_VENDOR = "cassini-android"
         const val CAPTURE_PREFIX = "capture."
         const val CHECKPOINT = "checkpoint.json"
-        const val VOICE_NOTES = "notes"
-        const val JSON = ".json"
     }
 }

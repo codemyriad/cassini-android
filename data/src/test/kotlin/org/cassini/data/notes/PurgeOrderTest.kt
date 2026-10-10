@@ -9,6 +9,7 @@ import org.cassini.data.checkpoint.CheckpointRepository
 import org.cassini.data.checkpoint.noteId
 import org.cassini.data.db.offMain
 import org.cassini.data.jobs.JobRepository
+import org.cassini.data.jobs.RunningJobCanceller
 import org.cassini.data.voices.VoiceRepository
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -53,8 +54,9 @@ class PurgeOrderTest {
         h = NotesHarness(folder)
         checkpoints = CheckpointRepository(h.db, h.paths, h.dispatchers, h.locks)
         voices = VoiceRepository(h.db, h.paths, h.dispatchers, checkpoints.names) { h.now }
-        val adopter = SealedAdopter { h.documents.adoptSealed(it) }
-        jobs = JobRepository(h.db, h.paths, h.dispatchers, h.locks, checkpoints, adopter) { h.now }
+        val adopter = SealedAdopter.of(h.documents, voices)
+        val canceller = RunningJobCanceller {}
+        jobs = JobRepository(h.db, h.paths, h.dispatchers, h.locks, checkpoints, adopter, canceller) { h.now }
         h.plainNote(purged)
         h.plainNote(live)
         jobs.enqueue(purged, JobKind.TRANSCRIBE)
@@ -103,7 +105,7 @@ class PurgeOrderTest {
     private fun pendingFile(id: String) = File(File(h.paths.voices, "pending"), "$id.json")
 
     private fun catalogue() =
-        CatalogueRepository(h.db, h.paths, h.dispatchers, h.locks, h.documents, FakeProbe()) { h.now }
+        CatalogueRepository(h.db, h.paths, h.dispatchers, h.locks, h.documents, voices, FakeProbe()) { h.now }
 
     private suspend fun trashLongAgo(repo: NoteRepository) {
         repo.moveToTrash(purged)

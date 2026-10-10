@@ -17,6 +17,7 @@ import org.cassini.data.db.JobEntity
 import org.cassini.data.notes.NoteRepository
 import org.cassini.data.notes.NotesHarness
 import org.cassini.data.notes.SealedAdopter
+import org.cassini.data.voices.VoiceRepository
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -47,7 +48,7 @@ class JobRepositoryTest {
             h.dispatchers,
             h.locks,
             checkpoints,
-            SealedAdopter { h.documents.adoptSealed(it) },
+            SealedAdopter.of(h.documents, VoiceRepository(h.db, h.paths, h.dispatchers, checkpoints.names)),
             RunningJobCanceller { cancelled += it },
         ) { h.now }
     }
@@ -192,7 +193,7 @@ class JobRepositoryTest {
         jobs.enqueue(a, JobKind.TRANSCRIBE)
         jobs.enqueue(b, JobKind.TRANSCRIBE)
 
-        // Restore of a note whose QUEUED job was kept: it goes to the back.
+        // A QUEUED row that still exists goes to the back.
         jobs.requeueAtBack(a, JobKind.TRANSCRIBE)
         assertEquals(3L, job(a).seq)
         // Restore of a note whose row is missing creates it.

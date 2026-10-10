@@ -5,6 +5,8 @@ import org.cassini.core.library.AudioKind
 import org.cassini.core.library.JobKind
 import org.cassini.core.library.JobState
 import org.cassini.core.library.PauseReason
+import org.cassini.core.models.ModelCatalog
+import org.cassini.core.speakers.SpeakerPrint
 import org.cassini.data.checkpoint.CheckpointLoad
 import org.cassini.data.checkpoint.CheckpointRepository
 import org.cassini.data.checkpoint.checkpoint
@@ -15,6 +17,7 @@ import org.cassini.data.notes.NotesHarness
 import org.cassini.data.notes.SealedAdopter
 import org.cassini.data.notes.documentBytes
 import org.cassini.data.notes.transcript
+import org.cassini.data.voices.VoiceRepository
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -34,6 +37,7 @@ class ReconcileOnStartTest {
     @get:Rule val folder = TemporaryFolder()
     private lateinit var h: NotesHarness
     private lateinit var checkpoints: CheckpointRepository
+    private lateinit var voices: VoiceRepository
     private lateinit var jobs: JobRepository
 
     private val sealed = noteId(1)
@@ -54,13 +58,15 @@ class ReconcileOnStartTest {
     @Before fun setUp() {
         h = NotesHarness(folder)
         checkpoints = CheckpointRepository(h.db, h.paths, h.dispatchers, h.locks)
+        voices = VoiceRepository(h.db, h.paths, h.dispatchers, checkpoints.names) { h.now }
         jobs = JobRepository(
             h.db,
             h.paths,
             h.dispatchers,
             h.locks,
             checkpoints,
-            SealedAdopter { h.documents.adoptSealed(it) },
+            SealedAdopter.of(h.documents, voices),
+            RunningJobCanceller {},
         ) { h.now }
     }
 
@@ -236,6 +242,27 @@ class ReconcileOnStartTest {
         assertEquals(listOf(sealed), jobs.reconcileOnStart(null).adopted)
         assertEquals(AudioKind.DOCUMENT, h.row(sealed).audioKind)
         assertFalse(h.paths.work(sealed).exists())
+    }
+
+    @Test fun aCrashAfterTheRowUpdateOfAnAdoptIsFinishedWithoutAnotherRun() = runTest {
+        row(sealed, JobState.RUNNING)
+        save(sealed)
+        seal(sealed, documentBytes(transcript("la seduta è aperta"), "Verbale"))
+        val print = SpeakerPrint(FloatArray(ModelCatalog.VOICEPRINT_DIM) { 0.5f }, 10.0, null)
+        assertTrue(offMain { voices.savePendingBlocking(sealed, mapOf("words/S1" to print), 0) })
+        // The process died after adoptSealed: the document and the rows are in place, the job row is gone,
+        // and work/ with its marker and the pending prints are still there.
+        h.documents.adoptSealed(sealed)
+        assertNull(jobs.job(sealed))
+
+        val report = jobs.reconcileOnStart(null)
+
+        assertEquals(listOf(sealed), report.adopted)
+        assertEquals(emptyList<String>(), report.requeued)
+        assertNull(jobs.job(sealed))
+        assertFalse(h.paths.work(sealed).exists())
+        assertFalse(File(h.paths.voices, "pending/$sealed.json").exists())
+        assertTrue(File(h.paths.voices, "notes/$sealed.json").isFile)
     }
 
     @Test fun anAdoptedNoteForgetsItsDraftNames() = runTest {
