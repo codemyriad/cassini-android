@@ -1,5 +1,6 @@
 package org.cassini.android.recording
 
+import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
@@ -9,8 +10,11 @@ import android.util.Log
 import androidx.core.app.ServiceCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.cassini.android.AppGraph
 import org.cassini.android.CassiniApplication
@@ -64,19 +68,26 @@ class RecordingService : LifecycleService() {
         super.onDestroy()
     }
 
-    /** Updates the notification until the recording ends, then tells the user (when hidden) and stops. */
+    /**
+     * Updates the notification until the recording ends, then tells the user (when hidden) and stops. The
+     * notification is built off the main thread (below API 33 each build reads the app locale from a file) and
+     * posted on it, so it is never posted after the service left the foreground.
+     */
     private suspend fun watch() {
         var shown: RecordingNotifications.Content? = null
-        val ended = controller.state.first { state ->
-            if (state.inProgress) {
-                val content = notifications.content(state)
-                if (content != shown) {
-                    shown = content
-                    post(state)
-                }
+        val ended = controller.state
+            .map { state ->
+                val content = if (state.inProgress) notifications.content(state) else null
+                val changed = content != null && content != shown
+                if (changed) shown = content
+                state to if (changed) notifications.ongoing(state, controller.elapsedNowMs) else null
             }
-            !state.inProgress
-        }
+            .flowOn(Dispatchers.Default)
+            .first { (state, notification) ->
+                if (notification != null) post(notification)
+                !state.inProgress
+            }
+            .first
         val outcome = (ended as? RecordingState.Ended)?.outcome
         val noteId = (ended as? RecordingState.Ended)?.noteId
         if (noteId != null && !graph.visibility.visible.value) {
@@ -102,10 +113,9 @@ class RecordingService : LifecycleService() {
         return foreground
     }
 
-    private fun post(state: RecordingState) {
+    private fun post(notification: Notification) {
         if (!foreground) return
-        getSystemService(NotificationManager::class.java)
-            ?.notify(RecordingNotifications.RECORDING_ID, notifications.ongoing(state, controller.elapsedNowMs))
+        getSystemService(NotificationManager::class.java)?.notify(RecordingNotifications.RECORDING_ID, notification)
     }
 
     /** `startForeground` with the microphone type, inside the catch of architecture 5.7; false when refused. */

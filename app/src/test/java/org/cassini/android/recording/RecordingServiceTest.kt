@@ -94,8 +94,8 @@ class RecordingServiceTest {
         assertEquals(RecordingNotifications.RECORDING_ID, shadowOf(started).lastForegroundNotificationId)
         until { controller.state.value is RecordingState.Active }
         val noteId = (controller.state.value as RecordingState.Active).noteId
-        until { ongoing()?.title() == "Recording" }
-        assertEquals(listOf("Pause", "Finish"), ongoing()?.actionTitles())
+        // The first notification comes from startForeground; the one with the actions is built off the main thread.
+        until { ongoing()?.title() == "Recording" && ongoing()?.actionTitles() == listOf("Pause", "Finish") }
 
         started.onStartCommand(RecordingService.intent(app, RecordingService.ACTION_PAUSE), 0, 2)
         until { ongoing()?.title() == "Recording paused" }

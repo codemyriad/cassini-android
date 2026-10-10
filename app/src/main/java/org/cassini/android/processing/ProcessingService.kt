@@ -13,13 +13,16 @@ import android.util.Log
 import androidx.core.app.ServiceCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.cassini.android.CassiniApplication
 import org.cassini.engine.job.JobPhase
 
@@ -139,18 +142,23 @@ class ProcessingService : LifecycleService() {
         stopSelf(lastStartId)
     }
 
-    /** The ongoing notification, at most once a second (architecture 5.10). */
+    /**
+     * The ongoing notification, at most once a second (architecture 5.10). The text is built off the main thread:
+     * below API 33 each build reads the app locale from a file.
+     */
     private suspend fun followNotification() {
         var posted = 0L
-        coordinator.state.map(notifications::content).distinctUntilChanged().conflate().collect {
-            val wait = posted + MIN_UPDATE_MS - SystemClock.elapsedRealtime()
-            if (wait > 0) delay(wait)
-            posted = SystemClock.elapsedRealtime()
-            if (foregroundType != null) {
-                getSystemService(NotificationManager::class.java)
-                    ?.notify(ProcessingNotifications.PROCESSING_ID, notifications.ongoing(coordinator.state.value))
+        coordinator.state.map(notifications::content).distinctUntilChanged().flowOn(Dispatchers.Default).conflate()
+            .collect {
+                val wait = posted + MIN_UPDATE_MS - SystemClock.elapsedRealtime()
+                if (wait > 0) delay(wait)
+                posted = SystemClock.elapsedRealtime()
+                val notification = withContext(Dispatchers.Default) { notifications.ongoing(coordinator.state.value) }
+                if (foregroundType != null) {
+                    getSystemService(NotificationManager::class.java)
+                        ?.notify(ProcessingNotifications.PROCESSING_ID, notification)
+                }
             }
-        }
     }
 
     /** A new service type when the work changes: dataSync while downloading, mediaProcessing from inference on. */
