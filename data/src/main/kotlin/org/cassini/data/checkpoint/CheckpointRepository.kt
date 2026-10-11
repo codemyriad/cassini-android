@@ -28,8 +28,9 @@ import java.io.IOException
  * refuse the main thread and take the lock directly. The suspend ones take the same lock inside the IO dispatcher and
  * never suspend while they hold it.
  *
- * The checkpoint commits the lengths of the two append-only files, so [saveBlocking] fsyncs them before it writes
- * `checkpoint.json`: after a crash the files are at least as long as the checkpoint says.
+ * The checkpoint commits the lengths of the append-only files, so [saveBlocking] fsyncs them before it writes
+ * `checkpoint.json`: after a crash the files are at least as long as the checkpoint says. The third append-only file,
+ * `words.log`, holds the settled words of checkpoint version 2 ([WordLogFile]); the checkpoint holds only the rest.
  */
 // Manual DI: the repositories take their collaborators explicitly; one API per area of the work directory.
 @Suppress("TooManyFunctions")
@@ -42,6 +43,7 @@ class CheckpointRepository(
     private val syncFile: (File) -> Unit = NoteFiles::syncFile,
 ) {
     private val notes = database.notes()
+    private val wordLog = WordLogFile()
 
     /** The owner of every draft's names (architecture 3.6). */
     val names = NamesStore(paths, dispatchers, locks, database.jobs())
@@ -82,7 +84,8 @@ class CheckpointRepository(
 
     /**
      * Commits [state] as the checkpoint of [noteId]: fsyncs `audio.opus.part` and `clips.pcm` (whose lengths the
-     * state commits), then writes `checkpoint.json` atomically.
+     * state commits), appends the newly settled words to `words.log` and fsyncs it, then writes `checkpoint.json`
+     * atomically with the words that are not in the log.
      */
     @WorkerThread
     fun saveBlocking(noteId: String, state: CheckpointState) {
@@ -92,7 +95,8 @@ class CheckpointRepository(
             val work = work(noteId).apply { mkdirs() }
             listOf(WorkFiles.AUDIO_PART, WorkFiles.CLIPS).map { File(work, it) }.filter { it.isFile }
                 .forEach(syncFile)
-            WorkFiles.write(File(work, WorkFiles.CHECKPOINT), CheckpointState.encode(state))
+            val log = wordLog.save(noteId, work, state)
+            WorkFiles.write(File(work, WorkFiles.CHECKPOINT), CheckpointState.encode(state, log))
         }
     }
 
@@ -108,6 +112,7 @@ class CheckpointRepository(
         require(NoteIds.isValid(noteId)) { "Not a note id: $noteId" }
         locks.withNoteLock(noteId, dispatchers.io) {
             names.releaseLocked(noteId)
+            wordLog.forget(noteId)
             val work = work(noteId)
             if (File(work, WorkFiles.SEALED_MARKER).delete()) NoteFiles.syncDirectory(work)
             work.deleteRecursively()
@@ -138,8 +143,11 @@ class CheckpointRepository(
         return !marker.exists() && (!sealed.exists() || sealed.delete())
     }
 
-    /** Forgets the in-memory draft names of [noteId] after adopt deleted `work/`. */
-    suspend fun release(noteId: String) = names.release(noteId)
+    /** Forgets the in-memory draft names and word log state of [noteId] after adopt deleted `work/`. */
+    suspend fun release(noteId: String) {
+        wordLog.forget(noteId)
+        names.release(noteId)
+    }
 
     /** Whether `work/sealed` marks a finished `sealed.opus` that waits for adopt. */
     suspend fun sealedMarker(noteId: String): Boolean =
@@ -189,10 +197,12 @@ class CheckpointRepository(
     }
 
     private fun decodeLocked(noteId: String): CheckpointState? {
-        val file = File(work(noteId), WorkFiles.CHECKPOINT)
+        val work = work(noteId)
+        val file = File(work, WorkFiles.CHECKPOINT)
         if (!WorkFiles.exists(file)) return null
         return try {
-            CheckpointState.decode(JSONObject(WorkFiles.read(file)))
+            val json = JSONObject(WorkFiles.read(file))
+            CheckpointState.decode(json, WordLogFile.read(work, json))
         } catch (_: IOException) {
             null
         } catch (_: JSONException) {
@@ -205,7 +215,7 @@ class CheckpointRepository(
     private fun loadLocked(noteId: String, identity: CheckpointIdentity): CheckpointLoad {
         val work = work(noteId)
         val file = File(work, WorkFiles.CHECKPOINT)
-        return if (WorkFiles.exists(file)) validate(file, expected(work, identity)) else CheckpointLoad.Missing
+        return if (WorkFiles.exists(file)) validate(work, file, expected(work, identity)) else CheckpointLoad.Missing
     }
 
     private fun expected(work: File, identity: CheckpointIdentity) = CheckpointState.Expected(
@@ -215,14 +225,18 @@ class CheckpointRepository(
         identity.speakersSha256,
         File(work, WorkFiles.CLIPS).length(),
         File(work, WorkFiles.AUDIO_PART).length(),
+        WordLogFile.length(work),
     )
 
-    /** Reads [file] and checks it with `CheckpointState.validate`; every failure is a [CheckpointLoad.Mismatch]. */
-    private fun validate(file: File, expected: CheckpointState.Expected): CheckpointLoad = try {
+    /**
+     * Reads [file] and its word log and checks them with `CheckpointState.validate`; every failure is a
+     * [CheckpointLoad.Mismatch].
+     */
+    private fun validate(work: File, file: File, expected: CheckpointState.Expected): CheckpointLoad = try {
         val json = JSONObject(WorkFiles.read(file))
         try {
             CheckpointState.validate(json, expected)
-            CheckpointLoad.Valid(CheckpointState.decode(json))
+            CheckpointLoad.Valid(CheckpointState.decode(json, WordLogFile.read(work, json)))
         } catch (error: IllegalArgumentException) {
             CheckpointLoad.Mismatch(reason(json, expected), error.message)
         }
@@ -241,7 +255,7 @@ class CheckpointRepository(
         val clipSamples = json.optLong("clipSamples", -1)
         val encoderLength = json.optJSONObject("encoder")?.optLong("length", -1)
         return when {
-            json.optInt("version", -1) != CheckpointState.VERSION -> MismatchReason.VERSION
+            json.optInt("version", -1) !in CheckpointState.VERSION_1..CheckpointState.VERSION -> MismatchReason.VERSION
             json.optString("source") != expected.source -> MismatchReason.SOURCE
             json.optString("signature") != expected.signature -> MismatchReason.SIGNATURE
             json.optString("model") != expected.modelRevision -> MismatchReason.MODEL
@@ -251,6 +265,7 @@ class CheckpointRepository(
             json.optLong("positionSamples", -1) !in 0L..Limits.MAX_SAMPLES.toLong() ||
                 json.optLong("doneMs", -1) !in 0..Limits.MAX_RECORDING_MS -> MismatchReason.RANGE
             encoderLength != null && (encoderLength < 0 || expected.audioBytes < encoderLength) -> MismatchReason.AUDIO
+            json.has("wordLog") -> MismatchReason.WORDS
             else -> MismatchReason.UNREADABLE
         }
     }

@@ -16,6 +16,7 @@ import org.cassini.data.CassiniDispatchers
 import org.cassini.data.NoteIds
 import org.cassini.data.NoteLocks
 import org.cassini.data.Sha256
+import org.cassini.data.checkpoint.WordLogFile
 import org.cassini.data.db.CassiniDatabase
 import org.cassini.data.db.JobEntity
 import org.cassini.data.db.NoteEntity
@@ -219,7 +220,8 @@ class CatalogueRepository(
         val file = File(work, CHECKPOINT)
         if (!file.isFile && !File(work, "$CHECKPOINT.bak").isFile) return null
         return try {
-            CheckpointState.decode(JSONObject(String(AtomicFile(file).readFully(), Charsets.UTF_8)))
+            val json = JSONObject(String(AtomicFile(file).readFully(), Charsets.UTF_8))
+            CheckpointState.decode(json, WordLogFile.read(work, json))
         } catch (error: IOException) {
             Log.w(TAG, "Cannot read $file", error)
             null

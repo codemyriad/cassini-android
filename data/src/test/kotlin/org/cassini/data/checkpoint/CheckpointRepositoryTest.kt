@@ -3,6 +3,7 @@ package org.cassini.data.checkpoint
 import android.util.AtomicFile
 import kotlinx.coroutines.test.runTest
 import org.cassini.core.checkpoint.CheckpointState
+import org.cassini.core.format.Word
 import org.cassini.core.speakers.Match
 import org.cassini.data.db.offMain
 import org.cassini.data.notes.NotesHarness
@@ -136,7 +137,7 @@ class CheckpointRepositoryTest {
         repo.audioPart(id).writeBytes(ByteArray(500))
         assertTrue(load() is CheckpointLoad.Valid)
 
-        edit { it.put("version", 2) }
+        edit { it.put("version", 3) }
         assertEquals(MismatchReason.VERSION, reason(load()))
         save(h.checkpoint(id, clipSamples = 1_000, encoderLength = 500))
 
@@ -154,6 +155,103 @@ class CheckpointRepositoryTest {
         val json = JSONObject(checkpointFile.readText())
         change(json)
         checkpointFile.writeText(json.toString())
+    }
+
+    private val wordLogFile get() = File(h.paths.work(id), "words.log")
+
+    /** One word each 400 ms for [seconds], with two speakers. */
+    private fun words(seconds: Int) = (0 until seconds * 5 / 2).map { i ->
+        Word(if (i / 10 % 2 == 0) "S1" else "S2", i * 400L, i * 400L + 300, "w$i")
+    }
+
+    /** The checkpoint after the window that ends at [doneSeconds]: the next window starts 2 s before it. */
+    private fun window(doneSeconds: Int, all: List<Word>) = h.checkpoint(
+        id,
+        words = all.filter { it.endMs <= doneSeconds * 1000L },
+        doneMs = doneSeconds * 1000L,
+        windowStartMs = (doneSeconds - 2) * 1000L,
+    )
+
+    /** The words of the checkpoint that loads now. */
+    private fun loadedWords() = (load() as CheckpointLoad.Valid).state.recognition.chunks.words
+
+    @Test fun eachWindowAppendsOnlyItsSettledWordsAndTheLoadGivesBackEveryWord() {
+        val all = words(30 * 60)
+        var previousLog = 0L
+        val sizes = mutableListOf<Long>()
+        var last = 0
+        for (done in 28..1800 step 26) {
+            last = done
+            save(window(done, all))
+            val log = wordLogFile.length()
+            assertTrue("the log only grows", log >= previousLog)
+            // A window adds at most 26 s of words (65 words of about 30 bytes).
+            assertTrue("appended ${log - previousLog}", log - previousLog < 4096)
+            previousLog = log
+            sizes += checkpointFile.length()
+        }
+        assertTrue("checkpoint sizes $sizes", sizes.max() - sizes.min() < 2048)
+        val json = JSONObject(checkpointFile.readText())
+        assertEquals(2, json.getInt("version"))
+        val ref = CheckpointState.wordLog(json)
+        assertTrue(ref.count > 0)
+        assertEquals(wordLogFile.length(), ref.bytes)
+        val loaded = load() as CheckpointLoad.Valid
+        assertEquals(all.filter { it.endMs <= last * 1000L }, loaded.state.recognition.chunks.words)
+        assertEquals(loaded.state.recognition.chunks.words.size, CheckpointState.wordCount(json))
+    }
+
+    @Test fun aNewProcessWritesTheLogAgainWithTheSamePrefix() {
+        val all = words(10 * 60)
+        save(window(184, all))
+        val before = wordLogFile.readBytes()
+        // Process death: a new repository continues the run from the loaded state.
+        repo = CheckpointRepository(h.db, h.paths, h.dispatchers, h.locks)
+        val restored = (load() as CheckpointLoad.Valid).state
+        assertEquals(all.filter { it.endMs <= 184_000 }, restored.recognition.chunks.words)
+        save(window(210, all))
+        val after = wordLogFile.readBytes()
+        assertTrue(after.size > before.size)
+        assertTrue("the old prefix stays", after.copyOf(before.size).contentEquals(before))
+        assertFalse(File(h.paths.work(id), "words.log.tmp").exists())
+        assertEquals(all.filter { it.endMs <= 210_000 }, loadedWords())
+    }
+
+    @Test fun bytesPastTheCommittedPrefixAreIgnoredThenWrittenOver() {
+        val all = words(10 * 60)
+        save(window(184, all))
+        val committed = wordLogFile.length()
+        // A crash after an append and before checkpoint.json: the log holds more than the checkpoint names.
+        wordLogFile.appendText("[\"S1\",1,2,\"half")
+        assertEquals(all.filter { it.endMs <= 184_000 }, loadedWords())
+        save(window(210, all))
+        assertEquals(CheckpointState.wordLog(JSONObject(checkpointFile.readText())).bytes, wordLogFile.length())
+        assertTrue(wordLogFile.length() > committed)
+        assertEquals(all.filter { it.endMs <= 210_000 }, loadedWords())
+    }
+
+    @Test fun aShortOrDamagedLogIsAMismatch() {
+        val all = words(10 * 60)
+        save(window(184, all))
+        val bytes = wordLogFile.readBytes()
+        RandomAccessFile(wordLogFile, "rw").use { it.setLength(bytes.size - 1L) }
+        assertEquals(MismatchReason.WORDS, reason(load()))
+        wordLogFile.writeBytes(bytes.copyOf().also { it[0] = '!'.code.toByte() })
+        assertEquals(MismatchReason.WORDS, reason(load()))
+        wordLogFile.delete()
+        assertEquals(MismatchReason.WORDS, reason(load()))
+    }
+
+    @Test fun aVersionOneCheckpointWithEveryWordInlineStillLoads() {
+        val state = window(184, words(10 * 60))
+        checkpointFile.parentFile!!.mkdirs()
+        checkpointFile.writeText(CheckpointState.encode(state).put("version", 1).apply { remove("wordLog") }.toString())
+        assertEquals(state.recognition.chunks.words, loadedWords())
+        // The next save writes version 2 with a log.
+        save(state)
+        assertEquals(2, JSONObject(checkpointFile.readText()).getInt("version"))
+        assertTrue(wordLogFile.length() > 0)
+        assertEquals(state.recognition.chunks.words, loadedWords())
     }
 
     @Test fun statusShowsEachState() = runTest {

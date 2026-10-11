@@ -63,10 +63,15 @@ class CheckpointGoldenTest {
         assertTrue("Stopped after the first window", stoppedAfterTheFirstWindow)
     }
 
+    /** The codec writes version 2: every member and value of 0.1.0, then an empty word log. */
     @Test fun reEncodingTheDecodedStateKeepsEveryMemberAndValue() {
-        val encoded = CheckpointState.encode(state)
-        assertEquals(golden.keys().asSequence().toSet(), encoded.keys().asSequence().toSet())
-        assertEquals(plain(golden), plain(JSONObject(encoded.toString())))
+        val encoded = JSONObject(CheckpointState.encode(state).toString())
+        assertEquals(golden.keys().asSequence().toSet() + "wordLog", encoded.keys().asSequence().toSet())
+        assertEquals(2, encoded.getInt("version"))
+        assertEquals(WordLogRef.EMPTY, CheckpointState.wordLog(encoded))
+        val upgraded = JSONObject(golden.toString()).put("version", 2).put("wordLog", WordLogRef.EMPTY.json())
+        assertEquals(plain(JSONObject(upgraded.toString())), plain(encoded))
+        assertEquals(state.recognition.chunks.words, CheckpointState.decode(encoded).recognition.chunks.words)
     }
 
     @Test fun theGoldenValidatesAgainstItsOwnIdentity() {

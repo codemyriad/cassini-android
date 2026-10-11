@@ -20,7 +20,7 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 import java.io.RandomAccessFile
 
-/** checkpoint.json version 1 and names.json through the typed codec, and the rules a checkpoint must pass to resume. */
+/** checkpoint.json version 2 and names.json through the typed codec, and the rules a checkpoint must pass to resume. */
 class CheckpointStateTest {
     @get:Rule val folder = TemporaryFolder()
 
@@ -66,23 +66,27 @@ class CheckpointStateTest {
             elapsedMs = 18_754,
         )
 
-        fun expected(signature: String = CheckpointState.signature(source)) = CheckpointState.Expected(
-            uri,
-            signature,
-            ModelCatalog.PARAKEET_REVISION,
-            ModelCatalog.diarizationModel.sha256,
-            clips.length(),
-            audio.length(),
-        )
+        fun expected(signature: String = CheckpointState.signature(source), wordLogBytes: Long = 0) =
+            CheckpointState.Expected(
+                uri,
+                signature,
+                ModelCatalog.PARAKEET_REVISION,
+                ModelCatalog.diarizationModel.sha256,
+                clips.length(),
+                audio.length(),
+                wordLogBytes,
+            )
     }
 
     /** The JSON as stored and read back: through text, as the file holds it. */
     private fun stored(state: CheckpointState) = JSONObject(CheckpointState.encode(state).toString())
 
-    @Test fun encodingWritesExactlyTheVersionOneMembers() {
+    @Test fun encodingWritesExactlyTheVersionTwoMembers() {
         val json = stored(Job().state)
-        assertEquals(CheckpointState.KEYS, json.keys().asSequence().toSet())
-        assertEquals(1, json.getInt("version"))
+        assertEquals(CheckpointState.KEYS_V2, json.keys().asSequence().toSet())
+        assertEquals(CheckpointState.KEYS + "wordLog", CheckpointState.KEYS_V2)
+        assertEquals(2, json.getInt("version"))
+        assertEquals(WordLogRef.EMPTY, CheckpointState.wordLog(json))
         assertEquals(setOf("inferenceMs", "chunks"), json.getJSONObject("recognition").keys().asSequence().toSet())
         val chunks = json.getJSONObject("recognition").getJSONObject("chunks")
         assertEquals(setOf("start", "end", "window", "words"), chunks.keys().asSequence().toSet())
@@ -128,7 +132,7 @@ class CheckpointStateTest {
         val state = Job().state.copy(encoder = null, diarizer = null, voiceClips = null, speakerFailure = true)
         val json = stored(state)
         val absent = setOf("encoder", "diarizer", "voiceClips")
-        assertEquals(CheckpointState.KEYS - absent, json.keys().asSequence().toSet())
+        assertEquals(CheckpointState.KEYS_V2 - absent, json.keys().asSequence().toSet())
         val back = CheckpointState.decode(json)
         assertEquals(null, back.encoder)
         assertEquals(null, back.diarizer)
@@ -171,7 +175,15 @@ class CheckpointStateTest {
             assertThrows(IllegalArgumentException::class.java) { CheckpointState.validate(json, expected) }
             assertThrows(IllegalArgumentException::class.java) { CheckpointState.validate(state, expected) }
         }
-        rejects { it.put("version", 2) }
+        rejects { it.put("version", 3) }
+        rejects { it.put("version", 0) }
+        fun rejectsLog(json: JSONObject, expected: CheckpointState.Expected) =
+            assertThrows(IllegalArgumentException::class.java) { CheckpointState.validate(json, expected) }
+        // Version 1 has no word log.
+        val log = WordLogRef(1, 10).json()
+        rejectsLog(stored(job.state).put("version", 1).put("wordLog", log), job.expected(wordLogBytes = 10))
+        // The log is shorter than the prefix the checkpoint names.
+        rejectsLog(stored(job.state).put("wordLog", log), job.expected(wordLogBytes = 9))
         rejects { it.put("source", "file:///elsewhere.m4a") }
         rejects(job.expected(signature = "1:2"))
         rejects { it.put("model", "another revision") }
@@ -183,6 +195,10 @@ class CheckpointStateTest {
         rejects { it.put("positionSamples", Limits.MAX_SAMPLES + 1L) }
         rejects { it.put("doneMs", Limits.MAX_RECORDING_MS + 1) }
         rejects { it.getJSONObject("encoder").put("length", job.audio.length() + 1) }
+        // Version 1, as 0.1.0 wrote it, still resumes.
+        CheckpointState.validate(stored(job.state).put("version", 1).apply { remove("wordLog") }, job.expected())
+        // A log at least as long as the prefix passes.
+        CheckpointState.validate(stored(job.state).put("wordLog", log), job.expected(wordLogBytes = 10))
         // A job that keeps the source's own Opus audio has no encoder and does not check the audio part.
         CheckpointState.validate(stored(job.state).apply { remove("encoder") }, job.expected())
     }
@@ -203,6 +219,19 @@ class CheckpointStateTest {
     @Test fun theDirectoryKeyIsTheSha256OfTheStoredSourceString() {
         assertEquals("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", CheckpointState.key(""))
         assertEquals(64, CheckpointState.key("file:///data/user/0/org.cassini.android/files/documents/a.m4a").length)
+    }
+
+    @Test fun loggedWordsLeaveTheCheckpointAndComeBackFirst() {
+        val state = Job().state
+        val json = JSONObject(CheckpointState.encode(state, WordLogRef(1, 40)).toString())
+        val inline = json.getJSONObject("recognition").getJSONObject("chunks").getJSONObject("words")
+        assertEquals(1, inline.getJSONArray("items").length())
+        assertEquals(WordLogRef(1, 40), CheckpointState.wordLog(json))
+        assertEquals(2, CheckpointState.wordCount(json))
+        assertEquals(words, CheckpointState.decode(json, words.subList(0, 1)).recognition.chunks.words)
+        // The log must hold exactly the prefix the checkpoint names.
+        assertThrows(IllegalArgumentException::class.java) { CheckpointState.decode(json) }
+        assertThrows(IllegalArgumentException::class.java) { CheckpointState.encode(state, WordLogRef(3, 99)) }
     }
 
     @Test fun namesRoundTripWithExactlyTheirMembers() {

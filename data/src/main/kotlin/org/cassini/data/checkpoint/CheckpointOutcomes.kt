@@ -55,6 +55,9 @@ enum class MismatchReason {
 
     /** A position or done time out of range. */
     RANGE,
+
+    /** `words.log` is shorter than the saved prefix, or its prefix does not hold the saved words. */
+    WORDS,
 }
 
 /** The result of loading a checkpoint. */

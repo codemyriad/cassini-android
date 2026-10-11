@@ -20,7 +20,8 @@ fun draftWords(vararg speakers: String): List<Word> =
 /**
  * A checkpoint of [noteId]'s audio file [source] that validates against the file as it is now, with [clipSamples]
  * saved clip samples and, when [encoderLength] is given, an encoder that committed that many bytes of
- * `audio.opus.part`.
+ * `audio.opus.part`. [windowStartMs] is the start of the window that fills; words that end 10 s before it go to the
+ * word log.
  */
 @Suppress("LongParameterList") // Test fixture: one parameter per member a test varies.
 fun NotesHarness.checkpoint(
@@ -31,12 +32,16 @@ fun NotesHarness.checkpoint(
     clipSamples: Int = 0,
     encoderLength: Long? = null,
     model: String = ModelCatalog.PARAKEET_REVISION,
+    windowStartMs: Long = 0,
 ): CheckpointState = CheckpointState(
     source = source,
     signature = CheckpointState.signature(File(dir(noteId), source)),
     model = model,
     speakers = ModelCatalog.diarizationModel.sha256,
-    recognition = RecognitionState(1_200, IncrementalState(0, doneMs * 16, FloatArray(4) { it / 4f }, words)),
+    recognition = RecognitionState(
+        1_200,
+        IncrementalState(windowStartMs * 16, doneMs * 16, FloatArray(4) { it / 4f }, words),
+    ),
     encoder = encoderLength?.let {
         EncoderState(null, FloatArray(CheckpointState.FRAME_FLOATS), 640, 0, it, 7, 3, 960, null)
     },

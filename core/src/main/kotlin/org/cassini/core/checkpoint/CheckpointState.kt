@@ -5,6 +5,7 @@ import org.cassini.core.asr.IncrementalTranscript
 import org.cassini.core.audio.Limits
 import org.cassini.core.format.OggOpus
 import org.cassini.core.format.Transcript
+import org.cassini.core.format.Word
 import org.cassini.core.speakers.PrintWindow
 import org.cassini.core.speakers.SpeakerBudget
 import org.cassini.core.speakers.SpeakerTurn
@@ -34,9 +35,12 @@ class EncoderState(
 class DiarizerState(val cache: FloatArray, val elapsedMs: Long, val turns: List<SpeakerTurn>)
 
 /**
- * `processing-checkpoints/<key>/checkpoint.json`, version 1, as 0.1.0 writes it. [encode] writes exactly the members
- * 0.1.0 writes, in its order (Android's org.json keeps insertion order; the JVM jar does not, so JVM tests compare
- * members, not bytes).
+ * `work/checkpoint.json`. Version 1 is the file of 0.1.0: it holds every word in `recognition.chunks.words`, so it
+ * grows with the recording, and a job rewrites it after each window. Version 2 adds one member, `wordLog`
+ * ([WordLogRef]): the words of the settled windows are in `work/words.log` ([WordLog]), and `chunks.words` holds only
+ * the words after them. [encode] writes version 2: the members of 0.1.0 in its order, then `wordLog` (Android's
+ * org.json keeps insertion order; the JVM jar does not, so JVM tests compare members, not bytes). [decode] reads both
+ * versions. The in-memory state always holds every word.
  */
 data class CheckpointState(
     val source: String,
@@ -57,6 +61,7 @@ data class CheckpointState(
     val version: Int = VERSION,
 ) {
     /** What a checkpoint must match to be resumed: the same source file, models and on-disk lengths. */
+    @Suppress("LongParameterList") // One value for each file and identity member that a checkpoint names.
     class Expected(
         val source: String,
         val signature: String,
@@ -66,22 +71,43 @@ data class CheckpointState(
         val clipsBytes: Long,
         /** Bytes in `audio.opus.part`. */
         val audioBytes: Long,
+        /** Bytes in `words.log`. */
+        val wordLogBytes: Long = 0,
     )
 
     /** One decode and one encode function per member type. */
     @Suppress("TooManyFunctions")
     companion object {
-        const val VERSION = 1
+        /** The version [encode] writes. */
+        const val VERSION = 2
+
+        /** The version of 0.1.0, which [decode] still reads: every word inline, no `wordLog`. */
+        const val VERSION_1 = 1
         const val HISTORY_FLOATS = 640
         const val FRAME_FLOATS = 320
         private const val FLOAT_BYTES = 4L
         const val MAX_CLIP_SAMPLES = SpeakerBudget.MAX_SPEAKERS * SpeakerBudget.SECONDS_PER_SPEAKER * Limits.ASR_RATE
 
-        /** Every member 0.1.0 writes, and the only ones [encode] writes. */
+        /** Every member 0.1.0 writes (version 1). */
         val KEYS = setOf(
             "version", "source", "signature", "model", "speakers", "recognition", "encoder", "diarizer", "speakerPrefix",
             "speakerFailure", "clipSamples", "voiceClips", "positionSamples", "doneMs", "durationMs", "elapsedMs",
         )
+
+        /** The members [encode] writes (version 2): those of 0.1.0 and `wordLog`. */
+        val KEYS_V2 = KEYS + WORD_LOG
+
+        private const val WORD_LOG = "wordLog"
+
+        /** The `wordLog` member of [json]; [WordLogRef.EMPTY] for version 1, which has none. */
+        fun wordLog(json: JSONObject): WordLogRef =
+            json.optJSONObject(WORD_LOG)?.let(WordLogRef::of) ?: WordLogRef.EMPTY
+
+        /** The number of words of the checkpoint [json]: those in the log and those inline. */
+        fun wordCount(json: JSONObject): Int = wordLog(json).count +
+            json.getJSONObject("recognition").getJSONObject("chunks").getJSONObject("words").optJSONArray("items").let {
+                it?.length() ?: 0
+            }
 
         /** The checkpoint directory name: the SHA-256 of the stored source uri string, never re-derived from a file. */
         fun key(source: String): String = OggOpus.hex(MessageDigest.getInstance("SHA-256").digest(source.toByteArray()))
@@ -93,14 +119,19 @@ data class CheckpointState(
          * The rules that the 0.1.0 checkpoint loader applies before a checkpoint is resumed. Throws
          * [IllegalArgumentException] (or org.json's exception for a missing member) when one fails.
          */
-        fun validate(json: JSONObject, expected: Expected) = validate(
-            json.getInt("version"), json.getString("source"), json.getString("signature"), json.getString("model"),
-            json.getString(
-                "speakers"
-            ),
-            json.getInt("clipSamples"), json.getLong("positionSamples"), json.getLong("doneMs"),
-            json.optJSONObject("encoder")?.getLong("length"), expected,
-        )
+        fun validate(json: JSONObject, expected: Expected) {
+            validate(
+                json.getInt("version"), json.getString("source"), json.getString("signature"), json.getString("model"),
+                json.getString(
+                    "speakers"
+                ),
+                json.getInt("clipSamples"), json.getLong("positionSamples"), json.getLong("doneMs"),
+                json.optJSONObject("encoder")?.getLong("length"), expected,
+            )
+            val log = wordLog(json)
+            require(json.getInt("version") == VERSION || !json.has(WORD_LOG))
+            require(log.bytes <= expected.wordLogBytes)
+        }
 
         fun validate(state: CheckpointState, expected: Expected) = validate(
             state.version, state.source, state.signature, state.model, state.speakers, state.clipSamples, state.positionSamples,
@@ -120,19 +151,30 @@ data class CheckpointState(
             encoderLength: Long?,
             expected: Expected,
         ) {
-            require(version == VERSION && source == expected.source && signature == expected.signature)
+            require(version in VERSION_1..VERSION && source == expected.source && signature == expected.signature)
             require(model == expected.modelRevision && speakers == expected.speakersSha256)
             require(clipSamples in 0..MAX_CLIP_SAMPLES && expected.clipsBytes >= clipSamples * FLOAT_BYTES)
             require(positionSamples in 0..Limits.MAX_SAMPLES && doneMs in 0..Limits.MAX_RECORDING_MS)
             encoderLength?.let { require(expected.audioBytes >= it) }
         }
 
-        fun decode(json: JSONObject) = CheckpointState(
+        /**
+         * The state of [json]. For version 2, [logged] are the words of its `wordLog` prefix, which the caller read
+         * from `words.log`; they come before the inline words.
+         */
+        fun decode(json: JSONObject, logged: List<Word> = emptyList()) = CheckpointState(
             source = json.getString("source"),
             signature = json.getString("signature"),
             model = json.getString("model"),
             speakers = json.getString("speakers"),
-            recognition = recognition(json.getJSONObject("recognition")),
+            recognition = recognition(json.getJSONObject("recognition")).let { inline ->
+                require(logged.size == wordLog(json).count) { "Word log does not match the checkpoint" }
+                if (logged.isEmpty()) {
+                    inline
+                } else {
+                    inline.copy(chunks = inline.chunks.withWords(logged + inline.chunks.words))
+                }
+            },
             encoder = json.optJSONObject("encoder")?.let(::encoder),
             diarizer = json.optJSONObject("diarizer")?.let(::diarizer),
             speakerPrefix = json.getString("speakerPrefix"),
@@ -146,9 +188,12 @@ data class CheckpointState(
             version = json.getInt("version"),
         )
 
-        /** The JSON 0.1.0 writes: the job's members in its order, then the identity members `save` adds. */
-        fun encode(state: CheckpointState): JSONObject = JSONObject()
-            .put("recognition", json(state.recognition))
+        /**
+         * The JSON of version 2: the job's members in the order of 0.1.0, then the identity members `save` adds, then
+         * [log]. The first `log.count` words are in `words.log`, so `chunks.words` holds only the words after them.
+         */
+        fun encode(state: CheckpointState, log: WordLogRef = WordLogRef.EMPTY): JSONObject = JSONObject()
+            .put("recognition", json(state.recognition, log.count))
             .put("encoder", state.encoder?.let(::json))
             .put("diarizer", state.diarizer?.let(::json))
             .put("speakerPrefix", state.speakerPrefix)
@@ -159,19 +204,25 @@ data class CheckpointState(
             .put("doneMs", state.doneMs)
             .put("durationMs", state.durationMs)
             .put("elapsedMs", state.elapsedMs)
-            .put("version", state.version)
+            .put("version", VERSION)
             .put("source", state.source)
             .put("signature", state.signature)
             .put("model", state.model)
             .put("speakers", state.speakers)
+            .put(WORD_LOG, log.json())
 
         fun recognition(json: JSONObject) = RecognitionState(
             json.optLong("inferenceMs"),
             incremental(json.getJSONObject("chunks"))
         )
 
-        fun json(recognition: RecognitionState): JSONObject =
-            JSONObject().put("inferenceMs", recognition.inferenceMs).put("chunks", json(recognition.chunks))
+        /** `recognition`, without its first [logged] words, which are in `words.log`. */
+        fun json(recognition: RecognitionState, logged: Int = 0): JSONObject {
+            val chunks = recognition.chunks
+            require(logged in 0..chunks.words.size) { "More logged words than words" }
+            val inline = if (logged == 0) chunks else chunks.withWords(chunks.words.subList(logged, chunks.words.size))
+            return JSONObject().put("inferenceMs", recognition.inferenceMs).put("chunks", json(inline))
+        }
 
         fun incremental(json: JSONObject) = IncrementalState(
             json.getLong("start"),
@@ -235,3 +286,5 @@ data class CheckpointState(
         }
     }
 }
+
+private fun IncrementalState.withWords(words: List<Word>) = IncrementalState(start, end, window, words)

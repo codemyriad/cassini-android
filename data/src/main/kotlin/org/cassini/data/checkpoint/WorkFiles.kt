@@ -10,6 +10,7 @@ internal object WorkFiles {
     const val NAMES = "names.json"
     const val AUDIO_PART = "audio.opus.part"
     const val CLIPS = "clips.pcm"
+    const val WORD_LOG = "words.log"
     const val SEALED = "sealed.opus"
     const val SEALED_MARKER = "sealed"
 
