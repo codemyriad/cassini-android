@@ -154,6 +154,9 @@
     <string name="ui_status_suffix_resume">· Riprendi</string>
     <string name="ui_status_suffix_try_again">· Riprova</string>
     <string name="ui_status_suffix_no_speech">· Nessun parlato</string>
+    <!-- The Note screen of a document with no words (docs/ui-fidelity.md, device follow-up 5). -->
+    <string name="ui_note_no_words_title">Nessun parlato</string>
+    <string name="ui_note_no_words_body">Non sono state trovate parole in questa registrazione.</string>
     <plurals name="ui_status_suffix_speakers">
         <item quantity="one">· %1$s voce</item>
         <item quantity="many">· %1$s voci</item>

@@ -24,6 +24,9 @@ import java.time.LocalTime
  * - [sheet] and [dialog] are the open overlay; [notificationsOff] switches the progress footnote.
  * - [snackbar] ("Saved “<file>”", "Couldn't save the file") is an addition to ui.md section 7: exports finish on
  *   this screen.
+ * - [noWords] is true when the sealed transcript has loaded and has no words. With no [turns], the transcript pane
+ *   then shows "No speech". It stays false while the transcript loads and for a transcript that cannot be read, so
+ *   that the pane does not say "No speech" for those (an addition to ui.md section 7).
  */
 @Immutable
 data class NoteUiState(
@@ -42,6 +45,7 @@ data class NoteUiState(
     val dialog: NoteDialog? = null,
     val notificationsOff: Boolean = false,
     val snackbar: SnackbarSpec? = null,
+    val noWords: Boolean = false,
 )
 
 /** The top bar subtitle: "<day>, <time> · <duration>". */

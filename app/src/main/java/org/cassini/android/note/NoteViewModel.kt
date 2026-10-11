@@ -414,6 +414,10 @@ class NoteViewModel(
             dialog = ui.dialog,
             notificationsOff = live.facts.notificationsOff,
             snackbar = ui.snackbar,
+            // Only a loaded sealed version with 0 words says "No speech"; not a draft, a transcript that is still
+            // loading, or a transcript that cannot be read.
+            noWords = !draft && core.sealed != null && transcript.turns.isEmpty() &&
+                wordsKey(details)?.words == 0,
         )
     }
 

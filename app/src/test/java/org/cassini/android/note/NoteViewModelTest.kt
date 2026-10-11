@@ -128,6 +128,23 @@ class NoteViewModelTest {
         assertEquals(4_000L, state.playback?.durationMs)
     }
 
+    /** "No speech" on the Note screen (docs/ui-fidelity.md, device follow-up 5) only for a loaded version of 0 words. */
+    @Test
+    fun aDocumentWithNoWordsSaysSoOnlyWhenItsTranscriptHasLoaded() = runTest(dispatcher) {
+        assertFalse("A document with words", viewModel().now().noWords)
+        ports.wordRows.value = emptyList()
+        ports.details.value = documentNote().let { d -> d.copy(variants = d.variants.map { it.copy(wordCount = 0) }) }
+        advanceUntilIdle()
+        val state = viewModel().now()
+        assertEquals(NoteMode.Reading, state.mode)
+        assertTrue(state.turns.isEmpty())
+        assertTrue("A document with no words", state.noWords)
+        ports.details.value = documentNote(state = DocumentState.UNREADABLE)
+            .let { d -> d.copy(variants = d.variants.map { it.copy(wordCount = 0, readable = false) }) }
+        advanceUntilIdle()
+        assertFalse("A transcript that cannot be read", viewModel().now().noWords)
+    }
+
     @Test
     fun theRestOfALongTranscriptLoadsAfterTheFirstTurnsAreShown() = runTest(dispatcher) {
         ports.wordRows.value = List(NoteViewModel.FIRST_PAGE + 50) { i ->

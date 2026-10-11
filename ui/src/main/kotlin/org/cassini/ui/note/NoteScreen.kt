@@ -197,5 +197,6 @@ internal fun ColumnScope.ReadAndListenBody(
         listState = listState,
         onEvent = onEvent,
         modifier = Modifier.weight(1f),
+        noWords = state.noWords,
     )
 }

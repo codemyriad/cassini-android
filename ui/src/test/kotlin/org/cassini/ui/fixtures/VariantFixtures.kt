@@ -412,6 +412,14 @@ internal object VariantFixtures {
         "read-unreadable" to untrusted(TrustUi.UNREADABLE, BannerKind.TRUST_UNREADABLE, transcript = false),
         "read-newer-format" to untrusted(TrustUi.NEWER_FORMAT, BannerKind.TRUST_NEWER_FORMAT, transcript = false),
         "read-verified-banner" to b.readAndListen.copy(banners = persistentListOf(banner(BannerKind.TRUST_VERIFIED))),
+        // A document with no words (docs/ui-fidelity.md, device follow-up 5): the "No speech" card, the player.
+        "read-no-words" to b.readAndListen.copy(
+            chips = NoteChipsUi(trust = TrustUi.VERIFIED, speakers = 0),
+            turns = persistentListOf(),
+            activeWord = null,
+            playback = b.readAndListen.playback?.copy(playing = false, positionMs = 0),
+            noWords = true,
+        ),
         "read-one-voice" to b.readAndListen.copy(
             chips = NoteChipsUi(trust = TrustUi.VERIFIED, speakers = 1),
             banners = persistentListOf(banner(BannerKind.TX_ONE_VOICE)),

@@ -45,6 +45,7 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.delay
 import org.cassini.ui.R
+import org.cassini.ui.components.BannerCard
 import org.cassini.ui.components.IconButton44
 import org.cassini.ui.components.LargeChip
 import org.cassini.ui.components.PillSearchField
@@ -236,7 +237,8 @@ private class ActiveLine {
  *
  * While [following], a new active word scrolls its line to 30 % of the pane once it leaves the top 70 %; a drag
  * pauses following ([NoteEvent.PauseFollowing]) and, while [followPaused], 4 s without scrolling resume it
- * ([NoteEvent.FollowPlayback]). The current search match scrolls into view.
+ * ([NoteEvent.FollowPlayback]). The current search match scrolls into view. With [noWords] and no turns, the pane
+ * shows the empty state ("No speech").
  */
 @Composable
 @Suppress("LongParameterList") // The transcript inputs and the follow state.
@@ -249,6 +251,7 @@ internal fun TranscriptPane(
     listState: LazyListState,
     onEvent: (NoteEvent) -> Unit,
     modifier: Modifier = Modifier,
+    noWords: Boolean = false,
 ) {
     val c = CassiniTheme.colors
     val matches = remember(search) { search?.byTurn() ?: emptyMap() }
@@ -269,6 +272,7 @@ internal fun TranscriptPane(
         state = listState,
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 0.5.dp, bottom = 16.dp),
     ) {
+        if (noWords && turns.isEmpty()) item(key = "no-words") { NoWordsCard() }
         items(turns, key = { it.id }) { turn ->
             val activeIndex = activeWord?.takeIf { it.turnId == turn.id }?.index
             Turn(
@@ -281,6 +285,20 @@ internal fun TranscriptPane(
             )
         }
     }
+}
+
+/**
+ * The empty transcript: a document with no words (the Library row says "· No speech"). A plain card, 16 dp below
+ * the top of the pane: "No speech" — "No words were found in this recording." (the copy of the TXT export).
+ */
+@Composable
+private fun NoWordsCard() {
+    BannerCard(
+        tone = Tone.Plain,
+        title = stringResource(R.string.ui_note_no_words_title),
+        body = stringResource(R.string.ui_note_no_words_body),
+        modifier = Modifier.padding(top = 16.dp),
+    )
 }
 
 /**

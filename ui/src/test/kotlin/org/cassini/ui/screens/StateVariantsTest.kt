@@ -213,6 +213,8 @@ class StateVariantsTest : BoardTest() {
 
     @Test fun readNewerFormat() = read("read-newer-format")
 
+    @Test fun readNoWords() = read("read-no-words")
+
     @Test fun readVerifiedBanner() = read("read-verified-banner")
 
     @Test fun readOneVoice() = read("read-one-voice")
