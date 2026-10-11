@@ -63,7 +63,8 @@ class CassiniTestRunner : AndroidJUnitRunner() {
     }
 
     override fun finish(resultCode: Int, results: Bundle?) {
-        graph?.close()
+        // The run ends either way: a graph whose work does not end in time is only logged.
+        graph?.runCatching { close() }?.onFailure { Log.w(TAG, "The graph did not close cleanly", it) }
         if (kept == null) {
             root?.deleteRecursively()
             cache?.deleteRecursively()

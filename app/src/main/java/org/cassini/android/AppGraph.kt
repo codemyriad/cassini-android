@@ -11,13 +11,15 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.cassini.android.adapters.InstalledEngines
 import org.cassini.android.adapters.NamingGate
 import org.cassini.android.adapters.NetworkCheck
@@ -280,11 +282,32 @@ class AppGraph(context: Context, val config: Config) {
     /** The catalogue, waiting until the database is open. */
     suspend fun awaitCatalogue(): Catalogue = opened.await()
 
-    /** Stops the graph's work and closes the database. For tests; the app's graph lives as long as the process. */
-    fun close() {
-        appScope.cancel()
+    /**
+     * Stops the graph's work, waits until it has ended, then closes the database. For tests; the app's graph lives as
+     * long as the process.
+     *
+     * The wait is necessary: a cancelled coroutine runs until its next suspension point, and DataStore releases the
+     * settings file only when its scope (the job of [appScope]) has completed. A new graph over the same files while
+     * the old one still held the file failed with "multiple DataStores active for the same file", in a coroutine of
+     * the application scope, so the next `runTest` failed with UncaughtExceptionsBeforeTest.
+     *
+     * [whileWaiting] runs between short waits. A Robolectric test calls close on the main thread: it runs the main
+     * looper there, so that work posted to the main thread can end. Throws when the work did not end in 10 s.
+     */
+    fun close(whileWaiting: () -> Unit = {}) {
+        val work = appScope.coroutineContext.job
+        work.cancel()
+        val ended = runBlocking {
+            withTimeoutOrNull(CLOSE_WAIT_MS) {
+                while (!work.isCompleted) {
+                    whileWaiting()
+                    withTimeoutOrNull(CLOSE_POLL_MS) { work.join() }
+                }
+            } != null
+        }
         recorderThread.shutdownNow()
         openedCatalogue?.database?.close()
+        check(ended) { "The work of the graph did not end in $CLOSE_WAIT_MS ms: ${work.children.toList()}" }
     }
 
     // Startup work (architecture 4.8). ---------------------------------------------------------------------------
@@ -408,6 +431,8 @@ class AppGraph(context: Context, val config: Config) {
     companion object {
         private const val TAG = "AppGraph"
         private const val TITLE_DATE_PATTERN = "d MMM, HH:mm"
+        private const val CLOSE_WAIT_MS = 10_000L
+        private const val CLOSE_POLL_MS = 10L
 
         // The startup steps in their order (architecture 4.8), as Config.onStartupStep names them.
         const val STEP_DATABASE = "database"

@@ -105,7 +105,8 @@ class AppShellTest {
         }
 
         override fun after() {
-            app.graph.close()
+            // Runs the main looper while it waits: the player's work ends on the main thread.
+            app.graph.close { shadowOf(Looper.getMainLooper()).idle() }
             CassiniApplication.graphFactory = null
         }
     }

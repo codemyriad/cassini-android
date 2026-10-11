@@ -6,10 +6,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.async
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -108,9 +108,10 @@ class ModelInstallOwnerTest {
         owner = ModelInstallOwner(models, paths.modelRoot, { true }, scope, Dispatchers.IO)
     }
 
-    @After fun tearDown() {
+    /** Waits until the work of [scope] has ended, before TemporaryFolder deletes its files. */
+    @After fun tearDown() = runBlocking {
         release.countDown()
-        scope.cancel()
+        withTimeout(WAIT_MS) { scope.coroutineContext.job.cancelAndJoin() }
     }
 
     private fun key(model: ModelDescriptor) = "${model.directory}/${model.markerFile}"
