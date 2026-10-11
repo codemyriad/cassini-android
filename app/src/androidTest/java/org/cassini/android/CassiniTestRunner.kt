@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.util.Log
 import androidx.test.runner.AndroidJUnitRunner
 import org.cassini.data.AppPaths
+import org.cassini.data.models.ModelFetcher
 import java.io.File
 
 /**
@@ -15,6 +16,9 @@ import java.io.File
  * empty directory inside the scratch root instead (the download screen tests). The scratch root is deleted when the
  * run ends, and roots that an earlier run left behind (a crash) are deleted when a run starts. So is the database
  * lock file that androidx.sqlite keeps at `cacheDir/<absolute database path>.lck`.
+ *
+ * The graph gets the seams of [TestHooks]: they behave as the app does until a test sets them. On an empty model root
+ * the model fetcher is [ScriptedModels], so such a run never downloads a model.
  *
  * With `-e keepRoot NAME` the run uses `filesDir/androidTest-kept-NAME` instead and keeps it when it ends, so a
  * later run with the same argument opens the same notes in a new process (scripts/note-opening-timing.sh). Other
@@ -44,8 +48,14 @@ class CassiniTestRunner : AndroidJUnitRunner() {
         locks = File(app.cacheDir, scratch.path)
         val models = if (emptyModelRoot) File(scratch, "models") else app.filesDir
         CassiniApplication.graphFactory = GraphFactory { application, _ ->
-            AppGraph(application, AppGraph.Config(AppPaths(root = scratch, cache = scratchCache, modelRoot = models)))
-                .also { graph = it }
+            val config = AppGraph.Config(
+                AppPaths(root = scratch, cache = scratchCache, modelRoot = models),
+                // An empty model root never downloads: its fetcher follows the script of the test.
+                fetcher = if (emptyModelRoot) ScriptedModels.fetcher else ModelFetcher.network(),
+                network = TestHooks.network(application),
+                recording = AppGraph.RecordingHooks(platform = TestHooks.recordingPlatform(application)),
+            )
+            AppGraph(application, config).also { graph = it }
         }
         Log.i(TAG, "Scratch root $scratch, models in $models")
         super.callApplicationOnCreate(app)
