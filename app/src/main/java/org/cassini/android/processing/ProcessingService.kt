@@ -24,6 +24,7 @@ import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.cassini.android.CassiniApplication
+import org.cassini.android.startForegroundWithType
 import org.cassini.engine.job.JobPhase
 
 /**
@@ -221,13 +222,13 @@ class ProcessingService : LifecycleService() {
     /**
      * `startForeground` with [type] inside the catch of architecture 5.7; false when Android refused it. It takes the
      * last notification that [followNotification] built, which updates it within a second. Only the first call of a
-     * start builds one here, on the main thread, because `startForeground` must come at once; below API 33 this
-     * build reads the app locale from a file.
+     * start builds one here, on the main thread, because `startForeground` must come at once; this build reads the
+     * app locale (a file below API 33, `LocaleManager` from API 33).
      */
     private fun enterForeground(type: Int): Boolean {
         val notification: Notification = lastNotification ?: notifications.ongoing(coordinator.state.value)
         return try {
-            ServiceCompat.startForeground(this, ProcessingNotifications.PROCESSING_ID, notification, type)
+            startForegroundWithType(ProcessingNotifications.PROCESSING_ID, notification, type)
             true
         } catch (
             @Suppress("TooGenericExceptionCaught") // the refusals have no common type below RuntimeException
@@ -268,7 +269,7 @@ class ProcessingService : LifecycleService() {
         fun resumeIntent(context: Context, noteId: String): Intent =
             processingIntent(context, ACTION_RESUME).putExtra(EXTRA_NOTE_ID, noteId)
 
-        /** The service type for [need]: untyped below API 29, where `ServiceCompat` ignores it anyway. */
+        /** The service type for [need]: untyped below API 29, where services have no type. */
         fun typeOf(need: ForegroundNeed): Int = when {
             Build.VERSION.SDK_INT < Build.VERSION_CODES.Q -> 0
             need == ForegroundNeed.MEDIA_PROCESSING && Build.VERSION.SDK_INT >= ProcessingState.MEDIA_PROCESSING_API ->

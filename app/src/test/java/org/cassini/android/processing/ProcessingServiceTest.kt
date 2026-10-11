@@ -21,6 +21,7 @@ import org.cassini.data.AppPaths
 import org.cassini.data.CassiniDispatchers
 import org.cassini.data.models.ModelFetcher
 import org.cassini.data.settings.QueueHold
+import org.cassini.engine.job.JobEvent
 import org.cassini.engine.job.JobOutcome
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -103,6 +104,28 @@ class ProcessingServiceTest {
         until { shadow.isStoppedBySelf }
         assertTrue(shadow.isForegroundStopped)
         until { !graph.processing.state.value.serviceForeground }
+    }
+
+    /**
+     * API 35: inference changes the type to mediaProcessing, and Android gets that type. `ServiceCompat` masked it to
+     * 0 ("type none"), which Android refused, so the service stayed dataSync.
+     */
+    @Test fun inferenceRunsAsMediaProcessingOnApi35() {
+        queuedNote()
+        val service = Robolectric.buildService(ProcessingService::class.java).create().get()
+        service.onStartCommand(ProcessingService.drainIntent(app), 0, 1)
+        val job = awaitJob()
+        until { service.foregroundServiceType != 0 }
+        assertEquals(ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC, service.foregroundServiceType)
+
+        job.send(JobEvent.Started(4_000, restored = null, speakers = false, prints = false, lowMemory = false))
+        until { graph.processing.foregroundNeed.value == ForegroundNeed.MEDIA_PROCESSING }
+        until { service.foregroundServiceType == ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING }
+        assertEquals(ProcessingNotifications.PROCESSING_ID, shadowOf(service).lastForegroundNotificationId)
+        assertFalse(shadowOf(service).isForegroundStopped)
+
+        job.finish(JobOutcome.Paused(PauseReason.USER))
+        until { shadowOf(service).isStoppedBySelf }
     }
 
     @Test fun aRefusedFirstStartLeavesTheQueueAndPostsReadyToTranscribe() {

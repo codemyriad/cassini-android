@@ -53,13 +53,12 @@ class ProcessingServiceTest {
         waitFor("The WAV note runs first") { processing.state.value.running?.takeIf { it.noteId == wav } }
         assertEquals(JobState.QUEUED, Background.row(mp3)?.jobState)
         waitFor("The service is in the foreground") { processing.state.value.serviceForeground.takeIf { it } }
-        val services = Background.shell("dumpsys activity services org.cassini.android")
-        val service = services.substringAfter("ServiceRecord", "").substringAfter("ProcessingService", "")
-        Log.i(TAG, "dumpsys activity services:\n$services")
-        assertTrue("ProcessingService is in the foreground:\n$services", service.contains("isForeground=true"))
+        val service = Background.processingService()
+        Log.i(TAG, "ProcessingService in dumpsys activity services:\n$service")
+        assertTrue("ProcessingService is in the foreground:\n$service", service.contains("isForeground=true"))
         if (Build.VERSION.SDK_INT in Build.VERSION_CODES.Q..Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            // FOREGROUND_SERVICE_TYPE_DATA_SYNC is 1; dumpsys prints the types as hex.
-            assertTrue("The service type is dataSync:\n$services", Regex("types=(0x)?0*1\\b").containsMatchIn(service))
+            // FOREGROUND_SERVICE_TYPE_DATA_SYNC is 1.
+            assertTrue("The service type is dataSync:\n$service", Background.hasType(service, DATA_SYNC))
         }
 
         val document = waitFor("The WAV note is transcribed") {
@@ -101,6 +100,13 @@ class ProcessingServiceTest {
             running?.let { graph.awaitCatalogue().checkpoints.status(long) as? CheckpointStatus.Saved }
         }
         Log.i(TAG, "Long note checkpoint at ${saved.doneMs} of ${saved.durationMs} ms")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            // Inference runs as mediaProcessing (0x2000), as Android reports it; dataSync would time out after 6 h.
+            val service = waitFor("ProcessingService runs as mediaProcessing during inference", TYPE_WAIT_MS) {
+                Background.processingService().takeIf { Background.hasType(it, MEDIA_PROCESSING) }
+            }
+            Log.i(TAG, "ProcessingService during inference:\n$service")
+        }
         assertTrue("Stop is accepted", processing.stop(long))
 
         val paused = waitFor("Stop pauses the long note") {
@@ -118,5 +124,8 @@ class ProcessingServiceTest {
 
     private companion object {
         const val TAG = "ProcessingServiceTest"
+        const val DATA_SYNC = 0x1
+        const val MEDIA_PROCESSING = 0x2000
+        const val TYPE_WAIT_MS = 30_000L
     }
 }

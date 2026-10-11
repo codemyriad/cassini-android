@@ -33,6 +33,15 @@ internal object Background {
         return ParcelFileDescriptor.AutoCloseInputStream(output).use { it.readBytes().toString(Charsets.UTF_8) }
     }
 
+    /** The `ProcessingService` part of `dumpsys activity services` (empty when it does not run). */
+    fun processingService(): String = shell("dumpsys activity services org.cassini.android")
+        .substringAfter("ServiceRecord", "").substringAfter("ProcessingService", "")
+
+    /** True when the dumpsys text of a service ([processingService]) gives the foreground service types [type]. */
+    fun hasType(service: String, type: Int): Boolean =
+        // dumpsys prints the types as hex, for example types=0x00002000.
+        Regex("types=(0x)?0*${Integer.toHexString(type)}\\b", RegexOption.IGNORE_CASE).containsMatchIn(service)
+
     /** Grants the runtime permissions the services need (notifications on API 33+, and [extra]). */
     fun grant(vararg extra: String) {
         val permissions = extra.toMutableList()

@@ -54,6 +54,7 @@ class CassiniTestRunner : AndroidJUnitRunner() {
                 fetcher = if (emptyModelRoot) ScriptedModels.fetcher else ModelFetcher.network(),
                 network = TestHooks.network(application),
                 recording = AppGraph.RecordingHooks(platform = TestHooks.recordingPlatform(application)),
+                processing = AppGraph.ProcessingHooks(jobs = TestHooks::jobs),
             )
             AppGraph(application, config).also { graph = it }
         }

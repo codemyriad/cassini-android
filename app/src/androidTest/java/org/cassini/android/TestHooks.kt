@@ -2,6 +2,8 @@ package org.cassini.android
 
 import android.content.Context
 import org.cassini.android.adapters.NetworkCheck
+import org.cassini.android.processing.ProcessingJobFactory
+import org.cassini.android.processing.TranscriptionJobFactory
 import org.cassini.android.recording.AndroidRecordingPlatform
 import org.cassini.android.recording.RecordingPlatform
 import org.cassini.core.Failure
@@ -22,9 +24,12 @@ import java.util.concurrent.TimeUnit
  * - [recordingFreeBytes] replaces the free space the recording sees ("Storage almost full"); it gets the directory of
  *   the capture.
  * - [ScriptedModels] is the model fetcher of a run with an empty model root: it never downloads.
+ * - [jobFactory] replaces the transcription job of the notes the queue claims (no models needed).
  */
 object TestHooks {
     @Volatile var validatedNetwork: Boolean? = null
+
+    @Volatile var jobFactory: ProcessingJobFactory? = null
 
     @Volatile var recordingFreeBytes: ((File) -> Long)? = null
 
@@ -41,9 +46,16 @@ object TestHooks {
         }
     }
 
+    /** The app's [TranscriptionJobFactory], or [jobFactory] while a test sets one. */
+    fun jobs(graph: AppGraph): ProcessingJobFactory {
+        val real = TranscriptionJobFactory(graph)
+        return ProcessingJobFactory { noteId -> (jobFactory ?: real).create(noteId) }
+    }
+
     fun reset() {
         validatedNetwork = null
         recordingFreeBytes = null
+        jobFactory = null
         ScriptedModels.clear()
     }
 }

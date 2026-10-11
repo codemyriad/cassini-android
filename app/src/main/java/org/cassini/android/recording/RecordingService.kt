@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 import org.cassini.android.AppGraph
 import org.cassini.android.CassiniApplication
 import org.cassini.android.processing.ProcessingService
+import org.cassini.android.startForegroundWithType
 
 /**
  * The microphone foreground lifetime of a recording (architecture 5.8): the notification and its actions. The
@@ -123,7 +124,7 @@ class RecordingService : LifecycleService() {
         val notification = notifications.ongoing(controller.state.value, controller.elapsedNowMs)
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0
         return try {
-            ServiceCompat.startForeground(this, RecordingNotifications.RECORDING_ID, notification, type)
+            startForegroundWithType(RecordingNotifications.RECORDING_ID, notification, type)
             true
         } catch (
             @Suppress("TooGenericExceptionCaught") // the refusals have no common type below RuntimeException

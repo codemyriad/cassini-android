@@ -716,6 +716,8 @@ The intents are `ACTION_DRAIN` and `ACTION_STOP_ALL`. `ACTION_DRAIN` has no note
 
 The callers also keep their own catch. The service does not increase `attempts`. Only `reconcileOnStart` does.
 
+Both services call `startForegroundWithType` (`Foreground.kt`). From API 29, this function calls `Service.startForeground(id, notification, type)` directly. The app does not use `ServiceCompat.startForeground` for this call, because androidx.core 1.19.1 removes the types that it does not know. It changes `FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING` (0x2000) to 0, and Android refuses a start with type 0.
+
 The service type follows `coordinator.foregroundNeed`:
 
 - During a download: `DATA_SYNC`.
