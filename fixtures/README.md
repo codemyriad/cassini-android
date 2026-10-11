@@ -13,6 +13,7 @@ The `audio/` directory holds a short Italian speech clip. The device tests, the 
 Three other sets of clips are not in the repository:
 
 - The long clip of the background device tests and of `scripts/device-kill-resume.sh`. `scripts/make-long-clip.sh` makes it on the host with ffmpeg: the FLEURS WAV 20 times in a row, 316.8 s of 16 kHz mono PCM. The script writes it to `app/src/androidTest/assets/generated/fleurs-it-x20.wav`, which `.gitignore` ignores. `scripts/device-smoke.sh` runs the script before it builds the test APK. If the source WAV changes, the script makes the clip again.
+- The clips of the acceptance walk. `scripts/acceptance-audio.sh` makes them on the host with ffmpeg: the FLEURS WAV 2, 3, 8 and 23 times in a row, as `app/src/androidTest/assets/generated/acceptance-x<N>.wav`. Each note of the walk has a different clip, so that no import is a copy of another note. `.gitignore` ignores these files.
 - The YouTube excerpts from `tools/fetch-youtube-audio.sh`. The script writes them to `app/src/androidTest/assets/`, which `.gitignore` ignores.
 - The private meeting clips for `VoiceprintCalibrationTest`. You put them in `tools/private-fixtures/meetings/`, which `.gitignore` ignores. When the clips are in this directory, the build adds them to the `:bench` APK.
 

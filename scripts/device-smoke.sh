@@ -15,7 +15,7 @@ real run differs from the dry run (or from CASSINI_EXPECTED_TESTS, when that is 
 
 Options:
   --annotation NAME   A test annotation in org.cassini.test: CiSmoke, NeedsModels, NeedsMicrophone or Manual.
-                      No test has Manual yet, so that selection fails with no tests.
+                      Manual tests need their own arguments; select them with --class.
   --class CLASS       A test class or method, for example org.cassini.android.background.RecordingServiceTest or
                       org.cassini.android.DeviceSmokeTest#importsRealItalianAudioAndPreservesItsDuration.
                       Repeat it to select more than one.

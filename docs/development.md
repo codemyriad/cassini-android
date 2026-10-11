@@ -130,6 +130,7 @@ The tests in `app/src/androidTest/.../flows/` start the real `MainActivity` on t
 | `NoteFlowTest` | `@NeedsModels` | It transcribes the FLEURS clip from its note and shows the progress card, the words and a seek on a word tap. Transcribe again adds version 2 to the Versions sheet. Save a copy gives the same bytes as `notes/<id>/document.opus`. The TXT, SRT and VTT exports are equal to the goldens. |
 | `SpeakerNamingFlowTest` | `@NeedsModels` | It saves a voice from a first transcription. The draft of a second transcription asks "Is this Luca?". "Yes, Luca" names the speaker. The sealed document has the label, and Saved voices shows Luca with 1 note. |
 | `NoteOpeningTimingTest` | `@Manual` | The timing check of [note-opening-timing.sh](#note-opening-timingsh). |
+| `AcceptanceWalkTest` | `@Manual` | The acceptance walk of [acceptance-walk.sh](#acceptance-walksh). It saves a screenshot of each board. |
 | `ModelDownloadFlowTest` | `@Manual` | On an empty model root, Settings shows "Not downloaded". The row opens the consent screen, its sources row opens Licenses, and "Not now" goes back to Settings. Nothing is downloaded. Run it with `scripts/device-smoke.sh --class org.cassini.android.flows.ModelDownloadFlowTest --arg emptyModelRoot=true`. |
 
 An `Instrumentation.ActivityMonitor` gives the result of the system file picker (`ACTION_CREATE_DOCUMENT`) in `NoteFlowTest`. The result is a file in the scratch cache, so no picker opens.
@@ -176,6 +177,8 @@ Before you start a device run, make sure that no other run uses the device. `adb
 The instrumentation runner `org.cassini.android.CassiniTestRunner` gives each run a scratch root. It sets `AppPaths.root` to `files/androidTest-<run>` and the cache to `cacheDir/androidTest-<run>`. The model root stays `filesDir`, so the tests use the installed models. A test for the download screens can ask for an empty scratch model root with `-e emptyModelRoot true`. The runner deletes its scratch root at the end of the run. At the start of a run, it deletes the scratch roots that an earlier run did not delete. Thus the tests do not touch the notes of the user. The 0.1.0 device tests still use `filesDir`.
 
 The device tests use the committed FLEURS clip as audio.
+
+The runner also gives the graph the test seams of `TestHooks`. Each seam does the same as the app until a test sets it. `TestHooks.validatedNetwork` replaces the answer of the network check. `TestHooks.recordingFreeBytes` replaces the free space that the recording sees. On an empty model root, the model fetcher is `ScriptedModels`. This fetcher does the steps of a script from the test, and it does not open a connection. If the script has no more steps, the fetch fails. Thus a run with an empty model root never downloads a model.
 
 ### device-smoke.sh
 
@@ -266,6 +269,39 @@ scripts/device-language-check.sh --serial emulator-5554
 ```
 
 The script uses the installed debug app and its own data. It does not change notes or models. Before you start it, set the device to a language that is not Italian, and set the app language to Phone. An instrumentation test cannot do this check, because the test stops when its process stops.
+
+### acceptance-walk.sh
+
+`scripts/acceptance-walk.sh` operates `AcceptanceWalkTest` on emulator-5554 and collects a screenshot of each board. It does these steps:
+
+1. It makes the test clips with `scripts/acceptance-audio.sh` (this needs ffmpeg).
+2. It writes a backup of `files/` without the models. Use `--backup FILE` to name the backup file.
+3. It builds the debug app and its test APK one time.
+4. It operates the walk in three variants: light, dark (`cmd uimode night yes`) and Italian.
+5. It copies the screenshots to `build/acceptance/<run>/<variant>/` and deletes them on the device.
+6. It makes sure that the model files did not change.
+7. It sets the night mode and the app language back to their values before the run.
+
+```sh
+scripts/acceptance-walk.sh --serial emulator-5554
+```
+
+Each variant has two parts. Each part is one test method and one instrumentation run with `scripts/device-smoke.sh`:
+
+- `realModels` uses the installed models. It makes the notes through the repositories and the coordinator. Then it opens Library, Recording, Transcribing, Read & listen, Name a speaker, Note actions, Saved voices, Settings and Trash. It also shows the Paused, Not verified, Unreadable and Storage almost full banners.
+- `downloadScreens` uses an empty model root and `ScriptedModels`. It shows Model download, Downloading 46%, Checking 80%, No connection, Not enough storage and File check failed.
+
+The test saves each screenshot in its scratch root. At the end of the test, it copies the screenshots to `files/acceptance-out/<variant>/`, because the runner deletes the scratch root when the run ends. In the Italian variant, the test selects Italiano in Settings first and selects Phone at the end.
+
+The test makes these notes for `realModels`:
+
+- A copy of a document with its last audio byte changed. The page check of Ogg fails, so the app cannot verify the audio (Not verified).
+- A copy of a document with a changed checksum of the manifest (Can't read transcript).
+- One note in the trash, one Audio only note and one paused note.
+- One transcription to Done. The test gives its speaker the name Anna Ricci and saves the voice as Anna Ricci and as Paolo Ferri. The two saved voices have the same voiceprint. Thus the draft of a later note asks "Is this Anna Ricci?" and does not give the name automatically.
+- One long transcription that runs during the walk, and one note in the queue after it.
+
+To find Storage almost full, the test sets the free space to the floor of the recording plus about 12 minutes at the measured rate of the capture file.
 
 ### note-opening-timing.sh
 
