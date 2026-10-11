@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import org.cassini.android.testing.NoUncaughtCoroutines
 import org.cassini.core.format.CassiniDocument
 import org.cassini.core.format.DocumentState
 import org.cassini.core.format.Transcript
@@ -43,6 +44,9 @@ import java.util.Collections
  */
 @RunWith(RobolectricTestRunner::class)
 class AppGraphTest {
+    @get:Rule(order = Int.MIN_VALUE)
+    val uncaught = NoUncaughtCoroutines()
+
     @get:Rule val folder = TemporaryFolder()
 
     private val context: Context = ApplicationProvider.getApplicationContext()

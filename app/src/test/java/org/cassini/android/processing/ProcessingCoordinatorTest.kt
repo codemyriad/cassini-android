@@ -12,6 +12,7 @@ import kotlinx.coroutines.withTimeout
 import org.cassini.android.AppGraph
 import org.cassini.android.Catalogue
 import org.cassini.android.settings.SettingsViewModel
+import org.cassini.android.testing.NoUncaughtCoroutines
 import org.cassini.core.Failure
 import org.cassini.core.asr.IncrementalState
 import org.cassini.core.checkpoint.CheckpointState
@@ -61,6 +62,9 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 @RunWith(RobolectricTestRunner::class)
 class ProcessingCoordinatorTest {
+    @get:Rule(order = Int.MIN_VALUE)
+    val uncaught = NoUncaughtCoroutines()
+
     @get:Rule val folder = TemporaryFolder()
 
     private val context: Context = ApplicationProvider.getApplicationContext()

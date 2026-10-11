@@ -13,6 +13,7 @@ import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import org.cassini.android.testing.NoUncaughtCoroutines
 import org.cassini.core.Failure
 import org.cassini.core.models.ModelCatalog
 import org.cassini.core.models.ModelDescriptor
@@ -51,6 +52,9 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 @RunWith(RobolectricTestRunner::class)
 class ModelInstallOwnerTest {
+    @get:Rule(order = Int.MIN_VALUE)
+    val uncaught = NoUncaughtCoroutines()
+
     @get:Rule val folder = TemporaryFolder()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)

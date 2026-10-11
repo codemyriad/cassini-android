@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.cassini.android.AppGraph
+import org.cassini.android.testing.NoUncaughtCoroutines
 import org.cassini.core.audio.Limits
 import org.cassini.core.audio.RecordingPolicy
 import org.cassini.core.library.AudioKind
@@ -43,6 +44,9 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 @RunWith(RobolectricTestRunner::class)
 class RecordingControllerTest {
+    @get:Rule(order = Int.MIN_VALUE)
+    val uncaught = NoUncaughtCoroutines()
+
     @get:Rule val folder = TemporaryFolder()
 
     private val context: Context = ApplicationProvider.getApplicationContext()

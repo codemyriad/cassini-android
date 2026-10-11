@@ -15,6 +15,7 @@ import kotlinx.coroutines.withContext
 import org.cassini.android.AppGraph
 import org.cassini.android.CassiniApplication
 import org.cassini.android.GraphFactory
+import org.cassini.android.testing.NoUncaughtCoroutines
 import org.cassini.core.library.JobState
 import org.cassini.core.library.PauseReason
 import org.cassini.data.AppPaths
@@ -42,6 +43,9 @@ import java.util.concurrent.CopyOnWriteArrayList
 /** The foreground lifetime of architecture 5.7 on Robolectric (SDK 35), over a graph with fake jobs. */
 @RunWith(RobolectricTestRunner::class)
 class ProcessingServiceTest {
+    @get:Rule(order = Int.MIN_VALUE)
+    val uncaught = NoUncaughtCoroutines()
+
     @get:Rule val folder = TemporaryFolder()
 
     private val app: CassiniApplication = ApplicationProvider.getApplicationContext()

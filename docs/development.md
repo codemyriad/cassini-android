@@ -90,6 +90,8 @@ The root task `ciTest` runs `:core:test`. For each Android module, it runs `veri
 
 Robolectric runs at SDK 35. Each module that uses it has `src/test/resources/robolectric.properties` with `sdk=35`. SDK 36 and later need a JDK 21 runtime, and the build uses JDK 17. One test in each module makes sure that `Build.VERSION.SDK_INT` is 35.
 
+All the JVM tests of a module run in one JVM, and the Robolectric tests share static state. Thus work that a test starts and does not stop can fail during a later test. A test that makes an `AppGraph` or its own coroutine scope must stop that work and wait until it ends. `AppGraph.close()` cancels the application scope and waits for its jobs. The `:app` rule `NoUncaughtCoroutines` (`app/src/test/.../testing/UncaughtCoroutines.kt`) makes such a test fail when one of its coroutines fails with an exception that nothing caught. Without the rule, `runTest` shows the exception only at the start of the next `runTest`, which can be in a different class, as `UncaughtExceptionsBeforeTest`.
+
 ### Screenshot tests
 
 The `:ui` tests draw the screens with Robolectric. They compare each picture with a committed PNG file (a golden) in `ui/src/test/screenshots/`. We record and compare the goldens on Linux x86_64 only, because font rendering on other systems can change the pixels.
@@ -554,7 +556,7 @@ The `models` job runs the `@NeedsModels` tests on an API 34 emulator with the re
 
 ### native.yml
 
-The `native` job builds the sherpa-onnx AAR from the pinned source with `setup.sh --from-source` (about 40 minutes). It writes the SHA-256 of the built AAR and of the pinned AAR in the job summary. If they are different, the job shows a warning and does not fail ([`native-runtime.md`](native-runtime.md)). Then it builds the app and runs the JVM tests with the built AAR.
+The `native` job builds the sherpa-onnx AAR from the pinned source with `setup.sh --from-source` (about 40 minutes). It writes the SHA-256 of the built AAR and of the pinned AAR in the job summary. If they are different, the job shows a warning and does not fail ([`native-runtime.md`](native-runtime.md)). Then it builds the app and runs the JVM tests with the built AAR. If the tests fail, the job uploads the test reports as the artifact `native-aar-test-reports`.
 
 ## Pre-release gate
 

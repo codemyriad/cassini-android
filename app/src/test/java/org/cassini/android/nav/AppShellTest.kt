@@ -37,6 +37,7 @@ import org.cassini.android.recording.FakeCaptureSource
 import org.cassini.android.recording.FakeConsent
 import org.cassini.android.recording.FakePlatform
 import org.cassini.android.recording.RecordingState
+import org.cassini.android.testing.NoUncaughtCoroutines
 import org.cassini.core.format.CassiniDocument
 import org.cassini.core.format.Transcript
 import org.cassini.core.format.Word
@@ -113,7 +114,8 @@ class AppShellTest {
 
     private val rule = createAndroidComposeRule<MainActivity>()
 
-    @get:Rule val chain: RuleChain = RuleChain.outerRule(folder).around(graphRule).around(rule)
+    @get:Rule val chain: RuleChain =
+        RuleChain.outerRule(NoUncaughtCoroutines()).around(folder).around(graphRule).around(rule)
 
     @Test fun backClosesTheSheetThenTheSearchThenLeavesTheNote() {
         importDocument()

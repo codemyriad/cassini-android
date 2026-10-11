@@ -15,6 +15,7 @@ import org.cassini.android.CassiniApplication
 import org.cassini.android.GraphFactory
 import org.cassini.android.processing.FakeVisibility
 import org.cassini.android.processing.ProcessingNotifications
+import org.cassini.android.testing.NoUncaughtCoroutines
 import org.cassini.core.audio.Limits
 import org.cassini.core.library.AudioKind
 import org.cassini.data.AppPaths
@@ -38,6 +39,9 @@ import java.util.concurrent.CopyOnWriteArrayList
 /** The microphone foreground lifetime of architecture 5.8 on Robolectric (SDK 35), over fakes for the capture. */
 @RunWith(RobolectricTestRunner::class)
 class RecordingServiceTest {
+    @get:Rule(order = Int.MIN_VALUE)
+    val uncaught = NoUncaughtCoroutines()
+
     @get:Rule val folder = TemporaryFolder()
 
     private val app: CassiniApplication = ApplicationProvider.getApplicationContext()
