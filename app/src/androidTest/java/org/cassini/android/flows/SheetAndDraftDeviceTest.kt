@@ -1,13 +1,16 @@
 package org.cassini.android.flows
 
 import android.graphics.Bitmap
+import android.os.Build
 import android.os.SystemClock
 import android.util.Log
+import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
@@ -77,18 +80,22 @@ class SheetAndDraftDeviceTest {
             rule.setContent { CassiniTheme(darkTheme = false) { NoteScreen(naming, onEvent = {}) } }
             rule.onNode(hasSetTextAction()).performClick()
             assertTrue("The soft keyboard did not open", waitForKeyboard())
+            // The field is in the sheet's own dialog window: read the insets and the height of that window.
+            val fieldRoot = rule.onNode(hasSetTextAction()).fetchSemanticsNode().root as ViewRootForTest
+            val sheetWindow = fieldRoot.view.rootView
+            val keyboard = waitForKeyboardInset(sheetWindow)
             rule.waitForIdle()
-            val insets = insets()
+            SystemClock.sleep(SETTLE_MS)
+            val insets = rule.runOnUiThread { requireNotNull(ViewCompat.getRootWindowInsets(sheetWindow)) }
             val statusBar = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top
-            val keyboard = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
-            val window = rule.activity.window.decorView.height
+            val window = rule.runOnUiThread { sheetWindow.height }
             val sheet = rule.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.PaneTitle))
                 .fetchSemanticsNode().boundsInWindow
             val field = rule.onNode(hasSetTextAction()).fetchSemanticsNode().boundsInWindow
             shot("name-sheet-keyboard")
             Log.i(TAG, "Status bar $statusBar px, sheet ${sheet.top}..${sheet.bottom} px, field ${field.bottom} px")
             Log.i(TAG, "Window $window px, keyboard $keyboard px")
-            assertTrue("The keyboard inset is 0 px", keyboard > 0)
+            assertTrue("The keyboard inset is 0 px (API ${Build.VERSION.SDK_INT})", keyboard > 0)
             assertTrue("The sheet top ${sheet.top} is above the status bar ($statusBar px)", sheet.top >= statusBar)
             // The field stays above the keyboard: its bottom is not below the top of the keyboard.
             assertTrue(
@@ -114,8 +121,21 @@ class SheetAndDraftDeviceTest {
         shot("transcribing-new-text")
     }
 
-    private fun insets(): WindowInsetsCompat =
-        requireNotNull(ViewCompat.getRootWindowInsets(rule.activity.window.decorView))
+    /**
+     * Waits up to 5 s until the IME inset of [window] is above 0, and gives that inset (0 at the timeout). The window
+     * gets the inset some time after `dumpsys input_method` reports the keyboard. Before API 30 the sheet's dialog
+     * window resizes for the keyboard, so WindowInsetsCompat can find the IME inset there too.
+     */
+    private fun waitForKeyboardInset(window: View): Int {
+        val end = SystemClock.uptimeMillis() + KEYBOARD_MS
+        while (true) {
+            val inset = rule.runOnUiThread {
+                ViewCompat.getRootWindowInsets(window)?.getInsets(WindowInsetsCompat.Type.ime())?.bottom ?: 0
+            }
+            if (inset > 0 || SystemClock.uptimeMillis() >= end) return inset
+            SystemClock.sleep(POLL_MS)
+        }
+    }
 
     /** Waits up to 5 s for the soft keyboard; true when it opened. */
     private fun waitForKeyboard(): Boolean {

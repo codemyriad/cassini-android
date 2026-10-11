@@ -581,7 +581,11 @@ test. "Open" items need more work.
    `CassiniSheet` no longer adds its own IME padding. On emulator-5554,
    `SheetAndDraftDeviceTest.theNameSheetStaysBelowTheStatusBarWithTheKeyboardOpen` opened the keyboard. The top of
    the sheet was at 136 px, the bottom of the status bar. Without the correction, the same test found the top at
-   0 px. The goldens did not change, because they draw the sheets inline.
+   0 px. The goldens did not change, because they draw the sheets inline. The test also checks that the name
+   field stays above the keyboard. It reads the keyboard inset from the sheet's own dialog window, and it waits
+   until that inset is above 0. Three runs on emulator-5554 (API 34) passed: keyboard 833 px, field bottom 595 px,
+   window 2340 px. The CI emulators at API 26 and 29 did not run this check yet. Below API 30 the dialog window
+   resizes for the keyboard, so the inset is available there too.
 5. Resolved, with an owner question. A document with no words shows "No speech" on the Note screen (new deviation
    20, contract change 20). `ScreenBehaviourTest.aDocumentWithNoWordsSaysSo` and
    `NoteViewModelTest.aDocumentWithNoWordsSaysSoOnlyWhenItsTranscriptHasLoaded` cover this. The new golden is
