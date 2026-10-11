@@ -22,6 +22,7 @@ test "$(adb shell getprop ro.build.version.sdk | tr -d '\r')" = "${TEST_API:?Set
 # Rules for each API level of the matrix (google_apis x86_64 images):
 # - platform_opus: whether the image has a platform Opus encoder. PortableDocumentTest fails when the device does
 #   not agree, so a changed image is seen. The API 29 image has none; recordings there use AAC (capture.m4a).
+#   Empty: no expectation. No API 35 run has confirmed a value yet, so API 35 accepts either result.
 # - data_tests: also run the :data NoteFtsDeviceTest, the FTS4 tokenizer of the oldest SQLite in the matrix.
 # PortableDocumentTest's platform Opus round trip has @SdkSuppress for API 34 only, so the selection has one test
 # less on the other levels. The dry run of device-smoke.sh counts that.
@@ -30,14 +31,17 @@ case "$TEST_API" in
     26) platform_opus=false; data_tests=true ;;
     29) platform_opus=false ;;
     34) platform_opus=true ;;
-    35) platform_opus=true ;;
+    35) platform_opus= ;;
     *) printf 'Unsupported CI emulator API: %s\n' "$TEST_API" >&2; exit 1 ;;
 esac
 mkdir -p .tools/emulator-results
 trap 'adb logcat -d > .tools/emulator-results/logcat.txt 2>&1 || true' EXIT
 
 # The tests that need no models and no microphone. The dry run of the same selection gives the expected count.
-./scripts/device-smoke.sh --sample fleurs --annotation CiSmoke --arg "expectPlatformOpus=$platform_opus" \
+expectation=()
+if [ -n "$platform_opus" ]; then expectation=(--arg "expectPlatformOpus=$platform_opus"); fi
+# The workflow does not retry the job after this script prints the dry-run count (.github/workflows/android.yml).
+./scripts/device-smoke.sh --sample fleurs --annotation CiSmoke "${expectation[@]}" \
     | tee .tools/emulator-results/instrumentation.txt
 
 if $data_tests; then
