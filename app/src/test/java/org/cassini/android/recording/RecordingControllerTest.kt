@@ -74,7 +74,7 @@ class RecordingControllerTest {
                 }
             },
             consent = consent,
-            timing = RecordingController.Timing(tickMs = 10, serviceWaitMs = 2_000),
+            timing = RecordingController.Timing(tickMs = 10, serviceWaitMs = 2_000, wakeLockRenewMs = 50),
         )
         val config = AppGraph.Config(
             paths = paths,
@@ -98,7 +98,7 @@ class RecordingControllerTest {
         val active = startRecording("Riunione")
         assertEquals(CaptureFormat.OPUS, active.format)
         assertEquals(48_000, active.sampleRateHz)
-        assertEquals(1, platform.wakeLocks.get())
+        assertTrue("the wake lock is held", platform.wakeLocks.get() >= 1)
         val mic = capture.latest
         mic.gate = CountDownLatch(1)
         mic.elapsedMs = 61_000
@@ -182,15 +182,23 @@ class RecordingControllerTest {
 
     @Test fun aRecordingHasNoTimeLimitAndRenewsItsWakeLock() = runBlocking {
         val active = startRecording("Lunga")
-        assertEquals(1, platform.wakeLocks.get())
+        assertTrue("the wake lock is held", platform.wakeLocks.get() >= 1)
         // Past the old 2 h cap, and far past it: the recording goes on, with no warning.
         for (hours in listOf(2L, 3L, 100L)) {
             capture.latest.elapsedMs = hours * HOUR_MS
             waitFor { activeState().elapsedMs == hours * HOUR_MS }
             assertNull(activeState().warning)
         }
-        assertTrue("the wake lock is renewed", platform.wakeLocks.get() >= 3)
+        // The policy loop renews the wake lock (each 50 ms in this test, each minute in the app).
+        waitFor { platform.wakeLocks.get() >= 3 }
         assertTrue(platform.wakeLockHeld)
+        // A paused recording does not advance its clock, and the lock is still renewed.
+        controller.pause()
+        waitFor { activeState().pause != null }
+        val paused = platform.wakeLocks.get()
+        waitFor { platform.wakeLocks.get() >= paused + 2 }
+        controller.resume()
+        waitFor { activeState().pause == null }
         // The hint is the space only: 64 GiB at 6000 B/s.
         val spare = (64L shl 30) - Limits.MIN_RECORDING_FREE_BYTES
         assertEquals(spare * 1000 / RecordingPolicy.OPUS_BYTES_PER_SECOND, activeState().space.spaceMs)

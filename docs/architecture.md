@@ -839,7 +839,7 @@ The visible Recording screen calls `start(title)`, because Android 14 requires a
 2. It sets `activeNoteId`.
 3. It starts `RecordingService`, which first calls `startForeground(MICROPHONE)`.
 4. It makes the capture.
-5. It acquires the wake lock (10 min). The policy loop acquires it again each minute.
+5. It acquires the wake lock (10 min). The policy loop acquires it again each minute of loop time, also during a pause.
 6. It starts the policy loop of 1 s.
 
 If the start fails, the function deletes the empty directory and the row (`CouldNotStart`).

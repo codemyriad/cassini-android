@@ -72,6 +72,8 @@ class RecordingController(private val parts: Parts) {
         val titleDebounceMs: Long = 500,
         val levelSampleMs: Long = 100,
         val serviceWaitMs: Long = 10_000,
+        /** How often the policy loop renews the wake lock, in loop time (a paused recording also counts). */
+        val wakeLockRenewMs: Long = 60_000,
     )
 
     private enum class Stop { USER, SPACE, FILE_LIMIT, MICROPHONE }
@@ -89,7 +91,9 @@ class RecordingController(private val parts: Parts) {
     // Touched only on parts.dispatcher, except the capture, which the level sampler reads.
     @Volatile private var capture: MicrophoneCapture? = null
     private var policy: Job? = null
-    private var wakeLockRenewedAt = 0L
+
+    /** Loop time since the last renewal of the wake lock. */
+    private var sinceWakeLockMs = 0L
     private var titleWrite: Job? = null
     private var silence: SilenceWatch? = null
     private var fallbackTitle = ""
@@ -202,7 +206,7 @@ class RecordingController(private val parts: Parts) {
             }
             capture = mic
             parts.platform.acquireWakeLock()
-            wakeLockRenewedAt = 0L
+            sinceWakeLockMs = 0L
             silence = parts.platform.watchSilence(mic) { silenced -> work { onSilence(silenced) } }
             val typed = (mutableState.value as? RecordingState.Starting)?.title ?: title
             val usable = parts.platform.usableBytes(notes.directory(id))
@@ -277,7 +281,7 @@ class RecordingController(private val parts: Parts) {
         val current = mutableState.value as? RecordingState.Active
         if (mic == null || current == null) return null
         val elapsedMs = mic.elapsedMs
-        renewWakeLock(elapsedMs)
+        renewWakeLock()
         val usable = parts.platform.usableBytes(mic.file.parentFile ?: mic.file)
         val rate = bytesPerSecond(mic, current.format, elapsedMs)
         val decision = RecordingPolicy.decide(usable, rate, mic.file.length(), maxFileBytes(current.format))
@@ -291,9 +295,11 @@ class RecordingController(private val parts: Parts) {
         }
     }
 
-    private fun renewWakeLock(elapsedMs: Long) {
-        if (elapsedMs - wakeLockRenewedAt < WAKE_LOCK_RENEW_MS) return
-        wakeLockRenewedAt = elapsedMs
+    /** Counts loop time, not captured time: a long pause must not let the lock expire. */
+    private fun renewWakeLock() {
+        sinceWakeLockMs += timing.tickMs
+        if (sinceWakeLockMs < timing.wakeLockRenewMs) return
+        sinceWakeLockMs = 0L
         parts.platform.acquireWakeLock()
     }
 
@@ -446,9 +452,8 @@ class RecordingController(private val parts: Parts) {
         const val BARS = 56
         const val BAR_MS = 125L
 
-        /** How long the wake lock lasts without a renewal; the policy loop renews it each [WAKE_LOCK_RENEW_MS]. */
+        /** How long the wake lock lasts without a renewal; the policy loop renews it each [Timing.wakeLockRenewMs]. */
         const val WAKE_LOCK_TIMEOUT_MS = 10 * 60_000L
-        private const val WAKE_LOCK_RENEW_MS = 60_000L
 
         private const val TAG = "RecordingController"
         private const val MAX_AMPLITUDE = 32_767
