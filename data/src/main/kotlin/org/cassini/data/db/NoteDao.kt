@@ -45,9 +45,11 @@ abstract class NoteDao {
     @Query("SELECT id FROM notes WHERE trashed_at IS NOT NULL AND trashed_at < :cutoff ORDER BY trashed_at ASC")
     abstract suspend fun expired(cutoff: Long): List<String>
 
-    /** Ids of every trashed note (Empty trash). */
-    @Query("SELECT id FROM notes WHERE trashed_at IS NOT NULL ORDER BY trashed_at ASC")
-    abstract suspend fun trashed(): List<String>
+    /** Every trashed note with the time it went to Trash (Empty trash), oldest first. */
+    @Query(
+        "SELECT id, title, duration_ms, trashed_at FROM notes WHERE trashed_at IS NOT NULL ORDER BY trashed_at ASC, id",
+    )
+    abstract suspend fun trashed(): List<TrashRow>
 
     @Transaction
     @Query("SELECT * FROM notes WHERE id = :id")
@@ -213,6 +215,9 @@ abstract class NoteDao {
     @Query("UPDATE notes SET trashed_at = NULL, trashed_job = NULL, updated_at = :now WHERE id = :id")
     abstract suspend fun restore(id: String, now: Long)
 
+    @Query("UPDATE notes SET trashed_at = NULL, trashed_job = NULL, updated_at = :now WHERE id = :id")
+    protected abstract fun restoreBlocking(id: String, now: Long)
+
     @Query("SELECT * FROM jobs WHERE note_id = :id")
     protected abstract suspend fun jobOf(id: String): JobEntity?
 
@@ -238,6 +243,15 @@ abstract class NoteDao {
     open suspend fun untrash(id: String, now: Long): NoteEntity? {
         val row = note(id)?.takeIf { it.trashedAt != null } ?: return null
         restore(id, now)
+        return row
+    }
+
+    /** [untrash] for a caller that holds the note's lock (Restore, which the purge must not overlap). */
+    @WorkerThread
+    @Transaction
+    open fun untrashBlocking(id: String, now: Long): NoteEntity? {
+        val row = noteBlocking(id)?.takeIf { it.trashedAt != null } ?: return null
+        restoreBlocking(id, now)
         return row
     }
 }

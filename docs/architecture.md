@@ -546,6 +546,8 @@ The purge operates at each process start (after the database opens) and when the
 
 The files go before the row. After a crash in the middle, an expired row stays in the trash, and the next run finishes it. With the opposite sequence, the catalogue rebuild can bring the audio back. The purge does not unenrol saved people. This is an open question for the owner.
 
+The purge reads its list of notes first, and Restore can operate after that. Thus, before step 1, the purge claims the note under the lock of the note in `NoteLocks`. Under the lock, it reads the row again. It continues only if the note is still in the trash and the trash time agrees with the request: older than the cutoff for the expiry purge, the same time as in the list for "Empty". Restore takes the same lock. It refuses a note that a purge claimed. The claim ends when the purge ends. Thus, if the purge stops, the note stays in the trash, and Restore can bring it back. The claim is in memory in `NoteRepository`, because the app has one `NoteRepository`.
+
 The purge does not use WorkManager, for these reasons:
 
 - The copy promises "after 30 days".

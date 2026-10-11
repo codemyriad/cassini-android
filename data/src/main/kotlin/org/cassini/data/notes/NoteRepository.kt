@@ -28,6 +28,7 @@ import org.cassini.data.db.WordEntity
 import java.time.Instant
 import java.time.ZoneId
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 /** The rules of a note title (features.md section 6, Rename). */
 object NoteTitles {
@@ -65,6 +66,9 @@ class NoteRepository(
     private val notes = database.notes()
     private val cache = database.cache()
     private val jobs = database.jobs()
+
+    /** The notes that a purge claimed (see [purge]). An id goes in only under the note's lock. */
+    private val purging: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     // Reads.
 
@@ -214,35 +218,57 @@ class NoteRepository(
 
     /**
      * Restores a trashed note. A job that was QUEUED when the note was trashed goes back to the queue at the back;
-     * any other job row was kept as it was (a paused note stays paused).
+     * any other job row was kept as it was (a paused note stays paused). False when the note is not in Trash, or when
+     * its purge has begun: the purge then deletes it, and a restore never brings back part of a note.
      */
     suspend fun restore(id: String): Boolean {
-        val trashed = notes.untrash(id, clock()) ?: return false
+        val trashed = locks.withNoteLock(id, dispatchers.io) {
+            if (id in purging) null else notes.untrashBlocking(id, clock())
+        } ?: return false
         trashed.trashedJob?.takeIf { it.state == JobState.QUEUED }?.let { queue.requeueAtBack(id, it.kind) }
         return true
     }
 
     /** "Delete now" for one trashed note. False for a live note. */
-    suspend fun deleteNow(id: String): Boolean = notes.note(id)?.trashedAt != null && purge(id)
+    suspend fun deleteNow(id: String): Boolean = purge(id) { true }
 
-    /** "Empty": deletes every trashed note. Returns how many went. */
-    suspend fun emptyTrash(): Int = notes.trashed().count { purge(it) }
+    /**
+     * "Empty": deletes every note that was in Trash when it started. A note restored meanwhile stays, and so does a
+     * note that went to Trash again after that (a new trash time). Returns how many went.
+     */
+    suspend fun emptyTrash(): Int = notes.trashed().count { row -> purge(row.id) { it == row.trashedAt } }
 
     /** Deletes the trashed notes whose 30 days are over at [now] in [zone] (`TrashPolicy`). Returns how many went. */
-    suspend fun purgeExpired(now: Instant, zone: ZoneId): Int =
-        notes.expired(TrashPolicy.purgeCutoff(now, zone)).count { purge(it) }
+    suspend fun purgeExpired(now: Instant, zone: ZoneId): Int {
+        val cutoff = TrashPolicy.purgeCutoff(now, zone)
+        return notes.expired(cutoff).count { id -> purge(id) { it < cutoff } }
+    }
 
     /**
      * Deletes one note in the order of architecture 4.10: the job, the voice files, the note directory, then the row.
      * Files go before the row, so a crash midway leaves a trashed row that the next run finishes, and a catalogue
      * rebuild cannot bring the audio back. When a voice file or the directory cannot be deleted the row stays for the
      * next run.
+     *
+     * The lists of notes to purge are read before the purge, and Restore can run in between. Thus the purge first
+     * claims the note under its lock: it reads the row again there, and it continues only when the note is still in
+     * Trash and [eligible] accepts its trash time. Restore takes the same lock and refuses a claimed note. The claim
+     * ends with the purge, so a purge that stops keeps a trashed note that Restore can bring back.
      */
-    private suspend fun purge(id: String): Boolean {
-        queue.cancelAndRemove(id)
-        val deleted = cleaner.deleteForNote(id) && documents.deleteFiles(id)
-        if (deleted) notes.delete(id)
-        return deleted
+    private suspend fun purge(id: String, eligible: (trashedAt: Long) -> Boolean): Boolean {
+        val claimed = locks.withNoteLock(id, dispatchers.io) {
+            val trashedAt = notes.noteBlocking(id)?.trashedAt
+            trashedAt != null && eligible(trashedAt) && purging.add(id)
+        }
+        if (!claimed) return false
+        return try {
+            queue.cancelAndRemove(id)
+            val deleted = cleaner.deleteForNote(id) && documents.deleteFiles(id)
+            if (deleted) notes.delete(id)
+            deleted
+        } finally {
+            purging.remove(id)
+        }
     }
 
     /** The cached words of the selected variant (else the default, else the first readable one). */

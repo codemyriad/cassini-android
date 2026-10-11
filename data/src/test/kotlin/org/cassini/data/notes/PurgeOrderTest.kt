@@ -1,6 +1,10 @@
 package org.cassini.data.notes
 
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import org.cassini.core.library.JobKind
 import org.cassini.core.speakers.Match
 import org.cassini.core.speakers.NoteVoiceCodec
@@ -46,6 +50,9 @@ class PurgeOrderTest {
     /** Set to make the cleaner fail after it deleted the voice files, as a process death there would. */
     private var crashAfterVoices = false
 
+    /** Runs at the start of each purge step 1, before the job goes: a point where another caller can interleave. */
+    private var onCancel: suspend (String) -> Unit = {}
+
     private val purged = noteId(1)
     private val live = noteId(2)
     private val day = 24 * 60 * 60 * 1000L
@@ -81,6 +88,7 @@ class PurgeOrderTest {
 
             override suspend fun cancelAndRemove(noteId: String) {
                 events += "job voices=${voiceFile(noteId).exists()}"
+                onCancel(noteId)
                 jobs.cancelAndRemove(noteId)
             }
         }
@@ -182,5 +190,94 @@ class PurgeOrderTest {
         assertFalse(h.dir(purged).exists())
         assertTrue(voices.syncLinks().deleted.isEmpty())
         assertEquals(1, h.db.voiceLinks().all().size)
+    }
+
+    /** The state of a note that a restore brought back: its row is live and it keeps its files and links. */
+    private suspend fun assertKept(id: String) {
+        val row = h.db.notes().note(id)
+        assertNotNull(row)
+        assertNull(row!!.trashedAt)
+        assertTrue(h.dir(id).exists() && voiceFile(id).exists())
+        assertEquals(1, h.db.voiceLinks().links(id).size)
+    }
+
+    @Test fun aRestoreAfterTheTrashSnapshotKeepsTheNote() = runTest {
+        val repo = notes()
+        repo.moveToTrash(purged)
+        h.now += 1
+        repo.moveToTrash(live)
+        // Empty took its list of trashed notes; the user restores the second note while the first one goes.
+        var restored = false
+        onCancel = { id -> if (id == purged) restored = repo.restore(live) }
+
+        assertEquals(1, repo.emptyTrash())
+
+        assertTrue(restored)
+        assertKept(live)
+        assertNull(h.db.notes().note(purged))
+    }
+
+    @Test fun anExpiredNoteRestoredAndTrashedAgainIsNotPurged() = runTest {
+        val repo = notes()
+        repo.moveToTrash(purged)
+        repo.moveToTrash(live)
+        h.now += 31 * day
+        // After the expiry query, the second note goes back to the Library and then to Trash again: its 30 days start
+        // again.
+        onCancel = { id ->
+            if (id == purged) {
+                check(repo.restore(live))
+                check(repo.moveToTrash(live))
+            }
+        }
+
+        assertEquals(1, purgeNow(repo))
+
+        assertNotNull(h.db.notes().note(live)?.trashedAt)
+        assertTrue(h.dir(live).exists() && voiceFile(live).exists())
+    }
+
+    @Test fun aRestoreDuringThePurgeOfTheSameNoteIsRefused() = runTest {
+        val repo = notes()
+        repo.moveToTrash(purged)
+        var restored: Boolean? = null
+        onCancel = { id -> if (id == purged) restored = repo.restore(purged) }
+
+        assertTrue(repo.deleteNow(purged))
+
+        assertEquals("a note that the purge took cannot come back", false, restored)
+        assertNull(h.db.notes().note(purged))
+        assertFalse(h.dir(purged).exists())
+    }
+
+    @Test fun aRestoreRacingThePurgeNeverLosesARestoredNote() = runTest {
+        val repo = notes()
+        repo.moveToTrash(purged)
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        onCancel = {
+            started.complete(Unit)
+            release.await()
+        }
+        val purge = async(Dispatchers.IO) { repo.deleteNow(purged) }
+        started.await()
+        // The restore runs on another thread while the purge waits in its first step.
+        val restored = withContext(Dispatchers.IO) { repo.restore(purged) }
+        release.complete(Unit)
+        val deleted = purge.await()
+
+        assertTrue("exactly one of them wins", restored != deleted)
+        if (restored) assertKept(purged) else assertNull(h.db.notes().note(purged))
+    }
+
+    @Test fun aRestoreAfterAFailedPurgeBringsTheNoteBack() = runTest {
+        crashAfterVoices = true
+        val repo = notes()
+        repo.moveToTrash(purged)
+        assertTrue(runCatching { repo.deleteNow(purged) }.exceptionOrNull() is IOException)
+
+        assertTrue("the purge gave the note back", repo.restore(purged))
+        assertNull(h.db.notes().note(purged)?.trashedAt)
+        assertTrue(h.dir(purged).exists())
     }
 }
