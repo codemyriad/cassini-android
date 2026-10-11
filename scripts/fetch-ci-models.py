@@ -6,34 +6,52 @@ Usage: scripts/fetch-ci-models.py [--dest DIR] [--print-key]
 The default DIR is .tools/ci-models. Each model goes into DIR/<directory>/ and gets its marker file after every
 file has its pinned size and SHA-256, as the app installs it. Files that are already correct are not downloaded
 again, so a restored cache costs only the hash checks. scripts/push-models.sh copies DIR into the app on a device.
+It needs Python 3.10 or later, and the zstd tool before Python 3.14.
 --print-key prints a cache key made from the SHA-256 values of the list and downloads nothing.
 """
 
 import argparse
 import hashlib
+import http.client
 import json
 import shutil
 import subprocess
+import time
 import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MODELS = ROOT / "scripts/ci-models.json"
+ATTEMPTS = 3
+CHUNK = 1024 * 1024
 
 
 def matches(path: Path, artifact: dict) -> bool:
     if not path.is_file() or path.stat().st_size != artifact["size"]:
         return False
+    digest = hashlib.sha256()
     with path.open("rb") as source:
-        return hashlib.file_digest(source, "sha256").hexdigest() == artifact["sha256"]
+        while chunk := source.read(CHUNK):
+            digest.update(chunk)
+    return digest.hexdigest() == artifact["sha256"]
 
 
 def download(artifact: dict, target: Path) -> None:
     partial = target.with_name(target.name + ".part")
-    print(f"Downloading {artifact['url']}", flush=True)
     request = urllib.request.Request(artifact["url"], headers={"User-Agent": "cassini-android-ci"})
-    with urllib.request.urlopen(request, timeout=60) as response, partial.open("wb") as output:
-        shutil.copyfileobj(response, output, 1024 * 1024)
+    for attempt in range(1, ATTEMPTS + 1):
+        print(f"Downloading {artifact['url']} (attempt {attempt} of {ATTEMPTS})", flush=True)
+        partial.unlink(missing_ok=True)
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response, partial.open("wb") as output:
+                shutil.copyfileobj(response, output, CHUNK)
+            break
+        except (OSError, http.client.HTTPException) as error:
+            partial.unlink(missing_ok=True)
+            if attempt == ATTEMPTS:
+                raise SystemExit(f"Cannot download {artifact['url']}: {error}") from error
+            print(f"The download failed: {error}", flush=True)
+            time.sleep(10 * attempt)
     if not matches(partial, artifact):
         partial.unlink()
         raise SystemExit(f"{artifact['url']} does not have the pinned size and SHA-256.")
@@ -46,9 +64,12 @@ def decompress(source: Path, target: Path) -> None:
         from compression import zstd  # Python 3.14+
 
         with zstd.open(source, "rb") as data, partial.open("wb") as output:
-            shutil.copyfileobj(data, output, 1024 * 1024)
+            shutil.copyfileobj(data, output, CHUNK)
     except ImportError:
-        subprocess.run(["zstd", "-q", "-d", "-f", str(source), "-o", str(partial)], check=True)
+        try:
+            subprocess.run(["zstd", "-q", "-d", "-f", str(source), "-o", str(partial)], check=True)
+        except FileNotFoundError:
+            raise SystemExit(f"Install the zstd tool (or use Python 3.14 or later) to unpack {source.name}.") from None
     partial.replace(target)
 
 
