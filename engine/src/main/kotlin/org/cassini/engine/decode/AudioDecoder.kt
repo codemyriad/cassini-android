@@ -139,8 +139,8 @@ class AudioDecoder(private val resolver: ContentResolver, private val cacheDir: 
             var encoding = AudioFormat.ENCODING_PCM_16BIT
             var resampler: StreamingResampler? = null
             var mono = FloatArray(0)
-            var count = 0
-            var next: Int? = null
+            var count = 0L
+            var next: Long? = null
             var inputEnded = false
             var outputEnded = false
             var reseek = false
@@ -154,7 +154,7 @@ class AudioDecoder(private val resolver: ContentResolver, private val cacheDir: 
                     codec.flush()
                     backOffUs *= 2
                     extractor.seekTo(seekUs(), MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
-                    next = null; count = 0; inputEnded = false
+                    next = null; count = 0L; inputEnded = false
                     lastProgress = System.nanoTime()
                 }
                 // Block only when neither side moved: a fixed wait per packet made an hour of Opus take minutes.
@@ -179,7 +179,7 @@ class AudioDecoder(private val resolver: ContentResolver, private val cacheDir: 
                     MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                         val output = codec.outputFormat
                         val nextRate = output.getInteger(MediaFormat.KEY_SAMPLE_RATE)
-                        requireUser(count == 0 || nextRate == sampleRate, Failure.AUDIO)
+                        requireUser(count == 0L || nextRate == sampleRate, Failure.AUDIO)
                         sampleRate = nextRate
                         channels = output.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
                         encoding = if (output.containsKey(MediaFormat.KEY_PCM_ENCODING))
@@ -196,7 +196,7 @@ class AudioDecoder(private val resolver: ContentResolver, private val cacheDir: 
                                 val sampleBytes = if (encoding == AudioFormat.ENCODING_PCM_FLOAT) 4 else 2
                                 requireUser(info.size % (sampleBytes * channels) == 0, Failure.AUDIO)
                                 val frames = info.size / (sampleBytes * channels)
-                                requireUser(info.presentationTimeUs <= Limits.MAX_RECORDING_MS * 1000 + (if (opusSamples != null) 120_000 else 0), Failure.LONG)
+                                requireUser(info.presentationTimeUs <= Limits.MAX_TRANSCRIBE_MS * 1000 + (if (opusSamples != null) 120_000 else 0), Failure.LONG)
                                 // MP3 output is contiguous after the first buffer, whatever the timestamps say.
                                 val firstFrame = gapless?.let { g ->
                                     next ?: (WavDecoder.framePosition(info.presentationTimeUs, sampleRate, null) - g.delay)
@@ -208,7 +208,7 @@ class AudioDecoder(private val resolver: ContentResolver, private val cacheDir: 
                                         continue
                                     }
                                     // From the very start, a late first frame is a real leading gap, as in a full decode.
-                                    count = if (firstFrame > firstNeededFrame(sampleRate, startSample)) 0 else firstFrame
+                                    count = if (firstFrame > firstNeededFrame(sampleRate, startSample)) 0L else firstFrame
                                 }
                                 next = firstFrame + frames
                                 // The verified end of the audio: the Ogg EOS sample count, or the length in the LAME tag.
@@ -217,13 +217,13 @@ class AudioDecoder(private val resolver: ContentResolver, private val cacheDir: 
                                     ?: frames
                                 // Keep real container gaps as silence. The player and words share a zero origin.
                                 // An overlap keeps the audio already passed on: the resampler only moves forward.
-                                val skip = (count - firstFrame).coerceIn(0, playableFrames)
+                                val skip = (count - firstFrame).coerceIn(0L, playableFrames.toLong()).toInt()
                                 if (playableFrames > skip) {
-                                    val stream = resampler ?: StreamingResampler(sampleRate, count.toLong(), startSample) { samples, size ->
+                                    val stream = resampler ?: StreamingResampler(sampleRate, count, startSample) { samples, size ->
                                         out?.append(samples, size)
                                         onSamples(samples, size)
                                     }.also { resampler = it }
-                                    if (firstFrame > count) stream.silence((firstFrame - count).toLong())
+                                    if (firstFrame > count) stream.silence(firstFrame - count)
                                     buffer.position(info.offset + skip * sampleBytes * channels)
                                     if (mono.size < frames) mono = FloatArray(frames)
                                     for (frame in 0 until playableFrames - skip) {

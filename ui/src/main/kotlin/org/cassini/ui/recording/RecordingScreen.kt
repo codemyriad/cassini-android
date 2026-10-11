@@ -234,7 +234,6 @@ private fun caption(state: RecordingUiState): String = when (state.phase) {
     RecordingPhase.Stopping -> stringResource(R.string.ui_recording_stopping)
     RecordingPhase.Recording, RecordingPhase.Paused -> when (val hint = state.hint) {
         is RecordingHint.Space -> Durations.spaceHint(hint.ms)
-        is RecordingHint.Cap -> Durations.capHint(hint.ms)
         null -> stringResource(R.string.ui_recording_hint)
     }
 }

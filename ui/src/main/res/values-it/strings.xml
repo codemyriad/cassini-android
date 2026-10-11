@@ -176,7 +176,6 @@
     <string name="ui_recording_waveform">Livello del microfono, ultimi 7 secondi</string>
     <string name="ui_recording_hint">Continua a registrare a schermo spento o in un’altra app.</string>
     <string name="ui_recording_hint_space">Spazio per circa %1$s ancora.</string>
-    <string name="ui_recording_hint_cap">Si ferma a 2 ore, tra circa %1$s.</string>
     <string name="ui_recording_library">Libreria</string>
     <string name="ui_recording_pause">Metti in pausa la registrazione</string>
     <string name="ui_recording_resume">Riprendi la registrazione</string>
@@ -468,12 +467,8 @@
     <string name="ui_banner_rec_paused_other_app_body">Riprendi quando finisce la chiamata. Non si è perso nulla.</string>
     <string name="ui_banner_rec_storage_low_title">Memoria quasi piena — restano circa %1$s</string>
     <string name="ui_banner_rec_storage_low_body">Libera spazio per continuare. Se si esaurisce, la registrazione viene salvata automaticamente.</string>
-    <plurals name="ui_banner_rec_near_limit_title">
-        <item quantity="one">Si ferma automaticamente tra %1$s minuto</item>
-        <item quantity="many">Si ferma automaticamente tra %1$s minuti</item>
-        <item quantity="other">Si ferma automaticamente tra %1$s minuti</item>
-    </plurals>
-    <string name="ui_banner_rec_near_limit_body">La registrazione fin qui è salvata.</string>
+    <string name="ui_banner_rec_stopped_file_title">Fermata — file della registrazione pieno</string>
+    <string name="ui_banner_rec_stopped_file_body">Il file ha raggiunto la dimensione massima che questo telefono può salvare. La registrazione fin qui è salvata.</string>
     <string name="ui_banner_rec_stopped_storage_title">Fermata — memoria quasi piena</string>
     <string name="ui_banner_rec_stopped_storage_body">Meno di %1$s liberi. La registrazione fin qui è salvata.</string>
     <string name="ui_banner_rec_mic_off_title">L’accesso al microfono è disattivato</string>
@@ -493,6 +488,7 @@
     <string name="ui_banner_tx_paused_body">Riprendi da dove avevi lasciato. La bozza fin qui è conservata.</string>
     <string name="ui_banner_tx_paused_early_title">In pausa prima di trovare parole</string>
     <string name="ui_banner_tx_paused_early_body">Riprendi per iniziare la trascrizione.</string>
+    <string name="ui_banner_tx_paused_system_body">L’ha messa in pausa Android: il lavoro in background ha un limite di circa 6 ore al giorno. Riprendi per continuare da dove si è fermata.</string>
     <plurals name="ui_banner_tx_queue_held_title">
         <item quantity="one">Trascrizione in pausa · %1$s in attesa</item>
         <item quantity="many">Trascrizione in pausa · %1$s in attesa</item>
@@ -536,7 +532,7 @@
     <string name="ui_banner_lib_no_match_body">Prova un’altra parola o un titolo.</string>
     <string name="ui_banner_importing_title">Importazione di %1$s…</string>
     <string name="ui_banner_import_too_large_title">File troppo grande</string>
-    <string name="ui_banner_import_too_large_body">Scegli un file sotto i 2 GB.</string>
+    <string name="ui_banner_import_too_large_body">Scegli un file sotto i 4 GB.</string>
     <string name="ui_banner_import_no_space_title">Spazio insufficiente per importare</string>
     <string name="ui_banner_import_no_space_body">Questo file richiede circa %1$s liberi. Libera spazio e riprova.</string>
     <string name="ui_banner_import_wav_title">WAV non supportato</string>

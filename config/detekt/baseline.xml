@@ -14,7 +14,7 @@
     <ID>ArgumentListWrapping:AudioDecoder.kt$AudioDecoder$(ByteOrder.nativeOrder())</ID>
     <ID>ArgumentListWrapping:AudioDecoder.kt$AudioDecoder$(encoding == AudioFormat.ENCODING_PCM_16BIT || encoding == AudioFormat.ENCODING_PCM_FLOAT, Failure.AUDIO)</ID>
     <ID>ArgumentListWrapping:AudioDecoder.kt$AudioDecoder$(file, onSamples, retainPcm, startSample, onProgress)</ID>
-    <ID>ArgumentListWrapping:AudioDecoder.kt$AudioDecoder$(info.presentationTimeUs &lt;= Limits.MAX_RECORDING_MS * 1000 + (if (opusSamples != null) 120_000 else 0), Failure.LONG)</ID>
+    <ID>ArgumentListWrapping:AudioDecoder.kt$AudioDecoder$(info.presentationTimeUs &lt;= Limits.MAX_TRANSCRIBE_MS * 1000 + (if (opusSamples != null) 120_000 else 0), Failure.LONG)</ID>
     <ID>ArgumentListWrapping:AudioDecoder.kt$AudioDecoder$(sampleRate, startSample)</ID>
     <ID>ArgumentListWrapping:BatteryReader.kt$BatteryReader$(elapsedMs, (level * 100 / scale).coerceIn(0, 100), intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0, charge)</ID>
     <ID>ArgumentListWrapping:CassiniDocument.kt$CassiniDocument$("label")</ID>
@@ -608,7 +608,7 @@
     <ID>ArgumentListWrapping:WavDecoderTest.kt$WavDecoderTest$(16)</ID>
     <ID>ArgumentListWrapping:WavDecoderTest.kt$WavDecoderTest$(4)</ID>
     <ID>ArgumentListWrapping:WavDecoderTest.kt$WavDecoderTest$(Failure.LONG, e.failure)</ID>
-    <ID>ArgumentListWrapping:WavDecoderTest.kt$WavDecoderTest$(Limits.MAX_RECORDING_MS + 1)</ID>
+    <ID>ArgumentListWrapping:WavDecoderTest.kt$WavDecoderTest$(Limits.MAX_TRANSCRIBE_MS + 1)</ID>
     <ID>ArgumentListWrapping:WavDecoderTest.kt$WavDecoderTest$(OggOpus.HEAD_BYTES.toLong())</ID>
     <ID>ArgumentListWrapping:WavDecoderTest.kt$WavDecoderTest$(channels * 2)</ID>
     <ID>ArgumentListWrapping:WavDecoderTest.kt$WavDecoderTest$(channels)</ID>
@@ -1004,7 +1004,7 @@
     <ID>MaxLineLength:AudioDecoder.kt$AudioDecoder$String(header, 8, 4, Charsets.US_ASCII) == "WAVE"</ID>
     <ID>MaxLineLength:AudioDecoder.kt$AudioDecoder$private</ID>
     <ID>MaxLineLength:AudioDecoder.kt$AudioDecoder$requireUser(encoding == AudioFormat.ENCODING_PCM_16BIT || encoding == AudioFormat.ENCODING_PCM_FLOAT, Failure.AUDIO)</ID>
-    <ID>MaxLineLength:AudioDecoder.kt$AudioDecoder$requireUser(info.presentationTimeUs &lt;= Limits.MAX_RECORDING_MS * 1000 + (if (opusSamples != null) 120_000 else 0), Failure.LONG)</ID>
+    <ID>MaxLineLength:AudioDecoder.kt$AudioDecoder$requireUser(info.presentationTimeUs &lt;= Limits.MAX_TRANSCRIBE_MS * 1000 + (if (opusSamples != null) 120_000 else 0), Failure.LONG)</ID>
     <ID>MaxLineLength:AudioDecoder.kt$AudioDecoder$val playableFrames = opusSamples?.let { minOf(frames.toLong(), (it * sampleRate / 48000 - firstFrame).coerceAtLeast(0)).toInt() } ?: frames</ID>
     <ID>MaxLineLength:CassiniDocument.kt$CassiniDocument$Variant</ID>
     <ID>MaxLineLength:CassiniDocument.kt$CassiniDocument.Companion$"CASSINI_DECODE_HINT=Concatenate CASSINI_PAYLOAD_000..N for the manifest; for a transcript body concatenate CASSINI_TX_&lt;ID&gt;_PAYLOAD_000..N. Each chunk set: base64url decode, gzip decompress, parse UTF-8 JSON."</ID>
@@ -1111,7 +1111,7 @@
     <ID>MaxLineLength:VoiceprintSelection.kt$Voiceprints$PrintWindow((s * sampleRate / 1000).toInt().coerceIn(0, totalSamples), (e * sampleRate / 1000).toInt().coerceIn(0, totalSamples))</ID>
     <ID>MaxLineLength:VoiceprintSelection.kt$Voiceprints$if</ID>
     <ID>MaxLineLength:WavDecoder.kt$WavDecoder$fun</ID>
-    <ID>MaxLineLength:WavDecoderTest.kt$WavDecoderTest$try { Limits.requireDuration(Limits.MAX_RECORDING_MS + 1); fail() } catch (e: UserFacingException) { assertEquals(Failure.LONG, e.failure) }</ID>
+    <ID>MaxLineLength:WavDecoderTest.kt$WavDecoderTest$try { Limits.requireDuration(Limits.MAX_TRANSCRIBE_MS + 1); fail() } catch (e: UserFacingException) { assertEquals(Failure.LONG, e.failure) }</ID>
     <ID>MaxLineLength:WavDecoderTest.kt$WavDecoderTest$val data = java.nio.ByteBuffer.allocate(pcm.size * 2).order(java.nio.ByteOrder.LITTLE_ENDIAN).also { b -&gt; pcm.forEach { b.putShort(it) } }.array()</ID>
     <ID>MaxLineLength:WordGate.kt$WordGate$fun</ID>
     <ID>MaxLineLength:WordGateTest.kt$WordGateTest$assertEquals("$rate Hz", listOf(word("Okay.", 1000, 1600)), WordGate.filterWordsByEnergy(samples, rate, listOf(timed("Okay.", 1000, 1150, 2500))))</ID>
@@ -1635,7 +1635,7 @@
     <ID>Wrapping:WavDecoderTest.kt$WavDecoderTest$;</ID>
     <ID>Wrapping:WavDecoderTest.kt$WavDecoderTest$b.putShort(it)</ID>
     <ID>Wrapping:WavDecoderTest.kt$WavDecoderTest$sum += pcm[f * channels + it] / 32768f</ID>
-    <ID>Wrapping:WavDecoderTest.kt$WavDecoderTest${ Limits.requireDuration(Limits.MAX_RECORDING_MS + 1); fail() }</ID>
+    <ID>Wrapping:WavDecoderTest.kt$WavDecoderTest${ Limits.requireDuration(Limits.MAX_TRANSCRIBE_MS + 1); fail() }</ID>
     <ID>Wrapping:WavDecoderTest.kt$WavDecoderTest${ assertEquals(Failure.LONG, e.failure) }</ID>
     <ID>Wrapping:WordGateTest.kt$WordGateTest$(</ID>
     <ID>Wrapping:WordGateTest.kt$WordGateTest$(listOf( timed("straddles", 900, 1100, 1400), timed("boundary", 1000, 1000, 1400), timed("inside", 800, 900, 950), ), 1000, 32)</ID>

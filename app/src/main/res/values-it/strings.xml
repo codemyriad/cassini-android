@@ -1,8 +1,8 @@
 <resources>
     <string name="app_name">Cassini</string>
     <string name="error_open">Impossibile aprire la registrazione. Seleziona di nuovo il file.</string>
-    <string name="error_large">Il file è troppo grande. Scegli un file sotto i 2 GB.</string>
-    <string name="error_long">Scegli una registrazione di massimo 2 ore.</string>
+    <string name="error_large">Il file è troppo grande. Scegli un file sotto i 4 GB.</string>
+    <string name="error_long">Questa registrazione è troppo lunga da trascrivere. Cassini trascrive fino a 36 ore di audio, con circa 11 ore di parlato.</string>
     <string name="error_short">Scegli almeno 200 millisecondi di audio.</string>
     <string name="error_audio">Impossibile leggere l’audio. Prova WAV PCM16, MP3, M4A o Opus.</string>
     <string name="error_wav">Usa un WAV PCM a 16 bit, oppure MP3, M4A o Opus.</string>
@@ -81,8 +81,8 @@
     <string name="notif_ready_text">%1$s è in attesa. Apri Cassini per iniziare.</string>
     <string name="notif_ready_public">Una nota è in attesa. Apri Cassini per iniziare.</string>
     <string name="notif_paused_title">Trascrizione sospesa da Android</string>
-    <string name="notif_paused_text">In pausa a %1$s di %2$s. Apri per riprendere.</string>
-    <string name="notif_paused_text_early">In pausa prima di trovare parole. Apri per riprendere.</string>
+    <string name="notif_paused_text">In pausa a %1$s di %2$s. Android limita il lavoro in background a circa 6 ore al giorno. Apri Cassini per riprendere.</string>
+    <string name="notif_paused_text_early">In pausa prima di trovare parole. Android limita il lavoro in background a circa 6 ore al giorno. Apri Cassini per riprendere.</string>
     <string name="notif_paused_public">Apri Cassini per riprendere.</string>
     <string name="notif_stopped_title">Trascrizione interrotta</string>
     <string name="notif_stopped_text">Cassini si è chiuso durante la trascrizione di %1$s.</string>
@@ -96,11 +96,11 @@
     <string name="notif_rec_saving">Salvataggio della registrazione…</string>
     <string name="notif_rec_other_app">In pausa — un\'altra app sta usando l\'audio</string>
     <string name="notif_rec_storage_low">Spazio quasi esaurito — circa %1$d min rimasti</string>
-    <string name="notif_rec_near_limit">Si ferma automaticamente tra 5 minuti</string>
     <string name="notif_action_pause">Pausa</string>
     <string name="notif_action_finish">Termina</string>
     <string name="notif_rec_stopped_title">Registrazione interrotta</string>
     <string name="notif_rec_stopped_text">Meno di 200 MB liberi. La registrazione fatta finora è salvata.</string>
+    <string name="notif_rec_file_full_text">Il file della registrazione è pieno. La registrazione fatta finora è salvata.</string>
     <string name="notif_rec_failed_title">Il microfono ha smesso di funzionare</string>
     <string name="notif_rec_failed_text">Registrazione terminata. L\'audio registrato finora è nella libreria.</string>
 </resources>

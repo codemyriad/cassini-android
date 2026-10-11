@@ -157,9 +157,9 @@ class StateVariantsTest : BoardTest() {
 
     @Test fun recordingStorageLow() = recording("recording-storage-low")
 
-    @Test fun recordingNearLimit() = recording("recording-near-limit")
+    @Test fun recordingStoppedFileLimit() = recording("recording-stopped-file-limit")
 
-    @Test fun recordingCapHint() = recording("recording-cap-hint")
+    @Test fun recordingLongHint() = recording("recording-long-hint")
 
     // Note modes other than Read & listen (features.md sections 3, 3.1 and 3.2).
 

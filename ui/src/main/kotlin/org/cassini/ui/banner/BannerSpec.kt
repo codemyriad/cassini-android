@@ -29,7 +29,8 @@ data class BannerSpec(
  * milliseconds and sizes bytes, so the copy is formatted in the shown language.
  *
  * [part] is an addition to ui.md section 7: the download banner names the part it downloads. [bySystem] is an
- * addition too: DL_STOPPED says that Android stopped the download, not the connection.
+ * addition too: DL_STOPPED says that Android stopped the download, not the connection, and TX_PAUSED and
+ * TX_PAUSED_EARLY say that Android paused the transcription.
  */
 @Immutable
 data class BannerArgs(

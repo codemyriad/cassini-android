@@ -2,6 +2,8 @@ package org.cassini.engine.job
 
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import org.cassini.core.audio.Limits
+import org.cassini.core.format.WordBodyBudget
 import java.io.File
 import java.util.UUID
 
@@ -23,6 +25,8 @@ class JobEngines(
  * (architecture section 5.7) for the known duration (null when not known): it only adds a hint to the progress card.
  * [warn] logs a best-effort failure. [syncFile] runs the fsync of a work file (`clips.pcm`, `work/sealed.opus`);
  * tests use it to record that the fsync comes before the checkpoint or the marker that counts on it.
+ * [maxDurationMs] and [maxBodyBytes] are the length limits of one transcription (`Limits.MAX_TRANSCRIBE_MS`,
+ * `WordBodyBudget.MAX_BYTES`); tests make them small.
  */
 @Suppress("LongParameterList") // one hook per thing the app provides; all but the label have defaults
 class JobEnvironment(
@@ -34,4 +38,6 @@ class JobEnvironment(
     val lowMemory: (durationMs: Long?) -> Boolean = { false },
     val warn: (String, Throwable) -> Unit = { _, _ -> },
     val syncFile: (File, () -> Unit) -> Unit = { _, sync -> sync() },
+    val maxDurationMs: Long = Limits.MAX_TRANSCRIBE_MS,
+    val maxBodyBytes: Long = WordBodyBudget.MAX_BYTES,
 )

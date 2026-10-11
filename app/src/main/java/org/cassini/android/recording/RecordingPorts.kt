@@ -20,7 +20,6 @@ import org.cassini.android.processing.ProcessingCoordinator
 import org.cassini.android.processing.ServiceStarter
 import org.cassini.android.processing.StartOrigin
 import org.cassini.android.processing.TranscribeOutcome
-import org.cassini.core.audio.Limits
 import org.cassini.core.library.JobKind
 import org.cassini.data.models.ModelRepository
 import org.cassini.data.notes.NoteRepository
@@ -61,6 +60,10 @@ interface RecordingPlatform {
     /** `startForegroundService(RecordingService)` inside a catch; false when Android refused the start. */
     fun startService(): Boolean
 
+    /**
+     * Holds the CPU awake for the next [RecordingController.WAKE_LOCK_TIMEOUT_MS]. The policy loop calls it again
+     * each minute, so the lock lasts as long as the recording, and a process that stops calling it lets it go.
+     */
     fun acquireWakeLock()
 
     fun releaseWakeLock()
@@ -102,7 +105,7 @@ class AndroidRecordingPlatform(context: Context) : RecordingPlatform {
                 it.setReferenceCounted(false)
                 wakeLock = it
             }
-        lock?.acquire(WAKE_LOCK_TIMEOUT_MS)
+        lock?.acquire(RecordingController.WAKE_LOCK_TIMEOUT_MS)
     }
 
     @Synchronized
@@ -178,9 +181,6 @@ class AndroidRecordingPlatform(context: Context) : RecordingPlatform {
     private companion object {
         const val TAG = "RecordingService"
         const val WAKE_LOCK_TAG = "Cassini:recording"
-
-        /** The 2 h cap plus 10 minutes. */
-        const val WAKE_LOCK_TIMEOUT_MS = Limits.MAX_RECORDING_MS + 10 * 60_000L
     }
 }
 

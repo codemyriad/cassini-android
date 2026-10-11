@@ -35,10 +35,14 @@ import java.io.File
  *
  * - [start] is called from the visible Recording screen (the Android 14 rule for a microphone service): it creates
  *   the LIVE_CAPTURE row, starts `RecordingService` and waits until it is in the foreground, then starts the capture,
- *   the wake lock (2 h 10 min) and the policy loop. A failed start removes the row and its directory (CouldNotStart).
+ *   the wake lock (renewed each minute) and the policy loop. A failed start removes the row and its directory
+ *   (CouldNotStart).
  * - Title edits are written to the row 500 ms after the last change; [finish] writes the final value.
+ * - A recording has no time limit. The policy loop stops it only when the free space falls below the floor, or when
+ *   an AAC file reaches its size limit (`RecordingPolicy`); the stop saves the audio first.
  * - [finish] stops the capture, makes the row PLAIN, hands the note to processing when transcription follows (with
- *   consent; never after a storage stop or a microphone failure), then ends with [RecordingState.Ended].
+ *   consent; never after a storage or file-limit stop or a microphone failure), then ends with
+ *   [RecordingState.Ended].
  * - Another app that silences the capture pauses it (OTHER_APP); it stays paused until the user resumes.
  */
 @Suppress("TooManyFunctions") // the recording API of architecture 5.8 plus one helper per step of start and finish
@@ -70,7 +74,7 @@ class RecordingController(private val parts: Parts) {
         val serviceWaitMs: Long = 10_000,
     )
 
-    private enum class Stop { USER, TIME_LIMIT, SPACE, MICROPHONE }
+    private enum class Stop { USER, SPACE, FILE_LIMIT, MICROPHONE }
 
     private enum class Service { IDLE, WAITING, FOREGROUND, REFUSED }
 
@@ -85,6 +89,7 @@ class RecordingController(private val parts: Parts) {
     // Touched only on parts.dispatcher, except the capture, which the level sampler reads.
     @Volatile private var capture: MicrophoneCapture? = null
     private var policy: Job? = null
+    private var wakeLockRenewedAt = 0L
     private var titleWrite: Job? = null
     private var silence: SilenceWatch? = null
     private var fallbackTitle = ""
@@ -197,6 +202,7 @@ class RecordingController(private val parts: Parts) {
             }
             capture = mic
             parts.platform.acquireWakeLock()
+            wakeLockRenewedAt = 0L
             silence = parts.platform.watchSilence(mic) { silenced -> work { onSilence(silenced) } }
             val typed = (mutableState.value as? RecordingState.Starting)?.title ?: title
             val usable = parts.platform.usableBytes(notes.directory(id))
@@ -208,7 +214,7 @@ class RecordingController(private val parts: Parts) {
                 sampleRateHz = format.sampleRateHz,
                 elapsedMs = mic.elapsedMs,
                 pause = null,
-                space = RecordingSpace.of(mic.elapsedMs, usable, format.nominalBytesPerSecond),
+                space = space(mic, format, usable, format.nominalBytesPerSecond),
                 warning = null,
             )
             if (typed != title) scheduleTitle()
@@ -262,27 +268,41 @@ class RecordingController(private val parts: Parts) {
         }
     }
 
-    /** One policy decision (`RecordingPolicy`); returns the stop it asks for. */
+    /**
+     * One policy decision (`RecordingPolicy`); returns the stop it asks for. Each minute it also renews the wake lock,
+     * because a recording has no end that the lock could wait for.
+     */
     private fun tick(): Stop? {
         val mic = capture
         val current = mutableState.value as? RecordingState.Active
         if (mic == null || current == null) return null
         val elapsedMs = mic.elapsedMs
+        renewWakeLock(elapsedMs)
         val usable = parts.platform.usableBytes(mic.file.parentFile ?: mic.file)
         val rate = bytesPerSecond(mic, current.format, elapsedMs)
-        val decision = RecordingPolicy.decide(elapsedMs, usable, rate)
-        val warning = when (decision) {
-            is RecordingPolicy.Decision.StorageLow -> RecordingWarning.StorageLow(decision.minutes)
-            is RecordingPolicy.Decision.NearTimeLimit -> RecordingWarning.NearTimeLimit(decision.msLeft)
-            else -> null
-        }
-        update { it.copy(elapsedMs = elapsedMs, space = RecordingSpace.of(elapsedMs, usable, rate), warning = warning) }
+        val decision = RecordingPolicy.decide(usable, rate, mic.file.length(), maxFileBytes(current.format))
+        val low = decision as? RecordingPolicy.Decision.StorageLow
+        val warning = low?.let { RecordingWarning.StorageLow(it.minutes) }
+        update { it.copy(elapsedMs = elapsedMs, space = space(mic, current.format, usable, rate), warning = warning) }
         return when (decision) {
-            RecordingPolicy.Decision.StopAtTimeLimit -> Stop.TIME_LIMIT
             RecordingPolicy.Decision.StopForSpace -> Stop.SPACE
+            RecordingPolicy.Decision.StopAtFileLimit -> Stop.FILE_LIMIT
             else -> null
         }
     }
+
+    private fun renewWakeLock(elapsedMs: Long) {
+        if (elapsedMs - wakeLockRenewedAt < WAKE_LOCK_RENEW_MS) return
+        wakeLockRenewedAt = elapsedMs
+        parts.platform.acquireWakeLock()
+    }
+
+    /** The hint's estimate: the free space, or the room left in an AAC file when that is smaller. */
+    private fun space(mic: MicrophoneCapture, format: CaptureFormat, usable: Long, rate: Long): RecordingSpace =
+        RecordingSpace.of(usable, rate, maxFileBytes(format) - mic.file.length())
+
+    private fun maxFileBytes(format: CaptureFormat): Long =
+        if (format == CaptureFormat.M4A) RecordingPolicy.AAC_MAX_FILE_BYTES else Long.MAX_VALUE
 
     /** The nominal rate of [format], or the measured growth of the file once it has recorded for 10 s. */
     private fun bytesPerSecond(mic: MicrophoneCapture, format: CaptureFormat, elapsedMs: Long): Long {
@@ -325,9 +345,9 @@ class RecordingController(private val parts: Parts) {
         var kept: String? = current.noteId
         var outcome = when (stop) {
             Stop.SPACE -> RecordingOutcome.StoppedForSpace
+            Stop.FILE_LIMIT -> RecordingOutcome.StoppedAtFileLimit
             Stop.MICROPHONE -> RecordingOutcome.MicrophoneFailed
             Stop.USER -> RecordingOutcome.Saved(AfterFinish.AUDIO_ONLY)
-            Stop.TIME_LIMIT -> RecordingOutcome.Saved(AfterFinish.AUDIO_ONLY, atTimeLimit = true)
         }
         try {
             val notes = parts.notes()
@@ -425,6 +445,10 @@ class RecordingController(private val parts: Parts) {
         /** The waveform: 56 bars of 125 ms, the last 7 s (features.md section 2). */
         const val BARS = 56
         const val BAR_MS = 125L
+
+        /** How long the wake lock lasts without a renewal; the policy loop renews it each [WAKE_LOCK_RENEW_MS]. */
+        const val WAKE_LOCK_TIMEOUT_MS = 10 * 60_000L
+        private const val WAKE_LOCK_RENEW_MS = 60_000L
 
         private const val TAG = "RecordingController"
         private const val MAX_AMPLITUDE = 32_767

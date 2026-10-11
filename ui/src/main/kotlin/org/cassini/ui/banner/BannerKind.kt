@@ -51,7 +51,7 @@ enum class BannerGroup { TRUST, RECORDING, TRANSCRIPTION, DOWNLOAD, LIBRARY }
  * The banner catalogue (features.md section 13, board 10): every kind with its [tone], [title] and [body]
  * resources, the [BannerArgs] fields it [uses], its catalogue [actions] (first ink-filled, second outlined), whether
  * the app emits it ([appEmitted] is false for the catalogue-only TX_CALCULATING and TX_BATTERY) and whether the
- * user can [dismissible] it. [title] is a plurals resource for RECOVERED, REC_NEAR_LIMIT and TX_QUEUE_HELD; [body]
+ * user can [dismissible] it. [title] is a plurals resource for RECOVERED and TX_QUEUE_HELD; [body]
  * is 0 when the kind has no body. [BannerText] turns a kind and its arguments into text.
  */
 @Suppress("LongParameterList") // One row of the catalogue table per constructor call.
@@ -118,12 +118,12 @@ enum class BannerKind(
         R.string.ui_banner_rec_storage_low_body,
         uses = setOf(MS1),
     ),
-    REC_NEAR_LIMIT(
+    REC_STOPPED_FILE_LIMIT(
         WARN,
         REC,
-        R.plurals.ui_banner_rec_near_limit_title,
-        R.string.ui_banner_rec_near_limit_body,
-        uses = setOf(MS1),
+        R.string.ui_banner_rec_stopped_file_title,
+        R.string.ui_banner_rec_stopped_file_body,
+        actions = listOf(OPEN_NOTE),
     ),
     REC_STOPPED_STORAGE(
         WARN,
@@ -170,7 +170,7 @@ enum class BannerKind(
         TX,
         R.string.ui_banner_tx_paused_title,
         R.string.ui_banner_tx_paused_body,
-        uses = setOf(MS1, MS2),
+        uses = setOf(MS1, MS2, BY_SYSTEM),
         actions = listOf(RESUME, START_OVER),
     ),
     TX_PAUSED_EARLY(
@@ -178,6 +178,7 @@ enum class BannerKind(
         TX,
         R.string.ui_banner_tx_paused_early_title,
         R.string.ui_banner_tx_paused_early_body,
+        uses = setOf(BY_SYSTEM),
         actions = listOf(RESUME),
     ),
     TX_QUEUE_HELD(

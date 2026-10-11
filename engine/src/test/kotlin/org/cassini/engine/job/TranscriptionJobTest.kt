@@ -17,12 +17,14 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import org.cassini.core.Failure
 import org.cassini.core.asr.TranscriptionProgress.Stage
+import org.cassini.core.audio.Limits
 import org.cassini.core.checkpoint.CheckpointNames
 import org.cassini.core.checkpoint.CheckpointState
 import org.cassini.core.format.CassiniDocument
 import org.cassini.core.format.DocumentState
 import org.cassini.core.format.Transcript
 import org.cassini.core.format.Word
+import org.cassini.core.format.WordBodyBudget
 import org.cassini.core.library.PauseReason
 import org.cassini.core.models.ModelPart
 import org.cassini.core.models.ModelPlan
@@ -51,6 +53,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
+@Suppress("LargeClass") // one test per rule of architecture 5.4, sharing one harness
 class TranscriptionJobTest {
     @get:Rule val temp = TemporaryFolder()
 
@@ -345,6 +348,49 @@ class TranscriptionJobTest {
         assertEquals(JobOutcome.Done, outcome)
         assertTrue(offline.models.installs.isEmpty())
         assertTrue(events.none { it is JobEvent.Downloading })
+    }
+
+    @Test fun audioLongerThanTheLimitFailsBeforeAnyWork() = runBlocking {
+        val h = Harness(maxDurationMs = 60_000)
+        h.storage.knownMs = 70_000L
+        h.models.readyParts = emptySet()
+        assertEquals(JobOutcome.Failed(JobFailure.Processing(Failure.LONG)), h.run().first)
+        assertTrue("nothing is decoded", h.audioSource.starts.isEmpty())
+        assertTrue("nothing is installed", h.models.installs.isEmpty())
+        assertTrue(h.storage.saved.isEmpty())
+    }
+
+    @Test fun aContainerDurationOverTheLimitFailsAtTheFirstBlock() = runBlocking {
+        val h = Harness(maxDurationMs = 60_000)
+        assertEquals(JobOutcome.Failed(JobFailure.Processing(Failure.LONG)), h.run().first)
+        assertTrue("no window is decoded", h.script.windows.isEmpty())
+    }
+
+    /** At the full limits a 36 h recording starts: the duration limit is not the old 2 h cap. */
+    @Test fun aLongRecordingIsNotRefusedForItsDuration() = runBlocking {
+        val h = Harness()
+        h.storage.knownMs = 30 * 3_600_000L
+        val outcome = h.run().first
+        assertEquals(JobOutcome.Done, outcome)
+    }
+
+    /**
+     * Words that outgrow the word body of the format code end the job at the window that passes the limit, with the
+     * checkpoint of the window before it, and not at the seal.
+     */
+    @Test fun wordsThatOutgrowTheWordBodyFailAtTheWindowThatPassesTheLimit() = runBlocking {
+        val h = Harness(totalMs = 200_000, maxBodyBytes = 4_000)
+        val (outcome, events) = h.run()
+        assertEquals(JobOutcome.Failed(JobFailure.Processing(Failure.LONG)), outcome)
+        assertEquals("the second window passes the limit", listOf(0L, 26_000L), h.script.windows.toList())
+        assertEquals(listOf(28_000L), h.storage.saved.map { it.doneMs })
+        assertFalse(h.storage.marker.exists())
+        assertTrue(events.none { it is JobEvent.NamingClosed })
+
+        // Try again resumes from that checkpoint and fails again at the same window, not after a full run.
+        h.script.windows.clear()
+        assertEquals(JobOutcome.Failed(JobFailure.Processing(Failure.LONG)), h.run().first)
+        assertEquals(listOf(26_000L), h.script.windows.toList())
     }
 
     @Test fun aCheckpointThatNoLongerMatchesFailsTheJob() = runBlocking {
@@ -720,6 +766,8 @@ class TranscriptionJobTest {
         totalMs: Long = 70_000,
         reportsTotal: Boolean = true,
         recordSyncs: Boolean = false,
+        private val maxDurationMs: Long = Limits.MAX_TRANSCRIBE_MS,
+        private val maxBodyBytes: Long = WordBodyBudget.MAX_BYTES,
     ) {
         val noteDir: File = temp.newFolder("notes-$source-${System.nanoTime()}", "note-1")
         val audio = File(noteDir, source)
@@ -766,6 +814,8 @@ class TranscriptionJobTest {
                     sync()
                     syncLog?.add("sync ${file.name}")
                 },
+                maxDurationMs = maxDurationMs,
+                maxBodyBytes = maxBodyBytes,
             ),
         )
 

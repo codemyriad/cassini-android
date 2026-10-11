@@ -76,8 +76,8 @@ class FormatTest {
             Durations.spaceHint(res, 31 * H + 10 * MIN),
         )
         assertEquals(
-            "Keeps recording with the screen off or in another app. Stops at 2 hours, in about ${nb("1 h 35 min")}.",
-            Durations.capHint(res, H + 36 * MIN),
+            "Keeps recording with the screen off or in another app. Space for about ${nb("2962 h")} more.",
+            Durations.spaceHint(res, 2962 * H + 59 * MIN),
         )
     }
 

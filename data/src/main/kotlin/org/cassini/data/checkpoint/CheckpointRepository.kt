@@ -263,7 +263,7 @@ class CheckpointRepository(
             clipSamples !in 0L..CheckpointState.MAX_CLIP_SAMPLES.toLong() ||
                 expected.clipsBytes < clipSamples * Float.SIZE_BYTES -> MismatchReason.CLIPS
             json.optLong("positionSamples", -1) !in 0L..Limits.MAX_SAMPLES.toLong() ||
-                json.optLong("doneMs", -1) !in 0..Limits.MAX_RECORDING_MS -> MismatchReason.RANGE
+                json.optLong("doneMs", -1) !in 0..Limits.MAX_TRANSCRIBE_MS -> MismatchReason.RANGE
             encoderLength != null && (encoderLength < 0 || expected.audioBytes < encoderLength) -> MismatchReason.AUDIO
             json.has("wordLog") -> MismatchReason.WORDS
             else -> MismatchReason.UNREADABLE

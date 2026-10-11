@@ -345,10 +345,8 @@ class RecordingViewModel(
         emit(RecordingEffect.Close)
     }
 
-    private fun hint(space: RecordingSpace): RecordingHint = when (space.limit) {
-        RecordingSpace.Limit.SPACE -> RecordingHint.Space(space.spaceMs)
-        RecordingSpace.Limit.CAP -> RecordingHint.Cap(space.capMs)
-    }
+    /** A recording has no time limit: the hint gives only the space left. */
+    private fun hint(space: RecordingSpace): RecordingHint = RecordingHint.Space(space.spaceMs)
 
     /** Opus from API 29 (the platform encoder), else M4A, as the controller picks it. */
     private fun defaultFormat(): CaptureFormat = if (sdkInt >= OPUS_API) CaptureFormat.OPUS else CaptureFormat.M4A

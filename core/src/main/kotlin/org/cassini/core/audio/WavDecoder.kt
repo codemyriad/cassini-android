@@ -14,9 +14,9 @@ object WavDecoder {
      * beyond a millisecond moves the write position away from [next]. The first buffer has no
      * predecessor and keeps its own time.
      */
-    fun framePosition(presentationTimeUs: Long, sampleRate: Int, next: Int?): Int {
+    fun framePosition(presentationTimeUs: Long, sampleRate: Int, next: Long?): Long {
         val nominal = (presentationTimeUs.coerceAtLeast(0) * sampleRate + 500_000) / 1_000_000
-        return if (next != null && kotlin.math.abs(nominal - next) <= sampleRate / 1000) next else nominal.toInt()
+        return if (next != null && kotlin.math.abs(nominal - next) <= sampleRate / 1000) next else nominal
     }
 
     fun decodeWav(file: RandomAccessFile, onSamples: (FloatArray, Int) -> Unit = { _, _ -> }, retainPcm: Boolean = true, startSample: Long = 0, onProgress: (Long, Long?) -> Unit = { _, _ -> }): PcmAudio {

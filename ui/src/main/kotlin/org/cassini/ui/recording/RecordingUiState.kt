@@ -32,13 +32,9 @@ enum class RecordingPhase { NeedsPermission, Starting, Recording, Paused, Stoppi
 /** The capture codec of the format chip. */
 enum class CaptureFormat { OPUS, M4A }
 
-/** The second sentence of the hint: the smaller of the space and the 2 h cap (`RecordingSpace`). */
+/** The second sentence of the hint (`RecordingSpace`). A recording has no time limit, so it tells only the space. */
 sealed interface RecordingHint {
     /** "Space for about 31 h more." */
     @Immutable
     data class Space(val ms: Long) : RecordingHint
-
-    /** "Stops at 2 hours, in about 1 h 35 min." */
-    @Immutable
-    data class Cap(val ms: Long) : RecordingHint
 }

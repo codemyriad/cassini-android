@@ -94,6 +94,7 @@ class RecordingService : LifecycleService() {
         if (noteId != null && !graph.visibility.visible.value) {
             when (outcome) {
                 RecordingOutcome.StoppedForSpace -> notifications.stoppedForSpace(noteId)
+                RecordingOutcome.StoppedAtFileLimit -> notifications.stoppedAtFileLimit(noteId)
                 RecordingOutcome.MicrophoneFailed -> notifications.microphoneFailed(noteId)
                 else -> Unit
             }

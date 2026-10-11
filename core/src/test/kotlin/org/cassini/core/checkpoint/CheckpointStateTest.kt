@@ -193,7 +193,7 @@ class CheckpointStateTest {
         rejects { it.put("clipSamples", 16_001) }
         rejects { it.put("positionSamples", -1) }
         rejects { it.put("positionSamples", Limits.MAX_SAMPLES + 1L) }
-        rejects { it.put("doneMs", Limits.MAX_RECORDING_MS + 1) }
+        rejects { it.put("doneMs", Limits.MAX_TRANSCRIBE_MS + 1) }
         rejects { it.getJSONObject("encoder").put("length", job.audio.length() + 1) }
         // Version 1, as 0.1.0 wrote it, still resumes.
         CheckpointState.validate(stored(job.state).put("version", 1).apply { remove("wordLog") }, job.expected())

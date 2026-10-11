@@ -102,6 +102,12 @@ class RecordingNotifications(context: Context) {
         post(noteId, result(res, R.string.notif_rec_stopped_title, R.string.notif_rec_stopped_text, noteId))
     }
 
+    /** "Recording stopped": the AAC file reached its size limit. */
+    fun stoppedAtFileLimit(noteId: String) {
+        val res = localized()
+        post(noteId, result(res, R.string.notif_rec_stopped_title, R.string.notif_rec_file_full_text, noteId))
+    }
+
     /** "Microphone stopped working". */
     fun microphoneFailed(noteId: String) {
         val res = localized()
@@ -112,7 +118,6 @@ class RecordingNotifications(context: Context) {
         state.pause == RecordingPause.OTHER_APP -> res.getString(R.string.notif_rec_other_app)
         else -> when (val warning = state.warning) {
             is RecordingWarning.StorageLow -> res.getString(R.string.notif_rec_storage_low, warning.minutes.toInt())
-            is RecordingWarning.NearTimeLimit -> res.getString(R.string.notif_rec_near_limit)
             null -> null
         }
     }

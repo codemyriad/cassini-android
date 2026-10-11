@@ -26,10 +26,6 @@ object BannerText {
     fun title(res: Resources, kind: BannerKind, args: BannerArgs, format: FormatSettings): String =
         when (kind) {
             BannerKind.REC_STORAGE_LOW -> res.getString(kind.title, Durations.atLeastOneMinute(res, args.ms1))
-            BannerKind.REC_NEAR_LIMIT -> {
-                val minutes = ((args.ms1 + Durations.MINUTE_MS - 1) / Durations.MINUTE_MS).toInt().coerceAtLeast(1)
-                Counts.plural(res, kind.title, minutes, format)
-            }
             BannerKind.RECOVERED, BannerKind.TX_QUEUE_HELD -> Counts.plural(res, kind.title, args.count, format)
             BannerKind.TX_PAUSED -> res.getString(kind.title, Durations.clock(args.ms1), Durations.clock(args.ms2))
             BannerKind.DL_DOWNLOADING -> (args.part ?: ModelPartUi.SPEECH).downloading(res, downloadPercent(args))
@@ -51,15 +47,21 @@ object BannerText {
             BannerKind.DL_DOWNLOADING -> Sizes.downloaded(res, args.bytes, args.bytes2, format)
             BannerKind.DL_NO_SPACE -> res.getString(kind.body, Sizes.megabytes(res, args.bytes, format))
             BannerKind.IMPORT_NO_SPACE -> res.getString(kind.body, Sizes.storage(res, args.bytes, format))
-            BannerKind.NO_ENCODER, BannerKind.DL_STOPPED -> res.getString(variantBody(kind, args))
+            BannerKind.NO_ENCODER, BannerKind.DL_STOPPED, BannerKind.TX_PAUSED, BannerKind.TX_PAUSED_EARLY ->
+                res.getString(variantBody(kind, args))
             else -> if (kind.body == 0) null else res.getString(kind.body)
         }
 
-    /** The body of a kind with a second copy: NO_ENCODER without M4A, DL_STOPPED after a stop by Android. */
+    /**
+     * The body of a kind with a second copy: NO_ENCODER without M4A; DL_STOPPED, TX_PAUSED and TX_PAUSED_EARLY after
+     * a stop by Android (the daily time limit of background work on Android 15 and later).
+     */
     @StringRes
     private fun variantBody(kind: BannerKind, args: BannerArgs): Int = when {
         kind == BannerKind.NO_ENCODER && !args.m4a -> R.string.ui_banner_no_encoder_body
         kind == BannerKind.DL_STOPPED && args.bySystem -> R.string.ui_banner_dl_stopped_system_body
+        (kind == BannerKind.TX_PAUSED || kind == BannerKind.TX_PAUSED_EARLY) && args.bySystem ->
+            R.string.ui_banner_tx_paused_system_body
         else -> kind.body
     }
 

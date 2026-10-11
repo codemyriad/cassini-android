@@ -27,6 +27,8 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.io.File
 
+private const val DAILY_LIMIT = "Android limits background work to about 6 hours a day. Open Cassini to resume."
+
 /** The copy of the processing notifications (features.md sections 3.1 and 12). */
 @RunWith(RobolectricTestRunner::class)
 class ProcessingNotificationsTest {
@@ -78,9 +80,9 @@ class ProcessingNotificationsTest {
         val manager = shadowOf(context.getSystemService(NotificationManager::class.java))
         val text = { manager.allNotifications.single().extras.getCharSequence(Notification.EXTRA_TEXT).toString() }
         notifications.pausedByAndroid(NOTE, "Riunione", 0, 0)
-        assertEquals("Paused before any words were found. Open to resume.", text())
+        assertEquals("Paused before any words were found. $DAILY_LIMIT", text())
         notifications.pausedByAndroid(NOTE, "Riunione", 760_000, 2_052_000)
-        assertEquals("Paused at 12:40 of 34:12. Open to resume.", text())
+        assertEquals("Paused at 12:40 of 34:12. $DAILY_LIMIT", text())
     }
 
     /** The last checkpoint of a job that Android stopped replaces the numbers only while "Paused at" is shown. */
@@ -90,7 +92,7 @@ class ProcessingNotificationsTest {
         val text = { shadowOf(manager).allNotifications.single().extras.getCharSequence(Notification.EXTRA_TEXT) }
         notifications.pausedByAndroid(NOTE, "Riunione", 288_000, 950_000)
         notifications.pausedByAndroidSaved(NOTE, "Riunione", 314_000, 950_000)
-        assertEquals("Paused at 05:14 of 15:50. Open to resume.", text().toString())
+        assertEquals("Paused at 05:14 of 15:50. $DAILY_LIMIT", text().toString())
 
         // Another result of the note, or no notification at all: nothing is posted.
         notifications.readyToTranscribe(NOTE, "Riunione")
@@ -231,7 +233,7 @@ class ProcessingNotificationsLocaleManagerTest {
         val pausedTitle = paused.extras.getCharSequence(Notification.EXTRA_TITLE).toString()
         assertEquals("Trascrizione sospesa da Android", pausedTitle)
         assertEquals(
-            "In pausa a 04:48 di 15:50. Apri per riprendere.",
+            "In pausa a 04:48 di 15:50. Android limita il lavoro in background a circa 6 ore al giorno. Apri Cassini per riprendere.",
             paused.extras.getCharSequence(Notification.EXTRA_TEXT).toString(),
         )
 

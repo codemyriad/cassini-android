@@ -57,7 +57,7 @@ class RecordingViewModelTest {
         title: String = "Weekly sync",
         pause: RecordingPause? = null,
         warning: RecordingWarning? = null,
-        space: RecordingSpace = RecordingSpace(spaceMs = 111_600_000, capMs = 5_700_000),
+        space: RecordingSpace = RecordingSpace(spaceMs = 111_600_000),
     ) = RecordingState.Active(
         noteId = "n1",
         title = title,
@@ -86,11 +86,11 @@ class RecordingViewModelTest {
         assertEquals(1_447_000L, state.elapsedMs)
         assertEquals(CaptureFormatUi.OPUS, state.format)
         assertEquals(48_000, state.sampleRateHz)
-        assertEquals(RecordingHint.Cap(5_700_000), state.hint)
+        assertEquals(RecordingHint.Space(111_600_000), state.hint)
         assertEquals(56, state.levels.size)
         assertNull(state.banner)
 
-        ports.state.value = active(space = RecordingSpace(spaceMs = 600_000, capMs = 5_700_000))
+        ports.state.value = active(space = RecordingSpace(spaceMs = 600_000))
         advanceUntilIdle()
         assertEquals(RecordingHint.Space(600_000), viewModel.state.value.hint)
     }
@@ -206,9 +206,6 @@ class RecordingViewModelTest {
         ports.state.value = active(warning = RecordingWarning.StorageLow(10))
         advanceUntilIdle()
         assertEquals(BannerKind.REC_STORAGE_LOW, viewModel.state.value.banner?.kind)
-        ports.state.value = active(warning = RecordingWarning.NearTimeLimit(300_000))
-        advanceUntilIdle()
-        assertEquals(BannerKind.REC_NEAR_LIMIT, viewModel.state.value.banner?.kind)
     }
 
     private suspend fun TestScope.finishWith(outcome: RecordingOutcome, noteId: String? = "n1"): RecordingEffect? {

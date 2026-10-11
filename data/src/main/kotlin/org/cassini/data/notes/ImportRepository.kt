@@ -86,7 +86,7 @@ class ImportLimits(
 /**
  * "Import audio" (docs/architecture.md, section 4.2; features.md sections 1 and 13.5). An import:
  *
- * 1. reads the display name and size, and rejects LARGE above 2 GiB;
+ * 1. reads the display name and size, and rejects LARGE above 4 GiB (`Limits.MAX_IMPORT_BYTES`);
  * 2. requires the size plus `Limits.MIN_FREE_BYTES` free, else SPACE with the bytes needed;
  * 3. copies the bytes into `notes/<newId>/source.tmp` while it hashes them (SHA-256) and enforces the cap and the free
  *    space, which also covers a provider that gave no size;

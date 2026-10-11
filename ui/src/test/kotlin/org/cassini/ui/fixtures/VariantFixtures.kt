@@ -232,12 +232,13 @@ internal object VariantFixtures {
             hint = RecordingHint.Space(10 * MINUTE),
             banner = banner(BannerKind.REC_STORAGE_LOW, announce = true),
         ),
-        "recording-near-limit" to b.recording.copy(
-            elapsedMs = clock(1, 55, 0),
-            hint = RecordingHint.Cap(5 * MINUTE),
-            banner = banner(BannerKind.REC_NEAR_LIMIT, announce = true),
+        "recording-stopped-file-limit" to b.recording.copy(
+            phase = RecordingPhase.Stopping,
+            format = CaptureFormat.M4A,
+            elapsedMs = clock(74, 33, 0),
+            banner = banner(BannerKind.REC_STOPPED_FILE_LIMIT, announce = true),
         ),
-        "recording-cap-hint" to b.recording.copy(elapsedMs = clock(25, 0), hint = RecordingHint.Cap(clock(1, 35, 0))),
+        "recording-long-hint" to b.recording.copy(elapsedMs = clock(26, 14, 9), hint = RecordingHint.Space(140 * HOUR)),
         "recording-m4a" to b.recording.copy(format = CaptureFormat.M4A, sampleRateHz = 44_100),
     )
 

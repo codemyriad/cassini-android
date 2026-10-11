@@ -32,6 +32,7 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.io.File
+import java.io.RandomAccessFile
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -179,18 +180,46 @@ class RecordingControllerTest {
         assertTrue("a storage stop never enqueues", handoffs.isEmpty())
     }
 
-    @Test fun nearTimeLimitThenStopAtTwoHours() = runBlocking {
+    @Test fun aRecordingHasNoTimeLimitAndRenewsItsWakeLock() = runBlocking {
         val active = startRecording("Lunga")
-        capture.latest.elapsedMs = Limits.MAX_RECORDING_MS - Limits.RECORDING_WARNING_MS
-        waitFor { activeState().warning != null }
-        assertEquals(RecordingWarning.NearTimeLimit(Limits.RECORDING_WARNING_MS), activeState().warning)
+        assertEquals(1, platform.wakeLocks.get())
+        // Past the old 2 h cap, and far past it: the recording goes on, with no warning.
+        for (hours in listOf(2L, 3L, 100L)) {
+            capture.latest.elapsedMs = hours * HOUR_MS
+            waitFor { activeState().elapsedMs == hours * HOUR_MS }
+            assertNull(activeState().warning)
+        }
+        assertTrue("the wake lock is renewed", platform.wakeLocks.get() >= 3)
+        assertTrue(platform.wakeLockHeld)
+        // The hint is the space only: 64 GiB at 6000 B/s.
+        val spare = (64L shl 30) - Limits.MIN_RECORDING_FREE_BYTES
+        assertEquals(spare * 1000 / RecordingPolicy.OPUS_BYTES_PER_SECOND, activeState().space.spaceMs)
 
-        capture.latest.elapsedMs = Limits.MAX_RECORDING_MS
+        controller.finish(null)
         val ended = awaitEnded()
-        val saved = RecordingOutcome.Saved(AfterFinish.TRANSCRIBE, atTimeLimit = true)
-        assertEquals(RecordingState.Ended(active.noteId, saved), ended)
-        assertEquals(Limits.MAX_RECORDING_MS, row(active.noteId)?.durationMs)
-        assertEquals("the cap stop is handed to processing", listOf(active.noteId), handoffs)
+        assertEquals(RecordingState.Ended(active.noteId, RecordingOutcome.Saved(AfterFinish.TRANSCRIBE)), ended)
+        assertEquals(100 * HOUR_MS, row(active.noteId)?.durationMs)
+        assertFalse(platform.wakeLockHeld)
+    }
+
+    @Test fun anAacFileStopsAtItsSizeLimitAndSavesTheAudio() = runBlocking {
+        capture.format = CaptureFormat.M4A
+        val active = startRecording("Vecchio telefono")
+        assertEquals(CaptureFormat.M4A, active.format)
+        val file = capture.latest.file
+        // 10 minutes of room left in the file: the hint counts the file, not the free space.
+        RandomAccessFile(file, "rw").use { it.setLength(RecordingPolicy.AAC_MAX_FILE_BYTES - 600 * 4000L) }
+        capture.latest.elapsedMs = 70 * HOUR_MS
+        waitFor { activeState().elapsedMs == 70 * HOUR_MS }
+        assertTrue(activeState().space.spaceMs <= 10 * 60_000L)
+        assertNull("the storage warning counts only the free space", activeState().warning)
+
+        RandomAccessFile(file, "rw").use { it.setLength(RecordingPolicy.AAC_MAX_FILE_BYTES) }
+        val ended = awaitEnded()
+        assertEquals(RecordingState.Ended(active.noteId, RecordingOutcome.StoppedAtFileLimit), ended)
+        assertEquals(AudioKind.PLAIN, row(active.noteId)?.audioKind)
+        assertTrue("a file-limit stop never enqueues", handoffs.isEmpty())
+        assertTrue("the audio is kept", file.length() > 0)
     }
 
     @Test fun microphoneFailureSavesTheAudioAndNeverEnqueues() = runBlocking {
@@ -327,6 +356,7 @@ class RecordingControllerTest {
 
     private companion object {
         const val TIMEOUT_MS = 10_000L
+        const val HOUR_MS = 3_600_000L
         const val POLL_MS = 10L
         const val DEBOUNCE_MS = 600L
     }
@@ -375,9 +405,11 @@ class FakeCapture(override val file: File, private val onError: () -> Unit) : Mi
 class FakeCaptureSource : CaptureSource {
     @Volatile var refuse = false
 
+    @Volatile var format = CaptureFormat.OPUS
+
     @Volatile lateinit var latest: FakeCapture
 
-    override suspend fun format(): CaptureFormat = CaptureFormat.OPUS
+    override suspend fun format(): CaptureFormat = format
 
     override fun start(file: File, onError: () -> Unit): MicrophoneCapture {
         check(!refuse) { "Microphone unavailable" }

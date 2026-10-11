@@ -163,7 +163,7 @@ class LibraryViewModelTest {
             sampleRateHz = 48_000,
             elapsedMs = 1_447_000,
             pause = null,
-            space = RecordingSpace(1, 1),
+            space = RecordingSpace(1),
             warning = null,
         )
         ports.processing.value = ProcessingState(loading = false, queue = listOf(QueuedNote("q", "Q")))

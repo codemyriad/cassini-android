@@ -154,7 +154,7 @@ data class CheckpointState(
             require(version in VERSION_1..VERSION && source == expected.source && signature == expected.signature)
             require(model == expected.modelRevision && speakers == expected.speakersSha256)
             require(clipSamples in 0..MAX_CLIP_SAMPLES && expected.clipsBytes >= clipSamples * FLOAT_BYTES)
-            require(positionSamples in 0..Limits.MAX_SAMPLES && doneMs in 0..Limits.MAX_RECORDING_MS)
+            require(positionSamples in 0..Limits.MAX_SAMPLES && doneMs in 0..Limits.MAX_TRANSCRIBE_MS)
             encoderLength?.let { require(expected.audioBytes >= it) }
         }
 

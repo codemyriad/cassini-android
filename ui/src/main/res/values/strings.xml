@@ -200,7 +200,6 @@
     <string name="ui_recording_waveform">Microphone level, last 7 seconds</string>
     <string name="ui_recording_hint">Keeps recording with the screen off or in another app.</string>
     <string name="ui_recording_hint_space">Space for about %1$s more.</string>
-    <string name="ui_recording_hint_cap">Stops at 2 hours, in about %1$s.</string>
     <string name="ui_recording_library">Library</string>
     <string name="ui_recording_pause">Pause recording</string>
     <string name="ui_recording_resume">Resume recording</string>
@@ -497,11 +496,8 @@
     <string name="ui_banner_rec_paused_other_app_body">Resume when your call ends. Nothing was lost.</string>
     <string name="ui_banner_rec_storage_low_title">Storage almost full — about %1$s left</string>
     <string name="ui_banner_rec_storage_low_body">Free some space to keep going. If it runs out, the recording saves automatically.</string>
-    <plurals name="ui_banner_rec_near_limit_title">
-        <item quantity="one">Stops automatically in %1$s minute</item>
-        <item quantity="other">Stops automatically in %1$s minutes</item>
-    </plurals>
-    <string name="ui_banner_rec_near_limit_body">The recording so far is saved.</string>
+    <string name="ui_banner_rec_stopped_file_title">Stopped — recording file is full</string>
+    <string name="ui_banner_rec_stopped_file_body">The file reached the largest size this phone can save. The recording so far is saved.</string>
     <string name="ui_banner_rec_stopped_storage_title">Stopped — storage almost full</string>
     <string name="ui_banner_rec_stopped_storage_body">Less than %1$s free. The recording so far is saved.</string>
     <string name="ui_banner_rec_mic_off_title">Microphone access is off</string>
@@ -520,6 +516,7 @@
     <string name="ui_banner_tx_paused_body">Pick up where you left off. The draft so far is kept.</string>
     <string name="ui_banner_tx_paused_early_title">Paused before any words were found</string>
     <string name="ui_banner_tx_paused_early_body">Resume to start transcribing.</string>
+    <string name="ui_banner_tx_paused_system_body">Android paused it: background work has a limit of about 6 hours a day. Resume to continue where it stopped.</string>
     <plurals name="ui_banner_tx_queue_held_title">
         <item quantity="one">Transcription paused · %1$s waiting</item>
         <item quantity="other">Transcription paused · %1$s waiting</item>
@@ -562,7 +559,7 @@
     <string name="ui_banner_lib_no_match_body">Try another word or title.</string>
     <string name="ui_banner_importing_title">Importing %1$s…</string>
     <string name="ui_banner_import_too_large_title">File too large</string>
-    <string name="ui_banner_import_too_large_body">Choose a file under 2 GB.</string>
+    <string name="ui_banner_import_too_large_body">Choose a file under 4 GB.</string>
     <string name="ui_banner_import_no_space_title">Not enough space to import</string>
     <string name="ui_banner_import_no_space_body">This file needs about %1$s free. Free some space and try again.</string>
     <string name="ui_banner_import_wav_title">Unsupported WAV</string>

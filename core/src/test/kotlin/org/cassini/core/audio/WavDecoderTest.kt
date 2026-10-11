@@ -9,26 +9,41 @@ import org.junit.Test
 class WavDecoderTest {
     @Test fun truncatedFrameTimesStayContiguous() {
         for ((rate, frame) in listOf(48000 to 1024, 44100 to 1024, 44100 to 1152, 16000 to 1024, 48000 to 960)) {
-            var next: Int? = null
+            var next: Long? = null
             repeat(2000) { index ->
                 val start = index.toLong() * frame
                 // Extractors and codecs report whole microseconds, truncated.
-                assertEquals("$rate Hz frame $index", start.toInt(), WavDecoder.framePosition(start * 1_000_000 / rate, rate, next))
-                next = start.toInt() + frame
+                val position = WavDecoder.framePosition(start * 1_000_000 / rate, rate, next)
+                assertEquals("$rate Hz frame $index", start, position)
+                next = start + frame
             }
         }
     }
 
+    /** Frame positions are Long: at 96 kHz, 36 h is more than 2^31 frames, and 48 kHz passes 2^31 after 12.4 h. */
+    @Test fun framePositionsPastTwoToTheThirtyOneStayExact() {
+        val hours36Us = Limits.MAX_TRANSCRIBE_MS * 1000
+        assertEquals(12_441_600_000L, WavDecoder.framePosition(hours36Us, 96000, null))
+        var next: Long? = null
+        val firstUs = 13L * 3600 * 1_000_000
+        repeat(100) { index ->
+            val start = firstUs * 48 / 1000 + index * 1024L
+            assertTrue(start > Int.MAX_VALUE)
+            assertEquals(start, WavDecoder.framePosition(start * 1_000_000 / 48000, 48000, next))
+            next = start + 1024
+        }
+    }
+
     @Test fun realContainerGapsAndOverlapsKeepTheirClock() {
-        assertEquals(96000, WavDecoder.framePosition(2_000_000, 48000, 48000))
-        assertEquals(24000, WavDecoder.framePosition(500_000, 48000, 48000))
-        assertEquals(0, WavDecoder.framePosition(-20_000, 48000, null))
+        assertEquals(96000L, WavDecoder.framePosition(2_000_000, 48000, 48000))
+        assertEquals(24000L, WavDecoder.framePosition(500_000, 48000, 48000))
+        assertEquals(0L, WavDecoder.framePosition(-20_000, 48000, null))
         // A first buffer has nothing to continue, so even a sub-millisecond start offset is kept.
-        assertEquals(43, WavDecoder.framePosition(900, 48000, null))
-        assertEquals(0, WavDecoder.framePosition(900, 48000, 0))
+        assertEquals(43L, WavDecoder.framePosition(900, 48000, null))
+        assertEquals(0L, WavDecoder.framePosition(900, 48000, 0))
         // Timestamp jitter below a millisecond is not a gap.
-        assertEquals(48000, WavDecoder.framePosition(1_000_900, 48000, 48000))
-        assertEquals(48096, WavDecoder.framePosition(1_002_000, 48000, 48000))
+        assertEquals(48000L, WavDecoder.framePosition(1_000_900, 48000, 48000))
+        assertEquals(48096L, WavDecoder.framePosition(1_002_000, 48000, 48000))
     }
 
     private fun wav(rate: Int, channels: Int, pcm: ShortArray, extraChunk: Boolean = true): java.io.File {
@@ -88,9 +103,10 @@ class WavDecoderTest {
     }
 
     @Test fun durationCapAndMemoryGuard() {
-        assertEquals(7_200_000L, Limits.MAX_RECORDING_MS)
+        assertEquals(129_600_000L, Limits.MAX_TRANSCRIBE_MS)
+        assertTrue((Limits.MAX_TRANSCRIBE_MS + 1000) * Limits.ASR_RATE / 1000 < Int.MAX_VALUE)
         assertTrue(Limits.memoryAllows(3_600_000, 400L shl 20))
         assertFalse(Limits.memoryAllows(3_600_000, 200L shl 20))
-        try { Limits.requireDuration(Limits.MAX_RECORDING_MS + 1); fail() } catch (e: UserFacingException) { assertEquals(Failure.LONG, e.failure) }
+        try { Limits.requireDuration(Limits.MAX_TRANSCRIBE_MS + 1); fail() } catch (e: UserFacingException) { assertEquals(Failure.LONG, e.failure) }
     }
 }

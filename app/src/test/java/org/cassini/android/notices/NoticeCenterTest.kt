@@ -44,7 +44,7 @@ class NoticeCenterTest {
         sampleRateHz = 48_000,
         elapsedMs = 60_000,
         pause = null,
-        space = RecordingSpace(spaceMs = 3_600_000, capMs = 7_140_000),
+        space = RecordingSpace(spaceMs = 3_600_000),
         warning = null,
     )
 
@@ -80,14 +80,13 @@ class NoticeCenterTest {
             BannerSpec(BannerKind.REC_STORAGE_LOW, BannerArgs(ms1 = 600_000), announce = true),
             only(Notices.recording(active.copy(warning = RecordingWarning.StorageLow(10)), micOff = false)),
         )
-        assertEquals(
-            BannerSpec(BannerKind.REC_NEAR_LIMIT, BannerArgs(ms1 = 300_000), announce = true),
-            only(Notices.recording(active.copy(warning = RecordingWarning.NearTimeLimit(300_000)), micOff = false)),
-        )
         val stopped = only(Notices.recording(RecordingState.Ended("n", RecordingOutcome.StoppedForSpace), false))
         assertEquals(BannerKind.REC_STOPPED_STORAGE, stopped.kind)
         assertEquals(Limits.MIN_RECORDING_FREE_BYTES, stopped.args.bytes)
         assertEquals(listOf(BannerAction.OPEN_NOTE), stopped.actions)
+        val full = only(Notices.recording(RecordingState.Ended("n", RecordingOutcome.StoppedAtFileLimit), false))
+        assertEquals(BannerSpec(BannerKind.REC_STOPPED_FILE_LIMIT, announce = true), full)
+        assertEquals(listOf(BannerAction.OPEN_NOTE), full.actions)
         assertEquals(
             BannerKind.REC_MIC_OFF,
             only(Notices.recording(RecordingState.Idle, micOff = true)).kind,
@@ -122,14 +121,14 @@ class NoticeCenterTest {
         assertEquals(BannerKind.TX_PAUSED, paused.kind)
         assertEquals(BannerArgs(ms1 = 760_000, ms2 = 2_052_000), paused.args)
         assertEquals(listOf(BannerAction.RESUME, BannerAction.START_OVER), paused.actions)
-        assertEquals(
-            BannerKind.TX_PAUSED,
-            only(Notices.job(job(JobState.PAUSED, doneMs = 1, reason = PauseReason.SYSTEM))).kind,
-        )
-        assertEquals(
-            BannerKind.TX_PAUSED_EARLY,
-            only(Notices.job(job(JobState.PAUSED, reason = PauseReason.INTERRUPTED))).kind,
-        )
+        // Android's daily limit of background work paused it: the banner says so.
+        val bySystem = only(Notices.job(job(JobState.PAUSED, doneMs = 1, reason = PauseReason.SYSTEM)))
+        assertEquals(BannerKind.TX_PAUSED, bySystem.kind)
+        assertEquals(BannerArgs(ms1 = 1, ms2 = 2_052_000, bySystem = true), bySystem.args)
+        val early = only(Notices.job(job(JobState.PAUSED, reason = PauseReason.INTERRUPTED)))
+        assertEquals(BannerKind.TX_PAUSED_EARLY, early.kind)
+        assertFalse(early.args.bySystem)
+        assertTrue(only(Notices.job(job(JobState.PAUSED, reason = PauseReason.SYSTEM))).args.bySystem)
         assertEquals(
             BannerKind.TX_MEMORY,
             only(Notices.job(job(JobState.PAUSED, doneMs = 5, reason = PauseReason.MEMORY))).kind,
@@ -321,8 +320,12 @@ class NoticeCenterTest {
     private fun produceAll(): List<BannerSpec> = buildList {
         addAll(Notices.recording(active.copy(pause = RecordingPause.OTHER_APP), micOff = true))
         addAll(Notices.recording(active.copy(warning = RecordingWarning.StorageLow(10)), micOff = false))
-        addAll(Notices.recording(active.copy(warning = RecordingWarning.NearTimeLimit(1)), micOff = false))
-        listOf(RecordingOutcome.StoppedForSpace, RecordingOutcome.MicrophoneFailed, RecordingOutcome.CouldNotStart)
+        listOf(
+            RecordingOutcome.StoppedForSpace,
+            RecordingOutcome.StoppedAtFileLimit,
+            RecordingOutcome.MicrophoneFailed,
+            RecordingOutcome.CouldNotStart,
+        )
             .forEach { addAll(Notices.recording(RecordingState.Idle, false, ended = it)) }
         addAll(
             Notices.library(

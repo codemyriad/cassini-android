@@ -96,14 +96,6 @@ object Durations {
             res.getString(R.string.ui_recording_hint_space, recordingLeft(res, ms)),
         )
 
-    /** The Recording caption when the 2 h cap comes first: "… Stops at 2 hours, in about 1 h 35 min." */
-    fun capHint(res: Resources, ms: Long): String =
-        res.getString(
-            R.string.ui_join_space,
-            res.getString(R.string.ui_recording_hint),
-            res.getString(R.string.ui_recording_hint_cap, recordingLeft(res, ms)),
-        )
-
     /** "N min" below 60 min, else "N h M min" ("N h" when M is 0). */
     internal fun hoursMinutes(res: Resources, minutes: Long): String {
         val h = (minutes / MINUTES_PER_HOUR).toInt()
@@ -158,8 +150,4 @@ object Durations {
     @Composable
     @ReadOnlyComposable
     fun spaceHint(ms: Long): String = spaceHint(resources(), ms)
-
-    @Composable
-    @ReadOnlyComposable
-    fun capHint(ms: Long): String = capHint(resources(), ms)
 }

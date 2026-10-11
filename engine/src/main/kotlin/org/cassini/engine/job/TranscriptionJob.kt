@@ -26,6 +26,8 @@ import org.cassini.core.format.DocumentState
 import org.cassini.core.format.OggOpus
 import org.cassini.core.format.SpeakerMerges
 import org.cassini.core.format.Transcript
+import org.cassini.core.format.Word
+import org.cassini.core.format.WordBodyBudget
 import org.cassini.core.library.PauseReason
 import org.cassini.core.models.ModelCatalog
 import org.cassini.core.models.ModelPart
@@ -73,6 +75,11 @@ import java.util.concurrent.atomic.AtomicReference
  * `Paused(MEMORY)` with the checkpoint intact.
  *
  * The job writes only in `work/`, `voices/pending/` and through [JobStorage.mutateNames]; never `document.opus`.
+ *
+ * Length limits (docs/architecture.md section 3.7): audio longer than [JobEnvironment.maxDurationMs] (36 h) fails
+ * with `Failure.LONG` before any work. The words of one transcript must fit the word body of the format code
+ * ([JobEnvironment.maxBodyBytes], about 11 h of continuous speech): the job counts them after each window and fails
+ * with `Failure.LONG` as soon as they do not fit, not hours later at the seal.
  */
 @Suppress("TooManyFunctions", "LargeClass") // one function per named step of architecture section 5.4
 class TranscriptionJob(
@@ -177,6 +184,9 @@ class TranscriptionJob(
         val generation = voices.generationBlocking()
         val saved = voices.peopleBlocking()
         val knownMs = storage.knownDurationMs(noteId)?.takeIf { it > 0 }
+        // Too long to transcribe: stop before the download, the model load and any decode.
+        requireUser(knownMs == null || knownMs <= env.maxDurationMs, Failure.LONG)
+        resumed?.let { requireWordsFit(it.recognition.chunks.words) }
         // Transcribe again over a document that can neither take a version nor be replaced stops here, before any work.
         val existing = storage.existingDocumentBlocking(noteId)?.also(::requireReplaceable)?.takeIf(::extendable)
         val noteVoices = existing?.let { noteVoices(it, saved) }.orEmpty()
@@ -328,6 +338,7 @@ class TranscriptionJob(
         },
         onProgress = { progress ->
             checkActive()
+            requireWordsFit(progress.words)
             emit(JobEvent.WindowDone(progress.doneMs, progress.totalMs, progress.words))
         },
     )
@@ -358,7 +369,10 @@ class TranscriptionJob(
             },
         ) { readMs, totalMs ->
             checkActive()
-            totalMs?.let { recognizer.totalMs = it }
+            totalMs?.let {
+                requireUser(it <= env.maxDurationMs, Failure.LONG)
+                recognizer.totalMs = it
+            }
             val now = env.nanoTime()
             if (now - run.lastReading >= READING_INTERVAL_NS) {
                 run.lastReading = now
@@ -690,6 +704,10 @@ class TranscriptionJob(
     // Helpers ---------------------------------------------------------------------------------------------------
 
     private suspend fun <T> onInference(block: () -> T): T = runInterruptible(env.inference, block)
+
+    /** The word body of [words] fits the format code; else the job ends with `Failure.LONG`. */
+    private fun requireWordsFit(words: List<Word>) =
+        requireUser(WordBodyBudget.bytes(words) <= env.maxBodyBytes, Failure.LONG)
 
     /**
      * Runs a write to the work files. An IOException there is SPACE when `work/` is low on space, else SAVE; only

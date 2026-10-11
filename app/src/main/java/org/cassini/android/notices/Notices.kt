@@ -158,6 +158,8 @@ object Notices {
                     announce = true,
                 ),
             )
+            RecordingOutcome.StoppedAtFileLimit ->
+                notices += Notice(BannerSpec(BannerKind.REC_STOPPED_FILE_LIMIT, announce = true))
             RecordingOutcome.MicrophoneFailed ->
                 notices += Notice(BannerSpec(BannerKind.REC_MIC_FAILED, announce = true))
             RecordingOutcome.CouldNotStart ->
@@ -173,9 +175,6 @@ object Notices {
                     val args = BannerArgs(ms1 = warning.minutes * MINUTE_MS)
                     notices += Notice(BannerSpec(BannerKind.REC_STORAGE_LOW, args, announce = true))
                 }
-                is RecordingWarning.NearTimeLimit -> notices += Notice(
-                    BannerSpec(BannerKind.REC_NEAR_LIMIT, BannerArgs(ms1 = warning.msLeft), announce = true),
-                )
                 null -> Unit
             }
         }
@@ -220,8 +219,12 @@ object Notices {
         val spec = when (job.state) {
             JobState.PAUSED -> when {
                 job.pauseReason == PauseReason.MEMORY -> BannerSpec(BannerKind.TX_MEMORY)
-                checkpoint -> BannerSpec(BannerKind.TX_PAUSED, BannerArgs(ms1 = job.doneMs, ms2 = job.totalMs))
-                else -> BannerSpec(BannerKind.TX_PAUSED_EARLY)
+                // Android's daily limit of background work stopped it (onTimeout, architecture 5.7): say so.
+                checkpoint -> BannerSpec(
+                    BannerKind.TX_PAUSED,
+                    BannerArgs(ms1 = job.doneMs, ms2 = job.totalMs, bySystem = job.pauseReason == PauseReason.SYSTEM),
+                )
+                else -> BannerSpec(BannerKind.TX_PAUSED_EARLY, BannerArgs(bySystem = job.pauseReason == PauseReason.SYSTEM))
             }
             JobState.FAILED -> {
                 val final = finalFailure(job, noNewVersion)

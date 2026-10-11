@@ -29,9 +29,6 @@ enum class RecordingPause {
 sealed interface RecordingWarning {
     /** About [minutes] of space left (rounded as the hint rounds). */
     data class StorageLow(val minutes: Long) : RecordingWarning
-
-    /** The 2 h cap stops the recording in [msLeft]. */
-    data class NearTimeLimit(val msLeft: Long) : RecordingWarning
 }
 
 /** What the app does after a saved recording (features.md section 2, Finish flow). */
@@ -48,11 +45,14 @@ enum class AfterFinish {
 
 /** How a recording ended. */
 sealed interface RecordingOutcome {
-    /** Finish, or the stop at the 2 h cap ([atTimeLimit]). */
-    data class Saved(val next: AfterFinish, val atTimeLimit: Boolean = false) : RecordingOutcome
+    /** Finish: the user stopped the recording. A recording has no time limit. */
+    data class Saved(val next: AfterFinish) : RecordingOutcome
 
     /** Free space went below the floor: the audio so far is saved and nothing is queued. */
     data object StoppedForSpace : RecordingOutcome
+
+    /** The AAC capture file reached its size limit (`RecordingPolicy.AAC_MAX_FILE_BYTES`): as [StoppedForSpace]. */
+    data object StoppedAtFileLimit : RecordingOutcome
 
     /** The capture failed: the audio so far is saved (when there is any) and nothing is queued. */
     data object MicrophoneFailed : RecordingOutcome

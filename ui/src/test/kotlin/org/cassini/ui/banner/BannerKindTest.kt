@@ -25,7 +25,6 @@ private const val MIB = 1_048_576L
 /** The arguments of the board 10 copy for each kind that reads arguments. */
 private val BOARD_ARGS: Map<BannerKind, BannerArgs> = mapOf(
     BannerKind.REC_STORAGE_LOW to BannerArgs(ms1 = 10 * MIN + 20_000),
-    BannerKind.REC_NEAR_LIMIT to BannerArgs(ms1 = 5 * MIN),
     BannerKind.REC_STOPPED_STORAGE to BannerArgs(bytes = 200 * MIB),
     BannerKind.RECOVERED to BannerArgs(count = 1, ms1 = 5 * MIN + 12_000),
     BannerKind.TX_PAUSED to BannerArgs(ms1 = 12 * MIN + 40_000, ms2 = 34 * MIN + 12_000),
@@ -79,7 +78,11 @@ private val ENGLISH: Map<BannerKind, Triple<String, String?, List<String>>> = ma
         "Free some space to keep going. If it runs out, the recording saves automatically.",
         listOf(),
     ),
-    BannerKind.REC_NEAR_LIMIT to Triple("Stops automatically in 5 minutes", "The recording so far is saved.", listOf()),
+    BannerKind.REC_STOPPED_FILE_LIMIT to Triple(
+        "Stopped — recording file is full",
+        "The file reached the largest size this phone can save. The recording so far is saved.",
+        listOf("Open note"),
+    ),
     BannerKind.REC_STOPPED_STORAGE to Triple(
         "Stopped — storage almost full",
         "Less than 200 MB free. The recording so far is saved.",
@@ -159,7 +162,7 @@ private val ENGLISH: Map<BannerKind, Triple<String, String?, List<String>>> = ma
         Triple("No notes yet", "Record something, or import an audio file.", listOf("Record", "Import")),
     BannerKind.LIB_NO_MATCH to Triple("Nothing matches “fattura”", "Try another word or title.", listOf()),
     BannerKind.IMPORTING to Triple("Importing call.m4a…", null, listOf()),
-    BannerKind.IMPORT_TOO_LARGE to Triple("File too large", "Choose a file under 2 GB.", listOf("Choose another")),
+    BannerKind.IMPORT_TOO_LARGE to Triple("File too large", "Choose a file under 4 GB.", listOf("Choose another")),
     BannerKind.IMPORT_NO_SPACE to Triple(
         "Not enough space to import",
         "This file needs about 1.4 GB free. Free some space and try again.",
@@ -233,12 +236,14 @@ class BannerKindTest {
             BannerText.body(res, BannerKind.NO_ENCODER, BannerArgs(m4a = false), f),
         )
         assertEquals("Your recording is kept.", BannerText.body(res, BannerKind.TX_FAILED, BannerArgs(), f))
+        val paused = "Android paused it: background work has a limit of about 6 hours a day. Resume to continue where it stopped."
+        assertEquals(paused, BannerText.body(res, BannerKind.TX_PAUSED, BannerArgs(bySystem = true), f))
+        assertEquals(paused, BannerText.body(res, BannerKind.TX_PAUSED_EARLY, BannerArgs(bySystem = true), f))
         assertEquals(
             "Android stopped the download. Try again to continue where it stopped.",
             BannerText.body(res, BannerKind.DL_STOPPED, BannerArgs(bySystem = true), f),
         )
         assertEquals("3 recordings recovered", title(BannerKind.RECOVERED, BannerArgs(count = 3)))
-        assertEquals("Stops automatically in 1 minute", title(BannerKind.REC_NEAR_LIMIT, BannerArgs(ms1 = 40_000)))
         assertEquals(
             "Downloading speaker separation — 50%",
             title(

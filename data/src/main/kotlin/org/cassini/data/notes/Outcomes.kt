@@ -113,7 +113,7 @@ sealed interface ImportOutcome {
     data class Existing(val noteId: String) : ImportOutcome
 
     /**
-     * Nothing was added: LARGE (over 2 GiB), SPACE ([neededBytes] free are needed), WAV (not 16-bit PCM), OPEN
+     * Nothing was added: LARGE (over 4 GiB), SPACE ([neededBytes] free are needed), WAV (not 16-bit PCM), OPEN
      * (unreadable, or not audio that Cassini can read), or SAVE (a storage error after the copy). [detail] is a
      * diagnostic, never shown as is.
      */

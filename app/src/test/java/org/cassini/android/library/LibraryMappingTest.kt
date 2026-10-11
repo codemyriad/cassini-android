@@ -226,7 +226,7 @@ class LibraryMappingTest {
             sampleRateHz = 48_000,
             elapsedMs = 1_447_000,
             pause = null,
-            space = RecordingSpace(1, 1),
+            space = RecordingSpace(1),
             warning = null,
         )
         assertEquals(RecordingPillUi("Voice note 8 Oct, 08:14", 1_447_000, false), LibraryMapping.recordingPill(active))
