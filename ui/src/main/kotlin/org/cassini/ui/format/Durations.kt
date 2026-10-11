@@ -8,6 +8,9 @@ import org.cassini.ui.R
 /**
  * Durations as the boards write them (docs/design/features.md section 0). Each function has a pure form that takes
  * [Resources] and a composable form that reads them from the composition. [clock] needs no resources.
+ *
+ * Every prose duration ("1 h 55 min", "under 1 min") has no-break spaces (U+00A0) in place of its spaces, in every
+ * language, so a line never breaks between a number and its unit. The translations can keep plain spaces.
  */
 @Suppress("TooManyFunctions") // A pure form and a composable form of each formatter.
 object Durations {
@@ -18,6 +21,8 @@ object Durations {
     private const val MINUTES_PER_HOUR = 60L
     private const val RECORDING_WHOLE_HOURS_FROM_MS = 2 * HOUR_MS
     private const val RECORDING_MINUTE_STEP = 5L
+    private const val NO_BREAK_SPACE = '\u00A0'
+    private val DIGIT_SPACE = Regex("(\\d) ")
 
     /** `mm:ss` below 1 h ("02:41"), `h:mm:ss` from 1 h ("1:12:05"). Seconds are floored; negative reads as 0. */
     fun clock(ms: Long): String {
@@ -46,16 +51,16 @@ object Durations {
         val s = (seconds % SECONDS_PER_MINUTE).toInt()
         return when {
             minutes >= MINUTES_PER_HOUR -> hoursMinutes(res, minutes)
-            minutes == 0L -> res.getString(R.string.ui_duration_s, s)
-            s == 0 -> res.getString(R.string.ui_duration_min, minutes.toInt())
-            else -> res.getString(R.string.ui_duration_min_s, minutes.toInt(), s)
+            minutes == 0L -> res.getString(R.string.ui_duration_s, s).noBreak()
+            s == 0 -> res.getString(R.string.ui_duration_min, minutes.toInt()).noBreak()
+            else -> res.getString(R.string.ui_duration_min_s, minutes.toInt(), s).noBreak()
         }
     }
 
     /** Whole minutes, floored: "under 1 min" below 60 s, "22 min", then "1 h 5 min" (or "2 h") from 60 min. */
     fun roughMinutes(res: Resources, ms: Long): String =
         if (ms < MINUTE_MS) {
-            res.getString(R.string.ui_duration_under_minute)
+            res.getString(R.string.ui_duration_under_minute).noBreak()
         } else {
             hoursMinutes(res, ms / MINUTE_MS)
         }
@@ -70,7 +75,7 @@ object Durations {
      */
     fun recordingLeft(res: Resources, ms: Long): String =
         if (ms >= RECORDING_WHOLE_HOURS_FROM_MS) {
-            res.getString(R.string.ui_duration_h, (ms / HOUR_MS).toInt())
+            res.getString(R.string.ui_duration_h, (ms / HOUR_MS).toInt()).noBreak()
         } else {
             val minutes = ms / MINUTE_MS / RECORDING_MINUTE_STEP * RECORDING_MINUTE_STEP
             hoursMinutes(res, minutes.coerceAtLeast(RECORDING_MINUTE_STEP))
@@ -107,8 +112,14 @@ object Durations {
             h == 0 -> res.getString(R.string.ui_duration_min, m)
             m == 0 -> res.getString(R.string.ui_duration_h, h)
             else -> res.getString(R.string.ui_duration_h_min, h, m)
-        }
+        }.noBreak()
     }
+
+    /** No-break spaces in place of the spaces of a prose duration (see the class KDoc). */
+    internal fun String.noBreak(): String = replace(' ', NO_BREAK_SPACE)
+
+    /** A no-break space in place of each space after a digit: "Under 1 min left" keeps "1 min" on one line. */
+    internal fun String.noBreakAfterNumbers(): String = replace(DIGIT_SPACE, "$1$NO_BREAK_SPACE")
 
     private fun two(value: Long): String = value.toString().padStart(2, '0')
 

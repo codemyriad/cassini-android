@@ -75,7 +75,7 @@ private val ENGLISH: Map<BannerKind, Triple<String, String?, List<String>>> = ma
             listOf("Resume"),
         ),
     BannerKind.REC_STORAGE_LOW to Triple(
-        "Storage almost full — about 10 min left",
+        "Storage almost full — about 10\u00A0min left",
         "Free some space to keep going. If it runs out, the recording saves automatically.",
         listOf(),
     ),

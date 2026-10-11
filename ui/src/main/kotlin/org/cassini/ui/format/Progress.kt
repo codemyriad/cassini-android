@@ -6,6 +6,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
 import org.cassini.ui.R
+import org.cassini.ui.format.Durations.noBreak
+import org.cassini.ui.format.Durations.noBreakAfterNumbers
 
 /** The progress card headline (features.md section 3.1). */
 enum class ProgressHeadline(@StringRes val text: Int) {
@@ -89,7 +91,7 @@ object Progress {
             TimeLeftUi.Calculating -> res.getString(R.string.ui_time_left_calculating)
             TimeLeftUi.Finishing -> res.getString(R.string.ui_time_left_finishing)
             is TimeLeftUi.Range -> when (val span = span(timeLeft)) {
-                null -> res.getString(R.string.ui_time_left_under_minute)
+                null -> res.getString(R.string.ui_time_left_under_minute).noBreakAfterNumbers()
                 else -> if (span.first == span.last) {
                     res.getString(R.string.ui_time_left_about, Durations.hoursMinutes(res, span.first))
                 } else {
@@ -107,7 +109,7 @@ object Progress {
             TimeLeftUi.Calculating -> res.getString(R.string.ui_time_left_line_calculating)
             TimeLeftUi.Finishing -> res.getString(R.string.ui_time_left_finishing)
             is TimeLeftUi.Range -> when (val span = span(timeLeft)) {
-                null -> res.getString(R.string.ui_time_left_line_under_minute)
+                null -> res.getString(R.string.ui_time_left_line_under_minute).noBreakAfterNumbers()
                 else -> res.getString(
                     R.string.ui_time_left_line_about,
                     if (span.first == span.last) Durations.hoursMinutes(res, span.first) else spanText(res, span),
@@ -134,7 +136,7 @@ object Progress {
 
     private fun spanText(res: Resources, span: LongRange): String =
         if (span.last < MINUTES_PER_HOUR) {
-            res.getString(R.string.ui_time_left_minutes_range, span.first.toInt(), span.last.toInt())
+            res.getString(R.string.ui_time_left_minutes_range, span.first.toInt(), span.last.toInt()).noBreak()
         } else {
             res.getString(
                 R.string.ui_range,

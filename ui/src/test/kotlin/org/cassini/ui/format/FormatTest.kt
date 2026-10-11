@@ -50,33 +50,33 @@ class FormatTest {
     }
 
     @Test fun proseDurations() {
-        assertEquals("3 min 12 s", Durations.compact(res, 3 * MIN + 12 * S))
-        assertEquals("45 s", Durations.compact(res, 45 * S))
-        assertEquals("3 min", Durations.compact(res, 3 * MIN))
-        assertEquals("1 h 12 min", Durations.compact(res, H + 12 * MIN + 5 * S))
-        assertEquals("1 h", Durations.compact(res, H + 30 * S))
-        assertEquals("Speaks for 3 min 12 s in this note", Durations.speaksFor(res, 3 * MIN + 12 * S))
-        assertEquals("22 min confirmed speech", Durations.confirmedSpeech(res, 22 * MIN + 59 * S))
-        assertEquals("under 1 min confirmed speech", Durations.confirmedSpeech(res, 59 * S))
-        assertEquals("1 h 5 min confirmed speech", Durations.confirmedSpeech(res, 65 * MIN))
-        assertEquals("2 h confirmed speech", Durations.confirmedSpeech(res, 2 * H))
-        assertEquals("10 min", Durations.atLeastOneMinute(res, 10 * MIN + 40 * S))
-        assertEquals("1 min", Durations.atLeastOneMinute(res, 20 * S))
+        assertEquals(nb("3 min 12 s"), Durations.compact(res, 3 * MIN + 12 * S))
+        assertEquals(nb("45 s"), Durations.compact(res, 45 * S))
+        assertEquals(nb("3 min"), Durations.compact(res, 3 * MIN))
+        assertEquals(nb("1 h 12 min"), Durations.compact(res, H + 12 * MIN + 5 * S))
+        assertEquals(nb("1 h"), Durations.compact(res, H + 30 * S))
+        assertEquals("Speaks for ${nb("3 min 12 s")} in this note", Durations.speaksFor(res, 3 * MIN + 12 * S))
+        assertEquals("${nb("22 min")} confirmed speech", Durations.confirmedSpeech(res, 22 * MIN + 59 * S))
+        assertEquals("${nb("under 1 min")} confirmed speech", Durations.confirmedSpeech(res, 59 * S))
+        assertEquals("${nb("1 h 5 min")} confirmed speech", Durations.confirmedSpeech(res, 65 * MIN))
+        assertEquals("${nb("2 h")} confirmed speech", Durations.confirmedSpeech(res, 2 * H))
+        assertEquals(nb("10 min"), Durations.atLeastOneMinute(res, 10 * MIN + 40 * S))
+        assertEquals(nb("1 min"), Durations.atLeastOneMinute(res, 20 * S))
     }
 
     @Test fun recordingHintRounding() {
-        assertEquals("31 h", Durations.recordingLeft(res, 31 * H + 50 * MIN))
-        assertEquals("2 h", Durations.recordingLeft(res, 2 * H))
-        assertEquals("1 h 55 min", Durations.recordingLeft(res, 2 * H - 1))
-        assertEquals("1 h 35 min", Durations.recordingLeft(res, H + 39 * MIN))
-        assertEquals("35 min", Durations.recordingLeft(res, 37 * MIN))
-        assertEquals("5 min", Durations.recordingLeft(res, 3 * MIN))
+        assertEquals(nb("31 h"), Durations.recordingLeft(res, 31 * H + 50 * MIN))
+        assertEquals(nb("2 h"), Durations.recordingLeft(res, 2 * H))
+        assertEquals(nb("1 h 55 min"), Durations.recordingLeft(res, 2 * H - 1))
+        assertEquals(nb("1 h 35 min"), Durations.recordingLeft(res, H + 39 * MIN))
+        assertEquals(nb("35 min"), Durations.recordingLeft(res, 37 * MIN))
+        assertEquals(nb("5 min"), Durations.recordingLeft(res, 3 * MIN))
         assertEquals(
-            "Keeps recording with the screen off or in another app. Space for about 31 h more.",
+            "Keeps recording with the screen off or in another app. Space for about ${nb("31 h")} more.",
             Durations.spaceHint(res, 31 * H + 10 * MIN),
         )
         assertEquals(
-            "Keeps recording with the screen off or in another app. Stops at 2 hours, in about 1 h 35 min.",
+            "Keeps recording with the screen off or in another app. Stops at 2 hours, in about ${nb("1 h 35 min")}.",
             Durations.capHint(res, H + 36 * MIN),
         )
     }
@@ -195,18 +195,19 @@ class FormatTest {
     }
 
     @Test fun progress() {
-        assertEquals("6–9 min", Progress.timeLeft(res, TimeLeftUi.Range(6 * MIN, 9 * MIN)))
-        assertEquals("6–9 min", Progress.timeLeft(res, TimeLeftUi.Range(6 * MIN + 50 * S, 8 * MIN + 10 * S)))
-        assertEquals("About 6 min", Progress.timeLeft(res, TimeLeftUi.Range(6 * MIN, 6 * MIN)))
-        assertEquals("Under 1 min", Progress.timeLeft(res, TimeLeftUi.Range(10 * S, 50 * S)))
-        assertEquals("1–2 min", Progress.timeLeft(res, TimeLeftUi.Range(10 * S, 2 * MIN)))
-        assertEquals("1 h 10 min–1 h 30 min", Progress.timeLeft(res, TimeLeftUi.Range(70 * MIN, 90 * MIN)))
-        assertEquals("45 min–1 h 10 min", Progress.timeLeft(res, TimeLeftUi.Range(45 * MIN, 70 * MIN)))
+        assertEquals(nb("6–9 min"), Progress.timeLeft(res, TimeLeftUi.Range(6 * MIN, 9 * MIN)))
+        assertEquals(nb("6–9 min"), Progress.timeLeft(res, TimeLeftUi.Range(6 * MIN + 50 * S, 8 * MIN + 10 * S)))
+        assertEquals("About ${nb("6 min")}", Progress.timeLeft(res, TimeLeftUi.Range(6 * MIN, 6 * MIN)))
+        assertEquals("Under ${nb("1 min")}", Progress.timeLeft(res, TimeLeftUi.Range(10 * S, 50 * S)))
+        assertEquals(nb("1–2 min"), Progress.timeLeft(res, TimeLeftUi.Range(10 * S, 2 * MIN)))
+        val hours = nb("1 h 10 min–1 h 30 min")
+        assertEquals(hours, Progress.timeLeft(res, TimeLeftUi.Range(70 * MIN, 90 * MIN)))
+        assertEquals(nb("45 min–1 h 10 min"), Progress.timeLeft(res, TimeLeftUi.Range(45 * MIN, 70 * MIN)))
         assertEquals("Calculating…", Progress.timeLeft(res, TimeLeftUi.Calculating))
         assertEquals("Finishing…", Progress.timeLeft(res, TimeLeftUi.Finishing))
-        assertEquals("About 6–9 min left", Progress.timeLeftLine(res, TimeLeftUi.Range(6 * MIN, 9 * MIN)))
-        assertEquals("About 6 min left", Progress.timeLeftLine(res, TimeLeftUi.Range(6 * MIN, 6 * MIN)))
-        assertEquals("Under 1 min left", Progress.timeLeftLine(res, TimeLeftUi.Range(0, 30 * S)))
+        assertEquals("About ${nb("6–9 min")} left", Progress.timeLeftLine(res, TimeLeftUi.Range(6 * MIN, 9 * MIN)))
+        assertEquals("About ${nb("6 min")} left", Progress.timeLeftLine(res, TimeLeftUi.Range(6 * MIN, 6 * MIN)))
+        assertEquals("Under ${nb("1 min")} left", Progress.timeLeftLine(res, TimeLeftUi.Range(0, 30 * S)))
         assertEquals("Calculating time left…", Progress.timeLeftLine(res, TimeLeftUi.Calculating))
         assertEquals("54% → about 41%", Progress.battery(res, BatteryUi.Projected(54, 41)))
         assertEquals("Plugged in", Progress.battery(res, BatteryUi.PluggedIn(80)))
@@ -232,16 +233,16 @@ class FormatItalianTest {
 
     @Test fun durations() {
         assertEquals("02:41", Durations.clock(161 * S))
-        assertEquals("3 min 12 s", Durations.compact(res, 3 * MIN + 12 * S))
-        assertEquals("Parla per 3 min 12 s in questa nota", Durations.speaksFor(res, 3 * MIN + 12 * S))
-        assertEquals("meno di 1 min di parlato confermato", Durations.confirmedSpeech(res, 30 * S))
-        assertEquals("1 h 5 min di parlato confermato", Durations.confirmedSpeech(res, 65 * MIN))
+        assertEquals(nb("3 min 12 s"), Durations.compact(res, 3 * MIN + 12 * S))
+        assertEquals("Parla per ${nb("3 min 12 s")} in questa nota", Durations.speaksFor(res, 3 * MIN + 12 * S))
+        assertEquals("${nb("meno di 1 min")} di parlato confermato", Durations.confirmedSpeech(res, 30 * S))
+        assertEquals("${nb("1 h 5 min")} di parlato confermato", Durations.confirmedSpeech(res, 65 * MIN))
         assertEquals("48 minuti e 13 secondi", Spoken.duration(res, 48 * MIN + 13 * S, f))
         assertEquals("1 ora, 12 minuti e 5 secondi", Spoken.duration(res, H + 12 * MIN + 5 * S, f))
         assertEquals("1 minuto", Spoken.duration(res, MIN, f))
         assertEquals("0 secondi", Spoken.duration(res, 0, f))
         assertEquals(
-            "Continua a registrare a schermo spento o in un’altra app. Spazio per circa 31 h ancora.",
+            "Continua a registrare a schermo spento o in un’altra app. Spazio per circa ${nb("31 h")} ancora.",
             Durations.spaceHint(res, 31 * H),
         )
         assertEquals("11:44 di 23:50", Spoken.position(res, 11 * MIN + 44 * S, 23 * MIN + 50 * S))
@@ -294,13 +295,16 @@ class FormatItalianTest {
     }
 
     @Test fun progress() {
-        assertEquals("6–9 min", Progress.timeLeft(res, TimeLeftUi.Range(6 * MIN, 9 * MIN)))
-        assertEquals("Circa 6 min", Progress.timeLeft(res, TimeLeftUi.Range(6 * MIN, 6 * MIN)))
-        assertEquals("Meno di 1 min", Progress.timeLeft(res, TimeLeftUi.Range(0, 30 * S)))
-        assertEquals("Circa 6–9 min rimanenti", Progress.timeLeftLine(res, TimeLeftUi.Range(6 * MIN, 9 * MIN)))
+        assertEquals(nb("6–9 min"), Progress.timeLeft(res, TimeLeftUi.Range(6 * MIN, 9 * MIN)))
+        assertEquals("Circa ${nb("6 min")}", Progress.timeLeft(res, TimeLeftUi.Range(6 * MIN, 6 * MIN)))
+        assertEquals("Meno di ${nb("1 min")}", Progress.timeLeft(res, TimeLeftUi.Range(0, 30 * S)))
+        assertEquals("Circa ${nb("6–9 min")} rimanenti", Progress.timeLeftLine(res, TimeLeftUi.Range(6 * MIN, 9 * MIN)))
         assertEquals("54% → circa 41%", Progress.battery(res, BatteryUi.Projected(54, 41)))
         assertEquals("Passo 3 di 5: Parole e voci", Progress.stageDescription(res, StageUi.WORDS_AND_VOICES))
         assertEquals("Ricerca di parole e voci", Progress.headline(res, ProgressHeadline.FINDING_WORDS_AND_SPEAKERS))
         assertEquals("Download del riconoscimento vocale — 46%", ModelPartUi.SPEECH.downloading(res, 46))
     }
 }
+
+/** [text] with no-break spaces, as [Durations] writes a prose duration. */
+private fun nb(text: String): String = text.replace(' ', '\u00A0')

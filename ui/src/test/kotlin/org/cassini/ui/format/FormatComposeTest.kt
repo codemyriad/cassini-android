@@ -44,7 +44,7 @@ class FormatComposeTest {
         compose.waitForIdle()
         assertEquals(
             listOf(
-                "3 min 12 s",
+                "3\u00A0min\u00A012\u00A0s",
                 "48 minuti e 13 secondi",
                 "4.812 parole",
                 "Ieri, 3:10 PM",
