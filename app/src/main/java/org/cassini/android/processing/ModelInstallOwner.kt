@@ -226,7 +226,7 @@ class ModelInstallOwner(
             if (shared.stopped) {
                 // Android stopped it (stopDownloads): "Download stopped" until the next install. The refresh below
                 // shows the parts that were installed as Ready again.
-                val error = DownloadError.INTERRUPTED
+                val error = DownloadError.STOPPED_BY_SYSTEM
                 shared.parts.forEach { models.publishProgress(it, ModelStatus.Failed(failureOf(error), error.name)) }
                 val part = shared.progress?.part ?: shared.parts.min()
                 mutableOutcome.value = InstallOutcome.Failed(part, error, requiredFreeBytes = 0)
@@ -286,7 +286,11 @@ class ModelInstallOwner(
             DownloadError.NOT_ENOUGH_STORAGE -> Failure.SPACE
             DownloadError.FILE_CHECK_FAILED -> Failure.VERIFY
             DownloadError.INSTALL -> Failure.INSTALL
-            DownloadError.NO_CONNECTION, DownloadError.INTERRUPTED, DownloadError.HOST_NOT_ALLOWED -> Failure.DOWNLOAD
+            DownloadError.NO_CONNECTION,
+            DownloadError.INTERRUPTED,
+            DownloadError.HOST_NOT_ALLOWED,
+            DownloadError.STOPPED_BY_SYSTEM,
+            -> Failure.DOWNLOAD
         }
     }
 }

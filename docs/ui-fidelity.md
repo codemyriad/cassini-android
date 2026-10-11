@@ -468,6 +468,10 @@ board, and in KDoc or a code comment.
 20. A document with no words shows a plain card in the transcript pane: "No speech" with "No words were found in
     this recording." The text comes from the TXT export (`export_no_words`). The golden `variants/read-no-words.png`
     shows it. features.md has no copy for this state (see "Items for the owner to review").
+21. When Android stops a standalone model download (`onTimeout`), DL_STOPPED has the body "Android stopped the
+    download. Try again to continue where it stopped." ("Android ha interrotto il download. Riprova per continuare
+    da dove si è fermato."), not "The connection dropped." The error is `STOPPED_BY_SYSTEM`. features.md has no
+    copy for this case (see "Items for the owner to review").
 
 ## Changes to the screen contracts
 
@@ -544,6 +548,8 @@ write or change its ViewModel.
   state, and F1 did not change them, because the two files are read-only in the worktree. The owner must accept
   the copy "No speech" — "No words were found in this recording." ("Nessun parlato" — "Non sono state trovate
   parole in questa registrazione.") and add it to features.md section 3.3 and to the table of ui.md section 12.
+- The DL_STOPPED body after a stop by Android (new deviation 21). features.md section 13.4 gives DL_STOPPED only
+  for network failures. The owner must accept the copy and add it to features.md.
 - The no-break spaces of new deviation 17 are not in features.md section 0. The owner must decide if section 0
   names them, and if the processing notification also uses them.
 

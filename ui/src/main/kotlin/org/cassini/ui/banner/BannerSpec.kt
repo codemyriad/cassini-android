@@ -28,7 +28,8 @@ data class BannerSpec(
  * The semantic values a banner's copy needs; [BannerKind.uses] says which ones a kind reads. Durations are
  * milliseconds and sizes bytes, so the copy is formatted in the shown language.
  *
- * [part] is an addition to ui.md section 7: the download banner names the part it downloads.
+ * [part] is an addition to ui.md section 7: the download banner names the part it downloads. [bySystem] is an
+ * addition too: DL_STOPPED says that Android stopped the download, not the connection.
  */
 @Immutable
 data class BannerArgs(
@@ -41,10 +42,11 @@ data class BannerArgs(
     val percent: Int? = null,
     val m4a: Boolean = false,
     val part: ModelPartUi? = null,
+    val bySystem: Boolean = false,
 )
 
 /** The fields of [BannerArgs] a kind reads. */
-enum class BannerArg { COUNT, TEXT, MS1, MS2, BYTES, BYTES2, PERCENT, M4A, PART }
+enum class BannerArg { COUNT, TEXT, MS1, MS2, BYTES, BYTES2, PERCENT, M4A, PART, BY_SYSTEM }
 
 /** A banner button (ui.md section 7) with its label. */
 enum class BannerAction(@StringRes val label: Int) {

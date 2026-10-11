@@ -1,6 +1,7 @@
 package org.cassini.ui.banner
 
 import android.content.res.Resources
+import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.platform.LocalResources
@@ -50,9 +51,17 @@ object BannerText {
             BannerKind.DL_DOWNLOADING -> Sizes.downloaded(res, args.bytes, args.bytes2, format)
             BannerKind.DL_NO_SPACE -> res.getString(kind.body, Sizes.megabytes(res, args.bytes, format))
             BannerKind.IMPORT_NO_SPACE -> res.getString(kind.body, Sizes.storage(res, args.bytes, format))
-            BannerKind.NO_ENCODER -> res.getString(if (args.m4a) kind.body else R.string.ui_banner_no_encoder_body)
+            BannerKind.NO_ENCODER, BannerKind.DL_STOPPED -> res.getString(variantBody(kind, args))
             else -> if (kind.body == 0) null else res.getString(kind.body)
         }
+
+    /** The body of a kind with a second copy: NO_ENCODER without M4A, DL_STOPPED after a stop by Android. */
+    @StringRes
+    private fun variantBody(kind: BannerKind, args: BannerArgs): Int = when {
+        kind == BannerKind.NO_ENCODER && !args.m4a -> R.string.ui_banner_no_encoder_body
+        kind == BannerKind.DL_STOPPED && args.bySystem -> R.string.ui_banner_dl_stopped_system_body
+        else -> kind.body
+    }
 
     fun action(res: Resources, action: BannerAction): String = res.getString(action.label)
 

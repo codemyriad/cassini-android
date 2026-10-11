@@ -297,6 +297,8 @@ object Notices {
             DownloadError.NO_CONNECTION -> BannerSpec(BannerKind.DL_NO_CONNECTION, announce = announce)
             DownloadError.INTERRUPTED, DownloadError.HOST_NOT_ALLOWED ->
                 BannerSpec(BannerKind.DL_STOPPED, announce = announce)
+            DownloadError.STOPPED_BY_SYSTEM ->
+                BannerSpec(BannerKind.DL_STOPPED, BannerArgs(bySystem = true), announce = announce)
             DownloadError.NOT_ENOUGH_STORAGE ->
                 BannerSpec(BannerKind.DL_NO_SPACE, BannerArgs(bytes = requiredFreeBytes), announce = announce)
             DownloadError.FILE_CHECK_FAILED -> BannerSpec(BannerKind.DL_FILE_CHECK, announce = announce)

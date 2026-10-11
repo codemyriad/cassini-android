@@ -520,6 +520,7 @@
     <string name="ui_banner_dl_no_connection_body">Connettiti a internet e riprova. La registrazione funziona comunque.</string>
     <string name="ui_banner_dl_stopped_title">Download interrotto</string>
     <string name="ui_banner_dl_stopped_body">La connessione si è interrotta. Riprova per continuare da dove si è fermato.</string>
+    <string name="ui_banner_dl_stopped_system_body">Android ha interrotto il download. Riprova per continuare da dove si è fermato.</string>
     <string name="ui_banner_dl_no_space_title">Spazio insufficiente</string>
     <string name="ui_banner_dl_no_space_body">Libera circa %1$s e riprova.</string>
     <string name="ui_banner_dl_file_check_title">Verifica del file non riuscita</string>

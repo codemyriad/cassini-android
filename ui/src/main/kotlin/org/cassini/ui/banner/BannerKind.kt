@@ -24,6 +24,7 @@ import org.cassini.ui.banner.BannerAction.TRY_AGAIN
 import org.cassini.ui.banner.BannerAction.TURN_ON
 import org.cassini.ui.banner.BannerArg.BYTES
 import org.cassini.ui.banner.BannerArg.BYTES2
+import org.cassini.ui.banner.BannerArg.BY_SYSTEM
 import org.cassini.ui.banner.BannerArg.COUNT
 import org.cassini.ui.banner.BannerArg.M4A
 import org.cassini.ui.banner.BannerArg.MS1
@@ -257,6 +258,7 @@ enum class BannerKind(
         DL,
         R.string.ui_banner_dl_stopped_title,
         R.string.ui_banner_dl_stopped_body,
+        uses = setOf(BY_SYSTEM),
         actions = listOf(RETRY),
     ),
     DL_NO_SPACE(

@@ -200,6 +200,7 @@ private fun BannerArgs.vary(arg: BannerArg): BannerArgs =
         BannerArg.PERCENT -> copy(percent = 37)
         BannerArg.M4A -> copy(m4a = true)
         BannerArg.PART -> copy(part = ModelPartUi.VOICES)
+        BannerArg.BY_SYSTEM -> copy(bySystem = true)
     }
 
 private val PLACEHOLDER = Regex("%(\\d+\\$)?[sd]")
@@ -232,6 +233,10 @@ class BannerKindTest {
             BannerText.body(res, BannerKind.NO_ENCODER, BannerArgs(m4a = false), f),
         )
         assertEquals("Your recording is kept.", BannerText.body(res, BannerKind.TX_FAILED, BannerArgs(), f))
+        assertEquals(
+            "Android stopped the download. Try again to continue where it stopped.",
+            BannerText.body(res, BannerKind.DL_STOPPED, BannerArgs(bySystem = true), f),
+        )
         assertEquals("3 recordings recovered", title(BannerKind.RECOVERED, BannerArgs(count = 3)))
         assertEquals("Stops automatically in 1 minute", title(BannerKind.REC_NEAR_LIMIT, BannerArgs(ms1 = 40_000)))
         assertEquals(

@@ -67,6 +67,9 @@ enum class DownloadError {
 
     /** A redirect pointed outside the download hosts; shown as "Download stopped". */
     HOST_NOT_ALLOWED,
+
+    /** Android stopped the download service (a time-out); "Download stopped" with its own body. */
+    STOPPED_BY_SYSTEM,
 }
 
 /** The stepper of the progress card, in order. [ordinal] is the step index (0 to 4). */

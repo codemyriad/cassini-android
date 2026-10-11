@@ -592,11 +592,11 @@ class ProcessingCoordinatorTest {
         assertFalse(withTimeout(TIMEOUT_MS) { coordinator.state.first { !it.downloading } }.downloading)
         val part = File(ModelCatalog.PARAKEET.directory(paths.modelRoot), PART_FILE)
         assertTrue("the .part file stays for a Range resume", part.isFile)
-        val stopped = ModelStatus.Failed(Failure.DOWNLOAD, DownloadError.INTERRUPTED.name)
+        val stopped = ModelStatus.Failed(Failure.DOWNLOAD, DownloadError.STOPPED_BY_SYSTEM.name)
         assertEquals("Settings shows the stop", stopped, graph.models.status.value[ModelPart.SPEECH])
         assertEquals(ModelStatusUi.Failed, SettingsViewModel.status(stopped))
         val failure = withTimeout(TIMEOUT_MS) { notices.facts.first { it.downloadFailure != null } }
-        assertEquals("the Library offers Retry", DownloadError.INTERRUPTED, failure.downloadFailure?.error)
+        assertEquals("the Library offers Retry", DownloadError.STOPPED_BY_SYSTEM, failure.downloadFailure?.error)
         assertEquals(1, fetches.get())
 
         // Retry starts it again; it finishes and every part is ready.

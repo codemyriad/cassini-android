@@ -189,6 +189,7 @@ class NoticeCenterTest {
             DownloadError.NO_CONNECTION to BannerKind.DL_NO_CONNECTION,
             DownloadError.INTERRUPTED to BannerKind.DL_STOPPED,
             DownloadError.HOST_NOT_ALLOWED to BannerKind.DL_STOPPED,
+            DownloadError.STOPPED_BY_SYSTEM to BannerKind.DL_STOPPED,
             DownloadError.NOT_ENOUGH_STORAGE to BannerKind.DL_NO_SPACE,
             DownloadError.FILE_CHECK_FAILED to BannerKind.DL_FILE_CHECK,
             DownloadError.INSTALL to BannerKind.DL_INSTALL_FAILED,
@@ -199,6 +200,9 @@ class NoticeCenterTest {
             assertEquals(kind, only(Notices.job(job(JobState.FAILED, failure = code), requiredFreeBytes = 5)).kind)
         }
         assertEquals(901_000_000L, Notices.download(DownloadError.NOT_ENOUGH_STORAGE, 901_000_000).args.bytes)
+        // Android stopped it: the body says so, not that the connection dropped.
+        assertTrue(Notices.download(DownloadError.STOPPED_BY_SYSTEM).args.bySystem)
+        assertFalse(Notices.download(DownloadError.INTERRUPTED).args.bySystem)
         assertEquals(listOf(BannerAction.DOWNLOAD_AGAIN), Notices.download(DownloadError.FILE_CHECK_FAILED).actions)
 
         val library = Notices.library(

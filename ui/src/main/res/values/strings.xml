@@ -546,6 +546,7 @@
     <string name="ui_banner_dl_no_connection_body">Connect to the internet and try again. Recording still works.</string>
     <string name="ui_banner_dl_stopped_title">Download stopped</string>
     <string name="ui_banner_dl_stopped_body">The connection dropped. Try again to continue where it stopped.</string>
+    <string name="ui_banner_dl_stopped_system_body">Android stopped the download. Try again to continue where it stopped.</string>
     <string name="ui_banner_dl_no_space_title">Not enough storage</string>
     <string name="ui_banner_dl_no_space_body">Free about %1$s and try again.</string>
     <string name="ui_banner_dl_file_check_title">File check failed</string>
