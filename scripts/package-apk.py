@@ -27,6 +27,11 @@ with zipfile.ZipFile(source) as apk:
             raise SystemExit(f'APK is missing {required}')
     if any(name.endswith(('.onnx', '.tflite', '.keystore')) for name in names):
         raise SystemExit('APK contains model weights or signing material')
+    if os.environ.get('IS_TAG') == 'true':
+        # The Licenses screen shows these files. Merge notes ("TODO(") belong in files that do not ship.
+        for name in names:
+            if name.startswith('assets/licenses/') and name.endswith('.md') and b'TODO(' in apk.read(name):
+                raise SystemExit(f'{name} in the APK contains a TODO( note')
 libraries = check_apk_compatibility(source)
 print(f'Checked {libraries} native libraries: 64-bit ABI and 16 KB ELF/ZIP alignment')
 if os.environ.get('IS_TAG') == 'true':
