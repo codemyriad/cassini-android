@@ -13,7 +13,7 @@ body:
     attributes:
       label: App version
       description: Settings > About shows the version. For a build from source, give the commit.
-      placeholder: 0.1.0
+      placeholder: 0.2.0-beta
     validations:
       required: true
   - type: input

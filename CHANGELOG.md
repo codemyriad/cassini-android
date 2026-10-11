@@ -6,7 +6,7 @@ We made the entries for 0.0.1-beta to 0.1.0 again from the release notes of thes
 
 ## [Unreleased]
 
-Version 0.2.0 is a new build of the app. It keeps the speech engine and the portable Cassini document format of 0.1.0.
+Version 0.2.0-beta is a new build of the app. It keeps the speech engine and the portable Cassini document format of 0.1.0.
 
 ### Changed
 
