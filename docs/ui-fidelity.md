@@ -472,6 +472,11 @@ board, and in KDoc or a code comment.
     download. Try again to continue where it stopped." ("Android ha interrotto il download. Riprova per continuare
     da dove si è fermato."), not "The connection dropped." The error is `STOPPED_BY_SYSTEM`. features.md has no
     copy for this case (see "Items for the owner to review").
+22. In Settings, a model row with "Download failed" opens Model download, as a "Not downloaded" row does.
+    features.md section 11 names only the "Not downloaded" row. architecture.md section 5.7 step 6 sends the user
+    to this row after Android stops a download. The text stays "Download failed — tries again next time", as on the
+    board. But nothing tries again in the background: the next transcription that needs the model, or a tap on
+    the row, starts the download again (see "Items for the owner to review").
 
 ## Changes to the screen contracts
 
@@ -550,6 +555,10 @@ write or change its ViewModel.
   parole in questa registrazione.") and add it to features.md section 3.3 and to the table of ui.md section 12.
 - The DL_STOPPED body after a stop by Android (new deviation 21). features.md section 13.4 gives DL_STOPPED only
   for network failures. The owner must accept the copy and add it to features.md.
+- The "Download failed" model row in Settings (new deviation 22). It opens Model download, but features.md
+  section 11 does not say so. The text "tries again next time" does not tell the user to tap the row. The owner
+  must decide if the row stays a button, and if the text changes, for example to "Download failed — tap to try
+  again". Then features.md section 11 must agree.
 - The no-break spaces of new deviation 17 are not in features.md section 0. The owner must decide if section 0
   names them, and if the processing notification also uses them.
 
