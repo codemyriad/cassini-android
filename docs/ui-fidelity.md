@@ -2,7 +2,7 @@
 
 This report compares the screenshot goldens of `:ui` with the design boards in `design/reference/png`. It records
 the P8 review of the ten phone boards and the five columns of the States board. All boards and columns meet the
-advisory targets. The differences that a reader can see are accepted deviations or new deviations, and this report
+advisory targets. It also records the P12 review of the device screenshots (see "Device review"). The differences that a reader can see are accepted deviations or new deviations, and this report
 gives the reason for each one.
 
 The rules for the review are in `docs/design/ui.md` sections 10.3 and 11, and in `tools/ui-fidelity/README.md`.
@@ -63,6 +63,27 @@ are the tokens of ui.md section 4.1. The type is Instrument Sans and IBM Plex Mo
 ui.md section 4.3. The icons are the icons of ui.md section 4.5. The copy is the board copy, word for word, except
 where a deviation in this report says otherwise.
 
+## Device review
+
+In P12 the reviewer compared each board with the screenshots of the acceptance walk on emulator-5554 (API 34,
+1080 x 2340 px, 420 dpi), in light, dark and Italian. The walk of `scripts/acceptance-walk.sh` made the
+screenshots on 11 Oct 2026 (`build/acceptance/20261011-031058/`, not committed). After the corrections of this
+review, the light `realModels` part ran again (`build/acceptance/20261011-034439/light/`). For each board, the reviewer read
+the design PNG, the golden and the device screenshots with the Read tool, side by side at the same dp scale. The
+"Device" part of each board section gives the verdict.
+
+These differences apply to all boards. They are not deviations:
+
+- The emulator screen is 411 dp wide. The boards are 390 dp wide. Thus some lines wrap one word later than on the
+  board.
+- The device shows the status bar and the gesture bar. The boards and the goldens have no system bars.
+- The content comes from the walk: FLEURS sentences in Italian and the fixture names (Anna Ricci, Paolo Ferri,
+  "Weekly product sync"). The board content is different.
+- The device language is English (United States). Thus the times show in the 12-hour form ("3:11 AM"). The boards
+  and the Italian walk use the 24-hour form. The app uses the format of the locale.
+- Text rows on the device are about 1.5 dp taller for each line than in the goldens. For example, a Settings
+  row is 70 dp high on the device and 67 dp high in the golden. The cause is not known (follow-up 1).
+
 ## 00 Library
 
 | Mean | Pixels above 32 | Highest band | Rows |
@@ -78,6 +99,14 @@ where a deviation in this report says otherwise.
 - The status chips have 0.5 dp less top padding, and the day headers have a bottom padding of 5.5 dp. Android sets
   one 13 sp line in 16 dp. The browser uses 15.5 dp.
 
+### Device
+
+Verdict: the device matches the board. The rows, the chips, the progress banner and the bottom bar show as on the
+board. The excerpt preview ends with the ellipsis of `TextOverflow.Ellipsis` after a space ("il …"). The board
+excerpt has no space before its ellipsis. At font scale 2.0, the suffix "· No speech" was cut to "· No". P12
+corrected this: the line with the time, the chip and the suffix is now a flow row, so the suffix goes to the next
+line. The goldens did not change.
+
 ## 01 Recording
 
 | Mean | Pixels above 32 | Highest band | Rows |
@@ -90,6 +119,13 @@ where a deviation in this report says otherwise.
   not at the center of the screen (195 dp), which ui.md section 8 gives.
 - The status shows only in the Recording and Paused phases. The board does not show the other phases. This is a
   decision of P8 (accepted deviation 14).
+
+### Device
+
+Verdict: the device matches the board. The emulator microphone gives silence, so the waveform shows a row of
+dots. The caption shows the 2-hour form of features.md section 2 ("Stops at 2 hours, in about 1 h 55 min."),
+because the space for the recording is more than the 2-hour limit. In English, "min." goes alone to the third
+line (follow-up 2). The dark and the Italian screens are the same design. No text is cut.
 
 ## 02 Transcribing
 
@@ -110,6 +146,15 @@ where a deviation in this report says otherwise.
 - The paddings in the suggestion card come from board 02: 7.5 dp above the question, 3 dp below it, and 4 dp at the
   bottom of the card.
 
+### Device
+
+Verdict: the device matches the board and the contract change of deviation 12. The progress card, the stepper, the
+suggestion card ("Is this Paolo Ferri?") and the draft show as on the board. The draft words that can still change
+use the unsettled color. In the light screenshot, new draft text came after the screen opened. Thus the list
+scrolled to the end, and the progress card is above the top of the list. This is the behavior of deviation 12, but
+the user then does not see the progress (follow-up 3). The dark screenshot shows the card at the top. In Italian,
+the tag "Le parole possono ancora cambiare" goes below the header, as in the golden.
+
 ## 03 Read and listen
 
 | Mean | Pixels above 32 | Highest band | Rows |
@@ -124,6 +169,19 @@ where a deviation in this report says otherwise.
   values come from board 03 (ui.md gives 0).
 - The chips row extends 4 dp into the layout of the top bar, and its rows have no gap. As a result, the 48 dp
   chips keep the pixels of the board.
+
+### Device
+
+Verdict: the device matches the board after one correction. The active word, the speaker header, the chips and
+the player show as on the board. With one speaker, "1 speaker" shows next to the Verified chip. The active word
+can include its punctuation ("settentrionale,"), because the recognizer gives the punctuation with the word.
+
+The review found two problems. P12 corrected them:
+
+- The player surface stopped above the gesture bar, and the bar showed the `bg` color below it. The navigation-bar
+  inset is now padding inside the surface (`PlaybackBar`). The goldens use zero insets, so they did not change.
+- At font scale 2.0, the "10" in the skip buttons covered the arrow of the icon. The "10" is now part of the icon
+  and does not follow the font scale. The golden `fontscale/03-read-and-listen.png` changed.
 
 ## 04 Name a speaker
 
@@ -140,6 +198,18 @@ where a deviation in this report says otherwise.
 - The checkmark of "Remember this voice on this phone" is thinner than on the board. This difference is for the
   owner to review.
 
+### Device
+
+Verdict: the device matches the board. The walk opens the sheet on the paused draft, with one speaker. Thus the
+list heading is "Saved voices" (no ranking), no row is "Likely", and the footer has no "Merge into…". The
+same-person question, Remember and the footer show as on the board. In Italian, all text fits.
+
+The review found one problem in dark. P12 corrected it: the white Check on the dark `accent` (#8FA6FF) had a
+contrast of 2.3:1. The Check now uses `surface`, which is white in light (no change) and #181C20 in dark (7.4:1).
+The goldens `dark/04-name-a-speaker.png` and `components/forms-dark.png` changed.
+
+With the keyboard open, the sheet goes up below the status bar (follow-up 4).
+
 ## 05 Model download
 
 | Mean | Pixels above 32 | Highest band | Rows |
@@ -153,6 +223,11 @@ where a deviation in this report says otherwise.
   the board (32.2 dp). Without this change, the body and the card are 2 dp low, and the rows drift to +7 dp.
 - The rows of the model parts have a vertical padding of 13.5 dp. Android sets the 15 sp Plex Mono line 0.5 dp
   taller than the browser.
+
+### Device
+
+Verdict: the device matches the board and deviation 7. The copy, the part sizes and the buttons are the board
+copy. The dark and the Italian screens fit without cut text.
 
 ## 06 Note actions and export
 
@@ -168,6 +243,11 @@ where a deviation in this report says otherwise.
 - The app puts a zero-width space before each mono file extension. Unicode line breaking (UAX 14, rule LB13) never
   breaks a line before ".". Without the space, "anywhere." moves to the next line with ".opus".
 
+### Device
+
+Verdict: the device matches the board. The sheet shows "Adds version 2", because the note of the walk has one
+version. The rows are a little taller than in the golden (see "Device review").
+
 ## 07 Saved voices
 
 | Mean | Pixels above 32 | Highest band | Rows |
@@ -180,6 +260,12 @@ where a deviation in this report says otherwise.
   the text, not the 48 dp button, sets the row height (the row of Luca, with the stale hint).
 - The meta line uses a 19.5 dp line box. On the board, it is an inline 13 px span in a 16 px line.
 
+### Device
+
+Verdict: the device matches the board. The walk has two saved voices. Paolo Ferri shows "0 notes", because the walk
+saves the same voiceprint two times and the second voice (Anna Ricci) keeps the link to the note. This is a state
+of the walk, not a defect.
+
 ## 08 Settings
 
 | Mean | Pixels above 32 | Highest band | Rows |
@@ -190,6 +276,12 @@ where a deviation in this report says otherwise.
 - The subtitle of a settings row uses the 19.5 dp line box of the 16 px parent on the board.
 - The helper below the language control uses the normal caption line height, because the board sets no line height
   there. The helper below the models keeps a line height of 1.4.
+
+### Device
+
+Verdict: the device matches the board. All three models show Ready, so no row shows "Downloads with next
+transcription". In Italian, the language helper wraps to two lines. At font scale 2.0, all text fits (see
+"Acceptance 0.2" in `development.md`).
 
 ## 09 Trash
 
@@ -205,6 +297,11 @@ where a deviation in this report says otherwise.
 - The top padding of a card is 14 dp, not 15 dp, and the top margin of the meta line is 2.5 dp. Android sets the
   16 sp title about 1 dp lower in its line.
 - "Empty" has 2 dp more end padding. The 6 dp compensation of the top bar is for 44 dp icon buttons.
+
+### Device
+
+Verdict: the device matches the board and deviation 11. The walk has one note in the trash, so the screen shows
+one card and no snackbar.
 
 ## 10 States, banners and errors
 
@@ -229,6 +326,25 @@ banners 12 dp apart. The test captures the column node, so the height is the con
   in the fixture.
 - TX_CALCULATING and TX_BATTERY are cards of the catalogue only (accepted deviation 9).
 - RECOVERED and NO_ENCODER show no close button, as on the board (accepted deviation 10).
+
+### Device
+
+The walk shows nine states on the screens where the app shows them:
+
+| State | Screenshot | Verdict |
+|---|---|---|
+| Paused | `10-states-paused.png` | Copy as the board. In the first walk the screenshot came before the draft loaded. The walk now waits for the draft. |
+| Not verified | `10-states-not-verified.png` | Copy and action as the board |
+| Transcript can't be read | `10-states-unreadable.png` | Copy and action as the board |
+| Storage almost full | `10-states-storage-low.png` | Copy as the board, on Recording |
+| Downloading | `10-states-downloading.png` | Copy as the board and deviation 8. The card shows "Starting…" and 0 %, as the golden `variants/transcribing-downloading.png`. |
+| Checking files | `10-states-checking.png` | Copy as the board |
+| No connection | `10-states-no-connection.png` | Copy and action as the board |
+| Not enough storage | `10-states-no-space.png` | Copy and action as the board |
+| File check failed | `10-states-file-check.png` | Copy and action as the board |
+
+The download screens show "294 of 640 MB", because the script of the walk gives 294 MB. All banners keep their
+tone in dark. In Italian, no text is cut.
 
 ## Goldens without a board
 
@@ -322,6 +438,13 @@ board, and in KDoc or a code comment.
 12. The draft of a running transcription does not scroll when the screen opens, so the progress card stays in view.
     When new text comes, the list scrolls to the end. A scroll that stops above the end pauses this, and a scroll
     back to the end starts it again (features.md section 3.1).
+13. The Check of `CassiniCheckbox` uses `surface`, not white (ui.md section 6). In light, `surface` is white, so
+    nothing changes. In dark, a white Check on `accent` (#8FA6FF) has a contrast of 2.3:1, and `surface` gives
+    7.4:1 (P12, board 04).
+14. The `PlaybackBar` surface extends below the navigation bar. The inset is padding inside the surface.
+15. The "10" in the skip buttons does not follow the font scale, because it is a part of the 28 dp icon.
+16. In a Library row, the line with the time, the chip and the suffix is a flow row. At a large font scale, the
+    suffix goes to the next line.
 
 ## Changes to the screen contracts
 
@@ -391,3 +514,24 @@ ViewModel.
   The owner must select one text.
 - The Recording screen, the Library and the Note screen depend on back handling in `:app` (see the contract
   changes 1 and 3). The owner of ui.md must decide if section 1 changes to name `BackHandler`.
+
+## Device follow-ups
+
+The device review found these items. P12 did not correct them:
+
+1. Text rows on the device are about 1.5 dp taller for each line than in the goldens. Measure the cause with
+   `rows.py` on a device screenshot at the same dp scale, for example Settings.
+2. A duration can wrap between the number and its unit: "in about 1 h 55" and "min." on the next line (board 01,
+   English). No-break spaces in the `ui_duration_*` strings prevent this. This change can move other lines that
+   contain a duration, so the owner must decide.
+3. On Transcribing, the list scrolls to the end when new draft text comes (deviation 12). When the draft is longer
+   than the screen, the progress card goes above the top of the list. The owner must decide if the card stays in
+   view.
+4. On Name a speaker, the open keyboard pushes the sheet up below the status bar. The top of the sheet must stay
+   below the status bar. This is a change to `CassiniSheet` and text input, so it needs its own review.
+5. A document with no words shows an empty transcript on the Note screen. The Library row says "· No speech", but
+   the Note screen says nothing. features.md has no copy for this state.
+6. The Library excerpt can end with a space before the ellipsis ("il …"). `TextOverflow.Ellipsis` keeps the
+   space. The board has no space.
+7. The emulator microphone gives silence. Thus the review did not see the waveform bars move, or stay static
+   with the animator duration scale at 0. Do this check on a phone, together with the pre-release gate.

@@ -331,6 +331,79 @@ Later opens do not increase with the length of the audio: the median of the late
 
 On 10 Oct 2026, before these steps, a later open of the one-hour document took about 0.4 s more than a later open of the 15 s document (median 987 ms against 569 ms).
 
+## Acceptance 0.2 (11 Oct 2026)
+
+These are the results of the P12 behavior checks on 11 Oct 2026. The device is emulator-5554 (API 34, x86_64, 2 GB RAM). The app is the debug build of the branch `rebuild` with the P12 corrections. The 1-minute load average of the host was between 5 and 8.
+
+The checks 2 to 6, 8 and 9 use a debug root (`files/debug-root.txt`, see [device-kill-resume.sh](#device-kill-resumesh)). Thus they did not touch the notes of the device. At the end of the checks, the debug roots are deleted. These device values are the same as before the checks: `font_scale` and `animator_duration_scale` are not set, the night mode is `no` and the app language is Phone (`[]`). The files of the models did not change: the `ls -laR` listings before and after are the same, except the time of the parent directory.
+
+| Check | Method | Result |
+|---|---|---|
+| 1. Process death and resume | `scripts/device-kill-resume.sh --serial emulator-5554` | Passed. See [Process death](#process-death). |
+| 2. Stop and Continue | Stop in the processing notification, then Continue in the Library | Passed. See [Stop and Continue](#stop-and-continue). |
+| 3. Back on Recording | `adb shell input keyevent KEYCODE_BACK`, then Finish in the recording notification | Passed. See [Recording in the background](#recording-in-the-background). |
+| 4. Recording during a transcription | Record while two notes transcribe, then `ffprobe` | Passed: 0.45 % less than the wall clock. See [Recording in the background](#recording-in-the-background). |
+| 5. Font scale 2.0 | `adb shell settings put system font_scale 2.0`, then screenshots of Library, Note, Name a speaker and Settings | Passed after two corrections. See [Font scale 2.0](#font-scale-20). |
+| 6. Reduced motion | `adb shell settings put global animator_duration_scale 0`, then four Recording screenshots 0.3 s apart | Passed with a limit. See [Reduced motion](#reduced-motion). |
+| 7. App language after process death | `scripts/device-language-check.sh --serial emulator-5554` | Passed |
+| 8. Foreground service types | `adb shell dumpsys activity services org.cassini.android` during check 4 | Passed: `ProcessingService` has `types=00000001` (`dataSync`) and `RecordingService` has `types=00000080` (`microphone`) |
+| 9. Cold start | `adb shell am start -W -n org.cassini.android/.MainActivity` after `am force-stop`, three times | `TotalTime` 3246, 2886 and 2923 ms |
+| 10. Note opening time | `scripts/note-opening-timing.sh --serial emulator-5554` | Passed. See [Note opening time](#note-opening-time). |
+| Acceptance walk | `scripts/acceptance-walk.sh` | Passed in light, dark and Italian (P12 step 1). After the corrections, the light `realModels` part passed again. |
+
+### Process death
+
+The script imported `fleurs-it-x20.wav` (316.8 s). The job saved its first checkpoint at 28000 ms. Then the script stopped the process with `kill -9`. Android delivered the service intent again 47 s later, and the job continued in a new process. The job sealed the document with 538 words. The document state is OK.
+
+```text
+manifest	ok	kind=cassini-portable-meeting version=1 profile=ogg-opus
+words	ok	538 items
+checked: the manifest and 1 transcript payload(s), sha256 and byte counts.
+```
+
+`check-portable-document.mjs` read the document with the web viewer of `../gocassini` (538 words, 316800 ms). `cassini-opus-digest.py` gives the audio digest `55a12554…f383`. This value is equal to `integrity.opusAudioSha256` in the manifest.
+
+### Stop and Continue
+
+1. Two notes are in the queue: `fleurs-it-x20` transcribes and `acceptance-x8` waits.
+2. Push Stop in the processing notification. The notification shows "Stopping and keeping progress…".
+3. The job stops at its next checkpoint. `fleurs-it-x20` is Paused (USER) at 01:20. The queue hold is `USER`, and `acceptance-x8` stays Queued. The service stops and the notification goes away.
+4. The Library shows "Transcription paused · 1 waiting" with Continue. The paused note shows its draft and the same banner.
+5. Push Continue. `acceptance-x8` starts. `fleurs-it-x20` stays Paused until you push Resume.
+
+### Recording in the background
+
+1. While `acceptance-x8` transcribes, push Record.
+2. On the Recording screen, push the system back key. The Library shows the card "Recording · Voice note 11 Oct, 03:28" and the Record button "Recording · 00:41". 9 s later, both show 00:50. The transcription continues.
+3. Push Finish in the recording notification. The note goes to the queue and the recording service stops.
+
+The time from the push on Record to the push on Finish was 214.16 s. During this time, two notes transcribed. `ffprobe` gives 213.1865 s for `capture.opus` (Opus, 48000 Hz, 1 channel). The difference is 0.97 s (0.45 %), and it includes the start and the stop of the capture. `ffmpeg -f null` decodes the file without an error. The emulator microphone gives silence, so `silencedetect` cannot find a gap.
+
+### Font scale 2.0
+
+The review found two problems. Both are corrected, and a second look on the device found no more cut text:
+
+- In the Library, the suffix "· No speech" was cut to "· No". The line with the time, the chip and the suffix is now a flow row.
+- In the player, the "10" of the skip buttons covered the arrow of the icon. The "10" now does not follow the font scale.
+
+In Settings, Name a speaker and the Note screen, all text fits. The rows become taller and the screens scroll.
+
+### Reduced motion
+
+With `animator_duration_scale` at 0, only the timer changes between the four screenshots. The waveform, the status and the buttons do not change. The waveform has no animation of its own. The emulator microphone gives silence, so the waveform is a row of dots at both scales. Thus this check does not show the waveform with sound (follow-up 7 in [`ui-fidelity.md`](ui-fidelity.md)).
+
+### Note opening time
+
+The second run of `scripts/note-opening-timing.sh`, in milliseconds:
+
+| Note | Audio | First open | Later opens | After process death | Later opens after process death |
+|---|---|---|---|---|---|
+| `timing-one-hour` | 3600 s | 1356 | 757, 625, 539 | 1391 | 807, 675 |
+| `timing-ten-minutes` | 586 s | 824 | 760, 692, 640 | 875 | 713, 759 |
+| `timing-fleurs` | 15 s | 731 | 436, 506, 478 | 777 | 618, 536 |
+
+The median of the five later opens is 675 ms for one hour, 713 ms for ten minutes and 506 ms for 15 s. Thus the later opens do not increase with the length of the audio, as in the first run of [note-opening-timing.sh](#note-opening-timingsh).
+
 ## Portable file checks
 
 The `:core` JVM tests run each conformance vector of the `third_party/cassini-format` submodule. The submodule is pinned to the revision that this app conforms to. To run the vectors of another checkout, for example a newer `../cassini-format`, add `-PcassiniConformanceDir=/path/to/spec/conformance`.
