@@ -7,6 +7,7 @@ import android.os.Looper
 import android.view.ViewGroup
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
@@ -121,21 +122,24 @@ class AppShellTest {
         importDocument()
         rule.onNodeWithText(TITLE).performClick()
         waitFor(hasContentDescription("Search in transcript"))
+        // The Note state is built off the main thread, so each step waits for the state that the one before makes.
         rule.onNodeWithContentDescription("Search in transcript").performClick()
+        waitFor(hasSetTextAction())
         rule.onNode(hasSetTextAction()).performTextInput("allora")
-        rule.onNode(hasContentDescription("Speaker 2", substring = true)).performClick()
+        waitFor(SPEAKER_2)
+        rule.onNode(SPEAKER_2).performClick()
         waitFor(hasText("Save name"))
 
         Espresso.pressBack()
-        rule.onNodeWithText("Save name").assertDoesNotExist()
+        waitGone(hasText("Save name"))
         rule.onNodeWithContentDescription("Close search").assertExists()
 
         Espresso.pressBack()
-        rule.onNodeWithContentDescription("Close search").assertDoesNotExist()
-        rule.onNodeWithContentDescription("Search in transcript").assertExists()
+        waitGone(hasContentDescription("Close search"))
+        waitFor(hasContentDescription("Search in transcript"))
 
         Espresso.pressBack()
-        rule.onNodeWithContentDescription("Search in transcript").assertDoesNotExist()
+        waitGone(hasContentDescription("Search in transcript"))
         rule.onNodeWithContentDescription("Settings").assertExists()
         rule.onNodeWithText(TITLE).assertExists()
     }
@@ -219,8 +223,10 @@ class AppShellTest {
         importDocument()
         rule.onNodeWithText(TITLE).performClick()
         waitFor(hasContentDescription("Search in transcript"))
+        // The label is drawn first inside its turn, then as its own button node.
+        waitFor(SPEAKER_2)
 
-        val speaker = rule.onNode(hasContentDescription("Speaker 2", substring = true))
+        val speaker = rule.onNode(SPEAKER_2)
         speaker.assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
         val label = speaker.fetchSemanticsNode().config.getOrNull(SemanticsActions.OnClick)?.label
         assertEquals("Name this speaker", label)
@@ -245,8 +251,19 @@ class AppShellTest {
         return (application as Element).getAttributeNS(ANDROID_NS, attribute)
     }
 
-    private fun waitFor(matcher: SemanticsMatcher) =
-        rule.waitUntil(TIMEOUT_MS) { rule.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty() }
+    private fun waitFor(matcher: SemanticsMatcher) = waitUntilNodes(matcher) { it.isNotEmpty() }
+
+    private fun waitGone(matcher: SemanticsMatcher) = waitUntilNodes(matcher) { it.isEmpty() }
+
+    /**
+     * Waits until the nodes of [matcher] meet [condition]. Each check first runs the main looper: the state built off
+     * the main thread comes back to it as a posted task.
+     */
+    private fun waitUntilNodes(matcher: SemanticsMatcher, condition: (List<SemanticsNode>) -> Boolean) =
+        rule.waitUntil(TIMEOUT_MS) {
+            shadowOf(Looper.getMainLooper()).idle()
+            condition(rule.onAllNodes(matcher).fetchSemanticsNodes())
+        }
 
     private fun darkIcons(): Boolean {
         rule.waitForIdle()
@@ -318,6 +335,8 @@ class AppShellTest {
     }
 
     private companion object {
+        /** The label of the second speaker as its own node (merged tree). */
+        val SPEAKER_2 = hasContentDescription("Speaker 2", substring = true)
         const val ANDROID_NS = "http://schemas.android.com/apk/res/android"
         const val TITLE = "Riunione"
         const val SECOND_TURN = "allora cominciamo subito"
