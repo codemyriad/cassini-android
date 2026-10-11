@@ -460,23 +460,27 @@ board, and in KDoc or a code comment.
 17. A prose duration ("1 h 55 min", "under 1 min") has no-break spaces (U+00A0) in place of its spaces, in each
     language (`Durations`). The time-left texts keep the number and its unit together ("6–9 min", "Under 1 min
     left"). Thus a line does not break inside a duration. The golden `variants/recording-cap-hint.png` changed:
-    "1 h 35 min." is now on one line. The text of the processing notification does not use these spaces.
+    "1 h 35 min." is now on one line. The text of the processing notification does not use these spaces. Now in
+    the spec: features.md section 0.
 18. The title and the excerpt of a Library row do not show a space before the ellipsis (`EllipsisText`). When the
     ellipsis of `TextOverflow.Ellipsis` comes after a space, the row shows the text before the space and "…".
 19. The top of a sheet (`CassiniSheet`) stays below the status bar and the display cutout. When the keyboard is
     open and the content is taller than the space, the content scrolls.
 20. A document with no words shows a plain card in the transcript pane: "No speech" with "No words were found in
     this recording." The text comes from the TXT export (`export_no_words`). The golden `variants/read-no-words.png`
-    shows it. features.md has no copy for this state (see "Items for the owner to review").
+    shows it. features.md has no copy for this state (see "Items for the owner to review"). Now in the spec:
+    features.md section 3.3, ui.md section 8 (Read & listen) and the table of ui.md section 12.
 21. When Android stops a standalone model download (`onTimeout`), DL_STOPPED has the body "Android stopped the
     download. Try again to continue where it stopped." ("Android ha interrotto il download. Riprova per continuare
     da dove si è fermato."), not "The connection dropped." The error is `STOPPED_BY_SYSTEM`. features.md has no
-    copy for this case (see "Items for the owner to review").
+    copy for this case (see "Items for the owner to review"). Now in the spec: features.md section 13.4 and the
+    table of ui.md section 12.
 22. In Settings, a model row with "Download failed" opens Model download, as a "Not downloaded" row does.
     features.md section 11 names only the "Not downloaded" row. architecture.md section 5.7 step 6 sends the user
     to this row after Android stops a download. The text stays "Download failed — tries again next time", as on the
     board. But nothing tries again in the background: the next transcription that needs the model, or a tap on
-    the row, starts the download again (see "Items for the owner to review").
+    the row, starts the download again (see "Items for the owner to review"). Now in the spec: features.md
+    section 11.
 
 ## Changes to the screen contracts
 
@@ -553,14 +557,19 @@ write or change its ViewModel.
   state, and F1 did not change them, because the two files are read-only in the worktree. The owner must accept
   the copy "No speech" — "No words were found in this recording." ("Nessun parlato" — "Non sono state trovate
   parole in questa registrazione.") and add it to features.md section 3.3 and to the table of ui.md section 12.
+  Now in the spec: features.md section 3.3 and the table of ui.md section 12 have this copy.
 - The DL_STOPPED body after a stop by Android (new deviation 21). features.md section 13.4 gives DL_STOPPED only
-  for network failures. The owner must accept the copy and add it to features.md.
+  for network failures. The owner must accept the copy and add it to features.md. Now in the spec: features.md
+  section 13.4 has this copy.
 - The "Download failed" model row in Settings (new deviation 22). It opens Model download, but features.md
   section 11 does not say so. The text "tries again next time" does not tell the user to tap the row. The owner
   must decide if the row stays a button, and if the text changes, for example to "Download failed — tap to try
-  again". Then features.md section 11 must agree.
+  again". Then features.md section 11 must agree. Now in the spec: features.md section 11 says that the row opens
+  Model download, with the text of the board. The question about the text stays open.
 - The no-break spaces of new deviation 17 are not in features.md section 0. The owner must decide if section 0
-  names them, and if the processing notification also uses them.
+  names them, and if the processing notification also uses them. Now in the spec: features.md section 0 names
+  them, and says that the processing notification does not use them. The question about the notification stays
+  open.
 
 ## Device follow-ups
 
@@ -598,7 +607,8 @@ test. "Open" items need more work.
 5. Resolved, with an owner question. A document with no words shows "No speech" on the Note screen (new deviation
    20, contract change 20). `ScreenBehaviourTest.aDocumentWithNoWordsSaysSo` and
    `NoteViewModelTest.aDocumentWithNoWordsSaysSoOnlyWhenItsTranscriptHasLoaded` cover this. The new golden is
-   `variants/read-no-words.png`. The copy is not in features.md (see "Items for the owner to review").
+   `variants/read-no-words.png`. The copy is not in features.md (see "Items for the owner to review"). Now in the
+   spec: features.md section 3.3.
 6. Resolved. The Library title and excerpt do not show a space before the ellipsis (new deviation 18).
    `EllipsisTextTest` covers this at 101 widths. The Library goldens did not change, because no fixture puts the
    ellipsis after a space.

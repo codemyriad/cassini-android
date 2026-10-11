@@ -556,6 +556,7 @@ These are the contracts of the screens:
 - The chips in a `FlowRow` (padding: top 4, horizontal 16, bottom 10, gap 8, aligned at the center).
 - The banners (margin: horizontal 16, bottom 10).
 - The transcript pane: weight 1, surface, a 1 dp line border at the top, padding 0/20/16.
+- A document with no words (features.md section 3.3): the pane shows a `BannerCard` with `Tone.Plain`, with a top margin of 16. The title is `ui_note_no_words_title` and the body is `ui_note_no_words_body`. The golden is `variants/read-no-words.png` (no board).
 - The `PlaybackBar`, and the `FollowChip` when the follow mode is paused.
 
 ### In-note search header (no board)
@@ -826,6 +827,8 @@ The table gives the key Italian copy. The implementer writes the other strings i
 | Is this %s? | È %s? |
 | Yes, %s | Sì, %s |
 | Not %s | Non è %s |
+| No speech | Nessun parlato |
+| No words were found in this recording. | Non sono state trovate parole in questa registrazione. |
 | Save a copy | Salva una copia |
 | Cassini document | Documento Cassini |
 | Transcript as text | Trascrizione come testo |
@@ -847,6 +850,7 @@ The table gives the key Italian copy. The implementer writes the other strings i
 | Save name | Salva il nome |
 | Transcribe on this phone | Trascrivi su questo telefono |
 | Download and transcribe | Scarica e trascrivi |
+| Android stopped the download. Try again to continue where it stopped. | Android ha interrotto il download. Riprova per continuare da dove si è fermato. |
 | Not now — keep the audio | Non ora — tieni l’audio |
 | App language | Lingua dell’app |
 | Phone | Telefono |
