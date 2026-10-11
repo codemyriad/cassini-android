@@ -175,6 +175,7 @@ if int(count.group(1)) == 0:
 print(count.group(1))
 PY
 )
+# The emulator job of android.yml looks for this line: after it, a failure is a test failure and gets no retry.
 printf 'Selected tests (dry run): %s\n' "$expected"
 if [ -n "${CASSINI_EXPECTED_TESTS:-}" ] && [ "$expected" != "$CASSINI_EXPECTED_TESTS" ]; then
     printf 'The selection has %s tests, but CASSINI_EXPECTED_TESTS is %s.\n' "$expected" "$CASSINI_EXPECTED_TESTS" >&2

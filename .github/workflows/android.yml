@@ -275,11 +275,17 @@ jobs:
           profile: pixel_2
           disable-animations: true
           script: ./scripts/ci-emulator-smoke.sh
-      # One retry on a new emulator, for a boot or adb failure of the runner. The first results stay for review.
+      # One retry on a new emulator, for a boot or adb failure of the runner. When device-smoke.sh printed the
+      # dry-run count, the emulator worked and the tests ran: then a failure is a test failure, and the job fails
+      # with no retry. The first results stay for review.
       - name: Keep the results of the first attempt
         if: steps.first-attempt.outcome == 'failure'
         run: |
-          echo "::warning title=Emulator retry (API ${{ matrix.api }})::The first attempt failed; the job runs the checks one more time."
+          if grep -qs '^Selected tests (dry run):' .tools/emulator-results/instrumentation.txt; then
+            echo "::error title=Device checks (API ${{ matrix.api }})::The tests ran and failed; the job does not retry them."
+            exit 1
+          fi
+          echo "::warning title=Emulator retry (API ${{ matrix.api }})::The emulator or adb failed before the tests; the job runs the checks one more time."
           if [ -d .tools/emulator-results ]; then mv .tools/emulator-results .tools/emulator-results-attempt-1; fi
       - name: Run the device checks again
         if: steps.first-attempt.outcome == 'failure'
