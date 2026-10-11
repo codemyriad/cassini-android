@@ -145,9 +145,9 @@ No text is cut.
 - The arrow in "54% → about 41%" is larger and heavier than on the board. The board draws it with a fallback font.
   This difference is for the owner to review.
 - The progress card stays fixed above a scrolling list with the banners, the "Draft transcript" header and the
-  turns, as on the board. If the card is taller than half of the space below the top bar (a short screen or a large
-  font scale), the card is the first item of the list. Then the card and the draft scroll together, and the draft
-  keeps some space (new deviation 7).
+  turns, as on the board. If the card leaves less than 160 dp for the draft below the top bar (a very short screen
+  or a large font scale), the card is the first item of the list. Then the card and the draft scroll together, and
+  the draft keeps some space (new deviation 7).
 - The first speaker header extends 15.5 dp up into the "Draft transcript" row. As a result, the first turn is in
   the position of the board. Each plain turn after the first is about 7 dp lower than a board turn, because its
   header is 48 dp high (accepted deviation 2). Board 02 shows no such turn.
@@ -435,9 +435,9 @@ board, and in KDoc or a code comment.
    above and below, the model rows have 13.5 dp padding, the Note actions sheet has 10.5 dp top padding and a
    3.5 dp title gap, and the Trash cards have 14 dp top padding.
 6. The Recording status sits between the chevron and the badge, as on board 01, not at the center of the screen.
-7. On Transcribing, the progress card stays fixed above the draft list while it uses half of the space or less.
-   If the card is taller, it is the first item of the list. The first draft header extends 15.5 dp up into the
-   "Draft transcript" row.
+7. On Transcribing, the progress card stays fixed above the draft list while it leaves 160 dp or more for the
+   draft. If the card is taller, it is the first item of the list. The first draft header extends 15.5 dp up into
+   the "Draft transcript" row.
 8. The suggestion card paddings come from board 02 (7.5 / 3 / 4 dp).
 9. A zero-width space comes before each mono file extension, so that a line can break before ".opus".
 10. The Read pane has a top padding of 0.5 dp, and the paragraph is 1.5 dp below the speaker header.
@@ -563,10 +563,13 @@ test. "Open" items need more work.
 2. Resolved. A duration does not wrap between the number and its unit (new deviation 17). `FormatTest` and
    `FormatItalianTest` cover the no-break spaces.
 3. Resolved. On Transcribing, the progress card stays fixed above the draft, and new text scrolls only the draft
-   list (new deviations 7 and 12). `ScreenBehaviourTest.newDraftTextKeepsTheProgressCardInView` covers this. Without
-   the fixed card, that test fails. On emulator-5554,
+   list (new deviations 7 and 12). `ScreenBehaviourTest.newDraftTextKeepsTheProgressCardInView` covers this at
+   390x844 dp, 411x731 dp (the pixel_2 profile of the CI emulators) and 360x640 dp. Without the fixed card, these
+   tests fail. Before round 1 of F1, the card was fixed only while it used half of the space or less, and the
+   tests at 411x731 dp and 360x640 dp failed. On emulator-5554,
    `SheetAndDraftDeviceTest.newDraftTextKeepsTheProgressCardInView` showed the full card and the newest turn after
-   new text came. The goldens of board 02 did not change.
+   new text came. The same test passed with the display set to 1080x1920 px at 420 dpi (731 dp high, as pixel_2).
+   The goldens of board 02 did not change.
 4. Resolved. On Name a speaker, the top of the sheet stays below the status bar when the keyboard is open (new
    deviation 19). `ModalBottomSheet` of Material 3 1.4 already moves the sheet above the keyboard. Thus
    `CassiniSheet` no longer adds its own IME padding. On emulator-5554,

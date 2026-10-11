@@ -124,7 +124,18 @@ class ScreenBehaviourTest {
      * New draft text scrolls only the draft below the progress card (docs/ui-fidelity.md, device follow-up 3): the
      * card stays in view, and the newest turn comes into view.
      */
-    @Test fun newDraftTextKeepsTheProgressCardInView() {
+    @Test fun newDraftTextKeepsTheProgressCardInView() = assertNewDraftTextKeepsTheCardInView()
+
+    /** The same on a 16:9 phone (the pixel_2 profile of the CI emulators), where the card is over half the space. */
+    @Config(qualifiers = "w411dp-h731dp-xxhdpi")
+    @Test
+    fun newDraftTextKeepsTheProgressCardInViewOnA16By9Phone() = assertNewDraftTextKeepsTheCardInView()
+
+    @Config(qualifiers = "w360dp-h640dp-xhdpi")
+    @Test
+    fun newDraftTextKeepsTheProgressCardInViewOnASmallPhone() = assertNewDraftTextKeepsTheCardInView()
+
+    private fun assertNewDraftTextKeepsTheCardInView() {
         val base = BoardFixtures.transcribing
         val many = (1..12).flatMap { n -> base.turns.map { it.copy(id = "${it.id}-$n") } }
         var state by mutableStateOf(base.copy(turns = many.toPersistentList()))

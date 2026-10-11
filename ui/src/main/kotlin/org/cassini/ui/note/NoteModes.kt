@@ -33,6 +33,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -68,8 +69,11 @@ private val FirstHeaderLift = 15.5.dp
 /** Board 02: 14 dp between the draft's turns (the article's gap). */
 private val DraftTurnGap = 14.dp
 
-/** The card stays fixed above the draft while it takes at most this part of the space. */
-private const val PIN_FRACTION = 0.5f
+/**
+ * The card stays fixed above the draft while at least this much space stays for the draft below it: about six
+ * draft lines. A share of the space is not used, because on a 16:9 phone (731 dp) the card is more than half of it.
+ */
+private val MinDraftSpace = 160.dp
 
 /** The large step that scrolls the draft to its end; the list stops at the end. */
 private const val TO_END_PX = 1_000_000f
@@ -165,8 +169,8 @@ private fun ColumnScope.DocumentBelow(
 /**
  * The draft list (board 02). The progress [card] (margin 8/16; null in Paused and Failed) stays fixed above a
  * LazyColumn with the banners, the "Draft transcript" header and one item per turn, keyed by its id, as on the
- * board. When the card is taller than [PIN_FRACTION] of the space (a short screen, a large font scale), it is the
- * first item of the list instead, so the card and the draft scroll together and the draft keeps some space.
+ * board. When the card leaves less than [MinDraftSpace] for the draft (a very short screen, a large font scale), it
+ * is the first item of the list instead, so the card and the draft scroll together and the draft keeps some space.
  *
  * Auto-follow (features.md section 3.1): new text scrolls the end of the draft into view. Only the list scrolls, so
  * a fixed card stays in view. A scroll that ends above the end pauses it, and a scroll back to the end resumes it.
@@ -202,7 +206,8 @@ private fun ColumnScope.DraftList(
     // The heights of the space and of the card with its margin. Before the first measurement the card is fixed.
     var areaPx by remember { mutableIntStateOf(0) }
     var cardPx by remember { mutableIntStateOf(0) }
-    val pinned = areaPx == 0 || cardPx <= areaPx * PIN_FRACTION
+    val minDraftPx = with(LocalDensity.current) { MinDraftSpace.roundToPx() }
+    val pinned = areaPx == 0 || areaPx - cardPx >= minDraftPx
     val cardItem: @Composable () -> Unit = {
         if (card != null) {
             ProcessingCard(
