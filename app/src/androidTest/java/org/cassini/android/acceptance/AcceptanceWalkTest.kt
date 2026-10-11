@@ -293,11 +293,12 @@ class AcceptanceWalkTest {
         openRow(BOARD_REVIEW)
         see(prefix(UiR.string.ui_banner_tx_paused_title))
         see(rule.text(UiR.string.ui_banner_tx_paused_body))
-        shot("10-states-paused")
-
+        // The saved draft loads after the banner: wait for its first speaker, so the shot shows the draft.
         val placeholder = rule.text(UiR.string.ui_speaker_label, NUMBER).substringBefore(NUMBER.toString())
         val speaker = hasContentDescription(placeholder, substring = true) and hasClickAction()
         rule.waitShown(speaker)
+        shot("10-states-paused")
+
         rule.onAllNodes(speaker).onFirst().performSemanticsAction(SemanticsActions.OnClick)
         val save = hasText(rule.text(UiR.string.ui_name_save)) and hasClickAction()
         rule.waitShown(save)
