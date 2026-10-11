@@ -71,8 +71,8 @@ class RecordingService : LifecycleService() {
 
     /**
      * Updates the notification until the recording ends, then tells the user (when hidden) and stops. The
-     * notification is built off the main thread (below API 33 each build reads the app locale from a file) and
-     * posted on it, so it is never posted after the service left the foreground.
+     * notification is built off the main thread (each build reads the app locale: a file below API 33, `LocaleManager`
+     * from API 33) and posted on it, so it is never posted after the service left the foreground.
      */
     private suspend fun watch() {
         var shown: RecordingNotifications.Content? = null

@@ -2,15 +2,18 @@ package org.cassini.android.processing
 
 import android.Manifest
 import android.app.Notification
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Bundle
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import org.cassini.android.R
+import org.cassini.android.inAppLanguage
 import org.cassini.android.stringRes
 import org.cassini.core.Failure
 import org.cassini.core.export.ExportClock
@@ -29,7 +32,8 @@ import org.cassini.ui.R as UiR
 /**
  * The processing notification and the results notifications (architecture 5.10, features.md section 12).
  *
- * Every text comes from `ContextCompat.getContextForLanguage`, so it follows the app language also below API 33.
+ * Every text comes from [inAppLanguage] at each build, so it follows the app language on every API level, also in a
+ * process that Android started for the service.
  * Every notification is VISIBILITY_PRIVATE with a public version without the note title. PendingIntents are
  * `FLAG_IMMUTABLE | FLAG_UPDATE_CURRENT`. Activity intents open the app's launcher activity with [EXTRA_OPEN] and
  * [EXTRA_NOTE_ID] (architecture section 6).
@@ -39,7 +43,7 @@ class ProcessingNotifications(context: Context) : ProcessingNotices {
     private val app = context.applicationContext
 
     /** A context whose resources use the app language. */
-    private fun localized(): Context = ContextCompat.getContextForLanguage(app)
+    private fun localized(): Context = app.inAppLanguage()
 
     // The ongoing notification. -----------------------------------------------------------------------------------
 

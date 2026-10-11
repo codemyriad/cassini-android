@@ -805,7 +805,7 @@ Two Note screens can open the player at the same time, for example when the user
 
 ### 5.10 Notifications
 
-The text comes from `ContextCompat.getContextForLanguage(context)`. Each notification is `VISIBILITY_PRIVATE`, with a public version without the note title. The channels are `recording` (LOW), `processing` (LOW) and `results` (DEFAULT, silent). The small icon is the monochrome logo (`ui_ic_stat_logo`). The PendingIntents use `FLAG_IMMUTABLE | FLAG_UPDATE_CURRENT`. features.md section 12 gives the content and the copy.
+The text comes from `inAppLanguage()` (`AppLanguage.kt`). Below API 33, this function uses `ContextCompat.getContextForLanguage`. From API 33, it gets the app language from `LocaleManager` and makes a context with this language. The application context does not always have the app language: on a Pixel 8 (API 37), the screens were in Italian and the notifications were in English. Each notification is `VISIBILITY_PRIVATE`, with a public version without the note title. The channels are `recording` (LOW), `processing` (LOW) and `results` (DEFAULT, silent). The small icon is the monochrome logo (`ui_ic_stat_logo`). The PendingIntents use `FLAG_IMMUTABLE | FLAG_UPDATE_CURRENT`. features.md section 12 gives the content and the copy.
 
 ## 6. UI architecture
 

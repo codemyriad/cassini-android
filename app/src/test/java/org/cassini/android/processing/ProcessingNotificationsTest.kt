@@ -1,9 +1,15 @@
 package org.cassini.android.processing
 
+import android.Manifest
+import android.app.Application
+import android.app.LocaleManager
 import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
+import android.os.LocaleList
 import androidx.test.core.app.ApplicationProvider
+import org.cassini.android.recording.RecordingNotifications
+import org.cassini.android.recording.RecordingState
 import org.cassini.core.models.ModelPart
 import org.cassini.engine.job.BatteryLine
 import org.cassini.engine.job.DownloadProgress
@@ -162,6 +168,62 @@ class ProcessingNotificationsLocaleTest {
     private fun storeAppLocales(tags: String) {
         File(context.filesDir, "androidx.appcompat.app.AppCompatDelegate.application_locales_record_file")
             .writeText("<?xml version='1.0' encoding='utf-8'?><locales application_locales=\"$tags\" />")
+    }
+
+    private companion object {
+        const val NOTE = "5eed0000-0000-4000-8000-000000000001"
+    }
+}
+
+/**
+ * From API 33 the app language is in `LocaleManager`, and the application context may not have it (an Italian UI
+ * gave English notifications on a Pixel 8): every notification text still follows it (architecture 5.10). Robolectric
+ * keeps the application context in English, as that device did.
+ */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34, 35])
+class ProcessingNotificationsLocaleManagerTest {
+    private val context: Context = ApplicationProvider.getApplicationContext()
+
+    @Test fun theTextFollowsTheLocaleManagerLanguage() {
+        shadowOf(context as Application).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        val processing = ProcessingNotifications(context)
+        val recording = RecordingNotifications(context)
+        val state = ProcessingState(loading = false, running = RunningJob(NOTE, "Riunione", JobPhase.Starting))
+        assertEquals("Transcribing “Riunione”", processing.content(state).title)
+
+        context.getSystemService(LocaleManager::class.java).applicationLocales = LocaleList.forLanguageTags("it")
+        val own = context.resources.configuration.locales[0].language
+        assertEquals("the application context itself stays English", "en", own)
+        assertEquals("Trascrizione di “Riunione”", processing.content(state).title)
+        assertEquals("Avvio…", processing.content(state).text)
+        val ongoing = processing.ongoing(state)
+        val ongoingTitle = ongoing.extras.getCharSequence(Notification.EXTRA_TITLE).toString()
+        assertEquals("Trascrizione di “Riunione”", ongoingTitle)
+        assertEquals("Interrompi", ongoing.actions.first().title.toString())
+        val mib = 1_048_576L
+        val download = DownloadProgress(ModelPart.SPEECH, 296 * mib, 640 * mib, verifying = false)
+        val downloading = state.copy(running = RunningJob(NOTE, "Riunione", JobPhase.Downloading(download)))
+        assertEquals("Download: riconoscimento vocale — 46%", processing.content(downloading).title)
+        assertEquals("Registrazione", recording.content(RecordingState.Idle).title)
+        assertEquals("Avvio del microfono…", recording.content(RecordingState.Idle).text)
+
+        processing.pausedByAndroid(NOTE, "Riunione", doneMs = 288_000, totalMs = 950_000)
+        val paused = shadowOf(context.getSystemService(NotificationManager::class.java)).allNotifications.single()
+        val pausedTitle = paused.extras.getCharSequence(Notification.EXTRA_TITLE).toString()
+        assertEquals("Trascrizione sospesa da Android", pausedTitle)
+        assertEquals(
+            "In pausa a 04:48 di 15:50. Apri per riprendere.",
+            paused.extras.getCharSequence(Notification.EXTRA_TEXT).toString(),
+        )
+
+        NotificationChannels.create(context)
+        val manager = context.getSystemService(NotificationManager::class.java)
+        assertEquals("Trascrizione", manager.getNotificationChannel(NotificationChannels.PROCESSING).name)
+
+        // Back to the phone's language.
+        context.getSystemService(LocaleManager::class.java).applicationLocales = LocaleList.getEmptyLocaleList()
+        assertEquals("Transcribing “Riunione”", processing.content(state).title)
     }
 
     private companion object {

@@ -148,7 +148,7 @@ class ProcessingService : LifecycleService() {
 
     /**
      * The ongoing notification, at most once a second (architecture 5.10). The text is built off the main thread:
-     * below API 33 each build reads the app locale from a file.
+     * each build reads the app locale (a file below API 33, `LocaleManager` from API 33).
      */
     private suspend fun followNotification() {
         var posted = 0L

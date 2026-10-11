@@ -3,7 +3,7 @@ package org.cassini.android.adapters
 import android.app.ActivityManager
 import android.content.Context
 import android.util.Log
-import androidx.core.content.ContextCompat
+import org.cassini.android.inAppLanguage
 import org.cassini.core.audio.Limits
 import org.cassini.core.models.ModelCatalog
 import org.cassini.core.models.ModelDescriptor
@@ -64,11 +64,11 @@ object InstalledEngines {
 
     /**
      * "Speaker 2" in the app language: `ui_speaker_label` of :ui, the label that the transcript shows. It is read at
-     * each call, so it follows a language change, and below API 33 it comes from `getContextForLanguage` because the
-     * application context keeps the system language there.
+     * each call, so it follows a language change, and it comes from [inAppLanguage] because the application context
+     * does not always have the app language.
      */
     fun speakerLabel(context: Context, number: Int): String =
-        ContextCompat.getContextForLanguage(context).getString(UiR.string.ui_speaker_label, number)
+        context.inAppLanguage().getString(UiR.string.ui_speaker_label, number)
 
     /**
      * `MemoryInfo.lowMemory`, a low-RAM device, or a known [durationMs] whose PCM does not fit the free heap

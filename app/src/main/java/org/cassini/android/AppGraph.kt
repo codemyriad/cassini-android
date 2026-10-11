@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.Build
 import android.os.SystemClock
 import android.util.Log
-import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -206,7 +205,7 @@ class AppGraph(context: Context, val config: Config) {
             describe = { uri -> withContext(dispatchers.io) { source.describe(uri.toUri()).displayName } },
             run = { uri -> awaitCatalogue().imports.import(uri.toUri()) },
             clock = config.clock,
-            fallbackName = { ContextCompat.getContextForLanguage(app).getString(R.string.import_fallback_title) },
+            fallbackName = { app.inAppLanguage().getString(R.string.import_fallback_title) },
         )
         NoticeCenter(this, app, imports)
     }
@@ -399,7 +398,7 @@ class AppGraph(context: Context, val config: Config) {
 
     /** "Voice note 8 Oct, 08:14" in the app language (features.md section 2). */
     private fun defaultTitle(createdAt: Long): String {
-        val localized = ContextCompat.getContextForLanguage(app)
+        val localized = app.inAppLanguage()
         val locale = localized.resources.configuration.locales[0] ?: Locale.getDefault()
         val time = Instant.ofEpochMilli(createdAt).atZone(config.zone())
         val date = DateTimeFormatter.ofPattern(TITLE_DATE_PATTERN, locale).format(time).replace(".", "")
@@ -463,7 +462,7 @@ class Catalogue internal constructor(
         documents,
         ImportSource.of(context.contentResolver),
         // Read at each import, in the app language of that moment (also below API 33).
-        fallbackTitle = { ContextCompat.getContextForLanguage(context).getString(R.string.import_fallback_title) },
+        fallbackTitle = { context.inAppLanguage().getString(R.string.import_fallback_title) },
         clock = clock,
     )
     val recovery = RecoveryRepository(database, paths, dispatchers, locks, clock = clock)

@@ -11,6 +11,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import org.cassini.android.R
+import org.cassini.android.inAppLanguage
 import org.cassini.android.processing.NotificationChannels
 import org.cassini.android.processing.ProcessingNotifications
 import org.cassini.core.export.ExportClock
@@ -25,7 +26,7 @@ import org.cassini.ui.R as UiR
 class RecordingNotifications(context: Context) {
     private val app = context.applicationContext
 
-    private fun localized(): Context = ContextCompat.getContextForLanguage(app)
+    private fun localized(): Context = app.inAppLanguage()
 
     /** What the ongoing notification shows; it is posted again only when this changes. */
     data class Content(val title: String, val text: String?, val pausedAtMs: Long?, val chronometer: Boolean)

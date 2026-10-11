@@ -18,6 +18,7 @@ import kotlinx.coroutines.withContext
 import org.cassini.android.AppGraph
 import org.cassini.android.R
 import org.cassini.android.adapters.InstalledEngines
+import org.cassini.android.inAppLanguage
 import org.cassini.android.library.GraphLibraryPorts
 import org.cassini.android.notices.NoticeFacts
 import org.cassini.android.notices.TrashedNote
@@ -374,7 +375,7 @@ class GraphNotePorts(private val graph: AppGraph, context: Context) : NotePorts 
 
     // Text. --------------------------------------------------------------------------------------------------------
 
-    private fun localized(): Context = ContextCompat.getContextForLanguage(app)
+    private fun localized(): Context = app.inAppLanguage()
 
     private fun format(context: Context): FormatSettings = FormatSettings(
         locale = context.resources.configuration.locales[0],
