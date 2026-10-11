@@ -205,7 +205,7 @@ The test APK holds the long clip of the background tests ([`fixtures/README.md`]
 | `@CiSmoke` | Tests that need no models and no microphone. `scripts/ci-emulator-smoke.sh` selects them. | The CI emulators, API 26, 29, 34 and 35 |
 | `@NeedsModels` | Tests that need the installed models | emulator-5554, and the weekly CI models job on API 34 |
 | `@NeedsMicrophone` | Tests that record from the microphone | An emulator or a phone. Emulator audio can be silence, so these tests examine the files and the states. |
-| `@Manual` | Tests that CI does not run, and that need their own inputs. `NoteOpeningTimingTest` needs the arguments of its script. `ModelDownloadFlowTest` needs `--arg emptyModelRoot=true`. Three `DeviceSmokeTest` tests need the models and the local YouTube clip. Without their inputs, they skip. | By hand, with the command of the test |
+| `@Manual` | Tests that CI does not run, and that need their own inputs. `NoteOpeningTimingTest` needs the arguments of its script. `ModelDownloadFlowTest` needs `--arg emptyModelRoot=true`. `AcceptanceWalkTest` needs the arguments of `scripts/acceptance-walk.sh`. Three `DeviceSmokeTest` tests need the models and the local YouTube clip. Without their inputs, they skip. | By hand, with the command of the test |
 
 Examples:
 
@@ -272,14 +272,18 @@ The script uses the installed debug app and its own data. It does not change not
 
 ### acceptance-walk.sh
 
-`scripts/acceptance-walk.sh` operates `AcceptanceWalkTest` on emulator-5554 and collects a screenshot of each board. It does these steps:
+`scripts/acceptance-walk.sh` operates `AcceptanceWalkTest` on emulator-5554 and collects a screenshot of each board.
+
+Before you start the script, install the app on the device, open it and download the models. The walk uses these models and does not download them. If the models are not on the device, the script stops with a message.
+
+The script does these steps:
 
 1. It makes the test clips with `scripts/acceptance-audio.sh` (this needs ffmpeg).
 2. It writes a backup of `files/` without the models. Use `--backup FILE` to name the backup file.
 3. It builds the debug app and its test APK one time.
 4. It operates the walk in three variants: light, dark (`cmd uimode night yes`) and Italian.
 5. It copies the screenshots to `build/acceptance/<run>/<variant>/` and deletes them on the device.
-6. It makes sure that the model files did not change.
+6. It makes sure that the model files did not change. It compares a recursive list of the model files and the checksums of their `verified` files before and after the walk.
 7. It sets the night mode and the app language back to their values before the run.
 
 ```sh

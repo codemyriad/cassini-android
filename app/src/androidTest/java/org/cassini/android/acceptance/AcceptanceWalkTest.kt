@@ -6,6 +6,7 @@ import android.os.SystemClock
 import android.util.Log
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
@@ -47,13 +48,17 @@ import org.cassini.core.format.CassiniDocument
 import org.cassini.core.format.DocumentState
 import org.cassini.core.library.JobKind
 import org.cassini.core.library.JobState
+import org.cassini.core.models.ModelPart
+import org.cassini.core.models.ModelPlan
 import org.cassini.engine.job.JobPhase
 import org.cassini.test.Manual
+import org.cassini.ui.components.ActiveWordStart
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeFalse
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -75,8 +80,9 @@ import org.cassini.ui.R as UiR
  *   nothing is downloaded: Model download, Downloading 46 %, Checking 80 %, No connection, Not enough storage and
  *   File check failed.
  *
- * Arguments: `-e acceptanceLabel NAME` names the output folder; `-e acceptanceLanguage it` switches the app to
- * Italian through Settings first and back to the phone language at the end. The night mode is set by the script.
+ * Arguments: `-e acceptanceLabel NAME` names the output folder, and [realModels] skips without it;
+ * `-e acceptanceLanguage it` switches the app to Italian through Settings first and back to the phone language at the
+ * end. The night mode is set by the script.
  */
 @Manual
 class AcceptanceWalkTest {
@@ -128,7 +134,9 @@ class AcceptanceWalkTest {
     // Part A: the installed models. ---------------------------------------------------------------------------------
 
     @Test fun realModels() {
-        assertFalse("Run the real-model walk without emptyModelRoot", CassiniTestRunner.emptyModelRoot)
+        // It skips without its script: it imports, transcribes, records and enrols voices with the installed models.
+        assumeTrue("Run the real-model walk with -e $ARG_LABEL NAME", arguments.containsKey(ARG_LABEL))
+        assumeFalse("Run the real-model walk without emptyModelRoot", CassiniTestRunner.emptyModelRoot)
         if (italian) chooseLanguage(ITALIANO, "it")
         val notes = seed()
 
@@ -274,6 +282,14 @@ class AcceptanceWalkTest {
         rule.waitFor("The position passes \"$letters\": ${graph.playback.state.value}", PLAYER_MS) {
             graph.playback.state.value.let { it.playing && it.positionMs > word.startMs }
         }
+        // The transcript shows it: one word is highlighted, from the tapped word on and not past the position.
+        rule.waitFor("A word from \"$letters\" on is highlighted: ${graph.playback.state.value}", PLAYER_MS) {
+            val position = graph.playback.state.value.positionMs
+            val highlighted = SemanticsMatcher("The active word starts in ${word.startMs}..$position ms") { node ->
+                node.config.getOrNull(ActiveWordStart)?.let { it in word.startMs..position } == true
+            }
+            rule.onAllNodes(highlighted, useUnmergedTree = true).fetchSemanticsNodes().size == 1
+        }
         shot("03-read-and-listen")
         Log.i(TAG, "Read & listen shot at ${graph.playback.state.value}")
         rule.runOnUiThread { graph.playback.pause() }
@@ -353,7 +369,7 @@ class AcceptanceWalkTest {
     // Part B: the download screens on an empty model root. ----------------------------------------------------------
 
     @Test fun downloadScreens() {
-        assertTrue("Run the download walk with -e emptyModelRoot true", CassiniTestRunner.emptyModelRoot)
+        assumeTrue("Run the download walk with -e emptyModelRoot true", CassiniTestRunner.emptyModelRoot)
         if (italian) chooseLanguage(ITALIANO, "it")
         runBlocking {
             val id = Background.import(Background.assetCopy("fleurs-it-short.wav"))
@@ -402,11 +418,11 @@ class AcceptanceWalkTest {
         see(rule.text(UiR.string.ui_banner_dl_file_check_title), timeoutMs = Flows.JOB_MS)
         see(rule.text(UiR.string.ui_banner_dl_file_check_body))
         shot("10-states-file-check")
-        assertEquals(
-            "Nothing was installed",
-            emptyList<String>(),
-            File(graph.paths.modelRoot, "parakeet-v3").listFiles().orEmpty().map { it.name },
-        )
+        // A real fetcher would leave .part files; a finished install would leave a marker.
+        val modelRoot = graph.paths.modelRoot
+        val written = modelRoot.walkTopDown().filter { it.isFile }.map { it.relativeTo(modelRoot).path }.toList()
+        assertEquals("No file was written in the model root", emptyList<String>(), written)
+        assertEquals("Every part is still missing", ModelPart.entries.toList(), ModelPlan.of(modelRoot).parts)
         library()
         if (italian) chooseLanguage(rule.text(UiR.string.ui_settings_language_phone), null)
     }

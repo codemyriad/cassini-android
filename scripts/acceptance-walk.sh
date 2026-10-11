@@ -50,14 +50,36 @@ out=build/acceptance/$run
 mkdir -p "$out"
 backup=${backup:-$out/files-backup.tar}
 
+model_dirs="files/parakeet-v3 files/speaker-models files/vad"
+
+# A recursive listing (with hidden files such as .part) and the checksums of the "verified" markers. It uses adb shell,
+# which gives the exit status of the command (adb exec-out does not), so a failed listing stops the script.
 models_listing() {
-    adb exec-out run-as "$package" ls -l files/parakeet-v3 files/speaker-models files/vad
+    local listing
+    if ! listing=$(adb shell "run-as $package sh -c 'ls -lAR $model_dirs && md5sum files/*/verified*'"); then
+        printf 'Cannot list the model files of %s.\n' "$package" >&2
+        return 1
+    fi
+    printf '%s\n' "$listing" | tr -d '\r'
 }
+
+# 0. The app and its models must be on the device: the walk uses them and never downloads.
+for dir in $model_dirs; do
+    if ! adb shell run-as "$package" test -f "$dir/verified" >/dev/null 2>&1; then
+        printf 'No verified models in %s of %s on %s.\n' "$dir" "$package" "$serial" >&2
+        printf 'Install the app, open it and download the models first. Then run this script again.\n' >&2
+        exit 1
+    fi
+done
 
 # 1. The test clips, the backup and the state to restore.
 scripts/acceptance-audio.sh
 adb exec-out run-as "$package" tar c \
     --exclude=files/parakeet-v3 --exclude=files/vad --exclude=files/speaker-models files > "$backup"
+if ! tar tf "$backup" >/dev/null 2>&1; then
+    printf 'The backup of files/ is not a tar archive: %s\n' "$backup" >&2
+    exit 1
+fi
 printf 'Backup of files/ (no models): %s (%s bytes)\n' "$backup" "$(wc -c < "$backup")"
 models_listing > "$out/models-before.txt"
 night=$(adb shell cmd uimode night | tr -d '\r' | sed -n 's/^Night mode: //p')
@@ -122,7 +144,7 @@ for variant in "${variants[@]}"; do
 done
 
 # 4. The models must be as they were.
-models_listing > "$out/models-after.txt"
+models_listing > "$out/models-after.txt" || status=1
 if ! cmp -s "$out/models-before.txt" "$out/models-after.txt"; then
     printf 'The model files changed:\n' >&2
     diff "$out/models-before.txt" "$out/models-after.txt" >&2 || true
