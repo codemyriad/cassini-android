@@ -12,9 +12,9 @@ Each release must have a `versionCode` that is more than the `versionCode` of th
 
 [`CHANGELOG.md`](../CHANGELOG.md) uses the Keep a Changelog format. The changes for the next version collect in the "Unreleased" section.
 
-At this time, the release job reads the notes from [`release-notes.md`](release-notes.md). A later change will take the notes from the CHANGELOG section of the tag, and `docs/release-notes.md` will go away.
+The release job takes the notes from the section of the tag in `CHANGELOG.md`. For the tag `v0.2.0`, this is the section `## [0.2.0]`. `scripts/changelog-section.py` extracts the section. It changes each relative link into a link to the file at the tag, because a relative link does not work on the release page. If the section is not there or is empty, the `checks` job fails before the build.
 
-<!-- TODO(P11): add scripts/changelog-section.py, make the release job read the CHANGELOG section of the tag with it, delete docs/release-notes.md, and update this section and step 3 of "Make a release". -->
+To see the notes before you make the tag, run `python3 scripts/changelog-section.py v0.2.0`. With no argument, the script shows the "Unreleased" section.
 
 ## Make a release
 
@@ -22,7 +22,7 @@ The owner does these steps:
 
 1. Do the pre-release gate in [`development.md`](development.md#pre-release-gate).
 2. In `CHANGELOG.md`, rename "Unreleased" to the new version and the date. Add a new empty "Unreleased" section and update the compare links.
-3. Copy the notes of the new version into `docs/release-notes.md`.
+3. Make sure that `python3 scripts/changelog-section.py v0.2.0` shows the notes of the new version.
 4. Set `versionName` and increase `versionCode` in `app/build.gradle.kts`.
 5. Commit the change on `main` and push it.
 6. Wait until CI passes on that commit.
