@@ -487,6 +487,16 @@ The script fails in two conditions. A "package only" group has a difference, or 
 
 The script shows the restructured groups (the models and the checkpoint) for reference, but it does not compare them.
 
+### Names of the removed 0.1.0 code
+
+The UI and the stores of 0.1.0 are not in the tree. To make sure of this, run this command:
+
+```sh
+git grep -n -E 'LibraryActivity|SessionStore|LibraryStore|DocumentStore|ProcessingCheckpoint|AppLanguage' -- ':!CHANGELOG.md' ':!docs/notes' ':!docs/development.md'
+```
+
+The command does not search `CHANGELOG.md`, `docs/notes/` and this file, because they name the old code on purpose. The command must find one line only: the `ProcessingCheckpoint` row of the `groups` table in `scripts/check-verbatim.sh`. This row is a permitted exception. It names the 0.1.0 file `app/src/main/java/org/cassini/android/ProcessingCheckpoint.kt` at the base commit, which is not in the tree. The script reads that file from git to show the restructured checkpoint group.
+
 ## Continuous integration
 
 Three workflows in `.github/workflows/` do the CI checks. All actions have a pin to a full commit SHA. Dependabot (`.github/dependabot.yml`) updates the Gradle dependencies, the actions and the submodule each week.
