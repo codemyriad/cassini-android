@@ -214,8 +214,16 @@ class ProcessingNotifications(context: Context) : ProcessingNotices {
         val heading = res.getString(R.string.notif_paused_title)
         val notification = resultBuilder(res, heading, text, R.string.notif_paused_public, noteId)
             .addAction(0, res.getString(R.string.notif_action_resume), openIntent(noteId, resume = true))
+            .addExtras(Bundle().apply { putBoolean(EXTRA_PAUSED_BY_ANDROID, true) })
             .build()
         post(noteId, notification)
+    }
+
+    override fun pausedByAndroidSaved(noteId: String, title: String, doneMs: Long, totalMs: Long) {
+        val shown = app.getSystemService(NotificationManager::class.java)?.activeNotifications.orEmpty().any {
+            it.tag == noteId && it.id == RESULT_ID && it.notification.extras.getBoolean(EXTRA_PAUSED_BY_ANDROID)
+        }
+        if (shown) pausedByAndroid(noteId, title, doneMs, totalMs)
     }
 
     override fun interrupted(noteId: String, title: String) {
@@ -307,6 +315,9 @@ class ProcessingNotifications(context: Context) : ProcessingNotices {
         const val OPEN_NOTE = "note"
         const val EXTRA_NOTE_ID = "noteId"
         const val EXTRA_RESUME = "resume"
+
+        /** Marks the "paused by Android" notification, which [pausedByAndroidSaved] may update. */
+        private const val EXTRA_PAUSED_BY_ANDROID = "org.cassini.android.pausedByAndroid"
 
         private const val PERCENT = 100
         private const val FLAGS = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT

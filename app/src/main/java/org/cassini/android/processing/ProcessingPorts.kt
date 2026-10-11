@@ -109,6 +109,12 @@ interface ProcessingNotices {
 
     fun pausedByAndroid(noteId: String, title: String, doneMs: Long, totalMs: Long)
 
+    /**
+     * The job that `onTimeout` stopped has ended with its last checkpoint at [doneMs]: a shown [pausedByAndroid]
+     * notification of [noteId] gets these numbers, the ones the Note screen shows. Nothing when it is not shown.
+     */
+    fun pausedByAndroidSaved(noteId: String, title: String, doneMs: Long, totalMs: Long)
+
     /** "Cassini closed while transcribing <title>": the job passed its automatic attempts (architecture 5.3). */
     fun interrupted(noteId: String, title: String)
 
@@ -121,6 +127,8 @@ interface ProcessingNotices {
             override fun readyToTranscribe(noteId: String, title: String) = Unit
 
             override fun pausedByAndroid(noteId: String, title: String, doneMs: Long, totalMs: Long) = Unit
+
+            override fun pausedByAndroidSaved(noteId: String, title: String, doneMs: Long, totalMs: Long) = Unit
 
             override fun interrupted(noteId: String, title: String) = Unit
         }

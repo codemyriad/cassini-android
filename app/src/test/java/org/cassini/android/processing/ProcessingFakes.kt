@@ -85,6 +85,9 @@ internal class RecordingNotices : ProcessingNotices {
     val failed: MutableList<String> = Collections.synchronizedList(mutableListOf())
     val ready: MutableList<String> = Collections.synchronizedList(mutableListOf())
     val paused: MutableList<String> = Collections.synchronizedList(mutableListOf())
+
+    /** The (note, doneMs) of each [pausedByAndroidSaved]. */
+    val pausedSaved: MutableList<Pair<String, Long>> = Collections.synchronizedList(mutableListOf())
     val interrupted: MutableList<String> = Collections.synchronizedList(mutableListOf())
 
     override fun transcribed(noteId: String, title: String, speakers: Int, durationMs: Long) {
@@ -101,6 +104,10 @@ internal class RecordingNotices : ProcessingNotices {
 
     override fun pausedByAndroid(noteId: String, title: String, doneMs: Long, totalMs: Long) {
         paused += noteId
+    }
+
+    override fun pausedByAndroidSaved(noteId: String, title: String, doneMs: Long, totalMs: Long) {
+        pausedSaved += noteId to doneMs
     }
 
     override fun interrupted(noteId: String, title: String) {

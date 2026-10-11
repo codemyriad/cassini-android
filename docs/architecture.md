@@ -729,7 +729,7 @@ The service type follows `coordinator.foregroundNeed`:
 
 1. It posts "Transcription paused by Android" with an Activity `PendingIntent` (content and Resume).
 2. It calls `stopForeground(STOP_FOREGROUND_REMOVE)` and `stopSelf()`. It does not wait for the job.
-3. It calls `coordinator.systemStop(noteId)` as best effort. The job saves a checkpoint at its next block.
+3. It calls `coordinator.systemStop(noteId)` as best effort. The job gets the stop before `onTimeout` returns, thus it starts no new window. A window that decodes at that time ends first. Then the job saves a checkpoint and stops. When the job ends and the "Transcription paused by Android" notification is on the screen, the coordinator puts the numbers of this checkpoint into it.
 4. It sets `queue.hold = SYSTEM`.
 5. It writes the row as PAUSED(SYSTEM), so that each screen shows Paused immediately.
 6. If a standalone download runs, it stops, because no foreground service keeps it. `ModelInstallOwner.stopDownloads` cancels each standalone wait. The installation stops when no job waits for it. The `.part` files stay for a Range resume. Each part that is not installed shows `Failed(DOWNLOAD, STOPPED_BY_SYSTEM)` until the next installation, and `lastOutcome` is STOPPED_BY_SYSTEM. Thus the Library shows DL_STOPPED with Retry and the body "Android stopped the download. Try again to continue where it stopped.", and Settings shows "Download failed". In Settings, a "Download failed" row opens Model download, and Download there starts the download again.

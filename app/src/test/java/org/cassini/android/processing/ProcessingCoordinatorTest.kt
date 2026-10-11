@@ -536,6 +536,39 @@ class ProcessingCoordinatorTest {
         assertEquals(b, job(1).noteId)
     }
 
+    /**
+     * onTimeout: the job learns of the stop before `systemStopAsync` returns, so it starts no other window once a
+     * frozen process thaws. The window that was decoding still ends and saves a later checkpoint; the "Paused at"
+     * notification then gets the numbers of that checkpoint, as the Note screen shows them.
+     */
+    @Test fun aSystemStopReachesTheJobAtOnceAndThePausedNoticeGetsTheLastCheckpoint() = runBlocking {
+        graph()
+        consent()
+        val a = note("A")
+        coordinator.transcribe(a)
+        val first = job(0)
+        first.pauseOnStop = false
+        checkpoint(a, doneMs = 288_000)
+
+        coordinator.systemStopAsync(a)
+        assertEquals("the job is stopped at once", PauseReason.SYSTEM, first.stopReason.get())
+        waitUntil { catalogue().jobs.job(a)?.state == JobState.PAUSED }
+        assertEquals(288_000L, catalogue().jobs.job(a)?.doneMs)
+        assertTrue(notices.pausedSaved.isEmpty())
+
+        // The window that was decoding at the timeout ends and saves its checkpoint, then the job ends.
+        checkpoint(a, doneMs = 314_000)
+        first.finish(JobOutcome.Paused(PauseReason.SYSTEM))
+        coordinator.awaitIdle()
+        val row = requireNotNull(catalogue().jobs.job(a))
+        assertEquals(JobState.PAUSED, row.state)
+        assertEquals(314_000L, row.doneMs)
+        assertEquals("the notification gets the row's numbers", listOf(a to 314_000L), notices.pausedSaved.toList())
+
+        // A stop by the user never updates it.
+        assertTrue(notices.paused.isEmpty())
+    }
+
     @Test fun aResumeFromAVisibleScreenClearsTheSystemHold() = runBlocking {
         graph()
         consent()

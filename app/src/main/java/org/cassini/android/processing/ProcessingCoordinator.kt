@@ -338,16 +338,17 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
     }
 
     /**
-     * `onTimeout` of the service (architecture 5.7): holds the queue (SYSTEM), stops the running job (it saves a
-     * checkpoint at its next block) and writes its row PAUSED(SYSTEM) at once, so every screen shows Paused. A
-     * standalone download stops too, because no foreground service keeps it: its `.part` files stay, and Settings and
-     * the Library show "Download stopped" with a way to start it again.
+     * `onTimeout` of the service (architecture 5.7): stops the running job (it saves a checkpoint at its next block),
+     * holds the queue (SYSTEM) and writes its row PAUSED(SYSTEM) at once, so every screen shows Paused. A standalone
+     * download stops too, because no foreground service keeps it: its `.part` files stay, and Settings and the
+     * Library show "Download stopped" with a way to start it again. When the job has ended, a shown "Paused at …"
+     * notification gets the numbers of its last checkpoint ([announce]).
      */
     suspend fun systemStop(noteId: String?) {
+        val current = stopForSystem(noteId)
         settings.setQueueHold(QueueHold.SYSTEM)
         graph.installOwner.stopDownloads()
-        val current = active?.takeIf { noteId == null || it.noteId == noteId } ?: return
-        current.job.stop(PauseReason.SYSTEM)
+        if (current == null) return
         val catalogue = graph.awaitCatalogue()
         // Under the lock, and only while the job runs: an outcome that record() wrote meanwhile stays.
         queueLock.withLock {
@@ -357,10 +358,19 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
         }
     }
 
-    /** [systemStop] from `onTimeout`, which must return at once. */
+    /**
+     * [systemStop] from `onTimeout`, which must return at once. The job learns of the stop here, on the caller's
+     * thread: Android may freeze the process soon after the service left the foreground, and a job that did not know
+     * of the stop decoded another window when the process thawed, past the "Paused at" of the notification.
+     */
     fun systemStopAsync(noteId: String?) {
+        stopForSystem(noteId)
         scope.launch { guarded("stop for Android") { systemStop(noteId) } }
     }
+
+    /** Stops the running job of [noteId] (any job for null) with SYSTEM, without suspending; returns it. */
+    private fun stopForSystem(noteId: String?): Active? =
+        active?.takeIf { noteId == null || it.noteId == noteId }?.also { it.job.stop(PauseReason.SYSTEM) }
 
     /** The draft-name actions of [noteId] (features.md section 3.1 and 4). */
     fun draft(noteId: String): DraftActions = DraftActions(noteId)
@@ -703,7 +713,10 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
         }
     }
 
-    /** The results notification for [outcome], only while the app is not visible (features.md section 12). */
+    /**
+     * The results notification for [outcome], only while the app is not visible (features.md section 12), and the
+     * final numbers of a shown "paused by Android" notification.
+     */
     private suspend fun announce(catalogue: Catalogue, current: Active, outcome: JobOutcome) {
         val noteId = current.noteId
         when (outcome) {
@@ -716,6 +729,14 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
             }
             is JobOutcome.Failed -> notifyHidden { failed(noteId, current.title, outcome.failure.code) }
             is JobOutcome.NeedsConsent -> notifyHidden { readyToTranscribe(noteId, current.title) }
+            // onTimeout posted "Paused at" with the numbers of that moment; a window that was decoding then ends
+            // first, so the last checkpoint can be later. The notification gets the numbers of the row.
+            is JobOutcome.Paused -> if (outcome.reason == PauseReason.SYSTEM) {
+                val row = catalogue.jobs.job(noteId)
+                if (row?.state == JobState.PAUSED && row.pauseReason == PauseReason.SYSTEM) {
+                    parts.notices.pausedByAndroidSaved(noteId, current.title, row.doneMs, row.totalMs)
+                }
+            }
             else -> Unit
         }
     }
