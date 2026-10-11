@@ -377,8 +377,8 @@ class AcceptanceWalkTest {
             Step.Progress(DOWNLOAD_PERCENT, verifying = false),
             Step.Progress(CHECK_PERCENT, verifying = true),
             Step.Fail(Failure.DOWNLOAD, online = false),
-            Step.Fail(Failure.SPACE),
-            Step.Fail(Failure.VERIFY),
+            Step.Fail(Failure.SPACE, online = true),
+            Step.Fail(Failure.VERIFY, online = true),
         )
         val start = hasText(rule.text(UiR.string.ui_models_download_and_transcribe)) and hasClickAction()
         rule.onNode(start).performClick()

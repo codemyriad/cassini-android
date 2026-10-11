@@ -51,16 +51,17 @@ object TestHooks {
 /**
  * A model fetcher that follows a script and never opens a connection (the download screens of the acceptance walk).
  * Each fetch takes the next [Step]s in order: a [Step.Progress] reports a percent of the part and waits until the
- * test calls [release]; a [Step.Fail] sets the network answer and fails the fetch. With no step left the fetch fails
- * with DOWNLOAD, so a run with an empty model root never installs a model.
+ * test calls [release]; a [Step.Fail] fails the fetch, and sets the network answer only when the step gives one. With
+ * no step left the fetch fails with DOWNLOAD and leaves the network check as it is, so a run with an empty model root
+ * never installs a model.
  */
 object ScriptedModels {
     sealed interface Step {
         /** Reports [percent] of the part's missing bytes (checked when [verifying]), then waits for [release]. */
         data class Progress(val percent: Int, val verifying: Boolean) : Step
 
-        /** Fails the fetch with [failure], with the validated-network check answering [online]. */
-        data class Fail(val failure: Failure, val online: Boolean = true) : Step
+        /** Fails the fetch with [failure]. A non-null [online] becomes the answer of the validated-network check. */
+        data class Fail(val failure: Failure, val online: Boolean? = null) : Step
     }
 
     private val steps = LinkedBlockingQueue<Step>()
@@ -80,7 +81,7 @@ object ScriptedModels {
 
     val fetcher = ModelFetcher { model, directory, progress ->
         while (true) {
-            when (val step = steps.poll() ?: Step.Fail(Failure.DOWNLOAD)) {
+            when (val step = steps.poll() ?: throw UserFacingException(Failure.DOWNLOAD, "No scripted step")) {
                 is Step.Progress -> {
                     progress(bytesFor(model, checkNotNull(directory.parentFile), step.percent), step.verifying)
                     // Interrupted when the job is cancelled: the installer reads that as a cancellation.
@@ -89,7 +90,7 @@ object ScriptedModels {
                     }
                 }
                 is Step.Fail -> {
-                    TestHooks.validatedNetwork = step.online
+                    step.online?.let { TestHooks.validatedNetwork = it }
                     throw UserFacingException(step.failure, "Scripted ${step.failure}")
                 }
             }
