@@ -362,7 +362,7 @@ Three workflows in `.github/workflows/` do the CI checks. All actions have a pin
 |---|---|
 | `android.yml` | Each push to `main`, each pull request, each tag `v*` and a manual start (`workflow_dispatch`) |
 | `models.yml` | Each Monday and a manual start |
-| `native.yml` | Each Monday, a manual start, and a push to `main` or a pull request that changes `scripts/`, `engine/src/main/cpp/` or the workflow |
+| `native.yml` | Each Monday, a manual start, and a push to `main` or a pull request that changes `scripts/`, `engine/src/main/cpp/`, `engine/build.gradle.kts`, `gradle/libs.versions.toml` or the workflow |
 
 If you push a branch and do not open a pull request, CI does not run. A new run of the same workflow on the same pull request or branch stops the earlier run. A run on a tag always continues to its end.
 
@@ -373,7 +373,7 @@ If you push a branch and do not open a pull request, CI does not run. A new run 
 | `checks` | The Gradle wrapper validation, detekt, actionlint, shellcheck on `scripts/*.sh` and `tools/*.sh`, ruff on `scripts` and `tools`, `scripts/check-links.sh`, `scripts/fetch-fonts.sh --check`, `scripts/check-resource-collisions.py` and `scripts/check-verbatim.sh`. On a tag, it also makes sure that `CHANGELOG.md` has a section for the tag. |
 | `core-only` | `./gradlew --configure-on-demand :core:test` with only a JDK and the submodules. It does not run `setup.sh` and it hides the Android SDK of the runner. |
 | `build` | `setup.sh --prebuilt-only`, then `ciTest` (with `:ui:verifyRoborazziDebug`), the lint of `:app`, `:data` and `:ui`, the APK, the device test APKs of `:app` and `:data`, and `scripts/package-apk.py`. On a tag, it builds `release` and `releaseTest` and collects the native sources. |
-| `emulator` | The device checks on API 26, 29, 34 and 35 (x86_64 Google APIs images), with `scripts/ci-emulator-smoke.sh`. If a check fails, the job does all the checks one more time on a new emulator. |
+| `emulator` | The device checks on API 26, 29, 34 and 35 (x86_64 Google APIs images), with `scripts/ci-emulator-smoke.sh`. If the emulator or adb fails before the tests start, the job does all the checks one more time on a new emulator. If a test fails, the job fails and does not try again. |
 | `release` | On a tag only, after `checks`, `core-only`, `build` and `emulator` pass. It publishes the GitHub release with the files of `dist/` and the notes of the tag from `CHANGELOG.md` ([`release.md`](release.md)). |
 
 The `build` job uploads these artifacts:
@@ -387,21 +387,23 @@ The `build` job uploads these artifacts:
 `scripts/ci-emulator-smoke.sh` takes the API level from `TEST_API` and does these checks:
 
 1. It runs the `@CiSmoke` tests with `scripts/device-smoke.sh`. The dry run of the same selection gives the expected count.
-2. It tells `PortableDocumentTest` if the system image has a platform Opus encoder (`expectPlatformOpus`). The images of API 26 and 29 have no encoder, so recordings there are AAC (`capture.m4a`). The images of API 34 and 35 have one. If the device does not agree, the test fails.
+2. It tells `PortableDocumentTest` if the system image has a platform Opus encoder (`expectPlatformOpus`). The images of API 26 and 29 have no encoder, so recordings there are AAC (`capture.m4a`). The image of API 34 has one. If the device does not agree, the test fails. On API 35, the test accepts both results, because no API 35 run has shown the value yet. The test writes the result to logcat (tag `CassiniCompatibility`).
 3. On API 26, it runs `org.cassini.data.NoteFtsDeviceTest` from the `:data` test APK with `adb shell am instrument`.
 4. It installs the published APK over the tested build and makes sure that the app starts (`scripts/launch-check.sh`).
 
 `PortableDocumentTest#platformOpusKeepsTheDurationAndTheSpeechClock` operates on API 34 only. A selected test that skips makes the job fail. Each emulator job uploads the instrumentation output and logcat as `emulator-api-<level>`.
+
+We did not run `scripts/ci-emulator-smoke.sh` on API 26, 29 or 35 on a local emulator. We ran it only on emulator-5554 (API 34). The first CI run shows the counts and the encoder result of the other API levels.
 
 ### models.yml
 
 The `models` job runs the `@NeedsModels` tests on an API 34 emulator with the real models. It does these steps:
 
 1. It runs `setup.sh --prebuilt-only` and `scripts/make-long-clip.sh`, and builds the debug APK and its test APK.
-2. `scripts/fetch-ci-models.py` downloads the models of `scripts/ci-models.json` into `.tools/ci-models` and makes sure that each file has its pinned size and SHA-256. The cache key of this directory comes from the SHA-256 values in the list. `ModelCatalogTest` makes sure that the list and `ModelCatalog` agree.
+2. `scripts/fetch-ci-models.py` downloads the models of `scripts/ci-models.json` into `.tools/ci-models` and makes sure that each file has its pinned size and SHA-256. The cache key of this directory comes from the SHA-256 values in the list. The job saves the cache after this check and before the device tests, so a failed test does not cause a new download in the next run. `ModelCatalogTest` makes sure that the list and `ModelCatalog` agree.
 3. `scripts/ci-models-smoke.sh` installs the debug APK. Then `scripts/push-models.sh` copies the models into the `files/` directory of the app with `run-as`, and `scripts/device-smoke.sh --annotation NeedsModels` runs the tests.
 
-`scripts/push-models.sh` copies a file only when the device does not have the same SHA-256. It writes the marker files last. To do a check of an emulator that has the models, run `scripts/push-models.sh` with the output of `scripts/fetch-ci-models.py`. If the models are the same, the script copies nothing.
+`scripts/push-models.sh` copies a file only when the device does not have the same SHA-256. It writes the marker files last. To do a check of an emulator that has the models, run `scripts/push-models.sh` with the output of `scripts/fetch-ci-models.py`. If the models are the same, the script copies nothing. `scripts/fetch-ci-models.py` needs Python 3.10 or later. Before Python 3.14, it also needs the `zstd` tool.
 
 ### native.yml
 
