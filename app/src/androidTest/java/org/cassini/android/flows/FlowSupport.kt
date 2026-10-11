@@ -4,6 +4,7 @@ import android.app.Instrumentation
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ComposeTimeoutException
@@ -16,6 +17,8 @@ import androidx.compose.ui.test.junit4.AndroidComposeTestRule
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.printToLog
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.cassini.android.MainActivity
@@ -70,6 +73,21 @@ internal object Flows {
 
     fun AppRule.waitGone(matcher: SemanticsMatcher, timeoutMs: Long = SCREEN_MS) =
         waitUntil(timeoutMs) { onAllNodes(matcher).fetchSemanticsNodes().isEmpty() }
+
+    /**
+     * Waits until the window that shows the node of [matcher] has no keyboard inset. A sheet opened while a field has
+     * the keyboard first stands above the keyboard, with its content scrolled; the system closes the keyboard when the
+     * sheet's window takes the focus, and the sheet then grows to its full height. Until then, the rows move.
+     */
+    fun AppRule.waitKeyboardClosed(matcher: SemanticsMatcher, timeoutMs: Long = SCREEN_MS) {
+        val window = (onNode(matcher).fetchSemanticsNode().root as ViewRootForTest).view.rootView
+        waitFor("The keyboard closes under ${matcher.description}", timeoutMs) {
+            runOnUiThread {
+                val insets = ViewCompat.getRootWindowInsets(window)
+                (insets?.getInsets(WindowInsetsCompat.Type.ime())?.bottom ?: 0) == 0
+            }
+        }
+    }
 
     /** Polls [condition] on the test thread (graph state, files) while the UI keeps running. */
     fun AppRule.waitFor(message: String, timeoutMs: Long = SCREEN_MS, condition: suspend () -> Boolean) {

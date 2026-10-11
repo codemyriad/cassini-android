@@ -7,6 +7,7 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
@@ -22,6 +23,7 @@ import org.cassini.android.flows.Flows.text
 import org.cassini.android.flows.Flows.view
 import org.cassini.android.flows.Flows.waitFor
 import org.cassini.android.flows.Flows.waitGone
+import org.cassini.android.flows.Flows.waitKeyboardClosed
 import org.cassini.android.flows.Flows.waitShown
 import org.cassini.android.flows.Flows.waitText
 import org.cassini.core.library.AudioKind
@@ -39,7 +41,8 @@ import org.cassini.ui.R as UiR
  * The Library on the device (features.md section 1): the empty state; the FLEURS clip opened through ACTION_VIEW
  * from a `file://` copy in the scratch cache opens its note with the Library under it, and a second ACTION_VIEW of
  * the same file opens the same note; the row is Audio only (or Queued); search finds a spoken word of another note;
- * a long press opens the actions sheet; Move to trash shows the snackbar and Undo restores the note.
+ * a long press opens the actions sheet, which closes the search keyboard; Move to trash shows the snackbar and Undo
+ * restores the note.
  */
 @CiSmoke
 class LibraryFlowTest {
@@ -95,7 +98,11 @@ class LibraryFlowTest {
         rule.onNode(row).performTouchInput { longClick() }
         val trash = rule.text(UiR.string.ui_action_move_to_trash)
         rule.waitText(trash)
-        rule.onNodeWithText(trash).performClick()
+        // The search field still has the keyboard. Until the keyboard closes, the sheet stands above it, and on a 16:9
+        // screen Move to trash is below the visible part of the sheet: a tap there falls on the scrim and closes the
+        // sheet. A slow emulator keeps the keyboard open for more than a second after the sheet opens.
+        rule.waitKeyboardClosed(hasText(trash))
+        rule.onNodeWithText(trash).performScrollTo().performClick()
         val moved = rule.text(UiR.string.ui_library_moved_to_trash, CLIP_TITLE)
         rule.waitText(moved)
         rule.waitFor("The note is in the trash") { row(CLIP_TITLE) == null }
