@@ -107,6 +107,29 @@ class TranscriptSemanticsTest {
         assertEquals(words.size, paragraph.linkCount())
     }
 
+    /** The acceptance walk reads [ActiveWordStart] to see that the playing word is highlighted. */
+    @Test fun onlyTheReadParagraphWithTheActiveWordReportsItsStart() {
+        val words = TranscriptFixtures.paolo
+        var active by mutableStateOf<Int?>(TranscriptFixtures.PAOLO_ACTIVE)
+        setThemed {
+            Column {
+                TurnParagraph(words, active, onWordTap = {}, modifier = Modifier.testTag(PARAGRAPH))
+                TurnParagraph(words, null, onWordTap = {}, modifier = Modifier.testTag(OTHER))
+                TurnParagraph(words, 2, onWordTap = {}, modifier = Modifier.testTag(DRAFT), mode = TurnMode.Draft)
+            }
+        }
+        fun start(tag: String) = rule.onNodeWithTag(tag).fetchSemanticsNode().config.getOrNull(ActiveWordStart)
+        assertEquals(words[TranscriptFixtures.PAOLO_ACTIVE].startMs, start(PARAGRAPH))
+        assertEquals(null, start(OTHER))
+        assertEquals(null, start(DRAFT))
+        active = 3
+        rule.waitForIdle()
+        assertEquals(words[3].startMs, start(PARAGRAPH))
+        active = null
+        rule.waitForIdle()
+        assertEquals(null, start(PARAGRAPH))
+    }
+
     @Test fun aDraftParagraphHasNoLinks() {
         setThemed {
             TurnParagraph(
@@ -283,5 +306,7 @@ class TranscriptSemanticsTest {
 
     private companion object {
         const val PARAGRAPH = "paragraph"
+        const val OTHER = "other"
+        const val DRAFT = "draft"
     }
 }

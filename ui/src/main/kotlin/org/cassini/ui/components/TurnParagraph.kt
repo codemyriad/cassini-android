@@ -26,6 +26,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.SemanticsPropertyKey
+import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
@@ -61,6 +63,9 @@ internal val LocalTurnParagraphProbe = staticCompositionLocalOf<(() -> Unit)?> {
  * behind them from the text layout, one rectangle per line when the word wraps, so the text never reflows.
  *
  * [TurnMode.Draft] (`draft`, text3; words from [unsettledFrom] on in text4): plain text, the words are not links.
+ *
+ * The paragraph that holds the active word has [ActiveWordStart] in its semantics: that word's start (ms), for tests.
+ * It is not given to accessibility services.
  *
  * [matches] are search hits on the amberTint background; the current one is also set in weight 600.
  * [onPlayFromStart] adds the "Play from start of turn" accessibility action. [onActiveLine] receives the top of the
@@ -102,9 +107,8 @@ fun TurnParagraph(
     val base = remember(words, mode, unsettledFrom, matches, c) {
         paragraph(words, starts, mode, unsettledFrom, matches, c) { index -> tap(index) }
     }
-    val active = activeIndex
-        ?.takeIf { mode == TurnMode.Read && it in words.indices }
-        ?.let { starts[it] until starts[it] + words[it].text.length }
+    val activeWord = activeIndex?.takeIf { mode == TurnMode.Read && it in words.indices }
+    val active = activeWord?.let { starts[it] until starts[it] + words[it].text.length }
     val text = remember(base, active, c) {
         if (active == null || active.isEmpty()) {
             base
@@ -126,16 +130,7 @@ fun TurnParagraph(
                     drawActiveWord(result, active, c.accentFill, style.fontSize.toPx() * SANS_NORMAL_LINE_HEIGHT)
                 }
             }
-            .semantics {
-                if (onPlayFromStart != null) {
-                    customActions = listOf(
-                        CustomAccessibilityAction(playLabel) {
-                            onPlayFromStart()
-                            true
-                        },
-                    )
-                }
-            },
+            .paragraphSemantics(activeWord?.takeIf { active?.isEmpty() == false }, words, playLabel, onPlayFromStart),
         style = style,
         color = color,
         onTextLayout = { result ->
@@ -143,6 +138,29 @@ fun TurnParagraph(
             reportActiveLine(result, active, onActiveLine)
         },
     )
+}
+
+/** The start (ms) of the word that a [TurnParagraph] shows as playing. Only tests read it. */
+val ActiveWordStart = SemanticsPropertyKey<Long>("ActiveWordStart")
+
+private var SemanticsPropertyReceiver.activeWordStart by ActiveWordStart
+
+/** The start of the [active] word, for tests, and the "Play from start of turn" action of [onPlayFromStart]. */
+private fun Modifier.paragraphSemantics(
+    active: Int?,
+    words: List<WordUi>,
+    playLabel: String,
+    onPlayFromStart: (() -> Unit)?,
+): Modifier = semantics {
+    if (active != null) activeWordStart = words[active].startMs
+    if (onPlayFromStart != null) {
+        customActions = listOf(
+            CustomAccessibilityAction(playLabel) {
+                onPlayFromStart()
+                true
+            },
+        )
+    }
 }
 
 /** Gives [onActiveLine] the top of the line that holds [active] in [layout]; nothing without either. */
