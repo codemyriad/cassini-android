@@ -29,7 +29,6 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import kotlinx.collections.immutable.persistentListOf
@@ -93,13 +92,12 @@ fun NoteRow(row: NoteRowUi, day: DayLabel, onAction: (NoteRowAction) -> Unit, mo
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
+            EllipsisText(
                 text = Highlighted(row.title, row.titleRanges).toAnnotatedString(match),
                 modifier = Modifier.weight(1f),
                 style = t.rowTitle,
                 color = c.ink,
                 maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = Durations.clock(row.durationMs),
@@ -109,12 +107,11 @@ fun NoteRow(row: NoteRowUi, day: DayLabel, onAction: (NoteRowAction) -> Unit, mo
         }
         val preview = row.preview
         if (preview != null) {
-            Text(
+            EllipsisText(
                 text = preview.toAnnotatedString(match),
                 style = t.snippet,
                 color = c.text3,
                 maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
             )
         }
         // A flow row: at a large font scale the suffix ("· No speech", "· Resume") goes to the next line, not out of
