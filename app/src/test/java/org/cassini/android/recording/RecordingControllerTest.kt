@@ -108,7 +108,8 @@ class RecordingControllerTest {
 
         val ended = awaitEnded()
         assertNotEquals(main, mic.stopThread)
-        assertEquals("cassini-recorder", mic.stopThread?.name)
+        // Coroutines debug mode (on in CI) appends " @coroutine#N" to thread names.
+        assertEquals("cassini-recorder", mic.stopThread?.name?.substringBefore(" @coroutine#"))
         assertEquals(RecordingState.Ended(active.noteId, RecordingOutcome.Saved(AfterFinish.TRANSCRIBE)), ended)
         val row = row(active.noteId)
         assertEquals(AudioKind.PLAIN, row?.audioKind)
