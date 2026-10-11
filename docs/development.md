@@ -2,10 +2,6 @@
 
 This file is for contributors who build, test and examine Cassini for Android 0.2. [`CONTRIBUTING.md`](../CONTRIBUTING.md) gives the first steps and the rules for a change. [`architecture.md`](architecture.md) gives the design. [`data-formats.md`](data-formats.md) gives the files, the tables and the export formats.
 
-> **Status.** This file describes the 0.2 target. Some tools in it are planned and are not in the tree yet: the API 35 emulator and the weekly models job of CI. Each of these sections says so.
-
-<!-- TODO(P11): Phase P11 adds the tools in the status note. When they are in the tree, compare each name and flag with the code, correct this file, and remove the status note and the "Planned" notes. -->
-
 ## Setup
 
 Do these steps one time for each clone:
@@ -360,9 +356,56 @@ The script shows the restructured groups (the models and the checkpoint) for ref
 
 ## Continuous integration
 
-`.github/workflows/android.yml` runs on each push to `main`, each pull request, each tag `v*`, a weekly schedule and a manual start (`workflow_dispatch`). If you push a branch and do not open a pull request, CI does not run. [`architecture.md`](architecture.md), section 8, gives the jobs. They are the static checks, a `:core` job with only a JDK, the build and an emulator matrix. A weekly job builds the native runtime. A weekly job that tests the models is planned.
+Three workflows in `.github/workflows/` do the CI checks. All actions have a pin to a full commit SHA. Dependabot (`.github/dependabot.yml`) updates the Gradle dependencies, the actions and the submodule each week.
 
-> **Planned.** The current emulator matrix is API 26, 29 and 34. API 35 and the models job come with the final CI workflow. On a tag, the release job publishes the release. A selected device test that skips makes the job fail. The emulator jobs save the instrumentation output and logcat.
+| Workflow | Triggers |
+|---|---|
+| `android.yml` | Each push to `main`, each pull request, each tag `v*` and a manual start (`workflow_dispatch`) |
+| `models.yml` | Each Monday and a manual start |
+| `native.yml` | Each Monday, a manual start, and a push to `main` or a pull request that changes `scripts/`, `engine/src/main/cpp/` or the workflow |
+
+If you push a branch and do not open a pull request, CI does not run. A new run of the same workflow on the same pull request or branch stops the earlier run. A run on a tag always continues to its end.
+
+### android.yml
+
+| Job | What it does |
+|---|---|
+| `checks` | The Gradle wrapper validation, detekt, actionlint, shellcheck on `scripts/*.sh` and `tools/*.sh`, ruff on `scripts` and `tools`, `scripts/check-links.sh`, `scripts/fetch-fonts.sh --check`, `scripts/check-resource-collisions.py` and `scripts/check-verbatim.sh`. On a tag, it also makes sure that `CHANGELOG.md` has a section for the tag. |
+| `core-only` | `./gradlew --configure-on-demand :core:test` with only a JDK and the submodules. It does not run `setup.sh` and it hides the Android SDK of the runner. |
+| `build` | `setup.sh --prebuilt-only`, then `ciTest` (with `:ui:verifyRoborazziDebug`), the lint of `:app`, `:data` and `:ui`, the APK, the device test APKs of `:app` and `:data`, and `scripts/package-apk.py`. On a tag, it builds `release` and `releaseTest` and collects the native sources. |
+| `emulator` | The device checks on API 26, 29, 34 and 35 (x86_64 Google APIs images), with `scripts/ci-emulator-smoke.sh`. If a check fails, the job does all the checks one more time on a new emulator. |
+| `release` | On a tag only, after `checks`, `core-only`, `build` and `emulator` pass. It publishes the GitHub release with the files of `dist/` and the notes of the tag from `CHANGELOG.md` ([`release.md`](release.md)). |
+
+The `build` job uploads these artifacts:
+
+- `cassini-android`: the content of `dist/`, that is the APK, its checksum and the notices. On a tag, also the R8 mapping and the native sources.
+- `cassini-android-device-tests`: the APK under test and its instrumentation APK.
+- `cassini-data-device-tests`: the instrumentation APK of `:data`.
+- `android-checks`: the test reports and the lint reports.
+- `roborazzi-diffs`: if the job fails, the actual image and the diff of each changed screenshot (`**/build/outputs/roborazzi`).
+
+`scripts/ci-emulator-smoke.sh` takes the API level from `TEST_API` and does these checks:
+
+1. It runs the `@CiSmoke` tests with `scripts/device-smoke.sh`. The dry run of the same selection gives the expected count.
+2. It tells `PortableDocumentTest` if the system image has a platform Opus encoder (`expectPlatformOpus`). The images of API 26 and 29 have no encoder, so recordings there are AAC (`capture.m4a`). The images of API 34 and 35 have one. If the device does not agree, the test fails.
+3. On API 26, it runs `org.cassini.data.NoteFtsDeviceTest` from the `:data` test APK with `adb shell am instrument`.
+4. It installs the published APK over the tested build and makes sure that the app starts (`scripts/launch-check.sh`).
+
+`PortableDocumentTest#platformOpusKeepsTheDurationAndTheSpeechClock` operates on API 34 only. A selected test that skips makes the job fail. Each emulator job uploads the instrumentation output and logcat as `emulator-api-<level>`.
+
+### models.yml
+
+The `models` job runs the `@NeedsModels` tests on an API 34 emulator with the real models. It does these steps:
+
+1. It runs `setup.sh --prebuilt-only` and `scripts/make-long-clip.sh`, and builds the debug APK and its test APK.
+2. `scripts/fetch-ci-models.py` downloads the models of `scripts/ci-models.json` into `.tools/ci-models` and makes sure that each file has its pinned size and SHA-256. The cache key of this directory comes from the SHA-256 values in the list. `ModelCatalogTest` makes sure that the list and `ModelCatalog` agree.
+3. `scripts/ci-models-smoke.sh` installs the debug APK. Then `scripts/push-models.sh` copies the models into the `files/` directory of the app with `run-as`, and `scripts/device-smoke.sh --annotation NeedsModels` runs the tests.
+
+`scripts/push-models.sh` copies a file only when the device does not have the same SHA-256. It writes the marker files last. To do a check of an emulator that has the models, run `scripts/push-models.sh` with the output of `scripts/fetch-ci-models.py`. If the models are the same, the script copies nothing.
+
+### native.yml
+
+The `native` job builds the sherpa-onnx AAR from the pinned source with `setup.sh --from-source` (about 40 minutes). It writes the SHA-256 of the built AAR and of the pinned AAR in the job summary. If they are different, the job shows a warning and does not fail ([`native-runtime.md`](native-runtime.md)). Then it builds the app and runs the JVM tests with the built AAR.
 
 ## Pre-release gate
 

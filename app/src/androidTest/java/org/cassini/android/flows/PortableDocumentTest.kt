@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.util.Log
 import androidx.test.filters.SdkSuppress
+import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
 import org.cassini.android.audioDecoder
 import org.cassini.android.background.Background
@@ -42,6 +43,11 @@ class PortableDocumentTest {
         val platform = CaptureFactory.platformOpusEncoderNow()
         val capture = runBlocking { CaptureFactory.extension() }
         Log.i(TAG, "API ${Build.VERSION.SDK_INT}: libcassini_opus=$native platform encoder=$platform capture=$capture")
+        // scripts/ci-emulator-smoke.sh gives the encoder that each CI system image has, so a changed image fails here.
+        InstrumentationRegistry.getArguments().getString(ARG_EXPECT_PLATFORM_OPUS)?.let { expectation ->
+            val message = "Platform Opus encoder on API ${Build.VERSION.SDK_INT}"
+            assertEquals(message, expectation.toBooleanStrict(), platform)
+        }
         val expected = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && platform) "opus" else "m4a"
         assertEquals("Recordings use Opus only with a platform encoder on API 29+", expected, capture)
         // The app packages libcassini_opus for every ABI it ships; without it the Library says NO_ENCODER.
@@ -217,6 +223,10 @@ class PortableDocumentTest {
 
     private companion object {
         const val TAG = "CassiniCompatibility"
+
+        /** `true` or `false`: whether the device must have a platform Opus encoder (unset: either is accepted). */
+        const val ARG_EXPECT_PLATFORM_OPUS = "expectPlatformOpus"
+
         const val RATE = 48_000
         const val FRAME = RATE / 50
         const val BIT_RATE = 48_000
