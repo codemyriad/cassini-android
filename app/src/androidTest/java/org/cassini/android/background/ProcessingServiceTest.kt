@@ -5,6 +5,7 @@ import android.util.Log
 import kotlinx.coroutines.runBlocking
 import org.cassini.android.background.Background.graph
 import org.cassini.android.background.Background.waitFor
+import org.cassini.android.processing.ProcessingService
 import org.cassini.core.format.DocumentState
 import org.cassini.core.library.AudioKind
 import org.cassini.core.library.JobState
@@ -57,8 +58,8 @@ class ProcessingServiceTest {
         Log.i(TAG, "ProcessingService in dumpsys activity services:\n$service")
         assertTrue("ProcessingService is in the foreground:\n$service", service.contains("isForeground=true"))
         if (Build.VERSION.SDK_INT in Build.VERSION_CODES.Q..Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            // FOREGROUND_SERVICE_TYPE_DATA_SYNC is 1.
-            assertTrue("The service type is dataSync:\n$service", Background.hasType(service, DATA_SYNC))
+            // FOREGROUND_SERVICE_TYPE_DATA_SYNC is 1. The dump of API 29 shows no type: ask Android in the process.
+            assertEquals("The service type is dataSync", DATA_SYNC, ProcessingService.currentType())
         }
 
         val document = waitFor("The WAV note is transcribed") {
@@ -103,7 +104,7 @@ class ProcessingServiceTest {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
             // Inference runs as mediaProcessing (0x2000), as Android reports it; dataSync would time out after 6 h.
             val service = waitFor("ProcessingService runs as mediaProcessing during inference", TYPE_WAIT_MS) {
-                Background.processingService().takeIf { Background.hasType(it, MEDIA_PROCESSING) }
+                Background.processingService().takeIf { ProcessingService.currentType() == MEDIA_PROCESSING }
             }
             Log.i(TAG, "ProcessingService during inference:\n$service")
         }

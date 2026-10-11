@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.PowerManager
 import android.os.SystemClock
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import androidx.core.app.ServiceCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
@@ -26,6 +27,7 @@ import kotlinx.coroutines.withContext
 import org.cassini.android.CassiniApplication
 import org.cassini.android.startForegroundWithType
 import org.cassini.engine.job.JobPhase
+import java.lang.ref.WeakReference
 
 /**
  * The foreground lifetime of transcription (architecture 5.7): type, wake lock, notification and `onTimeout`. The
@@ -56,6 +58,11 @@ class ProcessingService : LifecycleService() {
 
     /** The last ongoing notification that [followNotification] built; null before the first one (main thread). */
     private var lastNotification: Notification? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        current = WeakReference(this)
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
@@ -120,6 +127,7 @@ class ProcessingService : LifecycleService() {
     override fun onDestroy() {
         if (foregroundType != null) leaveForeground()
         releaseWakeLock()
+        if (current?.get() === this) current = null
         super.onDestroy()
     }
 
@@ -263,6 +271,19 @@ class ProcessingService : LifecycleService() {
         /** [followWakeLock] ticks that are no window position: acquire the lock, or keep it as it is. */
         private const val WAKE_HOLD = -1L
         private const val WAKE_KEEP = -2L
+
+        /** The service of this process while it exists (between onCreate and onDestroy). */
+        @Volatile
+        private var current: WeakReference<ProcessingService>? = null
+
+        /**
+         * The foreground service type that Android has for the service of this process now (`getForegroundServiceType`
+         * asks the system). Null below API 29, where services have no type, and when the service does not exist. The
+         * device tests read it: `dumpsys` of API 29 does not show the type.
+         */
+        @VisibleForTesting
+        fun currentType(): Int? =
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) null else current?.get()?.foregroundServiceType
 
         fun drainIntent(context: Context): Intent = processingIntent(context, ACTION_DRAIN)
 

@@ -37,10 +37,17 @@ internal object Background {
     fun processingService(): String = shell("dumpsys activity services org.cassini.android")
         .substringAfter("ServiceRecord", "").substringAfter("ProcessingService", "")
 
+    /**
+     * True when the dumpsys text of a service ([processingService]) shows a foreground service type. API 30+ prints
+     * the types as hex, for example `types=0x00002000`; the dump of API 29 shows no type. For the type that Android
+     * has on every API from 29, use `ProcessingService.currentType()`.
+     */
+    fun showsType(service: String): Boolean = Regex("\\b(types|foregroundServiceType)=").containsMatchIn(service)
+
     /** True when the dumpsys text of a service ([processingService]) gives the foreground service types [type]. */
     fun hasType(service: String, type: Int): Boolean =
-        // dumpsys prints the types as hex, for example types=0x00002000.
-        Regex("types=(0x)?0*${Integer.toHexString(type)}\\b", RegexOption.IGNORE_CASE).containsMatchIn(service)
+        Regex("\\b(types|foregroundServiceType)=(0x)?0*${Integer.toHexString(type)}\\b", RegexOption.IGNORE_CASE)
+            .containsMatchIn(service)
 
     /** Grants the runtime permissions the services need (notifications on API 33+, and [extra]). */
     fun grant(vararg extra: String) {
