@@ -270,14 +270,17 @@ class PurgeOrderTest {
         if (restored) assertKept(purged) else assertNull(h.db.notes().note(purged))
     }
 
-    @Test fun aRestoreAfterAFailedPurgeBringsTheNoteBack() = runTest {
+    /** A purge that stopped after the voice files gives back the document, without the voice files it deleted. */
+    @Test fun aRestoreAfterAFailedPurgeBringsTheDocumentBackWithoutItsVoices() = runTest {
         crashAfterVoices = true
         val repo = notes()
         repo.moveToTrash(purged)
+        assertTrue(voiceFile(purged).exists())
         assertTrue(runCatching { repo.deleteNow(purged) }.exceptionOrNull() is IOException)
 
         assertTrue("the purge gave the note back", repo.restore(purged))
         assertNull(h.db.notes().note(purged)?.trashedAt)
-        assertTrue(h.dir(purged).exists())
+        assertTrue("the document stays", h.dir(purged).exists())
+        assertFalse("the purge deleted the voice file", voiceFile(purged).exists())
     }
 }

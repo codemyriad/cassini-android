@@ -218,8 +218,9 @@ class NoteRepository(
 
     /**
      * Restores a trashed note. A job that was QUEUED when the note was trashed goes back to the queue at the back;
-     * any other job row was kept as it was (a paused note stays paused). False when the note is not in Trash, or when
-     * its purge has begun: the purge then deletes it, and a restore never brings back part of a note.
+     * any other job row was kept as it was (a paused note stays paused). False when the note is not in Trash, or while
+     * a purge of it runs: that purge then deletes it. After a purge that stopped midway (an I/O error), Restore brings
+     * back what is left: the document stays, but the purge can have removed the job row, the voice files and links.
      */
     suspend fun restore(id: String): Boolean {
         val trashed = locks.withNoteLock(id, dispatchers.io) {
