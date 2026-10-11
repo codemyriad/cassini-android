@@ -59,13 +59,22 @@ jobs:
       - name: Make the model cache key
         id: model-key
         run: echo "key=$(python3 -I scripts/fetch-ci-models.py --print-key)" >> "$GITHUB_OUTPUT"
-      - name: Cache the models
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # Restore and save are separate steps: the verified models go into the cache before the device tests, so a
+      # test failure does not make the next run download them again.
+      - name: Restore the models
+        id: model-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .tools/ci-models
           key: ${{ steps.model-key.outputs.key }}
       - name: Fetch and verify the models
         run: python3 -I scripts/fetch-ci-models.py
+      - name: Save the models
+        if: steps.model-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .tools/ci-models
+          key: ${{ steps.model-key.outputs.key }}
       - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
