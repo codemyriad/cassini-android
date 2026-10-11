@@ -105,7 +105,8 @@ class ModelCatalogTest {
     @Test fun theCiModelListIsTheCatalog() {
         val file = File(System.getProperty("cassini.ciModels", "../scripts/ci-models.json")!!)
         val listed = JSONObject(file.readText()).getJSONArray("models")
-        val catalog = listOf(ModelCatalog.PARAKEET, ModelCatalog.VAD, ModelCatalog.DIARIZATION, ModelCatalog.VOICEPRINT)
+        // Every model that the app installs: the consented download and the speech detector.
+        val catalog = (ModelCatalog.consented + ModelCatalog.VAD).sortedBy { it.directory }
         fun artifact(json: JSONObject) = Artifact(
             json.getString("name"),
             json.getLong("size"),
@@ -123,6 +124,6 @@ class ModelCatalogTest {
                 json.optJSONObject("download")?.let(::artifact),
             )
         }
-        assertEquals(catalog, models)
+        assertEquals(catalog, models.sortedBy { it.directory })
     }
 }
