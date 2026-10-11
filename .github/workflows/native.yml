@@ -2,7 +2,8 @@ name: Native runtime
 
 # Builds the sherpa-onnx AAR from the pinned source and compares it with the pinned release build
 # (docs/native-runtime.md). It takes about 40 minutes, so it runs weekly, by hand, and when a change can affect
-# the native build: the scripts (setup.sh, the pins, the patch) or the C++ sources of libcassini_opus.
+# the native build: the scripts (setup.sh, the pins, the patch), the C++ sources and CMake setup of
+# libcassini_opus, or gradle/libs.versions.toml (the NDK and sherpa-onnx versions).
 on:
   schedule:
     - cron: '17 4 * * 1'
@@ -12,11 +13,15 @@ on:
     paths:
       - 'scripts/**'
       - 'engine/src/main/cpp/**'
+      - 'engine/build.gradle.kts'
+      - 'gradle/libs.versions.toml'
       - '.github/workflows/native.yml'
   pull_request:
     paths:
       - 'scripts/**'
       - 'engine/src/main/cpp/**'
+      - 'engine/build.gradle.kts'
+      - 'gradle/libs.versions.toml'
       - '.github/workflows/native.yml'
 
 permissions:
