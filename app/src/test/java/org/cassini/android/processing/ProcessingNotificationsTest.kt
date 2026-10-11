@@ -83,6 +83,24 @@ class ProcessingNotificationsTest {
         assertEquals("Paused at 12:40 of 34:12. Open to resume.", text())
     }
 
+    /** The last checkpoint of a job that Android stopped replaces the numbers only while "Paused at" is shown. */
+    @Test fun theSavedCheckpointUpdatesOnlyAShownPausedNotification() {
+        shadowOf(context as android.app.Application).grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
+        val manager = context.getSystemService(NotificationManager::class.java)
+        val text = { shadowOf(manager).allNotifications.single().extras.getCharSequence(Notification.EXTRA_TEXT) }
+        notifications.pausedByAndroid(NOTE, "Riunione", 288_000, 950_000)
+        notifications.pausedByAndroidSaved(NOTE, "Riunione", 314_000, 950_000)
+        assertEquals("Paused at 05:14 of 15:50. Open to resume.", text().toString())
+
+        // Another result of the note, or no notification at all: nothing is posted.
+        notifications.readyToTranscribe(NOTE, "Riunione")
+        notifications.pausedByAndroidSaved(NOTE, "Riunione", 340_000, 950_000)
+        assertEquals("Riunione is waiting. Open Cassini to start.", text().toString())
+        manager.cancelAll()
+        notifications.pausedByAndroidSaved(NOTE, "Riunione", 340_000, 950_000)
+        assertEquals(0, shadowOf(manager).allNotifications.size)
+    }
+
     @Test fun resultsAreReplacedPerNoteAndHideTheTitleInPublic() {
         shadowOf(context as android.app.Application).grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
         notifications.readyToTranscribe(NOTE, "Riunione")
