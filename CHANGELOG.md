@@ -12,6 +12,7 @@ Version 0.2.0-beta is a new build of the app. It keeps the speech engine and the
 
 - 0.2 is a new app with a new storage layout. It does not read the app data of 0.1.x. Thus the notes, the unfinished transcriptions and the saved voices of 0.1.x do not show in 0.2. The Cassini documents (`.opus`) that you saved from 0.1.x open in 0.2 as before.
 - If 0.2 installs over 0.1.x, it does not delete the files of 0.1.x. [PRIVACY.md](PRIVACY.md) gives the list of these files and tells how to delete them.
+- If 0.2 installs over 0.1.x, Android can reset the app language to the language of the phone. If this occurs, select the app language again in Settings. This reset comes from Android, not from 0.2. The APK of 0.2 has its list of languages (`locales_config.xml`), and 0.2 does not change the app language when it installs over 0.2.
 - A new transcript does not give Italian as its language. Parakeet does not identify the language, so the language of a new transcript is empty.
 - A new user interface, made with Jetpack Compose, replaces all screens. It uses the Instrument Sans and IBM Plex Mono fonts and has a light theme and a dark theme.
 - Transcription runs in a foreground service, so it continues when you leave the app. If Android or you stop a transcription, it continues later from the last saved point.
