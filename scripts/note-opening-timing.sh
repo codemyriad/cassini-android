@@ -50,7 +50,8 @@ done
 adb shell input keyevent KEYCODE_WAKEUP
 adb shell wm dismiss-keyguard
 adb shell "run-as $package rm -rf files/$root cache/$root"
-adb logcat -c
+since=$(adb shell "date '+%m-%d %H:%M:%S.000'" | tr -d '\r')
+adb logcat -c 2>/dev/null || printf 'Could not clear the log; reading lines after %s.\n' "$since" >&2
 run firstAndLaterOpens
 adb shell am force-stop "$package"
 if [ -n "$(adb shell pidof "$package" | tr -d '\r')" ]; then
@@ -58,7 +59,7 @@ if [ -n "$(adb shell pidof "$package" | tr -d '\r')" ]; then
     exit 1
 fi
 run opensAfterProcessDeath
-adb logcat -d -s CassiniTiming:I | tr -d '\r' > "$work/timing.txt"
+adb logcat -d -T "$since" -s CassiniTiming:I | tr -d '\r' > "$work/timing.txt"
 python3 -I - "$work/timing.txt" "$(adb shell getprop ro.product.model | tr -d '\r')" \
     "$(adb shell getprop ro.build.version.sdk | tr -d '\r')" <<'PY'
 import json, statistics, sys
