@@ -67,7 +67,7 @@ where a deviation in this report says otherwise.
 ## Device review
 
 In P12 the reviewer compared each board with the screenshots of the acceptance walk on emulator-5554 (API 34,
-1080 x 2340 px, 420 dpi), in light, dark and Italian. The walk of `scripts/acceptance-walk.sh` made the
+1080 x 2340 px, 440 dpi), in light, dark and Italian. The walk of `scripts/acceptance-walk.sh` made the
 screenshots on 11 Oct 2026 (`build/acceptance/20261011-031058/`, not committed). After the corrections of this
 review, the `realModels` part ran again in light (`build/acceptance/20261011-034439/light/`) and in dark
 (`build/acceptance/20261011-034904/dark/`). The README and store screenshots come from these two runs. After the
@@ -108,10 +108,10 @@ These differences apply to all boards. They are not deviations:
 ### Device
 
 Verdict: the device matches the board. The rows, the chips, the progress banner and the bottom bar show as on the
-board. The excerpt preview ends with the ellipsis of `TextOverflow.Ellipsis` after a space ("il …"). The board
-excerpt has no space before its ellipsis. At font scale 2.0, the suffix "· No speech" was cut to "· No". P12
-corrected this: the line with the time, the chip and the suffix is now a flow row, so the suffix goes to the next
-line. The goldens did not change.
+board. The excerpt preview ended with the ellipsis of `TextOverflow.Ellipsis` after a space ("il …"). The board
+excerpt has no space before its ellipsis. F1 corrected this (follow-up 6). At font scale 2.0, the suffix "· No
+speech" was cut to "· No". P12 corrected this: the line with the time, the chip and the suffix is now a flow row, so
+the suffix goes to the next line. The goldens did not change.
 
 ## 01 Recording
 
@@ -128,10 +128,11 @@ line. The goldens did not change.
 
 ### Device
 
-Verdict: the device matches the board. The emulator microphone gives silence, so the waveform shows a row of
-dots. The caption shows the 2-hour form of features.md section 2 ("Stops at 2 hours, in about 1 h 55 min."),
-because the space for the recording is more than the 2-hour limit. In English, "min." goes alone to the third
-line (follow-up 2). The dark and the Italian screens are the same design. No text is cut.
+Verdict: the device matches the board. The emulator microphone gives silence, so the waveform shows a row of dots.
+The caption shows the 2-hour form of features.md section 2 ("Stops at 2 hours, in about 1 h 55 min."), because the
+space for the recording is more than the 2-hour limit. In English, "min." went alone to the third line. F1 corrected
+this (follow-up 2): a duration does not break at a line end. The dark and the Italian screens are the same design.
+No text is cut.
 
 ## 02 Transcribing
 
@@ -143,9 +144,10 @@ line (follow-up 2). The dark and the Italian screens are the same design. No tex
   board. "get the" wraps one word later (accepted deviation 4).
 - The arrow in "54% → about 41%" is larger and heavier than on the board. The board draws it with a fallback font.
   This difference is for the owner to review.
-- The card, the banners, the "Draft transcript" header and the turns are in one scrolling list. The board shows a
-  fixed card above a scrolling draft. With a fixed card, a large font scale or a short screen gives no space to the
-  draft.
+- The progress card stays fixed above a scrolling list with the banners, the "Draft transcript" header and the
+  turns, as on the board. If the card is taller than half of the space below the top bar (a short screen or a large
+  font scale), the card is the first item of the list. Then the card and the draft scroll together, and the draft
+  keeps some space (new deviation 7).
 - The first speaker header extends 15.5 dp up into the "Draft transcript" row. As a result, the first turn is in
   the position of the board. Each plain turn after the first is about 7 dp lower than a board turn, because its
   header is 48 dp high (accepted deviation 2). Board 02 shows no such turn.
@@ -154,12 +156,12 @@ line (follow-up 2). The dark and the Italian screens are the same design. No tex
 
 ### Device
 
-Verdict: the device matches the board and the contract change of new deviation 12. The progress card, the stepper, the
-suggestion card ("Is this Paolo Ferri?") and the draft show as on the board. The draft words that can still change
-use the unsettled color. In the light screenshot, new draft text came after the screen opened. Thus the list
-scrolled to the end, and the progress card is above the top of the list. This is the behavior of new deviation 12, but
-the user then does not see the progress (follow-up 3). The dark screenshot shows the card at the top. In Italian,
-the tag "Le parole possono ancora cambiare" goes below the header, as in the golden.
+Verdict: the device matches the board and the contract change of new deviation 12. The progress card, the stepper,
+the suggestion card ("Is this Paolo Ferri?") and the draft show as on the board. The draft words that can still
+change use the unsettled color. In the light screenshot, new draft text came after the screen opened. Thus the list
+scrolled to the end, and the progress card went above the top of the list. Then the user did not see the progress.
+F1 corrected this (follow-up 3): the card stays fixed, and only the draft scrolls. The dark screenshot shows the
+card at the top. In Italian, the tag "Le parole possono ancora cambiare" goes below the header, as in the golden.
 
 ## 03 Read and listen
 
@@ -214,7 +216,8 @@ The review found one problem in dark. P12 corrected it: the white Check on the d
 contrast of 2.3:1. The Check now uses `surface`, which is white in light (no change) and #181C20 in dark (7.4:1).
 The goldens `dark/04-name-a-speaker.png` and `components/forms-dark.png` changed.
 
-With the keyboard open, the sheet goes up below the status bar (follow-up 4).
+With the keyboard open, the sheet went up under the status bar. F1 corrected this (follow-up 4): the top of the
+sheet stays below the status bar, and the content of the sheet scrolls.
 
 ## 05 Model download
 
@@ -432,7 +435,9 @@ board, and in KDoc or a code comment.
    above and below, the model rows have 13.5 dp padding, the Note actions sheet has 10.5 dp top padding and a
    3.5 dp title gap, and the Trash cards have 14 dp top padding.
 6. The Recording status sits between the chevron and the badge, as on board 01, not at the center of the screen.
-7. Transcribing is one scrolling list. The first draft header extends 15.5 dp up into the "Draft transcript" row.
+7. On Transcribing, the progress card stays fixed above the draft list while it uses half of the space or less.
+   If the card is taller, it is the first item of the list. The first draft header extends 15.5 dp up into the
+   "Draft transcript" row.
 8. The suggestion card paddings come from board 02 (7.5 / 3 / 4 dp).
 9. A zero-width space comes before each mono file extension, so that a line can break before ".opus".
 10. The Read pane has a top padding of 0.5 dp, and the paragraph is 1.5 dp below the speaker header.
@@ -441,9 +446,10 @@ board, and in KDoc or a code comment.
     stage labels become smaller until their longest word fits. At large font scales the stage tracker uses more
     rows. The Library list and its snackbar use the measured height of the bottom bar, because the bar becomes
     taller when the Record label wraps.
-12. The draft of a running transcription does not scroll when the screen opens, so the progress card stays in view.
-    When new text comes, the list scrolls to the end. A scroll that stops above the end pauses this, and a scroll
-    back to the end starts it again (features.md section 3.1).
+12. The draft of a running transcription does not scroll when the screen opens. When new text comes, the draft
+    list scrolls to the end. Only the list below the fixed progress card scrolls, so the card stays in view (new
+    deviation 7). A scroll that stops above the end pauses this, and a scroll back to the end starts it again
+    (features.md section 3.1).
 13. The Check of `CassiniCheckbox` uses `surface`, not white (ui.md section 6). In light, `surface` is white, so
     nothing changes. In dark, a white Check on `accent` (#8FA6FF) has a contrast of 2.3:1, and `surface` gives
     7.4:1 (P12, board 04).
@@ -451,6 +457,17 @@ board, and in KDoc or a code comment.
 15. The "10" in the skip buttons does not follow the font scale, because it is a part of the 28 dp icon.
 16. In a Library row, the line with the time, the chip and the suffix is a flow row. At a large font scale, the
     suffix goes to the next line.
+17. A prose duration ("1 h 55 min", "under 1 min") has no-break spaces (U+00A0) in place of its spaces, in each
+    language (`Durations`). The time-left texts keep the number and its unit together ("6–9 min", "Under 1 min
+    left"). Thus a line does not break inside a duration. The golden `variants/recording-cap-hint.png` changed:
+    "1 h 35 min." is now on one line. The text of the processing notification does not use these spaces.
+18. The title and the excerpt of a Library row do not show a space before the ellipsis (`EllipsisText`). When the
+    ellipsis of `TextOverflow.Ellipsis` comes after a space, the row shows the text before the space and "…".
+19. The top of a sheet (`CassiniSheet`) stays below the status bar and the display cutout. When the keyboard is
+    open and the content is taller than the space, the content scrolls.
+20. A document with no words shows a plain card in the transcript pane: "No speech" with "No words were found in
+    this recording." The text comes from the TXT export (`export_no_words`). The golden `variants/read-no-words.png`
+    shows it. features.md has no copy for this state (see "Items for the owner to review").
 
 ## Changes to the screen contracts
 
@@ -508,6 +525,9 @@ write or change its ViewModel.
     is false, the header is a plain label and the user gets no message.
 19. Each screen limits its content to 560 dp and centres it on a wide window. The background of the screen fills
     the window (architecture.md section 6). `:app` must not add a second limit.
+20. `NoteUiState` has `noWords`. The ViewModel sets it when the sealed version has loaded and has 0 words. The
+    transcript pane shows the "No speech" card only when `noWords` is true. Thus the pane does not show the card
+    while the transcript loads, and not for a transcript that cannot be read (new deviation 20).
 
 ## Items for the owner to review
 
@@ -520,24 +540,45 @@ write or change its ViewModel.
   The owner must select one text.
 - The Recording screen, the Library and the Note screen depend on back handling in `:app` (see the contract
   changes 1 and 3). The owner of ui.md must decide if section 1 changes to name `BackHandler`.
+- The empty state of a document with no words (new deviation 20). features.md and ui.md have no copy for this
+  state, and F1 did not change them, because the two files are read-only in the worktree. The owner must accept
+  the copy "No speech" — "No words were found in this recording." ("Nessun parlato" — "Non sono state trovate
+  parole in questa registrazione.") and add it to features.md section 3.3 and to the table of ui.md section 12.
+- The no-break spaces of new deviation 17 are not in features.md section 0. The owner must decide if section 0
+  names them, and if the processing notification also uses them.
 
 ## Device follow-ups
 
-The device review found these items. P12 did not correct them:
+The device review of P12 found these items. F1 examined each item again. "Resolved" items have a correction and a
+test. "Open" items need more work.
 
-1. Text rows on the device are about 1.5 dp taller for each line than in the goldens. Measure the cause with
-   `rows.py` on a device screenshot at the same dp scale, for example Settings.
-2. A duration can wrap between the number and its unit: "in about 1 h 55" and "min." on the next line (board 01,
-   English). No-break spaces in the `ui_duration_*` strings prevent this. This change can move other lines that
-   contain a duration, so the owner must decide.
-3. On Transcribing, the list scrolls to the end when new draft text comes (new deviation 12). When the draft is longer
-   than the screen, the progress card goes above the top of the list. The owner must decide if the card stays in
-   view.
-4. On Name a speaker, the open keyboard pushes the sheet up below the status bar. The top of the sheet must stay
-   below the status bar. This is a change to `CassiniSheet` and text input, so it needs its own review.
-5. A document with no words shows an empty transcript on the Note screen. The Library row says "· No speech", but
-   the Note screen says nothing. features.md has no copy for this state.
-6. The Library excerpt can end with a space before the ellipsis ("il …"). `TextOverflow.Ellipsis` keeps the
-   space. The board has no space.
-7. The emulator microphone gives silence. Thus the review did not see the waveform bars move, or stay static
+1. Resolved, no defect. Text rows on the device seemed about 1.5 dp taller for each line than in the goldens. The
+   cause is the scale of the measurement, not the line height. emulator-5554 has 440 dpi (2.75 px for each dp),
+   not 420 dpi (2.625 px). At 420 dpi, each row seems 4.8 % taller: about 1.5 dp for a 31 dp row. F1 scaled the
+   Settings screenshot of `20261011-045343/light` to 2 px for each dp at 440 dpi and compared it with `rows.py`.
+   From "Transcription runs on this phone" to the end of the screen (11 rows), the offset changes by 1 dp in
+   total. At 420 dpi, the same rows change by 16.5 dp. The small remaining drift comes from Android: it rounds
+   each line up to a full pixel, and 19.5 sp is 53.6 px at 2.75 px for each dp. `includeFontPadding` is false
+   (the default of Compose), and F1 changed no line height.
+2. Resolved. A duration does not wrap between the number and its unit (new deviation 17). `FormatTest` and
+   `FormatItalianTest` cover the no-break spaces.
+3. Resolved. On Transcribing, the progress card stays fixed above the draft, and new text scrolls only the draft
+   list (new deviations 7 and 12). `ScreenBehaviourTest.newDraftTextKeepsTheProgressCardInView` covers this. Without
+   the fixed card, that test fails. On emulator-5554,
+   `SheetAndDraftDeviceTest.newDraftTextKeepsTheProgressCardInView` showed the full card and the newest turn after
+   new text came. The goldens of board 02 did not change.
+4. Resolved. On Name a speaker, the top of the sheet stays below the status bar when the keyboard is open (new
+   deviation 19). `ModalBottomSheet` of Material 3 1.4 already moves the sheet above the keyboard. Thus
+   `CassiniSheet` no longer adds its own IME padding. On emulator-5554,
+   `SheetAndDraftDeviceTest.theNameSheetStaysBelowTheStatusBarWithTheKeyboardOpen` opened the keyboard. The top of
+   the sheet was at 136 px, the bottom of the status bar. Without the correction, the same test found the top at
+   0 px. The goldens did not change, because they draw the sheets inline.
+5. Resolved, with an owner question. A document with no words shows "No speech" on the Note screen (new deviation
+   20, contract change 20). `ScreenBehaviourTest.aDocumentWithNoWordsSaysSo` and
+   `NoteViewModelTest.aDocumentWithNoWordsSaysSoOnlyWhenItsTranscriptHasLoaded` cover this. The new golden is
+   `variants/read-no-words.png`. The copy is not in features.md (see "Items for the owner to review").
+6. Resolved. The Library title and excerpt do not show a space before the ellipsis (new deviation 18).
+   `EllipsisTextTest` covers this at 101 widths. The Library goldens did not change, because no fixture puts the
+   ellipsis after a space.
+7. Open. The emulator microphone gives silence. Thus the review did not see the waveform bars move, or stay static
    with the animator duration scale at 0. Do this check on a phone, together with the pre-release gate.
