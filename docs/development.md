@@ -116,6 +116,8 @@ The Compose accessibility checks (`enableAccessibilityChecks()`) do not operate 
 
 Each ERROR or WARNING of the checks fails the test, with three exceptions. The exceptions are the small touch targets of inline word links and of the Library row suffixes, and the low contrast of the old waveform bars (`rec.barIdle`, permitted in `docs/design/ui.md` section 11). The tests write each finding to logcat with the tag `CassiniA11y`.
 
+One more `@CiSmoke` device test, `flows/SheetAndDraftDeviceTest`, does the checks of `docs/ui-fidelity.md` (device follow-ups 3 and 4) on an edge-to-edge window. With the keyboard open, the Name a speaker sheet must stay below the status bar. On Transcribing, new draft text must not move the progress card out of view. The test writes a screenshot of each check to `files/device-checks/` in the app data. If the device shows no soft keyboard, the sheet check still does the status-bar check, and logcat (tag `SheetAndDraftDeviceTest`) tells that the keyboard did not open.
+
 `app/src/test/.../nav/AppShellTest` runs the whole app under Robolectric on a scratch root. It tests the back order (a sheet, then the search, then the screen), the minimised recording, the predictive back callback, the edge-to-edge insets, the system bar icons of each screen and the TalkBack semantics of the Note screen.
 
 ### Device flow tests

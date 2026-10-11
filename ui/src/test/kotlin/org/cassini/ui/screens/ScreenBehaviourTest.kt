@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasClickAction
@@ -29,10 +30,13 @@ import androidx.compose.ui.unit.dp
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toPersistentList
 import org.cassini.ui.components.WordRef
 import org.cassini.ui.components.turnText
 import org.cassini.ui.fixtures.BoardFixtures
 import org.cassini.ui.fixtures.VariantFixtures
+import org.cassini.ui.fixtures.timedWords
 import org.cassini.ui.format.FIXED_ZONE
 import org.cassini.ui.format.ProvideFixedFormat
 import org.cassini.ui.library.LibraryEvent
@@ -114,6 +118,29 @@ class ScreenBehaviourTest {
         setThemed { NoteScreen(VariantFixtures.read.getValue("read-search"), onEvent = { events += it }) }
         rule.onNodeWithContentDescription("Close search").performClick()
         rule.runOnIdle { assertEquals(listOf<NoteEvent>(NoteEvent.CloseSearch), events) }
+    }
+
+    /**
+     * New draft text scrolls only the draft below the progress card (docs/ui-fidelity.md, device follow-up 3): the
+     * card stays in view, and the newest turn comes into view.
+     */
+    @Test fun newDraftTextKeepsTheProgressCardInView() {
+        val base = BoardFixtures.transcribing
+        val many = (1..12).flatMap { n -> base.turns.map { it.copy(id = "${it.id}-$n") } }
+        var state by mutableStateOf(base.copy(turns = many.toPersistentList()))
+        setThemed { NoteScreen(state, onEvent = {}) }
+        val newest = BoardFixtures.draftGiulia.copy(id = "newest", words = timedWords("Ultima frase nuova.", 0))
+        rule.runOnIdle { state = state.copy(turns = (many + newest).toPersistentList()) }
+        rule.onNodeWithText(turnText(newest.words)).assertIsDisplayed()
+        rule.onNodeWithText("Stop and keep progress").assertIsDisplayed()
+    }
+
+    /** A document with no words shows the empty state on the Note screen (docs/ui-fidelity.md, follow-up 5). */
+    @Test fun aDocumentWithNoWordsSaysSo() {
+        val empty = BoardFixtures.readAndListen.copy(turns = persistentListOf(), noWords = true)
+        setThemed { NoteScreen(empty, onEvent = {}) }
+        rule.onNodeWithText("No speech").assertIsDisplayed()
+        rule.onNodeWithText("No words were found in this recording.").assertIsDisplayed()
     }
 
     /** With playback paused a drag does not pause auto-follow, so no Follow playback chip appears and stays. */

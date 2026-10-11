@@ -24,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -31,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -65,6 +67,9 @@ private val FirstHeaderLift = 15.5.dp
 
 /** Board 02: 14 dp between the draft's turns (the article's gap). */
 private val DraftTurnGap = 14.dp
+
+/** The card stays fixed above the draft while it takes at most this part of the space. */
+private const val PIN_FRACTION = 0.5f
 
 /** The large step that scrolls the draft to its end; the list stops at the end. */
 private const val TO_END_PX = 1_000_000f
@@ -158,13 +163,14 @@ private fun ColumnScope.DocumentBelow(
 }
 
 /**
- * The draft list (board 02): one LazyColumn, so the card and the draft scroll together on short screens and at
- * large font scales. Items: the progress [card] (margin 8/16; null in Paused and Failed), the banners, the
- * "Draft transcript" header and one item per turn, keyed by its id.
+ * The draft list (board 02). The progress [card] (margin 8/16; null in Paused and Failed) stays fixed above a
+ * LazyColumn with the banners, the "Draft transcript" header and one item per turn, keyed by its id, as on the
+ * board. When the card is taller than [PIN_FRACTION] of the space (a short screen, a large font scale), it is the
+ * first item of the list instead, so the card and the draft scroll together and the draft keeps some space.
  *
- * Auto-follow (features.md section 3.1): new text scrolls the end of the draft into view. A scroll that ends above
- * the end pauses it, and a scroll back to the end resumes it. Opening the screen does not scroll, so the card stays
- * in view until the first new text arrives.
+ * Auto-follow (features.md section 3.1): new text scrolls the end of the draft into view. Only the list scrolls, so
+ * a fixed card stays in view. A scroll that ends above the end pauses it, and a scroll back to the end resumes it.
+ * Opening the screen does not scroll.
  */
 @Composable
 private fun ColumnScope.DraftList(
@@ -193,6 +199,46 @@ private fun ColumnScope.DraftList(
                 }
             }
     }
+    // The heights of the space and of the card with its margin. Before the first measurement the card is fixed.
+    var areaPx by remember { mutableIntStateOf(0) }
+    var cardPx by remember { mutableIntStateOf(0) }
+    val pinned = areaPx == 0 || cardPx <= areaPx * PIN_FRACTION
+    val cardItem: @Composable () -> Unit = {
+        if (card != null) {
+            ProcessingCard(
+                state = card,
+                onStop = { onEvent(NoteEvent.Stop) },
+                modifier = Modifier
+                    .onSizeChanged { cardPx = it.height }
+                    .then(TopItemPadding),
+                notificationsOff = state.notificationsOff,
+                onDownloadAction = { action ->
+                    card.download?.let { onEvent(NoteEvent.BannerAction(it.banner().id, action)) }
+                },
+            )
+        }
+    }
+    Column(
+        Modifier
+            .weight(1f)
+            .fillMaxWidth()
+            .onSizeChanged { areaPx = it.height },
+    ) {
+        if (pinned) cardItem()
+        DraftItems(state, cardItem.takeUnless { pinned || card == null }, listState, bottom, onEvent)
+    }
+}
+
+/** The scrolling part of [DraftList]: the [card] when it is not fixed, the banners, the header and the turns. */
+@Composable
+private fun ColumnScope.DraftItems(
+    state: NoteUiState,
+    card: (@Composable () -> Unit)?,
+    listState: LazyListState,
+    bottom: Dp,
+    onEvent: (NoteEvent) -> Unit,
+) {
+    val turns = state.turns
     LazyColumn(
         modifier = Modifier
             .weight(1f)
@@ -200,19 +246,7 @@ private fun ColumnScope.DraftList(
         state = listState,
         contentPadding = PaddingValues(bottom = 16.dp + bottom),
     ) {
-        if (card != null) {
-            item(key = "card") {
-                ProcessingCard(
-                    state = card,
-                    onStop = { onEvent(NoteEvent.Stop) },
-                    modifier = TopItemPadding,
-                    notificationsOff = state.notificationsOff,
-                    onDownloadAction = { action ->
-                        card.download?.let { onEvent(NoteEvent.BannerAction(it.banner().id, action)) }
-                    },
-                )
-            }
-        }
+        if (card != null) item(key = "card") { card() }
         // Ids are unique in a list (BannerSpec); the index only keeps a duplicate from crashing the list.
         state.banners.forEachIndexed { index, spec ->
             item(key = "banner-$index-${spec.id}") { NoteBanner(spec, onEvent, TopItemPadding) }
