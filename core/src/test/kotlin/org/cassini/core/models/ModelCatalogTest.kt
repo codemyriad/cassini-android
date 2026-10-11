@@ -1,5 +1,6 @@
 package org.cassini.core.models
 
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -98,5 +99,30 @@ class ModelCatalogTest {
         assertEquals(ModelCatalog.voiceprintModel.size, ModelCatalog.voiceprintBytes)
         assertEquals(28L, ModelCatalog.mebibytes(ModelCatalog.voiceprintBytes))
         assertEquals(1L, ModelCatalog.mebibytes(1))
+    }
+
+    /** scripts/ci-models.json gives the CI models workflow the same files, URLs and markers as the catalog. */
+    @Test fun theCiModelListIsTheCatalog() {
+        val file = File(System.getProperty("cassini.ciModels", "../scripts/ci-models.json")!!)
+        val listed = JSONObject(file.readText()).getJSONArray("models")
+        val catalog = listOf(ModelCatalog.PARAKEET, ModelCatalog.VAD, ModelCatalog.DIARIZATION, ModelCatalog.VOICEPRINT)
+        fun artifact(json: JSONObject) = Artifact(
+            json.getString("name"),
+            json.getLong("size"),
+            json.getString("sha256"),
+            json.getString("url"),
+        )
+        val models = (0 until listed.length()).map { index ->
+            val json = listed.getJSONObject(index)
+            val artifacts = json.getJSONArray("artifacts")
+            ModelDescriptor(
+                json.getString("directory"),
+                (0 until artifacts.length()).map { artifact(artifacts.getJSONObject(it)) },
+                json.getString("marker"),
+                json.getString("markerValue"),
+                json.optJSONObject("download")?.let(::artifact),
+            )
+        }
+        assertEquals(catalog, models)
     }
 }

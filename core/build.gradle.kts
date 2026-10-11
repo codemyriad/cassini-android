@@ -42,16 +42,21 @@ val conformanceDirectory: String = providers.gradleProperty("cassiniConformanceD
 val appResources: File = rootDir.resolve("ui/src/main/res")
 // SpeakerBudgetTest compares the diarizer state cap with the bound the pinned JNI patch enforces.
 val diarizationPatch: File = rootDir.resolve("scripts/streaming-diarization.patch")
+// ModelCatalogTest compares the model list of the CI models workflow with the catalog.
+val ciModels: File = rootDir.resolve("scripts/ci-models.json")
 
 tasks.test {
     jvmArgumentProviders.add(
         CoreTestData(
             conformance = fileTree(conformanceDirectory),
             resources = fileTree(appResources) { include("values*/strings.xml") },
-            patch = files(diarizationPatch),
-            conformancePath = conformanceDirectory,
-            resourcesPath = appResources.absolutePath,
-            patchPath = diarizationPatch.absolutePath,
+            scripts = files(diarizationPatch, ciModels),
+            properties = mapOf(
+                "cassini.conformance" to conformanceDirectory,
+                "cassini.appResources" to appResources.absolutePath,
+                "cassini.diarizationPatch" to diarizationPatch.absolutePath,
+                "cassini.ciModels" to ciModels.absolutePath,
+            ),
         ),
     )
 }
@@ -64,14 +69,8 @@ tasks.test {
 class CoreTestData(
     @get:InputFiles @get:PathSensitive(PathSensitivity.RELATIVE) val conformance: FileTree,
     @get:InputFiles @get:PathSensitive(PathSensitivity.RELATIVE) val resources: FileTree,
-    @get:InputFiles @get:PathSensitive(PathSensitivity.NONE) val patch: FileCollection,
-    @get:Internal val conformancePath: String,
-    @get:Internal val resourcesPath: String,
-    @get:Internal val patchPath: String,
+    @get:InputFiles @get:PathSensitive(PathSensitivity.NAME_ONLY) val scripts: FileCollection,
+    @get:Internal val properties: Map<String, String>,
 ) : CommandLineArgumentProvider {
-    override fun asArguments() = listOf(
-        "-Dcassini.conformance=$conformancePath",
-        "-Dcassini.appResources=$resourcesPath",
-        "-Dcassini.diarizationPatch=$patchPath",
-    )
+    override fun asArguments() = properties.map { (name, value) -> "-D$name=$value" }
 }
