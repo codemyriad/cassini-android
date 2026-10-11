@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # The device checks of the CI emulator matrix (API 26, 29, 34 and 35; docs/development.md, Continuous integration).
+# Any device on API 35 or above also works, with the rules of API 35.
 #   TEST_API=<level> scripts/ci-emulator-smoke.sh
 # Input, as the emulator job downloads it:
 #   .tools/ci-apk          the published APK (minified on tags)
@@ -23,6 +24,7 @@ test "$(adb shell getprop ro.build.version.sdk | tr -d '\r')" = "${TEST_API:?Set
 # - platform_opus: whether the image has a platform Opus encoder. PortableDocumentTest fails when the device does
 #   not agree, so a changed image is seen. The API 29 image has none; recordings there use AAC (capture.m4a).
 #   Empty: no expectation. No API 35 run has confirmed a value yet, so API 35 accepts either result.
+#   A level above 35 (for example a Pixel 8 on API 37) uses the rules of API 35: no expectation differs there.
 # - data_tests: also run the :data NoteFtsDeviceTest, the FTS4 tokenizer of the oldest SQLite in the matrix.
 # PortableDocumentTest's platform Opus round trip has @SdkSuppress for API 34 only, so the selection has one test
 # less on the other levels. The dry run of device-smoke.sh counts that.
@@ -31,8 +33,14 @@ case "$TEST_API" in
     26) platform_opus=false; data_tests=true ;;
     29) platform_opus=false ;;
     34) platform_opus=true ;;
-    35) platform_opus= ;;
-    *) printf 'Unsupported CI emulator API: %s\n' "$TEST_API" >&2; exit 1 ;;
+    *)
+        if [[ "$TEST_API" =~ ^[0-9]+$ ]] && [ "$TEST_API" -ge 35 ]; then
+            platform_opus=
+        else
+            printf 'Unsupported CI emulator API: %s (use 26, 29, 34, or 35 and above)\n' "$TEST_API" >&2
+            exit 1
+        fi
+        ;;
 esac
 mkdir -p .tools/emulator-results
 trap 'adb logcat -d > .tools/emulator-results/logcat.txt 2>&1 || true' EXIT
