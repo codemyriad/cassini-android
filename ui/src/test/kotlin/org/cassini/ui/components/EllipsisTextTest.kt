@@ -4,12 +4,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.hasParent
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import org.cassini.ui.theme.CassiniTheme
@@ -48,8 +50,7 @@ class EllipsisTextTest {
         val shown = (MIN_WIDTH..MAX_WIDTH).map { dp ->
             width = dp
             rule.waitForIdle()
-            val node = rule.onNodeWithTag(TAG).fetchSemanticsNode()
-            node.config.getOrNull(SemanticsProperties.Text).orEmpty().joinToString("") { it.text }
+            shownText()
         }
         shown.forEach { assertFalse("A space before the ellipsis: \"$it\"", it.endsWith(" …")) }
         val trimmed = shown.filter { it != TEXT }
@@ -72,14 +73,49 @@ class EllipsisTextTest {
                 )
             }
         }
-        val node = rule.onNodeWithTag(TAG).fetchSemanticsNode()
-        assertEquals(listOf("il cliente"), node.config[SemanticsProperties.Text].map { it.text })
+        assertEquals("il cliente", shownText())
     }
+
+    /** The first frame at a width already shows the final text: no frame draws "il …" first. */
+    @Test fun theFirstFrameAtAWidthShowsTheFinalText() {
+        var width by mutableIntStateOf(MIN_WIDTH)
+        rule.mainClock.autoAdvance = false
+        rule.setContent {
+            CassiniTheme {
+                EllipsisText(
+                    text = AnnotatedString(TEXT),
+                    style = CassiniTheme.type.snippet,
+                    color = CassiniTheme.colors.text3,
+                    maxLines = 2,
+                    modifier = Modifier
+                        .width(width.dp)
+                        .testTag(TAG),
+                )
+            }
+        }
+        var trimmed = 0
+        for (dp in MIN_WIDTH..MAX_WIDTH) {
+            width = dp
+            // The width reaches the composition before the frame, so the next frame is the first at this width.
+            Snapshot.sendApplyNotifications()
+            rule.mainClock.advanceTimeByFrame()
+            val first = shownText()
+            repeat(SETTLE_FRAMES) { rule.mainClock.advanceTimeByFrame() }
+            assertEquals("at $dp dp", shownText(), first)
+            if (first != TEXT) trimmed++
+        }
+        assertTrue("No width cut the text; the check found nothing", trimmed > 0)
+    }
+
+    /** The text of the Text inside the tagged EllipsisText. */
+    private fun shownText(): String = rule.onNode(hasParent(hasTestTag(TAG))).fetchSemanticsNode()
+        .config.getOrNull(SemanticsProperties.Text).orEmpty().joinToString("") { it.text }
 
     private companion object {
         const val TAG = "ellipsis"
         const val MIN_WIDTH = 120
         const val MAX_WIDTH = 220
+        const val SETTLE_FRAMES = 3
         const val TEXT =
             "e quindi il cliente ha detto che la consegna di giovedì va bene se il fornitore conferma entro la " +
                 "fine della settimana e se il prezzo resta quello del preventivo di marzo"

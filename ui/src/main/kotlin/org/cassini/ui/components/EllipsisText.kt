@@ -3,25 +3,27 @@
 
 package org.cassini.ui.components
 
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 
 /**
  * A [Text] of at most [maxLines] lines that ends with "…" when it is cut, with no space before the "…".
  * `TextOverflow.Ellipsis` cuts at a character and can keep the space before the cut ("il …"); the boards never show
- * that space. When the first layout puts the ellipsis after white space, the text is drawn again as the part before
- * the cut, without its trailing white space, plus "…". A new text, line count or width measures again.
+ * that space. Before the text is drawn, a [rememberTextMeasurer] layout at the given width finds the cut. When it
+ * puts the ellipsis after white space, the text is drawn as the part before the cut, without its trailing white
+ * space, plus "…". Thus the first frame already shows the trimmed text. A new text, style, line count or width
+ * measures again.
  */
 @Composable
 internal fun EllipsisText(
@@ -31,33 +33,36 @@ internal fun EllipsisText(
     maxLines: Int,
     modifier: Modifier = Modifier,
 ) {
-    // The width of the layout that found the cut, and the length of the text that stays before the "…".
-    var cut by remember(text, maxLines) { mutableStateOf<Pair<Int, Int>?>(null) }
-    val current = cut
-    val shown = if (current == null) {
-        text
-    } else {
-        buildAnnotatedString {
-            append(text.subSequence(0, current.second))
-            append(ELLIPSIS)
+    BoxWithConstraints(modifier) {
+        val measurer = rememberTextMeasurer()
+        val maxWidth = constraints.maxWidth
+        // The length of the text that stays before the "…", or null when the plain ellipsis is right.
+        val keep = remember(text, style, maxLines, maxWidth, measurer) {
+            val layout = measurer.measure(
+                text = text,
+                style = style,
+                overflow = TextOverflow.Ellipsis,
+                maxLines = maxLines,
+                constraints = Constraints(maxWidth = maxWidth),
+            )
+            trimmedCut(text, layout)
         }
-    }
-    Text(
-        text = shown,
-        modifier = modifier,
-        style = style,
-        color = color,
-        maxLines = maxLines,
-        overflow = if (current == null) TextOverflow.Ellipsis else TextOverflow.Clip,
-        onTextLayout = { layout ->
-            val width = layout.layoutInput.constraints.maxWidth
-            if (current == null) {
-                trimmedCut(text, layout)?.let { cut = width to it }
-            } else if (current.first != width) {
-                cut = null
+        val shown = if (keep == null) {
+            text
+        } else {
+            buildAnnotatedString {
+                append(text.subSequence(0, keep))
+                append(ELLIPSIS)
             }
-        },
-    )
+        }
+        Text(
+            text = shown,
+            style = style,
+            color = color,
+            maxLines = maxLines,
+            overflow = if (keep == null) TextOverflow.Ellipsis else TextOverflow.Clip,
+        )
+    }
 }
 
 /**
