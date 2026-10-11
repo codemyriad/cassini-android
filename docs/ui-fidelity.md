@@ -70,10 +70,10 @@ In P12 the reviewer compared each board with the screenshots of the acceptance w
 1080 x 2340 px, 440 dpi), in light, dark and Italian. The walk of `scripts/acceptance-walk.sh` made the
 screenshots on 11 Oct 2026 (`build/acceptance/20261011-031058/`, not committed). After the corrections of this
 review, the `realModels` part ran again in light (`build/acceptance/20261011-034439/light/`) and in dark
-(`build/acceptance/20261011-034904/dark/`). The README and store screenshots come from these two runs. After the
-last change to the walk (commit `57cc96d`), the full walk passed again in light, dark and Italian
-(`20261011-045343`, `20261011-045602` and `20261011-045814`). "Acceptance walk runs" in `development.md` lists the
-runs.
+(`build/acceptance/20261011-034904/dark/`). After the change to the walk in commit `57cc96d`, the full walk passed
+again in light, dark and Italian (`20261011-045343`, `20261011-045602` and `20261011-045814`). After the fixes of
+phase F1, the full walk passed again in light, dark and Italian (`20261011-065635`). The README and store
+screenshots come from this last run. "Acceptance walk runs" in `development.md` lists the runs.
 
 For each board, the reviewer read the design PNG, the golden and the device screenshots with the Read tool, side
 by side at the same dp scale. The "Device" part of each board section gives the verdict.
