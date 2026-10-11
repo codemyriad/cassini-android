@@ -37,7 +37,7 @@ class ParakeetRecognizers(
         val recognizer = IncrementalRecognizer(
             parakeet(),
             detectorModel,
-            restored?.let(CheckpointState::json),
+            restored,
             callbacks.onChunk,
             callbacks.onStage,
             callbacks.onProgress,
@@ -63,7 +63,7 @@ private class IncrementalRecognizerSeam(
 
     override fun finish(durationMs: Long): Transcript = recognizer.finish(durationMs)
 
-    override fun checkpoint(): RecognitionState = CheckpointState.recognition(recognizer.checkpoint())
+    override fun checkpoint(): RecognitionState = recognizer.checkpoint()
 
     override fun close() = recognizer.close()
 }

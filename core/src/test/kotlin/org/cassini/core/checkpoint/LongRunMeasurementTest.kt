@@ -2,6 +2,7 @@ package org.cassini.core.checkpoint
 
 import org.cassini.core.format.CassiniPayload
 import org.cassini.core.format.Transcript
+import org.json.JSONObject
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 
@@ -18,38 +19,25 @@ class LongRunMeasurementTest {
 
     private fun measuring() = assumeTrue("Set CASSINI_MEASURE to run", System.getenv("CASSINI_MEASURE") != null)
 
-    /** checkpoint.json as the job writes it after each window of a 10 h run. */
-    @Test fun checkpointWritesOfATenHourRun() {
+    /**
+     * The whole checkpoint path of each window of a 10 h run, as the job runs it: the state of the recognizer and of
+     * the diarizer, the word log, the encoding of checkpoint.json and its text. Three variants:
+     *
+     * - VERSION_1: 0.1.0 and the first 0.2 builds. The recognizer gives its state as JSON (every word as a pretty
+     *   word body, parsed again), and checkpoint.json holds every word.
+     * - LOG_JSON_RECOGNIZER: checkpoint.json version 2 with `words.log`, but the recognizer state still as JSON.
+     * - LOG_TYPED: version 2, and the recognizer gives its typed state (the job today).
+     *
+     * The diarizer state goes through its JSON in each variant, as `SortformerStream.checkpoint` gives it.
+     */
+    @Test fun checkpointPathOfATenHourRun() {
         measuring()
-        val duration = HOURS * LongRun.HOUR_MS
-        val all = run.words(duration)
-        var end = 0
-        var written = 0L
-        var nanos = 0L
-        var windows = 0
-        println("checkpoint.json, all words inline (version 1)")
-        println("hour  words  file_bytes  written_total_MB  encode_total_s")
-        var nextHour = LongRun.HOUR_MS
-        for (doneMs in run.windowEnds(duration)) {
-            while (end < all.size && all[end].endMs <= doneMs) end++
-            val state = run.checkpoint(doneMs, duration, all.subList(0, end))
-            val started = System.nanoTime()
-            val bytes = CheckpointState.encode(state).toString().toByteArray(Charsets.UTF_8).size
-            nanos += System.nanoTime() - started
-            written += bytes
-            windows++
-            if (doneMs >= nextHour) {
-                val hour = nextHour / LongRun.HOUR_MS
-                println("%4d %6d %11d %17.1f %15.1f".format(hour, end, bytes, written / MB, nanos / 1e9))
-                nextHour += LongRun.HOUR_MS
-            }
-        }
-        println("windows=$windows written=${"%.1f".format(written / MB)} MB encode=${"%.1f".format(nanos / 1e9)} s")
+        Variant.entries.forEach(::measure)
     }
 
-    /** checkpoint.json and words.log as version 2 writes them after each window of a 10 h run. */
-    @Test fun checkpointAndWordLogWritesOfATenHourRun() {
-        measuring()
+    private enum class Variant { VERSION_1, LOG_JSON_RECOGNIZER, LOG_TYPED }
+
+    private fun measure(variant: Variant) {
         val duration = HOURS * LongRun.HOUR_MS
         val all = run.words(duration)
         var end = 0
@@ -57,18 +45,28 @@ class LongRunMeasurementTest {
         var logBytes = 0L
         var nanos = 0L
         var ref = WordLogRef.EMPTY
-        println("checkpoint.json with words.log (version 2)")
-        println("hour  words  file_bytes  log_MB  written_total_MB  encode_total_s")
+        println("$variant")
+        println("hour  words  file_bytes  log_MB  written_total_MB  path_total_s")
         var nextHour = LongRun.HOUR_MS
         for (doneMs in run.windowEnds(duration)) {
             while (end < all.size && all[end].endMs <= doneMs) end++
-            val words = all.subList(0, end)
-            val state = run.checkpoint(doneMs, duration, words)
+            val typed = run.checkpoint(doneMs, duration, all.subList(0, end))
             val started = System.nanoTime()
-            val settled = WordLog.settled(words, state.recognition.chunks.start * 1000 / LongRun.RATE, ref.count)
-            val lines = WordLog.lines(words, ref.count, settled)
-            logBytes += lines.size
-            if (settled > 0) ref = WordLogRef(settled, logBytes)
+            val recognition = if (variant == Variant.LOG_TYPED) {
+                typed.recognition
+            } else {
+                CheckpointState.recognition(JSONObject(CheckpointState.json(typed.recognition).toString()))
+            }
+            val diarizer = CheckpointState.diarizer(JSONObject(CheckpointState.json(typed.diarizer!!).toString()))
+            val state = typed.copy(recognition = recognition, diarizer = diarizer)
+            var lines = ByteArray(0)
+            if (variant != Variant.VERSION_1) {
+                val words = state.recognition.chunks.words
+                val settled = WordLog.settled(words, state.recognition.chunks.start * 1000 / LongRun.RATE, ref.count)
+                lines = WordLog.lines(words, ref.count, settled)
+                logBytes += lines.size
+                if (settled > 0) ref = WordLogRef(settled, logBytes)
+            }
             val bytes = CheckpointState.encode(state, ref).toString().toByteArray(Charsets.UTF_8).size
             nanos += System.nanoTime() - started
             written += bytes + lines.size
@@ -79,7 +77,7 @@ class LongRunMeasurementTest {
                 nextHour += LongRun.HOUR_MS
             }
         }
-        println("written=${"%.1f".format(written / MB)} MB encode=${"%.1f".format(nanos / 1e9)} s")
+        println("$variant: written=${"%.1f".format(written / MB)} MB path=${"%.1f".format(nanos / 1e9)} s")
     }
 
     /** The word body that the seal writes for a long transcript, against the limits of the format code. */
