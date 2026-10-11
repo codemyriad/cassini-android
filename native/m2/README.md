@@ -1,25 +1,28 @@
-# native/m2: repo-local Maven repository
+# native/m2: repository-local Maven repository
 
-The app depends on the patched sherpa-onnx runtime as an ordinary Maven coordinate:
+The app uses the patched sherpa-onnx runtime as an ordinary Maven coordinate:
 
     org.cassini.native:sherpa-onnx-nemotron:1.13.7-1f23907a
 
-`settings.gradle.kts` reads that coordinate, and only the group `org.cassini.native`, from this
-directory. Everything here except this README is ignored by git.
+`settings.gradle.kts` reads this coordinate from this directory. It reads only the group `org.cassini.native`
+from here. Git ignores all files in this directory except this README.
 
-`scripts/setup.sh` fills the directory. It uses the first of these that works:
+`scripts/setup.sh` fills the directory. It uses the first of these sources that operates:
 
-1. the AAR already installed here, if its SHA-256 matches the pin;
-2. `app/libs/sherpa-onnx-1.13.7-nemotron.aar` from an older checkout, if its SHA-256 matches the pin;
-3. the AAR attached to the GitHub release `native-sherpa-onnx-1.13.7-nemotron.2` (`scripts/fetch-native-aar.sh`);
-4. a build from the pinned source plus `scripts/streaming-diarization.patch` (`scripts/build-native-aar.sh`, needs the NDK).
+1. The AAR that is already in this directory, if its SHA-256 agrees with the pin.
+2. The file `app/libs/sherpa-onnx-1.13.7-nemotron.aar` of an older checkout, if its SHA-256 agrees with the pin.
+3. The AAR of the GitHub release `native-sherpa-onnx-1.13.7-nemotron.2` (`scripts/fetch-native-aar.sh`).
+4. A build from the pinned source and `scripts/streaming-diarization.patch` (`scripts/build-native-aar.sh`). This
+   build needs the NDK.
 
-`scripts/setup.sh --from-source` skips straight to step 4. `scripts/setup.sh --prebuilt-only` (used by CI) stops
-with an error instead of running step 4. The pin (URL, SHA-256 and the hash of the
-patch it was built from) is the `sherpa-onnx-aar` entry in `scripts/native-dependencies.json`;
-`scripts/verify-native-runtime.sh` checks the installed file against it.
+`scripts/setup.sh --from-source` goes directly to source 4. `scripts/setup.sh --prebuilt-only` stops with an error
+and does not use source 4. CI uses `--prebuilt-only`.
 
-Layout written by the scripts:
+The pin is the `sherpa-onnx-aar` entry in `scripts/native-dependencies.json`. It holds the URL, the SHA-256 of the
+AAR and the SHA-256 of the patch that the AAR contains. `scripts/verify-native-runtime.sh` compares the installed
+file with the pin.
+
+The scripts write this layout:
 
     org/cassini/native/sherpa-onnx-nemotron/1.13.7-1f23907a/
         sherpa-onnx-nemotron-1.13.7-1f23907a.aar

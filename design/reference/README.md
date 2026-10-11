@@ -27,18 +27,18 @@ lists every accepted deviation.
 | 09 Trash | `png/09-trash.png` | `markup/09-Trash.html` |
 | 10 States, banners & errors | `png/10-states-and-errors.png` | `markup/10-States_and_errors.html` |
 
-P7 will add the board goldens in `ui/src/test/screenshots/light/` with these PNG slugs as their names.
-Thus the P7 comparison script can pair a board with its golden by file name.
+The board goldens in `ui/src/test/screenshots/light/` have these PNG slugs as their names. Thus
+`tools/ui-fidelity/compare.py` can pair a board with its golden by file name.
 
 ## Fonts
 
-The markup names the fonts by family only (Instrument Sans, IBM Plex Mono). The design's web font
-files are not committed: they are Google Fonts web-font subsets, and a subset is a Modified Version
-under the SIL Open Font License. The app ships the unmodified upstream TTFs instead (ui.md section 3).
-To view the markup as designed, install both families locally.
+The markup names the fonts by family only (Instrument Sans, IBM Plex Mono). We do not commit the web
+font files of the design. They are Google Fonts web-font subsets, and a subset is a Modified Version
+under the SIL Open Font License. The app ships the unmodified upstream TTFs (ui.md section 3). To see
+the markup as the designer made it, install the two families on your computer.
 
 ## Status
 
-- These files are a reference for development. They are not packaged in the APK: no Gradle source
-  set or resource directory includes `design/`.
-- Publishing them in the public repository is pending the owner's approval.
+- These files are a reference for development. The APK does not contain them, because no Gradle
+  source set or resource directory includes `design/`.
+- The owner must approve the publication of these files in the public repository.

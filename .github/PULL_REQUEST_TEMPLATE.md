@@ -8,8 +8,9 @@
 
 - [ ] `./gradlew detekt ciTest` passes. On macOS or Windows: `./gradlew detekt` and the tests without the pixel comparison pass (see `CONTRIBUTING.md`). CI does the pixel comparison.
 - [ ] `./gradlew :app:lintDebug :data:lintDebug :ui:lintDebug` passes.
+- [ ] The CI checks that are not in Gradle pass (see "Run the tests" in `CONTRIBUTING.md`).
 - [ ] Screenshot goldens: I recorded them on Linux x86_64 and examined each changed PNG, or no golden changed.
-- [ ] Device tests, if the change touches recording, playback, services, models or native code: I ran `scripts/device-smoke.sh` on this device and Android version: <!-- device, API level -->
+- [ ] Device tests: if the change touches recording, playback, services, models or native code, I ran `scripts/device-smoke.sh` on this device and Android version: <!-- device, API level -->
 - [ ] Verbatim engine code: `scripts/check-verbatim.sh` passes, and I recorded each reviewed change in `scripts/check-verbatim.baseline`.
 - [ ] Documentation: I updated the documents that the change affects (`README.md`, `docs/`, `CHANGELOG.md`, `PRIVACY.md`), and `scripts/check-links.sh` passes.
 - [ ] Each commit has a `Signed-off-by` line (`git commit -s`, see `CONTRIBUTING.md`).

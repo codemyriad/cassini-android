@@ -1,6 +1,6 @@
 # Contributing to Cassini for Android
 
-This file tells you how to get the code, build the app, run the tests and send a change. Cassini for Android is free software under the [GPLv3](LICENSE). By sending a change, you agree that we publish it under this license.
+This file tells you how to get the code, build the app, run the tests and send a change. Cassini for Android is free software under the [GPLv3](LICENSE). When you send a change, you agree that we publish it under this license.
 
 More detail is in these documents:
 
@@ -44,7 +44,7 @@ The `:core` module is plain Kotlin on the JVM. It holds the portable format, the
 JAVA_HOME=/path/to/jdk-17 ./gradlew --configure-on-demand :core:test
 ```
 
-This command needs no Android SDK, no NDK, no `scripts/setup.sh` and no device. The `--configure-on-demand` flag stops Gradle from configuring `:engine` and `:app`. If Gradle configures these modules, it needs the Android SDK, and it can download the NDK.
+This command needs no Android SDK, no NDK, no `scripts/setup.sh` and no device. With the `--configure-on-demand` flag, Gradle does not configure `:engine` and `:app`. If Gradle configures these modules, it needs the Android SDK, and it can download the NDK.
 
 ## Build the app
 
@@ -66,7 +66,7 @@ This command needs no Android SDK, no NDK, no `scripts/setup.sh` and no device. 
    adb install -r app/build/outputs/apk/debug/app-debug.apk
    ```
 
-`scripts/setup.sh` gets two inputs. Both are pinned by SHA-256:
+`scripts/setup.sh` gets two inputs. Each input has a SHA-256 pin:
 
 - The libopus source, in `.tools/opus/source`. Gradle compiles `libcassini_opus.so` from it.
 - The sherpa-onnx AAR, in `native/m2`. The script downloads the prebuilt AAR from the GitHub release. If the download is not possible, the script builds the AAR from source.
@@ -85,11 +85,26 @@ You do not need the NDK for `./gradlew --configure-on-demand :core:test`.
 
 ## Run the tests
 
-Before you send a change, run the checks that CI runs:
+Before you send a change, run the checks that CI runs. Run the Gradle checks first:
 
 ```sh
 ./gradlew detekt ciTest :app:lintDebug :data:lintDebug :ui:lintDebug
 ```
+
+Then run the checks that are not in Gradle. Run them from the repository root:
+
+```sh
+shellcheck -x scripts/*.sh tools/*.sh
+ruff check --config config/ruff.toml scripts tools
+scripts/check-links.sh
+scripts/fetch-fonts.sh --check
+python3 -I scripts/check-resource-collisions.py
+scripts/check-verbatim.sh
+```
+
+CI also runs actionlint on the workflows in `.github/workflows/`. [Code style](#code-style) and [Verbatim engine code](#verbatim-engine-code) tell more about these checks.
+
+`scripts/check-resource-collisions.py` fails if `:app` and `:ui` have a resource with the same name. The Android build merges the resources of `:ui` into `:app`. If the two modules have a resource with the same name, the `:app` resource replaces the `:ui` resource, and no error shows.
 
 The `ciTest` task runs the tests of these tiers:
 
@@ -144,12 +159,14 @@ If you install an APK by hand, use `adb install -r`.
 - Format: `.editorconfig` sets 4 spaces and 140 columns.
 - Python: [ruff](https://docs.astral.sh/ruff/). From the repository root, run `ruff check --config config/ruff.toml scripts tools`.
 - Shell: [ShellCheck](https://www.shellcheck.net). Run `shellcheck -x scripts/*.sh tools/*.sh`.
+- Workflows: [actionlint](https://github.com/rhysd/actionlint) 1.7.12. CI runs it on `.github/workflows/`.
+- Resources: run `python3 -I scripts/check-resource-collisions.py`. A resource name must not be in both `:app` and `:ui`.
 - Markdown: run `scripts/check-links.sh`. It finds broken relative links.
 - Code comments and KDoc are in plain English. The documentation follows ASD-STE100 Simplified Technical English: short sentences, active voice and simple tenses.
 
 ## Verbatim engine code
 
-The engine code came from Cassini 0.1.0 into `:core` and `:engine`. We changed the package names and a short list of other lines. The code is tested and the portable format depends on it. Thus each change to this code gets a review.
+The engine code came from Cassini 0.1.0 into `:core` and `:engine`. We changed the package names and a short list of other lines. We tested this code, and the portable format depends on it. Thus each change to this code gets a review.
 
 `scripts/check-verbatim.sh` compares the code with the base commit `0ebea43` (0.1.0 and two later fixes). CI runs it. The script fails in these conditions:
 
@@ -189,7 +206,15 @@ To add the sign-off, commit with `-s`:
 git commit -s -m "Add the export menu"
 ```
 
-Git adds a line `Signed-off-by: Your Name <you@example.com>` with your name and email from the git configuration. Each commit in a pull request must have this line. If you forgot it, update your local `main` from the main repository, run `git rebase --signoff main`, and push the branch again with `git push --force-with-lease`. The rebase changes the commits, so a plain push fails.
+Git adds a line `Signed-off-by: Your Name <you@example.com>` with your name and email from the git configuration. Each commit in a pull request must have this line.
+
+If a commit of your branch has no sign-off, do these steps:
+
+1. Update your local `main` from the main repository.
+2. On your branch, run `git rebase --signoff main`.
+3. Push the branch again with `git push --force-with-lease`.
+
+The rebase changes the commits, so a plain push fails.
 
 ## Send a pull request
 

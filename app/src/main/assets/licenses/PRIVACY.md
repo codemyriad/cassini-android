@@ -10,8 +10,8 @@ Cassini keeps your data in its private app storage (the `filesDir` directory of 
 
 - Audio: your recordings and the audio files that you import or open with Cassini. Location: `notes/<noteId>/`. A recording is `capture.opus` or `capture.m4a`. Imported audio is `source.<ext>`. An imported Cassini document, or a note after transcription, is `document.opus`.
 - Transcripts: the words and their times, the speaker labels, the speaker names that you give, and the title. Location: `notes/<noteId>/document.opus`. The catalogue database `cassini.db` keeps a copy of the text for the library and for search.
-- Unfinished transcription: the progress of a transcription, the draft speaker names, the matches between speakers and saved voices, short audio clips of each speaker (at most 45 seconds for each speaker), and the state of the speaker model. This state is a list of numbers that the speaker model calculates from the voices in the note, so that the transcription can continue later. It is not a voiceprint, and Cassini does not use it to recognize people. A match is the ID of a saved voice and a score. It is not a voiceprint. Location: `notes/<noteId>/work/`. Cassini deletes this directory when the transcription is complete, when you start again, or when it deletes the note.
-- Voiceprints: a voiceprint is a list of numbers that Cassini calculates from the voice of one speaker. Cassini uses voiceprints to recognize the people that you name. Location: `voices/` only. The section "Voiceprints" below gives the details.
+- Unfinished transcription: the progress of a transcription, the draft speaker names, the matches between speakers and saved voices, short audio clips of each speaker (at most 45 seconds for each speaker), and the state of the speaker model. This state is a list of numbers that the speaker model calculates from the voices in the note, so that the transcription can continue later. It is not a voiceprint, and Cassini does not use it to recognize people. A match is the ID of a saved voice and a score. It is not a voiceprint. Location: `notes/<noteId>/work/`. Cassini deletes this directory when the transcription ends, when you start again, or when it deletes the note.
+- Voiceprints: a voiceprint is a list of numbers that Cassini calculates from the voice of one speaker. Cassini uses voiceprints to recognize the people that you name. Location: `voices/` only. The section "Voiceprints" gives the details.
 - Settings and state: your model download decision and its time, the queue of transcriptions, the trash state of notes, the playback position, and some one-time notices. Location: `settings.preferences_pb` and `cassini.db`. On Android 13 and later, Android keeps the app language. On earlier versions, Cassini keeps the app language in a small file in its private storage.
 - Models: the downloaded speech and speaker models. They contain no personal data. Location: `parakeet-v3/`, `vad/` and `speaker-models/`.
 
@@ -23,7 +23,7 @@ Cassini 0.2 keeps all voiceprints in the `voices/` directory, and nowhere else:
 
 - `voices/people.json`: the saved voices. Each saved voice has a name, a voiceprint and its counts.
 - `voices/notes/<noteId>.json`: the voiceprints of the speakers in one note, and their matches with the saved voices.
-- `voices/pending/<noteId>.json`: the voiceprints of a transcription that is almost complete. When Cassini installs the result in the note, it moves them into `voices/notes/<noteId>.json`.
+- `voices/pending/<noteId>.json`: the voiceprints of a finished transcription, before Cassini installs the result in the note. When Cassini installs the result, it moves them into `voices/notes/<noteId>.json`.
 - `voices/generation`: a number that changes when you push "Forget everyone". It contains no voice data.
 
 The database `cassini.db` also keeps the matches between speakers and saved voices: the ID of the saved voice and the score. An unfinished transcription keeps its matches in `notes/<noteId>/work/`. These matches are not voiceprints.
@@ -97,7 +97,7 @@ These files contain no voiceprints. Cassini cannot delete a copy that you saved 
 
 ### Notes
 
-When you move a note to the trash, Cassini keeps it for 30 days. You can restore it during this time. Notes in Trash are deleted the first time Cassini runs on or after the 30th day.
+When you move a note to the trash, Cassini keeps it for 30 days. You can restore it during this time. Cassini deletes a note in Trash the first time that Cassini starts on or after the 30th day.
 
 On the Trash screen, "Delete now" deletes one note immediately. "Empty" deletes all notes in the trash immediately.
 

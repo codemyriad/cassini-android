@@ -10,10 +10,10 @@ Version 0.2.0 is a new build of the app. It keeps the speech engine and the port
 
 ### Changed
 
-- 0.2 starts with a fresh storage layout and does not read 0.1.x app data; exported .opus documents open as before.
+- 0.2 starts with a new storage layout and does not read the app data of 0.1.x. Exported `.opus` documents open as before.
 - The signing key does not change, so 0.2 installs over 0.1.x and the downloaded models stay. Before you update, transcribe each 0.1.x note that has no transcript, then save each note as a Cassini document (`.opus`). Then open these files in 0.2. 0.1.x cannot save a recording without a transcript as a document, and there is no other way to move such a recording to 0.2.
 - An update from 0.1.x does not delete the files of 0.1.x. These include the recordings, the list of notes, the unfinished transcriptions and the last transcript, and the 0.1.x voiceprints in `voices.json` and `voiceprints/`. "Forget everyone" does not delete them. "Clear storage" in the Android app settings, or an uninstall, deletes them. [PRIVACY.md](PRIVACY.md) gives the details.
-- New transcripts do not claim Italian. Parakeet does not identify the language, so the language of a new transcript is empty.
+- A new transcript does not give Italian as its language. Parakeet does not identify the language, so the language of a new transcript is empty.
 - A new user interface, made with Jetpack Compose, replaces all screens. It uses the Instrument Sans and IBM Plex Mono fonts and has a light theme and a dark theme.
 - Transcription runs in a foreground service, so it continues when you leave the app. If Android or you stop a transcription, it continues later from the last saved point.
 - The "People" screen has the new name "Saved voices". It shows the number of notes and the minutes of confirmed speech for each saved voice.
@@ -21,10 +21,11 @@ Version 0.2.0 is a new build of the app. It keeps the speech engine and the port
 - An interrupted model download continues from where it stopped.
 - The audio of a non-Opus source (an imported MP3, M4A or WAV file, or an AAC recording) goes into the Cassini document as Opus at 24 kb/s. In 0.1.0, some imports used a 48 kb/s platform encoder. After the transcription, Cassini deletes its copy of the original file. [PRIVACY.md](PRIVACY.md) gives the details.
 - The app targets Android 16 (targetSdk 36) and compiles against compileSdk 37. The minimum is still Android 8 (minSdk 26).
-- A long note opens as fast as a short note. The Note screen shows the first words and then gets the other words and the player ready.
+- The time to open a note does not increase with the length of the audio. The Note screen shows the first words first. Then it loads the other words and the player.
 - If you turn the phone, or if Android makes the screen again, the open sheets, the dialogs and the player stay.
-- The screens show all of their text when the Android font size is 200 % and when the app language is Italian.
-- "Transcribe again" is not available for a document that Cassini cannot verify or cannot read. These documents get a message and no "Try again".
+- At the Android font size 200 %, the Library, Note, Name a speaker and Settings screens show all of their text.
+- When the app language is Italian, the screens show all of their text.
+- "Transcribe again" is not available for a document with the state "Not verified" or "Newer format". These documents get a message and no "Try again".
 - The message for a file that is too large gives the limit of 2 GB.
 - "Document info" shows the name of the speech model.
 
@@ -90,19 +91,19 @@ Version 0.2.0 is a new build of the app. It keeps the speech engine and the port
 
 ### Added
 
-- Progress, speed and time left during a transcription. Words show as each part of the speech is decoded.
+- Progress, speed and time left during a transcription. Words show when Cassini decodes each part of the speech.
 - Silero VAD finds the speech parts, with the settings of the desktop pipeline. The small Silero model (about 630 KB) downloads separately.
 
 ### Changed
 
-- Words from overlapping windows are merged. The padding and the filter for quiet audio are the same as in the desktop pipeline.
+- Cassini merges the words of windows that overlap. The padding and the filter for quiet audio are the same as in the desktop pipeline.
 
 ## [0.0.3-beta] - 2026-10-04
 
 ### Fixed
 
 - A note that you left before its first playback can play its audio again.
-- Opening a note keeps the keyboard closed. On older Android versions, the search field took the focus.
+- When you open a note, the keyboard stays closed. On older Android versions, the search field took the focus.
 
 ### Added
 
@@ -112,8 +113,8 @@ Version 0.2.0 is a new build of the app. It keeps the speech engine and the port
 
 ### Fixed
 
-- Microphone recordings lost one sample every 64 ms. Decoding is gapless. Documents from 0.0.1-beta keep the audio that they have.
-- A file that you opened from a different app made a new note each time the screen was created again. It opens the same note.
+- Microphone recordings lost one sample every 64 ms. The decoder gives the audio without gaps. Documents from 0.0.1-beta keep the audio that they have.
+- A file that you opened from a different app made a new note each time that Android made the screen again. It opens the same note.
 - Long transcripts play without stops. Only the highlight moves.
 - "Cancel" on "Import audio" goes back to the notes.
 
@@ -121,7 +122,7 @@ Version 0.2.0 is a new build of the app. It keeps the speech engine and the port
 
 ### Added
 
-- The first beta. Record a voice note and find it again in a searchable library.
+- The first beta. You can record a voice note and find it again in a searchable library.
 - Transcription on the phone with Parakeet v3. The words link to the audio.
 - Save a complete Cassini `.opus` document with the audio and the transcript.
 - A one-time model download in Settings: INT8 (about 640 MiB) or FP32 (about 2.37 GiB).
