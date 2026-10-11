@@ -49,6 +49,8 @@ import org.cassini.android.playback.PlaybackState
 import org.cassini.android.processing.NoteJobState
 import org.cassini.android.processing.TranscribeOutcome
 import org.cassini.android.recording.RecordingState
+import org.cassini.core.Failure
+import org.cassini.core.audio.Limits
 import org.cassini.core.checkpoint.CheckpointNames
 import org.cassini.core.format.Word
 import org.cassini.core.library.AudioKind
@@ -443,10 +445,16 @@ class NoteViewModel(
         val mode = core.mode
         val list = mutableListOf<BannerSpec>()
         when (mode) {
-            NoteMode.AudioOnly -> list += BannerSpec(
-                BannerKind.PLAIN_AUDIO,
-                actions = if (note.audioKind == AudioKind.LIVE_CAPTURE) persistentListOf() else BannerKind.PLAIN_AUDIO.actions,
-            )
+            NoteMode.AudioOnly -> {
+                // Audio longer than one transcription takes (architecture 3.7): say why, and offer no Transcribe.
+                val tooLong = note.durationMs > Limits.MAX_TRANSCRIBE_MS
+                val noTranscribe = note.audioKind == AudioKind.LIVE_CAPTURE || tooLong
+                list += BannerSpec(
+                    BannerKind.PLAIN_AUDIO,
+                    BannerArgs(text = if (tooLong) ports.failureText(Failure.LONG.name) else null),
+                    actions = if (noTranscribe) persistentListOf() else BannerKind.PLAIN_AUDIO.actions,
+                )
+            }
             NoteMode.Unplayable -> list += BannerSpec(BannerKind.UNPLAYABLE)
             else -> Unit
         }

@@ -80,7 +80,7 @@ private val ENGLISH: Map<BannerKind, Triple<String, String?, List<String>>> = ma
     ),
     BannerKind.REC_STOPPED_FILE_LIMIT to Triple(
         "Stopped — recording file is full",
-        "The file reached the largest size this phone can save. The recording so far is saved.",
+        "Cassini ends M4A recordings at 1\u00A0GB, about 74\u00A0hours. The recording so far is saved. Start a new recording to continue.",
         listOf("Open note"),
     ),
     BannerKind.REC_STOPPED_STORAGE to Triple(
@@ -204,6 +204,7 @@ private fun BannerArgs.vary(arg: BannerArg): BannerArgs =
         BannerArg.M4A -> copy(m4a = true)
         BannerArg.PART -> copy(part = ModelPartUi.VOICES)
         BannerArg.BY_SYSTEM -> copy(bySystem = true)
+        BannerArg.FILE_LIMIT -> copy(fileLimit = true)
     }
 
 private val PLACEHOLDER = Regex("%(\\d+\\$)?[sd]")
@@ -236,6 +237,19 @@ class BannerKindTest {
             BannerText.body(res, BannerKind.NO_ENCODER, BannerArgs(m4a = false), f),
         )
         assertEquals("Your recording is kept.", BannerText.body(res, BannerKind.TX_FAILED, BannerArgs(), f))
+        assertEquals(
+            "Recording file almost full — about 10\u00A0min left",
+            title(BannerKind.REC_STORAGE_LOW, BannerArgs(ms1 = 10 * MIN, fileLimit = true)),
+        )
+        assertEquals(
+            "Cassini ends M4A recordings at 1\u00A0GB and saves them. To keep going, finish and start a new recording.",
+            BannerText.body(res, BannerKind.REC_STORAGE_LOW, BannerArgs(fileLimit = true), f),
+        )
+        assertEquals(
+            "No transcript yet.",
+            BannerText.body(res, BannerKind.PLAIN_AUDIO, BannerArgs(), f),
+        )
+        assertEquals("Too long.", BannerText.body(res, BannerKind.PLAIN_AUDIO, BannerArgs(text = "Too long."), f))
         val paused = "Android paused it: background work has a limit of about 6 hours a day. Resume to continue where it stopped."
         assertEquals(paused, BannerText.body(res, BannerKind.TX_PAUSED, BannerArgs(bySystem = true), f))
         assertEquals(paused, BannerText.body(res, BannerKind.TX_PAUSED_EARLY, BannerArgs(bySystem = true), f))

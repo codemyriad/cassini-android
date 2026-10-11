@@ -118,6 +118,7 @@ class RecordingNotifications(context: Context) {
         state.pause == RecordingPause.OTHER_APP -> res.getString(R.string.notif_rec_other_app)
         else -> when (val warning = state.warning) {
             is RecordingWarning.StorageLow -> res.getString(R.string.notif_rec_storage_low, warning.minutes.toInt())
+            is RecordingWarning.FileLimitNear -> res.getString(R.string.notif_rec_file_low, warning.minutes.toInt())
             null -> null
         }
     }

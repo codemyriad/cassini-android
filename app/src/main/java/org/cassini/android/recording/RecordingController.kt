@@ -22,6 +22,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import org.cassini.core.audio.Limits
 import org.cassini.core.audio.RecordingPolicy
 import org.cassini.core.audio.RecordingSpace
 import org.cassini.data.notes.NoteTitles
@@ -285,8 +286,11 @@ class RecordingController(private val parts: Parts) {
         val usable = parts.platform.usableBytes(mic.file.parentFile ?: mic.file)
         val rate = bytesPerSecond(mic, current.format, elapsedMs)
         val decision = RecordingPolicy.decide(usable, rate, mic.file.length(), maxFileBytes(current.format))
-        val low = decision as? RecordingPolicy.Decision.StorageLow
-        val warning = low?.let { RecordingWarning.StorageLow(it.minutes) }
+        val warning = when (decision) {
+            is RecordingPolicy.Decision.StorageLow -> RecordingWarning.StorageLow(decision.minutes)
+            is RecordingPolicy.Decision.FileLimitNear -> RecordingWarning.FileLimitNear(decision.minutes)
+            else -> null
+        }
         update { it.copy(elapsedMs = elapsedMs, space = space(mic, current.format, usable, rate), warning = warning) }
         return when (decision) {
             RecordingPolicy.Decision.StopForSpace -> Stop.SPACE
@@ -367,7 +371,7 @@ class RecordingController(private val parts: Parts) {
                     notes.rename(current.noteId, NoteTitles.clean(typed) ?: fallbackTitle)
                     notes.finish(current.noteId, mic.elapsedMs)
                 }
-                if (outcome is RecordingOutcome.Saved) outcome = outcome.copy(next = next(current.noteId))
+                if (outcome is RecordingOutcome.Saved) outcome = outcome.copy(next = next(current.noteId, mic.elapsedMs))
             }
         } finally {
             capture = null
@@ -392,9 +396,13 @@ class RecordingController(private val parts: Parts) {
         return file.takeIf { it.isFile && it.length() > 0 }
     }
 
-    /** After a saved recording: the hand-off with consent, else the consent question or Audio only. */
-    private suspend fun next(noteId: String): AfterFinish {
+    /**
+     * After a saved recording: the hand-off with consent, else the consent question or Audio only. A recording longer
+     * than one transcription takes ([Limits.MAX_TRANSCRIBE_MS]) stays Audio only, and the Note screen tells why.
+     */
+    private suspend fun next(noteId: String, durationMs: Long): AfterFinish {
         var next = AfterFinish.AUDIO_ONLY
+        if (durationMs > Limits.MAX_TRANSCRIBE_MS) return next
         guarded("hand the recording to processing") {
             next = when {
                 parts.consent.consented() ->

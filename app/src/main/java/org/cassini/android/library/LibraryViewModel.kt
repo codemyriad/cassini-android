@@ -291,8 +291,14 @@ class LibraryViewModel(
 
     /** Resume on a paused row and Try again on a failed one: the job's own kind goes to the back of the queue. */
     private suspend fun resume(id: String) {
-        val kind = ports.details(id).first()?.job?.kind ?: JobKind.TRANSCRIBE
-        transcribe(id, kind)
+        val details = ports.details(id).first()
+        val job = details?.job
+        // A final failure (too long, or a refused document) repeats at each try: the note tells why instead.
+        if (details != null && job != null && Notices.finalFailure(job, LibraryMapping.transcribeAgainRefused(details))) {
+            emit(LibraryEffect.OpenNote(NoteKey(id)))
+            return
+        }
+        transcribe(id, job?.kind ?: JobKind.TRANSCRIBE)
     }
 
     private suspend fun transcribe(id: String, kind: JobKind) {

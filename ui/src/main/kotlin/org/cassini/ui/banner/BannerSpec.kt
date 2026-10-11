@@ -30,7 +30,8 @@ data class BannerSpec(
  *
  * [part] is an addition to ui.md section 7: the download banner names the part it downloads. [bySystem] is an
  * addition too: DL_STOPPED says that Android stopped the download, not the connection, and TX_PAUSED and
- * TX_PAUSED_EARLY say that Android paused the transcription.
+ * TX_PAUSED_EARLY say that Android paused the transcription. PLAIN_AUDIO reads [text] as the reason why the note has
+ * no transcript. [fileLimit] gives REC_STORAGE_LOW the copy of the room left in an AAC file before its 1 GiB end.
  */
 @Immutable
 data class BannerArgs(
@@ -44,10 +45,11 @@ data class BannerArgs(
     val m4a: Boolean = false,
     val part: ModelPartUi? = null,
     val bySystem: Boolean = false,
+    val fileLimit: Boolean = false,
 )
 
 /** The fields of [BannerArgs] a kind reads. */
-enum class BannerArg { COUNT, TEXT, MS1, MS2, BYTES, BYTES2, PERCENT, M4A, PART, BY_SYSTEM }
+enum class BannerArg { COUNT, TEXT, MS1, MS2, BYTES, BYTES2, PERCENT, M4A, PART, BY_SYSTEM, FILE_LIMIT }
 
 /** A banner button (ui.md section 7) with its label. */
 enum class BannerAction(@StringRes val label: Int) {

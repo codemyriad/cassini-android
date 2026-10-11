@@ -468,7 +468,9 @@
     <string name="ui_banner_rec_storage_low_title">Memoria quasi piena — restano circa %1$s</string>
     <string name="ui_banner_rec_storage_low_body">Libera spazio per continuare. Se si esaurisce, la registrazione viene salvata automaticamente.</string>
     <string name="ui_banner_rec_stopped_file_title">Fermata — file della registrazione pieno</string>
-    <string name="ui_banner_rec_stopped_file_body">Il file ha raggiunto la dimensione massima che questo telefono può salvare. La registrazione fin qui è salvata.</string>
+    <string name="ui_banner_rec_stopped_file_body">Cassini chiude le registrazioni M4A a 1\u00A0GB, circa 74\u00A0ore. La registrazione fin qui è salvata. Avvia una nuova registrazione per continuare.</string>
+    <string name="ui_banner_rec_file_low_title">File della registrazione quasi pieno — restano circa %1$s</string>
+    <string name="ui_banner_rec_file_low_body">Cassini chiude le registrazioni M4A a 1\u00A0GB e le salva. Per continuare, termina e avvia una nuova registrazione.</string>
     <string name="ui_banner_rec_stopped_storage_title">Fermata — memoria quasi piena</string>
     <string name="ui_banner_rec_stopped_storage_body">Meno di %1$s liberi. La registrazione fin qui è salvata.</string>
     <string name="ui_banner_rec_mic_off_title">L’accesso al microfono è disattivato</string>

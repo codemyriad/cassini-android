@@ -2,7 +2,7 @@
     <string name="app_name">Cassini</string>
     <string name="error_open">Could not open this recording. Choose the file again.</string>
     <string name="error_large">This file is too large. Choose a file under 4 GB.</string>
-    <string name="error_long">This recording is too long to transcribe. Cassini transcribes up to 36 hours of audio, with about 11 hours of speech.</string>
+    <string name="error_long">This recording is too long to transcribe: one transcript holds up to 36 hours of audio and about 11 hours of speech. You can still play it, and save the audio file with Save a copy.</string>
     <string name="error_short">Choose at least 200 milliseconds of audio.</string>
     <string name="error_audio">Could not read this audio. Try PCM16 WAV, MP3, M4A or Opus.</string>
     <string name="error_wav">Use a 16-bit PCM WAV, or try MP3, M4A or Opus.</string>
@@ -94,11 +94,12 @@
     <string name="notif_rec_saving">Saving the recording…</string>
     <string name="notif_rec_other_app">Paused — another app is using audio</string>
     <string name="notif_rec_storage_low">Storage almost full — about %1$d min left</string>
+    <string name="notif_rec_file_low">Recording file almost full — about %1$d min left</string>
     <string name="notif_action_pause">Pause</string>
     <string name="notif_action_finish">Finish</string>
     <string name="notif_rec_stopped_title">Recording stopped</string>
     <string name="notif_rec_stopped_text">Less than 200 MB free. The recording so far is saved.</string>
-    <string name="notif_rec_file_full_text">The recording file is full. The recording so far is saved.</string>
+    <string name="notif_rec_file_full_text">Cassini ends M4A recordings at 1 GB, about 74 hours. The recording so far is saved. Start a new recording to continue.</string>
     <string name="notif_rec_failed_title">Microphone stopped working</string>
     <string name="notif_rec_failed_text">Recording ended. The audio so far is in your library.</string>
 </resources>

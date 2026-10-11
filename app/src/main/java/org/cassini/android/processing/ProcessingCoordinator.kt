@@ -265,7 +265,9 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
     suspend fun clearFailed(noteId: String) {
         val catalogue = graph.awaitCatalogue()
         queueLock.withLock {
-            if (catalogue.jobs.job(noteId)?.state == JobState.FAILED) catalogue.jobs.remove(noteId)
+            val job = catalogue.jobs.job(noteId)?.takeIf { it.state == JobState.FAILED } ?: return@withLock
+            // Too long to transcribe: no new try can use the checkpoint, so its work goes with the row.
+            if (job.failure == Failure.LONG.name) discardWork(catalogue, noteId) else catalogue.jobs.remove(noteId)
         }
     }
 

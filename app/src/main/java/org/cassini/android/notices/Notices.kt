@@ -175,6 +175,11 @@ object Notices {
                     val args = BannerArgs(ms1 = warning.minutes * MINUTE_MS)
                     notices += Notice(BannerSpec(BannerKind.REC_STORAGE_LOW, args, announce = true))
                 }
+                // The same banner with the copy of the AAC file limit (`BannerArgs.fileLimit`).
+                is RecordingWarning.FileLimitNear -> {
+                    val args = BannerArgs(ms1 = warning.minutes * MINUTE_MS, fileLimit = true)
+                    notices += Notice(BannerSpec(BannerKind.REC_STORAGE_LOW, args, announce = true))
+                }
                 null -> Unit
             }
         }
@@ -236,13 +241,15 @@ object Notices {
     }
 
     /**
-     * Whether [job] failed in a way that every new try repeats: the document was refused, or it cannot take a new
-     * version (architecture 12). Its TX_FAILED banner offers no Try again, and its dismissal removes the job row.
+     * Whether [job] failed in a way that every new try repeats: the document was refused, it cannot take a new
+     * version (architecture 12), or the recording is too long to transcribe (`Failure.LONG`, architecture 3.7). Its
+     * TX_FAILED banner offers no Try again and no Start over, and its dismissal removes the job row.
      */
     fun finalFailure(job: JobEntity, noNewVersion: Boolean): Boolean {
         if (job.state != JobState.FAILED) return false
         val refused = job.failure.orEmpty().startsWith(JobFailure.DOCUMENT_PREFIX)
-        return refused || (noNewVersion && job.kind == JobKind.TRANSCRIBE_AGAIN)
+        val tooLong = job.failure == Failure.LONG.name
+        return refused || tooLong || (noNewVersion && job.kind == JobKind.TRANSCRIBE_AGAIN)
     }
 
     private fun failed(

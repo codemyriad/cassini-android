@@ -62,7 +62,7 @@ class RecordingPolicyTest {
             when (decide(usable)) {
                 Decision.Continue -> assertEquals(-1L, warnedAt)
                 is Decision.StorageLow -> if (warnedAt < 0) warnedAt = elapsed
-                Decision.StopAtFileLimit -> fail("An Opus file has no limit")
+                Decision.StopAtFileLimit, is Decision.FileLimitNear -> fail("An Opus file has no limit")
                 Decision.StopForSpace -> {
                     stoppedAt = elapsed
                     break
@@ -80,11 +80,16 @@ class RecordingPolicyTest {
         val max = RecordingPolicy.AAC_MAX_FILE_BYTES
         assertTrue(max < 1L shl 32)
         assertEquals(74L, max / aac / 3600)
-        assertEquals(Decision.Continue, decide2(plenty, max - 1, max))
+        assertEquals(Decision.Continue, decide2(plenty, max - 16 * 60 * aac, max))
+        // 15 min of room in the file: the warning of the file limit, as the storage warning.
+        assertEquals(Decision.FileLimitNear(15), decide2(plenty, max - 15 * 60 * aac, max))
+        assertEquals(Decision.FileLimitNear(5), decide2(plenty, max - 1, max))
         assertEquals(Decision.StopAtFileLimit, decide2(plenty, max, max))
-        // The storage stop comes first; the storage warning does not count the file.
+        // The storage stop comes first.
         assertEquals(Decision.StopForSpace, decide2(floor - 1, max, max))
-        assertEquals(Decision.Continue, decide2(plenty, max - 10, max))
+        // Both low: the one that ends first warns.
+        assertEquals(Decision.StorageLow(5), decide2(spaceFor(5 * minute, aac), max - 600 * aac, max))
+        assertEquals(Decision.FileLimitNear(5), decide2(spaceFor(12 * minute, aac), max - 300 * aac, max))
         // An Opus capture has no file limit.
         assertEquals(Decision.Continue, RecordingPolicy.decide(plenty, opus, 100L shl 30))
     }

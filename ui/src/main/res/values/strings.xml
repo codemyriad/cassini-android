@@ -497,7 +497,9 @@
     <string name="ui_banner_rec_storage_low_title">Storage almost full — about %1$s left</string>
     <string name="ui_banner_rec_storage_low_body">Free some space to keep going. If it runs out, the recording saves automatically.</string>
     <string name="ui_banner_rec_stopped_file_title">Stopped — recording file is full</string>
-    <string name="ui_banner_rec_stopped_file_body">The file reached the largest size this phone can save. The recording so far is saved.</string>
+    <string name="ui_banner_rec_stopped_file_body">Cassini ends M4A recordings at 1\u00A0GB, about 74\u00A0hours. The recording so far is saved. Start a new recording to continue.</string>
+    <string name="ui_banner_rec_file_low_title">Recording file almost full — about %1$s left</string>
+    <string name="ui_banner_rec_file_low_body">Cassini ends M4A recordings at 1\u00A0GB and saves them. To keep going, finish and start a new recording.</string>
     <string name="ui_banner_rec_stopped_storage_title">Stopped — storage almost full</string>
     <string name="ui_banner_rec_stopped_storage_body">Less than %1$s free. The recording so far is saved.</string>
     <string name="ui_banner_rec_mic_off_title">Microphone access is off</string>

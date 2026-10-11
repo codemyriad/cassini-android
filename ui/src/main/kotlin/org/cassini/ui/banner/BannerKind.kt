@@ -26,6 +26,7 @@ import org.cassini.ui.banner.BannerArg.BYTES
 import org.cassini.ui.banner.BannerArg.BYTES2
 import org.cassini.ui.banner.BannerArg.BY_SYSTEM
 import org.cassini.ui.banner.BannerArg.COUNT
+import org.cassini.ui.banner.BannerArg.FILE_LIMIT
 import org.cassini.ui.banner.BannerArg.M4A
 import org.cassini.ui.banner.BannerArg.MS1
 import org.cassini.ui.banner.BannerArg.MS2
@@ -99,6 +100,7 @@ enum class BannerKind(
         TRUST,
         R.string.ui_banner_plain_audio_title,
         R.string.ui_banner_plain_audio_body,
+        uses = setOf(TEXT),
         actions = listOf(TRANSCRIBE),
     ),
     UNPLAYABLE(ERROR, TRUST, R.string.ui_banner_unplayable_title, R.string.ui_banner_unplayable_body),
@@ -116,7 +118,7 @@ enum class BannerKind(
         REC,
         R.string.ui_banner_rec_storage_low_title,
         R.string.ui_banner_rec_storage_low_body,
-        uses = setOf(MS1),
+        uses = setOf(MS1, FILE_LIMIT),
     ),
     REC_STOPPED_FILE_LIMIT(
         WARN,

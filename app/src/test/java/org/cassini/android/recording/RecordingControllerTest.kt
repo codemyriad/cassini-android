@@ -205,8 +205,10 @@ class RecordingControllerTest {
 
         controller.finish(null)
         val ended = awaitEnded()
-        assertEquals(RecordingState.Ended(active.noteId, RecordingOutcome.Saved(AfterFinish.TRANSCRIBE)), ended)
+        // More than one transcription takes: saved as Audio only and never queued.
+        assertEquals(RecordingState.Ended(active.noteId, RecordingOutcome.Saved(AfterFinish.AUDIO_ONLY)), ended)
         assertEquals(100 * HOUR_MS, row(active.noteId)?.durationMs)
+        assertTrue("too long to transcribe: no hand-off", handoffs.isEmpty())
         assertFalse(platform.wakeLockHeld)
     }
 
@@ -220,7 +222,8 @@ class RecordingControllerTest {
         capture.latest.elapsedMs = 70 * HOUR_MS
         waitFor { activeState().elapsedMs == 70 * HOUR_MS }
         assertTrue(activeState().space.spaceMs <= 10 * 60_000L)
-        assertNull("the storage warning counts only the free space", activeState().warning)
+        waitFor { activeState().warning != null }
+        assertTrue("the file limit warns first", activeState().warning is RecordingWarning.FileLimitNear)
 
         RandomAccessFile(file, "rw").use { it.setLength(RecordingPolicy.AAC_MAX_FILE_BYTES) }
         val ended = awaitEnded()

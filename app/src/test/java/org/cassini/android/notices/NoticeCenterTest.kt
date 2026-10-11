@@ -84,6 +84,10 @@ class NoticeCenterTest {
         assertEquals(BannerKind.REC_STOPPED_STORAGE, stopped.kind)
         assertEquals(Limits.MIN_RECORDING_FREE_BYTES, stopped.args.bytes)
         assertEquals(listOf(BannerAction.OPEN_NOTE), stopped.actions)
+        assertEquals(
+            BannerSpec(BannerKind.REC_STORAGE_LOW, BannerArgs(ms1 = 600_000, fileLimit = true), announce = true),
+            only(Notices.recording(active.copy(warning = RecordingWarning.FileLimitNear(10)), micOff = false)),
+        )
         val full = only(Notices.recording(RecordingState.Ended("n", RecordingOutcome.StoppedAtFileLimit), false))
         assertEquals(BannerSpec(BannerKind.REC_STOPPED_FILE_LIMIT, announce = true), full)
         assertEquals(listOf(BannerAction.OPEN_NOTE), full.actions)

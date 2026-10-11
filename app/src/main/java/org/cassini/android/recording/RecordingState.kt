@@ -29,6 +29,9 @@ enum class RecordingPause {
 sealed interface RecordingWarning {
     /** About [minutes] of space left (rounded as the hint rounds). */
     data class StorageLow(val minutes: Long) : RecordingWarning
+
+    /** About [minutes] of room left in an AAC file before Cassini ends it at 1 GiB. */
+    data class FileLimitNear(val minutes: Long) : RecordingWarning
 }
 
 /** What the app does after a saved recording (features.md section 2, Finish flow). */

@@ -25,7 +25,10 @@ object BannerText {
 
     fun title(res: Resources, kind: BannerKind, args: BannerArgs, format: FormatSettings): String =
         when (kind) {
-            BannerKind.REC_STORAGE_LOW -> res.getString(kind.title, Durations.atLeastOneMinute(res, args.ms1))
+            BannerKind.REC_STORAGE_LOW -> res.getString(
+                if (args.fileLimit) R.string.ui_banner_rec_file_low_title else kind.title,
+                Durations.atLeastOneMinute(res, args.ms1),
+            )
             BannerKind.RECOVERED, BannerKind.TX_QUEUE_HELD -> Counts.plural(res, kind.title, args.count, format)
             BannerKind.TX_PAUSED -> res.getString(kind.title, Durations.clock(args.ms1), Durations.clock(args.ms2))
             BannerKind.DL_DOWNLOADING -> (args.part ?: ModelPartUi.SPEECH).downloading(res, downloadPercent(args))
@@ -41,25 +44,30 @@ object BannerText {
         when (kind) {
             BannerKind.RECOVERED -> res.getString(kind.body, Durations.clock(args.ms1))
             BannerKind.REC_STOPPED_STORAGE -> res.getString(kind.body, Sizes.megabytes(res, args.bytes, format))
+            // The app's reason why there is no transcript (too long to transcribe), else "No transcript yet."
+            BannerKind.PLAIN_AUDIO -> args.text?.takeIf { it.isNotBlank() } ?: res.getString(kind.body)
             BannerKind.TX_FAILED ->
                 args.text?.takeIf { it.isNotBlank() }?.let { res.getString(kind.body, it) }
                     ?: res.getString(R.string.ui_banner_tx_failed_body_plain)
             BannerKind.DL_DOWNLOADING -> Sizes.downloaded(res, args.bytes, args.bytes2, format)
             BannerKind.DL_NO_SPACE -> res.getString(kind.body, Sizes.megabytes(res, args.bytes, format))
             BannerKind.IMPORT_NO_SPACE -> res.getString(kind.body, Sizes.storage(res, args.bytes, format))
-            BannerKind.NO_ENCODER, BannerKind.DL_STOPPED, BannerKind.TX_PAUSED, BannerKind.TX_PAUSED_EARLY ->
-                res.getString(variantBody(kind, args))
+            BannerKind.NO_ENCODER, BannerKind.DL_STOPPED, BannerKind.TX_PAUSED, BannerKind.TX_PAUSED_EARLY,
+            BannerKind.REC_STORAGE_LOW,
+            -> res.getString(variantBody(kind, args))
             else -> if (kind.body == 0) null else res.getString(kind.body)
         }
 
     /**
      * The body of a kind with a second copy: NO_ENCODER without M4A; DL_STOPPED, TX_PAUSED and TX_PAUSED_EARLY after
-     * a stop by Android (the daily time limit of background work on Android 15 and later).
+     * a stop by Android (the daily time limit of background work on Android 15 and later); REC_STORAGE_LOW for the
+     * room left in an AAC file.
      */
     @StringRes
     private fun variantBody(kind: BannerKind, args: BannerArgs): Int = when {
         kind == BannerKind.NO_ENCODER && !args.m4a -> R.string.ui_banner_no_encoder_body
         kind == BannerKind.DL_STOPPED && args.bySystem -> R.string.ui_banner_dl_stopped_system_body
+        kind == BannerKind.REC_STORAGE_LOW && args.fileLimit -> R.string.ui_banner_rec_file_low_body
         (kind == BannerKind.TX_PAUSED || kind == BannerKind.TX_PAUSED_EARLY) && args.bySystem ->
             R.string.ui_banner_tx_paused_system_body
         else -> kind.body
