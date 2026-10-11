@@ -1,6 +1,6 @@
 # Release
 
-This file tells how a Cassini for Android release is made. Only the owner of the repository makes a release. A contributor does not push tags, does not edit GitHub releases and does not change the secrets of the repository.
+This file tells how the owner makes a release of Cassini for Android. Only the owner of the repository makes a release. A contributor does not push tags, does not edit GitHub releases and does not change the secrets of the repository.
 
 ## Version and tag
 
@@ -12,7 +12,7 @@ Each release must have a `versionCode` that is more than the `versionCode` of th
 
 [`CHANGELOG.md`](../CHANGELOG.md) uses the Keep a Changelog format. The changes for the next version collect in the "Unreleased" section.
 
-The release job takes the notes from the section of the tag in `CHANGELOG.md`. For the tag `v0.2.0`, this is the section `## [0.2.0]`. `scripts/changelog-section.py` extracts the section. It changes each relative link into a link to the file at the tag, because a relative link does not work on the release page. If the section is not there or is empty, the `checks` job fails before the build.
+The release job takes the notes from the section of the tag in `CHANGELOG.md`. For the tag `v0.2.0`, this is the section `## [0.2.0]`. `scripts/changelog-section.py` extracts the section. It changes each relative link into a link to the file at the tag, because a relative link does not work on the release page. If the section is not there or is empty, the `checks` job fails. Then the release job does not run, and the release is not published. The `build` and `emulator` jobs do not wait for `checks`, so they still run.
 
 To see the notes before you make the tag, run `python3 scripts/changelog-section.py v0.2.0`. With no argument, the script shows the "Unreleased" section.
 
@@ -22,14 +22,16 @@ The owner does these steps:
 
 1. Do the pre-release gate in [`development.md`](development.md#pre-release-gate).
 2. In `CHANGELOG.md`, rename "Unreleased" to the new version and the date. Add a new empty "Unreleased" section and update the compare links.
-3. Make sure that `python3 scripts/changelog-section.py v0.2.0` shows the notes of the new version.
-4. Set `versionName` and increase `versionCode` in `app/build.gradle.kts`.
-5. Commit the change on `main` and push it.
-6. Wait until CI passes on that commit.
-7. Make an annotated tag on that commit with `git tag -a v0.2.0 -m "Cassini 0.2.0"`.
-8. Push the tag with `git push origin v0.2.0`.
-9. Wait for the release job. It publishes the GitHub release after the checks, the build and the emulator tests pass.
-10. Download the APK and its checksum from the release. Examine them with the steps in [`SECURITY.md`](../SECURITY.md).
+3. At the start of the section of the new version, add a short paragraph about the installation. Give the name of the APK file (`cassini-android-VERSION.apk`) and the requirements (Android 8.0 or later, 64-bit Android). Tell the users to install the APK over the earlier version, so that the notes and the downloaded models stay. Tell them that the release has the native sources and the notices, and that the models download separately.
+4. Make sure that `python3 scripts/changelog-section.py v0.2.0` shows the notes of the new version.
+5. Set `versionName` and increase `versionCode` in `app/build.gradle.kts`.
+6. Make the Settings screenshot again, because it shows the version number. Use the steps in [`development.md`](development.md#acceptance-walksh) to make `docs/screenshots/light/05-settings.png`, `docs/screenshots/dark/05-settings.png` and `metadata/en-US/images/phoneScreenshots/5.png`.
+7. Commit the changes on `main` and push them.
+8. Wait until CI passes on that commit.
+9. Make an annotated tag on that commit with `git tag -a v0.2.0 -m "Cassini 0.2.0"`.
+10. Push the tag with `git push origin v0.2.0`.
+11. Wait for the release job. It publishes the GitHub release after the checks, the build and the emulator tests pass.
+12. Download the APK and its checksum from the release. Examine them with the steps in [`SECURITY.md`](../SECURITY.md).
 
 The release job attaches these files from `dist/`:
 
@@ -38,7 +40,7 @@ The release job attaches these files from `dist/`:
 - The notices.
 - `cassini-native-sources.tar` and its SHA-256 checksum file.
 
-Before that, `scripts/package-apk.py` makes sure that the APK is not debuggable, has no model weights and has the certificate digest in `scripts/beta-signing-cert.sha256`.
+Before that, `scripts/package-apk.py` makes sure that the APK is not debuggable, has no model weights and has the certificate digest in `scripts/beta-signing-cert.sha256`. It also makes sure that no `assets/licenses/*.md` file in the APK contains the text `TODO(`, because the Licenses screen shows these files.
 
 CAUTION: Do not move or delete a published tag. Do not replace a file of a published release. People, checksums and F-Droid refer to the tag. A moved tag gives two different builds the same name. If a release has a problem, publish a new version with a higher `versionCode`.
 
@@ -67,11 +69,17 @@ CI uses these repository secrets on tags:
 
 Until the owner sets the three password secrets, CI uses the values of the old debug keystore (`android`, `androiddebugkey`, `android`). This fallback is temporary. It goes when the owner changes the passwords. If `ANDROID_BETA_KEYSTORE` is not set, the tag build fails.
 
-The beta key is the key of the earlier beta installations, so an update installs over them without an uninstall and the downloaded models stay. Version 0.2 does not show the notes of 0.1.x: before they update, users must transcribe each note that has no transcript and then save each note as a Cassini document (`.opus`). 0.1.x cannot save a recording without a transcript as a document, so such a recording cannot move to 0.2 in a different way. `scripts/beta-signing-cert.sha256` holds the SHA-256 digest of its certificate. The owner can choose a new signing identity for a stable release. Then Android does not install the stable release over a beta installation, and users must uninstall the beta, which erases their notes and models. The release notes must say this. Never commit a keystore or a password.
+The beta key is the key of the earlier beta installations. Thus an update installs over them without an uninstall, and the downloaded models stay. `scripts/beta-signing-cert.sha256` holds the SHA-256 digest of its certificate.
+
+Version 0.2 does not show the notes of 0.1.x. Before they update, users must transcribe each note that has no transcript. Then they must save each note as a Cassini document (`.opus`). 0.1.x cannot save a recording without a transcript as a document, and there is no other way to move such a recording to 0.2.
+
+The owner can select a new signing identity for a stable release. Then Android does not install the stable release over a beta installation. Users must uninstall the beta, and the uninstall erases their notes and models. The release notes must tell this to the users.
+
+Never commit a keystore or a password.
 
 ## releaseTest
 
-`releaseTest` is a build type for the device tests of a release. It is the release build without R8, with the same signing, and it is not debuggable. R8 removes the members that only the tests call, so the minified `release` APK cannot be instrumented.
+`releaseTest` is a build type for the device tests of a release. It is the release build without R8, with the same signing, and it is not debuggable. R8 removes the members that only the tests call, so the instrumentation cannot operate on the minified `release` APK.
 
 On a tag, CI does these steps:
 
@@ -87,7 +95,7 @@ Cassini has no F-Droid listing at this time. The fastlane texts are in [`metadat
 
 ### Open problems
 
-- The sherpa-onnx Android build scripts download a prebuilt ONNX Runtime 1.27.1 library from `csukuangfj/onnxruntime-libs`. F-Droid builds native code from source. A recipe must first build ONNX Runtime from source and give it to the sherpa-onnx build. Nobody has done this yet.
+- The sherpa-onnx Android build scripts download a prebuilt ONNX Runtime 1.27.1 library from `csukuangfj/onnxruntime-libs`. F-Droid builds native code from source. A recipe must first build ONNX Runtime from source and give it to the sherpa-onnx build. Nobody did this yet.
 - The `zstd-jni` AAR (1.5.7-22) contains prebuilt `.so` files. F-Droid must build them from source, or its scanner refuses the build.
 - A build of the AAR from source is not byte-for-byte equal to the pinned release build ([`native-runtime.md`](native-runtime.md)). Thus the F-Droid build is not reproducible against the GitHub APK at this time.
 - F-Droid signs with its own key if the build is not reproducible. An F-Droid APK then cannot update a GitHub APK, and a GitHub APK cannot update an F-Droid APK.

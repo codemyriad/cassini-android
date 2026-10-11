@@ -316,6 +316,8 @@ The screenshots in the README come from this walk. To make them again, use these
 5. Save them as `docs/screenshots/<variant>/01-library.png` to `05-settings.png`, in the order of step 2.
 6. Save the light screenshots also as `metadata/en-US/images/phoneScreenshots/1.png` to `5.png`, in the same order.
 
+The Settings screenshot (`05-settings.png` and the store image `5.png`) shows the version number of the app in the About card. The committed screenshots show "Cassini 0.1.0", because `app/build.gradle.kts` has `versionName = "0.1.0"`. After the owner changes `versionName` for a release, make this screenshot again ([`release.md`](release.md#make-a-release)).
+
 ### note-opening-timing.sh
 
 `scripts/note-opening-timing.sh` measures the time from a tap on a Library row to the first transcript turn on the screen. It uses three documents: about one hour (the FLEURS clip 227 times, 6129 words, 25.6 MB), about ten minutes (the clip 37 times, 999 words) and the 15 s FLEURS clip (one turn). It measures the first open, later opens and the opens after process death. The notes take turns in each round, so that the warm-up of the process does not help one note more than the others.
@@ -340,7 +342,8 @@ Later opens do not increase with the length of the audio: the median of the late
 
 - It shows the first page of 400 words first. It loads the other words after the frame that draws the first turns.
 - It prepares the player after that frame, because `MediaPlayer.prepare` of a long file takes about 0.5 s.
-- `AppGraph.recentWords` keeps the full word lists of the two notes that were opened last. A later open of the same version reads no word rows.
+
+`AppGraph.recentWords` keeps the full word lists of the two notes that the user opened last. If the user opens one of these two notes again, the Note screen reads no word rows. This cache did not change the times in the table. The test opens three notes in rotation, and the cache holds only two lists. Thus each open removes from the cache the note that the next round opens first, and each timed open reads the words from Room.
 
 On 10 Oct 2026, before these steps, a later open of the one-hour document took about 0.4 s more than a later open of the 15 s document (median 987 ms against 569 ms).
 
@@ -362,7 +365,13 @@ The checks 2 to 6, 8 and 9 use a debug root (`files/debug-root.txt`, see [device
 | 8. Foreground service types | `adb shell dumpsys activity services org.cassini.android` during check 4 | Passed: `ProcessingService` has `types=00000001` (`dataSync`) and `RecordingService` has `types=00000080` (`microphone`) |
 | 9. Cold start | `adb shell am start -W -n org.cassini.android/.MainActivity` after `am force-stop`, three times | `TotalTime` 3246, 2886 and 2923 ms |
 | 10. Note opening time | `scripts/note-opening-timing.sh --serial emulator-5554` | Passed. See [Note opening time](#note-opening-time). |
-| Acceptance walk | `scripts/acceptance-walk.sh` | Passed in light, dark and Italian (P12 step 1). After the corrections, the light `realModels` part passed again. |
+| Acceptance walk | `scripts/acceptance-walk.sh` | Passed in light, dark and Italian (P12 step 1). See [Acceptance walk runs](#acceptance-walk-runs). |
+
+### Acceptance walk runs
+
+The first walk ran in light, dark and Italian (`build/acceptance/20261011-031058/`). After the corrections of the device review, the `realModels` part ran again in light (`20261011-034439`) and in dark (`20261011-034904`). The screenshots of the README and of the store come from these two runs.
+
+After the last change to the walk (commit `57cc96d`), the full walk passed again on a debug build of that commit: light (`20261011-045343`), dark (`20261011-045602`) and Italian (`20261011-045814`). Each run has the `realModels` part and the `downloadScreens` part. The `build/` directory is not in the repository.
 
 ### Process death
 
@@ -515,7 +524,7 @@ The `build` job uploads these artifacts:
 
 `PortableDocumentTest#platformOpusKeepsTheDurationAndTheSpeechClock` operates on API 34 only. A selected test that skips makes the job fail. Each emulator job uploads the instrumentation output and logcat as `emulator-api-<level>`.
 
-We did not run `scripts/ci-emulator-smoke.sh` on API 26, 29 or 35 on a local emulator. We ran it only on emulator-5554 (API 34). The first CI run shows the counts and the encoder result of the other API levels.
+We did not run `scripts/ci-emulator-smoke.sh` on API 26, 29 or 35 on a local emulator, because the resource limits of the development machine permit only one emulator. We ran it only on emulator-5554 (API 34). The first CI run shows the counts and the encoder result of the other API levels.
 
 ### models.yml
 

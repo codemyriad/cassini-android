@@ -2,8 +2,8 @@
 
 This report compares the screenshot goldens of `:ui` with the design boards in `design/reference/png`. It records
 the P8 review of the ten phone boards and the five columns of the States board. All boards and columns meet the
-advisory targets. It also records the P12 review of the device screenshots (see "Device review"). The differences that a reader can see are accepted deviations or new deviations, and this report
-gives the reason for each one.
+advisory targets. It also records the P12 review of the device screenshots (see "Device review"). Each difference
+that a reader can see is an accepted deviation or a new deviation. This report gives the reason for each one.
 
 The rules for the review are in `docs/design/ui.md` sections 10.3 and 11, and in `tools/ui-fidelity/README.md`.
 
@@ -31,9 +31,10 @@ The golden of a States column starts at the top of the line box of the heading. 
 - Band: a horizontal strip of the image, 52 dp high. "Highest band" is the band with the most pixels above 32.
 - Rows: the vertical offset of each text row of the golden against the board, from `rows.py`. A positive offset
   is lower than the board.
-- Advisory target: at most 8 % of pixels above 32 for each board, and no band above 25 %. CI does not use this
-  target. CI compares the goldens only with the committed goldens (`:ui:verifyRoborazziDebug`).
+- Advisory target: at most 8 % of pixels above 32 for each board, and no band with more than 25 %. CI does not
+  use this target. CI compares the goldens only with the committed goldens (`:ui:verifyRoborazziDebug`).
 - Accepted deviation N: item N of the list "Accepted deviations from the boards" in ui.md section 11.
+- New deviation N: item N of the list "New deviations from the boards" in this report.
 
 ## Summary
 
@@ -68,9 +69,14 @@ where a deviation in this report says otherwise.
 In P12 the reviewer compared each board with the screenshots of the acceptance walk on emulator-5554 (API 34,
 1080 x 2340 px, 420 dpi), in light, dark and Italian. The walk of `scripts/acceptance-walk.sh` made the
 screenshots on 11 Oct 2026 (`build/acceptance/20261011-031058/`, not committed). After the corrections of this
-review, the light `realModels` part ran again (`build/acceptance/20261011-034439/light/`). For each board, the reviewer read
-the design PNG, the golden and the device screenshots with the Read tool, side by side at the same dp scale. The
-"Device" part of each board section gives the verdict.
+review, the `realModels` part ran again in light (`build/acceptance/20261011-034439/light/`) and in dark
+(`build/acceptance/20261011-034904/dark/`). The README and store screenshots come from these two runs. After the
+last change to the walk (commit `57cc96d`), the full walk passed again in light, dark and Italian
+(`20261011-045343`, `20261011-045602` and `20261011-045814`). "Acceptance walk runs" in `development.md` lists the
+runs.
+
+For each board, the reviewer read the design PNG, the golden and the device screenshots with the Read tool, side
+by side at the same dp scale. The "Device" part of each board section gives the verdict.
 
 These differences apply to all boards. They are not deviations:
 
@@ -148,10 +154,10 @@ line (follow-up 2). The dark and the Italian screens are the same design. No tex
 
 ### Device
 
-Verdict: the device matches the board and the contract change of deviation 12. The progress card, the stepper, the
+Verdict: the device matches the board and the contract change of new deviation 12. The progress card, the stepper, the
 suggestion card ("Is this Paolo Ferri?") and the draft show as on the board. The draft words that can still change
 use the unsettled color. In the light screenshot, new draft text came after the screen opened. Thus the list
-scrolled to the end, and the progress card is above the top of the list. This is the behavior of deviation 12, but
+scrolled to the end, and the progress card is above the top of the list. This is the behavior of new deviation 12, but
 the user then does not see the progress (follow-up 3). The dark screenshot shows the card at the top. In Italian,
 the tag "Le parole possono ancora cambiare" goes below the header, as in the golden.
 
@@ -226,7 +232,7 @@ With the keyboard open, the sheet goes up below the status bar (follow-up 4).
 
 ### Device
 
-Verdict: the device matches the board and deviation 7. The copy, the part sizes and the buttons are the board
+Verdict: the device matches the board and accepted deviation 7. The copy, the part sizes and the buttons are the board
 copy. The dark and the Italian screens fit without cut text.
 
 ## 06 Note actions and export
@@ -300,7 +306,7 @@ transcription". In Italian, the language helper wraps to two lines. At font scal
 
 ### Device
 
-Verdict: the device matches the board and deviation 11. The walk has one note in the trash, so the screen shows
+Verdict: the device matches the board and accepted deviation 11. The walk has one note in the trash, so the screen shows
 one card and no snackbar.
 
 ## 10 States, banners and errors
@@ -337,7 +343,7 @@ The walk shows nine states on the screens where the app shows them:
 | Not verified | `10-states-not-verified.png` | Copy and action as the board |
 | Transcript can't be read | `10-states-unreadable.png` | Copy and action as the board |
 | Storage almost full | `10-states-storage-low.png` | Copy as the board, on Recording |
-| Downloading | `10-states-downloading.png` | Copy as the board and deviation 8. The card shows "Starting…" and 0 %, as the golden `variants/transcribing-downloading.png`. |
+| Downloading | `10-states-downloading.png` | Copy as the board and accepted deviation 8. The card shows "Starting…" and 0 %, as the golden `variants/transcribing-downloading.png`. |
 | Checking files | `10-states-checking.png` | Copy as the board |
 | No connection | `10-states-no-connection.png` | Copy and action as the board |
 | Not enough storage | `10-states-no-space.png` | Copy and action as the board |
@@ -448,10 +454,10 @@ board, and in KDoc or a code comment.
 
 ## Changes to the screen contracts
 
-These changes are in addition to ui.md sections 1 and 7. P10 must use them when it writes the ViewModels and the
-navigation. Each one has its reason in the KDoc. This list names the changes that P10 can miss. The full contract
-is the code: read the KDoc of each `UiState`, `Event`, `Sheet` and `Dialog` type in `:ui` before you write its
-ViewModel.
+These changes are in addition to ui.md sections 1 and 7. P10 used them when it wrote the ViewModels and the
+navigation. Each one has its reason in the KDoc. This list names the changes that a reader of ui.md can miss. The
+full contract is the code: read the KDoc of each `UiState`, `Event`, `Sheet` and `Dialog` type in `:ui` before you
+write or change its ViewModel.
 
 1. `:ui` has `activity-compose` as a main dependency, not only for previews (ui.md section 1). It supplies
    `BackHandler`. Three screens use it: Library (back clears the search), Note (back closes the in-note search) and
@@ -500,8 +506,8 @@ ViewModel.
     "Fix the transcript first: Transcribe again" or "Saving — you can rename when it's done". Thus
     `TurnUi.renamable` must stay true while a rename is only blocked (features.md sections 3.1 and 3.3). When it
     is false, the header is a plain label and the user gets no message.
-19. Each screen limits its content to 560 dp and centres it on a wide window; the screen's background fills the
-    window (architecture.md section 6). `:app` must not add a second limit.
+19. Each screen limits its content to 560 dp and centres it on a wide window. The background of the screen fills
+    the window (architecture.md section 6). `:app` must not add a second limit.
 
 ## Items for the owner to review
 
@@ -524,7 +530,7 @@ The device review found these items. P12 did not correct them:
 2. A duration can wrap between the number and its unit: "in about 1 h 55" and "min." on the next line (board 01,
    English). No-break spaces in the `ui_duration_*` strings prevent this. This change can move other lines that
    contain a duration, so the owner must decide.
-3. On Transcribing, the list scrolls to the end when new draft text comes (deviation 12). When the draft is longer
+3. On Transcribing, the list scrolls to the end when new draft text comes (new deviation 12). When the draft is longer
    than the screen, the progress card goes above the top of the list. The owner must decide if the card stays in
    view.
 4. On Name a speaker, the open keyboard pushes the sheet up below the status bar. The top of the sheet must stay

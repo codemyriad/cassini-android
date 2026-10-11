@@ -4,7 +4,7 @@ Cassini uses two native libraries: a sherpa-onnx AAR that Cassini builds itself,
 
 ## The sherpa-onnx AAR
 
-The AAR is sherpa-onnx release 1.13.7 with Sortformer speaker diarization for [Nemotron-3-Diarization](https://huggingface.co/nvidia/Nemotron-3-Diarization). The source is the branch [`feat/nemotron3-diarization-android`](https://github.com/codemyriad/sherpa-onnx/tree/feat/nemotron3-diarization-android) of the Cassini fork. It has two commits on the tag `v1.13.7`, taken from the contribution for upstream issue k2-fsa/sherpa-onnx#4006. These commits add the C++ runtime and the Kotlin/JNI configuration. They do not change the speech recognition code. `scripts/streaming-diarization.patch` adds the streaming API (see [The patch API](#the-patch-api)).
+The AAR is sherpa-onnx release 1.13.7 with Sortformer speaker diarization for [Nemotron-3-Diarization](https://huggingface.co/nvidia/Nemotron-3-Diarization). The source is the branch [`feat/nemotron3-diarization-android`](https://github.com/codemyriad/sherpa-onnx/tree/feat/nemotron3-diarization-android) of the Cassini fork. It has two commits on the tag `v1.13.7`. These commits come from the contribution for upstream issue k2-fsa/sherpa-onnx#4006. These commits add the C++ runtime and the Kotlin/JNI configuration. They do not change the speech recognition code. `scripts/streaming-diarization.patch` adds the streaming API (see [The patch API](#the-patch-api)).
 
 The AAR contains the sherpa-onnx JNI library and the ONNX Runtime 1.27.1 Android library, for arm64-v8a and x86_64. It also contains text-to-speech parts that Cassini does not call.
 
@@ -61,7 +61,7 @@ The upstream build scripts download a prebuilt ONNX Runtime Android library. Its
 - `scripts/streaming-diarization.patch` has the SHA-256 of `patchSha256`.
 - The `sherpaOnnx` version in `gradle/libs.versions.toml` is the version of the entry.
 
-A weekly CI job builds the AAR from source, builds and tests the app with it, and compares its SHA-256 with the pin. A difference gives a warning, not a failure.
+The CI workflow `native.yml` builds the AAR from source. It operates each week, when you start it by hand, and after a change to the native inputs ([`development.md`](development.md#nativeyml)). It builds and tests the app with that AAR, and it compares the SHA-256 of the AAR with the pin. A difference gives a warning, not a failure.
 
 To change the patch, do these steps:
 
@@ -107,9 +107,9 @@ The checkpoint does not keep the libopus encoder state, because that state holds
 - The pending Ogg packet.
 - The serial number, the sequence number and the granule clock.
 
-At a restore, the app cuts the file tail that the checkpoint did not commit. The new encoder encodes the two saved frames again and drops their packets. Thus its lookahead holds the same audio, and the stream continues on the same clock.
+At a restore, the app cuts the file tail that the checkpoint did not commit. The new encoder encodes the two saved frames again and does not keep their packets. Thus its lookahead holds the same audio, and the stream continues on the same clock.
 
-The longer-term encoder state does not come back. Thus the packets after a resume point are not always equal to the packets of an encode without a stop. On the x86_64 API 34 emulator they are different from the first packet after the checkpoint. For this reason `DeviceSmokeTest#opusCheckpointContinuesIdenticalPacketsAfterClosingTheEncoder` is ignored. `DeviceSmokeTest#opusCheckpointContinuesTheSameStreamAfterClosingTheEncoder` tests what a resume gives:
+The longer-term encoder state does not come back. Thus the packets after a resume point are not always equal to the packets of an encode without a stop. On the x86_64 API 34 emulator they are different from the first packet after the checkpoint. For this reason, `DeviceSmokeTest#opusCheckpointContinuesIdenticalPacketsAfterClosingTheEncoder` has `@Ignore`. `DeviceSmokeTest#opusCheckpointContinuesTheSameStreamAfterClosingTheEncoder` tests what a resume gives:
 
 - Valid framing.
 - Equal packets up to the checkpoint.
