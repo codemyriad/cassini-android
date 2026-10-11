@@ -486,7 +486,9 @@ board, and in KDoc or a code comment.
 23. A recording has no time limit (2026-10-11, architecture.md section 3.7). We removed REC_NEAR_LIMIT and the "Stops
     at 2 hours" hint. REC_STOPPED_FILE_LIMIT is new (not on the board): it has the tone, the layout and the action of
     REC_STOPPED_STORAGE. The goldens `variants/recording-stopped-file-limit.png` and `components/banners-it-1.png`
-    show it. TX_PAUSED and TX_PAUSED_EARLY have a second body for a pause by Android (`BannerArgs.bySystem`). The
+    show it. REC_STORAGE_LOW has a second title and body for the AAC file limit (`BannerArgs.fileLimit`), and
+    PLAIN_AUDIO can show the reason why a note has no transcript (`BannerArgs.text`). TX_PAUSED and TX_PAUSED_EARLY
+    have a second body for a pause by Android (`BannerArgs.bySystem`). The
     States board column 5 shows "Choose a file under 4 GB." (accepted deviation 15 of ui.md section 11).
 
 ## Changes to the screen contracts

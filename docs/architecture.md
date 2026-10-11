@@ -396,12 +396,12 @@ A recording has no time limit. It continues until the user stops it, or until th
 | Storage floor of a recording | `Limits.MIN_RECORDING_FREE_BYTES` | 200 MiB | Policy | Kept. At the floor, the controller stops the capture, saves the file and shows REC_STOPPED_STORAGE. The space is for the end of the file, the database and the rest of the phone. |
 | Wake lock of a recording | `RecordingController.WAKE_LOCK_TIMEOUT_MS` | 2 h 10 min | Policy | Changed to a 10 min timeout. The policy loop renews the lock each minute. Thus the lock lasts as long as the recording, and a dead process cannot keep it. |
 | Opus capture file (API 29+) | `OggOpus.LiveMuxer`, `OpusCapture` | 2^63 samples, 2^32 pages | Real, not reachable | No change. The granule and the sample counts are `Long`. One page holds one 20 ms packet, so the 32-bit page sequence lasts 994 days. |
-| AAC capture file (API 26-28, and phones without an Opus encoder) | MediaRecorder MP4 (AOSP `MPEG4Writer`) | 4 GiB (290 h at 32 kb/s) | Real (calculation) | The MP4 file has 32-bit chunk offsets. MediaRecorder also keeps the index of the file in memory until the stop: 4 bytes for each 21.3 ms frame. The policy loop stops the capture at `RecordingPolicy.AAC_MAX_FILE_BYTES` (1 GiB, about 74 h) and saves it (REC_STOPPED_FILE_LIMIT). The space hint counts the room left in the file. We did not measure this limit on a device. |
+| AAC capture file (API 26-28, and phones without an Opus encoder) | MediaRecorder MP4 (AOSP `MPEG4Writer`) | 4 GiB (about 298 h at 32 kb/s) | Real (calculation) | The MP4 file has 32-bit chunk offsets. MediaRecorder also keeps the index of the file in memory until the stop: 4 bytes for each 21.3 ms frame. We selected a lower limit, `RecordingPolicy.AAC_MAX_FILE_BYTES` (1 GiB, about 74 h). 15 min before it, the storage banner shows the file copy ("Recording file almost full"). At the limit, the policy loop stops the capture and saves it (REC_STOPPED_FILE_LIMIT). The copy says that Cassini ends M4A recordings at 1 GB. The space hint counts the room left in the file. We did not measure this limit on a device. |
 | Import size | `Limits.MAX_IMPORT_BYTES` | 2 GiB | Policy | Changed to 4 GiB. The copy, the hash and the WAV reader use `Long` sizes. A WAV file cannot be larger than 4 GiB (32-bit sizes). At a speech bitrate, 4 GiB of compressed audio is more than 36 h. |
 | Free space for an import, a cache copy and the job | `Limits.MIN_FREE_BYTES` | 64 MiB | Policy | Kept. |
-| Duration of one transcription | `Limits.MAX_TRANSCRIBE_MS` (was `MAX_RECORDING_MS`) | 2 h | Real at 37.28 h | Changed to 36 h. The 16 kHz sample positions are `Int` in the verbatim engine (`Limits.MAX_SAMPLES`, `IncrementalTranscript`, `PcmFile`, `StreamingOpusEncoder`): 2^31 samples are 37.28 h. The job refuses longer audio before the download and the model load (`Failure.LONG`). |
+| Duration of one transcription | `Limits.MAX_TRANSCRIBE_MS` (was `MAX_RECORDING_MS`) | 2 h | Real at 37.28 h | Changed to 36 h. Two 16 kHz sample counts of the verbatim engine are 32-bit: the constant `Limits.MAX_SAMPLES`, and the sample count of `PcmFile`. 2^31 samples are 37.28 h. Other code (`IncrementalTranscript`, `StreamingOpusEncoder`, `AudioDecoder`) uses `Long` positions and compares them with `MAX_SAMPLES`. The job refuses longer audio before the download and the model load (`Failure.LONG`). A recording that is longer does not go into the queue, and its Note screen tells why. |
 | Frame positions of the decoder | `AudioDecoder`, `WavDecoder.framePosition` | 2^31 frames at the source rate | Real | Changed to `Long` (a permitted verbatim edit). Before, an `Int` overflowed after 12.4 h of 48 kHz audio and after 6.2 h of 96 kHz audio. |
-| Word body of one transcript | `CassiniPayload.MAX_RAW` (verbatim format code) | 16 MiB of JSON | Real | Kept. The body is pretty-printed JSON of about 151 bytes for each word (measured, with the speaker IDs of the job). 16 MiB holds about 111,000 words: 11.6 h at 9,500 words an hour. The job counts the body after each window (`WordBodyBudget`). When the words do not fit, it stops with `Failure.LONG` at that window, not at the seal. |
+| Word body of one transcript | `CassiniPayload.MAX_RAW` (verbatim format code) | 16 MiB of JSON | Real | Kept. The body is pretty-printed JSON of about 151 bytes for each word (measured, with the speaker IDs of the job). 16 MiB holds about 111,000 words: 11.6 h at 9,500 words an hour. The job counts the body after each window (`WordBodyBudget`). When the words do not fit, it stops with `Failure.LONG` at that window, not at the seal. `Failure.LONG` is a final failure: the banner has no Try again and no Start over, because each new try fails at the same point. When the user dismisses it, the app removes the job and its work directory. The message tells the user that the audio stays and that Save a copy exports it. |
 | Header of the document | `OggOpus.MAX_HEADER_BYTES`, the chunk count, the comment count | 8 MiB, 4,096 chunks of each body, 20,000 comments | Real | Kept. A body at its limit is about 1.1 MiB after gzip and 384 chunks (measured). Thus about five long versions fit in one document. |
 | `checkpoint.json` | `CheckpointState` version 1 | Grew with the recording | Real (time and wear) | Changed to version 2 with `work/words.log` (section 3.5). The measurements follow this table. |
 | Sortformer state | `SpeakerBudget.DIARIZER_STATE_FLOATS` | 200,000 floats | Real, fixed size | No change. The saved state has a fixed size: 7 + 188 x 512 + 188 x 4 + 188 x 512 = 193,271 floats for the pinned model. It does not grow with the recording. |
@@ -412,20 +412,22 @@ A recording has no time limit. It continues until the user stops it, or until th
 | Background budget of Android 15+ | `mediaProcessing` foreground service type | About 6 h in each 24 h | Real (platform) | No change in the mechanism (section 5.7). The job pauses with its checkpoint (PAUSED, `SYSTEM`). The banner and the notification now tell the user about the daily limit of Android. Resume continues from the checkpoint. |
 | Free space for the seal | `TranscriptionJob.requireSpace` | Audio length + 64 MiB | Real | No change. The sealed document is a copy of the audio (21.6 MB for each hour of Opus at 48 kb/s). A recording that stopped at the storage floor can only be transcribed after the user frees space (`Failure.SPACE`). |
 
-Measurements of `checkpoint.json` (`LongRunMeasurementTest`, JVM on the development computer, 2026-10-11). The synthetic run has these properties:
+Measurements of the checkpoint of each window (`LongRunMeasurementTest.checkpointPathOfATenHourRun`, JVM on the development computer, 2026-10-11). The time is the whole path of the job: the state of the recognizer and of the diarizer, the word log, and the encoding of `checkpoint.json`. The synthetic run has these properties:
 
 - 10 h of speech at 9,500 words an hour
 - A checkpoint after each 26 s window (1,384 windows)
 - The Sortformer state of the pinned model
 - One speaker turn for each 23 words
 
+| Variant | `checkpoint.json` at 9 h | Bytes written in 10 h | Time of the path in 10 h | Time of the path in hour 10 |
+|---|---|---|---|---|
+| Version 1: every word inline, the recognizer state as JSON | 10.6 MB | 8,469 MB | 2,215 s | 344 s |
+| Version 2 with `words.log`, the recognizer state as JSON | 1.29 MB | 1,655 MB | 1,310 s | 247 s |
+| Version 2 with `words.log`, the typed recognizer state (the job now) | 1.29 MB | 1,655 MB | 82 s | 8.5 s |
 
-| Version | `checkpoint.json` at 9 h | Bytes written in 10 h | Encoding time in 10 h |
-|---|---|---|---|
-| 1 (every word inline) | 10.6 MB | 8,469 MB | 541 s |
-| 2 (`words.log`) | 1.29 MB | 1,655 MB | 32 s |
+In the first two variants, the recognizer gave its state as JSON: each window wrote all words as a pretty-printed word body, and the job parsed it again. Thus the time of each window increased with the words, and the memory peak was several copies of the transcript. `IncrementalRecognizer` now gives a typed `RecognitionState` (a permitted verbatim edit), and the job makes JSON only for the open words. The time of each window is now the same for each hour.
 
-With version 2, the bytes that each window writes do not grow with the words. Most of the remaining 1.2 MB of each checkpoint is the Sortformer state and the 2 s of audio of the open window. This part is the same for each window, so the total increases linearly with the recording (about 160 MB for each hour). The diarizer turns stay inline, at about 22 bytes for each turn. A phone is slower than the development computer, so version 1 cost more time there.
+With version 2, the bytes that each window writes do not grow with the words. Most of the remaining 1.2 MB of each checkpoint is the Sortformer state and the 2 s of audio of the open window. This part is the same for each window, so the total increases linearly with the recording (about 160 MB for each hour). The diarizer turns stay inline, at about 22 bytes for each turn. A phone is slower than the development computer.
 
 Measurements of the word body (`LongRunMeasurementTest`, the same synthetic words):
 
@@ -850,7 +852,8 @@ The controller writes a title edit to the row 500 ms after the last keystroke. `
 
 A recording has no time limit. `RecordingPolicy.decide(usableBytes, bytesPerSecond, fileBytes, maxFileBytes)` is a pure function in `:core`. The nominal rates are 6000 B/s for Opus 48 kb/s and 4000 B/s for AAC 32 kb/s. After 10 s, the controller uses the measured growth of the file. `RecordingSpace` gives the remaining time until the storage floor, or until the size limit of an AAC file when that comes first. The hint shows it, with no upper limit ("Space for about 31 h more."). The policy gives these results:
 
-- 15 min of space or less: StorageLow. This warning counts only the free space.
+- 15 min of space or less: StorageLow.
+- 15 min or less of room in an AAC file: FileLimitNear. It shows as REC_STORAGE_LOW with the copy of the file limit. When the space and the file are both low, the one that ends first warns.
 - Less than the floor of 200 MiB: stop and save (`StoppedForSpace`).
 - An AAC file at `RecordingPolicy.AAC_MAX_FILE_BYTES` (1 GiB): stop and save (`StoppedAtFileLimit`, section 3.7).
 
@@ -866,6 +869,7 @@ After Finish, these rules apply:
 - Without consent and without `models.declinedAt`, the Note screen opens with the Model download screen on top.
 - Else the note is "Audio only".
 - After a stop for storage, a stop at the AAC file limit or a microphone failure, the note never goes into the queue automatically.
+- A recording longer than `Limits.MAX_TRANSCRIBE_MS` (36 h) never goes into the queue. It is "Audio only", and the plain banner gives the text of `Failure.LONG` and no Transcribe.
 
 `RecordingService` is `START_NOT_STICKY`. After a crash, `RecoveryRepository` repairs the recording at the next start.
 
