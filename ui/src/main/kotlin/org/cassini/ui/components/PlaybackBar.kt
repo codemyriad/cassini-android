@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -19,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,6 +28,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -34,6 +37,7 @@ import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import org.cassini.ui.R
 import org.cassini.ui.format.Durations
@@ -48,7 +52,8 @@ private val TimesLift = 4.dp
  * The Read & listen player (board 03): surface with a 1 dp line top border; padding 16 horizontal and 22 at the
  * bottom (the 48 dp slider absorbs the board's top 10). The [CassiniSlider]; the times row (`monoSmall` text2:
  * [positionMs] and [durationMs]); then the controls centred 28 dp apart: back 10 s, play/pause ([playing]) and
- * forward 10 s. The bar is one accessibility traversal group.
+ * forward 10 s. The bar is one accessibility traversal group. The surface reaches the bottom of the window: the
+ * navigation-bar inset is padding inside the surface (zero in the screenshot tests).
  */
 @Composable
 @Suppress("LongParameterList") // ui.md section 6: the position, the play state and four callbacks.
@@ -74,6 +79,7 @@ fun PlaybackBar(
                 isTraversalGroup = true
                 contentDescription = group
             }
+            .navigationBarsPadding()
             .padding(start = 16.dp, end = 16.dp, top = 1.dp, bottom = 22.dp),
     ) {
         CassiniSlider(positionMs, durationMs, onSeek, onSeekFinished = onSeekFinished)
@@ -122,11 +128,15 @@ fun SkipButton(forward: Boolean, onClick: () -> Unit, modifier: Modifier = Modif
         contentAlignment = Alignment.Center,
     ) {
         CassiniIcon(if (forward) Glyph.Fwd10 else Glyph.Back10, 28.dp, 1.6f, c.ink, null)
-        Text(
-            text = stringResource(R.string.ui_skip_seconds),
-            style = CassiniTheme.type.skip,
-            color = c.ink,
-        )
+        // The "10" is part of the 28 dp icon, so it does not follow the font scale (at 2.0 it covered the arrow).
+        val density = LocalDensity.current
+        CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 1f)) {
+            Text(
+                text = stringResource(R.string.ui_skip_seconds),
+                style = CassiniTheme.type.skip,
+                color = c.ink,
+            )
+        }
     }
 }
 

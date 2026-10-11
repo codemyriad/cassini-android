@@ -95,7 +95,6 @@ fun NoteScreen(
                 onSkipBack = { onEvent(NoteEvent.Skip(forward = false)) },
                 onSkipForward = { onEvent(NoteEvent.Skip(forward = true)) },
                 onPlayPause = { onEvent(NoteEvent.PlayPause) },
-                modifier = Modifier.navigationBarsPadding(),
                 onSeekFinished = { onEvent(NoteEvent.SeekFinished) },
             )
         }
