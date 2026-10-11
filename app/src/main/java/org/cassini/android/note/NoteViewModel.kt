@@ -620,7 +620,8 @@ class NoteViewModel(
                     file != opened -> {
                         ports.openPlayer(noteId, file, key.positionMs)
                         opened = file
-                        // Cleared while the file prepared: onCleared found no player to leave, so leave it here.
+                        // Cleared while the file prepared: leave here too. The leave of onCleared is asynchronous,
+                        // and a leave of a screen that no longer owns the player does nothing.
                         if (!viewModelScope.isActive) {
                             ports.leavePlayer(noteId)
                             opened = null

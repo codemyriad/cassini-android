@@ -127,7 +127,10 @@ interface NotePorts {
 
     fun playRange(id: String, startMs: Long, endMs: Long): Boolean
 
-    /** Leaves the player when it still plays note [id]: pause, save the final position and the preview, release. */
+    /**
+     * Leaves the player of note [id] when this screen still owns it (its last [openPlayer]): pause, save the final
+     * position and the preview, release. An open of this screen that still prepares then ends without a player.
+     */
     fun leavePlayer(id: String)
 
     // The queue.
@@ -259,13 +262,16 @@ class GraphNotePorts(private val graph: AppGraph, context: Context) : NotePorts 
 
     override val playback: StateFlow<PlaybackState> get() = graph.playback.state
 
+    // Each Note screen has its own ports object, so this object is the owner of the player it opens: a late leave
+    // of a screen that is gone does not close the player of a newer screen of the same note.
     override suspend fun openPlayer(id: String, audioFile: String, positionMs: Long): Boolean =
         withContext(graph.dispatchers.main) {
-            graph.playback.open(id, File(graph.paths.note(id), audioFile), positionMs)
+            graph.playback.open(id, File(graph.paths.note(id), audioFile), positionMs, owner = this@GraphNotePorts)
         }
 
     override suspend fun reloadPlayer(id: String, audioFile: String): Boolean = withContext(graph.dispatchers.main) {
-        graph.playback.state.value.noteId == id && graph.playback.reload(File(graph.paths.note(id), audioFile))
+        graph.playback.state.value.noteId == id &&
+            graph.playback.reload(File(graph.paths.note(id), audioFile), owner = this@GraphNotePorts)
     }
 
     override fun togglePlay() = graph.playback.toggle()
@@ -280,9 +286,7 @@ class GraphNotePorts(private val graph: AppGraph, context: Context) : NotePorts 
         graph.playback.playRange(id, startMs, endMs)
 
     override fun leavePlayer(id: String) {
-        graph.appScope.launch(graph.dispatchers.main) {
-            if (graph.playback.state.value.noteId == id) graph.playback.leave()
-        }
+        graph.appScope.launch(graph.dispatchers.main) { graph.playback.leave(owner = this@GraphNotePorts) }
     }
 
     // The queue. ---------------------------------------------------------------------------------------------------
