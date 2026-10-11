@@ -730,6 +730,7 @@ The service type follows `coordinator.foregroundNeed`:
 3. It calls `coordinator.systemStop(noteId)` as best effort. The job saves a checkpoint at its next block.
 4. It sets `queue.hold = SYSTEM`.
 5. It writes the row as PAUSED(SYSTEM), so that each screen shows Paused immediately.
+6. If a standalone download runs, it stops, because no foreground service keeps it. `ModelInstallOwner.stopDownloads` cancels each standalone wait. The installation stops when no job waits for it. The `.part` files stay for a Range resume. Each part that is not installed shows `Failed(DOWNLOAD, INTERRUPTED)` until the next installation, and `lastOutcome` is INTERRUPTED. Thus the Library shows DL_STOPPED with Retry, and Settings shows "Download failed". In Settings, a "Download failed" row opens Model download, and Download there starts the download again.
 
 The app never shows a timeout as an error. After a timeout, Resume operates only from a visible screen.
 

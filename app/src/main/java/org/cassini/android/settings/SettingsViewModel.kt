@@ -106,10 +106,15 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
         ports.setLanguage(next)
     }
 
-    /** Only a "Not downloaded" row leads somewhere: the Model download consent, with no note. */
+    /**
+     * A "Not downloaded" row opens Model download (the consent), with no note. A failed row opens it too: there,
+     * Download starts the download again, for example after Android stopped it.
+     */
     private fun openModel(event: SettingsEvent.OpenModel) {
-        val row = state.value.models.firstOrNull { it.part == event.part }
-        if (row?.status == ModelStatusUi.NotDownloaded) emit(SettingsEffect.Open(ModelDownloadKey()))
+        val status = state.value.models.firstOrNull { it.part == event.part }?.status
+        if (status == ModelStatusUi.NotDownloaded || status == ModelStatusUi.Failed) {
+            emit(SettingsEffect.Open(ModelDownloadKey()))
+        }
     }
 
     private fun initial() = SettingsUiState(

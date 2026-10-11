@@ -11,6 +11,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -27,6 +28,7 @@ import org.cassini.engine.job.InstallOutcome
 import org.cassini.engine.job.ModelInstaller
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CopyOnWriteArraySet
 
 /** What [ModelInstallOwner] does now. */
 sealed interface InstallState {
@@ -59,6 +61,7 @@ sealed interface InstallState {
  *
  * The standalone download is no `jobs` row: its only state is [state] and the `.part` files (architecture 3.3).
  */
+@Suppress("TooManyFunctions") // the install API of architecture 5.6, plus the stop by Android of 5.7
 class ModelInstallOwner(
     private val models: ModelRepository,
     private val modelRoot: File,
@@ -75,6 +78,9 @@ class ModelInstallOwner(
         var standalone = 0
 
         @Volatile var progress: DownloadProgress? = null
+
+        /** Set by [stopDownloads]: when this install ends cancelled, it shows as "Download stopped". */
+        @Volatile var stopped = false
     }
 
     /** Guards [current] and the waiter counts. Every holder is a coroutine (architecture section 7). */
@@ -82,12 +88,18 @@ class ModelInstallOwner(
 
     @Volatile private var current: Shared? = null
 
+    /** The standalone downloads ([startDownload]) that have not ended. */
+    private val downloads = CopyOnWriteArraySet<Job>()
+
     private val mutableState = MutableStateFlow<InstallState>(InstallState.Idle)
     private val mutableOutcome = MutableStateFlow<InstallOutcome?>(null)
 
     val state: StateFlow<InstallState> = mutableState.asStateFlow()
 
-    /** How the last install that ran to its end ended; null before the first one. */
+    /**
+     * How the last install ended: its outcome, or INTERRUPTED when Android stopped it ([stopDownloads]). Null before
+     * the first one and after an install that was cancelled in another way.
+     */
     val lastOutcome: StateFlow<InstallOutcome?> = mutableOutcome.asStateFlow()
 
     /**
@@ -101,12 +113,34 @@ class ModelInstallOwner(
      * The download from Settings or a banner, with no note (architecture 5.6): installs [parts] in the background
      * and shows its progress through [state] and `ModelRepository.status`. [cancel] stops it.
      */
-    fun startDownload(parts: Set<ModelPart> = ModelPart.entries.toSet()): Job = scope.launch {
-        try {
-            install(parts, {}, standalone = true)
-        } catch (_: CancellationException) {
-            // A cancelled download keeps its .part files; there is nothing more to do.
+    fun startDownload(parts: Set<ModelPart> = ModelPart.entries.toSet()): Job {
+        val job = scope.launch(start = CoroutineStart.LAZY) {
+            try {
+                install(parts, {}, standalone = true)
+            } catch (_: CancellationException) {
+                // A cancelled download keeps its .part files; there is nothing more to do.
+            }
         }
+        downloads += job
+        job.invokeOnCompletion { downloads -= job }
+        job.start()
+        return job
+    }
+
+    /**
+     * Android stopped the foreground service during a standalone download (`onTimeout`, architecture 5.7): every
+     * standalone wait ends, and the install ends when no job waits on it either. The `.part` files stay for a Range
+     * resume. When the install ends cancelled, each of its parts that is not installed shows "Download stopped"
+     * (INTERRUPTED) until the next install, and [lastOutcome] tells it, so that the user can start it again. False
+     * when no standalone download ran.
+     */
+    suspend fun stopDownloads(): Boolean {
+        val waiting = downloads.toList()
+        if (waiting.isEmpty()) return false
+        mutex.withLock { current?.stopped = true }
+        waiting.forEach { it.cancel(CancellationException("Android stopped the download")) }
+        waiting.joinAll()
+        return true
     }
 
     /** Cancels the install that runs now, if any. Its `.part` files stay. */
@@ -189,7 +223,18 @@ class ModelInstallOwner(
             mutableOutcome.value = outcome
             return outcome
         } catch (cancelled: CancellationException) {
-            shared.parts.forEach(models::clearProgress)
+            if (shared.stopped) {
+                // Android stopped it (stopDownloads): "Download stopped" until the next install. The refresh below
+                // shows the parts that were installed as Ready again.
+                val error = DownloadError.INTERRUPTED
+                shared.parts.forEach { models.publishProgress(it, ModelStatus.Failed(failureOf(error), error.name)) }
+                val part = shared.progress?.part ?: shared.parts.min()
+                mutableOutcome.value = InstallOutcome.Failed(part, error, requiredFreeBytes = 0)
+            } else {
+                shared.parts.forEach(models::clearProgress)
+                // A Cancel of the user is no failure: an older failure must not show again.
+                mutableOutcome.value = null
+            }
             throw cancelled
         } finally {
             withContext(NonCancellable) {

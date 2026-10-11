@@ -95,14 +95,19 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun onlyANotDownloadedRowOpensModelDownload() = runTest(dispatcher) {
-        ports.models.value =
-            mapOf(ModelPart.SPEECH to Missing(consented = false), ModelPart.VOICES to ModelStatus.Ready)
+    fun onlyANotDownloadedOrAFailedRowOpensModelDownload() = runTest(dispatcher) {
+        ports.models.value = mapOf(
+            ModelPart.SPEECH to Missing(consented = false),
+            ModelPart.SPEAKERS to ModelStatus.Failed(Failure.DOWNLOAD, "INTERRUPTED"),
+            ModelPart.VOICES to ModelStatus.Ready,
+        )
         val viewModel = viewModel()
         viewModel.onEvent(SettingsEvent.OpenModel(ModelPartUi.VOICES))
         viewModel.onEvent(SettingsEvent.OpenModel(ModelPartUi.SPEECH))
+        // A download that Android stopped (or that failed) starts again from Model download.
+        viewModel.onEvent(SettingsEvent.OpenModel(ModelPartUi.SPEAKERS))
         advanceUntilIdle()
-        assertEquals(listOf<SettingsEffect>(SettingsEffect.Open(ModelDownloadKey())), effects)
+        assertEquals(List<SettingsEffect>(2) { SettingsEffect.Open(ModelDownloadKey()) }, effects)
     }
 
     @Test

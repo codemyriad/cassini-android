@@ -11,6 +11,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.cassini.android.AppGraph
 import org.cassini.android.Catalogue
+import org.cassini.android.settings.SettingsViewModel
+import org.cassini.core.Failure
 import org.cassini.core.asr.IncrementalState
 import org.cassini.core.checkpoint.CheckpointState
 import org.cassini.core.checkpoint.RecognitionState
@@ -19,16 +21,20 @@ import org.cassini.core.library.JobKind
 import org.cassini.core.library.JobState
 import org.cassini.core.library.PauseReason
 import org.cassini.core.models.ModelCatalog
+import org.cassini.core.models.ModelPart
 import org.cassini.core.speakers.Match
 import org.cassini.data.AppPaths
 import org.cassini.data.CassiniDispatchers
 import org.cassini.data.db.JobEntity
 import org.cassini.data.models.ModelFetcher
+import org.cassini.data.models.ModelStatus
 import org.cassini.data.settings.QueueHold
 import org.cassini.engine.job.BatterySource
+import org.cassini.engine.job.DownloadError
 import org.cassini.engine.job.JobEvent
 import org.cassini.engine.job.JobOutcome
 import org.cassini.engine.job.JobPhase
+import org.cassini.ui.settings.ModelStatusUi
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -42,7 +48,11 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.io.File
+import java.io.RandomAccessFile
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -73,6 +83,7 @@ class ProcessingCoordinatorTest {
         realJobs: Boolean = false,
         battery: BatterySource? = null,
         awaitReady: Boolean = true,
+        fetcher: ModelFetcher = ModelFetcher { _, _, _ -> fail("No model is fetched in this test") },
     ): AppGraph {
         paths = root
         val hooks = AppGraph.ProcessingHooks(
@@ -91,7 +102,7 @@ class ProcessingCoordinatorTest {
         val config = AppGraph.Config(
             paths = root,
             dispatchers = CassiniDispatchers(Dispatchers.IO, Dispatchers.Default, Dispatchers.Unconfined),
-            fetcher = ModelFetcher { _, _, _ -> fail("No model is fetched in this test") },
+            fetcher = fetcher,
             network = { true },
             processing = hooks,
         )
@@ -540,6 +551,60 @@ class ProcessingCoordinatorTest {
         assertEquals(a, job(1).noteId)
     }
 
+    @Test fun aSystemStopEndsAStandaloneDownloadAndOffersItAgain() = runBlocking {
+        // The first fetch of Parakeet writes a .part file and blocks until the install is cancelled; later fetches
+        // write sparse files of the pinned sizes.
+        val started = CountDownLatch(1)
+        val interrupted = AtomicBoolean(false)
+        val fetches = AtomicInteger()
+        val fetcher = ModelFetcher { model, directory, progress ->
+            if (model == ModelCatalog.PARAKEET && fetches.getAndIncrement() == 0) {
+                File(directory, PART_FILE).writeBytes(ByteArray(PART_BYTES))
+                progress(PART_BYTES.toLong(), false)
+                started.countDown()
+                try {
+                    Thread.sleep(TIMEOUT_MS)
+                } catch (error: InterruptedException) {
+                    interrupted.set(true)
+                    throw error
+                }
+                fail("The stopped download went on")
+            }
+            model.artifacts.forEach { artifact ->
+                RandomAccessFile(File(directory, artifact.name), "rw").use { it.setLength(artifact.size) }
+            }
+            progress(model.downloadBytes, false)
+        }
+        graph(fetcher = fetcher)
+        // The banners follow the downloads from their first use, as the Library makes it at the start.
+        val notices = graph.notices
+        consent()
+        val download = coordinator.downloadModels()
+        assertTrue(withContext(Dispatchers.IO) { started.await(TIMEOUT_MS, TimeUnit.MILLISECONDS) })
+        withTimeout(TIMEOUT_MS) { coordinator.state.first { it.downloading } }
+
+        // onTimeout with no running job: the service has stopped, so the download must stop too.
+        coordinator.systemStop(null)
+        withTimeout(TIMEOUT_MS) { download.join() }
+        withTimeout(TIMEOUT_MS) { graph.installOwner.state.first { it == InstallState.Idle } }
+        withTimeout(TIMEOUT_MS) { coordinator.awaitIdle() }
+        assertTrue("the fetch was interrupted", interrupted.get())
+        assertFalse(withTimeout(TIMEOUT_MS) { coordinator.state.first { !it.downloading } }.downloading)
+        val part = File(ModelCatalog.PARAKEET.directory(paths.modelRoot), PART_FILE)
+        assertTrue("the .part file stays for a Range resume", part.isFile)
+        val stopped = ModelStatus.Failed(Failure.DOWNLOAD, DownloadError.INTERRUPTED.name)
+        assertEquals("Settings shows the stop", stopped, graph.models.status.value[ModelPart.SPEECH])
+        assertEquals(ModelStatusUi.Failed, SettingsViewModel.status(stopped))
+        val failure = withTimeout(TIMEOUT_MS) { notices.facts.first { it.downloadFailure != null } }
+        assertEquals("the Library offers Retry", DownloadError.INTERRUPTED, failure.downloadFailure?.error)
+        assertEquals(1, fetches.get())
+
+        // Retry starts it again; it finishes and every part is ready.
+        coordinator.downloadModels().join()
+        withTimeout(TIMEOUT_MS) { coordinator.awaitIdle() }
+        assertEquals(ModelPart.entries.associateWith { ModelStatus.Ready }, graph.models.status.value)
+    }
+
     // Outcomes and notifications. ----------------------------------------------------------------------------------
 
     @Test fun outcomesAreWrittenAndToldOnlyWhileTheAppIsHidden() = runBlocking {
@@ -674,6 +739,8 @@ class ProcessingCoordinatorTest {
         const val SETTLE_MS = 300L
         const val DURATION_MS = 4_000L
         const val RACE_ROUNDS = 200
+        const val PART_FILE = "encoder.int8.onnx.part"
+        const val PART_BYTES = 4_096
 
         val PROGRESS = org.cassini.engine.job.RunningProgress(
             headline = org.cassini.engine.job.ProgressHeadline.FINDING_WORDS_AND_SPEAKERS,

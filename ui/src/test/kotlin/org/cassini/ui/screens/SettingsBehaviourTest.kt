@@ -113,8 +113,9 @@ class SettingsBehaviourTest {
         rule.onNodeWithText("Phone").assertIsSelected()
         rule.onNodeWithText("Italiano").performClick()
         rule.onNodeWithText("Turn on").performClick()
-        // A Not downloaded row opens Model download; the other model rows are not buttons.
+        // A Not downloaded row and a Failed row open Model download; the other model rows are not buttons.
         rule.onNode(hasText("Recognising saved voices", substring = true) and hasClickAction()).performClick()
+        rule.onNode(hasText("Telling speakers apart", substring = true) and hasClickAction()).performClick()
         rule.onNode(hasText("Speech recognition", substring = true)).assertHasNoClickAction()
         rule.onNodeWithText("Saved voices").performScrollTo().performClick()
         rule.onNodeWithText("Trash").performScrollTo().performClick()
@@ -126,6 +127,7 @@ class SettingsBehaviourTest {
                     SettingsEvent.Language(LanguageChoice.ITALIAN),
                     SettingsEvent.TurnOnNotifications,
                     SettingsEvent.OpenModel(ModelPartUi.VOICES),
+                    SettingsEvent.OpenModel(ModelPartUi.SPEAKERS),
                     SettingsEvent.OpenVoices,
                     SettingsEvent.OpenTrash,
                     SettingsEvent.OpenLicenses,

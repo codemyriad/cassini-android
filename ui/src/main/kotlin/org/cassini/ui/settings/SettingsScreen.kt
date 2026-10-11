@@ -137,8 +137,8 @@ private fun PrivacySection(state: SettingsUiState, onEvent: (SettingsEvent) -> U
 
 /**
  * An On-device models row: the part, its size ("INT8 · 640 MB" for speech recognition) and the status in its tone:
- * Ready teal, Downloading and Checking blue, Pending amber, Failed red, Not downloaded plain. Only a Not downloaded
- * row is a button; it opens Model download.
+ * Ready teal, Downloading and Checking blue, Pending amber, Failed red, Not downloaded plain. A Not downloaded row
+ * and a Failed row are buttons; they open Model download.
  */
 @Composable
 private fun ModelRow(row: ModelRowUi, onClick: () -> Unit) {
@@ -156,6 +156,6 @@ private fun ModelRow(row: ModelRowUi, onClick: () -> Unit) {
         title = row.part.label(),
         subtitle = if (row.part == ModelPartUi.SPEECH) stringResource(R.string.ui_models_int8_size, size) else size,
         trailing = SettingsTrailing.Status(text, tone),
-        onClick = if (row.status == ModelStatusUi.NotDownloaded) onClick else null,
+        onClick = onClick.takeIf { row.status == ModelStatusUi.NotDownloaded || row.status == ModelStatusUi.Failed },
     )
 }

@@ -154,11 +154,13 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
     /** Guards the queue transitions; never held while a job runs. */
     private val queueLock = Mutex()
 
-    /** Guards [drainJob], [rerun] and [downloadJob]. */
+    /** Guards [drainJob], [rerun] and [downloadJobs]. */
     private val workLock = Any()
     private var drainJob: Job? = null
     private var rerun = false
-    private var downloadJob: Job? = null
+
+    /** The standalone downloads that have not ended. */
+    private val downloadJobs = mutableSetOf<Job>()
 
     @Volatile private var active: Active? = null
 
@@ -337,10 +339,13 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
 
     /**
      * `onTimeout` of the service (architecture 5.7): holds the queue (SYSTEM), stops the running job (it saves a
-     * checkpoint at its next block) and writes its row PAUSED(SYSTEM) at once, so every screen shows Paused.
+     * checkpoint at its next block) and writes its row PAUSED(SYSTEM) at once, so every screen shows Paused. A
+     * standalone download stops too, because no foreground service keeps it: its `.part` files stay, and Settings and
+     * the Library show "Download stopped" with a way to start it again.
      */
     suspend fun systemStop(noteId: String?) {
         settings.setQueueHold(QueueHold.SYSTEM)
+        graph.installOwner.stopDownloads()
         val current = active?.takeIf { noteId == null || it.noteId == noteId } ?: return
         current.job.stop(PauseReason.SYSTEM)
         val catalogue = graph.awaitCatalogue()
@@ -365,12 +370,12 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
     /** The standalone download through `ModelInstallOwner`, inside the foreground service. */
     fun downloadModels(parts: Set<ModelPart> = ModelPart.entries.toSet()): Job {
         val job = graph.installOwner.startDownload(parts)
-        synchronized(workLock) { downloadJob = job }
+        synchronized(workLock) { downloadJobs += job }
         work.update { it.copy(downloading = true) }
         job.invokeOnCompletion {
             val idle = synchronized(workLock) {
-                if (downloadJob === job) downloadJob = null
-                downloadJob == null
+                downloadJobs -= job
+                downloadJobs.isEmpty()
             }
             if (idle) work.update { it.copy(downloading = false) }
         }
@@ -416,7 +421,7 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
     /** Suspends until no drain loop and no standalone download runs. The service stops only after it returns. */
     suspend fun awaitIdle() {
         while (true) {
-            val pending = synchronized(workLock) { listOfNotNull(drainJob, downloadJob) }
+            val pending = synchronized(workLock) { listOfNotNull(drainJob) + downloadJobs }
             if (pending.isEmpty()) return
             pending.joinAll()
         }
