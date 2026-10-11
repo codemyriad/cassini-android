@@ -1380,7 +1380,6 @@
     <ID>SpacingBetweenDeclarationsWithAnnotations:VoiceprintSelectionTest.kt$VoiceprintSelectionTest$@Test fun shortSegmentsAndQuietSpeakersAreDropped()</ID>
     <ID>SpacingBetweenDeclarationsWithAnnotations:VoiceprintSelectionTest.kt$VoiceprintSelectionTest$@Test fun speechIsCappedAndDrawnFromEachThird()</ID>
     <ID>SpacingBetweenDeclarationsWithAnnotations:VoiceprintSelectionTest.kt$VoiceprintSelectionTest$@Test fun windowsStayInsideTheAudio()</ID>
-    <ID>SpacingBetweenDeclarationsWithComments:AudioLimits.kt$Limits$/** A recording stops before the device runs out of space, and warns this long before [MAX_RECORDING_MS]. */</ID>
     <ID>SpacingBetweenDeclarationsWithComments:AudioLimits.kt$Limits$/** Cache space left free while copying an import. */</ID>
     <ID>SpacingBetweenDeclarationsWithComments:AudioLimits.kt$Limits$/** One second of slack for codec padding past the stated duration. */</ID>
     <ID>SpacingBetweenDeclarationsWithComments:CassiniDocument.kt$CassiniDocument.Companion$/** * Renames speakers only: bodies, variants, unknown members and unrelated tags stay as they are, and the * manifest tags are re-encoded. The written file must read back identical apart from those labels. */</ID>

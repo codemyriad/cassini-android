@@ -103,12 +103,6 @@ data class CheckpointState(
         fun wordLog(json: JSONObject): WordLogRef =
             json.optJSONObject(WORD_LOG)?.let(WordLogRef::of) ?: WordLogRef.EMPTY
 
-        /** The number of words of the checkpoint [json]: those in the log and those inline. */
-        fun wordCount(json: JSONObject): Int = wordLog(json).count +
-            json.getJSONObject("recognition").getJSONObject("chunks").getJSONObject("words").optJSONArray("items").let {
-                it?.length() ?: 0
-            }
-
         /** The checkpoint directory name: the SHA-256 of the stored source uri string, never re-derived from a file. */
         fun key(source: String): String = OggOpus.hex(MessageDigest.getInstance("SHA-256").digest(source.toByteArray()))
 

@@ -227,7 +227,6 @@ class CheckpointStateTest {
         val inline = json.getJSONObject("recognition").getJSONObject("chunks").getJSONObject("words")
         assertEquals(1, inline.getJSONArray("items").length())
         assertEquals(WordLogRef(1, 40), CheckpointState.wordLog(json))
-        assertEquals(2, CheckpointState.wordCount(json))
         assertEquals(words, CheckpointState.decode(json, words.subList(0, 1)).recognition.chunks.words)
         // The log must hold exactly the prefix the checkpoint names.
         assertThrows(IllegalArgumentException::class.java) { CheckpointState.decode(json) }

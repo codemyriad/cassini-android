@@ -87,6 +87,5 @@ class WordLogTest {
         val json = JSONObject(checkNotNull(last).toString())
         val back = CheckpointState.decode(json, WordLog.read(log.toByteArray().copyOf(ref.bytes.toInt()), ref.count))
         assertEquals(all.subList(0, end), back.recognition.chunks.words)
-        assertEquals(end, CheckpointState.wordCount(json))
     }
 }

@@ -21,7 +21,9 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.io.File
+import java.io.IOException
 import java.io.RandomAccessFile
+import java.util.concurrent.ExecutionException
 
 /** CheckpointRepository (architecture 3.5 and 4.4) over a scratch root. */
 @RunWith(RobolectricTestRunner::class)
@@ -198,7 +200,6 @@ class CheckpointRepositoryTest {
         assertEquals(wordLogFile.length(), ref.bytes)
         val loaded = load() as CheckpointLoad.Valid
         assertEquals(all.filter { it.endMs <= last * 1000L }, loaded.state.recognition.chunks.words)
-        assertEquals(loaded.state.recognition.chunks.words.size, CheckpointState.wordCount(json))
     }
 
     @Test fun aNewProcessWritesTheLogAgainWithTheSamePrefix() {
@@ -227,6 +228,30 @@ class CheckpointRepositoryTest {
         save(window(210, all))
         assertEquals(CheckpointState.wordLog(JSONObject(checkpointFile.readText())).bytes, wordLogFile.length())
         assertTrue(wordLogFile.length() > committed)
+        assertEquals(all.filter { it.endMs <= 210_000 }, loadedWords())
+    }
+
+    /**
+     * The log is written before checkpoint.json. When that write fails, the cursor stays at the checkpoint on the
+     * disk: the load gives the older checkpoint, and the next save writes over the extra log bytes.
+     */
+    @Test fun aFailedCheckpointWriteKeepsTheLogConsistent() {
+        val all = words(10 * 60)
+        save(window(184, all))
+        val committed = CheckpointState.wordLog(JSONObject(checkpointFile.readText()))
+        // AtomicFile writes checkpoint.json.new first: a directory there makes the write fail.
+        val blocker = File(checkpointFile.path + ".new").apply { mkdirs() }
+        val failure = assertThrows(ExecutionException::class.java) { save(window(366, all)) }
+        assertTrue(failure.cause is IOException)
+        assertTrue("the log took the words of the failed save", wordLogFile.length() > committed.bytes)
+        assertEquals(committed, CheckpointState.wordLog(JSONObject(checkpointFile.readText())))
+        assertEquals(all.filter { it.endMs <= 184_000 }, loadedWords())
+        blocker.deleteRecursively()
+
+        // A resume in this process continues from the checkpoint on the disk.
+        save(window(210, all))
+        val ref = CheckpointState.wordLog(JSONObject(checkpointFile.readText()))
+        assertEquals(wordLogFile.length(), ref.bytes)
         assertEquals(all.filter { it.endMs <= 210_000 }, loadedWords())
     }
 

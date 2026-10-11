@@ -23,6 +23,9 @@ import java.util.concurrent.ConcurrentHashMap
  * process does not know yet whether the file holds the prefix of these words. The written prefix of an older
  * checkpoint stays the same, because settled words never change. A save whose words do not continue the log (a
  * new run of the note) also writes it again. Callers hold the note's lock.
+ *
+ * [save] writes the log and returns a [Pending] prefix. The caller writes `checkpoint.json` with it and then calls
+ * [commit]. If that write fails, the cursor stays where it was: the next save writes over the extra bytes.
  */
 internal class WordLogFile {
     /** What this process last committed for each note. */
@@ -30,8 +33,11 @@ internal class WordLogFile {
 
     private class Cursor(val ref: WordLogRef, val last: Word?)
 
+    /** A prefix that [save] wrote to the log and that a checkpoint can name; [commit] makes it the cursor. */
+    class Pending internal constructor(val ref: WordLogRef, internal val last: Word?)
+
     /** Writes the settled words of [state] to the log of [noteId] in [work] and returns the prefix to commit. */
-    fun save(noteId: String, work: File, state: CheckpointState): WordLogRef {
+    fun save(noteId: String, work: File, state: CheckpointState): Pending {
         val chunks = state.recognition.chunks
         val words = chunks.words
         val log = File(work, WorkFiles.WORD_LOG)
@@ -40,11 +46,15 @@ internal class WordLogFile {
         val settled = WordLog.settled(words, chunks.start * MS_PER_SECOND / Limits.ASR_RATE, from)
         val ref = when {
             cursor != null && settled == from -> cursor.ref
-            cursor != null -> append(log, cursor.ref, WordLog.lines(words, from, settled), settled)
+            cursor != null -> append(work, log, cursor.ref, WordLog.lines(words, from, settled), settled)
             else -> rewrite(work, log, WordLog.lines(words, 0, settled), settled)
         }
-        cursors[noteId] = Cursor(ref, words.getOrNull(ref.count - 1))
-        return ref
+        return Pending(ref, words.getOrNull(ref.count - 1))
+    }
+
+    /** The checkpoint that names [pending] is on the disk: the next save continues from it. */
+    fun commit(noteId: String, pending: Pending) {
+        cursors[noteId] = Cursor(pending.ref, pending.last)
     }
 
     /** Forgets what this process committed for [noteId]: its work directory went, or a new run starts. */
@@ -58,7 +68,8 @@ internal class WordLogFile {
         return count <= words.size && (count == 0 || words[count - 1] == cursor.last) && log.length() >= cursor.ref.bytes
     }
 
-    private fun append(log: File, base: WordLogRef, lines: ByteArray, count: Int): WordLogRef {
+    private fun append(work: File, log: File, base: WordLogRef, lines: ByteArray, count: Int): WordLogRef {
+        val created = !log.exists()
         RandomAccessFile(log, "rw").use { file ->
             // Bytes past the committed prefix are the rest of a write that failed: write over them.
             file.setLength(base.bytes)
@@ -66,6 +77,8 @@ internal class WordLogFile {
             file.write(lines)
             file.fd.sync()
         }
+        // A new file needs its directory entry on the disk too.
+        if (created) NoteFiles.syncDirectory(work)
         return WordLogRef(count, base.bytes + lines.size)
     }
 
@@ -88,12 +101,16 @@ internal class WordLogFile {
         private const val MS_PER_SECOND = 1000L
         private const val TEMPORARY = ".tmp"
 
-        /** The words of the `wordLog` prefix of the checkpoint [json] in [work]; empty for version 1. */
+        /**
+         * The words of the `wordLog` prefix of the checkpoint [json] in [work]; empty for version 1. A prefix that
+         * cannot be a log (more than 2 GiB) throws [IllegalArgumentException], as damaged content does.
+         */
         fun read(work: File, json: JSONObject): List<Word> {
             val ref = CheckpointState.wordLog(json)
             if (ref.count == 0) return emptyList()
             val log = File(work, WorkFiles.WORD_LOG)
-            val bytes = ByteArray(Math.toIntExact(ref.bytes))
+            require(ref.bytes <= Int.MAX_VALUE) { "Word log prefix of ${ref.bytes} bytes" }
+            val bytes = ByteArray(ref.bytes.toInt())
             RandomAccessFile(log, "r").use { it.readFully(bytes) }
             return WordLog.read(bytes, ref.count)
         }

@@ -96,7 +96,9 @@ class CheckpointRepository(
             listOf(WorkFiles.AUDIO_PART, WorkFiles.CLIPS).map { File(work, it) }.filter { it.isFile }
                 .forEach(syncFile)
             val log = wordLog.save(noteId, work, state)
-            WorkFiles.write(File(work, WorkFiles.CHECKPOINT), CheckpointState.encode(state, log))
+            WorkFiles.write(File(work, WorkFiles.CHECKPOINT), CheckpointState.encode(state, log.ref))
+            // Only a checkpoint on the disk moves the cursor: after a failed write, the next save writes over the log.
+            wordLog.commit(noteId, log)
         }
     }
 
@@ -143,7 +145,12 @@ class CheckpointRepository(
         return !marker.exists() && (!sealed.exists() || sealed.delete())
     }
 
-    /** Forgets the in-memory draft names and word log state of [noteId] after adopt deleted `work/`. */
+    /**
+     * Forgets the in-memory draft names and word log state of [noteId] after `work/` went: `JobRepository` calls it
+     * after it finished an adopt or deleted an orphan `work/`. The adopt of a job (`SealedAdopter`) releases only
+     * the draft names. A word log state that stays is harmless: the next save of the note finds that the log does not
+     * continue it and writes the log again.
+     */
     suspend fun release(noteId: String) {
         wordLog.forget(noteId)
         names.release(noteId)
