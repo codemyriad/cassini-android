@@ -8,12 +8,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -32,9 +35,13 @@ import org.cassini.ui.theme.CassiniTheme
 
 /**
  * The app's bottom sheet: an M3 `ModalBottomSheet`, always fully expanded, with the 28 dp top corners, the surface
- * colour, the scrim token, no tonal elevation, the [DragHandle] and the navigation-bar insets. The content gets IME
- * padding, so a focused field stays above the keyboard. Screens give the content its own padding (board 06: 10/12/20;
- * board 04: 10/20/24 with a 16 dp gap); the handle already holds the top 10 dp.
+ * colour, the scrim token, no tonal elevation, the [DragHandle] and the navigation-bar insets. Screens give the content
+ * its own padding (board 06: 10/12/20; board 04: 10/20/24 with a 16 dp gap); the handle already holds the top 10 dp.
+ *
+ * The keyboard: `ModalBottomSheet` puts the whole sheet above the IME, so a focused field stays above the keyboard.
+ * The top of the sheet stays below the status bar and the display cutout ([SheetTopInsets]): when the open keyboard
+ * leaves less space than the content needs, the sheet stops there and its content scrolls (each long sheet content
+ * is a `verticalScroll` column). Without that limit, the Name a speaker sheet went up under the status bar.
  *
  * The sheet state stays inside (its API is experimental). To close the sheet from its content (an action row), call
  * [SheetHider.hide] on the content's parameter: the sheet slides down, then [onDismissRequest] runs and the screen
@@ -59,7 +66,8 @@ fun CassiniSheet(
     }
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
-        modifier = modifier,
+        // Outside the sheet's own measurement: the space for the sheet starts below the status bar.
+        modifier = modifier.windowInsetsPadding(SheetTopInsets),
         sheetState = state,
         shape = CassiniTheme.shapes.sheet,
         containerColor = c.surface,
@@ -69,15 +77,15 @@ fun CassiniSheet(
         dragHandle = { DragHandle() },
         contentWindowInsets = { WindowInsets.navigationBars },
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .imePadding(),
-        ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             content(hider)
         }
     }
 }
+
+/** The top of a [CassiniSheet] never goes above these insets: the status bar and the display cutout. */
+private val SheetTopInsets: WindowInsets
+    @Composable get() = WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
 
 /** Closes a [CassiniSheet] with its slide-down animation, then calls the sheet's `onDismissRequest`. */
 fun interface SheetHider {
