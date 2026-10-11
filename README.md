@@ -16,9 +16,12 @@ Cassini does all speech recognition and speaker analysis on the phone. It does n
 
 ## Screenshots
 
-<!-- TODO(P12): add the light and dark device screenshots from docs/screenshots/light/ and docs/screenshots/dark/ in a small table. -->
+These screenshots come from the Android emulator. The audio is a clip of the FLEURS data set (CC BY 4.0), and the names are test names.
 
-The screenshots of the 0.2 interface come with the release.
+| | Notes | Read and listen | Transcribing | Name a speaker | Settings |
+|---|---|---|---|---|---|
+| Light | <img src="docs/screenshots/light/01-library.png" width="150" alt="Notes, light theme"> | <img src="docs/screenshots/light/02-read-and-listen.png" width="150" alt="Read and listen, light theme"> | <img src="docs/screenshots/light/03-transcribing.png" width="150" alt="Transcribing, light theme"> | <img src="docs/screenshots/light/04-name-a-speaker.png" width="150" alt="Name a speaker, light theme"> | <img src="docs/screenshots/light/05-settings.png" width="150" alt="Settings, light theme"> |
+| Dark | <img src="docs/screenshots/dark/01-library.png" width="150" alt="Notes, dark theme"> | <img src="docs/screenshots/dark/02-read-and-listen.png" width="150" alt="Read and listen, dark theme"> | <img src="docs/screenshots/dark/03-transcribing.png" width="150" alt="Transcribing, dark theme"> | <img src="docs/screenshots/dark/04-name-a-speaker.png" width="150" alt="Name a speaker, dark theme"> | <img src="docs/screenshots/dark/05-settings.png" width="150" alt="Settings, dark theme"> |
 
 ## Build
 

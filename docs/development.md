@@ -86,7 +86,7 @@ The root task `ciTest` runs `:core:test`. For each Android module, it runs `veri
 | Screenshots | `:ui:verifyRoborazziDebug` | Each board compared with its golden, in light, dark, Italian and 1.5x font scale |
 | Device | `scripts/device-smoke.sh` | Instrumentation tests on an emulator or a phone (see [Device scripts](#device-scripts)) |
 | Host persistence | `scripts/device-kill-resume.sh`, `scripts/device-language-check.sh`, `scripts/note-opening-timing.sh` | Process death, the app language and the time to open a note, driven from the host |
-| Acceptance | Planned | An instrumented walk through each board on emulator-5554, with device screenshots that a reviewer compares with the design |
+| Acceptance | `scripts/acceptance-walk.sh` | An instrumented walk through each board on emulator-5554, with device screenshots that a reviewer compares with the design (see [acceptance-walk.sh](#acceptance-walksh)) |
 
 Robolectric runs at SDK 35. Each module that uses it has `src/test/resources/robolectric.properties` with `sdk=35`. SDK 36 and later need a JDK 21 runtime, and the build uses JDK 17. One test in each module makes sure that `Build.VERSION.SDK_INT` is 35.
 
@@ -302,6 +302,15 @@ The test makes these notes for `realModels`:
 - One long transcription that runs during the walk, and one note in the queue after it.
 
 To find Storage almost full, the test sets the free space to the floor of the recording plus about 12 minutes at the measured rate of the capture file.
+
+The screenshots in the README come from this walk. To make them again, use these steps:
+
+1. Do the walk for the light and dark variants with `--part models`.
+2. Select these screenshots of each variant: `00-library`, `03-read-and-listen`, `02-transcribing`, `04-name-a-speaker` and `08-settings`.
+3. Make sure that they show only the FLEURS clip and the test names.
+4. Make them 540 pixels wide with Pillow, and make the files smaller with `optipng -o5 -strip all`.
+5. Save them as `docs/screenshots/<variant>/01-library.png` to `05-settings.png`, in the order of step 2.
+6. Save the light screenshots also as `metadata/en-US/images/phoneScreenshots/1.png` to `5.png`, in the same order.
 
 ### note-opening-timing.sh
 
