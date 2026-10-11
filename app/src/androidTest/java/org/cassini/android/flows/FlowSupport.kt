@@ -19,6 +19,7 @@ import androidx.compose.ui.test.printToLog
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.test.espresso.Espresso
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.cassini.android.MainActivity
@@ -90,6 +91,16 @@ internal object Flows {
     }
 
     /** Polls [condition] on the test thread (graph state, files) while the UI keeps running. */
+    /**
+     * Presses Back once the activity's own window has input focus. Right after an ACTION_VIEW (`onNewIntent`, the
+     * activity pauses and resumes) a slow emulator can drop a key injected before the window has focus again, so
+     * the Back press would not reach the app. Do not use it to close a sheet or dialog: their window has the focus.
+     */
+    fun AppRule.pressBackWhenFocused(timeoutMs: Long = SCREEN_MS) {
+        waitUntil(timeoutMs) { activity.hasWindowFocus() }
+        Espresso.pressBack()
+    }
+
     fun AppRule.waitFor(message: String, timeoutMs: Long = SCREEN_MS, condition: suspend () -> Boolean) {
         try {
             waitUntil(timeoutMs) { runBlocking { condition() } }

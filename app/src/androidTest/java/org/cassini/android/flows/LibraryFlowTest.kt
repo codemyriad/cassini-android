@@ -11,12 +11,12 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
-import androidx.test.espresso.Espresso
 import kotlinx.coroutines.runBlocking
 import org.cassini.android.MainActivity
 import org.cassini.android.background.Background
 import org.cassini.android.flows.Flows.import
 import org.cassini.android.flows.Flows.meetingDocument
+import org.cassini.android.flows.Flows.pressBackWhenFocused
 import org.cassini.android.flows.Flows.row
 import org.cassini.android.flows.Flows.rows
 import org.cassini.android.flows.Flows.text
@@ -66,7 +66,7 @@ class LibraryFlowTest {
         val noteId = runBlocking { rows().single().id }
         rule.waitShown(hasContentDescription(rule.text(UiR.string.ui_back_to_library)))
         rule.waitText(CLIP_TITLE)
-        Espresso.pressBack()
+        rule.pressBackWhenFocused()
         val row = hasContentDescription(CLIP_TITLE, substring = true)
         rule.waitShown(row)
         val status = runBlocking { row(CLIP_TITLE) }!!
@@ -79,7 +79,7 @@ class LibraryFlowTest {
         // The same file again: the same note, again with the Library under it.
         rule.view(clip, "audio/wav")
         rule.waitShown(hasContentDescription(rule.text(UiR.string.ui_back_to_library)))
-        Espresso.pressBack()
+        rule.pressBackWhenFocused()
         rule.waitShown(row)
         val ids = runBlocking { rows().map { it.id } }
         assertEquals("A second ACTION_VIEW of the same file keeps one note", listOf(noteId), ids)
