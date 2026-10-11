@@ -21,6 +21,12 @@ Version 0.2.0 is a new build of the app. It keeps the speech engine and the port
 - An interrupted model download continues from where it stopped.
 - The audio of a non-Opus source (an imported MP3, M4A or WAV file, or an AAC recording) goes into the Cassini document as Opus at 24 kb/s. In 0.1.0, some imports used a 48 kb/s platform encoder. After the transcription, Cassini deletes its copy of the original file. [PRIVACY.md](PRIVACY.md) gives the details.
 - The app targets Android 16 (targetSdk 36) and compiles against compileSdk 37. The minimum is still Android 8 (minSdk 26).
+- A long note opens as fast as a short note. The Note screen shows the first words and then gets the other words and the player ready.
+- If you turn the phone, or if Android makes the screen again, the open sheets, the dialogs and the player stay.
+- The screens show all of their text when the Android font size is 200 % and when the app language is Italian.
+- "Transcribe again" is not available for a document that Cassini cannot verify or cannot read. These documents get a message and no "Try again".
+- The message for a file that is too large gives the limit of 2 GB.
+- "Document info" shows the name of the speech model.
 
 ### Added
 
@@ -29,6 +35,8 @@ Version 0.2.0 is a new build of the app. It keeps the speech engine and the port
 - Export of a transcript as text (`.txt`) or as subtitles (`.srt`, `.vtt`).
 - Rename of a note.
 - Search with highlighted results, also for words without their accents.
+- "Stop" in the transcription notification pauses the transcription and holds the queue. "Continue" in the list of notes starts the queue again.
+- If Cassini cannot open its list of notes, it shows an error and not an empty list.
 - [PRIVACY.md](PRIVACY.md), [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
 ### Security
