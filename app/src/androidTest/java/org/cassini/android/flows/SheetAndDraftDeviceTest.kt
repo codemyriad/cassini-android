@@ -58,8 +58,9 @@ import java.time.LocalTime
  * - With the keyboard open, the Name a speaker sheet stays below the status bar and above the keyboard.
  * - New draft text on Transcribing scrolls only the draft, so the progress card stays in view.
  *
- * Each test saves a screenshot to `files/device-checks/` for a reviewer. When the device shows no soft keyboard (a
- * hardware keyboard), the sheet test still checks the status bar and logs that the keyboard did not open.
+ * Each test saves a screenshot to `files/device-checks/` for a reviewer. The sheet test sets
+ * `show_ime_with_hard_keyboard` for its run, so that the soft keyboard opens also on an emulator with a hardware
+ * keyboard, and it fails when the keyboard does not open.
  */
 @CiSmoke
 class SheetAndDraftDeviceTest {
@@ -70,18 +71,34 @@ class SheetAndDraftDeviceTest {
     }
 
     @Test fun theNameSheetStaysBelowTheStatusBarWithTheKeyboardOpen() {
-        rule.setContent { CassiniTheme(darkTheme = false) { NoteScreen(naming, onEvent = {}) } }
-        rule.onNode(hasSetTextAction()).performClick()
-        val ime = waitForKeyboard()
-        rule.waitForIdle()
-        val statusBar = insets().getInsets(WindowInsetsCompat.Type.statusBars()).top
-        val sheet = rule.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.PaneTitle))
-            .fetchSemanticsNode().boundsInWindow
-        shot("name-sheet-keyboard")
-        Log.i(TAG, "Status bar $statusBar px, sheet ${sheet.top}..${sheet.bottom} px, keyboard shown: $ime")
-        assertTrue("The sheet top ${sheet.top} is above the status bar ($statusBar px)", sheet.top >= statusBar)
-        // The field keeps its place above the keyboard: it is still on the screen and not covered.
-        rule.onNode(hasSetTextAction()).assertIsDisplayed()
+        val before = shell("settings get secure $SHOW_IME").trim()
+        shell("settings put secure $SHOW_IME 1")
+        try {
+            rule.setContent { CassiniTheme(darkTheme = false) { NoteScreen(naming, onEvent = {}) } }
+            rule.onNode(hasSetTextAction()).performClick()
+            assertTrue("The soft keyboard did not open", waitForKeyboard())
+            rule.waitForIdle()
+            val insets = insets()
+            val statusBar = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top
+            val keyboard = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+            val window = rule.activity.window.decorView.height
+            val sheet = rule.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.PaneTitle))
+                .fetchSemanticsNode().boundsInWindow
+            val field = rule.onNode(hasSetTextAction()).fetchSemanticsNode().boundsInWindow
+            shot("name-sheet-keyboard")
+            Log.i(TAG, "Status bar $statusBar px, sheet ${sheet.top}..${sheet.bottom} px, field ${field.bottom} px")
+            Log.i(TAG, "Window $window px, keyboard $keyboard px")
+            assertTrue("The keyboard inset is 0 px", keyboard > 0)
+            assertTrue("The sheet top ${sheet.top} is above the status bar ($statusBar px)", sheet.top >= statusBar)
+            // The field stays above the keyboard: its bottom is not below the top of the keyboard.
+            assertTrue(
+                "The field bottom ${field.bottom} is below the keyboard top (${window - keyboard} px)",
+                field.bottom <= window - keyboard,
+            )
+        } finally {
+            val unset = before == "null" || before.isEmpty()
+            shell(if (unset) "settings delete secure $SHOW_IME" else "settings put secure $SHOW_IME $before")
+        }
     }
 
     @Test fun newDraftTextKeepsTheProgressCardInView() {
@@ -128,6 +145,7 @@ class SheetAndDraftDeviceTest {
 
     private companion object {
         const val TAG = "SheetAndDraftDeviceTest"
+        const val SHOW_IME = "show_ime_with_hard_keyboard"
         const val KEYBOARD_MS = 5_000L
         const val POLL_MS = 200L
         const val SETTLE_MS = 600L
