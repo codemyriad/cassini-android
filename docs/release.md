@@ -71,7 +71,7 @@ Until the owner sets the three password secrets, CI uses the values of the old d
 
 The beta key is the key of the earlier beta installations. Thus an update installs over them without an uninstall, and the downloaded models stay. `scripts/beta-signing-cert.sha256` holds the SHA-256 digest of its certificate.
 
-Version 0.2 does not show the notes of 0.1.x. Before they update, users must transcribe each note that has no transcript. Then they must save each note as a Cassini document (`.opus`). 0.1.x cannot save a recording without a transcript as a document, and there is no other way to move such a recording to 0.2.
+Version 0.2 is a new app. It does not read the app data of 0.1.x. The Cassini documents (`.opus`) that users saved from 0.1.x open in 0.2 as before.
 
 The owner can select a new signing identity for a stable release. Then Android does not install the stable release over a beta installation. Users must uninstall the beta, and the uninstall erases their notes and models. The release notes must tell this to the users.
 
