@@ -28,8 +28,10 @@ import org.cassini.ui.theme.CassiniTheme
 import org.cassini.ui.theme.Glyph
 
 /**
- * The checkbox square (board 04): 22 dp, radius 4; checked is an accent fill with a white Check (16/2.2), unchecked
- * a 2 dp text2 border. It has no semantics of its own: [CassiniCheckboxRow] makes the whole row the toggle.
+ * The checkbox square (board 04): 22 dp, radius 4; checked is an accent fill with a Check (16/2.2) in surface,
+ * unchecked a 2 dp text2 border. It has no semantics of its own: [CassiniCheckboxRow] makes the whole row the toggle.
+ * The Check is white in light (surface = onAccentFill, as the board). In dark, accent is the light #8FA6FF, where a
+ * white Check has a contrast of 2.3:1; the dark surface gives 7.4:1.
  */
 @Composable
 fun CassiniCheckbox(checked: Boolean, modifier: Modifier = Modifier) {
@@ -42,7 +44,7 @@ fun CassiniCheckbox(checked: Boolean, modifier: Modifier = Modifier) {
             .then(if (checked) Modifier.background(c.accent) else Modifier.border(2.dp, c.text2, shape)),
         contentAlignment = Alignment.Center,
     ) {
-        if (checked) CassiniIcon(Glyph.Check, 16.dp, 2.2f, c.onAccentFill, null)
+        if (checked) CassiniIcon(Glyph.Check, 16.dp, 2.2f, c.surface, null)
     }
 }
 
