@@ -10,6 +10,7 @@ import android.util.Log
 import org.cassini.core.Failure
 import org.cassini.core.UserFacingException
 import org.cassini.core.audio.Limits
+import org.cassini.core.audio.Mp3Gapless
 import org.cassini.core.audio.PcmAudio
 import org.cassini.core.audio.PcmBuilder
 import org.cassini.core.audio.StreamingResampler
@@ -106,7 +107,11 @@ class AudioDecoder(private val resolver: ContentResolver, private val cacheDir: 
             fun seekUs() = (startSample * 1_000_000 / Limits.ASR_RATE - backOffUs).coerceAtLeast(0)
             if (startSample > 0) extractor.seekTo(seekUs(), MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
             val format = extractor.getTrackFormat(track)
-            val durationUs = opusSamples?.let { it * 1_000_000 / 48000 }
+            // The MP3 decoders remove their own 529-sample delay. Older versions (API 26, 29) keep the encoder delay and
+            // padding of the LAME tag; newer ones (API 34) drop them but keep their timestamps. Trim them here instead.
+            val mpeg = format.getString(MediaFormat.KEY_MIME) == MediaFormat.MIMETYPE_AUDIO_MPEG
+            val gapless = if (mpeg) Mp3Gapless.scan(file) else null
+            val durationUs = opusSamples?.let { it * 1_000_000 / 48000 } ?: gapless?.let { it.samples * 1_000_000 / it.sampleRate }
                 ?: if (format.containsKey(MediaFormat.KEY_DURATION)) format.getLong(MediaFormat.KEY_DURATION) else null
             durationUs?.let { Limits.requireDuration(it / 1000, retainPcm) }
             onProgress(startSample * 1000 / Limits.ASR_RATE, durationUs?.div(1000))
@@ -114,6 +119,10 @@ class AudioDecoder(private val resolver: ContentResolver, private val cacheDir: 
             val out = if (retainPcm) PcmBuilder(opusSamples?.let { (it * Limits.ASR_RATE + 24000) / 48000 }?.toInt()
                 ?: durationUs?.let { (it * Limits.ASR_RATE / 1_000_000).toInt() } ?: (Limits.ASR_RATE * 60)) else null
             val mime = requireNotNull(format.getString(MediaFormat.KEY_MIME))
+            if (gapless != null) {
+                format.setInteger("encoder-delay", 0)
+                format.setInteger("encoder-padding", 0)
+            }
             val codec = MediaCodec.createDecoderByType(mime)
             decoder = codec
             format.setInteger(MediaFormat.KEY_PCM_ENCODING, AudioFormat.ENCODING_PCM_16BIT)
@@ -188,7 +197,10 @@ class AudioDecoder(private val resolver: ContentResolver, private val cacheDir: 
                                 requireUser(info.size % (sampleBytes * channels) == 0, Failure.AUDIO)
                                 val frames = info.size / (sampleBytes * channels)
                                 requireUser(info.presentationTimeUs <= Limits.MAX_RECORDING_MS * 1000 + (if (opusSamples != null) 120_000 else 0), Failure.LONG)
-                                val firstFrame = WavDecoder.framePosition(info.presentationTimeUs, sampleRate, next)
+                                // MP3 output is contiguous after the first buffer, whatever the timestamps say.
+                                val firstFrame = gapless?.let { g ->
+                                    next ?: (WavDecoder.framePosition(info.presentationTimeUs, sampleRate, null) - g.delay)
+                                } ?: WavDecoder.framePosition(info.presentationTimeUs, sampleRate, next)
                                 if (startSample > 0 && next == null) {
                                     if (firstFrame > firstNeededFrame(sampleRate, startSample) && seekUs() > 0) {
                                         Log.w("Cassini", "Resume seek landed at frame $firstFrame, after ${firstNeededFrame(sampleRate, startSample)}; seeking earlier")
@@ -199,7 +211,10 @@ class AudioDecoder(private val resolver: ContentResolver, private val cacheDir: 
                                     count = if (firstFrame > firstNeededFrame(sampleRate, startSample)) 0 else firstFrame
                                 }
                                 next = firstFrame + frames
-                                val playableFrames = opusSamples?.let { minOf(frames.toLong(), (it * sampleRate / 48000 - firstFrame).coerceAtLeast(0)).toInt() } ?: frames
+                                // The verified end of the audio: the Ogg EOS sample count, or the length in the LAME tag.
+                                val endFrame = opusSamples?.let { it * sampleRate / 48000 } ?: gapless?.samples
+                                val playableFrames = endFrame?.let { minOf(frames.toLong(), (it - firstFrame).coerceAtLeast(0)).toInt() }
+                                    ?: frames
                                 // Keep real container gaps as silence. The player and words share a zero origin.
                                 // An overlap keeps the audio already passed on: the resampler only moves forward.
                                 val skip = (count - firstFrame).coerceIn(0, playableFrames)

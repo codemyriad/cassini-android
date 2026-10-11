@@ -62,7 +62,7 @@ groups=(
     "Resampler|verbatim|$old/Resampler.kt|$core/audio/Resampler.kt|package only"
     "PcmSource|verbatim|$old/PcmSource.kt|$core/audio/PcmSource.kt|PcmAudio moved here from AudioDecoder.kt"
     "Limits|verbatim|$old/Limits.kt|$core/audio/AudioLimits.kt $core/audio/PcmBuilder.kt|split into AudioLimits and PcmBuilder; the app's clock() retired with the 0.1.0 UI (P10)"
-    "AudioDecoder|verbatim|$old/AudioDecoder.kt|$engine/decode/AudioDecoder.kt $core/audio/WavDecoder.kt|ContentResolver + cacheDir instead of Context; framePosition/decodeWav in core WavDecoder; PcmAudio in PcmSource.kt"
+    "AudioDecoder|verbatim|$old/AudioDecoder.kt|$engine/decode/AudioDecoder.kt $core/audio/WavDecoder.kt|ContentResolver + cacheDir instead of Context; framePosition/decodeWav in core WavDecoder; PcmAudio in PcmSource.kt; MP3 with a LAME tag (core Mp3Gapless): platform trim off, contiguous output, delay and padding trimmed here, as the platforms differ (API 26/29 keep them; API 34 drops them but keeps the timestamps)"
     "SpeechWindows|verbatim|$old/SpeechWindows.kt|$core/asr/SpeechWindows.kt|package only"
     "SeamMerge|verbatim|$old/SeamMerge.kt|$core/asr/SeamMerge.kt|package only"
     "WordGate|verbatim|$old/WordGate.kt|$core/asr/WordGate.kt|package only"

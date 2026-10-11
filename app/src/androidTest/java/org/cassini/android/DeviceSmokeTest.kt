@@ -68,8 +68,30 @@ class DeviceSmokeTest {
                 assertTrue("$name duration ${audio.durationMs}", kotlin.math.abs(audio.durationMs - reference.durationMs) <= 100)
                 fun onset(pcm: PcmAudio) = pcm.samples.indexOfFirst { kotlin.math.abs(it) > .1f } * 1000L / pcm.sampleRate
                 assertTrue("$name speech onset shifted", kotlin.math.abs(onset(audio) - onset(reference)) <= 100)
+                if (name.endsWith(".mp3")) assertMp3OnTheWavClock(reference, audio)
             } finally { file.delete() }
         }
+    }
+
+    /**
+     * The MP3 fixture has a LAME tag (written by FFmpeg: delay 576, padding 576). The decoder trims the audio to exactly
+     * the samples of the WAV, and the waveform lines up sample for sample, on every Android version. Before the trim,
+     * API 26 and 29 kept the delay and the padding (15945 ms), and on API 34 the timestamps added 72 ms of silence at
+     * the start. The message gives the error at the shifts of those faults (529: the decoder delay; 576: the encoder
+     * delay).
+     */
+    private fun assertMp3OnTheWavClock(reference: PcmAudio, audio: PcmAudio) {
+        val expected = reference.samples
+        val found = audio.samples
+        assertEquals("mp3 samples (WAV ${expected.size})", expected.size, found.size)
+        val margin = 1_200
+        fun error(shift: Int) = (margin until expected.size - margin)
+            .sumOf { j -> val d = expected[j] - found[j + shift]; d.toDouble() * d } / (expected.size - 2 * margin)
+        val signal = expected.sumOf { it.toDouble() * it } / expected.size
+        val errors = listOf(-1_152, -576, -529, -1, 0, 1, 529, 576, 1_152).associateWith { error(it) / signal }
+        instrumentation.sendStatus(0, Bundle().apply { putString("stream", "mp3 error / signal by shift: $errors\n") })
+        // At shift 0 FFmpeg's decode differs from the WAV by 0.4 % of the signal; one sample off, by 10 %.
+        assertTrue("mp3 waveform is not on the WAV clock: $errors", errors.getValue(0) < .01)
     }
 
     @CiSmoke
