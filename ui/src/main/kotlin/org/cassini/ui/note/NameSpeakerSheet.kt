@@ -79,7 +79,8 @@ fun NameSpeakerSheet(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit, onDismi
  * The sheet's content, also drawn inline in screenshots (`SheetBoardFrame`): padding 16 (below the handle) / 20 /
  * 24 with a 16 dp gap. The header (avatar, title, "Speaks for …", Play sample), the Name field, the saved voices
  * card, "Not <name>?", the same-person or rename-saved question, Remember, and the footer (Merge into…, Cancel, Save
- * name). The content scrolls when it does not fit above the keyboard.
+ * name). When the content does not fit above the keyboard, the part above the footer scrolls and the footer stays
+ * in view.
  *
  * Save with a question open ([SaveState.BLOCKED_BY_QUESTION]) looks enabled. A press (or IME Done) sends
  * [NameSheetEvent.SaveBlocked], moves focus to the question, which then reports "Answer the question above first"
@@ -106,48 +107,60 @@ fun NameSpeakerSheetContent(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit, 
             SaveState.DISABLED -> Unit
         }
     }
-    Column(
-        modifier
-            .verticalScroll(rememberScrollState())
-            // Bottom 25: board 04's Cancel is 50 dp tall (a content-box border) and centres Save in its row.
-            .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 25.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        SheetHeader(ui, onEvent)
-        CassiniTextField(
-            value = ui.name,
-            onValueChange = { onEvent(NameSheetEvent.NameChanged(it)) },
-            label = stringResource(R.string.ui_name_label),
-            showFocus = if (ui.nameFieldFocused) true else null,
-            keyboardOptions = KeyboardOptions(
-                capitalization = KeyboardCapitalization.Words,
-                imeAction = ImeAction.Done,
-            ),
-            // Board 04 sets the 13 sp label in a 16 px line box (19.5 dp): 3 dp more than Android's own line.
-            modifier = Modifier.padding(top = 3.dp),
-            keyboardActions = KeyboardActions(onDone = { save() }),
-            maxLength = NAME_MAX_LENGTH,
-        )
-        if (ui.voices.isNotEmpty()) VoicesCard(ui, onEvent)
-        ui.notName?.let { name ->
-            // The text button's 14 dp padding hangs into the sheet padding, so its text starts at the content edge.
-            TextButton(
-                text = stringResource(R.string.ui_name_not, name),
-                onClick = { onEvent(NameSheetEvent.NotName) },
-                modifier = Modifier.offset(x = (-14).dp),
+    // The footer stays below the scrolling part, so Cancel and Save name stay above the keyboard also when the
+    // content is taller than the space above it (large font scales). When everything fits, the layout is board 04's.
+    Column(modifier) {
+        Column(
+            Modifier
+                .weight(1f, fill = false)
+                .verticalScroll(rememberScrollState())
+                .padding(start = 20.dp, end = 20.dp, top = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            SheetHeader(ui, onEvent)
+            CassiniTextField(
+                value = ui.name,
+                onValueChange = { onEvent(NameSheetEvent.NameChanged(it)) },
+                label = stringResource(R.string.ui_name_label),
+                showFocus = if (ui.nameFieldFocused) true else null,
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Words,
+                    imeAction = ImeAction.Done,
+                ),
+                // Board 04 sets the 13 sp label in a 16 px line box (19.5 dp): 3 dp more than Android's own line.
+                modifier = Modifier.padding(top = 3.dp),
+                keyboardActions = KeyboardActions(onDone = { save() }),
+                maxLength = NAME_MAX_LENGTH,
+            )
+            if (ui.voices.isNotEmpty()) VoicesCard(ui, onEvent)
+            ui.notName?.let { name ->
+                // The text button's 14 dp padding hangs into the sheet padding, so its text starts at the content edge.
+                TextButton(
+                    text = stringResource(R.string.ui_name_not, name),
+                    onClick = { onEvent(NameSheetEvent.NotName) },
+                    modifier = Modifier.offset(x = (-14).dp),
+                )
+            }
+            if (question != null) {
+                QuestionCard(question, pulses, onEvent, Modifier.focusRequester(questionFocus))
+            }
+            CassiniCheckboxRow(
+                checked = ui.remember,
+                onCheckedChange = { onEvent(NameSheetEvent.RememberChanged(it)) },
+                title = stringResource(R.string.ui_name_remember),
+                subtitle = rememberSubtitle(ui),
+                enabled = ui.rememberEnabled,
             )
         }
-        if (question != null) {
-            QuestionCard(question, pulses, onEvent, Modifier.focusRequester(questionFocus))
-        }
-        CassiniCheckboxRow(
-            checked = ui.remember,
-            onCheckedChange = { onEvent(NameSheetEvent.RememberChanged(it)) },
-            title = stringResource(R.string.ui_name_remember),
-            subtitle = rememberSubtitle(ui),
-            enabled = ui.rememberEnabled,
+        // Bottom 25: board 04's Cancel is 50 dp tall (a content-box border) and centres Save in its row. Top 16: the
+        // gap of the column above.
+        Footer(
+            ui,
+            onEvent,
+            onSave = save,
+            onBlocked = blocked,
+            modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 25.dp),
         )
-        Footer(ui, onEvent, onSave = save, onBlocked = blocked)
     }
 }
 
@@ -315,11 +328,12 @@ private fun Footer(
     onEvent: (NameSheetEvent) -> Unit,
     onSave: () -> Unit,
     onBlocked: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     // Flow rows: at large font scales Cancel and Save go below "Merge into…", and then below each other, instead
     // of squeezing "Save name" into a column of letters.
     FlowRow(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(top = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,

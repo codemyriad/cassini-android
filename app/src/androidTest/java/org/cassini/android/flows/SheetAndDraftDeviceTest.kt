@@ -10,10 +10,12 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -54,16 +56,19 @@ import org.junit.Rule
 import org.junit.Test
 import java.io.File
 import java.time.LocalTime
+import kotlin.math.abs
 
 /**
  * The device follow-ups 3 and 4 of docs/ui-fidelity.md, on an edge-to-edge window as in MainActivity:
  *
- * - With the keyboard open, the Name a speaker sheet stays below the status bar and above the keyboard.
+ * - With the keyboard open, the Name a speaker sheet stays below the status bar and above the keyboard, and at font
+ *   scale 1.3 its Cancel and Save name buttons stay fully above the keyboard.
  * - New draft text on Transcribing scrolls only the draft, so the progress card stays in view.
  *
- * Each test saves a screenshot to `files/device-checks/` for a reviewer. The sheet test sets
- * `show_ime_with_hard_keyboard` for its run, so that the soft keyboard opens also on an emulator with a hardware
- * keyboard, and it fails when the keyboard does not open.
+ * Each test saves a screenshot to `files/device-checks/` for a reviewer. The sheet tests set
+ * `show_ime_with_hard_keyboard` for their run, so that the soft keyboard opens also on an emulator with a hardware
+ * keyboard, and they fail when the keyboard does not open. The font scale test sets the system `font_scale` for its
+ * run.
  */
 @CiSmoke
 class SheetAndDraftDeviceTest {
@@ -73,38 +78,39 @@ class SheetAndDraftDeviceTest {
         rule.runOnUiThread { rule.activity.enableEdgeToEdge() }
     }
 
-    @Test fun theNameSheetStaysBelowTheStatusBarWithTheKeyboardOpen() {
-        val before = shell("settings get secure $SHOW_IME").trim()
-        shell("settings put secure $SHOW_IME 1")
-        try {
-            rule.setContent { CassiniTheme(darkTheme = false) { NoteScreen(naming, onEvent = {}) } }
-            rule.onNode(hasSetTextAction()).performClick()
-            assertTrue("The soft keyboard did not open", waitForKeyboard())
-            // The field is in the sheet's own dialog window: read the insets and the height of that window.
-            val fieldRoot = rule.onNode(hasSetTextAction()).fetchSemanticsNode().root as ViewRootForTest
-            val sheetWindow = fieldRoot.view.rootView
-            val keyboard = waitForKeyboardInset(sheetWindow)
-            rule.waitForIdle()
-            SystemClock.sleep(SETTLE_MS)
-            val insets = rule.runOnUiThread { requireNotNull(ViewCompat.getRootWindowInsets(sheetWindow)) }
-            val statusBar = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top
-            val window = rule.runOnUiThread { sheetWindow.height }
-            val sheet = rule.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.PaneTitle))
-                .fetchSemanticsNode().boundsInWindow
-            val field = rule.onNode(hasSetTextAction()).fetchSemanticsNode().boundsInWindow
-            shot("name-sheet-keyboard")
-            Log.i(TAG, "Status bar $statusBar px, sheet ${sheet.top}..${sheet.bottom} px, field ${field.bottom} px")
-            Log.i(TAG, "Window $window px, keyboard $keyboard px")
-            assertTrue("The keyboard inset is 0 px (API ${Build.VERSION.SDK_INT})", keyboard > 0)
-            assertTrue("The sheet top ${sheet.top} is above the status bar ($statusBar px)", sheet.top >= statusBar)
-            // The field stays above the keyboard: its bottom is not below the top of the keyboard.
+    @Test fun theNameSheetStaysBelowTheStatusBarWithTheKeyboardOpen() = withNameSheetAndKeyboard(
+        shotName = "name-sheet-keyboard",
+    ) { sheet ->
+        assertTrue("The sheet top ${sheet.sheet.top} is above the status bar", sheet.sheet.top >= sheet.statusBar)
+        // The field stays above the keyboard: its bottom is not below the top of the keyboard.
+        val field = rule.onNode(hasSetTextAction()).fetchSemanticsNode().boundsInWindow
+        assertTrue(
+            "The field bottom ${field.bottom} is below the keyboard top (${sheet.keyboardTop} px)",
+            field.bottom <= sheet.keyboardTop,
+        )
+    }
+
+    /**
+     * At font scale 1.3 the content is taller than the space above the keyboard (a Pixel 8 cut Cancel and Save name
+     * at the keyboard edge): the footer stays below the scrolling part, so both buttons are fully on screen.
+     */
+    @Test fun theNameSheetButtonsStayAboveTheKeyboardAtFontScale13() = withNameSheetAndKeyboard(
+        shotName = "name-sheet-keyboard-font-1.3",
+        fontScale = LARGE_FONT_SCALE,
+    ) { sheet ->
+        assertTrue("The sheet top ${sheet.sheet.top} is above the status bar", sheet.sheet.top >= sheet.statusBar)
+        val labels = listOf(org.cassini.ui.R.string.ui_action_cancel, org.cassini.ui.R.string.ui_name_save)
+        for (label in labels.map(rule.activity::getString)) {
+            val node = rule.onNode(hasText(label) and hasClickAction()).fetchSemanticsNode()
+            val shown = node.boundsInWindow
+            Log.i(TAG, "$label: ${shown.top}..${shown.bottom} px of ${node.size.height} px")
+            // boundsInWindow is clipped by the parents: a button cut by the sheet edge is shorter than its size.
+            assertTrue("$label is cut: ${shown.height} of ${node.size.height} px", shown.height >= node.size.height - 1)
             assertTrue(
-                "The field bottom ${field.bottom} is below the keyboard top (${window - keyboard} px)",
-                field.bottom <= window - keyboard,
+                "$label bottom ${shown.bottom} is below the keyboard top (${sheet.keyboardTop} px)",
+                shown.bottom <= sheet.keyboardTop,
             )
-        } finally {
-            val unset = before == "null" || before.isEmpty()
-            shell(if (unset) "settings delete secure $SHOW_IME" else "settings put secure $SHOW_IME $before")
+            assertTrue("$label is above the sheet top", shown.top >= sheet.sheet.top)
         }
     }
 
@@ -119,6 +125,68 @@ class SheetAndDraftDeviceTest {
         rule.onNode(hasText(rule.activity.getString(org.cassini.ui.R.string.ui_action_stop_keep_progress)))
             .assertIsDisplayed()
         shot("transcribing-new-text")
+    }
+
+    /** Where the open sheet is, in px of its window. */
+    private class SheetWithKeyboard(val statusBar: Int, val sheet: Rect, val keyboardTop: Int)
+
+    /**
+     * Shows the Name a speaker sheet, opens the soft keyboard on its Name field, then runs [check]. With [fontScale]
+     * the system font scale is that value during the test, and the activity is created again with it. The settings
+     * get their old values again at the end. A screenshot goes to `files/device-checks/<shotName>.png`.
+     */
+    private fun withNameSheetAndKeyboard(
+        shotName: String,
+        fontScale: String? = null,
+        check: (SheetWithKeyboard) -> Unit,
+    ) {
+        val before = shell("settings get secure $SHOW_IME").trim()
+        val scaleBefore = shell("settings get system $FONT_SCALE").trim()
+        shell("settings put secure $SHOW_IME 1")
+        try {
+            if (fontScale != null) useFontScale(fontScale.toFloat(), fontScale)
+            rule.setContent { CassiniTheme(darkTheme = false) { NoteScreen(naming, onEvent = {}) } }
+            rule.onNode(hasSetTextAction()).performClick()
+            assertTrue("The soft keyboard did not open", waitForKeyboard())
+            // The field is in the sheet's own dialog window: read the insets and the height of that window.
+            val fieldRoot = rule.onNode(hasSetTextAction()).fetchSemanticsNode().root as ViewRootForTest
+            val sheetWindow = fieldRoot.view.rootView
+            val keyboard = waitForKeyboardInset(sheetWindow)
+            rule.waitForIdle()
+            SystemClock.sleep(SETTLE_MS)
+            val insets = rule.runOnUiThread { requireNotNull(ViewCompat.getRootWindowInsets(sheetWindow)) }
+            val statusBar = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top
+            val window = rule.runOnUiThread { sheetWindow.height }
+            val sheet = rule.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.PaneTitle))
+                .fetchSemanticsNode().boundsInWindow
+            shot(shotName)
+            val scale = rule.activity.resources.configuration.fontScale
+            Log.i(TAG, "Font scale $scale, status bar $statusBar px, sheet ${sheet.top}..${sheet.bottom} px")
+            Log.i(TAG, "Window $window px, keyboard $keyboard px")
+            assertTrue("The keyboard inset is 0 px (API ${Build.VERSION.SDK_INT})", keyboard > 0)
+            check(SheetWithKeyboard(statusBar, sheet, window - keyboard))
+        } finally {
+            val unset = before == "null" || before.isEmpty()
+            shell(if (unset) "settings delete secure $SHOW_IME" else "settings put secure $SHOW_IME $before")
+            if (fontScale != null) {
+                val noScale = scaleBefore == "null" || scaleBefore.isEmpty()
+                shell(
+                    if (noScale) "settings delete system $FONT_SCALE" else "settings put system $FONT_SCALE $scaleBefore",
+                )
+            }
+        }
+    }
+
+    /** Sets the system font scale and waits until the activity has it (Android creates it again), then edge to edge. */
+    private fun useFontScale(scale: Float, setting: String) {
+        shell("settings put system $FONT_SCALE $setting")
+        val end = SystemClock.uptimeMillis() + FONT_SCALE_MS
+        while (abs(rule.activity.resources.configuration.fontScale - scale) > FONT_SCALE_DELTA) {
+            assertTrue("The activity did not get font scale $scale", SystemClock.uptimeMillis() < end)
+            SystemClock.sleep(POLL_MS)
+        }
+        rule.waitForIdle()
+        rule.runOnUiThread { rule.activity.enableEdgeToEdge() }
     }
 
     /**
@@ -166,6 +234,10 @@ class SheetAndDraftDeviceTest {
     private companion object {
         const val TAG = "SheetAndDraftDeviceTest"
         const val SHOW_IME = "show_ime_with_hard_keyboard"
+        const val FONT_SCALE = "font_scale"
+        const val LARGE_FONT_SCALE = "1.3"
+        const val FONT_SCALE_MS = 10_000L
+        const val FONT_SCALE_DELTA = 0.01f
         const val KEYBOARD_MS = 5_000L
         const val POLL_MS = 200L
         const val SETTLE_MS = 600L

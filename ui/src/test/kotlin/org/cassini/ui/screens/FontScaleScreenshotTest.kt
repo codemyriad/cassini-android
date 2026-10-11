@@ -9,7 +9,8 @@ import org.robolectric.annotation.Config
 /**
  * Four boards at font scale 1.5 (docs/design/ui.md section 10.2), goldens only in `fontscale/`. Rows grow with the
  * text and the screens scroll; no text is cut. The Name sheet and Settings scroll past the screen, so each has a
- * second golden (`-end`) scrolled to its last part.
+ * second golden (`-end`) scrolled to its last part. The Name sheet keeps its footer in view below the part that
+ * scrolls.
  */
 @Config(fontScale = 1.5f)
 class FontScaleScreenshotTest : BoardTest() {
@@ -35,7 +36,8 @@ class FontScaleScreenshotTest : BoardTest() {
 
     @Test fun nameSpeaker() = large("04-name-a-speaker")
 
-    @Test fun nameSpeakerEnd() = largeEnd("04-name-a-speaker", "Save name")
+    // The footer (Cancel, Save name) stays below the scrolling part; Remember is the last part that scrolls.
+    @Test fun nameSpeakerEnd() = largeEnd("04-name-a-speaker", "Remember this voice on this phone")
 
     @Test fun settings() = large("08-settings")
 
