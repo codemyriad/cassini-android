@@ -23,6 +23,7 @@ import org.cassini.data.DocumentSignature
 import org.cassini.data.NoteLocks
 import org.cassini.data.Threads
 import org.cassini.data.db.CassiniDatabase
+import org.cassini.data.db.JobEntity
 import org.cassini.data.db.NoteCache
 import org.cassini.data.db.NoteEntity
 import org.json.JSONException
@@ -139,23 +140,29 @@ class DocumentRepository(
      * signature, so the first open reads nothing. The title, the recording time and the meeting id come from the
      * manifest when it has them; otherwise [row]'s values stay, and a document without a manifest gets its duration
      * from its Ogg pages. [duplicateOf] runs inside that transaction first: when it returns a note id, nothing is
-     * written and that id is returned. Returns null when the note was written.
+     * written and that id is returned. Returns null when the note was written. A [job] (the catalogue rebuild's
+     * PAUSED job of a checkpoint) goes into the same transaction at the back of the queue, so the row never exists
+     * without it.
      */
-    internal suspend fun catalogueDocument(row: NoteEntity, duplicateOf: () -> String? = { null }): String? =
-        locks.withNoteLock(row.id, dispatchers.io) {
-            val file = documentFile(row.id)
-            val signature = DocumentSignature.of(file)
-            val document = if (signature == null) missing(file) else readLocked(file, signature)
-            val described = describedBy(row, document, file)
-            database.runInTransaction(
-                Callable<String?> {
-                    duplicateOf() ?: run {
-                        cache.replaceCacheBlocking(DocumentDerivation.derive(described, document, signature, clock()))
-                        null
-                    }
-                },
-            )
-        }
+    internal suspend fun catalogueDocument(
+        row: NoteEntity,
+        job: JobEntity? = null,
+        duplicateOf: () -> String? = { null },
+    ): String? = locks.withNoteLock(row.id, dispatchers.io) {
+        val file = documentFile(row.id)
+        val signature = DocumentSignature.of(file)
+        val document = if (signature == null) missing(file) else readLocked(file, signature)
+        val described = describedBy(row, document, file)
+        database.runInTransaction(
+            Callable<String?> {
+                duplicateOf() ?: run {
+                    cache.replaceCacheBlocking(DocumentDerivation.derive(described, document, signature, clock()))
+                    job?.let(jobs::insertAtBackBlocking)
+                    null
+                }
+            },
+        )
+    }
 
     /**
      * The title of a marked sealed job output that reads back OK (`work/sealed.opus`), or null. The catalogue rebuild names a

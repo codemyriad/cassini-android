@@ -424,4 +424,58 @@ class CatalogueRebuildTest {
             opened.database.close()
         }
     }
+
+    /** Makes each insert into `jobs` fail, as a storage error or a process death between the two writes would. */
+    private fun failJobInserts(fail: Boolean) = offMain {
+        val sql = if (fail) {
+            "CREATE TRIGGER fail_job_insert BEFORE INSERT ON jobs BEGIN SELECT RAISE(ABORT, 'injected'); END"
+        } else {
+            "DROP TRIGGER fail_job_insert"
+        }
+        h.db.openHelper.writableDatabase.execSQL(sql)
+    }
+
+    @Test fun aFailedJobWriteLeavesNoRowAndTheNextStartRecoversThePausedJob() = runTest {
+        fleurs("opus").copyTo(file(pausedId, "capture.opus"))
+        val plainCheckpoint = file(pausedId, "work/checkpoint.json")
+        plainCheckpoint.writeText(CheckpointState.encode(checkpoint("capture.opus")).toString())
+        file(documentId, "document.opus").writeBytes(documentBytes(meetingWords, "Seduta del consiglio"))
+        val documentCheckpoint = file(documentId, "work/checkpoint.json")
+        documentCheckpoint.writeText(CheckpointState.encode(checkpoint("document.opus")).toString())
+        failJobInserts(true)
+
+        val first = catalogue().rebuild()
+
+        assertEquals(listOf(documentId, pausedId), first.failed)
+        assertTrue(first.created.isEmpty())
+        assertNull("the row goes only with its job", h.db.notes().note(pausedId))
+        assertNull(h.db.notes().note(documentId))
+
+        // The next start: the rebuild, then the reconcile of the queue.
+        failJobInserts(false)
+        val next = catalogue().rebuildIfNeeded(setAside = null)
+        assertEquals(listOf(documentId, pausedId), next?.paused)
+        val plainJob = h.db.jobs().job(pausedId)
+        assertEquals(JobState.PAUSED, plainJob?.state)
+        assertEquals(JobKind.TRANSCRIBE, plainJob?.kind)
+        val documentJob = h.db.jobs().job(documentId)
+        assertEquals(JobState.PAUSED, documentJob?.state)
+        assertEquals(JobKind.TRANSCRIBE_AGAIN, documentJob?.kind)
+        val checkpoints = CheckpointRepository(h.db, h.paths, h.dispatchers, h.locks)
+        val jobs = JobRepository(
+            h.db,
+            h.paths,
+            h.dispatchers,
+            h.locks,
+            checkpoints,
+            SealedAdopter.of(h.documents, VoiceRepository(h.db, h.paths, h.dispatchers, checkpoints.names)),
+            RunningJobCanceller {},
+        ) { h.now }
+
+        assertTrue(jobs.reconcileOnStart(null).deletedWork.isEmpty())
+        assertTrue(plainCheckpoint.isFile && documentCheckpoint.isFile)
+        assertNotNull(h.db.jobs().job(pausedId))
+        assertNotNull(h.db.jobs().job(documentId))
+        assertEquals(AudioKind.DOCUMENT, h.row(documentId).audioKind)
+    }
 }

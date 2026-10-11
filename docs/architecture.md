@@ -529,8 +529,8 @@ A voice file whose `version` is newer than the codec stays in place, read-only, 
 
 - `document.opus`: `readChecked`, then a row and the cache rows. The origin is `RECORDED` if the vendor is cassini-android, else `IMPORTED_DOCUMENT`. The title comes from `meeting.title`.
 - `capture.*` or `source.*`: it repairs a `capture.opus` that does not end correctly. The row gets `PLAIN` (`UNPLAYABLE` for an m4a file that does not open), `title = "Recovered recording <d MMM>"` and `origin = RECOVERED`.
-- A `work/sealed` marker: the rebuild finishes the adopt (`SealedAdopter.of`) and makes no job row. If the rebuild cannot read the sealed output, the checkpoint rule applies.
-- A `work/checkpoint.json` that decodes: a PAUSED job with `pause_reason = INTERRUPTED`.
+- A `work/checkpoint.json` that decodes: a PAUSED job with `pause_reason = INTERRUPTED`. The rebuild reads the checkpoint before it writes the row. It writes the row and the job in one Room transaction. Thus a crash or an SQLite error cannot leave a row without its job. Without this rule, the next rebuild does not see the note, and `reconcileOnStart` deletes the checkpoint as orphaned work.
+- A `work/sealed` marker: after the row, the rebuild finishes the adopt (`SealedAdopter.of`). The adopt removes the job row. If the rebuild cannot read the sealed output, the PAUSED job stays.
 - `voices/notes/*.json`: `note_voice_links` rows. The function deletes a file whose note directory does not exist.
 
 ### 4.10 Trash purge

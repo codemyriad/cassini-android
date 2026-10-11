@@ -47,6 +47,19 @@ abstract class JobDao {
     @Insert
     abstract suspend fun insert(job: JobEntity)
 
+    @Insert
+    protected abstract fun insertBlocking(job: JobEntity)
+
+    @Query("SELECT MAX(seq) FROM jobs")
+    protected abstract fun maxSeqBlocking(): Long?
+
+    /** Inserts [job] at the back of the queue (`seq = max + 1`), in the transaction of a caller that holds a lock. */
+    @WorkerThread
+    @Transaction
+    open fun insertAtBackBlocking(job: JobEntity) {
+        insertBlocking(job.copy(seq = (maxSeqBlocking() ?: 0) + 1))
+    }
+
     @Update
     abstract suspend fun update(job: JobEntity)
 

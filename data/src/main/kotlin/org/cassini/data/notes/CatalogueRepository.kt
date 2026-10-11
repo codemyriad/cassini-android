@@ -3,6 +3,7 @@ package org.cassini.data.notes
 import android.database.SQLException
 import android.util.AtomicFile
 import android.util.Log
+import androidx.room.withTransaction
 import kotlinx.coroutines.withContext
 import org.cassini.core.checkpoint.CheckpointState
 import org.cassini.core.library.AudioKind
@@ -51,8 +52,11 @@ fun interface RecoveredTitle {
  *   cassini-android, else IMPORTED_DOCUMENT; the title is `meeting.title`);
  * - otherwise `capture.*` or `source.*` gives a RECOVERED row titled "Recovered recording <d MMM>": a capture that
  *   did not end cleanly is repaired, and the row is PLAIN, or UNPLAYABLE when nothing plays;
- * - a `work/sealed` marker is finished by [SealedAdopter.of]; a `work/checkpoint.json` that decodes gives a PAUSED
- *   job with reason INTERRUPTED (`reconcileOnStart` validates it later).
+ * - a `work/checkpoint.json` that decodes gives a PAUSED job with reason INTERRUPTED (`reconcileOnStart` validates
+ *   it later). The checkpoint is read first, and the row and its job are written in one transaction: otherwise a
+ *   crash between them leaves a row without a job, the next rebuild skips the note and `reconcileOnStart` deletes
+ *   the checkpoint as orphaned work;
+ * - then a `work/sealed` marker is finished by [SealedAdopter.of], which also removes the job row.
  *
  * Then `VoiceRepository.syncLinks` rebuilds `note_voice_links` from `voices/notes/<noteId>.json` and deletes the
  * voice files of notes that have neither a row nor a directory. The rebuild is idempotent (notes that have a row are
@@ -62,7 +66,7 @@ fun interface RecoveredTitle {
 // Manual DI: the repositories take their collaborators explicitly.
 @Suppress("LongParameterList")
 class CatalogueRepository(
-    database: CassiniDatabase,
+    private val database: CassiniDatabase,
     private val paths: AppPaths,
     private val dispatchers: CassiniDispatchers,
     private val locks: NoteLocks,
@@ -100,12 +104,11 @@ class CatalogueRepository(
             // again; with a row, `reconcileOnStart` handles what is left in its work directory.
             val added = attempt(dir) { catalogue(dir) }
             if (added == null) failed += id
-            if (added != true) continue
+            if (added == null || added == Added.NOTHING) continue
             created += id
-            when (attempt(dir) { finishWork(id) }) {
-                Work.ADOPTED -> adopted += id
-                Work.PAUSED -> paused += id
-                Work.NONE -> Unit
+            when (attempt(dir) { adoptSealed(id) }) {
+                true -> adopted += id
+                false -> if (added == Added.ROW_AND_JOB) paused += id
                 null -> failed += id
             }
         }
@@ -130,19 +133,34 @@ class CatalogueRepository(
         }
     }
 
-    /** Adds the row of one note directory; false when it holds no audio (an interrupted import, an empty folder). */
-    private suspend fun catalogue(dir: File): Boolean {
+    private enum class Added { NOTHING, ROW, ROW_AND_JOB }
+
+    /**
+     * Adds the row of one note directory, with the PAUSED job of a checkpoint in the same transaction. NOTHING when
+     * the directory holds no audio (an interrupted import, an empty folder).
+     */
+    private suspend fun catalogue(dir: File): Added {
+        val id = dir.name
+        val checkpoint = locks.withNoteLock(id, dispatchers.io) { readCheckpoint(paths.work(id)) }
+        val job = checkpoint?.let { pausedJob(id, it, clock()) }
         val document = File(dir, NoteFiles.DOCUMENT)
-        val documentRow = withContext(dispatchers.io) { if (document.isFile) documentRow(dir.name, document) else null }
+        val documentRow = withContext(dispatchers.io) { if (document.isFile) documentRow(id, document) else null }
         if (documentRow != null) {
-            documents.catalogueDocument(documentRow)
+            documents.catalogueDocument(documentRow, job)
         } else {
-            val plain = locks.withNoteLock(dir.name, dispatchers.io) { plainRow(dir, clock()) }
+            val plain = locks.withNoteLock(id, dispatchers.io) { plainRow(dir, clock()) } ?: return Added.NOTHING
             // A sealed output awaiting adopt carries the title the note had when the job sealed it.
-            val sealedTitle = plain?.let { documents.sealedTitle(it.id) }
-            plain?.let { notes.insert(if (sealedTitle == null) it else it.copy(title = sealedTitle)) }
+            val row = documents.sealedTitle(id)?.let { plain.copy(title = it) } ?: plain
+            database.withTransaction {
+                notes.insert(row)
+                job?.let { jobs.insert(it.copy(seq = (jobs.maxSeq() ?: 0) + 1)) }
+            }
         }
-        return documentRow != null || notes.note(dir.name) != null
+        return when {
+            notes.note(id) == null -> Added.NOTHING
+            job != null -> Added.ROW_AND_JOB
+            else -> Added.ROW
+        }
     }
 
     /** The row of a document note before its cache is derived; the document's manifest fills the title and time. */
@@ -190,32 +208,10 @@ class CatalogueRepository(
         )
     }
 
-    private enum class Work { NONE, ADOPTED, PAUSED }
-
-    /** Finishes a sealed output, else turns a saved checkpoint into a PAUSED(INTERRUPTED) job. */
-    private suspend fun finishWork(id: String): Work {
-        val work = paths.work(id)
-        val sealed = withContext(dispatchers.io) { File(work, NoteFiles.SEALED_MARKER).isFile }
-        if (sealed && adopter.adopt(id) is AdoptOutcome.Adopted) return Work.ADOPTED
-        val checkpoint = locks.withNoteLock(id, dispatchers.io) { readCheckpoint(work) }
-        if (checkpoint != null) {
-            val now = clock()
-            jobs.insert(
-                JobEntity(
-                    noteId = id,
-                    seq = (jobs.maxSeq() ?: 0) + 1,
-                    kind = if (checkpoint.source == NoteFiles.DOCUMENT) JobKind.TRANSCRIBE_AGAIN else JobKind.TRANSCRIBE,
-                    state = JobState.PAUSED,
-                    pauseReason = PauseReason.INTERRUPTED,
-                    doneMs = checkpoint.doneMs,
-                    totalMs = checkpoint.durationMs,
-                    words = checkpoint.recognition.chunks.words.size,
-                    enqueuedAt = now,
-                    updatedAt = now,
-                ),
-            )
-        }
-        return if (checkpoint != null) Work.PAUSED else Work.NONE
+    /** Finishes a sealed output; true when it was adopted (adopt also removes the PAUSED job). */
+    private suspend fun adoptSealed(id: String): Boolean {
+        val sealed = withContext(dispatchers.io) { File(paths.work(id), NoteFiles.SEALED_MARKER).isFile }
+        return sealed && adopter.adopt(id) is AdoptOutcome.Adopted
     }
 
     /** `work/checkpoint.json` through `AtomicFile` (which falls back to an interrupted write's backup), or null. */
@@ -260,3 +256,17 @@ private suspend fun <T : Any> attempt(dir: File, block: suspend () -> T): T? = t
     Log.w("CatalogueRepository", "Cannot catalogue $dir", error)
     null
 }
+
+/** The PAUSED(INTERRUPTED) job of a saved [checkpoint] at [now]; its `seq` is set when it is written. */
+private fun pausedJob(id: String, checkpoint: CheckpointState, now: Long) = JobEntity(
+    noteId = id,
+    seq = 0,
+    kind = if (checkpoint.source == NoteFiles.DOCUMENT) JobKind.TRANSCRIBE_AGAIN else JobKind.TRANSCRIBE,
+    state = JobState.PAUSED,
+    pauseReason = PauseReason.INTERRUPTED,
+    doneMs = checkpoint.doneMs,
+    totalMs = checkpoint.durationMs,
+    words = checkpoint.recognition.chunks.words.size,
+    enqueuedAt = now,
+    updatedAt = now,
+)
