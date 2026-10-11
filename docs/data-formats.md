@@ -24,7 +24,8 @@ notes/<noteId>/                              one directory for each note; <noteI
     document.opus                            the sealed Cassini document; when it exists, it is the audio of the note
     document.opus.tmp, source.tmp            temporary writes
     work/                                    transcription state, only while a job is not finished
-        checkpoint.json (+.bak)              the checkpoint, version 1
+        checkpoint.json (+.bak)              the checkpoint, version 2
+        words.log                            the settled words of the checkpoint
         names.json (+.bak)                   the draft speaker names
         audio.opus.part                      libopus output for a source that is not Opus
         clips.pcm                            voice clips, raw 16 kHz f32le audio
@@ -113,12 +114,14 @@ The app language is not in DataStore. AppCompat keeps it as a per-app locale. On
 
 `checkpoint.json` version 1 has the keys of 0.1.0. They are `version`, `source`, `signature`, `model`, `speakers`, `recognition`, `encoder`, `diarizer`, `speakerPrefix`, `speakerFailure`, `clipSamples`, `voiceClips`, `positionSamples`, `doneMs`, `durationMs` and `elapsedMs`.
 
+The app writes version 2. Version 2 adds one key, `wordLog`, with `count` and `bytes`. The first `count` words of the transcript are in the first `bytes` bytes of `work/words.log`, and `recognition.chunks.words` holds only the words after them. `words.log` has one word on each line, as a compact JSON array: `["<speaker>",<startMs>,<endMs>,"<text>"]`. The app appends a word to the log when the word is settled: when it ends 10 s or more before the start of the open window. Thus the size of `checkpoint.json` does not increase with the recording. The app reads version 1 and version 2. architecture.md section 3.5 gives the rules for a crash.
+
 - `source` is the name of the audio file of the note, for example `capture.opus` or `document.opus`.
 - `signature` is `length:mtime` of that file.
 - `model` is the Parakeet revision, and `speakers` is the SHA-256 of the diarizer model.
 - `diarizer.cache` holds at most 200000 floats.
 
-`CheckpointState.validate` compares these values with the note row. If a value is different, the job fails with `CHECKPOINT_MISMATCH` ("Saved progress no longer matches"). A golden `checkpoint.json` from a 0.1.0 device run is in `core/src/test/resources/checkpoint/`.
+`CheckpointState.validate` compares these values with the note row. It also makes sure that `words.log` holds at least `wordLog.bytes` bytes. If a value is different, the job fails with `CHECKPOINT_MISMATCH` ("Saved progress no longer matches"). A golden `checkpoint.json` from a 0.1.0 device run is in `core/src/test/resources/checkpoint/`.
 
 ### names.json
 

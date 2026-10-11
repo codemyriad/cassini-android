@@ -103,12 +103,12 @@ The P1 move kept the bodies of the files, except for the listed edits. `scripts/
 
 | Package | Files | Notes |
 |---|---|---|
-| `format` | `OggOpus`, `CassiniPayload`, `CassiniDocument`, `Transcript`, `OggRepair`, `SpeakerAttribution`, `SpeakerMerges` | Verbatim. `CassiniDocument` has a typed `DocumentState` (`PLAIN_AUDIO`, `UNKNOWN_FORMAT`, `INVALID_METADATA`, `UNVERIFIED`, `STALE_AUDIO`, `OK`, `UNREADABLE`). `UNREADABLE` means an I/O error. A note in this state stays openable, and you can transcribe it again. `seal` with an `existing` document uses its manifest again. Thus Transcribe again ignores the `title` argument. A new seal adds a `TITLE` tag only when the source has none. P3 added `CassiniDocument.retitle` next to the verbatim `relabel`. It has the same shape and requires `OK`. It sets `meeting.title` and replaces or adds the `TITLE` tag. It changes nothing else. |
-| `audio` | `Resampler`, `PcmSource`, `AudioLimits`, `PcmBuilder`, `WavDecoder` | P3 added `RecordingSpace` and `RecordingPolicy`. |
+| `format` | `OggOpus`, `CassiniPayload`, `CassiniDocument`, `Transcript`, `OggRepair`, `SpeakerAttribution`, `SpeakerMerges` | Verbatim. `WordBodyBudget` is new: it counts the bytes of a word body without the body (section 3.7). `CassiniDocument` has a typed `DocumentState` (`PLAIN_AUDIO`, `UNKNOWN_FORMAT`, `INVALID_METADATA`, `UNVERIFIED`, `STALE_AUDIO`, `OK`, `UNREADABLE`). `UNREADABLE` means an I/O error. A note in this state stays openable, and you can transcribe it again. `seal` with an `existing` document uses its manifest again. Thus Transcribe again ignores the `title` argument. A new seal adds a `TITLE` tag only when the source has none. P3 added `CassiniDocument.retitle` next to the verbatim `relabel`. It has the same shape and requires `OK`. It sets `meeting.title` and replaces or adds the `TITLE` tag. It changes nothing else. |
+| `audio` | `Resampler`, `PcmSource`, `AudioLimits`, `PcmBuilder`, `WavDecoder` | P3 added `RecordingSpace` and `RecordingPolicy`. On 2026-10-11, `Limits.MAX_RECORDING_MS` (2 h) became `MAX_TRANSCRIBE_MS` (36 h), and `MAX_IMPORT_BYTES` became 4 GiB. We removed `RECORDING_WARNING_MS` (section 3.7). |
 | `asr` | `SpeechWindows`, `SeamMerge`, `WordGate`, `IncrementalTranscript`, `SpeechFeed`, `DecodeSession`, `TokenWords`, `TranscriptionProgress`, `ProcessingSpeed`, `BatteryProjection` | The algorithms did not change. |
 | `speakers` | `SpeakerAssignment`, `TurnHistory`, `VoiceMatcher`, `VoiceprintSelection`, `VoiceClipCache`, `SpeakerBudget`, `VoiceCodec`, `NoteVoiceCodec`, `DefaultLabels` | `DefaultLabels.PREFIXES` = `Speaker `, `Voce ` (the placeholder label of each shipped language). P3 added `SpeakerStats`, `SpeakerTint`, `NameMatch`, `VoiceStaleness`, and an `excluded` parameter on `VoiceMatcher.match`. |
 | `models` | `ModelCatalog`, `ArtifactFetcher` | `ArtifactFetcher` continues `.part` files with HTTP Range (section 5.6). P3 added `ModelPart`, `ModelPlan`, a progress callback for the digest, `VOICEPRINT_DIM = 512` and the redirect allow-list. |
-| `checkpoint` | `CheckpointData`, `CheckpointState` | The codec of `checkpoint.json` version 1. P3 added two optional members to `names.json` (section 3.6). |
+| `checkpoint` | `CheckpointData`, `CheckpointState` | The codec of `checkpoint.json`. It reads version 1 and version 2, and writes version 2 (section 3.5). `WordLog` is the codec of `words.log`. P3 added two optional members to `names.json` (section 3.6). |
 | `library` | `NoteRules` (P10 removed it) | P3 added the shared enums (`Origin`, `AudioKind`, `JobState`, `JobKind`, `PauseReason`, `VariantKind`), `NoteStatus`, `DayGroups`, `SearchQuery`, `TrashPolicy` and `PreviewText`. Two rules refine features.md section 1. Their KDoc gives the details. `PreviewText` stops at the first turn end after it holds 40 characters (a shorter turn continues, and board 00 stops before Speaker 3). It uses the transcript start at or after the end of the last word. `SearchQuery.fts` changes each character that is not a letter, a digit or a mark into a space inside the phrase (`e-mail` → `"e mail*"`, `giov.` → `"giov*"`), as unicode61 makes tokens. It removes terms without a letter or a digit. |
 | `export` | New in P3 | `TranscriptTurns`, `ExportClock`, `TextExport`, `SubtitleCues`, `SrtWriter`, `VttWriter`, `ExportNames` (features.md section 9). |
 | (root) | `Failure` | Failure codes without string resources. `FailureMessages` in `:app` is the only place where a failure gets a string. |
@@ -200,7 +200,8 @@ notes/<noteId>/                              one directory for each note; <noteI
     document.opus                            sealed Cassini document; when it exists, it is the audio of the note
     document.opus.tmp, source.tmp            temporary writes (fsync, then rename into place)
     work/                                    transcription state, only while a job is not finished
-        checkpoint.json (+.bak)              CheckpointState version 1
+        checkpoint.json (+.bak)              CheckpointState version 2
+        words.log                            the settled words of the checkpoint, one JSON array for each line
         names.json (+.bak)                   draft labels, merges, remembered, automatic, generation, live, rejected
         audio.opus.part                      libopus output for non-Opus sources
         clips.pcm                            selected voice clips (at most 8 x 45 s), raw 16 kHz f32le (audio, not voiceprints)
@@ -351,6 +352,18 @@ The test APK instruments itself and does not touch the data of the app. If the S
 
 `checkpoint.json` version 1 has the keys of 0.1.0: `version`, `source`, `signature` (`length:mtime`), `model` (the Parakeet revision), `speakers` (the SHA-256 of the diarizer), `recognition{inferenceMs, chunks[{start, end, window (base64 f32le), words (cassini.words.v1)}]}`, `encoder{…libopus history, Ogg LiveState, length}`, `diarizer{cache (base64, at most 200000 floats), elapsedMs, turns}`, `speakerPrefix`, `speakerFailure`, `clipSamples`, `voiceClips`, `positionSamples`, `doneMs`, `durationMs` and `elapsedMs`.
 
+Version 1 holds all the words in `chunks.words`, and the job writes the file again after each 28 s window. Thus the bytes of each write increase with the recording, and the total work increases with the square of the length (section 3.7). Version 2 adds one key, `wordLog{count, bytes}`, and the file `work/words.log`:
+
+- A word is settled when it ends 10 s or more before the start of the open window (`WordLog.SETTLE_MS`). Only the merge of the next window changes words, and only in its 2 s overlap.
+- `words.log` has one settled word on each line: a compact JSON array `["<speaker>",<startMs>,<endMs>,"<text>"]`.
+- `wordLog` names the valid prefix of the log: its first `count` words, in its first `bytes` bytes. `chunks.words` holds only the words after this prefix.
+- `CheckpointRepository.saveBlocking` appends the words that settled since the last save and does an fsync of the log. Then it writes `checkpoint.json`. Thus a checkpoint never names bytes that are not on the disk.
+- After a crash between the append and the checkpoint, the log has more bytes than the prefix. The reader ignores them, and the next save writes over them.
+- The first save of a note in a process writes the whole log again, through `words.log.tmp` and a rename. The old prefix stays the same, because settled words do not change. A save whose words do not continue the log also writes it again.
+- `CheckpointState.validate` also makes sure that the log has at least `wordLog.bytes` bytes. A short or damaged log is a mismatch (`MismatchReason.WORDS`).
+
+The codec writes version 2 and reads both versions. A version 1 file resumes with all its words inline, and the next save writes version 2.
+
 In the new layout, `source` holds the name of the audio file of the note (`capture.opus`, `source.mp3`, `document.opus`, …). `CheckpointState.validate` compares `source`, the signature, the Parakeet revision and the SHA of the diarizer with values from the note row.
 
 The name of the directory comes from the note ID. The app deletes the directory at the end of adopt (first the row, then the directory), at "Start over" and at purge. A committed golden `checkpoint.json` from a 0.1.0 device run stays in `core/src/test/resources/checkpoint/` as a test of the codec.
@@ -369,6 +382,66 @@ The members of 0.1.0 are `labels`, `merges`, `remembered`, `automatic` and `gene
 Each running or paused note has one owner of its draft names: `DraftNames`. This class is in `:data`, and `CheckpointRepository` holds it. It keeps an `AtomicReference<CheckpointNames>`. Each change, from the UI or from the job, is an `updateAndGet` with a pure reducer of `CheckpointNames` in `:core`. The reducers are `confirm`, `reject`, `rename`, `merge`, `remember` and `applyLive`. `applyLive` applies the live matches of the job and also sets the `automatic` names. At step 6, the job closes naming with `DraftNames.close()` (P5). This function is not a reducer of `:core`.
 
 After each change, the code writes the current value to `names.json` under the file lock of the note. It reads the reference inside the lock, so the last write always holds the latest state. No code writes a copy that it read earlier.
+
+### 3.7 Length limits
+
+A recording has no time limit. It continues until the user stops it, or until the free space of the device gets to a floor. A transcription has real limits that come from the code and from the format. The table gives each length limit of the app, its cause, and the decision of 2026-10-11 (owner: "If the user started the recording and did not stop it, we should keep recording").
+
+"Real" means that the code or the platform cannot go past the limit. "Policy" means that we selected the value.
+
+| Limit | Where | Value | Kind | Decision |
+|---|---|---|---|---|
+| Time cap of a recording | `Limits.MAX_RECORDING_MS`, `RecordingPolicy` | 2 h | Policy | Removed. The recording continues until Finish or the storage floor. |
+| Warning before the time cap | `Limits.RECORDING_WARNING_MS`, REC_NEAR_LIMIT | 5 min | Policy | Removed, with the banner and the "Stops at 2 hours" hint. |
+| Storage floor of a recording | `Limits.MIN_RECORDING_FREE_BYTES` | 200 MiB | Policy | Kept. At the floor, the controller stops the capture, saves the file and shows REC_STOPPED_STORAGE. The space is for the end of the file, the database and the rest of the phone. |
+| Wake lock of a recording | `RecordingController.WAKE_LOCK_TIMEOUT_MS` | 2 h 10 min | Policy | Changed to a 10 min timeout. The policy loop renews the lock each minute. Thus the lock lasts as long as the recording, and a dead process cannot keep it. |
+| Opus capture file (API 29+) | `OggOpus.LiveMuxer`, `OpusCapture` | 2^63 samples, 2^32 pages | Real, not reachable | No change. The granule and the sample counts are `Long`. One page holds one 20 ms packet, so the 32-bit page sequence lasts 994 days. |
+| AAC capture file (API 26-28, and phones without an Opus encoder) | MediaRecorder MP4 (AOSP `MPEG4Writer`) | 4 GiB (290 h at 32 kb/s) | Real (calculation) | The MP4 file has 32-bit chunk offsets. MediaRecorder also keeps the index of the file in memory until the stop: 4 bytes for each 21.3 ms frame. The policy loop stops the capture at `RecordingPolicy.AAC_MAX_FILE_BYTES` (1 GiB, about 74 h) and saves it (REC_STOPPED_FILE_LIMIT). The space hint counts the room left in the file. We did not measure this limit on a device. |
+| Import size | `Limits.MAX_IMPORT_BYTES` | 2 GiB | Policy | Changed to 4 GiB. The copy, the hash and the WAV reader use `Long` sizes. A WAV file cannot be larger than 4 GiB (32-bit sizes). At a speech bitrate, 4 GiB of compressed audio is more than 36 h. |
+| Free space for an import, a cache copy and the job | `Limits.MIN_FREE_BYTES` | 64 MiB | Policy | Kept. |
+| Duration of one transcription | `Limits.MAX_TRANSCRIBE_MS` (was `MAX_RECORDING_MS`) | 2 h | Real at 37.28 h | Changed to 36 h. The 16 kHz sample positions are `Int` in the verbatim engine (`Limits.MAX_SAMPLES`, `IncrementalTranscript`, `PcmFile`, `StreamingOpusEncoder`): 2^31 samples are 37.28 h. The job refuses longer audio before the download and the model load (`Failure.LONG`). |
+| Frame positions of the decoder | `AudioDecoder`, `WavDecoder.framePosition` | 2^31 frames at the source rate | Real | Changed to `Long` (a permitted verbatim edit). Before, an `Int` overflowed after 12.4 h of 48 kHz audio and after 6.2 h of 96 kHz audio. |
+| Word body of one transcript | `CassiniPayload.MAX_RAW` (verbatim format code) | 16 MiB of JSON | Real | Kept. The body is pretty-printed JSON of about 151 bytes for each word (measured, with the speaker IDs of the job). 16 MiB holds about 111,000 words: 11.6 h at 9,500 words an hour. The job counts the body after each window (`WordBodyBudget`). When the words do not fit, it stops with `Failure.LONG` at that window, not at the seal. |
+| Header of the document | `OggOpus.MAX_HEADER_BYTES`, the chunk count, the comment count | 8 MiB, 4,096 chunks of each body, 20,000 comments | Real | Kept. A body at its limit is about 1.1 MiB after gzip and 384 chunks (measured). Thus about five long versions fit in one document. |
+| `checkpoint.json` | `CheckpointState` version 1 | Grew with the recording | Real (time and wear) | Changed to version 2 with `work/words.log` (section 3.5). The measurements follow this table. |
+| Sortformer state | `SpeakerBudget.DIARIZER_STATE_FLOATS` | 200,000 floats | Real, fixed size | No change. The saved state has a fixed size: 7 + 188 x 512 + 188 x 4 + 188 x 512 = 193,271 floats for the pinned model. It does not grow with the recording. |
+| Voice clips | `SpeakerBudget` | 8 speakers x 45 s | Policy, fixed size | No change. It does not grow with the recording. |
+| Word cache in Room | table `words` | One row for each word | No limit | No change. 9,500 rows load in about 210 ms (section 3.3), so 111,000 rows load in about 2.5 s. The first 200 rows load in less than 10 ms. One `note_text.body` row holds about 7 bytes for each word (0.8 MB at the body limit), less than the 2 MB cursor window. The queries read only a prefix or a snippet of it. |
+| Exports | `TextExport`, `SrtWriter`, `VttWriter` | No limit | – | No change. They write 11 h of words in less than 1 s on the JVM (`LongExportTest`). |
+| Progress and time left | `TranscriptionProgress`, `ProgressTracker` | No limit | – | No change. All times are `Long` milliseconds. The text form is "N h M min". |
+| Background budget of Android 15+ | `mediaProcessing` foreground service type | About 6 h in each 24 h | Real (platform) | No change in the mechanism (section 5.7). The job pauses with its checkpoint (PAUSED, `SYSTEM`). The banner and the notification now tell the user about the daily limit of Android. Resume continues from the checkpoint. |
+| Free space for the seal | `TranscriptionJob.requireSpace` | Audio length + 64 MiB | Real | No change. The sealed document is a copy of the audio (21.6 MB for each hour of Opus at 48 kb/s). A recording that stopped at the storage floor can only be transcribed after the user frees space (`Failure.SPACE`). |
+
+Measurements of `checkpoint.json` (`LongRunMeasurementTest`, JVM on the development computer, 2026-10-11). The synthetic run has these properties:
+
+- 10 h of speech at 9,500 words an hour
+- A checkpoint after each 26 s window (1,384 windows)
+- The Sortformer state of the pinned model
+- One speaker turn for each 23 words
+
+
+| Version | `checkpoint.json` at 9 h | Bytes written in 10 h | Encoding time in 10 h |
+|---|---|---|---|
+| 1 (every word inline) | 10.6 MB | 8,469 MB | 541 s |
+| 2 (`words.log`) | 1.29 MB | 1,655 MB | 32 s |
+
+With version 2, the bytes that each window writes do not grow with the words. Most of the remaining 1.2 MB of each checkpoint is the Sortformer state and the 2 s of audio of the open window. This part is the same for each window, so the total increases linearly with the recording (about 160 MB for each hour). The diarizer turns stay inline, at about 22 bytes for each turn. A phone is slower than the development computer, so version 1 cost more time there.
+
+Measurements of the word body (`LongRunMeasurementTest`, the same synthetic words):
+
+| Speech | Words | Body | After gzip | Chunks |
+|---|---|---|---|---|
+| 1 h | 9,523 | 1.35 MB | 0.10 MB | 36 |
+| 8 h | 76,190 | 10.96 MB | 0.82 MB | 280 |
+| 11 h | 104,761 | 15.09 MB | 1.12 MB | 384 |
+| 12 h | 114,285 | 16.47 MB | more than the limit | – |
+
+These changes can make the transcription limit longer. They are open decisions for the owner:
+
+- A body in compact JSON, as the specification requires (section 12). This gives space for about two times more words.
+- Shorter speaker IDs. The ID of the job (`diar_<UUID>_N`) is 43 of the 151 bytes of each word.
+- The 64 MiB limit of the specification for a body. Other Cassini readers accept it, but the Android reader keeps the parsed words in memory.
+- More than one note for a very long recording.
 
 ## 4. Repositories (`:data`)
 
@@ -415,7 +488,7 @@ If a crash or an I/O error occurs before the end, the marker stays, and the next
 
 `import(uri): ImportOutcome` gives `Created(noteId)`, `Existing(noteId)` or `Rejected(failure, detail)`. It does these steps:
 
-1. Read `OpenableColumns.SIZE` and `DISPLAY_NAME`. Reject a file larger than `Limits.MAX_IMPORT_BYTES` (2 GiB) with `LARGE`. `Limits` is in `core/audio/AudioLimits.kt`.
+1. Read `OpenableColumns.SIZE` and `DISPLAY_NAME`. Reject a file larger than `Limits.MAX_IMPORT_BYTES` (4 GiB) with `LARGE`. `Limits` is in `core/audio/AudioLimits.kt`.
 2. Make sure that `usableSpace ≥ size + Limits.MIN_FREE_BYTES`. If not, reject the file with `SPACE` and the necessary bytes. If the space goes during the copy, `SPACE` also gives `size + MIN_FREE_BYTES`, because the import deletes the copied part.
 3. Copy the stream into `notes/<newId>/source.tmp`. Calculate the SHA-256 and apply the size limit during the copy.
 4. If the hash is equal to the `source_sha256` of a live note, delete the new directory and return `Existing`. Ignore a match with a note in the trash.
@@ -450,7 +523,7 @@ An import can operate while a job runs.
 ### 4.4 `CheckpointRepository`
 
 - `loadBlocking(noteId, expected)` gives `Valid(state)`, `Missing` or `Mismatch(reason)`.
-- `saveBlocking(noteId, state)` writes with AtomicFile, after the fsync of `audio.opus.part` and `clips.pcm`.
+- `saveBlocking(noteId, state)` writes with AtomicFile, after the fsync of `audio.opus.part` and `clips.pcm`, and after the append and the fsync of `words.log` (section 3.5).
 - `draftNames(noteId): DraftNames` (section 3.6) loads `names.json` one time for each process.
 - `discard(noteId)`.
 - `dropSealed(noteId)` and `dropSealedBlocking(noteId)` (section 5.2, rule 5) delete the `sealed` marker, do an fsync of `work/` and then delete `sealed.opus`. The checkpoint, `names.json`, `clips.pcm` and `audio.opus.part` stay.
@@ -734,7 +807,7 @@ The service type follows `coordinator.foregroundNeed`:
 5. It writes the row as PAUSED(SYSTEM), so that each screen shows Paused immediately.
 6. If a standalone download runs, it stops, because no foreground service keeps it. `ModelInstallOwner.stopDownloads` cancels each standalone wait. The installation stops when no job waits for it. The `.part` files stay for a Range resume. Each part that is not installed shows `Failed(DOWNLOAD, STOPPED_BY_SYSTEM)` until the next installation, and `lastOutcome` is STOPPED_BY_SYSTEM. Thus the Library shows DL_STOPPED with Retry and the body "Android stopped the download. Try again to continue where it stopped.", and Settings shows "Download failed". In Settings, a "Download failed" row opens Model download, and Download there starts the download again.
 
-The app never shows a timeout as an error. After a timeout, Resume operates only from a visible screen.
+The app never shows a timeout as an error. After a timeout, Resume operates only from a visible screen. The notification and the TX_PAUSED banner tell the user why: "Android limits background work to about 6 hours a day." (`BannerArgs.bySystem` for a PAUSED row with `pause_reason = SYSTEM`). The budget applies only to API 35 and later. A long job can thus pause more than one time. Each Resume continues from the last checkpoint.
 
 The service stops only after the drain job of the coordinator completed its `join()`. Thus a native call that finishes never runs outside a foreground service.
 
@@ -766,7 +839,7 @@ The visible Recording screen calls `start(title)`, because Android 14 requires a
 2. It sets `activeNoteId`.
 3. It starts `RecordingService`, which first calls `startForeground(MICROPHONE)`.
 4. It makes the capture.
-5. It acquires the wake lock (2 h 10 min).
+5. It acquires the wake lock (10 min). The policy loop acquires it again each minute.
 6. It starts the policy loop of 1 s.
 
 If the start fails, the function deletes the empty directory and the row (`CouldNotStart`).
@@ -775,25 +848,24 @@ The controller writes a title edit to the row 500 ms after the last keystroke. `
 
 `finish(title)` is asynchronous. It calls `capture.stop()` on the capture dispatcher (up to 10 s). Then the row becomes `PLAIN` with the duration. If a transcription follows, the hand-off occurs. Then the state becomes `Ended(Saved)`.
 
-`RecordingPolicy.decide(elapsedMs, usableBytes, bytesPerSecond)` is a pure function in `:core`. The nominal rates are 6000 B/s for Opus 48 kb/s and 4000 B/s for AAC 32 kb/s. After 10 s, the function uses the measured growth of the file. `RecordingSpace` gives the remaining time for the space limit and for the time limit. The hint shows the smaller one (features.md section 2). The policy gives these results:
+A recording has no time limit. `RecordingPolicy.decide(usableBytes, bytesPerSecond, fileBytes, maxFileBytes)` is a pure function in `:core`. The nominal rates are 6000 B/s for Opus 48 kb/s and 4000 B/s for AAC 32 kb/s. After 10 s, the controller uses the measured growth of the file. `RecordingSpace` gives the remaining time until the storage floor, or until the size limit of an AAC file when that comes first. The hint shows it, with no upper limit ("Space for about 31 h more."). The policy gives these results:
 
-- 15 min of space or less: StorageLow.
-- Less than the floor of 200 MiB: stop and save.
-- 5 min before `MAX_RECORDING_MS` (2 h): NearTimeLimit.
-- At the time limit: stop and save.
+- 15 min of space or less: StorageLow. This warning counts only the free space.
+- Less than the floor of 200 MiB: stop and save (`StoppedForSpace`).
+- An AAC file at `RecordingPolicy.AAC_MAX_FILE_BYTES` (1 GiB): stop and save (`StoppedAtFileLimit`, section 3.7).
 
 Back, the chevron and the Library button do not stop the recording. Only Finish stops it.
 
 A pause has one of two causes: USER or OTHER_APP. On API 29+, OTHER_APP comes from `AudioManager.registerAudioRecordingCallback`, for the client session ID of the app (`isClientSilenced`). On API 26-28, it comes from the transient focus listener, which the controller requests again after each resume. When the silence ends, the recording stays paused until the user resumes it. On API 29+, the app does not request audio focus, so the music of the user continues.
 
-Hand-off from recording to processing: `RecordingService` writes the row as QUEUED and calls `startForegroundService(ProcessingService)` inside a `try`/`catch`. It waits for `coordinator.state.first { it.serviceForeground }` (10 s timeout). After this, it stops its own foreground state. The start is permitted when Finish came from the visible screen or from the notification action (temporary allow-list). After a timeout or a failure, the note stays QUEUED, and the user gets "Ready to transcribe". An example is a recording that gets to the 2 h limit in the background. The next ON_START starts the note.
+Hand-off from recording to processing: `RecordingService` writes the row as QUEUED and calls `startForegroundService(ProcessingService)` inside a `try`/`catch`. It waits for `coordinator.state.first { it.serviceForeground }` (10 s timeout). After this, it stops its own foreground state. The start is permitted when Finish came from the visible screen or from the notification action (temporary allow-list). After a timeout or a failure, the note stays QUEUED, and the user gets "Ready to transcribe". The next ON_START starts the note.
 
 After Finish, these rules apply:
 
 - With consent, the note goes into the queue.
 - Without consent and without `models.declinedAt`, the Note screen opens with the Model download screen on top.
 - Else the note is "Audio only".
-- After a stop for storage or a microphone failure, the note never goes into the queue automatically.
+- After a stop for storage, a stop at the AAC file limit or a microphone failure, the note never goes into the queue automatically.
 
 `RecordingService` is `START_NOT_STICKY`. After a crash, `RecoveryRepository` repairs the recording at the next start.
 
@@ -911,6 +983,7 @@ CI has three workflows in `.github/workflows/`. `docs/development.md` ("Continuo
 - No network without consent.
 - The provenance is the same as in 0.1.0 for the same inputs.
 - The seal never touches `document.opus`.
+- The length limits of section 3.7: audio longer than the limit fails before any work, and words that outgrow the word body fail at that window.
  `ModelInstallOwnerTest` makes sure that each artifact has one fetch when a standalone download and a job overlap. `DraftNamesTest` makes sure that UI and job reducers that operate at the same time lose nothing.
 
 Device tests: a `CassiniTestRunner` sets `AppPaths.root` to `filesDir/androidTest-<run>`. It keeps `modelRoot = filesDir`, or it gives an empty scratch model root to the tests of the download screens. Thus the tests never touch the data of the user, and they still use the installed models. The committed CC-BY-4.0 FLEURS clip is the audio input. The flow tests in `flows/` start the real `MainActivity` over the graph of the runner (`docs/development.md`, "Device flow tests").

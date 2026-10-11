@@ -101,14 +101,15 @@ The dark surface is the same in the two app themes.
 - Title [KEPT, live save NEW]: the label "Title" and an editable field. The default is "Voice note 8 Oct, 08:14" (Italian "Nota vocale 8 ott, 08:14"). The maximum is 200 characters. If the title is blank at Finish, the app uses the default.
 - Timer: `mm:ss` / `h:mm:ss`. It is not a live region. The content description is "24 minutes 7 seconds".
 - Waveform [CHANGED]: 56 bars for the last 7 s (125 ms each). The 7 newest bars have the fresh color. The waveform stops while the recording is paused. It is one image node, "Microphone level, last 7 seconds". With reduced motion, it has no animation.
-- Hint [NEW]: "Keeps recording with the screen off or in another app." and then the smaller of two limits (`RecordingSpace`). The space limit is "Space for about 31 h more.". When the 2 h limit comes first, the hint is "Stops at 2 hours, in about 1 h 35 min.". Rounding: whole hours from 2 h, else minutes rounded down to 5, with a minimum of 5. Board 01 shows the space form, and the fixture uses it.
+- Hint [NEW]: "Keeps recording with the screen off or in another app." and then the space left (`RecordingSpace`): "Space for about 31 h more.". A recording has no time limit [CHANGED: 0.1.0 and the first 0.2 builds stopped at 2 h]. Thus the hint has no upper limit ("Space for about 2962 h more." with 64 GB free). The time comes from the free space above the 200 MB floor, at the rate that the file grows. For an AAC capture, it is the room left in the file when that is smaller (architecture.md section 3.7). Rounding: whole hours from 2 h, else minutes rounded down to 5, with a minimum of 5. Board 01 shows this form, and the fixture uses it.
+- Length [CHANGED]: the recording continues until the user pushes Finish. Only two conditions stop it without the user. If the free space falls below 200 MB, the app stops and saves the recording (REC_STOPPED_STORAGE). If an AAC file (API 26-28, or a phone without an Opus encoder) gets to 1 GB, about 74 h, the app stops and saves it (REC_STOPPED_FILE_LIMIT).
 - Controls: "Library" (the recording continues), Pause/Resume (a11y "Pause recording" / "Resume recording") and "Finish" (stop and save).
-- Banners (section 13.2): paused by another app [Resume], storage almost full, near the 2 h limit ("Stops automatically in 5 minutes. The recording so far is saved."), microphone access off [Open settings], microphone stopped working [Open note], and couldn't start the microphone [Try again].
+- Banners (section 13.2): paused by another app [Resume], storage almost full, stopped because the storage is almost full [Open note], stopped because the recording file is full [Open note], microphone access off [Open settings], microphone stopped working [Open note], and couldn't start the microphone [Try again].
 - Finish flow: `finish(title)` makes the row PLAIN. With consent, the app adds the note to the queue and opens the Note screen (Transcribing or Queued). Without consent and without `models.declinedAt`, it opens the Note screen and then Model download on top. Else it opens the Note screen (Audio only).
 - Back minimises the screen [CHANGED: in 0.1.0, back finished the recording].
 - Permissions [KEPT]: the screen asks for RECORD_AUDIO and, on API 33+, POST_NOTIFICATIONS when it opens. After a permanent denial, it shows "Microphone access is off" with Open settings. When the user comes back with the permission, the capture starts automatically (`pendingStart` in `SavedStateHandle`, examined at ON_RESUME).
 
-**Acceptance**: JVM `RecordingPolicyTest` (StorageLow at 15 min, stop at the floor, warning at 1:55, stop at 2:00). `RecordingSpace` rounding and the smaller of the space and the time limit. `RecordingControllerTest` (finish never on the main thread, the title stays, silenced → paused, and it stays paused). Shot: `01-recording`. Variants: paused, permission off, storage low, near the limit, a hint with the time limit. Device `@NeedsMicrophone`: record 5 s, push back, the Library shows the recording card, push Finish in the notification, and the note shows as PLAIN or QUEUED.
+**Acceptance**: JVM `RecordingPolicyTest` (StorageLow at 15 min, stop at the floor, no stop for time in a 40 h run, stop of an AAC file at its limit). `RecordingSpaceTest` (rounding, no 2 h clamp, the room in an AAC file). `RecordingControllerTest` (finish never on the main thread, the title stays, silenced → paused, and it stays paused, no time limit at 100 h and a renewed wake lock, the AAC file limit saves the audio). Shot: `01-recording`. Variants: paused, permission off, storage low, stopped at the file limit, a long hint (140 h). Device `@NeedsMicrophone`: record 5 s, push back, the Library shows the recording card, push Finish in the notification, and the note shows as PLAIN or QUEUED.
 
 ## 3. Note screen
 
@@ -148,6 +149,8 @@ The draft transcript [KEPT, CHANGED visuals] has these parts and rules:
 - The list follows the newest text automatically. It stops when the user scrolls up and starts again at the bottom.
 - The words are not interactive. A tap on a speaker label opens the Name a speaker sheet in draft mode.
 - From step 6 (attribute), naming is closed. The cards and the rename show "Saving — you can rename when it's done".
+
+Length [CHANGED: 0.1.0 accepted 2 hours]: a transcription has two real limits (architecture.md section 3.7). The audio can be at most 36 hours. The words must fit in the transcript of one document: about 110,000 words, or 11 hours of continuous speech. If the audio is longer, the job fails before the download and the model load. If the words do not fit, the job fails at the window where they stop to fit, and not at the end. Both failures show TX_FAILED with the text of `Failure.LONG`: "This recording is too long to transcribe. Cassini transcribes up to 36 hours of audio, with about 11 hours of speech."
 
 The inline suggestion card [NEW] shows for each speaker with a `live` SUGGESTED match that is not rejected and whose label is a placeholder. It is at the most recent turn of that speaker. It has a header (the speaker label and the time, as a 48 dp button that opens the Name sheet, as each speaker label does), then "Is this **Luca**?" [Yes, Luca] [Not Luca]. These rules apply:
 
@@ -317,9 +320,9 @@ If a cue has more than 42 characters, the writer breaks the line. It uses the sp
 | Transcribed | results | "Transcribed: <title>" / "3 speakers · 48:13" | The content opens the note. |
 | Couldn't transcribe | results | "Couldn't transcribe <title>" / the failure text | The content opens the note. |
 | Ready to transcribe | results | "<title> is waiting. Open Cassini to start." | The content opens the note. |
-| Paused by Android | results | "Paused at 12:40 of 34:12. Open to resume." | The content and Resume open the note. |
+| Paused by Android | results | "Paused at 12:40 of 34:12. Android limits background work to about 6 hours a day. Open Cassini to resume." (API 35 and later, the `mediaProcessing` budget) | The content and Resume open the note. |
 | Transcription stopped | results | "Cassini closed while transcribing <title>." | Resume (foreground service) |
-| Recording stopped / Microphone stopped working | results | The copy for storage or for the microphone | It opens the note. |
+| Recording stopped / Microphone stopped working | results | The copy for storage ("Less than 200 MB free. The recording so far is saved."), for the file limit ("The recording file is full. The recording so far is saved.") or for the microphone | It opens the note. |
 
 The app posts the results notifications only while the app is not visible. The text follows the app language. The public versions do not show the title.
 
@@ -349,7 +352,7 @@ A banner that the user can dismiss has a 48 dp close button at the end (a 20 dp 
 |---|---|---|---|---|
 | REC_PAUSED_OTHER_APP | warn | "Paused — another app is using audio" — "Resume when your call ends. Nothing was lost." | `pause == OTHER_APP` | Resume |
 | REC_STORAGE_LOW | warn | "Storage almost full — about 10 min left" — "Free some space to keep going. If it runs out, the recording saves automatically." | StorageLow | – |
-| REC_NEAR_LIMIT | warn | "Stops automatically in 5 minutes" — "The recording so far is saved." (not on the board) | NearTimeLimit | – |
+| REC_STOPPED_FILE_LIMIT | warn | "Stopped — recording file is full" — "The file reached the largest size this phone can save. The recording so far is saved." (not on the board) | `Ended(StoppedAtFileLimit)`: an AAC file at 1 GB (also a notification in the background) | Open note |
 | REC_STOPPED_STORAGE | warn | "Stopped — storage almost full" — "Less than 200 MB free. The recording so far is saved." | `Ended(StoppedForSpace)` (also a notification in the background) | Open note |
 | REC_MIC_OFF | error | "Microphone access is off" — "Turn it on in system settings. Recording starts when you come back." | RECORD_AUDIO permanently denied | Open settings |
 | REC_MIC_FAILED | error | "Microphone stopped working" — "Recording ended. The audio so far is in your library." | Capture error | Open note |
@@ -360,8 +363,8 @@ A banner that the user can dismiss has a 48 dp close button at the end (a 20 dp 
 
 | Kind | Tone | Copy | Trigger | Actions |
 |---|---|---|---|---|
-| TX_PAUSED | warn | "Paused at 12:40 of 34:12" — "Pick up where you left off. The draft so far is kept." | PAUSED (USER, SYSTEM, INTERRUPTED) with a checkpoint | Resume, Start over |
-| TX_PAUSED_EARLY | warn | "Paused before any words were found" — "Resume to start transcribing." (not on the board) | PAUSED without a checkpoint | Resume |
+| TX_PAUSED | warn | "Paused at 12:40 of 34:12" — "Pick up where you left off. The draft so far is kept." For a PAUSED(SYSTEM) row: "Android paused it: background work has a limit of about 6 hours a day. Resume to continue where it stopped." (not on the board) | PAUSED (USER, SYSTEM, INTERRUPTED) with a checkpoint | Resume, Start over |
+| TX_PAUSED_EARLY | warn | "Paused before any words were found" — "Resume to start transcribing." For a PAUSED(SYSTEM) row, the body of TX_PAUSED for SYSTEM. (not on the board) | PAUSED without a checkpoint | Resume |
 | TX_QUEUE_HELD | warn | "Transcription paused · N waiting" — "Continue when you're ready." (not on the board) | `queue.hold` is set, and QUEUED rows exist | Continue |
 | TX_CALCULATING | info | "Calculating time left…" — "An estimate appears after the first few minutes of audio." | Catalogue only (StatesBoardTest). In the app, this state is the "Calculating…" stat cell. | – |
 | TX_BATTERY | info | "Measuring battery use…" — "Plugged in — no battery estimate needed." | Catalogue only (StatesBoardTest). In the app, these states are the "Measuring…" and "Plugged in" stat cells. | – |
@@ -394,7 +397,7 @@ A failure of a best-effort part never shows a red banner. It shows in Settings. 
 | LIB_EMPTY | plain | "No notes yet" — "Record something, or import an audio file." | No live notes and no query | Record, Import |
 | LIB_NO_MATCH | plain | "Nothing matches “fattura”" — "Try another word or title." | The search found nothing | – |
 | IMPORTING | info | "Importing <name>…" (not on the board) | An import operates | – |
-| IMPORT_TOO_LARGE | error | "File too large" — "Choose a file under 2 GB." | Rejected(LARGE) | Choose another |
+| IMPORT_TOO_LARGE | error | "File too large" — "Choose a file under 4 GB." (the board has 2 GB, ui.md section 11) | Rejected(LARGE) | Choose another |
 | IMPORT_NO_SPACE | error | "Not enough space to import" — "This file needs about 1.4 GB free. Free some space and try again." | Rejected(SPACE) | Try again |
 | IMPORT_WAV | error | "Unsupported WAV" — "Use 16-bit PCM WAV, or MP3, M4A or Opus." | Rejected(WAV) | Choose another |
 | IMPORT_OPEN | error | "Can't open this file" — "It doesn't look like audio Cassini can read." (not on the board) | Rejected(OPEN) | Choose another |

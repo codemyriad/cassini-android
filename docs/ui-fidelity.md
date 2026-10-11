@@ -129,9 +129,10 @@ the suffix goes to the next line. The goldens did not change.
 ### Device
 
 Verdict: the device matches the board. The emulator microphone gives silence, so the waveform shows a row of dots.
-The caption shows the 2-hour form of features.md section 2 ("Stops at 2 hours, in about 1 h 55 min."), because the
-space for the recording is more than the 2-hour limit. In English, "min." went alone to the third line. F1 corrected
-this (follow-up 2): a duration does not break at a line end. The dark and the Italian screens are the same design.
+At the time of this review (P12), the caption showed the 2-hour form ("Stops at 2 hours, in about 1 h 55 min."),
+because the space for the recording was more than the 2-hour limit. In English, "min." went alone to the third line.
+F1 corrected this (follow-up 2): a duration does not break at a line end. On 2026-10-11 we removed the 2-hour limit: the
+caption always shows the space form ("Space for about 31 h more."). The dark and the Italian screens are the same design.
 No text is cut.
 
 ## 02 Transcribing
@@ -460,7 +461,8 @@ board, and in KDoc or a code comment.
 17. A prose duration ("1 h 55 min", "under 1 min") has no-break spaces (U+00A0) in place of its spaces, in each
     language (`Durations`). The time-left texts keep the number and its unit together ("6–9 min", "Under 1 min
     left"). Thus a line does not break inside a duration. The golden `variants/recording-cap-hint.png` changed:
-    "1 h 35 min." is now on one line. The text of the processing notification does not use these spaces. Now in
+    "1 h 35 min." is now on one line. (On 2026-10-11 we removed that golden with the 2-hour limit.
+    `variants/recording-long-hint.png` shows a long space hint.) The text of the processing notification does not use these spaces. Now in
     the spec: features.md section 0.
 18. The title and the excerpt of a Library row do not show a space before the ellipsis (`EllipsisText`). When the
     ellipsis of `TextOverflow.Ellipsis` comes after a space, the row shows the text before the space and "…".
@@ -481,6 +483,11 @@ board, and in KDoc or a code comment.
     board. But nothing tries again in the background: the next transcription that needs the model, or a tap on
     the row, starts the download again (see "Items for the owner to review"). Now in the spec: features.md
     section 11.
+23. A recording has no time limit (2026-10-11, architecture.md section 3.7). We removed REC_NEAR_LIMIT and the "Stops
+    at 2 hours" hint. REC_STOPPED_FILE_LIMIT is new (not on the board): it has the tone, the layout and the action of
+    REC_STOPPED_STORAGE. The goldens `variants/recording-stopped-file-limit.png` and `components/banners-it-1.png`
+    show it. TX_PAUSED and TX_PAUSED_EARLY have a second body for a pause by Android (`BannerArgs.bySystem`). The
+    States board column 5 shows "Choose a file under 4 GB." (accepted deviation 15 of ui.md section 11).
 
 ## Changes to the screen contracts
 

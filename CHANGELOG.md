@@ -26,7 +26,12 @@ Version 0.2.0-beta is a new build of the app. It keeps the speech engine and the
 - At the Android font size 200 %, the Library, Note, Name a speaker and Settings screens show all of their text.
 - When the app language is Italian, the screens show all of their text.
 - "Transcribe again" is not available for a document with the state "Not verified" or "Newer format". These documents get a message and no "Try again".
-- The message for a file that is too large gives the limit of 2 GB.
+- The message for a file that is too large gives the limit of 4 GB. Before, the limit was 2 GB.
+- A recording has no time limit. It continues until you push Finish. Before, a recording stopped at 2 hours. If the free storage gets to 200 MB, Cassini stops the recording and saves it. On Android 8 and 9, and on phones without an Opus encoder, an M4A recording stops and saves at 1 GB (about 74 hours).
+- The Recording screen shows the space for the recording with no upper limit ("Space for about 31 h more.").
+- A transcription accepts up to 36 hours of audio. One transcript holds about 11 hours of continuous speech. A longer recording gets the message "This recording is too long to transcribe" when Cassini finds the problem, not at the end of the transcription. Before, the limit was 2 hours.
+- An unfinished transcription writes much less data to the phone storage. The saved words go into a separate file, and Cassini adds only the new words after each part. In a test of 10 hours, the writes decreased from 8.5 GB to 1.7 GB.
+- On Android 15 and later, Android permits about 6 hours of background transcription in each 24 hours. When Android pauses a transcription for this reason, the note and the notification tell you so. Resume continues from where it stopped.
 - "Document info" shows the name of the speech model.
 
 ### Added
