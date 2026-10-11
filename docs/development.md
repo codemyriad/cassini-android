@@ -318,7 +318,7 @@ The screenshots in the README come from this walk. To make them again, use these
 5. Save them as `docs/screenshots/<variant>/01-library.png` to `05-settings.png`, in the order of step 2.
 6. Save the light screenshots also as `metadata/en-US/images/phoneScreenshots/1.png` to `5.png`, in the same order.
 
-The Settings screenshot (`05-settings.png` and the store image `5.png`) shows the version number of the app in the About card. The committed screenshots show "Cassini 0.1.0", because `app/build.gradle.kts` has `versionName = "0.1.0"`. After the owner changes `versionName` for a release, make this screenshot again ([`release.md`](release.md#make-a-release)).
+The Settings screenshot (`05-settings.png` and the store image `5.png`) shows the version number of the app in the About card. The committed screenshots show "Cassini 0.2.0-beta", because `app/build.gradle.kts` has `versionName = "0.2.0-beta"`. After the owner changes `versionName` for a release, make this screenshot again ([`release.md`](release.md#make-a-release)).
 
 ### note-opening-timing.sh
 
