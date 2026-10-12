@@ -161,12 +161,15 @@ jobs:
         env:
           BUILD_TYPE: ${{ startsWith(github.ref, 'refs/tags/') && 'Release' || 'Debug' }}
           DEVICE_TEST_TYPE: ${{ startsWith(github.ref, 'refs/tags/') && 'releaseTest' || 'debug' }}
+        # Two Gradle runs: with -PdeviceTestBuildType=releaseTest, AGP 9 makes unit-test tasks only for that build
+        # type, so ciTest (testDebugUnitTest) cannot run in the same invocation on a tag.
         run: |
           ./gradlew --no-daemon \
-            -PdeviceTestBuildType="$DEVICE_TEST_TYPE" \
-            ":app:assemble$BUILD_TYPE" ":app:assemble${DEVICE_TEST_TYPE^}" ":app:assemble${DEVICE_TEST_TYPE^}AndroidTest" \
-            :data:assembleDebugAndroidTest \
+            ":app:assemble$BUILD_TYPE" :data:assembleDebugAndroidTest \
             ciTest ":app:lint$BUILD_TYPE" ":data:lint$BUILD_TYPE" ":ui:lint$BUILD_TYPE"
+          ./gradlew --no-daemon \
+            -PdeviceTestBuildType="$DEVICE_TEST_TYPE" \
+            ":app:assemble${DEVICE_TEST_TYPE^}" ":app:assemble${DEVICE_TEST_TYPE^}AndroidTest"
       # ciTest runs verifyRoborazziDebug in :ui. It writes the actual image and a diff of each changed golden to
       # <module>/build/outputs/roborazzi.
       - name: Upload the screenshot diffs
