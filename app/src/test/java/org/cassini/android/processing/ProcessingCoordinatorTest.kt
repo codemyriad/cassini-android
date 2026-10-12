@@ -655,6 +655,9 @@ class ProcessingCoordinatorTest {
         job(0).finish(JobOutcome.Failed(org.cassini.engine.job.JobFailure.CheckpointMismatch))
         job(1).finish(JobOutcome.NeedsConsent(missingBytes = 1))
         waitUntil { catalogue().jobs.job(consentless)?.state == JobState.NEEDS_CONSENT }
+        // The notices of the first two outcomes are posted after their rows; wait for them before the app becomes
+        // visible, else a late notice is (rightly) dropped as "visible" and the test races the coordinator.
+        waitUntil { failed in notices.failed && consentless in notices.ready }
         visibility.state.value = true
         job(2).finish(JobOutcome.Failed(org.cassini.engine.job.JobFailure.CheckpointMismatch))
         coordinator.awaitIdle()
