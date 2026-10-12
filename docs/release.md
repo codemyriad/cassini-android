@@ -119,7 +119,7 @@ Repo: https://github.com/codemyriad/cassini-android.git
 
 Builds:
   - versionName: 0.2.0
-    versionCode: 11  # TODO(owner): the versionCode of the release
+    versionCode: 12
     commit: v0.2.0
     subdir: app
     submodules: true
