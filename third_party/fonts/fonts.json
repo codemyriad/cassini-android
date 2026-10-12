@@ -1,0 +1,62 @@
+[
+  {
+    "file": "ui_instrument_sans_regular.ttf",
+    "family": "Instrument Sans",
+    "weight": 400,
+    "repo": "https://github.com/Instrument/instrument-sans",
+    "ref": "7fa22308a3d0c94ee2b3cd537a1196b65db34a3e",
+    "path": "fonts/ttf/InstrumentSans-Regular.ttf",
+    "sha256": "69fd3f7c467c70c1f73b232812407f688f3d87dd7a801ea7281aa97d29cf53d5",
+    "license": "instrument-sans/OFL.txt"
+  },
+  {
+    "file": "ui_instrument_sans_medium.ttf",
+    "family": "Instrument Sans",
+    "weight": 500,
+    "repo": "https://github.com/Instrument/instrument-sans",
+    "ref": "7fa22308a3d0c94ee2b3cd537a1196b65db34a3e",
+    "path": "fonts/ttf/InstrumentSans-Medium.ttf",
+    "sha256": "56ba599d12b7cf2fff4eebf46d29253231b6f49bc5b6ce7733dfbf3d7940bfae",
+    "license": "instrument-sans/OFL.txt"
+  },
+  {
+    "file": "ui_instrument_sans_semibold.ttf",
+    "family": "Instrument Sans",
+    "weight": 600,
+    "repo": "https://github.com/Instrument/instrument-sans",
+    "ref": "7fa22308a3d0c94ee2b3cd537a1196b65db34a3e",
+    "path": "fonts/ttf/InstrumentSans-SemiBold.ttf",
+    "sha256": "7151cf505f897e17b4e9b956293b5a60046ec39da3923a8feba29ce86fd14e12",
+    "license": "instrument-sans/OFL.txt"
+  },
+  {
+    "file": "ui_instrument_sans_bold.ttf",
+    "family": "Instrument Sans",
+    "weight": 700,
+    "repo": "https://github.com/Instrument/instrument-sans",
+    "ref": "7fa22308a3d0c94ee2b3cd537a1196b65db34a3e",
+    "path": "fonts/ttf/InstrumentSans-Bold.ttf",
+    "sha256": "735badeb8b2046cee6f5e1226412ab6c29db04accbca413af03d70e991dce10d",
+    "license": "instrument-sans/OFL.txt"
+  },
+  {
+    "file": "ui_ibm_plex_mono_regular.ttf",
+    "family": "IBM Plex Mono",
+    "weight": 400,
+    "repo": "https://github.com/IBM/plex",
+    "ref": "@ibm/plex-mono@2.5.0",
+    "path": "packages/plex-mono/fonts/complete/ttf/IBMPlexMono-Regular.ttf",
+    "sha256": "7c6fbddca4b700be918f5f6183d9bd4464fa427fe435f0b480d77fe2bb8c5a43",
+    "license": "ibm-plex-mono/LICENSE.txt"
+  },
+  {
+    "file": "ui_ibm_plex_mono_medium.ttf",
+    "family": "IBM Plex Mono",
+    "weight": 500,
+    "repo": "https://github.com/IBM/plex",
+    "ref": "@ibm/plex-mono@2.5.0",
+    "path": "packages/plex-mono/fonts/complete/ttf/IBMPlexMono-Medium.ttf",
+    "sha256": "98fbd727aae340b236955879dabed4d991aac9e8e90b3b2a67ce4a59221cc97c",
+    "license": "ibm-plex-mono/LICENSE.txt"
+  }
+]

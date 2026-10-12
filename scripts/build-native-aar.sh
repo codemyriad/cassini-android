@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Build Cassini's sherpa-onnx AAR: release 1.13.7 plus Sortformer speaker diarization
-# (Nemotron-3-Diarization), for arm64-v8a and x86_64. Follows upstream's android.yaml.
+# (Nemotron-3-Diarization), for arm64-v8a and x86_64. Follows upstream's android.yaml, then
+# installs the AAR into the repo-local Maven repository native/m2. scripts/setup.sh --from-source
+# runs it; scripts/verify-native-runtime.sh compares the result with the pinned release build.
 #
 #   ANDROID_NDK=~/Android/Sdk/ndk/28.2.13676358 scripts/build-native-aar.sh
 #
@@ -8,14 +10,16 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 root=$PWD
+. scripts/native-common.sh
 : "${ANDROID_NDK:?Set ANDROID_NDK to an Android NDK directory}"
 work=$root/.tools/native-build
 mkdir -p "$work"
 
 if [ -z "${SHERPA_ONNX_SRC:-}" ]; then
-    read -r url sha < <(python3 -c 'import json; e = next(e for e in json.load(open("scripts/native-dependencies.json")) if e["name"] == "sherpa-onnx"); print(e["url"], e["sha256"])')
+    url=$(pin sherpa-onnx url)
+    sha=$(pin sherpa-onnx sha256)
     archive=$work/sherpa-onnx.tar.gz
-    if ! printf '%s  %s\n' "$sha" "$archive" | sha256sum --check --status 2>/dev/null; then
+    if ! printf '%s  %s\n' "$sha" "$archive" | sha256sum --check --status >/dev/null 2>&1; then
         curl --fail --location --retry 3 "$url" -o "$archive.part"
         printf '%s  %s\n' "$sha" "$archive.part" | sha256sum --check
         mv "$archive.part" "$archive"
@@ -29,7 +33,8 @@ src=$(cd "$SHERPA_ONNX_SRC" && pwd)
 
 # Keep the incremental JNI API reproducible against the pinned source archive. The source sits
 # inside this repository's .tools/, where git apply would silently skip every path; stop discovery.
-export GIT_CEILING_DIRECTORIES=$(dirname "$src")
+GIT_CEILING_DIRECTORIES=$(dirname "$src")
+export GIT_CEILING_DIRECTORIES
 if (cd "$src" && git apply --check "$root/scripts/streaming-diarization.patch"); then
     (cd "$src" && git apply "$root/scripts/streaming-diarization.patch")
 elif ! (cd "$src" && git apply --reverse --check "$root/scripts/streaming-diarization.patch"); then
@@ -48,7 +53,4 @@ for abi in arm64-v8a x86_64; do
 done
 
 (cd "$src/android/SherpaOnnxAar" && ./gradlew --no-daemon :sherpa_onnx:assembleRelease)
-output=app/libs/sherpa-onnx-1.13.7-nemotron.aar
-cp -v "$src/android/SherpaOnnxAar/sherpa_onnx/build/outputs/aar/sherpa_onnx-release.aar" "$output"
-sha256sum "$output" scripts/streaming-diarization.patch > app/libs/streaming-diarization.sha256
-cat app/libs/streaming-diarization.sha256
+install_aar "$src/android/SherpaOnnxAar/sherpa_onnx/build/outputs/aar/sherpa_onnx-release.aar"

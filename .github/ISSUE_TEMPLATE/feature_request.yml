@@ -1,0 +1,34 @@
+name: Feature request
+description: Propose a new function or a change.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Do not attach private recordings, transcripts or voiceprints.** An issue is public.
+
+        Cassini keeps all audio, transcripts and voiceprints on the phone. It uses the network only to download the models. Tell us if your request changes this.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What do you want to do? What stops you at this time?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Your proposal
+      description: How can the app help? Write what the user sees and does.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Other solutions
+      description: Optional. Other solutions that you examined.
+  - type: textarea
+    id: privacy
+    attributes:
+      label: Privacy and the portable format
+      description: Optional. Does the proposal change what the app stores, sends or writes into `.opus` documents and exports?

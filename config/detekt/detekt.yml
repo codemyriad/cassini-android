@@ -1,0 +1,36 @@
+# Applied on top of detekt's default configuration (buildUponDefaultConfig = true in build.gradle.kts).
+# config/detekt/baseline.xml lists the findings in code that predates this file; new code must be clean.
+# Formatting is reported, never rewritten: autocorrect would also rewrite the baselined 0.1.0 code that
+# later phases keep verbatim. Fix findings in new code by hand.
+
+config:
+  validation: true
+
+style:
+  MagicNumber:
+    # detekt's default test paths, plus :bench, whose experiments are test code in a main source set.
+    excludes:
+      - '**/test/**'
+      - '**/androidTest/**'
+      - '**/commonTest/**'
+      - '**/jvmTest/**'
+      - '**/androidUnitTest/**'
+      - '**/androidInstrumentedTest/**'
+      - '**/jsTest/**'
+      - '**/iosTest/**'
+      - '**/*.kts'
+      - '**/bench/src/**'
+  MaxLineLength:
+    maxLineLength: 140
+  WildcardImport:
+    excludeImports:
+      - 'java.util.*'
+      - 'org.junit.Assert.*'
+
+formatting:
+  active: true
+  autoCorrect: false
+  MaximumLineLength:
+    maxLineLength: 140
+  NoWildcardImports:
+    active: false

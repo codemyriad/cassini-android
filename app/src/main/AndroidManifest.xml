@@ -1,24 +1,31 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- NET_CAPABILITY_VALIDATED: the best-effort models are skipped at once without a working network. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <!-- Transcription runs in a dataSync (API 29-34) or mediaProcessing (API 35+) foreground service. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROCESSING" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <application android:name=".CassiniApplication" android:label="@string/app_name" android:icon="@drawable/ic_cassini" android:theme="@style/Theme.Cassini"
+    <!-- tools:targetApi: localeConfig and enableOnBackInvokedCallback are API 33, dataExtractionRules API 31; older
+         releases ignore them. -->
+    <application android:name=".CassiniApplication" android:label="@string/app_name"
+        android:icon="@mipmap/ui_ic_launcher" android:roundIcon="@mipmap/ui_ic_launcher_round"
+        android:theme="@style/Theme.Cassini"
         android:localeConfig="@xml/locales_config" android:dataExtractionRules="@xml/data_extraction_rules"
-        android:largeHeap="true" android:allowBackup="false" android:fullBackupContent="false" android:supportsRtl="true" android:usesCleartextTraffic="false">
-        <activity android:name=".SettingsActivity" android:exported="false" android:label="@string/settings"
-            android:theme="@style/Theme.Cassini.Settings" android:parentActivityName=".MainActivity" />
-        <activity android:name=".RecordingActivity" android:exported="false" android:configChanges="orientation|screenSize" />
-        <service android:name=".RecordingService" android:exported="false" android:foregroundServiceType="microphone" />
-        <activity android:name=".LibraryActivity" android:exported="true">
+        android:largeHeap="true" android:allowBackup="false" android:fullBackupContent="false" android:supportsRtl="true"
+        android:usesCleartextTraffic="false" android:enableOnBackInvokedCallback="true" tools:targetApi="33">
+        <!-- The only activity (docs/architecture.md section 6). singleTop: a notification or a viewed file reaches the
+             running activity through onNewIntent. No configChanges: Compose state survives recreation. -->
+        <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>
-        <activity android:name=".MainActivity" android:exported="true" android:configChanges="orientation|screenSize">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -30,5 +37,14 @@
                 <data android:mimeType="application/ogg" />
             </intent-filter>
         </activity>
+        <service android:name=".recording.RecordingService" android:exported="false"
+            android:foregroundServiceType="microphone" />
+        <service android:name=".processing.ProcessingService" android:exported="false"
+            android:foregroundServiceType="dataSync|mediaProcessing" />
+        <!-- Below API 33 AppCompat keeps the app language itself (AppCompatDelegate.setApplicationLocales). -->
+        <service android:name="androidx.appcompat.app.AppLocalesMetadataHolderService" android:enabled="false"
+            android:exported="false">
+            <meta-data android:name="autoStoreLocales" android:value="true" />
+        </service>
     </application>
 </manifest>

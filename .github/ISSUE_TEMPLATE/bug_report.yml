@@ -1,0 +1,80 @@
+name: Bug report
+description: Tell us about a problem in the app.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Do not attach private recordings, transcripts, voiceprints or `.opus` documents of real conversations.** An issue is public. If the problem needs audio, use audio that you can share in public, for example the FLEURS clip in `fixtures/audio/`.
+
+        To report a security problem, do not use this form. Read [SECURITY.md](https://github.com/codemyriad/cassini-android/blob/main/SECURITY.md).
+  - type: input
+    id: app-version
+    attributes:
+      label: App version
+      description: Settings > About shows the version. For a build from source, give the commit.
+      placeholder: 0.2.0
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device
+      description: The manufacturer and the model of the phone, or the emulator image.
+      placeholder: Google Pixel 8
+    validations:
+      required: true
+  - type: input
+    id: android-version
+    attributes:
+      label: Android version
+      placeholder: Android 15 (API 35)
+    validations:
+      required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: Where did you get the app?
+      options:
+        - APK from GitHub Releases
+        - Build from source
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to show the problem
+      description: Write each step on a new line.
+      placeholder: |
+        1. Open a note.
+        2. Tap Transcribe.
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What occurred
+      description: Give the error text exactly as the app shows it. You can attach a screenshot. Make sure that it shows no private text.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log
+      description: "Optional. Output of `adb logcat`. Remove private text, for example transcript words and names, before you paste it."
+      render: text
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy
+      options:
+        - label: This issue contains no private recordings, transcripts, voiceprints or names of other people.
+          required: true

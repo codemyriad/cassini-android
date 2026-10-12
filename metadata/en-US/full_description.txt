@@ -1,0 +1,24 @@
+Cassini records audio and makes the transcript on your phone. It keeps the audio and the timed words together in one .opus file. Any audio player plays this file.
+
+Features:
+
+* Record with the screen off or with another app open. Back and Home do not stop a recording.
+* Import WAV, MP3, M4A and Ogg Opus files.
+* Transcribe on the phone with NVIDIA Parakeet TDT 0.6B v3. The model knows 25 European languages.
+* Find the speakers with NVIDIA Nemotron-3-Diarization, and give them names.
+* Save a voice on the phone. Cassini then finds that voice in later notes and gives or suggests the name.
+* Stop a transcription and continue it later. If Android stops the app, Cassini keeps the progress and continues from that point.
+* Search the titles and the words of all notes.
+* Tap a word to play the audio at that point.
+* Save a copy as a Cassini document, as text, or as SRT or WebVTT subtitles.
+* Use the app in English or Italian.
+
+Privacy:
+
+Cassini does all speech recognition on the phone. It does not upload audio, transcripts or voiceprints. It has no accounts, no analytics and no advertising. The app uses the network only to download the models (about 730 MB), and only after you agree. A voiceprint never goes into a document or an export.
+
+Requirements:
+
+Android 8.0 or later on a 64-bit ARM phone, and about 1 GB of free storage for the models.
+
+Cassini is free software under the GPLv3.

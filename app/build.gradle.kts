@@ -1,80 +1,172 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
+    // The @Serializable navigation keys (nav/Dest.kt).
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
     namespace = "org.cassini.android"
-    compileSdk = 34
+    compileSdk = libs.versions.compileSdk.get().toInt()
+    buildToolsVersion = libs.versions.buildTools.get()
+    // libcassini_opus is built in :engine; the app's NDK strips the packaged native libraries.
+    ndkVersion = libs.versions.ndk.get()
     defaultConfig {
         applicationId = "org.cassini.android"
-        minSdk = 26
-        targetSdk = 34
-        versionCode = 10
-        versionName = "0.1.0"
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        minSdk = libs.versions.minSdk.get().toInt()
+        targetSdk = libs.versions.targetSdk.get().toInt()
+        versionCode = 12
+        versionName = "0.2.0"
+        // Builds the graph on a scratch root (docs/architecture.md section 9).
+        testInstrumentationRunner = "org.cassini.android.CassiniTestRunner"
+        // Library modules cannot filter packaged ABIs; this line must stay in :app.
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
     }
+    // debug, or releaseTest for tag builds. The minified release build cannot be instrumented.
     testBuildType = providers.gradleProperty("deviceTestBuildType").getOrElse("debug")
-    val betaKeystore = providers.environmentVariable("CASSINI_BETA_KEYSTORE_FILE").orNull
+    // Release signing is configured only when CI or a maintainer supplies the keystore and its secrets.
+    val releaseKeystore = providers.environmentVariable("CASSINI_BETA_KEYSTORE_FILE").orNull
     signingConfigs {
-        if (betaKeystore != null) create("beta") {
-            storeFile = file(betaKeystore)
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
+        if (releaseKeystore != null) {
+            create("beta") {
+                fun secret(name: String) = providers.environmentVariable(name).orNull
+                    ?: throw GradleException("CASSINI_BETA_KEYSTORE_FILE is set but $name is not.")
+                storeFile = file(releaseKeystore)
+                storePassword = secret("CASSINI_RELEASE_STORE_PASSWORD")
+                keyAlias = secret("CASSINI_RELEASE_KEY_ALIAS")
+                keyPassword = secret("CASSINI_RELEASE_KEY_PASSWORD")
+            }
         }
     }
     buildTypes {
         getByName("release") {
             isDebuggable = false
-            if (betaKeystore != null) signingConfig = signingConfigs.getByName("beta")
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (releaseKeystore != null) signingConfig = signingConfigs.getByName("beta")
         }
+        // The release build without R8, for device tests: they call app and Kotlin library members that
+        // R8 removes from the minified APK. Tag builds instrument this APK, then install the published
+        // release APK over it and check that it launches (scripts/ci-emulator-smoke.sh).
+        create("releaseTest") {
+            initWith(getByName("release"))
+            isMinifyEnabled = false
+            isShrinkResources = false
+            matchingFallbacks += listOf("release")
+        }
+    }
+    // BuildConfig.DEBUG gates StrictMode and the files/debug-root.txt override (architecture 2.5).
+    buildFeatures {
+        buildConfig = true
+        compose = true
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
-    val conformanceDirectory = providers.gradleProperty("cassiniConformanceDir")
-        .getOrElse(rootProject.projectDir.parentFile.resolve("cassini-format/spec/conformance").absolutePath)
-    val requireConformance = providers.gradleProperty("requireCassiniConformance").getOrElse("false")
-    testOptions { unitTests.all {
-        it.systemProperty("cassini.conformance", conformanceDirectory)
-        it.systemProperty("cassini.conformance.required", requireConformance)
-    } }
+    lint {
+        warningsAsErrors = true
+        abortOnError = true
+        checkDependencies = true
+        // No baseline: every finding is fixed or, in lint.xml, ignored with its reason.
+        lintConfig = file("lint.xml")
+    }
+    // The conformance vectors and the golden checkpoint are :core test data, not :app test inputs.
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+            all {
+                // LicenseAssetsTest compares the APK's copies with these repository files. Declaring them as
+                // inputs, relative to their directories, re-runs the tests when one changes instead of leaving
+                // them up to date or taking them from the build cache.
+                it.inputs.files(
+                    rootDir.resolve("THIRD_PARTY_NOTICES.md"),
+                    rootDir.resolve("PRIVACY.md"),
+                    rootDir.resolve("scripts/native-dependencies.json"),
+                    file("src/main/assets/licenses"),
+                ).withPropertyName("licenseSources").withPathSensitivity(PathSensitivity.RELATIVE)
+                // The AppGraph tests seal the committed FLEURS clip, as the :data tests do.
+                it.inputs.dir(rootDir.resolve("fixtures/audio"))
+                    .withPropertyName("fixtures")
+                    .withPathSensitivity(PathSensitivity.RELATIVE)
+                // A local copy: the lambda must not capture the script object (configuration cache).
+                val fixturesPath = rootDir.resolve("fixtures").absolutePath
+                it.jvmArgumentProviders.add(CommandLineArgumentProvider { listOf("-Dcassini.fixtures=$fixturesPath") })
+                // Robolectric needs these on JDK 17.
+                it.jvmArgs(
+                    "--add-opens=java.base/java.lang=ALL-UNNAMED",
+                    "--add-opens=java.base/java.util=ALL-UNNAMED",
+                    "--add-opens=java.base/java.io=ALL-UNNAMED",
+                    "--add-opens=java.base/java.util.concurrent=ALL-UNNAMED",
+                )
+            }
+        }
+    }
     bundle { language { enableSplit = false } }
+    sourceSets {
+        // Device tests read the committed CC-BY-4.0 FLEURS clip from fixtures/audio. The local-only YouTube clips
+        // (tools/fetch-youtube-audio.sh output in src/androidTest/assets) are packaged when present and never
+        // committed. The private meeting clips (tools/private-fixtures) go into the :bench APK only.
+        getByName("androidTest") {
+            assets.directories.add(rootDir.resolve("fixtures/audio").path)
+        }
+    }
+}
+
+kotlin {
+    compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
 }
 
 dependencies {
-    implementation(files("libs/sherpa-onnx-1.13.7-nemotron.aar"))
-    // Decompresses the speaker model download. The AAR carries the Android native libraries;
-    // the JVM unit tests use the jar, which carries the desktop ones.
-    implementation("com.github.luben:zstd-jni:1.5.7-6@aar")
-    testImplementation("com.github.luben:zstd-jni:1.5.7-6")
-    testImplementation("junit:junit:4.13.2")
-    testImplementation("org.json:json:20240303")
-    androidTestImplementation("androidx.test:runner:1.7.0")
-    androidTestImplementation("androidx.test.ext:junit:1.3.0")
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
+    // The design system and the stateless screens (docs/design/ui.md).
+    implementation(project(":ui"))
+    implementation(project(":core"))
+    // The native wrappers, libcassini_opus, sherpa-onnx and the zstd-jni AAR (engine/build.gradle.kts).
+    implementation(project(":engine"))
+    // The Room catalogue, DataStore settings and file repositories that AppGraph wires (architecture 2.3 and 2.5).
+    implementation(project(":data"))
+    // Catalogue exposes the Room database (it closes it in tests); :data keeps Room as an implementation detail.
+    implementation(libs.room.runtime)
+    implementation(libs.coroutines.android)
+    // ProcessingService: LifecycleService, ServiceCompat, NotificationCompat, getContextForLanguage; ProcessLifecycleOwner
+    // for ON_START (architecture 5.3 and 5.7).
+    implementation(libs.core.ktx)
+    implementation(libs.lifecycle.service)
+    implementation(libs.lifecycle.process)
+    // MainActivity is an AppCompatActivity only for AppCompatDelegate.setApplicationLocales (architecture 6).
+    implementation(libs.appcompat)
+    // The Compose UI: one activity, Navigation 3 destinations, one ViewModel per destination.
+    implementation(platform(libs.compose.bom))
+    implementation(libs.compose.ui)
+    implementation(libs.compose.foundation)
+    implementation(libs.compose.material3)
+    implementation(libs.bundles.compose)
+    implementation(libs.bundles.navigation3)
+    implementation(libs.serialization.json)
+    // The JVM unit tests decompress with the zstd-jni jar, which carries the desktop natives.
+    testImplementation(libs.zstd.jni)
+    testImplementation(libs.org.json)
+    testImplementation(libs.bundles.testing.robolectric)
+    testImplementation(platform(libs.compose.bom))
+    testImplementation(libs.compose.ui.test.junit4)
+    // Espresso.pressBack in AppShellTest: it reaches the focused window, so a sheet gets back first.
+    testImplementation(libs.androidx.test.espresso.core)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.espresso.core)
+    // enableAccessibilityChecks() runs only on a device: under Robolectric ATF skips Compose content (P2 outcome).
+    androidTestImplementation(platform(libs.compose.bom))
+    androidTestImplementation(libs.compose.ui.test.junit4)
+    androidTestImplementation(libs.compose.ui.test.junit4.accessibility)
+    // ScreenAccessibilityTest shows :ui screens in the empty ComponentActivity of this manifest. It is in both device
+    // test build types (tag builds instrument releaseTest), and their manifests make it not exported. The release
+    // build does not have it.
+    debugImplementation(platform(libs.compose.bom))
+    debugImplementation(libs.compose.ui.test.manifest)
+    "releaseTestImplementation"(platform(libs.compose.bom))
+    "releaseTestImplementation"(libs.compose.ui.test.manifest)
 }
-
-// Host evaluation (app/src/test/.../eval): writes the unit-test runtime classpath for scripts/asr-eval.sh.
-afterEvaluate {
-    tasks.register("writeEvalClasspath") {
-        val test = tasks.named<Test>("testDebugUnitTest")
-        dependsOn("compileDebugUnitTestKotlin")
-        doLast { layout.buildDirectory.file("eval-classpath.txt").get().asFile.writeText(test.get().classpath.asPath) }
-    }
-}
-
-// libcassini_opus.so is built by scripts/setup.sh into an ignored directory. Without it the APK
-// still packages, then every transcription crashes, so a missing library fails the build instead.
-val checkNativeOpus by tasks.registering {
-    val libraries = listOf("arm64-v8a", "x86_64").map { file("src/main/jniLibs/$it/libcassini_opus.so") }
-    doLast {
-        val missing = libraries.filterNot { it.isFile }
-        if (missing.isNotEmpty()) throw GradleException("Missing ${missing.joinToString()}. Run scripts/setup.sh with ANDROID_NDK set.")
-    }
-}
-tasks.named("preBuild") { dependsOn(checkNativeOpus) }

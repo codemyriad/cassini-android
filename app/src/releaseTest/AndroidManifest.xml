@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- releaseTest builds only (the device tests of tag builds). -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application>
+        <!-- compose-ui-test-manifest brings an exported, empty activity for the device tests that show :ui screens
+             (ScreenAccessibilityTest). The tests start it from the app's own process, so it need not be exported. -->
+        <activity android:name="androidx.activity.ComponentActivity" android:exported="false"
+            tools:replace="android:exported" />
+    </application>
+</manifest>

@@ -3,10 +3,10 @@
 import hashlib
 import json
 import os
-from pathlib import Path
 import shutil
 import subprocess
 import zipfile
+from pathlib import Path
 
 from apk_compatibility import check_apk_compatibility
 
@@ -27,12 +27,17 @@ with zipfile.ZipFile(source) as apk:
             raise SystemExit(f'APK is missing {required}')
     if any(name.endswith(('.onnx', '.tflite', '.keystore')) for name in names):
         raise SystemExit('APK contains model weights or signing material')
+    if os.environ.get('IS_TAG') == 'true':
+        # The Licenses screen shows these files. Merge notes ("TODO(") belong in files that do not ship.
+        for name in names:
+            if name.startswith('assets/licenses/') and name.endswith('.md') and b'TODO(' in apk.read(name):
+                raise SystemExit(f'{name} in the APK contains a TODO( note')
 libraries = check_apk_compatibility(source)
 print(f'Checked {libraries} native libraries: 64-bit ABI and 16 KB ELF/ZIP alignment')
 if os.environ.get('IS_TAG') == 'true':
     if variant != 'release':
         raise SystemExit('Tagged APK must use the release build type')
-    sdk = Path(os.environ['ANDROID_HOME']) / 'build-tools' / '34.0.0'
+    sdk = Path(os.environ['ANDROID_HOME']) / 'build-tools' / '36.0.0'
     certificate = subprocess.check_output([str(sdk / 'apksigner'), 'verify', '--print-certs',
                                            str(source)], text=True)
     expected = Path('scripts/beta-signing-cert.sha256').read_text().strip()
@@ -49,3 +54,12 @@ shutil.copyfile(output / element['outputFile'], destination / name)
 checksum = hashlib.sha256((destination / name).read_bytes()).hexdigest()
 (destination / f'{name}.sha256').write_text(f'{checksum}  {name}\n')
 shutil.copyfile('THIRD_PARTY_NOTICES.md', destination / 'THIRD_PARTY_NOTICES.md')
+# R8 renames classes in the release APK; keep its mapping so crash traces can be decoded.
+mapping = Path('app/build/outputs/mapping') / variant / 'mapping.txt'
+if variant == 'release':
+    if not mapping.is_file():
+        raise SystemExit(f'Release build has no R8 mapping at {mapping}')
+    mapping_name = f'cassini-android-{version}-mapping.txt'
+    shutil.copyfile(mapping, destination / mapping_name)
+    mapping_checksum = hashlib.sha256((destination / mapping_name).read_bytes()).hexdigest()
+    (destination / f'{mapping_name}.sha256').write_text(f'{mapping_checksum}  {mapping_name}\n')

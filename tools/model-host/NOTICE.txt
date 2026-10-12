@@ -1,0 +1,28 @@
+Nemotron-3-Diarization, INT8 ONNX export for sherpa-onnx
+=========================================================
+
+File: model.int8.onnx.zst
+URL: https://dist.gocassini.com/models/files/51249515e4cb49dc00c5d5dc0a41ac59aa91157d689ec9586b3f4bf567c3f602/model.int8.onnx.zst
+
+Original model: NVIDIA Nemotron-3-Diarization
+https://huggingface.co/nvidia/Nemotron-3-Diarization
+Revision: f667ed73aee57d40cc39428eb768b4fd87a0a29e
+License: OpenMDW License Agreement, version 1.1 (OpenMDW-1.1).
+The full text is in LICENSE-OpenMDW-1.1.txt, next to this file, and at
+https://openmdw.ai/license/1-1/
+
+Changes from the original model:
+- Cassini exported the model to ONNX and quantized it to INT8 with the
+  sherpa-onnx export script scripts/nemo/nemotron-3-diarization/export_onnx.py
+  (from k2-fsa/sherpa-onnx#4006).
+- Cassini compressed the exported file with seekable Zstandard. The
+  decompressed contents are the exported file, byte for byte.
+ONNX conversion and INT8 quantization are changes from the original model
+format of NVIDIA. provenance.json gives the toolchain, the sizes and the
+SHA-256 hashes.
+
+No endorsement by NVIDIA or by the sherpa-onnx project is implied.
+
+Cassini for Android downloads this file only after the user agrees, and makes
+sure that its size and SHA-256 hash are correct before it uses it:
+https://github.com/codemyriad/cassini-android

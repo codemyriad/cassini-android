@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Fetch the optional speaker model used by the app and native device checks."""
 import hashlib
-from pathlib import Path
 import shutil
 import subprocess
 import urllib.request
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DEST = ROOT / ".tools/diar"
-# Same pinned download as DiarizationModels.kt. Model files stay out of the APK and git.
+# Same pinned download as ModelCatalog.DIARIZATION in :core. Model files stay out of the APK and git.
 NAME = "nemotron-3-diarization.int8.onnx"
 SIZE, DIGEST = 103941758, "01d1f893f394cc0418ae78425d216ed62c334c0125e650135332a7a8e595f168"
 ZST_SIZE, ZST_DIGEST = 64982914, "51249515e4cb49dc00c5d5dc0a41ac59aa91157d689ec9586b3f4bf567c3f602"

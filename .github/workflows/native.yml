@@ -1,0 +1,93 @@
+name: Native runtime
+
+# Builds the sherpa-onnx AAR from the pinned source and compares it with the pinned release build
+# (docs/native-runtime.md). It takes about 40 minutes, so it runs weekly, by hand, and when a change can affect
+# the native build: the scripts (setup.sh, the pins, the patch), the C++ sources and CMake setup of
+# libcassini_opus, or gradle/libs.versions.toml (the NDK and sherpa-onnx versions).
+on:
+  schedule:
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/**'
+      - 'engine/src/main/cpp/**'
+      - 'engine/build.gradle.kts'
+      - 'gradle/libs.versions.toml'
+      - '.github/workflows/native.yml'
+  pull_request:
+    paths:
+      - 'scripts/**'
+      - 'engine/src/main/cpp/**'
+      - 'engine/build.gradle.kts'
+      - 'gradle/libs.versions.toml'
+      - '.github/workflows/native.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    name: sherpa-onnx AAR from source
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          packages: 'platform-tools platforms;android-37.0 build-tools;36.0.0 ndk;28.2.13676358 cmake;3.22.1'
+          log-accepted-android-sdk-licenses: false
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          cache-provider: basic
+      - name: Cache the pinned source archives
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .tools/native-build/sherpa-onnx.tar.gz
+            .tools/opus/source.tar.gz
+          key: native-source-${{ hashFiles('scripts/native-dependencies.json') }}
+      # setup.sh finds the pinned NDK inside ANDROID_HOME. The job reports drift and does not fail
+      # on it: a source build is not yet known to match the release byte for byte. The summary
+      # records both hashes and a mismatch raises a warning annotation.
+      - name: Build the AAR from source
+        run: ./scripts/setup.sh --from-source
+      - name: Record the AAR hashes
+        run: |
+          . scripts/native-common.sh
+          built=$(sha256_of "$aar_installed")
+          pinned=$(pin sherpa-onnx-aar sha256)
+          {
+            echo "Source-built AAR: \`$built\`"
+            echo
+            echo "Pinned release AAR: \`$pinned\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$built" != "$pinned" ]; then
+            echo "::warning title=Native AAR drift::The AAR built from source ($built) differs from the pinned release build ($pinned)."
+          fi
+      - name: Build and test the app with the source-built AAR
+        run: ./gradlew --no-daemon :app:assembleDebug :core:test :engine:testDebugUnitTest :app:testDebugUnitTest
+      # The XML results keep the standard error of each test class: a coroutine that fails after its test ended
+      # writes its stack trace there.
+      - name: Upload the test reports
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-aar-test-reports
+          path: |
+            app/build/reports/tests/testDebugUnitTest/
+            app/build/test-results/testDebugUnitTest/
+            core/build/test-results/test/
+            engine/build/test-results/testDebugUnitTest/
+          if-no-files-found: warn

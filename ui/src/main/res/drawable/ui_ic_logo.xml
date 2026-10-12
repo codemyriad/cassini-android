@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Cassini logo (docs/design/ui.md section 4.5): a circle of radius 5.5 and an ellipse of 12 x 4.2 rotated
+     by -20 degrees, stroked at 1.6 in a 28 viewport. Glyph.Logo draws the same shape in Compose. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="28dp"
+    android:height="28dp"
+    android:viewportWidth="28"
+    android:viewportHeight="28">
+    <path
+        android:pathData="M8.5,14a5.5,5.5 0,1 0,11 0a5.5,5.5 0,1 0,-11 0z"
+        android:strokeWidth="1.6"
+        android:strokeColor="@color/ui_logo_ink" />
+    <group
+        android:pivotX="14"
+        android:pivotY="14"
+        android:rotation="-20">
+        <path
+            android:pathData="M2,14a12,4.2 0,1 0,24 0a12,4.2 0,1 0,-24 0z"
+            android:strokeWidth="1.6"
+            android:strokeColor="@color/ui_logo_ink" />
+    </group>
+</vector>

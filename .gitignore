@@ -1,20 +1,33 @@
 .gradle/
+.kotlin/
 **/build/
 local.properties
-app/libs/*.aar
-app/libs/streaming-diarization.sha256
-app/src/main/jniLibs/
 .idea/
 *.iml
-.tools/
-__pycache__/
+# No trailing slash: a worktree may link .tools to the main checkout's copy.
+.tools
+.claude/
+.ruff_cache/
+**/__pycache__/
+# Repo-local Maven repository for the native AAR; scripts/setup.sh fills it.
+native/m2/**
+!native/m2/README.md
+# Native outputs of 0.1.0 checkouts. Gradle no longer reads them; never commit them.
+app/libs/
+app/src/main/jniLibs/
 *.pyc
 *.wav
 *.opus
-app/src/androidTest/assets/*.mp3
-app/src/androidTest/assets/*.m4a
-app/src/androidTest/assets/italian-smoke.json
 dist/
+**/.cxx/
 
+# Device test audio. Only the CC-BY-4.0 FLEURS clip is committed (fixtures/README.md), so a recording
+# copied next to it stays ignored. Local clips (tools/fetch-youtube-audio.sh) stay in
+# app/src/androidTest/assets and are never committed.
+fixtures/audio/*
+!fixtures/audio/fleurs-it-short.*
+app/src/androidTest/assets/*
+# The export goldens of NoteFlowTest are committed.
+!app/src/androidTest/assets/goldens/
 # Private meeting speaker fixtures (never commit)
-app/src/androidTest/assets/meetings/
+tools/private-fixtures/

@@ -1,0 +1,8 @@
+Cassini 0.2 is a new app with a new design.
+
+* A recording has no time limit.
+* A transcription takes up to 36 hours of audio.
+* A queue for many transcriptions, and a trash that keeps notes for 30 days.
+* Search in all notes, and save a transcript as text or subtitles.
+* A transcription continues in the background and after a stop.
+* The notes of 0.1.x do not show in 0.2, but your saved .opus documents open.

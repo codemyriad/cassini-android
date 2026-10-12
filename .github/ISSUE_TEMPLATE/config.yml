@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security problem
+    url: https://github.com/codemyriad/cassini-android/security/advisories/new
+    about: Report a vulnerability in private. Do not open a public issue for it.
+  - name: The portable .opus format
+    url: https://github.com/codemyriad/cassini-format/issues
+    about: Questions and proposals about the document format go to the cassini-format repository.

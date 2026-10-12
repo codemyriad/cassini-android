@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Notification small icon: the logo in white on a 24 dp icon (the system tints it). The stroke is 2 instead of
+     1.6 so the lines stay about 1.7 dp wide at this size. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="28"
+    android:viewportHeight="28">
+    <path
+        android:pathData="M8.5,14a5.5,5.5 0,1 0,11 0a5.5,5.5 0,1 0,-11 0z"
+        android:strokeWidth="2"
+        android:strokeColor="@android:color/white" />
+    <group
+        android:pivotX="14"
+        android:pivotY="14"
+        android:rotation="-20">
+        <path
+            android:pathData="M2,14a12,4.2 0,1 0,24 0a12,4.2 0,1 0,-24 0z"
+            android:strokeWidth="2"
+            android:strokeColor="@android:color/white" />
+    </group>
+</vector>

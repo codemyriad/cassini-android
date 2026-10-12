@@ -1,0 +1,7 @@
+# Code owners of Cassini for Android. GitHub asks these owners to review each pull request.
+#
+# TODO(owner): add the owner. The git remote names the organization codemyriad, but an organization
+# name alone is not a valid owner. Use a GitHub user (@user) or a team of the organization
+# (@codemyriad/team), then remove the "#" before the rule that follows.
+#
+# * @codemyriad/TEAM

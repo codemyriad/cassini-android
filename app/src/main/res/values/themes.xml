@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The app theme (docs/architecture.md section 6). It lives in :app because it needs AppCompat, which :ui does not
+     use. The UI is Compose, so the theme sets only what shows before the first frame: the window background from
+     :ui and the bar icons. MainActivity is edge to edge, so the bars have no colour of their own. -->
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.Cassini" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/ui_window_bg</item>
+        <!-- Dark icons on the light window. -->
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
+    </style>
+</resources>

@@ -1,0 +1,260 @@
+package org.cassini.engine.decode
+
+import android.content.ContentResolver
+import android.media.AudioFormat
+import android.media.MediaCodec
+import android.media.MediaExtractor
+import android.media.MediaFormat
+import android.net.Uri
+import android.util.Log
+import org.cassini.core.Failure
+import org.cassini.core.UserFacingException
+import org.cassini.core.audio.Limits
+import org.cassini.core.audio.Mp3Gapless
+import org.cassini.core.audio.PcmAudio
+import org.cassini.core.audio.PcmBuilder
+import org.cassini.core.audio.StreamingResampler
+import org.cassini.core.audio.WavDecoder
+import org.cassini.core.audio.firstNeededFrame
+import org.cassini.core.format.OggOpus
+import org.cassini.core.requireUser
+import java.io.File
+import java.io.RandomAccessFile
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+
+/**
+ * Decode to 16 kHz mono, either as borrowed streaming blocks or a bounded retained recording.
+ * Reject long recordings rather than silently dropping audio. A content uri is first copied into
+ * [cacheDir] through [resolver]; a file uri is read in place.
+ */
+class AudioDecoder(private val resolver: ContentResolver, private val cacheDir: File) {
+    /**
+     * [onSamples] receives borrowed 16 kHz mono buffers on the calling thread; consume or copy
+     * them before returning. [onProgress] reports source milliseconds read and optional duration.
+     * The returned PCM remains available for speaker identification and document creation.
+     */
+    fun decode(uri: Uri, onSamples: (FloatArray, Int) -> Unit = { _, _ -> },
+               onProgress: (Long, Long?) -> Unit = { _, _ -> }): PcmAudio =
+        decodeInternal(uri, true, onSamples, onProgress)
+
+    /** Streams 16 kHz PCM without allocating a whole-recording array. Returns actual decoded duration. */
+    fun stream(uri: Uri, onSamples: (FloatArray, Int) -> Unit, startSample: Long = 0,
+               onProgress: (Long, Long?) -> Unit = { _, _ -> }): Long {
+        require(startSample in 0..Limits.MAX_SAMPLES)
+        var count = startSample
+        decodeInternal(uri, false, { samples, size ->
+            count += size
+            requireUser(count <= Limits.MAX_SAMPLES, Failure.LONG)
+            onSamples(samples, size)
+        }, onProgress, startSample)
+        return count * 1000 / Limits.ASR_RATE
+    }
+
+    private fun decodeInternal(uri: Uri, retainPcm: Boolean, onSamples: (FloatArray, Int) -> Unit,
+                               onProgress: (Long, Long?) -> Unit, startSample: Long = 0): PcmAudio {
+        val owned = uri.takeIf { it.scheme == "file" }?.path?.let(::File)
+        val local = owned ?: File.createTempFile("audio-", ".input", cacheDir)
+        try {
+            requireUser(local.length() <= Limits.MAX_IMPORT_BYTES, Failure.LARGE)
+            if (owned == null) resolver.openInputStream(uri).use { input ->
+                val source = input ?: throw UserFacingException(Failure.OPEN)
+                local.outputStream().use { output ->
+                    val buffer = ByteArray(64 * 1024)
+                    var size = 0L
+                    while (true) {
+                        requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
+                        val n = source.read(buffer)
+                        if (n < 0) break
+                        if (size / (16 shl 20) != (size + n) / (16 shl 20))
+                            requireUser(cacheDir.usableSpace >= Limits.MIN_FREE_BYTES, Failure.SPACE)
+                        size += n
+                        requireUser(size <= Limits.MAX_IMPORT_BYTES, Failure.LARGE)
+                        output.write(buffer, 0, n)
+                    }
+                }
+            }
+            RandomAccessFile(local, "r").use { file ->
+                val header = ByteArray(OggOpus.HEAD_BYTES)
+                if (file.length() >= 12) {
+                    file.readFully(header, 0, minOf(file.length(), header.size.toLong()).toInt())
+                    if (String(header, 0, 4, Charsets.US_ASCII) == "RIFF" &&
+                        String(header, 8, 4, Charsets.US_ASCII) == "WAVE") return WavDecoder.decodeWav(file, onSamples, retainPcm, startSample, onProgress)
+                }
+            }
+            return decodeCompressed(local, onSamples, onProgress, retainPcm, startSample)
+        } finally {
+            if (owned == null) local.delete()
+        }
+    }
+
+    private fun decodeCompressed(file: File, onSamples: (FloatArray, Int) -> Unit, onProgress: (Long, Long?) -> Unit, retainPcm: Boolean, startSample: Long): PcmAudio {
+        val extractor = MediaExtractor()
+        var decoder: MediaCodec? = null
+        var started = false
+        try {
+            // Android's Opus decoder removes pre-skip but can expose the final frame's padding.
+            // Trust the independently verified Ogg EOS sample count, not codec buffer length.
+            val opusSamples = try { OggOpus.scan(file).also { it.digest() }.sampleCount } catch (_: Exception) { null }
+            extractor.setDataSource(file.absolutePath)
+            val track = (0 until extractor.trackCount).firstOrNull {
+                extractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true
+            } ?: throw UserFacingException(Failure.AUDIO)
+            extractor.selectTrack(track)
+            // A resume backs off before the requested position; a landing past the history the
+            // resampler needs retries further back, so no audio is ever replaced by silence or shifted.
+            var backOffUs = 1_000_000L
+            fun seekUs() = (startSample * 1_000_000 / Limits.ASR_RATE - backOffUs).coerceAtLeast(0)
+            if (startSample > 0) extractor.seekTo(seekUs(), MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+            val format = extractor.getTrackFormat(track)
+            // The MP3 decoders remove their own 529-sample delay. Older versions (API 26, 29) keep the encoder delay and
+            // padding of the LAME tag; newer ones (API 34) drop them but keep their timestamps. Trim them here instead.
+            val mpeg = format.getString(MediaFormat.KEY_MIME) == MediaFormat.MIMETYPE_AUDIO_MPEG
+            val gapless = if (mpeg) Mp3Gapless.scan(file) else null
+            val durationUs = opusSamples?.let { it * 1_000_000 / 48000 } ?: gapless?.let { it.samples * 1_000_000 / it.sampleRate }
+                ?: if (format.containsKey(MediaFormat.KEY_DURATION)) format.getLong(MediaFormat.KEY_DURATION) else null
+            durationUs?.let { Limits.requireDuration(it / 1000, retainPcm) }
+            onProgress(startSample * 1000 / Limits.ASR_RATE, durationUs?.div(1000))
+            // Presized exactly for Ogg Opus; a container estimate that is wrong costs one trim or growth.
+            val out = if (retainPcm) PcmBuilder(opusSamples?.let { (it * Limits.ASR_RATE + 24000) / 48000 }?.toInt()
+                ?: durationUs?.let { (it * Limits.ASR_RATE / 1_000_000).toInt() } ?: (Limits.ASR_RATE * 60)) else null
+            val mime = requireNotNull(format.getString(MediaFormat.KEY_MIME))
+            if (gapless != null) {
+                format.setInteger("encoder-delay", 0)
+                format.setInteger("encoder-padding", 0)
+            }
+            val codec = MediaCodec.createDecoderByType(mime)
+            decoder = codec
+            format.setInteger(MediaFormat.KEY_PCM_ENCODING, AudioFormat.ENCODING_PCM_16BIT)
+            if (startSample > 0 && mime == MediaFormat.MIMETYPE_AUDIO_OPUS) {
+                // Opus pre-skip belongs only to the beginning of the stream. A fresh decoder
+                // at a seek must not trim that delay a second time from the middle of the recording.
+                format.setByteBuffer("csd-1", ByteBuffer.allocate(8).order(ByteOrder.nativeOrder()).putLong(0).apply { flip() })
+            }
+            codec.configure(format, null, null, 0)
+            codec.start()
+            started = true
+            var sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+            var channels = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+            var encoding = AudioFormat.ENCODING_PCM_16BIT
+            var resampler: StreamingResampler? = null
+            var mono = FloatArray(0)
+            var count = 0L
+            var next: Long? = null
+            var inputEnded = false
+            var outputEnded = false
+            var reseek = false
+            val info = MediaCodec.BufferInfo()
+            var lastProgress = System.nanoTime()
+            while (!outputEnded) {
+                requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
+                requireUser(System.nanoTime() - lastProgress < 30_000_000_000L, Failure.STALLED)
+                if (reseek) {
+                    reseek = false
+                    codec.flush()
+                    backOffUs *= 2
+                    extractor.seekTo(seekUs(), MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+                    next = null; count = 0L; inputEnded = false
+                    lastProgress = System.nanoTime()
+                }
+                // Block only when neither side moved: a fixed wait per packet made an hour of Opus take minutes.
+                var fed = false
+                if (!inputEnded) {
+                    val index = codec.dequeueInputBuffer(0)
+                    if (index >= 0) {
+                        fed = true
+                        val buffer = requireNotNull(codec.getInputBuffer(index))
+                        val size = extractor.readSampleData(buffer, 0)
+                        if (size < 0) {
+                            codec.queueInputBuffer(index, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                            inputEnded = true
+                        } else {
+                            codec.queueInputBuffer(index, 0, size, extractor.sampleTime, 0)
+                            extractor.advance()
+                        }
+                        lastProgress = System.nanoTime()
+                    }
+                }
+                when (val index = codec.dequeueOutputBuffer(info, if (fed) 0 else 10_000)) {
+                    MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
+                        val output = codec.outputFormat
+                        val nextRate = output.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+                        requireUser(count == 0L || nextRate == sampleRate, Failure.AUDIO)
+                        sampleRate = nextRate
+                        channels = output.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+                        encoding = if (output.containsKey(MediaFormat.KEY_PCM_ENCODING))
+                            output.getInteger(MediaFormat.KEY_PCM_ENCODING) else AudioFormat.ENCODING_PCM_16BIT
+                    }
+                    else -> if (index >= 0) {
+                        try {
+                            requireUser(sampleRate in 8000..96000 && channels in 1..2, Failure.AUDIO)
+                            requireUser(encoding == AudioFormat.ENCODING_PCM_16BIT || encoding == AudioFormat.ENCODING_PCM_FLOAT, Failure.AUDIO)
+                            if (info.size > 0) {
+                                val buffer = requireNotNull(codec.getOutputBuffer(index)).order(ByteOrder.LITTLE_ENDIAN)
+                                buffer.position(info.offset)
+                                buffer.limit(info.offset + info.size)
+                                val sampleBytes = if (encoding == AudioFormat.ENCODING_PCM_FLOAT) 4 else 2
+                                requireUser(info.size % (sampleBytes * channels) == 0, Failure.AUDIO)
+                                val frames = info.size / (sampleBytes * channels)
+                                requireUser(info.presentationTimeUs <= Limits.MAX_TRANSCRIBE_MS * 1000 + (if (opusSamples != null) 120_000 else 0), Failure.LONG)
+                                // MP3 output is contiguous after the first buffer, whatever the timestamps say.
+                                val firstFrame = gapless?.let { g ->
+                                    next ?: (WavDecoder.framePosition(info.presentationTimeUs, sampleRate, null) - g.delay)
+                                } ?: WavDecoder.framePosition(info.presentationTimeUs, sampleRate, next)
+                                if (startSample > 0 && next == null) {
+                                    if (firstFrame > firstNeededFrame(sampleRate, startSample) && seekUs() > 0) {
+                                        Log.w("Cassini", "Resume seek landed at frame $firstFrame, after ${firstNeededFrame(sampleRate, startSample)}; seeking earlier")
+                                        reseek = true
+                                        continue
+                                    }
+                                    // From the very start, a late first frame is a real leading gap, as in a full decode.
+                                    count = if (firstFrame > firstNeededFrame(sampleRate, startSample)) 0L else firstFrame
+                                }
+                                next = firstFrame + frames
+                                // The verified end of the audio: the Ogg EOS sample count, or the length in the LAME tag.
+                                val endFrame = opusSamples?.let { it * sampleRate / 48000 } ?: gapless?.samples
+                                val playableFrames = endFrame?.let { minOf(frames.toLong(), (it - firstFrame).coerceAtLeast(0)).toInt() }
+                                    ?: frames
+                                // Keep real container gaps as silence. The player and words share a zero origin.
+                                // An overlap keeps the audio already passed on: the resampler only moves forward.
+                                val skip = (count - firstFrame).coerceIn(0L, playableFrames.toLong()).toInt()
+                                if (playableFrames > skip) {
+                                    val stream = resampler ?: StreamingResampler(sampleRate, count, startSample) { samples, size ->
+                                        out?.append(samples, size)
+                                        onSamples(samples, size)
+                                    }.also { resampler = it }
+                                    if (firstFrame > count) stream.silence(firstFrame - count)
+                                    buffer.position(info.offset + skip * sampleBytes * channels)
+                                    if (mono.size < frames) mono = FloatArray(frames)
+                                    for (frame in 0 until playableFrames - skip) {
+                                        var sum = 0f
+                                        repeat(channels) {
+                                            val sample = if (sampleBytes == 4) buffer.float else buffer.short / 32768f
+                                            requireUser(sample.isFinite(), Failure.AUDIO)
+                                            sum += sample
+                                        }
+                                        mono[frame] = sum / channels
+                                    }
+                                    stream.push(mono, 0, playableFrames - skip)
+                                    count = firstFrame + playableFrames
+                                    onProgress(count * 1000L / sampleRate, durationUs?.div(1000))
+                                }
+                            }
+                            outputEnded = info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0
+                            lastProgress = System.nanoTime()
+                        } finally {
+                            codec.releaseOutputBuffer(index, false)
+                        }
+                    }
+                }
+            }
+            requireUser(count > 0, Failure.EMPTY)
+            requireNotNull(resampler).finish()
+            return PcmAudio(out?.build() ?: FloatArray(0), Limits.ASR_RATE)
+        } finally {
+            try { if (started) decoder?.stop() } finally {
+                try { decoder?.release() } finally { extractor.release() }
+            }
+        }
+    }
+}

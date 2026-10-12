@@ -1,0 +1,3 @@
+# Fonts and licence copies are byte-identical to upstream (third_party/fonts/fonts.json).
+src/main/res/font/*.ttf binary
+src/main/assets/licenses/** -text

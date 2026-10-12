@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Native measurements with a public four-speaker clip. No app data is cleared.
+# Native measurements with a public four-speaker clip, in the :bench module. No app data is cleared.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 python3 scripts/fetch-diarization-models.py
@@ -20,4 +20,4 @@ done
 if [ -f .tools/diar/conversation.wav ]; then adb push .tools/diar/conversation.wav "$remote/conversation.wav"; fi
 adb shell chmod -R a+rX "$remote"
 export CASSINI_EXPECTED_TESTS=1
-scripts/device-smoke.sh fleurs "${1:-org.cassini.android.DiarizationPocTest#fourSpeakerClipTimeAndMemory}"
+scripts/device-smoke.sh --bench --class "${1:-org.cassini.bench.DiarizationPocTest#fourSpeakerClipTimeAndMemory}"
