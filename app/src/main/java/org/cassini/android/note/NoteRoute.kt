@@ -35,7 +35,12 @@ import org.cassini.ui.note.NoteScreen
  */
 @Composable
 @Suppress("FunctionNaming") // Composables are nouns in PascalCase.
-fun NoteRoute(viewModel: NoteViewModel, navigator: NoteNavigator, modifier: Modifier = Modifier) {
+fun NoteRoute(
+    viewModel: NoteViewModel,
+    navigator: NoteNavigator,
+    modifier: Modifier = Modifier,
+    transitionRunning: Boolean = false,
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val createFile = rememberLauncherForActivityResult(CreateFile()) { uri ->
@@ -69,8 +74,8 @@ fun NoteRoute(viewModel: NoteViewModel, navigator: NoteNavigator, modifier: Modi
         onDispose { if (activity?.isChangingConfigurations != true) viewModel.onVisible(false) }
     }
     val turnsShown = state.turns.isNotEmpty()
-    LaunchedEffect(viewModel, turnsShown) {
-        if (turnsShown) {
+    LaunchedEffect(viewModel, turnsShown, transitionRunning) {
+        if (turnsShown && !transitionRunning) {
             // The next frame starts when the frame that draws them has ended.
             withFrameNanos { }
             viewModel.onTurnsShown()

@@ -18,7 +18,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
@@ -62,6 +67,7 @@ fun NoteRow(row: NoteRowUi, day: DayLabel, onAction: (NoteRowAction) -> Unit, mo
     val c = CassiniTheme.colors
     val t = CassiniTheme.type
     val status = rowStatus(row.status)
+    val (boundsModifier, layerModifier) = noteRowBoundsModifiers(row.id)
     // The explicit description replaces the merged texts for TalkBack, so it also carries what they add: a suffix
     // that is not a button ("3 speakers", "No speech") and the preview, which tells why a search result matched.
     val locale = LocalFormat.current.locale
@@ -75,6 +81,7 @@ fun NoteRow(row: NoteRowUi, day: DayLabel, onAction: (NoteRowAction) -> Unit, mo
     Column(
         modifier = modifier
             .fillMaxWidth()
+            .then(boundsModifier)
             .clip(CassiniTheme.shapes.row)
             .background(if (row.highlighted) c.surface else Color.Transparent)
             .combinedClickable(
@@ -88,6 +95,7 @@ fun NoteRow(row: NoteRowUi, day: DayLabel, onAction: (NoteRowAction) -> Unit, mo
                 contentDescription = description
                 customActions = actions
             }
+            .then(layerModifier)
             .padding(horizontal = 10.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -150,6 +158,20 @@ fun NoteRow(row: NoteRowUi, day: DayLabel, onAction: (NoteRowAction) -> Unit, mo
             }
         }
     }
+}
+
+@Composable
+private fun noteRowBoundsModifiers(noteId: String): Pair<Modifier, Modifier> {
+    val noteBounds = LocalNoteBounds.current ?: return Modifier to Modifier
+    val rowLayer = rememberGraphicsLayer()
+    val boundsModifier = Modifier.onGloballyPositioned { coords ->
+        if (coords.isAttached) noteBounds.update(noteId, coords.boundsInRoot(), rowLayer)
+    }
+    val layerModifier = Modifier.drawWithContent {
+        rowLayer.record { this@drawWithContent.drawContent() }
+        drawLayer(rowLayer)
+    }
+    return boundsModifier to layerModifier
 }
 
 /** The chip and suffix of a status (features.md section 1, the status table). */

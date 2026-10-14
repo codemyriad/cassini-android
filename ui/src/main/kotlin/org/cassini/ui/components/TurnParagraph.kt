@@ -103,9 +103,10 @@ fun TurnParagraph(
     val style = if (mode == TurnMode.Read) CassiniTheme.type.transcript else CassiniTheme.type.draft
     val color = if (mode == TurnMode.Draft || placeholder) c.text3 else c.ink
     val tap by rememberUpdatedState(onWordTap)
+    val deferLinks = LocalDeferWordLinks.current
     val starts = remember(words) { wordStarts(words) }
-    val base = remember(words, mode, unsettledFrom, matches, c) {
-        paragraph(words, starts, mode, unsettledFrom, matches, c) { index -> tap(index) }
+    val base = remember(words, mode, unsettledFrom, matches, c, deferLinks) {
+        paragraph(words, starts, mode, unsettledFrom, matches, c, links = !deferLinks) { index -> tap(index) }
     }
     val activeWord = activeIndex?.takeIf { mode == TurnMode.Read && it in words.indices }
     val active = activeWord?.let { starts[it] until starts[it] + words[it].text.length }
@@ -180,10 +181,11 @@ private fun paragraph(
     unsettledFrom: Int?,
     matches: TurnMatches,
     c: CassiniColors,
+    links: Boolean = true,
     onTap: (Int) -> Unit,
 ): AnnotatedString = buildAnnotatedString {
     append(turnText(words))
-    if (mode == TurnMode.Read) {
+    if (mode == TurnMode.Read && links) {
         val styles = TextLinkStyles(style = SpanStyle(), pressedStyle = SpanStyle(background = c.accentTint))
         words.forEachIndexed { index, word ->
             // The link covers the word only. A range with the following space would cross a line break where the
@@ -192,7 +194,7 @@ private fun paragraph(
             val start = starts[index]
             addLink(LinkAnnotation.Clickable("word-$index", styles) { onTap(index) }, start, start + word.text.length)
         }
-    } else if (unsettledFrom != null && unsettledFrom in words.indices) {
+    } else if (mode != TurnMode.Read && unsettledFrom != null && unsettledFrom in words.indices) {
         addStyle(SpanStyle(color = c.text4), starts[unsettledFrom], length)
     }
     matches.ranges.forEachIndexed { index, range ->

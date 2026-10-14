@@ -302,6 +302,35 @@ class AppShellTest {
         assertTrue("the player was not left: $seen", seen.all { it == noteId })
     }
 
+    @Test fun openingAndClosingANoteKeepsTheLibraryVisibleWhileMorphing() {
+        importDocument()
+        rule.waitForIdle()
+
+        rule.mainClock.autoAdvance = false
+        rule.onNodeWithText(TITLE).performClick()
+        rule.mainClock.advanceTimeBy(100)
+        shadowOf(Looper.getMainLooper()).idle()
+        // Both Library ("Settings") and Note are in the composition while the container morphs open.
+        rule.onNodeWithContentDescription("Settings").assertExists()
+
+        rule.mainClock.autoAdvance = true
+        waitFor(hasContentDescription("Search in transcript"))
+        rule.onNodeWithContentDescription("Settings").assertDoesNotExist()
+
+        rule.mainClock.autoAdvance = false
+        Espresso.pressBack()
+        rule.mainClock.advanceTimeBy(100)
+        shadowOf(Looper.getMainLooper()).idle()
+        // Both Library ("Settings") and Note ("Search in transcript") stay visible while morphing back into the row.
+        rule.onNodeWithContentDescription("Settings").assertExists()
+        rule.onNodeWithContentDescription("Search in transcript").assertExists()
+
+        rule.mainClock.autoAdvance = true
+        waitGone(hasContentDescription("Search in transcript"))
+        rule.onNodeWithContentDescription("Settings").assertExists()
+        rule.onNodeWithText(TITLE).assertExists()
+    }
+
     /** A sealed two-speaker document over the FLEURS clip, imported as ACTION_VIEW does; Library shows its row. */
     private fun importDocument() {
         val uri = Uri.fromFile(writeDocument()).toString()

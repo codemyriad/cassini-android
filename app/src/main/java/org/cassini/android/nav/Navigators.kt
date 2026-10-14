@@ -5,6 +5,7 @@ import androidx.navigation3.runtime.NavKey
 import org.cassini.android.library.LibraryNavigator
 import org.cassini.android.note.NoteNavigator
 import org.cassini.android.recording.RecordingNavigator
+import org.cassini.ui.components.NoteBounds
 
 // The navigators that [CassiniApp] gives each route: what a screen's "open", "close" and "replace" do to the back
 // stack.
@@ -19,12 +20,19 @@ internal fun libraryNavigator(backStack: NavBackStack<NavKey>) = object : Librar
 }
 
 /** The Note screen's navigation: back pops it; after Move to trash only the Library stays. */
-internal fun noteNavigator(backStack: NavBackStack<NavKey>) = object : NoteNavigator {
+internal fun noteNavigator(
+    backStack: NavBackStack<NavKey>,
+    noteBounds: NoteBounds? = null,
+    noteId: String? = null,
+) = object : NoteNavigator {
     override fun close() {
         if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
     }
 
-    override fun closeToLibrary() = backStack.replaceWith(listOf(LibraryKey))
+    override fun closeToLibrary() {
+        if (noteId != null) noteBounds?.dispose(noteId)
+        backStack.replaceWith(listOf(LibraryKey))
+    }
 
     override fun open(key: NavKey) {
         if (backStack.lastOrNull() != key) backStack.add(key)

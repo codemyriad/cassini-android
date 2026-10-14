@@ -17,6 +17,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -61,6 +62,7 @@ import org.cassini.android.voices.GraphSavedVoicesPorts
 import org.cassini.android.voices.SavedVoicesRoute
 import org.cassini.android.voices.SavedVoicesViewModel
 import org.cassini.core.library.JobState
+import org.cassini.ui.components.LocalNoteBounds
 import org.cassini.ui.licenses.LicensesBackTo
 import org.cassini.ui.theme.CassiniTheme
 import org.cassini.ui.trash.TrashBackTo
@@ -75,6 +77,7 @@ import org.cassini.ui.trash.TrashBackTo
 @Suppress("FunctionNaming") // Composables are nouns in PascalCase.
 fun CassiniApp(graph: AppGraph, links: Flow<DeepLink>, modifier: Modifier = Modifier) {
     val backStack = rememberNavBackStack(LibraryKey)
+    val noteBounds = rememberNoteBounds()
     val context = LocalContext.current
     LaunchedEffect(links) {
         links.collect { link -> open(graph, backStack, link) }
@@ -90,42 +93,73 @@ fun CassiniApp(graph: AppGraph, links: Flow<DeepLink>, modifier: Modifier = Modi
     }
     // The screen on top sets the bar icons; during a back gesture they stay those of that screen until it pops.
     SystemBarsAppearance(darkIcons = darkBarIcons(backStack.lastOrNull(), isSystemInDarkTheme()))
-    NavDisplay(
-        backStack = backStack,
-        modifier = modifier.fillMaxSize().background(CassiniTheme.colors.bg),
-        onBack = { if (backStack.size > 1) backStack.removeAt(backStack.lastIndex) },
-        entryDecorators = listOf(
-            rememberSaveableStateHolderNavEntryDecorator(),
-            rememberViewModelStoreNavEntryDecorator(),
-        ),
-        transitionSpec = { push() },
-        popTransitionSpec = { pop() },
-        entryProvider = entryProvider {
-            entry<LibraryKey> {
-                val viewModel = viewModel {
-                    LibraryViewModel(createSavedStateHandle(), GraphLibraryPorts(graph, context), graph.clock())
+    CompositionLocalProvider(LocalNoteBounds provides noteBounds) {
+        NavDisplay(
+            backStack = backStack,
+            modifier = modifier.fillMaxSize().background(CassiniTheme.colors.bg),
+            onBack = { if (backStack.size > 1) backStack.removeAt(backStack.lastIndex) },
+            entryDecorators = listOf(
+                rememberSaveableStateHolderNavEntryDecorator(),
+                rememberViewModelStoreNavEntryDecorator(),
+            ),
+            transitionSpec = { appPush(noteBounds) },
+            popTransitionSpec = { appPop(noteBounds) },
+            predictivePopTransitionSpec = { _ -> appPop(noteBounds) },
+            entryProvider = entryProvider {
+                entry<LibraryKey> {
+                    val viewModel = viewModel {
+                        LibraryViewModel(createSavedStateHandle(), GraphLibraryPorts(graph, context), graph.clock())
+                    }
+                    LibraryRoute(viewModel, libraryNavigator(backStack))
                 }
-                LibraryRoute(viewModel, libraryNavigator(backStack))
-            }
-            entry<NoteKey> { key ->
-                val viewModel = viewModel {
-                    NoteViewModel(
-                        createSavedStateHandle(),
-                        key,
-                        GraphNotePorts(graph, context),
-                        graph.clock(),
-                        recentWords = graph.recentWords,
-                    )
+                entry<NoteKey> { key ->
+                    NoteEntry(key, graph, backStack, noteBounds, context)
                 }
-                NoteRoute(viewModel, noteNavigator(backStack))
-            }
-            entry<RecordingKey>(metadata = recordingTransitions) {
-                val viewModel = viewModel { RecordingViewModel(createSavedStateHandle(), GraphRecordingPorts(graph)) }
-                RecordingRoute(viewModel, recordingNavigator(backStack))
-            }
-            screenEntries(graph, backStack, context)
-        },
-    )
+                entry<RecordingKey>(metadata = recordingTransitions) {
+                    val viewModel = viewModel {
+                        RecordingViewModel(createSavedStateHandle(), GraphRecordingPorts(graph))
+                    }
+                    RecordingRoute(viewModel, recordingNavigator(backStack))
+                }
+                screenEntries(graph, backStack, context)
+            },
+        )
+    }
+}
+
+@Composable
+@Suppress("FunctionNaming")
+private fun NoteEntry(
+    key: NoteKey,
+    graph: AppGraph,
+    backStack: NavBackStack<NavKey>,
+    noteBounds: org.cassini.ui.components.NoteBounds,
+    context: Context,
+) {
+    val viewModel = viewModel {
+        NoteViewModel(
+            createSavedStateHandle(),
+            key,
+            GraphNotePorts(graph, context),
+            graph.clock(),
+            recentWords = graph.recentWords,
+        )
+    }
+    val top = backStack.lastOrNull()
+    val withLibrary = top is LibraryKey || (top == key && backStack.below(key) is LibraryKey)
+    val transitionRunning = isNoteTransitionRunning(withLibrary)
+    val deferLinks = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(transitionRunning) }
+    LaunchedEffect(transitionRunning) {
+        if (!transitionRunning) deferLinks.value = false
+    }
+    CompositionLocalProvider(org.cassini.ui.components.LocalDeferWordLinks provides deferLinks.value) {
+        NoteRoute(
+            viewModel = viewModel,
+            navigator = noteNavigator(backStack, noteBounds, key.noteId),
+            modifier = Modifier.noteContainerTransition(key.noteId, withLibrary = withLibrary),
+            transitionRunning = transitionRunning,
+        )
+    }
 }
 
 /** Model download, Settings, Saved voices, Trash and Licenses, each with its ViewModel over [graph]. */
@@ -212,18 +246,18 @@ internal fun MutableList<NavKey>.replaceWith(target: List<NavKey>) {
 
 private const val TAG = "CassiniNav"
 private const val PUSH_MS = 250
-private const val SLIDE_FRACTION = 0.3f
+internal const val SLIDE_FRACTION = 0.3f
 
 private fun <T> pushSpec() = tween<T>(PUSH_MS, easing = FastOutSlowInEasing)
 
 /** The push of every destination but Recording: in from 30 % of the width on the right, with a fade. */
-private fun AnimatedContentTransitionScope<Scene<NavKey>>.push(): ContentTransform {
+internal fun <S : Scene<*>> AnimatedContentTransitionScope<S>.push(): ContentTransform {
     val enter = slideInHorizontally(pushSpec()) { (it * SLIDE_FRACTION).toInt() } + fadeIn(pushSpec())
     return enter togetherWith fadeOut(pushSpec())
 }
 
 /** The pop of [push], reversed. */
-private fun AnimatedContentTransitionScope<Scene<NavKey>>.pop(): ContentTransform {
+internal fun <S : Scene<*>> AnimatedContentTransitionScope<S>.pop(): ContentTransform {
     val exit = slideOutHorizontally(pushSpec()) { (it * SLIDE_FRACTION).toInt() } + fadeOut(pushSpec())
     return fadeIn(pushSpec()) togetherWith exit
 }
