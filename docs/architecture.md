@@ -235,7 +235,7 @@ Adopt installs the sealed file in this sequence:
 
 After a crash at any point, one of two conditions is true. Either the old audio did not change (no marker), or a marker exists and the next start finishes adopt (section 5.3).
 
-The model directories stay at the root of `filesDir`. `vad/` and `speaker-models/` have their 0.1.0 names. `ModelCatalog` pins these names and the markers. The marker `parakeet-ultra/verified` holds the Hugging Face revision of Parakeet Ultra. Versions 0.1.0 to 0.2.0 kept Parakeet TDT 0.6B v3 in `parakeet-v3/`. This build does not read that directory. The startup step `models` deletes it (`ModelRepository.removeRetired`, `ModelCatalog.RETIRED_DIRECTORIES`), and `AppRoots` keeps its name reserved. A verified v3 counted as consent (`consented()`), and 0.1.x and 0.2.0 did not always store `models.consentAt` for it. Thus `removeRetired()` first records the consent when the marker `parakeet-v3/verified` holds the v3 revision and `models.consentAt` is empty. A phone that had v3 downloads Parakeet Ultra one time, and the 640 MB of v3 do not stay. The markers `vad/verified`, `speaker-models/verified` and `speaker-models/verified-voiceprint` hold the SHA-256. The default of `AppPaths.modelRoot` is `root`, but it is a separate value. Thus an instrumentation test can use a scratch root and the installed models at the same time. A test can also use an empty scratch model root to show the download screens.
+The model directories stay at the root of `filesDir`. `vad/` and `speaker-models/` have their 0.1.0 names. `ModelCatalog` pins these names and the markers. The marker `parakeet-ultra/verified` holds the Hugging Face revision of Parakeet Ultra. Versions 0.1.0 to 0.2.0 kept Parakeet TDT 0.6B v3 in `parakeet-v3/`. This build neither reads nor deletes that directory. The markers `vad/verified`, `speaker-models/verified` and `speaker-models/verified-voiceprint` hold the SHA-256. The default of `AppPaths.modelRoot` is `root`, but it is a separate value. Thus an instrumentation test can use a scratch root and the installed models at the same time. A test can also use an empty scratch model root to show the download screens.
 
 On emulator-5554, the files of the old app (for example `documents/`, `library.json` and `voices.json`) stay where they are. The new app does not read them and does not delete them.
 
@@ -562,7 +562,7 @@ A voice file whose `version` is newer than the codec stays in place, read-only, 
 
 ### 4.6 `ModelRepository`
 
-`status: StateFlow<Map<ModelPart, ModelStatus>>` gives the state of three parts: `SPEECH` (Parakeet, and the VAD as best effort), `SPEAKERS` (the diarizer) and `VOICES` (the voiceprint model). A best-effort part can fail, and the job continues without it. `ModelStatus = Ready | Missing(consented) | Downloading(pct, bytes, total) | Verifying(pct) | Failed(error)`. The repository also has `consented()`, `recordConsent()`, `recordDeclined()` and `plan()` (`ModelPlan` of `:core`). This version has no delete API for an installed model, because the design has no screen for it. Only `removeRetired()` deletes the directories of models that this build does not use (section 3.2).
+`status: StateFlow<Map<ModelPart, ModelStatus>>` gives the state of three parts: `SPEECH` (Parakeet, and the VAD as best effort), `SPEAKERS` (the diarizer) and `VOICES` (the voiceprint model). A best-effort part can fail, and the job continues without it. `ModelStatus = Ready | Missing(consented) | Downloading(pct, bytes, total) | Verifying(pct) | Failed(error)`. The repository also has `consented()`, `recordConsent()`, `recordDeclined()` and `plan()` (`ModelPlan` of `:core`). This version has no delete API, because the design has no screen for it.
 
 `ModelInstaller` does not call `ModelRepository` directly. It uses the `ModelStore` port in `:engine` (`ModelInstaller.kt`). `:app` implements this port over `ModelRepository` and the connectivity service. All functions of `ModelStore` block, and they operate on IO:
 
@@ -598,7 +598,7 @@ A voice file whose `version` is newer than the codec stays in place, read-only, 
 6. Do the sweep. Delete the `*.tmp` files older than 1 h that no job or import owns. Delete `cacheDir/exports/`. Delete a note directory without a row only if it holds only `*.tmp` files and is older than 1 h. A sweep never deletes audio.
 7. Run `DocumentRepository.retitleDirty()`. It writes the titles that a rename did not write into the document.
 
-The step `models` (between steps 1 and 2) reads the readiness of the models. It also deletes the model directories that this build does not use (`parakeet-v3/`, section 3.2).
+The step `models` (between steps 1 and 2) reads the readiness of the models.
 
 ### 4.9 Catalogue rebuild
 

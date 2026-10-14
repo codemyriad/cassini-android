@@ -75,7 +75,7 @@ done
 # 1. The test clips, the backup and the state to restore.
 scripts/acceptance-audio.sh
 adb exec-out run-as "$package" tar c \
-    --exclude=files/parakeet-ultra --exclude=files/parakeet-v3 --exclude=files/vad --exclude=files/speaker-models \
+    --exclude=files/parakeet-ultra --exclude=files/vad --exclude=files/speaker-models \
     files > "$backup"
 if ! tar tf "$backup" >/dev/null 2>&1; then
     printf 'The backup of files/ is not a tar archive: %s\n' "$backup" >&2

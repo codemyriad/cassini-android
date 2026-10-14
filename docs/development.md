@@ -202,7 +202,7 @@ The runner also gives the graph the test seams of `TestHooks`. Each seam does th
 
 The script first does a dry run (`am instrument -e log true`) of the same selection to get the expected count. The run fails if a test fails or skips, or if the count is different. If you set `CASSINI_EXPECTED_TESTS`, the run also fails when the count is not equal to it.
 
-The script gives `downloadModels=true` to the tests. If the device has no Parakeet Ultra model or no speech detector, `DeviceSmokeTest` downloads them (several hundred MB) through `ModelRepository`. A device that has only Parakeet TDT 0.6B v3 of 0.2.0 has no Parakeet Ultra model. To prevent this download, select only the tests that need no models, for example `--annotation CiSmoke`. The `:bench` experiments do not download models.
+The script gives `downloadModels=true` to the tests. If the device has no Parakeet Ultra model or no speech detector, `DeviceSmokeTest` downloads them (several hundred MB) through `ModelRepository`. To prevent this download, select only the tests that need no models, for example `--annotation CiSmoke`. The `:bench` experiments do not download models.
 
 The test APK holds the long clip of the background tests ([`fixtures/README.md`](../fixtures/README.md)). The script runs `scripts/make-long-clip.sh` before it builds the test APK. That script needs ffmpeg on the host. If ffmpeg is not there, the script shows a warning and builds the test APK without the clip. Then the tests that use the clip fail. The test APK from CI does not hold the clip.
 

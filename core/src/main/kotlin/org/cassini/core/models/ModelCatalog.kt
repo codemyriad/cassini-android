@@ -101,17 +101,7 @@ object ModelCatalog {
         ),
     )
 
-    /**
-     * A new directory, not `parakeet-v3/`: the files of v3 never look like Ultra files, and a `.part` file of v3 is
-     * never resumed as an Ultra file.
-     */
     val PARAKEET = ModelDescriptor("parakeet-ultra", parakeetArtifacts, "verified", PARAKEET_REVISION)
-
-    /**
-     * Model directories of earlier builds that this build does not read (`parakeet-v3/`, about 640 MiB). The app
-     * deletes them at startup (`ModelRepository.removeRetired`). They stay reserved names at the top of `filesDir`.
-     */
-    val RETIRED_DIRECTORIES = listOf("parakeet-v3")
 
     /** Silero VAD for chunked decoding, installed on its own so an existing Parakeet install stays ready without it. */
     const val SILERO_VAD_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"

@@ -41,20 +41,6 @@ class ModelCatalogTest {
         assertEquals("Parakeet Ultra", ModelCatalog.PARAKEET_DISPLAY_NAME)
     }
 
-    /** An install of v3 in `parakeet-v3/` (0.1.0 to 0.2.0) never makes Ultra ready, and its directory is retired. */
-    @Test fun anInstallOfParakeetV3IsNotUltra() {
-        val v3 = File(folder.root, "parakeet-v3").apply { mkdirs() }
-        val sizes = listOf(652184281L, 11845275L, 6355277L, 93939L)
-        ModelCatalog.parakeetArtifacts.zip(sizes).forEach { (artifact, size) ->
-            RandomAccessFile(File(v3, artifact.name), "rw").use { it.setLength(size) }
-        }
-        File(v3, "verified").writeText(ModelCatalog.PARAKEET_V3_REVISION)
-        assertFalse(ModelCatalog.PARAKEET.ready(folder.root))
-        assertEquals(listOf("parakeet-v3"), ModelCatalog.RETIRED_DIRECTORIES)
-        val installed = ModelPart.entries.flatMap { part -> part.models.map { it.directory } }
-        assertTrue(ModelCatalog.RETIRED_DIRECTORIES.none { it in installed })
-    }
-
     @Test fun everySpeechModelOfADocumentHasAName() {
         assertEquals("Parakeet Ultra", ModelCatalog.SPEECH_MODEL_NAMES[ModelCatalog.PARAKEET_MODEL_ID])
         assertEquals("Parakeet TDT 0.6B v3", ModelCatalog.SPEECH_MODEL_NAMES["nvidia/parakeet-tdt-0.6b-v3"])

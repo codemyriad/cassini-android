@@ -43,8 +43,7 @@ class AppRootsTest {
 
     @Test fun unusableNamesAreRefused() {
         val names = listOf(
-            "", "  ", ".", "..", "../elsewhere", "/tmp", "notes", "voices", "parakeet-ultra", "parakeet-v3", "vad/x",
-            "speaker-models",
+            "", "  ", ".", "..", "../elsewhere", "/tmp", "notes", "voices", "parakeet-ultra", "vad/x", "speaker-models",
             AppRoots.DEBUG_ROOT_FILE,
         )
         for (bad in names) {

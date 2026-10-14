@@ -14,7 +14,6 @@ import org.cassini.core.format.Transcript
 import org.cassini.core.format.Word
 import org.cassini.core.library.AudioKind
 import org.cassini.core.library.JobKind
-import org.cassini.core.models.ModelCatalog
 import org.cassini.core.models.ModelPart
 import org.cassini.data.AppPaths
 import org.cassini.data.CassiniDispatchers
@@ -104,22 +103,6 @@ class AppGraphTest {
             ),
             steps.toList(),
         )
-    }
-
-    /** Parakeet TDT 0.6B v3 of 0.2.0 and earlier goes at startup; the installed models stay. */
-    @Test fun theStartupDeletesTheRetiredParakeetV3() {
-        val root = AppPaths(folder.newFolder(), folder.newFolder(), modelRoot = folder.newFolder())
-        val v3 = File(root.modelRoot, "parakeet-v3").apply { mkdirs() }
-        File(v3, "encoder.int8.onnx").writeBytes(ByteArray(16))
-        File(v3, "verified").writeText(ModelCatalog.PARAKEET_V3_REVISION)
-        val vad = File(root.modelRoot, "vad").apply { mkdirs() }
-        File(vad, "verified").writeText("kept")
-
-        graph(root).awaitReady()
-
-        assertFalse(v3.exists())
-        assertTrue(File(vad, "verified").isFile)
-        assertEquals(emptyMap<String, String>(), graphs.single().startupReport.value?.failed)
     }
 
     @Test fun theNextStartRecoversALiveCaptureAndRequeuesARunningJob() = runBlocking {

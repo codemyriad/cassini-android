@@ -17,7 +17,6 @@ import org.cassini.data.settings.SettingsRepository
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -183,87 +182,6 @@ class ModelRepositoryTest {
 
         assertEquals(listOf("vad/verified"), fetched)
         assertTrue(ModelCatalog.VAD.ready(paths.modelRoot))
-    }
-
-    /** A phone of 0.2.0 or earlier: Parakeet TDT 0.6B v3 in `parakeet-v3/`, verified by its own revision. */
-    private fun installParakeetV3(): File {
-        val v3 = File(paths.modelRoot, "parakeet-v3").apply { mkdirs() }
-        val sizes = listOf(652184281L, 11845275L, 6355277L, 93939L)
-        ModelCatalog.parakeetArtifacts.zip(sizes).forEach { (artifact, size) ->
-            RandomAccessFile(File(v3, artifact.name), "rw").use { it.setLength(size) }
-        }
-        File(v3, "encoder.int8.onnx.part").writeBytes(ByteArray(8))
-        File(v3, "verified").writeText(ModelCatalog.PARAKEET_V3_REVISION)
-        return v3
-    }
-
-    @Test fun parakeetV3IsNeitherUltraNorConsent() = runTest {
-        installParakeetV3()
-
-        val status = repository().refresh()
-
-        assertEquals(ModelPart.entries.associateWith { ModelStatus.Missing(consented = false) }, status)
-        assertFalse(repository().consented())
-        assertEquals(ModelPart.entries, repository().plan().parts)
-    }
-
-    @Test fun theRetiredParakeetV3IsDeletedAndTheOtherModelsStay() = runTest {
-        val v3 = installParakeetV3()
-        install(ModelCatalog.PARAKEET)
-        install(ModelCatalog.VOICEPRINT)
-        val repo = repository()
-
-        assertEquals(listOf("parakeet-v3"), repo.removeRetired())
-
-        assertFalse(v3.exists())
-        assertTrue(ModelCatalog.PARAKEET.ready(paths.modelRoot))
-        assertTrue(ModelCatalog.VOICEPRINT.ready(paths.modelRoot))
-        assertEquals("nothing left to delete", emptyList<String>(), repo.removeRetired())
-    }
-
-    @Test fun anInstalledParakeetV3KeepsItsConsentWhenItIsDeleted() = runTest {
-        installParakeetV3()
-        val repo = repository()
-        repo.refresh()
-        assertNull(settings.snapshot().consentAt)
-
-        assertEquals(listOf("parakeet-v3"), repo.removeRetired())
-
-        assertEquals(42L, settings.snapshot().consentAt)
-        assertTrue(repo.consented())
-        assertEquals(ModelStatus.Missing(consented = true), repo.status.value[ModelPart.SPEECH])
-    }
-
-    @Test fun anIncompleteParakeetV3IsDeletedWithoutConsent() = runTest {
-        File(paths.modelRoot, "parakeet-v3").mkdirs()
-        File(paths.modelRoot, "parakeet-v3/encoder.int8.onnx.part").writeText("partial")
-        val repo = repository()
-
-        assertEquals(listOf("parakeet-v3"), repo.removeRetired())
-
-        assertNull(settings.snapshot().consentAt)
-        assertFalse(repo.consented())
-    }
-
-    @Test fun anEarlierConsentStaysWhenParakeetV3IsDeleted() = runTest {
-        installParakeetV3()
-        settings.recordConsent(7)
-        val repo = repository()
-
-        repo.removeRetired()
-
-        assertEquals(7L, settings.snapshot().consentAt)
-    }
-
-    @Test fun anInstallOverParakeetV3FetchesUltraIntoItsOwnDirectory() = runTest {
-        installParakeetV3()
-        val repo = repository()
-        repo.refresh()
-
-        offMain { repo.installBlocking(ModelPart.SPEECH) }
-
-        assertEquals(listOf("parakeet-ultra/verified", "vad/verified"), fetched)
-        assertEquals(ModelStatus.Ready, repo.status.value[ModelPart.SPEECH])
     }
 
     @Test fun theInstallOwnerPushesProgress() = runTest {

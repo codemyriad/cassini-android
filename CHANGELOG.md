@@ -9,7 +9,7 @@ We made the entries for 0.0.1-beta to 0.1.0 again from the release notes of thes
 ### Changed
 
 - Cassini recognizes speech with Parakeet Ultra INT8. Moondream made this model with more training of NVIDIA Parakeet TDT 0.6B v3. It makes fewer errors in the 25 languages of v3. Earlier versions used Parakeet TDT 0.6B v3.
-- If you used an earlier version, Cassini downloads Parakeet Ultra one time (about 640 MB). If you agreed to the model download before, or Parakeet TDT 0.6B v3 is on your phone, it occurs with your next transcription. Else, Cassini asks first. When Cassini starts, it deletes Parakeet TDT 0.6B v3 (the `parakeet-v3/` directory, about 640 MB). The speaker models stay.
+- Parakeet Ultra installs in `parakeet-ultra/`. This version does not read or delete the `parakeet-v3/` directory of earlier versions.
 - The documents that you made before keep the name of their model. Document info shows "Parakeet TDT 0.6B v3, INT8" for them and "Parakeet Ultra, INT8" for new versions.
 - A transcription that you stopped with an earlier version does not continue with Parakeet Ultra. Cassini shows "Saved progress no longer matches", and your recording stays. Start the transcription again.
 - The sherpa-onnx runtime has the feature extraction of NVIDIA NeMo for Parakeet, from upstream pull request [k2-fsa/sherpa-onnx#4024](https://github.com/k2-fsa/sherpa-onnx/pull/4024).
