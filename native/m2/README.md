@@ -2,7 +2,7 @@
 
 The app uses the patched sherpa-onnx runtime as an ordinary Maven coordinate:
 
-    org.cassini.native:sherpa-onnx-nemotron:1.13.7-1f23907a
+    org.cassini.native:sherpa-onnx-nemotron:1.13.7-dbbeef9c
 
 `settings.gradle.kts` reads this coordinate from this directory. It reads only the group `org.cassini.native`
 from here. Git ignores all files in this directory except this README.
@@ -11,7 +11,7 @@ from here. Git ignores all files in this directory except this README.
 
 1. The AAR that is already in this directory, if its SHA-256 agrees with the pin.
 2. The file `app/libs/sherpa-onnx-1.13.7-nemotron.aar` of an older checkout, if its SHA-256 agrees with the pin.
-3. The AAR of the GitHub release `native-sherpa-onnx-1.13.7-nemotron.2` (`scripts/fetch-native-aar.sh`).
+3. The AAR of the GitHub release `native-sherpa-onnx-1.13.7-nemotron.3` (`scripts/fetch-native-aar.sh`).
 4. A build from the pinned source and `scripts/streaming-diarization.patch` (`scripts/build-native-aar.sh`). This
    build needs the NDK.
 
@@ -24,6 +24,6 @@ file with the pin.
 
 The scripts write this layout:
 
-    org/cassini/native/sherpa-onnx-nemotron/1.13.7-1f23907a/
-        sherpa-onnx-nemotron-1.13.7-1f23907a.aar
-        sherpa-onnx-nemotron-1.13.7-1f23907a.pom
+    org/cassini/native/sherpa-onnx-nemotron/1.13.7-dbbeef9c/
+        sherpa-onnx-nemotron-1.13.7-dbbeef9c.aar
+        sherpa-onnx-nemotron-1.13.7-dbbeef9c.pom

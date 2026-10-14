@@ -41,7 +41,7 @@ enum class MismatchReason {
     /** The audio file changed (length or modification time). */
     SIGNATURE,
 
-    /** Another Parakeet revision. */
+    /** Another speech model or revision, for example a checkpoint of Parakeet TDT 0.6B v3 in this build. */
     MODEL,
 
     /** Another diarization model. */

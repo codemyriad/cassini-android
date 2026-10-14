@@ -36,7 +36,7 @@ voices/                                      all voiceprints and voice matches, 
     generation                               an integer; "Forget everyone" increases it
     notes/<noteId>.json                      voiceprints and matches of a sealed note (NoteVoiceCodec version 2)
     pending/<noteId>.json                    voiceprints and matches of a sealed job before adopt
-parakeet-v3/  vad/  speaker-models/          the models, with the names and markers that ModelCatalog pins
+parakeet-ultra/  vad/  speaker-models/       the models, with the names and markers that ModelCatalog pins
 ```
 
 `cacheDir/exports/` holds temporary export files. The app deletes them after each write and at each start.
@@ -118,7 +118,7 @@ The app writes version 2. Version 2 adds one key, `wordLog`, with `count` and `b
 
 - `source` is the name of the audio file of the note, for example `capture.opus` or `document.opus`.
 - `signature` is `length:mtime` of that file.
-- `model` is the Parakeet revision, and `speakers` is the SHA-256 of the diarizer model.
+- `model` is the Hugging Face revision of the Parakeet export, and `speakers` is the SHA-256 of the diarizer model. A checkpoint of Parakeet TDT 0.6B v3 (0.2.0 and earlier) has another revision, so it does not resume with Parakeet Ultra.
 - `diarizer.cache` holds at most 200000 floats.
 
 `CheckpointState.validate` compares these values with the note row. It also makes sure that `words.log` holds at least `wordLog.bytes` bytes. If a value is different, the job fails with `CHECKPOINT_MISMATCH` ("Saved progress no longer matches"). A golden `checkpoint.json` from a 0.1.0 device run is in `core/src/test/resources/checkpoint/`.
@@ -170,6 +170,8 @@ A Cassini document is an Ogg Opus file at 48 kHz. Any audio player plays it. The
 - A JSON manifest (`application/vnd.cassini.portable-meeting+json`) and the transcript bodies (`application/vnd.cassini.transcript-words+json`, format `cassini.words.v1`). They are compressed and split across numbered tags.
 
 Each transcription adds a transcript version (a variant). The document keeps the earlier versions. "Save a copy" copies the document byte for byte, together with the versions, extensions and attachments that Android does not use.
+
+The recognition step of the provenance names the speech model as `<id> <precision>`. The `model` of a new version is `moondream/parakeet-ultra INT8`. A version of 0.2.0 or earlier has `nvidia/parakeet-tdt-0.6b-v3 INT8`. Document info shows "Parakeet Ultra, INT8" and "Parakeet TDT 0.6B v3, INT8" for these ids, and any other id as it is. The `engine` stays `Parakeet TDT` (the architecture of both models). The `version` gives `sherpa-onnx 1.13.7; model revision <revision>`. The format does not restrict these strings. The desktop app writes its own ids, for example `parakeet-tdt-0.6b-v3-int8`.
 
 Parakeet does not identify the language, so the Android producer writes an empty `language` (`""`). The Android producer also writes these extension keys in the provenance of a version: `x-inferenceMs`, `x-segmentation`, `x-resumedFromMs`, `x-speakerDiarization`, `x-incrementalDiarization`, `x-speakerMerges`, `x-speakerAssignmentEditedBy` (the value `"user"`, written together with `x-speakerMerges`), `x-speakerIdentification`, `x-derivedFromTranscript` and `x-sourceAttribution`.
 

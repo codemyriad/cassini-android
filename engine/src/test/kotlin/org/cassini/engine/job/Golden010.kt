@@ -28,12 +28,13 @@ import org.json.JSONObject
  * The 0.1.0 `MainActivity.transcribe()` provenance and label code as the golden for the same inputs. It is copied from
  * the 0.1.x line after commit ed73e73, which removed `.put("language", "it")` from `processing()`, so it does not
  * reproduce the v0.1.0 tag byte for byte. Only the free variables became parameters and
- * `getString(R.string.speaker_label, n)` became "Speaker n". The comparison ignores key order.
+ * `getString(R.string.speaker_label, n)` became "Speaker n". The model id, `nvidia/parakeet-tdt-0.6b-v3` in 0.1.0,
+ * is the pinned one of this build (Parakeet Ultra). The comparison ignores key order.
  */
 object Golden010 {
     private fun processing(precision: String, revision: String? = null): JSONObject = JSONObject()
         .put("backend", "sherpa-onnx").put("engine", "Parakeet TDT")
-        .put("model", "nvidia/parakeet-tdt-0.6b-v3 $precision")
+        .put("model", "${ModelCatalog.PARAKEET_MODEL_ID} $precision")
         .put("device", "Android CPU")
         .put("source", "recording").put("version", "sherpa-onnx 1.13.7${revision?.let { "; model revision $it" }.orEmpty()}")
 

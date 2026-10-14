@@ -170,7 +170,7 @@ class ModelRepositoryTest {
         runCatching { offMain { repo.installBlocking(ModelPart.SPEECH) } }
 
         assertEquals(ModelStatus.Missing(consented = false), repo.status.value[ModelPart.SPEECH])
-        assertEquals("no detector after a cancelled Parakeet", listOf("parakeet-v3/verified"), fetched)
+        assertEquals("no detector after a cancelled Parakeet", listOf("parakeet-ultra/verified"), fetched)
     }
 
     @Test fun anInstallSkipsReadyModelsAndKeepsMarkersUntilVerified() = runTest {

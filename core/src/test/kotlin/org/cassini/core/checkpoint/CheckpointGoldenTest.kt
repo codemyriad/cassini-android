@@ -77,9 +77,23 @@ class CheckpointGoldenTest {
     @Test fun theGoldenValidatesAgainstItsOwnIdentity() {
         CheckpointState.validate(golden, expected())
         CheckpointState.validate(state, expected())
-        assertEquals(ModelCatalog.PARAKEET_REVISION, state.model)
+        assertEquals("0.1.0 made it with Parakeet TDT 0.6B v3", ModelCatalog.PARAKEET_V3_REVISION, state.model)
         assertEquals(ModelCatalog.diarizationModel.sha256, state.speakers)
         assertEquals("0.1.0 keys a checkpoint by its source uri", DIRECTORY_KEY, CheckpointState.key(state.source))
+    }
+
+    /** Words of v3 and words of Parakeet Ultra never mix in one transcript: this build does not resume the golden. */
+    @Test fun aCheckpointOfParakeetV3IsNotResumedWithUltra() {
+        val ultra = CheckpointState.Expected(
+            source = state.source,
+            signature = state.signature,
+            modelRevision = ModelCatalog.PARAKEET_REVISION,
+            speakersSha256 = ModelCatalog.diarizationModel.sha256,
+            clipsBytes = Long.MAX_VALUE,
+            audioBytes = Long.MAX_VALUE,
+        )
+        assertThrows(IllegalArgumentException::class.java) { CheckpointState.validate(golden, ultra) }
+        assertThrows(IllegalArgumentException::class.java) { CheckpointState.validate(state, ultra) }
     }
 
     @Test fun aChangedIdentityOrShorterFilesRejectTheGolden() {

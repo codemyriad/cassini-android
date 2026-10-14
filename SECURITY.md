@@ -55,7 +55,7 @@ The APK does not contain the speech models. The app downloads them only after th
 
 | Model | Host |
 |---|---|
-| Parakeet TDT 0.6B v3 INT8 (speech recognition) | `huggingface.co`, at a pinned revision |
+| Parakeet Ultra INT8 (speech recognition) | `huggingface.co`, at a pinned revision |
 | Silero VAD (speech detection) and CAM++ (voiceprints) | `github.com`, from the `k2-fsa/sherpa-onnx` releases |
 | Nemotron-3-Diarization INT8 (speaker labels) | `dist.gocassini.com` |
 
@@ -67,7 +67,7 @@ If a host gives a file with a different hash, the app stops the download. Report
 
 ## Native runtime
 
-The app contains a sherpa-onnx AAR that we build from a pinned source and [`scripts/streaming-diarization.patch`](scripts/streaming-diarization.patch). [`scripts/native-dependencies.json`](scripts/native-dependencies.json) pins the SHA-256 of the source archives, of the patch and of the prebuilt AAR on the GitHub release `native-sherpa-onnx-1.13.7-nemotron.2`. `scripts/setup.sh` and `scripts/verify-native-runtime.sh` compare the AAR with the pin. Each week, and after a change to the native inputs, CI builds the AAR from source and compares its SHA-256 with the pin. [`docs/native-runtime.md`](docs/native-runtime.md) gives more detail.
+The app contains a sherpa-onnx AAR that we build from a pinned source and [`scripts/streaming-diarization.patch`](scripts/streaming-diarization.patch). [`scripts/native-dependencies.json`](scripts/native-dependencies.json) pins the SHA-256 of the source archives, of the patch and of the prebuilt AAR on the GitHub release `native-sherpa-onnx-1.13.7-nemotron.3`. `scripts/setup.sh` and `scripts/verify-native-runtime.sh` compare the AAR with the pin. Each week, and after a change to the native inputs, CI builds the AAR from source and compares its SHA-256 with the pin. [`docs/native-runtime.md`](docs/native-runtime.md) gives more detail.
 
 ## Scope
 

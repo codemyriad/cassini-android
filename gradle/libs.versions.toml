@@ -37,7 +37,7 @@ collectionsImmutable = "0.5.2"
 zstd = "1.5.7-22"
 orgJson = "20240303"
 # Patched sherpa-onnx AAR served from the repo-local Maven directory native/m2 (scripts/setup.sh).
-sherpaOnnx = "1.13.7-1f23907a"
+sherpaOnnx = "1.13.7-dbbeef9c"
 
 # Tests
 junit = "4.13.2"
