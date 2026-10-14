@@ -10,7 +10,7 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 import java.io.RandomAccessFile
 
-/** The pins, URLs, directories and markers of 0.1.0. Installed phones depend on every one of them. */
+/** The pins, URLs, directories and markers of the installed models. Installed phones depend on every one of them. */
 class ModelCatalogTest {
     @get:Rule val folder = TemporaryFolder()
 
@@ -24,19 +24,41 @@ class ModelCatalogTest {
 
     @Test fun parakeetIsTheHuggingFaceRevisionMarkedByThatRevision() {
         val parakeet = ModelCatalog.PARAKEET
-        assertEquals("parakeet-v3", parakeet.directory)
+        assertEquals("parakeet-ultra", parakeet.directory)
         assertEquals("verified", parakeet.markerFile)
-        assertEquals("2bda32ec70b097a55adaa07d9a7173915b43cc78", parakeet.markerValue)
+        assertEquals("b86784a3a5356cbd126f710b61cd90c5fe5898f1", parakeet.markerValue)
         val names = listOf("encoder.int8.onnx", "decoder.int8.onnx", "joiner.int8.onnx", "tokens.txt")
         assertEquals(names, parakeet.artifacts.map { it.name })
-        assertEquals(listOf(652184281L, 11845275L, 6355277L, 93939L), parakeet.artifacts.map { it.size })
+        assertEquals(listOf(652282347L, 11845275L, 6355277L, 93939L), parakeet.artifacts.map { it.size })
         parakeet.artifacts.forEach {
             assertEquals(
-                "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/" +
-                    "2bda32ec70b097a55adaa07d9a7173915b43cc78/${it.name}",
+                "https://huggingface.co/tpmaerk/parakeet-ultra-sherpa-onnx-int8/resolve/" +
+                    "b86784a3a5356cbd126f710b61cd90c5fe5898f1/${it.name}",
                 it.url,
             )
         }
+        assertEquals("moondream/parakeet-ultra", ModelCatalog.PARAKEET_MODEL_ID)
+        assertEquals("Parakeet Ultra", ModelCatalog.PARAKEET_DISPLAY_NAME)
+    }
+
+    /** An install of v3 in `parakeet-v3/` (0.1.0 to 0.2.0) never makes Ultra ready, and its directory is retired. */
+    @Test fun anInstallOfParakeetV3IsNotUltra() {
+        val v3 = File(folder.root, "parakeet-v3").apply { mkdirs() }
+        val sizes = listOf(652184281L, 11845275L, 6355277L, 93939L)
+        ModelCatalog.parakeetArtifacts.zip(sizes).forEach { (artifact, size) ->
+            RandomAccessFile(File(v3, artifact.name), "rw").use { it.setLength(size) }
+        }
+        File(v3, "verified").writeText(ModelCatalog.PARAKEET_V3_REVISION)
+        assertFalse(ModelCatalog.PARAKEET.ready(folder.root))
+        assertEquals(listOf("parakeet-v3"), ModelCatalog.RETIRED_DIRECTORIES)
+        val installed = ModelPart.entries.flatMap { part -> part.models.map { it.directory } }
+        assertTrue(ModelCatalog.RETIRED_DIRECTORIES.none { it in installed })
+    }
+
+    @Test fun everySpeechModelOfADocumentHasAName() {
+        assertEquals("Parakeet Ultra", ModelCatalog.SPEECH_MODEL_NAMES[ModelCatalog.PARAKEET_MODEL_ID])
+        assertEquals("Parakeet TDT 0.6B v3", ModelCatalog.SPEECH_MODEL_NAMES["nvidia/parakeet-tdt-0.6b-v3"])
+        assertEquals("2bda32ec70b097a55adaa07d9a7173915b43cc78", ModelCatalog.PARAKEET_V3_REVISION)
     }
 
     @Test fun theDetectorAndSpeakerModelsAreMarkedByTheirHashes() {

@@ -148,7 +148,7 @@ CAUTION: Do not run `adb uninstall org.cassini.android` or `adb shell pm clear o
 
 Use `scripts/device-smoke.sh` for the device tests. The script installs the app and the test APK with `adb install -r`. Then it runs the instrumentation with `adb shell am instrument`. This keeps the app data and the models.
 
-The script tells the tests to download the models (`downloadModels=true`). If the device has no models, `DeviceSmokeTest` downloads Parakeet and Silero VAD (about 640 MB). To prevent this download, select the tests that need no models (`--annotation CiSmoke`). [`docs/development.md`](docs/development.md) gives the arguments of the script.
+The script tells the tests to download the models (`downloadModels=true`). If the device has no models, `DeviceSmokeTest` downloads Parakeet Ultra and Silero VAD (about 640 MB). A device with Parakeet TDT 0.6B v3 of an earlier version also downloads Parakeet Ultra. To prevent this download, select the tests that need no models (`--annotation CiSmoke`). [`docs/development.md`](docs/development.md) gives the arguments of the script.
 
 If you install an APK by hand, use `adb install -r`.
 

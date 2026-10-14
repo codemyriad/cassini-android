@@ -6,6 +6,18 @@ We made the entries for 0.0.1-beta to 0.1.0 again from the release notes of thes
 
 ## [Unreleased]
 
+### Changed
+
+- Cassini recognizes speech with Parakeet Ultra INT8. Moondream made this model with more training of NVIDIA Parakeet TDT 0.6B v3. It makes fewer errors in the 25 languages of v3. Earlier versions used Parakeet TDT 0.6B v3.
+- If you used an earlier version, Cassini downloads Parakeet Ultra one time (about 640 MB). If you agreed to the model download before, or Parakeet TDT 0.6B v3 is on your phone, it occurs with your next transcription. Else, Cassini asks first. When Cassini starts, it deletes Parakeet TDT 0.6B v3 (the `parakeet-v3/` directory, about 640 MB). The speaker models stay.
+- The documents that you made before keep the name of their model. Document info shows "Parakeet TDT 0.6B v3, INT8" for them and "Parakeet Ultra, INT8" for new versions.
+- A transcription that you stopped with an earlier version does not continue with Parakeet Ultra. Cassini shows "Saved progress no longer matches", and your recording stays. Start the transcription again.
+- The sherpa-onnx runtime has the feature extraction of NVIDIA NeMo for Parakeet, from upstream pull request [k2-fsa/sherpa-onnx#4024](https://github.com/k2-fsa/sherpa-onnx/pull/4024).
+
+### Fixed
+
+- Quiet audio gives a transcript. Before, the transcript of a very quiet recording could be empty.
+
 ## [0.2.0] - 2026-10-12
 
 The APK file of this release is `cassini-android-0.2.0.apk`. It operates on Android 8.0 or later, on a 64-bit ARM phone (`arm64-v8a`). The APK also has `x86_64` for emulators. Install it over your earlier version of Cassini, without an uninstall. Then your notes and your downloaded models stay. Android accepts the update because 0.2.0 has the same beta signing key as the earlier versions. Version 0.2 does not show the notes of 0.1.x, but the `.opus` documents that you saved from 0.1.x open as before. The release also has the native sources (`cassini-native-sources.tar`) and the notices. The APK has no models. After you agree, the app downloads them separately (about 730 MB).

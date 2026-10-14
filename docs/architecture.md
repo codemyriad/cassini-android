@@ -42,7 +42,7 @@ Disk space: on 2026-10-09, the root file system had 12 GB of free space. Each ph
 
 ## 1. Scope and constraints
 
-Cassini records audio and makes the transcript on the phone with sherpa-onnx Parakeet TDT v3 INT8. It labels the speakers with Nemotron-3 Sortformer streaming diarization (diarization finds who speaks when). It recognizes named voices with CAM++ voiceprints. It saves all of this as one portable `.opus` document. The engine is good and has tests. Version 0.2 keeps the engine and replaces the app around it.
+Cassini records audio and makes the transcript on the phone with sherpa-onnx and Parakeet Ultra INT8 (a post-train of Parakeet TDT 0.6B v3 by Moondream). It labels the speakers with Nemotron-3 Sortformer streaming diarization (diarization finds who speaks when). It recognizes named voices with CAM++ voiceprints. It saves all of this as one portable `.opus` document. The engine is good and has tests. Version 0.2 keeps the engine and replaces the app around it.
 
 These constraints are mandatory:
 
@@ -124,7 +124,7 @@ The P1 move kept the bodies of the files, except for the listed edits. `scripts/
 | `speakers` | `SortformerStream`, `VoiceprintExtractor`. |
 | `job` | `InferenceDispatcher` (one thread) and `NativeBudget` (the `Mutex` for model loads). From P5, also these items: the seams of section 2, `TranscriptionJob`, `ModelInstaller`, `ProgressTracker`, the ports (`JobStorage`, `JobVoices`, `ModelAccess`, `ModelStore`, `BatterySource`), `JobEngines` (the factories of the seams), `JobEnvironment` (dispatchers, clock, logger, placeholder label), `DraftSources` and the job state types (section 5). A JVM test makes sure that `ModelCatalog.VOICEPRINT_DIM` is the print length that the voiceprint adapter accepts. The adapter refuses a print of a different length. No test operates the real CAM++ model. |
 
-The sherpa-onnx AAR is the Maven coordinate `org.cassini.native:sherpa-onnx-nemotron:1.13.7-1f23907a` in the repository `native/m2/`, which git ignores (section 8).
+The sherpa-onnx AAR is the Maven coordinate `org.cassini.native:sherpa-onnx-nemotron:1.13.7-dbbeef9c` in the repository `native/m2/`, which git ignores (section 8).
 
 ### 2.3 `:data` (package `org.cassini.data`)
 
@@ -212,7 +212,7 @@ voices/                                      all voiceprints and voice matches, 
     generation                               integer, increased by "Forget everyone"
     notes/<noteId>.json                      NoteVoiceCodec version 2 (keys <variantId>/<speakerId>)
     pending/<noteId>.json                    final prints and matches of a sealed job before adopt (same codec)
-parakeet-v3/  vad/  speaker-models/          models, names and marker files exactly as ModelCatalog pins them
+parakeet-ultra/  vad/  speaker-models/       models, names and marker files exactly as ModelCatalog pins them
 ```
 
 `cacheDir/exports/` holds temporary export files. The app deletes them after each write and at each start.
@@ -235,7 +235,7 @@ Adopt installs the sealed file in this sequence:
 
 After a crash at any point, one of two conditions is true. Either the old audio did not change (no marker), or a marker exists and the next start finishes adopt (section 5.3).
 
-The model directories stay at the root of `filesDir`, with their 0.1.0 names. `ModelCatalog` pins these names and the markers. The marker `parakeet-v3/verified` holds the Hugging Face revision. The markers `vad/verified`, `speaker-models/verified` and `speaker-models/verified-voiceprint` hold the SHA-256. The default of `AppPaths.modelRoot` is `root`, but it is a separate value. Thus an instrumentation test can use a scratch root and the installed models at the same time. A test can also use an empty scratch model root to show the download screens.
+The model directories stay at the root of `filesDir`. `vad/` and `speaker-models/` have their 0.1.0 names. `ModelCatalog` pins these names and the markers. The marker `parakeet-ultra/verified` holds the Hugging Face revision of Parakeet Ultra. Versions 0.1.0 to 0.2.0 kept Parakeet TDT 0.6B v3 in `parakeet-v3/`. This build does not read that directory. The startup step `models` deletes it (`ModelRepository.removeRetired`, `ModelCatalog.RETIRED_DIRECTORIES`), and `AppRoots` keeps its name reserved. A verified v3 counted as consent (`consented()`), and 0.1.x and 0.2.0 did not always store `models.consentAt` for it. Thus `removeRetired()` first records the consent when the marker `parakeet-v3/verified` holds the v3 revision and `models.consentAt` is empty. A phone that had v3 downloads Parakeet Ultra one time, and the 640 MB of v3 do not stay. The markers `vad/verified`, `speaker-models/verified` and `speaker-models/verified-voiceprint` hold the SHA-256. The default of `AppPaths.modelRoot` is `root`, but it is a separate value. Thus an instrumentation test can use a scratch root and the installed models at the same time. A test can also use an empty scratch model root to show the download screens.
 
 On emulator-5554, the files of the old app (for example `documents/`, `library.json` and `voices.json`) stay where they are. The new app does not read them and does not delete them.
 
@@ -364,7 +364,7 @@ Version 1 holds all the words in `chunks.words`, and the job writes the file aga
 
 The codec writes version 2 and reads both versions. A version 1 file resumes with all its words inline, and the next save writes version 2.
 
-In the new layout, `source` holds the name of the audio file of the note (`capture.opus`, `source.mp3`, `document.opus`, …). `CheckpointState.validate` compares `source`, the signature, the Parakeet revision and the SHA of the diarizer with values from the note row.
+In the new layout, `source` holds the name of the audio file of the note (`capture.opus`, `source.mp3`, `document.opus`, …). `CheckpointState.validate` compares `source`, the signature, the Parakeet revision and the SHA of the diarizer with values from the note row. Thus a checkpoint that Parakeet TDT 0.6B v3 made does not resume with Parakeet Ultra: the job fails with "Saved progress no longer matches" (MismatchReason.MODEL), and the recording stays. The words of two models never mix in one transcript.
 
 The name of the directory comes from the note ID. The app deletes the directory at the end of adopt (first the row, then the directory), at "Start over" and at purge. A committed golden `checkpoint.json` from a 0.1.0 device run stays in `core/src/test/resources/checkpoint/` as a test of the codec.
 
@@ -562,7 +562,7 @@ A voice file whose `version` is newer than the codec stays in place, read-only, 
 
 ### 4.6 `ModelRepository`
 
-`status: StateFlow<Map<ModelPart, ModelStatus>>` gives the state of three parts: `SPEECH` (Parakeet, and the VAD as best effort), `SPEAKERS` (the diarizer) and `VOICES` (the voiceprint model). A best-effort part can fail, and the job continues without it. `ModelStatus = Ready | Missing(consented) | Downloading(pct, bytes, total) | Verifying(pct) | Failed(error)`. The repository also has `consented()`, `recordConsent()`, `recordDeclined()` and `plan()` (`ModelPlan` of `:core`). This version has no delete API, because the design has no screen for it.
+`status: StateFlow<Map<ModelPart, ModelStatus>>` gives the state of three parts: `SPEECH` (Parakeet, and the VAD as best effort), `SPEAKERS` (the diarizer) and `VOICES` (the voiceprint model). A best-effort part can fail, and the job continues without it. `ModelStatus = Ready | Missing(consented) | Downloading(pct, bytes, total) | Verifying(pct) | Failed(error)`. The repository also has `consented()`, `recordConsent()`, `recordDeclined()` and `plan()` (`ModelPlan` of `:core`). This version has no delete API for an installed model, because the design has no screen for it. Only `removeRetired()` deletes the directories of models that this build does not use (section 3.2).
 
 `ModelInstaller` does not call `ModelRepository` directly. It uses the `ModelStore` port in `:engine` (`ModelInstaller.kt`). `:app` implements this port over `ModelRepository` and the connectivity service. All functions of `ModelStore` block, and they operate on IO:
 
@@ -597,6 +597,8 @@ A voice file whose `version` is newer than the codec stays in place, read-only, 
 5. Do the trash purge (section 4.10).
 6. Do the sweep. Delete the `*.tmp` files older than 1 h that no job or import owns. Delete `cacheDir/exports/`. Delete a note directory without a row only if it holds only `*.tmp` files and is older than 1 h. A sweep never deletes audio.
 7. Run `DocumentRepository.retitleDirty()`. It writes the titles that a rename did not write into the document.
+
+The step `models` (between steps 1 and 2) reads the readiness of the models. It also deletes the model directories that this build does not use (`parakeet-v3/`, section 3.2).
 
 ### 4.9 Catalogue rebuild
 
@@ -925,7 +927,7 @@ The draft names have one owner, `DraftNames` (section 3.6). The UI and the job c
 
 ## 8. Native runtime and build
 
-AAR: `scripts/build-native-aar.sh` builds the pinned fork and the patch with ONNX Runtime 1.27.1. It installs the AAR and a generated POM into `native/m2/org/cassini/native/sherpa-onnx-nemotron/1.13.7-1f23907a/`. Git ignores this directory, but `native/m2/README.md` is committed. `scripts/fetch-native-aar.sh` downloads the AAR from the GitHub release `native-sherpa-onnx-1.13.7-nemotron.2`. Its SHA-256 is `d376f7e25707cf6834208db297e5955c8e02117131740df7ff7fd6ca17216068`, and `scripts/native-dependencies.json` pins it with the hash of the patch. The older release `.1` is a build without the patch (SHA-256 `d03a06f8…`, without `processStreamingChunk`, `saveStreamingState` and `restoreStreamingState`). Never use it.
+AAR: `scripts/build-native-aar.sh` builds the pinned fork and the patch with ONNX Runtime 1.27.1. It installs the AAR and a generated POM into `native/m2/org/cassini/native/sherpa-onnx-nemotron/1.13.7-dbbeef9c/`. Git ignores this directory, but `native/m2/README.md` is committed. `scripts/fetch-native-aar.sh` downloads the AAR from the GitHub release `native-sherpa-onnx-1.13.7-nemotron.3`. The `sherpa-onnx-aar` entry of `scripts/native-dependencies.json` pins its SHA-256 and the hash of the patch. The release `.2` is a build of the fork without the frontend of upstream pull request #4024. Do not use it with Parakeet Ultra. The older release `.1` is a build without the patch (SHA-256 `d03a06f8…`, without `processStreamingChunk`, `saveStreamingState` and `restoreStreamingState`). Never use it.
 
 `scripts/setup.sh` gets the libopus source. Then it gets the AAR from the first of these sources that operates:
 

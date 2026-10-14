@@ -99,7 +99,7 @@ Cassini has no F-Droid listing at this time. The fastlane texts are in [`metadat
 - The `zstd-jni` AAR (1.5.7-22) contains prebuilt `.so` files. F-Droid must build them from source, or its scanner refuses the build.
 - A build of the AAR from source is not byte-for-byte equal to the pinned release build ([`native-runtime.md`](native-runtime.md)). Thus the F-Droid build is not reproducible against the GitHub APK at this time.
 - F-Droid signs with its own key if the build is not reproducible. An F-Droid APK then cannot update a GitHub APK, and a GitHub APK cannot update an F-Droid APK.
-- After consent, the app downloads the models from huggingface.co, github.com and dist.gocassini.com. The licenses are CC-BY-4.0 (Parakeet), OpenMDW-1.1 (Nemotron-3-Diarization) and Apache-2.0 (CAM++). The F-Droid reviewers decide if the listing needs an anti-feature label for these downloads.
+- After consent, the app downloads the models from huggingface.co, github.com and dist.gocassini.com. The licenses are CC-BY-4.0 (Parakeet Ultra), OpenMDW-1.1 (Nemotron-3-Diarization) and Apache-2.0 (CAM++). The F-Droid reviewers decide if the listing needs an anti-feature label for these downloads.
 
 ### Draft recipe
 

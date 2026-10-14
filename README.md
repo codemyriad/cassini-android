@@ -1,6 +1,6 @@
 # Cassini for Android
 
-Cassini records audio and makes the transcript on your phone. It labels the speakers and can remember the voices of the people that you name. It keeps the audio and the timed words together in one `.opus` file. Any audio player plays this file, and other Cassini software reads the transcript in it. Speech recognition operates without a network connection after a one-time model download.
+Cassini records audio and makes the transcript on your phone. It labels the speakers and can remember the voices of the people that you name. It keeps the audio and the timed words together in one `.opus` file. Any audio player plays this file, and other Cassini software reads the transcript in it. Speech recognition operates without a network connection after a one-time model download. The speech model is [Parakeet Ultra](https://huggingface.co/moondream/parakeet-ultra) by Moondream, a further-trained NVIDIA Parakeet TDT 0.6B v3 for 25 European languages.
 
 **[Download the latest release](https://github.com/codemyriad/cassini-android/releases/latest)** · [Changelog](CHANGELOG.md)
 

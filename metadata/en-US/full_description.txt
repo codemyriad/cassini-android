@@ -4,7 +4,7 @@ Features:
 
 * Record with the screen off or with another app open. Back and Home do not stop a recording.
 * Import WAV, MP3, M4A and Ogg Opus files.
-* Transcribe on the phone with NVIDIA Parakeet TDT 0.6B v3. The model knows 25 European languages.
+* Transcribe on the phone with Parakeet Ultra by Moondream, a further-trained NVIDIA Parakeet TDT 0.6B v3. The model knows 25 European languages.
 * Find the speakers with NVIDIA Nemotron-3-Diarization, and give them names.
 * Save a voice on the phone. Cassini then finds that voice in later notes and gives or suggests the name.
 * Stop a transcription and continue it later. If Android stops the app, Cassini keeps the progress and continues from that point.

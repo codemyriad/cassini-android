@@ -56,6 +56,7 @@ import org.cassini.android.recording.RecordingPlatform
 import org.cassini.android.recording.RepositoryRecordingNotes
 import org.cassini.android.recording.SettingsConsent
 import org.cassini.android.recording.TranscriptionHandoff
+import org.cassini.core.models.ModelCatalog
 import org.cassini.core.models.ModelPart
 import org.cassini.data.AppPaths
 import org.cassini.data.CassiniDispatchers
@@ -332,7 +333,11 @@ class AppGraph(context: Context, val config: Config) {
         val failed = LinkedHashMap<String, String>()
         val active = activeRecording.get()
         val rebuild = bestEffort(STEP_REBUILD, failed) { catalogue.rebuilder.rebuildIfNeeded(setAside) }
-        bestEffort(STEP_MODELS, failed) { models.refresh() }
+        bestEffort(STEP_MODELS, failed) {
+            models.refresh()
+            // Parakeet TDT 0.6B v3 of 0.2.0 and earlier: Parakeet Ultra replaced it in its own directory.
+            models.removeRetired()
+        }
         val recovered = bestEffort(STEP_RECOVER, failed) { catalogue.recovery.recover(active()) }
         val reconcile = bestEffort(STEP_RECONCILE, failed) { catalogue.jobs.reconcileOnStart(active()) }
         val links = bestEffort(STEP_LINKS, failed) { catalogue.voices.syncLinks() }
@@ -530,8 +535,8 @@ object AppRoots {
     const val DEBUG_ROOT_FILE = "debug-root.txt"
 
     /** The default and reserved names at the top of `filesDir`, which a scratch root must not be. */
-    private val reserved: Set<String> =
-        setOf("notes", "voices") + ModelPart.entries.flatMap { part -> part.models.map { it.directory } }
+    private val reserved: Set<String> = setOf("notes", "voices") +
+        ModelPart.entries.flatMap { part -> part.models.map { it.directory } } + ModelCatalog.RETIRED_DIRECTORIES
 
     /**
      * The paths of this process. [debug] is `BuildConfig.DEBUG`: in a release build `debug-root.txt` is never read.

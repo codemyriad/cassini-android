@@ -36,39 +36,61 @@ data class ModelDescriptor(
 
 /**
  * Every model the app installs, with the exact pins, URLs, directory names and marker semantics of 0.1.0
- * (`ModelStore`, `DiarizationModels`, `VoiceprintModel`, `ModelBundle`). Changing a pin, a directory or a marker
- * value makes installed models look missing or, worse, look ready when they are not. The sizes are pinned data.
+ * (`ModelStore`, `DiarizationModels`, `VoiceprintModel`, `ModelBundle`), except the speech model: Parakeet Ultra
+ * replaced Parakeet TDT 0.6B v3 in its own directory. Changing a pin, a directory or a marker value makes installed
+ * models look missing or, worse, look ready when they are not. The sizes are pinned data.
  */
 @Suppress("MagicNumber")
 object ModelCatalog {
-    /** Parakeet TDT 0.6B v3 INT8 on Hugging Face. Its marker `parakeet-v3/verified` holds this revision. */
-    const val PARAKEET_REVISION = "2bda32ec70b097a55adaa07d9a7173915b43cc78"
-    const val PARAKEET_REPOSITORY = "csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8"
+    /**
+     * Parakeet Ultra INT8 on Hugging Face: tpmaerk's sherpa-onnx `nemo_transducer` export of moondream/parakeet-ultra
+     * (revision 73175eb7), a post-train of NVIDIA Parakeet TDT 0.6B v3. The export changes only the format; the token
+     * table is the one of v3. Its marker `parakeet-ultra/verified` holds this revision.
+     */
+    const val PARAKEET_REVISION = "b86784a3a5356cbd126f710b61cd90c5fe5898f1"
+    const val PARAKEET_REPOSITORY = "tpmaerk/parakeet-ultra-sherpa-onnx-int8"
     const val PARAKEET_PRECISION = "INT8"
 
     /** The model id that a document's provenance names (`<id> <precision>`), and the name the app shows for it. */
-    const val PARAKEET_MODEL_ID = "nvidia/parakeet-tdt-0.6b-v3"
-    const val PARAKEET_DISPLAY_NAME = "Parakeet TDT 0.6B v3"
+    const val PARAKEET_MODEL_ID = "moondream/parakeet-ultra"
+    const val PARAKEET_DISPLAY_NAME = "Parakeet Ultra"
+
+    /**
+     * Parakeet TDT 0.6B v3 INT8 (csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8), the speech model of 0.1.0 to
+     * 0.2.0. This build does not install it. Documents and checkpoints made with it keep its id and revision.
+     */
+    const val PARAKEET_V3_REVISION = "2bda32ec70b097a55adaa07d9a7173915b43cc78"
+    const val PARAKEET_V3_MODEL_ID = "nvidia/parakeet-tdt-0.6b-v3"
+    const val PARAKEET_V3_DISPLAY_NAME = "Parakeet TDT 0.6B v3"
+
+    /**
+     * The name the app shows for each speech model id that a document's provenance can name: this build's model and
+     * the earlier ones, so a document keeps its true model name.
+     */
+    val SPEECH_MODEL_NAMES = mapOf(
+        PARAKEET_MODEL_ID to PARAKEET_DISPLAY_NAME,
+        PARAKEET_V3_MODEL_ID to PARAKEET_V3_DISPLAY_NAME,
+    )
 
     private fun huggingFace(name: String) = "https://huggingface.co/$PARAKEET_REPOSITORY/resolve/$PARAKEET_REVISION/$name"
 
     val parakeetArtifacts = listOf(
         Artifact(
             "encoder.int8.onnx",
-            652184281,
-            "acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247",
+            652282347,
+            "f4d06712d32431b1718eceba2153c314ac4425e8fe708a3534f5e56c5ad53697",
             huggingFace("encoder.int8.onnx"),
         ),
         Artifact(
             "decoder.int8.onnx",
             11845275,
-            "179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e",
+            "94373c6405c8149d1c9d1e9862514e0e3e88dab1c7de18fac9d5df9c6ba5efdd",
             huggingFace("decoder.int8.onnx"),
         ),
         Artifact(
             "joiner.int8.onnx",
             6355277,
-            "3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3",
+            "8a71aaccfdba3d451775507a889afd2257d2e754463fd81095a8c8f290f924c2",
             huggingFace("joiner.int8.onnx"),
         ),
         Artifact(
@@ -78,7 +100,18 @@ object ModelCatalog {
             huggingFace("tokens.txt")
         ),
     )
-    val PARAKEET = ModelDescriptor("parakeet-v3", parakeetArtifacts, "verified", PARAKEET_REVISION)
+
+    /**
+     * A new directory, not `parakeet-v3/`: the files of v3 never look like Ultra files, and a `.part` file of v3 is
+     * never resumed as an Ultra file.
+     */
+    val PARAKEET = ModelDescriptor("parakeet-ultra", parakeetArtifacts, "verified", PARAKEET_REVISION)
+
+    /**
+     * Model directories of earlier builds that this build does not read (`parakeet-v3/`, about 640 MiB). The app
+     * deletes them at startup (`ModelRepository.removeRetired`). They stay reserved names at the top of `filesDir`.
+     */
+    val RETIRED_DIRECTORIES = listOf("parakeet-v3")
 
     /** Silero VAD for chunked decoding, installed on its own so an existing Parakeet install stays ready without it. */
     const val SILERO_VAD_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"

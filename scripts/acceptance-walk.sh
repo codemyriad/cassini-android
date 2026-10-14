@@ -50,7 +50,7 @@ out=build/acceptance/$run
 mkdir -p "$out"
 backup=${backup:-$out/files-backup.tar}
 
-model_dirs="files/parakeet-v3 files/speaker-models files/vad"
+model_dirs="files/parakeet-ultra files/speaker-models files/vad"
 
 # A recursive listing (with hidden files such as .part) and the checksums of the "verified" markers. It uses adb shell,
 # which gives the exit status of the command (adb exec-out does not), so a failed listing stops the script.
@@ -75,7 +75,8 @@ done
 # 1. The test clips, the backup and the state to restore.
 scripts/acceptance-audio.sh
 adb exec-out run-as "$package" tar c \
-    --exclude=files/parakeet-v3 --exclude=files/vad --exclude=files/speaker-models files > "$backup"
+    --exclude=files/parakeet-ultra --exclude=files/parakeet-v3 --exclude=files/vad --exclude=files/speaker-models \
+    files > "$backup"
 if ! tar tf "$backup" >/dev/null 2>&1; then
     printf 'The backup of files/ is not a tar archive: %s\n' "$backup" >&2
     exit 1

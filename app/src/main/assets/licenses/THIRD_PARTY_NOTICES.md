@@ -4,16 +4,16 @@ Cassini Android is licensed under [GNU GPLv3](LICENSE). Copyright © 2026 Silvio
 
 ## Native Android runtime
 
-The APK contains a sherpa-onnx 1.13.7 AAR that Cassini builds. The AAR is the [upstream release](https://github.com/k2-fsa/sherpa-onnx/releases/tag/v1.13.7) plus Sortformer speaker diarization for Nemotron-3-Diarization, from the [Cassini fork](https://github.com/codemyriad/sherpa-onnx/tree/feat/nemotron3-diarization-android). The AAR comes from one of two sources:
+The APK contains a sherpa-onnx 1.13.7 AAR that Cassini builds. The AAR is the [upstream release](https://github.com/k2-fsa/sherpa-onnx/releases/tag/v1.13.7) plus Sortformer speaker diarization for Nemotron-3-Diarization and the NeMo-reference Parakeet frontend of upstream pull request [#4024](https://github.com/k2-fsa/sherpa-onnx/pull/4024), from the [Cassini fork](https://github.com/codemyriad/sherpa-onnx/tree/feat/nemotron3-diarization-android-parakeet-ultra). The AAR comes from one of two sources:
 
 - `scripts/build-native-aar.sh` builds it from the pinned source plus `scripts/streaming-diarization.patch`.
-- `scripts/fetch-native-aar.sh` downloads it from the GitHub release [`native-sherpa-onnx-1.13.7-nemotron.2`](https://github.com/codemyriad/cassini-android/releases/tag/native-sherpa-onnx-1.13.7-nemotron.2).
+- `scripts/fetch-native-aar.sh` downloads it from the GitHub release [`native-sherpa-onnx-1.13.7-nemotron.3`](https://github.com/codemyriad/cassini-android/releases/tag/native-sherpa-onnx-1.13.7-nemotron.3).
 
 The `sherpa-onnx-aar` entry of `scripts/native-dependencies.json` pins the SHA-256 of the AAR. The AAR also contains text-to-speech components that Cassini does not use, including eSpeak NG under GPLv3. Cassini uses only speech recognition and speaker diarization.
 
 | Component | Pinned version | License |
 | --- | --- | --- |
-| [sherpa-onnx](https://github.com/codemyriad/sherpa-onnx/tree/feat/nemotron3-diarization-android) | 1.13.7 with Sortformer diarization | Apache-2.0 |
+| [sherpa-onnx](https://github.com/codemyriad/sherpa-onnx/tree/feat/nemotron3-diarization-android-parakeet-ultra) | 1.13.7 with Sortformer diarization and the Parakeet frontend of upstream PR #4024 | Apache-2.0 |
 | [ONNX Runtime](https://github.com/microsoft/onnxruntime/tree/v1.27.1) | 1.27.1 | MIT, with upstream third-party notices |
 | [Eigen](https://gitlab.com/libeigen/eigen/-/tree/5.0.1) | 5.0.1 | MPL-2.0, with component notices |
 | [nlohmann JSON](https://github.com/nlohmann/json/tree/v3.12.0) | 3.12.0 | MIT |
@@ -29,7 +29,7 @@ The APK also bundles [zstd-jni](https://central.sonatype.com/artifact/com.github
 
 The streaming encoder bundles unmodified [libopus 1.5.2](https://github.com/xiph/opus/tree/v1.5.2), under its BSD license. Cassini’s JNI wrapper and its CMake build files are included in the corresponding source archive.
 
-Full texts and copyright notices are checked in under [app assets](app/src/main/assets/licenses/). The release’s `cassini-native-sources.tar` contains these pinned source archives, including native build files. [The source manifest](scripts/native-dependencies.json) provides archive URLs and SHA-256 hashes; [native build notes](docs/native-runtime.md) describe the upstream build. Apart from the sherpa-onnx diarization changes, dependency code is unmodified by Cassini.
+Full texts and copyright notices are checked in under [app assets](app/src/main/assets/licenses/). The release’s `cassini-native-sources.tar` contains these pinned source archives, including native build files. [The source manifest](scripts/native-dependencies.json) provides archive URLs and SHA-256 hashes; [native build notes](docs/native-runtime.md) describe the upstream build. Apart from the sherpa-onnx diarization changes and the Parakeet frontend of upstream PR #4024, dependency code is unmodified by Cassini.
 
 ## Android and Kotlin libraries
 
@@ -69,7 +69,9 @@ The APK contains two font families. Their authors publish them under the SIL Ope
 
 ## Downloaded models and local test fixtures
 
-[NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) weights are CC-BY-4.0, with ONNX conversion published by the sherpa-onnx maintainer. Weights are downloaded separately and are not in the APK. Model revisions and hashes are in `ModelCatalog.kt`. Cassini runs on-device inference with the converted model.
+The speech recognition model is [Parakeet Ultra](https://huggingface.co/moondream/parakeet-ultra) by Moondream (revision `73175eb7`), under CC-BY-4.0. Moondream made it by further training of [NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3), also CC-BY-4.0. Cassini downloads the INT8 ONNX conversion for sherpa-onnx that tpmaerk publishes in [tpmaerk/parakeet-ultra-sherpa-onnx-int8](https://huggingface.co/tpmaerk/parakeet-ultra-sherpa-onnx-int8) under CC-BY-4.0. The conversion changes only the format: it removes the six `vad_head` tensors of Ultra, which the NeMo architecture does not use, and quantizes the weights to INT8. Its `tokens.txt` is the same file as the one of v3. The weights download separately and are not in the APK. The revision and the hashes are in `ModelCatalog.kt`. Cassini runs on-device inference with the converted model, and does not change it. The license text is at https://creativecommons.org/licenses/by/4.0/.
+
+Cassini 0.2.0 and earlier used [NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) (CC-BY-4.0) directly, in the INT8 ONNX conversion that the sherpa-onnx maintainer publishes. The documents that these versions made name that model in their provenance.
 
 [Silero VAD](https://github.com/snakers4/silero-vad) is MIT-licensed. Its ONNX model (`silero_vad.onnx`, 630 KB) is downloaded separately from the sherpa-onnx `asr-models` release and is not in the APK. Its size and SHA-256 are in `ModelCatalog.kt`.
 

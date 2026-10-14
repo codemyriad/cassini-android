@@ -89,7 +89,8 @@ fun interface ModelFetcher {
  * The on-device models (docs/architecture.md, sections 4.6 and 5.6): which parts are installed under
  * [AppPaths.modelRoot], consent, the install plan and the install itself. [status] combines the readiness on disk
  * (read by [refresh]) with the progress of an install in flight, which [installBlocking] and the app's install owner
- * push. It is empty until the first [refresh]. There is no delete API: the design has no surface for it.
+ * push. It is empty until the first [refresh]. There is no delete API for an installed model: the design has no
+ * surface for it. Only the directories of models that this build no longer uses go ([removeRetired]).
  *
  * Consent is `models.consentAt` present or Parakeet installed. It is recorded only by [recordConsent] (the Model
  * download screen's primary button); callers check [consented] before any install, and [installBlocking] does not.
@@ -123,6 +124,33 @@ class ModelRepository(
                 // A failure is shown until the part is installed or a new install starts.
                 inFlight.keys.removeAll { readiness[it] == true }
                 publish()
+            }
+        }
+    }
+
+    /**
+     * Deletes the model directories of earlier builds ([ModelCatalog.RETIRED_DIRECTORIES]: Parakeet TDT 0.6B v3 in
+     * `parakeet-v3/`, about 640 MiB). No code of this build reads them, and Parakeet Ultra installs in its own
+     * directory. A startup step; it returns the names of the deleted directories. A directory that cannot be deleted
+     * fails with an [IOException], and the next start tries again.
+     *
+     * An installed v3 was the consent of 0.1.x and 0.2.0 ([consented]), which never stored `models.consentAt` for it.
+     * Before the directory goes, that consent is recorded, so the user is not asked again and Parakeet Ultra
+     * downloads with the next transcription.
+     */
+    suspend fun removeRetired(): List<String> {
+        val v3Installed = withContext(dispatchers.io) {
+            File(paths.modelRoot, "parakeet-v3/verified").let {
+                it.isFile && it.readText() == ModelCatalog.PARAKEET_V3_REVISION
+            }
+        }
+        if (v3Installed && settings.consentAt.first() == null) recordConsent()
+        return withContext(dispatchers.io) {
+            ModelCatalog.RETIRED_DIRECTORIES.filter { name ->
+                val directory = File(paths.modelRoot, name)
+                val present = directory.exists()
+                if (present && !directory.deleteRecursively()) throw IOException("Cannot delete the retired $name/")
+                present
             }
         }
     }

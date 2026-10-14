@@ -14,7 +14,7 @@ import java.nio.ByteOrder
 /**
  * Host evaluation: runs the app's own ASR pipeline (speech detector, cutting, seams, word gate) on raw
  * float PCM, one job per line: `<f32le file> <sample rate> <output json>`. Arguments: the model directory
- * (an INT8 Parakeet export with the file names of `parakeet-v3/`), the Silero VAD file or `-`, and the job list.
+ * (an INT8 Parakeet export with the file names of `parakeet-ultra/`), the Silero VAD file or `-`, and the job list.
  * Needs a host build of libsherpa-onnx-jni on java.library.path. Not built by Gradle; see README.md.
  */
 object AsrEval {

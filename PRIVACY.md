@@ -13,7 +13,7 @@ Cassini keeps your data in its private app storage (the `filesDir` directory of 
 - Unfinished transcription: the progress of a transcription, the words found so far, the draft speaker names, the matches between speakers and saved voices, short audio clips of each speaker (at most 45 seconds for each speaker), and the state of the speaker model. This state is a list of numbers that the speaker model calculates from the voices in the note, so that the transcription can continue later. It is not a voiceprint, and Cassini does not use it to recognize people. A match is the ID of a saved voice and a score. It is not a voiceprint. Location: `notes/<noteId>/work/`. Cassini deletes this directory when the transcription ends, when you start again, or when it deletes the note.
 - Voiceprints: a voiceprint is a list of numbers that Cassini calculates from the voice of one speaker. Cassini uses voiceprints to recognize the people that you name. Location: `voices/` only. The section "Voiceprints" gives the details.
 - Settings and state: your model download decision and its time, the queue of transcriptions, the trash state of notes, the playback position, and some one-time notices. Location: `settings.preferences_pb` and `cassini.db`. On Android 13 and later, Android keeps the app language. On earlier versions, Cassini keeps the app language in a small file in its private storage.
-- Models: the downloaded speech and speaker models. They contain no personal data. Location: `parakeet-v3/`, `vad/` and `speaker-models/`.
+- Models: the downloaded speech and speaker models. They contain no personal data. Location: `parakeet-ultra/`, `vad/` and `speaker-models/`. Cassini 0.2.0 and earlier kept a different speech model in `parakeet-v3/`. The later versions do not use it, and they delete `parakeet-v3/` when they start.
 
 When you import a file, or open a file with Cassini from a different app, Cassini copies the file into its storage. The original file stays where it is.
 
@@ -53,7 +53,7 @@ Cassini downloads no model before you agree. The "Transcribe on this phone" scre
 
 Cassini downloads each model from one host:
 
-- Speech recognition (NVIDIA Parakeet TDT 0.6B v3, INT8): `huggingface.co`
+- Speech recognition (Parakeet Ultra, INT8): `huggingface.co`
 - Speech detection (Silero VAD): `github.com`
 - Telling speakers apart (NVIDIA Nemotron-3-Diarization, INT8): `dist.gocassini.com`
 - Recognising saved voices (3D-Speaker CAM++): `github.com`

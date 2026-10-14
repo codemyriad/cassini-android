@@ -43,9 +43,11 @@ import org.cassini.ui.R as UiR
  * Transcribe again adds version 2 to the Versions sheet, Save a copy of the Cassini document is byte-identical to
  * `notes/<id>/document.opus`, and the TXT, SRT and VTT exports equal the goldens in `assets/goldens/`.
  *
- * The goldens were recorded on emulator-5554 (API 34, x86_64) on the first green run: when a golden is missing the
- * test writes the export to `cacheDir/goldens-candidate/` of the app and fails, so it can be read and reviewed
- * before it is committed. The second line of the TXT export is the note's date, which changes per run: it is
+ * The goldens were recorded on emulator-5554 (API 34, x86_64) with Parakeet Ultra, as the models workflow runs the
+ * test: when a golden is missing or differs, the test writes the export to `cacheDir/goldens-candidate/` of the app
+ * and fails, so it can be read and reviewed before it is committed. On an arm64 phone (Pixel 8) the INT8 kernels
+ * give "Catena della Sentinella" for the "catena della sentinella" of the goldens, with the same times; this test
+ * then fails on that line. The second line of the TXT export is the note's date, which changes per run: it is
  * compared as `<date> · <duration>`.
  */
 @NeedsModels

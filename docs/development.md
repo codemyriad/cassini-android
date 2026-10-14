@@ -162,7 +162,7 @@ Most device tests use a scratch root (see [CassiniTestRunner](#cassinitestrunner
 
 ```sh
 adb exec-out run-as org.cassini.android tar c \
-    --exclude=files/parakeet-v3 --exclude=files/vad --exclude=files/speaker-models files > files-backup.tar
+    --exclude=files/parakeet-ultra --exclude=files/vad --exclude=files/speaker-models files > files-backup.tar
 ```
 
 If the test damaged or erased your notes, restore the backup. First stop the app, then extract the backup into the app storage:
@@ -202,7 +202,7 @@ The runner also gives the graph the test seams of `TestHooks`. Each seam does th
 
 The script first does a dry run (`am instrument -e log true`) of the same selection to get the expected count. The run fails if a test fails or skips, or if the count is different. If you set `CASSINI_EXPECTED_TESTS`, the run also fails when the count is not equal to it.
 
-The script gives `downloadModels=true` to the tests. If the device has no Parakeet model or no speech detector, `DeviceSmokeTest` downloads them (several hundred MB) through `ModelRepository`. To prevent this download, select only the tests that need no models, for example `--annotation CiSmoke`. The `:bench` experiments do not download models.
+The script gives `downloadModels=true` to the tests. If the device has no Parakeet Ultra model or no speech detector, `DeviceSmokeTest` downloads them (several hundred MB) through `ModelRepository`. A device that has only Parakeet TDT 0.6B v3 of 0.2.0 has no Parakeet Ultra model. To prevent this download, select only the tests that need no models, for example `--annotation CiSmoke`. The `:bench` experiments do not download models.
 
 The test APK holds the long clip of the background tests ([`fixtures/README.md`](../fixtures/README.md)). The script runs `scripts/make-long-clip.sh` before it builds the test APK. That script needs ffmpeg on the host. If ffmpeg is not there, the script shows a warning and builds the test APK without the clip. Then the tests that use the clip fail. The test APK from CI does not hold the clip.
 
@@ -465,8 +465,8 @@ To examine a document from a device, do these steps:
 
 The desktop pipeline is in `../gocassini`. The Android app is different in these ways:
 
-- Android uses sherpa-onnx 1.13.7 with the Sortformer patch ([`native-runtime.md`](native-runtime.md)), on the CPU, with two threads and greedy decoding. It uses only the INT8 Parakeet model.
-- Android does not use the modified Parakeet feature frontend of the desktop runtime. [`notes/feasibility.md`](notes/feasibility.md) gives the history.
+- Android uses sherpa-onnx 1.13.7 with the Sortformer patch ([`native-runtime.md`](native-runtime.md)), on the CPU, with two threads and greedy decoding. It uses only Parakeet Ultra INT8. The desktop uses Parakeet TDT 0.6B v3.
+- The Android runtime has the NeMo-reference Parakeet feature frontend of upstream pull request [k2-fsa/sherpa-onnx#4024](https://github.com/k2-fsa/sherpa-onnx/pull/4024). The frontend operates automatically for Parakeet v3 and Ultra. The desktop runtime has its own fork with a corrected frontend. Android still decodes with `DecodePolicy.WHOLE_SPANS` (0.5 s of synthetic silence after each span), which we measured with the stock frontend. The reference frontend normalises over the entire input, and the synthetic silence is part of that input. Before a release, compare `WHOLE_SPANS` with `PARAKEET_V3_REFERENCE` on Parakeet Ultra (`ChunkingComparisonTest`), and choose the policy from the result. The KDoc of `DecodePolicy` in `SpeechWindows.kt` still names a stock runtime, because `scripts/check-verbatim.sh` keeps that file as in 0.1.0. [`notes/feasibility.md`](notes/feasibility.md) gives the history.
 - Android cuts a recording at speech pauses with the Silero VAD values of the desktop. It cuts a span of more than 28 s at its quietest 30 ms, between 20 s and 25 s after the previous cut. The window arithmetic, the seam alignment and the word gate come from `gocassini` `transcribe/stt.go`, together with their tests.
 - The desktop takes the speaker names from the call signaling and does no voice analysis. Android finds the speakers in the audio with Nemotron-3 Sortformer (at most 8, in the order of arrival). It compares them with CAM++ voiceprints that stay on the phone.
 - A saved voice gets its name automatically at a cosine similarity of 0.72 or more and at least 0.08 more than the next voice. Android suggests the name from 0.50. These values come from a small calibration on call recordings (`core/src/main/kotlin/org/cassini/core/speakers/VoiceprintSelection.kt`).

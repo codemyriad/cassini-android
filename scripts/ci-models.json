@@ -2,33 +2,33 @@
   "comment": "The models of ModelCatalog (core/src/main/kotlin/org/cassini/core/models/ModelCatalog.kt) for scripts/fetch-ci-models.py. ModelCatalogTest makes sure that this file and the catalog agree.",
   "models": [
     {
-      "directory": "parakeet-v3",
+      "directory": "parakeet-ultra",
       "marker": "verified",
-      "markerValue": "2bda32ec70b097a55adaa07d9a7173915b43cc78",
+      "markerValue": "b86784a3a5356cbd126f710b61cd90c5fe5898f1",
       "artifacts": [
         {
           "name": "encoder.int8.onnx",
-          "size": 652184281,
-          "sha256": "acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247",
-          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/2bda32ec70b097a55adaa07d9a7173915b43cc78/encoder.int8.onnx"
+          "size": 652282347,
+          "sha256": "f4d06712d32431b1718eceba2153c314ac4425e8fe708a3534f5e56c5ad53697",
+          "url": "https://huggingface.co/tpmaerk/parakeet-ultra-sherpa-onnx-int8/resolve/b86784a3a5356cbd126f710b61cd90c5fe5898f1/encoder.int8.onnx"
         },
         {
           "name": "decoder.int8.onnx",
           "size": 11845275,
-          "sha256": "179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e",
-          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/2bda32ec70b097a55adaa07d9a7173915b43cc78/decoder.int8.onnx"
+          "sha256": "94373c6405c8149d1c9d1e9862514e0e3e88dab1c7de18fac9d5df9c6ba5efdd",
+          "url": "https://huggingface.co/tpmaerk/parakeet-ultra-sherpa-onnx-int8/resolve/b86784a3a5356cbd126f710b61cd90c5fe5898f1/decoder.int8.onnx"
         },
         {
           "name": "joiner.int8.onnx",
           "size": 6355277,
-          "sha256": "3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3",
-          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/2bda32ec70b097a55adaa07d9a7173915b43cc78/joiner.int8.onnx"
+          "sha256": "8a71aaccfdba3d451775507a889afd2257d2e754463fd81095a8c8f290f924c2",
+          "url": "https://huggingface.co/tpmaerk/parakeet-ultra-sherpa-onnx-int8/resolve/b86784a3a5356cbd126f710b61cd90c5fe5898f1/joiner.int8.onnx"
         },
         {
           "name": "tokens.txt",
           "size": 93939,
           "sha256": "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d",
-          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/2bda32ec70b097a55adaa07d9a7173915b43cc78/tokens.txt"
+          "url": "https://huggingface.co/tpmaerk/parakeet-ultra-sherpa-onnx-int8/resolve/b86784a3a5356cbd126f710b61cd90c5fe5898f1/tokens.txt"
         }
       ]
     },

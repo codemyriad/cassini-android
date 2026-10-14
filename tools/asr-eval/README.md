@@ -12,7 +12,7 @@ The program is not part of the Gradle build, and no CI job compiles it. It needs
 `AsrEval` takes three arguments:
 
 1. The model directory. It holds `encoder.int8.onnx`, `decoder.int8.onnx`, `joiner.int8.onnx` and `tokens.txt`.
-   These are the same files as in the `parakeet-v3/` directory of the app.
+   These are the same files as in the `parakeet-ultra/` directory of the app.
 2. The Silero VAD file (`silero_vad.onnx`). Or `-`: then the program cuts at quiet points without a speech
    detector.
 3. A job list, with one job on each line: `<f32le file> <sample rate> <output json>`. The PCM file is mono 32-bit
