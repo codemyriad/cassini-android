@@ -12,8 +12,8 @@ import java.util.Locale
 
 /**
  * The Accessibility Test Framework rule of features.md section 14: every ERROR and WARNING fails the test, except a
- * touch target below 48 dp on an inline transcript word link (WCAG 2.5.8 inline exception) or on a Library row
- * suffix ("· Resume", "· Try again"), whose 48 dp comes from extended hit testing (ui.md section 11, item 13).
+ * touch target below 48 dp on a Library row suffix ("· Resume", "· Try again"), whose 48 dp comes from extended hit
+ * testing (ui.md section 11, item 13).
  * [inline] holds the texts of those elements. [idleBars] holds the descriptions of images whose low contrast
  * ui.md section 11 allows: the Recording waveform, whose estimated foreground is the colour of its older bars
  * (rec.barIdle, decorative; the newest bars, in rec.barFresh, have 7.73:1). Each finding is logged with its check,
@@ -50,7 +50,7 @@ private class AllowedFindings(
     }
 
     override fun describeTo(description: Description) {
-        description.appendText("a small inline word link or row suffix, or the waveform's idle bars")
+        description.appendText("a small row suffix, or the waveform's idle bars")
     }
 }
 
