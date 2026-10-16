@@ -6,6 +6,12 @@ We made the entries for 0.0.1-beta to 0.1.0 again from the release notes of thes
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-16
+
+The APK file of this release is `cassini-android-0.3.0.apk`. It operates on Android 8.0 or later, on a 64-bit ARM phone (`arm64-v8a`). The APK also has `x86_64` for emulators. This release has a new signing key, so it does not install over 0.1.x or an earlier beta. Before you uninstall the earlier version, save your notes as Cassini documents (`.opus`). The uninstall erases the notes and the downloaded models, so Cassini downloads the models again (about 730 MB). Testers can also get Cassini from Google Play, with the same key. The release also has the native sources (`cassini-native-sources.tar`) and the notices. The APK has no models. After you agree, the app downloads them separately.
+
+Version 0.3.0 has all the changes of 0.2.0, which was not published.
+
 ### Changed
 
 - A new release key signs Cassini. Google Play does not accept the beta key of 0.0.1-beta to 0.1.0, and the same key now signs the APK on GitHub and the app on Google Play. Android does not install this version over 0.1.x. Save your notes as Cassini documents (`.opus`), uninstall 0.1.x and then install this version. The uninstall erases the notes and the downloaded models of 0.1.x. [SECURITY.md](SECURITY.md) gives the digest of the new certificate.
@@ -21,7 +27,7 @@ We made the entries for 0.0.1-beta to 0.1.0 again from the release notes of thes
 
 ## [0.2.0] - 2026-10-12
 
-The APK file of this release is `cassini-android-0.2.0.apk`. It operates on Android 8.0 or later, on a 64-bit ARM phone (`arm64-v8a`). The APK also has `x86_64` for emulators. Install it over your earlier version of Cassini, without an uninstall. Then your notes and your downloaded models stay. Android accepts the update because 0.2.0 has the same beta signing key as the earlier versions. Version 0.2 does not show the notes of 0.1.x, but the `.opus` documents that you saved from 0.1.x open as before. The release also has the native sources (`cassini-native-sources.tar`) and the notices. The APK has no models. After you agree, the app downloads them separately (about 730 MB).
+Not published: the tag build failed in lint, so there is no GitHub release of 0.2.0. Version 0.3.0 has these changes.
 
 Version 0.2.0 is a new build of the app. It keeps the speech engine and the portable Cassini document format of 0.1.0.
 
@@ -162,7 +168,8 @@ Version 0.2.0 is a new build of the app. It keeps the speech engine and the port
 - A one-time model download in Settings: INT8 (about 640 MiB) or FP32 (about 2.37 GiB).
 - Recordings of up to 2:59 and imports of up to 3 minutes.
 
-[Unreleased]: https://github.com/codemyriad/cassini-android/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/codemyriad/cassini-android/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/codemyriad/cassini-android/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/codemyriad/cassini-android/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/codemyriad/cassini-android/compare/v0.0.6-beta...v0.1.0
 [0.0.6-beta]: https://github.com/codemyriad/cassini-android/compare/v0.0.5-beta...v0.0.6-beta

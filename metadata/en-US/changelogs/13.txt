@@ -1,0 +1,8 @@
+Cassini 0.3 is a new app with a new design.
+
+* Speech recognition with Parakeet Ultra, with fewer errors.
+* A recording has no time limit.
+* A queue for many transcriptions, and a trash that keeps notes for 30 days.
+* Search in all notes, and save a transcript as text or subtitles.
+* A transcription continues in the background and after a stop.
+* A new signing key: uninstall 0.1.x first. Save your notes as .opus documents before.
