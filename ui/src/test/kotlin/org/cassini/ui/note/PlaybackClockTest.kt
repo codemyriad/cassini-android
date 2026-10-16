@@ -16,13 +16,21 @@ import org.junit.Test
 class PlaybackClockTest {
     private fun ms(value: Long) = value * 1_000_000
 
-    @Test fun aPlayingAnchorIsExtrapolatedAtItsSpeed() {
+    @Test fun aPlayingAnchorIsExtrapolatedInRealTime() {
         val clock = PlaybackClock()
         clock.update(PlaybackAnchor(1_000, ms(10_000), playing = true))
         assertEquals(1_000L, clock.positionMs(ms(10_000)))
         assertEquals(1_120L, clock.positionMs(ms(10_120)))
-        clock.update(PlaybackAnchor(2_000, ms(20_000), playing = true, speed = 2f, epoch = 1))
-        assertEquals(2_200L, clock.positionMs(ms(20_100)))
+    }
+
+    @Test fun theClockStopsAtTheEndOfTheFile() {
+        val clock = PlaybackClock()
+        clock.update(PlaybackAnchor(3_900, ms(0), playing = true, durationMs = 4_000))
+        assertEquals(3_950L, clock.positionMs(ms(50)))
+        assertEquals("not past the end before the completion", 4_000L, clock.positionMs(ms(500)))
+        // A last tick a little behind: the hold stays at the end, not past it.
+        clock.update(PlaybackAnchor(3_980, ms(500), playing = true, durationMs = 4_000))
+        assertEquals(4_000L, clock.positionMs(ms(900)))
     }
 
     @Test fun aPausedAnchorStays() {

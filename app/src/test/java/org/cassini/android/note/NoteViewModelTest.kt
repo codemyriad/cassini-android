@@ -278,6 +278,12 @@ class NoteViewModelTest {
         assertEquals(NoteMode.Paused(400, 4_000, hasCheckpoint = true), viewModel.now().mode)
         assertEquals("Fermato", viewModel.now().turns.single().words.single().text)
         assertNotNull("Paused has the player", viewModel.now().playback)
+        ports.playback.value = PlaybackState(noteId = NOTE, durationMs = 4_000, positionMs = 100, playing = true)
+        advanceUntilIdle()
+        assertTrue(viewModel.now().playback!!.playing)
+        assertNull("a draft has no frame clock", viewModel.now().playback!!.anchor)
+        ports.playback.value = PlaybackState()
+        advanceUntilIdle()
         assertTrue(viewModel.now().banners.any { it.kind == BannerKind.TX_PAUSED })
 
         ports.setJob(null)
@@ -317,11 +323,21 @@ class NoteViewModelTest {
         assertTrue(viewModel.now().playback!!.playing)
         assertEquals(
             "the screen extrapolates the position between ticks from its anchor",
-            PlaybackAnchor(2_500, 0, playing = true),
+            PlaybackAnchor(2_500, 0, playing = true, durationMs = 4_000),
             viewModel.now().playback!!.anchor,
         )
         send(viewModel, NoteEvent.Seek(3_000))
         assertNull("no anchor while a seek is dragged", viewModel.now().playback!!.anchor)
+        ports.playback.value = ports.playback.value.copy(positionMs = 3_000, sampledAtNanos = 7, epoch = 1)
+        send(viewModel, NoteEvent.SeekFinished)
+        assertEquals(
+            "the anchor returns after the drag, of the seek's epoch",
+            PlaybackAnchor(3_000, 7, playing = true, epoch = 1, durationMs = 4_000),
+            viewModel.now().playback!!.anchor,
+        )
+        ports.playback.value = ports.playback.value.copy(playing = false)
+        advanceUntilIdle()
+        assertNull("no anchor while paused", viewModel.now().playback!!.anchor)
 
         ports.playback.value = PlaybackState(noteId = "another note", positionMs = 3_500)
         advanceUntilIdle()

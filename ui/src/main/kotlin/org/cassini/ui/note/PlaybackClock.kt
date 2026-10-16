@@ -15,20 +15,22 @@ import kotlin.math.abs
 
 /**
  * A published player position: [positionMs] as read at [sampledAtNanos] (`System.nanoTime`), with the play state and
- * [speed]. [epoch] changes on every jump of the position (seek, sample, reload, open), so a new anchor of another
- * epoch is not slewed to.
+ * the file's [durationMs] (0 when unknown), past which the position is never extrapolated. Playback runs at normal
+ * speed (there is no speed control). [epoch] changes on every jump of the position (seek, sample, reload, open), so
+ * a new anchor of another epoch is not slewed to.
  */
 @Immutable
 data class PlaybackAnchor(
     val positionMs: Long,
     val sampledAtNanos: Long,
     val playing: Boolean,
-    val speed: Float = 1f,
     val epoch: Long = 0,
+    val durationMs: Long = 0,
 )
 
 /**
- * The player position between two anchors, for each frame: the last anchor extrapolated at its speed.
+ * The player position between two anchors, for each frame: the last anchor extrapolated in real time, up to its
+ * duration.
  *
  * A new anchor of the same epoch while playing is reconciled: the difference from the extrapolated position at its
  * sample time fades out over [slewNanos], and the position never goes back while playing (it holds instead). A
@@ -59,7 +61,10 @@ class PlaybackClock(private val slewNanos: Long = SLEW_NANOS, private val snapMs
     /** The position at [nowNanos]; while playing, never less than the last position returned. */
     fun positionMs(nowNanos: Long): Long {
         val current = anchor ?: return 0
-        if (current.playing) lastMs = maxOf(extrapolate(current, nowNanos).toLong(), lastMs)
+        if (current.playing) {
+            val held = maxOf(extrapolate(current, nowNanos).toLong(), lastMs)
+            lastMs = if (current.durationMs > 0) held.coerceAtMost(current.durationMs) else held
+        }
         return if (current.playing) lastMs else current.positionMs
     }
 
@@ -69,7 +74,8 @@ class PlaybackClock(private val slewNanos: Long = SLEW_NANOS, private val snapMs
         if (!current.playing) return current.positionMs.toDouble()
         val elapsed = (nowNanos - current.sampledAtNanos).coerceAtLeast(0)
         val fade = (1.0 - elapsed.toDouble() / slewNanos).coerceAtLeast(0.0)
-        return current.positionMs + elapsed / NANOS_PER_MS * current.speed + correctionMs * fade
+        val position = current.positionMs + elapsed / NANOS_PER_MS + correctionMs * fade
+        return if (current.durationMs > 0) position.coerceAtMost(current.durationMs.toDouble()) else position
     }
 
     private companion object {
@@ -120,32 +126,37 @@ class WordStarts(private val turns: ImmutableList<TurnUi>) {
 /**
  * The active word: while [anchor] plays, the word at the position extrapolated each frame ([PlaybackClock]), so the
  * highlight changes at the word's start; otherwise [published]. The value changes only when the word does, so a frame
- * recomposes nothing.
+ * recomposes nothing. New [turns] while playing keep the loop and the clock running; only the word is looked up again.
  */
 @Composable
 internal fun frameWord(turns: ImmutableList<TurnUi>, anchor: PlaybackAnchor?, published: WordRef?): WordRef? {
     val starts = remember(turns) { WordStarts(turns) }
+    val currentStarts by rememberUpdatedState(starts)
     val clock = remember { PlaybackClock() }
     val latest by rememberUpdatedState(anchor)
     val word = remember { mutableStateOf<WordRef?>(null) }
     val playing = anchor?.playing == true
-    if (playing) {
-        LaunchedEffect(starts) {
-            clock.update(null)
-            var shown = Int.MIN_VALUE
-            try {
-                while (true) {
-                    withFrameNanos {
-                        clock.update(latest)
-                        val index = starts.indexAt(clock.positionMs(System.nanoTime()))
-                        if (index != shown) {
-                            shown = index
-                            word.value = starts.ref(index)
-                        }
-                    }
-                }
-            } finally {
-                word.value = null
+    LaunchedEffect(playing) {
+        if (!playing) {
+            word.value = null
+            return@LaunchedEffect
+        }
+        clock.update(null)
+        var lookup: WordStarts? = null
+        var shown = Int.MIN_VALUE
+        while (true) {
+            // Same time base as System.nanoTime on Android; nothing is captured, so a frame allocates nothing.
+            val now = withFrameNanos { it }
+            clock.update(latest)
+            val current = currentStarts
+            if (current !== lookup) {
+                lookup = current
+                shown = Int.MIN_VALUE
+            }
+            val index = current.indexAt(clock.positionMs(now))
+            if (index != shown) {
+                shown = index
+                word.value = current.ref(index)
             }
         }
     }

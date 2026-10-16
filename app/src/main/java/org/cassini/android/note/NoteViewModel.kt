@@ -434,7 +434,13 @@ class NoteViewModel(
         val playing = ours && playback.playing
         // While this note plays, the sealed transcript extrapolates the position each frame; not during a seek drag.
         val anchor = if (playing && ui.seekingMs == null && !NoteMapping.showsDraft(mode)) {
-            PlaybackAnchor(playback.positionMs, playback.sampledAtNanos, playing = true, epoch = playback.epoch)
+            PlaybackAnchor(
+                playback.positionMs,
+                playback.sampledAtNanos,
+                playing = true,
+                epoch = playback.epoch,
+                durationMs = duration,
+            )
         } else {
             null
         }

@@ -58,7 +58,28 @@ class PlaybackControllerTest {
         assertEquals(1_900L, ticked.positionMs)
         assertEquals("playing on is no jump", opened, ticked.epoch)
         playback.seekTo(100)
-        assertTrue("a seek is a jump", playback.state.value.epoch != opened)
+        val sought = playback.state.value.epoch
+        assertTrue("a seek is a jump", sought != opened)
+
+        assertTrue(playback.playRange(NOTE, startMs = 2_000, endMs = 2_300))
+        val sampled = playback.state.value.epoch
+        assertTrue("a sample is a jump", sampled != sought)
+        advanceTimeBy(500)
+        runCurrent()
+        assertFalse(playback.state.value.sample)
+        val ended = playback.state.value.epoch
+        assertTrue("the end of a sample is a jump", ended != sampled)
+
+        assertTrue(playback.reload(File("document.opus")))
+        val reloaded = playback.state.value.epoch
+        assertTrue("a reload is a jump", reloaded != ended)
+
+        playback.seekTo(DURATION_MS)
+        playback.pause()
+        runCurrent()
+        val atEnd = playback.state.value.epoch
+        playback.play()
+        assertTrue("play from the end starts over", playback.state.value.epoch != atEnd)
         playback.leave()
     }
 
