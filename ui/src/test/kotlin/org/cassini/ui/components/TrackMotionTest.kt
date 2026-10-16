@@ -65,6 +65,26 @@ class TrackMotionTest {
     }
 
     @Test
+    fun theGlideCatchesAMovingAimWithinASecond() {
+        // A 900 px track at 30 px/s: a 20 px jump, then the aim moves on at the pace, one frame each 8 ms.
+        val width = 900f
+        val pace = 30f / width / 1000f
+        var shown = 0.3f
+        var previousAim = shown + 20f / width
+        var settledAtMs = -1L
+        for (now in 8L..2_000L step 8) {
+            val aim = 0.3f + 20f / width + pace * now
+            shown = TrackMotion.step(shown, aim, 8, previousAim)
+            previousAim = aim
+            assertTrue(shown <= aim)
+            if (settledAtMs < 0 && (aim - shown) * width < 1.5f) settledAtMs = now
+        }
+        assertTrue("Settled at $settledAtMs ms", settledAtMs in 0L..1_000L)
+        // It stays settled: it does not trail the aim at a lag.
+        assertTrue((0.3f + 20f / width + pace * 2_000 - shown) * width < 0.1f)
+    }
+
+    @Test
     fun noTimeMeansNoMotion() {
         assertEquals(0.3f, TrackMotion.step(0.3f, 0.4f, 0), 1e-6f)
         assertEquals(0.3f, TrackMotion.step(0.3f, 0.4f, -5), 1e-6f)

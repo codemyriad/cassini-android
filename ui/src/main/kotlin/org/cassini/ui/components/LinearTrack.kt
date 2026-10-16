@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
@@ -30,6 +31,7 @@ import androidx.compose.ui.node.invalidateDraw
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -126,6 +128,7 @@ private class MovingFillNode(
     private var motion: Job? = null
     private var frameNanos = 0L
     private var lastFrameNanos = -1L
+    private var lastAim = Float.NaN
 
     // One lambda for every frame: no allocation per frame.
     private val onFrame: (Long) -> Unit = { frameNanos = it }
@@ -160,6 +163,8 @@ private class MovingFillNode(
             return
         }
         lastFrameNanos = -1L
+        // A new run glides from the shown value: its first frame has no earlier aim.
+        lastAim = Float.NaN
         while (true) {
             withFrameNanos(onFrame)
             // A frame clock that does not advance (a paused test clock) still counts one frame per frame.
@@ -170,7 +175,8 @@ private class MovingFillNode(
             val now = SystemClock.elapsedRealtime()
             val anchor = anchor
             val aim = TrackMotion.aim(fraction, anchor, now)
-            var next = TrackMotion.step(shown, aim, frameMs)
+            var next = TrackMotion.step(shown, aim, frameMs, previousAim = if (lastAim.isNaN()) aim else lastAim)
+            lastAim = aim
             val gap = (aim - next) * widthPx
             // Within a pixel or so, the fill is where it should be: a glide is only for a jump.
             val settled = widthPx > 0f && gap < SNAP_PIXELS
@@ -197,10 +203,12 @@ private class MovingFillNode(
         val width = pixels(shown)
         if (width > 0) {
             val fill = Size(width.toFloat(), size.height)
+            // The fill grows from the start edge, as the static track's does: the right one in RTL.
+            val start = Offset(if (layoutDirection == LayoutDirection.Rtl) size.width - width else 0f, 0f)
             if (rounded) {
-                drawRoundRect(color, size = fill, cornerRadius = CornerRadius(size.height / 2))
+                drawRoundRect(color, start, fill, CornerRadius(size.height / 2))
             } else {
-                drawRect(color, size = fill)
+                drawRect(color, start, fill)
             }
         }
         drawContent()

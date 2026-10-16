@@ -52,11 +52,17 @@ object TrackMotion {
     /**
      * One frame of the glide from [shown] to [aim] after [elapsedMs]. The track never goes back, except to a value
      * more than [RESET] below (a new run), where it goes at once.
+     *
+     * [previousAim] is the aim of the frame before. The track moves with the aim and the gap to it shrinks, so the
+     * glide ends in about the same time at any pace. A glide toward a moving aim would trail it at a fixed lag.
      */
-    fun step(shown: Float, aim: Float, elapsedMs: Long): Float = when {
+    fun step(shown: Float, aim: Float, elapsedMs: Long, previousAim: Float = aim): Float = when {
         aim < shown - RESET -> aim
         aim <= shown -> shown
         aim - shown < SETTLED -> aim
-        else -> shown + (aim - shown) * (1f - exp(-elapsedMs.coerceAtLeast(0L) / GLIDE_MS))
+        else -> {
+            val behind = (minOf(previousAim, aim) - shown).coerceAtLeast(0f)
+            aim - behind * exp(-elapsedMs.coerceAtLeast(0L) / GLIDE_MS)
+        }
     }
 }
