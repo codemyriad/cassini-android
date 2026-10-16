@@ -91,7 +91,7 @@ jobs:
         run: env -u ANDROID_HOME -u ANDROID_SDK_ROOT ./gradlew --no-daemon --configure-on-demand :core:test
       - name: Upload the :core test reports
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: core-tests
           path: core/build/reports/tests/
@@ -175,7 +175,7 @@ jobs:
       # <module>/build/outputs/roborazzi.
       - name: Upload the screenshot diffs
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: roborazzi-diffs
           path: '**/build/outputs/roborazzi'
@@ -191,7 +191,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         run: python3 scripts/package-native-sources.py
       - name: Upload APK and sources
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: cassini-android
           compression-level: 0
@@ -199,14 +199,14 @@ jobs:
           if-no-files-found: error
       - name: Upload the Play bundle
         if: startsWith(github.ref, 'refs/tags/')
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: cassini-android-play
           compression-level: 0
           path: play/
           if-no-files-found: error
       - name: Upload the APK under test and its device test APK
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: cassini-android-device-tests
           path: |
@@ -215,14 +215,14 @@ jobs:
           if-no-files-found: error
       # A separate artifact: in the one above, a path outside app/build/outputs/apk would change its layout.
       - name: Upload the :data device test APK
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: cassini-data-device-tests
           path: data/build/outputs/apk/androidTest/debug/*.apk
           if-no-files-found: error
       - name: Upload test and lint reports
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: android-checks
           path: |
@@ -314,7 +314,7 @@ jobs:
           script: ./scripts/ci-emulator-smoke.sh
       - name: Upload emulator results
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: emulator-api-${{ matrix.api }}
           path: |
