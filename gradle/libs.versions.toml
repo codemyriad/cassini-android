@@ -34,7 +34,7 @@ serialization = "1.11.0"
 collectionsImmutable = "0.5.2"
 
 # Third party
-zstd = "1.5.7-22"
+zstd = "1.5.7-23"
 orgJson = "20260814"
 # Patched sherpa-onnx AAR served from the repo-local Maven directory native/m2 (scripts/setup.sh).
 sherpaOnnx = "1.13.7-dbbeef9c"

@@ -20,6 +20,7 @@ Version 0.3.0 has all the changes of 0.2.0, which was not published.
 - The documents that you made before keep the name of their model. Document info shows "Parakeet TDT 0.6B v3, INT8" for them and "Parakeet Ultra, INT8" for new versions.
 - A transcription that you stopped with an earlier version does not continue with Parakeet Ultra. Cassini shows "Saved progress no longer matches", and your recording stays. Start the transcription again.
 - The sherpa-onnx runtime has the feature extraction of NVIDIA NeMo for Parakeet, from upstream pull request [k2-fsa/sherpa-onnx#4024](https://github.com/k2-fsa/sherpa-onnx/pull/4024).
+- zstd-jni 1.5.7-23 and AndroidX Annotation 1.11.0.
 
 ### Fixed
 
