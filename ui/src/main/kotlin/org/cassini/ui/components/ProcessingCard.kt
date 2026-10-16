@@ -48,10 +48,10 @@ private const val ANNOUNCE_STEP = 5
 /**
  * The Transcribing card (board 02): surface, 1 dp line, radius 20, padding 16, 12 dp between parts. The header row
  * (bottom-aligned) holds the headline (`caption` text2) over the window range (`monoTime` text3, 2 dp below; hidden
- * at 0–0) and the percentage ("62" in `percent`, "%" in `percentSign`). Then the 6 dp track, the [StageTracker], the
- * [StatGrid] (the [ProcessingCardUi.download] banner replaces it while models download; its Cancel calls
- * [onDownloadAction]), the amber low-memory hint, "Stop and keep progress" ([onStop]) and the footnote (`caption12`
- * text2; [notificationsOff] picks the "only here" variant).
+ * at 0–0) and the percentage ("62" in `percent`, "%" in `percentSign`). Then the 6 dp moving track (with the
+ * [ProcessingCardUi.anchor]), the [StageTracker], the [StatGrid] (the [ProcessingCardUi.download] banner replaces it
+ * while models download; its Cancel calls [onDownloadAction]), the amber low-memory hint, "Stop and keep progress"
+ * ([onStop]) and the footnote (`caption12` text2; [notificationsOff] picks the "only here" variant).
  *
  * The header is a polite live region whose text changes only when the headline changes or the percentage crosses a
  * 5 % step. The screen gives the margins (top 8, horizontal 16).
@@ -113,7 +113,7 @@ fun ProcessingCard(
             )
         }
         Spacer(Modifier.height(12.dp))
-        LinearTrack(state.percent / 100f, height = TrackHeight.Thick)
+        LinearTrack(state.percent / 100f, height = TrackHeight.Thick, moving = true, anchor = state.anchor)
         Spacer(Modifier.height(12.dp))
         StageTracker(state.stage, state.skippedMatching)
         Spacer(Modifier.height(12.dp))

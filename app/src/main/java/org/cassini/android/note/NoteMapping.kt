@@ -20,6 +20,7 @@ import org.cassini.engine.job.RunningProgress
 import org.cassini.engine.job.Step
 import org.cassini.ui.components.DownloadUi
 import org.cassini.ui.components.ProcessingCardUi
+import org.cassini.ui.components.TrackAnchor
 import org.cassini.ui.format.BatteryUi
 import org.cassini.ui.format.ProgressHeadline
 import org.cassini.ui.format.StageUi
@@ -204,6 +205,9 @@ object NoteMapping {
         battery = battery(progress.battery),
         words = progress.words,
         lowMemory = progress.lowMemory,
+        anchor = progress.anchor?.let {
+            TrackAnchor(it.doneFraction, it.windowEndFraction, it.msPerFraction, it.completedAtMs)
+        },
     )
 
     private fun download(progress: DownloadProgress) = DownloadUi(
