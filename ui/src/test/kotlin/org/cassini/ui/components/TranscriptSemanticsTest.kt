@@ -12,6 +12,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
@@ -24,6 +26,7 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHasNoClickAction
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -41,6 +44,7 @@ import org.cassini.ui.format.ProvideFixedFormat
 import org.cassini.ui.theme.CassiniTheme
 import org.cassini.ui.theme.SpeakerTone
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -124,6 +128,32 @@ class TranscriptSemanticsTest {
         paragraph.performTouchInput { click(Offset(space.left + 1f, space.center.y)) }
         paragraph.performTouchInput { click(Offset(space.right - 1f, space.center.y)) }
         rule.runOnIdle { assertEquals(listOf(3, 4), taps) }
+    }
+
+    @Test fun aPressShowsItsWordOnlyAfterTheTapTimeout() {
+        val words = TranscriptFixtures.paolo
+        setThemed {
+            Box(Modifier.width(350.dp)) {
+                TurnParagraph(words, null, onWordTap = {}, modifier = Modifier.testTag(PARAGRAPH))
+            }
+        }
+        val paragraph = rule.onNodeWithTag(PARAGRAPH)
+        val layout = paragraph.textLayout()
+        val start = wordStarts(words)[12]
+        val box = layout.getBoundingBox(start)
+        // In the word's 3 dp outset, left of its first glyph: the background unless the word is pressed.
+        val probe = Offset(box.left - with(rule.density) { 1.5.dp.toPx() }, box.center.y)
+        fun colour(): Color = paragraph.captureToImage().toPixelMap()[probe.x.toInt(), probe.y.toInt()]
+        rule.mainClock.autoAdvance = false
+        val background = colour()
+        paragraph.performTouchInput { down(box.center) }
+        rule.mainClock.advanceTimeBy(TAP_TIMEOUT_MS / 2)
+        assertEquals("pressed before the tap timeout", background, colour())
+        rule.mainClock.advanceTimeBy(TAP_TIMEOUT_MS)
+        assertNotEquals("not pressed after the tap timeout", background, colour())
+        paragraph.performTouchInput { up() }
+        rule.mainClock.advanceTimeBy(TAP_TIMEOUT_MS)
+        assertEquals("pressed after the release", background, colour())
     }
 
     @Test fun aNewActiveWordKeepsTheLayoutAndReportsItsLine() {
@@ -356,5 +386,6 @@ class TranscriptSemanticsTest {
         const val PARAGRAPH = "paragraph"
         const val OTHER = "other"
         const val DRAFT = "draft"
+        const val TAP_TIMEOUT_MS = 100L // android.view.ViewConfiguration.getTapTimeout()
     }
 }

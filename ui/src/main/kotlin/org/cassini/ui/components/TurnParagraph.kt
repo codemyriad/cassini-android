@@ -3,6 +3,7 @@
 
 package org.cassini.ui.components
 
+import android.view.ViewConfiguration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
@@ -48,6 +50,9 @@ import androidx.compose.ui.unit.dp
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.cassini.ui.R
 import org.cassini.ui.theme.CassiniColors
 import org.cassini.ui.theme.CassiniTheme
@@ -79,10 +84,11 @@ internal val LocalTurnParagraphProbe = staticCompositionLocalOf<(() -> Unit)?> {
  * active word's line (px, in this paragraph's coordinates) on every text layout and when the active word changes.
  * The Note screen passes it only to the turn that holds the active word, to follow playback.
  *
- * Known gaps against ui.md section 6 and features.md section 3.3, for the owner's review:
+ * Known gaps against ui.md section 6 and features.md sections 3.3 and 14, for the owner's review:
  * - The words are not links, so TalkBack has no action for each word, only "Play from start of turn". A tap gives
  *   a position, and the paragraph finds the word at that position in its text layout. A link for each word made
- *   one child node for each word, and long notes were then too slow to scroll, to open and to draw.
+ *   one child node for each word, and long notes were then too slow to scroll, to open and to draw. The device
+ *   accessibility checks still permit small inline word links, which no longer exist.
  *
  * The annotated text is built once per words, mode, unsettled range and matches. The active and the pressed word are
  * drawn from the text layout in the draw phase, so a new [activeIndex] does not lay out the text again. In a list
@@ -203,6 +209,9 @@ private class Highlights {
 /**
  * The word taps of a Read paragraph: [onTap] gets the index of the tapped word, and [highlights] holds the pressed
  * word while the finger is down. A drag cancels the tap, so the list still scrolls.
+ *
+ * As `clickable` does in a scrolling list, the pressed word shows only after the tap timeout, so a scroll that
+ * starts on a word does not flash it. A tap released before the timeout shows it for one frame.
  */
 private fun Modifier.wordTaps(
     words: List<WordUi>,
@@ -213,9 +222,27 @@ private fun Modifier.wordTaps(
     fun wordAt(position: Offset): Int? = highlights.layout?.let { wordAt(it, words, starts, position) }
     detectTapGestures(
         onPress = { position ->
-            highlights.pressed = wordAt(position)?.let { starts[it] until starts[it] + words[it].text.length }
-            tryAwaitRelease()
-            highlights.pressed = null
+            val range = wordAt(position)?.let { starts[it] until starts[it] + words[it].text.length }
+            try {
+                coroutineScope {
+                    val show = launch {
+                        delay(ViewConfiguration.getTapTimeout().toLong())
+                        highlights.pressed = range
+                    }
+                    val released = tryAwaitRelease()
+                    val shown = show.isCompleted
+                    show.cancel()
+                    if (released && !shown) {
+                        highlights.pressed = range
+                        // The first frame can resume before it draws; the second one comes after a drawn frame.
+                        withFrameNanos {}
+                        withFrameNanos {}
+                    }
+                }
+            } finally {
+                // Also when the detector stops during a press: new words or a Draft paragraph.
+                highlights.pressed = null
+            }
         },
         onTap = { position -> wordAt(position)?.let(onTap) },
     )

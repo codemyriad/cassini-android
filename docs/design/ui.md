@@ -417,8 +417,9 @@ All buttons are pills, with no elevation, a clipped ripple and `Role.Button`. A 
 ### `TurnParagraph(words, activeIndex?, unsettledFrom?, matches, onWordTap, mode)`
 
 - One `Text` for each turn. Build the `AnnotatedString` one time for each (turn, matches, unsettled range).
-- Each word is `LinkAnnotation.Clickable` with `TextLinkStyles(style = SpanStyle(), pressedStyle = SpanStyle(background = accentTint))`. The style is explicitly empty, with no underline. The separators are part of the word.
-- The active word: `SpanStyle(color = onAccentFill)` on that word and a rounded accentFill rect (radius 4, 3 dp outset at the left and right, full line height). `drawBehind` draws the rect from `TextLayoutResult` (`getPathForRange` when the word wraps). Thus the text never moves.
+- The words are not links (one child node for each word made long notes too slow). One `pointerInput` with `detectTapGestures` covers the paragraph. `getOffsetForPosition` of the stored `TextLayoutResult` and a binary search over the word starts find the tapped word. A tap on the space between two words of a line goes to the nearer word. A drag cancels the tap, so the list scrolls.
+- The pressed word: a rounded accentTint rect, drawn from the text layout like the active word. As with `clickable` in a scrolling list, it shows after the tap timeout, so a scroll that starts on a word does not flash it. A shorter tap shows it for one frame.
+- The active word: a rounded accentFill rect (radius 4, 3 dp outset at the left and right, the height of the font's content area). The draw phase draws it from `TextLayoutResult`, one rect for each line of the word (bounds of `getPathForRange`, cached for each layout and word). After the text, the draw phase clips to these rects and draws the same `TextLayoutResult` again in onAccentFill. Thus the text never moves, and a new active word does not lay out the text again.
 - Read: `transcript`, ink for named speakers, text3 for placeholders.
 - Draft: `draft`, text3 for settled words, text4 for unsettled words.
 - Search: the matches on amberTint. The current match is amberTint and W600.
@@ -783,7 +784,7 @@ Accepted deviations from the boards. The reviewer examines each one, and the tol
 
 Mapping to features.md section 14 (the acceptance list):
 
-- The word links have the onClick label "Play from here".
+- The transcript words are not links, so TalkBack has no action for each word (a deviation for the owner's review, section 6 `TurnParagraph`). Each turn has the custom action "Play from start of turn".
 - The speaker labels are buttons with full spoken descriptions.
 - The live regions have a limited update rate.
 - The recording status, the stepper, play/pause, the slider and the segments have state descriptions.
