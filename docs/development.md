@@ -41,6 +41,7 @@ These files stay out of commits: `local.properties`, model weights, AAR download
 | `:ui` | Android library, package `org.cassini.ui`. The Compose design system, the stateless screens and the Roborazzi screenshot tests. | The Android SDK |
 | `:app` | The application. `AppGraph`, the ViewModels, the navigation, the services, the coordinators and the notifications. | All that `:engine` needs |
 | `:bench` | A `com.android.test` module, package `org.cassini.bench`, for experiments and calibration on a device. It instruments the debug build of `:app` and uses the models that the app installed. `ciTest` and CI do not run it. | All that `:app` needs |
+| `:baselineprofile` | A `com.android.test` module, package `org.cassini.baselineprofile`, that generates the Baseline Profile of `:app` ([Baseline Profile](#baseline-profile)). `ciTest` and CI do not run it. | All that `:app` needs |
 
 The dependency graph is in [`architecture.md`](architecture.md), section 2. `tools/asr-eval/` holds a host program that runs the speech recognition pipeline on PCM files. Gradle does not build it. Its README tells how to run it.
 
@@ -352,6 +353,18 @@ Later opens do not increase with the length of the audio: the median of the late
 `AppGraph.recentWords` keeps the full word lists of the two notes that the user opened last. If the user opens one of these two notes again, the Note screen reads no word rows. This cache did not change the times in the table. The test opens three notes in rotation, and the cache holds only two lists. Thus each open removes from the cache the note that the next round opens first, and each timed open reads the words from Room.
 
 On 10 Oct 2026, before these steps, a later open of the one-hour document took about 0.4 s more than a later open of the 15 s document (median 987 ms against 569 ms).
+
+### Baseline Profile
+
+`app/src/main/baseline-prof.txt` lists the classes and methods of the app that Android compiles ahead of time at install. Without it, the app code runs in the interpreter the first times, and a screen that is composed again from the start is slow. On a Pixel 8 (16 Oct 2026), closing a note took 69 to 98 ms with the code interpreted and about 43 ms with the code compiled.
+
+`BaselineProfileGenerator` in `:baselineprofile` collects the profile. It starts the app, scrolls the Library, opens a note with speech three times (it scrolls the transcript and plays two seconds each time), and opens Settings and Trash. It drives the `releaseTest` build, the release build without R8, so the profile has the real names. R8 rewrites the names when it builds the minified release.
+
+`scripts/baseline-profile.sh` builds the two APKs, installs them with direct adb instrumentation (the app data stays), runs the generator and writes `app/src/main/baseline-prof.txt`. The device needs API 33 or later, English, and at least one transcribed note with speech. The generator does not record, transcribe or change notes. Make the profile again after large changes to the screens, and commit the file.
+
+```sh
+scripts/baseline-profile.sh --serial emulator-5554
+```
 
 ## Acceptance 0.2 (11 Oct 2026)
 
