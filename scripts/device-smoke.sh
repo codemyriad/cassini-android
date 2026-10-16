@@ -133,9 +133,9 @@ if $bench && [ "$CASSINI_TEST_BUILD_TYPE" != debug ]; then
     printf 'The bench instruments the debug build only.\n' >&2
     exit 1
 fi
-if [ "$CASSINI_TEST_BUILD_TYPE" = releaseTest ] && [ -z "${CASSINI_BETA_KEYSTORE_FILE:-}" ]; then
+if [ "$CASSINI_TEST_BUILD_TYPE" = releaseTest ] && [ -z "${CASSINI_RELEASE_KEYSTORE_FILE:-}" ]; then
     # Without a supplied key, sign with the local debug key, so the APK installs over a debug build.
-    export CASSINI_BETA_KEYSTORE_FILE=$HOME/.android/debug.keystore
+    export CASSINI_RELEASE_KEYSTORE_FILE=$HOME/.android/debug.keystore
     export CASSINI_RELEASE_STORE_PASSWORD=${CASSINI_RELEASE_STORE_PASSWORD:-android}
     export CASSINI_RELEASE_KEY_PASSWORD=${CASSINI_RELEASE_KEY_PASSWORD:-android}
     export CASSINI_RELEASE_KEY_ALIAS=${CASSINI_RELEASE_KEY_ALIAS:-androiddebugkey}

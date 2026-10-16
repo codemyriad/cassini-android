@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <!-- The bg token (docs/design/ui.md section 4.1). The app's Theme.Cassini sets it as android:windowBackground,
          so the cold-start frame matches the first Compose frame. -->
     <color name="ui_window_bg">#F5F6F7</color>
     <!-- The ink token: the stroke of ui_ic_logo, which follows the theme like the in-app logo. -->
-    <color name="ui_logo_ink">#14171A</color>
+    <color name="ui_logo_ink" tools:ignore="UnusedResources">#14171A</color>
     <!-- The launcher icon is ink on bg in both themes (no values-night entry); the monochrome layer is the
          themed variant. -->
     <color name="ui_launcher_background">#F5F6F7</color>

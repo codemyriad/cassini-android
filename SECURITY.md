@@ -26,28 +26,24 @@ Cassini for Android is beta software. Only the latest release gets security fixe
 
 ## Release signing
 
-We publish the APK only on the [GitHub Releases page](https://github.com/codemyriad/cassini-android/releases). Each release has these files:
+We publish the APK on the [GitHub Releases page](https://github.com/codemyriad/cassini-android/releases). Testers also get Cassini from the internal testing track of Google Play. Each GitHub release has these files:
 
 - `cassini-android-VERSION.apk`: the APK.
 - `cassini-android-VERSION.apk.sha256`: the SHA-256 of the APK.
 
-All release APKs have the same signing key, the beta key. Thus an update installs over the earlier version without an uninstall, and the downloaded models stay. Version 0.2 does not show the notes of 0.1.x. Before you update from 0.1.x, transcribe each note that has no transcript. Then save each note as a Cassini document (`.opus`), and open these files in 0.2. Version 0.1.x cannot save a recording without a transcript as a Cassini document, and there is no other way to move such a recording to 0.2. The update does not delete the files of 0.1.x, which include the 0.1.x voiceprints. [PRIVACY.md](PRIVACY.md) tells how to delete them. The SHA-256 digest of the signing certificate is in [`scripts/beta-signing-cert.sha256`](scripts/beta-signing-cert.sha256):
+One release key signs the APK on GitHub and the app on Google Play (Play App Signing holds the same key). Thus an update from either source installs over the other without an uninstall, and the downloaded models stay. The SHA-256 digest of the signing certificate is in [`scripts/release-signing-cert.sha256`](scripts/release-signing-cert.sha256).
 
-```text
-06b2a95b3a6e6e7cdef618999d37631a18216307def007102980db71cf2387ec
-```
-
-If the APK has a different certificate or is debuggable, the release job of CI stops.
+If the APK or the Play bundle has a different certificate, or the APK is debuggable, the release job of CI stops.
 
 To make sure that you have a genuine APK, do these steps:
 
 1. Run `sha256sum -c cassini-android-VERSION.apk.sha256` in the directory of the two files.
 2. Run `apksigner verify --print-certs cassini-android-VERSION.apk` (`apksigner` is in the Android SDK build tools).
-3. Compare the line `Signer #1 certificate SHA-256 digest` with the digest in `scripts/beta-signing-cert.sha256`.
+3. Compare the line `Signer #1 certificate SHA-256 digest` with the digest in `scripts/release-signing-cert.sha256`.
 
-The repository does not contain the keystore. The Gradle files contain no passwords. The build reads the passwords from the environment variables `CASSINI_RELEASE_STORE_PASSWORD`, `CASSINI_RELEASE_KEY_PASSWORD` and `CASSINI_RELEASE_KEY_ALIAS`. CI gets the keystore from a repository secret. Until the owner sets new passwords, CI and `scripts/device-smoke.sh` use the standard passwords of the Android debug keystore (`android`, `androiddebugkey`) as a fallback. Thus the keystore file is the only secret. [docs/release.md](docs/release.md) gives the details.
+The repository does not contain the keystore. The Gradle files contain no passwords. The build reads the passwords from the environment variables `CASSINI_RELEASE_STORE_PASSWORD`, `CASSINI_RELEASE_KEY_PASSWORD` and `CASSINI_RELEASE_KEY_ALIAS`. CI gets the keystore and the passwords from repository secrets. [docs/release.md](docs/release.md) gives the details.
 
-A later stable release can have a different signing key. If the key changes, Android does not install the update over the beta version. You must then uninstall the beta version, and the uninstall erases the notes and the downloaded models. Before you uninstall, save each note as a Cassini document (`.opus`).
+Versions 0.0.1-beta to 0.1.0 have a different key, the beta key (certificate SHA-256 `06b2a95b3a6e6e7cdef618999d37631a18216307def007102980db71cf2387ec`). Android does not install a version with the release key over them. Version 0.2 does not show the notes of 0.1.x. Before you uninstall 0.1.x, transcribe each note that has no transcript. Then save each note as a Cassini document (`.opus`), and open these files in the new version. Version 0.1.x cannot save a recording without a transcript as a Cassini document, and there is no other way to move such a recording. The uninstall erases the notes, the voiceprints and the downloaded models of 0.1.x.
 
 ## Model downloads and pinned hashes
 

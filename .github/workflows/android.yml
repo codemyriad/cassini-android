@@ -115,26 +115,24 @@ jobs:
       - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
           cache-provider: basic
-      - name: Restore beta signing key
+      # The release key signs the GitHub APK and the Play bundle (docs/release.md, "Signing"). No fallbacks: a tag
+      # build without the four secrets fails here.
+      - name: Restore the release signing key
         if: startsWith(github.ref, 'refs/tags/')
         env:
-          BETA_KEYSTORE: ${{ secrets.ANDROID_BETA_KEYSTORE }}
+          RELEASE_KEYSTORE: ${{ secrets.CASSINI_RELEASE_KEYSTORE }}
+          STORE_PASSWORD: ${{ secrets.CASSINI_RELEASE_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.CASSINI_RELEASE_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.CASSINI_RELEASE_KEY_ALIAS }}
         run: |
-          test -n "$BETA_KEYSTORE"
-          mkdir -p "$HOME/.android"
-          printf '%s' "$BETA_KEYSTORE" | base64 --decode > "$HOME/.android/debug.keystore"
-          chmod 600 "$HOME/.android/debug.keystore"
-          echo "CASSINI_BETA_KEYSTORE_FILE=$HOME/.android/debug.keystore" >> "$GITHUB_ENV"
-      - name: Pass release signing secrets
-        if: startsWith(github.ref, 'refs/tags/')
-        # The 'android' fallbacks are temporary: they keep tag builds working until the owner rotates
-        # the keystore passwords and stores them as secrets.
-        env:
-          STORE_PASSWORD: ${{ secrets.CASSINI_RELEASE_STORE_PASSWORD || 'android' }}
-          KEY_PASSWORD: ${{ secrets.CASSINI_RELEASE_KEY_PASSWORD || 'android' }}
-          KEY_ALIAS: ${{ secrets.CASSINI_RELEASE_KEY_ALIAS || 'androiddebugkey' }}
-        run: |
+          for secret in RELEASE_KEYSTORE STORE_PASSWORD KEY_PASSWORD KEY_ALIAS; do
+            if [ -z "${!secret}" ]; then echo "::error::The secret for $secret is not set"; exit 1; fi
+          done
+          keystore="$RUNNER_TEMP/release.keystore"
+          printf '%s' "$RELEASE_KEYSTORE" | base64 --decode > "$keystore"
+          chmod 600 "$keystore"
           {
+            echo "CASSINI_RELEASE_KEYSTORE_FILE=$keystore"
             echo "CASSINI_RELEASE_STORE_PASSWORD=$STORE_PASSWORD"
             echo "CASSINI_RELEASE_KEY_PASSWORD=$KEY_PASSWORD"
             echo "CASSINI_RELEASE_KEY_ALIAS=$KEY_ALIAS"
@@ -161,11 +159,14 @@ jobs:
         env:
           BUILD_TYPE: ${{ startsWith(github.ref, 'refs/tags/') && 'Release' || 'Debug' }}
           DEVICE_TEST_TYPE: ${{ startsWith(github.ref, 'refs/tags/') && 'releaseTest' || 'debug' }}
+          # On tags, also the bundle for Google Play.
+          BUNDLE_TASK: ${{ startsWith(github.ref, 'refs/tags/') && ':app:bundleRelease' || '' }}
         # Two Gradle runs: with -PdeviceTestBuildType=releaseTest, AGP 9 makes unit-test tasks only for that build
         # type, so ciTest (testDebugUnitTest) cannot run in the same invocation on a tag.
         run: |
+          # shellcheck disable=SC2086 # BUNDLE_TASK is empty or one task name.
           ./gradlew --no-daemon \
-            ":app:assemble$BUILD_TYPE" :data:assembleDebugAndroidTest \
+            ":app:assemble$BUILD_TYPE" $BUNDLE_TASK :data:assembleDebugAndroidTest \
             ciTest ":app:lint$BUILD_TYPE" ":data:lint$BUILD_TYPE" ":ui:lint$BUILD_TYPE"
           ./gradlew --no-daemon \
             -PdeviceTestBuildType="$DEVICE_TEST_TYPE" \
@@ -195,6 +196,14 @@ jobs:
           name: cassini-android
           compression-level: 0
           path: dist/*
+          if-no-files-found: error
+      - name: Upload the Play bundle
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cassini-android-play
+          compression-level: 0
+          path: play/
           if-no-files-found: error
       - name: Upload the APK under test and its device test APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -343,3 +352,41 @@ jobs:
           if [[ "$TAG" == *-* ]]; then prerelease=(--prerelease); fi
           gh release create "$TAG" dist/* --verify-tag --title "${TAG#v}" \
             --notes-file "$RUNNER_TEMP/release-notes.md" "${prerelease[@]}"
+
+  # Uploads the bundle of a tag to the internal testing track of Google Play, after the GitHub release. Without the
+  # PLAY_SERVICE_ACCOUNT_JSON secret the job only reports a notice; the first bundle of a new Play app must be uploaded
+  # by hand in Play Console anyway (docs/release.md, "Google Play").
+  play:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check for the Play credentials
+        id: credentials
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -n "$PLAY_SERVICE_ACCOUNT_JSON" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice title=Google Play::PLAY_SERVICE_ACCOUNT_JSON is not set; the bundle is in the cassini-android-play artifact."
+          fi
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        if: steps.credentials.outputs.present == 'true'
+        with:
+          name: cassini-android-play
+          path: play
+      - name: Upload to the internal testing track
+        if: steps.credentials.outputs.present == 'true'
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: org.cassini.android
+          releaseFiles: play/*.aab
+          releaseName: ${{ github.ref_name }}
+          track: internal
+          # A Play app that has never been rolled out accepts only drafts; set the variable to draft until then.
+          status: ${{ vars.PLAY_RELEASE_STATUS || 'completed' }}
+          whatsNewDirectory: play/whatsnew
+          mappingFile: play/mapping.txt

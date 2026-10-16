@@ -19,6 +19,7 @@ app/src/main/jniLibs/
 *.wav
 *.opus
 dist/
+play/
 **/.cxx/
 
 # Device test audio. Only the CC-BY-4.0 FLEURS clip is committed (fixtures/README.md), so a recording
