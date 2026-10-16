@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.createSavedStateHandle
@@ -78,6 +79,7 @@ import org.cassini.ui.trash.TrashBackTo
 fun CassiniApp(graph: AppGraph, links: Flow<DeepLink>, modifier: Modifier = Modifier) {
     val backStack = rememberNavBackStack(LibraryKey)
     val noteBounds = rememberNoteBounds()
+    val morph = remember { NoteMorph() }
     val context = LocalContext.current
     LaunchedEffect(links) {
         links.collect { link -> open(graph, backStack, link) }
@@ -102,18 +104,20 @@ fun CassiniApp(graph: AppGraph, links: Flow<DeepLink>, modifier: Modifier = Modi
                 rememberSaveableStateHolderNavEntryDecorator(),
                 rememberViewModelStoreNavEntryDecorator(),
             ),
-            transitionSpec = { appPush(noteBounds) },
-            popTransitionSpec = { appPop(noteBounds) },
-            predictivePopTransitionSpec = { _ -> appPop(noteBounds) },
+            // The Library stays composed under a note it opened, so closing the note does not compose it again.
+            sceneStrategies = listOf(remember { LibraryNoteSceneStrategy() }),
+            transitionSpec = { appPush(morph) },
+            popTransitionSpec = { appPop(morph) },
+            predictivePopTransitionSpec = { _ -> appPop(morph) },
             entryProvider = entryProvider {
-                entry<LibraryKey> {
+                entry<LibraryKey>(metadata = LibraryNoteScenes.library()) {
                     val viewModel = viewModel {
                         LibraryViewModel(createSavedStateHandle(), GraphLibraryPorts(graph, context), graph.clock())
                     }
                     LibraryRoute(viewModel, libraryNavigator(backStack))
                 }
-                entry<NoteKey> { key ->
-                    NoteEntry(key, graph, backStack, noteBounds, context)
+                entry<NoteKey>(metadata = LibraryNoteScenes.note()) { key ->
+                    NoteEntry(key, graph, backStack, noteBounds, morph)
                 }
                 entry<RecordingKey>(metadata = recordingTransitions) {
                     val viewModel = viewModel {
@@ -134,8 +138,9 @@ private fun NoteEntry(
     graph: AppGraph,
     backStack: NavBackStack<NavKey>,
     noteBounds: org.cassini.ui.components.NoteBounds,
-    context: Context,
+    morph: NoteMorph,
 ) {
+    val context = LocalContext.current
     val viewModel = viewModel {
         NoteViewModel(
             createSavedStateHandle(),
@@ -151,7 +156,7 @@ private fun NoteEntry(
     NoteRoute(
         viewModel = viewModel,
         navigator = noteNavigator(backStack, noteBounds, key.noteId),
-        modifier = Modifier.noteContainerTransition(key.noteId, withLibrary = withLibrary),
+        modifier = Modifier.noteContainerTransition(key.noteId, morph),
         transitionRunning = transitionRunning,
     )
 }

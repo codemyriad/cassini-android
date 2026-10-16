@@ -101,14 +101,24 @@ private fun Scene<*>.noteIdOrNull(): String? =
         ?.substringBefore(",")
 
 /**
- * Push transition for [CassiniApp]: when opening a [NoteKey] from [LibraryKey] and its row bounds are known, keeps the
- * Library visible underneath (`targetContentZIndex = 1f`) while [noteContainerTransition] stretches the note container
- * from the row bounds to full screen. Otherwise uses the standard horizontal [push].
+ * Which note is opening from, or closing into, the Library under it. [appPush] and [appPop] set it when a transition
+ * starts, and [noteContainerTransition] reads it while it draws: it morphs or slides that note over the Library only,
+ * not a note that comes back from a screen above it.
  */
-internal fun <S : Scene<*>> AnimatedContentTransitionScope<S>.appPush(noteBounds: NoteBounds): ContentTransform {
-    val fromLibrary = initialState.isLibraryScene()
-    val noteId = targetState.noteIdOrNull()
-    if (!fromLibrary || noteId == null || noteBounds.get(noteId) == null) return push()
+internal class NoteMorph {
+    var noteId: String? = null
+}
+
+/**
+ * Push transition for [CassiniApp]. A [NoteKey] opened from [LibraryKey] enters as a `LibraryNoteScene` that already
+ * holds the Library, so the scene enters with no animation on top of the Library (`targetContentZIndex = 1f`) and
+ * [noteContainerTransition] animates the note alone: from its row when the row bounds are known, otherwise with the
+ * slide of [push]. Every other push is the standard horizontal [push].
+ */
+internal fun <S : Scene<*>> AnimatedContentTransitionScope<S>.appPush(morph: NoteMorph): ContentTransform {
+    val noteId = targetState.noteIdOrNull()?.takeIf { initialState.isLibraryScene() }
+    morph.noteId = noteId
+    if (noteId == null) return push()
     val hold = tween<Float>(MORPH_MS, easing = FastOutSlowInEasing)
     // No fadeIn: noteContainerTransition already starts the note at alpha 0. A fadeIn draws the first frame of the
     // whole screen at alpha 0 through a full-size offscreen buffer, which stalled that frame by about 100 ms.
@@ -120,14 +130,15 @@ internal fun <S : Scene<*>> AnimatedContentTransitionScope<S>.appPush(noteBounds
 }
 
 /**
- * Pop (and predictive-pop) transition for [CassiniApp]: when closing a [NoteKey] back to [LibraryKey] and its row
- * bounds are known, keeps the Library visible underneath (`targetContentZIndex = -1f`) while [noteContainerTransition]
- * stretches the note screen back into its row in the Library list. Otherwise uses the standard horizontal [pop].
+ * Pop (and predictive-pop) transition for [CassiniApp]: when closing a [NoteKey] back to [LibraryKey], the exiting
+ * `LibraryNoteScene` stays on top (`targetContentZIndex = -1f`) with the Library inside it, while
+ * [noteContainerTransition] stretches the note back into its row, or slides it out as [pop] does when the row bounds
+ * are unknown. Otherwise uses the standard horizontal [pop].
  */
-internal fun <S : Scene<*>> AnimatedContentTransitionScope<S>.appPop(noteBounds: NoteBounds): ContentTransform {
-    val noteId = initialState.noteIdOrNull()
-    val toLibrary = targetState.isLibraryScene()
-    if (!toLibrary || noteId == null || noteBounds.get(noteId) == null) return pop()
+internal fun <S : Scene<*>> AnimatedContentTransitionScope<S>.appPop(morph: NoteMorph): ContentTransform {
+    val noteId = initialState.noteIdOrNull()?.takeIf { targetState.isLibraryScene() }
+    morph.noteId = noteId
+    if (noteId == null) return pop()
     val hold = tween<Float>(MORPH_MS, easing = FastOutSlowInEasing)
     return (
         EnterTransition.None togetherWith fadeOut(hold, targetAlpha = 1f)
@@ -170,10 +181,11 @@ private fun rememberMorphSpec(): MorphSpec {
 
 /**
  * Stretches the Note screen container from its Library row bounds on open and back into its row bounds on close (both
- * button/system back and predictive swipe-back) using hardware RenderNode layers and outline clipping.
+ * button/system back and predictive swipe-back) using hardware RenderNode layers and outline clipping. Without row
+ * bounds it slides and fades the note as [push] and [pop] do, over the Library that stays still under it.
  */
 @Composable
-internal fun Modifier.noteContainerTransition(noteId: String, withLibrary: Boolean): Modifier {
+internal fun Modifier.noteContainerTransition(noteId: String, morph: NoteMorph): Modifier {
     val navScope = LocalNavAnimatedContentScope.current
     val noteBounds = LocalNoteBounds.current
     val fraction by navScope.transition.animateFloat(
@@ -195,7 +207,7 @@ internal fun Modifier.noteContainerTransition(noteId: String, withLibrary: Boole
     return this
         .drawWithContent {
             val f = fraction.coerceIn(0f, 1f)
-            val rowRect = if (withLibrary && f < 0.999f) noteBounds?.get(noteId) else null
+            val rowRect = if (morph.noteId == noteId && f < 0.999f) noteBounds?.get(noteId) else null
             val rowLayer = noteBounds?.layer(noteId)?.takeIf { !it.isReleased }
             if (rowRect == null) {
                 if (rowLayer != null && rowLayer.alpha != 1f) rowLayer.alpha = 1f
@@ -206,7 +218,8 @@ internal fun Modifier.noteContainerTransition(noteId: String, withLibrary: Boole
         }
         .graphicsLayer {
             val f = fraction.coerceIn(0f, 1f)
-            val rowRect = if (withLibrary && f < 0.999f) noteBounds?.get(noteId) else null
+            val overLibrary = morph.noteId == noteId && f < 0.999f
+            val rowRect = if (overLibrary) noteBounds?.get(noteId) else null
             if (rowRect != null) {
                 val currentRect = lerp(rowRect, Rect(0f, 0f, size.width, size.height), f)
                 val scale = (currentRect.width / size.width.coerceAtLeast(1f)).coerceAtLeast(0.01f)
@@ -218,6 +231,11 @@ internal fun Modifier.noteContainerTransition(noteId: String, withLibrary: Boole
                 alpha = (f / CROSSFADE_END).coerceIn(0f, 1f)
                 // Fade each draw instead of the whole screen through a full-size offscreen buffer: allocating and
                 // clearing that buffer stalled the first frame of the open by about 100 ms on a Pixel 8.
+                compositingStrategy = CompositingStrategy.ModulateAlpha
+            } else if (overLibrary) {
+                // The slide of push() and pop(), on the note alone.
+                translationX = size.width * SLIDE_FRACTION * (1f - f)
+                alpha = f
                 compositingStrategy = CompositingStrategy.ModulateAlpha
             }
         }
