@@ -26,7 +26,7 @@ navigation3 = "1.2.0"
 coreKtx = "1.19.1"
 appcompat = "1.8.0"
 datastore = "1.2.1"
-annotation = "1.9.1"
+annotation = "1.11.0"
 
 # Kotlin libraries
 coroutines = "1.11.0"
@@ -34,8 +34,8 @@ serialization = "1.11.0"
 collectionsImmutable = "0.5.2"
 
 # Third party
-zstd = "1.5.7-22"
-orgJson = "20240303"
+zstd = "1.5.7-23"
+orgJson = "20260814"
 # Patched sherpa-onnx AAR served from the repo-local Maven directory native/m2 (scripts/setup.sh).
 sherpaOnnx = "1.13.7-dbbeef9c"
 
