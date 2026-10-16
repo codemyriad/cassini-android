@@ -2,7 +2,6 @@ package org.cassini.ui.components
 
 import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.layer.GraphicsLayer
@@ -20,9 +19,3 @@ interface NoteBounds {
 }
 
 val LocalNoteBounds: ProvidableCompositionLocal<NoteBounds?> = staticCompositionLocalOf { null }
-
-/**
- * True while a Note screen is actively running its enter transition so [TurnParagraph] defers creating hundreds of
- * per-word [androidx.compose.ui.text.LinkAnnotation.Clickable] child layout nodes until the animation finishes.
- */
-val LocalDeferWordLinks: ProvidableCompositionLocal<Boolean> = compositionLocalOf { false }

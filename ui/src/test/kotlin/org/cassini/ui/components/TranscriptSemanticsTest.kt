@@ -56,8 +56,8 @@ import java.util.Locale
  * description and steps, and the player buttons.
  *
  * Accessibility Test Framework checks (`enableAccessibilityChecks()`) do not run under Robolectric (P2 finding, see
- * ScaffoldScreenshotTest); the P10 device flow tests run them on the emulator. Each transcript word is a link node
- * with a click action (no click label: see TurnParagraph). Native graphics give the text
+ * ScaffoldScreenshotTest); the P10 device flow tests run them on the emulator. The transcript words are not link
+ * nodes: the paragraph maps a tap position to a word (see TurnParagraph). Native graphics give the text
  * its real geometry, which the word taps need.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -103,8 +103,56 @@ class TranscriptSemanticsTest {
             assertEquals(tapped.size + 1, taps.size)
             assertTrue("space tap went to ${taps.last()}", taps.last() in 3..4)
         }
-        // Each word is its own link node.
-        assertEquals(words.size, paragraph.linkCount())
+        // The words are not links: the paragraph has no child node for each word.
+        assertEquals(0, paragraph.linkCount())
+        assertTrue(paragraph.fetchSemanticsNode().children.isEmpty())
+    }
+
+    @Test fun aTapOnASpaceReachesTheNearerWord() {
+        val taps = mutableListOf<Int>()
+        val words = TranscriptFixtures.paolo
+        setThemed {
+            Box(Modifier.width(350.dp)) {
+                TurnParagraph(words, null, onWordTap = { taps += it }, modifier = Modifier.testTag(PARAGRAPH))
+            }
+        }
+        val paragraph = rule.onNodeWithTag(PARAGRAPH)
+        val layout = paragraph.textLayout()
+        val starts = wordStarts(words)
+        val space = layout.getBoundingBox(starts[3] + words[3].text.length)
+        assertEquals(layout.getLineForOffset(starts[3]), layout.getLineForOffset(starts[4]))
+        paragraph.performTouchInput { click(Offset(space.left + 1f, space.center.y)) }
+        paragraph.performTouchInput { click(Offset(space.right - 1f, space.center.y)) }
+        rule.runOnIdle { assertEquals(listOf(3, 4), taps) }
+    }
+
+    @Test fun aNewActiveWordKeepsTheLayoutAndReportsItsLine() {
+        val words = TranscriptFixtures.paolo
+        val lines = mutableListOf<Float>()
+        var active by mutableStateOf(0)
+        setThemed {
+            Box(Modifier.width(350.dp)) {
+                TurnParagraph(
+                    words = words,
+                    activeIndex = active,
+                    onWordTap = {},
+                    modifier = Modifier.testTag(PARAGRAPH),
+                    onActiveLine = { lines += it },
+                )
+            }
+        }
+        val paragraph = rule.onNodeWithTag(PARAGRAPH)
+        val before = paragraph.textLayout()
+        val last = wordStarts(words)[words.lastIndex]
+        assertTrue("the paragraph wraps", before.getLineForOffset(last) > 0)
+        rule.runOnIdle { lines.clear() }
+        active = words.lastIndex
+        rule.waitForIdle()
+        val after = paragraph.textLayout()
+        // The same annotated text: the active word adds no span.
+        assertEquals(before.layoutInput.text, after.layoutInput.text)
+        // One report of the new line, from the effect. A new text layout would report it a second time.
+        rule.runOnIdle { assertEquals(listOf(after.getLineTop(after.getLineForOffset(last))), lines) }
     }
 
     /** The acceptance walk reads [ActiveWordStart] to see that the playing word is highlighted. */
