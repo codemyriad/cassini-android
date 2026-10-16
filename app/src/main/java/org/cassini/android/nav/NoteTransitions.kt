@@ -10,7 +10,6 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.WindowInsets
@@ -30,6 +29,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -110,8 +110,10 @@ internal fun <S : Scene<*>> AnimatedContentTransitionScope<S>.appPush(noteBounds
     val noteId = targetState.noteIdOrNull()
     if (!fromLibrary || noteId == null || noteBounds.get(noteId) == null) return push()
     val hold = tween<Float>(MORPH_MS, easing = FastOutSlowInEasing)
+    // No fadeIn: noteContainerTransition already starts the note at alpha 0. A fadeIn draws the first frame of the
+    // whole screen at alpha 0 through a full-size offscreen buffer, which stalled that frame by about 100 ms.
     return (
-        fadeIn(tween(1)) togetherWith fadeOut(hold, targetAlpha = 1f)
+        EnterTransition.None togetherWith fadeOut(hold, targetAlpha = 1f)
         ).apply {
         targetContentZIndex = 1f
     }
@@ -214,6 +216,9 @@ internal fun Modifier.noteContainerTransition(noteId: String, withLibrary: Boole
                 translationX = currentRect.left
                 translationY = currentRect.top - spec.headerShiftPx * scale * (1f - f)
                 alpha = (f / CROSSFADE_END).coerceIn(0f, 1f)
+                // Fade each draw instead of the whole screen through a full-size offscreen buffer: allocating and
+                // clearing that buffer stalled the first frame of the open by about 100 ms on a Pixel 8.
+                compositingStrategy = CompositingStrategy.ModulateAlpha
             }
         }
 }

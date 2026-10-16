@@ -2,6 +2,7 @@ package org.cassini.android.recording
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -19,6 +20,7 @@ import org.cassini.android.nav.NoteKey
 import org.cassini.core.audio.RecordingSpace
 import org.cassini.ui.banner.BannerAction
 import org.cassini.ui.banner.BannerKind
+import org.cassini.ui.components.WaveformLevels
 import org.cassini.ui.recording.RecordingEvent
 import org.cassini.ui.recording.RecordingHint
 import org.cassini.ui.recording.RecordingPhase
@@ -87,7 +89,7 @@ class RecordingViewModelTest {
         assertEquals(CaptureFormatUi.OPUS, state.format)
         assertEquals(48_000, state.sampleRateHz)
         assertEquals(RecordingHint.Space(111_600_000), state.hint)
-        assertEquals(56, state.levels.size)
+        assertEquals(56, state.levels.bars.size)
         assertNull(state.banner)
 
         ports.state.value = active(space = RecordingSpace(spaceMs = 600_000))
@@ -314,7 +316,7 @@ class RecordingViewModelTest {
 /** A recorder that records the calls; [start] moves to Starting as the controller does. */
 private class FakeRecordingPorts : RecordingPorts {
     override val state = MutableStateFlow<RecordingState>(RecordingState.Idle)
-    override val levels: Flow<List<Float>> = MutableStateFlow(List(56) { 0.5f })
+    override val levels: Flow<WaveformLevels> = MutableStateFlow(WaveformLevels(List(56) { 0.5f }.toImmutableList()))
     val actions = mutableListOf<String>()
     var missing = false
     var asked = false

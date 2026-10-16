@@ -1,6 +1,7 @@
 package org.cassini.engine.job
 
 import org.cassini.core.Failure
+import org.cassini.core.asr.ProgressAnchor
 import org.cassini.core.asr.TranscriptionProgress
 import org.cassini.core.format.DocumentState
 import org.cassini.core.format.Word
@@ -136,6 +137,7 @@ sealed interface BatteryLine {
  * The numbers of the progress card at one tick. [percent] is null for an indeterminate bar and at most 99 until the
  * job is done. [rangeStartMs]..[rangeEndMs] is the window being worked on (hidden when both are 0).
  * [matchingSkipped] draws the Matching step as skipped: the job will not match voices in this run.
+ * [anchor] lets the bar move between window completions; null outside the Words & voices step.
  */
 data class RunningProgress(
     val headline: ProgressHeadline,
@@ -150,6 +152,7 @@ data class RunningProgress(
     val battery: BatteryLine,
     val words: Int,
     val lowMemory: Boolean,
+    val anchor: ProgressAnchor? = null,
 )
 
 /**

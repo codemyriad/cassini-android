@@ -337,6 +337,39 @@ class ProgressTrackerTest {
         t.close()
     }
 
+    @Test fun theAnchorFollowsTheWindowsAndStaysEqualBetweenThem() = runTest {
+        val t = Tracked(this)
+        t.send(started(totalMs = 260_000))
+        t.send(JobEvent.StageChanged(Stage.WORDS, 0, 28_000))
+        advanceTimeBy(10_000)
+        t.send(JobEvent.WindowDone(28_000, 260_000, words(0, 28)))
+        t.send(JobEvent.StageChanged(Stage.WORDS, 26_000, 54_000))
+        tick()
+        // The first window includes the model load: no pace yet.
+        assertNull(t.progress.anchor)
+        advanceTimeBy(5_200)
+        t.send(JobEvent.WindowDone(54_000, 260_000, words(0, 54)))
+        val completedAt = testScheduler.currentTime
+        t.send(JobEvent.StageChanged(Stage.WORDS, 52_000, 80_000))
+        tick()
+        val anchor = t.progress.anchor!!
+        assertEquals(54_000f / 260_000, anchor.doneFraction, 1e-6f)
+        assertEquals(80_000f / 260_000, anchor.windowEndFraction, 1e-6f)
+        // 6.2 s (the tick and 5.2 s) for 26 s of audio: 62 s for the whole audio.
+        assertEquals(62_000f, anchor.msPerFraction, 1f)
+        assertEquals(completedAt, anchor.completedAtMs)
+        val published = t.phase
+        tick()
+        tick()
+        assertEquals(published, t.phase)
+        t.send(JobEvent.StageChanged(Stage.SAVING))
+        tick()
+        assertNull(t.progress.anchor)
+        t.send(JobEvent.Ended(JobOutcome.Done))
+        assertNull(t.progress.anchor)
+        t.close()
+    }
+
     // Battery ---------------------------------------------------------------------------------------------------
 
     @Test fun batteryIsHiddenWithoutAReading() = runTest {

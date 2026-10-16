@@ -6,7 +6,6 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation3.runtime.NavKey
-import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -26,6 +25,7 @@ import org.cassini.android.nav.NoteKey
 import org.cassini.android.notices.Notices
 import org.cassini.core.audio.RecordingSpace
 import org.cassini.ui.banner.BannerAction
+import org.cassini.ui.components.WaveformLevels
 import org.cassini.ui.recording.RecordingEvent
 import org.cassini.ui.recording.RecordingHint
 import org.cassini.ui.recording.RecordingPhase
@@ -36,8 +36,8 @@ import org.cassini.ui.recording.CaptureFormat as CaptureFormatUi
 interface RecordingPorts {
     val state: StateFlow<RecordingState>
 
-    /** The 56 waveform bars; sampled only while collected. */
-    val levels: Flow<List<Float>>
+    /** The 56 waveform bars and the captured time of their newest sample; sampled only while collected. */
+    val levels: Flow<WaveformLevels>
 
     fun start(title: String): Boolean
 
@@ -68,7 +68,7 @@ class GraphRecordingPorts(private val graph: AppGraph) : RecordingPorts {
     private val controller get() = graph.recording
 
     override val state: StateFlow<RecordingState> get() = controller.state
-    override val levels: Flow<List<Float>> = flow { emitAll(controller.levels) }
+    override val levels: Flow<WaveformLevels> = flow { emitAll(controller.levels) }
 
     override fun start(title: String): Boolean = controller.start(title)
 
@@ -170,14 +170,14 @@ class RecordingViewModel(
         sampleRateHz = SAMPLE_RATE_HZ,
     )
 
-    private fun build(recorder: RecordingState, levels: List<Float>, flags: Flags): RecordingUiState {
+    private fun build(recorder: RecordingState, levels: WaveformLevels, flags: Flags): RecordingUiState {
         val active = recorder as? RecordingState.Active
         val format = active?.format ?: flags.format ?: defaultFormat()
         return RecordingUiState(
             phase = phase(recorder, flags),
             title = titleOf(recorder),
             elapsedMs = elapsedOf(recorder),
-            levels = levels.toImmutableList(),
+            levels = levels,
             format = if (format == CaptureFormat.OPUS) CaptureFormatUi.OPUS else CaptureFormatUi.M4A,
             sampleRateHz = active?.sampleRateHz ?: format.sampleRateHz,
             hint = active?.space?.let(::hint),

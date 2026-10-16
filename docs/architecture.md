@@ -834,7 +834,7 @@ If the user denies `POST_NOTIFICATIONS`, the service still runs. The progress ca
 `RecordingController` owns the `MicrophoneCapture` on a dispatcher with one thread. It gives these values:
 
 - `StateFlow<RecordingState>`: `Idle`, `Starting`, `Active(noteId, title, format, elapsedMs, pause, space, warning)`, `Finishing` or `Ended(noteId, outcome)`.
-- `levels`: 56 values of 125 ms each. Each value is the maximum of the 100 ms samples. The controller calculates the levels only while a collector subscribes.
+- `levels`: 56 values of 125 ms each, with the captured time of the newest sample (`WaveformLevels` of `:ui`). Each value is the maximum of the 100 ms samples. The controller calculates the levels only while a collector subscribes.
 - `activeNoteId`.
 
 The visible Recording screen calls `start(title)`, because Android 14 requires a visible start. The function does these steps:

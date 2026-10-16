@@ -219,7 +219,7 @@ class AppShellTest {
         assertEquals(false, darkIcons())
     }
 
-    @Test fun transcriptWordsAreLinksAndSpeakerLabelsAreSpokenButtons() {
+    @Test fun transcriptWordsAreNotLinksAndSpeakerLabelsAreSpokenButtons() {
         importDocument()
         rule.onNodeWithText(TITLE).performClick()
         waitFor(hasContentDescription("Search in transcript"))
@@ -235,10 +235,10 @@ class AppShellTest {
         rule.onNode(hasContentDescription("Ada", substring = true))
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
 
-        // Each word of a turn is its own link node for TalkBack, inside the paragraph.
+        // The words are not links: the paragraph maps a tap position to a word, with no child node per word.
         val paragraph = rule.onNode(hasText(SECOND_TURN), useUnmergedTree = true).fetchSemanticsNode()
         val links = paragraph.children.count { it.config.contains(SemanticsProperties.LinkTestMarker) }
-        assertEquals(SECOND_TURN.split(' ').size, links)
+        assertEquals(0, links)
     }
 
     /** An attribute of `<application>` in the merged manifest of this test run (AGP's test_config.properties). */

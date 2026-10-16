@@ -237,7 +237,7 @@ The logo vector is also the adaptive launcher foreground (ink on bg, in `mipmap-
 
 Each standalone control has a touch area of at least 48 x 48 dp. Some visuals of the boards are smaller: 44 dp icon buttons, 40/36 dp pills, 44 dp segments and the 32 dp version chip. For these controls, the layout is 48 dp, with the visual at the center. The padding next to the control is less by the difference. Thus the pixels do not move. Use an explicit `Modifier.touchTarget()` helper, so that the code shows the compensation. Do not use the silent `minimumInteractiveComponentSize()`. Section 6 gives the compensated values for each component ("visual 44 / layout 48").
 
-The inline text buttons inside a line of text (the Library row suffixes "· Resume" and "· Try again") keep their text layout. Their touch area gets to 48 x 48 dp through the extended hit testing of Compose. A `clickable` node that is smaller than `LocalViewConfiguration.current.minimumTouchTargetSize` receives the taps in the 48 dp square around its center, without a change of the layout. A test taps 14 dp above the center of the text and expects the event. The row also gives the action as a TalkBack custom action. The inline word links of the transcript are an exception (the inline exception of WCAG 2.5.8).
+The inline text buttons inside a line of text (the Library row suffixes "· Resume" and "· Try again") keep their text layout. Their touch area gets to 48 x 48 dp through the extended hit testing of Compose. A `clickable` node that is smaller than `LocalViewConfiguration.current.minimumTouchTargetSize` receives the taps in the 48 dp square around its center, without a change of the layout. A test taps 14 dp above the center of the text and expects the event. The row also gives the action as a TalkBack custom action.
 
 ## 6. Components (`components/`, each with a `@Preview` and a component screenshot)
 
@@ -396,7 +396,7 @@ All buttons are pills, with no elevation, a clipped ripple and `Role.Button`. A 
 
 - Margin: top 8, horizontal 16. surface, 1 dp line, radius 20, padding 16, gap 12.
 - Header row, aligned at the bottom: the headline (`caption` text2), the range (`monoTime` text3, 2 dp above) and the percent.
-- `LinearTrack`: 6 dp (line track, accent fill, radius 3).
+- `LinearTrack`: 6 dp (line track, accent fill, radius 3). The fill moves in the draw phase only. It glides to each new value. While words are found, it also moves at the measured pace toward the end of the current window, and never past it. The percent and the stats change only at each update. With reduced motion, the fill goes to each value at once.
 - `StageTracker`: 5 equal columns with gap 4. A 2 dp rule at the top: accent for done and current steps, line2 for the next steps. Padding 4, `stage` text2, and the current step in W600 ink. The labels can wrap. There is one node for each step, with the stateDescription "done", "in progress", "not started" or "skipped".
 - `StatGrid`: 2 columns, row gap 10, column gap 12. The label is `caption` text2, then 2 dp, then the value in `button` ink. "Processed" uses `monoValue`. The values that are not available yet ("Calculating…", "Measuring…") are text2 W400.
 - The block "Stop and keep progress".
@@ -417,8 +417,9 @@ All buttons are pills, with no elevation, a clipped ripple and `Role.Button`. A 
 ### `TurnParagraph(words, activeIndex?, unsettledFrom?, matches, onWordTap, mode)`
 
 - One `Text` for each turn. Build the `AnnotatedString` one time for each (turn, matches, unsettled range).
-- Each word is `LinkAnnotation.Clickable` with `TextLinkStyles(style = SpanStyle(), pressedStyle = SpanStyle(background = accentTint))`. The style is explicitly empty, with no underline. The separators are part of the word.
-- The active word: `SpanStyle(color = onAccentFill)` on that word and a rounded accentFill rect (radius 4, 3 dp outset at the left and right, full line height). `drawBehind` draws the rect from `TextLayoutResult` (`getPathForRange` when the word wraps). Thus the text never moves.
+- The words are not links (one child node for each word made long notes too slow). One `pointerInput` with `detectTapGestures` covers the paragraph. `getOffsetForPosition` of the stored `TextLayoutResult` and a binary search over the word starts find the tapped word. A tap on the space between two words of a line goes to the nearer word. A drag cancels the tap, so the list scrolls.
+- The pressed word: a rounded accentTint rect, drawn from the text layout like the active word. As with `clickable` in a scrolling list, it shows after the tap timeout, so a scroll that starts on a word does not flash it. A shorter tap shows it for one frame.
+- The active word: a rounded accentFill rect (radius 4, 3 dp outset at the left and right, the height of the font's content area). The draw phase draws it from `TextLayoutResult`, one rect for each line of the word (bounds of `getPathForRange`, cached for each layout and word). After the text, the draw phase clips to these rects and draws the same `TextLayoutResult` again in onAccentFill. Thus the text never moves, and a new active word does not lay out the text again.
 - Read: `transcript`, ink for named speakers, text3 for placeholders.
 - Draft: `draft`, text3 for settled words, text4 for unsettled words.
 - Search: the matches on amberTint. The current match is amberTint and W600.
@@ -445,11 +446,13 @@ All buttons are pills, with no elevation, a clipped ripple and `Role.Button`. A 
 - `PlayPauseButton`: 64 dp inkFill, Play/Pause 26 onInkFill. The stateDescription is "Playing" or "Paused".
 - The bar is a traversal group.
 
-### `Waveform(levels: ImmutableList<Float>, freshCount = 7)`
+### `Waveform(levels: WaveformLevels, running = false, freshCount = 7)`
 
 - A Canvas, full width, 96 dp.
 - Bar width (W − 55 × 3 dp)/56, gap 3 dp, height max(4 dp, round(v × 92) dp), at the vertical center, radius 2.
 - The last 7 bars are barFresh, and the other bars are barIdle.
+- `WaveformLevels` holds the bars and the captured time of the newest sample. It also holds the constants: 56 bars of 125 ms, one sample each 100 ms.
+- When `running` is false (paused, previews, tests), the newest bar is at the right edge. When `running` is true, the bars move to the left at the display rate. A frame loop moves a playhead from the captured time of the newest sample plus the time since it arrived (at most two samples more). The playhead does not move back. Only the draw phase reads it. The newest bar grows to its level in a few frames. With reduced motion, the bars do not move.
 - One image node.
 - The fixture is `v_i = 0.18 + 0.82·|sin(0.61 i)·cos(0.23 i + 1.1)|`.
 
@@ -517,7 +520,7 @@ These are the contracts of the screens:
 - **Library**: `LibraryUiState(loading, query, recording: RecordingPillUi?(title, elapsedMs, paused), progress: ProgressBannerUi?(noteId?, title?, percent, progress, line: ProgressLine /* TimeLeft(TimeLeftUi) | Waiting | Downloading(part, percent) | Checking(percent) */, queued: Int), banners, sections: ImmutableList<DaySection(label, rows)>, results: ImmutableList<NoteRowUi>?, snackbar, sheet: NoteActionsUi?, dialog: LibraryDialog? /* Rename(id, title) */)`. Events: Query, ClearQuery, OpenNote, LongPress, Record, ReturnToRecording, Import, OpenTrash, OpenSettings, OpenProgress, Resume(id), TryAgain(id), BannerAction(id, action), DismissBanner(id), Undo, SheetAction(…), DismissSheet, RenameConfirmed.
 - **Recording**: `RecordingUiState(phase: NeedsPermission | Starting | Recording | Paused | Stopping, title, elapsedMs, levels, format: OPUS | M4A + sampleRateHz, hint: RecordingHint? /* Space(ms): a recording has no time limit */, banner?)`. Events: Title, PauseResume, Finish, Minimise, OpenLibrary, OpenSettings, BannerAction.
 - **Note**: `NoteUiState(title, subtitle: NoteSubtitleUi?(day: DayLabel, time: LocalTime, durationMs) /* null in Reading mode */, mode: NoteMode, readOnlyReason: ReadOnlyReason? /* JOB_PENDING, TRUST */, chips: NoteChipsUi?(trust, version: VersionChipUi?(index, count, kind), speakers), banners, turns, activeWord: WordRef?, playback: PlaybackUi?(positionMs, durationMs, playing, following), search: TranscriptSearchUi?(query, current, total), sheet: NoteSheet? /* Actions | NameSpeaker | Merge | Versions | SubtitleFormat | Info */, dialog: NoteDialog?, notificationsOff)`.
-- **Note** modes: `NoteMode = Loading | AudioOnly | Queued(ahead, overDocument) | Processing(ProcessingCardUi(headline, rangeStartMs, rangeEndMs, percent, stage, skippedMatching, timeLeft, doneMs, totalMs, battery, words, lowMemory, download: DownloadUi?)) | Paused(doneMs, totalMs, hasCheckpoint) | Failed(overDocument) | Reading | Unplayable`. The More label of the top bar follows the mode: "Share and more" in Reading, else "More actions".
+- **Note** modes: `NoteMode = Loading | AudioOnly | Queued(ahead, overDocument) | Processing(ProcessingCardUi(headline, rangeStartMs, rangeEndMs, percent, stage, skippedMatching, timeLeft, doneMs, totalMs, battery, words, lowMemory, download: DownloadUi?, anchor: TrackAnchor?)) | Paused(doneMs, totalMs, hasCheckpoint) | Failed(overDocument) | Reading | Unplayable`. The More label of the top bar follows the mode: "Share and more" in Reading, else "More actions".
 - **Note** events: they follow features.md section 3. Back, More, Stop, Resume, StartOver, RemoveFromQueue, WordTap, SpeakerTap, AcceptSuggestion, RejectSuggestion, PlayPause, Seek, Skip, FollowPlayback, OpenVersions, PickVersion, Search…, Export(kind), Rename, Transcribe, TranscribeAgain, Trash, NameSheet(event), BannerAction, DismissSheet, DismissDialog.
 - **Name a speaker**: `NameSheetUi(speakerId, label: SpeakerNameUi, tone, speakingMs, canSample, sampling, name, voices: ImmutableList<VoiceOptionUi(id, name, likely)>, showAll, ranked: Boolean, samePerson: String?, renameSaved: String?, notName: String?, remember, rememberEnabled, rememberReason: TOO_LITTLE_SPEECH | NO_MODEL | null, canMerge, save: SaveState /* ENABLED | DISABLED | BLOCKED_BY_QUESTION */, nameFieldFocused: Boolean, draft: Boolean)`. The merge state is `MergeUi(targets: (speakerId, label, tone, speakingMs), confirm: target?, sealedVersion: Int?)`.
 - **Note actions**: `NoteActionsUi(title, recordedAt, durationMs, speakers, documentKind: DOCUMENT | PLAIN(ext), textExportEnabled, transcribeRow: TRANSCRIBE | TRANSCRIBE_AGAIN(nextVersion, namesCarry) | STOP | REMOVE_FROM_QUEUE | RESUME_OR_START_OVER, busyRow?, recording: Boolean)`.
@@ -783,7 +786,7 @@ Accepted deviations from the boards. The reviewer examines each one, and the tol
 
 Mapping to features.md section 14 (the acceptance list):
 
-- The word links have the onClick label "Play from here".
+- The transcript words are not links, so TalkBack has no action for each word (a deviation for the owner's review, section 6 `TurnParagraph`). Each turn has the custom action "Play from start of turn".
 - The speaker labels are buttons with full spoken descriptions.
 - The live regions have a limited update rate.
 - The recording status, the stepper, play/pause, the slider and the segments have state descriptions.

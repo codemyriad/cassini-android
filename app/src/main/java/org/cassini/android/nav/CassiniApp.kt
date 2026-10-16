@@ -148,18 +148,12 @@ private fun NoteEntry(
     val top = backStack.lastOrNull()
     val withLibrary = top is LibraryKey || (top == key && backStack.below(key) is LibraryKey)
     val transitionRunning = isNoteTransitionRunning(withLibrary)
-    val deferLinks = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(transitionRunning) }
-    LaunchedEffect(transitionRunning) {
-        if (!transitionRunning) deferLinks.value = false
-    }
-    CompositionLocalProvider(org.cassini.ui.components.LocalDeferWordLinks provides deferLinks.value) {
-        NoteRoute(
-            viewModel = viewModel,
-            navigator = noteNavigator(backStack, noteBounds, key.noteId),
-            modifier = Modifier.noteContainerTransition(key.noteId, withLibrary = withLibrary),
-            transitionRunning = transitionRunning,
-        )
-    }
+    NoteRoute(
+        viewModel = viewModel,
+        navigator = noteNavigator(backStack, noteBounds, key.noteId),
+        modifier = Modifier.noteContainerTransition(key.noteId, withLibrary = withLibrary),
+        transitionRunning = transitionRunning,
+    )
 }
 
 /** Model download, Settings, Saved voices, Trash and Licenses, each with its ViewModel over [graph]. */

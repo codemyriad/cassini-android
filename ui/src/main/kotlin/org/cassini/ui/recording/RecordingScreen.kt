@@ -111,7 +111,7 @@ fun RecordingScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             RecordingTimer(state.elapsedMs)
-            Waveform(state.levels)
+            Waveform(state.levels, running = state.phase == RecordingPhase.Recording)
             Text(
                 text = caption(state),
                 modifier = Modifier.widthIn(max = 300.dp),

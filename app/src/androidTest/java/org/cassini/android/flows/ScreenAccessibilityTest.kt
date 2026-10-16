@@ -16,6 +16,7 @@ import org.cassini.ui.components.ProcessingCardUi
 import org.cassini.ui.components.SpeakerNameUi
 import org.cassini.ui.components.SuggestionUi
 import org.cassini.ui.components.TurnUi
+import org.cassini.ui.components.WaveformLevels
 import org.cassini.ui.components.WordRef
 import org.cassini.ui.components.WordUi
 import org.cassini.ui.format.BatteryUi
@@ -57,7 +58,7 @@ import org.cassini.ui.R as UiR
  * The Accessibility Test Framework checks of features.md section 14 on the Library, the Note screen (reading and
  * processing), Recording and Settings, each in states close to its board. They run on a device because the checks
  * skip Compose content under Robolectric (P2). [accessibilityValidator] fails on every ERROR or WARNING except the
- * small touch targets of inline word links and of the Library row suffixes.
+ * small touch targets of the Library row suffixes.
  */
 @CiSmoke
 class ScreenAccessibilityTest {
@@ -76,9 +77,9 @@ class ScreenAccessibilityTest {
         check(suffixes) { LibraryScreen(library, onEvent = {}) }
     }
 
-    @Test fun noteReading() = check(words(reading.turns)) { NoteScreen(reading, onEvent = {}) }
+    @Test fun noteReading() = check(emptySet()) { NoteScreen(reading, onEvent = {}) }
 
-    @Test fun noteProcessing() = check(words(processing.turns)) { NoteScreen(processing, onEvent = {}) }
+    @Test fun noteProcessing() = check(emptySet()) { NoteScreen(processing, onEvent = {}) }
 
     @Test fun recording() {
         val waveform = setOf(text(UiR.string.ui_recording_waveform))
@@ -86,8 +87,6 @@ class ScreenAccessibilityTest {
     }
 
     @Test fun settings() = check(emptySet()) { SettingsScreen(settings, onEvent = {}) }
-
-    private fun words(turns: List<TurnUi>): Set<String> = turns.flatMap { turn -> turn.words.map { it.text } }.toSet()
 
     private companion object {
         const val SECOND = 1_000L
@@ -197,7 +196,7 @@ class ScreenAccessibilityTest {
             phase = RecordingPhase.Recording,
             title = "Weekly product sync",
             elapsedMs = 24 * MINUTE + 7 * SECOND,
-            levels = List(56) { index -> (index % 7) / 7f }.toImmutableList(),
+            levels = WaveformLevels(List(56) { index -> (index % 7) / 7f }.toImmutableList()),
             format = CaptureFormat.OPUS,
             sampleRateHz = 48_000,
             hint = RecordingHint.Space(31 * 60 * MINUTE),

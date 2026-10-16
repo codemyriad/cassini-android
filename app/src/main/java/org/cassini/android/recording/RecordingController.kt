@@ -2,6 +2,7 @@ package org.cassini.android.recording
 
 import android.util.Log
 import androidx.annotation.VisibleForTesting
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -27,6 +28,9 @@ import org.cassini.core.audio.RecordingPolicy
 import org.cassini.core.audio.RecordingSpace
 import org.cassini.data.notes.NoteTitles
 import org.cassini.engine.capture.MicrophoneCapture
+import org.cassini.ui.components.WaveformLevels
+import org.cassini.ui.components.WaveformLevels.Companion.BARS
+import org.cassini.ui.components.WaveformLevels.Companion.BAR_MS
 import java.io.File
 
 /**
@@ -71,7 +75,7 @@ class RecordingController(private val parts: Parts) {
     data class Timing(
         val tickMs: Long = 1_000,
         val titleDebounceMs: Long = 500,
-        val levelSampleMs: Long = 100,
+        val levelSampleMs: Long = WaveformLevels.SAMPLE_MS,
         val serviceWaitMs: Long = 10_000,
         /** How often the policy loop renews the wake lock, in loop time (a paused recording also counts). */
         val wakeLockRenewMs: Long = 60_000,
@@ -106,15 +110,20 @@ class RecordingController(private val parts: Parts) {
 
     /**
      * The waveform: [BARS] values in 0..1 for the last 7 s, 125 ms each ([BAR_MS]), each the maximum of the 100 ms
-     * amplitude samples in it. The newest is last. Bars follow the captured time, so they freeze while paused. The
+     * amplitude samples in it. The newest is last. Each value also has the captured time of its newest sample, so the
+     * UI can scroll the bars between two samples. Bars follow the captured time, so they freeze while paused. The
      * sampler runs only while somebody collects.
      */
-    val levels: StateFlow<List<Float>> = flow {
+    val levels: StateFlow<WaveformLevels> = flow {
         while (true) {
             sampleLevel()?.let { emit(it) }
             delay(timing.levelSampleMs)
         }
-    }.distinctUntilChanged().stateIn(parts.scope, SharingStarted.WhileSubscribed(), List(BARS) { 0f })
+    }.distinctUntilChanged().stateIn(
+        parts.scope,
+        SharingStarted.WhileSubscribed(),
+        WaveformLevels(List(BARS) { 0f }.toImmutableList()),
+    )
 
     // The waveform's bars, kept across subscriptions; only the one sampler of [levels] touches them.
     private val bars = FloatArray(BARS)
@@ -416,10 +425,11 @@ class RecordingController(private val parts: Parts) {
 
     // Helpers. ----------------------------------------------------------------------------------------------------
 
-    /** One 100 ms amplitude sample into the bar of its captured time; null without a capture. */
-    private fun sampleLevel(): List<Float>? {
+    /** One 100 ms amplitude sample into the bar of its captured time, with that time; null without a capture. */
+    private fun sampleLevel(): WaveformLevels? {
         val mic = capture ?: return null
-        val bar = mic.elapsedMs / BAR_MS
+        val capturedMs = mic.elapsedMs
+        val bar = capturedMs / BAR_MS
         if (mic !== barSource) {
             bars.fill(0f)
             barSource = mic
@@ -433,7 +443,7 @@ class RecordingController(private val parts: Parts) {
         }
         val level = mic.amplitude.coerceIn(0, MAX_AMPLITUDE) / MAX_AMPLITUDE.toFloat()
         bars[BARS - 1] = maxOf(bars[BARS - 1], level)
-        return bars.toList()
+        return WaveformLevels(bars.asList().toImmutableList(), capturedMs)
     }
 
     private fun work(block: suspend () -> Unit) {
@@ -456,10 +466,6 @@ class RecordingController(private val parts: Parts) {
     }
 
     companion object {
-        /** The waveform: 56 bars of 125 ms, the last 7 s (features.md section 2). */
-        const val BARS = 56
-        const val BAR_MS = 125L
-
         /** How long the wake lock lasts without a renewal; the policy loop renews it each [Timing.wakeLockRenewMs]. */
         const val WAKE_LOCK_TIMEOUT_MS = 10 * 60_000L
 

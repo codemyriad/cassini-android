@@ -13,6 +13,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.cassini.core.asr.BatteryProjection
+import org.cassini.core.asr.ProgressAnchor
+import org.cassini.core.asr.ProgressPace
 import org.cassini.core.asr.TranscriptionProgress
 import org.cassini.core.asr.TranscriptionProgress.Stage
 import org.cassini.core.checkpoint.CheckpointNames
@@ -62,6 +64,8 @@ class DraftSources(
  *   (`matching`), [JobEvent.NamingClosed] says it will not, or Saving began without it. [JobEvent.SpeakersUnavailable]
  *   alone does not skip it, because the windows before the failure keep their speakers.
  * - The percent is capped at 99 until [JobOutcome.Done], which publishes 100.
+ * - Anchor: set while the shown stage is WORDS or SPEAKERS, from the [ProgressPace] of this run (on the [clock]) and
+ *   the shown window. It changes only with a completion or a new window, so equal ticks stay equal.
  * - Time left is Calculating until 3 windows completed since this run started, or while the total is unknown; Finishing
  *   when no audio is left; else the rounded range plus [finalizationMs].
  * - Battery: hidden without a reading, Plugged in while charging, Measuring until 120 s and a 0.5 % drop, else the
@@ -160,6 +164,7 @@ class ProgressTracker(
             }
             event is JobEvent.WindowDone -> {
                 run.progress.complete(event.doneMs, event.totalMs, event.words.size, run.elapsed())
+                run.pace.complete(event.doneMs, clock())
                 run.words = event.words
             }
             event is JobEvent.SpeakersUnavailable -> run.speakers = false
@@ -210,6 +215,7 @@ class ProgressTracker(
             battery = battery(run, snapshot, elapsed),
             words = snapshot.words,
             lowMemory = run.lowMemory,
+            anchor = if (done) null else anchor(run.pace, shown, snapshot.totalMs),
         )
     }
 
@@ -247,6 +253,7 @@ class ProgressTracker(
         val lowMemory: Boolean,
     ) {
         val projection = BatteryProjection()
+        val pace = ProgressPace()
         var speakers = false
         var words: List<Word> = emptyList()
         var step = Step.READING
@@ -283,6 +290,14 @@ class ProgressTracker(
             Stage.MATCHING -> ProgressHeadline.MATCHING_VOICES
             Stage.SAVING -> ProgressHeadline.SAVING
         }
+
+        /** The anchor of the [shown] window while words are found, from this run's [pace]. */
+        fun anchor(pace: ProgressPace, shown: Shown, totalMs: Long): ProgressAnchor? =
+            if (shown.stage == Stage.WORDS || shown.stage == Stage.SPEAKERS) {
+                pace.anchor(totalMs, shown.endMs, CAP / FULL.toFloat())
+            } else {
+                null
+            }
 
         fun timeLeft(snapshot: TranscriptionProgress.Snapshot, finalizationMs: Long): TimeLeft {
             val remaining = snapshot.remainingMs

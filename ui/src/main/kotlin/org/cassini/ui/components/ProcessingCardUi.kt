@@ -17,6 +17,7 @@ import org.cassini.ui.format.TimeLeftUi
  * [rangeStartMs] to [rangeEndMs] is the window being transcribed ("29:00–29:45"; hidden when both are 0). [percent]
  * is 0–99 until done. [skippedMatching] marks the Matching stage as skipped (no saved voices to match). [doneMs] of
  * [totalMs] is the Processed stat; [words] the words found so far; [lowMemory] shows the amber memory hint.
+ * [anchor] moves the track between two updates while words are found; null keeps the track at [percent].
  */
 @Immutable
 data class ProcessingCardUi(
@@ -33,6 +34,7 @@ data class ProcessingCardUi(
     val words: Int,
     val lowMemory: Boolean,
     val download: DownloadUi? = null,
+    val anchor: TrackAnchor? = null,
 )
 
 /**
