@@ -109,13 +109,13 @@ fun LibraryScreen(
             state = rememberLazyListState(),
             contentPadding = PaddingValues(bottom = listBottom),
         ) {
-            item(key = "header") {
+            item(key = "header", contentType = "header") {
                 LibraryTopBar(
                     onTrash = { onEvent(LibraryEvent.OpenTrash) },
                     onSettings = { onEvent(LibraryEvent.OpenSettings) },
                 )
             }
-            item(key = "search") { SearchBlock(state.query, onEvent) }
+            item(key = "search", contentType = "search") { SearchBlock(state.query, onEvent) }
             activity(state, onEvent)
             if (!state.loading) {
                 val results = state.results
@@ -174,7 +174,7 @@ private fun LazyListScope.activity(state: LibraryUiState, onEvent: (LibraryEvent
     }
     state.recording?.let { recording ->
         val modifier = top()
-        item(key = "recording") {
+        item(key = "recording", contentType = "recording") {
             RecordingBannerCard(
                 title = recording.title,
                 elapsedMs = recording.elapsedMs,
@@ -186,12 +186,12 @@ private fun LazyListScope.activity(state: LibraryUiState, onEvent: (LibraryEvent
     }
     state.progress?.let { progress ->
         val modifier = top()
-        item(key = "progress") { ProgressCard(progress, onEvent, modifier) }
+        item(key = "progress", contentType = "progress") { ProgressCard(progress, onEvent, modifier) }
     }
     state.banners.forEachIndexed { index, spec ->
         val modifier = top()
         // Ids are unique in a list (BannerSpec); the index only keeps a duplicate from crashing the list.
-        item(key = "banner-$index-${spec.id}") {
+        item(key = "banner-$index-${spec.id}", contentType = "banner") {
             Banner(
                 spec = spec,
                 onAction = { onEvent(LibraryEvent.BannerAction(spec.id, it)) },
@@ -237,21 +237,23 @@ private fun ProgressCard(progress: ProgressBannerUi, onEvent: (LibraryEvent) -> 
 
 /** The day sections: an overline header per day (top 14 for the first, else 16) and rows 2 dp apart. */
 private fun LazyListScope.sections(sections: List<DaySection>, onEvent: (LibraryEvent) -> Unit) {
-    item(key = "list-top") { Spacer(Modifier.height(6.dp)) }
+    item(key = "list-top", contentType = "list-top") { Spacer(Modifier.height(6.dp)) }
     sections.forEachIndexed { index, section ->
-        item(key = "day-${section.label}") { DayHeader(Dates.dayLabel(section.label), first = index == 0) }
+        item(key = "day-${section.label}", contentType = "day") {
+            DayHeader(Dates.dayLabel(section.label), first = index == 0)
+        }
         rows(section.rows, section.label, onEvent)
     }
 }
 
 /** The flat search results, newest first, each with its own day in the meta line. */
 private fun LazyListScope.results(results: List<NoteRowUi>, onEvent: (LibraryEvent) -> Unit) {
-    item(key = "list-top") { Spacer(Modifier.height(6.dp)) }
+    item(key = "list-top", contentType = "list-top") { Spacer(Modifier.height(6.dp)) }
     rows(results, day = null, onEvent)
 }
 
 private fun LazyListScope.rows(rows: List<NoteRowUi>, day: DayLabel?, onEvent: (LibraryEvent) -> Unit) {
-    itemsIndexed(rows, key = { _, row -> "row-${row.id}" }) { index, row ->
+    itemsIndexed(rows, key = { _, row -> "row-${row.id}" }, contentType = { _, _ -> "note" }) { index, row ->
         NoteRow(
             row = row,
             day = row.day ?: day ?: DayLabel.Today,

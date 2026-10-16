@@ -251,14 +251,14 @@ private fun ColumnScope.DraftItems(
         state = listState,
         contentPadding = PaddingValues(bottom = 16.dp + bottom),
     ) {
-        if (card != null) item(key = "card") { card() }
+        if (card != null) item(key = "card", contentType = "card") { card() }
         // Ids are unique in a list (BannerSpec); the index only keeps a duplicate from crashing the list.
         state.banners.forEachIndexed { index, spec ->
-            item(key = "banner-$index-${spec.id}") { NoteBanner(spec, onEvent, TopItemPadding) }
+            item(key = "banner-$index-${spec.id}", contentType = "banner") { NoteBanner(spec, onEvent, TopItemPadding) }
         }
         if (turns.isNotEmpty()) {
-            item(key = "draft-header") { DraftHeader() }
-            itemsIndexed(turns, key = { _, turn -> turn.id }) { index, turn ->
+            item(key = "draft-header", contentType = "draft-header") { DraftHeader() }
+            itemsIndexed(turns, key = { _, turn -> turn.id }, contentType = { _, _ -> "turn" }) { index, turn ->
                 DraftTurn(turn, first = index == 0, onEvent = onEvent)
             }
         }
