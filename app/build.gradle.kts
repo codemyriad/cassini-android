@@ -27,13 +27,14 @@ android {
     }
     // debug, or releaseTest for tag builds. The minified release build cannot be instrumented.
     testBuildType = providers.gradleProperty("deviceTestBuildType").getOrElse("debug")
-    // Release signing is configured only when CI or a maintainer supplies the keystore and its secrets.
-    val releaseKeystore = providers.environmentVariable("CASSINI_BETA_KEYSTORE_FILE").orNull
+    // Release signing is configured only when CI or a maintainer supplies the keystore and its secrets. The same
+    // key signs the GitHub APK and the Play bundle, and Play App Signing holds it too (docs/release.md).
+    val releaseKeystore = providers.environmentVariable("CASSINI_RELEASE_KEYSTORE_FILE").orNull
     signingConfigs {
         if (releaseKeystore != null) {
-            create("beta") {
+            create("release") {
                 fun secret(name: String) = providers.environmentVariable(name).orNull
-                    ?: throw GradleException("CASSINI_BETA_KEYSTORE_FILE is set but $name is not.")
+                    ?: throw GradleException("CASSINI_RELEASE_KEYSTORE_FILE is set but $name is not.")
                 storeFile = file(releaseKeystore)
                 storePassword = secret("CASSINI_RELEASE_STORE_PASSWORD")
                 keyAlias = secret("CASSINI_RELEASE_KEY_ALIAS")
@@ -47,7 +48,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            if (releaseKeystore != null) signingConfig = signingConfigs.getByName("beta")
+            if (releaseKeystore != null) signingConfig = signingConfigs.getByName("release")
         }
         // The release build without R8, for device tests: they call app and Kotlin library members that
         // R8 removes from the minified APK. Tag builds instrument this APK, then install the published

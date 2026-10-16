@@ -521,13 +521,15 @@ If you push a branch and do not open a pull request, CI does not run. A new run 
 |---|---|
 | `checks` | The Gradle wrapper validation, detekt, actionlint, shellcheck on `scripts/*.sh` and `tools/*.sh`, ruff on `scripts` and `tools`, `scripts/check-links.sh`, `scripts/fetch-fonts.sh --check`, `scripts/check-resource-collisions.py` and `scripts/check-verbatim.sh`. On a tag, it also makes sure that `CHANGELOG.md` has a section for the tag. |
 | `core-only` | `./gradlew --configure-on-demand :core:test` with only a JDK and the submodules. It does not run `setup.sh` and it hides the Android SDK of the runner. |
-| `build` | `setup.sh --prebuilt-only`, then `ciTest` (with `:ui:verifyRoborazziDebug`), the lint of `:app`, `:data` and `:ui`, the APK, the device test APKs of `:app` and `:data`, and `scripts/package-apk.py`. On a tag, it builds `release` and `releaseTest` and collects the native sources. |
+| `build` | `setup.sh --prebuilt-only`, then `ciTest` (with `:ui:verifyRoborazziDebug`), the lint of `:app`, `:data` and `:ui`, the APK, the device test APKs of `:app` and `:data`, and `scripts/package-apk.py`. On a tag, it builds `release` (the APK and the bundle) and `releaseTest` and collects the native sources. |
 | `emulator` | The device checks on API 26, 29, 34 and 35 (x86_64 Google APIs images), with `scripts/ci-emulator-smoke.sh`. If the emulator or adb fails before the tests start, the job does all the checks one more time on a new emulator. If a test fails, the job fails and does not try again. |
 | `release` | On a tag only, after `checks`, `core-only`, `build` and `emulator` pass. It publishes the GitHub release with the files of `dist/` and the notes of the tag from `CHANGELOG.md` ([`release.md`](release.md)). |
+| `play` | On a tag only, after `release`. If the secret `PLAY_SERVICE_ACCOUNT_JSON` is set, it uploads the bundle to the internal testing track of Google Play ([`release.md`](release.md#google-play)). Else it only shows a notice. |
 
 The `build` job uploads these artifacts:
 
 - `cassini-android`: the content of `dist/`, that is the APK, its checksum and the notices. On a tag, also the R8 mapping and the native sources.
+- `cassini-android-play`: on a tag only, the content of `play/`, that is the signed bundle (`.aab`), the R8 mapping and the Play release notes.
 - `cassini-android-device-tests`: the APK under test and its instrumentation APK.
 - `cassini-data-device-tests`: the instrumentation APK of `:data`.
 - `android-checks`: the test reports and the lint reports.

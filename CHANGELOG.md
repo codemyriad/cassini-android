@@ -8,6 +8,7 @@ We made the entries for 0.0.1-beta to 0.1.0 again from the release notes of thes
 
 ### Changed
 
+- A new release key signs Cassini. Google Play does not accept the beta key of 0.0.1-beta to 0.1.0, and the same key now signs the APK on GitHub and the app on Google Play. Android does not install this version over 0.1.x. Save your notes as Cassini documents (`.opus`), uninstall 0.1.x and then install this version. The uninstall erases the notes and the downloaded models of 0.1.x. [SECURITY.md](SECURITY.md) gives the digest of the new certificate.
 - Cassini recognizes speech with Parakeet Ultra INT8. Moondream made this model with more training of NVIDIA Parakeet TDT 0.6B v3. It makes fewer errors in the 25 languages of v3. Earlier versions used Parakeet TDT 0.6B v3.
 - Parakeet Ultra installs in `parakeet-ultra/`. This version does not read or delete the `parakeet-v3/` directory of earlier versions.
 - The documents that you made before keep the name of their model. Document info shows "Parakeet TDT 0.6B v3, INT8" for them and "Parakeet Ultra, INT8" for new versions.

@@ -40,17 +40,19 @@ The release job attaches these files from `dist/`:
 - The notices.
 - `cassini-native-sources.tar` and its SHA-256 checksum file.
 
-Before that, `scripts/package-apk.py` makes sure that the APK is not debuggable, has no model weights and has the certificate digest in `scripts/beta-signing-cert.sha256`. It also makes sure that no `assets/licenses/*.md` file in the APK contains the text `TODO(`, because the Licenses screen shows these files.
+Before that, `scripts/package-apk.py` makes sure that the APK is not debuggable, has no model weights and has the certificate digest in `scripts/release-signing-cert.sha256`. The bundle for Google Play must have the same certificate. It also makes sure that no `assets/licenses/*.md` file in the APK contains the text `TODO(`, because the Licenses screen shows these files.
 
 CAUTION: Do not move or delete a published tag. Do not replace a file of a published release. People, checksums and F-Droid refer to the tag. A moved tag gives two different builds the same name. If a release has a problem, publish a new version with a higher `versionCode`.
 
 ## Signing
 
-The build makes the release signing configuration only when the environment has `CASSINI_BETA_KEYSTORE_FILE`. Gradle then reads the other values from these environment variables:
+One release key signs the APK of the GitHub release and the bundle (`.aab`) for Google Play. Play App Signing holds the same key, so Google Play signs its installs with it too. Thus an APK from GitHub installs over an installation from Google Play, and the reverse.
+
+The build makes the release signing configuration only when the environment has `CASSINI_RELEASE_KEYSTORE_FILE`. Gradle then reads the other values from these environment variables:
 
 | Variable | Content |
 |---|---|
-| `CASSINI_BETA_KEYSTORE_FILE` | The path of the keystore |
+| `CASSINI_RELEASE_KEYSTORE_FILE` | The path of the keystore |
 | `CASSINI_RELEASE_STORE_PASSWORD` | The password of the keystore |
 | `CASSINI_RELEASE_KEY_ALIAS` | The alias of the key |
 | `CASSINI_RELEASE_KEY_PASSWORD` | The password of the key |
@@ -60,22 +62,43 @@ If the keystore variable is set and one of the other variables is not set, Gradl
 To make a signed release build on your computer, do these steps:
 
 1. Export the four variables.
-2. Run `./gradlew :app:assembleRelease`.
+2. Run `./gradlew :app:assembleRelease :app:bundleRelease`.
 
-CI uses these repository secrets on tags:
+CI uses these repository secrets on tags. If one of them is not set, the tag build fails.
 
-- `ANDROID_BETA_KEYSTORE`: the keystore, encoded as base64.
+- `CASSINI_RELEASE_KEYSTORE`: the keystore, encoded as base64.
 - `CASSINI_RELEASE_STORE_PASSWORD`, `CASSINI_RELEASE_KEY_ALIAS` and `CASSINI_RELEASE_KEY_PASSWORD`.
 
-Until the owner sets the three password secrets, CI uses the values of the old debug keystore (`android`, `androiddebugkey`, `android`). This fallback is temporary. It goes when the owner changes the passwords. If `ANDROID_BETA_KEYSTORE` is not set, the tag build fails.
+`scripts/release-signing-cert.sha256` holds the SHA-256 digest of the certificate of the release key.
 
-The beta key is the key of the earlier beta installations. Thus an update installs over them without an uninstall, and the downloaded models stay. `scripts/beta-signing-cert.sha256` holds the SHA-256 digest of its certificate.
+### Make the release key
 
-Version 0.2 is a new app. It does not read the app data of 0.1.x. The Cassini documents (`.opus`) that users saved from 0.1.x open in 0.2 as before.
+The owner makes the key one time. The key cannot change later without an uninstall on each phone, so keep two copies of the keystore and its passwords, for example in a password manager that the founders share.
 
-The owner can select a new signing identity for a stable release. Then Android does not install the stable release over a beta installation. Users must uninstall the beta, and the uninstall erases their notes and models. The release notes must tell this to the users.
+1. Make the keystore. Use a long random password:
+   `keytool -genkeypair -v -keystore cassini-release.jks -alias cassini -keyalg RSA -keysize 4096 -validity 10000`
+2. Write the digest into `scripts/release-signing-cert.sha256`:
+   `keytool -list -v -keystore cassini-release.jks -alias cassini | sed -n 's/^\s*SHA256: //p' | tr -d ':' | tr 'A-F' 'a-f'`
+3. Set the four repository secrets. For the keystore, use `base64 -w0 cassini-release.jks`.
+4. In Play Console, when you make the app, select Play App Signing with "Use a key from Java keystore". Play Console gives the PEPK tool and its command. The tool encrypts the key for Google.
+
+### The old beta key
+
+Versions 0.0.1-beta to 0.1.0 have the beta key: the Android debug keystore of the owner, with the certificate digest `06b2a95b3a6e6e7cdef618999d37631a18216307def007102980db71cf2387ec`. Google Play does not accept a key with the name "Android Debug". Thus the first release with the release key does not install over these versions. Users must save their notes as Cassini documents (`.opus`), uninstall the old version and then install the new version. The uninstall erases the notes and the downloaded models. The release notes must tell this to the users.
+
+`scripts/device-smoke.sh` still signs a local `releaseTest` build with the debug keystore when `CASSINI_RELEASE_KEYSTORE_FILE` is not set, so that it installs over a debug build.
 
 Never commit a keystore or a password.
+
+## Google Play
+
+The testers get Cassini from the internal testing track of Google Play. Each tag build makes a bundle in the CI artifact `cassini-android-play`, with the R8 mapping and the release notes. Play takes the release notes from `metadata/en-US/changelogs/VERSIONCODE.txt`. The tag build fails if this file is not there or has more than 500 characters.
+
+The `play` job uploads the bundle to the internal track when the repository secret `PLAY_SERVICE_ACCOUNT_JSON` is set. This secret is the JSON key of a Google Cloud service account that has the permission "Release to testing tracks" in Play Console ([Google Play Developer API](https://developers.google.com/android-publisher/getting_started)). Without the secret, the job only shows a notice.
+
+The first bundle of a new app must be uploaded by hand: download `cassini-android-play` from the run of the tag and upload the `.aab` in Play Console (Testing, Internal testing, Create new release). Until the app has a release that is rolled out, Play accepts only draft releases from the API. In this time, set the repository variable `PLAY_RELEASE_STATUS` to `draft`. Then remove it.
+
+Each upload needs a `versionCode` that is more than the `versionCode` of each earlier upload. A tag that failed before the upload does not use a `versionCode`.
 
 ## releaseTest
 
