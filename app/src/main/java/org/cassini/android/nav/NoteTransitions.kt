@@ -30,6 +30,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -214,6 +215,9 @@ internal fun Modifier.noteContainerTransition(noteId: String, withLibrary: Boole
                 translationX = currentRect.left
                 translationY = currentRect.top - spec.headerShiftPx * scale * (1f - f)
                 alpha = (f / CROSSFADE_END).coerceIn(0f, 1f)
+                // Fade each draw instead of the whole screen through a full-size offscreen buffer: allocating and
+                // clearing that buffer stalled the first frame of the open by about 100 ms on a Pixel 8.
+                compositingStrategy = CompositingStrategy.ModulateAlpha
             }
         }
 }
