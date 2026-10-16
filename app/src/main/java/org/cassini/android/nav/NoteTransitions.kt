@@ -10,7 +10,6 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.WindowInsets
@@ -111,8 +110,10 @@ internal fun <S : Scene<*>> AnimatedContentTransitionScope<S>.appPush(noteBounds
     val noteId = targetState.noteIdOrNull()
     if (!fromLibrary || noteId == null || noteBounds.get(noteId) == null) return push()
     val hold = tween<Float>(MORPH_MS, easing = FastOutSlowInEasing)
+    // No fadeIn: noteContainerTransition already starts the note at alpha 0. A fadeIn draws the first frame of the
+    // whole screen at alpha 0 through a full-size offscreen buffer, which stalled that frame by about 100 ms.
     return (
-        fadeIn(tween(1)) togetherWith fadeOut(hold, targetAlpha = 1f)
+        EnterTransition.None togetherWith fadeOut(hold, targetAlpha = 1f)
         ).apply {
         targetContentZIndex = 1f
     }
