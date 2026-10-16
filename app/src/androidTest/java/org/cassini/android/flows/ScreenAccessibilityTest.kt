@@ -16,6 +16,7 @@ import org.cassini.ui.components.ProcessingCardUi
 import org.cassini.ui.components.SpeakerNameUi
 import org.cassini.ui.components.SuggestionUi
 import org.cassini.ui.components.TurnUi
+import org.cassini.ui.components.WaveformLevels
 import org.cassini.ui.components.WordRef
 import org.cassini.ui.components.WordUi
 import org.cassini.ui.format.BatteryUi
@@ -197,7 +198,7 @@ class ScreenAccessibilityTest {
             phase = RecordingPhase.Recording,
             title = "Weekly product sync",
             elapsedMs = 24 * MINUTE + 7 * SECOND,
-            levels = List(56) { index -> (index % 7) / 7f }.toImmutableList(),
+            levels = WaveformLevels(List(56) { index -> (index % 7) / 7f }.toImmutableList()),
             format = CaptureFormat.OPUS,
             sampleRateHz = 48_000,
             hint = RecordingHint.Space(31 * 60 * MINUTE),

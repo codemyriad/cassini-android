@@ -446,11 +446,13 @@ All buttons are pills, with no elevation, a clipped ripple and `Role.Button`. A 
 - `PlayPauseButton`: 64 dp inkFill, Play/Pause 26 onInkFill. The stateDescription is "Playing" or "Paused".
 - The bar is a traversal group.
 
-### `Waveform(levels: ImmutableList<Float>, freshCount = 7)`
+### `Waveform(levels: WaveformLevels, running = false, freshCount = 7)`
 
 - A Canvas, full width, 96 dp.
 - Bar width (W − 55 × 3 dp)/56, gap 3 dp, height max(4 dp, round(v × 92) dp), at the vertical center, radius 2.
 - The last 7 bars are barFresh, and the other bars are barIdle.
+- `WaveformLevels` holds the bars and the captured time of the newest sample. It also holds the constants: 56 bars of 125 ms, one sample each 100 ms.
+- When `running` is false (paused, previews, tests), the newest bar is at the right edge. When `running` is true, the bars move to the left at the display rate. A frame loop moves a playhead from the captured time of the newest sample plus the time since it arrived (at most two samples more). The playhead does not move back. Only the draw phase reads it. The newest bar grows to its level in a few frames. With reduced motion, the bars do not move.
 - One image node.
 - The fixture is `v_i = 0.18 + 0.82·|sin(0.61 i)·cos(0.23 i + 1.1)|`.
 

@@ -17,6 +17,7 @@ import org.cassini.ui.components.SnackbarKind
 import org.cassini.ui.components.SnackbarSpec
 import org.cassini.ui.components.SpeakerNameUi
 import org.cassini.ui.components.TurnUi
+import org.cassini.ui.components.WaveformLevels
 import org.cassini.ui.components.turnText
 import org.cassini.ui.format.BatteryUi
 import org.cassini.ui.format.DayLabel
@@ -217,7 +218,7 @@ internal object VariantFixtures {
             phase = RecordingPhase.NeedsPermission,
             title = "Voice note 9 Oct, 10:30",
             elapsedMs = 0,
-            levels = persistentListOf(),
+            levels = WaveformLevels.Empty,
             hint = null,
             banner = banner(BannerKind.REC_MIC_OFF),
         ),
@@ -225,7 +226,7 @@ internal object VariantFixtures {
             phase = RecordingPhase.Starting,
             title = "Voice note 9 Oct, 10:30",
             elapsedMs = 0,
-            levels = persistentListOf(),
+            levels = WaveformLevels.Empty,
         ),
         "recording-stopping" to b.recording.copy(phase = RecordingPhase.Stopping),
         "recording-storage-low" to b.recording.copy(

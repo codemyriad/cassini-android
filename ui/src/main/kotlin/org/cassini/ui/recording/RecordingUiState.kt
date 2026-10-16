@@ -1,14 +1,14 @@
 package org.cassini.ui.recording
 
 import androidx.compose.runtime.Immutable
-import kotlinx.collections.immutable.ImmutableList
-import kotlinx.collections.immutable.persistentListOf
 import org.cassini.ui.banner.BannerSpec
+import org.cassini.ui.components.WaveformLevels
 
 /**
  * The Recording screen (board 01, features.md section 2; ui.md section 7). [levels] are the 56 waveform bars
- * (0–1, oldest first); [format] and [sampleRateHz] make the format chip ("Opus 48 kHz"); [hint] follows the
- * fixed hint sentence; [banner] sits below the title (light tones on the dark surface).
+ * (0–1, oldest first) with the captured time of their newest sample; [format] and [sampleRateHz] make the format
+ * chip ("Opus 48 kHz"); [hint] follows the fixed hint sentence; [banner] sits below the title (light tones on the
+ * dark surface).
  *
  * [title] is the text of a field. The field keeps its own copy and sends each change as [RecordingEvent.Title]; it
  * takes a different text from the state only when that text is not one it sent (SyncedText). Thus the
@@ -19,7 +19,7 @@ data class RecordingUiState(
     val phase: RecordingPhase,
     val title: String,
     val elapsedMs: Long,
-    val levels: ImmutableList<Float> = persistentListOf(),
+    val levels: WaveformLevels = WaveformLevels.Empty,
     val format: CaptureFormat,
     val sampleRateHz: Int,
     val hint: RecordingHint? = null,

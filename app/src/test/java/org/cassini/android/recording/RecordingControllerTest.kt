@@ -18,6 +18,7 @@ import org.cassini.data.CassiniDispatchers
 import org.cassini.data.db.NoteEntity
 import org.cassini.data.models.ModelFetcher
 import org.cassini.engine.capture.MicrophoneCapture
+import org.cassini.ui.components.WaveformLevels
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -323,13 +324,30 @@ class RecordingControllerTest {
         val mic = capture.latest
         mic.elapsedMs = 1_000
         mic.amplitude = 16_384
-        val loud = withTimeout(TIMEOUT_MS) { controller.levels.first { it.last() > 0.49f } }
-        assertEquals(RecordingController.BARS, loud.size)
+        val loud = withTimeout(TIMEOUT_MS) { controller.levels.first { it.bars.last() > 0.49f } }
+        assertEquals(WaveformLevels.BARS, loud.bars.size)
+        assertEquals("the time of the newest sample", 1_000L, loud.capturedMs)
 
         mic.amplitude = 0
-        mic.elapsedMs = 1_000 + 3 * RecordingController.BAR_MS
-        val shifted = withTimeout(TIMEOUT_MS) { controller.levels.first { it[RecordingController.BARS - 4] > 0.49f } }
-        assertEquals(0f, shifted.last())
+        mic.elapsedMs = 1_000 + 3 * WaveformLevels.BAR_MS
+        val shifted = withTimeout(TIMEOUT_MS) { controller.levels.first { it.bars[WaveformLevels.BARS - 4] > 0.49f } }
+        assertEquals(0f, shifted.bars.last())
+        assertEquals(1_000 + 3 * WaveformLevels.BAR_MS, shifted.capturedMs)
+    }
+
+    @Test fun levelsInTheSameBarKeepTheLoudestSampleAndTheNewestTime() = runBlocking {
+        startRecording("Livelli")
+        val mic = capture.latest
+        mic.elapsedMs = 2_000
+        mic.amplitude = 32_767
+        withTimeout(TIMEOUT_MS) { controller.levels.first { it.capturedMs == 2_000L && it.bars.last() == 1f } }
+
+        // A quieter sample later in the same 125 ms bar: the bar keeps its maximum, and the time moves on.
+        mic.amplitude = 8_192
+        mic.elapsedMs = 2_100
+        val later = withTimeout(TIMEOUT_MS) { controller.levels.first { it.capturedMs == 2_100L } }
+        assertEquals(1f, later.bars.last())
+        assertEquals(0f, later.bars[WaveformLevels.BARS - 2])
     }
 
     // Helpers. ----------------------------------------------------------------------------------------------------
