@@ -41,8 +41,25 @@ class PlaybackControllerTest {
                 platform = platform,
                 store = { noteId, positionMs, final -> saves += Save(noteId, positionMs, final) },
                 clock = clock,
+                nanos = { testScheduler.currentTime * 1_000_000 },
             ),
         )
+    }
+
+    @Test fun eachPositionCarriesItsSampleTimeAndJumpsChangeTheEpoch() = runTest {
+        val playback = controller()
+        assertTrue(playback.open(NOTE, audio, positionMs = 1_000))
+        val opened = playback.state.value.epoch
+        playback.play()
+        advanceTimeBy(1_000)
+        runCurrent()
+        val ticked = playback.state.value
+        assertEquals("read with the position (the last tick)", 900_000_000L, ticked.sampledAtNanos)
+        assertEquals(1_900L, ticked.positionMs)
+        assertEquals("playing on is no jump", opened, ticked.epoch)
+        playback.seekTo(100)
+        assertTrue("a seek is a jump", playback.state.value.epoch != opened)
+        playback.leave()
     }
 
     @Test fun thePositionIsSavedEveryFiveSecondsAndFinallyOnPauseAndLeave() = runTest {

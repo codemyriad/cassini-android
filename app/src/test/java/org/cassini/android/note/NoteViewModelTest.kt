@@ -52,6 +52,7 @@ import org.cassini.ui.note.NoteEvent
 import org.cassini.ui.note.NoteMode
 import org.cassini.ui.note.NoteSheet
 import org.cassini.ui.note.NoteUiState
+import org.cassini.ui.note.PlaybackAnchor
 import org.cassini.ui.note.ReadOnlyReason
 import org.cassini.ui.note.SaveState
 import org.cassini.ui.note.TranscribeRowUi
@@ -314,6 +315,13 @@ class NoteViewModelTest {
         advanceUntilIdle()
         assertEquals("between words the last started word stays active", WordRef("w3", 1), viewModel.now().activeWord)
         assertTrue(viewModel.now().playback!!.playing)
+        assertEquals(
+            "the screen extrapolates the position between ticks from its anchor",
+            PlaybackAnchor(2_500, 0, playing = true),
+            viewModel.now().playback!!.anchor,
+        )
+        send(viewModel, NoteEvent.Seek(3_000))
+        assertNull("no anchor while a seek is dragged", viewModel.now().playback!!.anchor)
 
         ports.playback.value = PlaybackState(noteId = "another note", positionMs = 3_500)
         advanceUntilIdle()
