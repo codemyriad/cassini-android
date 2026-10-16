@@ -20,6 +20,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.geometry.CornerRadius
@@ -36,6 +37,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.flow.first
 import org.cassini.ui.R
 import org.cassini.ui.components.WaveformLevels.Companion.BAR_MS
 import org.cassini.ui.components.WaveformLevels.Companion.SAMPLE_MS
@@ -156,7 +158,7 @@ private fun DrawScope.drawBars(
  * arrived, at most [MAX_AHEAD_MS] past it. It never moves back: when a sample is late, it waits.
  */
 @Stable
-private class WaveformMotion {
+internal class WaveformMotion {
     /** The bars that the loop placed; null draws the static picture. */
     var levels by mutableStateOf<WaveformLevels?>(null)
         private set
@@ -185,25 +187,36 @@ private class WaveformMotion {
     /** True once a sample arrived after the first one: only then does the playhead move. */
     private var moving = false
 
-    /** Moves the waveform each frame with the latest [source] until cancelled; then the static picture shows again. */
+    /**
+     * Moves the waveform each frame with the latest [source] until cancelled; then the static picture shows again.
+     * With reduced motion, it shows the static picture and asks for no frames until motion is on again.
+     */
     suspend fun run(source: () -> WaveformLevels) {
         val scale = coroutineContext[MotionDurationScale]
-        val frame: (Long) -> Unit = { nanos -> step(source(), nanos, scale?.scaleFactor == 0f) }
+        val frame: (Long) -> Unit = { nanos -> step(source(), nanos) }
         try {
-            while (true) withInfiniteAnimationFrameNanos(frame)
+            while (true) {
+                if (scale != null && scale.scaleFactor == 0f) {
+                    stop()
+                    // The scale factor of a window is a snapshot state.
+                    snapshotFlow { scale.scaleFactor }.first { it != 0f }
+                }
+                withInfiniteAnimationFrameNanos(frame)
+            }
         } finally {
-            seen = null
-            levels = null
+            stop()
         }
     }
 
-    private fun step(latest: WaveformLevels, nanos: Long, still: Boolean) {
+    /** Shows the static picture. The next [step] starts again from it. */
+    fun stop() {
+        seen = null
+        levels = null
+    }
+
+    /** Moves the waveform to the frame time [nanos] with the latest bars [latest]. */
+    fun step(latest: WaveformLevels, nanos: Long) {
         val shown = seen
-        if (still) {
-            seen = null
-            levels = null
-            return
-        }
         val dtMs = if (shown == null) 0.0 else (nanos - frameNanos) / NANOS_PER_MS
         frameNanos = nanos
         when {

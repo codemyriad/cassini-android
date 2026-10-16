@@ -25,8 +25,8 @@ import org.robolectric.annotation.GraphicsMode
 
 /**
  * The static picture of the [Waveform] (docs/design/ui.md section 6): it depends only on the bars. The captured time
- * does not move it, and a running waveform starts from the same picture. Compose tests stop infinite animations, so
- * a running waveform in a screenshot test also keeps this picture, and the goldens stay the same.
+ * does not move it. Compose tests cancel infinite animations, so a running waveform in a screenshot test also draws
+ * this picture, and the goldens stay the same. [WaveformMotionTest] tests the scroll.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -43,7 +43,7 @@ class WaveformTest {
         assertTrue("The captured time moved the static bars", picture(FIRST).sameAs(picture(SECOND)))
     }
 
-    @Test fun aRunningWaveformStartsFromTheStaticPicture() {
+    @Test fun aCancelledRunningWaveformDrawsTheStaticPicture() {
         val bars = boardWaveformLevels().copy(capturedMs = 7_310)
         show {
             Box(Modifier.testTag(FIRST)) { Waveform(bars) }
