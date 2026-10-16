@@ -105,7 +105,7 @@ fun CassiniApp(graph: AppGraph, links: Flow<DeepLink>, modifier: Modifier = Modi
                 rememberViewModelStoreNavEntryDecorator(),
             ),
             // The Library stays composed under a note it opened, so closing the note does not compose it again.
-            sceneStrategies = listOf(remember { LibraryNoteSceneStrategy() }),
+            sceneStrategies = listOf(remember { LibraryNoteSceneStrategy(morph) }),
             transitionSpec = { appPush(morph) },
             popTransitionSpec = { appPop(morph) },
             predictivePopTransitionSpec = { _ -> appPop(morph) },

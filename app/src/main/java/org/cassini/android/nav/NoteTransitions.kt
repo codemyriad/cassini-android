@@ -19,7 +19,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
@@ -94,7 +96,7 @@ private class MapNoteBounds : NoteBounds {
 private fun Scene<*>.isLibraryScene(): Boolean =
     entries.lastOrNull()?.contentKey?.toString()?.startsWith("LibraryKey") == true
 
-private fun Scene<*>.noteIdOrNull(): String? =
+internal fun Scene<*>.noteIdOrNull(): String? =
     entries.lastOrNull()?.contentKey?.toString()
         ?.takeIf { it.startsWith("NoteKey(") }
         ?.substringAfter("noteId=")
@@ -106,7 +108,7 @@ private fun Scene<*>.noteIdOrNull(): String? =
  * not a note that comes back from a screen above it.
  */
 internal class NoteMorph {
-    var noteId: String? = null
+    var noteId: String? by mutableStateOf(null)
 }
 
 /**

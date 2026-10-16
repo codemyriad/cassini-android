@@ -51,12 +51,12 @@ internal object LibraryNoteScenes {
 }
 
 /** A [LibraryNoteScene] for a stack that ends in Library, Note; the other stacks get Navigation 3's single pane. */
-internal class LibraryNoteSceneStrategy : SceneStrategy<NavKey> {
+internal class LibraryNoteSceneStrategy(private val morph: NoteMorph) : SceneStrategy<NavKey> {
     override fun SceneStrategyScope<NavKey>.calculateScene(entries: List<NavEntry<NavKey>>): Scene<NavKey>? {
         val note = entries.lastOrNull()?.takeIf(::isNote)
         val library = entries.getOrNull(entries.lastIndex - 1)?.takeIf(::isLibrary)
         return if (note != null && library != null) {
-            LibraryNoteScene(note.contentKey, library, note, entries.dropLast(1))
+            LibraryNoteScene(note.contentKey, library, note, entries.dropLast(1), morph)
         } else {
             null
         }
@@ -67,18 +67,21 @@ internal class LibraryNoteSceneStrategy : SceneStrategy<NavKey> {
  * The note over the Library that opened it. Its last entry is the note, so the transitions of [appPush] and [appPop]
  * see a note scene. The Library under the note is capped at [Lifecycle.State.CREATED]: it collects no state, and its
  * back handler (which clears a search) is off. While the note covers it, the Library is not placed, so it draws
- * nothing, takes no touch and has no semantics; during the open morph it draws under the note.
+ * nothing, takes no touch and has no semantics; it draws under the note only during the Library morph of this note
+ * ([NoteMorph.noteId]), not while another screen is pushed over the note or popped back to it.
  */
 private data class LibraryNoteScene(
     override val key: Any,
     val library: NavEntry<NavKey>,
     val note: NavEntry<NavKey>,
     override val previousEntries: List<NavEntry<NavKey>>,
+    val morph: NoteMorph,
 ) : Scene<NavKey> {
     override val entries: List<NavEntry<NavKey>> = listOf(library, note)
 
     override val content: @Composable () -> Unit = {
-        val hidden = LocalNavAnimatedContentScope.current.transition.coversTheLibrary()
+        val morphing = morph.noteId != null && morph.noteId == noteIdOrNull()
+        val hidden = !morphing || LocalNavAnimatedContentScope.current.transition.coversTheLibrary()
         Box(Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxSize().hiddenUnder(hidden)) {
                 val created = rememberLifecycleOwner(maxLifecycle = Lifecycle.State.CREATED)
