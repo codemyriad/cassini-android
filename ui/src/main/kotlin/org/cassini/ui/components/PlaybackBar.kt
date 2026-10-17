@@ -29,6 +29,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -70,6 +71,11 @@ fun PlaybackBar(
 ) {
     val c = CassiniTheme.colors
     val group = stringResource(R.string.ui_player_group)
+    val windowHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() }
+    if (windowHeight < COMPACT_HEIGHT) {
+        CompactPlaybackBar(positionMs, durationMs, playing, onSeek, onSkipBack, onSkipForward, onPlayPause, modifier, onSeekFinished)
+        return
+    }
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -107,6 +113,64 @@ fun PlaybackBar(
             PlayPauseButton(playing = playing, onClick = onPlayPause)
             SkipButton(forward = true, onClick = onSkipForward)
         }
+    }
+}
+
+/**
+ * Below this window height the player is one row, so the transcript keeps the height. A phone in landscape is 410 to
+ * 490 dp tall, depending on its display size; a phone upright is over 700 dp.
+ */
+private val COMPACT_HEIGHT = 600.dp
+
+/**
+ * The player in one row for a short window: back 10 s, play/pause, forward 10 s, the position, the slider and the
+ * length. The same controls, semantics and callbacks as [PlaybackBar]; 8 dp padding above and below.
+ */
+@Composable
+@Suppress("LongParameterList") // The parameters of PlaybackBar.
+private fun CompactPlaybackBar(
+    positionMs: Long,
+    durationMs: Long,
+    playing: Boolean,
+    onSeek: (Long) -> Unit,
+    onSkipBack: () -> Unit,
+    onSkipForward: () -> Unit,
+    onPlayPause: () -> Unit,
+    modifier: Modifier,
+    onSeekFinished: (() -> Unit)?,
+) {
+    val c = CassiniTheme.colors
+    val group = stringResource(R.string.ui_player_group)
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(c.surface)
+            .drawBehind { drawRect(c.line, Offset.Zero, Size(size.width, 1.dp.toPx())) }
+            .semantics {
+                isTraversalGroup = true
+                contentDescription = group
+            }
+            .navigationBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        SkipButton(forward = false, onClick = onSkipBack)
+        PlayPauseButton(playing = playing, onClick = onPlayPause)
+        SkipButton(forward = true, onClick = onSkipForward)
+        Text(
+            text = Durations.clock(positionMs),
+            style = CassiniTheme.type.monoSmall,
+            color = c.text2,
+            modifier = Modifier.clearAndSetSemantics {},
+        )
+        Box(Modifier.weight(1f)) { CassiniSlider(positionMs, durationMs, onSeek, onSeekFinished = onSeekFinished) }
+        Text(
+            text = Durations.clock(durationMs),
+            style = CassiniTheme.type.monoSmall,
+            color = c.text2,
+            modifier = Modifier.clearAndSetSemantics {},
+        )
     }
 }
 
