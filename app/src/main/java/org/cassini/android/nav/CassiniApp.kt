@@ -4,7 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.ContentTransform
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -244,21 +244,32 @@ internal fun MutableList<NavKey>.replaceWith(target: List<NavKey>) {
 }
 
 private const val TAG = "CassiniNav"
-private const val PUSH_MS = 250
-internal const val SLIDE_FRACTION = 0.3f
+private const val PUSH_MS = 350
+internal const val SLIDE_FRACTION = 0.25f
 
-private fun <T> pushSpec() = tween<T>(PUSH_MS, easing = FastOutSlowInEasing)
+/** Material 3 "emphasized decelerate": a fast start that settles softly. */
+@Suppress("MagicNumber") // The control points of the Material 3 curve.
+private val Emphasized = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
 
-/** The push of every destination but Recording: in from 30 % of the width on the right, with a fade. */
+private fun <T> pushSpec() = tween<T>(PUSH_MS, easing = Emphasized)
+
+/**
+ * The push of every destination but Recording: the new screen slides in over the full width on top, and the old one
+ * moves 25 % of the width to the left under it. Neither fades: an alpha below 1 renders a whole screen through an
+ * offscreen buffer on every frame, and two half-transparent screens over each other look muddy. Every screen paints
+ * its own bg, so the slide needs no fade.
+ */
 internal fun <S : Scene<*>> AnimatedContentTransitionScope<S>.push(): ContentTransform {
-    val enter = slideInHorizontally(pushSpec()) { (it * SLIDE_FRACTION).toInt() } + fadeIn(pushSpec())
-    return enter togetherWith fadeOut(pushSpec())
+    val enter = slideInHorizontally(pushSpec()) { width -> width }
+    val exit = slideOutHorizontally(pushSpec()) { width -> -(width * SLIDE_FRACTION).toInt() }
+    return (enter togetherWith exit).apply { targetContentZIndex = 1f }
 }
 
-/** The pop of [push], reversed. */
+/** The pop of [push], reversed: the top screen slides out to the right over the one it uncovers. */
 internal fun <S : Scene<*>> AnimatedContentTransitionScope<S>.pop(): ContentTransform {
-    val exit = slideOutHorizontally(pushSpec()) { (it * SLIDE_FRACTION).toInt() } + fadeOut(pushSpec())
-    return fadeIn(pushSpec()) togetherWith exit
+    val enter = slideInHorizontally(pushSpec()) { width -> -(width * SLIDE_FRACTION).toInt() }
+    val exit = slideOutHorizontally(pushSpec()) { width -> width }
+    return (enter togetherWith exit).apply { targetContentZIndex = -1f }
 }
 
 /** Recording comes up from the bottom and goes down again, also on a predictive back. */
