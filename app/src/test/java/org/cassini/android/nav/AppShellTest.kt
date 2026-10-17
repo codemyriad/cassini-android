@@ -5,6 +5,7 @@ import android.app.Application
 import android.net.Uri
 import android.os.Looper
 import android.view.ViewGroup
+import androidx.activity.BackEventCompat
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
@@ -331,6 +332,77 @@ class AppShellTest {
         rule.onNodeWithText(TITLE).assertExists()
     }
 
+    @Test fun closingANoteMovesTheLibraryBackInsteadOfComposingItAgain() {
+        importDocument()
+        rule.waitForIdle()
+        val settings = libraryNodeId()
+
+        rule.onNodeWithText(TITLE).performClick()
+        waitFor(hasContentDescription("Search in transcript"))
+        // Under a settled note the Library is composed but not placed: no node of it is reachable.
+        rule.onNodeWithContentDescription("Settings").assertDoesNotExist()
+        rule.onNodeWithContentDescription("Record a new note").assertDoesNotExist()
+
+        Espresso.pressBack()
+        waitGone(hasContentDescription("Search in transcript"))
+        rule.waitForIdle()
+        // The same layout node: the Library moved between scenes, it was not disposed and composed again.
+        assertEquals(settings, libraryNodeId())
+    }
+
+    @Test fun aCancelledPredictiveBackKeepsTheNoteAndACommittedOneMovesTheLibraryBack() {
+        importDocument()
+        rule.waitForIdle()
+        val settings = libraryNodeId()
+        rule.onNodeWithText(TITLE).performClick()
+        waitFor(hasContentDescription("Search in transcript"))
+        val dispatcher = rule.activity.onBackPressedDispatcher
+
+        rule.runOnIdle {
+            dispatcher.dispatchOnBackStarted(backEvent(0f))
+            dispatcher.dispatchOnBackProgressed(backEvent(HALF))
+        }
+        rule.waitForIdle()
+        // Mid-gesture the Library shows under the shrinking note.
+        rule.onNodeWithContentDescription("Settings").assertExists()
+        rule.onNodeWithContentDescription("Search in transcript").assertExists()
+        rule.runOnIdle { dispatcher.dispatchOnBackCancelled() }
+        waitGone(hasContentDescription("Settings"))
+        rule.onNodeWithContentDescription("Search in transcript").assertExists()
+
+        rule.runOnIdle {
+            dispatcher.dispatchOnBackStarted(backEvent(0f))
+            dispatcher.dispatchOnBackProgressed(backEvent(HALF))
+            dispatcher.onBackPressed()
+        }
+        waitGone(hasContentDescription("Search in transcript"))
+        rule.waitForIdle()
+        assertEquals(settings, libraryNodeId())
+    }
+
+    @Test fun backLeavesANoteOpenedFromSearchResultsAndKeepsTheQuery() {
+        importDocument()
+        rule.onNode(hasSetTextAction()).performTextInput(QUERY)
+        waitFor(hasText(TITLE))
+        rule.onNodeWithText(TITLE).performClick()
+        // A result opens its note with the query in the note's own search.
+        waitFor(hasContentDescription("Close search"))
+        rule.waitForIdle()
+
+        // The Library's own back handler (it clears the query) is off while the note covers it: back closes the
+        // note's search, then the note.
+        Espresso.pressBack()
+        waitFor(hasContentDescription("Search in transcript"))
+        Espresso.pressBack()
+        waitGone(hasContentDescription("Search in transcript"))
+        rule.onNode(hasSetTextAction()).assert(hasText(QUERY))
+    }
+
+    /** The node id of the Library's Settings button, which is the same while its layout node lives. */
+    private fun libraryNodeId(): Int = rule.onNodeWithContentDescription("Settings").fetchSemanticsNode().id
+
+    private fun backEvent(progress: Float) = BackEventCompat(0f, 0f, progress, BackEventCompat.EDGE_LEFT)
+
     /** A sealed two-speaker document over the FLEURS clip, imported as ACTION_VIEW does; Library shows its row. */
     private fun importDocument() {
         val uri = Uri.fromFile(writeDocument()).toString()
@@ -368,6 +440,8 @@ class AppShellTest {
         val SPEAKER_2 = hasContentDescription("Speaker 2", substring = true)
         const val ANDROID_NS = "http://schemas.android.com/apk/res/android"
         const val TITLE = "Riunione"
+        const val QUERY = "Riun"
+        const val HALF = 0.5f
         const val SECOND_TURN = "allora cominciamo subito"
         const val TIMEOUT_MS = 10_000L
         const val STATUS_PX = 60

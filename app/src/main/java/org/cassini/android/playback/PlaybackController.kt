@@ -24,13 +24,18 @@ data class PlaybackState(
     val sample: Boolean = false,
     /** The open file could not be played. */
     val failed: Boolean = false,
+    /** When [positionMs] was read (`System.nanoTime`), so the screen can extrapolate it between ticks. */
+    val sampledAtNanos: Long = 0,
+    /** Changes whenever the position jumps (seek, sample, reload, open): the screen does not slew across it. */
+    val epoch: Long = 0,
 )
 
 /**
  * The audio player of the Note screen (architecture 5.9), over one prepared file at a time. Call it on the main
  * thread ([Parts.main]); `MediaPlayer` is controlled there.
  *
- * - [state] carries the position every 150 ms while playing.
+ * - [state] carries the position every 150 ms while playing, with the time it was read and an epoch that changes on
+ *   every jump, for the frame-accurate active word of the Note screen.
  * - The position is saved every 5 s while playing, and with `final = true` (which also stores the Library preview
  *   excerpt) on pause and on [leave].
  * - [play] requests AUDIOFOCUS_GAIN (USAGE_MEDIA, CONTENT_TYPE_SPEECH); a focus loss and ACTION_AUDIO_BECOMING_NOISY
@@ -54,6 +59,8 @@ class PlaybackController(private val parts: Parts) {
         /** A monotonic clock in ms (`SystemClock.elapsedRealtime`). */
         val clock: () -> Long,
         val timing: Timing = Timing(),
+        /** A monotonic clock in ns, the frame loop's base (`System.nanoTime`). */
+        val nanos: () -> Long = System::nanoTime,
     )
 
     data class Timing(val tickMs: Long = 150, val saveEveryMs: Long = 5_000)
@@ -69,6 +76,7 @@ class PlaybackController(private val parts: Parts) {
     private var ticker: Job? = null
     private var sample: Sample? = null
     private var lastSaved = 0L
+    private var epoch = 0L
 
     /**
      * Counts every [open] and [leave]. An [open] or a [reload] that finds another value after its prepare has been
@@ -114,11 +122,18 @@ class PlaybackController(private val parts: Parts) {
         }
         val start = positionMs.coerceIn(0, created.durationMs)
         created.seekTo(start)
+        epoch++
         created.onCompletion(::onCompletion)
         player = created
         this.noteId = noteId
         this.file = file
-        mutableState.value = PlaybackState(noteId = noteId, durationMs = created.durationMs, positionMs = start)
+        mutableState.value = PlaybackState(
+            noteId = noteId,
+            durationMs = created.durationMs,
+            positionMs = start,
+            sampledAtNanos = parts.nanos(),
+            epoch = epoch,
+        )
         return true
     }
 
@@ -157,6 +172,7 @@ class PlaybackController(private val parts: Parts) {
             return leftDuringReload(id, positionMs)
         }
         created.seekTo(positionMs.coerceIn(0, created.durationMs))
+        epoch++
         created.onCompletion(::onCompletion)
         player = created
         this.file = file
@@ -175,7 +191,10 @@ class PlaybackController(private val parts: Parts) {
         if (active.playing) return
         if (!parts.platform.requestFocus(::pause)) return
         parts.platform.watchNoisy(::pause)
-        if (sample == null && active.positionMs >= active.durationMs) active.seekTo(0)
+        if (sample == null && active.positionMs >= active.durationMs) {
+            active.seekTo(0)
+            epoch++
+        }
         active.play()
         lastSaved = parts.clock()
         startTicker()
@@ -206,6 +225,7 @@ class PlaybackController(private val parts: Parts) {
         val active = player ?: return
         sample = null
         active.seekTo(positionMs.coerceIn(0, active.durationMs))
+        epoch++
         publish()
     }
 
@@ -229,6 +249,7 @@ class PlaybackController(private val parts: Parts) {
             wasPlaying = previous?.wasPlaying ?: active.playing,
         )
         active.seekTo(startMs.coerceIn(0, active.durationMs))
+        epoch++
         if (active.playing) publish() else play()
         return true
     }
@@ -297,6 +318,7 @@ class PlaybackController(private val parts: Parts) {
         sample = null
         if (active.playing) active.pause()
         active.seekTo(ended.restoreMs)
+        epoch++
         stopTicker()
         release()
         if (!interrupted && ended.wasPlaying) {
@@ -346,6 +368,8 @@ class PlaybackController(private val parts: Parts) {
             positionMs = active.positionMs,
             playing = active.playing,
             sample = sample != null,
+            sampledAtNanos = parts.nanos(),
+            epoch = epoch,
         )
     }
 

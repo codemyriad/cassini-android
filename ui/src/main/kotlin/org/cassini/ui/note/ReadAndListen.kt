@@ -233,7 +233,8 @@ private class ActiveLine {
 /**
  * The transcript pane (board 03): surface with a 1 dp line top border, padding 0/20/16. One item per turn, keyed by
  * its id: the speaker header (or the inline suggestion card) and the paragraph. Only the turn that holds the
- * active word gets it, so a new word recomposes two turns at most.
+ * active word gets it, so a new word recomposes two turns at most. While [anchor] plays, the active word comes from
+ * the position extrapolated each frame instead of [activeWord] (the published position).
  *
  * While [following], a new active word scrolls its line to 30 % of the pane once it leaves the top 70 %; a drag
  * pauses following ([NoteEvent.PauseFollowing]) and, while [followPaused], 4 s without scrolling resume it
@@ -252,13 +253,15 @@ internal fun TranscriptPane(
     onEvent: (NoteEvent) -> Unit,
     modifier: Modifier = Modifier,
     noWords: Boolean = false,
+    anchor: PlaybackAnchor? = null,
 ) {
     val c = CassiniTheme.colors
+    val playingWord = frameWord(turns, anchor, activeWord)
     val matches = remember(search) { search?.byTurn() ?: emptyMap() }
     val active = remember { ActiveLine() }
     val onLine = remember { { top: Float -> active.top = top } }
     val onPlaced = remember { { coordinates: LayoutCoordinates -> active.paragraph = coordinates } }
-    FollowEffects(turns, activeWord, following, followPaused, listState, active, onEvent)
+    FollowEffects(turns, playingWord, following, followPaused, listState, active, onEvent)
     SearchScroll(turns, search, listState)
     LazyColumn(
         modifier = modifier
@@ -274,7 +277,7 @@ internal fun TranscriptPane(
     ) {
         if (noWords && turns.isEmpty()) item(key = "no-words") { NoWordsCard() }
         items(turns, key = { it.id }) { turn ->
-            val activeIndex = activeWord?.takeIf { it.turnId == turn.id }?.index
+            val activeIndex = playingWord?.takeIf { it.turnId == turn.id }?.index
             Turn(
                 turn = turn,
                 activeIndex = activeIndex,

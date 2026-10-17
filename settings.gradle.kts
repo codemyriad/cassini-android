@@ -25,3 +25,5 @@ include(":ui")
 include(":app")
 // Device experiments and calibration (com.android.test, instruments :app). Not part of ciTest.
 include(":bench")
+// Generates app/src/main/baseline-prof.txt on a device (com.android.test, scripts/baseline-profile.sh). Not part of ciTest.
+include(":baselineprofile")

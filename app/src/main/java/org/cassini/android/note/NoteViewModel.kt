@@ -88,6 +88,7 @@ import org.cassini.ui.note.NoteEvent
 import org.cassini.ui.note.NoteMode
 import org.cassini.ui.note.NoteSheet
 import org.cassini.ui.note.NoteUiState
+import org.cassini.ui.note.PlaybackAnchor
 import org.cassini.ui.note.PlaybackUi
 import org.cassini.ui.note.ReadOnlyReason
 import org.cassini.ui.note.TranscriptMatch
@@ -430,7 +431,20 @@ class NoteViewModel(
         val ours = playback.noteId == noteId && !playback.failed
         val duration = if (ours && playback.durationMs > 0) playback.durationMs else details.note.durationMs
         val position = ui.seekingMs ?: if (ours) playback.positionMs else details.note.positionMs
-        return PlaybackUi(position, duration, playing = ours && playback.playing, following = ui.following)
+        val playing = ours && playback.playing
+        // While this note plays, the sealed transcript extrapolates the position each frame; not during a seek drag.
+        val anchor = if (playing && ui.seekingMs == null && !NoteMapping.showsDraft(mode)) {
+            PlaybackAnchor(
+                playback.positionMs,
+                playback.sampledAtNanos,
+                playing = true,
+                epoch = playback.epoch,
+                durationMs = duration,
+            )
+        } else {
+            null
+        }
+        return PlaybackUi(position, duration, playing = playing, following = ui.following, anchor = anchor)
     }
 
     @Suppress("CyclomaticComplexMethod") // one branch per banner source of features.md sections 3 and 13

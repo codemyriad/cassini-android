@@ -46,6 +46,7 @@ import org.cassini.ui.note.NoteAction
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -87,6 +88,18 @@ class LibraryViewModelTest {
         assertEquals(listOf(DayLabel.Today, DayLabel.Yesterday), state.sections.map { it.label })
         assertTrue(state.banners.isEmpty())
         assertNull(state.results)
+    }
+
+    @Test
+    fun openingAnOverlayKeepsTheMappedRows() = runTest(dispatcher) {
+        ports.add(libraryRow("a"))
+        val viewModel = viewModel()
+        advanceUntilIdle()
+        val sections = viewModel.now().sections
+        viewModel.onEvent(LibraryEvent.Rename("a"))
+        advanceUntilIdle()
+        assertTrue(viewModel.now().dialog is LibraryDialog.Rename)
+        assertSame(sections, viewModel.now().sections)
     }
 
     @Test

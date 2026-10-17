@@ -111,14 +111,14 @@ fun CassiniSlider(
 @OptIn(ExperimentalMaterial3Api::class)
 private fun SliderTrack(state: SliderState) {
     val c = CassiniTheme.colors
-    val range = state.valueRange
-    val span = range.endInclusive - range.start
-    val fraction = if (span > 0f) ((state.value - range.start) / span).coerceIn(0f, 1f) else 0f
     Canvas(
         Modifier
             .fillMaxWidth()
             .height(TrackThickness),
     ) {
+        val range = state.valueRange
+        val span = range.endInclusive - range.start
+        val fraction = if (span > 0f) ((state.value - range.start) / span).coerceIn(0f, 1f) else 0f
         val inset = ThumbSize.toPx() / 2f
         val radius = CornerRadius(size.height / 2f)
         val border = 1.dp.toPx()

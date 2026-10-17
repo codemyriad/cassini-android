@@ -113,7 +113,7 @@ private fun LazyListScope.trashItems(
     onEvent: (TrashEvent) -> Unit,
 ) {
     if (state.items.isEmpty()) {
-        item(key = "empty") {
+        item(key = "empty", contentType = "empty") {
             BannerCard(
                 tone = Tone.Plain,
                 title = stringResource(R.string.ui_trash_is_empty),
@@ -123,7 +123,7 @@ private fun LazyListScope.trashItems(
         }
         return
     }
-    item(key = "intro") {
+    item(key = "intro", contentType = "intro") {
         // The intro's 14 dp bottom margin: the list's 8 dp gap and 6 dp here, less the 1 dp that Android's three
         // 20.5 dp lines take beyond the board's 20.3.
         Text(
@@ -133,7 +133,7 @@ private fun LazyListScope.trashItems(
             color = CassiniTheme.colors.text3,
         )
     }
-    items(state.items, key = { it.id }) { item -> TrashCard(item, onEvent) }
+    items(state.items, key = { it.id }, contentType = { "note" }) { item -> TrashCard(item, onEvent) }
 }
 
 /**

@@ -4,7 +4,6 @@ import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -46,7 +45,6 @@ import org.cassini.data.db.SearchRow
 import org.cassini.ui.banner.BannerAction
 import org.cassini.ui.banner.BannerGroup
 import org.cassini.ui.banner.BannerKind
-import org.cassini.ui.components.NoteStatusUi
 import org.cassini.ui.components.SnackbarKind
 import org.cassini.ui.components.SnackbarSpec
 import org.cassini.ui.library.LibraryDialog
@@ -92,7 +90,7 @@ class LibraryViewModel(
     private val saved: SavedStateHandle,
     private val ports: LibraryPorts,
     private val clock: Clock = Clock.systemDefaultZone(),
-    /** Where [state] is built: every row is mapped again on each recording tick and progress update. */
+    /** Where [state] and changed Library rows are mapped. */
     private val compute: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
     private val effectChannel = Channel<LibraryEffect>(Channel.BUFFERED)
@@ -112,6 +110,7 @@ class LibraryViewModel(
     private val snackbar = MutableStateFlow<SnackbarSpec?>(null)
     private var trashed: String? = null
     private var snackbarCount = 0L
+    private val listingCache = LibraryListing()
 
     /** The catalogue cannot be read (the database did not open): the Library says so, it is not empty. */
     private val unavailable = MutableStateFlow(false)
@@ -207,14 +206,13 @@ class LibraryViewModel(
         val rows = listing.rows.orEmpty()
         val (searched, found) = listing.search
         val searching = listing.query.isNotBlank()
-        val results = found?.takeIf { searching }?.let { LibraryMapping.results(it, context, now, zone) }
-        val audioOnly = rows.any { LibraryMapping.status(it, context) == NoteStatusUi.AudioOnly }
+        val mapped = listingCache.map(rows, found, searching, context, now, zone)
         val facts = LibraryFacts(
             loading = listing.rows == null,
             liveNotes = rows.size,
             query = if (searching) searched else "",
-            results = results?.size,
-            audioOnly = audioOnly,
+            results = mapped.results?.size?.takeIf { found != null },
+            audioOnly = mapped.audioOnly,
             unavailable = listing.unavailable,
         )
         return LibraryUiState(
@@ -223,8 +221,8 @@ class LibraryViewModel(
             recording = LibraryMapping.recordingPill(recording),
             progress = LibraryMapping.progress(live.processing),
             banners = Notices.library(live.facts, facts),
-            sections = if (searching) persistentListOf() else LibraryMapping.sections(rows, context, now, zone),
-            results = results ?: if (searching) persistentListOf() else null,
+            sections = mapped.sections,
+            results = mapped.results,
             snackbar = snackbar,
             sheet = details?.let {
                 LibrarySheet.Actions(LibraryMapping.actions(it, context.activeNoteId, now, zone, live.voiceModelReady))

@@ -4,7 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.ContentTransform
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.createSavedStateHandle
@@ -78,6 +79,7 @@ import org.cassini.ui.trash.TrashBackTo
 fun CassiniApp(graph: AppGraph, links: Flow<DeepLink>, modifier: Modifier = Modifier) {
     val backStack = rememberNavBackStack(LibraryKey)
     val noteBounds = rememberNoteBounds()
+    val morph = remember { NoteMorph() }
     val context = LocalContext.current
     LaunchedEffect(links) {
         links.collect { link -> open(graph, backStack, link) }
@@ -102,18 +104,20 @@ fun CassiniApp(graph: AppGraph, links: Flow<DeepLink>, modifier: Modifier = Modi
                 rememberSaveableStateHolderNavEntryDecorator(),
                 rememberViewModelStoreNavEntryDecorator(),
             ),
-            transitionSpec = { appPush(noteBounds) },
-            popTransitionSpec = { appPop(noteBounds) },
-            predictivePopTransitionSpec = { _ -> appPop(noteBounds) },
+            // The Library stays composed under a note it opened, so closing the note does not compose it again.
+            sceneStrategies = listOf(remember { LibraryNoteSceneStrategy(morph) }),
+            transitionSpec = { appPush(morph) },
+            popTransitionSpec = { appPop(morph) },
+            predictivePopTransitionSpec = { _ -> appPop(morph) },
             entryProvider = entryProvider {
-                entry<LibraryKey> {
+                entry<LibraryKey>(metadata = LibraryNoteScenes.library()) {
                     val viewModel = viewModel {
                         LibraryViewModel(createSavedStateHandle(), GraphLibraryPorts(graph, context), graph.clock())
                     }
                     LibraryRoute(viewModel, libraryNavigator(backStack))
                 }
-                entry<NoteKey> { key ->
-                    NoteEntry(key, graph, backStack, noteBounds, context)
+                entry<NoteKey>(metadata = LibraryNoteScenes.note()) { key ->
+                    NoteEntry(key, graph, backStack, noteBounds, morph)
                 }
                 entry<RecordingKey>(metadata = recordingTransitions) {
                     val viewModel = viewModel {
@@ -134,8 +138,9 @@ private fun NoteEntry(
     graph: AppGraph,
     backStack: NavBackStack<NavKey>,
     noteBounds: org.cassini.ui.components.NoteBounds,
-    context: Context,
+    morph: NoteMorph,
 ) {
+    val context = LocalContext.current
     val viewModel = viewModel {
         NoteViewModel(
             createSavedStateHandle(),
@@ -151,7 +156,7 @@ private fun NoteEntry(
     NoteRoute(
         viewModel = viewModel,
         navigator = noteNavigator(backStack, noteBounds, key.noteId),
-        modifier = Modifier.noteContainerTransition(key.noteId, withLibrary = withLibrary),
+        modifier = Modifier.noteContainerTransition(key.noteId, morph),
         transitionRunning = transitionRunning,
     )
 }
@@ -239,21 +244,32 @@ internal fun MutableList<NavKey>.replaceWith(target: List<NavKey>) {
 }
 
 private const val TAG = "CassiniNav"
-private const val PUSH_MS = 250
-internal const val SLIDE_FRACTION = 0.3f
+private const val PUSH_MS = 350
+internal const val SLIDE_FRACTION = 0.25f
 
-private fun <T> pushSpec() = tween<T>(PUSH_MS, easing = FastOutSlowInEasing)
+/** Material 3 "emphasized decelerate": a fast start that settles softly. */
+@Suppress("MagicNumber") // The control points of the Material 3 curve.
+private val Emphasized = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
 
-/** The push of every destination but Recording: in from 30 % of the width on the right, with a fade. */
+private fun <T> pushSpec() = tween<T>(PUSH_MS, easing = Emphasized)
+
+/**
+ * The push of every destination but Recording: the new screen slides in over the full width on top, and the old one
+ * moves 25 % of the width to the left under it. Neither fades: an alpha below 1 renders a whole screen through an
+ * offscreen buffer on every frame, and two half-transparent screens over each other look muddy. Every screen paints
+ * its own bg, so the slide needs no fade.
+ */
 internal fun <S : Scene<*>> AnimatedContentTransitionScope<S>.push(): ContentTransform {
-    val enter = slideInHorizontally(pushSpec()) { (it * SLIDE_FRACTION).toInt() } + fadeIn(pushSpec())
-    return enter togetherWith fadeOut(pushSpec())
+    val enter = slideInHorizontally(pushSpec()) { width -> width }
+    val exit = slideOutHorizontally(pushSpec()) { width -> -(width * SLIDE_FRACTION).toInt() }
+    return (enter togetherWith exit).apply { targetContentZIndex = 1f }
 }
 
-/** The pop of [push], reversed. */
+/** The pop of [push], reversed: the top screen slides out to the right over the one it uncovers. */
 internal fun <S : Scene<*>> AnimatedContentTransitionScope<S>.pop(): ContentTransform {
-    val exit = slideOutHorizontally(pushSpec()) { (it * SLIDE_FRACTION).toInt() } + fadeOut(pushSpec())
-    return fadeIn(pushSpec()) togetherWith exit
+    val enter = slideInHorizontally(pushSpec()) { width -> -(width * SLIDE_FRACTION).toInt() }
+    val exit = slideOutHorizontally(pushSpec()) { width -> width }
+    return (enter togetherWith exit).apply { targetContentZIndex = -1f }
 }
 
 /** Recording comes up from the bottom and goes down again, also on a predictive back. */

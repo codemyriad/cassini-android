@@ -191,6 +191,7 @@ internal fun ColumnScope.ReadAndListenBody(
     TranscriptPane(
         turns = state.turns,
         activeWord = state.activeWord,
+        anchor = state.playback?.anchor,
         search = state.search,
         following = state.playback?.let { it.following && it.playing } ?: false,
         followPaused = state.playback?.let { !it.following && it.playing } ?: false,

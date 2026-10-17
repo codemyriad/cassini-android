@@ -49,6 +49,8 @@ androidxTestRunner = "1.7.0"
 androidxTestCore = "1.7.0"
 androidxTestExt = "1.3.0"
 uiautomator = "2.4.0"
+# Baseline Profile generation (:baselineprofile, scripts/baseline-profile.sh).
+benchmark = "1.5.0"
 espresso = "3.7.0"
 
 [libraries]
@@ -113,6 +115,7 @@ androidx-test-core = { group = "androidx.test", name = "core", version.ref = "an
 androidx-test-core-ktx = { group = "androidx.test", name = "core-ktx", version.ref = "androidxTestCore" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestExt" }
 androidx-test-uiautomator = { group = "androidx.test.uiautomator", name = "uiautomator", version.ref = "uiautomator" }
+androidx-benchmark-macro-junit4 = { group = "androidx.benchmark", name = "benchmark-macro-junit4", version.ref = "benchmark" }
 androidx-test-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espresso" }
 
 # Static analysis
