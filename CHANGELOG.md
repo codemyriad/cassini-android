@@ -6,7 +6,7 @@ We made the entries for 0.0.1-beta to 0.1.0 again from the release notes of thes
 
 ## [Unreleased]
 
-## [0.3.0] - 2026-10-16
+## [0.3.0] - 2026-10-17
 
 The APK file of this release is `cassini-android-0.3.0.apk`. It operates on Android 8.0 or later, on a 64-bit ARM phone (`arm64-v8a`). The APK also has `x86_64` for emulators. This release has a new signing key, so it does not install over 0.1.x or an earlier beta. Before you uninstall the earlier version, save your notes as Cassini documents (`.opus`). The uninstall erases the notes and the downloaded models, so Cassini downloads the models again (about 730 MB). Testers can also get Cassini from Google Play, with the same key. The release also has the native sources (`cassini-native-sources.tar`) and the notices. The APK has no models. After you agree, the app downloads them separately.
 
@@ -14,6 +14,9 @@ Version 0.3.0 has all the changes of 0.2.0, which was not published.
 
 ### Changed
 
+- The screens are smoother. Transcript words are drawn without one link per word, so long notes scroll and play without stutter. Opening and closing a note no longer stalls for about 100 ms. The Library stays ready under an open note. The recording waveform scrolls at the display rate, and the transcription progress bar moves between decoding windows. The app ships a Baseline Profile, so its code is compiled at install.
+- The highlighted word changes at the start of the word that you hear. Before, it was 100 to 200 ms late.
+- TalkBack reads each turn as one paragraph with "Play from start of turn". The words are no longer links.
 - A new release key signs Cassini. Google Play does not accept the beta key of 0.0.1-beta to 0.1.0, and the same key now signs the APK on GitHub and the app on Google Play. Android does not install this version over 0.1.x. Save your notes as Cassini documents (`.opus`), uninstall 0.1.x and then install this version. The uninstall erases the notes and the downloaded models of 0.1.x. [SECURITY.md](SECURITY.md) gives the digest of the new certificate.
 - Cassini recognizes speech with Parakeet Ultra INT8. Moondream made this model with more training of NVIDIA Parakeet TDT 0.6B v3. It makes fewer errors in the 25 languages of v3. Earlier versions used Parakeet TDT 0.6B v3.
 - Parakeet Ultra installs in `parakeet-ultra/`. This version does not read or delete the `parakeet-v3/` directory of earlier versions.
