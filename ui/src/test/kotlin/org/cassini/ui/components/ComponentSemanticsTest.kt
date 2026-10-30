@@ -358,6 +358,11 @@ class ComponentSemanticsTest {
         rule.runOnIdle { assertEquals(1, clicks) }
     }
 
+    @Test fun aboutCardNamesTheProductAndItsVersion() {
+        setThemed { AboutCard(version = "0.2.0", onSourceClick = {}) }
+        rule.onNodeWithText("Cassini talk 0.2.0 ", substring = true).assertExists()
+    }
+
     @Test fun aboutCardLinkOpensTheSource() {
         var opened = 0
         setThemed { AboutCard(version = "0.2.0", onSourceClick = { opened++ }) }

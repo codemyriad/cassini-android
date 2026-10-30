@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Cassini</string>
+    <string name="app_name">Cassini talk</string>
     <string name="error_open">Impossibile aprire la registrazione. Seleziona di nuovo il file.</string>
     <string name="error_large">Il file è troppo grande. Scegli un file sotto i 4 GB.</string>
     <string name="error_long">Questa registrazione è troppo lunga da trascrivere: una trascrizione contiene fino a 36 ore di audio e circa 11 ore di parlato. Puoi comunque ascoltarla e salvare il file audio con Salva una copia.</string>

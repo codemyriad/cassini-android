@@ -335,7 +335,7 @@ internal object BoardFixtures {
         ),
     )
 
-    // Board 08: Settings (the board's About card reads "Cassini 0.1.0").
+    // Board 08: Settings (the board's About card reads "Cassini 0.1.0"; since the rename it reads "Cassini talk").
 
     val settings = SettingsUiState(
         language = LanguageChoice.PHONE,
