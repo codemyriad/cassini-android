@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Cassini</string>
+    <string name="app_name">Cassini talk</string>
     <string name="error_open">Could not open this recording. Choose the file again.</string>
     <string name="error_large">This file is too large. Choose a file under 4 GB.</string>
     <string name="error_long">This recording is too long to transcribe: one transcript holds up to 36 hours of audio and about 11 hours of speech. You can still play it, and save the audio file with Save a copy.</string>

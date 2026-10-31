@@ -7,8 +7,8 @@
 -->
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Brand, file extensions and pure punctuation: the same in every language. -->
-    <string name="ui_brand" translatable="false">Cassini</string>
-    <string name="ui_brand_version" translatable="false">Cassini %1$s</string>
+    <string name="ui_brand" translatable="false">Cassini talk</string>
+    <string name="ui_brand_version" translatable="false">Cassini talk %1$s</string>
     <string name="ui_ext_opus" translatable="false">.opus</string>
     <string name="ui_ext_txt" translatable="false">.txt</string>
     <string name="ui_ext_subtitles" translatable="false">.srt · .vtt</string>

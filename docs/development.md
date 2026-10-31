@@ -323,7 +323,7 @@ The screenshots in the README come from this walk. To make them again, use these
 5. Save them as `docs/screenshots/<variant>/01-library.png` to `05-settings.png`, in the order of step 2.
 6. Save the light screenshots also as `metadata/en-US/images/phoneScreenshots/1.png` to `5.png`, in the same order.
 
-The Settings screenshot (`05-settings.png` and the store image `5.png`) shows the version number of the app in the About card. The committed screenshots show "Cassini 0.3.0", because `app/build.gradle.kts` has `versionName = "0.3.0"`. After the owner changes `versionName` for a release, make this screenshot again ([`release.md`](release.md#make-a-release)).
+The Settings screenshot (`05-settings.png` and the store image `5.png`) shows the version number of the app in the About card. The About card shows the product name and the version, for example "Cassini talk 0.3.0". The committed screenshots still show "Cassini 0.3.0": they are from before the rename to Cassini talk, and the next refresh replaces them. After the owner changes `versionName` for a release, make this screenshot again ([`release.md`](release.md#make-a-release)).
 
 ### note-opening-timing.sh
 
