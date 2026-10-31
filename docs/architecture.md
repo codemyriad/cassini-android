@@ -819,6 +819,8 @@ The wake lock is `PARTIAL_WAKE_LOCK "Cassini:processing"`, without reference cou
 
 Memory check before the start: `ActivityManager.MemoryInfo.lowMemory`, `isLowRamDevice` or `!Limits.memoryAllows` sets a low-memory hint on the progress card. The job continues. `largeHeap` stays until we measure its effect.
 
+The decode refuses audio whose samples do not fit in the heap (`Limits.requireDuration`, MEMORY), and so does the growth of the sample buffer (`PcmBuilder`). The free heap counts garbage as used until a collection runs. Thus when the heap looks too short, `Limits.heapAllows` runs one garbage collection and measures again. Garbage that earlier work left does not refuse an import or a transcription. The collection runs only in this case.
+
 Android permits these start paths:
 
 - A visible screen: Transcribe, Resume or Continue, through `ContextCompat.startForegroundService`. On API 33+, the app asks for `POST_NOTIFICATIONS` one time. A denial does not stop the start.

@@ -29,8 +29,34 @@ object Limits {
 
     fun availableHeap(runtime: Runtime = Runtime.getRuntime()) = runtime.maxMemory() - (runtime.totalMemory() - runtime.freeMemory())
 
-    fun requireDuration(durationMs: Long, retainPcm: Boolean = true) {
+    /**
+     * Whether [fits] holds for the free heap. Garbage that earlier work left counts as used until a collection, so a
+     * heap that looks too short is measured once more after one: garbage alone never refuses an import.
+     */
+    fun heapAllows(heap: Heap = Heap.Jvm, fits: (Long) -> Boolean): Boolean {
+        if (fits(heap.available())) return true
+        heap.collect()
+        return fits(heap.available())
+    }
+
+    fun requireDuration(durationMs: Long, retainPcm: Boolean = true, heap: Heap = Heap.Jvm) {
         requireUser(durationMs <= MAX_TRANSCRIBE_MS, Failure.LONG)
-        if (retainPcm) requireUser(memoryAllows(durationMs, availableHeap()), Failure.MEMORY)
+        if (retainPcm) requireUser(heapAllows(heap) { memoryAllows(durationMs, it) }, Failure.MEMORY)
+    }
+}
+
+/** The heap that [Limits] measures. Tests give their own. */
+interface Heap {
+    /** The bytes the heap can still take: its maximum minus what is in use, garbage included ([Limits.availableHeap]). */
+    fun available(): Long
+
+    /** A full garbage collection. `Runtime.gc()` runs one on ART too, where `System.gc()` may only ask for it later. */
+    fun collect()
+
+    object Jvm : Heap {
+        override fun available() = Limits.availableHeap()
+
+        @Suppress("ExplicitGarbageCollectionCall") // Only when the heap looks too short ([Limits.heapAllows]).
+        override fun collect() = Runtime.getRuntime().gc()
     }
 }
