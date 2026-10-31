@@ -7,11 +7,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -21,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,6 +33,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -37,8 +42,11 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.testTag
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.cassini.ui.R
 import org.cassini.ui.format.Durations
@@ -54,7 +62,8 @@ private val TimesLift = 4.dp
  * bottom (the 48 dp slider absorbs the board's top 10). The [CassiniSlider]; the times row (`monoSmall` text2:
  * [positionMs] and [durationMs]); then the controls centred 28 dp apart: back 10 s, play/pause ([playing]) and
  * forward 10 s. The bar is one accessibility traversal group. The surface reaches the bottom of the window: the
- * navigation-bar inset is padding inside the surface (zero in the screenshot tests).
+ * navigation-bar inset is padding inside the surface (zero in the screenshot tests). In a short window where the
+ * slider keeps [COMPACT_MIN_SLIDER], the player is one row instead ([CompactPlaybackBar]).
  */
 @Composable
 @Suppress("LongParameterList") // ui.md section 6: the position, the play state and four callbacks.
@@ -69,15 +78,52 @@ fun PlaybackBar(
     modifier: Modifier = Modifier,
     onSeekFinished: (() -> Unit)? = null,
 ) {
+    val windowHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() }
+    val fixedWidth = compactFixedWidth(durationMs)
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        if (windowHeight < COMPACT_HEIGHT && maxWidth - fixedWidth >= COMPACT_MIN_SLIDER) {
+            CompactPlaybackBar(
+                positionMs,
+                durationMs,
+                playing,
+                onSeek,
+                onSkipBack,
+                onSkipForward,
+                onPlayPause,
+                onSeekFinished,
+            )
+        } else {
+            TwoRowPlaybackBar(
+                positionMs,
+                durationMs,
+                playing,
+                onSeek,
+                onSkipBack,
+                onSkipForward,
+                onPlayPause,
+                onSeekFinished,
+            )
+        }
+    }
+}
+
+/** The player of board 03: the slider, the times row, then the controls. */
+@Composable
+@Suppress("LongParameterList") // The parameters of PlaybackBar.
+private fun TwoRowPlaybackBar(
+    positionMs: Long,
+    durationMs: Long,
+    playing: Boolean,
+    onSeek: (Long) -> Unit,
+    onSkipBack: () -> Unit,
+    onSkipForward: () -> Unit,
+    onPlayPause: () -> Unit,
+    onSeekFinished: (() -> Unit)?,
+) {
     val c = CassiniTheme.colors
     val group = stringResource(R.string.ui_player_group)
-    val windowHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() }
-    if (windowHeight < COMPACT_HEIGHT) {
-        CompactPlaybackBar(positionMs, durationMs, playing, onSeek, onSkipBack, onSkipForward, onPlayPause, modifier, onSeekFinished)
-        return
-    }
     Column(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxWidth()
             .background(c.surface)
             .drawBehind { drawRect(c.line, Offset.Zero, Size(size.width, 1.dp.toPx())) }
@@ -100,8 +146,20 @@ fun PlaybackBar(
                 .clearAndSetSemantics {},
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text(text = Durations.clock(positionMs), style = CassiniTheme.type.monoSmall, color = c.text2)
-            Text(text = Durations.clock(durationMs), style = CassiniTheme.type.monoSmall, color = c.text2)
+            Text(
+                text = Durations.clock(positionMs),
+                style = CassiniTheme.type.monoSmall,
+                color = c.text2,
+                maxLines = 1,
+                softWrap = false,
+            )
+            Text(
+                text = Durations.clock(durationMs),
+                style = CassiniTheme.type.monoSmall,
+                color = c.text2,
+                maxLines = 1,
+                softWrap = false,
+            )
         }
         Spacer(Modifier.height(6.dp))
         Row(
@@ -123,8 +181,45 @@ fun PlaybackBar(
 private val COMPACT_HEIGHT = 600.dp
 
 /**
+ * The one row needs at least this much width left for the slider; else the player keeps its two rows. A narrow short
+ * window (split screen upright, a small phone in landscape, large text, a note over an hour) would crush the slider
+ * below its 48 dp touch target.
+ */
+private val COMPACT_MIN_SLIDER = 96.dp
+
+private val CompactPadding = 16.dp
+private val CompactGap = 12.dp
+private val SkipSize = 52.dp
+private val PlayPauseSize = 64.dp
+
+/** Test tags of the two times of the one-row player, which TalkBack does not read: the slider says both. */
+internal const val COMPACT_POSITION_TAG = "player-position"
+internal const val COMPACT_LENGTH_TAG = "player-length"
+
+/**
+ * The width of everything but the slider in [CompactPlaybackBar]: the padding, the side navigation bar, the five gaps,
+ * the three buttons and the two times at the current font scale. Both times are measured as the length, which is
+ * never shorter than the position, so the layout does not change while the note plays.
+ */
+@Composable
+private fun compactFixedWidth(durationMs: Long): Dp {
+    val density = LocalDensity.current
+    val direction = LocalLayoutDirection.current
+    val insets = WindowInsets.navigationBars
+    val sides = insets.getLeft(density, direction) + insets.getRight(density, direction)
+    val measurer = rememberTextMeasurer()
+    val style = CassiniTheme.type.monoSmall
+    val time = remember(durationMs, style, density) {
+        measurer.measure(Durations.clock(durationMs), style, maxLines = 1, softWrap = false).size.width
+    }
+    return with(density) { (2 * time + sides).toDp() } + CompactPadding * 2 + CompactGap * 5 + SkipSize * 2 +
+        PlayPauseSize
+}
+
+/**
  * The player in one row for a short window: back 10 s, play/pause, forward 10 s, the position, the slider and the
- * length. The same controls, semantics and callbacks as [PlaybackBar]; 8 dp padding above and below.
+ * length. The same controls, semantics and callbacks as [PlaybackBar]; 8 dp padding above and below. The times stay on
+ * one line; [PlaybackBar] chooses this row only when the slider keeps [COMPACT_MIN_SLIDER].
  */
 @Composable
 @Suppress("LongParameterList") // The parameters of PlaybackBar.
@@ -136,13 +231,12 @@ private fun CompactPlaybackBar(
     onSkipBack: () -> Unit,
     onSkipForward: () -> Unit,
     onPlayPause: () -> Unit,
-    modifier: Modifier,
     onSeekFinished: (() -> Unit)?,
 ) {
     val c = CassiniTheme.colors
     val group = stringResource(R.string.ui_player_group)
     Row(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxWidth()
             .background(c.surface)
             .drawBehind { drawRect(c.line, Offset.Zero, Size(size.width, 1.dp.toPx())) }
@@ -151,9 +245,9 @@ private fun CompactPlaybackBar(
                 contentDescription = group
             }
             .navigationBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = CompactPadding, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(CompactGap),
     ) {
         SkipButton(forward = false, onClick = onSkipBack)
         PlayPauseButton(playing = playing, onClick = onPlayPause)
@@ -162,14 +256,18 @@ private fun CompactPlaybackBar(
             text = Durations.clock(positionMs),
             style = CassiniTheme.type.monoSmall,
             color = c.text2,
-            modifier = Modifier.clearAndSetSemantics {},
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.clearAndSetSemantics { testTag = COMPACT_POSITION_TAG },
         )
         Box(Modifier.weight(1f)) { CassiniSlider(positionMs, durationMs, onSeek, onSeekFinished = onSeekFinished) }
         Text(
             text = Durations.clock(durationMs),
             style = CassiniTheme.type.monoSmall,
             color = c.text2,
-            modifier = Modifier.clearAndSetSemantics {},
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.clearAndSetSemantics { testTag = COMPACT_LENGTH_TAG },
         )
     }
 }
@@ -185,7 +283,7 @@ fun SkipButton(forward: Boolean, onClick: () -> Unit, modifier: Modifier = Modif
     val description = stringResource(if (forward) R.string.ui_player_forward_10 else R.string.ui_player_back_10)
     Box(
         modifier = modifier
-            .size(52.dp)
+            .size(SkipSize)
             .clip(CircleShape)
             .clickable(role = Role.Button, onClick = onClick)
             .clearAndSetSemantics { contentDescription = description },
@@ -215,7 +313,7 @@ fun PlayPauseButton(playing: Boolean, onClick: () -> Unit, modifier: Modifier = 
     val state = stringResource(if (playing) R.string.ui_player_playing else R.string.ui_player_paused)
     Box(
         modifier = modifier
-            .size(64.dp)
+            .size(PlayPauseSize)
             .clip(CircleShape)
             .background(c.inkFill)
             .clickable(
