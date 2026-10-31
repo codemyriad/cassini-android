@@ -54,14 +54,16 @@ backup=${backup:-$out/files-backup.tar}
 model_dirs="files/parakeet-ultra files/speaker-models files/vad"
 
 # A recursive listing (with hidden files such as .part) and the checksums of the "verified" markers. It uses adb shell,
-# which gives the exit status of the command (adb exec-out does not), so a failed listing stops the script.
+# which gives the exit status of the command (adb exec-out does not), so a failed listing stops the script. The
+# "total" lines (allocated blocks) are left out: the filesystem can change them for a file whose bytes stay the same
+# (seen on a CI emulator for the 104 MB speaker model).
 models_listing() {
     local listing
     if ! listing=$(adb shell "run-as $package sh -c 'ls -lAR $model_dirs && md5sum files/*/verified*'"); then
         printf 'Cannot list the model files of %s.\n' "$package" >&2
         return 1
     fi
-    printf '%s\n' "$listing" | tr -d '\r'
+    printf '%s\n' "$listing" | tr -d '\r' | grep -v '^total ' || true
 }
 
 # 0. The app and its models must be on the device: the walk uses them and never downloads.
