@@ -1,10 +1,11 @@
 [versions]
 # Build tooling. Verified together on 2026-10-31 with JDK 17 on CI:
-# Gradle 9.8.2 + AGP 9.5.0 (android.builtInKotlin=false, android.newDsl=false) + KGP 2.4.21.
-# AGP and Gradle are newer than the Kotlin Gradle plugin's documented range (AGP 8.5.2-9.3.1,
-# Gradle 7.6.3-9.7.0); KGP 2.4.21 is the latest stable Kotlin. If a build breaks in KGP, go back to
-# AGP 9.3.x and Gradle 9.7.x, which are inside that range.
-agp = "9.5.0"
+# Gradle 9.8.2 + AGP 9.3.3 (android.builtInKotlin=false, android.newDsl=false) + KGP 2.4.21.
+# Both are patch or minor releases past the Kotlin Gradle plugin's documented range (AGP 8.5.2-9.3.1,
+# Gradle 7.6.3-9.7.0); KGP 2.4.21 is the latest stable Kotlin.
+# Not AGP 9.5: its lint cannot load the lint checks of lifecycle-runtime 2.11.0 (ObsoleteLintCustomCheck,
+# an error here) and it deprecates the `android {}` DSL that android.newDsl=false keeps.
+agp = "9.3.3"
 kotlin = "2.4.21"
 ksp = "2.3.13"
 room = "2.8.5"

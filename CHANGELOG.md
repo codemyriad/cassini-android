@@ -9,7 +9,7 @@ We made the entries for 0.0.1-beta to 0.1.0 again from the release notes of thes
 ### Changed
 
 - The app is called Cassini talk. The launcher, the About card, the Licenses screen and the store title show the new name. Sentences in the app still say "Cassini". The package name stays `org.cassini.android`, so this version updates the installed app and keeps your notes, voices, models and settings.
-- zstd-jni 1.5.7-25, AndroidX DataStore 1.3.0 and kotlinx.serialization 1.12.0. The build uses Gradle 9.8.2 and AGP 9.5.0.
+- zstd-jni 1.5.7-25, AndroidX DataStore 1.3.0 and kotlinx.serialization 1.12.0. The build uses Gradle 9.8.2 and AGP 9.3.3.
 
 ### Fixed
 
