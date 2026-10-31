@@ -25,7 +25,7 @@ The `sherpa-onnx-aar` entry of `scripts/native-dependencies.json` pins the SHA-2
 | [piper-phonemize](https://github.com/csukuangfj/piper-phonemize/tree/f3ff95afc03640bc1399e113e83361192a2fafb4) | f3ff95afc03640bc1399e113e83361192a2fafb4 | MIT, including uni-algo notices |
 | [eSpeak NG](https://github.com/csukuangfj/espeak-ng/tree/ed530aa113046142eb5115cf2fc9157854d0ffe1) | ed530aa113046142eb5115cf2fc9157854d0ffe1 | GPL-3.0, with Apache/BSD/Unicode component notices |
 
-The APK also bundles [zstd-jni](https://central.sonatype.com/artifact/com.github.luben/zstd-jni/1.5.7-23) 1.5.7-23 (BSD-2-Clause, including Zstandard under BSD-3-Clause) from Maven Central, to decompress the speaker model download.
+The APK also bundles [zstd-jni](https://central.sonatype.com/artifact/com.github.luben/zstd-jni/1.5.7-25) 1.5.7-25 (BSD-2-Clause, including Zstandard under BSD-3-Clause) from Maven Central, to decompress the speaker model download.
 
 The streaming encoder bundles unmodified [libopus 1.5.2](https://github.com/xiph/opus/tree/v1.5.2), under its BSD license. Cassini’s JNI wrapper and its CMake build files are included in the corresponding source archive.
 
