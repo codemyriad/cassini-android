@@ -2,7 +2,7 @@ package org.cassini.android.acceptance
 
 import android.Manifest
 import android.graphics.Bitmap
-import android.os.SystemClock
+import android.os.Build
 import android.util.Log
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.ui.semantics.SemanticsActions
@@ -65,6 +65,10 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import java.io.File
+import java.util.Locale
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import org.cassini.ui.R as UiR
 
 /**
@@ -83,8 +87,9 @@ import org.cassini.ui.R as UiR
  *   File check failed.
  *
  * Arguments: `-e acceptanceLabel NAME` names the output folder, and [realModels] skips without it;
- * `-e acceptanceLanguage it` switches the app to Italian through Settings first and back to the phone language at the
- * end. The night mode is set by the script.
+ * `-e acceptanceLanguage TAG` switches the app language first and back to the phone language through Settings at the
+ * end: `it` through the Italiano segment of Settings, another app language (`fr`, `pt-BR`) as Android's per-app
+ * language setting sets it. The night mode is set by the script.
  */
 @Manual
 class AcceptanceWalkTest {
@@ -93,7 +98,7 @@ class AcceptanceWalkTest {
     private val graph get() = Flows.graph
     private val arguments get() = InstrumentationRegistry.getArguments()
     private val label get() = arguments.getString(ARG_LABEL)?.takeIf { it.matches(LABEL) } ?: "run"
-    private val italian get() = arguments.getString(ARG_LANGUAGE) == "it"
+    private val language get() = arguments.getString(ARG_LANGUAGE)?.takeIf { it.matches(LANGUAGE_TAG) }
     private val shots get() = File(graph.paths.root, "acceptance")
     private var languageChanged = false
 
@@ -139,7 +144,7 @@ class AcceptanceWalkTest {
         // It skips without its script: it imports, transcribes, records and enrols voices with the installed models.
         assumeTrue("Run the real-model walk with -e $ARG_LABEL NAME", arguments.containsKey(ARG_LABEL))
         assumeFalse("Run the real-model walk without emptyModelRoot", CassiniTestRunner.emptyModelRoot)
-        if (italian) chooseLanguage(ITALIANO, "it")
+        language?.let(::useLanguage)
         val notes = seed()
 
         // 00 Library: the progress banner and the queued row.
@@ -161,7 +166,7 @@ class AcceptanceWalkTest {
         library()
         graph.recording.finish()
         rule.waitFor("The recording is saved", FINISH_MS) { graph.recording.state.value is RecordingState.Ended }
-        if (italian) chooseLanguage(rule.text(UiR.string.ui_settings_language_phone), null)
+        if (language != null) chooseLanguage(rule.text(UiR.string.ui_settings_language_phone), null)
     }
 
     /** The notes of the walk, oldest first, and the jobs that run, pause and wait in the queue. */
@@ -261,12 +266,8 @@ class AcceptanceWalkTest {
         openRow(WEEKLY)
         see(rule.text(UiR.string.ui_action_stop_keep_progress))
         val header = hasText(rule.text(UiR.string.ui_draft_title))
-        val deadline = SystemClock.uptimeMillis() + SEE_MS
         val toHeader = { rule.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(header) }
-        while (runCatching { toHeader() }.isFailure) {
-            assertTrue("Not shown: the draft header", SystemClock.uptimeMillis() < deadline)
-            SystemClock.sleep(SETTLE_MS)
-        }
+        rule.waitFor("Not shown: the draft header", SEE_MS) { runCatching { toHeader() }.isSuccess }
         see(rule.text(UiR.string.ui_draft_title))
         shot("02-transcribing")
         library()
@@ -384,7 +385,7 @@ class AcceptanceWalkTest {
 
     @Test fun downloadScreens() {
         assumeTrue("Run the download walk with -e emptyModelRoot true", CassiniTestRunner.emptyModelRoot)
-        if (italian) chooseLanguage(ITALIANO, "it")
+        language?.let(::useLanguage)
         runBlocking {
             val id = Background.import(Background.assetCopy("fleurs-it-short.wav"))
             graph.awaitCatalogue().notes.rename(id, SUPPLIER_CALL)
@@ -438,7 +439,7 @@ class AcceptanceWalkTest {
         assertEquals("No file was written in the model root", emptyList<String>(), written)
         assertEquals("Every part is still missing", ModelPart.entries.toList(), ModelPlan.of(modelRoot).parts)
         library()
-        if (italian) chooseLanguage(rule.text(UiR.string.ui_settings_language_phone), null)
+        if (language != null) chooseLanguage(rule.text(UiR.string.ui_settings_language_phone), null)
     }
 
     // Helpers. -------------------------------------------------------------------------------------------------------
@@ -508,6 +509,18 @@ class AcceptanceWalkTest {
     }
 
     /**
+     * Switches the app to [tag]: Italian through its segment in Settings; a language without a segment (French,
+     * Portuguese) as Android's per-app language setting sets it, which Settings shows with no segment selected.
+     */
+    private fun useLanguage(tag: String) {
+        if (tag == "it") return chooseLanguage(ITALIANO, "it")
+        rule.runOnUiThread { AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(tag)) }
+        languageChanged = true
+        waitForLanguage(Locale.forLanguageTag(tag).language)
+        library()
+    }
+
+    /**
      * Picks the [segment] of App language in Settings and goes back to the Library. [language] is the app language
      * it gives (null: the phone's); the activity is created again with it.
      */
@@ -518,22 +531,55 @@ class AcceptanceWalkTest {
         rule.waitShown(choice)
         rule.onNode(choice).performClick()
         languageChanged = language != null
+        waitForLanguage(language)
+        rule.waitShown(hasText(rule.text(UiR.string.ui_settings_language), ignoreCase = true))
+        library()
+    }
+
+    /** Waits until the app locales and the activity have [language] (null: the phone's, no app locales). */
+    private fun waitForLanguage(language: String?) {
         rule.waitFor("The app language is ${language ?: "the phone's"}") {
             val locales = AppCompatDelegate.getApplicationLocales()
             val shown = runCatching { rule.activity.resources.configuration.locales[0].language }.getOrNull()
             if (language == null) locales.isEmpty else locales[0]?.language == language && shown == language
         }
-        rule.waitShown(hasText(rule.text(UiR.string.ui_settings_language), ignoreCase = true))
-        library()
     }
 
-    /** Saves a screenshot of the whole screen as `<name>.png` once the transitions have settled. */
+    /**
+     * Saves a screenshot of the whole screen as `<name>.png` once the screen is still and drawn: Compose is idle (its
+     * animations have ended), the window has sent no accessibility event for [QUIET_MS] (a sheet or activity
+     * transition has ended), and a frame drawn after that has reached the display, all within [STILL_MS]. Without the
+     * last step a Transcribing screenshot on the CI emulator showed the note screen with none of its content.
+     */
     private fun shot(name: String) {
-        SystemClock.sleep(SETTLE_MS)
+        rule.waitForIdle()
+        try {
+            Background.instrumentation.uiAutomation.waitForIdle(QUIET_MS, STILL_MS)
+        } catch (timeout: TimeoutException) {
+            throw AssertionError("The screen of $name did not become still (waited ${STILL_MS / 1_000} s)", timeout)
+        }
+        awaitDrawnFrame(name)
         val bitmap = checkNotNull(Background.instrumentation.uiAutomation.takeScreenshot()) { "No screenshot" }
         File(shots, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, PNG_QUALITY, it) }
         bitmap.recycle()
         Log.i(TAG, "Screenshot $name")
+    }
+
+    /** Draws the activity's window again and waits until that frame is committed to the display (API 29 and above). */
+    private fun awaitDrawnFrame(name: String) {
+        val committed = CountDownLatch(1)
+        rule.runOnUiThread {
+            val root = rule.activity.window.decorView
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                root.viewTreeObserver.registerFrameCommitCallback { committed.countDown() }
+            } else {
+                root.post { committed.countDown() }
+            }
+            root.invalidate()
+        }
+        if (!committed.await(STILL_MS, TimeUnit.MILLISECONDS)) {
+            throw AssertionError("No frame of $name reached the display (waited ${STILL_MS / 1_000} s)")
+        }
     }
 
     /** Waits for the note's job to end with a verified document, and returns it. */
@@ -579,7 +625,7 @@ class AcceptanceWalkTest {
         const val ARG_LABEL = "acceptanceLabel"
         const val ARG_LANGUAGE = "acceptanceLanguage"
         const val OUT = "acceptance-out"
-        val LABEL = Regex("[a-z0-9-]{1,32}")
+        val LABEL = Regex("[A-Za-z0-9-]{1,32}")
 
         const val WEEKLY = "Weekly product sync"
         const val INTERVIEW = "Interview — Marta"
@@ -593,6 +639,7 @@ class AcceptanceWalkTest {
         const val PAOLO = "Paolo Ferri"
         const val FIRST_NAME = "Anna"
         const val ITALIANO = "Italiano"
+        val LANGUAGE_TAG = Regex("[a-z]{2}(-[A-Z]{2})?")
         const val TOTAL_MB = "730"
         const val MANIFEST_SHA = "CASSINI_PAYLOAD_SHA256="
         const val MARK = "\u0000"
@@ -606,7 +653,8 @@ class AcceptanceWalkTest {
         const val FINISH_MS = 30_000L
         const val SEE_MS = 20_000L
         const val PLAYER_MS = 60_000L
-        const val SETTLE_MS = 800L
+        const val QUIET_MS = 500L
+        const val STILL_MS = 10_000L
         const val BACK_TRIES = 3
         const val BACK_MS = 5_000L
         const val FIRST_LOOK_MS = 200L

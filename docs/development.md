@@ -288,7 +288,7 @@ The script does these steps:
 1. It makes the test clips with `scripts/acceptance-audio.sh` (this needs ffmpeg).
 2. It writes a backup of `files/` without the models. Use `--backup FILE` to name the backup file.
 3. It builds the debug app and its test APK one time.
-4. It operates the walk in three variants: light, dark (`cmd uimode night yes`) and Italian.
+4. It operates the walk in three variants: light, dark (`cmd uimode night yes`) and Italian. `--variant fr` and `--variant pt-BR` add French and Brazilian Portuguese, for the store screenshots of those listings.
 5. It copies the screenshots to `build/acceptance/<run>/<variant>/` and deletes them on the device.
 6. It makes sure that the model files did not change. It compares a recursive list of the model files and the checksums of their `verified` files before and after the walk.
 7. It sets the night mode and the app language back to their values before the run.
@@ -302,7 +302,7 @@ Each variant has two parts. Each part is one test method and one instrumentation
 - `realModels` uses the installed models. It makes the notes through the repositories and the coordinator. Then it opens Library, Recording, Transcribing, Read & listen, Name a speaker, Note actions, Saved voices, Settings and Trash. It also shows the Paused, Not verified, Unreadable and Storage almost full banners.
 - `downloadScreens` uses an empty model root and `ScriptedModels`. It shows Model download, Downloading 46%, Checking 80%, No connection, Not enough storage and File check failed.
 
-The test saves each screenshot in its scratch root. At the end of the test, it copies the screenshots to `files/acceptance-out/<variant>/`, because the runner deletes the scratch root when the run ends. In the Italian variant, the test selects Italiano in Settings first and selects Phone at the end.
+The test saves each screenshot in its scratch root. At the end of the test, it copies the screenshots to `files/acceptance-out/<variant>/`, because the runner deletes the scratch root when the run ends. In the Italian variant, the test selects Italiano in Settings first and selects Phone at the end. In the French and Brazilian Portuguese variants, it sets the app language as Android's per-app language setting does (Settings then shows no segment selected) and selects Phone at the end. Before each screenshot the test waits until the screen is still: Compose is idle and the window sends no accessibility event for 500 ms.
 
 The test makes these notes for `realModels`:
 
@@ -321,7 +321,7 @@ The screenshots in the README come from this walk. To make them again, use these
 3. Make sure that they show only the FLEURS clip and the test names.
 4. Make them 540 pixels wide with Pillow, and make the files smaller with `optipng -o5 -strip all`.
 5. Save them as `docs/screenshots/<variant>/01-library.png` to `05-settings.png`, in the order of step 2.
-6. Save the light screenshots also as `metadata/en-US/images/phoneScreenshots/1.png` to `5.png`, in the same order.
+6. Save the light screenshots also as `metadata/en-US/images/phoneScreenshots/1.png` to `5.png`, in the same order. The French and Brazilian Portuguese variants give `metadata/fr-FR/images/phoneScreenshots/` and `metadata/pt-BR/images/phoneScreenshots/` the same way.
 
 The Settings screenshot (`05-settings.png` and the store image `5.png`) shows the version number of the app in the About card. The About card shows the product name and the version, for example "Cassini talk 0.3.0". After the owner changes `versionName` for a release, make this screenshot again ([`release.md`](release.md#make-a-release)).
 
