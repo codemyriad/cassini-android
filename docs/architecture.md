@@ -52,7 +52,7 @@ These constraints are mandatory:
 - Android stays native Kotlin. The iOS app is separate Swift code. The two apps share only the portable format.
 - `applicationId org.cassini.android` and the JNI class name `org.cassini.android.NativeOpus` do not change. The native symbols use the second name. The old plan kept a launcher alias for the library activity of 0.1.0. The app does not need this alias, because no installed shortcuts exist.
 - UI stack: Jetpack Compose, with Material 3 components under the Cassini tokens. The tokens give all of the style: there is no stock Material look and no dynamic color. The app uses ViewModels, `StateFlow`, a unidirectional data flow, coroutines and manual dependency injection (`AppGraph`).
-- Languages and accessibility: English and Italian, TalkBack support and 48 dp touch targets. The app never shows a state by color alone. It has the light theme of the boards and a dark theme that we made from it. It is edge-to-edge and has predictive back with targetSdk 36 (from P10).
+- Languages and accessibility: English, Italian, French, Spanish, and Brazilian and European Portuguese (coordination decisions D50 and D50.1), TalkBack support and 48 dp touch targets. The app never shows a state by color alone. It has the light theme of the boards and a dark theme that we made from it. It is edge-to-edge and has predictive back with targetSdk 36 (from P10).
 
 The privacy rules are:
 
@@ -138,7 +138,7 @@ This module holds these parts:
 - `components/`.
 - One package for each screen, with its `XxxScreen(state, onEvent)`, `XxxUiState` and `XxxEvent`.
 - `format/`: durations, dates, plurals and spoken descriptions.
-- All UI string resources, in English and Italian.
+- All UI string resources, in the six app languages (`values`, `values-it`, `values-fr`, `values-es`, `values-pt-rBR`, `values-pt-rPT`).
 - The bundled fonts, the drawables of the logo and the launcher icon, and the color resources for the window background.
 - The Roborazzi screenshot tests.
 

@@ -23,7 +23,7 @@ Each section ends with the **Acceptance** criteria. In these criteria, "JVM" is 
 - Placeholder speaker labels ("Speaker N" / "Voce N"): `DefaultLabels.isDefault` finds them. The UI shows them localized, from `placeholder_number`. The stored label does not change.
 - Speaker tint: a placeholder speaker is always amber ("not named yet"). The named speakers get blue, teal and violet, in this sequence, by their first turn in the variant on the screen. Placeholder speakers do not take a position in this sequence (`SpeakerTint` in `:core`). The label text always shows.
 - Saved-voice avatars: blue, teal, amber and violet, in sequence by the position in the list. The initial has the ink color of the tone.
-- Each string is a resource in English and Italian. Composite lines are format resources.
+- Each string is a resource in English (the source), Italian, French, Spanish, Brazilian Portuguese and European Portuguese (D50, D50.1). The terms follow the coordination glossary (`ux-draft/i18n/GLOSSARY.md`); "Cassini talk" and "Cassini" are never translated. A bare `pt` phone language gets Brazilian Portuguese, the other Portuguese regions get European Portuguese, a regional variant gets its base language (es-MX → es) and any other language gets English. `TranslationsTest` (:app) checks that every string is in every language with the English format arguments and the CLDR plural categories. Composite lines are format resources.
 
 ## 1. Library (board 00) [CHANGED]
 
@@ -302,7 +302,7 @@ If a cue has more than 42 characters, the writer breaks the line. It uses the sp
 
 ## 11. Settings (board 08) and Licenses
 
-- **App language**: a segmented control Phone / English / Italiano. It calls `AppCompatDelegate.setApplicationLocales` (an empty list = Phone). For a11y, it is a radio group. The footnote is "Speech is recognised in any language, automatically."
+- **App language**: a segmented control Phone / English / Italiano. It calls `AppCompatDelegate.setApplicationLocales` (an empty list = Phone). A language set in Android's per-app language setting that has no segment (French, Spanish, Portuguese) selects no segment, and Phone then clears it; Settings reads the language again when it resumes. For a11y, it is a radio group. The footnote is "Speech is recognised in any language, automatically."
 - **On-device models**: "Speech recognition — INT8 · 640 MB", "Telling speakers apart — 62 MB" and "Recognising saved voices — 28 MB", with a status text. The status texts are Ready (teal), "Downloading 46%" / "Checking files" (blue), "Downloads with next transcription" (consent given and the model is missing, amber), "Not downloaded" (no consent, and the row opens Model download) and "Download failed — tries again next time" (red). A "Download failed" row also opens Model download, without a note. There, Download starts the download again (section 5). For example, the row shows "Download failed" after Android stops a standalone download (architecture.md section 5.7, step 6). Nothing tries again in the background. The next transcription that needs the model, or a tap on the row, starts the download again. The other rows are not buttons. The footnote is "Transcription runs on this phone. Audio never leaves it." There is no delete action.
 - **Privacy**: "Saved voices — 4 people" ("None yet") opens Saved voices. "Trash — 2 notes" ("Empty") opens Trash.
 - **About**: "**Cassini <versionName>** — turns speech into searchable, timed text on your phone." "Free software under GPLv3. Source code and notices" opens Licenses.

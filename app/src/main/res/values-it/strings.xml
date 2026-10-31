@@ -47,7 +47,7 @@
     <string name="notif_processing_checking">Verifica dei file — %1$d%%</string>
     <string name="notif_processing_public">Trascrizione di una nota</string>
     <string name="notif_part_speech">riconoscimento vocale</string>
-    <string name="notif_part_speakers">distinguere chi parla</string>
+    <string name="notif_part_speakers">distinzione delle voci</string>
     <string name="notif_part_voices">riconoscere le voci salvate</string>
     <plurals name="notif_queue_more">
         <item quantity="one">ancora %d in coda</item>
@@ -61,7 +61,7 @@
     <string name="notif_time_minutes_range">%1$d–%2$d min</string>
     <string name="notif_time_hours">%1$d h</string>
     <string name="notif_time_hours_minutes">%1$d h %2$d min</string>
-    <string name="notif_action_stop">Interrompi</string>
+    <string name="notif_action_stop">Ferma</string>
     <string name="notif_action_open">Apri</string>
     <string name="notif_action_cancel">Annulla</string>
     <string name="notif_action_resume">Riprendi</string>
@@ -100,8 +100,8 @@
     <string name="notif_action_pause">Pausa</string>
     <string name="notif_action_finish">Termina</string>
     <string name="notif_rec_stopped_title">Registrazione interrotta</string>
-    <string name="notif_rec_stopped_text">Meno di 200 MB liberi. La registrazione fatta finora è salvata.</string>
-    <string name="notif_rec_file_full_text">Cassini chiude le registrazioni M4A a 1 GB, circa 74 ore. La registrazione fatta finora è salvata. Avvia una nuova registrazione per continuare.</string>
+    <string name="notif_rec_stopped_text">Meno di 200 MB liberi. La registrazione fin qui è salvata.</string>
+    <string name="notif_rec_file_full_text">Cassini chiude le registrazioni M4A a 1 GB, circa 74 ore. La registrazione fin qui è salvata. Avvia una nuova registrazione per continuare.</string>
     <string name="notif_rec_failed_title">Il microfono ha smesso di funzionare</string>
-    <string name="notif_rec_failed_text">Registrazione terminata. L\'audio registrato finora è nella libreria.</string>
+    <string name="notif_rec_failed_text">Registrazione terminata. L\'audio fin qui è nella libreria.</string>
 </resources>

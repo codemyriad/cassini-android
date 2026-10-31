@@ -1,6 +1,7 @@
 package org.cassini.ui.format
 
 import android.content.res.Resources
+import android.text.format.DateFormat
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
@@ -8,6 +9,7 @@ import org.cassini.ui.R
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /**
  * A day as the ViewModel classifies it with its injected clock (ui.md section 2): the UI never asks what today is.
@@ -34,7 +36,7 @@ object Dates {
             DayLabel.Today -> res.getString(R.string.ui_day_today)
             DayLabel.Yesterday -> res.getString(R.string.ui_day_yesterday)
             is DayLabel.Date -> {
-                val pattern = if (label.withYear) "d MMM yyyy" else "EEEE d MMM"
+                val pattern = if (label.withYear) DAY_MONTH_YEAR else WEEKDAY_DAY_MONTH
                 capitalise(pattern(pattern, format).format(label.date), format)
             }
         }
@@ -49,7 +51,7 @@ object Dates {
 
     /** "8 Oct", or "8 Oct 2025" with the year. */
     fun shortDate(date: LocalDate, withYear: Boolean, format: FormatSettings): String =
-        pattern(if (withYear) "d MMM yyyy" else "d MMM", format).format(date)
+        pattern(if (withYear) DAY_MONTH_YEAR else DAY_MONTH, format).format(date)
 
     /** "8 Oct, 15:40" (the Versions sheet), with the year when [withYear]. */
     fun shortDateTime(
@@ -85,6 +87,26 @@ object Dates {
 
     private fun pattern(pattern: String, format: FormatSettings): DateTimeFormatter =
         DateTimeFormatter.ofPattern(pattern, format.locale)
+
+    /**
+     * A date pattern for [format]'s locale (D50 point 5): the CLDR pattern of [skeleton] (ICU's best pattern, as
+     * `DateFormat.getBestDateTimePattern` gives it), so French reads "lundi 5 oct." and Portuguese "segunda-feira,
+     * 5 de out.". English keeps the boards' day-month order ("Monday 5 Oct", features.md section 0) in every region;
+     * the CLDR patterns of Italian are the boards' Italian ones.
+     */
+    private fun pattern(skeleton: Skeleton, format: FormatSettings): DateTimeFormatter =
+        if (format.locale.language == Locale.ENGLISH.language) {
+            pattern(skeleton.english, format)
+        } else {
+            pattern(DateFormat.getBestDateTimePattern(format.locale, skeleton.skeleton), format)
+        }
+
+    /** A CLDR date skeleton and the boards' English pattern for it. */
+    private class Skeleton(val skeleton: String, val english: String)
+
+    private val WEEKDAY_DAY_MONTH = Skeleton("EEEEdMMM", "EEEE d MMM")
+    private val DAY_MONTH = Skeleton("dMMM", "d MMM")
+    private val DAY_MONTH_YEAR = Skeleton("dMMMy", "d MMM yyyy")
 
     private fun capitalise(text: String, format: FormatSettings): String =
         text.replaceFirstChar { it.titlecase(format.locale) }

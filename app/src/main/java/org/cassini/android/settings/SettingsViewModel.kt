@@ -97,11 +97,18 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
         }
     }
 
-    /** ON_RESUME: the notification permission may have changed in the system settings. */
-    fun onResume() = ports.refreshNotices()
+    /**
+     * ON_RESUME: the notification permission or the app language may have changed in the system settings. A language
+     * change there creates the activity again but keeps this ViewModel.
+     */
+    fun onResume() {
+        language.value = ports.language()
+        ports.refreshNotices()
+    }
 
     private fun choose(next: LanguageChoice) {
-        if (next == language.value) return
+        // With Other (a language from the system settings) every segment differs, so Phone clears that language.
+        if (next == language.value || next == LanguageChoice.OTHER) return
         language.value = next
         ports.setLanguage(next)
     }

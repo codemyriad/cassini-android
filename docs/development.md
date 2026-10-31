@@ -84,7 +84,7 @@ The root task `ciTest` runs `:core:test`. For each Android module, it runs `veri
 |---|---|---|
 | JVM | `:core:test`, `:engine:testDebugUnitTest`, `:app:testDebugUnitTest` | The engine tests, the codec goldens, the pure rules, `TranscriptionJob` with fakes, the coordinators and the ViewModels |
 | Robolectric | `:data:testDebugUnitTest` and the Robolectric tests of the other modules | The repositories and DAOs, the full-text search, the purge order, the catalogue rebuild, the font and license assets |
-| Screenshots | `:ui:verifyRoborazziDebug` | Each board compared with its golden, in light, dark, Italian and 1.5x font scale |
+| Screenshots | `:ui:verifyRoborazziDebug` | Each board compared with its golden, in light, dark, Italian, French and 1.5x font scale |
 | Device | `scripts/device-smoke.sh` | Instrumentation tests on an emulator or a phone (see [Device scripts](#device-scripts)) |
 | Host persistence | `scripts/device-kill-resume.sh`, `scripts/device-language-check.sh`, `scripts/note-opening-timing.sh` | Process death, the app language and the time to open a note, driven from the host |
 | Acceptance | `scripts/acceptance-walk.sh` | An instrumented walk through each board on emulator-5554, with device screenshots that a reviewer compares with the design (see [acceptance-walk.sh](#acceptance-walksh)) |

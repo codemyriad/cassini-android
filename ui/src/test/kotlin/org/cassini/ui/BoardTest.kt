@@ -4,8 +4,11 @@ import android.content.res.Configuration
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.text.TextLayoutResult
 import com.github.takahirom.roborazzi.RoborazziOptions
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.github.takahirom.roborazzi.captureScreenRoboImage
@@ -92,6 +95,29 @@ abstract class BoardTest {
         assertEquals("Compose did not pick up the font scale", fontScale, densityFontScale, FONT_SCALE_DELTA)
     }
 
+    /**
+     * The texts on screen, in every window, that do not fit their layout now, each as "<text> (<how>)": a line
+     * shortened with "…", more lines than its maxLines, lines below the bottom of the text, or a line wider than
+     * the text's node.
+     * TextLayoutResult.hasVisualOverflow is no help here: under Robolectric it is true for every one-line text.
+     */
+    fun cutTexts(): List<String> = rule.onAllNodes(hasGetTextLayoutAction(), useUnmergedTree = true)
+        .fetchSemanticsNodes()
+        .mapNotNull { node ->
+            val results = mutableListOf<TextLayoutResult>()
+            node.config[SemanticsActions.GetTextLayoutResult].action?.invoke(results)
+            val layout = results.firstOrNull() ?: return@mapNotNull null
+            val lines = 0 until layout.lineCount
+            val how = when {
+                lines.any(layout::isLineEllipsized) -> "ellipsized"
+                layout.multiParagraph.didExceedMaxLines -> "more lines than maxLines"
+                layout.multiParagraph.height > layout.size.height + 1 -> "cut at the bottom"
+                lines.any { layout.getLineRight(it) - layout.getLineLeft(it) > node.size.width + 1 } -> "cut at the side"
+                else -> return@mapNotNull null
+            }
+            "${layout.layoutInput.text} ($how)"
+        }
+
     companion object {
         /** The boards' phone: 390 x 844 dp at xhdpi (2x). */
         const val PHONE = "w390dp-h844dp-xhdpi"
@@ -105,6 +131,8 @@ abstract class BoardTest {
         private const val CLOCK_ADVANCE_MS = 1_000L
         private const val FONT_SCALE_DELTA = 0.001f
         private const val CHANGE_THRESHOLD = 0.0005f
+
+        private fun hasGetTextLayoutAction() = SemanticsMatcher.keyIsDefined(SemanticsActions.GetTextLayoutResult)
 
         /** The compare options of every golden. */
         val OPTIONS: RoborazziOptions = RoborazziOptions(

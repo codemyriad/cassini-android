@@ -85,12 +85,13 @@ import org.cassini.engine.job.JobEnvironment
 import org.cassini.engine.job.JobStorage
 import org.cassini.engine.job.JobVoices
 import org.cassini.engine.job.ModelAccess
+import org.cassini.ui.format.Dates
+import org.cassini.ui.format.FormatSettings
 import java.io.File
 import java.io.IOException
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -424,13 +425,14 @@ class AppGraph(context: Context, val config: Config) {
         val localized = app.inAppLanguage()
         val locale = localized.resources.configuration.locales[0] ?: Locale.getDefault()
         val time = Instant.ofEpochMilli(createdAt).atZone(config.zone())
-        val date = DateTimeFormatter.ofPattern(TITLE_DATE_PATTERN, locale).format(time).replace(".", "")
-        return localized.getString(R.string.rec_default_title, date)
+        // The Library's short date and a 24-hour time, in the app language's date pattern (D50 point 5).
+        val format = FormatSettings(locale, is24Hour = true, zone = config.zone())
+        val date = Dates.shortDateTime(localized.resources, time.toLocalDate(), time.toLocalTime(), false, format)
+        return localized.getString(R.string.rec_default_title, date.replace(".", ""))
     }
 
     companion object {
         private const val TAG = "AppGraph"
-        private const val TITLE_DATE_PATTERN = "d MMM, HH:mm"
         private const val CLOSE_WAIT_MS = 10_000L
         private const val CLOSE_POLL_MS = 10L
 

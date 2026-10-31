@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Italian copy in the register of docs/design/ui.md section 12. Same names and arguments as values/strings.xml. -->
 <resources>
+    <!-- Size units. -->
+    <string name="ui_percent">%1$d%%</string>
+    <string name="ui_size_mb">%1$s MB</string>
+    <string name="ui_size_gb">%1$s GB</string>
+
     <!-- Shared buttons and labels. -->
     <string name="ui_action_cancel">Annulla</string>
     <string name="ui_action_close">Chiudi</string>
@@ -10,7 +15,7 @@
     <string name="ui_action_rename_more">Rinomina…</string>
     <string name="ui_action_delete">Elimina</string>
     <string name="ui_action_save">Salva</string>
-    <string name="ui_action_move_to_trash">Sposta nel cestino</string>
+    <string name="ui_action_move_to_trash">Sposta nel Cestino</string>
     <string name="ui_action_resume">Riprendi</string>
     <string name="ui_action_start_over">Ricomincia</string>
     <string name="ui_action_try_again">Riprova</string>
@@ -139,7 +144,7 @@
     <string name="ui_library_record_description">Registra una nuova nota</string>
     <string name="ui_library_recording_fab">Registrazione · %1$s</string>
     <string name="ui_library_return_to_recording">Torna alla registrazione</string>
-    <string name="ui_library_moved_to_trash">“%1$s” spostata nel cestino</string>
+    <string name="ui_library_moved_to_trash">“%1$s” spostata nel Cestino</string>
 
     <string name="ui_status_recording">Registrazione in corso</string>
     <string name="ui_status_transcribing">In trascrizione</string>
@@ -349,7 +354,7 @@
     <string name="ui_actions_fresh_body">Le versioni precedenti non si possono conservare perché l’audio è cambiato.</string>
     <string name="ui_actions_document_info">Informazioni sul documento</string>
     <string name="ui_actions_trash_body">Conservata per 30 giorni, poi eliminata.</string>
-    <string name="ui_actions_trash_running">Fermare la trascrizione e spostare nel cestino?</string>
+    <string name="ui_actions_trash_running">Fermare la trascrizione e spostare nel Cestino?</string>
 
     <string name="ui_info_trust">Stato</string>
     <string name="ui_info_title">Titolo</string>
@@ -386,7 +391,7 @@
         <item quantity="other">Eliminare %1$s note per sempre?</item>
     </plurals>
     <string name="ui_trash_delete_all_body">L’audio, le trascrizioni e le impronte vocali vengono eliminati. Non si può annullare.</string>
-    <string name="ui_trash_is_empty">Il cestino è vuoto</string>
+    <string name="ui_trash_is_empty">Il Cestino è vuoto</string>
     <string name="ui_trash_is_empty_body">Le note che elimini restano qui per 30 giorni.</string>
 
     <!-- Voci salvate. -->
@@ -461,17 +466,17 @@
     <string name="ui_banner_plain_audio_title">Solo audio</string>
     <string name="ui_banner_plain_audio_body">Ancora nessuna trascrizione.</string>
     <string name="ui_banner_unplayable_title">Questa registrazione non si può riprodurre</string>
-    <string name="ui_banner_unplayable_body">Cassini si è chiusa prima di salvare la registrazione. Puoi comunque salvare il file.</string>
+    <string name="ui_banner_unplayable_body">Cassini si è chiuso prima di salvare la registrazione. Puoi comunque salvare il file.</string>
 
     <string name="ui_banner_rec_paused_other_app_title">In pausa — un’altra app sta usando l’audio</string>
     <string name="ui_banner_rec_paused_other_app_body">Riprendi quando finisce la chiamata. Non si è perso nulla.</string>
     <string name="ui_banner_rec_storage_low_title">Memoria quasi piena — restano circa %1$s</string>
     <string name="ui_banner_rec_storage_low_body">Libera spazio per continuare. Se si esaurisce, la registrazione viene salvata automaticamente.</string>
-    <string name="ui_banner_rec_stopped_file_title">Fermata — file della registrazione pieno</string>
+    <string name="ui_banner_rec_stopped_file_title">Registrazione interrotta — file pieno</string>
     <string name="ui_banner_rec_stopped_file_body">Cassini chiude le registrazioni M4A a 1\u00A0GB, circa 74\u00A0ore. La registrazione fin qui è salvata. Avvia una nuova registrazione per continuare.</string>
     <string name="ui_banner_rec_file_low_title">File della registrazione quasi pieno — restano circa %1$s</string>
     <string name="ui_banner_rec_file_low_body">Cassini chiude le registrazioni M4A a 1\u00A0GB e le salva. Per continuare, termina e avvia una nuova registrazione.</string>
-    <string name="ui_banner_rec_stopped_storage_title">Fermata — memoria quasi piena</string>
+    <string name="ui_banner_rec_stopped_storage_title">Registrazione interrotta — memoria quasi piena</string>
     <string name="ui_banner_rec_stopped_storage_body">Meno di %1$s liberi. La registrazione fin qui è salvata.</string>
     <string name="ui_banner_rec_mic_off_title">L’accesso al microfono è disattivato</string>
     <string name="ui_banner_rec_mic_off_body">Attivalo nelle impostazioni di sistema. La registrazione parte quando torni.</string>
@@ -484,7 +489,7 @@
         <item quantity="many">%1$s registrazioni recuperate</item>
         <item quantity="other">%1$s registrazioni recuperate</item>
     </plurals>
-    <string name="ui_banner_recovered_body">Cassini si è chiusa inaspettatamente. Abbiamo salvato ciò che era stato registrato (%1$s).</string>
+    <string name="ui_banner_recovered_body">Cassini si è chiuso inaspettatamente. Abbiamo salvato ciò che era stato registrato (%1$s).</string>
 
     <string name="ui_banner_tx_paused_title">In pausa a %1$s di %2$s</string>
     <string name="ui_banner_tx_paused_body">Riprendi da dove avevi lasciato. La bozza fin qui è conservata.</string>

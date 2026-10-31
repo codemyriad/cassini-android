@@ -19,8 +19,12 @@ data class SettingsUiState(
     val notificationsOff: Boolean = false,
 )
 
-/** The App language segments: Phone (follow the system), English, Italiano. */
-enum class LanguageChoice { PHONE, ENGLISH, ITALIAN }
+/**
+ * The app language: the segments Phone (follow the system), English and Italiano, and [OTHER], a language set for the
+ * app outside it (Android's per-app language setting, with the languages of `locales_config`) that has no segment.
+ * With [OTHER] no segment is selected, and each segment, Phone included, sets the app language again.
+ */
+enum class LanguageChoice { PHONE, ENGLISH, ITALIAN, OTHER }
 
 /** One On-device models row: the part, its size in bytes and its status text. */
 @Immutable

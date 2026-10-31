@@ -1,6 +1,7 @@
 package org.cassini.ui.screens
 
 import org.cassini.ui.BoardTest
+import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.robolectric.annotation.Config
 import java.util.Locale
@@ -8,13 +9,17 @@ import java.util.Locale
 /**
  * Six boards in Italian (docs/design/ui.md section 10.2), goldens only in `it/`: the strings come from `values-it`
  * and the dates and numbers from the Italian locale. The fixtures' own content (titles, transcript words, names)
- * stays as the boards write it. The longer Italian copy must wrap, never clip.
+ * stays as the boards write it. The longer Italian copy must wrap, never clip: [cutTexts] finds no text that does
+ * not fit.
  */
 @Config(qualifiers = "+it")
 class LocaleScreenshotTest : BoardTest() {
     override val locale: Locale = Locale.ITALIAN
 
-    private fun italian(slug: String) = board("it", slug) { BoardContent(slug) }
+    private fun italian(slug: String) {
+        board("it", slug) { BoardContent(slug) }
+        assertEquals("Texts that do not fit", emptyList<String>(), cutTexts())
+    }
 
     @Test fun library() = italian("00-library")
 
