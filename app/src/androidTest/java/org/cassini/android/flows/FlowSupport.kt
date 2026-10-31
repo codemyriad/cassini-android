@@ -3,9 +3,12 @@ package org.cassini.android.flows
 import android.app.Instrumentation
 import android.content.Intent
 import android.net.Uri
+import android.view.View
+import android.view.ViewGroup
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.SemanticsMatcher
@@ -56,6 +59,31 @@ internal object Flows {
         logOnTimeout(matcher) {
             waitUntil(timeoutMs) { onAllNodes(matcher, useUnmergedTree = unmerged).fetchSemanticsNodes().isNotEmpty() }
         }
+
+    /**
+     * Waits until a node matches [matcher] without waiting for the UI to go idle first, as [waitShown] does. Use it
+     * while the player plays: it redraws every frame then, so an idle-synced lookup returns only after playback ends.
+     */
+    fun AppRule.waitShownLive(matcher: SemanticsMatcher, timeoutMs: Long = SCREEN_MS, unmerged: Boolean = false) =
+        logOnTimeout(matcher) {
+            waitUntil(timeoutMs) { liveNodes(unmerged).any(matcher::matches) }
+        }
+
+    /** The semantics nodes of the activity's window as they are now, read on the UI thread without an idle sync. */
+    fun AppRule.liveNodes(unmerged: Boolean = false): List<SemanticsNode> = runOnUiThread {
+        composeRoots(activity.window.decorView).flatMap { root ->
+            val owner = root.semanticsOwner
+            descendants(if (unmerged) owner.unmergedRootSemanticsNode else owner.rootSemanticsNode)
+        }
+    }
+
+    private fun composeRoots(view: View): List<ViewRootForTest> = when {
+        view is ViewRootForTest -> listOf(view)
+        view is ViewGroup -> (0 until view.childCount).flatMap { composeRoots(view.getChildAt(it)) }
+        else -> emptyList()
+    }
+
+    private fun descendants(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::descendants)
 
     /** Runs [wait]; on a timeout logs the screen's semantics tree (tag CassiniFlow) before the failure. */
     private fun AppRule.logOnTimeout(matcher: SemanticsMatcher, wait: () -> Unit) {
