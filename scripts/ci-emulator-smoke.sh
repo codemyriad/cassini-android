@@ -78,18 +78,28 @@ error_dialog() {
     adb shell dumpsys window windows | tr -d '\r' | grep -m 1 -oE 'Application (Not Responding|Error): [^ }:]+' || true
 }
 dialog_closed() { [ "$(error_dialog)" != "$1" ]; }
+# From the start of an ANR until its end (a dialog, or the process killed) the activity manager marks the app as not
+# responding (mNotResponding=true in its process list).
+not_responding() {
+    [ -n "$(adb shell dumpsys activity processes | tr -d '\r' | grep -oE 'otResponding=true' || true)" ]
+}
+anr_settled() { [ -n "$(error_dialog)" ] || ! not_responding; }
 # Android reports no state for the setting (no API level dumps mShowDialogs), so there is nothing to wait for: the
 # system server applies it when the settings provider notifies it.
 adb shell settings put global hide_error_dialogs 1
+# The launcher ANR starts before this script (the runner's `input keyevent` returns when the key is dropped and the
+# ANR raised), and its dialog can open after the first look: in run 41188862768 the window list had no dialog at
+# 09:44:07.0 and the dialog opened at 09:44:07.05, after the trace dumps. So each ANR in progress ends first.
 for _ in 1 2 3 4 5; do
+    wait_for 60 'An app is still in an ANR: it got neither an error dialog nor stopped' anr_settled
     dialog=$(error_dialog)
     [ -n "$dialog" ] || break
     printf 'Closing a system error dialog before the tests: %s\n' "$dialog"
     adb shell am force-stop "${dialog##* }"
     wait_for 10 "The system error dialog did not close: $dialog" dialog_closed "$dialog"
 done
-if [ -n "$(error_dialog)" ]; then
-    printf 'A system error dialog is still open: %s\n' "$(error_dialog)" >&2
+if [ -n "$(error_dialog)" ] || not_responding; then
+    printf 'A system error dialog is still open (%s), or an app is still in an ANR\n' "$(error_dialog)" >&2
     exit 1
 fi
 

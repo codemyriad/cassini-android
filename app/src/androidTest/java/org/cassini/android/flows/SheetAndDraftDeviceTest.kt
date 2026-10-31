@@ -2,7 +2,6 @@ package org.cassini.android.flows
 
 import android.graphics.Bitmap
 import android.os.Build
-import android.os.SystemClock
 import android.util.Log
 import android.view.View
 import androidx.activity.ComponentActivity
@@ -13,6 +12,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
@@ -128,7 +128,7 @@ class SheetAndDraftDeviceTest {
     }
 
     /** Where the open sheet is, in px of its window. */
-    private class SheetWithKeyboard(val statusBar: Int, val sheet: Rect, val keyboardTop: Int)
+    private data class SheetWithKeyboard(val statusBar: Int, val sheet: Rect, val keyboardTop: Int)
 
     /**
      * Shows the Name a speaker sheet, opens the soft keyboard on its Name field, then runs [check]. With [fontScale]
@@ -146,25 +146,27 @@ class SheetAndDraftDeviceTest {
         try {
             if (fontScale != null) useFontScale(fontScale.toFloat(), fontScale)
             rule.setContent { CassiniTheme(darkTheme = false) { NoteScreen(naming, onEvent = {}) } }
-            rule.onNode(hasSetTextAction()).performClick()
-            assertTrue("The soft keyboard did not open", waitForKeyboard())
-            // The field is in the sheet's own dialog window: read the insets and the height of that window.
-            val fieldRoot = rule.onNode(hasSetTextAction()).fetchSemanticsNode().root as ViewRootForTest
-            val sheetWindow = fieldRoot.view.rootView
-            val keyboard = waitForKeyboardInset(sheetWindow)
-            rule.waitForIdle()
-            SystemClock.sleep(SETTLE_MS)
-            val insets = rule.runOnUiThread { requireNotNull(ViewCompat.getRootWindowInsets(sheetWindow)) }
-            val statusBar = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top
-            val window = rule.runOnUiThread { sheetWindow.height }
-            val sheet = rule.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.PaneTitle))
-                .fetchSemanticsNode().boundsInWindow
+            val field = rule.onNode(hasSetTextAction())
+            // The field is in the sheet's own dialog window: wait for its focus, read its insets and its height.
+            val sheetWindow = (field.fetchSemanticsNode().root as ViewRootForTest).view.rootView
+            waitFor(KEYBOARD_MS, { "The sheet window got no input focus; ${Flows.focusReport()}" }) {
+                rule.runOnUiThread { sheetWindow.hasWindowFocus() }
+            }
+            field.performClick()
+            waitFor(KEYBOARD_MS, { "The soft keyboard did not open (${imeReport()}; ${Flows.focusReport()})" }) {
+                keyboardInset(sheetWindow) > 0
+            }
+            // The window has the final inset from the start of the keyboard animation; ModalBottomSheet pads its window
+            // by the animated inset, so the sheet stands on the keyboard when the animation has ended.
+            var placed = placement(sheetWindow)
+            waitFor(KEYBOARD_MS, { "The sheet does not stand on the keyboard: $placed" }) {
+                placed = placement(sheetWindow)
+                abs(placed.sheet.bottom - placed.keyboardTop) <= 1f
+            }
             shot(shotName)
             val scale = rule.activity.resources.configuration.fontScale
-            Log.i(TAG, "Font scale $scale, status bar $statusBar px, sheet ${sheet.top}..${sheet.bottom} px")
-            Log.i(TAG, "Window $window px, keyboard $keyboard px")
-            assertTrue("The keyboard inset is 0 px (API ${Build.VERSION.SDK_INT})", keyboard > 0)
-            check(SheetWithKeyboard(statusBar, sheet, window - keyboard))
+            Log.i(TAG, "Font scale $scale, $placed")
+            check(placed)
         } finally {
             val unset = before == "null" || before.isEmpty()
             shell(if (unset) "settings delete secure $SHOW_IME" else "settings put secure $SHOW_IME $before")
@@ -180,40 +182,46 @@ class SheetAndDraftDeviceTest {
     /** Sets the system font scale and waits until the activity has it (Android creates it again), then edge to edge. */
     private fun useFontScale(scale: Float, setting: String) {
         shell("settings put system $FONT_SCALE $setting")
-        val end = SystemClock.uptimeMillis() + FONT_SCALE_MS
-        while (abs(rule.activity.resources.configuration.fontScale - scale) > FONT_SCALE_DELTA) {
-            assertTrue("The activity did not get font scale $scale", SystemClock.uptimeMillis() < end)
-            SystemClock.sleep(POLL_MS)
+        waitFor(FONT_SCALE_MS, { "The activity did not get font scale $scale" }) {
+            abs(rule.activity.resources.configuration.fontScale - scale) <= FONT_SCALE_DELTA
         }
         rule.waitForIdle()
         rule.runOnUiThread { rule.activity.enableEdgeToEdge() }
     }
 
     /**
-     * Waits up to 5 s until the IME inset of [window] is above 0, and gives that inset (0 at the timeout). The window
-     * gets the inset some time after `dumpsys input_method` reports the keyboard. Before API 30 the sheet's dialog
-     * window resizes for the keyboard, so WindowInsetsCompat can find the IME inset there too.
+     * The IME inset of [window] in px, 0 while the keyboard is closed. Before API 30 the sheet's dialog window gets
+     * the keyboard as a system window inset, and WindowInsetsCompat finds the IME inset there too.
      */
-    private fun waitForKeyboardInset(window: View): Int {
-        val end = SystemClock.uptimeMillis() + KEYBOARD_MS
-        while (true) {
-            val inset = rule.runOnUiThread {
-                ViewCompat.getRootWindowInsets(window)?.getInsets(WindowInsetsCompat.Type.ime())?.bottom ?: 0
-            }
-            if (inset > 0 || SystemClock.uptimeMillis() >= end) return inset
-            SystemClock.sleep(POLL_MS)
-        }
+    private fun keyboardInset(window: View): Int = rule.runOnUiThread {
+        ViewCompat.getRootWindowInsets(window)?.getInsets(WindowInsetsCompat.Type.ime())?.bottom ?: 0
     }
 
-    /** Waits up to 5 s for the soft keyboard; true when it opened. */
-    private fun waitForKeyboard(): Boolean {
-        val end = SystemClock.uptimeMillis() + KEYBOARD_MS
-        while (SystemClock.uptimeMillis() < end) {
-            val report = shell("dumpsys input_method")
-            if ("mInputShown=true" in report || "isInputViewShown=true" in report) return true
-            SystemClock.sleep(POLL_MS)
+    /** Where the sheet is now in [window], with the status bar and the keyboard of that window. */
+    private fun placement(window: View): SheetWithKeyboard {
+        val (statusBar, height) = rule.runOnUiThread {
+            val insets = requireNotNull(ViewCompat.getRootWindowInsets(window))
+            insets.getInsets(WindowInsetsCompat.Type.statusBars()).top to window.height
         }
-        return false
+        val sheet = rule.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.PaneTitle))
+            .fetchSemanticsNode().boundsInWindow
+        return SheetWithKeyboard(statusBar, sheet, height - keyboardInset(window))
+    }
+
+    /** What the input method service reports, for a failure message: whether it shows the keyboard. */
+    private fun imeReport(): String {
+        val report = shell("dumpsys input_method")
+        val shown = "mInputShown=true" in report || "isInputViewShown=true" in report
+        return "API ${Build.VERSION.SDK_INT}, input method ${if (shown) "shows" else "does not show"} the keyboard"
+    }
+
+    /** Waits until [condition] holds; at [timeoutMs] fails with [message], built then. */
+    private fun waitFor(timeoutMs: Long, message: () -> String, condition: () -> Boolean) {
+        try {
+            rule.waitUntil(timeoutMs, condition)
+        } catch (timeout: ComposeTimeoutException) {
+            throw AssertionError("${message()} (waited ${timeoutMs / 1_000} s)", timeout)
+        }
     }
 
     private fun shell(command: String): String {
@@ -224,7 +232,7 @@ class SheetAndDraftDeviceTest {
     }
 
     private fun shot(name: String) {
-        SystemClock.sleep(SETTLE_MS)
+        rule.waitForIdle()
         val bitmap = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot() ?: return
         val dir = File(rule.activity.filesDir, "device-checks").apply { mkdirs() }
         File(dir, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, PNG_QUALITY, it) }
@@ -239,8 +247,6 @@ class SheetAndDraftDeviceTest {
         const val FONT_SCALE_MS = 10_000L
         const val FONT_SCALE_DELTA = 0.01f
         const val KEYBOARD_MS = 5_000L
-        const val POLL_MS = 200L
-        const val SETTLE_MS = 600L
         const val PNG_QUALITY = 100
         const val TURNS = 14
         const val MINUTE = 60_000L
