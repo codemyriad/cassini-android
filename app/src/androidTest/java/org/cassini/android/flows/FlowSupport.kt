@@ -3,6 +3,7 @@ package org.cassini.android.flows
 import android.app.Instrumentation
 import android.content.Intent
 import android.net.Uri
+import android.os.ParcelFileDescriptor
 import android.view.View
 import android.view.ViewGroup
 import androidx.compose.ui.geometry.Offset
@@ -23,6 +24,7 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.test.espresso.Espresso
+import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.cassini.android.MainActivity
@@ -118,17 +120,40 @@ internal object Flows {
         }
     }
 
-    /** Polls [condition] on the test thread (graph state, files) while the UI keeps running. */
     /**
      * Presses Back once the activity's own window has input focus. Right after an ACTION_VIEW (`onNewIntent`, the
      * activity pauses and resumes) a slow emulator can drop a key injected before the window has focus again, so
      * the Back press would not reach the app. Do not use it to close a sheet or dialog: their window has the focus.
      */
     fun AppRule.pressBackWhenFocused(timeoutMs: Long = SCREEN_MS) {
-        waitUntil(timeoutMs) { activity.hasWindowFocus() }
+        try {
+            waitUntil(timeoutMs) { activity.hasWindowFocus() }
+        } catch (timeout: ComposeTimeoutException) {
+            val waited = "waited ${timeoutMs / 1_000} s"
+            throw AssertionError("The activity got no input focus ($waited; ${focusReport()})", timeout)
+        }
         Espresso.pressBack()
     }
 
+    /**
+     * The window that has the input focus and any system error dialog, for a failure message. A dialog that stays
+     * over the test (a launcher's "Application Not Responding") keeps the focus: no test window gets it, and no soft
+     * keyboard opens. API 34 does not always report such a dialog as the focused window, so the window list counts.
+     */
+    fun focusReport(): String {
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        val windows = automation.executeShellCommand("dumpsys window windows").use { pipe ->
+            ParcelFileDescriptor.AutoCloseInputStream(pipe).bufferedReader().readText()
+        }
+        val focus = windows.lineSequence().map(String::trim).filter { it.startsWith("mCurrentFocus=") }.distinct()
+        val dialogs = ERROR_DIALOG.findAll(windows).map { it.value }.distinct()
+        return "${focus.joinToString().ifEmpty { "no mCurrentFocus" }}, system error dialogs: " +
+            dialogs.joinToString().ifEmpty { "none" }
+    }
+
+    private val ERROR_DIALOG = Regex("Application (Not Responding|Error): [^ }:]+")
+
+    /** Polls [condition] on the test thread (graph state, files) while the UI keeps running. */
     fun AppRule.waitFor(message: String, timeoutMs: Long = SCREEN_MS, condition: suspend () -> Boolean) {
         try {
             waitUntil(timeoutMs) { runBlocking { condition() } }
