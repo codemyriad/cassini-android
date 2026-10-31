@@ -262,7 +262,7 @@ class CheckpointRepository(
         val clipSamples = json.optLong("clipSamples", -1)
         val encoderLength = json.optJSONObject("encoder")?.optLong("length", -1)
         return when {
-            json.optInt("version", -1) !in CheckpointState.VERSION_1..CheckpointState.VERSION -> MismatchReason.VERSION
+            json.optInt("version", -1) != CheckpointState.VERSION -> MismatchReason.VERSION
             json.optString("source") != expected.source -> MismatchReason.SOURCE
             json.optString("signature") != expected.signature -> MismatchReason.SIGNATURE
             json.optString("model") != expected.modelRevision -> MismatchReason.MODEL

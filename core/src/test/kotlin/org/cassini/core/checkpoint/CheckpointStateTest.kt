@@ -83,8 +83,8 @@ class CheckpointStateTest {
 
     @Test fun encodingWritesExactlyTheVersionTwoMembers() {
         val json = stored(Job().state)
-        assertEquals(CheckpointState.KEYS_V2, json.keys().asSequence().toSet())
-        assertEquals(CheckpointState.KEYS + "wordLog", CheckpointState.KEYS_V2)
+        assertEquals(CheckpointState.KEYS, json.keys().asSequence().toSet())
+        assertTrue("wordLog" in CheckpointState.KEYS)
         assertEquals(2, json.getInt("version"))
         assertEquals(WordLogRef.EMPTY, CheckpointState.wordLog(json))
         assertEquals(setOf("inferenceMs", "chunks"), json.getJSONObject("recognition").keys().asSequence().toSet())
@@ -132,7 +132,7 @@ class CheckpointStateTest {
         val state = Job().state.copy(encoder = null, diarizer = null, voiceClips = null, speakerFailure = true)
         val json = stored(state)
         val absent = setOf("encoder", "diarizer", "voiceClips")
-        assertEquals(CheckpointState.KEYS_V2 - absent, json.keys().asSequence().toSet())
+        assertEquals(CheckpointState.KEYS - absent, json.keys().asSequence().toSet())
         val back = CheckpointState.decode(json)
         assertEquals(null, back.encoder)
         assertEquals(null, back.diarizer)
@@ -179,8 +179,9 @@ class CheckpointStateTest {
         rejects { it.put("version", 0) }
         fun rejectsLog(json: JSONObject, expected: CheckpointState.Expected) =
             assertThrows(IllegalArgumentException::class.java) { CheckpointState.validate(json, expected) }
-        // Version 1 has no word log.
+        // Version 1 (0.1.0 and early 0.2 development builds, every word inline) is not resumed (D51).
         val log = WordLogRef(1, 10).json()
+        rejectsLog(stored(job.state).put("version", 1).apply { remove("wordLog") }, job.expected())
         rejectsLog(stored(job.state).put("version", 1).put("wordLog", log), job.expected(wordLogBytes = 10))
         // The log is shorter than the prefix the checkpoint names.
         rejectsLog(stored(job.state).put("wordLog", log), job.expected(wordLogBytes = 9))
@@ -195,8 +196,6 @@ class CheckpointStateTest {
         rejects { it.put("positionSamples", Limits.MAX_SAMPLES + 1L) }
         rejects { it.put("doneMs", Limits.MAX_TRANSCRIBE_MS + 1) }
         rejects { it.getJSONObject("encoder").put("length", job.audio.length() + 1) }
-        // Version 1, as 0.1.0 wrote it, still resumes.
-        CheckpointState.validate(stored(job.state).put("version", 1).apply { remove("wordLog") }, job.expected())
         // A log at least as long as the prefix passes.
         CheckpointState.validate(stored(job.state).put("wordLog", log), job.expected(wordLogBytes = 10))
         // A job that keeps the source's own Opus audio has no encoder and does not check the audio part.
