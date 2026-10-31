@@ -33,11 +33,13 @@ import org.cassini.android.ScriptedModels.Step
 import org.cassini.android.TestHooks
 import org.cassini.android.background.Background
 import org.cassini.android.flows.Flows
+import org.cassini.android.flows.Flows.liveNodes
 import org.cassini.android.flows.Flows.tapWord
 import org.cassini.android.flows.Flows.text
 import org.cassini.android.flows.Flows.waitFor
 import org.cassini.android.flows.Flows.waitGone
 import org.cassini.android.flows.Flows.waitShown
+import org.cassini.android.flows.Flows.waitShownLive
 import org.cassini.android.processing.StartOrigin
 import org.cassini.android.recording.RecordingState
 import org.cassini.android.recording.RecordingWarning
@@ -288,8 +290,9 @@ class AcceptanceWalkTest {
         rule.waitFor("The word tap plays from \"$letters\": ${graph.playback.state.value}", PLAYER_MS) {
             graph.playback.state.value.playing
         }
-        // The screen shows it: the Pause button and a position past the start of the word.
-        rule.waitShown(hasContentDescription(rule.text(UiR.string.ui_player_pause)))
+        // The screen shows it: the Pause button and a position past the start of the word. The player redraws every
+        // frame while it plays, so these checks read the screen live instead of waiting for it to go idle.
+        rule.waitShownLive(hasContentDescription(rule.text(UiR.string.ui_player_pause)))
         rule.waitFor("The position passes \"$letters\": ${graph.playback.state.value}", PLAYER_MS) {
             graph.playback.state.value.let { it.playing && it.positionMs > word.startMs }
         }
@@ -299,7 +302,7 @@ class AcceptanceWalkTest {
             val highlighted = SemanticsMatcher("The active word starts in ${word.startMs}..$position ms") { node ->
                 node.config.getOrNull(ActiveWordStart)?.let { it in word.startMs..position } == true
             }
-            rule.onAllNodes(highlighted, useUnmergedTree = true).fetchSemanticsNodes().size == 1
+            rule.liveNodes(unmerged = true).count(highlighted::matches) == 1
         }
         shot("03-read-and-listen")
         Log.i(TAG, "Read & listen shot at ${graph.playback.state.value}")
