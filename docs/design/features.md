@@ -23,7 +23,7 @@ Each section ends with the **Acceptance** criteria. In these criteria, "JVM" is 
 - Placeholder speaker labels ("Speaker N" / "Voce N"): `DefaultLabels.isDefault` finds them. The UI shows them localized, from `placeholder_number`. The stored label does not change.
 - Speaker tint: a placeholder speaker is always amber ("not named yet"). The named speakers get blue, teal and violet, in this sequence, by their first turn in the variant on the screen. Placeholder speakers do not take a position in this sequence (`SpeakerTint` in `:core`). The label text always shows.
 - Saved-voice avatars: blue, teal, amber and violet, in sequence by the position in the list. The initial has the ink color of the tone.
-- Each string is a resource in English and Italian. Composite lines are format resources.
+- Each string is a resource in English (the source), Italian, French, Spanish, Brazilian Portuguese and European Portuguese (D50, D50.1). The terms follow the coordination glossary (`ux-draft/i18n/GLOSSARY.md`); "Cassini talk" and "Cassini" are never translated. A bare `pt` phone language gets Brazilian Portuguese, the other Portuguese regions get European Portuguese, a regional variant gets its base language (es-MX → es) and any other language gets English. `TranslationsTest` (:app) checks that every string is in every language with the English format arguments and the CLDR plural categories. Composite lines are format resources.
 
 ## 1. Library (board 00) [CHANGED]
 

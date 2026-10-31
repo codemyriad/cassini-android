@@ -1,7 +1,13 @@
 package org.cassini.ui
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Text
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import org.cassini.ui.format.FIXED_ZONE
 import org.cassini.ui.format.FormatSettings
 import org.cassini.ui.format.LocalFormat
@@ -50,6 +56,26 @@ class BoardTestSetupTest : BoardTest() {
     @Test fun darkWithoutTheNightQualifierFails() {
         val error = runCatching { show(dark = true) {} }.exceptionOrNull()
         assertTrue("expected a configuration mismatch, got $error", error is AssertionError)
+    }
+
+    /** [cutTexts] finds each way a text can fail to fit, and nothing in a text that fits. */
+    @Test fun cutTextsFindsTextsThatDoNotFit() {
+        show {
+            Column(Modifier.width(80.dp)) {
+                Text("Fits")
+                Text("Shortened with an ellipsis", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("Cut at the edge of its width", softWrap = false, overflow = TextOverflow.Clip)
+                Text("Wraps to more lines than it may have", maxLines = 2, overflow = TextOverflow.Clip)
+            }
+        }
+        assertEquals(
+            listOf(
+                "Shortened with an ellipsis (ellipsized)",
+                "Cut at the edge of its width (cut at the bottom)",
+                "Wraps to more lines than it may have (more lines than maxLines)",
+            ),
+            cutTexts(),
+        )
     }
 }
 

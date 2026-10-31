@@ -29,6 +29,10 @@ class DefaultLabelsTest {
         assertTrue(DefaultLabels.isDefault("spk_1", "Speaker 1"))
         assertTrue(DefaultLabels.isDefault("spk_1", "Speaker 12"))
         assertTrue(DefaultLabels.isDefault("spk_1", "Voce 2"))
+        assertTrue(DefaultLabels.isDefault("spk_1", "Intervenant 3"))
+        assertTrue(DefaultLabels.isDefault("spk_1", "Hablante 4"))
+        assertTrue(DefaultLabels.isDefault("spk_1", "Locutor 5"))
+        assertTrue(DefaultLabels.isDefault("spk_1", "Orador 6"))
         assertTrue(DefaultLabels.isDefault("diar_x_1", "diar_x_1"))
         assertTrue(DefaultLabels.isDefault("spk_1", ""))
         assertTrue(DefaultLabels.isDefault("spk_1", "  "))
@@ -41,5 +45,6 @@ class DefaultLabelsTest {
         assertFalse(DefaultLabels.isDefault("spk_1", "Voce"))
         assertFalse(DefaultLabels.isDefault("spk_1", "speaker 1"))
         assertFalse(DefaultLabels.isDefault("spk_1", "Relatore 1"))
+        assertFalse(DefaultLabels.isDefault("spk_1", "Locutor Ana"))
     }
 }

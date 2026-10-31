@@ -1,6 +1,7 @@
 package org.cassini.ui.screens
 
 import org.cassini.ui.BoardTest
+import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
@@ -8,7 +9,10 @@ import org.junit.Test
  * tools/ui-fidelity/compare.py. Goldens in `light/`, named after the design slugs. [BoardContent] draws each board.
  */
 class BoardScreenshotTest : BoardTest() {
-    private fun light(slug: String) = board("light", slug) { BoardContent(slug) }
+    private fun light(slug: String) {
+        board("light", slug) { BoardContent(slug) }
+        assertEquals("Texts that do not fit", emptyList<String>(), cutTexts())
+    }
 
     @Test fun library() = light("00-library")
 

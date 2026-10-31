@@ -11,7 +11,7 @@ format/      Durations.kt, Dates.kt, Counts.kt, Spoken.kt, LocalFormat.kt (Compo
 banner/      BannerKind.kt (catalogue with tone, title, body and action resources), BannerSpec.kt
 library/ recording/ note/ models/ settings/ voices/ trash/ licenses/
              XxxScreen.kt (stateless), XxxUiState.kt, XxxEvent.kt
-res/         values/strings.xml, values-it/strings.xml, values/colors.xml + values-night/colors.xml (ui_window_bg),
+res/         values/strings.xml, values-{it,fr,es,pt-rBR,pt-rPT}/strings.xml, values/colors.xml + values-night/colors.xml (ui_window_bg),
              font/ui_*.ttf, drawable/ui_ic_logo.xml, drawable/ui_ic_stat_logo.xml,
              drawable/ui_ic_launcher_{foreground,background,monochrome}.xml, mipmap-anydpi/ui_ic_launcher.xml (+ _round)
 assets/licenses/fonts/InstrumentSans-OFL.txt, IBMPlexMono-OFL.txt
@@ -713,6 +713,7 @@ abstract class BoardTest {
 - `StatesBoardTest`: five images, `states/10-states-col1.png` … `col5.png`. The paragraphs after this list give the geometry.
 - `DarkScreenshotTest`: the 10 boards and the 5 columns in dark (`dark/`, goldens only).
 - `LocaleScreenshotTest` (`+it`, `Locale.ITALIAN`): Library, Transcribing, ReadAndListen, NameSpeaker, Settings and NoteActions (`it/`).
+- `LongLanguageScreenshotTest` (`+fr`, `Locale.FRENCH`): the 10 boards in French, the longest app language (`fr/`). It, `LocaleScreenshotTest` and `BoardScreenshotTest` also fail when a text does not fit its layout (`BoardTest.cutTexts`: an ellipsis, more lines than `maxLines`, lines below the bottom of the text, or a line wider than its node; `BoardTestSetupTest` shows that it finds each).
 - `FontScaleScreenshotTest` (font scale 1.5 through `RuntimeEnvironment.setFontScale`): Library, ReadAndListen, NameSpeaker and Settings (`fontscale/`).
 - `StateVariantsTest` (goldens only, `variants/`): each variant in the acceptance sections of features.md, each dialog, the person menu, the items of section 8 with no board, and Model download with No connection.
 - `ComponentScreenshotTest`: each component in all tones and states, on a 390 dp strip (`components/`).

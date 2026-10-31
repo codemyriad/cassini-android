@@ -220,7 +220,7 @@ class ProcessingNotificationsLocaleManagerTest {
         val ongoing = processing.ongoing(state)
         val ongoingTitle = ongoing.extras.getCharSequence(Notification.EXTRA_TITLE).toString()
         assertEquals("Trascrizione di “Riunione”", ongoingTitle)
-        assertEquals("Interrompi", ongoing.actions.first().title.toString())
+        assertEquals("Ferma", ongoing.actions.first().title.toString())
         val mib = 1_048_576L
         val download = DownloadProgress(ModelPart.SPEECH, 296 * mib, 640 * mib, verifying = false)
         val downloading = state.copy(running = RunningJob(NOTE, "Riunione", JobPhase.Downloading(download)))
