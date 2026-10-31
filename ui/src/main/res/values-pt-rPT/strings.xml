@@ -2,6 +2,7 @@
 <!-- European Portuguese copy in the register of docs/design/ui.md section 12 and the i18n glossary (D50.1: European vocabulary, no "você"). Same names and arguments as values/strings.xml. -->
 <resources>
     <!-- Size units (D50: French writes Mo and Go). -->
+    <string name="ui_percent">%1$d%%</string>
     <string name="ui_size_mb">%1$s MB</string>
     <string name="ui_size_gb">%1$s GB</string>
 

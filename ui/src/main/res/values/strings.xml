@@ -25,7 +25,6 @@
     <string name="ui_join_comma4" translatable="false">%1$s, %2$s, %3$s, %4$s</string>
     <string name="ui_range" translatable="false">%1$s–%2$s</string>
     <string name="ui_of_clock" translatable="false">%1$s / %2$s</string>
-    <string name="ui_percent" translatable="false">%1$d%%</string>
     <string name="ui_skip_seconds" translatable="false">10</string>
     <string name="ui_speed_times" translatable="false">%1$s×</string>
     <string name="ui_models_int8_size" translatable="false">INT8 · %1$s</string>
@@ -34,7 +33,8 @@
     <string name="ui_font_instrument_sans" translatable="false">Instrument Sans</string>
     <string name="ui_font_plex_mono" translatable="false">IBM Plex Mono</string>
 
-    <!-- Size units (D50: French writes Mo and Go). -->
+    <!-- Units (D50: French writes Mo and Go, and French and Spanish put a space before %). -->
+    <string name="ui_percent">%1$d%%</string>
     <string name="ui_size_mb">%1$s MB</string>
     <string name="ui_size_gb">%1$s GB</string>
 

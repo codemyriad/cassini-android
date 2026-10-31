@@ -2,6 +2,7 @@
 <!-- French copy in the register of docs/design/ui.md section 12 and the i18n glossary (vous, French typography). Same names and arguments as values/strings.xml. -->
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Size units (D50: French writes Mo and Go). -->
+    <string name="ui_percent">%1$d\u202F%%</string>
     <string name="ui_size_mb">%1$s Mo</string>
     <string name="ui_size_gb">%1$s Go</string>
 
