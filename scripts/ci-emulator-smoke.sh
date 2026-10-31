@@ -61,17 +61,32 @@ finish() {
     adb logcat -d > .tools/emulator-results/logcat.txt 2>&1 || true
 }
 trap finish EXIT
-adb shell settings put global hide_error_dialogs 1
-sleep 2
+# Waits up to $1 s until the command after the message succeeds; otherwise prints the message and fails.
+wait_for() {
+    local seconds=$1 message=$2
+    shift 2
+    local end=$((SECONDS + seconds))
+    until "$@"; do
+        if [ "$SECONDS" -ge "$end" ]; then
+            printf '%s (waited %s s)\n' "$message" "$seconds" >&2
+            return 1
+        fi
+        sleep 0.5
+    done
+}
 error_dialog() {
     adb shell dumpsys window windows | tr -d '\r' | grep -m 1 -oE 'Application (Not Responding|Error): [^ }:]+' || true
 }
+dialog_closed() { [ "$(error_dialog)" != "$1" ]; }
+# Android reports no state for the setting (no API level dumps mShowDialogs), so there is nothing to wait for: the
+# system server applies it when the settings provider notifies it.
+adb shell settings put global hide_error_dialogs 1
 for _ in 1 2 3 4 5; do
     dialog=$(error_dialog)
     [ -n "$dialog" ] || break
     printf 'Closing a system error dialog before the tests: %s\n' "$dialog"
     adb shell am force-stop "${dialog##* }"
-    sleep 2
+    wait_for 10 "The system error dialog did not close: $dialog" dialog_closed "$dialog"
 done
 if [ -n "$(error_dialog)" ]; then
     printf 'A system error dialog is still open: %s\n' "$(error_dialog)" >&2
