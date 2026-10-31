@@ -672,11 +672,11 @@ These are the contracts of the screens:
 
 ### 10.1 Tool and setup
 
-The tool is Roborazzi 1.76.0 with the native graphics of Robolectric 4.17 (SDK 35). A spike with this toolchain in an application module showed that it operates. `@Config(qualifiers = "w390dp-h844dp-xhdpi")` + `@GraphicsMode(NATIVE)` gives 780 x 1688 px, the size of the boards. In the spike, 4.9 % of the pixels of Library and 4.6 % of the pixels of Read & listen had a difference of more than 32 levels. Almost all of these pixels were text anti-aliasing.
+The tool is Roborazzi 1.77.0 with the native graphics of Robolectric 4.17 (SDK 35). A spike with this toolchain in an application module showed that it operates. `@Config(qualifiers = "w390dp-h844dp-xhdpi")` + `@GraphicsMode(NATIVE)` gives 780 x 1688 px, the size of the boards. In the spike, 4.9 % of the pixels of Library and 4.6 % of the pixels of Read & listen had a difference of more than 32 levels. Almost all of these pixels were text anti-aliasing.
 
 The P2 scaffold test in `:ui` shows that the tool operates in an AGP 9 library module with `android.newDsl=false`. It also draws a `LinkAnnotation` paragraph with a drawn rect for the active word (`getPathForRange`). P2 found that `enableAccessibilityChecks()` does not operate under Robolectric. Thus the scaffold has no accessibility test, and the checks are in the device tests (features.md section 14). We rejected Paparazzi (alpha, bound to layoutlib) and Compose Preview Screenshot Testing (alpha, previews only).
 
-- Catalog: `roborazzi = "1.76.0"`, with `roborazzi`, `roborazzi-compose` and `roborazzi-junit-rule` (group `io.github.takahirom.roborazzi`) and the plugin `io.github.takahirom.roborazzi`. The BOM manages `compose-ui-test-junit4` and `compose-ui-test-junit4-accessibility`.
+- Catalog: `roborazzi = "1.77.0"`, with `roborazzi`, `roborazzi-compose` and `roborazzi-junit-rule` (group `io.github.takahirom.roborazzi`) and the plugin `io.github.takahirom.roborazzi`. The BOM manages `compose-ui-test-junit4` and `compose-ui-test-junit4-accessibility`.
 - `ui/build.gradle.kts`: the plugin, `roborazzi { outputDir.set(file("src/test/screenshots")) }`, `isIncludeAndroidResources = true`, `src/test/screenshots` as a test input, `resourcePrefix = "ui_"`, and a lint block as in `:data`.
 - The base class is in the code block that follows.
 
