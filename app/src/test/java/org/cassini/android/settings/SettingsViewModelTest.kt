@@ -130,6 +130,40 @@ class SettingsViewModelTest {
         assertEquals(LanguageChoice.ENGLISH, GraphSettingsPorts.languageOf(LocaleListCompat.forLanguageTags("en-GB")))
     }
 
+    // A language set in Android's per-app setting (locales_config) is Other, not Phone: the row selects no segment and
+    // Phone clears it. One test per language that has no segment.
+    @Test fun frenchFromTheSystemSettingsIsClearedByPhone() = runTest(dispatcher) { phoneClears("fr") }
+
+    @Test fun spanishFromTheSystemSettingsIsClearedByPhone() = runTest(dispatcher) { phoneClears("es") }
+
+    @Test fun brazilianPortugueseFromTheSystemSettingsIsClearedByPhone() = runTest(dispatcher) { phoneClears("pt-BR") }
+
+    @Test fun europeanPortugueseFromTheSystemSettingsIsClearedByPhone() = runTest(dispatcher) { phoneClears("pt-PT") }
+
+    private fun TestScope.phoneClears(tag: String) {
+        assertEquals(tag, LanguageChoice.OTHER, GraphSettingsPorts.languageOf(LocaleListCompat.forLanguageTags(tag)))
+        ports.current = LanguageChoice.OTHER
+        val viewModel = viewModel()
+        assertEquals(tag, LanguageChoice.OTHER, viewModel.now().language)
+        viewModel.onEvent(SettingsEvent.Language(LanguageChoice.PHONE))
+        advanceUntilIdle()
+        assertEquals(tag, listOf(LanguageChoice.PHONE), ports.languages)
+        assertEquals(tag, LanguageChoice.PHONE, viewModel.now().language)
+        assertTrue(GraphSettingsPorts.localesOf(ports.languages.single()).isEmpty)
+    }
+
+    /** A language changed in the system settings while Settings was open shows when the screen resumes. */
+    @Test
+    fun resumingReadsTheLanguageAgain() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        assertEquals(LanguageChoice.PHONE, viewModel.now().language)
+        ports.current = LanguageChoice.OTHER
+        viewModel.onResume()
+        advanceUntilIdle()
+        assertEquals(LanguageChoice.OTHER, viewModel.now().language)
+        assertEquals(emptyList<LanguageChoice>(), ports.languages)
+    }
+
     @Test
     fun theRowsOpenTheirScreensAndTurnOnOpensTheNotificationSettings() = runTest(dispatcher) {
         val viewModel = viewModel()

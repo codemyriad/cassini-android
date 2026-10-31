@@ -43,6 +43,9 @@ import org.cassini.ui.theme.Tone
 /** The notifications banner of Settings: NOTIFICATIONS_OFF with its Turn on. */
 private val NotificationsBanner = BannerSpec(BannerKind.NOTIFICATIONS_OFF)
 
+/** The selected index of the App language control when the language is [LanguageChoice.OTHER]: no segment. */
+private const val NO_SEGMENT = -1
+
 /**
  * Settings (board 08, features.md section 11; ui.md section 8). One scrolling Column on bg: the top bar ("Back to
  * library"); "App language" with the segmented control and its helper; the notifications banner when
@@ -78,7 +81,7 @@ fun SettingsScreen(
         SectionHeader(stringResource(R.string.ui_settings_language), first = true)
         SegmentedControl(
             options = languages,
-            selectedIndex = state.language.ordinal,
+            selectedIndex = if (state.language == LanguageChoice.OTHER) NO_SEGMENT else state.language.ordinal,
             onSelect = { onEvent(SettingsEvent.Language(LanguageChoice.entries[it])) },
             modifier = Modifier.padding(horizontal = 16.dp),
         )

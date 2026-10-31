@@ -18,10 +18,16 @@ import org.cassini.ui.settings.LanguageChoice
  * [AppGraph] and AppCompat's per-app language; the ViewModel tests pass a fake.
  */
 interface SettingsPorts {
-    /** The app language now: [LanguageChoice.PHONE] when the app follows the system. */
+    /**
+     * The app language now: [LanguageChoice.PHONE] when the app follows the system, [LanguageChoice.OTHER] for a
+     * language set in Android's per-app setting that has no segment.
+     */
     fun language(): LanguageChoice
 
-    /** Sets the app language (`AppCompatDelegate.setApplicationLocales`; Phone is the empty list). Main thread. */
+    /**
+     * Sets the app language (`AppCompatDelegate.setApplicationLocales`; Phone is the empty list). Main thread. Never
+     * [LanguageChoice.OTHER], which is no segment.
+     */
     fun setLanguage(language: LanguageChoice)
 
     /** The status of each model part. */
@@ -68,11 +74,15 @@ class GraphSettingsPorts(private val graph: AppGraph) : SettingsPorts {
     override val version: String get() = BuildConfig.VERSION_NAME
 
     companion object {
-        /** The segment of the app locales: Phone for none, English or Italiano by the first locale's language. */
+        /**
+         * The segment of the app locales: Phone for none, English or Italiano by the first locale's language, and
+         * Other for any other language (French, Spanish or Portuguese, set in Android's per-app language setting).
+         */
         fun languageOf(locales: LocaleListCompat): LanguageChoice = when (locales[0]?.language) {
+            null -> LanguageChoice.PHONE
             "en" -> LanguageChoice.ENGLISH
             "it" -> LanguageChoice.ITALIAN
-            else -> LanguageChoice.PHONE
+            else -> LanguageChoice.OTHER
         }
 
         /** The app locales of a segment; Phone is the empty list (follow the system). */
@@ -80,6 +90,7 @@ class GraphSettingsPorts(private val graph: AppGraph) : SettingsPorts {
             LanguageChoice.PHONE -> LocaleListCompat.getEmptyLocaleList()
             LanguageChoice.ENGLISH -> LocaleListCompat.forLanguageTags("en")
             LanguageChoice.ITALIAN -> LocaleListCompat.forLanguageTags("it")
+            LanguageChoice.OTHER -> throw IllegalArgumentException("Other is no segment and sets no language")
         }
     }
 }

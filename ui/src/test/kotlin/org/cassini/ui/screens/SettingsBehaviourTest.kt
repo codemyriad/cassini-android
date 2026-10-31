@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
@@ -136,6 +137,16 @@ class SettingsBehaviourTest {
                 events,
             )
         }
+    }
+
+    /** A language set in Android's per-app setting (French, Spanish, Portuguese) selects no segment; Phone still works. */
+    @Test fun aLanguageFromTheSystemSettingsSelectsNoSegment() {
+        val events = mutableListOf<SettingsEvent>()
+        val state = BoardFixtures.settings.copy(language = LanguageChoice.OTHER)
+        setThemed { SettingsScreen(state, onEvent = { events += it }) }
+        for (segment in listOf("Phone", "English", "Italiano")) rule.onNodeWithText(segment).assertIsNotSelected()
+        rule.onNodeWithText("Phone").performClick()
+        rule.runOnIdle { assertEquals(listOf(SettingsEvent.Language(LanguageChoice.PHONE)), events) }
     }
 
     @Test fun aModelRowReadsItsStatusWithItsName() {
