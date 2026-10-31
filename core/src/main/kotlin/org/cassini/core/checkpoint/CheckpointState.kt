@@ -35,12 +35,11 @@ class EncoderState(
 class DiarizerState(val cache: FloatArray, val elapsedMs: Long, val turns: List<SpeakerTurn>)
 
 /**
- * `work/checkpoint.json`. Version 1 is the file of 0.1.0: it holds every word in `recognition.chunks.words`, so it
- * grows with the recording, and a job rewrites it after each window. Version 2 adds one member, `wordLog`
- * ([WordLogRef]): the words of the settled windows are in `work/words.log` ([WordLog]), and `chunks.words` holds only
- * the words after them. [encode] writes version 2: the members of 0.1.0 in its order, then `wordLog` (Android's
- * org.json keeps insertion order; the JVM jar does not, so JVM tests compare members, not bytes). [decode] reads both
- * versions. The in-memory state always holds every word.
+ * `work/checkpoint.json`, version 2: the members of the 0.1.0 checkpoint in its order, then `wordLog` ([WordLogRef]).
+ * The words of the settled windows are in `work/words.log` ([WordLog]), and `recognition.chunks.words` holds only the
+ * words after them (Android's org.json keeps insertion order; the JVM jar does not, so JVM tests compare members, not
+ * bytes). The in-memory state always holds every word. Version 1, which kept every word inline, came only from 0.1.0
+ * and early 0.2 development builds; it is not read (coordination decision D51), so such a checkpoint does not resume.
  */
 data class CheckpointState(
     val source: String,
@@ -78,30 +77,24 @@ data class CheckpointState(
     /** One decode and one encode function per member type. */
     @Suppress("TooManyFunctions")
     companion object {
-        /** The version [encode] writes. */
+        /** The version [encode] writes and [validate] accepts. */
         const val VERSION = 2
-
-        /** The version of 0.1.0, which [decode] still reads: every word inline, no `wordLog`. */
-        const val VERSION_1 = 1
         const val HISTORY_FLOATS = 640
         const val FRAME_FLOATS = 320
         private const val FLOAT_BYTES = 4L
         const val MAX_CLIP_SAMPLES = SpeakerBudget.MAX_SPEAKERS * SpeakerBudget.SECONDS_PER_SPEAKER * Limits.ASR_RATE
 
-        /** Every member 0.1.0 writes (version 1). */
+        private const val WORD_LOG = "wordLog"
+
+        /** Every member [encode] writes: those of the 0.1.0 checkpoint, then `wordLog`. */
         val KEYS = setOf(
             "version", "source", "signature", "model", "speakers", "recognition", "encoder", "diarizer", "speakerPrefix",
             "speakerFailure", "clipSamples", "voiceClips", "positionSamples", "doneMs", "durationMs", "elapsedMs",
+            WORD_LOG,
         )
 
-        /** The members [encode] writes (version 2): those of 0.1.0 and `wordLog`. */
-        val KEYS_V2 = KEYS + WORD_LOG
-
-        private const val WORD_LOG = "wordLog"
-
-        /** The `wordLog` member of [json]; [WordLogRef.EMPTY] for version 1, which has none. */
-        fun wordLog(json: JSONObject): WordLogRef =
-            json.optJSONObject(WORD_LOG)?.let(WordLogRef::of) ?: WordLogRef.EMPTY
+        /** The `wordLog` member of [json]. */
+        fun wordLog(json: JSONObject): WordLogRef = WordLogRef.of(json.getJSONObject(WORD_LOG))
 
         /** The checkpoint directory name: the SHA-256 of the stored source uri string, never re-derived from a file. */
         fun key(source: String): String = OggOpus.hex(MessageDigest.getInstance("SHA-256").digest(source.toByteArray()))
@@ -122,9 +115,7 @@ data class CheckpointState(
                 json.getInt("clipSamples"), json.getLong("positionSamples"), json.getLong("doneMs"),
                 json.optJSONObject("encoder")?.getLong("length"), expected,
             )
-            val log = wordLog(json)
-            require(json.getInt("version") == VERSION || !json.has(WORD_LOG))
-            require(log.bytes <= expected.wordLogBytes)
+            require(wordLog(json).bytes <= expected.wordLogBytes)
         }
 
         fun validate(state: CheckpointState, expected: Expected) = validate(
@@ -145,7 +136,7 @@ data class CheckpointState(
             encoderLength: Long?,
             expected: Expected,
         ) {
-            require(version in VERSION_1..VERSION && source == expected.source && signature == expected.signature)
+            require(version == VERSION && source == expected.source && signature == expected.signature)
             require(model == expected.modelRevision && speakers == expected.speakersSha256)
             require(clipSamples in 0..MAX_CLIP_SAMPLES && expected.clipsBytes >= clipSamples * FLOAT_BYTES)
             require(positionSamples in 0..Limits.MAX_SAMPLES && doneMs in 0..Limits.MAX_TRANSCRIBE_MS)
@@ -153,8 +144,8 @@ data class CheckpointState(
         }
 
         /**
-         * The state of [json]. For version 2, [logged] are the words of its `wordLog` prefix, which the caller read
-         * from `words.log`; they come before the inline words.
+         * The state of [json]. [logged] are the words of its `wordLog` prefix, which the caller read from `words.log`;
+         * they come before the inline words.
          */
         fun decode(json: JSONObject, logged: List<Word> = emptyList()) = CheckpointState(
             source = json.getString("source"),

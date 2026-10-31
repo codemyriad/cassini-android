@@ -267,16 +267,12 @@ class CheckpointRepositoryTest {
         assertEquals(MismatchReason.WORDS, reason(load()))
     }
 
-    @Test fun aVersionOneCheckpointWithEveryWordInlineStillLoads() {
+    /** Version 1 (every word inline) came only from 0.1.0 and early 0.2 development builds: it does not resume (D51). */
+    @Test fun aVersionOneCheckpointDoesNotResume() {
         val state = window(184, words(10 * 60))
         checkpointFile.parentFile!!.mkdirs()
         checkpointFile.writeText(CheckpointState.encode(state).put("version", 1).apply { remove("wordLog") }.toString())
-        assertEquals(state.recognition.chunks.words, loadedWords())
-        // The next save writes version 2 with a log.
-        save(state)
-        assertEquals(2, JSONObject(checkpointFile.readText()).getInt("version"))
-        assertTrue(wordLogFile.length() > 0)
-        assertEquals(state.recognition.chunks.words, loadedWords())
+        assertEquals(MismatchReason.VERSION, reason(load()))
     }
 
     @Test fun statusShowsEachState() = runTest {

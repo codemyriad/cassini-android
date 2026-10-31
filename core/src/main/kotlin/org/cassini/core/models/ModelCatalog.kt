@@ -56,21 +56,10 @@ object ModelCatalog {
     const val PARAKEET_DISPLAY_NAME = "Parakeet Ultra"
 
     /**
-     * Parakeet TDT 0.6B v3 INT8 (csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8), the speech model of 0.1.0 to
-     * 0.2.0. This build does not install it. Documents and checkpoints made with it keep its id and revision.
+     * The name the app shows for each speech model id that a document's provenance can name. Only this build's model:
+     * the Parakeet TDT 0.6B v3 of 0.1.0 to 0.2.0 made only development-build documents (D51), which show its id.
      */
-    const val PARAKEET_V3_REVISION = "2bda32ec70b097a55adaa07d9a7173915b43cc78"
-    const val PARAKEET_V3_MODEL_ID = "nvidia/parakeet-tdt-0.6b-v3"
-    const val PARAKEET_V3_DISPLAY_NAME = "Parakeet TDT 0.6B v3"
-
-    /**
-     * The name the app shows for each speech model id that a document's provenance can name: this build's model and
-     * the earlier ones, so a document keeps its true model name.
-     */
-    val SPEECH_MODEL_NAMES = mapOf(
-        PARAKEET_MODEL_ID to PARAKEET_DISPLAY_NAME,
-        PARAKEET_V3_MODEL_ID to PARAKEET_V3_DISPLAY_NAME,
-    )
+    val SPEECH_MODEL_NAMES = mapOf(PARAKEET_MODEL_ID to PARAKEET_DISPLAY_NAME)
 
     private fun huggingFace(name: String) = "https://huggingface.co/$PARAKEET_REPOSITORY/resolve/$PARAKEET_REVISION/$name"
 

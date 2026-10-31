@@ -47,8 +47,7 @@ import org.cassini.engine.job.ProgressHeadline as EngineHeadline
 object NoteMapping {
     /**
      * The name that Document info shows for a provenance [model] id (features.md section 6): "Parakeet Ultra, INT8"
-     * for the speech model of this app, "Parakeet TDT 0.6B v3, INT8" for a document of 0.2.0 or earlier, and the id
-     * as it is for a model that this app does not know.
+     * for the speech model of this app, and the id as it is for a model that this app does not know.
      */
     fun modelName(model: String): String {
         val (id, name) = ModelCatalog.SPEECH_MODEL_NAMES.entries

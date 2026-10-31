@@ -41,10 +41,8 @@ class ModelCatalogTest {
         assertEquals("Parakeet Ultra", ModelCatalog.PARAKEET_DISPLAY_NAME)
     }
 
-    @Test fun everySpeechModelOfADocumentHasAName() {
-        assertEquals("Parakeet Ultra", ModelCatalog.SPEECH_MODEL_NAMES[ModelCatalog.PARAKEET_MODEL_ID])
-        assertEquals("Parakeet TDT 0.6B v3", ModelCatalog.SPEECH_MODEL_NAMES["nvidia/parakeet-tdt-0.6b-v3"])
-        assertEquals("2bda32ec70b097a55adaa07d9a7173915b43cc78", ModelCatalog.PARAKEET_V3_REVISION)
+    @Test fun theSpeechModelOfThisBuildHasAName() {
+        assertEquals(mapOf(ModelCatalog.PARAKEET_MODEL_ID to "Parakeet Ultra"), ModelCatalog.SPEECH_MODEL_NAMES)
     }
 
     @Test fun theDetectorAndSpeakerModelsAreMarkedByTheirHashes() {

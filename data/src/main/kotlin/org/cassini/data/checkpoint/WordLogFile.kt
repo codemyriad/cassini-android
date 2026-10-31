@@ -102,8 +102,8 @@ internal class WordLogFile {
         private const val TEMPORARY = ".tmp"
 
         /**
-         * The words of the `wordLog` prefix of the checkpoint [json] in [work]; empty for version 1. A prefix that
-         * cannot be a log (more than 2 GiB) throws [IllegalArgumentException], as damaged content does.
+         * The words of the `wordLog` prefix of the checkpoint [json] in [work]. A prefix that cannot be a log (more
+         * than 2 GiB) throws [IllegalArgumentException], as damaged content does.
          */
         fun read(work: File, json: JSONObject): List<Word> {
             val ref = CheckpointState.wordLog(json)

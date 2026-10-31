@@ -13,6 +13,8 @@ import org.junit.Test
 /**
  * A `checkpoint.json` and its `names.json` that a real 0.1.0 job left on emulator-5554 (a 60-second import stopped
  * after its first 28-second window, its speaker named "Ada Example"), read and written by the typed codec.
+ * The file is version 1, which the app no longer resumes (D51): [raw] is it as stored, and [golden] is the same job
+ * as version 2 (with an empty word log), the data every codec check uses.
  * Equality is semantic: the JVM org.json orders members differently from Android's, so the test compares key sets
  * and values, not bytes. The golden comes from 0ebea43, which omits an empty transcript language.
  */
@@ -22,7 +24,8 @@ class CheckpointGoldenTest {
         return JSONObject(stream.bufferedReader().use { it.readText() })
     }
 
-    private val golden = resource("checkpoint.json")
+    private val raw = resource("checkpoint.json")
+    private val golden = JSONObject(raw.toString()).put("version", 2).put("wordLog", WordLogRef.EMPTY.json())
     private val state = CheckpointState.decode(golden)
 
     /** What the golden itself says it was made from, and the lengths its own counters need on disk. */
@@ -40,16 +43,16 @@ class CheckpointGoldenTest {
         audioBytes = audioBytes,
     )
 
-    @Test fun theGoldenHasExactlyTheVersionOneMembers() {
-        assertEquals(CheckpointState.KEYS, golden.keys().asSequence().toSet())
+    @Test fun theFileHasExactlyTheVersionOneMembers() {
+        assertEquals(CheckpointState.KEYS - "wordLog", raw.keys().asSequence().toSet())
         assertEquals(
             setOf(
                 "version", "source", "signature", "model", "speakers", "recognition", "encoder", "diarizer", "speakerPrefix",
                 "speakerFailure", "clipSamples", "voiceClips", "positionSamples", "doneMs", "durationMs", "elapsedMs",
             ),
-            CheckpointState.KEYS,
+            CheckpointState.KEYS - "wordLog",
         )
-        assertEquals(1, golden.getInt("version"))
+        assertEquals(1, raw.getInt("version"))
         val recognition = golden.getJSONObject("recognition")
         assertEquals(setOf("inferenceMs", "chunks"), recognition.keys().asSequence().toSet())
         val chunks = recognition.getJSONObject("chunks")
@@ -63,21 +66,25 @@ class CheckpointGoldenTest {
         assertTrue("Stopped after the first window", stoppedAfterTheFirstWindow)
     }
 
+    /** A version 1 file, as 0.1.0 and early 0.2 development builds wrote it, is not resumed (D51). */
+    @Test fun theVersionOneFileIsNotResumed() {
+        assertThrows(IllegalArgumentException::class.java) { CheckpointState.validate(raw, expected()) }
+    }
+
     /** The codec writes version 2: every member and value of 0.1.0, then an empty word log. */
     @Test fun reEncodingTheDecodedStateKeepsEveryMemberAndValue() {
         val encoded = JSONObject(CheckpointState.encode(state).toString())
-        assertEquals(golden.keys().asSequence().toSet() + "wordLog", encoded.keys().asSequence().toSet())
+        assertEquals(CheckpointState.KEYS, encoded.keys().asSequence().toSet())
         assertEquals(2, encoded.getInt("version"))
         assertEquals(WordLogRef.EMPTY, CheckpointState.wordLog(encoded))
-        val upgraded = JSONObject(golden.toString()).put("version", 2).put("wordLog", WordLogRef.EMPTY.json())
-        assertEquals(plain(JSONObject(upgraded.toString())), plain(encoded))
+        assertEquals(plain(JSONObject(golden.toString())), plain(encoded))
         assertEquals(state.recognition.chunks.words, CheckpointState.decode(encoded).recognition.chunks.words)
     }
 
     @Test fun theGoldenValidatesAgainstItsOwnIdentity() {
         CheckpointState.validate(golden, expected())
         CheckpointState.validate(state, expected())
-        assertEquals("0.1.0 made it with Parakeet TDT 0.6B v3", ModelCatalog.PARAKEET_V3_REVISION, state.model)
+        assertEquals("0.1.0 made it with Parakeet TDT 0.6B v3", PARAKEET_V3_REVISION, state.model)
         assertEquals(ModelCatalog.diarizationModel.sha256, state.speakers)
         assertEquals("0.1.0 keys a checkpoint by its source uri", DIRECTORY_KEY, CheckpointState.key(state.source))
     }
@@ -199,5 +206,8 @@ class CheckpointGoldenTest {
     private companion object {
         /** The directory 0.1.0 stored this checkpoint in: the SHA-256 of its `source` string. */
         const val DIRECTORY_KEY = "837a3ea3f0eaa764c13133771ad687859511481d587d90a0612ff25b955a275b"
+
+        /** The revision of Parakeet TDT 0.6B v3 INT8, the speech model of 0.1.0, which made the golden. */
+        const val PARAKEET_V3_REVISION = "2bda32ec70b097a55adaa07d9a7173915b43cc78"
     }
 }
