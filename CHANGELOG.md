@@ -10,6 +10,10 @@ We made the entries for 0.0.1-beta to 0.1.0 again from the release notes of thes
 
 - The app is called Cassini talk. The launcher, the About card, the Licenses screen and the store title show the new name. Sentences in the app still say "Cassini". The package name stays `org.cassini.android`, so this version updates the installed app and keeps your notes, voices, models and settings.
 
+### Fixed
+
+- An import or a transcription no longer fails with "Not enough memory" only because of memory that the app no longer used. Cassini now frees that memory and checks again before it refuses the audio.
+
 ## [0.3.0] - 2026-10-17
 
 The APK file of this release is `cassini-android-0.3.0.apk`. It operates on Android 8.0 or later, on a 64-bit ARM phone (`arm64-v8a`). The APK also has `x86_64` for emulators. This release has a new signing key, so it does not install over 0.1.x or an earlier beta. Before you uninstall the earlier version, save your notes as Cassini documents (`.opus`). The uninstall erases the notes and the downloaded models, so Cassini downloads the models again (about 730 MB). Testers can also get Cassini from Google Play, with the same key. The release also has the native sources (`cassini-native-sources.tar`) and the notices. The APK has no models. After you agree, the app downloads them separately.
