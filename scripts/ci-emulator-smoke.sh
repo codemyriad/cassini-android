@@ -43,7 +43,40 @@ case "$TEST_API" in
         ;;
 esac
 mkdir -p .tools/emulator-results
-trap 'adb logcat -d > .tools/emulator-results/logcat.txt 2>&1 || true' EXIT
+
+# A system error dialog stays over every test, so no test activity gets window focus and no soft keyboard opens.
+# The emulator runner injects a key right after boot; when the launcher has no window yet, the key times out and some
+# seconds later the launcher gets an "Application Not Responding" dialog (seen on API 34 and 35). dumpsys does not
+# always report such a dialog as the focused window (API 34), so look for it in the window list.
+# With hide_error_dialogs Android shows no new error dialog (it stops the app instead); a dialog that is already
+# open closes when its process stops. The setting gets its old value at the end. The workflow runs everything again
+# when a dialog stays, because that happens before the tests.
+hide_before=$(adb shell settings get global hide_error_dialogs | tr -d '\r')
+finish() {
+    if [ "$hide_before" = null ] || [ -z "$hide_before" ]; then
+        adb shell settings delete global hide_error_dialogs >/dev/null || true
+    else
+        adb shell settings put global hide_error_dialogs "$hide_before" || true
+    fi
+    adb logcat -d > .tools/emulator-results/logcat.txt 2>&1 || true
+}
+trap finish EXIT
+adb shell settings put global hide_error_dialogs 1
+sleep 2
+error_dialog() {
+    adb shell dumpsys window windows | tr -d '\r' | grep -m 1 -oE 'Application (Not Responding|Error): [^ }:]+' || true
+}
+for _ in 1 2 3 4 5; do
+    dialog=$(error_dialog)
+    [ -n "$dialog" ] || break
+    printf 'Closing a system error dialog before the tests: %s\n' "$dialog"
+    adb shell am force-stop "${dialog##* }"
+    sleep 2
+done
+if [ -n "$(error_dialog)" ]; then
+    printf 'A system error dialog is still open: %s\n' "$(error_dialog)" >&2
+    exit 1
+fi
 
 # The tests that need no models and no microphone. The dry run of the same selection gives the expected count.
 expectation=()

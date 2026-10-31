@@ -550,6 +550,7 @@ The `build` job uploads these artifacts:
 
 `scripts/ci-emulator-smoke.sh` takes the API level from `TEST_API` and does these checks:
 
+0. It sets `hide_error_dialogs`, so Android shows no new "Application Not Responding" or "Application Error" dialog and stops the app instead, and it closes such a dialog that is already open by stopping its process. Such a dialog stays over every test, so no activity gets window focus and no soft keyboard opens. On API 34 and 35 the launcher sometimes gets one at boot, because the emulator runner injects a key before the launcher has a window. If a dialog stays, the script stops before the tests, so the job tries again on a new emulator. The setting gets its old value at the end.
 1. It runs the `@CiSmoke` tests with `scripts/device-smoke.sh`. The dry run of the same selection gives the expected count.
 2. It tells `PortableDocumentTest` if the system image has a platform Opus encoder (`expectPlatformOpus`). The images of API 26 and 29 have no encoder, so recordings there are AAC (`capture.m4a`). The image of API 34 has one. If the device does not agree, the test fails. On API 35, the test accepts both results, because no API 35 run has shown the value yet. A device on API 36 or more gets the rules of API 35, because no rule is different there. Thus you can run the script on a phone, for example `TEST_API=37` for a Pixel 8. The test writes the result to logcat (tag `CassiniCompatibility`).
 3. On API 26, it runs `org.cassini.data.NoteFtsDeviceTest` from the `:data` test APK with `adb shell am instrument`.
