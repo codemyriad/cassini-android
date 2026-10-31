@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Runs the acceptance walk (AcceptanceWalkTest) on a device in light, dark and Italian, and collects a screenshot of
-# every board into build/acceptance/<run>/<variant>/. It keeps the app data and the models: it uses direct adb
+# Runs the acceptance walk (AcceptanceWalkTest) on a device in light, dark and Italian (or French and Brazilian
+# Portuguese on request), and collects a screenshot of every board into build/acceptance/<run>/<variant>/. It keeps the app data and the models: it uses direct adb
 # instrumentation (scripts/device-smoke.sh), never a Gradle connected task, and it makes a backup of the files/
 # metadata (not the models) first. It restores the night mode and the app language at the end.
 set -euo pipefail
@@ -12,7 +12,8 @@ Usage: scripts/acceptance-walk.sh [options]
 
 Options:
   --serial SERIAL    The adb serial of the device (default: emulator-5554).
-  --variant NAME     light, dark or it. Repeat it to run more than one (default: all three).
+  --variant NAME     light, dark, it, fr or pt-BR (fr and pt-BR set the app language as Android's per-app setting
+                     does). Repeat it to run more than one (default: light, dark and it).
   --part PART        models (the real-model walk), download (the download screens) or both (default: both).
   --backup FILE      Where to write the backup of files/ (default: build/acceptance/<run>/files-backup.tar).
   --help             Shows this text.
@@ -38,7 +39,7 @@ while [ $# -gt 0 ]; do
 done
 if [ "${#variants[@]}" -eq 0 ]; then variants=(light dark it); fi
 for variant in "${variants[@]}"; do
-    case "$variant" in light|dark|it) ;; *) printf 'Unknown variant: %s\n' "$variant" >&2; exit 2 ;; esac
+    case "$variant" in light|dark|it|fr|pt-BR) ;; *) printf 'Unknown variant: %s\n' "$variant" >&2; exit 2 ;; esac
 done
 case "$part" in models|download|both) ;; *) printf 'Unknown part: %s\n' "$part" >&2; exit 2 ;; esac
 
@@ -116,7 +117,7 @@ for variant in "${variants[@]}"; do
     printf '\n== Variant %s ==\n' "$variant"
     if [ "$variant" = dark ]; then adb shell cmd uimode night yes >/dev/null; else adb shell cmd uimode night no >/dev/null; fi
     args=(--arg "acceptanceLabel=$variant")
-    if [ "$variant" = it ]; then args+=(--arg acceptanceLanguage=it); fi
+    case "$variant" in it|fr|pt-BR) args+=(--arg "acceptanceLanguage=$variant") ;; esac
     expected=()
     if [ "$part" != download ]; then
         scripts/device-smoke.sh --class "$test_class#realModels" "${args[@]}" 2>&1 | tee "$out/$variant-models.log" ||
