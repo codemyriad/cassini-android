@@ -54,20 +54,20 @@ class PlaybackSessionTest {
         // Not runBlocking on the main thread: the prepare ends with a callback on the main looper.
         val opened = withContext(Dispatchers.Main) { playback.open(noteId, clip, positionMs = 0) }
         assertTrue("The clip opens in the player", opened)
+        // A controller binds to the session service, as the system's media controls do.
+        val token = SessionToken(Background.context, ComponentName(Background.context, PlaybackService::class.java))
+        val connected = MediaController.Builder(Background.context, token).buildAsync().get(CONNECT_S, TimeUnit.SECONDS)
+        controller = connected
         main { playback.play() }
+        waitFor("The session shows the note playing") { main { connected.takeIf { it.isPlaying } } }
 
-        // The first play starts the session service; Media3 posts the media notification while it plays.
+        // Media3 posts the media notification of the session while it plays.
         val manager = Background.context.getSystemService(NotificationManager::class.java)
         waitFor("The media notification is posted", NOTIFICATION_MS) {
             manager.activeNotifications.firstOrNull { posted ->
                 posted.notification.extras.containsKey(Notification.EXTRA_MEDIA_SESSION)
             }
         }
-
-        val token = SessionToken(Background.context, ComponentName(Background.context, PlaybackService::class.java))
-        val connected = MediaController.Builder(Background.context, token).buildAsync().get(CONNECT_S, TimeUnit.SECONDS)
-        controller = connected
-        waitFor("The session shows the note playing") { main { connected.takeIf { it.isPlaying } } }
         val title = main { connected.mediaMetadata.title?.toString() }
         assertEquals("The session names the note", "fleurs-it-short", title)
 
