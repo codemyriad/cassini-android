@@ -16,13 +16,10 @@ data class ModelPlan(val missing: List<Item>) {
         val downloadBytes: Long get() = models.sumOf { it.downloadBytes }
 
         /**
-         * Bytes on disk while installing: the download, plus the decompressed files of a compressed download (both
-         * exist until the compressed copy is deleted).
+         * Bytes on disk while installing: the downloads, plus the decompressed files of the compressed ones
+         * ([ModelDescriptor.installBytes]).
          */
-        val installBytes: Long
-            get() = models.sumOf { model ->
-                model.downloadBytes + if (model.download != null) model.artifactBytes else 0
-            }
+        val installBytes: Long get() = models.sumOf { it.installBytes }
 
         /** The size shown next to the part: [downloadBytes] in whole MiB as [ModelCatalog.mebibytes] rounds it. */
         val mebibytes: Long get() = ModelCatalog.mebibytes(downloadBytes)
@@ -39,8 +36,8 @@ data class ModelPlan(val missing: List<Item>) {
     val totalBytes: Long get() = missing.sumOf { it.downloadBytes }
 
     /**
-     * The total the screen shows: the sum of the rounded part sizes, so the numbers on screen add up (640 + 62 + 28 =
-     * 730 for a fresh install, which is also `mebibytes(totalBytes)`).
+     * The total the screen shows: the sum of the rounded part sizes, so the numbers on screen add up (440 + 62 + 26 =
+     * 528 for a fresh install; `mebibytes(totalBytes)` would round the same bytes to 530).
      */
     val totalMebibytes: Long get() = missing.sumOf { it.mebibytes }
 
@@ -53,8 +50,8 @@ data class ModelPlan(val missing: List<Item>) {
         get() = if (missing.isEmpty()) 0 else missing.sumOf { it.installBytes } + ArtifactFetcher.SLACK_BYTES
 
     /**
-     * [requiredFreeBytes] as the "Needs about 860 MB free" figure, rounded to the nearest 10 like every size on the
-     * screen (a fresh install needs about 861 MiB and shows 860; the space check itself compares bytes).
+     * [requiredFreeBytes] as the "Needs about 1330 MB free" figure, rounded to the nearest 10 like every size on the
+     * screen (a fresh install needs about 1331 MiB and shows 1330; the space check itself compares bytes).
      */
     val requiredFreeMebibytes: Long get() = if (missing.isEmpty()) 0 else ModelCatalog.mebibytes(requiredFreeBytes)
 

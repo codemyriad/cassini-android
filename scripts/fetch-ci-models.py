@@ -3,10 +3,12 @@
 
 Usage: scripts/fetch-ci-models.py [--dest DIR] [--print-key]
 
-The default DIR is .tools/ci-models. Each model goes into DIR/<directory>/ and gets its marker file after every
-file has its pinned size and SHA-256, as the app installs it. Files that are already correct are not downloaded
-again, so a restored cache costs only the hash checks. scripts/push-models.sh copies DIR into the app on a device.
-It needs Python 3.10 or later, and the zstd tool before Python 3.14.
+The default DIR is .tools/ci-models. Each model goes into DIR/<directory>/ (models/<id>/<source sha256>/) and gets
+its marker file after every file has its pinned size and SHA-256, as the app installs it. Each file is downloaded
+from dist.gocassini.com as its own Zstandard file, checked, decompressed and checked again. Files that are already
+correct are not downloaded again, so a restored cache costs only the hash checks. scripts/push-models.sh copies DIR into the app on a device.
+It needs Python 3.10 or later, and the zstd tool before Python 3.14. It reads the URLs of scripts/ci-models.json
+(the content-addressed paths of the files), not the manifest, which only the app reads.
 --print-key prints a cache key made from the SHA-256 values of the list and downloads nothing.
 """
 
@@ -38,7 +40,8 @@ def matches(path: Path, artifact: dict) -> bool:
 
 def download(artifact: dict, target: Path) -> None:
     partial = target.with_name(target.name + ".part")
-    request = urllib.request.Request(artifact["url"], headers={"User-Agent": "cassini-android-ci"})
+    headers = {"User-Agent": "cassini-android-ci", "Accept-Encoding": "identity"}
+    request = urllib.request.Request(artifact["url"], headers=headers)
     for attempt in range(1, ATTEMPTS + 1):
         print(f"Downloading {artifact['url']} (attempt {attempt} of {ATTEMPTS})", flush=True)
         partial.unlink(missing_ok=True)
@@ -82,18 +85,15 @@ def install(model: dict, dest: Path) -> None:
         if matches(target, artifact):
             continue
         marker.unlink(missing_ok=True)
-        packed = model.get("download")
-        if packed:
-            compressed = dest / ".downloads" / packed["name"]
-            compressed.parent.mkdir(exist_ok=True)
-            if not matches(compressed, packed):
-                download(packed, compressed)
-            decompress(compressed, target)
-            compressed.unlink()
-            if not matches(target, artifact):
-                raise SystemExit(f"{target} does not have the pinned size and SHA-256 after decompression.")
-        else:
-            download(artifact, target)
+        packed = artifact["download"]
+        compressed = dest / ".downloads" / packed["name"]
+        compressed.parent.mkdir(exist_ok=True)
+        if not matches(compressed, packed):
+            download(packed, compressed)
+        decompress(compressed, target)
+        compressed.unlink()
+        if not matches(target, artifact):
+            raise SystemExit(f"{target} does not have the pinned size and SHA-256 after decompression.")
     marker.write_text(model["markerValue"], encoding="utf-8")
     print(f"Ready: {model['directory']}/{model['marker']}")
 
@@ -105,7 +105,7 @@ def main() -> None:
     arguments = parser.parse_args()
     models = json.loads(MODELS.read_text(encoding="utf-8"))["models"]
     if arguments.print_key:
-        digests = [a["sha256"] for m in models for a in m["artifacts"] + ([m["download"]] if "download" in m else [])]
+        digests = [d["sha256"] for m in models for a in m["artifacts"] for d in (a, a["download"])]
         print("models-" + hashlib.sha256("\n".join(digests).encode()).hexdigest()[:32])
         return
     for model in models:

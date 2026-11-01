@@ -264,6 +264,62 @@ class ArtifactFetcherTest {
         }
     }
 
+    @Test fun everyRequestAsksForTheBytesThemselvesAndAResumeOnlyForTheSameFile() {
+        withServer(ranged(weights)) { url, directory, requests ->
+            File(directory, "model.onnx.part").writeBytes(weights.copyOf(1000))
+            ArtifactFetcher.fetch(url, artifact(weights), directory) { _, _ -> }
+            val request = requests.single()
+            assertEquals("identity", request["accept-encoding"])
+            assertEquals("bytes=1000-", request["range"])
+            // The model host's entity tag is the quoted SHA-256 of the file.
+            assertEquals("\"${artifact(weights).sha256}\"", request["if-range"])
+        }
+        withServer(weights) { url, directory ->
+            ArtifactFetcher.fetch(url, artifact(weights), directory) { _, _ -> }
+            assertArrayEquals(weights, File(directory, "model.onnx").readBytes())
+        }
+    }
+
+    @Test fun aServerWhoseFileChangedAnswersTheWholeFileAndTheDownloadRestarts() {
+        withServer({ headers ->
+            // An If-Range server: another entity tag than the one asked for means the whole file.
+            if (headers["if-range"] == "\"other\"") ranged(weights)(headers) else Answer(200, weights)
+        }) { url, directory, requests ->
+            File(directory, "model.onnx.part").writeBytes(ByteArray(1000) { 5 })
+            ArtifactFetcher.fetch(url, artifact(weights), directory) { _, _ -> }
+            assertEquals("bytes=1000-", requests.single()["range"])
+            assertArrayEquals(weights, File(directory, "model.onnx").readBytes())
+        }
+    }
+
+    @Test fun aSmallAnswerIsReadWholeAndALargerOneIsRefused() {
+        val manifest = """{"schema_version":2}""".toByteArray()
+        withServer({ Answer(200, manifest) }) { url, _, requests ->
+            assertArrayEquals(manifest, ArtifactFetcher.read(url, 1024))
+            assertEquals("identity", requests.single()["accept-encoding"])
+            assertEquals(Failure.VERIFY, failure { ArtifactFetcher.read(url, manifest.size - 1L) })
+        }
+        withServer({ Answer(404, ByteArray(0)) }) { url, _, _ ->
+            assertEquals(Failure.DOWNLOAD, failure { ArtifactFetcher.read(url, 1024) })
+        }
+        withServer({ Answer(200, manifest, sent = 5) }) { url, _, _ ->
+            val failed = try {
+                failure { ArtifactFetcher.read(url, 1024) }
+            } catch (_: IOException) {
+                // Some HTTP stacks report the early close as an error instead of an early end.
+                Failure.DOWNLOAD
+            }
+            assertEquals(Failure.DOWNLOAD, failed)
+        }
+    }
+
+    @Test fun aReadFollowsOnlyTheAllowedRedirects() {
+        withServer({ redirect("https://example.com/manifest.json") }) { url, _, requests ->
+            assertEquals(Failure.DOWNLOAD, failure { ArtifactFetcher.read(url, 1024) })
+            assertEquals(1, requests.size)
+        }
+    }
+
     @Test fun aFullAnswerToARangeRequestRestartsFromZero() {
         withServer({ Answer(200, weights) }) { url, directory, requests ->
             // Not a prefix of the artifact: a restart must not keep any of it.
@@ -431,14 +487,15 @@ class ArtifactFetcherTest {
     }
 
     @Test fun aRedirectToPlainHttpIsRefusedEvenForAnAllowedHost() {
-        val httpsOnly = RedirectPolicy(listOf("127.0.0.1", "huggingface.co"))
+        val httpsOnly = RedirectPolicy(listOf("127.0.0.1", "dist.gocassini.com"))
         var port = 0
         withServer({ redirect("http://127.0.0.1:$port/again") }) { url, directory, requests ->
             port = port(url)
             assertEquals(Failure.DOWNLOAD, fetchFailure(url, directory, httpsOnly))
             assertEquals(1, requests.size)
         }
-        withServer({ redirect("http://huggingface.co/repo/model") }) { url, directory, requests ->
+        val plainHttp = "http://dist.gocassini.com/models/files/x/model.onnx.zst"
+        withServer({ redirect(plainHttp) }) { url, directory, requests ->
             assertEquals(Failure.DOWNLOAD, fetchFailure(url, directory))
             assertEquals(1, requests.size)
         }

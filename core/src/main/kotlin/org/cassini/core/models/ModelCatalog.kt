@@ -2,21 +2,33 @@ package org.cassini.core.models
 
 import java.io.File
 
-/** A pinned file: [size] bytes with SHA-256 [sha256], fetched from [url] (empty for a file produced on the phone). */
-data class Artifact(val name: String, val size: Long, val sha256: String, val url: String = "")
+/**
+ * A pinned file: [size] bytes with SHA-256 [sha256]. [download] is the seekable Zstandard copy fetched in its place,
+ * with its own pins; its [url] is where the model host keeps it (for the notices and CI: the app fetches the URL that
+ * the host's manifest gives, `DistManifest`). A file without [download] is not fetched by the app (tests, CI).
+ */
+data class Artifact(
+    val name: String,
+    val size: Long,
+    val sha256: String,
+    val url: String = "",
+    val download: Artifact? = null,
+)
 
 /**
- * One installed model: the [artifacts] in `filesDir/[directory]`. It is ready when every artifact has its pinned size
- * and the marker file [markerFile] holds [markerValue]; the marker is written only after every artifact verified.
- * [download] is the compressed file fetched in place of the single artifact, when there is one.
+ * One installed model, identified by its pinned pair on the model host: the manifest [id] and the hash of its source,
+ * [sourceSha256] (the desktop's rule, D53.1). Its [artifacts] go in `<modelRoot>/models/<id>/<sourceSha256>/`
+ * ([directory]). It is ready when every artifact has its pinned size and the marker file [markerFile] holds
+ * [markerValue], the source hash; the marker is written only after every artifact verified.
  */
-data class ModelDescriptor(
-    val directory: String,
-    val artifacts: List<Artifact>,
-    val markerFile: String,
-    val markerValue: String,
-    val download: Artifact? = null,
-) {
+data class ModelDescriptor(val id: String, val sourceSha256: String, val artifacts: List<Artifact>) {
+    /** The directory under the model root. */
+    val directory: String get() = "$MODELS_DIRECTORY/$id/$sourceSha256"
+
+    val markerFile: String get() = MARKER_FILE
+
+    val markerValue: String get() = sourceSha256
+
     fun directory(filesDir: File) = File(filesDir, directory)
 
     fun path(filesDir: File, name: String): String = File(directory(filesDir), name).absolutePath
@@ -27,28 +39,65 @@ data class ModelDescriptor(
         return artifacts.all { File(home, it.name).length() == it.size } && marker.isFile && marker.readText() == markerValue
     }
 
-    /** Bytes fetched over the network to install this model from nothing. */
-    val downloadBytes: Long get() = download?.size ?: artifacts.sumOf { it.size }
+    /** Bytes fetched over the network to install this model from nothing: the compressed files. */
+    val downloadBytes: Long get() = artifacts.sumOf { it.download?.size ?: it.size }
 
     /** Bytes of the installed files. */
     val artifactBytes: Long get() = artifacts.sumOf { it.size }
+
+    /**
+     * Bytes on disk at most while installing: every download, plus the decompressed file of each compressed one
+     * (a compressed file is deleted once its decompressed copy verified, so this is an upper bound).
+     */
+    val installBytes: Long get() = downloadBytes + artifacts.filter { it.download != null }.sumOf { it.size }
+
+    companion object {
+        /** The directory under the model root that holds every model, as on the desktop. */
+        const val MODELS_DIRECTORY = "models"
+
+        /** The marker file of every model directory. */
+        const val MARKER_FILE = "verified"
+    }
 }
 
 /**
- * Every model the app installs, with the exact pins, URLs, directory names and marker semantics of 0.1.0
- * (`ModelStore`, `DiarizationModels`, `VoiceprintModel`, `ModelBundle`), except the speech model: Parakeet Ultra
- * replaced Parakeet TDT 0.6B v3 in its own directory. Changing a pin, a directory or a marker value makes installed
- * models look missing or, worse, look ready when they are not. The sizes are pinned data.
+ * Every model the app installs, pinned as the model host `dist.gocassini.com` publishes it (manifest schema 2,
+ * published 2026-10-27): each model by its pair (manifest id, source SHA-256), each file by its decompressed size
+ * and SHA-256 and by the size and SHA-256 of its seekable Zstandard download. The app never follows a newer entry
+ * of the manifest: a model whose pair or files the manifest no longer lists as pinned here is not downloaded
+ * (`DistManifest`). Changing a pin changes the model's directory, so installed models look missing; earlier
+ * development builds' directories (`parakeet-ultra/`, `vad/`, `speaker-models/`) are not read (D51).
  */
 @Suppress("MagicNumber")
 object ModelCatalog {
+    /** The model host. Every model file and the manifest come from it, and from nowhere else. */
+    const val DIST_HOST = "dist.gocassini.com"
+
+    /** The manifest of the model host, read before each model download to find the pinned files. */
+    const val DIST_MANIFEST_URL = "https://$DIST_HOST/manifest.json"
+
+    /** A decompressed file [name] and its download, at the content-addressed path of the model host. */
+    private fun dist(name: String, size: Long, sha256: String, compressedSize: Long, compressedSha256: String) =
+        Artifact(
+            name,
+            size,
+            sha256,
+            download = Artifact(
+                "$name.zst",
+                compressedSize,
+                compressedSha256,
+                "https://$DIST_HOST/models/files/$compressedSha256/$name.zst",
+            ),
+        )
+
     /**
-     * Parakeet Ultra INT8 on Hugging Face: tpmaerk's sherpa-onnx `nemo_transducer` export of moondream/parakeet-ultra
-     * (revision 73175eb7), a post-train of NVIDIA Parakeet TDT 0.6B v3. The export changes only the format; the token
-     * table is the one of v3. Its marker `parakeet-ultra/verified` holds this revision.
+     * Parakeet Ultra INT8 on the model host (`parakeet-ultra-0.6b-int8`): Cassini's sherpa-onnx `nemo_transducer`
+     * export of moondream/parakeet-ultra (revision 73175eb7), a post-train of NVIDIA Parakeet TDT 0.6B v3, quantized
+     * to INT8. The export changes only the format; the token table is the one of v3. The revision that provenance
+     * and checkpoints name is the model's source SHA-256 on the host, which is also its marker value.
      */
-    const val PARAKEET_REVISION = "b86784a3a5356cbd126f710b61cd90c5fe5898f1"
-    const val PARAKEET_REPOSITORY = "tpmaerk/parakeet-ultra-sherpa-onnx-int8"
+    const val PARAKEET_DIST_ID = "parakeet-ultra-0.6b-int8"
+    const val PARAKEET_REVISION = "18cb623004dd6c15999b93cb70b14d8a1f6e8f3a2a97ff733f104bfc3494f6a9"
     const val PARAKEET_PRECISION = "INT8"
 
     /** The model id that a document's provenance names (`<id> <precision>`), and the name the app shows for it. */
@@ -61,81 +110,74 @@ object ModelCatalog {
      */
     val SPEECH_MODEL_NAMES = mapOf(PARAKEET_MODEL_ID to PARAKEET_DISPLAY_NAME)
 
-    private fun huggingFace(name: String) = "https://huggingface.co/$PARAKEET_REPOSITORY/resolve/$PARAKEET_REVISION/$name"
-
     val parakeetArtifacts = listOf(
-        Artifact(
+        dist(
             "encoder.int8.onnx",
-            652282347,
-            "f4d06712d32431b1718eceba2153c314ac4425e8fe708a3534f5e56c5ad53697",
-            huggingFace("encoder.int8.onnx"),
+            652282922,
+            "299617fefd4664d1c115b691dcb6413cabcdbcc694cdf3cb4464b72c5fc3ae69",
+            452306705,
+            "caf7a38f2ad3224c1863564fb6e975a11aa3ae6ad1e7ad0bee5c4f5e018babb4",
         ),
-        Artifact(
+        dist(
             "decoder.int8.onnx",
-            11845275,
-            "94373c6405c8149d1c9d1e9862514e0e3e88dab1c7de18fac9d5df9c6ba5efdd",
-            huggingFace("decoder.int8.onnx"),
+            11845274,
+            "1fab98fe6c12aded87d2da66272cc9e148d0a0044ce3850a12fe56302ec4a922",
+            8841708,
+            "69e2e91d01225bc552f8b0113630562fc52622cb2a3c61ef4445ee779f06b295",
         ),
-        Artifact(
+        dist(
             "joiner.int8.onnx",
             6355277,
             "8a71aaccfdba3d451775507a889afd2257d2e754463fd81095a8c8f290f924c2",
-            huggingFace("joiner.int8.onnx"),
+            3714640,
+            "639fda62a71242a8d7cefb6647f2094eb8ac783925ce91cbd047a0de6988f396",
         ),
-        Artifact(
+        dist(
             "tokens.txt",
             93939,
             "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d",
-            huggingFace("tokens.txt")
+            45831,
+            "5b3811f0c23fefc86835981f0a23ecfb817999df272ad744c597e5b669ea1b4a",
         ),
     )
 
-    val PARAKEET = ModelDescriptor("parakeet-ultra", parakeetArtifacts, "verified", PARAKEET_REVISION)
+    val PARAKEET = ModelDescriptor(PARAKEET_DIST_ID, PARAKEET_REVISION, parakeetArtifacts)
 
-    /** Silero VAD for chunked decoding, installed on its own so an existing Parakeet install stays ready without it. */
-    const val SILERO_VAD_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"
-    val sileroVad =
-        Artifact(
-            "silero_vad.onnx",
-            643854,
-            "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
-            SILERO_VAD_URL
-        )
-    val VAD = ModelDescriptor("vad", listOf(sileroVad), "verified", sileroVad.sha256)
+    /** Silero VAD for chunked decoding (`silero-vad`), installed on its own: Parakeet is ready without it. */
+    val sileroVad = dist(
+        "silero_vad.onnx",
+        643854,
+        "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
+        469349,
+        "dad26acf8515705fed5510d847c69366cb2710681ec4f87484a2de65ca855a3c",
+    )
+    val VAD = ModelDescriptor("silero-vad", sileroVad.sha256, listOf(sileroVad))
 
-    /** NVIDIA Nemotron-3-Diarization, exported to INT8 ONNX for sherpa-onnx's Sortformer runtime. */
+    /**
+     * NVIDIA Nemotron-3-Diarization (`nemotron-3-diarization-int8`), exported to INT8 ONNX (interface v2) for
+     * sherpa-onnx's Sortformer runtime. [DIARIZATION_SOURCE_REVISION] is the Hugging Face revision that the
+     * manifest's `source_url` names; the source SHA-256 is the export's own hash.
+     */
     const val DIARIZATION_SOURCE_REVISION = "f667ed73aee57d40cc39428eb768b4fd87a0a29e"
-    const val DIARIZATION_URL =
-        "https://dist.gocassini.com/models/files/51249515e4cb49dc00c5d5dc0a41ac59aa91157d689ec9586b3f4bf567c3f602/model.int8.onnx.zst"
-    val diarizationModel = Artifact(
-        "nemotron-3-diarization.int8.onnx",
-        103941758,
-        "01d1f893f394cc0418ae78425d216ed62c334c0125e650135332a7a8e595f168",
+    val diarizationModel = dist(
+        "model.int8.onnx",
+        103967426,
+        "47c221ea9b4d4e7f6c108bd098e769bc706cdc986c29f6133c93cae335fe6779",
+        64915668,
+        "794720a59892189484d38a186d2b350018b4194cae55292f501b2849d6313290",
     )
+    val DIARIZATION = ModelDescriptor("nemotron-3-diarization-int8", diarizationModel.sha256, listOf(diarizationModel))
 
-    /** Seekable Zstandard copy of [diarizationModel] on Cassini's model host, verified before decompression. */
-    val diarizationDownload = Artifact(
-        "nemotron-3-diarization.int8.onnx.zst",
-        64982914,
-        "51249515e4cb49dc00c5d5dc0a41ac59aa91157d689ec9586b3f4bf567c3f602",
-        DIARIZATION_URL,
-    )
-    val DIARIZATION = ModelDescriptor(
-        "speaker-models",
-        listOf(diarizationModel),
-        "verified",
-        diarizationModel.sha256,
-        diarizationDownload,
-    )
-
-    /** CAM++ speaker embeddings, fetched verbatim from the pinned sherpa-onnx release. Shares `speaker-models/`. */
-    const val VOICEPRINT_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/" +
-        "3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx"
-    val voiceprintModel = Artifact(
-        "voiceprint-campplus.onnx",
+    /**
+     * CAM++ speaker embeddings (`campplus-voxceleb-16k`), the file of the sherpa-onnx release byte for byte. Its
+     * SHA-256 is the model identity of every saved voice (`VoiceStaleness`), so it must not change.
+     */
+    val voiceprintModel = dist(
+        "3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx",
         29596978,
         "357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b",
-        VOICEPRINT_URL,
+        27138478,
+        "c310f60acec22ce27d78bd37736e40015af6473a1e3482224e81434aca5557b0",
     )
 
     /**
@@ -145,41 +187,21 @@ object ModelCatalog {
      */
     const val VOICEPRINT_DIM = 512
 
-    val VOICEPRINT =
-        ModelDescriptor("speaker-models", listOf(voiceprintModel), "verified-voiceprint", voiceprintModel.sha256)
+    val VOICEPRINT = ModelDescriptor("campplus-voxceleb-16k", voiceprintModel.sha256, listOf(voiceprintModel))
 
     /** The models one consented download installs, in install order. The detector is fetched separately. */
     val consented = listOf(PARAKEET, DIARIZATION, VOICEPRINT)
 
     /**
-     * The hosts a model download may be redirected to (`RedirectPolicy`). An entry `*.example.com` matches every
-     * subdomain of example.com but not example.com itself; any other entry matches exactly. Downloads start only at
-     * the catalogue URLs (huggingface.co, github.com, dist.gocassini.com), and each redirect must be HTTPS to one of
-     * these hosts. PRIVACY.md lists the same entries (LicenseAssetsTest checks it).
+     * The hosts a model download may reach (`RedirectPolicy`): the model host alone. An entry `*.example.com` would
+     * match every subdomain of example.com but not example.com itself; any other entry matches exactly. The manifest
+     * and every file URL it gives must be HTTPS on these hosts, and so must each redirect. PRIVACY.md lists the same
+     * entries (LicenseAssetsTest checks it).
      *
-     * Redirects recorded on 2026-10-09 with `curl -sIL --max-redirs 5` for every catalogue URL (query strings left
-     * out):
-     * - huggingface.co/.../resolve/<rev>/encoder.int8.onnx, decoder.int8.onnx, joiner.int8.onnx: 302 to
-     *   https://us.aws.cdn.hf.co/xet-bridge-us/... (the Xet CDN, signed URL), then 200.
-     * - huggingface.co/.../resolve/<rev>/tokens.txt: 307 to the relative /api/resolve-cache/models/... on
-     *   huggingface.co, then 200.
-     * - github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx and
-     *   .../speaker-recongition-models/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx: 302 to
-     *   https://release-assets.githubusercontent.com/github-production-release-asset/..., then 200.
-     * - dist.gocassini.com/models/files/<sha>/model.int8.onnx.zst: 200, no redirect.
-     *
-     * The Hugging Face CDN host depends on the region (for example cdn-lfs.hf.co, cas-bridge.xethub.hf.co or an
-     * eu. host), and GitHub has used objects.githubusercontent.com before, so the subdomain entries are wider than
-     * the trace.
+     * Recorded on 2026-11-01 with `curl -sI`: the manifest and the model files answer 200 without a redirect, the
+     * files with `ETag: "<SHA-256 of the compressed file>"` and `Accept-Ranges: bytes`.
      */
-    val DOWNLOAD_HOSTS = listOf(
-        "huggingface.co",
-        "*.huggingface.co",
-        "*.hf.co",
-        "github.com",
-        "*.githubusercontent.com",
-        "dist.gocassini.com",
-    )
+    val DOWNLOAD_HOSTS = listOf(DIST_HOST)
 
     /** Bytes fetched over the network for each part, which is what the consent dialog quotes. */
     val parakeetBytes = PARAKEET.downloadBytes

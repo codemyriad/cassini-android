@@ -72,6 +72,8 @@ dependencies {
     testImplementation(libs.bundles.testing.robolectric)
     testImplementation(libs.room.testing)
     testImplementation(libs.org.json)
+    // ModelFetcherNetworkTest decompresses real Zstandard files: the plain jar on the JVM.
+    testImplementation(libs.zstd.jni)
     testImplementation(libs.coroutines.test)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)

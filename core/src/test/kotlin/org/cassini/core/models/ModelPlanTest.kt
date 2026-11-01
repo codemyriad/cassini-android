@@ -22,27 +22,31 @@ class ModelPlanTest {
         File(directory, model.markerFile).writeText(model.markerValue)
     }
 
-    @Test fun aFreshInstallNeedsAbout861MiBAndShows730() {
+    /** Each file's download and its decompressed copy: both are on disk until the download is deleted. */
+    private fun Artifact.installed() = download!!.size + size
+
+    @Test fun aFreshInstallNeedsAbout1331MiBAndShows528() {
         val plan = ModelPlan.of { false }
         assertEquals(listOf(ModelPart.SPEECH, ModelPart.SPEAKERS, ModelPart.VOICES), plan.parts)
-        assertEquals(listOf(640L, 62L, 28L), plan.missing.map { it.mebibytes })
-        assertEquals(730L, plan.totalMebibytes)
-        assertEquals(730L, ModelCatalog.mebibytes(plan.totalBytes))
-        val speech = ModelCatalog.PARAKEET.artifactBytes + ModelCatalog.sileroVad.size
-        val speakers = ModelCatalog.diarizationDownload.size + ModelCatalog.diarizationModel.size
-        val voices = ModelCatalog.voiceprintModel.size
+        assertEquals(listOf(440L, 62L, 26L), plan.missing.map { it.mebibytes })
+        assertEquals(528L, plan.totalMebibytes)
+        // The rounded parts add up on screen; the rounded sum of the bytes would say 530.
+        assertEquals(530L, ModelCatalog.mebibytes(plan.totalBytes))
+        val speech = ModelCatalog.parakeetArtifacts.sumOf { it.installed() } + ModelCatalog.sileroVad.installed()
+        val speakers = ModelCatalog.diarizationModel.installed()
+        val voices = ModelCatalog.voiceprintModel.installed()
         assertEquals(speech + speakers + voices + ArtifactFetcher.SLACK_BYTES, plan.requiredFreeBytes)
-        assertEquals(861L, (plan.requiredFreeBytes / mib).roundToLong())
-        assertEquals(860L, plan.requiredFreeMebibytes)
+        assertEquals(1331L, (plan.requiredFreeBytes / mib).roundToLong())
+        assertEquals(1330L, plan.requiredFreeMebibytes)
     }
 
     @Test fun theDownloadBytesOfEachPartAreWhatTheNetworkCarries() {
         val plan = ModelPlan.of { false }
         assertEquals(
             mapOf(
-                ModelPart.SPEECH to ModelCatalog.parakeetBytes + ModelCatalog.sileroVad.size,
-                ModelPart.SPEAKERS to ModelCatalog.diarizationDownload.size,
-                ModelPart.VOICES to ModelCatalog.voiceprintModel.size,
+                ModelPart.SPEECH to ModelCatalog.parakeetBytes + ModelCatalog.sileroVad.download!!.size,
+                ModelPart.SPEAKERS to ModelCatalog.diarizationModel.download!!.size,
+                ModelPart.VOICES to ModelCatalog.voiceprintModel.download!!.size,
             ),
             plan.downloadBytes,
         )
@@ -52,9 +56,9 @@ class ModelPlanTest {
     @Test fun aReadySpeechPartLeavesOnlyTheSpeakerParts() {
         val plan = ModelPlan.of { it == ModelCatalog.PARAKEET }
         assertEquals(listOf(ModelPart.SPEAKERS, ModelPart.VOICES), plan.parts)
-        assertEquals(90L, plan.totalMebibytes)
-        val expected = ModelCatalog.diarizationDownload.size + ModelCatalog.diarizationModel.size +
-            ModelCatalog.voiceprintModel.size + ArtifactFetcher.SLACK_BYTES
+        assertEquals(88L, plan.totalMebibytes)
+        val expected = ModelCatalog.diarizationModel.installed() + ModelCatalog.voiceprintModel.installed() +
+            ArtifactFetcher.SLACK_BYTES
         assertEquals(expected, plan.requiredFreeBytes)
     }
 
@@ -68,14 +72,14 @@ class ModelPlanTest {
     @Test fun aMissingPartBringsOnlyItsModelsThatAreNotReady() {
         val plan = ModelPlan.of { it == ModelCatalog.VAD }
         assertEquals(listOf(ModelCatalog.PARAKEET), plan.missing.first { it.part == ModelPart.SPEECH }.models)
-        assertEquals(640L, plan.missing.first().mebibytes)
+        assertEquals(440L, plan.missing.first().mebibytes)
     }
 
     @Test fun onlyTheVoiceModelMissing() {
         val plan = ModelPlan.of { it != ModelCatalog.VOICEPRINT }
         assertEquals(listOf(ModelPart.VOICES), plan.parts)
-        assertEquals(28L, plan.totalMebibytes)
-        assertEquals(ModelCatalog.voiceprintModel.size + ArtifactFetcher.SLACK_BYTES, plan.requiredFreeBytes)
+        assertEquals(26L, plan.totalMebibytes)
+        assertEquals(ModelCatalog.voiceprintModel.installed() + ArtifactFetcher.SLACK_BYTES, plan.requiredFreeBytes)
     }
 
     @Test fun thePlanForADirectoryReadsTheInstalledModels() {
@@ -96,12 +100,8 @@ class ModelPlanTest {
             val ready = all.filterIndexed { index, _ -> mask and (1 shl index) != 0 }.toSet()
             val plan = ModelPlan.of { it in ready }
             for (model in plan.missing.flatMap { it.models }) {
-                val download = model.download
-                val perFile = if (download != null) {
-                    listOf(download.size + model.artifactBytes)
-                } else {
-                    model.artifacts.map { it.size }
-                }
+                // ArtifactFetcher.fetchZstd checks each file's download and its decompressed copy.
+                val perFile = model.artifacts.map { it.installed() }
                 for (need in perFile + model.downloadBytes) {
                     assertTrue("$ready: $need", plan.requiredFreeBytes >= need + ArtifactFetcher.SLACK_BYTES)
                 }

@@ -85,7 +85,7 @@ class CheckpointGoldenTest {
         CheckpointState.validate(golden, expected())
         CheckpointState.validate(state, expected())
         assertEquals("0.1.0 made it with Parakeet TDT 0.6B v3", PARAKEET_V3_REVISION, state.model)
-        assertEquals(ModelCatalog.diarizationModel.sha256, state.speakers)
+        assertEquals("0.1.0's diarizer export", DIARIZER_010, state.speakers)
         assertEquals("0.1.0 keys a checkpoint by its source uri", DIRECTORY_KEY, CheckpointState.key(state.source))
     }
 
@@ -209,5 +209,8 @@ class CheckpointGoldenTest {
 
         /** The revision of Parakeet TDT 0.6B v3 INT8, the speech model of 0.1.0, which made the golden. */
         const val PARAKEET_V3_REVISION = "2bda32ec70b097a55adaa07d9a7173915b43cc78"
+
+        /** The SHA-256 of 0.1.0's diarizer export, which made the golden; the model host's export replaced it. */
+        const val DIARIZER_010 = "01d1f893f394cc0418ae78425d216ed62c334c0125e650135332a7a8e595f168"
     }
 }

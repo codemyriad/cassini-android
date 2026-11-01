@@ -9,8 +9,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import org.cassini.core.Failure
 import org.cassini.core.UserFacingException
-import org.cassini.core.models.Artifact
 import org.cassini.core.models.ArtifactFetcher
+import org.cassini.core.models.DistManifest
 import org.cassini.core.models.ModelCatalog
 import org.cassini.core.models.ModelDescriptor
 import org.cassini.core.models.ModelPart
@@ -55,31 +55,26 @@ fun interface ModelFetcher {
 
     companion object {
         /**
-         * [ArtifactFetcher] with Range resume, following only the redirects [redirects] allows (architecture 5.6:
-         * HTTPS to `ModelCatalog.DOWNLOAD_HOSTS`, at most five hops). [url] says where each artifact comes from.
+         * Downloads from the model host only (architecture 5.6, D53.1). First reads the host's manifest ([manifest])
+         * and finds the model's pinned pair and files in it ([DistManifest.urls]); a manifest that does not list them
+         * as pinned refuses the download with [Failure.VERIFY]. Then each file is fetched as its own seekable
+         * Zstandard object with [ArtifactFetcher.fetchZstd] (Range resume, verified before and after decompression),
+         * following only the redirects [redirects] allows (HTTPS to `ModelCatalog.DOWNLOAD_HOSTS`, at most five hops).
          */
         fun network(
             redirects: RedirectPolicy = RedirectPolicy.DOWNLOADS,
-            url: (Artifact) -> String = Artifact::url,
+            manifest: () -> DistManifest = { DistManifest.fetch(redirects = redirects) },
         ): ModelFetcher = ModelFetcher { model, directory, progress ->
-            val download = model.download
-            if (download != null) {
-                ArtifactFetcher.fetchZstd(
-                    url(download),
-                    download,
-                    model.artifacts.single(),
-                    directory,
-                    redirects,
-                    progress,
-                )
-            } else {
-                var completed = 0L
-                for (artifact in model.artifacts) {
-                    ArtifactFetcher.fetch(url(artifact), artifact, directory, redirects) { bytes, verifying ->
-                        progress(completed + bytes, verifying)
-                    }
-                    completed += artifact.size
+            val urls = manifest().urls(model, redirects)
+            var completed = 0L
+            for (artifact in model.artifacts) {
+                val download = checkNotNull(artifact.download) { "${artifact.name} has no pinned download" }
+                val done = completed
+                ArtifactFetcher.fetchZstd(urls.getValue(artifact.name), download, artifact, directory, redirects) {
+                        bytes, verifying ->
+                    progress(done + bytes, verifying)
                 }
+                completed += download.size
             }
         }
     }

@@ -95,7 +95,9 @@ object ScriptedModels {
         while (true) {
             when (val step = steps.poll() ?: throw UserFacingException(Failure.DOWNLOAD, "No scripted step")) {
                 is Step.Progress -> {
-                    progress(bytesFor(model, checkNotNull(directory.parentFile), step.percent), step.verifying)
+                    // The model's directory is <modelRoot>/models/<id>/<source sha256>.
+                    val modelRoot = File(directory.path.removeSuffix(File.separator + model.directory))
+                    progress(bytesFor(model, modelRoot, step.percent), step.verifying)
                     // Interrupted when the job is cancelled: the installer reads that as a cancellation.
                     if (!gate.tryAcquire(WAIT_S, TimeUnit.SECONDS)) {
                         throw UserFacingException(Failure.DOWNLOAD, "The scripted fetch was not released")
