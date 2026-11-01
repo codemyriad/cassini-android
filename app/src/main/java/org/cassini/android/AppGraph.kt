@@ -240,10 +240,11 @@ class AppGraph(context: Context, val config: Config) {
                 clock = SystemClock::elapsedRealtime,
             ),
         )
-        // A note open in the player gets its MediaSession (lock screen, notification, headsets; D53).
+        // The first play gets the MediaSession (lock screen, notification, headsets; D53). Not at note open: a note
+        // that is only read needs no session, and opening a note stays light.
         appScope.launch(dispatchers.main) {
-            controller.state.map { it.noteId }.distinctUntilChanged().collect { id ->
-                if (id != null) PlaybackService.start(app)
+            controller.state.map { it.playing }.distinctUntilChanged().collect { playing ->
+                if (playing) PlaybackService.start(app)
             }
         }
         controller
