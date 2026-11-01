@@ -16,10 +16,11 @@ data class ModelPlan(val missing: List<Item>) {
         val downloadBytes: Long get() = models.sumOf { it.downloadBytes }
 
         /**
-         * Bytes on disk while installing: the downloads, plus the decompressed files of the compressed ones
-         * ([ModelDescriptor.installBytes]).
+         * Bytes on disk at most while installing: the models install one after another, so every installed file plus
+         * the largest single download being decompressed ([ModelDescriptor.installBytes]).
          */
-        val installBytes: Long get() = models.sumOf { it.installBytes }
+        val installBytes: Long
+            get() = models.sumOf { it.artifactBytes } + (models.maxOfOrNull { it.largestDownloadBytes } ?: 0L)
 
         /** The size shown next to the part: [downloadBytes] in whole MiB as [ModelCatalog.mebibytes] rounds it. */
         val mebibytes: Long get() = ModelCatalog.mebibytes(downloadBytes)
@@ -42,16 +43,22 @@ data class ModelPlan(val missing: List<Item>) {
     val totalMebibytes: Long get() = missing.sumOf { it.mebibytes }
 
     /**
-     * Free space needed before the first byte: each missing part's [Item.installBytes] plus
-     * [ArtifactFetcher.SLACK_BYTES], or 0 when nothing is missing. Kept `.part` files are not subtracted;
+     * Free space needed before the first byte: every file of the missing parts, plus the largest single download
+     * (the parts install one after another, and each download is deleted once its file verified), plus
+     * [ArtifactFetcher.SLACK_BYTES]; 0 when nothing is missing. Kept `.part` files are not subtracted;
      * [ArtifactFetcher] checks each file again with what it still has to fetch.
      */
     val requiredFreeBytes: Long
-        get() = if (missing.isEmpty()) 0 else missing.sumOf { it.installBytes } + ArtifactFetcher.SLACK_BYTES
+        get() {
+            if (missing.isEmpty()) return 0
+            val models = missing.flatMap { it.models }
+            val largest = models.maxOfOrNull { it.largestDownloadBytes } ?: 0L
+            return models.sumOf { it.artifactBytes } + largest + ArtifactFetcher.SLACK_BYTES
+        }
 
     /**
-     * [requiredFreeBytes] as the "Needs about 1330 MB free" figure, rounded to the nearest 10 like every size on the
-     * screen (a fresh install needs about 1331 MiB and shows 1330; the space check itself compares bytes).
+     * [requiredFreeBytes] as the "Needs about 1230 MB free" figure, rounded to the nearest 10 like every size on the
+     * screen (a fresh install needs about 1231 MiB and shows 1230; the space check itself compares bytes).
      */
     val requiredFreeMebibytes: Long get() = if (missing.isEmpty()) 0 else ModelCatalog.mebibytes(requiredFreeBytes)
 
