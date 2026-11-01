@@ -45,11 +45,15 @@ data class ModelDescriptor(val id: String, val sourceSha256: String, val artifac
     /** Bytes of the installed files. */
     val artifactBytes: Long get() = artifacts.sumOf { it.size }
 
+    /** The largest compressed download of one file; 0 when no file is compressed. */
+    val largestDownloadBytes: Long get() = artifacts.maxOfOrNull { it.download?.size ?: 0L } ?: 0L
+
     /**
-     * Bytes on disk at most while installing: every download, plus the decompressed file of each compressed one
-     * (a compressed file is deleted once its decompressed copy verified, so this is an upper bound).
+     * Bytes on disk at most while installing: the files are fetched one at a time, and a compressed download is
+     * deleted as soon as its decompressed file verified. So the peak is every installed file plus the one download
+     * that is being decompressed, at most [largestDownloadBytes].
      */
-    val installBytes: Long get() = downloadBytes + artifacts.filter { it.download != null }.sumOf { it.size }
+    val installBytes: Long get() = artifactBytes + largestDownloadBytes
 
     companion object {
         /** The directory under the model root that holds every model, as on the desktop. */

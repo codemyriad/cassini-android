@@ -110,9 +110,17 @@ class ModelInstallerTest {
         assertEquals(InstallOutcome.Installed(), ModelInstaller(enough).install(all) {})
     }
 
-    @Test fun roomForSpeechAloneInstallsSpeechAndDegradesTheRest() = runBlocking {
+    @Test fun theRoomThatSpeechNeedsAlsoFitsTheOtherParts() = runBlocking {
+        // Speech's peak holds the 431 MiB encoder download, which is deleted before the speaker parts start.
+        val speech = ModelPlan(ModelPlan.of { false }.missing.filter { it.part == ModelPart.SPEECH }).requiredFreeBytes
+        assertEquals(InstallOutcome.Installed(), ModelInstaller(FakeStore(usable = speech)).install(all) {})
+    }
+
+    @Test fun spaceTakenDuringSpeechInstallsSpeechAndDegradesTheRest() = runBlocking {
         val speech = ModelPlan(ModelPlan.of { false }.missing.filter { it.part == ModelPart.SPEECH }).requiredFreeBytes
         val store = FakeStore(usable = speech)
+        // Another app fills the phone while speech downloads: only what speech's files left stays free.
+        store.onInstall = { model, _ -> if (model == ModelCatalog.PARAKEET) store.take(speech - model.artifactBytes) }
         val outcome = ModelInstaller(store).install(all) {}
         val expected = mapOf(
             ModelPart.SPEAKERS to DownloadError.NOT_ENOUGH_STORAGE,
@@ -257,7 +265,7 @@ class ModelInstallerTest {
         private val online: Boolean = true,
         usable: Long = Long.MAX_VALUE,
     ) : ModelStore {
-        /** Free bytes now: each install takes what `ModelPlan.Item.installBytes` counts for its model. */
+        /** Free bytes now: each install takes its installed files; its downloads are deleted once verified. */
         @Volatile private var free = usable
         private val installed = ready.toMutableSet()
         val attempts = mutableListOf<ModelDescriptor>()
@@ -284,12 +292,17 @@ class ModelInstallerTest {
             return free
         }
 
+        /** Space that something else takes. */
+        fun take(bytes: Long) {
+            free -= bytes
+        }
+
         override fun installBlocking(model: ModelDescriptor, progress: (Long, Boolean) -> Unit) {
             attempts += model
             failures[model]?.let { throw it }
             onInstall(model, progress)
             installed += model
-            free -= ModelPlan.Item(ModelPart.SPEECH, listOf(model)).installBytes
+            free -= model.artifactBytes
         }
     }
 }
