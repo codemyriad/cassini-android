@@ -47,17 +47,13 @@ Versions 0.0.1-beta to 0.1.0 have a different key, the beta key (certificate SHA
 
 ## Model downloads and pinned hashes
 
-The APK does not contain the speech models. The app downloads them only after the user agrees to the download. The app downloads the models from these hosts:
+The APK does not contain the speech models. The app downloads them only after the user agrees to the download. The app downloads every model from one host, `dist.gocassini.com`, the model host of Cassini: Parakeet Ultra INT8 (speech recognition), Silero VAD (speech detection), Nemotron-3-Diarization INT8 (speaker labels) and CAM++ (voiceprints). The desktop app of Cassini downloads its models from the same host, with the same rules.
 
-| Model | Host |
-|---|---|
-| Parakeet Ultra INT8 (speech recognition) | `huggingface.co`, at a pinned revision |
-| Silero VAD (speech detection) and CAM++ (voiceprints) | `github.com`, from the `k2-fsa/sherpa-onnx` releases |
-| Nemotron-3-Diarization INT8 (speaker labels) | `dist.gocassini.com` |
+[`ModelCatalog.kt`](core/src/main/kotlin/org/cassini/core/models/ModelCatalog.kt) pins each model by its identifier on the host and the SHA-256 of its source. It also pins the size and the SHA-256 of each model file, compressed and decompressed. Before a download, the app reads the manifest of the host (`https://dist.gocassini.com/manifest.json`) only to find the files. If the manifest does not list the pinned model, or if one of its files does not have the pinned sizes and hashes, the app does not download the model. The app never installs a newer version of a model that the manifest offers.
 
-These hosts can send the download to a different download host (a redirect). The app follows a redirect only to a host in the list `ModelCatalog.DOWNLOAD_HOSTS`. [PRIVACY.md](PRIVACY.md) gives this list.
+Each model file is a seekable Zstandard file. The app asks for the file without a transfer encoding (`Accept-Encoding: identity`). It continues an interrupted download with an HTTP range request, only if the file on the host is still the same (`If-Range` with the SHA-256 of the file). The app compares the size and the SHA-256 of the compressed file before decompression, and the size and the SHA-256 of the model file after decompression. If they are not equal, the app deletes the file and does not install it. The app installs a model in `models/<identifier>/<source SHA-256>/`, and writes the marker of the model only after every file is correct.
 
-[`ModelCatalog.kt`](core/src/main/kotlin/org/cassini/core/models/ModelCatalog.kt) pins the URL, the size and the SHA-256 of each model file. The app compares the size and the SHA-256 of each downloaded file with the pin before it installs the file. If they are not equal, the app deletes the partial file and does not install it. The Nemotron model is a Zstandard file. The app compares the hash of the compressed file before decompression, and the hash of the model after decompression.
+The host can send the download to a different host (a redirect). The app follows a redirect only to a host in the list `ModelCatalog.DOWNLOAD_HOSTS`, which has only `dist.gocassini.com`. [PRIVACY.md](PRIVACY.md) gives this list.
 
 If a host gives a file with a different hash, the app stops the download. Report this to us, because it can show that a host is not safe.
 

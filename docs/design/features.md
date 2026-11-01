@@ -222,7 +222,7 @@ The sheet has two modes: SEALED (document OK, no job row) and DRAFT (job RUNNING
 - No missing model: the entry points (Transcribe, Settings rows, banners) do not open this screen. An old entry removes itself. With a note, it first adds the note to the queue.
 - The screen does not use the "Keep Cassini open." of board 10 (in the download banner). Downloads run in the foreground service, and they continue when the user leaves the app.
 
-**Acceptance**: JVM `ModelPlan` (a new installation needs about 861 MiB, and the screen shows 730 MB, partial installations). Coordinator test: no `ArtifactFetcher` call before consent. Shot: `05-model-download` and the no-space variant. Device (P12): the walk opens it on an empty scratch model root.
+**Acceptance**: JVM `ModelPlan` (with the pins of the model host, a new installation needs about 1331 MiB, and the screen shows 528 MB; partial installations). The sizes in this section are the 0.1.0 figures of the boards and the screenshot fixtures. Coordinator test: no `ArtifactFetcher` call before consent. Shot: `05-model-download` and the no-space variant. Device (P12): the walk opens it on an empty scratch model root.
 
 ## 6. Note actions and export (board 06)
 
