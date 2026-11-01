@@ -7,14 +7,23 @@ import android.content.IntentFilter
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
-import android.media.MediaPlayer
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import androidx.core.content.ContextCompat
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.runInterruptible
+import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.suspendCancellableCoroutine
 import org.cassini.data.notes.NoteRepository
+import org.cassini.data.settings.SettingsRepository
 import java.io.File
+import java.io.IOException
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 // The seams of PlaybackController: the player, audio focus and the noisy broadcast, and where positions go. The app
 // uses the implementations below; JVM tests pass fakes.
@@ -34,40 +43,93 @@ interface AudioPlayer {
 
     fun seekTo(positionMs: Long)
 
+    /** Plays at [speed] (1 = normal), keeping the pitch. */
+    fun setSpeed(speed: Float)
+
     /** Called on the main thread when playback reaches the end. */
     fun onCompletion(listener: () -> Unit)
 
     fun release()
 }
 
-/** [AudioPlayer] over `MediaPlayer` (architecture 5.9). Create it on the main thread, so its callbacks come there. */
-class MediaAudioPlayer(private val io: CoroutineDispatcher) : AudioPlayer {
-    private val player = MediaPlayer().apply { setAudioAttributes(PlaybackAttributes.speech) }
+/**
+ * [AudioPlayer] over Media3 ExoPlayer (architecture 5.9, coordination D53): Ogg Opus, M4A and the other imports, and
+ * time-stretched speeds that keep the pitch. Create and call it on the main thread (the app's looper); its callbacks
+ * come there. Audio focus and unplugged headphones stay with [PlaybackPlatform], as with the earlier `MediaPlayer`.
+ */
+class ExoAudioPlayer(context: Context) : AudioPlayer {
+    private val player: ExoPlayer = ExoPlayer.Builder(context.applicationContext)
+        .setAudioAttributes(
+            androidx.media3.common.AudioAttributes.Builder()
+                .setUsage(C.USAGE_MEDIA)
+                .setContentType(C.AUDIO_CONTENT_TYPE_SPEECH)
+                .build(),
+            // handleAudioFocus: no, PlaybackPlatform keeps the focus.
+            false,
+        )
+        .setHandleAudioBecomingNoisy(false)
+        .build()
+    private var completion: (() -> Unit)? = null
 
-    @Volatile private var prepared = false
-
-    override val positionMs: Long get() = if (prepared) player.currentPosition.toLong() else 0L
-    override val durationMs: Long get() = if (prepared) player.duration.toLong().coerceAtLeast(0) else 0L
-    override val playing: Boolean get() = prepared && player.isPlaying
-
-    override suspend fun prepare(file: File) {
-        runInterruptible(io) {
-            player.setDataSource(file.path)
-            player.prepare()
-        }
-        prepared = true
+    init {
+        player.addListener(
+            object : Player.Listener {
+                override fun onPlaybackStateChanged(playbackState: Int) {
+                    if (playbackState == Player.STATE_ENDED) completion?.invoke()
+                }
+            },
+        )
     }
 
-    override fun play() = player.start()
+    override val positionMs: Long get() = player.currentPosition.coerceAtLeast(0)
+    override val durationMs: Long get() = player.duration.takeIf { it != C.TIME_UNSET }?.coerceAtLeast(0) ?: 0L
+
+    // As MediaPlayer.isPlaying: true from play() on, also while the player buffers, until pause or the end.
+    override val playing: Boolean get() = player.playWhenReady && player.playbackState != Player.STATE_ENDED
+
+    override suspend fun prepare(file: File) {
+        player.setMediaItem(MediaItem.fromUri(Uri.fromFile(file)))
+        player.prepare()
+        suspendCancellableCoroutine { continuation ->
+            val listener = object : Player.Listener {
+                override fun onPlaybackStateChanged(playbackState: Int) {
+                    if (playbackState == Player.STATE_READY && continuation.isActive) {
+                        player.removeListener(this)
+                        continuation.resume(Unit)
+                    }
+                }
+
+                override fun onPlayerError(error: PlaybackException) {
+                    player.removeListener(this)
+                    if (continuation.isActive) continuation.resumeWithException(IOException("Cannot play $file", error))
+                }
+            }
+            player.addListener(listener)
+            continuation.invokeOnCancellation { player.removeListener(listener) }
+            if (player.playbackState == Player.STATE_READY) {
+                player.removeListener(listener)
+                continuation.resume(Unit)
+            }
+        }
+    }
+
+    override fun play() {
+        if (player.playbackState == Player.STATE_ENDED) player.seekTo(player.currentPosition)
+        player.play()
+    }
 
     override fun pause() = player.pause()
 
-    override fun seekTo(positionMs: Long) = player.seekTo(positionMs, MediaPlayer.SEEK_CLOSEST)
+    override fun seekTo(positionMs: Long) = player.seekTo(positionMs)
 
-    override fun onCompletion(listener: () -> Unit) = player.setOnCompletionListener { listener() }
+    override fun setSpeed(speed: Float) = player.setPlaybackSpeed(speed)
+
+    override fun onCompletion(listener: () -> Unit) {
+        completion = listener
+    }
 
     override fun release() {
-        prepared = false
+        completion = null
         player.release()
     }
 }
@@ -140,6 +202,27 @@ class AndroidPlaybackPlatform(context: Context) : PlaybackPlatform {
         noisy?.let(app::unregisterReceiver)
         noisy = null
     }
+}
+
+/** Where the app-wide playback speed is kept (`SettingsRepository` in the app). */
+interface SpeedStore {
+    suspend fun load(): Float
+
+    suspend fun save(speed: Float)
+
+    /** Always normal speed, and nothing is kept: tests that do not care about speed. */
+    object Fixed : SpeedStore {
+        override suspend fun load(): Float = 1f
+
+        override suspend fun save(speed: Float) = Unit
+    }
+}
+
+/** [SpeedStore] over the app's settings. */
+class SettingsSpeedStore(private val settings: SettingsRepository) : SpeedStore {
+    override suspend fun load(): Float = settings.playbackSpeed.first() ?: 1f
+
+    override suspend fun save(speed: Float) = settings.setPlaybackSpeed(speed)
 }
 
 /** Where playback positions go ([NoteRepository.setPosition] in the app). */

@@ -650,7 +650,7 @@ The purge does not use WorkManager, for these reasons:
 | `ProcessingService` | `:app` | Only the foreground lifetime: the type, the wake lock, the notification and `onTimeout`. |
 | `RecordingController` | `:app` | `MicrophoneCapture`, `StateFlow<RecordingState>`, the levels, the policy loop and `activeNoteId`. |
 | `RecordingService` | `:app` (`recording/`) | The foreground lifetime of the microphone, the notification, and the hand-off to the processing. |
-| `PlaybackController` | `:app` | `MediaPlayer`, the position flow, the audio focus and `playRange`. |
+| `PlaybackController` | `:app` | Media3 ExoPlayer (`ExoAudioPlayer`), the position flow, the speed, the audio focus and `playRange`; `SessionPlayer` and `PlaybackService` give it a MediaSession. |
 | `NoticeCenter` | `:app` (P10) | It merges the state of the coordinator, the recorder, the recovery, the models and the imports into the banner list of each screen. |
 
 ### 5.2 The transcription queue
@@ -879,7 +879,7 @@ After Finish, these rules apply:
 
 ### 5.9 Playback
 
-`PlaybackController` keeps `MediaPlayer`. We did not use Media3, because we tested the behavior of `MediaPlayer` on devices, and the app only seeks inside one local file. During playback, a position flow gives the position each 150 ms. The controller saves the position each 5 s. It also saves it with `final = true` at pause and when the user leaves the screen, and this save also updates the Library preview. It requests `AUDIOFOCUS_GAIN` (`USAGE_MEDIA`, `CONTENT_TYPE_SPEECH`). It pauses when it loses the focus and at `ACTION_AUDIO_BECOMING_NOISY`. `playRange(noteId, startMs, endMs)` plays a speaker sample, stops at `endMs` and puts back the previous position.
+`PlaybackController` plays through Media3 ExoPlayer (`ExoAudioPlayer`, coordination D53), which replaced `MediaPlayer` for two things that `MediaPlayer` does not give: speeds that keep the pitch, and a MediaSession. The speed is one of 0.75, 1, 1.25, 1.5, 1.75 and 2 (`PlaybackSpeeds`), the same for every note and kept in the settings (`playback.speed`). A speed change starts a new epoch, and the screen extrapolates the position at the speed (`PlaybackAnchor.speed`). `SessionPlayer`, a Media3 `SimpleBasePlayer`, mirrors the controller's state and hands every command of the lock screen, the media notification, headsets, Bluetooth and Android Auto to the controller (play and pause, seek, −10 s/+10 s, speed), so the rules below hold whatever sent the command. `PlaybackService`, a `MediaSessionService` (`mediaPlayback`), holds the session; the app starts it when a note opens in the player, and Media3 runs it in the foreground while it plays, so playback goes on in the background. Its notification opens the note. Leaving the Note screen still pauses and releases the player. During playback, a position flow gives the position each 150 ms. The controller saves the position each 5 s. It also saves it with `final = true` at pause and when the user leaves the screen, and this save also updates the Library preview. It requests `AUDIOFOCUS_GAIN` (`USAGE_MEDIA`, `CONTENT_TYPE_SPEECH`). It pauses when it loses the focus and at `ACTION_AUDIO_BECOMING_NOISY`. `playRange(noteId, startMs, endMs)` plays a speaker sample, stops at `endMs` and puts back the previous position.
 
 Two Note screens can open the player at the same time, for example when the user leaves note A and opens note B (or note A again) before the file of A is prepared. For this reason, each Note screen is the owner of the player that it opens. `open` and `leave` increase a generation counter. After `prepare`, an `open` or a `reload` that finds a different generation releases its new player and returns false. Thus only the player of the last `open` stays, and the controller releases each other player. A `leave` names its owner. It does nothing when a newer screen owns the player, also when that screen shows the same note.
 
@@ -910,7 +910,7 @@ The text comes from `inAppLanguage()` (`AppLanguage.kt`). Below API 33, this fun
 
 | Thread or dispatcher | Runs | Never |
 |---|---|---|
-| Main | Compose, `StateFlow` collection, `MediaPlayer` control, `startForeground`/`stopSelf`, notification posts | File I/O (StrictMode logs it), sherpa, `capture.stop()` |
+| Main | Compose, `StateFlow` collection, ExoPlayer and MediaSession control, `startForeground`/`stopSelf`, notification posts | File I/O (StrictMode logs it), sherpa, `capture.stop()` |
 | `cassini-inference` (`InferenceDispatcher`, one thread) | Each sherpa call, `StreamingOpusEncoder`, decoder callbacks, the checkpoint and `names.json` writes of the job, the seal | `runBlocking`, suspension inside the native loop |
 | IO | Room, DataStore, each repository call, `ModelInstaller` (`runInterruptible(IO)`), adopt, recovery, imports, exports | sherpa |
 | `ProgressTracker` (`Default.limitedParallelism(1)`) | `TranscriptionProgress`, `BatteryProjection`, battery reads, the construction of `RunningProgress`/`DraftState` | Blocking I/O |
@@ -1055,7 +1055,7 @@ F-Droid: the app has no proprietary SDKs. `docs/release.md` gives the open probl
 - Roborazzi, not Paparazzi (alpha, bound to layoutlib) and not Compose Preview Screenshot Testing (alpha, previews only). A spike with this toolchain at 780 x 1688 px, the size of the boards, showed that Roborazzi operates.
 - The unmodified static TTFs from upstream, not the woff2 web subsets of the design. A subset is a Modified Version under the OFL, and "Plex" is a Reserved Font Name.
 - Icons as `ImageVector`s from the SVG paths of the design. The build does not have `material-icons-extended`.
-- A manual `AppGraph`, not Hilt. org.json stays in `:core`. kotlinx-serialization is only for the navigation keys. `MediaPlayer` stays. AppCompat is only for the locales, and for this reason the XML theme is in `:app`. No dynamic color. StrictMode logs, and it does not kill. `singleTop`, not `singleTask`.
+- A manual `AppGraph`, not Hilt. org.json stays in `:core`. kotlinx-serialization is only for the navigation keys. Media3 ExoPlayer replaced `MediaPlayer` for speeds and the MediaSession (D53). AppCompat is only for the locales, and for this reason the XML theme is in `:app`. No dynamic color. StrictMode logs, and it does not kill. `singleTop`, not `singleTask`.
 - The `:core` string scan `DefaultLabels.isDefault` finds the default speaker labels, not a stored flag. The documents store only the label text.
 - We deleted `OpusEncoder.kt` (MediaCodec, 48 kb/s). Sources that are not Opus go through the 24 kb/s libopus path.
 - We rejected AGP 8.13, because it cannot compile against SDK 37. AGP 9.4/Gradle 9.8 is for later. Robolectric at SDK 35, not JDK 21. We rejected a committed AAR in favor of a release asset with a hash pin and a weekly check from source. We rejected a copy of the conformance vectors in the repository in favor of a pinned submodule.

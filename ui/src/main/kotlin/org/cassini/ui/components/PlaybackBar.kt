@@ -14,11 +14,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
@@ -50,9 +52,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.cassini.ui.R
 import org.cassini.ui.format.Durations
+import org.cassini.ui.format.format
 import org.cassini.ui.theme.CassiniIcon
 import org.cassini.ui.theme.CassiniTheme
 import org.cassini.ui.theme.Glyph
+import java.text.NumberFormat
 
 /** The times row is drawn 4 dp higher than its layout slot, so the 48 dp slider keeps the board's 28 dp spacing. */
 private val TimesLift = 4.dp
@@ -77,9 +81,10 @@ fun PlaybackBar(
     onPlayPause: () -> Unit,
     modifier: Modifier = Modifier,
     onSeekFinished: (() -> Unit)? = null,
+    speed: SpeedControl? = null,
 ) {
     val windowHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() }
-    val fixedWidth = compactFixedWidth(durationMs)
+    val fixedWidth = compactFixedWidth(durationMs, speed != null)
     BoxWithConstraints(modifier.fillMaxWidth()) {
         if (windowHeight < COMPACT_HEIGHT && maxWidth - fixedWidth >= COMPACT_MIN_SLIDER) {
             CompactPlaybackBar(
@@ -91,6 +96,7 @@ fun PlaybackBar(
                 onSkipForward,
                 onPlayPause,
                 onSeekFinished,
+                speed,
             )
         } else {
             TwoRowPlaybackBar(
@@ -102,6 +108,7 @@ fun PlaybackBar(
                 onSkipForward,
                 onPlayPause,
                 onSeekFinished,
+                speed,
             )
         }
     }
@@ -119,6 +126,7 @@ private fun TwoRowPlaybackBar(
     onSkipForward: () -> Unit,
     onPlayPause: () -> Unit,
     onSeekFinished: (() -> Unit)?,
+    speed: SpeedControl?,
 ) {
     val c = CassiniTheme.colors
     val group = stringResource(R.string.ui_player_group)
@@ -162,14 +170,17 @@ private fun TwoRowPlaybackBar(
             )
         }
         Spacer(Modifier.height(6.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(28.dp, Alignment.CenterHorizontally),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            SkipButton(forward = false, onClick = onSkipBack)
-            PlayPauseButton(playing = playing, onClick = onPlayPause)
-            SkipButton(forward = true, onClick = onSkipForward)
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(28.dp, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SkipButton(forward = false, onClick = onSkipBack)
+                PlayPauseButton(playing = playing, onClick = onPlayPause)
+                SkipButton(forward = true, onClick = onSkipForward)
+            }
+            // At the end, so the three controls stay centred as on board 03.
+            if (speed != null) SpeedButton(speed, Modifier.align(Alignment.CenterEnd))
         }
     }
 }
@@ -202,7 +213,7 @@ internal const val COMPACT_LENGTH_TAG = "player-length"
  * never shorter than the position, so the layout does not change while the note plays.
  */
 @Composable
-private fun compactFixedWidth(durationMs: Long): Dp {
+private fun compactFixedWidth(durationMs: Long, speed: Boolean): Dp {
     val density = LocalDensity.current
     val direction = LocalLayoutDirection.current
     val insets = WindowInsets.navigationBars
@@ -212,8 +223,9 @@ private fun compactFixedWidth(durationMs: Long): Dp {
     val time = remember(durationMs, style, density) {
         measurer.measure(Durations.clock(durationMs), style, maxLines = 1, softWrap = false).size.width
     }
+    val speedWidth = if (speed) CompactGap + SkipSize else 0.dp
     return with(density) { (2 * time + sides).toDp() } + CompactPadding * 2 + CompactGap * 5 + SkipSize * 2 +
-        PlayPauseSize
+        PlayPauseSize + speedWidth
 }
 
 /**
@@ -232,6 +244,7 @@ private fun CompactPlaybackBar(
     onSkipForward: () -> Unit,
     onPlayPause: () -> Unit,
     onSeekFinished: (() -> Unit)?,
+    speed: SpeedControl?,
 ) {
     val c = CassiniTheme.colors
     val group = stringResource(R.string.ui_player_group)
@@ -252,6 +265,7 @@ private fun CompactPlaybackBar(
         SkipButton(forward = false, onClick = onSkipBack)
         PlayPauseButton(playing = playing, onClick = onPlayPause)
         SkipButton(forward = true, onClick = onSkipForward)
+        if (speed != null) SpeedButton(speed)
         Text(
             text = Durations.clock(positionMs),
             style = CassiniTheme.type.monoSmall,
@@ -299,6 +313,42 @@ fun SkipButton(forward: Boolean, onClick: () -> Unit, modifier: Modifier = Modif
                 color = c.ink,
             )
         }
+    }
+}
+
+/**
+ * The speed button: a 52 dp tall rounded button with the speed ("1×", "1.25×", the number in the formatting locale) in
+ * `label14` ink, at least 52 dp wide. Described with the catalog's "Playback speed, 1.25×" (`player.speed.a11y`); a
+ * tap goes to the next speed.
+ */
+@Composable
+fun SpeedButton(speed: SpeedControl, modifier: Modifier = Modifier) {
+    val c = CassiniTheme.colors
+    val rate = stringResource(R.string.ui_speed_rate, speedNumber(speed.speed))
+    val description = stringResource(R.string.ui_player_speed, rate)
+    Box(
+        modifier = modifier
+            .heightIn(min = SkipSize)
+            .widthIn(min = SkipSize)
+            .clip(CassiniTheme.shapes.row)
+            .clickable(role = Role.Button, onClick = speed.onClick)
+            .clearAndSetSemantics { contentDescription = description }
+            .padding(horizontal = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text = rate, style = CassiniTheme.type.label14, color = c.ink, maxLines = 1, softWrap = false)
+    }
+}
+
+/** 1, 1.25, 0.75 in the formatting locale ("1,25" in Italian), without trailing zeros. */
+@Composable
+private fun speedNumber(speed: Float): String {
+    val locale = format().locale
+    return remember(speed, locale) {
+        NumberFormat.getNumberInstance(locale).apply {
+            minimumFractionDigits = 0
+            maximumFractionDigits = 2
+        }.format(speed.toDouble())
     }
 }
 

@@ -106,7 +106,8 @@ data class NoteChipsUi(val trust: TrustUi, val version: VersionChipUi? = null, v
 data class VersionChipUi(val index: Int, val count: Int, val kind: VersionKindUi)
 
 /**
- * The player: [positionMs] of [durationMs]; [following] is false while auto-follow is paused (the Follow chip shows).
+ * The player: [positionMs] of [durationMs] at [speed] (1 = normal; the speed button shows it); [following] is false
+ * while auto-follow is paused (the Follow chip shows).
  * [anchor] is set while this note plays and no seek is dragged: the transcript extrapolates it every frame, so the
  * active word changes at its start rather than at the next published position.
  */
@@ -117,6 +118,7 @@ data class PlaybackUi(
     val playing: Boolean,
     val following: Boolean = true,
     val anchor: PlaybackAnchor? = null,
+    val speed: Float = 1f,
 )
 
 /**

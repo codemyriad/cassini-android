@@ -23,6 +23,15 @@ class PlaybackClockTest {
         assertEquals(1_120L, clock.positionMs(ms(10_120)))
     }
 
+    /** D53: at 1.5× the active word advances 1.5 ms per real ms. */
+    @Test fun aPlayingAnchorAdvancesAtItsSpeed() {
+        val clock = PlaybackClock()
+        clock.update(PlaybackAnchor(1_000, ms(10_000), playing = true, speed = 1.5f))
+        assertEquals(1_180L, clock.positionMs(ms(10_120)))
+        clock.update(PlaybackAnchor(1_000, ms(20_000), playing = true, epoch = 1, speed = 0.75f))
+        assertEquals(1_075L, clock.positionMs(ms(20_100)))
+    }
+
     @Test fun theClockStopsAtTheEndOfTheFile() {
         val clock = PlaybackClock()
         clock.update(PlaybackAnchor(3_900, ms(0), playing = true, durationMs = 4_000))

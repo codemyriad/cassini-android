@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.CoroutineScope
@@ -114,6 +115,11 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
 
     suspend fun recordPurge(at: Long) = set(Keys.LAST_PURGE_AT, at)
 
+    /** The Note screen's playback speed, for every note (coordination D53); null until one is chosen. */
+    val playbackSpeed: Flow<Float?> = key(Keys.PLAYBACK_SPEED)
+
+    suspend fun setPlaybackSpeed(speed: Float) = set(Keys.PLAYBACK_SPEED, speed)
+
     private fun <T> key(key: Preferences.Key<T>): Flow<T?> = preferences.map { it[key] }.distinctUntilChanged()
 
     private fun flag(key: Preferences.Key<Boolean>): Flow<Boolean> =
@@ -149,6 +155,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         val OPUS_NATIVE_ACK = booleanPreferencesKey("notices.opusNativeAck")
         val NOTIFICATIONS_ASKED = booleanPreferencesKey("notifications.asked")
         val LAST_PURGE_AT = longPreferencesKey("trash.lastPurgeAt")
+        val PLAYBACK_SPEED = floatPreferencesKey("playback.speed")
     }
 
     companion object {

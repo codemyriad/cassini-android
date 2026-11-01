@@ -14,7 +14,9 @@ import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -32,9 +34,12 @@ import org.cassini.android.notices.ImportTracker
 import org.cassini.android.notices.NoticeCenter
 import org.cassini.android.notices.TrashUndo
 import org.cassini.android.playback.AndroidPlaybackPlatform
-import org.cassini.android.playback.MediaAudioPlayer
+import org.cassini.android.playback.ExoAudioPlayer
 import org.cassini.android.playback.PlaybackController
+import org.cassini.android.playback.PlaybackService
 import org.cassini.android.playback.RepositoryPositionStore
+import org.cassini.android.playback.SessionPlayer
+import org.cassini.android.playback.SettingsSpeedStore
 import org.cassini.android.processing.AppVisibility
 import org.cassini.android.processing.ForegroundServiceStarter
 import org.cassini.android.processing.ModelInstallOwner
@@ -224,16 +229,31 @@ class AppGraph(context: Context, val config: Config) {
 
     /** The Note screen's player (architecture 5.9). Main thread only. */
     val playback: PlaybackController by lazy {
-        PlaybackController(
+        val controller = PlaybackController(
             PlaybackController.Parts(
                 scope = appScope,
                 main = dispatchers.main,
-                player = { MediaAudioPlayer(dispatchers.io) },
+                player = { ExoAudioPlayer(app) },
                 platform = AndroidPlaybackPlatform(app),
                 store = RepositoryPositionStore { awaitCatalogue().notes },
+                speeds = SettingsSpeedStore(settings),
                 clock = SystemClock::elapsedRealtime,
             ),
         )
+        // A note open in the player gets its MediaSession (lock screen, notification, headsets; D53).
+        appScope.launch(dispatchers.main) {
+            controller.state.map { it.noteId }.distinctUntilChanged().collect { id ->
+                if (id != null) PlaybackService.start(app)
+            }
+        }
+        controller
+    }
+
+    /** The player that the MediaSession of [PlaybackService] controls: [playback], seen from outside. Main thread. */
+    val sessionPlayer: SessionPlayer by lazy {
+        SessionPlayer(playback, CoroutineScope(appScope.coroutineContext + dispatchers.main)) { id ->
+            awaitCatalogue().notes.note(id).first()?.note?.title
+        }
     }
 
     private val runningJobCanceller = AtomicReference(RunningJobCanceller { })

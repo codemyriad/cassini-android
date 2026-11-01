@@ -41,6 +41,8 @@ The APK contains these libraries from Maven Central and the Google Maven reposit
 | [Room](https://developer.android.com/jetpack/androidx/releases/room) | 2.8.5 |
 | [DataStore](https://developer.android.com/jetpack/androidx/releases/datastore) Preferences | 1.2.1 |
 | [Navigation 3](https://developer.android.com/jetpack/androidx/releases/navigation3) | 1.2.0 |
+| [Media3](https://developer.android.com/jetpack/androidx/releases/media3) ExoPlayer and Session (with Common, Container, Database, DataSource, Decoder and Extractor), the player and its lock-screen controls | 1.11.1 |
+| [AndroidX Media](https://developer.android.com/jetpack/androidx/releases/media), a dependency of Media3 Session | 1.7.0 |
 | [Jetpack Compose](https://developer.android.com/jetpack/androidx/releases/compose) UI, Foundation and Material 3 | Compose BOM 2026.09.00 |
 | [Kotlin standard library](https://github.com/JetBrains/kotlin) | 2.4.21 |
 | [kotlinx-coroutines](https://github.com/Kotlin/kotlinx.coroutines) | 1.11.0 |
@@ -48,7 +50,7 @@ The APK contains these libraries from Maven Central and the Google Maven reposit
 | [kotlinx-collections-immutable](https://github.com/Kotlin/kotlinx.collections.immutable) | 0.5.2 |
 | [Okio](https://github.com/square/okio), a dependency of DataStore | 3.9.1 |
 | AndroidX Arch Core, Autofill, Collection, Concurrent Futures, CursorAdapter, CustomView, DrawerLayout, Emoji2, Fragment, Graphics, Interpolator, Loader, NavigationEvent, ProfileInstaller, ResourceInspection, SavedState, SQLite, Startup, Tracing, VectorDrawable, VersionedParcelable, ViewPager and WindowManager, dependencies of the libraries above | The versions that these libraries ask for |
-| [Guava ListenableFuture](https://github.com/google/guava), a dependency of AndroidX | 1.0 |
+| [Guava](https://github.com/google/guava) (Android flavor) and its failureaccess, dependencies of Media3; they replace the Guava ListenableFuture stub that AndroidX asks for | 33.3.1-android, failureaccess 1.0.2 |
 | [JetBrains Java Annotations](https://github.com/JetBrains/java-annotations), a dependency of the Kotlin standard library | 23.0.0 |
 | [JSpecify](https://github.com/jspecify/jspecify) annotations, a dependency of AndroidX | 1.0.0 |
 

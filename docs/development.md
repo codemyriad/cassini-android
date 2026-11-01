@@ -348,7 +348,7 @@ The times include the 250 ms screen transition and the time of the test to find 
 Later opens do not increase with the length of the audio: the median of the later opens is 690 ms for one hour and 740 ms for ten minutes. The 15 s note is faster (503 ms), because its screen has only one turn to draw. The Note screen does these steps to get this result:
 
 - It shows the first page of 400 words first. It loads the other words after the frame that draws the first turns.
-- It prepares the player after that frame, because `MediaPlayer.prepare` of a long file takes about 0.5 s.
+- It prepares the player after that frame, because preparing a long file took about 0.5 s with `MediaPlayer` (ExoPlayer since D53; not measured again).
 
 `AppGraph.recentWords` keeps the full word lists of the two notes that the user opened last. If the user opens one of these two notes again, the Note screen reads no word rows. This cache did not change the times in the table. The test opens three notes in rotation, and the cache holds only two lists. Thus each open removes from the cache the note that the next round opens first, and each timed open reads the words from Room.
 
