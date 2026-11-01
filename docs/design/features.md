@@ -241,6 +241,8 @@ The "Save a copy" rows are:
 2. **Transcript as text** `.txt` [NEW] (`text/plain`).
 3. **Subtitles** `.srt · .vtt` [NEW]: it opens a chooser with "SubRip (.srt) — works in most video players" and "WebVTT (.vtt) — for web players" (`application/x-subrip`, `text/vtt`).
 
+**Share** [NEW, coordination D53]: each of the three rows ends with a 44 dp Share button ("Share Cassini document", "Share Transcript as text", "Share Subtitles"). It writes the same file as the row, byte for byte for the document, into a fresh `cacheDir/share/<uuid>/<name>`, and sends it with `ACTION_SEND` through the system chooser: the `content://` Uri of the app's FileProvider (authority `<applicationId>.share`, only the `share/` cache folder) as the stream and as ClipData, with the read grant, the MIME type of the row and the note title as subject. The Subtitles Share button opens the same SubRip/WebVTT chooser, which then shares. A share folder is deleted at the next share once it is older than one day, because the receiving app may read it later. A failed write shows "Couldn't share the file". From the Library's sheet, the Note screen opens and runs the share (`NoteStart.SHARE_*`).
+
 **Acceptance**: JVM export goldens (section 9). Device `@NeedsModels`: the Cassini copy is the same, byte for byte (`run-as sha256sum`). The TXT, SRT and VTT exports of the FLEURS clip are equal to the goldens that we recorded one time on the emulator. Shot: `06-note-actions-and-export`, the plain-note variant and the subtitle chooser.
 
 ## 7. (reserved)

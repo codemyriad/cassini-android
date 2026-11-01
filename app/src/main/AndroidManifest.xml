@@ -46,5 +46,15 @@
             android:exported="false">
             <meta-data android:name="autoStoreLocales" android:value="true" />
         </service>
+        <!-- Share: the export files that the system chooser hands to other apps (note/ShareFiles.kt). -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.share"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/share_paths" />
+        </provider>
     </application>
 </manifest>

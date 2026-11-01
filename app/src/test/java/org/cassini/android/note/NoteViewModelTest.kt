@@ -419,6 +419,57 @@ class NoteViewModelTest {
         assertEquals("exportCopy:content://picked/2", ports.calls.last())
     }
 
+    /** Share (D53): the same export, written to a share file, then handed to the chooser; no picker. */
+    @Test
+    fun shareWritesTheExportAndHandsItToTheChooser() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        send(viewModel, NoteEvent.More, NoteEvent.SheetAction(NoteAction.SHARE_TEXT))
+        val text = NoteEffect.Share(
+            "content://org.cassini.android.share/share/0/Weekly sync.txt",
+            "text/plain",
+            "Weekly sync.txt",
+            "Weekly sync",
+        )
+        assertEquals(text, effects.last())
+        assertTrue(effects.none { it is NoteEffect.CreateFile })
+        val request = ports.exports.single()
+        assertEquals(TranscriptFormat.TXT, request.format)
+        assertEquals(mapOf("a" to "Giulia", "b" to "Speaker 2", "c" to "Paolo"), request.labels)
+        assertNull("the sheet closes", viewModel.now().sheet)
+        assertNull("no snackbar for a share", viewModel.now().snackbar)
+
+        // Subtitles: the chooser opens first, then the chosen format is shared, not saved.
+        send(viewModel, NoteEvent.More, NoteEvent.SheetAction(NoteAction.SHARE_SUBTITLES))
+        assertEquals(NoteSheet.SubtitleFormat, viewModel.now().sheet)
+        send(viewModel, NoteEvent.Export(ExportKind.SRT))
+        assertEquals("application/x-subrip", (effects.last() as NoteEffect.Share).mime)
+        assertEquals(TranscriptFormat.SRT, ports.exports.last().format)
+
+        // The Subtitles row itself still saves.
+        send(viewModel, NoteEvent.More, NoteEvent.SheetAction(NoteAction.SAVE_SUBTITLES))
+        send(viewModel, NoteEvent.Export(ExportKind.VTT))
+        assertEquals(NoteEffect.CreateFile("text/vtt", "Weekly sync.vtt"), effects.last())
+
+        send(viewModel, NoteEvent.More, NoteEvent.SheetAction(NoteAction.SHARE_DOCUMENT))
+        assertEquals("exportCopy:file:///share/2/Weekly sync.opus", ports.calls.last { it.startsWith("exportCopy") })
+        assertEquals("audio/ogg", (effects.last() as NoteEffect.Share).mime)
+    }
+
+    @Test
+    fun aShareThatCannotBeWrittenSaysSo() = runTest(dispatcher) {
+        ports.shareRoot = null
+        val viewModel = viewModel()
+        send(viewModel, NoteEvent.More, NoteEvent.SheetAction(NoteAction.SHARE_DOCUMENT))
+        assertTrue(effects.none { it is NoteEffect.Share })
+        assertEquals(SnackbarKind.SHARE_FAILED, viewModel.now().snackbar!!.kind)
+    }
+
+    @Test
+    fun aShareStartedFromTheLibraryRuns() = runTest(dispatcher) {
+        viewModel(start = NoteStart.SHARE_TEXT)
+        assertEquals("text/plain", (effects.single() as NoteEffect.Share).mime)
+    }
+
     @Test
     fun aPlainNoteSavesItsAudioAndHasNoTextExports() = runTest(dispatcher) {
         ports.details.value = documentNote(audioKind = AudioKind.PLAIN)
@@ -428,7 +479,8 @@ class NoteViewModelTest {
         assertFalse(actions.textExportEnabled)
         assertEquals(TranscribeRowUi.Transcribe, actions.transcribeRow)
         send(viewModel, NoteEvent.SheetAction(NoteAction.SAVE_TEXT))
-        assertTrue(effects.none { it is NoteEffect.CreateFile })
+        send(viewModel, NoteEvent.SheetAction(NoteAction.SHARE_TEXT))
+        assertTrue(effects.none { it is NoteEffect.CreateFile || it is NoteEffect.Share })
         send(viewModel, NoteEvent.SheetAction(NoteAction.SAVE_DOCUMENT))
         assertEquals(NoteEffect.CreateFile("audio/ogg", "Weekly sync.opus"), effects.last())
     }

@@ -20,7 +20,17 @@ data class NoteKey(val noteId: String, val query: String? = null, val start: Not
 
 /** A Library actions sheet row that the Note screen does for it: the exports and Document info. */
 @Serializable
-enum class NoteStart { SAVE_DOCUMENT, SAVE_TEXT, SAVE_SRT, SAVE_VTT, CHOOSE_SUBTITLES, DOCUMENT_INFO }
+enum class NoteStart {
+    SAVE_DOCUMENT,
+    SAVE_TEXT,
+    SAVE_SRT,
+    SAVE_VTT,
+    CHOOSE_SUBTITLES,
+    SHARE_DOCUMENT,
+    SHARE_TEXT,
+    SHARE_SUBTITLES,
+    DOCUMENT_INFO,
+}
 
 /** The active recording. Back minimises it; the recording continues. */
 @Serializable

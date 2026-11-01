@@ -386,8 +386,10 @@ class LibraryViewModel(
                 closeSheet()
                 trash(id)
             }
-            NoteAction.SAVE_DOCUMENT, NoteAction.SAVE_TEXT, NoteAction.SAVE_SUBTITLES, NoteAction.DOCUMENT_INFO -> {
-                // The exports and Document info are the Note screen's: it opens and starts the row.
+            NoteAction.SAVE_DOCUMENT, NoteAction.SAVE_TEXT, NoteAction.SAVE_SUBTITLES, NoteAction.SHARE_DOCUMENT,
+            NoteAction.SHARE_TEXT, NoteAction.SHARE_SUBTITLES, NoteAction.DOCUMENT_INFO,
+            -> {
+                // The exports, the shares and Document info are the Note screen's: it opens and starts the row.
                 closeSheet()
                 emit(LibraryEffect.OpenNote(NoteKey(id, start = start(action))))
             }
@@ -405,6 +407,9 @@ class LibraryViewModel(
         NoteAction.SAVE_DOCUMENT -> NoteStart.SAVE_DOCUMENT
         NoteAction.SAVE_TEXT -> NoteStart.SAVE_TEXT
         NoteAction.SAVE_SUBTITLES -> NoteStart.CHOOSE_SUBTITLES
+        NoteAction.SHARE_DOCUMENT -> NoteStart.SHARE_DOCUMENT
+        NoteAction.SHARE_TEXT -> NoteStart.SHARE_TEXT
+        NoteAction.SHARE_SUBTITLES -> NoteStart.SHARE_SUBTITLES
         NoteAction.DOCUMENT_INFO -> NoteStart.DOCUMENT_INFO
         else -> null
     }

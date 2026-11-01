@@ -3,8 +3,11 @@ package org.cassini.android.note
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.util.Log
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
@@ -187,6 +190,9 @@ interface NotePorts {
     /** The name the picker saved [dest] under, or null when the provider does not say. */
     suspend fun displayName(dest: String): String?
 
+    /** A fresh share file named [name] (`ShareFiles`), or null when it cannot be made (a full cache). */
+    suspend fun shareTarget(name: String): ShareTarget?
+
     // Text in the app language, for exports and the documents (the ViewModel has no Resources).
     fun placeholderLabel(number: Int): String
 
@@ -211,6 +217,9 @@ interface NotePorts {
 
     fun snackbarTimeoutMs(): Long
 }
+
+/** A share file: [file] is where the export writes (`file://`), [shared] the FileProvider Uri other apps read. */
+data class ShareTarget(val file: String, val shared: String)
 
 /** [NotePorts] over the app's graph. */
 @Suppress("TooManyFunctions") // one binding per port function
@@ -371,6 +380,17 @@ class GraphNotePorts(private val graph: AppGraph, context: Context) : NotePorts 
 
     override suspend fun displayName(dest: String): String? = withContext(graph.dispatchers.io) {
         runCatching { ImportSource.of(app.contentResolver).describe(dest.toUri()).displayName }.getOrNull()
+    }
+
+    override suspend fun shareTarget(name: String): ShareTarget? = withContext(graph.dispatchers.io) {
+        try {
+            val file = ShareFiles(File(app.cacheDir, ShareFiles.FOLDER)).target(name)
+            val shared = FileProvider.getUriForFile(app, "${app.packageName}.share", file)
+            ShareTarget(Uri.fromFile(file).toString(), shared.toString())
+        } catch (error: IllegalStateException) {
+            Log.w("CassiniNote", "No share file for $name", error)
+            null
+        }
     }
 
     // Text. --------------------------------------------------------------------------------------------------------

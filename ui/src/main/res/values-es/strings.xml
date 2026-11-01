@@ -351,6 +351,8 @@
     <string name="ui_actions_webvtt_body">para reproductores web</string>
     <string name="ui_actions_saved_file">Se guardó “%1$s”</string>
     <string name="ui_actions_save_failed">No se pudo guardar el archivo</string>
+    <string name="ui_actions_share">Compartir %1$s</string>
+    <string name="ui_actions_share_failed">No se pudo compartir el archivo</string>
     <string name="ui_actions_saving">Guardando…</string>
     <string name="ui_actions_rename_title">Renombrar</string>
     <string name="ui_actions_adds_version">Añade la versión %1$d.</string>

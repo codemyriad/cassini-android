@@ -12,6 +12,9 @@ enum class SnackbarKind {
 
     /** "Couldn't save the file". */
     SAVE_FAILED,
+
+    /** "Couldn't share the file": the share file could not be written. */
+    SHARE_FAILED,
 }
 
 /**

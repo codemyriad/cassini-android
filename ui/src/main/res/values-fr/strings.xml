@@ -352,6 +352,8 @@
     <string name="ui_actions_webvtt_body">pour les lecteurs web</string>
     <string name="ui_actions_saved_file">«\u202F%1$s\u202F» sauvegardé</string>
     <string name="ui_actions_save_failed">Impossible de sauvegarder le fichier</string>
+    <string name="ui_actions_share">Partager %1$s</string>
+    <string name="ui_actions_share_failed">Impossible de partager le fichier</string>
     <string name="ui_actions_saving">Sauvegarde…</string>
     <string name="ui_actions_rename_title">Renommer</string>
     <string name="ui_actions_adds_version">Ajoute la version %1$d.</string>

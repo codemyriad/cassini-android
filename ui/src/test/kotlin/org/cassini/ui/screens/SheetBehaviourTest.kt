@@ -173,6 +173,33 @@ class SheetBehaviourTest {
         }
     }
 
+    /** Each "Save a copy" row has its own Share button (D53), spoken as "Share" and the row's name. */
+    @Test fun theShareButtonsSendTheirShareAction() {
+        val actions = mutableListOf<NoteAction>()
+        setThemed { NoteActionsSheetContent(BoardFixtures.noteActions, onAction = { actions += it }) }
+        rule.onNodeWithContentDescription("Share Cassini document").performClick()
+        rule.onNodeWithContentDescription("Share Transcript as text").performClick()
+        rule.onNodeWithContentDescription("Share Subtitles").performClick()
+        rule.runOnIdle {
+            assertEquals(listOf(NoteAction.SHARE_DOCUMENT, NoteAction.SHARE_TEXT, NoteAction.SHARE_SUBTITLES), actions)
+        }
+    }
+
+    @Test fun aRowThatCannotExportCannotShare() {
+        setThemed {
+            NoteActionsSheetContent(VariantFixtures.noteActions.getValue("actions-plain"), onAction = {})
+        }
+        rule.onNodeWithContentDescription("Share Audio file").assertIsEnabled()
+        rule.onNodeWithContentDescription("Share Transcript as text").assertIsNotEnabled()
+        rule.onNodeWithContentDescription("Share Subtitles").assertIsNotEnabled()
+    }
+
+    @Test fun aBusyRowCannotShare() {
+        setThemed { NoteActionsSheetContent(VariantFixtures.noteActions.getValue("actions-busy"), onAction = {}) }
+        rule.onNodeWithContentDescription("Share Transcript as text").assertIsNotEnabled()
+        rule.onNodeWithContentDescription("Share Cassini document").assertIsEnabled()
+    }
+
     @Test fun aPlainNoteDisablesTextExportAndHasNoDocumentInfo() {
         val actions = mutableListOf<NoteAction>()
         setThemed {

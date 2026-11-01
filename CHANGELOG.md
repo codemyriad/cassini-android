@@ -9,6 +9,7 @@ We made the entries for 0.0.1-beta to 0.1.0 again from the release notes of thes
 ### Added
 
 - Cassini talk is in French, Spanish, Brazilian Portuguese and European Portuguese, besides English and Italian. The app follows the phone language, or the language you set for it in the system settings (Android 13 or later). Dates follow each language, and French writes sizes in Mo and Go.
+- Share a note with another app, for example mail or a chat app: each "Save a copy" row of the note menu has a Share button, for the Cassini document (or the audio), the transcript as text and the subtitles.
 
 ### Changed
 

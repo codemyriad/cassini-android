@@ -352,6 +352,8 @@
     <string name="ui_actions_webvtt_body">para players da web</string>
     <string name="ui_actions_saved_file">“%1$s” salvo</string>
     <string name="ui_actions_save_failed">Não foi possível salvar o arquivo</string>
+    <string name="ui_actions_share">Compartilhar %1$s</string>
+    <string name="ui_actions_share_failed">Não foi possível compartilhar o arquivo</string>
     <string name="ui_actions_saving">Salvando…</string>
     <string name="ui_actions_rename_title">Renomear</string>
     <string name="ui_actions_adds_version">Adiciona a versão %1$d.</string>

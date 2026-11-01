@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Share (coordination D53): only the share folder of the cache is readable by the apps a share is sent to,
+     and each only for the Uri it was granted. ShareFiles writes there. -->
+<paths>
+    <cache-path name="share" path="share/" />
+</paths>

@@ -50,6 +50,9 @@ import org.cassini.ui.theme.PlexMono
  */
 enum class SheetRowStyle { Plain, Featured, Destructive }
 
+/** The Share button at the end of a "Save a copy" row: its spoken [label] ("Share Cassini document") and [onClick]. */
+data class RowShare(val label: String, val onClick: () -> Unit)
+
 /**
  * An action row of a sheet. [SheetRowStyle.Featured]: surfaceWash, radius 14, padding 12, gap 14, top-aligned; the
  * [glyph] (24/1.7) in accent; [label] in `rowTitle`; [subtitle] in `caption` (line height 1.4 in a 19.5 dp line box) followed by the mono
@@ -57,7 +60,8 @@ enum class SheetRowStyle { Plain, Featured, Destructive }
  * centred; the glyph in the label colour; [label] in `body16` followed by the mono [extension] (13 sp, text2); an
  * optional [subtitle] below in `caption` text2. A disabled row draws at 38 % and its [subtitle] says why. A [busy] row
  * (an export being written) shows a 20 dp spinner at the end, does not respond to taps and reports "Saving…" as its
- * state.
+ * state. A [share] row ends with a 44 dp Share button of its own (an accessibility node of its own), disabled with the
+ * row.
  */
 @Composable
 @Suppress("LongParameterList") // ui.md section 6: icon, label, extension, subtitle, style and states.
@@ -71,6 +75,7 @@ fun SheetActionRow(
     style: SheetRowStyle = SheetRowStyle.Plain,
     enabled: Boolean = true,
     busy: Boolean = false,
+    share: RowShare? = null,
 ) {
     val c = CassiniTheme.colors
     val featured = style == SheetRowStyle.Featured
@@ -112,6 +117,16 @@ fun SheetActionRow(
                     .size(20.dp),
                 color = c.accent,
                 strokeWidth = 2.dp,
+            )
+        }
+        if (share != null) {
+            IconButton44(
+                glyph = Glyph.Share,
+                contentDescription = share.label,
+                onClick = share.onClick,
+                modifier = Modifier.align(Alignment.CenterVertically),
+                tint = tint,
+                enabled = enabled && !busy,
             )
         }
     }
