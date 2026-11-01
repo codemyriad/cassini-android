@@ -123,22 +123,60 @@ class SettingsViewModelTest {
         assertEquals(listOf(LanguageChoice.ITALIAN, LanguageChoice.PHONE), ports.languages)
 
         assertTrue(GraphSettingsPorts.localesOf(LanguageChoice.PHONE).isEmpty)
-        assertEquals("it", GraphSettingsPorts.localesOf(LanguageChoice.ITALIAN).toLanguageTags())
-        assertEquals("en", GraphSettingsPorts.localesOf(LanguageChoice.ENGLISH).toLanguageTags())
         assertEquals(LanguageChoice.PHONE, GraphSettingsPorts.languageOf(LocaleListCompat.getEmptyLocaleList()))
-        assertEquals(LanguageChoice.ITALIAN, GraphSettingsPorts.languageOf(LocaleListCompat.forLanguageTags("it-IT")))
-        assertEquals(LanguageChoice.ENGLISH, GraphSettingsPorts.languageOf(LocaleListCompat.forLanguageTags("en-GB")))
     }
 
-    // A language set in Android's per-app setting (locales_config) is Other, not Phone: the row selects no segment and
-    // Phone clears it. One test per language that has no segment.
-    @Test fun frenchFromTheSystemSettingsIsClearedByPhone() = runTest(dispatcher) { phoneClears("fr") }
+    /** Each of the six app languages (D50, D50.1) is a choice of its own, set and read back by its tag. */
+    @Test
+    fun everyAppLanguageIsAChoiceWithItsTag() {
+        val tags = mapOf(
+            LanguageChoice.ENGLISH to "en",
+            LanguageChoice.ITALIAN to "it",
+            LanguageChoice.FRENCH to "fr",
+            LanguageChoice.SPANISH to "es",
+            LanguageChoice.PORTUGUESE_BRAZIL to "pt-BR",
+            LanguageChoice.PORTUGUESE_PORTUGAL to "pt-PT",
+        )
+        assertEquals(LanguageChoice.offered - LanguageChoice.PHONE, tags.keys.toList())
+        for ((choice, tag) in tags) {
+            assertEquals(tag, GraphSettingsPorts.localesOf(choice).toLanguageTags())
+            assertEquals(tag, choice, GraphSettingsPorts.languageOf(GraphSettingsPorts.localesOf(choice)))
+        }
+    }
 
-    @Test fun spanishFromTheSystemSettingsIsClearedByPhone() = runTest(dispatcher) { phoneClears("es") }
+    /** A regional variant gives its language; Portuguese falls back as D50.1 says. */
+    @Test
+    fun regionsGiveTheirLanguage() {
+        val cases = mapOf(
+            "it-IT" to LanguageChoice.ITALIAN,
+            "en-GB" to LanguageChoice.ENGLISH,
+            "fr-CA" to LanguageChoice.FRENCH,
+            "es-MX" to LanguageChoice.SPANISH,
+            "pt" to LanguageChoice.PORTUGUESE_BRAZIL,
+            "pt-AO" to LanguageChoice.PORTUGUESE_PORTUGAL,
+            "pt-MZ" to LanguageChoice.PORTUGUESE_PORTUGAL,
+            "de" to LanguageChoice.OTHER,
+        )
+        for ((tag, choice) in cases) {
+            assertEquals(tag, choice, GraphSettingsPorts.languageOf(LocaleListCompat.forLanguageTags(tag)))
+        }
+    }
 
-    @Test fun brazilianPortugueseFromTheSystemSettingsIsClearedByPhone() = runTest(dispatcher) { phoneClears("pt-BR") }
+    /** French is chosen in Settings like any other language, and Phone clears it. */
+    @Test
+    fun frenchIsChosenAndPhoneClearsIt() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        viewModel.onEvent(SettingsEvent.Language(LanguageChoice.FRENCH))
+        advanceUntilIdle()
+        assertEquals(LanguageChoice.FRENCH, viewModel.now().language)
+        viewModel.onEvent(SettingsEvent.Language(LanguageChoice.PHONE))
+        advanceUntilIdle()
+        assertEquals(listOf(LanguageChoice.FRENCH, LanguageChoice.PHONE), ports.languages)
+    }
 
-    @Test fun europeanPortugueseFromTheSystemSettingsIsClearedByPhone() = runTest(dispatcher) { phoneClears("pt-PT") }
+    // A language that is not an app language (German, set with adb) is Other, not Phone: the sheet selects no choice
+    // and Phone clears it.
+    @Test fun anotherLanguageIsClearedByPhone() = runTest(dispatcher) { phoneClears("de") }
 
     private fun TestScope.phoneClears(tag: String) {
         assertEquals(tag, LanguageChoice.OTHER, GraphSettingsPorts.languageOf(LocaleListCompat.forLanguageTags(tag)))

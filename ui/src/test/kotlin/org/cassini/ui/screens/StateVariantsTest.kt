@@ -22,6 +22,8 @@ import org.cassini.ui.note.NameSpeakerSheetContent
 import org.cassini.ui.note.NoteActionsSheetContent
 import org.cassini.ui.note.NoteScreen
 import org.cassini.ui.recording.RecordingScreen
+import org.cassini.ui.settings.LanguageChoice
+import org.cassini.ui.settings.LanguageSheetContent
 import org.cassini.ui.settings.SettingsScreen
 import org.cassini.ui.trash.TrashDialogContent
 import org.cassini.ui.trash.TrashScreen
@@ -316,6 +318,10 @@ class StateVariantsTest : BoardTest() {
     @Test fun settingsModelStatuses() = settings("settings-model-statuses")
 
     @Test fun settingsItalianNone() = settings("settings-italian-none")
+
+    @Test fun settingsLanguageSheet() = board("variants", "settings-language-sheet") {
+        SheetBoardFrame { LanguageSheetContent(LanguageChoice.ITALIAN, onPick = {}) }
+    }
 
     // Saved voices (features.md section 10).
 

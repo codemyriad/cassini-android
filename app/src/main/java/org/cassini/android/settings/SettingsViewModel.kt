@@ -107,7 +107,7 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
     }
 
     private fun choose(next: LanguageChoice) {
-        // With Other (a language from the system settings) every segment differs, so Phone clears that language.
+        // With Other (a language that is not an app language) every choice differs, so Phone clears it.
         if (next == language.value || next == LanguageChoice.OTHER) return
         language.value = next
         ports.setLanguage(next)

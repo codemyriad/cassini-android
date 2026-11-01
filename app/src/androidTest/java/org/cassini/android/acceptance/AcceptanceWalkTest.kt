@@ -14,6 +14,7 @@ import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isRoot
+import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onLast
@@ -87,9 +88,8 @@ import org.cassini.ui.R as UiR
  *   File check failed.
  *
  * Arguments: `-e acceptanceLabel NAME` names the output folder, and [realModels] skips without it;
- * `-e acceptanceLanguage TAG` switches the app language first and back to the phone language through Settings at the
- * end: `it` through the Italiano segment of Settings, another app language (`fr`, `pt-BR`) as Android's per-app
- * language setting sets it. The night mode is set by the script.
+ * `-e acceptanceLanguage TAG` switches the app language first and back to the phone language at the end, both through
+ * the App language sheet of Settings (`it`, `fr`, `pt-BR`, …). The night mode is set by the script.
  */
 @Manual
 class AcceptanceWalkTest {
@@ -508,28 +508,27 @@ class AcceptanceWalkTest {
         rule.waitShown(hasContentDescription(rule.text(UiR.string.ui_back_to_library)))
     }
 
-    /**
-     * Switches the app to [tag]: Italian through its segment in Settings; a language without a segment (French,
-     * Portuguese) as Android's per-app language setting sets it, which Settings shows with no segment selected.
-     */
+    /** Switches the app to [tag] through the App language sheet of Settings, by the language's own name. */
     private fun useLanguage(tag: String) {
-        if (tag == "it") return chooseLanguage(ITALIANO, "it")
-        rule.runOnUiThread { AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(tag)) }
-        languageChanged = true
-        waitForLanguage(Locale.forLanguageTag(tag).language)
-        library()
+        val name = LANGUAGE_NAMES[tag] ?: error("$tag is not an app language")
+        chooseLanguage(name, Locale.forLanguageTag(tag).language)
     }
 
     /**
-     * Picks the [segment] of App language in Settings and goes back to the Library. [language] is the app language
-     * it gives (null: the phone's); the activity is created again with it.
+     * Opens the App language sheet in Settings, picks [choice] and goes back to the Library. [language] is the app
+     * language it gives (null: the phone's); the activity is created again with it.
      */
-    private fun chooseLanguage(segment: String, language: String?) {
+    private fun chooseLanguage(choice: String, language: String?) {
         library()
         rule.onNode(hasContentDescription(rule.text(UiR.string.ui_library_settings))).performClick()
-        val choice = hasText(segment) and hasClickAction()
-        rule.waitShown(choice)
-        rule.onNode(choice).performClick()
+        // The App language row names the current choice; it is the first button under the header.
+        val names = LANGUAGE_NAMES.values + rule.text(UiR.string.ui_settings_language_phone)
+        val row = hasClickAction() and !isSelectable() and names.map { hasText(it) }.reduce { a, b -> a or b }
+        rule.waitShown(row)
+        rule.onAllNodes(row).onFirst().performClick()
+        val option = hasText(choice) and isSelectable()
+        rule.waitShown(option)
+        rule.onNode(option).performClick()
         languageChanged = language != null
         waitForLanguage(language)
         rule.waitShown(hasText(rule.text(UiR.string.ui_settings_language), ignoreCase = true))
@@ -638,7 +637,16 @@ class AcceptanceWalkTest {
         const val ANNA = "Anna Ricci"
         const val PAOLO = "Paolo Ferri"
         const val FIRST_NAME = "Anna"
-        const val ITALIANO = "Italiano"
+
+        /** The app languages by their own names, as the App language sheet shows them (never translated). */
+        val LANGUAGE_NAMES = mapOf(
+            "en" to "English",
+            "it" to "Italiano",
+            "fr" to "Français",
+            "es" to "Español",
+            "pt-BR" to "Português (Brasil)",
+            "pt-PT" to "Português (Portugal)",
+        )
         val LANGUAGE_TAG = Regex("[a-z]{2}(-[A-Z]{2})?")
         const val TOTAL_MB = "730"
         const val MANIFEST_SHA = "CASSINI_PAYLOAD_SHA256="
