@@ -115,6 +115,10 @@ android {
         getByName("androidTest") {
             assets.directories.add(rootDir.resolve("fixtures/audio").path)
         }
+        // The loopback network configuration of the instrumented build types (src/instrumented/res).
+        for (type in listOf("debug", "releaseTest")) {
+            getByName(type) { res.directories.add("src/instrumented/res") }
+        }
     }
 }
 
@@ -157,6 +161,8 @@ dependencies {
     // Espresso.pressBack in AppShellTest: it reaches the focused window, so a sheet gets back first.
     testImplementation(libs.androidx.test.espresso.core)
     androidTestImplementation(libs.androidx.test.runner)
+    // ModelDownloadDeviceTest compresses its loopback model files; the APK already carries the AAR (:engine).
+    androidTestImplementation("${libs.zstd.jni.get()}@aar")
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.espresso.core)
     // enableAccessibilityChecks() runs only on a device: under Robolectric ATF skips Compose content (P2 outcome).
