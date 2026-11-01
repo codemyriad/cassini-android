@@ -260,6 +260,25 @@ class DocumentRepository(
     }
 
     /**
+     * Makes [variantId] the document's default version (`CassiniDocument.setDefault`) and selects it, so the file
+     * opens on it in every Cassini app and its byte-for-byte copy shares it (coordination D53, D53.3). Refused while a
+     * job row exists or unless OK, like every edit; `Done` without a write when it already is the default.
+     */
+    suspend fun selectDefault(noteId: String, variantId: String): EditOutcome = edit(noteId) { _, document ->
+        when {
+            document.variants.none { it.id == variantId && it.transcript != null } ->
+                EditOutcome.Invalid("unknown or unreadable variant")
+            document.defaultId == variantId -> EditOutcome.Done(variantId)
+            else -> {
+                rewrite(noteId, selectDefault = true) { source, target ->
+                    CassiniDocument.setDefault(source, document, variantId, target)
+                }
+                EditOutcome.Done(variantId)
+            }
+        }
+    }
+
+    /**
      * Writes `notes.title` into the document (`meeting.title` and the `TITLE` tag) and clears `title_dirty`. The title
      * is read from the row under the note's lock, so the latest rename wins. Refused while a job row exists (adopt
      * writes the title then) and for a document that is not OK, which keeps the new title in Room only.

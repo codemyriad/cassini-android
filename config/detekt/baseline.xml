@@ -714,7 +714,7 @@
     <ID>CyclomaticComplexMethod:AudioDecoder.kt$AudioDecoder$private fun decodeInternal(uri: Uri, retainPcm: Boolean, onSamples: (FloatArray, Int) -&gt; Unit, onProgress: (Long, Long?) -&gt; Unit, startSample: Long = 0): PcmAudio</ID>
     <ID>CyclomaticComplexMethod:BatteryProjection.kt$BatteryProjection$fun sample(now: Reading, remainingMs: Long?): Estimate</ID>
     <ID>CyclomaticComplexMethod:CassiniDocument.kt$CassiniDocument.Companion$private fun read(verify: Boolean = true, open: () -&gt; InputStream): CassiniDocument</ID>
-    <ID>CyclomaticComplexMethod:CassiniDocument.kt$CassiniDocument.Companion$private fun seal(stream: OggOpus.Info, transcript: Transcript, title: String, processing: JSONObject, existing: CassiniDocument?, speakerLabels: Map&lt;String, String&gt;): Pair&lt;List&lt;String&gt;, String&gt;</ID>
+    <ID>CyclomaticComplexMethod:CassiniDocument.kt$CassiniDocument.Companion$private fun seal( stream: OggOpus.Info, transcript: Transcript, title: String, processing: JSONObject, existing: CassiniDocument?, speakerLabels: Map&lt;String, String&gt;, extensions: JSONObject? = null, ): Pair&lt;List&lt;String&gt;, String&gt;</ID>
     <ID>CyclomaticComplexMethod:ChunkingComparisonTest.kt$ChunkingComparisonTest$@Test fun cuttingModesAgainstTheWholeRecording()</ID>
     <ID>CyclomaticComplexMethod:DeviceSmokeTest.kt$DeviceSmokeTest$@NeedsModels @Test fun nativeParakeetProducesTimedItalianWords()</ID>
     <ID>CyclomaticComplexMethod:OggOpus.kt$OggOpus.Reader$fun page(): ByteArray?</ID>
@@ -751,9 +751,9 @@
     <ID>LongMethod:CassiniDocument.kt$CassiniDocument.Companion$private fun read(verify: Boolean = true, open: () -&gt; InputStream): CassiniDocument</ID>
     <ID>LongMethod:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$@Test fun meetingVoicesAcrossRecordings()</ID>
     <ID>LongMethod:WavDecoder.kt$WavDecoder$fun decodeWav(file: RandomAccessFile, onSamples: (FloatArray, Int) -&gt; Unit = { _, _ -&gt; }, retainPcm: Boolean = true, startSample: Long = 0, onProgress: (Long, Long?) -&gt; Unit = { _, _ -&gt; }): PcmAudio</ID>
-    <ID>LongParameterList:CassiniDocument.kt$CassiniDocument.Companion$(audio: File, transcript: Transcript, title: String, processing: JSONObject, existing: CassiniDocument?, speakerLabels: Map&lt;String, String&gt;, target: File)</ID>
+    <ID>LongParameterList:CassiniDocument.kt$CassiniDocument.Companion$( audio: File, transcript: Transcript, title: String, processing: JSONObject, existing: CassiniDocument?, speakerLabels: Map&lt;String, String&gt;, target: File, extensions: JSONObject? = null, )</ID>
     <ID>LongParameterList:CassiniDocument.kt$CassiniDocument.Companion$(audioBytes: ByteArray, transcript: Transcript, title: String, processing: JSONObject, existing: CassiniDocument? = null, speakerLabels: Map&lt;String, String&gt; = emptyMap())</ID>
-    <ID>LongParameterList:CassiniDocument.kt$CassiniDocument.Companion$(stream: OggOpus.Info, transcript: Transcript, title: String, processing: JSONObject, existing: CassiniDocument?, speakerLabels: Map&lt;String, String&gt;)</ID>
+    <ID>LongParameterList:CassiniDocument.kt$CassiniDocument.Companion$( stream: OggOpus.Info, transcript: Transcript, title: String, processing: JSONObject, existing: CassiniDocument?, speakerLabels: Map&lt;String, String&gt;, extensions: JSONObject? = null, )</ID>
     <ID>LongParameterList:Parakeet.kt$Parakeet$(audio: PcmAudio, decoder: WordDecoder, detectorModel: String?, policy: DecodePolicy, cutting: Cutting, onProgress: (Progress) -&gt; Unit)</ID>
     <ID>LongParameterList:Parakeet.kt$Parakeet$(audio: PcmAudio, models: ParakeetFiles, detectorModel: String?, policy: DecodePolicy = DecodePolicy.WHOLE_SPANS, cutting: Cutting = cutting(detectorModel), onProgress: (Progress) -&gt; Unit = {})</ID>
     <ID>LongParameterList:SeamMerge.kt$SeamMerge$(acc: List&lt;Word&gt;, next: List&lt;Word&gt;, firstWindow: Boolean, windowStartMs: Long, overlapMs: Long, midpointOnDisagreement: Boolean = false)</ID>
@@ -1230,13 +1230,11 @@
     <ID>ParameterListWrapping:AudioLimits.kt$Limits$(durationMs: Long, availableBytes: Long)</ID>
     <ID>ParameterListWrapping:CassiniDocument.kt$CassiniDocument$( val state: String, val manifest: JSONObject? = null, val variants: List&lt;Variant&gt; = emptyList(), val comments: List&lt;String&gt; = emptyList(), val warnings: List&lt;String&gt; = emptyList(), )</ID>
     <ID>ParameterListWrapping:CassiniDocument.kt$CassiniDocument.Companion$(_: Exception)</ID>
-    <ID>ParameterListWrapping:CassiniDocument.kt$CassiniDocument.Companion$(audio: File, transcript: Transcript, title: String, processing: JSONObject, existing: CassiniDocument?, speakerLabels: Map&lt;String, String&gt;, target: File)</ID>
     <ID>ParameterListWrapping:CassiniDocument.kt$CassiniDocument.Companion$(audioBytes: ByteArray, transcript: Transcript, title: String, processing: JSONObject, existing: CassiniDocument? = null, speakerLabels: Map&lt;String, String&gt; = emptyMap())</ID>
     <ID>ParameterListWrapping:CassiniDocument.kt$CassiniDocument.Companion$(error: Exception)</ID>
     <ID>ParameterListWrapping:CassiniDocument.kt$CassiniDocument.Companion$(name: String)</ID>
     <ID>ParameterListWrapping:CassiniDocument.kt$CassiniDocument.Companion$(o: JSONObject, key: String)</ID>
     <ID>ParameterListWrapping:CassiniDocument.kt$CassiniDocument.Companion$(source: File, existing: CassiniDocument, labels: Map&lt;String, String&gt;, target: File)</ID>
-    <ID>ParameterListWrapping:CassiniDocument.kt$CassiniDocument.Companion$(stream: OggOpus.Info, transcript: Transcript, title: String, processing: JSONObject, existing: CassiniDocument?, speakerLabels: Map&lt;String, String&gt;)</ID>
     <ID>ParameterListWrapping:CassiniDocument.kt$CassiniDocument.Companion$(tags: Map&lt;String, String&gt;)</ID>
     <ID>ParameterListWrapping:CassiniDocument.kt$CassiniDocument.Variant$(val id: String, val descriptor: JSONObject, val body: String?, val transcript: Transcript?, val error: String? = null)</ID>
     <ID>ParameterListWrapping:CassiniDocumentTest.kt$CassiniDocumentTest$(String)</ID>
@@ -1386,7 +1384,6 @@
     <ID>SpacingBetweenDeclarationsWithComments:CassiniDocument.kt$CassiniDocument.Companion$/** Adds a variant while retaining existing descriptors, bodies, extensions and unrelated tags. */</ID>
     <ID>SpacingBetweenDeclarationsWithComments:CassiniDocument.kt$CassiniDocument.Companion$/** Copies [source]'s audio packet for packet behind [comments]; the audio must still hash to [digest]. */</ID>
     <ID>SpacingBetweenDeclarationsWithComments:CassiniDocument.kt$CassiniDocument.Companion$/** Order-insensitive structural equality; Android's org.json has no `similar`. */</ID>
-    <ID>SpacingBetweenDeclarationsWithComments:CassiniDocument.kt$CassiniDocument.Companion$/** Streams [audio] into [target] behind the new tags and verifies the written file from disk. */</ID>
     <ID>SpacingBetweenDeclarationsWithComments:CassiniDocument.kt$CassiniDocument.Companion$/** Streams [file]; without [verify] only the headers are read and the audio stays unverified. */</ID>
     <ID>SpacingBetweenDeclarationsWithComments:DecodeSession.kt$DecodeSession$/** The span being decoded: its windows so far, shown before the span is settled. */</ID>
     <ID>SpacingBetweenDeclarationsWithComments:LiveMuxerTest.kt$LiveMuxerTest$/** 20 ms CELT packets (TOC config 31, one frame) of varying size. */</ID>

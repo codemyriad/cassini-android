@@ -217,10 +217,24 @@ data class CassiniDocument(
             require(OggOpus.rewrite(ByteArrayInputStream(audioBytes), tagsPacket(comments), out).digest() == digest)
             return out.toByteArray().also { verify(read(it), transcript) }
         }
-        /** Streams [audio] into [target] behind the new tags and verifies the written file from disk. */
-        fun create(audio: File, transcript: Transcript, title: String, processing: JSONObject, existing: CassiniDocument?,
-                   speakerLabels: Map<String, String>, target: File): CassiniDocument {
-            val (comments, digest) = seal(OggOpus.scan(audio), transcript, title, processing, existing, speakerLabels)
+
+        /**
+         * Streams [audio] into [target] behind the new tags and verifies the written file from disk. [extensions] is
+         * the `x` of a document that can not take a new variant (stale audio): a fresh manifest carries it verbatim
+         * (coordination D53.2, "never drop"); with [existing] its own `x` stays and [extensions] is not used.
+         */
+        fun create(
+            audio: File,
+            transcript: Transcript,
+            title: String,
+            processing: JSONObject,
+            existing: CassiniDocument?,
+            speakerLabels: Map<String, String>,
+            target: File,
+            extensions: JSONObject? = null,
+        ): CassiniDocument {
+            val stream = OggOpus.scan(audio)
+            val (comments, digest) = seal(stream, transcript, title, processing, existing, speakerLabels, extensions)
             writeWithTags(audio, comments, digest, target)
             return read(target).also { verify(it, transcript) }
         }
@@ -247,6 +261,56 @@ data class CassiniDocument(
                 require(sealed.variants.map { it.id to it.body } == existing.variants.map { it.id to it.body })
                 return sealed
             } catch (error: Throwable) { target.delete(); throw error }
+        }
+
+        /**
+         * Makes [variantId] the default transcript, so every reader opens the file on it (the spec selects the first
+         * descriptor with `default: true`): its descriptor gets `default: true`, a descriptor that had `default: true`
+         * gets `false`, and `CASSINI_TRANSCRIPT_DEFAULT` names it, where it stands. Bodies, variants and their order,
+         * `x`, unknown members, other tags and the audio stay as they are; the manifest tags are re-encoded. The
+         * written file must read back identical apart from those flags, with [variantId] as its default.
+         */
+        fun setDefault(source: File, existing: CassiniDocument, variantId: String, target: File): CassiniDocument {
+            require(existing.state == "ok" && existing.manifest != null)
+            require(existing.variants.any { it.id == variantId && it.transcript != null }) {
+                "Unknown or unreadable variant"
+            }
+            val manifest = JSONObject(existing.manifest.toString())
+            val descriptors = manifest.getJSONArray("transcripts")
+            for (i in 0 until descriptors.length()) {
+                val descriptor = descriptors.getJSONObject(i)
+                when {
+                    descriptor.getString("id") == variantId -> descriptor.put("default", true)
+                    descriptor.optBoolean("default") -> descriptor.put("default", false)
+                }
+            }
+            val digest = manifest.getJSONObject("integrity").getString("opusAudioSha256")
+            val tag = "CASSINI_TRANSCRIPT_DEFAULT"
+            fun isDefaultTag(comment: String) = comment.substringBefore('=').uppercase(Locale.ROOT) == tag
+            val kept = existing.comments.filterNot(::isManifestComment)
+            val tagged = if (kept.any(::isDefaultTag)) {
+                kept.map { if (isDefaultTag(it)) "$tag=$variantId" else it }
+            } else {
+                kept + "$tag=$variantId"
+            }
+            val manifestTags = CassiniPayload.encode(MANIFEST_PREFIX, CassiniPayload.MIME, manifest.toString()).second
+            val comments = tagged + manifestTags
+            var written = false
+            try {
+                writeWithTags(source, comments, digest, target)
+                val sealed = read(target)
+                require(sealed.state == "ok" && same(sealed.manifest, manifest)) {
+                    "The new default does not read back"
+                }
+                require(sealed.variants.map { it.id to it.body } == existing.variants.map { it.id to it.body })
+                require(sealed.defaultId == variantId && sealed.warnings.isEmpty()) {
+                    "The default tag and flag disagree"
+                }
+                written = true
+                return sealed
+            } finally {
+                if (!written) target.delete()
+            }
         }
 
         /**
@@ -301,8 +365,15 @@ data class CassiniDocument(
         }
         private fun verify(sealed: CassiniDocument, transcript: Transcript) =
             require(sealed.state == "ok" && sealed.selected(null)?.transcript == transcript)
-        private fun seal(stream: OggOpus.Info, transcript: Transcript, title: String, processing: JSONObject,
-                         existing: CassiniDocument?, speakerLabels: Map<String, String>): Pair<List<String>, String> {
+        private fun seal(
+            stream: OggOpus.Info,
+            transcript: Transcript,
+            title: String,
+            processing: JSONObject,
+            existing: CassiniDocument?,
+            speakerLabels: Map<String, String>,
+            extensions: JSONObject? = null,
+        ): Pair<List<String>, String> {
             val digest = stream.digest()
             require(existing == null || existing.state == "ok") // Never rebind stale transcripts to different audio.
             val now = Instant.now().toString()
@@ -315,6 +386,7 @@ data class CassiniDocument(
                 .put("integrity", JSONObject().put("matchPolicy", "exact-opus-audio-v1").put("opusAudioSha256", digest)
                     .put("sampleRate", 48000).put("channels", stream.channels).put("sampleCount", stream.sampleCount).put("durationMs", stream.durationMs))
                 .put("speakers", JSONArray()).put("transcripts", JSONArray())
+                .apply { if (extensions != null) put("x", JSONObject(extensions.toString())) }
             val descriptors = manifest.getJSONArray("transcripts")
             val id = if (descriptors.length() == 0) "words" else "words-${UUID.randomUUID().toString().take(8)}"
             for (i in 0 until descriptors.length()) descriptors.getJSONObject(i).put("default", false)

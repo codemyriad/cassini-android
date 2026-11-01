@@ -1,7 +1,9 @@
 package org.cassini.data.notes
 
+import android.net.Uri
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import org.cassini.core.format.CassiniDocument
 import org.cassini.core.library.AudioKind
 import org.cassini.core.library.JobKind
 import org.cassini.core.library.JobState
@@ -143,6 +145,42 @@ class NoteRepositoryTest {
         assertFalse(h.notes.selectVariant("a", "nope"))
         assertTrue(h.notes.selectVariant("a", merged))
         assertEquals(merged, h.row("a").selectedVariant)
+    }
+
+    @Test fun selectingAVersionMakesItTheFilesDefaultAndTheCopyOpensOnIt() = runTest {
+        // D53: going back to an earlier version (the undo of a merge) changes the file, not only Room.
+        h.documentNote("a", words)
+        h.notes.refreshIfStale("a")
+        val merged = (h.documents.mergeSpeakers("a", "words", "S2", "S1") as EditOutcome.Done).variantId!!
+        assertEquals(merged, CassiniDocument.read(h.document("a")).defaultId)
+
+        assertTrue(h.notes.selectVariant("a", "words"))
+        val back = CassiniDocument.read(h.document("a"))
+        assertEquals("ok", back.state)
+        assertEquals("words", back.defaultId)
+        assertEquals("both versions stay", listOf("words", merged), back.variants.map { it.id })
+        assertEquals("words", h.row("a").selectedVariant)
+        assertEquals(listOf(true, false), h.db.cache().variants("a").sortedBy { it.ordinal }.map { it.isDefault })
+
+        val copy = File(folder.newFolder("out"), "copy.opus")
+        assertTrue(h.documents.exportCopy("a", Uri.fromFile(copy)) is ExportOutcome.Saved)
+        assertEquals("the shared copy opens on the chosen version", "words", CassiniDocument.read(copy).defaultId)
+
+        assertTrue(h.notes.selectVariant("a", merged))
+        assertEquals(merged, CassiniDocument.read(h.document("a")).defaultId)
+    }
+
+    @Test fun whileAJobRunsTheChoiceStaysInRoomAndTheFileIsUntouched() = runTest {
+        h.documentNote("a", words)
+        h.notes.refreshIfStale("a")
+        val merged = (h.documents.mergeSpeakers("a", "words", "S2", "S1") as EditOutcome.Done).variantId!!
+        val bytes = h.document("a").readBytes()
+        insertJob("a", JobState.QUEUED)
+
+        assertTrue(h.notes.selectVariant("a", "words"))
+        assertEquals("words", h.row("a").selectedVariant)
+        assertTrue("the job's audio source is never rewritten", bytes.contentEquals(h.document("a").readBytes()))
+        assertEquals(merged, CassiniDocument.read(h.document("a")).defaultId)
     }
 
     @Test fun aBlankSearchYieldsTheLibrary() = runTest {

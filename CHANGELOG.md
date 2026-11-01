@@ -16,6 +16,8 @@ We made the entries for 0.0.1-beta to 0.1.0 again from the release notes of thes
 - The app is called Cassini talk. The launcher, the About card, the Licenses screen and the store title show the new name. Sentences in the app still say "Cassini". The package name stays `org.cassini.android`, so this version updates the installed app and keeps your notes, voices, models and settings.
 - An unnamed speaker shows with the label that the file stores, in the language that wrote it, on screen and in TXT, SRT and VTT exports. A file transcribed in Italian keeps "Voce 2" under an English phone, as in the other Cassini apps. A speaker that has no label in the file shows as "Speaker N" in the app language, numbered in the order the speakers first talk, and never as its internal id.
 - A new transcript records its language as `und` ("undetermined") instead of an empty value, in the transcript, its description and its provenance, as the other Cassini apps do. Parakeet recognizes the language without saying which one it is.
+- The version you choose in Versions, for example to undo a merge of speakers, is now saved in the note's file. A saved copy and the other Cassini apps open the note on that version. Before, only this phone remembered the choice.
+- Transcribe again on a note whose audio no longer matches its transcript keeps the extra data that other Cassini apps stored in the file, such as desktop notes.
 - zstd-jni 1.5.7-25, AndroidX DataStore 1.3.0 and kotlinx.serialization 1.12.0. The build uses Gradle 9.8.2 and AGP 9.3.3.
 
 ### Removed
