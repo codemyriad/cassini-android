@@ -3,6 +3,7 @@ package org.cassini.android.note
 import android.Manifest
 import android.app.Activity
 import android.content.ActivityNotFoundException
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -19,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -56,6 +58,7 @@ fun NoteRoute(
                     NoteEffect.CloseToLibrary -> navigator.closeToLibrary()
                     is NoteEffect.OpenModelDownload -> navigator.open(effect.key)
                     is NoteEffect.CreateFile -> start(context) { createFile.launch(effect.mime to effect.name) }
+                    is NoteEffect.Share -> start(context) { context.startActivity(shareChooser(context, effect)) }
                     NoteEffect.RequestNotifications -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
                     }
@@ -98,6 +101,22 @@ private class CreateFile : ActivityResultContract<Pair<String, String>, Uri?>() 
 
     override fun parseResult(resultCode: Int, intent: Intent?): Uri? =
         intent?.takeIf { resultCode == Activity.RESULT_OK }?.data
+}
+
+/**
+ * `ACTION_SEND` of a share file through the system chooser: the FileProvider Uri as the stream and as ClipData (so the
+ * read grant reaches the chosen app and the chooser shows a preview), the MIME type, and the note title as subject.
+ */
+private fun shareChooser(context: Context, share: NoteEffect.Share): Intent {
+    val uri = share.uri.toUri()
+    val send = Intent(Intent.ACTION_SEND)
+        .setType(share.mime)
+        .putExtra(Intent.EXTRA_STREAM, uri)
+        .putExtra(Intent.EXTRA_SUBJECT, share.title)
+        .putExtra(Intent.EXTRA_TITLE, share.name)
+        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    send.clipData = ClipData.newUri(context.contentResolver, share.name, uri)
+    return Intent.createChooser(send, null)
 }
 
 /** Starts a system screen; a device without it only logs. */

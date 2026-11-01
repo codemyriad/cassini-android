@@ -80,5 +80,7 @@ internal val GlyphUses: Map<Glyph, List<GlyphUse>> = mapOf(
     Glyph.TextFile to listOf(use(24, 1.7f)),
     Glyph.Subtitles to listOf(use(24, 1.7f)),
     Glyph.Info to listOf(use(24, 1.7f)),
+    // The Share buttons of the "Save a copy" rows (D53): no board shows them.
+    Glyph.Share to listOf(use(22, 1.8f, IconTint.Accent, onBoard = false), use(22, 1.8f, onBoard = false)),
     Glyph.Warn to listOf(use(14, 2f, IconTint.AmberInk, onBoard = false)),
 )

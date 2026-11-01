@@ -89,6 +89,7 @@ fun CassiniSnackbarHost(
             SnackbarKind.MOVED_TO_TRASH -> stringResource(R.string.ui_library_moved_to_trash, it.text.orEmpty())
             SnackbarKind.SAVED_FILE -> stringResource(R.string.ui_actions_saved_file, it.text.orEmpty())
             SnackbarKind.SAVE_FAILED -> stringResource(R.string.ui_actions_save_failed)
+            SnackbarKind.SHARE_FAILED -> stringResource(R.string.ui_actions_share_failed)
         }
     }
     CassiniSnackbarHost(

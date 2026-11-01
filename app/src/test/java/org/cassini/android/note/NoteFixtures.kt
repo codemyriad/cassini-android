@@ -353,6 +353,15 @@ internal class FakeNotePorts : NotePorts {
 
     override suspend fun displayName(dest: String): String? = "Weekly sync (1).txt"
 
+    /** The next share file; null makes it fail. Each one is `file:///share/<n>/<name>`. */
+    var shareRoot: String? = "file:///share"
+
+    override suspend fun shareTarget(name: String): ShareTarget? = shareRoot?.let { root ->
+        val n = calls.count { it.startsWith("shareTarget") }
+        calls += "shareTarget:$name"
+        ShareTarget("$root/$n/$name", "content://org.cassini.android.share/share/$n/$name")
+    }
+
     override fun placeholderLabel(number: Int): String = "Speaker $number"
 
     override fun exportSubtitle(createdAt: Long, durationMs: Long, speakers: Int): String = "8 Oct 2026 · $speakers"

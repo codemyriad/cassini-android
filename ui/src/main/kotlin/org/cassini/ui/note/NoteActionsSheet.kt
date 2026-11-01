@@ -17,6 +17,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import org.cassini.ui.R
 import org.cassini.ui.components.CassiniSheet
+import org.cassini.ui.components.RowShare
 import org.cassini.ui.components.SheetActionRow
 import org.cassini.ui.components.SheetDivider
 import org.cassini.ui.components.SheetRowStyle
@@ -107,14 +108,16 @@ private fun metaLine(ui: NoteActionsUi, document: Boolean): String {
 
 /**
  * "Save a copy": the featured row (Cassini document `.opus`, or the plain Audio file with its own extension), then
- * Transcript as text and Subtitles, disabled with the reason when [NoteActionsUi.textExportEnabled] is false.
+ * Transcript as text and Subtitles, disabled with the reason when [NoteActionsUi.textExportEnabled] is false. A row
+ * saves a copy through the system picker; its Share button sends the same file to another app (coordination D53).
  */
 @Composable
 private fun ColumnScope.SaveACopy(ui: NoteActionsUi, document: Boolean, onAction: (NoteAction) -> Unit) {
     SheetSection(stringResource(R.string.ui_actions_save_copy))
     val plain = ui.documentKind as? DocumentKindUi.Plain
+    val documentLabel = stringResource(if (document) R.string.ui_actions_document else R.string.ui_actions_audio_file)
     SheetActionRow(
-        label = stringResource(if (document) R.string.ui_actions_document else R.string.ui_actions_audio_file),
+        label = documentLabel,
         glyph = Glyph.Music,
         onClick = { onAction(NoteAction.SAVE_DOCUMENT) },
         extension = if (plain != null) {
@@ -127,31 +130,41 @@ private fun ColumnScope.SaveACopy(ui: NoteActionsUi, document: Boolean, onAction
         ),
         style = SheetRowStyle.Featured,
         busy = ui.busyRow == NoteAction.SAVE_DOCUMENT,
+        share = rowShare(documentLabel) { onAction(NoteAction.SHARE_DOCUMENT) },
     )
     val reason = when {
         ui.textExportEnabled -> null
         document -> stringResource(R.string.ui_actions_not_readable)
         else -> stringResource(R.string.ui_actions_after_transcription)
     }
+    val textLabel = stringResource(R.string.ui_actions_text)
     SheetActionRow(
-        label = stringResource(R.string.ui_actions_text),
+        label = textLabel,
         glyph = Glyph.TextFile,
         onClick = { onAction(NoteAction.SAVE_TEXT) },
         extension = stringResource(R.string.ui_ext_txt),
         subtitle = reason,
         enabled = ui.textExportEnabled,
         busy = ui.busyRow == NoteAction.SAVE_TEXT,
+        share = rowShare(textLabel) { onAction(NoteAction.SHARE_TEXT) },
     )
+    val subtitlesLabel = stringResource(R.string.ui_actions_subtitles)
     SheetActionRow(
-        label = stringResource(R.string.ui_actions_subtitles),
+        label = subtitlesLabel,
         glyph = Glyph.Subtitles,
         onClick = { onAction(NoteAction.SAVE_SUBTITLES) },
         extension = stringResource(R.string.ui_ext_subtitles),
         subtitle = reason,
         enabled = ui.textExportEnabled,
         busy = ui.busyRow == NoteAction.SAVE_SUBTITLES,
+        share = rowShare(subtitlesLabel) { onAction(NoteAction.SHARE_SUBTITLES) },
     )
 }
+
+/** The Share button of a "Save a copy" row, spoken as "Share [label]". */
+@Composable
+private fun rowShare(label: String, onClick: () -> Unit): RowShare =
+    RowShare(stringResource(R.string.ui_actions_share, label), onClick)
 
 /**
  * The transcribe row in its form (features.md section 6): Transcribe (plain), Transcribe again with "Adds version N."

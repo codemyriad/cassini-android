@@ -85,7 +85,7 @@ Android does not back up the Cassini data and does not copy it to a new phone. T
 
 ## Copies that you save
 
-Cassini writes a file outside its storage only when you tell it to. On the "Save a copy" menu of a note, you select the format. Then Android asks you for the location. The formats are:
+Cassini writes a file outside its storage only when you tell it to. On the "Save a copy" menu of a note, you select the format. Then Android asks you for the location. With the Share button of a format, you send the same file to an app that you choose instead (for example mail or a chat app): Cassini puts it in its cache, and only that app gets permission to read it. Cassini deletes such a file from its cache a day later. The formats are:
 
 - Cassini document (`.opus`): the audio, all transcripts, the speaker names, the title, the recording time, and the names of the models that made each transcript.
 - Audio file: the audio of a note that has no transcript.

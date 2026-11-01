@@ -93,6 +93,12 @@ enum class Glyph(internal val parts: List<GlyphPart>, val filled: Boolean = fals
     Subtitles(listOf(GlyphPart.Rect(3f, 5f, 18f, 14f, 2f)) + paths("M7 14h4M13 14h4M7 10h10")),
     Info(listOf(circle(12f, 12f, 9f)) + paths("M12 11v6M12 7.5v.5")),
 
+    /** Android's share sign: three nodes joined by two lines (the actions sheet's Share buttons). */
+    Share(
+        listOf(circle(18f, 5f, 3f), circle(6f, 12f, 3f), circle(18f, 19f, 3f)) +
+            paths("M8.6 13.5l6.8 4", "M15.4 6.5l-6.8 4"),
+    ),
+
     /** No board: the Warn and Error trust chips. */
     Warn(paths("M12 4 3 20h18z", "M12 10v4M12 17v.5")),
     ;
