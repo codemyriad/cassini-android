@@ -52,6 +52,7 @@ import org.cassini.android.recording.RecordingState
 import org.cassini.core.Failure
 import org.cassini.core.audio.Limits
 import org.cassini.core.checkpoint.CheckpointNames
+import org.cassini.core.format.Transcript
 import org.cassini.core.format.Word
 import org.cassini.core.library.AudioKind
 import org.cassini.core.library.JobKind
@@ -531,7 +532,7 @@ class NoteViewModel(
             durationMs = note.durationMs,
             versions = details.variants.size,
             speakers = selected?.speakerCount ?: 0,
-            language = selected?.language?.ifEmpty { null },
+            language = Transcript.knownLanguage(selected?.language),
             processingMs = inference,
             realtimeFactor = inference?.let { note.durationMs.toDouble() / it }?.takeIf { it > 0 },
             model = facts?.model,

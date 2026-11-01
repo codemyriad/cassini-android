@@ -95,6 +95,7 @@ class FakeRecognizer(
     override var inferenceMs = restored?.inferenceMs ?: 0L
         private set
     override val segmentation = "Fake segmentation: 28 s windows"
+    override val language = Transcript.UNDETERMINED
 
     @Volatile var closed = false
     private var loaded = false
@@ -115,7 +116,7 @@ class FakeRecognizer(
         callbacks.onProgress(Parakeet.Progress(done, maxOf(totalMs, done), 0, words))
     }
 
-    override fun finish(durationMs: Long): Transcript = chunks.finish().also {
+    override fun finish(durationMs: Long): Transcript = chunks.finish().copy(language = language).also {
         callbacks.onProgress(Parakeet.Progress(durationMs, durationMs, 0, it.words))
     }
 

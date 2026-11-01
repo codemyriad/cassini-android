@@ -59,9 +59,12 @@ private class IncrementalRecognizerSeam(
     override val positionSamples: Long get() = recognizer.positionSamples
     override val doneMs: Long get() = recognizer.doneMs
 
+    /** Parakeet recognizes 25 languages without saying which one it heard. */
+    override val language: String = Transcript.UNDETERMINED
+
     override fun accept(samples: FloatArray, count: Int) = recognizer.accept(samples, count)
 
-    override fun finish(durationMs: Long): Transcript = recognizer.finish(durationMs)
+    override fun finish(durationMs: Long): Transcript = recognizer.finish(durationMs).copy(language = language)
 
     override fun checkpoint(): RecognitionState = recognizer.checkpoint()
 

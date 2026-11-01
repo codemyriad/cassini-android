@@ -69,4 +69,14 @@ class TranscriptTest {
     @Test(expected = IllegalArgumentException::class) fun rejectsBackwardTimes() {
         TokenWords.fromTokens(arrayOf("▁ciao", "▁ciao"), floatArrayOf(1f, .5f), floatArrayOf(.1f, .1f))
     }
+
+    @Test fun undIsWrittenAndRoundTripsButIsNoKnownLanguage() {
+        val und = Transcript(listOf(Word("s", 0, 1, "ciao")), Transcript.UNDETERMINED)
+        assertEquals("und", JSONObject(und.json()).getString("language"))
+        assertEquals("und", Transcript.fromJson(und.json()).language)
+        assertNull(Transcript.knownLanguage("und"))
+        assertNull(Transcript.knownLanguage(""))
+        assertNull(Transcript.knownLanguage(null))
+        assertEquals("it-IT", Transcript.knownLanguage("it-IT"))
+    }
 }
