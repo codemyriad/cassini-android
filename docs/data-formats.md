@@ -36,7 +36,7 @@ voices/                                      all voiceprints and voice matches, 
     generation                               an integer; "Forget everyone" increases it
     notes/<noteId>.json                      voiceprints and matches of a sealed note (NoteVoiceCodec version 2)
     pending/<noteId>.json                    voiceprints and matches of a sealed job before adopt
-parakeet-ultra/  vad/  speaker-models/       the models, with the names and markers that ModelCatalog pins
+models/<id>/<sourceSha256>/                  one directory for each model (the model host's pair, as on the desktop), with its files and the marker `verified`
 ```
 
 `cacheDir/exports/` holds temporary export files. The app deletes them after each write and at each start.
@@ -171,7 +171,7 @@ A Cassini document is an Ogg Opus file at 48 kHz. Any audio player plays it. The
 
 Each transcription adds a transcript version (a variant). The document keeps the earlier versions. "Save a copy" copies the document byte for byte, together with the versions, extensions and attachments that Android does not use.
 
-The recognition step of the provenance names the speech model as `<id> <precision>`. The `model` of a new version is `moondream/parakeet-ultra INT8`. A version of 0.2.0 or earlier (development builds only) has `nvidia/parakeet-tdt-0.6b-v3 INT8`. Document info shows "Parakeet Ultra, INT8" for this build's id and any other id as it is. The `engine` stays `Parakeet TDT` (the architecture of both models). The `version` gives `sherpa-onnx 1.13.7; model revision <revision>`. The format does not restrict these strings. The desktop app writes its own ids, for example `parakeet-tdt-0.6b-v3-int8`.
+The recognition step of the provenance names the speech model as `<id> <precision>`. The `model` of a new version is `moondream/parakeet-ultra INT8`. A version of 0.2.0 or earlier (development builds only) has `nvidia/parakeet-tdt-0.6b-v3 INT8`. Document info shows "Parakeet Ultra, INT8" for this build's id and any other id as it is. The `engine` stays `Parakeet TDT` (the architecture of both models). The `version` gives `sherpa-onnx 1.13.7; model revision <revision>`. From the version that downloads its models from `dist.gocassini.com`, the revision is the source SHA-256 of `parakeet-ultra-0.6b-int8` on that host (`18cb6230…`); 0.3.0 wrote the Hugging Face revision of the tpmaerk conversion (`b86784a3…`). The `model` stays `moondream/parakeet-ultra INT8`: it is the same model in another conversion. The format does not restrict these strings. The desktop app writes its own ids, for example `parakeet-tdt-0.6b-v3-int8`.
 
 Parakeet does not identify the language, so the Android producer writes an empty `language` (`""`). The Android producer also writes these extension keys in the provenance of a version: `x-inferenceMs`, `x-segmentation`, `x-resumedFromMs`, `x-speakerDiarization`, `x-incrementalDiarization`, `x-speakerMerges`, `x-speakerAssignmentEditedBy` (the value `"user"`, written together with `x-speakerMerges`), `x-speakerIdentification`, `x-derivedFromTranscript` and `x-sourceAttribution`.
 

@@ -9,12 +9,18 @@ We made the entries for 0.0.1-beta to 0.1.0 again from the release notes of thes
 ### Added
 
 - Cassini talk is in French, Spanish, Brazilian Portuguese and European Portuguese, besides English and Italian. The app follows the phone language, or the language you set for it in the system settings (Android 13 or later). Dates follow each language, and French writes sizes in Mo and Go.
+- The Licenses screen shows the notices of the Cassini model host (`NOTICE.txt` of dist.gocassini.com) under "Model notices".
 
 ### Changed
 
 - A few Italian labels now use the words of the other Cassini apps: "Ferma" in the transcription notification, "Cestino" with a capital, and "fin qui".
 - The app is called Cassini talk. The launcher, the About card, the Licenses screen and the store title show the new name. Sentences in the app still say "Cassini". The package name stays `org.cassini.android`, so this version updates the installed app and keeps your notes, voices, models and settings.
 - zstd-jni 1.5.7-25, AndroidX DataStore 1.3.0 and kotlinx.serialization 1.12.0. The build uses Gradle 9.8.2 and AGP 9.3.3.
+- Cassini downloads all its models from dist.gocassini.com, the model host that Cassini for the desktop also uses. Before a download, the app checks that the host still offers the exact models of this version, with the same files. If it does not, the app downloads nothing and shows "File check failed". The app never takes a newer model by itself.
+- The download is smaller: about 530 MB in all, instead of about 730 MB, because each file comes compressed. While the models install, the app needs about 1330 MB of free storage.
+- The speech model is the Parakeet Ultra INT8 conversion of the Cassini model host, made from the same Moondream model. The speaker model is its new export for the updated runtime.
+- The models install in `models/`. This version does not read or delete the `parakeet-ultra/`, `vad/` and `speaker-models/` directories of 0.3.0, so it downloads the models again. Your saved voices stay valid, because the voice model is the same file.
+- A transcription that you stopped with an earlier version does not continue with the new models. Cassini shows "Saved progress no longer matches", and your recording stays. Start the transcription again.
 
 ### Removed
 

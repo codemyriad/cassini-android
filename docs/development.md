@@ -163,7 +163,8 @@ Most device tests use a scratch root (see [CassiniTestRunner](#cassinitestrunner
 
 ```sh
 adb exec-out run-as org.cassini.android tar c \
-    --exclude=files/parakeet-ultra --exclude=files/vad --exclude=files/speaker-models files > files-backup.tar
+    --exclude=files/models --exclude=files/parakeet-ultra --exclude=files/vad --exclude=files/speaker-models \
+    files > files-backup.tar
 ```
 
 If the test damaged or erased your notes, restore the backup. First stop the app, then extract the backup into the app storage:
@@ -481,6 +482,7 @@ The desktop pipeline is in `../gocassini`. The Android app is different in these
 - Android uses sherpa-onnx 1.13.7 with the Sortformer patch ([`native-runtime.md`](native-runtime.md)), on the CPU, with two threads and greedy decoding. It uses only Parakeet Ultra INT8. The desktop uses Parakeet TDT 0.6B v3.
 - The Android runtime has the NeMo-reference Parakeet feature frontend of upstream pull request [k2-fsa/sherpa-onnx#4024](https://github.com/k2-fsa/sherpa-onnx/pull/4024). The frontend operates automatically for Parakeet v3 and Ultra. The desktop runtime has its own fork with a corrected frontend. Android still decodes with `DecodePolicy.WHOLE_SPANS` (0.5 s of synthetic silence after each span), which we measured with the stock frontend. The reference frontend normalises over the entire input, and the synthetic silence is part of that input. Before a release, compare `WHOLE_SPANS` with `PARAKEET_V3_REFERENCE` on Parakeet Ultra (`ChunkingComparisonTest`), and choose the policy from the result. The KDoc of `DecodePolicy` in `SpeechWindows.kt` still names a stock runtime, because `scripts/check-verbatim.sh` keeps that file as in 0.1.0. [`notes/feasibility.md`](notes/feasibility.md) gives the history.
 - Android cuts a recording at speech pauses with the Silero VAD values of the desktop. It cuts a span of more than 28 s at its quietest 30 ms, between 20 s and 25 s after the previous cut. The window arithmetic, the seam alignment and the word gate come from `gocassini` `transcribe/stt.go`, together with their tests.
+- Android downloads its models with the rules of the desktop (D53.1): only from `dist.gocassini.com`, through its manifest, each model by its pinned pair (`id`, `source_sha256`), each file as its own seekable Zstandard object, and into `models/<id>/<source_sha256>/`. Android compiles the pins of the four models that it uses into `ModelCatalog` and never takes a newer entry of the manifest. It checks the compressed and decompressed size and SHA-256 of each file before it installs the file.
 - The desktop takes the speaker names from the call signaling and does no voice analysis. Android finds the speakers in the audio with Nemotron-3 Sortformer (at most 8, in the order of arrival). It compares them with CAM++ voiceprints that stay on the phone.
 - A saved voice gets its name automatically at a cosine similarity of 0.72 or more and at least 0.08 more than the next voice. Android suggests the name from 0.50. These values come from a small calibration on call recordings (`core/src/main/kotlin/org/cassini/core/speakers/VoiceprintSelection.kt`).
 
@@ -565,7 +567,7 @@ We did not run `scripts/ci-emulator-smoke.sh` on API 26, 29 or 35 on a local emu
 The `models` job runs the `@NeedsModels` tests on an API 34 emulator with the real models. It does these steps:
 
 1. It runs `setup.sh --prebuilt-only` and `scripts/make-long-clip.sh`, and builds the debug APK and its test APK.
-2. `scripts/fetch-ci-models.py` downloads the models of `scripts/ci-models.json` into `.tools/ci-models` and makes sure that each file has its pinned size and SHA-256. The cache key of this directory comes from the SHA-256 values in the list. The job saves the cache after this check and before the device tests, so a failed test does not cause a new download in the next run. `ModelCatalogTest` makes sure that the list and `ModelCatalog` agree.
+2. `scripts/fetch-ci-models.py` downloads the models of `scripts/ci-models.json` from `dist.gocassini.com` into `.tools/ci-models/models/<id>/<source sha256>/`. It downloads each file as a Zstandard file, makes sure that it has its pinned size and SHA-256, decompresses it and checks the size and SHA-256 again. The cache key of this directory comes from the SHA-256 values in the list. The job saves the cache after this check and before the device tests, so a failed test does not cause a new download in the next run. `ModelCatalogTest` makes sure that the list and `ModelCatalog` agree.
 3. `scripts/ci-models-smoke.sh` installs the debug APK. Then `scripts/push-models.sh` copies the models into the `files/` directory of the app with `run-as`, and `scripts/device-smoke.sh --annotation NeedsModels` runs the tests.
 
 `scripts/push-models.sh` copies a file only when the device does not have the same SHA-256. It writes the marker files last. To do a check of an emulator that has the models, run `scripts/push-models.sh` with the output of `scripts/fetch-ci-models.py`. If the models are the same, the script copies nothing. `scripts/fetch-ci-models.py` needs Python 3.10 or later. Before Python 3.14, it also needs the `zstd` tool.
