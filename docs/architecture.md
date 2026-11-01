@@ -124,7 +124,7 @@ The P1 move kept the bodies of the files, except for the listed edits. `scripts/
 | `speakers` | `SortformerStream`, `VoiceprintExtractor`. |
 | `job` | `InferenceDispatcher` (one thread) and `NativeBudget` (the `Mutex` for model loads). From P5, also these items: the seams of section 2, `TranscriptionJob`, `ModelInstaller`, `ProgressTracker`, the ports (`JobStorage`, `JobVoices`, `ModelAccess`, `ModelStore`, `BatterySource`), `JobEngines` (the factories of the seams), `JobEnvironment` (dispatchers, clock, logger, placeholder label), `DraftSources` and the job state types (section 5). A JVM test makes sure that `ModelCatalog.VOICEPRINT_DIM` is the print length that the voiceprint adapter accepts. The adapter refuses a print of a different length. No test operates the real CAM++ model. |
 
-The sherpa-onnx AAR is the Maven coordinate `org.cassini.native:sherpa-onnx-nemotron:1.13.7-dbbeef9c` in the repository `native/m2/`, which git ignores (section 8).
+The sherpa-onnx AAR is the Maven coordinate `org.cassini.native:sherpa-onnx-nemotron:1.13.7-0c2ee3f3` in the repository `native/m2/`, which git ignores (section 8).
 
 ### 2.3 `:data` (package `org.cassini.data`)
 
@@ -931,7 +931,7 @@ The draft names have one owner, `DraftNames` (section 3.6). The UI and the job c
 
 ## 8. Native runtime and build
 
-AAR: `scripts/build-native-aar.sh` builds the pinned fork and the patch with ONNX Runtime 1.27.1. It installs the AAR and a generated POM into `native/m2/org/cassini/native/sherpa-onnx-nemotron/1.13.7-dbbeef9c/`. Git ignores this directory, but `native/m2/README.md` is committed. `scripts/fetch-native-aar.sh` downloads the AAR from the GitHub release `native-sherpa-onnx-1.13.7-nemotron.3`. The `sherpa-onnx-aar` entry of `scripts/native-dependencies.json` pins its SHA-256 and the hash of the patch. The release `.2` is a build of the fork without the frontend of upstream pull request #4024. Do not use it with Parakeet Ultra. The older release `.1` is a build without the patch (SHA-256 `d03a06f8…`, without `processStreamingChunk`, `saveStreamingState` and `restoreStreamingState`). Never use it.
+AAR: `scripts/build-native-aar.sh` builds the pinned fork and the patch with ONNX Runtime 1.27.1. It installs the AAR and a generated POM into `native/m2/org/cassini/native/sherpa-onnx-nemotron/1.13.7-0c2ee3f3/`. Git ignores this directory, but `native/m2/README.md` is committed. `scripts/fetch-native-aar.sh` downloads the AAR from the GitHub release `native-sherpa-onnx-1.13.7-nemotron.3`. The `sherpa-onnx-aar` entry of `scripts/native-dependencies.json` pins its SHA-256 and the hash of the patch. The release `.2` is a build of the fork without the frontend of upstream pull request #4024. Do not use it with Parakeet Ultra. The older release `.1` is a build without the patch (SHA-256 `d03a06f8…`, without `processStreamingChunk`, `saveStreamingState` and `restoreStreamingState`). Never use it.
 
 `scripts/setup.sh` gets the libopus source. Then it gets the AAR from the first of these sources that operates:
 
