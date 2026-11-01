@@ -76,6 +76,26 @@ jobs:
           if [ "$built" != "$pinned" ]; then
             echo "::warning title=Native AAR drift::The AAR built from source ($built) differs from the pinned release build ($pinned)."
           fi
+      # The release asset of the codemyriad/sherpa-onnx fork (coordination D53.2, D53.3) is this Linux build: the AAR,
+      # the ONNX Runtime archive it was linked against, and their SHA-256 sums, kept for 90 days.
+      - name: Collect the AAR for the release
+        run: |
+          . scripts/native-common.sh
+          out=$RUNNER_TEMP/sherpa-onnx-android
+          mkdir -p "$out"
+          cp "$aar_installed" "$out/"
+          cp scripts/streaming-diarization.patch "$out/"
+          # The build unpacks and deletes this archive; fetch the same file for the mirror.
+          ort=1.27.1
+          curl --fail --location --retry 3 -o "$out/onnxruntime-android-$ort.zip" \
+            "https://github.com/csukuangfj/onnxruntime-libs/releases/download/v$ort/onnxruntime-android-$ort.zip"
+          (cd "$out" && sha256sum -- * > SHA256SUMS && cat SHA256SUMS)
+      - name: Upload the AAR for the release
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sherpa-onnx-android-aar
+          path: ${{ runner.temp }}/sherpa-onnx-android
+          retention-days: 90
       - name: Build and test the app with the source-built AAR
         run: ./gradlew --no-daemon :app:assembleDebug :core:test :engine:testDebugUnitTest :app:testDebugUnitTest
       # The XML results keep the standard error of each test class: a coroutine that fails after its test ended
