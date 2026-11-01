@@ -58,7 +58,10 @@ class PlaybackSessionTest {
         val token = SessionToken(Background.context, ComponentName(Background.context, PlaybackService::class.java))
         val connected = MediaController.Builder(Background.context, token).buildAsync().get(CONNECT_S, TimeUnit.SECONDS)
         controller = connected
-        main { playback.play() }
+        // Play through the session, as from the lock screen: the app shows no screen here, and Android 15 gives audio
+        // focus only to an app in the foreground or with a foreground service, which Media3 starts for a controller's
+        // play before it reaches the player (MediaSessionService, startInForegroundRequired).
+        main { connected.play() }
         waitFor("The session shows the note playing") { main { connected.takeIf { it.isPlaying } } }
 
         // Media3 posts the media notification of the session while it plays.
