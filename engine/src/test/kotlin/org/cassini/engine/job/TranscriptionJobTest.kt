@@ -30,6 +30,7 @@ import org.cassini.core.models.ModelPart
 import org.cassini.core.models.ModelPlan
 import org.cassini.core.speakers.Match
 import org.cassini.core.speakers.SpeakerPrint
+import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -458,6 +459,31 @@ class TranscriptionJobTest {
         assertEquals(1, sealed.comments.count { it.startsWith("CASSINI_PAYLOAD_000=") })
         assertEquals("Speaker 1", sealed.speakerLabel(sp1))
         assertTrue(sealed.comments.any { it.startsWith("TITLE=") })
+    }
+
+    @Test fun aFreshDocumentKeepsTheExtensionsOfTheStaleOneVerbatim() = runBlocking {
+        // D53.2: `x` is never dropped, notes from a stale-audio source included; trust is computed again.
+        val h = Harness(source = "document.opus")
+        val notes = JSONArray().put(JSONObject().put("text", "Ricorda"))
+        val x = JSONObject().put("gocassini.com", JSONObject().put("notes", notes))
+        val old = CassiniDocument.create(
+            FIXTURE_OPUS,
+            Transcript(listOf(Word("old_a", 0, 500, "ciao"))),
+            "Weekly sync",
+            JSONObject(),
+            null,
+            emptyMap(),
+            File(temp.root, "old-x.opus"),
+            x,
+        )
+        File(temp.root, "old-x.opus").copyTo(h.audio, overwrite = true)
+        h.storage.existing = old.copy(state = "stale-audio")
+
+        assertEquals(JobOutcome.Done, h.run().first)
+
+        val sealed = h.sealed()
+        assertEquals("ok", sealed.state)
+        assertTrue(sameJson(x, sealed.manifest!!.getJSONObject("x")))
     }
 
     @Test fun transcribeAgainOnAnUnverifiedOrNewerDocumentIsRefusedBeforeAnyWork() = runBlocking {

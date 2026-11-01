@@ -180,10 +180,17 @@ class NoteRepository(
 
     /** Selects a readable variant: the row, `note_text.body` and the preview change together. */
     suspend fun selectVariant(id: String, variantId: String): Boolean {
+        // An OK document records the choice in the file: it becomes the default that every app opens and that a
+        // copy carries (D53). A document that is not OK, or the audio of a running job, is never rewritten; the
+        // choice then stays in Room only, as the version this phone shows.
+        val recorded = when (documents.selectDefault(id, variantId)) {
+            is EditOutcome.Done, EditOutcome.JobPending, is EditOutcome.NotEditable -> true
+            is EditOutcome.Invalid, EditOutcome.NoNote, is EditOutcome.Failed -> false
+        }
         documents.refreshIfStale(id) // The word cache must be complete before it becomes the searchable body.
         val row = notes.note(id)
         val readable = cache.variants(id).any { it.variantId == variantId && it.readable }
-        if (row == null || !readable) return false
+        if (!recorded || row == null || !readable) return false
         val words = cache.words(id, variantId).map(::word)
         val preview = PreviewText.of(words, row.positionMs)?.display
         return notes.selectVariant(id, variantId, words.joinToString(" ") { it.text }, preview, clock())

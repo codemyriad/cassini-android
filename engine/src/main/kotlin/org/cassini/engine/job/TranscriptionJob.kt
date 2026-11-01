@@ -606,7 +606,7 @@ class TranscriptionJob(
      * Step 9: seals into `work/sealed.opus` (never `document.opus`) while holding the note's lock, re-reading the
      * existing document and the title under it. Only an `ok` document gets a new variant; a STALE_AUDIO,
      * INVALID_METADATA or UNREADABLE document is replaced by a fresh one over the same audio, without its old Cassini
-     * tags, and any other state is refused ([requireReplaceable]). `CassiniDocument.create`
+     * tags but with its manifest's `x` (D53.2), and any other state is refused ([requireReplaceable]). `CassiniDocument.create`
      * verifies the written file; the job fsyncs it, saves the pending prints (or deletes an older pending file when
      * there are none), then writes the marker. A stop or a failure before the marker deletes the sealed file and keeps
      * the checkpoint.
@@ -625,8 +625,10 @@ class TranscriptionJob(
                 val existing = current?.takeIf(::extendable)
                 val title = storage.titleBlocking(noteId)
                 val audio = if (existing == null) freshAudio(decoded.run, target) else decoded.run.sealAudio
+                // A fresh document keeps the `x` of the one it replaces, notes included (D53.2): never dropped.
+                val extensions = if (existing == null) current?.manifest?.optJSONObject("x") else null
                 requireSpace(target, audio.length())
-                CassiniDocument.create(audio, draft.transcript, title, processing, existing, labels, target)
+                CassiniDocument.create(audio, draft.transcript, title, processing, existing, labels, target, extensions)
             }
             env.syncFile(target) { sync(target) }
             val variant = document.defaultId

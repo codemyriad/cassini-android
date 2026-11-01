@@ -46,7 +46,7 @@ These rules apply to a note directory:
 - A note has one current audio file. The column `notes.audio_file` names it.
 - An import keeps an extension of 1 to 5 characters `[a-z0-9]`. If the extension is not known, the file name is `source.bin`.
 - For a source that is not Opus, the document holds a 24 kb/s libopus encode. After adopt, the app deletes its copy of the original file.
-- An edit outside a job (rename of a speaker, title, merge) writes `document.opus.tmp`, syncs it to the disk and renames it over `document.opus`.
+- An edit outside a job (rename of a speaker, title, merge, the choice of a version) writes `document.opus.tmp`, syncs it to the disk and renames it over `document.opus`.
 - The lock of the note in `NoteLocks` serializes all writes to one note.
 
 ## What is authoritative where
@@ -56,7 +56,8 @@ These rules apply to a note directory:
 | Audio of a note | The file in `notes/<id>/` | `notes.audio_file`, `notes.duration_ms` |
 | Transcript versions, speaker labels, meeting ID, provenance | The sealed `document.opus` | The tables `variants`, `speakers`, `note_text` |
 | Title | Room `notes.title` | `meeting.title` and the `TITLE` tag of the document |
-| Trash state, playback position, selected version, preview | Room `notes` | None |
+| Selected version | The default version of an OK `document.opus` (coordination D53) | `notes.selected_variant` |
+| Trash state, playback position, preview | Room `notes` | None |
 | Transcription queue | Room `jobs` | None |
 | Unfinished transcription | `notes/<id>/work/` | `jobs.done_ms` |
 | Saved people | `voices/people.json` | None |
@@ -170,6 +171,10 @@ A Cassini document is an Ogg Opus file at 48 kHz. Any audio player plays it. The
 - A JSON manifest (`application/vnd.cassini.portable-meeting+json`) and the transcript bodies (`application/vnd.cassini.transcript-words+json`, format `cassini.words.v1`). They are compressed and split across numbered tags.
 
 Each transcription adds a transcript version (a variant). The document keeps the earlier versions. "Save a copy" copies the document byte for byte, together with the versions, extensions and attachments that Android does not use.
+
+The version you choose in the Versions sheet, a merge undone included, is written into the document: its descriptor gets `default: true`, the earlier default gets `false`, and `CASSINI_TRANSCRIPT_DEFAULT` names it (`CassiniDocument.setDefault`). The versions keep their order and their bodies, and the manifest is re-encoded with everything else unchanged, `x` included. Every Cassini reader opens the file, and any copy of it, on that version (coordination D53.3; the shared vector `two-versions-default-switched.opus` in `core/src/test/resources/cross-app/`). iOS instead appends the chosen version again as a new last version at export; both follow the selection rule of the format. Two cases keep the choice in Room only, as the version this phone shows: a document that is not OK, which Android never rewrites, and a note with a job row, whose document is the job's audio source (the job's new version becomes the default when it is adopted).
+
+Transcribe again on a document with stale audio, invalid metadata or an unreadable file seals a fresh document. The fresh manifest carries the `x` of the old one verbatim when the old manifest can be read, notes from the desktop included (coordination D53.2). The old versions do not carry over, because they belong to other audio.
 
 The recognition step of the provenance names the speech model as `<id> <precision>`. The `model` of a new version is `moondream/parakeet-ultra INT8`. A version of 0.2.0 or earlier (development builds only) has `nvidia/parakeet-tdt-0.6b-v3 INT8`. Document info shows "Parakeet Ultra, INT8" for this build's id and any other id as it is. The `engine` stays `Parakeet TDT` (the architecture of both models). The `version` gives `sherpa-onnx 1.13.7; model revision <revision>`. The format does not restrict these strings. The desktop app writes its own ids, for example `parakeet-tdt-0.6b-v3-int8`.
 
