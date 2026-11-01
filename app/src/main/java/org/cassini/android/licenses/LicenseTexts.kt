@@ -5,6 +5,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.cassini.core.models.ModelCatalog
 import org.cassini.core.models.ModelPart
 import org.cassini.ui.licenses.LicenseEntry
 import org.cassini.ui.licenses.SOURCE_CODE_URL
@@ -17,9 +18,10 @@ import org.cassini.ui.licenses.SOURCE_CODE_URL
  *   libraries that are neither native nor models (DataStore's protobuf, zstd-jni).
  * - Native dependencies: each entry of `native-dependencies.json` (name, version, source URL), then the licence
  *   files of those entries and the Opus licence.
- * - Model notices: the models section of the notices, then the OpenMDW licence of the diarizer.
- * - Where the models come from: the Network section of `PRIVACY.md` (the hosts and the redirect allow-list,
- *   architecture 5.6), then the pinned URL of every file that the app downloads.
+ * - Model notices: the models section of the notices, then the model host's `NOTICE.txt` (a pinned copy of
+ *   https://dist.gocassini.com/NOTICE.txt) and the OpenMDW licence of the diarizer.
+ * - Where the models come from: the Network section of `PRIVACY.md` (the model host and the redirect allow-list,
+ *   architecture 5.6), then each model's pinned pair on the host and the URL of every file that the app downloads.
  *
  * [read] gives the text of an asset path; [list] gives the names in an asset directory (empty for a file).
  */
@@ -30,7 +32,7 @@ class LicenseTexts(private val read: (String) -> String, private val list: (Stri
         LicenseEntry.NATIVE -> native()
         LicenseEntry.INSTRUMENT_SANS -> read("$ROOT/fonts/InstrumentSans-OFL.txt")
         LicenseEntry.PLEX_MONO -> read("$ROOT/fonts/IBMPlexMono-OFL.txt")
-        LicenseEntry.MODELS -> join(listOf(section(read(NOTICES), MODELS_HEADING)) + files(MODEL_DIRECTORY))
+        LicenseEntry.MODELS -> join(listOf(section(read(NOTICES), MODELS_HEADING)) + MODEL_DIRECTORIES.flatMap(::files))
         LicenseEntry.MODEL_SOURCES -> join(listOf(section(read(PRIVACY), NETWORK_HEADING)) + downloads())
         LicenseEntry.PRIVACY -> read(PRIVACY)
         LicenseEntry.SOURCE_CODE -> SOURCE_CODE_URL
@@ -62,7 +64,7 @@ class LicenseTexts(private val read: (String) -> String, private val list: (Stri
 
     private fun otherDirectories(): List<String> {
         val native = nativeDependencies().map { it.name }.toSet()
-        return directories().filter { it !in native && it != FONTS && it != MODEL_DIRECTORY }
+        return directories().filter { it !in native && it != FONTS && it !in MODEL_DIRECTORIES }
     }
 
     /** Every file under [path] (relative to `licenses/`), each as its path and its text; a file gives itself. */
@@ -72,11 +74,15 @@ class LicenseTexts(private val read: (String) -> String, private val list: (Stri
         return children.sorted().flatMap { files("$path/$it") }
     }
 
-    /** Each downloaded file and its pinned URL, part by part. */
-    private fun downloads(): List<String> = ModelPart.entries.flatMap { part -> part.models }
-        .flatMap { model -> model.download?.let(::listOf) ?: model.artifacts }
-        .filter { it.url.isNotEmpty() }
-        .map { "${it.name}\n${it.url}" }
+    /**
+     * The manifest, then each model's pinned pair (manifest id and source SHA-256) and each of its downloaded files
+     * with its URL on the model host, part by part.
+     */
+    private fun downloads(): List<String> = listOf(ModelCatalog.DIST_MANIFEST_URL) +
+        ModelPart.entries.flatMap { part -> part.models }.map { model ->
+            val files = model.artifacts.mapNotNull { it.download }.map { "${it.name}\n${it.url}" }
+            (listOf("${model.id} ${model.sourceSha256}") + files).joinToString("\n")
+        }
 
     private fun join(parts: List<String>): String = parts.map(String::trim).filter(String::isNotEmpty)
         .joinToString("\n\n")
@@ -87,7 +93,9 @@ class LicenseTexts(private val read: (String) -> String, private val list: (Stri
         const val PRIVACY = "$ROOT/PRIVACY.md"
         private const val NATIVE_LIST = "$ROOT/native-dependencies.json"
         private const val OPUS_LICENCE = "opus-COPYING.txt"
-        private const val MODEL_DIRECTORY = "nemotron-3-diarization"
+
+        /** The model host's notices first, then the licence the diarizer asks to keep with it. */
+        private val MODEL_DIRECTORIES = listOf("dist.gocassini.com", "nemotron-3-diarization")
         private const val FONTS = "fonts"
         private const val MODELS_HEADING = "## Downloaded models"
         private const val NETWORK_HEADING = "## Network"

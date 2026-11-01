@@ -13,7 +13,7 @@ Cassini keeps your data in its private app storage (the `filesDir` directory of 
 - Unfinished transcription: the progress of a transcription, the words found so far, the draft speaker names, the matches between speakers and saved voices, short audio clips of each speaker (at most 45 seconds for each speaker), and the state of the speaker model. This state is a list of numbers that the speaker model calculates from the voices in the note, so that the transcription can continue later. It is not a voiceprint, and Cassini does not use it to recognize people. A match is the ID of a saved voice and a score. It is not a voiceprint. Location: `notes/<noteId>/work/`. Cassini deletes this directory when the transcription ends, when you start again, or when it deletes the note.
 - Voiceprints: a voiceprint is a list of numbers that Cassini calculates from the voice of one speaker. Cassini uses voiceprints to recognize the people that you name. Location: `voices/` only. The section "Voiceprints" gives the details.
 - Settings and state: your model download decision and its time, the queue of transcriptions, the trash state of notes, the playback position, and some one-time notices. Location: `settings.preferences_pb` and `cassini.db`. On Android 13 and later, Android keeps the app language. On earlier versions, Cassini keeps the app language in a small file in its private storage.
-- Models: the downloaded speech and speaker models. They contain no personal data. Location: `parakeet-ultra/`, `vad/` and `speaker-models/`.
+- Models: the downloaded speech and speaker models. They contain no personal data. Location: `models/`. Cassini 0.3.0 kept them in `parakeet-ultra/`, `vad/` and `speaker-models/`. Later versions do not read these directories and do not delete them.
 
 When you import a file, or open a file with Cassini from a different app, Cassini copies the file into its storage. The original file stays where it is.
 
@@ -51,25 +51,22 @@ Cassini connects to the internet only to download models. It sends no audio, tra
 
 Cassini downloads no model before you agree. The "Transcribe on this phone" screen shows the size of each model. The first download starts only when you push "Download and transcribe" or "Download". If you push "Not now — keep the audio", Cassini downloads nothing. After you agree, Cassini downloads a missing model, or a model that it did not download fully, when you start a transcription.
 
-Cassini downloads each model from one host:
+Cassini downloads all models from one host, `dist.gocassini.com`, the model host of Cassini:
 
-- Speech recognition (Parakeet Ultra, INT8): `huggingface.co`
-- Speech detection (Silero VAD): `github.com`
-- Telling speakers apart (NVIDIA Nemotron-3-Diarization, INT8): `dist.gocassini.com`
-- Recognising saved voices (3D-Speaker CAM++): `github.com`
+- Speech recognition (Parakeet Ultra, INT8)
+- Speech detection (Silero VAD)
+- Telling speakers apart (NVIDIA Nemotron-3-Diarization, INT8)
+- Recognising saved voices (3D-Speaker CAM++)
 
-A host can send the download to a different host (a redirect). Cassini follows a redirect only to an HTTPS host in its allow-list (a list of permitted hosts). This allow-list is the list in `ModelCatalog.DOWNLOAD_HOSTS`:
+Before a download, Cassini reads the list of models on this host (`https://dist.gocassini.com/manifest.json`). Cassini uses this list only to find the files. The app contains the exact version of each model and the hash of each file. If the list does not give these versions and these files, Cassini downloads nothing. Cassini never downloads a newer version of a model that it does not know.
 
-- `huggingface.co`
-- `*.huggingface.co`: the subdomains of `huggingface.co`
-- `*.hf.co`: the subdomains of `hf.co` (the file storage of Hugging Face)
-- `github.com`
-- `*.githubusercontent.com`: the subdomains of `githubusercontent.com` (the file storage of GitHub releases)
+A host can send the download to a different host (a redirect). Cassini follows a redirect only to an HTTPS host in its allow-list (a list of permitted hosts). This allow-list is the list in `ModelCatalog.DOWNLOAD_HOSTS`, and it has one host:
+
 - `dist.gocassini.com`
 
-If a redirect goes to a different host, Cassini stops the download of that model.
+If the list of models or a redirect gives a different host, Cassini stops the download of that model.
 
-A host receives the IP address of your phone and the name of the file. Android also sends a standard user agent, which gives the Android version and the phone model. The privacy policy of each host applies to these data. Cassini sends no cookies and no account data.
+The host receives the IP address of your phone and the name of the file. Android also sends a standard user agent, which gives the Android version and the phone model. The privacy policy of the host applies to these data. Cassini sends no cookies and no account data.
 
 Before Cassini uses a downloaded file, it makes sure that the size and the SHA-256 hash of the file are correct. The security policy of Cassini gives the details: https://github.com/codemyriad/cassini-android/blob/main/SECURITY.md
 

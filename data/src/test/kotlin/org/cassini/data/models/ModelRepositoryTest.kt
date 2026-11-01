@@ -86,7 +86,7 @@ class ModelRepositoryTest {
         assertEquals(status, repo.status.value)
         assertFalse(repo.consented())
         assertEquals(ModelPart.entries, repo.plan().parts)
-        assertEquals(730L, repo.plan().totalMebibytes)
+        assertEquals(528L, repo.plan().totalMebibytes)
     }
 
     @Test fun markerFilesDecideReadiness() = runTest {
@@ -156,7 +156,7 @@ class ModelRepositoryTest {
         val error = runCatching { offMain { failing.installBlocking(ModelPart.VOICES) } }.exceptionOrNull()
         assertEquals(Failure.VERIFY, ((error?.cause ?: error) as UserFacingException).failure)
         assertEquals(ModelStatus.Failed(Failure.VERIFY, "VERIFY"), failing.status.value[ModelPart.VOICES])
-        assertFalse(File(ModelCatalog.VOICEPRINT.directory(paths.modelRoot), "verified-voiceprint").exists())
+        assertFalse(File(ModelCatalog.VOICEPRINT.directory(paths.modelRoot), "verified").exists())
         // The failure stays until the part is installed.
         assertEquals(ModelStatus.Failed(Failure.VERIFY, "VERIFY"), failing.refresh()[ModelPart.VOICES])
         install(ModelCatalog.VOICEPRINT)
@@ -170,7 +170,8 @@ class ModelRepositoryTest {
         runCatching { offMain { repo.installBlocking(ModelPart.SPEECH) } }
 
         assertEquals(ModelStatus.Missing(consented = false), repo.status.value[ModelPart.SPEECH])
-        assertEquals("no detector after a cancelled Parakeet", listOf("parakeet-ultra/verified"), fetched)
+        val parakeet = "${ModelCatalog.PARAKEET.directory}/verified"
+        assertEquals("no detector after a cancelled Parakeet", listOf(parakeet), fetched)
     }
 
     @Test fun anInstallSkipsReadyModelsAndKeepsMarkersUntilVerified() = runTest {
@@ -180,7 +181,7 @@ class ModelRepositoryTest {
 
         offMain { repo.installBlocking(ModelPart.SPEECH) }
 
-        assertEquals(listOf("vad/verified"), fetched)
+        assertEquals(listOf("${ModelCatalog.VAD.directory}/verified"), fetched)
         assertTrue(ModelCatalog.VAD.ready(paths.modelRoot))
     }
 

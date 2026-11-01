@@ -103,10 +103,15 @@ class LicensesViewModelTest {
         val models = texts.text(LicenseEntry.MODELS)
         assertTrue(models.startsWith("Downloaded models and local test fixtures\n"))
         assertTrue("nemotron-3-diarization/OpenMDW-1.1.txt" in models)
+        assertTrue("the model host's notices", "dist.gocassini.com/NOTICE.txt\n\nCassini model distribution" in models)
         val sources = texts.text(LicenseEntry.MODEL_SOURCES)
         assertTrue(sources.startsWith("Network\n"))
         for (host in ModelCatalog.DOWNLOAD_HOSTS) assertTrue(host, host in sources)
-        assertTrue(ModelCatalog.PARAKEET.artifacts.first().url in sources)
+        assertTrue(ModelCatalog.DIST_MANIFEST_URL in sources)
+        for (model in ModelCatalog.consented + ModelCatalog.VAD) {
+            assertTrue(model.id, "${model.id} ${model.sourceSha256}" in sources)
+            model.artifacts.forEach { assertTrue(it.name, it.download!!.url in sources) }
+        }
         assertEquals(File(root, "PRIVACY.md").readText(), texts.text(LicenseEntry.PRIVACY))
     }
 

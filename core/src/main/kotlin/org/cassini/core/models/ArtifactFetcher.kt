@@ -3,6 +3,7 @@ package org.cassini.core.models
 import org.cassini.core.Failure
 import org.cassini.core.UserFacingException
 import org.cassini.core.requireUser
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -21,7 +22,13 @@ import java.security.MessageDigest
  *
  * Redirects are followed by hand, only as [RedirectPolicy] allows: HTTPS to [ModelCatalog.DOWNLOAD_HOSTS], at
  * most five hops. Any other redirect fails the file with [Failure.DOWNLOAD] and keeps its `.part`.
+ *
+ * Every request asks for `Accept-Encoding: identity`: the bytes counted, resumed and hashed are the file's own, never
+ * a transfer encoding of them. A resumed request also sends `If-Range` with the entity tag of the pinned file, which
+ * the model host gives as its quoted SHA-256: a server holding other bytes answers the whole file (`200`), and the
+ * download restarts from zero.
  */
+@Suppress("TooManyFunctions") // one HTTP client for the model host: fetch, resume, decompress and read, and helpers
 object ArtifactFetcher {
     private const val TIMEOUT_MS = 30_000
 
@@ -85,7 +92,8 @@ object ArtifactFetcher {
      * `.part`; while verifying, the bytes hashed so far (from 0 up to the artifact's size, which always comes last).
      * [redirects] decides which redirects are followed.
      *
-     * A `.part` left by an earlier attempt is resumed with `Range: bytes=<length>-`. A `206` answer is accepted
+     * A `.part` left by an earlier attempt is resumed with `Range: bytes=<length>-` and `If-Range: "<sha256>"`. A
+     * `206` answer is accepted
      * only when its `Content-Range` starts at that length and its total is the pinned size; a `200` answer restarts
      * from zero. A `206` that ends before the artifact's last byte (some servers cap open-ended ranges) keeps what it
      * brought and fails with [Failure.DOWNLOAD], so the next attempt resumes further on. On a size or SHA-256
@@ -129,7 +137,7 @@ object ArtifactFetcher {
         progress: (Long, Boolean) -> Unit,
     ) {
         val offset = partial.length()
-        val connection = open(url, offset, redirects)
+        val connection = open(url, offset, "\"${artifact.sha256}\"", redirects)
         try {
             // Where a 206 answer's range ends (exclusive); null for a whole 200 answer.
             val rangeEnd = resumes(connection, artifact, partial, offset)
@@ -157,11 +165,34 @@ object ArtifactFetcher {
     }
 
     /**
-     * Connects to [url] (asking for the bytes from [offset] on, when it is not 0) and follows the redirects
-     * [policy] allows, sending the same request each time. Returns the connection of the first answer that is not a
-     * redirect, with its status read.
+     * Reads the whole answer to a GET of [url], at most [limit] bytes, following the redirects [redirects] allows
+     * (the model host's manifest). An answer other than `200` or shorter than it announced fails with
+     * [Failure.DOWNLOAD]; a longer one with [Failure.VERIFY].
      */
-    private fun open(url: String, offset: Long, policy: RedirectPolicy): HttpURLConnection {
+    fun read(url: String, limit: Long, redirects: RedirectPolicy = RedirectPolicy.DOWNLOADS): ByteArray {
+        val connection = open(url, 0, null, redirects)
+        try {
+            val status = connection.responseCode
+            if (status != HttpURLConnection.HTTP_OK) throw UserFacingException(Failure.DOWNLOAD, "HTTP $status")
+            val announced = connection.contentLengthLong
+            requireUser(announced <= limit, Failure.VERIFY)
+            val body = ByteArrayOutputStream()
+            val received = connection.inputStream.buffered().use { copy(it, body, 0, limit) {} }
+            if (received < announced) {
+                throw UserFacingException(Failure.DOWNLOAD, "Transfer ended at $received of $announced bytes")
+            }
+            return body.toByteArray()
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    /**
+     * Connects to [url] (asking for the bytes from [offset] on, when it is not 0, if the entity tag is still
+     * [ifRange]) and follows the redirects [policy] allows, sending the same request each time. Returns the
+     * connection of the first answer that is not a redirect, with its status read.
+     */
+    private fun open(url: String, offset: Long, ifRange: String?, policy: RedirectPolicy): HttpURLConnection {
         var target = URL(url)
         var hop = 0
         while (true) {
@@ -169,7 +200,11 @@ object ArtifactFetcher {
             connection.instanceFollowRedirects = false
             connection.connectTimeout = TIMEOUT_MS
             connection.readTimeout = TIMEOUT_MS
-            if (offset > 0) connection.setRequestProperty("Range", "bytes=$offset-")
+            connection.setRequestProperty("Accept-Encoding", "identity")
+            if (offset > 0) {
+                connection.setRequestProperty("Range", "bytes=$offset-")
+                ifRange?.let { connection.setRequestProperty("If-Range", it) }
+            }
             val status = try {
                 connection.responseCode
             } catch (error: IOException) {
@@ -234,9 +269,10 @@ object ArtifactFetcher {
     }
 
     /**
-     * Like [fetch] for a Zstandard-compressed [download] of [artifact]. The compressed file is verified,
-     * then decompressed to a `.part` file that replaces nothing until the decompressed size and SHA-256
-     * match. The verified compressed file is not kept; its own `.part` is resumed like any other.
+     * Like [fetch] for a Zstandard-compressed [download] of [artifact] (each model file on the model host is its own
+     * seekable Zstandard object). The compressed file is fetched and verified (size and SHA-256), then decompressed
+     * to a `.part` file that replaces nothing until the decompressed size and SHA-256 match. The verified compressed
+     * file is not kept; its own `.part` is resumed like any other.
      *
      * [progress] counts in bytes of [download], as for [fetch]. While verifying, the count covers the whole check:
      * hashing the compressed file, decompressing it and hashing the result, each share in proportion to the bytes

@@ -13,7 +13,7 @@ staging=/data/local/tmp/cassini-model.part
 test -d "$source_dir" || { printf 'No models in %s: run scripts/fetch-ci-models.py first.\n' "$source_dir" >&2; exit 1; }
 adb shell run-as "$package" true || { printf 'run-as %s failed: install a debug build first.\n' "$package" >&2; exit 1; }
 
-# Each model directory holds its files and one or more marker files ("verified", "verified-voiceprint").
+# Each model directory holds its files and one marker file ("verified").
 markers=()
 copied=0
 # The list comes on descriptor 3, because adb shell reads its standard input.

@@ -22,21 +22,21 @@ class ModelCatalogTest {
         File(directory, model.markerFile).writeText(marker)
     }
 
-    @Test fun parakeetIsTheHuggingFaceRevisionMarkedByThatRevision() {
+    @Test fun parakeetIsTheModelHostsUltraInt8MarkedByItsSourceHash() {
         val parakeet = ModelCatalog.PARAKEET
-        assertEquals("parakeet-ultra", parakeet.directory)
+        assertEquals("parakeet-ultra-0.6b-int8", parakeet.id)
+        assertEquals("18cb623004dd6c15999b93cb70b14d8a1f6e8f3a2a97ff733f104bfc3494f6a9", parakeet.sourceSha256)
+        assertEquals(
+            "models/parakeet-ultra-0.6b-int8/18cb623004dd6c15999b93cb70b14d8a1f6e8f3a2a97ff733f104bfc3494f6a9",
+            parakeet.directory,
+        )
         assertEquals("verified", parakeet.markerFile)
-        assertEquals("b86784a3a5356cbd126f710b61cd90c5fe5898f1", parakeet.markerValue)
+        assertEquals(parakeet.sourceSha256, parakeet.markerValue)
+        assertEquals(ModelCatalog.PARAKEET_REVISION, parakeet.sourceSha256)
         val names = listOf("encoder.int8.onnx", "decoder.int8.onnx", "joiner.int8.onnx", "tokens.txt")
         assertEquals(names, parakeet.artifacts.map { it.name })
-        assertEquals(listOf(652282347L, 11845275L, 6355277L, 93939L), parakeet.artifacts.map { it.size })
-        parakeet.artifacts.forEach {
-            assertEquals(
-                "https://huggingface.co/tpmaerk/parakeet-ultra-sherpa-onnx-int8/resolve/" +
-                    "b86784a3a5356cbd126f710b61cd90c5fe5898f1/${it.name}",
-                it.url,
-            )
-        }
+        assertEquals(listOf(652282922L, 11845274L, 6355277L, 93939L), parakeet.artifacts.map { it.size })
+        assertEquals(listOf(452306705L, 8841708L, 3714640L, 45831L), parakeet.artifacts.map { it.download!!.size })
         assertEquals("moondream/parakeet-ultra", ModelCatalog.PARAKEET_MODEL_ID)
         assertEquals("Parakeet Ultra", ModelCatalog.PARAKEET_DISPLAY_NAME)
     }
@@ -45,35 +45,37 @@ class ModelCatalogTest {
         assertEquals(mapOf(ModelCatalog.PARAKEET_MODEL_ID to "Parakeet Ultra"), ModelCatalog.SPEECH_MODEL_NAMES)
     }
 
-    @Test fun theDetectorAndSpeakerModelsAreMarkedByTheirHashes() {
-        assertEquals("vad", ModelCatalog.VAD.directory)
-        assertEquals("verified", ModelCatalog.VAD.markerFile)
-        assertEquals(ModelCatalog.sileroVad.sha256, ModelCatalog.VAD.markerValue)
-        assertEquals(
-            "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx",
-            ModelCatalog.sileroVad.url
-        )
-        assertEquals("speaker-models", ModelCatalog.DIARIZATION.directory)
-        assertEquals("verified", ModelCatalog.DIARIZATION.markerFile)
-        assertEquals(
-            "01d1f893f394cc0418ae78425d216ed62c334c0125e650135332a7a8e595f168",
-            ModelCatalog.DIARIZATION.markerValue
-        )
-        assertEquals(ModelCatalog.diarizationDownload, ModelCatalog.DIARIZATION.download)
-        assertTrue(ModelCatalog.diarizationDownload.url.startsWith("https://dist.gocassini.com/models/files/"))
-        assertEquals("speaker-models", ModelCatalog.VOICEPRINT.directory)
-        assertEquals("verified-voiceprint", ModelCatalog.VOICEPRINT.markerFile)
-        assertEquals(
-            "357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b",
-            ModelCatalog.VOICEPRINT.markerValue
-        )
-        assertEquals("voiceprint-campplus.onnx", ModelCatalog.voiceprintModel.name)
+    @Test fun theDetectorAndSpeakerModelsLiveInTheirOwnDirectories() {
+        assertEquals("models/silero-vad/${ModelCatalog.sileroVad.sha256}", ModelCatalog.VAD.directory)
+        assertEquals("9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6", ModelCatalog.VAD.markerValue)
+        assertEquals("silero_vad.onnx", ModelCatalog.sileroVad.name)
+        val diarizer = "47c221ea9b4d4e7f6c108bd098e769bc706cdc986c29f6133c93cae335fe6779"
+        assertEquals("models/nemotron-3-diarization-int8/$diarizer", ModelCatalog.DIARIZATION.directory)
+        assertEquals(diarizer, ModelCatalog.DIARIZATION.markerValue)
+        assertEquals(diarizer, ModelCatalog.diarizationModel.sha256)
+        assertEquals("model.int8.onnx", ModelCatalog.diarizationModel.name)
+        assertEquals("f667ed73aee57d40cc39428eb768b4fd87a0a29e", ModelCatalog.DIARIZATION_SOURCE_REVISION)
+        // The saved-voice identity of 0.2 and 0.3: the same CAM++ file, so saved voices stay valid.
+        val voiceprint = "357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b"
+        assertEquals(voiceprint, ModelCatalog.voiceprintModel.sha256)
+        assertEquals(29596978L, ModelCatalog.voiceprintModel.size)
+        assertEquals("models/campplus-voxceleb-16k/$voiceprint", ModelCatalog.VOICEPRINT.directory)
+        assertEquals("3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx", ModelCatalog.voiceprintModel.name)
+        val all = ModelCatalog.consented + ModelCatalog.VAD
+        assertEquals(all.size, all.map { it.directory }.toSet().size)
+        assertTrue(all.all { it.markerFile == "verified" && it.markerValue == it.sourceSha256 })
     }
 
-    @Test fun onlyTheThreeModelHostsAreContacted() {
-        val hosts = (ModelCatalog.consented + ModelCatalog.VAD).flatMap { model -> (model.artifacts + listOfNotNull(model.download)) }
-            .filter { it.url.isNotEmpty() }.map { java.net.URI(it.url).host }.toSet()
-        assertEquals(setOf("huggingface.co", "github.com", "dist.gocassini.com"), hosts)
+    @Test fun everyFileIsASeekableZstandardObjectOnTheModelHost() {
+        val files = (ModelCatalog.consented + ModelCatalog.VAD).flatMap { it.artifacts }
+        for (file in files) {
+            val download = file.download!!
+            assertEquals("${file.name}.zst", download.name)
+            assertEquals("https://dist.gocassini.com/models/files/${download.sha256}/${file.name}.zst", download.url)
+            assertTrue(file.url.isEmpty())
+        }
+        assertEquals(listOf("dist.gocassini.com"), ModelCatalog.DOWNLOAD_HOSTS)
+        assertEquals("https://dist.gocassini.com/manifest.json", ModelCatalog.DIST_MANIFEST_URL)
     }
 
     @Test fun aModelIsReadyOnlyWithEveryFullFileAndItsMarker() {
@@ -93,17 +95,18 @@ class ModelCatalogTest {
         }
     }
 
-    @Test fun theDiarizerAndVoiceprintShareADirectoryWithoutSharingAMarker() {
+    @Test fun theDiarizerAndVoiceprintAreInstalledApart() {
         install(ModelCatalog.VOICEPRINT)
         assertTrue(ModelCatalog.VOICEPRINT.ready(folder.root))
         assertFalse(ModelCatalog.DIARIZATION.ready(folder.root))
     }
 
-    @Test fun theConsentDialogQuotesTheBytesFetched() {
-        assertEquals(ModelCatalog.parakeetArtifacts.sumOf { it.size }, ModelCatalog.parakeetBytes)
-        assertEquals(ModelCatalog.diarizationDownload.size, ModelCatalog.speakerBytes)
-        assertEquals(ModelCatalog.voiceprintModel.size, ModelCatalog.voiceprintBytes)
-        assertEquals(28L, ModelCatalog.mebibytes(ModelCatalog.voiceprintBytes))
+    @Test fun theConsentDialogQuotesTheCompressedBytesFetched() {
+        assertEquals(ModelCatalog.parakeetArtifacts.sumOf { it.download!!.size }, ModelCatalog.parakeetBytes)
+        assertEquals(ModelCatalog.diarizationModel.download!!.size, ModelCatalog.speakerBytes)
+        assertEquals(ModelCatalog.voiceprintModel.download!!.size, ModelCatalog.voiceprintBytes)
+        assertEquals(440L, ModelCatalog.mebibytes(ModelCatalog.parakeetBytes))
+        assertEquals(26L, ModelCatalog.mebibytes(ModelCatalog.voiceprintBytes))
         assertEquals(1L, ModelCatalog.mebibytes(1))
     }
 
@@ -113,22 +116,25 @@ class ModelCatalogTest {
         val listed = JSONObject(file.readText()).getJSONArray("models")
         // Every model that the app installs: the consented download and the speech detector.
         val catalog = (ModelCatalog.consented + ModelCatalog.VAD).sortedBy { it.directory }
-        fun artifact(json: JSONObject) = Artifact(
+        fun artifact(json: JSONObject): Artifact = Artifact(
             json.getString("name"),
             json.getLong("size"),
             json.getString("sha256"),
-            json.getString("url"),
+            json.optString("url"),
+            json.optJSONObject("download")?.let(::artifact),
         )
         val models = (0 until listed.length()).map { index ->
             val json = listed.getJSONObject(index)
             val artifacts = json.getJSONArray("artifacts")
-            ModelDescriptor(
-                json.getString("directory"),
+            val model = ModelDescriptor(
+                json.getString("id"),
+                json.getString("sourceSha256"),
                 (0 until artifacts.length()).map { artifact(artifacts.getJSONObject(it)) },
-                json.getString("marker"),
-                json.getString("markerValue"),
-                json.optJSONObject("download")?.let(::artifact),
             )
+            assertEquals(model.directory, json.getString("directory"))
+            assertEquals(model.markerFile, json.getString("marker"))
+            assertEquals(model.markerValue, json.getString("markerValue"))
+            model
         }
         assertEquals(catalog, models.sortedBy { it.directory })
     }

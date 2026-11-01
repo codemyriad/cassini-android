@@ -533,7 +533,7 @@ object AppRoots {
 
     /** The default and reserved names at the top of `filesDir`, which a scratch root must not be. */
     private val reserved: Set<String> =
-        setOf("notes", "voices") + ModelPart.entries.flatMap { part -> part.models.map { it.directory } }
+        setOf("notes", "voices") + ModelPart.entries.flatMap { part -> part.models.map { it.directory.substringBefore('/') } }
 
     /**
      * The paths of this process. [debug] is `BuildConfig.DEBUG`: in a release build `debug-root.txt` is never read.

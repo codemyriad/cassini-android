@@ -5,6 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import java.security.MessageDigest
 
 /** The APK carries copies of the repository's notices, privacy policy and native source manifest; they must not drift. */
 class LicenseAssetsTest {
@@ -25,6 +26,13 @@ class LicenseAssetsTest {
         for (host in ModelCatalog.DOWNLOAD_HOSTS) {
             assertTrue("PRIVACY.md does not list $host", "- `$host`" in privacy)
         }
+    }
+
+    /** The model host's notices, as https://dist.gocassini.com/NOTICE.txt served them on 2026-11-01, byte for byte. */
+    @Test fun theModelHostNoticeIsThePinnedCopy() {
+        val notice = File(root, "app/src/main/assets/licenses/dist.gocassini.com/NOTICE.txt").readBytes()
+        val sha256 = MessageDigest.getInstance("SHA-256").digest(notice).joinToString("") { "%02x".format(it) }
+        assertEquals("8a153125fcc23e60ee52ec06a1af64436d568eaef0c8eeffc83c0f365f4621b8", sha256)
     }
 
     @Test fun nativeDependenciesMatchTheBuildManifest() = same("scripts/native-dependencies.json", "native-dependencies.json")
