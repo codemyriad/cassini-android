@@ -10,6 +10,7 @@ We made the entries for 0.0.1-beta to 0.1.0 again from the release notes of thes
 
 - Cassini talk is in French, Spanish, Brazilian Portuguese and European Portuguese, besides English and Italian. The app follows the phone language, or the language you set for it in the system settings (Android 13 or later). Dates follow each language, and French writes sizes in Mo and Go.
 - Share a note with another app, for example mail or a chat app: each "Save a copy" row of the note menu has a Share button, for the Cassini document (or the audio), the transcript as text and the subtitles.
+- Model downloads name the app and its version to the model host: `CassiniTalk/0.3.0 (Android 15; build 13)`, with your Android release. They send nothing that identifies your phone or you.
 - The Licenses screen shows the notices of the Cassini model host (`NOTICE.txt` of dist.gocassini.com) under "Model notices".
 
 ### Changed
@@ -23,7 +24,7 @@ We made the entries for 0.0.1-beta to 0.1.0 again from the release notes of thes
 - Transcribe again on a note whose audio no longer matches its transcript keeps the extra data that other Cassini apps stored in the file, such as desktop notes.
 - zstd-jni 1.5.7-25, AndroidX DataStore 1.3.0 and kotlinx.serialization 1.12.0. The build uses Gradle 9.8.2 and AGP 9.3.3.
 - Cassini downloads all its models from dist.gocassini.com, the model host that Cassini for the desktop also uses. Before a download, the app checks that the host still offers the exact models of this version, with the same files. If it does not, the app downloads nothing and shows "File check failed". The app never takes a newer model by itself.
-- The download is smaller: about 530 MB in all, instead of about 730 MB, because each file comes compressed. While the models install, the app needs about 1330 MB of free storage.
+- The download is smaller: about 530 MB in all, instead of about 730 MB, because each file comes compressed. While the models install, the app needs about 1230 MB of free storage.
 - The speech model is the Parakeet Ultra INT8 conversion of the Cassini model host, made from the same Moondream model. The speaker model is its new export for the updated runtime.
 - The models install in `models/`. This version does not read or delete the `parakeet-ultra/`, `vad/` and `speaker-models/` directories of 0.3.0, so it downloads the models again. Your saved voices stay valid, because the voice model is the same file.
 - A transcription that you stopped with an earlier version does not continue with the new models. Cassini shows "Saved progress no longer matches", and your recording stays. Start the transcription again.

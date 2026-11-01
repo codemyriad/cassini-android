@@ -1,8 +1,11 @@
 package org.cassini.android.flows
 
+import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.github.luben.zstd.Zstd
+import org.cassini.android.AppGraph
+import org.cassini.android.BuildConfig
 import org.cassini.core.Failure
 import org.cassini.core.UserFacingException
 import org.cassini.core.models.Artifact
@@ -34,6 +37,8 @@ import java.util.Collections
  * A model download on the device (coordination D53.1, D4): Android's `HttpURLConnection` and the zstd-jni AAR against a
  * loopback model host that serves a schema 2 manifest and content-addressed Zstandard files, with `Range`, `If-Range`
  * and the ETag of the real host. The JVM tests cover the same code with the desktop JDK; this one proves it on Android.
+ * The manifest is reached through a redirect, and every request, each hop included, must carry the app's User-Agent
+ * (coordination D54) rather than Dalvik's.
  */
 @RunWith(AndroidJUnit4::class)
 class ModelDownloadDeviceTest {
@@ -119,6 +124,11 @@ class ModelDownloadDeviceTest {
             .associate { it.substringBefore(':').lowercase() to it.substringAfter(':').trim() }
         requests += Request(path, headers)
         val out = socket.getOutputStream()
+        if (path == LATEST) {
+            val moved = "HTTP/1.1 302 Found\r\nLocation: /manifest.json\r\nContent-Length: 0\r\n"
+            out.write("${moved}Connection: close\r\n\r\n".toByteArray())
+            return
+        }
         val (body, etag) = bodies[path] ?: run {
             out.write("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".toByteArray())
             return
@@ -140,7 +150,17 @@ class ModelDownloadDeviceTest {
         out.flush()
     }
 
-    private fun fetcher() = ModelFetcher.network(loopback) { DistManifest.fetch("$base/manifest.json", loopback) }
+    private val agent = AppGraph.MODEL_USER_AGENT
+
+    private fun fetcher() =
+        ModelFetcher.network(agent, loopback) { DistManifest.fetch(agent, "$base$LATEST", loopback) }
+
+    /** The exact User-Agent of D54 on every request: the app, its version, the Android release and the build. */
+    private fun assertTheAppIsNamed() {
+        val expected = "CassiniTalk/${BuildConfig.VERSION_NAME} (Android ${Build.VERSION.RELEASE}; " +
+            "build ${BuildConfig.VERSION_CODE})"
+        assertEquals(requests.map { expected }, requests.map { it.headers["user-agent"] })
+    }
 
     @CiSmoke
     @Test fun theManifestLeadsToEachFileWhichIsResumedDecompressedAndVerified() {
@@ -157,8 +177,9 @@ class ModelDownloadDeviceTest {
         assertEquals(model.downloadBytes to true, last)
 
         val paths = requests.map { it.path }
-        assertEquals("/manifest.json", paths.first())
-        assertEquals(1 + model.artifacts.size, paths.size)
+        assertEquals(listOf(LATEST, "/manifest.json"), paths.take(2))
+        assertEquals(2 + model.artifacts.size, paths.size)
+        assertTheAppIsNamed()
         val identity = requests.all { it.headers["accept-encoding"] == "identity" }
         assertTrue("every request asks for the bytes as they are", identity)
         val resumed = requests.single { it.path.endsWith("/encoder.int8.onnx.zst") }
@@ -176,7 +197,13 @@ class ModelDownloadDeviceTest {
         } catch (refused: UserFacingException) {
             assertEquals(Failure.VERIFY, refused.failure)
         }
-        assertEquals("only the manifest was read", listOf("/manifest.json"), requests.map { it.path })
+        assertEquals("only the manifest was read", listOf(LATEST, "/manifest.json"), requests.map { it.path })
+        assertTheAppIsNamed()
         assertFalse(File(directory, "encoder.int8.onnx").exists())
+    }
+
+    private companion object {
+        /** Redirects to `/manifest.json`, as a CDN alias of the manifest would. */
+        const val LATEST = "/latest/manifest.json"
     }
 }
