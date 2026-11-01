@@ -15,4 +15,12 @@ object DefaultLabels {
     /** True for the speaker id itself, a blank label, or a placeholder prefix followed by a number. */
     fun isDefault(id: String, label: String): Boolean = label == id || label.isBlank() ||
         PREFIXES.any { label.startsWith(it) && label.removePrefix(it).toIntOrNull() != null }
+
+    /**
+     * The label the file stores for speaker [id], which every reader shows verbatim (D47), placeholder or not: null
+     * when there is none, that is when [label] is missing, blank or the raw [id]. A reader then shows the catalog's
+     * unnamed-speaker label ("Speaker {n}" in the UI language, numbered by first-speaking order) and never the id
+     * (D53.3).
+     */
+    fun stored(id: String, label: String?): String? = label?.takeIf { it.isNotBlank() && it != id }
 }

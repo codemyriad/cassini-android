@@ -47,4 +47,13 @@ class DefaultLabelsTest {
         assertFalse(DefaultLabels.isDefault("spk_1", "Relatore 1"))
         assertFalse(DefaultLabels.isDefault("spk_1", "Locutor Ana"))
     }
+
+    @Test fun aStoredLabelIsKeptVerbatimAndAnAbsentOneIsNull() {
+        assertEquals("Voce 2", DefaultLabels.stored("spk_2", "Voce 2"))
+        assertEquals("Ada", DefaultLabels.stored("spk_1", "Ada"))
+        assertEquals(null, DefaultLabels.stored("spk_1", null))
+        assertEquals(null, DefaultLabels.stored("spk_1", ""))
+        assertEquals(null, DefaultLabels.stored("spk_1", "  "))
+        assertEquals("a raw id is never shown", null, DefaultLabels.stored("spk_1", "spk_1"))
+    }
 }

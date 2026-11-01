@@ -184,7 +184,7 @@ The format code keeps four known differences from the specification, because the
 
 ## Exports
 
-The Note actions sheet has three export rows. Each export uses the selected version and the display labels. A placeholder speaker gets the localized "Speaker N". A text file is UTF-8 without a BOM, with `\n` line ends and one `\n` at the end.
+The Note actions sheet has three export rows. Each export uses the selected version and the labels that the file stores, verbatim, whatever language wrote them (D47): an Italian "Voce 2" stays "Voce 2" under an English UI. Only a speaker with no stored label (missing, blank or the raw id) gets "Speaker N" in the UI language, numbered by first-speaking order (D53.3); the raw id is never written. A text file is UTF-8 without a BOM, with `\n` line ends and one `\n` at the end.
 
 | Export | Extension and type | Content |
 |---|---|---|

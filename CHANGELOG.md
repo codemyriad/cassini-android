@@ -14,6 +14,7 @@ We made the entries for 0.0.1-beta to 0.1.0 again from the release notes of thes
 
 - A few Italian labels now use the words of the other Cassini apps: "Ferma" in the transcription notification, "Cestino" with a capital, and "fin qui".
 - The app is called Cassini talk. The launcher, the About card, the Licenses screen and the store title show the new name. Sentences in the app still say "Cassini". The package name stays `org.cassini.android`, so this version updates the installed app and keeps your notes, voices, models and settings.
+- An unnamed speaker shows with the label that the file stores, in the language that wrote it, on screen and in TXT, SRT and VTT exports. A file transcribed in Italian keeps "Voce 2" under an English phone, as in the other Cassini apps. A speaker that has no label in the file shows as "Speaker N" in the app language, numbered in the order the speakers first talk, and never as its internal id.
 - zstd-jni 1.5.7-25, AndroidX DataStore 1.3.0 and kotlinx.serialization 1.12.0. The build uses Gradle 9.8.2 and AGP 9.3.3.
 
 ### Removed

@@ -76,9 +76,15 @@ object NoteTranscripts {
         SpeakerTint.AMBER -> SpeakerTone.Amber
     }
 
-    /** The name of a speaker row: the label, or "Speaker N" from its placeholder number (ordinal + 1 without one). */
+    /**
+     * The name of a speaker row: the stored label verbatim (D47). A placeholder keeps its number (from the label, else
+     * the first-speaking order); without a stored label it shows as "Speaker N" in the UI language (D53.3).
+     */
     fun name(speaker: SpeakerEntity): SpeakerNameUi = if (speaker.isPlaceholder) {
-        SpeakerNameUi.Placeholder(speaker.placeholderNumber ?: (speaker.ordinal + 1))
+        SpeakerNameUi.Placeholder(
+            speaker.placeholderNumber ?: (speaker.ordinal + 1),
+            DefaultLabels.stored(speaker.speakerId, speaker.label),
+        )
     } else {
         SpeakerNameUi.Named(speaker.label)
     }
@@ -118,10 +124,10 @@ object NoteTranscripts {
     }
 
     /**
-     * The draft: [words] with the draft merges applied, [labels] by speaker (draft name, AUTO name, or a placeholder,
-     * which shows as "Speaker N" numbered by first word), [automatic] (the "auto" badge), [suggestions] by speaker
-     * (the card sits at that speaker's most recent turn) and [tentativeFromMs]: words that end after it may change
-     * (null for a paused draft, which has no unsettled words).
+     * The draft: [words] with the draft merges applied, [labels] by speaker (draft name, AUTO name, or a placeholder
+     * label, shown verbatim; a speaker without one shows as "Speaker N" numbered by first word), [automatic] (the
+     * "auto" badge), [suggestions] by speaker (the card sits at that speaker's most recent turn) and
+     * [tentativeFromMs]: words that end after it may change (null for a paused draft, which has no unsettled words).
      */
     fun draft(
         words: List<Word>,
@@ -134,7 +140,7 @@ object NoteTranscripts {
         val names = order.withIndex().associate { (index, id) ->
             val label = labels[id]
             id to if (label == null || DefaultLabels.isDefault(id, label)) {
-                SpeakerNameUi.Placeholder(index + 1)
+                SpeakerNameUi.Placeholder(index + 1, DefaultLabels.stored(id, label))
             } else {
                 SpeakerNameUi.Named(label)
             }

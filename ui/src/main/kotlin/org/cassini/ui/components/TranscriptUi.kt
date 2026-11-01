@@ -45,23 +45,27 @@ internal fun wordStarts(words: List<WordUi>): IntArray {
 }
 
 /**
- * A speaker's label as the transcript shows it (ui.md section 7): a [Named] label verbatim, or a [Placeholder]
- * number that the UI shows as "Speaker 3" / "Voce 3" (features.md section 0). The stored label is not changed.
+ * A speaker's label as the transcript shows it (ui.md section 7). The file is the truth (D47): a stored label is shown
+ * verbatim, whatever language wrote it.
+ * - [Named]: a name.
+ * - [Placeholder]: a speaker without a name yet (amber, offered for naming). [stored] is the placeholder label the
+ *   file stores, such as "Voce 3" from an Italian writer. It is null only when the file stores no label; the UI then
+ *   shows "Speaker [number]" in the UI language (D53.3). [number] is the placeholder's number (the avatar).
  */
 sealed interface SpeakerNameUi {
     @Immutable
     data class Named(val text: String) : SpeakerNameUi
 
     @Immutable
-    data class Placeholder(val number: Int) : SpeakerNameUi
+    data class Placeholder(val number: Int, val stored: String? = null) : SpeakerNameUi
 }
 
-/** The label of this speaker in the shown language: the name, or "Speaker N". */
+/** The label of this speaker: the stored label verbatim, or "Speaker N" in the UI language when there is none. */
 @Composable
 @ReadOnlyComposable
 fun SpeakerNameUi.display(): String = when (this) {
     is SpeakerNameUi.Named -> text
-    is SpeakerNameUi.Placeholder -> stringResource(R.string.ui_speaker_label, number)
+    is SpeakerNameUi.Placeholder -> stored ?: stringResource(R.string.ui_speaker_label, number)
 }
 
 /** A saved voice that the matcher suggests for a placeholder speaker ("Is this **Luca**?"). */
