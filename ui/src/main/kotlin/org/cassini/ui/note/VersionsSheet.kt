@@ -3,20 +3,15 @@
 
 package org.cassini.ui.note
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import org.cassini.ui.R
 import org.cassini.ui.components.CassiniSheet
 import org.cassini.ui.components.DISABLED_ALPHA
+import org.cassini.ui.components.Radio
 import org.cassini.ui.format.Counts
 import org.cassini.ui.format.Dates
 import org.cassini.ui.format.Languages
@@ -104,26 +100,6 @@ private fun VersionRow(row: VersionRowUi, selected: Boolean, onPick: (Int) -> Un
                 color = c.ink,
             )
             Text(text = versionDetail(row), style = CassiniTheme.type.caption, color = c.text2)
-        }
-    }
-}
-
-/** A 22 dp radio: a 2 dp accent ring with a 12 dp accent dot when [selected], else a 2 dp text2 ring. */
-@Composable
-private fun Radio(selected: Boolean) {
-    val c = CassiniTheme.colors
-    Box(
-        Modifier
-            .size(22.dp)
-            .border(2.dp, if (selected) c.accent else c.text2, CircleShape),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (selected) {
-            Box(
-                Modifier
-                    .size(12.dp)
-                    .background(c.accent, CircleShape),
-            )
         }
     }
 }

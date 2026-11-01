@@ -13,6 +13,7 @@ import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -111,8 +112,11 @@ class SettingsBehaviourTest {
         val events = mutableListOf<SettingsEvent>()
         val state = VariantFixtures.settings.getValue("settings-model-statuses").copy(notificationsOff = true)
         setThemed { SettingsScreen(state, onEvent = { events += it }) }
-        rule.onNodeWithText("Phone").assertIsSelected()
+        // The App language row names the choice and opens the sheet; a pick closes it.
+        rule.onNode(hasText("Phone") and hasClickAction()).performClick()
+        rule.onNode(hasText("Phone") and isSelectable()).assertIsSelected()
         rule.onNodeWithText("Italiano").performClick()
+        rule.onAllNodes(isSelectable()).assertCountEquals(0)
         rule.onNodeWithText("Turn on").performClick()
         // A Not downloaded row and a Failed row open Model download; the other model rows are not buttons.
         rule.onNode(hasText("Recognising saved voices", substring = true) and hasClickAction()).performClick()
@@ -139,13 +143,46 @@ class SettingsBehaviourTest {
         }
     }
 
-    /** A language set in Android's per-app setting (French, Spanish, Portuguese) selects no segment; Phone still works. */
-    @Test fun aLanguageFromTheSystemSettingsSelectsNoSegment() {
+    /** The row names a language set in Android's per-app setting in its own language ("Français"). */
+    @Test fun theRowNamesTheChoiceInItsOwnLanguage() {
+        val state = BoardFixtures.settings.copy(language = LanguageChoice.PORTUGUESE_PORTUGAL)
+        setThemed { SettingsScreen(state, onEvent = {}) }
+        rule.onNode(hasText("Português (Portugal)") and hasClickAction()).assertExists()
+    }
+
+    /** The sheet offers Phone and the six app languages, each named in its own language, and selects the current one. */
+    @Test fun theSheetOffersEveryAppLanguage() {
+        val events = mutableListOf<SettingsEvent>()
+        val state = BoardFixtures.settings.copy(language = LanguageChoice.SPANISH)
+        setThemed { SettingsScreen(state, onEvent = { events += it }) }
+        rule.onNode(hasText("Español") and hasClickAction()).performClick()
+        val names = listOf(
+            "Phone",
+            "English",
+            "Italiano",
+            "Français",
+            "Español",
+            "Português (Brasil)",
+            "Português (Portugal)",
+        )
+        rule.onAllNodes(isSelectable()).assertCountEquals(names.size)
+        for (name in names) {
+            val row = rule.onNode(hasText(name) and isSelectable())
+            if (name == "Español") row.assertIsSelected() else row.assertIsNotSelected()
+        }
+        rule.onNode(hasText("Português (Brasil)") and isSelectable()).performClick()
+        rule.runOnIdle { assertEquals(listOf(SettingsEvent.Language(LanguageChoice.PORTUGUESE_BRAZIL)), events) }
+    }
+
+    /** A language that is not an app language (German, set with adb) selects no choice; Phone still works. */
+    @Test fun anotherLanguageSelectsNoChoice() {
         val events = mutableListOf<SettingsEvent>()
         val state = BoardFixtures.settings.copy(language = LanguageChoice.OTHER)
         setThemed { SettingsScreen(state, onEvent = { events += it }) }
-        for (segment in listOf("Phone", "English", "Italiano")) rule.onNodeWithText(segment).assertIsNotSelected()
-        rule.onNodeWithText("Phone").performClick()
+        rule.onNode(hasText("English (United States)") and hasClickAction()).performClick()
+        rule.onAllNodes(isSelectable()).assertCountEquals(LanguageChoice.offered.size)
+        for (choice in LanguageChoice.offered) rule.onAllNodes(isSelectable())[choice.ordinal].assertIsNotSelected()
+        rule.onNode(hasText("Phone") and isSelectable()).performClick()
         rule.runOnIdle { assertEquals(listOf(SettingsEvent.Language(LanguageChoice.PHONE)), events) }
     }
 

@@ -20,6 +20,11 @@
     <string name="ui_webvtt" translatable="false">WebVTT (.vtt)</string>
     <string name="ui_language_english" translatable="false">English</string>
     <string name="ui_language_italian" translatable="false">Italiano</string>
+    <!-- Each language is named in its own language, never translated (coordination R3, D53). -->
+    <string name="ui_language_french" translatable="false">Français</string>
+    <string name="ui_language_spanish" translatable="false">Español</string>
+    <string name="ui_language_portuguese_brazil" translatable="false">Português (Brasil)</string>
+    <string name="ui_language_portuguese_portugal" translatable="false">Português (Portugal)</string>
     <string name="ui_join_dot" translatable="false">%1$s · %2$s</string>
     <string name="ui_join_space" translatable="false">%1$s %2$s</string>
     <string name="ui_join_comma4" translatable="false">%1$s, %2$s, %3$s, %4$s</string>

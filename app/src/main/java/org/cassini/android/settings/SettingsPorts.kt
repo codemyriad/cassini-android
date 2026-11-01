@@ -20,7 +20,7 @@ import org.cassini.ui.settings.LanguageChoice
 interface SettingsPorts {
     /**
      * The app language now: [LanguageChoice.PHONE] when the app follows the system, [LanguageChoice.OTHER] for a
-     * language set in Android's per-app setting that has no segment.
+     * language that is not one of the six app languages.
      */
     fun language(): LanguageChoice
 
@@ -75,22 +75,30 @@ class GraphSettingsPorts(private val graph: AppGraph) : SettingsPorts {
 
     companion object {
         /**
-         * The segment of the app locales: Phone for none, English or Italiano by the first locale's language, and
-         * Other for any other language (French, Spanish or Portuguese, set in Android's per-app language setting).
+         * The choice of the app locales, by the first locale: Phone for none; a regional variant gives its language
+         * (en-GB English, es-MX Spanish); Portuguese follows D50.1 (pt-BR and a bare pt Brazilian, every other region
+         * European). Other for a language that is not an app language.
          */
-        fun languageOf(locales: LocaleListCompat): LanguageChoice = when (locales[0]?.language) {
-            null -> LanguageChoice.PHONE
-            "en" -> LanguageChoice.ENGLISH
-            "it" -> LanguageChoice.ITALIAN
-            else -> LanguageChoice.OTHER
+        fun languageOf(locales: LocaleListCompat): LanguageChoice {
+            val locale = locales[0] ?: return LanguageChoice.PHONE
+            return when (locale.language) {
+                "en" -> LanguageChoice.ENGLISH
+                "it" -> LanguageChoice.ITALIAN
+                "fr" -> LanguageChoice.FRENCH
+                "es" -> LanguageChoice.SPANISH
+                "pt" -> if (locale.country in setOf("", "BR")) {
+                    LanguageChoice.PORTUGUESE_BRAZIL
+                } else {
+                    LanguageChoice.PORTUGUESE_PORTUGAL
+                }
+                else -> LanguageChoice.OTHER
+            }
         }
 
-        /** The app locales of a segment; Phone is the empty list (follow the system). */
-        fun localesOf(language: LanguageChoice): LocaleListCompat = when (language) {
-            LanguageChoice.PHONE -> LocaleListCompat.getEmptyLocaleList()
-            LanguageChoice.ENGLISH -> LocaleListCompat.forLanguageTags("en")
-            LanguageChoice.ITALIAN -> LocaleListCompat.forLanguageTags("it")
-            LanguageChoice.OTHER -> throw IllegalArgumentException("Other is no segment and sets no language")
+        /** The app locales of a choice; Phone is the empty list (follow the system). */
+        fun localesOf(language: LanguageChoice): LocaleListCompat {
+            require(language != LanguageChoice.OTHER) { "Other is no choice of the sheet and sets no language" }
+            return language.tag?.let(LocaleListCompat::forLanguageTags) ?: LocaleListCompat.getEmptyLocaleList()
         }
     }
 }

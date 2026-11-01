@@ -87,6 +87,7 @@ start
 wait_node 'Settings' > /dev/null || { printf 'Start with the app in English (Phone language, device not in Italian).\n' >&2; exit 1; }
 
 tap 'Settings'
+tap 'Phone'    # the App language row, which names the current choice; it opens the sheet
 tap 'Italiano'
 wait_node "Lingua dell’app" > /dev/null
 printf 'Italiano is set; the activity shows Italian.\n'
@@ -112,6 +113,7 @@ printf 'After kill -9 (pid %s, now %s) the app is still in Italian.\n' "$pid" "$
 # Back to Phone, from the screen the app shows now (Library or Settings).
 dump
 if find_node 'Impostazioni' > /dev/null; then tap 'Impostazioni'; fi
+tap 'Italiano'    # the App language row opens the sheet
 tap 'Telefono'
 wait_node 'App language' > /dev/null
 printf 'Language check passed; the app language is Phone again.\n'

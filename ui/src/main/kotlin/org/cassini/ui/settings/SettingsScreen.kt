@@ -16,10 +16,13 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import kotlinx.collections.immutable.persistentListOf
 import org.cassini.ui.R
 import org.cassini.ui.banner.BannerAction
 import org.cassini.ui.banner.BannerKind
@@ -30,7 +33,6 @@ import org.cassini.ui.components.CassiniTopBar
 import org.cassini.ui.components.GroupCard
 import org.cassini.ui.components.HelperText
 import org.cassini.ui.components.SectionHeader
-import org.cassini.ui.components.SegmentedControl
 import org.cassini.ui.components.SettingsRow
 import org.cassini.ui.components.SettingsTrailing
 import org.cassini.ui.components.screenContentWidth
@@ -43,12 +45,9 @@ import org.cassini.ui.theme.Tone
 /** The notifications banner of Settings: NOTIFICATIONS_OFF with its Turn on. */
 private val NotificationsBanner = BannerSpec(BannerKind.NOTIFICATIONS_OFF)
 
-/** The selected index of the App language control when the language is [LanguageChoice.OTHER]: no segment. */
-private const val NO_SEGMENT = -1
-
 /**
  * Settings (board 08, features.md section 11; ui.md section 8). One scrolling Column on bg: the top bar ("Back to
- * library"); "App language" with the segmented control and its helper; the notifications banner when
+ * library"); "App language" ([LanguageSection]); the notifications banner when
  * [SettingsUiState.notificationsOff]; "On-device models" with a row per part and the helper; "Privacy" with the
  * Saved voices and Trash rows; "About" with the version card and its "Source code and notices" link.
  */
@@ -58,11 +57,6 @@ fun SettingsScreen(
     onEvent: (SettingsEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val languages = persistentListOf(
-        stringResource(R.string.ui_settings_language_phone),
-        stringResource(R.string.ui_language_english),
-        stringResource(R.string.ui_language_italian),
-    )
     Column(
         modifier
             .fillMaxSize()
@@ -78,14 +72,7 @@ fun SettingsScreen(
             onBack = { onEvent(SettingsEvent.Back) },
             backLabel = stringResource(R.string.ui_back_to_library),
         )
-        SectionHeader(stringResource(R.string.ui_settings_language), first = true)
-        SegmentedControl(
-            options = languages,
-            selectedIndex = if (state.language == LanguageChoice.OTHER) NO_SEGMENT else state.language.ordinal,
-            onSelect = { onEvent(SettingsEvent.Language(LanguageChoice.entries[it])) },
-            modifier = Modifier.padding(horizontal = 16.dp),
-        )
-        HelperText(stringResource(R.string.ui_settings_language_footnote), normalLineHeight = true)
+        LanguageSection(state.language, onEvent)
         if (state.notificationsOff) {
             Banner(
                 spec = NotificationsBanner,
@@ -108,6 +95,30 @@ fun SettingsScreen(
             modifier = Modifier.padding(horizontal = 16.dp),
         )
     }
+}
+
+/**
+ * "App language": a row that names the [current] choice and opens the [LanguageSheet], then the helper. The sheet's
+ * state is saved, and the sheet closes before a pick is sent, because the new language creates the activity again.
+ */
+@Composable
+private fun LanguageSection(current: LanguageChoice, onEvent: (SettingsEvent) -> Unit) {
+    var sheet by rememberSaveable { mutableStateOf(false) }
+    if (sheet) {
+        LanguageSheet(
+            current = current,
+            onPick = { choice ->
+                sheet = false
+                onEvent(SettingsEvent.Language(choice))
+            },
+            onDismiss = { sheet = false },
+        )
+    }
+    SectionHeader(stringResource(R.string.ui_settings_language), first = true)
+    GroupCard(Modifier.padding(horizontal = 16.dp)) {
+        SettingsRow(title = languageName(current), trailing = SettingsTrailing.Chevron, onClick = { sheet = true })
+    }
+    HelperText(stringResource(R.string.ui_settings_language_footnote), normalLineHeight = true)
 }
 
 /** "Privacy": the Saved voices and Trash rows with their counts ("None yet" and "Empty" at 0). */

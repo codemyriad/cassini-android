@@ -20,11 +20,26 @@ data class SettingsUiState(
 )
 
 /**
- * The app language: the segments Phone (follow the system), English and Italiano, and [OTHER], a language set for the
- * app outside it (Android's per-app language setting, with the languages of `locales_config`) that has no segment.
- * With [OTHER] no segment is selected, and each segment, Phone included, sets the app language again.
+ * The app language (coordination D50, D50.1, D53): [PHONE] follows the system, then the six app languages with their
+ * BCP 47 [tag]. [OTHER] is a language that is not one of them, set for the app outside Settings (adb, another app):
+ * no choice of the sheet is selected, and each one, Phone included, sets the app language again.
  */
-enum class LanguageChoice { PHONE, ENGLISH, ITALIAN, OTHER }
+enum class LanguageChoice(val tag: String?) {
+    PHONE(null),
+    ENGLISH("en"),
+    ITALIAN("it"),
+    FRENCH("fr"),
+    SPANISH("es"),
+    PORTUGUESE_BRAZIL("pt-BR"),
+    PORTUGUESE_PORTUGAL("pt-PT"),
+    OTHER(null),
+    ;
+
+    companion object {
+        /** The choices of the App language sheet, in its order. */
+        val offered: List<LanguageChoice> = entries.filter { it != OTHER }
+    }
+}
 
 /** One On-device models row: the part, its size in bytes and its status text. */
 @Immutable

@@ -269,7 +269,7 @@ A host script does this test because the two Android tools do not kill the proce
 
 ### device-language-check.sh
 
-`scripts/device-language-check.sh` makes sure that the app language stays after process death. It selects Italiano in Settings with `uiautomator dump` and `input tap`. Then it kills the process with `run-as org.cassini.android kill -9`, starts the app with `am start -W` and finds Italian text in a new `uiautomator dump`. At the end, it sets the language back to Phone.
+`scripts/device-language-check.sh` makes sure that the app language stays after process death. It opens the App language sheet in Settings and selects Italiano, with `uiautomator dump` and `input tap`. Then it kills the process with `run-as org.cassini.android kill -9`, starts the app with `am start -W` and finds Italian text in a new `uiautomator dump`. At the end, it sets the language back to Phone.
 
 ```sh
 scripts/device-language-check.sh --serial emulator-5554
@@ -302,7 +302,7 @@ Each variant has two parts. Each part is one test method and one instrumentation
 - `realModels` uses the installed models. It makes the notes through the repositories and the coordinator. Then it opens Library, Recording, Transcribing, Read & listen, Name a speaker, Note actions, Saved voices, Settings and Trash. It also shows the Paused, Not verified, Unreadable and Storage almost full banners.
 - `downloadScreens` uses an empty model root and `ScriptedModels`. It shows Model download, Downloading 46%, Checking 80%, No connection, Not enough storage and File check failed.
 
-The test saves each screenshot in its scratch root. At the end of the test, it copies the screenshots to `files/acceptance-out/<variant>/`, because the runner deletes the scratch root when the run ends. In the Italian variant, the test selects Italiano in Settings first and selects Phone at the end. In the French and Brazilian Portuguese variants, it sets the app language as Android's per-app language setting does (Settings then shows no segment selected) and selects Phone at the end. Before each screenshot the test waits until the screen is still: Compose is idle and the window sends no accessibility event for 500 ms.
+The test saves each screenshot in its scratch root. At the end of the test, it copies the screenshots to `files/acceptance-out/<variant>/`, because the runner deletes the scratch root when the run ends. In the Italian, French and Brazilian Portuguese variants, the test selects the language in the App language sheet of Settings first and selects Phone at the end. Before each screenshot the test waits until the screen is still: Compose is idle and the window sends no accessibility event for 500 ms.
 
 The test makes these notes for `realModels`:
 
