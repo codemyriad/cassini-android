@@ -99,6 +99,17 @@ class TranscriptionJobTest {
         assertFalse(File(h.noteDir, "document.opus").exists())
     }
 
+    @Test fun theRecognizersLanguageIsWrittenAlikeInBodyDescriptorAndProvenance() = runBlocking {
+        // D53.2: a Parakeet run writes "und" in all three places, never "" or a missing key.
+        val h = Harness()
+        assertEquals(JobOutcome.Done, h.run().first)
+        val variant = h.sealed().selected(null)!!
+        assertEquals("und", JSONObject(variant.body!!).getString("language"))
+        assertEquals("und", variant.transcript!!.language)
+        assertEquals("und", variant.descriptor.getString("language"))
+        assertEquals("und", h.provenance().getString("language"))
+    }
+
     @Test fun checkpointsOnlyCountWhatWasFsynced() = runBlocking {
         val h = Harness(source = "source.mp3", recordSyncs = true)
         h.storage.onCheckpoint = { state ->

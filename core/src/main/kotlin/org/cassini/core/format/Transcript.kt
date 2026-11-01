@@ -17,7 +17,11 @@ data class TimedWord(val word: Word, val capMs: Long = 0) {
 }
 
 /** Word order is canonical; never sort a Cassini transcript by time. */
-/** [language] is empty unless something actually identified it: Parakeet does not report the spoken language. */
+/**
+ * [language] is the BCP-47 tag of the recognizer run that made the words (coordination D53.2), the same in the word
+ * body, the descriptor and the provenance. Parakeet does not identify the spoken language, so its runs write
+ * [UNDETERMINED]. Empty only where no run is known yet (decoded windows, a body that has no tag).
+ */
 data class Transcript(val words: List<Word>, val language: String = "") {
     fun json(): String = JSONObject()
         .put("format", "cassini.words.v1")
@@ -31,6 +35,13 @@ data class Transcript(val words: List<Word>, val language: String = "") {
         }).toString(2)
 
     companion object {
+        /** BCP-47 "undetermined": a recognizer run that does not identify the language (Parakeet), D53.2. */
+        const val UNDETERMINED = "und"
+
+        /** [tag] when it names a language; null for an empty tag or [UNDETERMINED], which the UI does not show. */
+        fun knownLanguage(tag: String?): String? =
+            tag?.takeUnless { it.isEmpty() || it.equals(UNDETERMINED, ignoreCase = true) }
+
         fun fromJson(json: String): Transcript {
             val body = CassiniPayload.json(json)
             requireUser(body.getString("format") == "cassini.words.v1", Failure.TIMINGS)

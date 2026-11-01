@@ -36,10 +36,13 @@ interface Recognizer : AutoCloseable {
     /** How the recording is cut, for the `x-segmentation` provenance. */
     val segmentation: String
 
+    /** The BCP-47 tag of the language this run recognizes (D53.2): [Transcript.UNDETERMINED] for Parakeet. */
+    val language: String
+
     /** Takes [count] borrowed 16 kHz samples; decodes every window they complete, calling the [Callbacks]. */
     fun accept(samples: FloatArray, count: Int)
 
-    /** Decodes the last partial window and returns the merged transcript of the whole [durationMs]. */
+    /** Decodes the last partial window and returns the merged transcript of the whole [durationMs], in [language]. */
     fun finish(durationMs: Long): Transcript
 
     /** The `recognition` member of checkpoint.json for the windows decoded so far. */

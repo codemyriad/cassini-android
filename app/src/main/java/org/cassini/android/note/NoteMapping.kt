@@ -5,6 +5,7 @@ import org.cassini.android.library.LibraryMapping
 import org.cassini.android.notices.Notices
 import org.cassini.android.processing.NoteJobState
 import org.cassini.core.format.DocumentState
+import org.cassini.core.format.Transcript
 import org.cassini.core.library.AudioKind
 import org.cassini.core.library.DayGroups
 import org.cassini.core.library.JobState
@@ -161,7 +162,7 @@ object NoteMapping {
                 time = at.toLocalTime(),
                 words = variant.wordCount,
                 fromVersion = variant.derivedFrom?.let(ordinals::get)?.plus(1),
-                language = variant.language.ifEmpty { null },
+                language = Transcript.knownLanguage(variant.language),
                 readable = variant.readable,
                 withYear = at.year != now.atZone(zone).year,
             )

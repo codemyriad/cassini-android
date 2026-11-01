@@ -79,7 +79,7 @@ The database is `org.cassini.data.db.CassiniDatabase`, version 1. The schemas ar
 | Table | Key | Content |
 |---|---|---|
 | `notes` | `id` | Title, `title_dirty`, dates, origin, audio file and kind, duration, SHA-256 of an import, document state and signature, meeting ID, selected version, position, preview, trust acknowledgement, trash time and the job state at trash time |
-| `variants` | `note_id`, `variant_id` | One row for each transcript version: order, default, language (`""` if not identified), kind (`TRANSCRIBED` or `MERGED`), word count, speaker count, inference time, errors |
+| `variants` | `note_id`, `variant_id` | One row for each transcript version: order, default, language (`und` for a Parakeet run, `""` in older files), kind (`TRANSCRIBED` or `MERGED`), word count, speaker count, inference time, errors |
 | `speakers` | `note_id`, `variant_id`, `speaker_id` | Label, placeholder flag and number, speaking time, word and turn counts, the sample window |
 | `note_text` | `rowid` | The title and the words of the selected version, for search |
 | `note_fts` | | An FTS4 table over `note_text` with `tokenizer = unicode61` and `remove_diacritics=1` |
@@ -173,7 +173,7 @@ Each transcription adds a transcript version (a variant). The document keeps the
 
 The recognition step of the provenance names the speech model as `<id> <precision>`. The `model` of a new version is `moondream/parakeet-ultra INT8`. A version of 0.2.0 or earlier (development builds only) has `nvidia/parakeet-tdt-0.6b-v3 INT8`. Document info shows "Parakeet Ultra, INT8" for this build's id and any other id as it is. The `engine` stays `Parakeet TDT` (the architecture of both models). The `version` gives `sherpa-onnx 1.13.7; model revision <revision>`. The format does not restrict these strings. The desktop app writes its own ids, for example `parakeet-tdt-0.6b-v3-int8`.
 
-Parakeet does not identify the language, so the Android producer writes an empty `language` (`""`). The Android producer also writes these extension keys in the provenance of a version: `x-inferenceMs`, `x-segmentation`, `x-resumedFromMs`, `x-speakerDiarization`, `x-incrementalDiarization`, `x-speakerMerges`, `x-speakerAssignmentEditedBy` (the value `"user"`, written together with `x-speakerMerges`), `x-speakerIdentification`, `x-derivedFromTranscript` and `x-sourceAttribution`.
+Parakeet does not identify the language, so the Android producer writes `language: "und"` (BCP 47 "undetermined"), the same in the word body, the descriptor and the provenance, as the other Cassini apps do for a run that does not identify the language (coordination D53.2). Files from earlier versions have `""`, or no `language` key in the body; they still open. Document info and the Versions sheet show no language for `und` or `""`. The Android producer also writes these extension keys in the provenance of a version: `x-inferenceMs`, `x-segmentation`, `x-resumedFromMs`, `x-speakerDiarization`, `x-incrementalDiarization`, `x-speakerMerges`, `x-speakerAssignmentEditedBy` (the value `"user"`, written together with `x-speakerMerges`), `x-speakerIdentification`, `x-derivedFromTranscript` and `x-sourceAttribution`.
 
 The format code keeps four known differences from the specification, because the pinned vectors and gocassini agree with the current behavior:
 
