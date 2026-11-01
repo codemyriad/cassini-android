@@ -37,6 +37,9 @@ class PlaybackService : MediaSessionService() {
         )
         val created = MediaSession.Builder(this, graph.sessionPlayer).build()
         session = created
+        // Added at once, not at the first controller's onGetSession: Media3 posts the media notification only for
+        // the sessions of the service, and the user's play comes before any controller connects.
+        addSession(created)
         // The notification and the lock screen open the note that plays.
         scope.launch {
             graph.playback.state.map { it.noteId }.distinctUntilChanged().collect { id ->
