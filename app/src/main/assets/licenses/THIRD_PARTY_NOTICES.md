@@ -4,7 +4,7 @@ Cassini Android is licensed under [GNU GPLv3](LICENSE). Copyright © 2026 Silvio
 
 ## Native Android runtime
 
-The APK contains a sherpa-onnx 1.13.7 AAR that Cassini builds. The AAR is the [upstream release](https://github.com/k2-fsa/sherpa-onnx/releases/tag/v1.13.7) plus Sortformer speaker diarization for Nemotron-3-Diarization and the NeMo-reference Parakeet frontend of upstream pull request [#4024](https://github.com/k2-fsa/sherpa-onnx/pull/4024), from the [Cassini fork](https://github.com/codemyriad/sherpa-onnx/tree/feat/nemotron3-diarization-android-parakeet-ultra). The AAR comes from one of two sources:
+The APK contains a sherpa-onnx 1.13.7 AAR that Cassini builds. The AAR is the [upstream release](https://github.com/k2-fsa/sherpa-onnx/releases/tag/v1.13.7) plus Sortformer speaker diarization for Nemotron-3-Diarization, the NeMo-reference Parakeet frontend and Parakeet Ultra decoding, from the [Cassini fork](https://github.com/codemyriad/sherpa-onnx/tree/v1.13.7-cassini-parakeet-ultra-v1) at commit `0c2ee3f3`, with the Android patch `scripts/streaming-diarization.patch` (the Sortformer Kotlin binding and the streaming API). The AAR comes from one of two sources:
 
 - `scripts/build-native-aar.sh` builds it from the pinned source plus `scripts/streaming-diarization.patch`.
 - `scripts/fetch-native-aar.sh` downloads it from the GitHub release [`native-sherpa-onnx-1.13.7-nemotron.3`](https://github.com/codemyriad/cassini-android/releases/tag/native-sherpa-onnx-1.13.7-nemotron.3).
@@ -13,7 +13,7 @@ The `sherpa-onnx-aar` entry of `scripts/native-dependencies.json` pins the SHA-2
 
 | Component | Pinned version | License |
 | --- | --- | --- |
-| [sherpa-onnx](https://github.com/codemyriad/sherpa-onnx/tree/feat/nemotron3-diarization-android-parakeet-ultra) | 1.13.7 with Sortformer diarization and the Parakeet frontend of upstream PR #4024 | Apache-2.0 |
+| [sherpa-onnx](https://github.com/codemyriad/sherpa-onnx/tree/v1.13.7-cassini-parakeet-ultra-v1) | 1.13.7, the Cassini fork at `0c2ee3f3` (Sortformer diarization, the NeMo Parakeet frontend, Parakeet Ultra) | Apache-2.0 |
 | [ONNX Runtime](https://github.com/microsoft/onnxruntime/tree/v1.27.1) | 1.27.1 | MIT, with upstream third-party notices |
 | [Eigen](https://gitlab.com/libeigen/eigen/-/tree/5.0.1) | 5.0.1 | MPL-2.0, with component notices |
 | [nlohmann JSON](https://github.com/nlohmann/json/tree/v3.12.0) | 3.12.0 | MIT |

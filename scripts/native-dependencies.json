@@ -10,7 +10,7 @@
     "version": "1.13.7-0c2ee3f3",
     "url": "https://github.com/codemyriad/cassini-android/releases/download/native-sherpa-onnx-1.13.7-nemotron.3/sherpa-onnx-1.13.7-nemotron.aar",
     "sha256": "776a2adf4c0ec6f9623d734cbce1a0bf15b9e6e7372e80cc08d268a2ab5b9285",
-    "patchSha256": "2160b80640351aebd95df279a55b65ef54c96abfd73fb54fca56f819ebb2735f"
+    "patchSha256": "9a3a78e4d806b5980cccee07a89c6ef5c8e6af75526bf5dda0c24faf121ded4e"
   },
   {
     "name": "onnxruntime",

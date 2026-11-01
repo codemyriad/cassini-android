@@ -4,14 +4,13 @@ Cassini uses two native libraries: a sherpa-onnx AAR that Cassini builds itself,
 
 ## The sherpa-onnx AAR
 
-The AAR is sherpa-onnx release 1.13.7 with Sortformer speaker diarization for [Nemotron-3-Diarization](https://huggingface.co/nvidia/Nemotron-3-Diarization) and the NeMo-reference Parakeet frontend. The source is the branch [`feat/nemotron3-diarization-android-parakeet-ultra`](https://github.com/codemyriad/sherpa-onnx/tree/feat/nemotron3-diarization-android-parakeet-ultra) of the Cassini fork, at commit `dbbeef9c`. It has four commits on the tag `v1.13.7`:
+The AAR is sherpa-onnx 1.13.7 from the Cassini fork at the tag [`v1.13.7-cassini-parakeet-ultra-v1`](https://github.com/codemyriad/sherpa-onnx/tree/v1.13.7-cassini-parakeet-ultra-v1), commit `0c2ee3f3`: the engine pin of coordination decision D16, the same as the desktop apps and iOS (D53.2). The fork adds, on top of the upstream release, Sortformer speaker diarization for [Nemotron-3-Diarization](https://huggingface.co/nvidia/Nemotron-3-Diarization) (ONNX interface v2), the NeMo-reference frontend for Parakeet TDT 0.6B v3 and Parakeet Ultra (it operates when the encoder metadata identifies one of these models), and Parakeet Ultra's TDT decoding, so that the unmodified model files of dist.gocassini.com load.
 
-- `41d56a61` and `1f23907a` come from the contribution for upstream issue k2-fsa/sherpa-onnx#4006. They add the Sortformer C++ runtime and the Kotlin/JNI configuration. They do not change the speech recognition code.
-- `ea6b4365` and `dbbeef9c` are the commits of upstream pull request [k2-fsa/sherpa-onnx#4024](https://github.com/k2-fsa/sherpa-onnx/pull/4024). They give Parakeet TDT 0.6B v3 and Parakeet Ultra the feature extraction of NVIDIA NeMo. The new frontend operates automatically when the encoder metadata identifies one of these models. It corrects empty transcripts of quiet audio. Other models keep the earlier frontend. `scripts/streaming-diarization.patch` adds the streaming API (see [The patch API](#the-patch-api)).
+The fork has no Kotlin binding for Sortformer, because the desktop apps use the C API. `scripts/streaming-diarization.patch` adds it (the `OfflineSpeakerSegmentationSortformerModelConfig` class and its JNI reader, as in the earlier Android branch of the fork) and the streaming API with the save and restore of the speaker cache (see [The patch API](#the-patch-api)). Until 0.3.0 the AAR came from the branch `feat/nemotron3-diarization-android-parakeet-ultra` at `dbbeef9c`, with the Parakeet frontend of upstream pull request [k2-fsa/sherpa-onnx#4024](https://github.com/k2-fsa/sherpa-onnx/pull/4024).
 
 The AAR contains the sherpa-onnx JNI library and the ONNX Runtime 1.27.1 Android library, for arm64-v8a and x86_64. It also contains text-to-speech parts that Cassini does not call.
 
-The app uses the AAR as the Maven coordinate `org.cassini.native:sherpa-onnx-nemotron:1.13.7-dbbeef9c`. Gradle reads this coordinate from the repository-local Maven directory `native/m2/` (see [its README](../native/m2/README.md)). Git ignores all of `native/m2/` except the README.
+The app uses the AAR as the Maven coordinate `org.cassini.native:sherpa-onnx-nemotron:1.13.7-0c2ee3f3`. Gradle reads this coordinate from the repository-local Maven directory `native/m2/` (see [its README](../native/m2/README.md)). Git ignores all of `native/m2/` except the README.
 
 ## Prebuilt or from source
 
@@ -44,7 +43,7 @@ The script does these steps:
 2. It applies `scripts/streaming-diarization.patch`.
 3. It runs the upstream scripts `build-android-arm64-v8a.sh` and `build-android-x86-64.sh` with `SHERPA_ONNX_ENABLE_C_API=ON` and ONNX Runtime 1.27.1.
 4. It copies the libraries into `android/SherpaOnnxAar` and runs `./gradlew :sherpa_onnx:assembleRelease` there, as the upstream `.github/workflows/android.yaml` does.
-5. It installs the AAR and a minimal POM into `native/m2/org/cassini/native/sherpa-onnx-nemotron/1.13.7-dbbeef9c/`.
+5. It installs the AAR and a minimal POM into `native/m2/org/cassini/native/sherpa-onnx-nemotron/1.13.7-0c2ee3f3/`.
 
 The upstream build scripts download a prebuilt ONNX Runtime Android library. Its build is in [onnxruntime-libs](https://github.com/csukuangfj/onnxruntime-libs/tree/v1.27.1), `.github/workflows/android-shared.yaml`. That workflow gives the NDK, the Android API level and the build flags. It also removes the VERSION and SOVERSION properties of the shared library from the CMake build of ONNX Runtime. The source archives of the dependencies keep their own build scripts and licenses.
 
@@ -54,7 +53,7 @@ The upstream build scripts download a prebuilt ONNX Runtime Android library. Its
 
 | Entry | Content |
 |---|---|
-| `sherpa-onnx` | The source archive of the fork at commit `dbbeef9c` |
+| `sherpa-onnx` | The source archive of the fork at commit `0c2ee3f3` |
 | `sherpa-onnx-aar` | The URL and SHA-256 of the prebuilt AAR, and `patchSha256`, the SHA-256 of the patch that the AAR contains |
 | `onnxruntime` and the other entries | The source archives of the dependencies |
 
