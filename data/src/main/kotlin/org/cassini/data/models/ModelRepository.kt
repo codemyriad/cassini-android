@@ -60,19 +60,22 @@ fun interface ModelFetcher {
          * as pinned refuses the download with [Failure.VERIFY]. Then each file is fetched as its own seekable
          * Zstandard object with [ArtifactFetcher.fetchZstd] (Range resume, verified before and after decompression),
          * following only the redirects [redirects] allows (HTTPS to `ModelCatalog.DOWNLOAD_HOSTS`, at most five hops).
+         * Every request, the manifest's included, sends [userAgent]: the app's own (D54), built where its version is
+         * known.
          */
         fun network(
+            userAgent: String,
             redirects: RedirectPolicy = RedirectPolicy.DOWNLOADS,
-            manifest: () -> DistManifest = { DistManifest.fetch(redirects = redirects) },
+            manifest: () -> DistManifest = { DistManifest.fetch(userAgent, redirects = redirects) },
         ): ModelFetcher = ModelFetcher { model, directory, progress ->
             val urls = manifest().urls(model, redirects)
             var completed = 0L
             for (artifact in model.artifacts) {
                 val download = checkNotNull(artifact.download) { "${artifact.name} has no pinned download" }
                 val done = completed
-                ArtifactFetcher.fetchZstd(urls.getValue(artifact.name), download, artifact, directory, redirects) {
-                        bytes, verifying ->
-                    progress(done + bytes, verifying)
+                val url = urls.getValue(artifact.name)
+                ArtifactFetcher.fetchZstd(url, download, artifact, directory, userAgent, redirects) { bytes, checking ->
+                    progress(done + bytes, checking)
                 }
                 completed += download.size
             }
@@ -95,7 +98,7 @@ class ModelRepository(
     private val paths: AppPaths,
     private val settings: SettingsRepository,
     private val dispatchers: CassiniDispatchers,
-    private val fetcher: ModelFetcher = ModelFetcher.network(),
+    private val fetcher: ModelFetcher,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     /** Guards the fields below and the [state] updates. Never held across a suspension point or a download. */

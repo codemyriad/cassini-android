@@ -118,7 +118,7 @@ class AppGraph(context: Context, val config: Config) {
     data class Config(
         val paths: AppPaths,
         val dispatchers: CassiniDispatchers = CassiniDispatchers(),
-        val fetcher: ModelFetcher = ModelFetcher.network(),
+        val fetcher: ModelFetcher = ModelFetcher.network(MODEL_USER_AGENT),
         val network: NetworkCheck? = null,
         val clock: () -> Long = System::currentTimeMillis,
         val zone: () -> ZoneId = ZoneId::systemDefault,
@@ -433,6 +433,16 @@ class AppGraph(context: Context, val config: Config) {
 
     companion object {
         private const val TAG = "AppGraph"
+
+        /**
+         * The User-Agent of every model request (coordination D54): the app, its version and the Android release,
+         * e.g. `CassiniTalk/0.3.0 (Android 15; build 13)`. Nothing that tells a device or a person apart.
+         */
+        val MODEL_USER_AGENT: String =
+            modelUserAgent(BuildConfig.VERSION_NAME, Build.VERSION.RELEASE, BuildConfig.VERSION_CODE)
+
+        fun modelUserAgent(version: String, release: String, build: Int) =
+            "CassiniTalk/$version (Android $release; build $build)"
         private const val CLOSE_WAIT_MS = 10_000L
         private const val CLOSE_POLL_MS = 10L
 

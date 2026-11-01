@@ -51,7 +51,11 @@ class CassiniTestRunner : AndroidJUnitRunner() {
             val config = AppGraph.Config(
                 AppPaths(root = scratch, cache = scratchCache, modelRoot = models),
                 // An empty model root never downloads: its fetcher follows the script of the test.
-                fetcher = if (emptyModelRoot) ScriptedModels.fetcher else ModelFetcher.network(),
+                fetcher = if (emptyModelRoot) {
+                    ScriptedModels.fetcher
+                } else {
+                    ModelFetcher.network(AppGraph.MODEL_USER_AGENT)
+                },
                 network = TestHooks.network(application),
                 recording = AppGraph.RecordingHooks(platform = TestHooks.recordingPlatform(application)),
                 processing = AppGraph.ProcessingHooks(jobs = TestHooks::jobs),

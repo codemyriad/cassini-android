@@ -119,7 +119,7 @@ class ModelFetcherNetworkTest {
     @Test fun eachFileIsFetchedFromWhereTheManifestSaysAndDecompressed() = withHost { base, requests ->
         val directory = folder.newFolder("model")
         val seen = mutableListOf<Pair<Long, Boolean>>()
-        ModelFetcher.network(loopback) { manifest(base) }.fetch(model, directory) { bytes, verifying ->
+        ModelFetcher.network(AGENT, loopback) { manifest(base) }.fetch(model, directory) { bytes, verifying ->
             seen += bytes to verifying
         }
         for ((name, bytes) in files) assertArrayEquals(bytes, File(directory, name).readBytes())
@@ -133,7 +133,7 @@ class ModelFetcherNetworkTest {
     @Test fun aManifestWithoutThePinnedPairFetchesNothing() = withHost { base, requests ->
         val directory = folder.newFolder("model")
         try {
-            ModelFetcher.network(loopback) { manifest(base, sourceSha256 = "0".repeat(64)) }
+            ModelFetcher.network(AGENT, loopback) { manifest(base, sourceSha256 = "0".repeat(64)) }
                 .fetch(model, directory) { _, _ -> }
             fail("A model the manifest does not list as pinned must not download")
         } catch (error: UserFacingException) {
@@ -147,11 +147,15 @@ class ModelFetcherNetworkTest {
         val directory = folder.newFolder("model")
         try {
             // The download policy of the app: HTTPS to dist.gocassini.com only.
-            ModelFetcher.network { manifest(base) }.fetch(model, directory) { _, _ -> }
+            ModelFetcher.network(AGENT) { manifest(base) }.fetch(model, directory) { _, _ -> }
             fail("A loopback URL is not on the model host")
         } catch (error: UserFacingException) {
             assertEquals(Failure.VERIFY, error.failure)
         }
         assertTrue(requests.isEmpty())
+    }
+
+    private companion object {
+        const val AGENT = "CassiniTalk/0.0.0-test (JVM; build 0)"
     }
 }

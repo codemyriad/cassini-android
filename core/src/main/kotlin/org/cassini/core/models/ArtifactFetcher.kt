@@ -27,6 +27,10 @@ import java.security.MessageDigest
  * a transfer encoding of them. A resumed request also sends `If-Range` with the entity tag of the pinned file, which
  * the model host gives as its quoted SHA-256: a server holding other bytes answers the whole file (`200`), and the
  * download restarts from zero.
+ *
+ * Every request, and each redirect hop, names the app in `User-Agent` (coordination D54): the caller's `userAgent`,
+ * which the app builds once from its version. The HTTP stack's own default (Dalvik's or Java's) never reaches the
+ * host.
  */
 @Suppress("TooManyFunctions") // one HTTP client for the model host: fetch, resume, decompress and read, and helpers
 object ArtifactFetcher {
@@ -90,7 +94,7 @@ object ArtifactFetcher {
      * `.part` file that replaces nothing until its size and SHA-256 match. [progress] receives the bytes
      * done so far and whether they are being verified rather than downloaded: while downloading, the bytes in the
      * `.part`; while verifying, the bytes hashed so far (from 0 up to the artifact's size, which always comes last).
-     * [redirects] decides which redirects are followed.
+     * [userAgent] goes with every request; [redirects] decides which redirects are followed.
      *
      * A `.part` left by an earlier attempt is resumed with `Range: bytes=<length>-` and `If-Range: "<sha256>"`. A
      * `206` answer is accepted
@@ -100,10 +104,12 @@ object ArtifactFetcher {
      * mismatch the `.part` is deleted. The 30 s read timeout stays: interrupting the thread does not unblock
      * `HttpURLConnection`.
      */
+    @Suppress("LongParameterList") // where from, what, where to, how to ask, and the progress
     fun fetch(
         url: String,
         artifact: Artifact,
         directory: File,
+        userAgent: String,
         redirects: RedirectPolicy = RedirectPolicy.DOWNLOADS,
         progress: (Long, Boolean) -> Unit,
     ) {
@@ -118,7 +124,7 @@ object ArtifactFetcher {
         if (partial.length() > artifact.size) partial.delete()
         val offset = partial.length()
         requireUser(directory.usableSpace > artifact.size - offset + SLACK_BYTES, Failure.SPACE)
-        if (offset < artifact.size) download(url, artifact, partial, redirects, progress)
+        if (offset < artifact.size) download(url, artifact, partial, Ask(userAgent, redirects), progress)
         progress(0, true)
         if (partial.length() != artifact.size || digest(partial, checking) != artifact.sha256) {
             partial.delete()
@@ -128,16 +134,13 @@ object ArtifactFetcher {
         progress(artifact.size, true)
     }
 
+    /** How every request is made: the app's User-Agent and the redirects it may follow. */
+    private data class Ask(val userAgent: String, val redirects: RedirectPolicy)
+
     /** Downloads the rest of [artifact] into [partial], from its current length on. */
-    private fun download(
-        url: String,
-        artifact: Artifact,
-        partial: File,
-        redirects: RedirectPolicy,
-        progress: (Long, Boolean) -> Unit,
-    ) {
+    private fun download(url: String, artifact: Artifact, partial: File, ask: Ask, progress: (Long, Boolean) -> Unit) {
         val offset = partial.length()
-        val connection = open(url, offset, "\"${artifact.sha256}\"", redirects)
+        val connection = open(url, offset, "\"${artifact.sha256}\"", ask)
         try {
             // Where a 206 answer's range ends (exclusive); null for a whole 200 answer.
             val rangeEnd = resumes(connection, artifact, partial, offset)
@@ -166,11 +169,16 @@ object ArtifactFetcher {
 
     /**
      * Reads the whole answer to a GET of [url], at most [limit] bytes, following the redirects [redirects] allows
-     * (the model host's manifest). An answer other than `200` or shorter than it announced fails with
-     * [Failure.DOWNLOAD]; a longer one with [Failure.VERIFY].
+     * (the model host's manifest), with [userAgent] on every request. An answer other than `200` or shorter than it
+     * announced fails with [Failure.DOWNLOAD]; a longer one with [Failure.VERIFY].
      */
-    fun read(url: String, limit: Long, redirects: RedirectPolicy = RedirectPolicy.DOWNLOADS): ByteArray {
-        val connection = open(url, 0, null, redirects)
+    fun read(
+        url: String,
+        limit: Long,
+        userAgent: String,
+        redirects: RedirectPolicy = RedirectPolicy.DOWNLOADS,
+    ): ByteArray {
+        val connection = open(url, 0, null, Ask(userAgent, redirects))
         try {
             val status = connection.responseCode
             if (status != HttpURLConnection.HTTP_OK) throw UserFacingException(Failure.DOWNLOAD, "HTTP $status")
@@ -189,10 +197,10 @@ object ArtifactFetcher {
 
     /**
      * Connects to [url] (asking for the bytes from [offset] on, when it is not 0, if the entity tag is still
-     * [ifRange]) and follows the redirects [policy] allows, sending the same request each time. Returns the
-     * connection of the first answer that is not a redirect, with its status read.
+     * [ifRange]) and follows the redirects [ask] allows, sending the same request, User-Agent included, each time.
+     * Returns the connection of the first answer that is not a redirect, with its status read.
      */
-    private fun open(url: String, offset: Long, ifRange: String?, policy: RedirectPolicy): HttpURLConnection {
+    private fun open(url: String, offset: Long, ifRange: String?, ask: Ask): HttpURLConnection {
         var target = URL(url)
         var hop = 0
         while (true) {
@@ -200,6 +208,7 @@ object ArtifactFetcher {
             connection.instanceFollowRedirects = false
             connection.connectTimeout = TIMEOUT_MS
             connection.readTimeout = TIMEOUT_MS
+            connection.setRequestProperty("User-Agent", ask.userAgent)
             connection.setRequestProperty("Accept-Encoding", "identity")
             if (offset > 0) {
                 connection.setRequestProperty("Range", "bytes=$offset-")
@@ -215,7 +224,7 @@ object ArtifactFetcher {
             val location = connection.getHeaderField("Location")
             connection.disconnect()
             hop += 1
-            target = policy.next(target, location, hop)
+            target = ask.redirects.next(target, location, hop)
         }
     }
 
@@ -284,6 +293,7 @@ object ArtifactFetcher {
         download: Artifact,
         artifact: Artifact,
         directory: File,
+        userAgent: String,
         redirects: RedirectPolicy = RedirectPolicy.DOWNLOADS,
         progress: (Long, Boolean) -> Unit,
     ) {
@@ -302,7 +312,7 @@ object ArtifactFetcher {
         // The check reads the download once and writes and reads the decompressed file once each.
         val check = scaled(download.size, download.size + 2 * artifact.size)
         try {
-            fetch(url, download, directory, redirects) { bytes, verifying ->
+            fetch(url, download, directory, userAgent, redirects) { bytes, verifying ->
                 // fetch ends with the download's size once it is installed; the check is not over yet.
                 if (verifying) progress(check(minOf(bytes, download.size)), true) else progress(bytes, false)
             }

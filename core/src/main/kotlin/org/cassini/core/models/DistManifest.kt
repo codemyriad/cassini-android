@@ -78,11 +78,15 @@ class DistManifest private constructor(private val json: JSONObject) {
             return DistManifest(json)
         }
 
-        /** Downloads and parses the manifest at [url], following only the redirects [redirects] allows. */
+        /**
+         * Downloads and parses the manifest at [url] as [userAgent] (the app, D54), following only the redirects
+         * [redirects] allows.
+         */
         fun fetch(
+            userAgent: String,
             url: String = ModelCatalog.DIST_MANIFEST_URL,
             redirects: RedirectPolicy = RedirectPolicy.DOWNLOADS,
-        ): DistManifest = parse(ArtifactFetcher.read(url, MAX_BYTES, redirects).toString(Charsets.UTF_8))
+        ): DistManifest = parse(ArtifactFetcher.read(url, MAX_BYTES, userAgent, redirects).toString(Charsets.UTF_8))
 
         private fun objects(array: JSONArray): List<JSONObject> = (0 until array.length()).map(array::getJSONObject)
 
