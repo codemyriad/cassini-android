@@ -3,6 +3,7 @@ package org.cassini.android.note
 import org.cassini.core.export.ExportNames
 import org.cassini.core.format.DocumentState
 import org.cassini.core.library.AudioKind
+import org.cassini.core.speakers.DefaultLabels
 import org.cassini.data.db.NoteDetails
 import org.cassini.data.notes.TranscriptExport
 import org.cassini.data.notes.TranscriptFormat
@@ -66,17 +67,16 @@ object NoteExports {
     }
 
     /**
-     * The display label of each speaker of the selected variant: named labels verbatim, placeholders as
-     * [placeholder] of their number (features.md section 9).
+     * The label of each speaker of the selected variant: the stored label verbatim, placeholder or not (D47), and
+     * [placeholder] of the speaker's number only when the file stores no label (D53.3).
      */
     fun labels(details: NoteDetails, placeholder: (Int) -> String): Map<String, String> {
         val variant = NoteMapping.selected(details) ?: return emptyMap()
         return details.speakers.filter { it.variantId == variant.variantId }.associate { speaker ->
-            speaker.speakerId to if (speaker.isPlaceholder) {
-                placeholder(speaker.placeholderNumber ?: (speaker.ordinal + 1))
-            } else {
-                speaker.label
-            }
+            speaker.speakerId to (
+                DefaultLabels.stored(speaker.speakerId, speaker.label)
+                    ?: placeholder(speaker.placeholderNumber ?: (speaker.ordinal + 1))
+                )
         }
     }
 

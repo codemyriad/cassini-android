@@ -122,7 +122,7 @@ class NoteViewModelTest {
         assertEquals(3, state.chips?.speakers)
         assertNull("one variant: no version chip", state.chips?.version)
         assertEquals(listOf("w0", "w2", "w3", "w5"), state.turns.map { it.id })
-        assertEquals(SpeakerNameUi.Placeholder(2), state.turns[1].name)
+        assertEquals(SpeakerNameUi.Placeholder(2, "Speaker 2"), state.turns[1].name)
         assertEquals(setOf("refreshIfStale", "words:0", "openPlayer:document.opus"), ports.calls.toSet())
         assertEquals("one page of words is enough for six words", 1, ports.calls.count { it.startsWith("words") })
         assertFalse("Document info reads the file only when asked", "documentFacts" in ports.calls)
@@ -561,7 +561,7 @@ class NoteViewModelTest {
         val viewModel = viewModel()
         send(viewModel, NoteEvent.SpeakerTap("b"))
         val open = (viewModel.now().sheet as NoteSheet.NameSpeaker).ui
-        assertEquals(SpeakerNameUi.Placeholder(2), open.label)
+        assertEquals(SpeakerNameUi.Placeholder(2, "Speaker 2"), open.label)
         assertEquals("", open.name)
         assertTrue(open.remember)
 

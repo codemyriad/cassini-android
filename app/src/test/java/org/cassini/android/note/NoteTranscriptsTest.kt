@@ -41,7 +41,7 @@ class NoteTranscriptsTest {
         assertEquals(listOf("w0", "w2", "w3", "w4"), turns.map { it.id })
         assertEquals(listOf("a", "b", "c", "a"), turns.map { it.speakerId })
         assertEquals(SpeakerNameUi.Named("Giulia"), turns[0].name)
-        assertEquals(SpeakerNameUi.Placeholder(2), turns[1].name)
+        assertEquals(SpeakerNameUi.Placeholder(2, "Speaker 2"), turns[1].name)
         // Placeholders are amber and take no slot: Giulia blue, Paolo teal.
         val tones = listOf(SpeakerTone.Blue, SpeakerTone.Amber, SpeakerTone.Teal, SpeakerTone.Blue)
         assertEquals(tones, turns.map { it.tone })
@@ -104,8 +104,8 @@ class NoteTranscriptsTest {
             tentativeFromMs = 3_600,
         )
         val turns = draft.turns
-        assertEquals(SpeakerNameUi.Placeholder(1), turns[0].name)
-        assertEquals(SpeakerNameUi.Placeholder(2), turns[1].name)
+        assertEquals(SpeakerNameUi.Placeholder(1, "Speaker 1"), turns[0].name)
+        assertEquals("no label yet: Speaker N by first word", SpeakerNameUi.Placeholder(2), turns[1].name)
         assertEquals(SpeakerNameUi.Named("Paolo Ferri"), turns[2].name)
         assertTrue(turns[2].auto)
         assertNull("the card sits at the speaker's most recent turn", turns[0].suggestion)
@@ -113,6 +113,37 @@ class NoteTranscriptsTest {
         assertEquals("quindi ends after 3.6 s", 1, turns[3].unsettledFrom)
         assertNull(turns[0].unsettledFrom)
         assertEquals(WordRef("w4", 0), draft.activeWord(3_100))
+    }
+
+    @Test
+    fun aStoredPlaceholderShowsVerbatimInAnyUiLanguage() {
+        // D47: an Italian writer stored "Voce 2"; an English UI still shows "Voce 2", never "Speaker 2".
+        val italian = listOf(
+            speaker("a", 0, "Giulia", placeholder = false),
+            speaker("b", 1, "Voce 2", placeholder = true, number = 2),
+            speaker("c", 2, "Hablante 7", placeholder = true, number = 7),
+        )
+        val turns = NoteTranscripts.sealed(words, italian, emptyMap(), emptyList()).turns
+        assertEquals(SpeakerNameUi.Placeholder(2, "Voce 2"), turns[1].name)
+        val spanish = SpeakerNameUi.Placeholder(7, "Hablante 7")
+        assertEquals("the number comes from the stored label", spanish, turns[2].name)
+        assertEquals("a stored placeholder stays amber", SpeakerTone.Amber, turns[1].tone)
+
+        val draft = NoteTranscripts.draft(words, mapOf("a" to "Voce 1"), emptySet(), emptyMap(), null).turns
+        assertEquals(SpeakerNameUi.Placeholder(1, "Voce 1"), draft[0].name)
+    }
+
+    @Test
+    fun aSpeakerWithoutAStoredLabelIsSpeakerNByFirstSpeakingOrderNeverItsId() {
+        // D53.3: a missing, blank or raw-id label falls back to "Speaker N"; the id is never shown.
+        val unlabelled = listOf(
+            speaker("a", 0, "a", placeholder = true),
+            speaker("b", 1, " ", placeholder = true),
+        )
+        val turns = NoteTranscripts.sealed(words, unlabelled, emptyMap(), emptyList()).turns
+        assertEquals(SpeakerNameUi.Placeholder(1), turns[0].name)
+        assertEquals(SpeakerNameUi.Placeholder(2), turns[1].name)
+        assertEquals("not in speakers[]: numbered by first word", SpeakerNameUi.Placeholder(3), turns[2].name)
     }
 
     @Test
