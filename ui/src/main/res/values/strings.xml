@@ -13,6 +13,8 @@
     <string name="ui_ext_txt" translatable="false">.txt</string>
     <string name="ui_ext_subtitles" translatable="false">.srt · .vtt</string>
     <string name="ui_ext_any" translatable="false">.%1$s</string>
+    <!-- The playback speed on its button: "1.25×" (the number in the formatting locale). -->
+    <string name="ui_speed_rate" translatable="false">%1$s×</string>
     <string name="ui_format_opus" translatable="false">Opus</string>
     <string name="ui_format_m4a" translatable="false">M4A</string>
     <string name="ui_format_sample_rate" translatable="false">%1$s %2$s kHz</string>
@@ -283,6 +285,8 @@
     <string name="ui_player_position_state">%1$s of %2$s</string>
     <string name="ui_player_back_10">Back 10 seconds</string>
     <string name="ui_player_forward_10">Forward 10 seconds</string>
+    <!-- Catalog player.speed.a11y (coordination D53). -->
+    <string name="ui_player_speed">Playback speed, %1$s</string>
     <string name="ui_player_play">Play</string>
     <string name="ui_player_pause">Pause</string>
     <string name="ui_player_playing">Playing</string>

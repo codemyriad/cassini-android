@@ -358,6 +358,13 @@ class NoteViewModelTest {
         assertEquals("the slider shows the drag", 3_200, viewModel.now().playback!!.positionMs)
         send(viewModel, NoteEvent.SeekFinished, NoteEvent.Skip(forward = false))
         assertEquals(listOf("seek:3200", "skip:-10000"), ports.calls.takeLast(2))
+
+        // D53: the speed button goes to the next speed, and the player shows it.
+        send(viewModel, NoteEvent.NextSpeed)
+        assertEquals("speed:1.25", ports.calls.last())
+        assertEquals(1.25f, viewModel.now().playback!!.speed)
+        send(viewModel, NoteEvent.NextSpeed, NoteEvent.NextSpeed, NoteEvent.NextSpeed, NoteEvent.NextSpeed)
+        assertEquals("from 2× back to 0.75×", "speed:0.75", ports.calls.last())
     }
 
     // Search. ---------------------------------------------------------------------------------------------------

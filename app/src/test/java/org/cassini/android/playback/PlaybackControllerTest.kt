@@ -28,6 +28,15 @@ class PlaybackControllerTest {
     /** When set, prepare waits for it (a long file). */
     private var prepareGate: CompletableDeferred<Unit>? = null
 
+    /** The stored app-wide speed. */
+    private val speeds = object : SpeedStore {
+        var stored = 1f
+        override suspend fun load() = stored
+        override suspend fun save(speed: Float) {
+            stored = speed
+        }
+    }
+
     private data class Save(val noteId: String, val positionMs: Long, val final: Boolean)
 
     private fun TestScope.controller(): PlaybackController {
@@ -40,10 +49,43 @@ class PlaybackControllerTest {
                 player = { FakePlayer(clock, DURATION_MS) { prepareGate }.also(players::add) },
                 platform = platform,
                 store = { noteId, positionMs, final -> saves += Save(noteId, positionMs, final) },
+                speeds = speeds,
                 clock = clock,
                 nanos = { testScheduler.currentTime * 1_000_000 },
             ),
         )
+    }
+
+    /** D53: the speed applies to the player, is stored for every note, and a change is a jump of the position. */
+    @Test fun theSpeedIsAppliedStoredAndKeptForTheNextNote() = runTest {
+        speeds.stored = 1.5f
+        val playback = controller()
+        assertTrue(playback.open(NOTE, audio, positionMs = 0))
+        assertEquals("the stored speed applies at open", 1.5f, players.last().appliedSpeed)
+        assertEquals(1.5f, playback.state.value.speed)
+
+        val before = playback.state.value.epoch
+        playback.setSpeed(2f)
+        runCurrent()
+        assertEquals(2f, players.last().appliedSpeed)
+        assertEquals(2f, playback.state.value.speed)
+        assertEquals("stored for the next notes", 2f, speeds.stored)
+        assertTrue("a speed change re-anchors the position", playback.state.value.epoch != before)
+
+        assertTrue(playback.reload(File("document.opus")))
+        assertEquals("a reload keeps the speed", 2f, players.last().appliedSpeed)
+        assertTrue(playback.open(OTHER, File("other.opus"), positionMs = 0))
+        runCurrent()
+        assertEquals("another note opens at the same speed", 2f, players.last().appliedSpeed)
+
+        playback.setSpeed(1.3f)
+        assertEquals("a value between steps snaps to the nearest", 1.25f, playback.state.value.speed)
+    }
+
+    @Test fun theSpeedButtonCyclesThroughTheSteps() {
+        val seen = generateSequence(1f) { PlaybackSpeeds.next(it) }.take(7).toList()
+        assertEquals(listOf(1f, 1.25f, 1.5f, 1.75f, 2f, 0.75f, 1f), seen)
+        assertEquals("an unknown stored value is normal speed", 1f, PlaybackSpeeds.nearest(Float.NaN))
     }
 
     @Test fun eachPositionCarriesItsSampleTimeAndJumpsChangeTheEpoch() = runTest {
@@ -385,6 +427,7 @@ private class FakePlayer(
     private var completion: (() -> Unit)? = null
     var file: File? = null
     var released = false
+    var appliedSpeed = 1f
 
     override val positionMs: Long
         get() = (base + (startedAt?.let { clock() - it } ?: 0L)).coerceAtMost(durationMs)
@@ -408,6 +451,10 @@ private class FakePlayer(
     override fun seekTo(positionMs: Long) {
         base = positionMs
         if (startedAt != null) startedAt = clock()
+    }
+
+    override fun setSpeed(speed: Float) {
+        appliedSpeed = speed
     }
 
     override fun onCompletion(listener: () -> Unit) {

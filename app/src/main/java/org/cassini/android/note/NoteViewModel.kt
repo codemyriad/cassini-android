@@ -45,6 +45,7 @@ import org.cassini.android.nav.NoteStart
 import org.cassini.android.notices.NoticeFacts
 import org.cassini.android.notices.Notices
 import org.cassini.android.notices.TrashedNote
+import org.cassini.android.playback.PlaybackSpeeds
 import org.cassini.android.playback.PlaybackState
 import org.cassini.android.processing.NoteJobState
 import org.cassini.android.processing.TranscribeOutcome
@@ -447,11 +448,19 @@ class NoteViewModel(
                 playing = true,
                 epoch = playback.epoch,
                 durationMs = duration,
+                speed = playback.speed,
             )
         } else {
             null
         }
-        return PlaybackUi(position, duration, playing = playing, following = ui.following, anchor = anchor)
+        return PlaybackUi(
+            position,
+            duration,
+            playing = playing,
+            following = ui.following,
+            anchor = anchor,
+            speed = playback.speed,
+        )
     }
 
     @Suppress("CyclomaticComplexMethod") // one branch per banner source of features.md sections 3 and 13
@@ -569,6 +578,7 @@ class NoteViewModel(
             is NoteEvent.Seek -> local.update { it.copy(seekingMs = event.positionMs) }
             NoteEvent.SeekFinished -> seekFinished()
             is NoteEvent.Skip -> ports.skip(if (event.forward) SKIP_MS else -SKIP_MS)
+            NoteEvent.NextSpeed -> ports.setSpeed(PlaybackSpeeds.next(ports.playback.value.speed))
             NoteEvent.PauseFollowing -> local.update { it.copy(following = false) }
             NoteEvent.FollowPlayback -> local.update { it.copy(following = true) }
             NoteEvent.TrustChip -> local.update { it.copy(trustToggled = !it.trustToggled) }
