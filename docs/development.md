@@ -125,6 +125,8 @@ The `@CiSmoke` device test `background/ProcessingServiceTypeTest` makes sure tha
 
 The `@CiSmoke` device test `flows/ModelDownloadDeviceTest` downloads a small model through `ModelFetcher.network` on the emulator: Android's `HttpURLConnection` and the zstd-jni AAR against a loopback model host that serves a schema 2 manifest and content-addressed Zstandard files with `Range`, `If-Range` and an ETag. It resumes a half-written download, reaches the manifest through a redirect, checks the `Accept-Encoding: identity` and `If-Range` headers and the exact `User-Agent` of D54 on every request and hop, and checks that a manifest without the pinned pair downloads nothing. The host is plain HTTP on 127.0.0.1, which only the instrumented build types allow (`src/instrumented/res/xml/loopback_network.xml`, in the debug and releaseTest manifests); the release build stays HTTPS-only.
 
+The `@CiSmoke` device test `background/PlaybackSessionTest` checks the MediaSession of the player (coordination D53) on each emulator. It plays the FLEURS clip, waits for the media notification, binds a Media3 `MediaController` to `PlaybackService` as the lock screen, Bluetooth and Android Auto do, and checks that the session names the note and that pause, seek, −10 s, the speed and play from the controller reach `PlaybackController`. Then a `KEYCODE_MEDIA_PAUSE` key event, the path of a headset button, pauses it.
+
 `app/src/test/.../nav/AppShellTest` runs the whole app under Robolectric on a scratch root. It tests the back order (a sheet, then the search, then the screen), the minimised recording, the predictive back callback, the edge-to-edge insets, the system bar icons of each screen and the TalkBack semantics of the Note screen.
 
 ### Device flow tests
