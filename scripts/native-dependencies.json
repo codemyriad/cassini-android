@@ -1,16 +1,16 @@
 [
   {
     "name": "sherpa-onnx",
-    "version": "1.13.7+nemotron-diarization+parakeet-reference-frontend (dbbeef9c23e158c52949dd620659a20608e501c9)",
-    "url": "https://github.com/codemyriad/sherpa-onnx/archive/dbbeef9c23e158c52949dd620659a20608e501c9.tar.gz",
-    "sha256": "6b1519317bfc51d2b486ece4d324b6eb7b16f3debe41145bb5aaa3c42e747501"
+    "version": "1.13.7+cassini-parakeet-v3-reference-v1.nemotron-diarization-v2.parakeet-ultra-v1 (0c2ee3f3f5f16bb06d234a0f98632810296ba0eb, tag v1.13.7-cassini-parakeet-ultra-v1)",
+    "url": "https://github.com/codemyriad/sherpa-onnx/archive/0c2ee3f3f5f16bb06d234a0f98632810296ba0eb.tar.gz",
+    "sha256": "b6998671b8d40c3a2f4a3a52ca1be82156353544fd1d0a8f28f85ef61db0f076"
   },
   {
     "name": "sherpa-onnx-aar",
-    "version": "1.13.7-dbbeef9c",
+    "version": "1.13.7-0c2ee3f3",
     "url": "https://github.com/codemyriad/cassini-android/releases/download/native-sherpa-onnx-1.13.7-nemotron.3/sherpa-onnx-1.13.7-nemotron.aar",
     "sha256": "776a2adf4c0ec6f9623d734cbce1a0bf15b9e6e7372e80cc08d268a2ab5b9285",
-    "patchSha256": "91b3f2c55e2d5188a71a3602a56f94d3ae128e0b04635838c5f70800412700d5"
+    "patchSha256": "2160b80640351aebd95df279a55b65ef54c96abfd73fb54fca56f819ebb2735f"
   },
   {
     "name": "onnxruntime",
