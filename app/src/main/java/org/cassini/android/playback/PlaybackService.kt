@@ -79,8 +79,9 @@ class PlaybackService : MediaSessionService() {
         private const val OPEN_REQUEST = 4
 
         /**
-         * Starts the service when a note opens in the player, so its session exists before playback starts. The app is
-         * in the foreground then; a start that Android refuses only logs (the controls are missing, playback works).
+         * Starts the service when playback starts, so the session and its controls appear. The user started it in the
+         * app, which is in the foreground then; a start that Android refuses only logs (no controls, playback works).
+         * Starting a running service again does nothing.
          */
         fun start(context: Context) {
             try {
