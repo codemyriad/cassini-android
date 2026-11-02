@@ -32,8 +32,8 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
+                <!-- content:// only: Cassini reads the file with its own permissions, so it never takes a path. -->
                 <data android:scheme="content" />
-                <data android:scheme="file" />
                 <!-- Every audio file the Library's picker imports (LibraryViewModel.IMPORT_TYPES), not only Ogg. -->
                 <data android:mimeType="audio/*" />
                 <data android:mimeType="application/ogg" />
@@ -48,6 +48,8 @@
         </activity>
         <service android:name=".recording.RecordingService" android:exported="false"
             android:foregroundServiceType="microphone" />
+        <!-- Holds the read grant of a file another app opened with Cassini or shared until its import ends. -->
+        <service android:name=".nav.ImportGrantService" android:exported="false" />
         <service android:name=".processing.ProcessingService" android:exported="false"
             android:foregroundServiceType="dataSync|mediaProcessing" />
         <!-- Exported for media controllers (the system UI, Bluetooth, Android Auto), as Media3 requires; no permission

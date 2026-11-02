@@ -37,7 +37,7 @@ class OpenWithTest {
             "audio/flac",
         )
         for (type in types) assertEquals(type, listOf(MainActivity::class.java.name), handlers(type))
-        assertEquals("a file uri too", listOf(MainActivity::class.java.name), handlers("audio/mpeg", scheme = "file"))
+        assertTrue("never a path (review of #45)", handlers("audio/mpeg", scheme = "file").isEmpty())
     }
 
     /** Receiving shares (approved after R10): an audio file shared from another app's share sheet. */

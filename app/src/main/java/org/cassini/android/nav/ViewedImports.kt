@@ -3,6 +3,7 @@ package org.cassini.android.nav
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,8 +22,8 @@ class ViewedImports(private val scope: CoroutineScope, private val import: (Stri
 
     val ready: StateFlow<List<String>> = pending.asStateFlow()
 
-    /** Imports [uri]; a failed import only shows its Library banner, and nothing opens. */
-    fun start(uri: String) {
+    /** Imports [uri]; a failed import only shows its Library banner, and nothing opens. The job ends with it. */
+    fun start(uri: String): Job =
         scope.launch {
             val noteId = when (val outcome = import(uri).await()) {
                 is ImportOutcome.Created -> outcome.noteId
@@ -31,7 +32,6 @@ class ViewedImports(private val scope: CoroutineScope, private val import: (Stri
             }
             if (noteId != null) pending.update { it + noteId }
         }
-    }
 
     /** The navigation opened [noteId]. */
     fun take(noteId: String) = pending.update { it - noteId }

@@ -663,7 +663,7 @@ These are the contracts of the screens:
 |---|---|---|
 | Recording notification | `open = recording` | Go back to `RecordingKey` if it is in the stack, else push it |
 | Processing and results notifications | `open = note`, `noteId` | Nothing if the note is on top. Go back to it if it is in the stack. Else push it, with the Library at the bottom. |
-| ACTION_VIEW | Data URI | Import on IO with the "Importing…" banner, then push `NoteKey(id)` |
+| ACTION_VIEW | Data URI (another app's `content://` only) | Import on IO with the "Importing…" banner, then push `NoteKey(id)` |
 | ACTION_SEND (`audio/*`, `application/ogg`) | `EXTRA_STREAM` URI | The same as ACTION_VIEW: an audio file shared from another app's share sheet |
 
 - `SystemBarsAppearance(darkIcons)`: in the light theme, the light screens use dark icons. Recording always uses light icons. The sheets do not change the bars.

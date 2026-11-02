@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import org.cassini.android.nav.CassiniApp
 import org.cassini.android.nav.DeepLink
 import org.cassini.android.nav.DeepLinks
+import org.cassini.android.nav.ImportGrantService
 import org.cassini.android.processing.ProcessingNotifications
 import org.cassini.ui.theme.CassiniTheme
 
@@ -58,7 +59,8 @@ class MainActivity : AppCompatActivity() {
             stream = if (intent.action == Intent.ACTION_SEND) sharedStream(intent) else null,
         ) ?: return
         intent.putExtra(DeepLinks.EXTRA_HANDLED, true)
-        links.trySend(link)
+        // A file from another app: its read grant ends with this activity, so a service holds it for the import.
+        if (link is DeepLink.Import) ImportGrantService.start(this, link.uri) else links.trySend(link)
     }
 
     /** The audio file of an ACTION_SEND from another app's share sheet. */
