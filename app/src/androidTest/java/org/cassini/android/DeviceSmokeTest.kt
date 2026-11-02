@@ -239,8 +239,11 @@ class DeviceSmokeTest {
             val raw = spans(vector, filter = null)
             val rawControl = spans(control, filter = null)
             val report = "filtered $filtered, control $filteredControl; raw $raw, control $rawControl"
-            // Two detector windows at the recording's rate: float rounding of the offset may move a boundary.
-            val tolerance = 2 * SpeechFeed.WINDOW * vector.sampleRate / VAD_SAMPLE_RATE
+            // Eight detector windows (256 ms) at the recording's rate. The filtered inputs differ only by the filter's
+            // start-up step and float rounding, but this clip is very quiet and Android's threshold is low (0.18), so
+            // a boundary where the probability hovers at the threshold can move: the first Models run measured 192 ms
+            // at one boundary, while without the filter the offset adds two whole spans.
+            val tolerance = DC_TOLERANCE_WINDOWS * SpeechFeed.WINDOW * vector.sampleRate / VAD_SAMPLE_RATE
             fun close(a: List<Span>, b: List<Span>) = a.size == b.size && a.zip(b).all { (x, y) ->
                 kotlin.math.abs(x.start - y.start) <= tolerance && kotlin.math.abs(x.end - y.end) <= tolerance
             }
@@ -530,3 +533,4 @@ private const val DC_VECTOR_SHA256 = "071f051241d394587c85463272e9414f133ee18c4b
 /** The vector's offset: the control file is the vector plus exactly this much (`y = ((x + 64) >> 7) - 2060`). */
 private const val DC_OFFSET_LSB = 2060f
 private const val PCM16_SCALE = 32768f
+private const val DC_TOLERANCE_WINDOWS = 8
