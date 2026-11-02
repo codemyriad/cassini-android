@@ -6,7 +6,7 @@
 # Not AGP 9.5.0 (checked 2026-11-02): :ui's lint still cannot load the lint checks of lifecycle-runtime 2.11.0
 # ("Library lint checks reference invalid APIs", ObsoleteLintCustomCheck, an error here), and 9.5 deprecates the
 # org.jetbrains.kotlin.android plugin, removed in AGP 10: moving on means migrating to built-in Kotlin.
-agp = "9.4.1"
+agp = "9.5.0"
 kotlin = "2.4.21"
 ksp = "2.3.13"
 room = "2.8.5"
