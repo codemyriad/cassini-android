@@ -6,7 +6,8 @@ Usage: scripts/fetch-ci-models.py [--dest DIR] [--print-key]
 The default DIR is .tools/ci-models. Each model goes into DIR/<directory>/ (models/<id>/<source sha256>/) and gets
 its marker file after every file has its pinned size and SHA-256, as the app installs it. Each file is downloaded
 from dist.gocassini.com as its own Zstandard file, checked, decompressed and checked again. Files that are already
-correct are not downloaded again, so a restored cache costs only the hash checks. scripts/push-models.sh copies DIR into the app on a device.
+correct are not downloaded again, so a restored cache costs only the hash checks. scripts/push-models.sh copies DIR
+into the app on a device.
 It needs Python 3.10 or later, and the zstd tool before Python 3.14. It reads the URLs of scripts/ci-models.json
 (the content-addressed paths of the files), not the manifest, which only the app reads.
 --print-key prints a cache key made from the SHA-256 values of the list and downloads nothing.
