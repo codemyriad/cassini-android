@@ -21,6 +21,7 @@ import androidx.compose.ui.test.junit4.AndroidComposeTestRule
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.printToLog
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.core.content.FileProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.test.espresso.Espresso
@@ -48,6 +49,9 @@ internal typealias AppRule = AndroidComposeTestRule<*, MainActivity>
  */
 internal object Flows {
     const val SCREEN_MS = 15_000L
+
+    /** The authority of `TestFilesProvider` (src/instrumented), which is not one of Cassini's own. */
+    const val TEST_FILES = "cassini.instrumented.testfiles"
     const val JOB_MS = 300_000L
     private const val TAG = "CassiniFlow"
 
@@ -163,15 +167,16 @@ internal object Flows {
     }
 
     /**
-     * Opens [file] as ACTION_VIEW does from a file manager: the intent reaches the running activity (`singleTop`,
-     * so `onNewIntent`). ActivityScenario follows only an activity whose intent equals its launch intent, so the
+     * Opens [file] as ACTION_VIEW does from a file manager, through a content uri of another provider (the
+     * instrumented builds' `TestFilesProvider`; the app takes no `file://` uri): the intent reaches the running
+     * activity (`singleTop`, so `onNewIntent`). ActivityScenario follows only an activity whose intent equals its launch intent, so the
      * launch intent is put back once the activity has taken the new one; else the rule cannot close the activity.
      */
     fun AppRule.view(file: File, mime: String) {
         val launch = activity.intent
         val intent = Intent(activity, MainActivity::class.java)
             .setAction(Intent.ACTION_VIEW)
-            .setDataAndType(Uri.fromFile(file), mime)
+            .setDataAndType(FileProvider.getUriForFile(activity, TEST_FILES, file), mime)
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         activity.startActivity(intent)
         waitUntil(SCREEN_MS) { activity.intent.action == Intent.ACTION_VIEW }

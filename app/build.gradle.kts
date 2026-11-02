@@ -115,9 +115,13 @@ android {
         getByName("androidTest") {
             assets.directories.add(rootDir.resolve("fixtures/audio").path)
         }
-        // The loopback network configuration of the instrumented build types (src/instrumented/res).
+        // The loopback network configuration and the test files provider of the instrumented build types
+        // (src/instrumented).
         for (type in listOf("debug", "releaseTest")) {
-            getByName(type) { res.directories.add("src/instrumented/res") }
+            getByName(type) {
+                res.directories.add("src/instrumented/res")
+                java.directories.add("src/instrumented/java")
+            }
         }
     }
 }
