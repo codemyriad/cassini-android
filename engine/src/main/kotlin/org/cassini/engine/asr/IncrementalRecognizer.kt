@@ -2,6 +2,7 @@ package org.cassini.engine.asr
 
 import org.cassini.core.asr.DecodePolicy
 import org.cassini.core.asr.IncrementalTranscript
+import org.cassini.core.asr.TrackSileroInput
 import org.cassini.core.audio.PcmAudio
 import org.cassini.core.checkpoint.RecognitionState
 import org.cassini.core.format.Transcript
@@ -29,12 +30,26 @@ class IncrementalRecognizer(
     var totalMs = 0L
     var inferenceMs = restored?.inferenceMs ?: 0L
         private set
+
+    // D26.1: one detector-input filter state for the whole track, carried from window to window.
+    private val vadInput = TrackSileroInput()
     private val chunks = IncrementalTranscript(restored?.chunks) { audio, startMs ->
         onStage(startMs, startMs + audio.durationMs, decoder == null)
         val recognizer = decoder ?: ParakeetDecoder(models).also { decoder = it }
         onStage(startMs, startMs + audio.durationMs, false)
         val started = System.nanoTime()
-        val transcript = Parakeet.transcribeWithDecoder(audio, recognizer, detectorModel, DecodePolicy.WHOLE_SPANS, Parakeet.cutting(detectorModel)) {}
+        val start = startMs * audio.sampleRate / MS_PER_SECOND
+        val full = audio.samples.size == IncrementalTranscript.WINDOW_SAMPLES
+        val next = if (full) audio.samples.size - IncrementalTranscript.OVERLAP_SAMPLES else null
+        val transcript = Parakeet.transcribeWithDecoder(
+            audio,
+            recognizer,
+            detectorModel,
+            DecodePolicy.WHOLE_SPANS,
+            Parakeet.cutting(detectorModel),
+            onProgress = {},
+            vadInput = vadInput.window(start, next),
+        )
         inferenceMs += (System.nanoTime() - started) / 1_000_000
         onChunk(audio, startMs, transcript)
     }
@@ -56,3 +71,5 @@ class IncrementalRecognizer(
 
     override fun close() { decoder?.close() }
 }
+
+private const val MS_PER_SECOND = 1000L

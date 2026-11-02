@@ -81,8 +81,12 @@ internal class OpusCapture(override val file: File, private val onError: () -> U
                     n += got
                 }
                 if (n == 0) continue
+                // D26.1: the AC peak, max |x - mean|, so a microphone that carries only a DC offset reads as silent.
+                var sum = 0L
+                for (i in 0 until n) sum += frame[i]
+                val mean = (sum / n).toInt()
                 var max = 0
-                for (i in 0 until n) max = maxOf(max, abs(frame[i].toInt()))
+                for (i in 0 until n) max = maxOf(max, abs(frame[i] - mean))
                 peak = max
                 queue(frame, n, 0, info)
                 samples += n

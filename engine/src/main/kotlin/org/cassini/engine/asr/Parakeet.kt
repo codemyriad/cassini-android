@@ -3,6 +3,7 @@ package org.cassini.engine.asr
 import org.cassini.core.Failure
 import org.cassini.core.asr.DecodePolicy
 import org.cassini.core.asr.DecodeSession
+import org.cassini.core.asr.SileroInputFilter
 import org.cassini.core.asr.Span
 import org.cassini.core.asr.SpeechWindows
 import org.cassini.core.asr.WordDecoder
@@ -27,7 +28,10 @@ object Parakeet {
         /** No speech detector installed: the recording as one span, cut at its quiet points. */
         QUIET("pieces of 20 to 28 s cut at the quietest point with 1 s of recorded context, 0.5 s synthetic tail"),
         /** Speech spans found by the detector, each split by the [DecodePolicy]. */
-        SPEECH("Silero VAD 0.18 speech spans, cut at the quietest point with 1 s of recorded context when longer than 28 s, 0.5 s synthetic tail"),
+        SPEECH(
+            "Silero VAD 0.18 speech spans (input high-passed, ${SileroInputFilter.STAGE}), cut at the quietest " +
+                "point with 1 s of recorded context when longer than 28 s, 0.5 s synthetic tail",
+        ),
     }
 
     fun cutting(detectorModel: String?) = if (detectorModel == null) Cutting.QUIET else Cutting.SPEECH
@@ -53,8 +57,17 @@ object Parakeet {
         }
     }
 
-    internal fun transcribeWithDecoder(audio: PcmAudio, decoder: WordDecoder, detectorModel: String?, policy: DecodePolicy,
-                                     cutting: Cutting, onProgress: (Progress) -> Unit): Transcript {
+    /** [vadInput] high-passes the detector's input (D26.1); an incremental track passes the state it carries. */
+    @Suppress("LongParameterList") // the decode inputs, the cutting, the detector input filter and the progress
+    internal fun transcribeWithDecoder(
+        audio: PcmAudio,
+        decoder: WordDecoder,
+        detectorModel: String?,
+        policy: DecodePolicy,
+        cutting: Cutting,
+        onProgress: (Progress) -> Unit,
+        vadInput: SileroInputFilter = SileroInputFilter(),
+    ): Transcript {
         if (cutting == Cutting.WHOLE) {
             requireUser(audio.durationMs <= WHOLE_MAX_MS, Failure.LONG)
             val began = System.nanoTime()
@@ -81,7 +94,7 @@ object Parakeet {
         report(0)
         var paddedTailMs = 0L
         when (cutting) {
-            Cutting.SPEECH -> SileroDetector(requireNotNull(detectorModel)).use { detector ->
+            Cutting.SPEECH -> SileroDetector(requireNotNull(detectorModel), vadInput).use { detector ->
                 paddedTailMs = detector.detect(audio) { span -> session.speech(span, report) }
             }
             Cutting.QUIET -> session.speech(Span(0, audio.samples.size), report)

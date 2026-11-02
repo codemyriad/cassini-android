@@ -8,11 +8,14 @@ import android.net.Uri
 import android.os.Bundle
 import androidx.test.platform.app.InstrumentationRegistry
 import org.cassini.core.asr.IncrementalTranscript
+import org.cassini.core.asr.SileroInputFilter
 import org.cassini.core.asr.Span
+import org.cassini.core.asr.SpeechFeed
 import org.cassini.core.audio.Limits
 import org.cassini.core.audio.PcmAudio
 import org.cassini.core.audio.PcmBuilder
 import org.cassini.core.audio.PcmFile
+import org.cassini.core.audio.VAD_SAMPLE_RATE
 import org.cassini.core.format.OggOpus
 import org.cassini.core.format.Transcript
 import org.cassini.core.format.Word
@@ -206,6 +209,47 @@ class DeviceSmokeTest {
                 detector.detect(PcmAudio(FloatArray(48000), 48000)) { silence += it }
                 assertTrue("Silence has no speech: $silence", silence.isEmpty())
             }
+        } finally { file.delete() }
+    }
+
+    /**
+     * D26.1 on the shared vector `dc-quiet-jfk-v1` (fixtures/README.md): quiet speech under a DC offset of -2060 LSB,
+     * the regime of a real failing microphone. The vector is its control file less exactly 2060 LSB, so the control is
+     * rebuilt here by adding the offset back. With the high-passed input the detector finds the same speech in both
+     * (DC invariance); without it, the offset changes what it finds. Android's resampler and threshold (0.18) differ
+     * from GNOME and Mac, so neither their exact segments nor iOS's "none without the filter" apply here.
+     */
+    @NeedsModels
+    @Test fun aDcOffsetNoLongerChangesWhatTheDetectorFinds() {
+        installModelsIfAsked(context, ModelPart.SPEECH)
+        assumeTrue("Install the speech detector first", ModelCatalog.VAD.ready(context.filesDir))
+        val file = fixture(DC_VECTOR)
+        try {
+            val digest = java.security.MessageDigest.getInstance("SHA-256").digest(file.readBytes())
+            assertEquals(DC_VECTOR_SHA256, digest.joinToString("") { "%02x".format(it) })
+            val vector = audioDecoder(context).decode(Uri.fromFile(file))
+            val offset = DC_OFFSET_LSB / PCM16_SCALE
+            val control = PcmAudio(FloatArray(vector.samples.size) { vector.samples[it] + offset }, vector.sampleRate)
+            val model = ModelCatalog.VAD.path(context.filesDir, ModelCatalog.sileroVad.name)
+            fun spans(audio: PcmAudio, filter: SileroInputFilter?): List<Span> = SileroDetector(model, filter).use {
+                ArrayList<Span>().also { found -> it.detect(audio) { found += it } }
+            }
+            val filtered = spans(vector, SileroInputFilter())
+            val filteredControl = spans(control, SileroInputFilter())
+            val raw = spans(vector, filter = null)
+            val rawControl = spans(control, filter = null)
+            val report = "filtered $filtered, control $filteredControl; raw $raw, control $rawControl"
+            // Eight detector windows (256 ms) at the recording's rate. The filtered inputs differ only by the filter's
+            // start-up step and float rounding, but this clip is very quiet and Android's threshold is low (0.18), so
+            // a boundary where the probability hovers at the threshold can move: the first Models run measured 192 ms
+            // at one boundary, while without the filter the offset adds two whole spans.
+            val tolerance = DC_TOLERANCE_WINDOWS * SpeechFeed.WINDOW * vector.sampleRate / VAD_SAMPLE_RATE
+            fun close(a: List<Span>, b: List<Span>) = a.size == b.size && a.zip(b).all { (x, y) ->
+                kotlin.math.abs(x.start - y.start) <= tolerance && kotlin.math.abs(x.end - y.end) <= tolerance
+            }
+            assertTrue("the high-passed input finds speech: $report", filtered.isNotEmpty())
+            assertTrue("the offset no longer changes what is found: $report", close(filtered, filteredControl))
+            assertFalse("without the filter the offset changes what is found: $report", close(raw, rawControl))
         } finally { file.delete() }
     }
 
@@ -481,3 +525,12 @@ class DeviceSmokeTest {
 }
 
 private const val YOUTUBE_SMOKE = "youtube-smoke.wav"
+
+/** The shared D26.1 vector (coordination ux-draft/dc), committed as fixtures/audio/dc-quiet-jfk-v1.wav. */
+private const val DC_VECTOR = "dc-quiet-jfk-v1.wav"
+private const val DC_VECTOR_SHA256 = "071f051241d394587c85463272e9414f133ee18c4bb835d1382b662e4154efda"
+
+/** The vector's offset: the control file is the vector plus exactly this much (`y = ((x + 64) >> 7) - 2060`). */
+private const val DC_OFFSET_LSB = 2060f
+private const val PCM16_SCALE = 32768f
+private const val DC_TOLERANCE_WINDOWS = 8
