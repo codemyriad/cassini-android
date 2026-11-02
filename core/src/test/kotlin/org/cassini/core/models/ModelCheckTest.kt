@@ -10,6 +10,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
+import java.io.IOException
 import java.security.MessageDigest
 
 /** The once-per-process check of an installed model against its pins before its first native load (D16 section 4). */
@@ -75,6 +76,48 @@ class ModelCheckTest {
         install(root)
         check.require(model, root)
         assertTrue(check.passed(model, root))
+    }
+
+    /** Review of #41: a file that cannot be read is damaged, not a storage error that repeats for ever. */
+    @Test fun anUnreadableFileLosesTheMarkerAndTheFileAndFailsTheCheck() {
+        val root = folder.root
+        val home = install(root)
+        var unreadable = true
+        val reading = ModelCheck { file ->
+            if (unreadable && file.name == "encoder.onnx") throw IOException("read failed: EIO (I/O error)")
+            ArtifactFetcher.digest(file)
+        }
+        try {
+            reading.require(model, root)
+            fail("An unreadable model must not reach the native runtime")
+        } catch (error: UserFacingException) {
+            assertEquals(Failure.VERIFY, error.failure)
+        }
+        assertFalse(File(home, model.markerFile).exists())
+        assertFalse(File(home, "encoder.onnx").exists())
+        assertTrue(File(home, "tokens.txt").isFile)
+        assertFalse(model.ready(root))
+
+        // Installed again on good blocks, the model passes.
+        unreadable = false
+        install(root)
+        reading.require(model, root)
+        assertTrue(reading.passed(model, root))
+    }
+
+    @Test fun aCancelDuringTheCheckLeavesTheModelAlone() {
+        val root = folder.root
+        val home = install(root)
+        val cancelled = ModelCheck { throw UserFacingException(Failure.CANCELLED) }
+        try {
+            cancelled.require(model, root)
+            fail("A cancel ends the check")
+        } catch (error: UserFacingException) {
+            assertEquals(Failure.CANCELLED, error.failure)
+        }
+        assertTrue("a cancel is not damage", model.ready(root))
+        assertTrue(File(home, "encoder.onnx").isFile)
+        assertFalse(cancelled.passed(model, root))
     }
 
     @Test fun aModelWithoutItsMarkerIsLeftToTheSeam() {
