@@ -38,6 +38,13 @@
                 <data android:mimeType="audio/*" />
                 <data android:mimeType="application/ogg" />
             </intent-filter>
+            <!-- An audio file shared from another app (a voice message, a recorder): imported as Open with does. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="audio/*" />
+                <data android:mimeType="application/ogg" />
+            </intent-filter>
         </activity>
         <service android:name=".recording.RecordingService" android:exported="false"
             android:foregroundServiceType="microphone" />

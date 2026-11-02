@@ -12,7 +12,7 @@ sealed interface DeepLink {
     /** A processing or results notification. [resume] is the Resume action of a paused note. */
     data class Note(val noteId: String, val resume: Boolean = false) : DeepLink
 
-    /** ACTION_VIEW of a document or an audio file: import [uri], then open its note. */
+    /** ACTION_VIEW or ACTION_SEND of a document or an audio file: import [uri], then open its note. */
     data class Import(val uri: String) : DeepLink
 }
 
@@ -22,6 +22,7 @@ sealed interface DeepLink {
  */
 object DeepLinks {
     const val ACTION_VIEW = "android.intent.action.VIEW"
+    const val ACTION_SEND = "android.intent.action.SEND"
 
     /** Set on an intent once it is handled, so a recreated activity does not open it again. */
     const val EXTRA_HANDLED = "org.cassini.android.extra.HANDLED"
@@ -29,12 +30,22 @@ object DeepLinks {
     private val schemes = setOf("content", "file")
 
     /**
-     * The link of an intent with [action], the [data] uri and the extras the notifications set ([open], [noteId],
-     * [resume]); null when the intent asks for nothing beyond the app (the launcher).
+     * The link of an intent with [action], the [data] uri, the shared [stream] (`EXTRA_STREAM` of ACTION_SEND: an
+     * audio file shared from another app) and the extras the notifications set ([open], [noteId], [resume]); null
+     * when the intent asks for nothing beyond the app (the launcher).
      */
-    fun parse(action: String?, data: String?, open: String?, noteId: String?, resume: Boolean = false): DeepLink? =
+    @Suppress("LongParameterList") // the parts of an intent that a link reads
+    fun parse(
+        action: String?,
+        data: String?,
+        open: String?,
+        noteId: String?,
+        resume: Boolean = false,
+        stream: String? = null,
+    ): DeepLink? =
         when {
             action == ACTION_VIEW -> data?.takeIf { it.substringBefore(':', "") in schemes }?.let(DeepLink::Import)
+            action == ACTION_SEND -> stream?.takeIf { it.substringBefore(':', "") in schemes }?.let(DeepLink::Import)
             open == RecordingNotifications.OPEN_RECORDING -> DeepLink.Recording
             open == ProcessingNotifications.OPEN_NOTE && !noteId.isNullOrBlank() -> DeepLink.Note(noteId, resume)
             else -> null

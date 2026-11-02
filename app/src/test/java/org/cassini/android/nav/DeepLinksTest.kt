@@ -21,6 +21,13 @@ class DeepLinksTest {
         assertNull(view(null))
     }
 
+    @Test fun parsesASharedAudioFile() {
+        fun send(stream: String?) = DeepLinks.parse(DeepLinks.ACTION_SEND, null, null, null, stream = stream)
+        assertEquals(DeepLink.Import("content://chat/voice/7"), send("content://chat/voice/7"))
+        assertNull("a share without a file", send(null))
+        assertNull(send("https://example.org/a.mp3"))
+    }
+
     @Test fun theLauncherAndUnknownExtrasAskForNothing() {
         assertNull(DeepLinks.parse(MAIN, null, null, null))
         assertNull(DeepLinks.parse(MAIN, null, "note", null))
