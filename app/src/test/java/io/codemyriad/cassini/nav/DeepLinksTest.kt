@@ -55,6 +55,12 @@ class DeepLinksTest {
         for (uri in accepted) assertEquals(uri, uri, external(uri))
     }
 
+    /** Review of #53: the device tests' provider names the app after a prefix, outside Cassini's own authorities. */
+    @Test fun acceptsTheTestFilesProviderOfThisApp() {
+        val uri = "content://testfiles.$OWN/files/a.opus"
+        assertEquals(uri, DeepLinks.external(uri, ownPackage = OWN))
+    }
+
     @Test fun parsesASharedAudioFile() {
         fun send(stream: String?) =
             DeepLinks.parse(DeepLinks.ACTION_SEND, null, null, null, stream = stream, ownPackage = OWN)

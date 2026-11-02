@@ -26,6 +26,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.test.espresso.Espresso
 import androidx.test.platform.app.InstrumentationRegistry
+import io.codemyriad.cassini.BuildConfig
 import io.codemyriad.cassini.MainActivity
 import io.codemyriad.cassini.background.Background
 import io.codemyriad.cassini.core.format.CassiniDocument
@@ -50,8 +51,8 @@ internal typealias AppRule = AndroidComposeTestRule<*, MainActivity>
 internal object Flows {
     const val SCREEN_MS = 15_000L
 
-    /** The authority of `TestFilesProvider` (src/instrumented), which is not one of Cassini's own. */
-    const val TEST_FILES = "cassini.instrumented.testfiles"
+    /** The authority of `TestFilesProvider` (src/instrumented): unique to this app, but not one of Cassini's own. */
+    const val TEST_FILES = "testfiles.${BuildConfig.APPLICATION_ID}"
     const val JOB_MS = 300_000L
     private const val TAG = "CassiniFlow"
 
