@@ -542,6 +542,9 @@
     <string name="ui_banner_dl_file_check_body">O download estava danificado e foi descartado.</string>
     <string name="ui_banner_dl_install_failed_title">Não foi possível concluir a instalação</string>
     <string name="ui_banner_dl_install_failed_body">Tente novamente. Suas gravações estão seguras.</string>
+    <!-- R11: the copy iOS ships for D16 DOWNLOAD_PIN_UNAVAILABLE, byte for byte. -->
+    <string name="ui_banner_dl_model_unavailable_title">Modelo indisponível</string>
+    <string name="ui_banner_dl_model_unavailable_body">O servidor de modelos não oferece mais esta versão do modelo. Atualize o Cassini para baixá-lo.</string>
     <string name="ui_banner_dl_record_now_title">Grave agora, transcreva depois</string>
     <string name="ui_banner_dl_record_now_body">A transcrição precisa de um download único. Enquanto isso, o áudio está seguro.</string>
 

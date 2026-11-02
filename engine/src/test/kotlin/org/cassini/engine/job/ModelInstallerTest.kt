@@ -195,16 +195,17 @@ class ModelInstallerTest {
         assertEquals(DownloadError.NO_CONNECTION, map(UserFacingException(Failure.DOWNLOAD, "HTTP 503"), offline))
         assertEquals(DownloadError.NOT_ENOUGH_STORAGE, map(UserFacingException(Failure.SPACE)))
         assertEquals(DownloadError.FILE_CHECK_FAILED, map(UserFacingException(Failure.VERIFY)))
-        // A manifest that no longer lists the pinned model refuses the download: "File check failed".
+        // A manifest that no longer lists the pinned model refuses the download: "Model not available" (R11).
         val unlisted = try {
             DistManifest.parse("""{"schema_version":2,"models":[],"artifacts":[]}""").urls(ModelCatalog.VAD)
             error("The manifest must refuse the model")
         } catch (error: UserFacingException) {
             error
         }
-        assertEquals(DownloadError.FILE_CHECK_FAILED, map(unlisted))
-        assertEquals(DownloadError.FILE_CHECK_FAILED, map(unlisted, offline))
+        assertEquals(DownloadError.MODEL_UNAVAILABLE, map(unlisted))
+        assertEquals(DownloadError.MODEL_UNAVAILABLE, map(unlisted, offline))
         assertEquals(DownloadError.INSTALL, map(UserFacingException(Failure.INSTALL)))
+        assertEquals("R11", DownloadError.MODEL_UNAVAILABLE, map(UserFacingException(Failure.MODEL_UNAVAILABLE)))
         assertEquals(DownloadError.NO_CONNECTION, map(SocketTimeoutException("Read timed out")))
         assertEquals(DownloadError.NO_CONNECTION, map(UnknownHostException("dist.gocassini.com")))
         assertEquals(DownloadError.INTERRUPTED, map(IOException("Connection reset")))

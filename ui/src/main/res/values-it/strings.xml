@@ -533,6 +533,9 @@
     <string name="ui_banner_dl_file_check_body">Il download era danneggiato ed è stato scartato.</string>
     <string name="ui_banner_dl_install_failed_title">Impossibile completare l’installazione</string>
     <string name="ui_banner_dl_install_failed_body">Riprova. Le registrazioni sono al sicuro.</string>
+    <!-- R11: the copy iOS ships for D16 DOWNLOAD_PIN_UNAVAILABLE, byte for byte. -->
+    <string name="ui_banner_dl_model_unavailable_title">Modello non disponibile</string>
+    <string name="ui_banner_dl_model_unavailable_body">Il server dei modelli non offre più questa versione del modello. Aggiorna Cassini per scaricarlo.</string>
     <string name="ui_banner_dl_record_now_title">Registra ora, trascrivi dopo</string>
     <string name="ui_banner_dl_record_now_body">La trascrizione richiede un unico download. Intanto l’audio è al sicuro.</string>
 

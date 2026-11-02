@@ -13,6 +13,9 @@ enum class Failure {
     SPEAKERS,
     MEMORY, CANCELLED, UNKNOWN,
     PLAYBACK, OPUS_ENCODER,
+
+    /** The model host no longer offers the pinned model this build needs ("Model not available", R11). */
+    MODEL_UNAVAILABLE,
 }
 
 /** Keep stable failure codes separate from localized copy and native diagnostic messages. */

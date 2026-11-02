@@ -54,6 +54,13 @@ fun interface ModelFetcher {
      */
     fun fetch(model: ModelDescriptor, directory: File, progress: (Long, Boolean) -> Unit)
 
+    /**
+     * Runs [block], one install run of several models, as one session of this fetcher: the network fetcher reads the
+     * model host's manifest at most once in it (R11). Nothing outlives the session, so the next run reads the
+     * manifest again and sees a change. A fetcher with nothing to share runs [block] as it is.
+     */
+    fun <T> session(block: () -> T): T = block()
+
     companion object {
         /**
          * Downloads from the model host only (architecture 5.6, D53.1). First reads the host's manifest ([manifest])
@@ -62,24 +69,57 @@ fun interface ModelFetcher {
          * Zstandard object with [ArtifactFetcher.fetchZstd] (Range resume, verified before and after decompression),
          * following only the redirects [redirects] allows (HTTPS to `ModelCatalog.DOWNLOAD_HOSTS`, at most five hops).
          * Every request, the manifest's included, sends [userAgent]: the app's own (D54), built where its version is
-         * known.
+         * known. Inside a [session] the manifest is read once and kept for the session, in memory only; a read that
+         * failed is not kept, so the next model of the run tries again.
          */
         fun network(
             userAgent: String,
             redirects: RedirectPolicy = RedirectPolicy.DOWNLOADS,
             manifest: () -> DistManifest = { DistManifest.fetch(userAgent, redirects = redirects) },
-        ): ModelFetcher = ModelFetcher { model, directory, progress ->
-            val urls = manifest().urls(model, redirects)
-            var completed = 0L
-            for (artifact in model.artifacts) {
-                val download = checkNotNull(artifact.download) { "${artifact.name} has no pinned download" }
-                val done = completed
-                val url = urls.getValue(artifact.name)
-                ArtifactFetcher.fetchZstd(url, download, artifact, directory, userAgent, redirects) { bytes, checking ->
-                    progress(done + bytes, checking)
-                }
-                completed += download.size
+        ): ModelFetcher = NetworkFetcher(userAgent, redirects, read = manifest)
+    }
+}
+
+/** [ModelFetcher.network]: the model host's manifest, then each pinned file as its own Zstandard download. */
+private class NetworkFetcher(
+    private val userAgent: String,
+    private val redirects: RedirectPolicy,
+    private val read: () -> DistManifest,
+) : ModelFetcher {
+    /** The manifest of the session that runs on this thread; a session is one install run on one IO thread. */
+    private val session = ThreadLocal<Session?>()
+
+    private class Session {
+        var manifest: DistManifest? = null
+    }
+
+    override fun <T> session(block: () -> T): T {
+        // A session inside a session shares the outer one.
+        if (session.get() != null) return block()
+        session.set(Session())
+        try {
+            return block()
+        } finally {
+            session.remove()
+        }
+    }
+
+    private fun manifest(): DistManifest {
+        val current = session.get() ?: return read()
+        return current.manifest ?: read().also { current.manifest = it }
+    }
+
+    override fun fetch(model: ModelDescriptor, directory: File, progress: (Long, Boolean) -> Unit) {
+        val urls = manifest().urls(model, redirects)
+        var completed = 0L
+        for (artifact in model.artifacts) {
+            val download = checkNotNull(artifact.download) { "${artifact.name} has no pinned download" }
+            val done = completed
+            val url = urls.getValue(artifact.name)
+            ArtifactFetcher.fetchZstd(url, download, artifact, directory, userAgent, redirects) { bytes, checking ->
+                progress(done + bytes, checking)
             }
+            completed += download.size
         }
     }
 }
@@ -179,7 +219,11 @@ class ModelRepository(
      * logged and listed in [InstallResult.skipped]. For the install owner, on an IO thread (`runInterruptible`).
      */
     @WorkerThread
-    fun installBlocking(part: ModelPart, progress: (ModelStatus) -> Unit = {}): InstallResult {
+    fun installBlocking(part: ModelPart, progress: (ModelStatus) -> Unit = {}): InstallResult =
+        fetcher.session { installPartBlocking(part, progress) }
+
+    /** [installBlocking] inside one fetcher session: the manifest is read once for every model of [part]. */
+    private fun installPartBlocking(part: ModelPart, progress: (ModelStatus) -> Unit): InstallResult {
         Threads.assertOffMain("ModelRepository.installBlocking")
         val todo = part.models.filterNot { it.ready(paths.modelRoot) }
         val total = todo.sumOf { it.downloadBytes }.coerceAtLeast(1)
@@ -231,6 +275,9 @@ class ModelRepository(
      * (an I/O error becomes DOWNLOAD). For the app's `ModelInstaller` store, which decides itself what is best effort,
      * on an IO thread.
      */
+    /** Runs [block], an install run of several models, as one fetcher session (one manifest read, R11). */
+    fun <T> installSession(block: () -> T): T = fetcher.session(block)
+
     @WorkerThread
     fun installModelBlocking(model: ModelDescriptor, progress: (Long, Boolean) -> Unit) {
         Threads.assertOffMain("ModelRepository.installModelBlocking")

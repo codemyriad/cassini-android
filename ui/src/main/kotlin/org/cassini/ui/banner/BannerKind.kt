@@ -286,6 +286,18 @@ enum class BannerKind(
         R.string.ui_banner_dl_install_failed_body,
         actions = listOf(TRY_AGAIN),
     ),
+
+    /**
+     * The model host no longer offers the pinned model (R11; the copy iOS ships for D16 `DOWNLOAD_PIN_UNAVAILABLE`).
+     * Nothing to retry: only an update of the app helps, so it has no action and can be closed.
+     */
+    DL_MODEL_UNAVAILABLE(
+        ERROR,
+        DL,
+        R.string.ui_banner_dl_model_unavailable_title,
+        R.string.ui_banner_dl_model_unavailable_body,
+        dismissible = true,
+    ),
     DL_RECORD_NOW(
         INFO,
         DL,

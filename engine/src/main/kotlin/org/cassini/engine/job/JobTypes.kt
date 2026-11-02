@@ -66,6 +66,12 @@ enum class DownloadError {
     /** A verified file could not be put in place ("Couldn't finish installing"). */
     INSTALL,
 
+    /**
+     * The model host no longer offers the pinned model this build needs ("Model not available", R11): nothing to
+     * retry, the app must be updated.
+     */
+    MODEL_UNAVAILABLE,
+
     /** A redirect pointed outside the download hosts; shown as "Download stopped". */
     HOST_NOT_ALLOWED,
 
