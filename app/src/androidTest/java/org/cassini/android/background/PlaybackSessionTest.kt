@@ -15,7 +15,6 @@ import org.cassini.android.background.Background.waitFor
 import org.cassini.android.playback.PlaybackService
 import org.cassini.test.CiSmoke
 import org.junit.After
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -75,8 +74,10 @@ class PlaybackSessionTest {
                 posted.notification.extras.containsKey(Notification.EXTRA_MEDIA_SESSION)
             }
         }
-        val title = main { connected.mediaMetadata.title?.toString() }
-        assertEquals("The session names the note", "fleurs-it-short", title)
+        // The title follows the state once it has been read from the database.
+        waitFor("The session names the note") {
+            main { connected.mediaMetadata.title?.toString()?.takeIf { it == "fleurs-it-short" } }
+        }
 
         main { connected.pause() }
         waitFor("Pause from the session pauses the player") { playback.state.value.takeUnless { it.playing } }
