@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TestFilesProvider (instrumented builds only): the cache directory, where the device tests copy their clips. -->
+<paths>
+    <cache-path name="cache" path="." />
+</paths>

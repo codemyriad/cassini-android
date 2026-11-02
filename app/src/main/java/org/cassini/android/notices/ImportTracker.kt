@@ -60,6 +60,14 @@ class ImportTracker(
         outcome
     }
 
+    /**
+     * A file another app handed over could not be imported at all (Android refused to pass its read grant on): the
+     * banner shows [failure], as for a failed import.
+     */
+    fun refuse(failure: Failure) {
+        mutable.update { it.copy(failure = ImportFailure(failure, at = clock())) }
+    }
+
     /** The user closed the import error banner. */
     fun dismissFailure() {
         mutable.update { it.copy(failure = null) }

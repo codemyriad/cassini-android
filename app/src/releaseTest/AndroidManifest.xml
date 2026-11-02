@@ -8,5 +8,11 @@
              (ScreenAccessibilityTest). The tests start it from the app's own process, so it need not be exported. -->
         <activity android:name="androidx.activity.ComponentActivity" android:exported="false"
             tools:replace="android:exported" />
+        <!-- The device tests' "Open with" and share uris (src/instrumented): an authority that is not Cassini's own,
+             as another app's provider has, so MainActivity takes it. Not exported. -->
+        <provider android:name=".TestFilesProvider" android:authorities="cassini.instrumented.testfiles"
+            android:exported="false" android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/test_files" />
+        </provider>
     </application>
 </manifest>
