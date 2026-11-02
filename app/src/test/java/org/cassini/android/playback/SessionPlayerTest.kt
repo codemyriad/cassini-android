@@ -3,6 +3,7 @@ package org.cassini.android.playback
 import android.os.Looper
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -98,5 +99,27 @@ class SessionPlayerTest {
         session.pause()
         idle()
         assertFalse(controller.state.value.playing)
+    }
+
+    @Test fun theCommandsComeWithTheOpenNoteBeforeItsTitle() = runTest {
+        val audio = Player1()
+        val controller = controller(audio)
+        val title = CompletableDeferred<String>()
+        val session = SessionPlayer(controller, scope) { title.await() }
+        assertTrue(controller.open("n1", File("a.opus"), positionMs = 0))
+        idle()
+        // A controller that connects now and plays at once (Media3 drops a play the player does not offer).
+        val offered = session.isCommandAvailable(Player.COMMAND_PLAY_PAUSE)
+        assertTrue("play is offered while the title is still read", offered)
+        session.play()
+        idle()
+        assertTrue(controller.state.value.playing)
+
+        title.complete("Title of n1")
+        idle()
+        assertEquals("Title of n1", session.mediaMetadata.title.toString())
+        // Paused, so the position ticker stops and runTest can end.
+        session.pause()
+        idle()
     }
 }
