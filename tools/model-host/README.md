@@ -9,7 +9,7 @@ The host publishes these files:
 | [`manifest.json`](https://dist.gocassini.com/manifest.json) | Schema version 2: each model as `{id, source_sha256, files[]}`, and each file as a seekable Zstandard artifact `models/files/<compressed sha256>/<name>.zst` with its compressed and decompressed size and SHA-256. |
 | [`NOTICE.txt`](https://dist.gocassini.com/NOTICE.txt) | The origin, the license and the changes of every model on the host, with the license texts that the models ask to keep (OpenMDW-1.1, Apache-2.0, MIT, the NVIDIA Open Model License). |
 
-The app does not follow the manifest to new models. `core/src/main/kotlin/org/cassini/core/models/ModelCatalog.kt` pins the pair (`id`, `source_sha256`) of each model that the app uses, and the sizes and hashes of each file. Before a download, `DistManifest` checks that the manifest still lists these pins, and refuses the download if it does not.
+The app does not follow the manifest to new models. `core/src/main/kotlin/io/codemyriad/cassini/core/models/ModelCatalog.kt` pins the pair (`id`, `source_sha256`) of each model that the app uses, and the sizes and hashes of each file. Before a download, `DistManifest` checks that the manifest still lists these pins, and refuses the download if it does not.
 
 The app keeps copies of the two files:
 

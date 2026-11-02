@@ -12,7 +12,7 @@ plugins {
 val fixtures: String = rootProject.file("fixtures").absolutePath
 
 android {
-    namespace = "org.cassini.data"
+    namespace = "io.codemyriad.cassini.data"
     compileSdk = libs.versions.compileSdk.get().toInt()
     buildToolsVersion = libs.versions.buildTools.get()
     defaultConfig {

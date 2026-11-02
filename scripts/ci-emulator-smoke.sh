@@ -113,10 +113,10 @@ if [ -n "$platform_opus" ]; then expectation=(--arg "expectPlatformOpus=$platfor
 if $data_tests; then
     data_apks=(.tools/ci-data-tests/**/*.apk)
     test "${#data_apks[@]}" -eq 1
-    # A library test APK instruments itself (org.cassini.data.test) and never touches org.cassini.android.
+    # A library test APK instruments itself (io.codemyriad.cassini.data.test) and never touches io.codemyriad.cassini.
     adb install -r "${data_apks[0]}"
-    adb shell am instrument -w -r -e class org.cassini.data.NoteFtsDeviceTest \
-        org.cassini.data.test/androidx.test.runner.AndroidJUnitRunner | tee .tools/emulator-results/data-instrumentation.txt
+    adb shell am instrument -w -r -e class io.codemyriad.cassini.data.NoteFtsDeviceTest \
+        io.codemyriad.cassini.data.test/androidx.test.runner.AndroidJUnitRunner | tee .tools/emulator-results/data-instrumentation.txt
     python3 -I - .tools/emulator-results/data-instrumentation.txt <<'PY'
 import pathlib, re, sys
 report = pathlib.Path(sys.argv[1]).read_text()

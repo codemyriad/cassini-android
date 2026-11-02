@@ -3,8 +3,8 @@
 
 # The navigation keys (nav/Dest.kt). Navigation 3 saves the back stack with kotlinx-serialization: it looks up each
 # key's serializer by reflection and stores the class name, so the keys, their companions and serializers stay.
--keep @kotlinx.serialization.Serializable class org.cassini.android.nav.** { *; }
--keepclassmembers class org.cassini.android.nav.** {
+-keep @kotlinx.serialization.Serializable class io.codemyriad.cassini.nav.** { *; }
+-keepclassmembers class io.codemyriad.cassini.nav.** {
     *** Companion;
     kotlinx.serialization.KSerializer serializer(...);
 }

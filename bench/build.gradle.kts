@@ -9,7 +9,7 @@ plugins {
 }
 
 android {
-    namespace = "org.cassini.bench"
+    namespace = "io.codemyriad.cassini.bench"
     compileSdk = libs.versions.compileSdk.get().toInt()
     buildToolsVersion = libs.versions.buildTools.get()
     targetProjectPath = ":app"

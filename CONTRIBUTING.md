@@ -144,7 +144,7 @@ On macOS or Windows, do not run `ciTest`, and do not record or commit goldens. R
 
 CAUTION: Do not run the Gradle `connected*` tasks or the managed-device tasks. These tasks can uninstall the app. The uninstall erases the app data and the downloaded models (about 770 MB).
 
-CAUTION: Do not run `adb uninstall org.cassini.android` or `adb shell pm clear org.cassini.android`. These commands erase the app data and the downloaded models.
+CAUTION: Do not run `adb uninstall io.codemyriad.cassini` or `adb shell pm clear io.codemyriad.cassini`. These commands erase the app data and the downloaded models.
 
 Use `scripts/device-smoke.sh` for the device tests. The script installs the app and the test APK with `adb install -r`. Then it runs the instrumentation with `adb shell am instrument`. This keeps the app data and the models.
 

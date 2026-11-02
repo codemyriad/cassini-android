@@ -262,7 +262,7 @@ The "Save a copy" rows are:
 
 **Acceptance**: JVM `TrashPolicy` ("Deleted 2 Oct · 23 days left" on 9 Oct, "today · 30 days left", DST changes). Robo `PurgeOrderTest` (a crash after the file deletion, and the next run finishes), and a restore of a queued note puts it again into the queue. Shot `09-trash` and the empty variant. Device: trash → Undo → trash → Delete now removes `notes/<id>` and `voices/notes/<id>.json`.
 
-## 9. Export writers (`:core` `org.cassini.core.export`) [NEW]
+## 9. Export writers (`:core` `io.codemyriad.cassini.core.export`) [NEW]
 
 The input is `ExportTranscript(title, durationMs, words, labels)`. It has the words of the selected variant in canonical order (the writers never sort them again) and the display label of each speaker ID. Named labels are verbatim, and placeholders are the localized "Speaker N". If a label is missing, the writer uses the ID. The output is UTF-8 without BOM, with `\n` line ends and exactly one `\n` at the end. One space separates the words.
 

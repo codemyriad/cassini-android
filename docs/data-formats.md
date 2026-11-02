@@ -75,7 +75,7 @@ A note with a valid checkpoint comes back paused.
 
 ## Room catalogue
 
-The database is `org.cassini.data.db.CassiniDatabase`, version 1. The schemas are in `data/schemas/`. Room stores the enums as `TEXT` with stable names, never as ordinals.
+The database is `io.codemyriad.cassini.data.db.CassiniDatabase`, version 1. The schemas are in `data/schemas/`. Room stores the enums as `TEXT` with stable names, never as ordinals.
 
 | Table | Key | Content |
 |---|---|---|
@@ -200,7 +200,7 @@ The Note actions sheet has three export rows. Each export uses the selected vers
 | Transcript as text | `.txt`, `text/plain` | The title, a subtitle and the turns |
 | Subtitles | `.srt` (`application/x-subrip`) or `.vtt` (`text/vtt`) | Timed cues |
 
-The `:core` package `org.cassini.core.export` writes the text exports. [`design/features.md`](design/features.md), section 9, gives all the rules.
+The `:core` package `io.codemyriad.cassini.core.export` writes the text exports. [`design/features.md`](design/features.md), section 9, gives all the rules.
 
 ### TXT
 

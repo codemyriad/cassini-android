@@ -1,11 +1,11 @@
 @file:Suppress("InvalidPackageDeclaration") // Kept flat under tools/asr-eval; see README.md.
 
-package org.cassini.tools.asreval
+package io.codemyriad.cassini.tools.asreval
 
-import org.cassini.core.asr.DecodePolicy
-import org.cassini.core.audio.PcmAudio
-import org.cassini.engine.asr.Parakeet
-import org.cassini.engine.asr.ParakeetFiles
+import io.codemyriad.cassini.core.asr.DecodePolicy
+import io.codemyriad.cassini.core.audio.PcmAudio
+import io.codemyriad.cassini.engine.asr.Parakeet
+import io.codemyriad.cassini.engine.asr.ParakeetFiles
 import org.json.JSONObject
 import java.io.File
 import java.nio.ByteBuffer

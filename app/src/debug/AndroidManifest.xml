@@ -10,7 +10,7 @@
             android:theme="@android:style/Theme.Translucent.NoTitleBar" android:excludeFromRecents="true" />
         <!-- Starts the status writer in every process of a debug-root run, also one that Android starts for a
              redelivered service intent. -->
-        <provider android:name=".debug.DebugStatusProvider" android:authorities="org.cassini.android.debugstatus"
+        <provider android:name=".debug.DebugStatusProvider" android:authorities="io.codemyriad.cassini.debugstatus"
             android:exported="false" />
         <!-- compose-ui-tooling (the :ui previews) brings an exported activity that would start any composable of the
              app from outside. The app does not need it on a device. MissingClass: lint reads the compile classpath,
@@ -22,8 +22,9 @@
         <activity android:name="androidx.activity.ComponentActivity" android:exported="false"
             tools:replace="android:exported" />
         <!-- The device tests' "Open with" and share uris (src/instrumented): an authority that is not Cassini's own,
-             as another app's provider has, so MainActivity takes it. Not exported. -->
-        <provider android:name=".TestFilesProvider" android:authorities="cassini.instrumented.testfiles"
+             as another app's provider has, so MainActivity takes it. It names the app after a prefix, so it is unique to
+             each application id (an old build beside this one would otherwise refuse to install). Not exported. -->
+        <provider android:name=".TestFilesProvider" android:authorities="testfiles.${applicationId}"
             android:exported="false" android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/test_files" />
         </provider>

@@ -17,6 +17,8 @@ Privacy:
 
 Cassini does all speech recognition on the phone. It does not upload audio, transcripts or voiceprints. It has no accounts, no analytics and no advertising. The app uses the network only to download the models (about 730 MB), and only after you agree. A voiceprint never goes into a document or an export.
 
+Privacy policy: https://cassini.talk/privacy/android/
+
 Requirements:
 
 Android 8.0 or later on a 64-bit ARM phone, and about 1 GB of free storage for the models.

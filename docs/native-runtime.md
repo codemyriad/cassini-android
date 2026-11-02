@@ -88,7 +88,7 @@ fun restoreStreamingState(values: FloatArray): Boolean
 - `saveStreamingState` returns the speaker cache, the FIFO and the activity probabilities as one float array.
 - `restoreStreamingState` puts a saved array back. It returns `false` if the diarizer cannot use the array. Only the Sortformer implementation supports it.
 
-`org.cassini.engine.speakers.SortformerStream` uses these calls. The checkpoint keeps the saved array (at most 200000 floats) in `diarizer.cache` ([`data-formats.md`](data-formats.md#checkpointjson)).
+`io.codemyriad.cassini.engine.speakers.SortformerStream` uses these calls. The checkpoint keeps the saved array (at most 200000 floats) in `diarizer.cache` ([`data-formats.md`](data-formats.md#checkpointjson)).
 
 ## The superseded release .1
 

@@ -50,7 +50,7 @@ These constraints are mandatory:
 - The privacy rules apply. The list that follows gives them.
 - Native runtime: `minSdk 26`. The ABIs are `arm64-v8a` and `x86_64` (16 KB aligned). The app uses `libcassini_opus.so` and the custom sherpa-onnx AAR. We build this AAR from the pinned fork and `scripts/streaming-diarization.patch`.
 - Android stays native Kotlin. The iOS app is separate Swift code. The two apps share only the portable format.
-- `applicationId org.cassini.android` and the JNI class name `org.cassini.android.NativeOpus` do not change. The native symbols use the second name. The old plan kept a launcher alias for the library activity of 0.1.0. The app does not need this alias, because no installed shortcuts exist.
+- `applicationId io.codemyriad.cassini` (coordination D62; 0.3.0 and earlier were `org.cassini.android`, with no data migration, D51). The JNI class is `io.codemyriad.cassini.NativeOpus`, and the native symbols use this name. The old plan kept a launcher alias for the library activity of 0.1.0. The app does not need this alias, because no installed shortcuts exist.
 - UI stack: Jetpack Compose, with Material 3 components under the Cassini tokens. The tokens give all of the style: there is no stock Material look and no dynamic color. The app uses ViewModels, `StateFlow`, a unidirectional data flow, coroutines and manual dependency injection (`AppGraph`).
 - Languages and accessibility: English, Italian, French, Spanish, and Brazilian and European Portuguese (coordination decisions D50 and D50.1), TalkBack support and 48 dp touch targets. The app never shows a state by color alone. It has the light theme of the boards and a dark theme that we made from it. It is edge-to-edge and has predictive back with targetSdk 36 (from P10).
 
@@ -95,9 +95,9 @@ bench -(instruments)-> app
 
 `./gradlew --configure-on-demand :core:test` needs a JDK and the `third_party/cassini-format` submodule. It needs nothing else: no NDK, no AAR and no device.
 
-Native seams: `:core` has the interfaces that the verbatim engine already uses: `WordDecoder` (`asr/DecodeSession.kt`), `SpeechFeed.Stream` and `PcmSource`. The other native parts are concrete classes in `:engine`: `SortformerStream`, the `VoiceprintExtractor` object, `AudioDecoder` and `StreamingOpusEncoder`. P5 added interfaces in `org.cassini.engine.job` that the engine owns: `Recognizer`, `StreamingDiarizer`, `PrintExtractor`, `AudioSource` and `OpusSink`. Thin adapters connect these interfaces to the native classes. Thus the JVM tests of `TranscriptionJob` can use fakes.
+Native seams: `:core` has the interfaces that the verbatim engine already uses: `WordDecoder` (`asr/DecodeSession.kt`), `SpeechFeed.Stream` and `PcmSource`. The other native parts are concrete classes in `:engine`: `SortformerStream`, the `VoiceprintExtractor` object, `AudioDecoder` and `StreamingOpusEncoder`. P5 added interfaces in `io.codemyriad.cassini.engine.job` that the engine owns: `Recognizer`, `StreamingDiarizer`, `PrintExtractor`, `AudioSource` and `OpusSink`. Thin adapters connect these interfaces to the native classes. Thus the JVM tests of `TranscriptionJob` can use fakes.
 
-### 2.1 `:core` (package `org.cassini.core`)
+### 2.1 `:core` (package `io.codemyriad.cassini.core`)
 
 The P1 move kept the bodies of the files, except for the listed edits. `scripts/check-verbatim.sh` compares each verbatim file with its 0.1.0 origin. It ignores the package and import lines, and it reports only the listed edits.
 
@@ -113,7 +113,7 @@ The P1 move kept the bodies of the files, except for the listed edits. `scripts/
 | `export` | New in P3 | `TranscriptTurns`, `ExportClock`, `TextExport`, `SubtitleCues`, `SrtWriter`, `VttWriter`, `ExportNames` (features.md section 9). |
 | (root) | `Failure` | Failure codes without string resources. `FailureMessages` in `:app` is the only place where a failure gets a string. |
 
-### 2.2 `:engine` (package `org.cassini.engine`, and `org.cassini.android.NativeOpus`)
+### 2.2 `:engine` (package `io.codemyriad.cassini.engine`, and `io.codemyriad.cassini.NativeOpus`)
 
 | Package | Content |
 |---|---|
@@ -126,11 +126,11 @@ The P1 move kept the bodies of the files, except for the listed edits. `scripts/
 
 The sherpa-onnx AAR is the Maven coordinate `org.cassini.native:sherpa-onnx-nemotron:1.13.7-0c2ee3f3` in the repository `native/m2/`, which git ignores (section 8).
 
-### 2.3 `:data` (package `org.cassini.data`)
+### 2.3 `:data` (package `io.codemyriad.cassini.data`)
 
 This module holds Room, DataStore and the file repositories of section 4. Each repository takes `AppPaths`, `CassiniDispatchers` and the shared `NoteLocks`. The repositories give `suspend` functions and cold `Flow`s. Functions with the name `…Blocking` are only for the inference thread.
 
-### 2.4 `:ui` (package `org.cassini.ui`)
+### 2.4 `:ui` (package `io.codemyriad.cassini.ui`)
 
 This module holds these parts:
 
@@ -144,7 +144,7 @@ This module holds these parts:
 
 `:ui` has no XML theme. `Theme.Cassini` is in `:app`, because it needs AppCompat. `ui.md` is the specification of `:ui`.
 
-### 2.5 `:app` (package `org.cassini.android`)
+### 2.5 `:app` (package `io.codemyriad.cassini`)
 
 - `CassiniApplication` makes `AppGraph`. The graph holds the paths, dispatchers, locks, repositories, engine wrappers, port adapters, `ProcessingCoordinator`, `ModelInstallOwner`, `RecordingController`, `PlaybackController` and `NoticeCenter`. `AppGraph` is constructor wiring (about 550 lines).
 - `AppGraph.ready: Deferred<Unit>` completes after the startup work of section 4.8. The start of a job, an import or a recording waits for it.
@@ -239,7 +239,7 @@ Each model has its own directory `models/<id>/<sourceSha256>/` under the model r
 
 On emulator-5554, the files of the old app (for example `documents/`, `library.json` and `voices.json`) stay where they are. The new app does not read them and does not delete them.
 
-### 3.3 Room schema (`org.cassini.data.db.CassiniDatabase`, version 1)
+### 3.3 Room schema (`io.codemyriad.cassini.data.db.CassiniDatabase`, version 1)
 
 `exportSchema = true`, and the schemas are in `data/schemas/`. `TypeConverter`s store the enums as `TEXT` with stable names, never as ordinals. The enums are in the `library/` package of `:core`, so that `:data` and `:engine` share them.
 
@@ -330,7 +330,7 @@ The unicode61 tokenizer must operate on API 26. `NoteFtsDeviceTest` is a `:data`
 
 1. Build it with `./gradlew :data:assembleDebugAndroidTest`.
 2. Install `data/build/outputs/apk/androidTest/debug/data-debug-androidTest.apk` with `adb install -r`.
-3. Start `adb shell am instrument -w org.cassini.data.test/androidx.test.runner.AndroidJUnitRunner`.
+3. Start `adb shell am instrument -w io.codemyriad.cassini.data.test/androidx.test.runner.AndroidJUnitRunner`.
 
 The test APK instruments itself and does not touch the data of the app. If the SQLite of a device has no unicode61, the database does not open. The app logs this as a bug and does not use a different tokenizer. If the SQLite of Robolectric has no such tokenizer, the DAO tests fail. They never skip. The device test is the authority.
 
@@ -694,7 +694,7 @@ Then the queue starts in one of two ways:
 | Reboot | Nothing runs until the user opens the app. Then the work in the queue continues as this section describes. |
 | Java `OutOfMemoryError` | The job boundary catches it. The job becomes PAUSED(MEMORY), and the checkpoint stays. The checkpoint and the redelivery cover the native out-of-memory kills. |
 
-`adb shell am kill` does not kill a process that runs a foreground service. Thus the device checks use `adb shell run-as org.cassini.android kill -9 <pid>` (section 9).
+`adb shell am kill` does not kill a process that runs a foreground service. Thus the device checks use `adb shell run-as io.codemyriad.cassini kill -9 <pid>` (section 9).
 
 ### 5.4 `TranscriptionJob` and its ports
 
@@ -899,7 +899,7 @@ The text comes from `inAppLanguage()` (`AppLanguage.kt`). Below API 33, this fun
 - Sheets and dialogs are ViewModel state (in `SavedStateHandle`), not destinations. "Transcribing" is a mode of the Note screen.
 - State holders: each destination has one ViewModel, made in a `viewModel { }` factory from `AppGraph`. Each screen has one immutable `UiState` as a `StateFlow` (`combine` + `stateIn(WhileSubscribed(5_000))`). The events of each screen are a sealed interface, and the screen gives them to `onEvent`. `XxxRoute(viewModel)` in `:app` collects the state with `collectAsStateWithLifecycle()` and calls the stateless `XxxScreen(state, onEvent)` in `:ui`.
 - The ViewModels give semantic values: enums, durations in milliseconds, `LocalDate`/`LocalTime`, counts and user text. `:ui` changes them into localized text. Thus the ViewModels do not need `Resources`, and the Italian and font-scale screenshot tests can use the same fixtures.
-- The state machine for speaker naming is a pure reducer in `:app`: `note/SpeakerNaming.kt` (package `org.cassini.android.note`), with unit tests. It covers rename, the selection of a saved person, the same-person prompt, the rename of the saved voice, the merge with a confirmation, Remember and "Not X".
+- The state machine for speaker naming is a pure reducer in `:app`: `note/SpeakerNaming.kt` (package `io.codemyriad.cassini.note`), with unit tests. It covers rename, the selection of a saved person, the same-person prompt, the rename of the saved voice, the merge with a confirmation, Remember and "Not X".
 - Back: an open sheet, a dialog, the search mode or a rename uses back first. On Recording, back minimises the screen, and the recording continues. Library is the root. On Library, back leaves the app with the predictive back-to-home of the system.
 - Deep links go through `MainActivity` (`onCreate` with no saved state, and `onNewIntent`). The activity marks a handled intent, so that a new activity after a configuration change does not handle it again. ACTION_VIEW imports the file on IO and pushes `NoteKey(id)` on top of the existing stack. If the stack was empty, Library is under the Note screen. Notification intents have `open = recording | note` and `noteId`.
 - `ModelDownloadKey` when no model is missing: the entry points do not open it then. If it opens (for example from an old back stack), the route removes itself from the stack. If it has a note, it first puts the note into the queue.
@@ -956,7 +956,7 @@ The other rules of the build are:
 - Fonts: the unmodified static TTFs of Instrument Sans and IBM Plex Mono. `third_party/fonts/fonts.json` pins them, and `scripts/fetch-fonts.sh` gets them (ui.md section 3).
 - JVM tests: `src/test/resources/robolectric.properties` pins Robolectric 4.17 to SDK 35 in each module that uses it. One test in each such module asserts `Build.VERSION.SDK_INT == 35`. SDK 36 and later need a JDK 21 runtime. The tests use `--add-opens` jvmArgs and `isIncludeAndroidResources = true`.
 - `ciTest` (a root task) runs `:core:test`. For each Android module, it runs `verifyRoborazziDebug` if the module has the Roborazzi plugin, else `testDebugUnitTest`. CI and the green check of each phase run it.
-- Release: R8 (`isMinifyEnabled`, `isShrinkResources`, `proguard-android-optimize.txt`). The keep rules keep the members of `com.k2fsa.sherpa.onnx.** { *; }`, `com.github.luben.zstd.** { *; }`, `org.cassini.android.NativeOpus { *; }`, the classes with `native` methods, and kotlinx-serialization for the navigation keys. `scripts/package-apk.py` copies the R8 mapping into `dist/`.
+- Release: R8 (`isMinifyEnabled`, `isShrinkResources`, `proguard-android-optimize.txt`). The keep rules keep the members of `com.k2fsa.sherpa.onnx.** { *; }`, `com.github.luben.zstd.** { *; }`, `io.codemyriad.cassini.NativeOpus { *; }`, the classes with `native` methods, and kotlinx-serialization for the navigation keys. `scripts/package-apk.py` copies the R8 mapping into `dist/`.
 - `releaseTest` is a build type: the release build without R8, with the same signing. The device tests of a tag build use it. `scripts/launch-check.sh` makes sure that the minified release APK starts.
 - zstd-jni 1.5.7-25: the `@aar` in the Android modules, and the plain jar in the JVM tests.
 - Lint: `warningsAsErrors`, `abortOnError` and `checkDependencies`. `MissingTranslation` is an error. Lint ignores `OldTargetApi`, the version checks that need a network, and `UsableSpace`, on purpose. Each Android module has an explicit lint block. The adaptive icons are in `mipmap-anydpi/`, not in `-v26`, because `-v26` causes ObsoleteSdkInt at minSdk 26. After P10, the lint baseline is empty. The attributes on `<application>` that are newer than minSdk have `tools:targetApi`.
@@ -982,7 +982,7 @@ CI has three workflows in `.github/workflows/`. `docs/development.md` ("Continuo
 4. Device tests (`scripts/device-smoke.sh --annotation <name> [--class <c>] [--serial <s>]`). The paragraphs after this list describe them.
 5. Process-death and persistence checks with host scripts. The paragraphs after this list describe them.
 6. Acceptance (P12): `scripts/acceptance-walk.sh`, an instrumented walk through each board on emulator-5554 with device screenshots. A reviewer compared the screenshots with the design (`docs/ui-fidelity.md`).
-7. Device safety: never run the Gradle `connected*` or managed-device tasks. They uninstall the app and erase about 770 MB of models on emulator-5554. Install with `adb install -r`. Run the instrumentation with `adb shell am instrument` or `scripts/device-smoke.sh`. Never use `adb uninstall org.cassini.android` or `pm clear`. Before a test that `CassiniTestRunner` or a debug root does not isolate, make a backup of the `files/` metadata (not the models) with `run-as` and `tar`.
+7. Device safety: never run the Gradle `connected*` or managed-device tasks. They uninstall the app and erase about 770 MB of models on emulator-5554. Install with `adb install -r`. Run the instrumentation with `adb shell am instrument` or `scripts/device-smoke.sh`. Never use `adb uninstall io.codemyriad.cassini` or `pm clear`. Before a test that `CassiniTestRunner` or a debug root does not isolate, make a backup of the `files/` metadata (not the models) with `run-as` and `tar`.
 8. Pre-release gate (by hand, `docs/development.md`): an end-to-end run on a Pixel 8 (API 37). Music that plays during a recording does not pause the recording. An incoming call pauses the capture. An API 35/36 AVD for `mediaProcessing` and `onTimeout`. `node scripts/check-portable-document.mjs` and `cassini-extract.py --check` accept a document that the new engine sealed.
 
 `TranscriptionJobTest` covers these items:
@@ -1014,8 +1014,8 @@ Process-death and persistence checks are host scripts, not instrumentation. The 
 
 1. It writes `files/debug-root.txt`. Debug builds read this file. The models stay at `filesDir`.
 2. It copies the long clip into the cache of the scratch root.
-3. It starts a job through the debug-only `DebugCommandActivity` (`adb shell am start -n org.cassini.android/.debug.DebugCommandActivity --es cmd import --es file …`).
-4. It kills the process with `adb shell run-as org.cassini.android kill -9 $(pidof org.cassini.android)`.
+3. It starts a job through the debug-only `DebugCommandActivity` (`adb shell am start -n io.codemyriad.cassini/.debug.DebugCommandActivity --es cmd import --es file …`).
+4. It kills the process with `adb shell run-as io.codemyriad.cassini kill -9 $(pidof io.codemyriad.cassini)`.
 5. It waits for the redelivery, or it opens the app again with `--es cmd open`.
 6. It reads the status file `<root>/debug-status.json` with `run-as cat`.
 7. It makes sure that the sealed document passes the format tools.
