@@ -90,6 +90,7 @@ fun CassiniSnackbarHost(
             SnackbarKind.SAVED_FILE -> stringResource(R.string.ui_actions_saved_file, it.text.orEmpty())
             SnackbarKind.SAVE_FAILED -> stringResource(R.string.ui_actions_save_failed)
             SnackbarKind.SHARE_FAILED -> stringResource(R.string.ui_actions_share_failed)
+            SnackbarKind.PLAYBACK_FAILED -> stringResource(R.string.ui_status_unplayable)
         }
     }
     CassiniSnackbarHost(

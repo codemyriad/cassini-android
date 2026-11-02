@@ -116,6 +116,17 @@ class PlaybackSessionTest {
         // A headset's pause button: the media key goes to the playing session.
         Background.shell("input keyevent KEYCODE_MEDIA_PAUSE")
         waitFor("The media key pauses the player") { playback.state.value.takeUnless { it.playing } }
+
+        // Leaving the note ends the session even though this controller is still bound: Media3 removes the
+        // notification and the released session disconnects the controller, so nothing keeps the service alive.
+        withContext(Dispatchers.Main) { playback.leave() }
+        waitFor("The session disconnects its controllers") { main { connected.takeUnless { it.isConnected } } }
+        waitFor("The media notification is gone", NOTIFICATION_MS) {
+            val media = manager.activeNotifications.filter { posted ->
+                posted.notification.extras.containsKey(Notification.EXTRA_MEDIA_SESSION)
+            }
+            Unit.takeIf { media.isEmpty() }
+        }
         Unit
     }
 

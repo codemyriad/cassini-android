@@ -301,6 +301,7 @@ class NoteViewModel(
         launch { ports.refreshIfStale(noteId) }
         launch { closeWhenGone() }
         launch { followPlayer() }
+        launch { announcePlayerFailures() }
         saved.get<String>(KEY_NAME_SHEET)?.let { speaker -> launch { openNaming(speaker, restoring = true) } }
         if (local.value.sheet == SheetKind.INFO) {
             launch { details.filterNotNull().first().details?.let { openInfo(it) } }
@@ -574,7 +575,7 @@ class NoteViewModel(
             is NoteEvent.SpeakerTap -> launch { openNaming(event.speakerId) }
             is NoteEvent.AcceptSuggestion -> launch { accept(event.speakerId, event.voiceId) }
             is NoteEvent.RejectSuggestion -> launch { reject(event.speakerId, event.voiceId) }
-            NoteEvent.PlayPause -> ports.togglePlay()
+            NoteEvent.PlayPause -> if (playerFailed()) launch { retryPlayer(null) } else ports.togglePlay()
             is NoteEvent.Seek -> local.update { it.copy(seekingMs = event.positionMs) }
             NoteEvent.SeekFinished -> seekFinished()
             is NoteEvent.Skip -> ports.skip(if (event.forward) SKIP_MS else -SKIP_MS)
@@ -705,8 +706,36 @@ class NoteViewModel(
 
     private fun seekAndPlay(positionMs: Long) {
         local.update { it.copy(following = true) }
+        if (playerFailed()) {
+            launch { retryPlayer(positionMs) }
+            return
+        }
         ports.seekTo(positionMs)
         ports.play()
+    }
+
+    /** This note's player failed (it could not prepare the file, or an error stopped it) and was released. */
+    private fun playerFailed(): Boolean = ports.playback.value.let { it.noteId == noteId && it.failed }
+
+    /**
+     * Play after a failure: the player is opened again on the note's file, at [positionMs] or the saved position,
+     * and plays. A file that still cannot play shows "Can't play" again.
+     */
+    private suspend fun retryPlayer(positionMs: Long?) {
+        val note = details.value?.details?.note ?: return
+        val file = note.audioFile ?: return
+        if (ports.openPlayer(noteId, file, positionMs ?: note.positionMs)) {
+            ports.play()
+        } else {
+            snackbar(SnackbarKind.PLAYBACK_FAILED, null)
+        }
+    }
+
+    /** "Can't play" each time this note's player fails, so the screen never shows a player that silently does nothing. */
+    private suspend fun announcePlayerFailures() {
+        ports.playback.map { it.noteId == noteId && it.failed }.distinctUntilChanged().collect { failed ->
+            if (failed) snackbar(SnackbarKind.PLAYBACK_FAILED, null)
+        }
     }
 
     private fun seekFinished() {

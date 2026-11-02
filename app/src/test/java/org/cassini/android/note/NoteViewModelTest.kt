@@ -367,6 +367,34 @@ class NoteViewModelTest {
         assertEquals("from 2× back to 0.75×", "speed:0.75", ports.calls.last())
     }
 
+    /** Review of #40: after the player fails, the screen says so and Play opens it again instead of doing nothing. */
+    @Test
+    fun aFailedPlayerShowsCantPlayAndPlayOpensItAgain() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        advanceUntilIdle()
+        val opens = ports.calls.count { it.startsWith("openPlayer:") }
+
+        // An error stopped the player while it played.
+        ports.playback.value = PlaybackState(noteId = NOTE, failed = true)
+        advanceUntilIdle()
+        assertEquals(SnackbarKind.PLAYBACK_FAILED, viewModel.now().snackbar?.kind)
+        assertFalse(viewModel.now().playback!!.playing)
+
+        send(viewModel, NoteEvent.PlayPause)
+        assertEquals("Play opens the player again", opens + 1, ports.calls.count { it.startsWith("openPlayer:") })
+        assertEquals("play", ports.calls.last())
+        assertFalse("not a toggle of a released player", ports.calls.contains("toggle"))
+        assertFalse(ports.playback.value.failed)
+
+        // A word tap after another failure opens it again at the word.
+        ports.playback.value = PlaybackState(noteId = NOTE, failed = true)
+        advanceUntilIdle()
+        send(viewModel, NoteEvent.WordTap(WordRef("w3", 1)))
+        assertEquals(opens + 2, ports.calls.count { it.startsWith("openPlayer:") })
+        assertEquals(2_400L, ports.playback.value.positionMs)
+        assertEquals("play", ports.calls.last())
+    }
+
     // Search. ---------------------------------------------------------------------------------------------------
 
     @Test

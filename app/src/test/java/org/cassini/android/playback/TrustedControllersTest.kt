@@ -14,6 +14,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /** Review of #40: the session shows the note's title and takes commands, so only trusted controllers connect. */
 @OptIn(UnstableApi::class)
@@ -53,7 +54,22 @@ class TrustedControllersTest {
         assertTrue(TrustedControllers.trusted(session, controller("com.example.watch", OTHER_APP_UID, trusted = true)))
     }
 
+    /**
+     * Review of #40: before API 28 a platform controller comes without a package name. It is refused unless Android
+     * trusts it; nothing is trusted for being unidentified.
+     */
+    @Config(sdk = [26, 27])
+    @Test
+    fun anUnidentifiedControllerBeforeApi28IsRefusedUnlessTrusted() {
+        val legacy = MediaSession.ControllerInfo.LEGACY_CONTROLLER_PACKAGE_NAME
+        assertFalse(TrustedControllers.trusted(session, controller(legacy, UNKNOWN_UID)))
+        assertTrue(TrustedControllers.trusted(session, controller(legacy, UNKNOWN_UID, trusted = true)))
+        assertFalse(TrustedControllers.trusted(session, controller("com.example.reader", OTHER_APP_UID)))
+        assertTrue(TrustedControllers.trusted(session, controller("org.cassini.android", Process.myUid())))
+    }
+
     private companion object {
+        const val UNKNOWN_UID = -1
         const val OTHER_APP_UID = 10_999
         const val SYSTEM_UI_UID = 10_050
         const val BLUETOOTH_UID = 1_002
