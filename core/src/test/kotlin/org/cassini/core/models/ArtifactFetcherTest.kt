@@ -588,6 +588,66 @@ class ArtifactFetcherTest {
         }
     }
 
+    @Test fun aCompleteCompressedDownloadIsNothingLeftToFetch() {
+        val compressed = com.github.luben.zstd.Zstd.compress(weights)
+        val download = artifact(compressed).copy(name = "model.onnx.zst")
+        val directory = Files.createTempDirectory("cassini-zst").toFile()
+        try {
+            File(directory, "model.onnx.zst").writeBytes(compressed)
+            assertEquals(0L, ArtifactFetcher.bytesToFetch(download, directory))
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test fun aCancelDuringDecompressionKeepsTheVerifiedDownload() {
+        val compressed = com.github.luben.zstd.Zstd.compress(weights)
+        val download = artifact(compressed).copy(name = "model.onnx.zst")
+        withServer({ Answer(200, compressed) }) { url, directory, requests ->
+            val kept = File(directory, "model.onnx.zst")
+            val failed = try {
+                // The download is in place once fetch has renamed it: stop during the decompression.
+                failure {
+                    ArtifactFetcher.fetchZstd(url, download, artifact(weights), directory, AGENT) { _, verifying ->
+                        if (verifying && kept.isFile) Thread.currentThread().interrupt()
+                    }
+                }
+            } finally {
+                Thread.interrupted()
+            }
+            assertEquals(Failure.CANCELLED, failed)
+            assertTrue("the verified download stays for the next attempt", kept.isFile)
+            assertFalse(File(directory, "model.onnx").exists())
+            assertEquals(0L, ArtifactFetcher.bytesToFetch(download, directory))
+
+            ArtifactFetcher.fetchZstd(url, download, artifact(weights), directory, AGENT) { _, _ -> }
+            assertEquals("the kept download is not fetched again", 1, requests.size)
+            assertArrayEquals(weights, File(directory, "model.onnx").readBytes())
+            assertFalse(kept.exists())
+        }
+    }
+
+    @Test fun aDownloadThatDoesNotDecodeFailsTheCheckAndGoes() {
+        val notZstd = ByteArray(4096) { (it * 13).toByte() }
+        val download = artifact(notZstd).copy(name = "model.onnx.zst")
+        withServer({ Answer(200, notZstd) }) { url, directory, _ ->
+            val failed = failure {
+                ArtifactFetcher.fetchZstd(url, download, artifact(weights), directory, AGENT) { _, _ -> }
+            }
+            assertEquals(Failure.VERIFY, failed)
+            assertFalse(File(directory, "model.onnx.zst").exists())
+            assertFalse(File(directory, "model.onnx").exists())
+            assertFalse(File(directory, "model.onnx.part").exists())
+        }
+    }
+
+    @Test fun aFullDiskIsSpaceAndOtherLocalErrorsAreInstall() {
+        val full = IOException("write failed: ENOSPC (No space left on device)")
+        assertEquals(Failure.SPACE, ArtifactFetcher.localFailure(full))
+        assertEquals(Failure.SPACE, ArtifactFetcher.localFailure(IOException("wrapped", full)))
+        assertEquals(Failure.INSTALL, ArtifactFetcher.localFailure(IOException("EIO (I/O error)")))
+    }
+
     private companion object {
         const val AGENT = "CassiniTalk/0.0.0-test (JVM; build 0)"
     }

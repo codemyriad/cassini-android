@@ -1,5 +1,7 @@
 package org.cassini.core.models
 
+import com.github.luben.zstd.ZstdIOException
+import com.github.luben.zstd.ZstdInputStream
 import org.cassini.core.Failure
 import org.cassini.core.UserFacingException
 import org.cassini.core.requireUser
@@ -9,6 +11,7 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
+import java.io.RandomAccessFile
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
@@ -81,10 +84,12 @@ object ArtifactFetcher {
     }
 
     /**
-     * The bytes of [artifact] still to download into [directory]: its size less a `.part` that can still be its
-     * prefix. A longer `.part` is deleted by [fetch], so it saves nothing.
+     * The bytes of [artifact] still to download into [directory]: none when the file is already there at its size
+     * (a kept compressed download, which [fetch] hashes and keeps), else its size less a `.part` that can still be
+     * its prefix. A longer `.part` is deleted by [fetch], so it saves nothing.
      */
     fun bytesToFetch(artifact: Artifact, directory: File): Long {
+        if (File(directory, artifact.name).length() == artifact.size) return 0
         val kept = File(directory, "${artifact.name}.part").length()
         return if (kept > artifact.size) artifact.size else artifact.size - kept
     }
@@ -130,6 +135,8 @@ object ArtifactFetcher {
             partial.delete()
             throw UserFacingException(Failure.VERIFY)
         }
+        // On the storage device before the rename makes it the verified file.
+        sync(partial)
         requireUser(partial.renameTo(destination), Failure.INSTALL)
         progress(artifact.size, true)
     }
@@ -311,15 +318,19 @@ object ArtifactFetcher {
         val compressed = File(directory, download.name)
         // The check reads the download once and writes and reads the decompressed file once each.
         val check = scaled(download.size, download.size + 2 * artifact.size)
-        try {
-            fetch(url, download, directory, userAgent, redirects) { bytes, verifying ->
-                // fetch ends with the download's size once it is installed; the check is not over yet.
-                if (verifying) progress(check(minOf(bytes, download.size)), true) else progress(bytes, false)
-            }
-            decompress(compressed, artifact, directory) { progress(check(download.size + it), true) }
-        } finally {
-            compressed.delete()
+        fetch(url, download, directory, userAgent, redirects) { bytes, verifying ->
+            // fetch ends with the download's size once it is installed; the check is not over yet.
+            if (verifying) progress(check(minOf(bytes, download.size)), true) else progress(bytes, false)
         }
+        try {
+            decompress(compressed, artifact, directory) { progress(check(download.size + it), true) }
+        } catch (error: UserFacingException) {
+            // A cancel, a full disk or a local write error leaves the verified download for the next attempt; only
+            // bytes that do not decode to the pinned file make it useless.
+            if (error.failure == Failure.VERIFY) compressed.delete()
+            throw error
+        }
+        compressed.delete()
         progress(download.size, true)
     }
 
@@ -328,7 +339,9 @@ object ArtifactFetcher {
         { done -> if (of <= 0) to else (to.toDouble() * done.coerceIn(0, of) / of).toLong() }
 
     /**
-     * Decompresses a verified Zstandard [source] into [directory] as [artifact], or fails without a file.
+     * Decompresses a verified Zstandard [source] into [directory] as [artifact], or fails without a file. A stream
+     * that does not decode, or decodes to other bytes, fails with [Failure.VERIFY]; a full disk with [Failure.SPACE];
+     * any other local I/O error with [Failure.INSTALL]. The file is on the storage device before its rename.
      * [progress] receives the bytes written, then the artifact's size plus the bytes hashed (up to twice its size).
      */
     fun decompress(source: File, artifact: Artifact, directory: File, progress: (Long) -> Unit = {}) {
@@ -336,17 +349,40 @@ object ArtifactFetcher {
         val partial = File(directory, "${artifact.name}.part")
         try {
             // Seekable Zstandard ends with a skippable seek-table frame, which the decoder skips.
-            com.github.luben.zstd.ZstdInputStream(source.inputStream().buffered()).use { input ->
-                partial.outputStream().buffered().use { output -> copy(input, output, 0, artifact.size, progress) }
+            ZstdInputStream(source.inputStream().buffered()).use { input ->
+                FileOutputStream(partial).use { file ->
+                    val output = file.buffered()
+                    copy(input, output, 0, artifact.size, progress)
+                    output.flush()
+                    file.fd.sync()
+                }
             }
             val matches = partial.length() == artifact.size &&
                 digest(partial) { progress(artifact.size + it) } == artifact.sha256
             requireUser(matches, Failure.VERIFY)
             requireUser(partial.renameTo(destination), Failure.INSTALL)
-        } catch (error: IOException) {
+        } catch (error: ZstdIOException) {
             throw UserFacingException(Failure.VERIFY, error.message ?: "Zstandard").apply { initCause(error) }
+        } catch (error: IOException) {
+            throw UserFacingException(localFailure(error), error.message ?: "I/O").apply { initCause(error) }
         } finally {
             partial.delete()
         }
+    }
+
+    /** Flushes [file] to the storage device; a failure is a local install error. */
+    private fun sync(file: File) {
+        try {
+            RandomAccessFile(file, "rw").use { it.fd.sync() }
+        } catch (error: IOException) {
+            throw UserFacingException(localFailure(error), error.message ?: "fsync").apply { initCause(error) }
+        }
+    }
+
+    /** [Failure.SPACE] for a full disk (ENOSPC), else [Failure.INSTALL]. */
+    internal fun localFailure(error: IOException): Failure {
+        val message = generateSequence<Throwable>(error) { it.cause }.mapNotNull { it.message }.joinToString(" ")
+        val full = "ENOSPC" in message || message.contains("No space left", ignoreCase = true)
+        return if (full) Failure.SPACE else Failure.INSTALL
     }
 }

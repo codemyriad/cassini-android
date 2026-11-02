@@ -4,6 +4,8 @@ import android.app.ActivityManager
 import android.content.Context
 import android.util.Log
 import org.cassini.android.inAppLanguage
+import org.cassini.core.Failure
+import org.cassini.core.UserFacingException
 import org.cassini.core.audio.Limits
 import org.cassini.core.models.ModelCatalog
 import org.cassini.core.models.ModelDescriptor
@@ -21,13 +23,27 @@ import org.cassini.ui.R as UiR
 
 /**
  * The native seams of a job over the models installed in [modelRoot] (architecture 2.2 and 5.4). The paths are read
- * when a job opens each seam, so a model installed by the job's own download is used.
+ * when a job opens each seam, so a model installed by the job's own download is used. [check] runs before each seam
+ * hands a model to the native runtime: the app's `ModelCheck`, which hashes each model once per process and fails
+ * with VERIFY for a damaged one (D16 section 4).
  */
 object InstalledEngines {
-    fun of(context: Context, modelRoot: File, cache: File): JobEngines = JobEngines(
-        recognizers = ParakeetRecognizers(parakeet = { parakeet(modelRoot) }, detector = { detector(modelRoot) }),
-        diarizers = SortformerDiarizers { only(ModelCatalog.DIARIZATION, modelRoot) },
-        prints = VoiceprintPrints({ File(only(ModelCatalog.VOICEPRINT, modelRoot)) }),
+    fun of(context: Context, modelRoot: File, cache: File, check: (ModelDescriptor) -> Unit): JobEngines = JobEngines(
+        recognizers = ParakeetRecognizers(
+            parakeet = {
+                check(ModelCatalog.PARAKEET)
+                parakeet(modelRoot)
+            },
+            detector = { detector(modelRoot, check) },
+        ),
+        diarizers = SortformerDiarizers {
+            check(ModelCatalog.DIARIZATION)
+            only(ModelCatalog.DIARIZATION, modelRoot)
+        },
+        prints = VoiceprintPrints({
+            check(ModelCatalog.VOICEPRINT)
+            File(only(ModelCatalog.VOICEPRINT, modelRoot))
+        }),
         audio = DecoderAudioSource(AudioDecoder(context.contentResolver, cache)),
         encoders = OpusEncoders(),
     )
@@ -42,9 +58,22 @@ object InstalledEngines {
         )
     }
 
-    /** The speech detector when it is installed; without it recordings are cut at quiet points. */
-    fun detector(modelRoot: File): String? =
-        ModelCatalog.VAD.takeIf { it.ready(modelRoot) }?.let { only(it, modelRoot) }
+    /**
+     * The speech detector when it is installed and intact; without it recordings are cut at quiet points. It is
+     * optional, so a damaged copy is deleted by [check] and the job goes on without it, as when it is missing.
+     */
+    fun detector(modelRoot: File, check: (ModelDescriptor) -> Unit = {}): String? {
+        val vad = ModelCatalog.VAD.takeIf { it.ready(modelRoot) } ?: return null
+        val intact = try {
+            check(vad)
+            true
+        } catch (damaged: UserFacingException) {
+            if (damaged.failure == Failure.CANCELLED) throw damaged
+            Log.w(TAG, "The speech detector is damaged and was removed; going on without it", damaged)
+            false
+        }
+        return if (intact) only(vad, modelRoot) else null
+    }
 
     private fun only(model: ModelDescriptor, modelRoot: File): String =
         model.path(modelRoot, model.artifacts.single().name)

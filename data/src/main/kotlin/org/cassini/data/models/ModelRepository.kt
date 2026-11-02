@@ -19,6 +19,7 @@ import org.cassini.core.models.RedirectPolicy
 import org.cassini.data.AppPaths
 import org.cassini.data.CassiniDispatchers
 import org.cassini.data.Threads
+import org.cassini.data.notes.NoteFiles
 import org.cassini.data.settings.SettingsRepository
 import java.io.File
 import java.io.IOException
@@ -224,9 +225,11 @@ class ModelRepository(
 
     /**
      * Installs one [model] through the [fetcher], with no status update: deletes its marker, fetches and verifies its
-     * files (resuming `.part` files), then writes the marker. [progress] gets the bytes of the model's download and
-     * whether they are being checked. Any failure is thrown: a [UserFacingException] (an I/O error becomes DOWNLOAD).
-     * For the app's `ModelInstaller` store, which decides itself what is best effort, on an IO thread.
+     * files (resuming `.part` files), then writes the marker durably: written to a temporary file and fsynced, renamed,
+     * and the directory fsynced, so the renames of the files and the marker survive a power cut. [progress] gets the
+     * bytes of the model's download and whether they are being checked. Any failure is thrown: a [UserFacingException]
+     * (an I/O error becomes DOWNLOAD). For the app's `ModelInstaller` store, which decides itself what is best effort,
+     * on an IO thread.
      */
     @WorkerThread
     fun installModelBlocking(model: ModelDescriptor, progress: (Long, Boolean) -> Unit) {
@@ -240,7 +243,20 @@ class ModelRepository(
         } catch (error: IOException) {
             throw UserFacingException(Failure.DOWNLOAD, error.message ?: "I/O").apply { initCause(error) }
         }
-        marker.writeText(model.markerValue)
+        writeMarker(marker, model.markerValue)
+    }
+
+    private fun writeMarker(marker: File, value: String) {
+        val written = File(marker.parentFile, "${marker.name}.tmp")
+        try {
+            written.writeText(value)
+            NoteFiles.syncFile(written)
+            NoteFiles.replace(written, marker)
+            NoteFiles.syncDirectory(marker.parentFile!!)
+        } catch (error: IOException) {
+            written.delete()
+            throw UserFacingException(Failure.INSTALL, error.message ?: "marker").apply { initCause(error) }
+        }
     }
 
     /** Installs one model; false when a best-effort extra failed (and was skipped). */

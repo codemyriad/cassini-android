@@ -56,6 +56,9 @@ import org.cassini.android.recording.RecordingPlatform
 import org.cassini.android.recording.RepositoryRecordingNotes
 import org.cassini.android.recording.SettingsConsent
 import org.cassini.android.recording.TranscriptionHandoff
+import org.cassini.core.Failure
+import org.cassini.core.UserFacingException
+import org.cassini.core.models.ModelCheck
 import org.cassini.core.models.ModelPart
 import org.cassini.data.AppPaths
 import org.cassini.data.CassiniDispatchers
@@ -169,8 +172,23 @@ class AppGraph(context: Context, val config: Config) {
     val installOwner = ModelInstallOwner(models, paths.modelRoot, network, appScope, dispatchers.io)
     val modelAccess: ModelAccess = RepositoryModelAccess(models, paths.modelRoot, installOwner, network)
 
-    /** The native seams of every job, over the models installed in [AppPaths.modelRoot]. */
-    val engines: JobEngines by lazy { InstalledEngines.of(app, paths.modelRoot, paths.cache) }
+    /**
+     * The once-per-process check of each installed model against its pins before its first native load (D16 section
+     * 4). A damaged model loses its marker and files; the models are read again so the app shows it missing.
+     */
+    val modelCheck = ModelCheck()
+
+    /** The native seams of every job, over the models installed in [AppPaths.modelRoot], each checked first. */
+    val engines: JobEngines by lazy {
+        InstalledEngines.of(app, paths.modelRoot, paths.cache) { model ->
+            try {
+                modelCheck.require(model, paths.modelRoot)
+            } catch (damaged: UserFacingException) {
+                if (damaged.failure == Failure.VERIFY) appScope.launch { models.refresh() }
+                throw damaged
+            }
+        }
+    }
     val jobEnvironment: JobEnvironment by lazy { InstalledEngines.environment(app) }
 
     /** Whether the UI may change the draft names of a note; the job closes it at step 6. */
