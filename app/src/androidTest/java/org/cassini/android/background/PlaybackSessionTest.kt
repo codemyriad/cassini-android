@@ -4,13 +4,16 @@ import android.app.Notification
 import android.app.NotificationManager
 import android.content.ComponentName
 import android.content.Intent
+import androidx.lifecycle.Lifecycle
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import org.cassini.android.MainActivity
 import org.cassini.android.background.Background.waitFor
 import org.cassini.android.playback.PlaybackService
 import org.cassini.test.CiSmoke
@@ -26,6 +29,11 @@ import java.util.concurrent.TimeUnit
  * notification, Bluetooth and Android Auto see and send. A Media3 [MediaController] binds to [PlaybackService] as
  * those controllers do; a media key goes the way a headset button goes. Every command must reach the app's
  * `PlaybackController`, and the session must mirror it.
+ *
+ * The test follows the user: play starts while the app is on screen, the app goes to the background, and the rest
+ * comes from the session. Resuming from the background goes through the system, as a media key, as it does from the
+ * lock screen or a headset: Android 15 gives audio focus to a background app only for a play the system delivers,
+ * never for one sent from inside the app's own process.
  */
 @CiSmoke
 @RunWith(AndroidJUnit4::class)
@@ -33,6 +41,7 @@ class PlaybackSessionTest {
     private val graph get() = Background.graph
     private val playback get() = graph.playback
     private var controller: MediaController? = null
+    private var screen: ActivityScenario<MainActivity>? = null
 
     @Before fun grant() = Background.grant()
 
@@ -43,6 +52,7 @@ class PlaybackSessionTest {
             playback.leave()
         }
         Background.context.stopService(Intent(Background.context, PlaybackService::class.java))
+        screen?.close()
         Unit
     }
 
@@ -58,14 +68,17 @@ class PlaybackSessionTest {
         val token = SessionToken(Background.context, ComponentName(Background.context, PlaybackService::class.java))
         val connected = MediaController.Builder(Background.context, token).buildAsync().get(CONNECT_S, TimeUnit.SECONDS)
         controller = connected
-        // Play through the session, as from the lock screen: the app shows no screen here, and Android 15 gives audio
-        // focus only to an app in the foreground or with a foreground service, which Media3 starts for a controller's
-        // play before it reaches the player (MediaSessionService, startInForegroundRequired).
         waitFor("The session offers play for the open note") {
             main { connected.takeIf { it.isCommandAvailable(Player.COMMAND_PLAY_PAUSE) } }
         }
-        main { connected.play() }
+
+        // The user presses play with the app on screen, then leaves the app: playback goes on in the background.
+        val shown = ActivityScenario.launch(MainActivity::class.java).also { screen = it }
+        main { playback.play() }
         waitFor("The session shows the note playing") { main { connected.takeIf { it.isPlaying } } }
+        Background.shell("input keyevent KEYCODE_HOME")
+        waitFor("The app goes to the background") { shown.state.takeIf { it == Lifecycle.State.CREATED } }
+        waitFor("The note still plays in the background") { playback.state.value.takeIf { it.playing } }
 
         // Media3 posts the media notification of the session while it plays.
         val manager = Background.context.getSystemService(NotificationManager::class.java)
@@ -95,8 +108,10 @@ class PlaybackSessionTest {
         waitFor("A speed from the session reaches the player") { playback.state.value.takeIf { it.speed == SPEED } }
         waitFor("The session shows the speed") { main { connected.takeIf { it.playbackParameters.speed == SPEED } } }
 
-        main { connected.play() }
-        waitFor("Play from the session plays") { playback.state.value.takeIf { it.playing } }
+        // Resuming from the background, as the lock screen or a headset does: the system delivers the play.
+        Background.shell("input keyevent KEYCODE_MEDIA_PLAY")
+        waitFor("The media key resumes the note in the background") { playback.state.value.takeIf { it.playing } }
+        waitFor("The session shows it playing") { main { connected.takeIf { it.isPlaying } } }
 
         // A headset's pause button: the media key goes to the playing session.
         Background.shell("input keyevent KEYCODE_MEDIA_PAUSE")
