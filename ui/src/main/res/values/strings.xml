@@ -565,6 +565,9 @@
     <string name="ui_banner_dl_file_check_body">The download was damaged and has been discarded.</string>
     <string name="ui_banner_dl_install_failed_title">Couldn’t finish installing</string>
     <string name="ui_banner_dl_install_failed_body">Try again. Your recordings are safe.</string>
+    <!-- R11: the copy iOS ships for D16 DOWNLOAD_PIN_UNAVAILABLE, byte for byte. -->
+    <string name="ui_banner_dl_model_unavailable_title">Model not available</string>
+    <string name="ui_banner_dl_model_unavailable_body">The model server no longer offers this version of the model. Update Cassini to download it.</string>
     <string name="ui_banner_dl_record_now_title">Record now, transcribe later</string>
     <string name="ui_banner_dl_record_now_body">Transcription needs a one-time download. Audio is safe meanwhile.</string>
 

@@ -542,6 +542,9 @@
     <string name="ui_banner_dl_file_check_body">Le téléchargement était endommagé et a été supprimé.</string>
     <string name="ui_banner_dl_install_failed_title">Impossible de terminer l’installation</string>
     <string name="ui_banner_dl_install_failed_body">Réessayez. Vos enregistrements sont en sécurité.</string>
+    <!-- R11: the copy iOS ships for D16 DOWNLOAD_PIN_UNAVAILABLE, byte for byte. -->
+    <string name="ui_banner_dl_model_unavailable_title">Modèle indisponible</string>
+    <string name="ui_banner_dl_model_unavailable_body">Le serveur des modèles ne propose plus cette version du modèle. Mettez à jour Cassini pour le télécharger.</string>
     <string name="ui_banner_dl_record_now_title">Enregistrer maintenant, transcrire plus tard</string>
     <string name="ui_banner_dl_record_now_body">La transcription nécessite un téléchargement unique. En attendant, l’audio est en sécurité.</string>
 

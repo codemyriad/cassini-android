@@ -1,6 +1,7 @@
 package org.cassini.android
 
 import org.cassini.core.Failure
+import org.cassini.ui.R as UiR
 
 /** The localized message for each failure code: the only place a [Failure] meets a string resource. */
 val Failure.stringRes: Int
@@ -26,4 +27,5 @@ val Failure.stringRes: Int
         Failure.UNKNOWN -> R.string.error_unknown
         Failure.PLAYBACK -> R.string.error_playback
         Failure.OPUS_ENCODER -> R.string.error_opus_encoder
+        Failure.MODEL_UNAVAILABLE -> UiR.string.ui_banner_dl_model_unavailable_body
     }

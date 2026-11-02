@@ -58,4 +58,6 @@ class RepositoryModelStore(
 
     override fun installBlocking(model: ModelDescriptor, progress: (Long, Boolean) -> Unit) =
         models.installModelBlocking(model, progress)
+
+    override fun <T> session(block: () -> T): T = models.installSession(block)
 }

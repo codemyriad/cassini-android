@@ -196,6 +196,7 @@ class NoticeCenterTest {
             DownloadError.NOT_ENOUGH_STORAGE to BannerKind.DL_NO_SPACE,
             DownloadError.FILE_CHECK_FAILED to BannerKind.DL_FILE_CHECK,
             DownloadError.INSTALL to BannerKind.DL_INSTALL_FAILED,
+            DownloadError.MODEL_UNAVAILABLE to BannerKind.DL_MODEL_UNAVAILABLE,
         )
         for ((error, kind) in kinds) {
             assertEquals(kind, Notices.modelDownload(null, DownloadFailure(error, 901_000_000))!!.kind)

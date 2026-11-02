@@ -389,6 +389,7 @@ A banner that the user can dismiss has a 48 dp close button at the end (a 20 dp 
 | DL_NO_SPACE | error | "Not enough storage" — "Free about 860 MB and try again." | SPACE (the figure is the remaining `requiredFreeBytes`) | Retry |
 | DL_FILE_CHECK | error | "File check failed" — "The download was damaged and has been discarded." | VERIFY | Download again |
 | DL_INSTALL_FAILED | error | "Couldn't finish installing" — "Try again. Your recordings are safe." (not on the board) | INSTALL | Try again |
+| DL_MODEL_UNAVAILABLE | error, can be closed | "Model not available" — "The model server no longer offers this version of the model. Update Cassini to download it." (not on the board; the copy iOS ships for D16 `DOWNLOAD_PIN_UNAVAILABLE`, R11) | MODEL_UNAVAILABLE: the model host's manifest no longer lists the pinned pair or files, or has another schema version | – (only an update of the app helps) |
 | DL_RECORD_NOW | info | "Record now, transcribe later" — "Transcription needs a one-time download. Audio is safe meanwhile." | No consent, and Audio-only notes exist | Download |
 
 A failure of a best-effort part never shows a red banner. It shows in Settings. After Done, it shows as TX_ONE_VOICE when the diarizer was missing.

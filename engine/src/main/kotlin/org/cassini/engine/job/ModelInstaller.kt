@@ -42,6 +42,9 @@ interface ModelStore {
      * throws (UserFacingException with DOWNLOAD, VERIFY, SPACE, INSTALL or CANCELLED, or an IOException).
      */
     fun installBlocking(model: ModelDescriptor, progress: (Long, Boolean) -> Unit)
+
+    /** Runs [block], one install run, as one session of the store's downloads (one manifest read, R11). */
+    fun <T> session(block: () -> T): T = block()
 }
 
 /** How a [ModelInstaller.install] call ended. */
@@ -89,7 +92,7 @@ sealed interface InstallOutcome {
 class ModelInstaller(private val store: ModelStore, private val io: CoroutineDispatcher = Dispatchers.IO) {
     /** Installs the missing models of [parts]. [onProgress] is called on the IO thread. */
     suspend fun install(parts: Set<ModelPart>, onProgress: (DownloadProgress) -> Unit): InstallOutcome =
-        runInterruptible(io) { installBlocking(parts, onProgress) }
+        runInterruptible(io) { store.session { installBlocking(parts, onProgress) } }
 
     private fun installBlocking(parts: Set<ModelPart>, onProgress: (DownloadProgress) -> Unit): InstallOutcome {
         val missing = ModelPlan.of(store::ready).missing.filter { it.part in parts }
@@ -195,13 +198,14 @@ class ModelInstaller(private val store: ModelStore, private val io: CoroutineDis
          * The banner a download failure shows (architecture section 5.6, features.md section 13.4). A DOWNLOAD failure
          * or a network exception reads NO_CONNECTION when [online] says the network is not validated, INTERRUPTED
          * when it is; a timeout or an unknown host is always NO_CONNECTION. A redirect outside the allow-list
-         * (`RedirectPolicy` reports "… is not allowed") is HOST_NOT_ALLOWED. SPACE, VERIFY and INSTALL map to their
-         * own errors; anything else did not finish installing.
+         * (`RedirectPolicy` reports "… is not allowed") is HOST_NOT_ALLOWED. SPACE, VERIFY, INSTALL and MODEL_UNAVAILABLE map to
+         * their own errors; anything else did not finish installing.
          */
         fun downloadError(failure: Throwable, online: () -> Boolean): DownloadError = when (failure) {
             is UserFacingException -> when (failure.failure) {
                 Failure.SPACE -> DownloadError.NOT_ENOUGH_STORAGE
                 Failure.VERIFY -> DownloadError.FILE_CHECK_FAILED
+                Failure.MODEL_UNAVAILABLE -> DownloadError.MODEL_UNAVAILABLE
                 Failure.DOWNLOAD -> when {
                     failure.message.orEmpty().endsWith(REDIRECT_REFUSED) -> DownloadError.HOST_NOT_ALLOWED
                     online() -> DownloadError.INTERRUPTED

@@ -195,7 +195,7 @@ class ModelDownloadDeviceTest {
             fetcher().fetch(pinnedElsewhere, directory) { _, _ -> }
             fail("A revision the manifest does not list must not download")
         } catch (refused: UserFacingException) {
-            assertEquals(Failure.VERIFY, refused.failure)
+            assertEquals(Failure.MODEL_UNAVAILABLE, refused.failure)
         }
         assertEquals("only the manifest was read", listOf(LATEST, "/manifest.json"), requests.map { it.path })
         assertTheAppIsNamed()

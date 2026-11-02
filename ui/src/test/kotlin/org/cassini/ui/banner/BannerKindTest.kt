@@ -153,6 +153,11 @@ private val ENGLISH: Map<BannerKind, Triple<String, String?, List<String>>> = ma
     ),
     BannerKind.DL_INSTALL_FAILED to
         Triple("Couldn’t finish installing", "Try again. Your recordings are safe.", listOf("Try again")),
+    BannerKind.DL_MODEL_UNAVAILABLE to Triple(
+        "Model not available",
+        "The model server no longer offers this version of the model. Update Cassini to download it.",
+        emptyList(),
+    ),
     BannerKind.DL_RECORD_NOW to Triple(
         "Record now, transcribe later",
         "Transcription needs a one-time download. Audio is safe meanwhile.",
@@ -293,13 +298,13 @@ class BannerKindTest {
             BannerKind.entries.filterNot { it.appEmitted }.toSet(),
         )
         val dismissible = BannerKind.entries.filter { it.dismissible }.toSet()
-        assertEquals(setOf(BannerKind.RECOVERED, BannerKind.NO_ENCODER), dismissible)
+        assertEquals(setOf(BannerKind.RECOVERED, BannerKind.NO_ENCODER, BannerKind.DL_MODEL_UNAVAILABLE), dismissible)
         assertEquals(
             mapOf(
                 BannerGroup.TRUST to 7,
                 BannerGroup.RECORDING to 8,
                 BannerGroup.TRANSCRIPTION to 9,
-                BannerGroup.DOWNLOAD to 8,
+                BannerGroup.DOWNLOAD to 9,
                 BannerGroup.LIBRARY to 11,
             ),
             BannerKind.entries.groupingBy { it.group }.eachCount(),

@@ -286,6 +286,7 @@ class ModelInstallOwner(
             DownloadError.NOT_ENOUGH_STORAGE -> Failure.SPACE
             DownloadError.FILE_CHECK_FAILED -> Failure.VERIFY
             DownloadError.INSTALL -> Failure.INSTALL
+            DownloadError.MODEL_UNAVAILABLE -> Failure.MODEL_UNAVAILABLE
             DownloadError.NO_CONNECTION,
             DownloadError.INTERRUPTED,
             DownloadError.HOST_NOT_ALLOWED,

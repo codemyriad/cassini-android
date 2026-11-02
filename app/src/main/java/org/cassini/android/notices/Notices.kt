@@ -313,6 +313,7 @@ object Notices {
                 BannerSpec(BannerKind.DL_NO_SPACE, BannerArgs(bytes = requiredFreeBytes), announce = announce)
             DownloadError.FILE_CHECK_FAILED -> BannerSpec(BannerKind.DL_FILE_CHECK, announce = announce)
             DownloadError.INSTALL -> BannerSpec(BannerKind.DL_INSTALL_FAILED, announce = announce)
+            DownloadError.MODEL_UNAVAILABLE -> BannerSpec(BannerKind.DL_MODEL_UNAVAILABLE, announce = announce)
         }
 
     fun partUi(part: ModelPart): ModelPartUi = when (part) {

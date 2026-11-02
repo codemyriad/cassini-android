@@ -137,7 +137,7 @@ class ModelFetcherNetworkTest {
                 .fetch(model, directory) { _, _ -> }
             fail("A model the manifest does not list as pinned must not download")
         } catch (error: UserFacingException) {
-            assertEquals(Failure.VERIFY, error.failure)
+            assertEquals(Failure.MODEL_UNAVAILABLE, error.failure)
         }
         assertTrue(requests.isEmpty())
         assertFalse(File(directory, "encoder.onnx").exists())
@@ -153,6 +153,46 @@ class ModelFetcherNetworkTest {
             assertEquals(Failure.VERIFY, error.failure)
         }
         assertTrue(requests.isEmpty())
+    }
+
+    /** R11: one install run reads the manifest once; the next run reads it again; a failed read is not kept. */
+    @Test fun aSessionReadsTheManifestOnceAndKeepsNoFailure() = withHost { base, _ ->
+        var reads = 0
+        var failNext = false
+        val fetcher = ModelFetcher.network(AGENT, loopback) {
+            reads++
+            if (failNext) {
+                failNext = false
+                throw java.io.IOException("the host dropped the connection")
+            }
+            manifest(base)
+        }
+        fun install(name: String) = fetcher.fetch(model, folder.newFolder(name)) { _, _ -> }
+
+        fetcher.session {
+            install("a")
+            install("b")
+            fetcher.session { install("nested") }
+        }
+        assertEquals("one read for the whole run, a nested session included", 1, reads)
+
+        fetcher.session { install("c") }
+        assertEquals("the next run reads it again", 2, reads)
+
+        install("d")
+        install("e")
+        assertEquals("outside a session every install reads it", 4, reads)
+
+        failNext = true
+        fetcher.session {
+            try {
+                install("f")
+                fail("The failed read fails the install")
+            } catch (_: java.io.IOException) {
+            }
+            install("g")
+        }
+        assertEquals("the failed read was not kept: the next install read again", 6, reads)
     }
 
     private companion object {

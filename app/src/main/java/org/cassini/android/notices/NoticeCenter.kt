@@ -123,7 +123,7 @@ class NoticeCenter(private val graph: AppGraph, context: Context, val imports: I
             BannerKind.IMPORT_TOO_LARGE, BannerKind.IMPORT_NO_SPACE, BannerKind.IMPORT_WAV, BannerKind.IMPORT_OPEN ->
                 imports.dismissFailure()
             BannerKind.DL_NO_CONNECTION, BannerKind.DL_STOPPED, BannerKind.DL_NO_SPACE, BannerKind.DL_FILE_CHECK,
-            BannerKind.DL_INSTALL_FAILED,
+            BannerKind.DL_INSTALL_FAILED, BannerKind.DL_MODEL_UNAVAILABLE,
             -> downloadFailure.value = null
             else -> Unit
         }

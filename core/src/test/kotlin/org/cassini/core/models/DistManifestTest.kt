@@ -58,14 +58,14 @@ class DistManifestTest {
         // A newer export under the same id: the app keeps its pinned source hash and refuses.
         val newer = edited { it.model("silero-vad").put("source_sha256", "0".repeat(64)) }
         val error = refusal(newer, ModelCatalog.VAD)
-        assertEquals(Failure.VERIFY, error.failure)
+        assertEquals("Model not available (R11)", Failure.MODEL_UNAVAILABLE, error.failure)
         assertTrue(error.message!!, "does not list silero-vad" in error.message!!)
         val gone = edited { json ->
             val models = json.getJSONArray("models")
             val index = (0 until models.length()).first { models.getJSONObject(it).getString("id") == "silero-vad" }
             models.remove(index)
         }
-        assertEquals(Failure.VERIFY, refusal(gone, ModelCatalog.VAD).failure)
+        assertEquals(Failure.MODEL_UNAVAILABLE, refusal(gone, ModelCatalog.VAD).failure)
         // Other models are not affected.
         DistManifest.parse(gone).urls(ModelCatalog.PARAKEET)
     }
@@ -78,11 +78,14 @@ class DistManifestTest {
             { it.artifact(id).put("sha256", "1".repeat(64)) },
             { it.artifact(id).put("uncompressed_size", encoder.size - 1) },
             { it.artifact(id).put("uncompressed_sha256", "2".repeat(64)) },
-            { it.artifact(id).remove("uncompressed_sha256") },
         )
+        // Other pins: the host no longer offers this build's file (R11).
         for (change in changes) {
-            assertEquals(Failure.VERIFY, refusal(edited(change), ModelCatalog.PARAKEET).failure)
+            assertEquals(Failure.MODEL_UNAVAILABLE, refusal(edited(change), ModelCatalog.PARAKEET).failure)
         }
+        // A member missing: not a manifest the app can read, a file check failure.
+        val missing = edited { it.artifact(id).remove("uncompressed_sha256") }
+        assertEquals(Failure.VERIFY, refusal(missing, ModelCatalog.PARAKEET).failure)
     }
 
     private fun extra(required: Boolean) = JSONObject().put("path", "extra.onnx")
@@ -93,9 +96,9 @@ class DistManifestTest {
             json.model("parakeet-ultra-0.6b-int8").getJSONArray("files").getJSONObject(0)
                 .put("artifact", "models/files/${"3".repeat(64)}/encoder.int8.onnx.zst")
         }
-        assertEquals(Failure.VERIFY, refusal(otherArtifact, ModelCatalog.PARAKEET).failure)
+        assertEquals(Failure.MODEL_UNAVAILABLE, refusal(otherArtifact, ModelCatalog.PARAKEET).failure)
         val extraFile = edited { it.model("silero-vad").getJSONArray("files").put(extra(required = true)) }
-        assertEquals(Failure.VERIFY, refusal(extraFile, ModelCatalog.VAD).failure)
+        assertEquals(Failure.MODEL_UNAVAILABLE, refusal(extraFile, ModelCatalog.VAD).failure)
         val optionalExtra = edited { it.model("silero-vad").getJSONArray("files").put(extra(required = false)) }
         DistManifest.parse(optionalExtra).urls(ModelCatalog.VAD)
     }
@@ -114,12 +117,18 @@ class DistManifestTest {
     }
 
     @Test fun onlyASchemaTwoManifestIsRead() {
-        for (text in listOf(edited { it.put("schema_version", 3) }, edited { it.remove("schema_version") }, "<html>")) {
+        // Another schema: the host moved on, update the app (R11). Not a manifest at all: a file check failure.
+        val expected = listOf(
+            edited { it.put("schema_version", 3) } to Failure.MODEL_UNAVAILABLE,
+            edited { it.remove("schema_version") } to Failure.VERIFY,
+            "<html>" to Failure.VERIFY,
+        )
+        for ((text, failure) in expected) {
             try {
                 DistManifest.parse(text)
                 fail("Read $text")
             } catch (error: UserFacingException) {
-                assertEquals(Failure.VERIFY, error.failure)
+                assertEquals(text.take(40), failure, error.failure)
             }
         }
         val broken = edited { it.remove("artifacts") }
