@@ -24,7 +24,7 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.core.content.FileProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.test.espresso.Espresso
+import androidx.lifecycle.Lifecycle
 import androidx.test.platform.app.InstrumentationRegistry
 import io.codemyriad.cassini.BuildConfig
 import io.codemyriad.cassini.MainActivity
@@ -126,18 +126,17 @@ internal object Flows {
     }
 
     /**
-     * Presses Back once the activity's own window has input focus. Right after an ACTION_VIEW (`onNewIntent`, the
-     * activity pauses and resumes) a slow emulator can drop a key injected before the window has focus again, so
-     * the Back press would not reach the app. Do not use it to close a sheet or dialog: their window has the focus.
+     * Goes Back through the activity's [androidx.activity.OnBackPressedDispatcher], the handler that a Back key
+     * reaches, once the activity is resumed. Right after an ACTION_VIEW (`onNewIntent`: the activity pauses and
+     * resumes) a slow emulator can drop an injected Back key even when the window already reports input focus (API 26,
+     * #53 and main at 98851d7), so the flow tests that follow an "Open with" do not inject one. The other flow tests
+     * still press the Back key. Do not use it to close a sheet or dialog: they have their own window.
      */
-    fun AppRule.pressBackWhenFocused(timeoutMs: Long = SCREEN_MS) {
-        try {
-            waitUntil(timeoutMs) { activity.hasWindowFocus() }
-        } catch (timeout: ComposeTimeoutException) {
-            val waited = "waited ${timeoutMs / 1_000} s"
-            throw AssertionError("The activity got no input focus ($waited; ${focusReport()})", timeout)
+    fun AppRule.backAfterOpenWith(timeoutMs: Long = SCREEN_MS) {
+        waitFor("The activity is resumed for Back", timeoutMs) {
+            runOnUiThread { activity.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) }
         }
-        Espresso.pressBack()
+        runOnUiThread { activity.onBackPressedDispatcher.onBackPressed() }
     }
 
     /**

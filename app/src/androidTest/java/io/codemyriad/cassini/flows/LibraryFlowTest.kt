@@ -15,9 +15,9 @@ import io.codemyriad.cassini.MainActivity
 import io.codemyriad.cassini.background.Background
 import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobState
+import io.codemyriad.cassini.flows.Flows.backAfterOpenWith
 import io.codemyriad.cassini.flows.Flows.import
 import io.codemyriad.cassini.flows.Flows.meetingDocument
-import io.codemyriad.cassini.flows.Flows.pressBackWhenFocused
 import io.codemyriad.cassini.flows.Flows.row
 import io.codemyriad.cassini.flows.Flows.rows
 import io.codemyriad.cassini.flows.Flows.text
@@ -66,7 +66,7 @@ class LibraryFlowTest {
         val noteId = runBlocking { rows().single().id }
         rule.waitShown(hasContentDescription(rule.text(UiR.string.ui_back_to_library)))
         rule.waitText(CLIP_TITLE)
-        rule.pressBackWhenFocused()
+        rule.backAfterOpenWith()
         val row = hasContentDescription(CLIP_TITLE, substring = true)
         rule.waitShown(row)
         val status = runBlocking { row(CLIP_TITLE) }!!
@@ -79,7 +79,7 @@ class LibraryFlowTest {
         // The same file again: the same note, again with the Library under it.
         rule.view(clip, "audio/wav")
         rule.waitShown(hasContentDescription(rule.text(UiR.string.ui_back_to_library)))
-        rule.pressBackWhenFocused()
+        rule.backAfterOpenWith()
         rule.waitShown(row)
         val ids = runBlocking { rows().map { it.id } }
         assertEquals("A second ACTION_VIEW of the same file keeps one note", listOf(noteId), ids)
