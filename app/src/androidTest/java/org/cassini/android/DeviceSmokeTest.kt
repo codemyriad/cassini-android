@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Bundle
 import androidx.test.platform.app.InstrumentationRegistry
 import org.cassini.core.asr.IncrementalTranscript
+import org.cassini.core.asr.SileroInputFilter
 import org.cassini.core.asr.Span
 import org.cassini.core.audio.Limits
 import org.cassini.core.audio.PcmAudio
@@ -206,6 +207,31 @@ class DeviceSmokeTest {
                 detector.detect(PcmAudio(FloatArray(48000), 48000)) { silence += it }
                 assertTrue("Silence has no speech: $silence", silence.isEmpty())
             }
+        } finally { file.delete() }
+    }
+
+    /**
+     * D26.1 on the shared vector `dc-quiet-jfk-v1` (fixtures/README.md): quiet speech under a DC offset of -2060 LSB,
+     * the regime of a real failing microphone. Silero finds nothing in the raw samples, and finds the speech once
+     * its input is high-passed. Android's resampler and threshold differ from GNOME and Mac, so the exact segments of
+     * the vector do not apply here: only "none without the filter, some with it".
+     */
+    @NeedsModels
+    @Test fun aDcOffsetNoLongerHidesQuietSpeech() {
+        installModelsIfAsked(context, ModelPart.SPEECH)
+        assumeTrue("Install the speech detector first", ModelCatalog.VAD.ready(context.filesDir))
+        val file = fixture(DC_VECTOR)
+        try {
+            val digest = java.security.MessageDigest.getInstance("SHA-256").digest(file.readBytes())
+            assertEquals(DC_VECTOR_SHA256, digest.joinToString("") { "%02x".format(it) })
+            val audio = audioDecoder(context).decode(Uri.fromFile(file))
+            val model = ModelCatalog.VAD.path(context.filesDir, ModelCatalog.sileroVad.name)
+            fun spans(filter: SileroInputFilter?): List<Span> = SileroDetector(model, filter).use { detector ->
+                ArrayList<Span>().also { found -> detector.detect(audio) { found += it } }
+            }
+            val raw = spans(filter = null)
+            assertEquals("the offset hides the speech from the raw detector", emptyList<Span>(), raw)
+            assertTrue("the high-passed input finds it", spans(SileroInputFilter()).isNotEmpty())
         } finally { file.delete() }
     }
 
@@ -481,3 +507,7 @@ class DeviceSmokeTest {
 }
 
 private const val YOUTUBE_SMOKE = "youtube-smoke.wav"
+
+/** The shared D26.1 vector (coordination ux-draft/dc), committed as fixtures/audio/dc-quiet-jfk-v1.wav. */
+private const val DC_VECTOR = "dc-quiet-jfk-v1.wav"
+private const val DC_VECTOR_SHA256 = "071f051241d394587c85463272e9414f133ee18c4bb835d1382b662e4154efda"

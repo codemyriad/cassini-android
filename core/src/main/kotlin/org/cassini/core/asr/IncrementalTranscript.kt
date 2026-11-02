@@ -23,7 +23,7 @@ class IncrementalState(val start: Long, val end: Long, val window: FloatArray, v
 class IncrementalTranscript(restored: IncrementalState? = null, private val recognize: (PcmAudio, Long) -> Transcript) {
     private val rate = Limits.ASR_RATE
     private val window = FloatArray(28 * rate)
-    private val overlap = 2 * rate
+    private val overlap = OVERLAP_SAMPLES
     private var size = 0
     private var start = 0L
     private var decodedEnd = 0L
@@ -84,5 +84,8 @@ class IncrementalTranscript(restored: IncrementalState? = null, private val reco
     companion object {
         /** The longest window a checkpoint can hold: 28 s at the recognition rate. */
         const val WINDOW_SAMPLES = 28 * Limits.ASR_RATE
+
+        /** The recorded overlap of consecutive windows: the next window starts this far before a full one ends. */
+        const val OVERLAP_SAMPLES = 2 * Limits.ASR_RATE
     }
 }

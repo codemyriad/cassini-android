@@ -35,6 +35,7 @@ We made the entries for 0.0.1-beta to 0.1.0 again from the release notes of thes
 
 ### Fixed
 
+- Audio with a DC offset, from some microphones, in imported files and in recordings made on Android 8 and 9, no longer hides quiet speech from the speech detector, which could leave such a recording without a transcript. The detector's input goes through the same 100 Hz high-pass as the other Cassini apps (WebRTC's capture filter); the recognizer and the saved audio are unchanged. The recording level meter now ignores a DC offset.
 - An import or a transcription no longer fails with "Not enough memory" only because of memory that the app no longer used. Cassini now frees that memory and checks again before it refuses the audio.
 
 ## [0.3.0] - 2026-10-17
