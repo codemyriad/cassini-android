@@ -49,6 +49,12 @@ interface AudioPlayer {
     /** Called on the main thread when playback reaches the end. */
     fun onCompletion(listener: () -> Unit)
 
+    /**
+     * Called on the main thread when the player fails after [prepare] (the file went away, a decoder error): it
+     * plays no more, and the listener must stop and release it.
+     */
+    fun onError(listener: () -> Unit)
+
     fun release()
 }
 
@@ -70,12 +76,20 @@ class ExoAudioPlayer(context: Context) : AudioPlayer {
         .setHandleAudioBecomingNoisy(false)
         .build()
     private var completion: (() -> Unit)? = null
+    private var error: (() -> Unit)? = null
+
+    /** Whether [prepare] ended: a failure before it is [prepare]'s own. */
+    private var prepared = false
 
     init {
         player.addListener(
             object : Player.Listener {
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     if (playbackState == Player.STATE_ENDED) completion?.invoke()
+                }
+
+                override fun onPlayerError(failure: PlaybackException) {
+                    if (prepared) error?.invoke()
                 }
             },
         )
@@ -84,8 +98,11 @@ class ExoAudioPlayer(context: Context) : AudioPlayer {
     override val positionMs: Long get() = player.currentPosition.coerceAtLeast(0)
     override val durationMs: Long get() = player.duration.takeIf { it != C.TIME_UNSET }?.coerceAtLeast(0) ?: 0L
 
-    // As MediaPlayer.isPlaying: true from play() on, also while the player buffers, until pause or the end.
-    override val playing: Boolean get() = player.playWhenReady && player.playbackState != Player.STATE_ENDED
+    // As MediaPlayer.isPlaying: true from play() on, also while the player buffers, until a pause, the end or an
+    // error (which leaves the player IDLE with playWhenReady still set).
+    override val playing: Boolean
+        get() = player.playWhenReady &&
+            (player.playbackState == Player.STATE_BUFFERING || player.playbackState == Player.STATE_READY)
 
     override suspend fun prepare(file: File) {
         player.setMediaItem(MediaItem.fromUri(Uri.fromFile(file)))
@@ -95,6 +112,7 @@ class ExoAudioPlayer(context: Context) : AudioPlayer {
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     if (playbackState == Player.STATE_READY && continuation.isActive) {
                         player.removeListener(this)
+                        prepared = true
                         continuation.resume(Unit)
                     }
                 }
@@ -108,6 +126,7 @@ class ExoAudioPlayer(context: Context) : AudioPlayer {
             continuation.invokeOnCancellation { player.removeListener(listener) }
             if (player.playbackState == Player.STATE_READY) {
                 player.removeListener(listener)
+                prepared = true
                 continuation.resume(Unit)
             }
         }
@@ -128,8 +147,13 @@ class ExoAudioPlayer(context: Context) : AudioPlayer {
         completion = listener
     }
 
+    override fun onError(listener: () -> Unit) {
+        error = listener
+    }
+
     override fun release() {
         completion = null
+        error = null
         player.release()
     }
 }

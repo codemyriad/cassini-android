@@ -107,6 +107,9 @@ class PlaybackController(private val parts: Parts) {
         if (player != null) close()
         // A newer open or leave came during the final save of the note that was open.
         if (operation != generation) return false
+        // Read before the player exists: a leave or another open during this suspension must find nothing to release.
+        val chosen = PlaybackSpeeds.nearest(parts.speeds.load())
+        if (operation != generation) return false
         val created = parts.player()
         try {
             created.prepare(file)
@@ -129,7 +132,8 @@ class PlaybackController(private val parts: Parts) {
         created.seekTo(start)
         epoch++
         created.onCompletion(::onCompletion)
-        speed = PlaybackSpeeds.nearest(parts.speeds.load())
+        created.onError(::onPlayerError)
+        speed = chosen
         created.setSpeed(speed)
         player = created
         this.noteId = noteId
@@ -182,6 +186,7 @@ class PlaybackController(private val parts: Parts) {
         created.seekTo(positionMs.coerceIn(0, created.durationMs))
         epoch++
         created.onCompletion(::onCompletion)
+        created.onError(::onPlayerError)
         created.setSpeed(speed)
         player = created
         this.file = file
@@ -317,6 +322,24 @@ class PlaybackController(private val parts: Parts) {
         if (player?.playing != true) release()
         parts.scope.launch(parts.main) { saveNow(id, positionMs, final = true) }
         return false
+    }
+
+    /**
+     * The player failed while the note was open (the file went away, a decoder error). It stops as a pause does: the
+     * focus and the headphones watch go, the position is saved, and the player is released. The note shows that it
+     * cannot play ([PlaybackState.failed]); opening it again tries again.
+     */
+    private fun onPlayerError() {
+        val active = player ?: return
+        val id = noteId ?: return
+        val positionMs = sample?.restoreMs ?: active.positionMs
+        stopTicker()
+        release()
+        active.release()
+        reset()
+        noteId = id
+        mutableState.value = PlaybackState(noteId = id, failed = true)
+        parts.scope.launch(parts.main) { saveNow(id, positionMs, final = true) }
     }
 
     private fun onCompletion() {

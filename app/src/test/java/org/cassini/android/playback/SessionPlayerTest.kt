@@ -42,6 +42,7 @@ class SessionPlayerTest {
         override fun seekTo(positionMs: Long) { this.positionMs = positionMs }
         override fun setSpeed(speed: Float) { applied = speed }
         override fun onCompletion(listener: () -> Unit) = Unit
+        override fun onError(listener: () -> Unit) = Unit
         override fun release() = Unit
     }
 
