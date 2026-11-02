@@ -12,6 +12,8 @@ import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -20,7 +22,9 @@ import kotlinx.coroutines.launch
  * hands every command to the [controller], so the controller's rules (audio focus, saved positions, speaker samples)
  * hold whatever sent the command: play and pause, seek, −10 s/+10 s, and the speed. Main thread only.
  *
- * [title] gives a note's title for the notification; it is read once per opened note.
+ * [title] gives a note's title for the notification; it is read once per opened note, apart from the state: the
+ * commands are offered as soon as a note is open, before its title is read, so a controller that connects and plays
+ * at once (a headset, Bluetooth, the lock screen right after the service starts) is never refused.
  */
 @OptIn(UnstableApi::class) // SimpleBasePlayer
 class SessionPlayer(
@@ -33,11 +37,17 @@ class SessionPlayer(
 
     init {
         scope.launch {
-            controller.state.collectLatest { state ->
-                val id = state.noteId
-                if (id != null && titled?.first != id) titled = id to title(id)
+            controller.state.collect { state ->
                 shown = state
                 invalidateState()
+            }
+        }
+        scope.launch {
+            controller.state.map { it.noteId }.distinctUntilChanged().collectLatest { id ->
+                if (id != null && titled?.first != id) {
+                    titled = id to title(id)
+                    invalidateState()
+                }
             }
         }
     }

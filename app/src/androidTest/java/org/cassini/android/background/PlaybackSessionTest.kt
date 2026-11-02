@@ -4,6 +4,7 @@ import android.app.Notification
 import android.app.NotificationManager
 import android.content.ComponentName
 import android.content.Intent
+import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -61,6 +62,9 @@ class PlaybackSessionTest {
         // Play through the session, as from the lock screen: the app shows no screen here, and Android 15 gives audio
         // focus only to an app in the foreground or with a foreground service, which Media3 starts for a controller's
         // play before it reaches the player (MediaSessionService, startInForegroundRequired).
+        waitFor("The session offers play for the open note") {
+            main { connected.takeIf { it.isCommandAvailable(Player.COMMAND_PLAY_PAUSE) } }
+        }
         main { connected.play() }
         waitFor("The session shows the note playing") { main { connected.takeIf { it.isPlaying } } }
 
