@@ -34,8 +34,8 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="content" />
                 <data android:scheme="file" />
-                <data android:mimeType="audio/ogg" />
-                <data android:mimeType="audio/opus" />
+                <!-- Every audio file the Library's picker imports (LibraryViewModel.IMPORT_TYPES), not only Ogg. -->
+                <data android:mimeType="audio/*" />
                 <data android:mimeType="application/ogg" />
             </intent-filter>
         </activity>

@@ -8,6 +8,7 @@ We made the entries for 0.0.1-beta to 0.1.0 again from the release notes of thes
 
 ### Added
 
+- "Open with" offers Cassini talk for any audio file, for example an MP3, M4A or WAV from a file manager or a chat app, not only for Ogg and Opus files. The file is imported as from the Library.
 - Cassini talk is in French, Spanish, Brazilian Portuguese and European Portuguese, besides English and Italian. The app follows the phone language, or the language you set for it in the system settings (Android 13 or later). Dates follow each language, and French writes sizes in Mo and Go.
 - Share a note with another app, for example mail or a chat app: each "Save a copy" row of the note menu has a Share button, for the Cassini document (or the audio), the transcript as text and the subtitles.
 - Model downloads name the app and its version to the model host: `CassiniTalk/0.3.0 (Android 15; build 13)`, with your Android release. They send nothing that identifies your phone or you.
