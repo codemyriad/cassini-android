@@ -10,6 +10,7 @@ import android.net.Uri
 import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.provider.OpenableColumns
+import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.flow.first
@@ -166,6 +167,42 @@ class SharedFileTest {
             }
         }
         assertTrue(stopped)
+    }
+
+    /** Review of #45: a nested document of the Files app, whose id has an encoded slash, imports by both routes. */
+    @Test fun aNestedDocumentUriImportsByOpenWithAndByShare() {
+        val nested = "content://$AUTHORITY/document/primary%3AMusic%2FInterviews%2Fvoice.wav"
+        for (intent in listOf(view(nested), send(nested))) {
+            ActivityScenario.launch<MainActivity>(intent).use {
+                assertEquals(intent.action, listOf(nested), importStarts().map { it.dataString })
+            }
+        }
+        val start = Intent(app, ImportGrantService::class.java).setData(Uri.parse(nested))
+        Robolectric.buildService(ImportGrantService::class.java, start).create().startCommand(0, 1)
+        val noteId = runBlocking {
+            withTimeout(TIMEOUT_MS) { app.graph.viewedImports.ready.first { it.isNotEmpty() }.single() }
+        }
+        assertTrue(noteId.isNotEmpty())
+    }
+
+    /**
+     * Review of #45: a uri sent without a read grant. Android refuses to pass the grant on, and startService throws
+     * SecurityException: the activity stays, nothing is imported, and the Library shows "Can't open this file".
+     */
+    @Test fun aShareWithoutAReadGrantShowsCantOpenInsteadOfCrashing() {
+        val starter = ImportGrantService.starter
+        ImportGrantService.starter = { _, intent -> throw SecurityException("No permission to grant ${intent.data}") }
+        try {
+            ActivityScenario.launch<MainActivity>(send("content://$AUTHORITY/voice/9")).use { scenario ->
+                shadowOf(Looper.getMainLooper()).idle()
+                assertEquals(Lifecycle.State.RESUMED, scenario.state)
+                assertEquals(Failure.OPEN, app.graph.notices.imports.state.value.failure?.failure)
+                assertTrue(app.graph.notices.imports.state.value.running.isEmpty())
+            }
+            assertEquals("the provider was never asked", 1L, GrantedProvider.entered.count)
+        } finally {
+            ImportGrantService.starter = starter
+        }
     }
 
     /** The control: without the service, the provider refuses the import once the activity has finished. */

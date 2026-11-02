@@ -47,6 +47,10 @@ class DeepLinksTest {
             "content://media/external/audio/media/1000",
             "content://com.android.providers.downloads.documents/document/msf%3A24",
             "content://chat/voice/a..b.ogg",
+            // The Files app's document ids carry an encoded slash (review of #45): a separator, not a traversal.
+            "content://com.android.externalstorage.documents/document/primary%3AMusic%2Fvoice.wav",
+            "content://com.android.externalstorage.documents/document/primary%3AMusic%2FInterviews%2Fday%201.m4a",
+            "content://com.android.externalstorage.documents/tree/primary%3AMusic/document/primary%3AMusic%2Fa.ogg",
         )
         for (uri in accepted) assertEquals(uri, uri, external(uri))
     }

@@ -54,8 +54,10 @@ object DeepLinks {
     /**
      * [uri] when another app may hand it to Cassini (review of #45): the activity is exported, and Cassini reads the
      * file with its own permissions, so only a `content://` uri of another app's provider passes. A `file://` path
-     * (any app could name Cassini's private files), Cassini's own providers, and a path with a traversal segment
-     * (`..`, `.`, or an encoded slash, also percent-encoded once more) are refused.
+     * (any app could name Cassini's private files), Cassini's own providers, and a path with a traversal component
+     * are refused: `..` or `.` as a segment, or as a component of a segment once its percent-encoding is decoded (once
+     * or twice), where an encoded slash or backslash separates components. An encoded separator by itself is fine:
+     * the Files app's document ids have one (`primary%3AMusic%2Fvoice.wav`). A malformed escape is refused.
      */
     fun external(uri: String?, ownPackage: String = BuildConfig.APPLICATION_ID): String? {
         val rest = uri?.takeIf { it.startsWith(CONTENT) }?.removePrefix(CONTENT) ?: return null
@@ -66,10 +68,10 @@ object DeepLinks {
         return uri.takeIf { foreign && path.split('/').none(::traversal) }
     }
 
-    /** A path segment that walks up or sideways, as written or after one or two rounds of percent-decoding. */
+    /** A path segment that walks up or stays put, as written or after one or two rounds of percent-decoding. */
     private fun traversal(segment: String): Boolean =
         generateSequence(segment) { it.takeIf { '%' in it }?.let(::percentDecoded) }.take(DECODE_ROUNDS).any { form ->
-            form == ".." || form == "." || '/' in form || '\\' in form
+            form.split('/', '\\').any { component -> component == ".." || component == "." }
         }
 
     private fun percentDecoded(text: String): String = try {
