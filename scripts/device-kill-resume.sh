@@ -31,7 +31,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-package=org.cassini.android
+package=io.codemyriad.cassini
 name=killtest-$(date +%s)
 clip=$(scripts/make-long-clip.sh --print-path)
 clip_name=$(basename "$clip")

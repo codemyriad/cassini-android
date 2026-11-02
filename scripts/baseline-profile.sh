@@ -36,10 +36,10 @@ fi
 adb install -r app/build/outputs/apk/releaseTest/app-releaseTest.apk
 adb install -r baselineprofile/build/outputs/apk/releaseTest/baselineprofile-releaseTest.apk
 
-runner=org.cassini.baselineprofile/androidx.test.runner.AndroidJUnitRunner
+runner=io.codemyriad.cassini.baselineprofile/androidx.test.runner.AndroidJUnitRunner
 report=$(mktemp)
 trap 'rm -f "$report"' EXIT
-adb shell am instrument -w -r -e class org.cassini.baselineprofile.BaselineProfileGenerator "$runner" | tee "$report"
+adb shell am instrument -w -r -e class io.codemyriad.cassini.baselineprofile.BaselineProfileGenerator "$runner" | tee "$report"
 # am instrument can return shell status 0 even when the test fails.
 if ! grep -q '^OK (1 test)' "$report"; then
     printf 'The generator failed; no profile was copied.\n' >&2
@@ -47,7 +47,7 @@ if ! grep -q '^OK (1 test)' "$report"; then
 fi
 
 # BaselineProfileRule writes BaselineProfileGenerator_generate-baseline-prof.txt (and a timestamped copy) here.
-output=/sdcard/Android/media/org.cassini.baselineprofile
+output=/sdcard/Android/media/io.codemyriad.cassini.baselineprofile
 profile=$(adb shell "ls $output/" | tr -d '\r' | grep -E '^BaselineProfileGenerator_generate-.*prof\.txt$' \
     | grep -v -E '[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -1)
 profile=${profile:+$output/$profile}

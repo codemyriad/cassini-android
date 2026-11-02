@@ -66,7 +66,7 @@ A host can send the download to a different host (a redirect). Cassini follows a
 
 If the list of models or a redirect gives a different host, Cassini stops the download of that model.
 
-The host receives the IP address of your phone and the name of the file. Android also sends a standard user agent, which gives the Android version and the phone model. The privacy policy of the host applies to these data. Cassini sends no cookies and no account data.
+The host receives the IP address of your phone and the name of the file. Cassini sends the user agent `CassiniTalk/<version> (Android <release>; build <code>)`: the app version, the Android release and the app build number. It contains nothing that names you or your phone. The privacy policy of the host applies to these data. Cassini sends no cookies and no account data.
 
 Before Cassini uses a downloaded file, it makes sure that the size and the SHA-256 hash of the file are correct. The security policy of Cassini gives the details: https://github.com/codemyriad/cassini-android/blob/main/SECURITY.md
 

@@ -16,7 +16,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-package=org.cassini.android
+package=io.codemyriad.cassini
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 

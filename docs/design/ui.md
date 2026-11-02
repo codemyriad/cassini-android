@@ -2,7 +2,7 @@
 
 Status: this document is the binding specification for the `:ui` module (P7, P8) and for the Routes and ViewModels in `:app` (P10). The visual reference is `design/reference/png/*.png` and the markup with the exact inline styles in `design/reference/markup/*.html`. A phone board is 780 x 1688 px, that is 390 x 844 dp at 2x. The States board is 4540 x 2360 px, that is 2270 x 1180 dp. `features.md` gives the behavior and the copy.
 
-## 1. Module and package layout (`:ui`, package `org.cassini.ui`)
+## 1. Module and package layout (`:ui`, package `io.codemyriad.cassini.ui`)
 
 ```
 theme/       Color.kt, RecordingColors.kt, Tone.kt, Type.kt, Shape.kt, Spacing.kt, Fonts.kt, Theme.kt, CassiniIcons.kt

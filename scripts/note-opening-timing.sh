@@ -17,7 +17,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-package=org.cassini.android
+package=io.codemyriad.cassini
 runner=$package.test/$package.CassiniTestRunner
 test=$package.flows.NoteOpeningTimingTest
 root=androidTest-kept-timing

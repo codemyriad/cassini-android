@@ -17,7 +17,7 @@ static OpusEncoder *encoder(JNIEnv *env, jlong ptr) {
   if (ptr == 0) fail(env, "Opus encoder is not open");
   return reinterpret_cast<OpusEncoder *>(ptr);
 }
-extern "C" JNIEXPORT jlong JNICALL Java_org_cassini_android_NativeOpus_create(JNIEnv *env, jobject) {
+extern "C" JNIEXPORT jlong JNICALL Java_io_codemyriad_cassini_NativeOpus_create(JNIEnv *env, jobject) {
   int error;
   auto *enc = opus_encoder_create(16000, 1, OPUS_APPLICATION_AUDIO, &error);
   if (error != OPUS_OK || !enc) { fail(env, "Cannot create Opus encoder"); return 0; }
@@ -27,7 +27,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_org_cassini_android_NativeOpus_create(JN
   if (status != OPUS_OK) { opus_encoder_destroy(enc); fail(env, opus_strerror(status)); return 0; }
   return reinterpret_cast<jlong>(enc);
 }
-extern "C" JNIEXPORT jint JNICALL Java_org_cassini_android_NativeOpus_lookahead(JNIEnv *env, jobject, jlong ptr) {
+extern "C" JNIEXPORT jint JNICALL Java_io_codemyriad_cassini_NativeOpus_lookahead(JNIEnv *env, jobject, jlong ptr) {
   auto *enc = encoder(env, ptr);
   if (!enc) return 0;
   int samples = 0;
@@ -35,7 +35,7 @@ extern "C" JNIEXPORT jint JNICALL Java_org_cassini_android_NativeOpus_lookahead(
   if (status != OPUS_OK) { fail(env, opus_strerror(status)); return 0; }
   return samples;
 }
-extern "C" JNIEXPORT jbyteArray JNICALL Java_org_cassini_android_NativeOpus_encode(JNIEnv *env, jobject, jlong ptr, jfloatArray pcm) {
+extern "C" JNIEXPORT jbyteArray JNICALL Java_io_codemyriad_cassini_NativeOpus_encode(JNIEnv *env, jobject, jlong ptr, jfloatArray pcm) {
   auto *enc = encoder(env, ptr);
   if (!enc) return nullptr;
   if (env->GetArrayLength(pcm) != 320) { fail(env, "Opus needs a 20 ms frame"); return nullptr; }
@@ -48,7 +48,7 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_org_cassini_android_NativeOpus_enco
   if (out) env->SetByteArrayRegion(out, 0, n, reinterpret_cast<jbyte *>(packet));
   return out;
 }
-extern "C" JNIEXPORT void JNICALL Java_org_cassini_android_NativeOpus_destroy(JNIEnv *, jobject, jlong ptr) {
+extern "C" JNIEXPORT void JNICALL Java_io_codemyriad_cassini_NativeOpus_destroy(JNIEnv *, jobject, jlong ptr) {
   if (ptr == 0) return;
   opus_encoder_destroy(reinterpret_cast<OpusEncoder *>(ptr));
 }

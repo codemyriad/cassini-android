@@ -9,19 +9,19 @@ plugins {
 }
 
 android {
-    namespace = "org.cassini.android"
+    namespace = "io.codemyriad.cassini"
     compileSdk = libs.versions.compileSdk.get().toInt()
     buildToolsVersion = libs.versions.buildTools.get()
     // libcassini_opus is built in :engine; the app's NDK strips the packaged native libraries.
     ndkVersion = libs.versions.ndk.get()
     defaultConfig {
-        applicationId = "org.cassini.android"
+        applicationId = "io.codemyriad.cassini"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = 13
         versionName = "0.3.0"
         // Builds the graph on a scratch root (docs/architecture.md section 9).
-        testInstrumentationRunner = "org.cassini.android.CassiniTestRunner"
+        testInstrumentationRunner = "io.codemyriad.cassini.CassiniTestRunner"
         // Library modules cannot filter packaged ABIs; this line must stay in :app.
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
     }

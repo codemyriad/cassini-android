@@ -45,9 +45,9 @@ while (($#)); do
 done
 
 old=app/src/main/java/org/cassini/android
-core=core/src/main/kotlin/org/cassini/core
-engine=engine/src/main/kotlin/org/cassini/engine
-app=app/src/main/java/org/cassini/android
+core=core/src/main/kotlin/io/codemyriad/cassini/core
+engine=engine/src/main/kotlin/io/codemyriad/cassini/engine
+app=app/src/main/java/io/codemyriad/cassini
 
 # name | kind | old files (at the base) | new files (working tree) | the edits the plan allows
 # A new file written as `path#regex` contributes only its lines from the first line matching regex to the end.
@@ -80,9 +80,9 @@ groups=(
     "VoiceStore|verbatim|$old/VoiceStore.kt|$core/speakers/VoiceCodec.kt|Voice JSON and enrol/unenrol maths -> core VoiceCodec; the app's file I/O retired (P10; VoiceRepository replaces it)"
     "NoteVoices|verbatim|$old/NoteVoices.kt|$core/speakers/NoteVoiceCodec.kt|Match/SpeakerPrint/JSON -> core NoteVoiceCodec (a version mismatch throws); the app's file I/O retired (P10; VoiceRepository replaces it)"
     "UserFacingException|verbatim|$old/UserFacingException.kt|$core/Failure.kt $app/FailureMessages.kt|Failure without R.string; FailureMessages maps codes to strings; MODEL_UNAVAILABLE for a model the host no longer offers (R11)"
-    "StreamingOpusEncoder|verbatim|$old/StreamingOpusEncoder.kt|engine/src/main/kotlin/org/cassini/android/NativeOpus.kt $engine/opus/StreamingOpusEncoder.kt|NativeOpus split out, JNI package kept"
+    "StreamingOpusEncoder|verbatim|$old/StreamingOpusEncoder.kt|engine/src/main/kotlin/io/codemyriad/cassini/NativeOpus.kt $engine/opus/StreamingOpusEncoder.kt|NativeOpus split out; package and JNI names io.codemyriad.cassini (D62)"
     "MicrophoneRecording|verbatim|$old/MicrophoneRecording.kt|$engine/capture/MicrophoneCapture.kt $engine/capture/OpusCapture.kt $engine/capture/AacCapture.kt $engine/capture/CaptureFactory.kt|interface with suspend stop(); Opus/Aac loops unchanged but for the Opus meter (D26.1, below); format probe cached off the main thread (the app's OpusEncoder that shared it retired in P10); sessionId for the recording-callback match (P6); D26.1 AC peak (max |x - mean|) in the Opus meter"
-    "opus-jni.cpp|verbatim|app/src/main/cpp/opus-jni.cpp|engine/src/main/cpp/opus-jni.cpp|ptr == 0 guards, FindClass null check, opus_encoder_ctl return checks"
+    "opus-jni.cpp|verbatim|app/src/main/cpp/opus-jni.cpp|engine/src/main/cpp/opus-jni.cpp|ptr == 0 guards, FindClass null check, opus_encoder_ctl return checks; JNI names follow the io.codemyriad.cassini package (D62)"
     "CMakeLists.txt|verbatim|app/src/main/cpp/CMakeLists.txt|engine/src/main/cpp/CMakeLists.txt|built by AGP externalNativeBuild instead of a script"
     "Models|restructured|$old/ModelStore.kt $old/DiarizationModels.kt $old/VoiceprintModel.kt $old/ModelBundle.kt|$core/models/ArtifactFetcher.kt $core/models/ModelCatalog.kt|one descriptor table (the app's InstalledModels retired in P10; ModelRepository replaces it); fetch/fetchZstd/decompress/digest in ArtifactFetcher with Range resume; digest progress and the redirect allow-list (P3); the dist.gocassini.com pins, one Zstandard download per file and If-Range (D53)"
     "ProcessingCheckpoint|restructured|$old/ProcessingCheckpoint.kt|$core/checkpoint/CheckpointNames.kt|the app class retired in P10 (CheckpointRepository replaces it); typed CheckpointState codec and validation rules in core; CheckpointNames gains live and rejected members and pure reducers (P3)"

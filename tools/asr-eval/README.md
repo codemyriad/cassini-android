@@ -26,8 +26,8 @@ The environment variable `CASSINI_CONTEXT_MS` sets `DecodePolicy.contextMs` (the
 
 1. Build `libsherpa-onnx-jni` for the host from the pinned sherpa-onnx source and
    `scripts/streaming-diarization.patch` (see `docs/native-runtime.md`).
-2. Copy `AsrEval.kt` into `engine/src/test/kotlin/org/cassini/tools/asreval/`. Do not commit the copy.
-3. In Android Studio, run `org.cassini.tools.asreval.AsrEval.main` with the unit-test classpath of `:engine`. Add
+2. Copy `AsrEval.kt` into `engine/src/test/kotlin/io/codemyriad/cassini/tools/asreval/`. Do not commit the copy.
+3. In Android Studio, run `io.codemyriad.cassini.tools.asreval.AsrEval.main` with the unit-test classpath of `:engine`. Add
    `-Djava.library.path=<directory of the host libsherpa-onnx-jni>`.
 
 `./gradlew :engine:compileDebugUnitTestKotlin` compiles the copy. That classpath has the JVM classes of the engine

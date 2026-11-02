@@ -37,7 +37,7 @@ val webFonts: FileCollection = rootProject.fileTree(rootDir).matching(webFontPat
 val designMarkupDir = rootProject.layout.projectDirectory.dir("design/reference/markup")
 
 android {
-    namespace = "org.cassini.ui"
+    namespace = "io.codemyriad.cassini.ui"
     compileSdk = libs.versions.compileSdk.get().toInt()
     buildToolsVersion = libs.versions.buildTools.get()
     // Every :ui resource name starts with ui_, so :app resources can never silently override them.

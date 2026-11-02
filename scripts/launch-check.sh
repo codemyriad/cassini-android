@@ -4,7 +4,7 @@
 #   scripts/launch-check.sh APK
 set -euo pipefail
 apk=${1:?Usage: scripts/launch-check.sh APK}
-package=org.cassini.android
+package=io.codemyriad.cassini
 adb install -r "$apk"
 adb shell am force-stop "$package"
 # Read only the log lines after this point. Some emulators (API 26) cannot clear the log ("failed to clear

@@ -44,8 +44,8 @@ done
 case "$part" in models|download|both) ;; *) printf 'Unknown part: %s\n' "$part" >&2; exit 2 ;; esac
 
 export ANDROID_SERIAL=$serial
-package=org.cassini.android
-test_class=org.cassini.android.acceptance.AcceptanceWalkTest
+package=io.codemyriad.cassini
+test_class=io.codemyriad.cassini.acceptance.AcceptanceWalkTest
 run=$(date +%Y%m%d-%H%M%S)
 out=build/acceptance/$run
 mkdir -p "$out"

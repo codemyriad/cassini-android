@@ -11,7 +11,7 @@ plugins {
 val opusSource: File = rootDir.resolve(".tools/opus/source")
 
 android {
-    namespace = "org.cassini.engine"
+    namespace = "io.codemyriad.cassini.engine"
     compileSdk = libs.versions.compileSdk.get().toInt()
     buildToolsVersion = libs.versions.buildTools.get()
     ndkVersion = libs.versions.ndk.get()

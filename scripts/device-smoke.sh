@@ -14,7 +14,7 @@ to get the expected count. It fails when a test fails, when a test is skipped or
 real run differs from the dry run (or from CASSINI_EXPECTED_TESTS, when that is set).
 
 Options:
-  --annotation NAME   A test annotation in org.cassini.test: CiSmoke, NeedsModels, NeedsMicrophone or Manual.
+  --annotation NAME   A test annotation in io.codemyriad.cassini.test: CiSmoke, NeedsModels, NeedsMicrophone or Manual.
                       A Manual test skips without its inputs, and a skip fails the run. Thus do not select
                       Manual. Run each Manual test as follows:
                       - AcceptanceWalkTest: use scripts/acceptance-walk.sh.
@@ -22,11 +22,11 @@ Options:
                       - ModelDownloadFlowTest: use --class with --arg emptyModelRoot=true.
                       - The DeviceSmokeTest tests that read the YouTube clip: first get the clip with
                         tools/fetch-youtube-audio.sh (the test APK includes it), then use --class.
-  --class CLASS       A test class or method, for example org.cassini.android.background.RecordingServiceTest or
-                      org.cassini.android.DeviceSmokeTest#importsRealItalianAudioAndPreservesItsDuration.
+  --class CLASS       A test class or method, for example io.codemyriad.cassini.background.RecordingServiceTest or
+                      io.codemyriad.cassini.DeviceSmokeTest#importsRealItalianAudioAndPreservesItsDuration.
                       Repeat it to select more than one.
-  --bench             Run the :bench experiments (org.cassini.bench) instead of the app's device tests. Select them
-                      with --class, for example org.cassini.bench.DiarizationPocTest. Debug builds only. The bench
+  --bench             Run the :bench experiments (io.codemyriad.cassini.bench) instead of the app's device tests. Select them
+                      with --class, for example io.codemyriad.cassini.bench.DiarizationPocTest. Debug builds only. The bench
                       uses the models the app installed and never downloads one.
   --serial SERIAL     The adb serial of the device (default: $ANDROID_SERIAL, or the only device).
   --sample NAME       The audioSample argument of the 0.1.0 tests (default: fleurs).
@@ -79,7 +79,7 @@ if [ -z "$annotation" ] && [ "${#classes[@]}" -eq 0 ]; then
     exit 2
 fi
 selection=()
-if [ -n "$annotation" ]; then selection+=(-e annotation "org.cassini.test.$annotation"); fi
+if [ -n "$annotation" ]; then selection+=(-e annotation "io.codemyriad.cassini.test.$annotation"); fi
 if [ "${#classes[@]}" -gt 0 ]; then
     joined=$(IFS=,; printf '%s' "${classes[*]}")
     selection+=(-e class "$joined")
@@ -157,10 +157,10 @@ adb install -r "${CASSINI_APK:-app/build/outputs/apk/$CASSINI_TEST_BUILD_TYPE/ap
 if $bench; then
     adb install -r "${CASSINI_TEST_APK:-bench/build/outputs/apk/debug/bench-debug.apk}"
     # The bench has no scratch root: it reads the models and files of the installed app.
-    runner=org.cassini.bench/androidx.test.runner.AndroidJUnitRunner
+    runner=io.codemyriad.cassini.bench/androidx.test.runner.AndroidJUnitRunner
 else
     adb install -r "${CASSINI_TEST_APK:-app/build/outputs/apk/androidTest/$CASSINI_TEST_BUILD_TYPE/app-$CASSINI_TEST_BUILD_TYPE-androidTest.apk}"
-    runner=org.cassini.android.test/org.cassini.android.CassiniTestRunner
+    runner=io.codemyriad.cassini.test/io.codemyriad.cassini.CassiniTestRunner
 fi
 arguments=("${selection[@]}" -e downloadModels true -e audioSample "$sample")
 if [ "${#extra[@]}" -gt 0 ]; then arguments+=("${extra[@]}"); fi
