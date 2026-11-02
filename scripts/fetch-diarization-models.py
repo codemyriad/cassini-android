@@ -10,8 +10,8 @@ ROOT = Path(__file__).resolve().parents[1]
 DEST = ROOT / ".tools/diar"
 # Same pinned download as ModelCatalog.DIARIZATION in :core. Model files stay out of the APK and git.
 NAME = "nemotron-3-diarization.int8.onnx"
-SIZE, DIGEST = 103941758, "01d1f893f394cc0418ae78425d216ed62c334c0125e650135332a7a8e595f168"
-ZST_SIZE, ZST_DIGEST = 64982914, "51249515e4cb49dc00c5d5dc0a41ac59aa91157d689ec9586b3f4bf567c3f602"
+SIZE, DIGEST = 103967426, "47c221ea9b4d4e7f6c108bd098e769bc706cdc986c29f6133c93cae335fe6779"
+ZST_SIZE, ZST_DIGEST = 64915668, "794720a59892189484d38a186d2b350018b4194cae55292f501b2849d6313290"
 URL = f"https://dist.gocassini.com/models/files/{ZST_DIGEST}/model.int8.onnx.zst"
 
 

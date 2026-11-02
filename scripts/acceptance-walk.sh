@@ -51,7 +51,9 @@ out=build/acceptance/$run
 mkdir -p "$out"
 backup=${backup:-$out/files-backup.tar}
 
-model_dirs="files/parakeet-ultra files/speaker-models files/vad"
+# The model directories files/models/<id>/<source sha256> of scripts/ci-models.json, which ModelCatalogTest keeps
+# equal to ModelCatalog.
+model_dirs=$(python3 -I -c 'import json, sys; print(" ".join("files/" + m["directory"] for m in json.load(open(sys.argv[1]))["models"]))' scripts/ci-models.json)
 
 # A recursive listing (with hidden files such as .part) and the checksums of the "verified" markers. It uses adb shell,
 # which gives the exit status of the command (adb exec-out does not), so a failed listing stops the script. The
@@ -59,7 +61,7 @@ model_dirs="files/parakeet-ultra files/speaker-models files/vad"
 # (seen on a CI emulator for the 104 MB speaker model).
 models_listing() {
     local listing
-    if ! listing=$(adb shell "run-as $package sh -c 'ls -lAR $model_dirs && md5sum files/*/verified*'"); then
+    if ! listing=$(adb shell "run-as $package sh -c 'ls -lAR $model_dirs && md5sum files/models/*/*/verified'"); then
         printf 'Cannot list the model files of %s.\n' "$package" >&2
         return 1
     fi
@@ -77,8 +79,10 @@ done
 
 # 1. The test clips, the backup and the state to restore.
 scripts/acceptance-audio.sh
+# The model directories of earlier development builds stay on a phone (the app no longer reads them, D51): they
+# are left out as well.
 adb exec-out run-as "$package" tar c \
-    --exclude=files/parakeet-ultra --exclude=files/vad --exclude=files/speaker-models \
+    --exclude=files/models --exclude=files/parakeet-ultra --exclude=files/vad --exclude=files/speaker-models \
     files > "$backup"
 if ! tar tf "$backup" >/dev/null 2>&1; then
     printf 'The backup of files/ is not a tar archive: %s\n' "$backup" >&2

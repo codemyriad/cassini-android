@@ -1,6 +1,7 @@
 package org.cassini.android
 
 import android.content.Context
+import android.os.Build
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -74,6 +75,14 @@ class AppGraphTest {
     @After fun tearDown() = graphs.forEach(AppGraph::close)
 
     private fun AppGraph.awaitReady() = runBlocking { withTimeout(TIMEOUT_MS) { ready.await() } }
+
+    @Test fun modelRequestsNameTheAppItsVersionAndTheAndroidReleaseOnly() {
+        // Coordination D54: no device model, locale or install id.
+        assertEquals("CassiniTalk/0.3.0 (Android 15; build 13)", AppGraph.modelUserAgent("0.3.0", "15", 13))
+        val expected = "CassiniTalk/${BuildConfig.VERSION_NAME} (Android ${Build.VERSION.RELEASE}; " +
+            "build ${BuildConfig.VERSION_CODE})"
+        assertEquals(expected, AppGraph.MODEL_USER_AGENT)
+    }
 
     @Test fun theGraphBuildsOnAScratchRootAndReadyCompletes() {
         val graph = graph()

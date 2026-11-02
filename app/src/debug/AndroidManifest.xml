@@ -2,7 +2,8 @@
 <!-- Debug builds only: the entry points of scripts/device-kill-resume.sh (docs/architecture.md section 9). -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
-    <application>
+    <!-- Plain HTTP to 127.0.0.1 only, for ModelDownloadDeviceTest's loopback model host (src/instrumented/res). -->
+    <application android:networkSecurityConfig="@xml/loopback_network">
         <!-- Exported so that adb shell am start reaches it; a release build has no such entry point. A visible
              start is also what lets it start the processing service on Android 12 and later. -->
         <activity android:name=".debug.DebugCommandActivity" android:exported="true"

@@ -112,7 +112,9 @@ class ArtifactFetcherTest {
     @Test fun bytesThatDoNotMatchTheVoiceprintPinAreNotKept() {
         val bytes = "voiceprint weights".toByteArray()
         withServer(bytes) { url, directory ->
-            val failure = failure { ArtifactFetcher.fetch(url, ModelCatalog.voiceprintModel, directory) { _, _ -> } }
+            val failure = failure {
+                ArtifactFetcher.fetch(url, ModelCatalog.voiceprintModel, directory, AGENT) { _, _ -> }
+            }
             assertEquals(Failure.VERIFY, failure)
             assertFalse(File(directory, ModelCatalog.voiceprintModel.name).exists())
             assertFalse(File(directory, "${ModelCatalog.voiceprintModel.name}.part").exists())
@@ -122,7 +124,7 @@ class ArtifactFetcherTest {
     @Test fun verifiedBytesAreInstalledAndPartialFilesAreRemoved() {
         val bytes = "model weights".toByteArray()
         withServer(bytes) { url, directory ->
-            ArtifactFetcher.fetch(url, artifact(bytes), directory) { _, _ -> }
+            ArtifactFetcher.fetch(url, artifact(bytes), directory, AGENT) { _, _ -> }
             assertArrayEquals(bytes, File(directory, "model.onnx").readBytes())
             assertFalse(File(directory, "model.onnx.part").exists())
         }
@@ -133,7 +135,8 @@ class ArtifactFetcherTest {
         withServer("wrong weights".toByteArray()) { url, directory ->
             val original = "existing copy".toByteArray()
             File(directory, "model.onnx").writeBytes(original)
-            assertEquals(Failure.VERIFY, failure { ArtifactFetcher.fetch(url, artifact(bytes), directory) { _, _ -> } })
+            val failed = failure { ArtifactFetcher.fetch(url, artifact(bytes), directory, AGENT) { _, _ -> } }
+            assertEquals(Failure.VERIFY, failed)
             assertArrayEquals(original, File(directory, "model.onnx").readBytes())
             assertFalse(File(directory, "model.onnx.part").exists())
         }
@@ -144,7 +147,7 @@ class ArtifactFetcherTest {
         withServer(bytes, 404) { url, directory ->
             assertEquals(
                 Failure.DOWNLOAD,
-                failure { ArtifactFetcher.fetch(url, artifact(bytes), directory) { _, _ -> } }
+                failure { ArtifactFetcher.fetch(url, artifact(bytes), directory, AGENT) { _, _ -> } }
             )
             assertFalse(File(directory, "model.onnx").exists())
             assertFalse(File(directory, "model.onnx.part").exists())
@@ -158,7 +161,7 @@ class ArtifactFetcherTest {
                 Thread.currentThread().interrupt()
                 assertEquals(
                     Failure.CANCELLED,
-                    failure { ArtifactFetcher.fetch(url, artifact(bytes), directory) { _, _ -> } }
+                    failure { ArtifactFetcher.fetch(url, artifact(bytes), directory, AGENT) { _, _ -> } }
                 )
                 assertFalse(File(directory, "model.onnx").exists())
             } finally { Thread.interrupted() }
@@ -174,7 +177,7 @@ class ArtifactFetcherTest {
             if (attempts == 1) Answer(200, weights, sent = 100_000) else respond(headers)
         }) { url, directory, requests ->
             try {
-                ArtifactFetcher.fetch(url, artifact(weights), directory) { _, _ -> }
+                ArtifactFetcher.fetch(url, artifact(weights), directory, AGENT) { _, _ -> }
                 fail("A truncated body must not install")
             } catch (error: UserFacingException) {
                 assertEquals(Failure.DOWNLOAD, error.failure)
@@ -187,7 +190,8 @@ class ArtifactFetcherTest {
             ArtifactFetcher.fetch(
                 url,
                 artifact(weights),
-                directory
+                directory,
+                AGENT,
             ) { done, verifying -> if (!verifying) reported += done }
             assertEquals("bytes=100000-", requests.last()["range"])
             assertArrayEquals(weights, File(directory, "model.onnx").readBytes())
@@ -199,7 +203,7 @@ class ArtifactFetcherTest {
     @Test fun aPartialAnswerResumesFromThePartLength() {
         withServer(ranged(weights)) { url, directory, requests ->
             File(directory, "model.onnx.part").writeBytes(weights.copyOf(123_456))
-            ArtifactFetcher.fetch(url, artifact(weights), directory) { _, _ -> }
+            ArtifactFetcher.fetch(url, artifact(weights), directory, AGENT) { _, _ -> }
             assertEquals(listOf("bytes=123456-"), requests.map { it["range"] })
             assertArrayEquals(weights, File(directory, "model.onnx").readBytes())
             assertFalse(File(directory, "model.onnx.part").exists())
@@ -208,7 +212,7 @@ class ArtifactFetcherTest {
 
     /** The failure of one fetch of [weights] from [url] into [directory]. */
     private fun fetching(url: String, directory: File) =
-        failure { ArtifactFetcher.fetch(url, artifact(weights), directory) { _, _ -> } }
+        failure { ArtifactFetcher.fetch(url, artifact(weights), directory, AGENT) { _, _ -> } }
 
     @Test fun aRangeThatEndsBeforeTheArtifactKeepsItsBytesAndTheNextAttemptGoesOn() {
         val cap = 100_000
@@ -229,7 +233,7 @@ class ArtifactFetcherTest {
             assertEquals(weights.size - 101_000L, ArtifactFetcher.bytesToFetch(artifact(weights), directory))
             assertEquals(Failure.DOWNLOAD, fetching(url, directory))
             assertEquals(201_000L, part.length())
-            ArtifactFetcher.fetch(url, artifact(weights), directory) { _, _ -> }
+            ArtifactFetcher.fetch(url, artifact(weights), directory, AGENT) { _, _ -> }
             assertEquals(listOf("bytes=1000-", "bytes=101000-", "bytes=201000-"), requests.map { it["range"] })
             assertArrayEquals(weights, File(directory, "model.onnx").readBytes())
             assertFalse(part.exists())
@@ -264,11 +268,80 @@ class ArtifactFetcherTest {
         }
     }
 
+    @Test fun everyRequestAsksForTheBytesThemselvesAndAResumeOnlyForTheSameFile() {
+        withServer(ranged(weights)) { url, directory, requests ->
+            File(directory, "model.onnx.part").writeBytes(weights.copyOf(1000))
+            ArtifactFetcher.fetch(url, artifact(weights), directory, AGENT) { _, _ -> }
+            val request = requests.single()
+            assertEquals("identity", request["accept-encoding"])
+            assertEquals("bytes=1000-", request["range"])
+            // The model host's entity tag is the quoted SHA-256 of the file.
+            assertEquals("\"${artifact(weights).sha256}\"", request["if-range"])
+        }
+        withServer(weights) { url, directory ->
+            ArtifactFetcher.fetch(url, artifact(weights), directory, AGENT) { _, _ -> }
+            assertArrayEquals(weights, File(directory, "model.onnx").readBytes())
+        }
+    }
+
+    @Test fun aServerWhoseFileChangedAnswersTheWholeFileAndTheDownloadRestarts() {
+        withServer({ headers ->
+            // An If-Range server: another entity tag than the one asked for means the whole file.
+            if (headers["if-range"] == "\"other\"") ranged(weights)(headers) else Answer(200, weights)
+        }) { url, directory, requests ->
+            File(directory, "model.onnx.part").writeBytes(ByteArray(1000) { 5 })
+            ArtifactFetcher.fetch(url, artifact(weights), directory, AGENT) { _, _ -> }
+            assertEquals("bytes=1000-", requests.single()["range"])
+            assertArrayEquals(weights, File(directory, "model.onnx").readBytes())
+        }
+    }
+
+    @Test fun aSmallAnswerIsReadWholeAndALargerOneIsRefused() {
+        val manifest = """{"schema_version":2}""".toByteArray()
+        withServer({ Answer(200, manifest) }) { url, _, requests ->
+            assertArrayEquals(manifest, ArtifactFetcher.read(url, 1024, AGENT))
+            assertEquals("identity", requests.single()["accept-encoding"])
+            assertEquals(AGENT, requests.single()["user-agent"])
+            assertEquals(Failure.VERIFY, failure { ArtifactFetcher.read(url, manifest.size - 1L, AGENT) })
+        }
+        withServer({ Answer(404, ByteArray(0)) }) { url, _, _ ->
+            assertEquals(Failure.DOWNLOAD, failure { ArtifactFetcher.read(url, 1024, AGENT) })
+        }
+        withServer({ Answer(200, manifest, sent = 5) }) { url, _, _ ->
+            val failed = try {
+                failure { ArtifactFetcher.read(url, 1024, AGENT) }
+            } catch (_: IOException) {
+                // Some HTTP stacks report the early close as an error instead of an early end.
+                Failure.DOWNLOAD
+            }
+            assertEquals(Failure.DOWNLOAD, failed)
+        }
+    }
+
+    @Test fun aReadNamesTheAppOnEveryHop() {
+        val manifest = """{"schema_version":2}""".toByteArray()
+        var attempts = 0
+        val respond = { _: Map<String, String> ->
+            if (++attempts == 1) redirect("/v2/manifest.json") else Answer(200, manifest)
+        }
+        withServer(respond) { url, _, requests ->
+            assertArrayEquals(manifest, ArtifactFetcher.read(url, 1024, AGENT, loopback))
+            assertEquals(listOf(AGENT, AGENT), requests.map { it["user-agent"] })
+        }
+    }
+
+    @Test fun aReadFollowsOnlyTheAllowedRedirects() {
+        withServer({ redirect("https://example.com/manifest.json") }) { url, _, requests ->
+            assertEquals(Failure.DOWNLOAD, failure { ArtifactFetcher.read(url, 1024, AGENT) })
+            assertEquals(1, requests.size)
+        }
+    }
+
     @Test fun aFullAnswerToARangeRequestRestartsFromZero() {
         withServer({ Answer(200, weights) }) { url, directory, requests ->
             // Not a prefix of the artifact: a restart must not keep any of it.
             File(directory, "model.onnx.part").writeBytes(ByteArray(50_000) { 1 })
-            ArtifactFetcher.fetch(url, artifact(weights), directory) { _, _ -> }
+            ArtifactFetcher.fetch(url, artifact(weights), directory, AGENT) { _, _ -> }
             assertEquals("bytes=50000-", requests.single()["range"])
             assertArrayEquals(weights, File(directory, "model.onnx").readBytes())
         }
@@ -279,7 +352,7 @@ class ArtifactFetcherTest {
             File(directory, "model.onnx.part").writeBytes(weights.copyOf(1000))
             assertEquals(
                 Failure.VERIFY,
-                failure { ArtifactFetcher.fetch(url, artifact(weights), directory) { _, _ -> } }
+                failure { ArtifactFetcher.fetch(url, artifact(weights), directory, AGENT) { _, _ -> } }
             )
             assertFalse(File(directory, "model.onnx.part").exists())
             assertFalse(File(directory, "model.onnx").exists())
@@ -298,7 +371,7 @@ class ArtifactFetcherTest {
             File(directory, "model.onnx.part").writeBytes(weights.copyOf(1000))
             assertEquals(
                 Failure.VERIFY,
-                failure { ArtifactFetcher.fetch(url, artifact(weights), directory) { _, _ -> } }
+                failure { ArtifactFetcher.fetch(url, artifact(weights), directory, AGENT) { _, _ -> } }
             )
             assertFalse(File(directory, "model.onnx.part").exists())
         }
@@ -310,12 +383,12 @@ class ArtifactFetcherTest {
             File(directory, "model.onnx.part").writeBytes(ByteArray(1000) { 9 })
             assertEquals(
                 Failure.VERIFY,
-                failure { ArtifactFetcher.fetch(url, artifact(weights), directory) { _, _ -> } }
+                failure { ArtifactFetcher.fetch(url, artifact(weights), directory, AGENT) { _, _ -> } }
             )
             assertFalse(File(directory, "model.onnx.part").exists())
             assertFalse(File(directory, "model.onnx").exists())
             // The next attempt starts over and succeeds.
-            ArtifactFetcher.fetch(url, artifact(weights), directory) { _, _ -> }
+            ArtifactFetcher.fetch(url, artifact(weights), directory, AGENT) { _, _ -> }
             assertArrayEquals(weights, File(directory, "model.onnx").readBytes())
         }
     }
@@ -323,7 +396,7 @@ class ArtifactFetcherTest {
     @Test fun aPartLongerThanTheArtifactIsDiscarded() {
         withServer(ranged(weights)) { url, directory, requests ->
             File(directory, "model.onnx.part").writeBytes(ByteArray(weights.size + 1))
-            ArtifactFetcher.fetch(url, artifact(weights), directory) { _, _ -> }
+            ArtifactFetcher.fetch(url, artifact(weights), directory, AGENT) { _, _ -> }
             assertEquals(null, requests.single()["range"])
             assertArrayEquals(weights, File(directory, "model.onnx").readBytes())
         }
@@ -334,7 +407,7 @@ class ArtifactFetcherTest {
             File(directory, "model.onnx.part").writeBytes(weights.copyOf(1000))
             assertEquals(
                 Failure.DOWNLOAD,
-                failure { ArtifactFetcher.fetch(url, artifact(weights), directory) { _, _ -> } }
+                failure { ArtifactFetcher.fetch(url, artifact(weights), directory, AGENT) { _, _ -> } }
             )
             assertFalse(File(directory, "model.onnx.part").exists())
         }
@@ -345,7 +418,7 @@ class ArtifactFetcherTest {
             File(directory, "model.onnx.part").writeBytes(weights.copyOf(1000))
             assertEquals(
                 Failure.DOWNLOAD,
-                failure { ArtifactFetcher.fetch(url, artifact(weights), directory) { _, _ -> } }
+                failure { ArtifactFetcher.fetch(url, artifact(weights), directory, AGENT) { _, _ -> } }
             )
             assertEquals(1000L, File(directory, "model.onnx.part").length())
         }
@@ -354,7 +427,7 @@ class ArtifactFetcherTest {
     @Test fun aVerifiedFileIsNeverReplacedOrDownloadedAgain() {
         withServer({ Answer(200, ByteArray(weights.size)) }) { url, directory, requests ->
             File(directory, "model.onnx").writeBytes(weights)
-            ArtifactFetcher.fetch(url, artifact(weights), directory) { _, _ -> }
+            ArtifactFetcher.fetch(url, artifact(weights), directory, AGENT) { _, _ -> }
             assertEquals(0, requests.size)
             assertArrayEquals(weights, File(directory, "model.onnx").readBytes())
         }
@@ -363,7 +436,7 @@ class ArtifactFetcherTest {
     @Test fun aCompletePartIsVerifiedWithoutARequest() {
         withServer({ Answer(500, ByteArray(0)) }) { url, directory, requests ->
             File(directory, "model.onnx.part").writeBytes(weights)
-            ArtifactFetcher.fetch(url, artifact(weights), directory) { _, _ -> }
+            ArtifactFetcher.fetch(url, artifact(weights), directory, AGENT) { _, _ -> }
             assertEquals(0, requests.size)
             assertArrayEquals(weights, File(directory, "model.onnx").readBytes())
         }
@@ -377,7 +450,7 @@ class ArtifactFetcherTest {
 
     /** The failure of fetching [weights] from [url] under [policy]. */
     private fun fetchFailure(url: String, directory: File, policy: RedirectPolicy = RedirectPolicy.DOWNLOADS) =
-        failure { ArtifactFetcher.fetch(url, artifact(weights), directory, policy) { _, _ -> } }
+        failure { ArtifactFetcher.fetch(url, artifact(weights), directory, AGENT, policy) { _, _ -> } }
 
     private fun port(url: String) = java.net.URI(url).port
 
@@ -396,10 +469,11 @@ class ArtifactFetcherTest {
         }) { url, directory, requests ->
             port = port(url)
             File(directory, "model.onnx.part").writeBytes(weights.copyOf(1000))
-            ArtifactFetcher.fetch(url, artifact(weights), directory, loopback) { _, _ -> }
+            ArtifactFetcher.fetch(url, artifact(weights), directory, AGENT, loopback) { _, _ -> }
             assertArrayEquals(weights, File(directory, "model.onnx").readBytes())
             assertEquals(4, requests.size)
             assertEquals(List(4) { "bytes=1000-" }, requests.map { it["range"] })
+            assertEquals("every hop names the app (D54)", List(4) { AGENT }, requests.map { it["user-agent"] })
             val hosts = listOf("127.0.0.1:$port", "localhost:$port", "localhost:$port", "127.0.0.1:$port")
             assertEquals(hosts, requests.map { it["host"] })
         }
@@ -431,14 +505,15 @@ class ArtifactFetcherTest {
     }
 
     @Test fun aRedirectToPlainHttpIsRefusedEvenForAnAllowedHost() {
-        val httpsOnly = RedirectPolicy(listOf("127.0.0.1", "huggingface.co"))
+        val httpsOnly = RedirectPolicy(listOf("127.0.0.1", "dist.gocassini.com"))
         var port = 0
         withServer({ redirect("http://127.0.0.1:$port/again") }) { url, directory, requests ->
             port = port(url)
             assertEquals(Failure.DOWNLOAD, fetchFailure(url, directory, httpsOnly))
             assertEquals(1, requests.size)
         }
-        withServer({ redirect("http://huggingface.co/repo/model") }) { url, directory, requests ->
+        val plainHttp = "http://dist.gocassini.com/models/files/x/model.onnx.zst"
+        withServer({ redirect(plainHttp) }) { url, directory, requests ->
             assertEquals(Failure.DOWNLOAD, fetchFailure(url, directory))
             assertEquals(1, requests.size)
         }
@@ -457,7 +532,7 @@ class ArtifactFetcherTest {
         withServer({
             if (++attempts <= RedirectPolicy.MAX_REDIRECTS) redirect("/hop$attempts") else Answer(200, weights)
         }) { url, directory, requests ->
-            ArtifactFetcher.fetch(url, artifact(weights), directory, loopback) { _, _ -> }
+            ArtifactFetcher.fetch(url, artifact(weights), directory, AGENT, loopback) { _, _ -> }
             assertEquals(6, requests.size)
             assertArrayEquals(weights, File(directory, "model.onnx").readBytes())
         }
@@ -477,7 +552,7 @@ class ArtifactFetcherTest {
     @Test fun verifyingReportsTheBytesCheckedSoFar() {
         withServer(weights) { url, directory ->
             val events = mutableListOf<Pair<Long, Boolean>>()
-            ArtifactFetcher.fetch(url, artifact(weights), directory) { bytes, verifying ->
+            ArtifactFetcher.fetch(url, artifact(weights), directory, AGENT) { bytes, verifying ->
                 events += bytes to verifying
             }
             assertFalse(events.first().second)
@@ -504,12 +579,76 @@ class ArtifactFetcherTest {
         val download = artifact(compressed).copy(name = "model.onnx.zst")
         withServer(compressed) { url, directory ->
             val events = mutableListOf<Pair<Long, Boolean>>()
-            ArtifactFetcher.fetchZstd(url, download, artifact(weights), directory) { bytes, verifying ->
+            ArtifactFetcher.fetchZstd(url, download, artifact(weights), directory, AGENT) { bytes, verifying ->
                 events += bytes to verifying
             }
             assertArrayEquals(weights, File(directory, "model.onnx").readBytes())
             assertFalse(File(directory, "model.onnx.zst").exists())
             assertChecking(events, compressed.size.toLong())
         }
+    }
+
+    @Test fun aCompleteCompressedDownloadIsNothingLeftToFetch() {
+        val compressed = com.github.luben.zstd.Zstd.compress(weights)
+        val download = artifact(compressed).copy(name = "model.onnx.zst")
+        val directory = Files.createTempDirectory("cassini-zst").toFile()
+        try {
+            File(directory, "model.onnx.zst").writeBytes(compressed)
+            assertEquals(0L, ArtifactFetcher.bytesToFetch(download, directory))
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test fun aCancelDuringDecompressionKeepsTheVerifiedDownload() {
+        val compressed = com.github.luben.zstd.Zstd.compress(weights)
+        val download = artifact(compressed).copy(name = "model.onnx.zst")
+        withServer({ Answer(200, compressed) }) { url, directory, requests ->
+            val kept = File(directory, "model.onnx.zst")
+            val failed = try {
+                // The download is in place once fetch has renamed it: stop during the decompression.
+                failure {
+                    ArtifactFetcher.fetchZstd(url, download, artifact(weights), directory, AGENT) { _, verifying ->
+                        if (verifying && kept.isFile) Thread.currentThread().interrupt()
+                    }
+                }
+            } finally {
+                Thread.interrupted()
+            }
+            assertEquals(Failure.CANCELLED, failed)
+            assertTrue("the verified download stays for the next attempt", kept.isFile)
+            assertFalse(File(directory, "model.onnx").exists())
+            assertEquals(0L, ArtifactFetcher.bytesToFetch(download, directory))
+
+            ArtifactFetcher.fetchZstd(url, download, artifact(weights), directory, AGENT) { _, _ -> }
+            assertEquals("the kept download is not fetched again", 1, requests.size)
+            assertArrayEquals(weights, File(directory, "model.onnx").readBytes())
+            assertFalse(kept.exists())
+        }
+    }
+
+    @Test fun aDownloadThatDoesNotDecodeFailsTheCheckAndGoes() {
+        val notZstd = ByteArray(4096) { (it * 13).toByte() }
+        val download = artifact(notZstd).copy(name = "model.onnx.zst")
+        withServer({ Answer(200, notZstd) }) { url, directory, _ ->
+            val failed = failure {
+                ArtifactFetcher.fetchZstd(url, download, artifact(weights), directory, AGENT) { _, _ -> }
+            }
+            assertEquals(Failure.VERIFY, failed)
+            assertFalse(File(directory, "model.onnx.zst").exists())
+            assertFalse(File(directory, "model.onnx").exists())
+            assertFalse(File(directory, "model.onnx.part").exists())
+        }
+    }
+
+    @Test fun aFullDiskIsSpaceAndOtherLocalErrorsAreInstall() {
+        val full = IOException("write failed: ENOSPC (No space left on device)")
+        assertEquals(Failure.SPACE, ArtifactFetcher.localFailure(full))
+        assertEquals(Failure.SPACE, ArtifactFetcher.localFailure(IOException("wrapped", full)))
+        assertEquals(Failure.INSTALL, ArtifactFetcher.localFailure(IOException("EIO (I/O error)")))
+    }
+
+    private companion object {
+        const val AGENT = "CassiniTalk/0.0.0-test (JVM; build 0)"
     }
 }

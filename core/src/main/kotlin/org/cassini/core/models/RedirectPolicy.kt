@@ -9,10 +9,12 @@ import java.util.Locale
 /**
  * Which redirects a download follows. `ArtifactFetcher` turns off `HttpURLConnection`'s own redirect handling and
  * asks [next] for each `Location`, so a model download can reach only [hosts], over HTTPS when [httpsOnly], in at
- * most [maxRedirects] hops. The start URL is not checked here: it comes from [ModelCatalog].
+ * most [maxRedirects] hops. The start URL is not checked here: it is the manifest URL of [ModelCatalog] or a file URL
+ * that `DistManifest` checked with [allows].
  *
  * Host entries follow [ModelCatalog.DOWNLOAD_HOSTS]: `*.example.com` matches subdomains only, anything else matches
- * the whole host. Matching ignores case and a trailing dot.
+ * the whole host. Matching ignores case and a trailing dot. [ModelCatalog.DOWNLOAD_HOSTS] has only the model host;
+ * the manifest's file URLs must pass [allows] too (`DistManifest`).
  */
 class RedirectPolicy(
     val hosts: List<String>,

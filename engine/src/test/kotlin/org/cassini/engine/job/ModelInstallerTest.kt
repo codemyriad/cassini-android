@@ -7,6 +7,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.cassini.core.Failure
 import org.cassini.core.UserFacingException
+import org.cassini.core.models.DistManifest
 import org.cassini.core.models.ModelCatalog
 import org.cassini.core.models.ModelDescriptor
 import org.cassini.core.models.ModelPart
@@ -56,7 +57,7 @@ class ModelInstallerTest {
 
     @Test fun offlineStillTriesSpeechAndReportsNoConnection() = runBlocking {
         val store = FakeStore(online = false)
-        store.failures[ModelCatalog.PARAKEET] = UnknownHostException("huggingface.co")
+        store.failures[ModelCatalog.PARAKEET] = UnknownHostException("dist.gocassini.com")
         val outcome = ModelInstaller(store).install(all) {}
         val speech = ModelPlan.of { false }.missing.filter { it.part == ModelPart.SPEECH }
         val required = ModelPlan(speech).requiredFreeBytes
@@ -109,9 +110,17 @@ class ModelInstallerTest {
         assertEquals(InstallOutcome.Installed(), ModelInstaller(enough).install(all) {})
     }
 
-    @Test fun roomForSpeechAloneInstallsSpeechAndDegradesTheRest() = runBlocking {
+    @Test fun theRoomThatSpeechNeedsAlsoFitsTheOtherParts() = runBlocking {
+        // Speech's peak holds the 431 MiB encoder download, which is deleted before the speaker parts start.
+        val speech = ModelPlan(ModelPlan.of { false }.missing.filter { it.part == ModelPart.SPEECH }).requiredFreeBytes
+        assertEquals(InstallOutcome.Installed(), ModelInstaller(FakeStore(usable = speech)).install(all) {})
+    }
+
+    @Test fun spaceTakenDuringSpeechInstallsSpeechAndDegradesTheRest() = runBlocking {
         val speech = ModelPlan(ModelPlan.of { false }.missing.filter { it.part == ModelPart.SPEECH }).requiredFreeBytes
         val store = FakeStore(usable = speech)
+        // Another app fills the phone while speech downloads: only what speech's files left stays free.
+        store.onInstall = { model, _ -> if (model == ModelCatalog.PARAKEET) store.take(speech - model.artifactBytes) }
         val outcome = ModelInstaller(store).install(all) {}
         val expected = mapOf(
             ModelPart.SPEAKERS to DownloadError.NOT_ENOUGH_STORAGE,
@@ -168,13 +177,13 @@ class ModelInstallerTest {
         val offline = { false }
         fun map(error: Throwable, network: () -> Boolean = online) = ModelInstaller.downloadError(error, network)
         val refused = try {
-            RedirectPolicy.DOWNLOADS.next(URL("https://huggingface.co/model"), "https://example.org/model", 1)
+            RedirectPolicy.DOWNLOADS.next(URL("https://dist.gocassini.com/model"), "https://example.org/model", 1)
             error("The redirect must be refused")
         } catch (error: UserFacingException) {
             error
         }
         val tooMany = try {
-            RedirectPolicy.DOWNLOADS.next(URL("https://huggingface.co/model"), "https://cdn-lfs.hf.co/model", 6)
+            RedirectPolicy.DOWNLOADS.next(URL("https://dist.gocassini.com/model"), "https://dist.gocassini.com/b", 6)
             error("The redirect must be refused")
         } catch (error: UserFacingException) {
             error
@@ -186,9 +195,18 @@ class ModelInstallerTest {
         assertEquals(DownloadError.NO_CONNECTION, map(UserFacingException(Failure.DOWNLOAD, "HTTP 503"), offline))
         assertEquals(DownloadError.NOT_ENOUGH_STORAGE, map(UserFacingException(Failure.SPACE)))
         assertEquals(DownloadError.FILE_CHECK_FAILED, map(UserFacingException(Failure.VERIFY)))
+        // A manifest that no longer lists the pinned model refuses the download: "File check failed".
+        val unlisted = try {
+            DistManifest.parse("""{"schema_version":2,"models":[],"artifacts":[]}""").urls(ModelCatalog.VAD)
+            error("The manifest must refuse the model")
+        } catch (error: UserFacingException) {
+            error
+        }
+        assertEquals(DownloadError.FILE_CHECK_FAILED, map(unlisted))
+        assertEquals(DownloadError.FILE_CHECK_FAILED, map(unlisted, offline))
         assertEquals(DownloadError.INSTALL, map(UserFacingException(Failure.INSTALL)))
         assertEquals(DownloadError.NO_CONNECTION, map(SocketTimeoutException("Read timed out")))
-        assertEquals(DownloadError.NO_CONNECTION, map(UnknownHostException("huggingface.co")))
+        assertEquals(DownloadError.NO_CONNECTION, map(UnknownHostException("dist.gocassini.com")))
         assertEquals(DownloadError.INTERRUPTED, map(IOException("Connection reset")))
         assertEquals(DownloadError.NO_CONNECTION, map(IOException("Connection reset"), offline))
         assertEquals(DownloadError.INSTALL, map(IllegalStateException("disk")))
@@ -247,7 +265,7 @@ class ModelInstallerTest {
         private val online: Boolean = true,
         usable: Long = Long.MAX_VALUE,
     ) : ModelStore {
-        /** Free bytes now: each install takes what `ModelPlan.Item.installBytes` counts for its model. */
+        /** Free bytes now: each install takes its installed files; its downloads are deleted once verified. */
         @Volatile private var free = usable
         private val installed = ready.toMutableSet()
         val attempts = mutableListOf<ModelDescriptor>()
@@ -274,12 +292,17 @@ class ModelInstallerTest {
             return free
         }
 
+        /** Space that something else takes. */
+        fun take(bytes: Long) {
+            free -= bytes
+        }
+
         override fun installBlocking(model: ModelDescriptor, progress: (Long, Boolean) -> Unit) {
             attempts += model
             failures[model]?.let { throw it }
             onInstall(model, progress)
             installed += model
-            free -= ModelPlan.Item(ModelPart.SPEECH, listOf(model)).installBytes
+            free -= model.artifactBytes
         }
     }
 }
