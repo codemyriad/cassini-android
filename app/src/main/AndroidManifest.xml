@@ -9,6 +9,8 @@
     <!-- Transcription runs in a dataSync (API 29-34) or mediaProcessing (API 35+) foreground service. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROCESSING" />
+    <!-- Playback goes on in the background, with the lock screen and notification controls (PlaybackService). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- tools:targetApi: localeConfig and enableOnBackInvokedCallback are API 33, dataExtractionRules API 31; older
@@ -41,6 +43,14 @@
             android:foregroundServiceType="microphone" />
         <service android:name=".processing.ProcessingService" android:exported="false"
             android:foregroundServiceType="dataSync|mediaProcessing" />
+        <!-- Exported for media controllers (the system UI, Bluetooth, Android Auto), as Media3 requires; no permission
+             can name them all, and the session decides what each connecting controller may do. -->
+        <service android:name=".playback.PlaybackService" android:exported="true"
+            android:foregroundServiceType="mediaPlayback" tools:ignore="ExportedService">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
         <!-- Below API 33 AppCompat keeps the app language itself (AppCompatDelegate.setApplicationLocales). -->
         <service android:name="androidx.appcompat.app.AppLocalesMetadataHolderService" android:enabled="false"
             android:exported="false">

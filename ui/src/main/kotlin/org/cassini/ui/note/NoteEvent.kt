@@ -51,6 +51,9 @@ sealed interface NoteEvent {
     @Immutable
     data class Skip(val forward: Boolean) : NoteEvent
 
+    /** The speed button: the next playback speed (coordination D53). */
+    data object NextSpeed : NoteEvent
+
     /** The user scrolled the transcript away from the active word: pause auto-follow. */
     data object PauseFollowing : NoteEvent
 

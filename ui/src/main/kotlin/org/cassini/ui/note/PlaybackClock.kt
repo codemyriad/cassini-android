@@ -15,8 +15,8 @@ import kotlin.math.abs
 
 /**
  * A published player position: [positionMs] as read at [sampledAtNanos] (`System.nanoTime`), with the play state and
- * the file's [durationMs] (0 when unknown), past which the position is never extrapolated. Playback runs at normal
- * speed (there is no speed control). [epoch] changes on every jump of the position (seek, sample, reload, open), so
+ * the file's [durationMs] (0 when unknown), past which the position is never extrapolated, and the playback [speed]
+ * (1 = normal), at which it advances. [epoch] changes on every jump of the position (seek, sample, reload, open), so
  * a new anchor of another epoch is not slewed to.
  */
 @Immutable
@@ -26,11 +26,12 @@ data class PlaybackAnchor(
     val playing: Boolean,
     val epoch: Long = 0,
     val durationMs: Long = 0,
+    val speed: Float = 1f,
 )
 
 /**
- * The player position between two anchors, for each frame: the last anchor extrapolated in real time, up to its
- * duration.
+ * The player position between two anchors, for each frame: the last anchor extrapolated in real time at its speed, up
+ * to its duration.
  *
  * A new anchor of the same epoch while playing is reconciled: the difference from the extrapolated position at its
  * sample time fades out over [slewNanos], and the position never goes back while playing (it holds instead). A
@@ -74,7 +75,7 @@ class PlaybackClock(private val slewNanos: Long = SLEW_NANOS, private val snapMs
         if (!current.playing) return current.positionMs.toDouble()
         val elapsed = (nowNanos - current.sampledAtNanos).coerceAtLeast(0)
         val fade = (1.0 - elapsed.toDouble() / slewNanos).coerceAtLeast(0.0)
-        val position = current.positionMs + elapsed / NANOS_PER_MS + correctionMs * fade
+        val position = current.positionMs + elapsed / NANOS_PER_MS * current.speed + correctionMs * fade
         return if (current.durationMs > 0) position.coerceAtMost(current.durationMs.toDouble()) else position
     }
 

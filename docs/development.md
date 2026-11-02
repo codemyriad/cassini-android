@@ -123,6 +123,8 @@ One more `@CiSmoke` device test, `flows/SheetAndDraftDeviceTest`, does the check
 
 The `@CiSmoke` device test `background/ProcessingServiceTypeTest` makes sure that `ProcessingService` has the correct type during inference. The type is `mediaProcessing` (0x2000) on API 35 or more, and `dataSync` (0x1) on API 29-34. The test gets the type from Android in the app process (`ProcessingService.currentType()`, which calls `Service.getForegroundServiceType()`), because `dumpsys activity services` on API 29 does not show the type. When the dump shows a type (API 30 or more), the test also makes sure that it is the same type. A scripted job takes the place of the transcription, thus the test needs no models. The CI emulators of API 26, 29, 34 and 35 run it. On API 26 the test does not examine the type, because services have no type before API 29.
 
+The `@CiSmoke` device test `background/PlaybackSessionTest` checks the MediaSession of the player (coordination D53) on each emulator. It plays the FLEURS clip, waits for the media notification, binds a Media3 `MediaController` to `PlaybackService` as the lock screen, Bluetooth and Android Auto do, and checks that the session names the note and that pause, seek, −10 s, the speed and play from the controller reach `PlaybackController`. Then a `KEYCODE_MEDIA_PAUSE` key event, the path of a headset button, pauses it.
+
 `app/src/test/.../nav/AppShellTest` runs the whole app under Robolectric on a scratch root. It tests the back order (a sheet, then the search, then the screen), the minimised recording, the predictive back callback, the edge-to-edge insets, the system bar icons of each screen and the TalkBack semantics of the Note screen.
 
 ### Device flow tests
@@ -348,7 +350,7 @@ The times include the 250 ms screen transition and the time of the test to find 
 Later opens do not increase with the length of the audio: the median of the later opens is 690 ms for one hour and 740 ms for ten minutes. The 15 s note is faster (503 ms), because its screen has only one turn to draw. The Note screen does these steps to get this result:
 
 - It shows the first page of 400 words first. It loads the other words after the frame that draws the first turns.
-- It prepares the player after that frame, because `MediaPlayer.prepare` of a long file takes about 0.5 s.
+- It prepares the player after that frame, because preparing a long file took about 0.5 s with `MediaPlayer` (ExoPlayer since D53; not measured again).
 
 `AppGraph.recentWords` keeps the full word lists of the two notes that the user opened last. If the user opens one of these two notes again, the Note screen reads no word rows. This cache did not change the times in the table. The test opens three notes in rotation, and the cache holds only two lists. Thus each open removes from the cache the note that the next round opens first, and each timed open reads the words from Room.
 

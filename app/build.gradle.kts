@@ -138,6 +138,8 @@ dependencies {
     implementation(libs.core.ktx)
     implementation(libs.lifecycle.service)
     implementation(libs.lifecycle.process)
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.session)
     // MainActivity is an AppCompatActivity only for AppCompatDelegate.setApplicationLocales (architecture 6).
     implementation(libs.appcompat)
     // The Compose UI: one activity, Navigation 3 destinations, one ViewModel per destination.
