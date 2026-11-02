@@ -59,7 +59,7 @@ If a host gives a file with a different hash, the app stops the download. Report
 
 ## Native runtime
 
-The app contains a sherpa-onnx AAR that we build from a pinned source and [`scripts/streaming-diarization.patch`](scripts/streaming-diarization.patch). [`scripts/native-dependencies.json`](scripts/native-dependencies.json) pins the SHA-256 of the source archives, of the patch and of the prebuilt AAR on the GitHub release `native-sherpa-onnx-1.13.7-nemotron.3`. `scripts/setup.sh` and `scripts/verify-native-runtime.sh` compare the AAR with the pin. Each week, and after a change to the native inputs, CI builds the AAR from source and compares its SHA-256 with the pin. [`docs/native-runtime.md`](docs/native-runtime.md) gives more detail.
+The app contains a sherpa-onnx AAR that we build from a pinned source and [`scripts/streaming-diarization.patch`](scripts/streaming-diarization.patch). [`scripts/native-dependencies.json`](scripts/native-dependencies.json) pins the SHA-256 of the source archives, of the patch and of the prebuilt AAR on the shared release [`v1.13.7-cassini-mobile.1`](https://github.com/codemyriad/sherpa-onnx/releases/tag/v1.13.7-cassini-mobile.1) of the codemyriad/sherpa-onnx fork. `scripts/setup.sh` and `scripts/verify-native-runtime.sh` compare the AAR with the pin. Each week, and after a change to the native inputs, CI builds the AAR from source and compares its SHA-256 with the pin. [`docs/native-runtime.md`](docs/native-runtime.md) gives more detail.
 
 ## Scope
 

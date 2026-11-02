@@ -11,7 +11,7 @@ from here. Git ignores all files in this directory except this README.
 
 1. The AAR that is already in this directory, if its SHA-256 agrees with the pin.
 2. The file `app/libs/sherpa-onnx-1.13.7-nemotron.aar` of an older checkout, if its SHA-256 agrees with the pin.
-3. The AAR of the GitHub release `native-sherpa-onnx-1.13.7-nemotron.3` (`scripts/fetch-native-aar.sh`).
+3. The AAR of the fork's shared release `v1.13.7-cassini-mobile.1` (`scripts/fetch-native-aar.sh`).
 4. A build from the pinned source and `scripts/streaming-diarization.patch` (`scripts/build-native-aar.sh`). This
    build needs the NDK.
 

@@ -7,7 +7,7 @@ Cassini Android is licensed under [GNU GPLv3](LICENSE). Copyright © 2026 Silvio
 The APK contains a sherpa-onnx 1.13.7 AAR that Cassini builds. The AAR is the [upstream release](https://github.com/k2-fsa/sherpa-onnx/releases/tag/v1.13.7) plus Sortformer speaker diarization for Nemotron-3-Diarization, the NeMo-reference Parakeet frontend and Parakeet Ultra decoding, from the [Cassini fork](https://github.com/codemyriad/sherpa-onnx/tree/v1.13.7-cassini-parakeet-ultra-v1) at commit `0c2ee3f3`, with the Android patch `scripts/streaming-diarization.patch` (the Sortformer Kotlin binding and the streaming API). The AAR comes from one of two sources:
 
 - `scripts/build-native-aar.sh` builds it from the pinned source plus `scripts/streaming-diarization.patch`.
-- `scripts/fetch-native-aar.sh` downloads it from the GitHub release [`native-sherpa-onnx-1.13.7-nemotron.3`](https://github.com/codemyriad/cassini-android/releases/tag/native-sherpa-onnx-1.13.7-nemotron.3).
+- `scripts/fetch-native-aar.sh` downloads it from the shared Cassini runtime release [`v1.13.7-cassini-mobile.1`](https://github.com/codemyriad/sherpa-onnx/releases/tag/v1.13.7-cassini-mobile.1) of the fork, which also holds the iOS build and `CASSINI-SHA256SUMS`.
 
 The `sherpa-onnx-aar` entry of `scripts/native-dependencies.json` pins the SHA-256 of the AAR. The AAR also contains text-to-speech components that Cassini does not use, including eSpeak NG under GPLv3. Cassini uses only speech recognition and speaker diarization.
 

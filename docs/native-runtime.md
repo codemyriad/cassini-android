@@ -18,7 +18,7 @@ The app uses the AAR as the Maven coordinate `org.cassini.native:sherpa-onnx-nem
 
 1. The AAR that is already in `native/m2`, if its SHA-256 agrees with the pin.
 2. The file `app/libs/sherpa-onnx-1.13.7-nemotron.aar` of an older checkout, if its SHA-256 agrees with the pin.
-3. The prebuilt AAR of the GitHub release `native-sherpa-onnx-1.13.7-nemotron.3`, with `scripts/fetch-native-aar.sh`.
+3. The prebuilt AAR of the shared release [`v1.13.7-cassini-mobile.1`](https://github.com/codemyriad/sherpa-onnx/releases/tag/v1.13.7-cassini-mobile.1) of the codemyriad/sherpa-onnx fork, with `scripts/fetch-native-aar.sh`. The same release holds the iOS xcframework, the patches and one `CASSINI-SHA256SUMS` (coordination D53.3); the AAR is the Linux build of `native.yml`.
 4. A build from source, with `scripts/build-native-aar.sh`.
 
 | Command | Result |
@@ -70,7 +70,7 @@ To change the patch, do these steps:
 1. Change `scripts/streaming-diarization.patch`.
 2. Build the AAR with `scripts/setup.sh --from-source`.
 3. Test the app with the new AAR.
-4. Ask the owner to publish the AAR and the patch in a new GitHub release `native-sherpa-onnx-1.13.7-nemotron.N`.
+4. Ask the owner to publish the AAR and the patch in a new shared release of the fork (`v1.13.7-cassini-mobile.N`), together with iOS (D53.3).
 5. Update the `sherpa-onnx-aar` entry with the new URL, SHA-256 and `patchSha256`.
 6. Run `scripts/verify-native-runtime.sh`.
 
@@ -92,7 +92,7 @@ fun restoreStreamingState(values: FloatArray): Boolean
 
 ## The superseded release .1
 
-The GitHub release `native-sherpa-onnx-1.13.7-nemotron.1` (SHA-256 `d03a06f8…`) holds a build without the streaming patch. It does not have `processStreamingChunk`, `saveStreamingState` or `restoreStreamingState`. The app calls these methods, so it cannot use this build. Do not use it. The pin and `scripts/fetch-native-aar.sh` use the release `.2`.
+The GitHub release `native-sherpa-onnx-1.13.7-nemotron.1` (SHA-256 `d03a06f8…`) holds a build without the streaming patch. It does not have `processStreamingChunk`, `saveStreamingState` or `restoreStreamingState`. The app calls these methods, so it cannot use this build. Do not use it. The releases `native-sherpa-onnx-1.13.7-nemotron.2` and `.3` of cassini-android are superseded too: the pin and `scripts/fetch-native-aar.sh` use the fork's release `v1.13.7-cassini-mobile.1`.
 
 ## libopus
 
