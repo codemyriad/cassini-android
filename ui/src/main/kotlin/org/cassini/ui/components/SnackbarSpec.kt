@@ -15,6 +15,9 @@ enum class SnackbarKind {
 
     /** "Couldn't share the file": the share file could not be written. */
     SHARE_FAILED,
+
+    /** "Can't play" (the status text of an unplayable note): the player failed; Play opens it again. */
+    PLAYBACK_FAILED,
 }
 
 /**

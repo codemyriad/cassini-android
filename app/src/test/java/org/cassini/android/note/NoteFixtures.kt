@@ -216,6 +216,11 @@ internal class FakeNotePorts : NotePorts {
         calls += "skip:$deltaMs"
     }
 
+    override fun setSpeed(speed: Float) {
+        calls += "speed:$speed"
+        playback.value = playback.value.copy(speed = speed)
+    }
+
     override fun playRange(id: String, startMs: Long, endMs: Long): Boolean {
         calls += "playRange:$startMs-$endMs"
         return true

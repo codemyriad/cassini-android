@@ -358,6 +358,41 @@ class NoteViewModelTest {
         assertEquals("the slider shows the drag", 3_200, viewModel.now().playback!!.positionMs)
         send(viewModel, NoteEvent.SeekFinished, NoteEvent.Skip(forward = false))
         assertEquals(listOf("seek:3200", "skip:-10000"), ports.calls.takeLast(2))
+
+        // D53: the speed button goes to the next speed, and the player shows it.
+        send(viewModel, NoteEvent.NextSpeed)
+        assertEquals("speed:1.25", ports.calls.last())
+        assertEquals(1.25f, viewModel.now().playback!!.speed)
+        send(viewModel, NoteEvent.NextSpeed, NoteEvent.NextSpeed, NoteEvent.NextSpeed, NoteEvent.NextSpeed)
+        assertEquals("from 2× back to 0.75×", "speed:0.75", ports.calls.last())
+    }
+
+    /** Review of #40: after the player fails, the screen says so and Play opens it again instead of doing nothing. */
+    @Test
+    fun aFailedPlayerShowsCantPlayAndPlayOpensItAgain() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        advanceUntilIdle()
+        val opens = ports.calls.count { it.startsWith("openPlayer:") }
+
+        // An error stopped the player while it played.
+        ports.playback.value = PlaybackState(noteId = NOTE, failed = true)
+        advanceUntilIdle()
+        assertEquals(SnackbarKind.PLAYBACK_FAILED, viewModel.now().snackbar?.kind)
+        assertFalse(viewModel.now().playback!!.playing)
+
+        send(viewModel, NoteEvent.PlayPause)
+        assertEquals("Play opens the player again", opens + 1, ports.calls.count { it.startsWith("openPlayer:") })
+        assertEquals("play", ports.calls.last())
+        assertFalse("not a toggle of a released player", ports.calls.contains("toggle"))
+        assertFalse(ports.playback.value.failed)
+
+        // A word tap after another failure opens it again at the word.
+        ports.playback.value = PlaybackState(noteId = NOTE, failed = true)
+        advanceUntilIdle()
+        send(viewModel, NoteEvent.WordTap(WordRef("w3", 1)))
+        assertEquals(opens + 2, ports.calls.count { it.startsWith("openPlayer:") })
+        assertEquals(2_400L, ports.playback.value.positionMs)
+        assertEquals("play", ports.calls.last())
     }
 
     // Search. ---------------------------------------------------------------------------------------------------

@@ -33,6 +33,7 @@ import org.cassini.ui.components.CassiniTopBar
 import org.cassini.ui.components.FollowChip
 import org.cassini.ui.components.IconButton44
 import org.cassini.ui.components.PlaybackBar
+import org.cassini.ui.components.SpeedControl
 import org.cassini.ui.components.TopBarStyle
 import org.cassini.ui.components.screenContentWidth
 import org.cassini.ui.format.Dates
@@ -96,6 +97,7 @@ fun NoteScreen(
                 onSkipForward = { onEvent(NoteEvent.Skip(forward = true)) },
                 onPlayPause = { onEvent(NoteEvent.PlayPause) },
                 onSeekFinished = { onEvent(NoteEvent.SeekFinished) },
+                speed = SpeedControl(playback.speed) { onEvent(NoteEvent.NextSpeed) },
             )
         }
     }

@@ -28,6 +28,23 @@ class PlaybackControllerTest {
     /** When set, prepare waits for it (a long file). */
     private var prepareGate: CompletableDeferred<Unit>? = null
 
+    /** The stored app-wide speed. */
+    private val speeds = object : SpeedStore {
+        var stored = 1f
+
+        /** When set, the load waits for it (a slow settings read). */
+        var gate: CompletableDeferred<Unit>? = null
+
+        override suspend fun load(): Float {
+            gate?.await()
+            return stored
+        }
+
+        override suspend fun save(speed: Float) {
+            stored = speed
+        }
+    }
+
     private data class Save(val noteId: String, val positionMs: Long, val final: Boolean)
 
     private fun TestScope.controller(): PlaybackController {
@@ -40,10 +57,43 @@ class PlaybackControllerTest {
                 player = { FakePlayer(clock, DURATION_MS) { prepareGate }.also(players::add) },
                 platform = platform,
                 store = { noteId, positionMs, final -> saves += Save(noteId, positionMs, final) },
+                speeds = speeds,
                 clock = clock,
                 nanos = { testScheduler.currentTime * 1_000_000 },
             ),
         )
+    }
+
+    /** D53: the speed applies to the player, is stored for every note, and a change is a jump of the position. */
+    @Test fun theSpeedIsAppliedStoredAndKeptForTheNextNote() = runTest {
+        speeds.stored = 1.5f
+        val playback = controller()
+        assertTrue(playback.open(NOTE, audio, positionMs = 0))
+        assertEquals("the stored speed applies at open", 1.5f, players.last().appliedSpeed)
+        assertEquals(1.5f, playback.state.value.speed)
+
+        val before = playback.state.value.epoch
+        playback.setSpeed(2f)
+        runCurrent()
+        assertEquals(2f, players.last().appliedSpeed)
+        assertEquals(2f, playback.state.value.speed)
+        assertEquals("stored for the next notes", 2f, speeds.stored)
+        assertTrue("a speed change re-anchors the position", playback.state.value.epoch != before)
+
+        assertTrue(playback.reload(File("document.opus")))
+        assertEquals("a reload keeps the speed", 2f, players.last().appliedSpeed)
+        assertTrue(playback.open(OTHER, File("other.opus"), positionMs = 0))
+        runCurrent()
+        assertEquals("another note opens at the same speed", 2f, players.last().appliedSpeed)
+
+        playback.setSpeed(1.3f)
+        assertEquals("a value between steps snaps to the nearest", 1.25f, playback.state.value.speed)
+    }
+
+    @Test fun theSpeedButtonCyclesThroughTheSteps() {
+        val seen = generateSequence(1f) { PlaybackSpeeds.next(it) }.take(7).toList()
+        assertEquals(listOf(1f, 1.25f, 1.5f, 1.75f, 2f, 0.75f, 1f), seen)
+        assertEquals("an unknown stored value is normal speed", 1f, PlaybackSpeeds.nearest(Float.NaN))
     }
 
     @Test fun eachPositionCarriesItsSampleTimeAndJumpsChangeTheEpoch() = runTest {
@@ -358,6 +408,58 @@ class PlaybackControllerTest {
         assertEquals("the position of the first note is saved", Save(NOTE, 3_000, final = true), saves.last())
     }
 
+    /** Review of #40: a leave or another open during a slow speed read leaves no player behind. */
+    @Test fun aSlowSpeedReadCreatesNoPlayerForAnOpenThatWasOvertaken() = runTest {
+        val playback = controller()
+        val slow = CompletableDeferred<Unit>()
+        speeds.gate = slow
+        val left = backgroundScope.async { playback.open(NOTE, audio, positionMs = 0, owner = "screen A") }
+        runCurrent()
+        playback.leave("screen A")
+        slow.complete(Unit)
+        assertFalse(left.await())
+        assertTrue("no player was created for the screen that left", players.isEmpty())
+        assertEquals(PlaybackState(), playback.state.value)
+
+        val slowAgain = CompletableDeferred<Unit>()
+        speeds.gate = slowAgain
+        val overtaken = backgroundScope.async { playback.open(NOTE, audio, positionMs = 0) }
+        runCurrent()
+        speeds.gate = null
+        assertTrue(playback.open(OTHER, audio, positionMs = 0))
+        slowAgain.complete(Unit)
+        assertFalse(overtaken.await())
+        assertEquals("only the open that came last has a player", 1, players.size)
+        assertFalse(players.single().released)
+        assertEquals(OTHER, playback.state.value.noteId)
+    }
+
+    /** Review of #40: an error after the file was prepared stops playback, gives back focus and shows the failure. */
+    @Test fun aPlayerErrorWhilePlayingStopsAndShowsTheFailure() = runTest {
+        val playback = controller()
+        playback.open(NOTE, audio, positionMs = 0)
+        playback.play()
+        advanceTimeBy(4_000)
+        players.single().fail()
+        runCurrent()
+
+        val state = playback.state.value
+        assertTrue(state.failed)
+        assertFalse(state.playing)
+        assertEquals(NOTE, state.noteId)
+        assertTrue("the failed player is released", players.single().released)
+        assertFalse(platform.focused)
+        assertFalse(platform.noisyWatched)
+        assertEquals(Save(NOTE, 4_000, final = true), saves.last())
+
+        // Play does nothing until the note is opened again, which tries again.
+        playback.play()
+        assertFalse(platform.focused)
+        assertTrue(playback.open(NOTE, audio, positionMs = 4_000))
+        assertFalse(playback.state.value.failed)
+        assertEquals(2, players.size)
+    }
+
     @Test fun aFileThatCannotBePlayedFails() = runTest {
         val playback = controller()
         assertFalse(playback.open(NOTE, File(FakePlayer.BROKEN), positionMs = 0))
@@ -383,8 +485,10 @@ private class FakePlayer(
     private var base = 0L
     private var startedAt: Long? = null
     private var completion: (() -> Unit)? = null
+    private var error: (() -> Unit)? = null
     var file: File? = null
     var released = false
+    var appliedSpeed = 1f
 
     override val positionMs: Long
         get() = (base + (startedAt?.let { clock() - it } ?: 0L)).coerceAtMost(durationMs)
@@ -410,8 +514,23 @@ private class FakePlayer(
         if (startedAt != null) startedAt = clock()
     }
 
+    override fun setSpeed(speed: Float) {
+        appliedSpeed = speed
+    }
+
     override fun onCompletion(listener: () -> Unit) {
         completion = listener
+    }
+
+    override fun onError(listener: () -> Unit) {
+        error = listener
+    }
+
+    /** The player fails while it plays: it stops, as ExoPlayer goes IDLE. */
+    fun fail() {
+        base = positionMs
+        startedAt = null
+        error?.invoke()
     }
 
     override fun release() {

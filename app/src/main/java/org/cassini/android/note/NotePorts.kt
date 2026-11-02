@@ -129,6 +129,9 @@ interface NotePorts {
 
     fun skip(deltaMs: Long)
 
+    /** The playback speed for this note and the next ones (D53). */
+    fun setSpeed(speed: Float)
+
     fun playRange(id: String, startMs: Long, endMs: Long): Boolean
 
     /**
@@ -291,6 +294,8 @@ class GraphNotePorts(private val graph: AppGraph, context: Context) : NotePorts 
     override fun seekTo(positionMs: Long) = graph.playback.seekTo(positionMs)
 
     override fun skip(deltaMs: Long) = graph.playback.skip(deltaMs)
+
+    override fun setSpeed(speed: Float) = graph.playback.setSpeed(speed)
 
     override fun playRange(id: String, startMs: Long, endMs: Long): Boolean =
         graph.playback.playRange(id, startMs, endMs)

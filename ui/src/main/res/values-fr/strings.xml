@@ -259,6 +259,7 @@
     <string name="ui_player_position_state">%1$s sur %2$s</string>
     <string name="ui_player_back_10">Reculer de 10 secondes</string>
     <string name="ui_player_forward_10">Avancer de 10 secondes</string>
+    <string name="ui_player_speed">Vitesse de lecture, %1$s</string>
     <string name="ui_player_play">Lire</string>
     <string name="ui_player_pause">Pause</string>
     <string name="ui_player_playing">Lecture en cours</string>

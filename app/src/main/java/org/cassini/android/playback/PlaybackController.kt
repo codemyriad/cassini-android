@@ -26,6 +26,8 @@ data class PlaybackState(
     val failed: Boolean = false,
     /** When [positionMs] was read (`System.nanoTime`), so the screen can extrapolate it between ticks. */
     val sampledAtNanos: Long = 0,
+    /** The playback speed, one of [PlaybackSpeeds.STEPS]; the screen extrapolates the position at it. */
+    val speed: Float = 1f,
     /** Changes whenever the position jumps (seek, sample, reload, open): the screen does not slew across it. */
     val epoch: Long = 0,
 )
@@ -56,6 +58,8 @@ class PlaybackController(private val parts: Parts) {
         val player: () -> AudioPlayer,
         val platform: PlaybackPlatform,
         val store: PositionStore,
+        /** The app-wide playback speed (D53): read at each [open], written at each [setSpeed]. */
+        val speeds: SpeedStore = SpeedStore.Fixed,
         /** A monotonic clock in ms (`SystemClock.elapsedRealtime`). */
         val clock: () -> Long,
         val timing: Timing = Timing(),
@@ -77,6 +81,7 @@ class PlaybackController(private val parts: Parts) {
     private var sample: Sample? = null
     private var lastSaved = 0L
     private var epoch = 0L
+    private var speed = 1f
 
     /**
      * Counts every [open] and [leave]. An [open] or a [reload] that finds another value after its prepare has been
@@ -102,6 +107,9 @@ class PlaybackController(private val parts: Parts) {
         if (player != null) close()
         // A newer open or leave came during the final save of the note that was open.
         if (operation != generation) return false
+        // Read before the player exists: a leave or another open during this suspension must find nothing to release.
+        val chosen = PlaybackSpeeds.nearest(parts.speeds.load())
+        if (operation != generation) return false
         val created = parts.player()
         try {
             created.prepare(file)
@@ -124,6 +132,9 @@ class PlaybackController(private val parts: Parts) {
         created.seekTo(start)
         epoch++
         created.onCompletion(::onCompletion)
+        created.onError(::onPlayerError)
+        speed = chosen
+        created.setSpeed(speed)
         player = created
         this.noteId = noteId
         this.file = file
@@ -133,6 +144,7 @@ class PlaybackController(private val parts: Parts) {
             positionMs = start,
             sampledAtNanos = parts.nanos(),
             epoch = epoch,
+            speed = speed,
         )
         return true
     }
@@ -174,6 +186,8 @@ class PlaybackController(private val parts: Parts) {
         created.seekTo(positionMs.coerceIn(0, created.durationMs))
         epoch++
         created.onCompletion(::onCompletion)
+        created.onError(::onPlayerError)
+        created.setSpeed(speed)
         player = created
         this.file = file
         if (resume) {
@@ -227,6 +241,20 @@ class PlaybackController(private val parts: Parts) {
         active.seekTo(positionMs.coerceIn(0, active.durationMs))
         epoch++
         publish()
+    }
+
+    /**
+     * Sets the playback speed for this note and every later one (D53), snapped to [PlaybackSpeeds.STEPS]. The position
+     * is re-anchored (a new epoch), because the screen extrapolates it at the speed.
+     */
+    fun setSpeed(next: Float) {
+        val snapped = PlaybackSpeeds.nearest(next)
+        if (snapped == speed) return
+        speed = snapped
+        player?.setSpeed(snapped)
+        epoch++
+        publish()
+        parts.scope.launch(parts.main) { parts.speeds.save(snapped) }
     }
 
     /** −10 s / +10 s. */
@@ -294,6 +322,24 @@ class PlaybackController(private val parts: Parts) {
         if (player?.playing != true) release()
         parts.scope.launch(parts.main) { saveNow(id, positionMs, final = true) }
         return false
+    }
+
+    /**
+     * The player failed while the note was open (the file went away, a decoder error). It stops as a pause does: the
+     * focus and the headphones watch go, the position is saved, and the player is released. The note shows that it
+     * cannot play ([PlaybackState.failed]); opening it again tries again.
+     */
+    private fun onPlayerError() {
+        val active = player ?: return
+        val id = noteId ?: return
+        val positionMs = sample?.restoreMs ?: active.positionMs
+        stopTicker()
+        release()
+        active.release()
+        reset()
+        noteId = id
+        mutableState.value = PlaybackState(noteId = id, failed = true)
+        parts.scope.launch(parts.main) { saveNow(id, positionMs, final = true) }
     }
 
     private fun onCompletion() {
@@ -370,6 +416,7 @@ class PlaybackController(private val parts: Parts) {
             sample = sample != null,
             sampledAtNanos = parts.nanos(),
             epoch = epoch,
+            speed = speed,
         )
     }
 

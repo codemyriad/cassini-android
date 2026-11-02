@@ -257,6 +257,7 @@
     <string name="ui_player_position_state">%1$s di %2$s</string>
     <string name="ui_player_back_10">Indietro di 10 secondi</string>
     <string name="ui_player_forward_10">Avanti di 10 secondi</string>
+    <string name="ui_player_speed">Velocità di riproduzione, %1$s</string>
     <string name="ui_player_play">Riproduci</string>
     <string name="ui_player_pause">Pausa</string>
     <string name="ui_player_playing">In riproduzione</string>
