@@ -536,6 +536,8 @@ Three workflows in `.github/workflows/` do the CI checks. All actions have a pin
 
 If you push a branch and do not open a pull request, CI does not run. A new run of the same workflow on the same pull request or branch stops the earlier run. A run on a tag always continues to its end.
 
+All runs restore the caches (the native runtime, the pinned source archives, Robolectric's `android-all` jars and the models). Only runs on `main` save them, because GitHub keeps at most 10 GB of caches for the repository and a pull request can only read its own entries and those of `main`. The Robolectric entry follows the Robolectric version. `main` saves a new one only when the tests downloaded a jar that the restored entry did not have, for example after a new `@Config(sdk = …)`. Until that commit is on `main`, the pull request runs download the jar.
+
 ### android.yml
 
 | Job | What it does |
@@ -573,7 +575,7 @@ We did not run `scripts/ci-emulator-smoke.sh` on API 26, 29 or 35 on a local emu
 The `models` job runs the `@NeedsModels` tests on an API 34 emulator with the real models. It does these steps:
 
 1. It runs `setup.sh --prebuilt-only` and `scripts/make-long-clip.sh`, and builds the debug APK and its test APK.
-2. `scripts/fetch-ci-models.py` downloads the models of `scripts/ci-models.json` from `dist.gocassini.com` into `.tools/ci-models/models/<id>/<source sha256>/`. It downloads each file as a Zstandard file, makes sure that it has its pinned size and SHA-256, decompresses it and checks the size and SHA-256 again. The cache key of this directory comes from the SHA-256 values in the list. The job saves the cache after this check and before the device tests, so a failed test does not cause a new download in the next run. `ModelCatalogTest` makes sure that the list and `ModelCatalog` agree.
+2. `scripts/fetch-ci-models.py` downloads the models of `scripts/ci-models.json` from `dist.gocassini.com` into `.tools/ci-models/models/<id>/<source sha256>/`. It downloads each file as a Zstandard file, makes sure that it has its pinned size and SHA-256, decompresses it and checks the size and SHA-256 again. The cache key of this directory comes from the SHA-256 values in the list. On `main`, the job saves the cache after this check and before the device tests, so a failed test does not cause a new download in the next run. A run started by hand on another branch saves no cache. `ModelCatalogTest` makes sure that the list and `ModelCatalog` agree.
 3. `scripts/ci-models-smoke.sh` installs the debug APK. Then `scripts/push-models.sh` copies the models into the `files/` directory of the app with `run-as`, and `scripts/device-smoke.sh --annotation NeedsModels` runs the tests.
 
 `scripts/push-models.sh` copies a file only when the device does not have the same SHA-256. It writes the marker files last. To do a check of an emulator that has the models, run `scripts/push-models.sh` with the output of `scripts/fetch-ci-models.py`. If the models are the same, the script copies nothing. `scripts/fetch-ci-models.py` needs Python 3.10 or later. Before Python 3.14, it also needs the `zstd` tool.
