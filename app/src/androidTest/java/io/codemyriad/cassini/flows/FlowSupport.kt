@@ -4,6 +4,7 @@ import android.app.Instrumentation
 import android.content.Intent
 import android.net.Uri
 import android.os.ParcelFileDescriptor
+import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import androidx.compose.ui.geometry.Offset
@@ -19,7 +20,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.AndroidComposeTestRule
 import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.printToLog
+import androidx.compose.ui.test.printToString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.core.content.FileProvider
 import androidx.core.view.ViewCompat
@@ -97,11 +98,35 @@ internal object Flows {
         try {
             wait()
         } catch (timeout: ComposeTimeoutException) {
-            onAllNodes(isRoot()).fetchSemanticsNodes().indices.forEach { index ->
-                onAllNodes(isRoot())[index].printToLog(TAG)
-            }
+            logScreen()
             throw AssertionError("Not shown: ${matcher.description}", timeout)
         }
+    }
+
+    /**
+     * Logs the semantics tree of every window (tag CassiniFlow), one log line per tree line. printToLog writes a
+     * tree as one entry, and logcat cuts an entry at about 4 KB: the Library's tree lost its rows and the snackbar.
+     */
+    fun AppRule.logScreen() {
+        val roots = onAllNodes(isRoot())
+        roots.fetchSemanticsNodes().indices.forEach { index ->
+            Log.d(TAG, "Window ${index + 1}:")
+            roots[index].printToString().lineSequence().forEach { Log.d(TAG, it) }
+        }
+    }
+
+    /**
+     * Where the node of [matcher] is in its window, for a failure message: its bounds, the window's size and the
+     * keyboard inset. A tap outside a sheet falls on its scrim and closes it.
+     */
+    fun AppRule.placementReport(matcher: SemanticsMatcher): String {
+        val node = onNode(matcher).fetchSemanticsNode()
+        val window = (node.root as ViewRootForTest).view.rootView
+        val (size, keyboard) = runOnUiThread {
+            val insets = ViewCompat.getRootWindowInsets(window)
+            "${window.width}x${window.height}" to (insets?.getInsets(WindowInsetsCompat.Type.ime())?.bottom ?: 0)
+        }
+        return "${matcher.description} at ${node.boundsInWindow} in a $size px window, keyboard inset $keyboard px"
     }
 
     fun AppRule.waitText(text: String, timeoutMs: Long = SCREEN_MS, substring: Boolean = false) =
