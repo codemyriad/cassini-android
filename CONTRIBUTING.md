@@ -71,7 +71,7 @@ This command needs no Android SDK, no NDK, no `scripts/setup.sh` and no device. 
 - The libopus source, in `.tools/opus/source`. Gradle compiles `libcassini_opus.so` from it.
 - The sherpa-onnx AAR, in `native/m2`. The script downloads the prebuilt AAR from the GitHub release. If the download is not possible, the script builds the AAR from source.
 
-`scripts/setup.sh --prebuilt-only` stops with an error if it cannot get the prebuilt AAR. `scripts/setup.sh --from-source` always builds the AAR from source. This build takes about 25 minutes.
+`scripts/setup.sh --prebuilt-only` stops with an error if it cannot get the prebuilt AAR. `scripts/setup.sh --from-source` always builds the AAR from source. This build takes about 10 minutes on a GitHub runner (9.2 in the native workflow on main).
 
 ## When you need the NDK
 
@@ -134,7 +134,14 @@ If you change a screen on purpose, do these steps:
 2. Examine each changed PNG with `git diff --stat ui/src/test/screenshots` and an image viewer.
 3. Commit the goldens together with the change.
 
-On macOS or Windows, do not run `ciTest`, and do not record or commit goldens. Run the same tests without the pixel comparison. CI does the pixel comparison.
+On macOS or Windows, do not run `ciTest`, and do not record goldens there. Run the same tests without the pixel comparison. CI does the pixel comparison. To get new goldens without Linux x86_64, push your branch and let CI record them:
+
+```sh
+gh workflow run record-goldens.yml --ref <branch>
+gh run download <run id> --name recorded-goldens --dir .   # only the goldens that changed or are new
+```
+
+Then examine each changed PNG and commit the goldens with the change, as in steps 2 and 3.
 
 ```sh
 ./gradlew :core:test :engine:testDebugUnitTest :data:testDebugUnitTest :ui:testDebugUnitTest :app:testDebugUnitTest

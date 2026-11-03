@@ -28,6 +28,11 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # One PR for all action bumps of the week, which runs every check once
+    # (D66 AND-10). #49 and #50 bumped the same gradle/actions commit.
+    groups:
+      actions:
+        patterns: ["*"]
   - package-ecosystem: gitsubmodule
     directory: /
     schedule:

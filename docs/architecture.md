@@ -972,7 +972,7 @@ CI has three workflows in `.github/workflows/`. `docs/development.md` ("Continuo
 - `android.yml`, job `emulator`: API 26, 29, 34 and 35, with `scripts/ci-emulator-smoke.sh`. It runs `@CiSmoke`, makes sure that the platform Opus encoder is as expected for each API level, and runs `NoteFtsDeviceTest` on API 26. If the emulator or adb fails before the tests start, the job tries one more time.
 - `android.yml`, job `release`, on tags: after `checks`, `core-only`, `build` and `emulator`. The notes come from the section of the tag in `CHANGELOG.md`, through `scripts/changelog-section.py`.
 - `models.yml` (each week, and by hand): the models of `scripts/ci-models.json`, which `ModelCatalogTest` keeps equal to `ModelCatalog`. A cache keeps the models, with their SHA-256 values as the key. `scripts/push-models.sh` copies them into the `files/` of the debug app with `run-as`. Then the job runs `@NeedsModels` on API 34.
-- `native.yml` (each week, by hand, and on changes under `scripts/` or `engine/src/main/cpp/` and some build files): `setup.sh --from-source`. It compares the result with the pin. A difference gives a warning.
+- `native.yml` (each week, by hand, and on changes to the scripts of the native build, under `engine/src/main/cpp/` or to some build files): `setup.sh --from-source`. It compares the result with the pin. A difference gives a warning.
 
 ## 9. Testing
 
