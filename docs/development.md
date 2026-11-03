@@ -534,7 +534,7 @@ Three workflows in `.github/workflows/` do the CI checks. All actions have a pin
 | `models.yml` | Each Monday and a manual start |
 | `native.yml` | Each Monday, a manual start, and a push to `main` or a pull request that changes a script of the native build (`setup.sh` and the scripts, pins and patch it uses), `engine/src/main/cpp/`, `engine/build.gradle.kts`, `gradle/libs.versions.toml` or the workflow |
 
-If you push a branch and do not open a pull request, CI does not run. A new run of the same workflow on the same pull request or branch stops the earlier run. A run on a tag always continues to its end.
+If you push a branch and do not open a pull request, CI does not run. A new push to a pull request stops the earlier run of the same workflow on it. Runs on `main` and on tags are never stopped by a newer push, so every commit on `main` gets a complete run.
 
 All runs restore the caches (the native runtime, the pinned source archives, Robolectric's `android-all` jars and the models). Only runs on `main` save them, because GitHub keeps at most 10 GB of caches for the repository and a pull request can only read its own entries and those of `main`. The Robolectric entry follows the Robolectric version. `main` saves a new one only when the tests downloaded a jar that the restored entry did not have, for example after a new `@Config(sdk = …)`. Until that commit is on `main`, the pull request runs download the jar.
 
