@@ -12,9 +12,12 @@ permissions:
 
 # The weekly model and native runtime checks are in models.yml and native.yml (docs/development.md).
 concurrency:
+  # A newer push to a pull request cancels its older run. Pushes to main and tags never cancel or replace each
+  # other (D66 AND-7): each commit has its own group, because GitHub keeps one pending run per group and drops the
+  # other even without cancel-in-progress (run 41335351975, main's tip f94c3a3c, was dropped 2 s after it was made).
   # Manual runs use main's ref too; their own group keeps a push from cancelling them.
-  group: android-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+  group: android-${{ github.event_name }}-${{ github.ref }}${{ github.event_name == 'push' && format('-{0}', github.sha) || '' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   checks:

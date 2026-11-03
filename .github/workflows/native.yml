@@ -28,8 +28,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: native-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: true
+  # As in android.yml: only a pull request's newer push cancels its older run; each push to main has its own group.
+  group: native-${{ github.event_name }}-${{ github.ref }}${{ github.event_name == 'push' && format('-{0}', github.sha) || '' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   native:
