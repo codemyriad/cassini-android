@@ -1,5 +1,6 @@
 package io.codemyriad.cassini.flows
 
+import android.os.SystemClock
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -17,7 +18,9 @@ import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.flows.Flows.backAfterOpenWith
 import io.codemyriad.cassini.flows.Flows.import
+import io.codemyriad.cassini.flows.Flows.logScreen
 import io.codemyriad.cassini.flows.Flows.meetingDocument
+import io.codemyriad.cassini.flows.Flows.placementReport
 import io.codemyriad.cassini.flows.Flows.row
 import io.codemyriad.cassini.flows.Flows.rows
 import io.codemyriad.cassini.flows.Flows.text
@@ -102,10 +105,25 @@ class LibraryFlowTest {
         // screen Move to trash is below the visible part of the sheet: a tap there falls on the scrim and closes the
         // sheet. A slow emulator keeps the keyboard open for more than a second after the sheet opens.
         rule.waitKeyboardClosed(hasText(trash))
-        rule.onNodeWithText(trash).performScrollTo().performClick()
+        rule.onNodeWithText(trash).performScrollTo()
+        val placement = rule.placementReport(hasText(trash))
+        rule.onNodeWithText(trash).performClick()
+        // On CI the snackbar was sometimes not seen (D66 AND-2). Either the tap missed Move to trash (the note stays),
+        // or the note was trashed and its snackbar had gone before the wait saw it; the two messages tell them apart.
+        try {
+            rule.waitFor("Move to trash did not trash the note; the tap missed? $placement") { row(CLIP_TITLE) == null }
+        } catch (notTrashed: AssertionError) {
+            rule.logScreen()
+            throw AssertionError("${notTrashed.message}; ${Flows.focusReport()}", notTrashed)
+        }
+        val trashedAt = SystemClock.elapsedRealtime()
         val moved = rule.text(UiR.string.ui_library_moved_to_trash, CLIP_TITLE)
-        rule.waitText(moved)
-        rule.waitFor("The note is in the trash") { row(CLIP_TITLE) == null }
+        try {
+            rule.waitText(moved)
+        } catch (notShown: AssertionError) {
+            val seconds = (SystemClock.elapsedRealtime() - trashedAt) / 1_000
+            throw AssertionError("The note is in the trash, but its snackbar was not seen in $seconds s", notShown)
+        }
         rule.onNode(hasText(rule.text(UiR.string.ui_action_undo))).performClick()
         rule.waitFor("Undo restores the note") { row(CLIP_TITLE)?.id == noteId }
         rule.waitShown(row)

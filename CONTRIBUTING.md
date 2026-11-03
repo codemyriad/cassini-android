@@ -71,7 +71,7 @@ This command needs no Android SDK, no NDK, no `scripts/setup.sh` and no device. 
 - The libopus source, in `.tools/opus/source`. Gradle compiles `libcassini_opus.so` from it.
 - The sherpa-onnx AAR, in `native/m2`. The script downloads the prebuilt AAR from the GitHub release. If the download is not possible, the script builds the AAR from source.
 
-`scripts/setup.sh --prebuilt-only` stops with an error if it cannot get the prebuilt AAR. `scripts/setup.sh --from-source` always builds the AAR from source. This build takes about 25 minutes.
+`scripts/setup.sh --prebuilt-only` stops with an error if it cannot get the prebuilt AAR. `scripts/setup.sh --from-source` always builds the AAR from source. This build takes about 10 minutes on a GitHub runner (9.2 in the native workflow on main).
 
 ## When you need the NDK
 
