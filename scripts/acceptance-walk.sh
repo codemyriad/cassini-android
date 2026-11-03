@@ -4,6 +4,10 @@
 # instrumentation (scripts/device-smoke.sh), never a Gradle connected task, and it makes a backup of the files/
 # metadata (not the models) first. It restores the night mode and the app language at the end.
 set -euo pipefail
+# One heavy run at a time on this machine (scripts/heavy-lock.sh).
+# shellcheck source=scripts/heavy-lock.sh
+. "$(dirname "$0")/heavy-lock.sh"
+heavy_lock "$0" "$@"
 cd "$(dirname "$0")/.."
 
 usage() {

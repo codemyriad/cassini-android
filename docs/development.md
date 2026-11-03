@@ -72,6 +72,17 @@ To remove a worktree, do these steps:
 2. In the worktree, delete the build outputs with `rm -rf build */build engine/.cxx .gradle/configuration-cache`.
 3. In a different checkout, run `git worktree remove --force PATH`. The worktree contains a submodule, and without `--force` git does not remove it. Git deletes a link, not its target.
 
+## One heavy run per machine
+
+When several checkouts or agents share one machine (the Android, iOS and Mac agents share a 16 GB Mac), two heavy runs at once make each of them slower and make tight waits fail. Each heavy run therefore takes the host lock `~/.cassini-heavy.lock`, an `flock` that the iOS scripts take too. It waits while another run holds it. The holder writes a line into the file that names it, and a run that waits prints that line.
+
+- `device-smoke.sh`, `acceptance-walk.sh`, `note-opening-timing.sh`, `baseline-profile.sh`, `diarization-poc.sh` and `build-native-aar.sh` (so also `setup.sh --from-source`) take the lock themselves. A script that another locked script calls does not wait for it again.
+- For other heavy commands, such as a Gradle build or the local checks, use `scripts/heavy-lock.sh`, for example `scripts/heavy-lock.sh ./gradlew detekt ciTest`.
+- A run waits at most `CASSINI_LOCK_MINUTES` (default 60), then fails with exit status 75. `CASSINI_HEAVY_LOCK` names another lock file, or `off` for none.
+- On CI (`CI=true`) the scripts take no lock, because a runner has one job.
+
+On macOS the lock is held by `/usr/bin/lockf -k`, elsewhere by `flock -o`. Neither passes the lock to the command, so a Gradle daemon that keeps running after the build does not hold it.
+
 ## Test tiers
 
 The root task `ciTest` runs `:core:test`. For each Android module, it runs `verifyRoborazziDebug` if the module has the Roborazzi plugin, else `testDebugUnitTest`. CI runs this command:

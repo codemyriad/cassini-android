@@ -2,6 +2,10 @@
 # Runs a selection of the instrumented tests on a device with direct adb instrumentation, which keeps the app data
 # and the downloaded models (Gradle's connected tasks can uninstall the app and erase them).
 set -euo pipefail
+# One heavy run at a time on this machine (scripts/heavy-lock.sh).
+# shellcheck source=scripts/heavy-lock.sh
+. "$(dirname "$0")/heavy-lock.sh"
+heavy_lock "$0" "$@"
 cd "$(dirname "$0")/.."
 
 usage() {

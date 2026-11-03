@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Native measurements with a public four-speaker clip, in the :bench module. No app data is cleared.
 set -euo pipefail
+# One heavy run at a time on this machine (scripts/heavy-lock.sh).
+# shellcheck source=scripts/heavy-lock.sh
+. "$(dirname "$0")/heavy-lock.sh"
+heavy_lock "$0" "$@"
 cd "$(dirname "$0")/.."
 python3 scripts/fetch-diarization-models.py
 python3 - <<'PY'
