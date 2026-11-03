@@ -1,0 +1,77 @@
+name: Record screenshot goldens
+
+# Records the :ui screenshot goldens on Linux x86_64, the platform CI compares them on (CONTRIBUTING.md,
+# "Screenshot goldens"), for a branch: gh workflow run record-goldens.yml --ref <branch>. It uploads the goldens that
+# changed or are new as the artifact recorded-goldens and lists them in the job summary; it commits nothing. Examine
+# each picture before you commit it. Until D66 (AND-9) each golden update pushed a temporary workflow to its branch.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: record-goldens-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  record:
+    name: Record the :ui goldens
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          packages: 'platform-tools platforms;android-37.0 build-tools;36.0.0 ndk;28.2.13676358 cmake;3.22.1'
+          log-accepted-android-sdk-licenses: false
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          cache-provider: basic
+          cache-read-only: true
+      # Restore only: android.yml saves this entry on main.
+      - name: Restore the native runtime
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            native/m2/org
+            .tools/opus/source.tar.gz
+          key: native-${{ hashFiles('scripts/native-dependencies.json', 'scripts/streaming-diarization.patch', 'gradle/libs.versions.toml') }}
+      - name: Fetch the pinned native runtime
+        run: ./scripts/setup.sh --prebuilt-only
+      - name: Record the goldens
+        run: ./gradlew --no-daemon :ui:recordRoborazziDebug
+      - name: Collect the changed goldens
+        run: |
+          out=$RUNNER_TEMP/recorded-goldens
+          mkdir -p "$out"
+          git status --porcelain --untracked-files=all -- ui/src/test/screenshots | cut -c4- > "$RUNNER_TEMP/changed.txt"
+          while IFS= read -r file; do
+            mkdir -p "$out/$(dirname "$file")"
+            cp "$file" "$out/$file"
+          done < "$RUNNER_TEMP/changed.txt"
+          {
+            echo "Recorded at \`$(git rev-parse HEAD)\` on \`$GITHUB_REF_NAME\`."
+            echo
+            if [ -s "$RUNNER_TEMP/changed.txt" ]; then
+              echo "Changed or new goldens ($(wc -l < "$RUNNER_TEMP/changed.txt")), in the artifact \`recorded-goldens\`:"
+              echo
+              tick='`'
+              while IFS= read -r file; do echo "- $tick$file$tick"; done < "$RUNNER_TEMP/changed.txt"
+            else
+              echo "No golden changed."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload the changed goldens
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: recorded-goldens
+          path: ${{ runner.temp }}/recorded-goldens
+          retention-days: 7
+          if-no-files-found: ignore

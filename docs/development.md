@@ -106,6 +106,8 @@ If you change a screen on purpose, do these steps on Linux x86_64:
 
 `./gradlew :ui:compareRoborazziDebug` writes the pictures and the differences to `ui/build/outputs/roborazzi/`. If the pixel check fails in CI, CI uploads that directory as the `roborazzi-diffs` artifact.
 
+Without Linux x86_64, the `record-goldens.yml` workflow records them on CI for a pushed branch: `gh workflow run record-goldens.yml --ref <branch>`. It runs `:ui:recordRoborazziDebug` and uploads only the goldens that changed or are new, as the artifact `recorded-goldens` (kept 7 days). The job summary lists them. Download them with `gh run download <run id> --name recorded-goldens --dir .`, examine each one and commit them with the change. The workflow commits nothing, and no temporary workflow is needed on the branch.
+
 On macOS or Windows, do not run `ciTest` or `verifyRoborazziDebug`. Do not record or commit goldens there. Run the same tests without the pixel check:
 
 ```sh
@@ -526,12 +528,13 @@ The command does not search `CHANGELOG.md`, `docs/notes/` and this file, because
 
 ## Continuous integration
 
-Three workflows in `.github/workflows/` do the CI checks. All actions have a pin to a full commit SHA. Dependabot (`.github/dependabot.yml`) updates the Gradle dependencies, the actions and the submodule each week.
+Three workflows in `.github/workflows/` do the CI checks, and a fourth records the screenshot goldens when started by hand. All actions have a pin to a full commit SHA. Dependabot (`.github/dependabot.yml`) updates the Gradle dependencies, the actions and the submodule each week.
 
 | Workflow | Triggers |
 |---|---|
 | `android.yml` | Each push to `main`, each pull request, each tag `v*` and a manual start (`workflow_dispatch`) |
 | `models.yml` | Each Monday and a manual start |
+| `record-goldens.yml` | A manual start only, for a branch ([Screenshot tests](#screenshot-tests)) |
 | `native.yml` | Each Monday, a manual start, and a push to `main` or a pull request that changes a script of the native build (`setup.sh` and the scripts, pins and patch it uses), `engine/src/main/cpp/`, `engine/build.gradle.kts`, `gradle/libs.versions.toml` or the workflow |
 
 If you push a branch and do not open a pull request, CI does not run. A new push to a pull request stops the earlier run of the same workflow on it. Runs on `main` and on tags are never stopped by a newer push, so every commit on `main` gets a complete run.
