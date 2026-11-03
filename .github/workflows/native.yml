@@ -20,6 +20,7 @@ on:
       - 'scripts/fetch-native-aar.sh'
       - 'scripts/fetch-opus-source.sh'
       - 'scripts/verify-native-runtime.sh'
+      - 'scripts/heavy-lock.sh'
       - 'engine/src/main/cpp/**'
       - 'engine/build.gradle.kts'
       - 'gradle/libs.versions.toml'
@@ -34,6 +35,7 @@ on:
       - 'scripts/fetch-native-aar.sh'
       - 'scripts/fetch-opus-source.sh'
       - 'scripts/verify-native-runtime.sh'
+      - 'scripts/heavy-lock.sh'
       - 'engine/src/main/cpp/**'
       - 'engine/build.gradle.kts'
       - 'gradle/libs.versions.toml'
@@ -43,14 +45,16 @@ permissions:
   contents: read
 
 concurrency:
-  group: native-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: true
+  # As in android.yml: only a pull request's newer push cancels its older run; each push to main has its own group.
+  group: native-${{ github.event_name }}-${{ github.ref }}${{ github.event_name == 'push' && format('-{0}', github.sha) || '' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   native:
     name: sherpa-onnx AAR from source
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    # About 2.3x the longest job seen (19.4 min in 65 runs; D66 AND-8).
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

@@ -8,6 +8,10 @@
 #
 # SHERPA_ONNX_SRC selects an existing checkout instead of the pinned source archive.
 set -euo pipefail
+# One heavy run at a time on this machine (scripts/heavy-lock.sh).
+# shellcheck source=scripts/heavy-lock.sh
+. "$(dirname "$0")/heavy-lock.sh"
+heavy_lock "$0" "$@"
 cd "$(dirname "$0")/.."
 root=$PWD
 . scripts/native-common.sh

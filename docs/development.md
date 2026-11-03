@@ -72,6 +72,17 @@ To remove a worktree, do these steps:
 2. In the worktree, delete the build outputs with `rm -rf build */build engine/.cxx .gradle/configuration-cache`.
 3. In a different checkout, run `git worktree remove --force PATH`. The worktree contains a submodule, and without `--force` git does not remove it. Git deletes a link, not its target.
 
+## One heavy run per machine
+
+When several checkouts or agents share one machine (the Android, iOS and Mac agents share a 16 GB Mac), two heavy runs at once make each of them slower and make tight waits fail. Each heavy run therefore takes the host lock `~/.cassini-heavy.lock`, an `flock` that the iOS scripts take too. It waits while another run holds it. The holder writes a line into the file that names it, and a run that waits prints that line.
+
+- `device-smoke.sh`, `acceptance-walk.sh`, `note-opening-timing.sh`, `baseline-profile.sh`, `diarization-poc.sh` and `build-native-aar.sh` (so also `setup.sh --from-source`) take the lock themselves. A script that another locked script calls does not wait for it again.
+- For other heavy commands, such as a Gradle build or the local checks, use `scripts/heavy-lock.sh`, for example `scripts/heavy-lock.sh ./gradlew detekt ciTest`.
+- A run waits at most `CASSINI_LOCK_MINUTES` (default 60), then fails with exit status 75. `CASSINI_HEAVY_LOCK` names another lock file, or `off` for none.
+- On CI (`CI=true`) the scripts take no lock, because a runner has one job.
+
+On macOS the lock is held by `/usr/bin/lockf -k`, elsewhere by `flock -o`. Neither passes the lock to the command, so a Gradle daemon that keeps running after the build does not hold it.
+
 ## Test tiers
 
 The root task `ciTest` runs `:core:test`. For each Android module, it runs `verifyRoborazziDebug` if the module has the Roborazzi plugin, else `testDebugUnitTest`. CI runs this command:
@@ -105,6 +116,8 @@ If you change a screen on purpose, do these steps on Linux x86_64:
 4. Commit the goldens together with the change.
 
 `./gradlew :ui:compareRoborazziDebug` writes the pictures and the differences to `ui/build/outputs/roborazzi/`. If the pixel check fails in CI, CI uploads that directory as the `roborazzi-diffs` artifact.
+
+Without Linux x86_64, the `record-goldens.yml` workflow records them on CI for a pushed branch: `gh workflow run record-goldens.yml --ref <branch>`. It runs `:ui:recordRoborazziDebug` and uploads only the goldens that changed or are new, as the artifact `recorded-goldens` (kept 7 days). The job summary lists them. Download them with `gh run download <run id> --name recorded-goldens --dir .`, examine each one and commit them with the change. The workflow commits nothing, and no temporary workflow is needed on the branch.
 
 On macOS or Windows, do not run `ciTest` or `verifyRoborazziDebug`. Do not record or commit goldens there. Run the same tests without the pixel check:
 
@@ -526,15 +539,16 @@ The command does not search `CHANGELOG.md`, `docs/notes/` and this file, because
 
 ## Continuous integration
 
-Three workflows in `.github/workflows/` do the CI checks. All actions have a pin to a full commit SHA. Dependabot (`.github/dependabot.yml`) updates the Gradle dependencies, the actions and the submodule each week.
+Three workflows in `.github/workflows/` do the CI checks, and a fourth records the screenshot goldens when started by hand. All actions have a pin to a full commit SHA. Dependabot (`.github/dependabot.yml`) updates the Gradle dependencies, the actions and the submodule each week. The action updates of a week come as one pull request.
 
 | Workflow | Triggers |
 |---|---|
 | `android.yml` | Each push to `main`, each pull request, each tag `v*` and a manual start (`workflow_dispatch`) |
 | `models.yml` | Each Monday and a manual start |
+| `record-goldens.yml` | A manual start only, for a branch ([Screenshot tests](#screenshot-tests)) |
 | `native.yml` | Each Monday, a manual start, and a push to `main` or a pull request that changes a script of the native build (`setup.sh` and the scripts, pins and patch it uses), `engine/src/main/cpp/`, `engine/build.gradle.kts`, `gradle/libs.versions.toml` or the workflow |
 
-If you push a branch and do not open a pull request, CI does not run. A new run of the same workflow on the same pull request or branch stops the earlier run. A run on a tag always continues to its end.
+If you push a branch and do not open a pull request, CI does not run. A new push to a pull request stops the earlier run of the same workflow on it. Runs on `main` and on tags are never stopped by a newer push, so every commit on `main` gets a complete run.
 
 All runs restore the caches (the native runtime, the pinned source archives, Robolectric's `android-all` jars and the models). Only runs on `main` save them, because GitHub keeps at most 10 GB of caches for the repository and a pull request can only read its own entries and those of `main`. The Robolectric entry follows the Robolectric version. `main` saves a new one only when the tests downloaded a jar that the restored entry did not have, for example after a new `@Config(sdk = …)`. Until that commit is on `main`, the pull request runs download the jar.
 
@@ -545,7 +559,7 @@ All runs restore the caches (the native runtime, the pinned source archives, Rob
 | `checks` | The Gradle wrapper validation, detekt, actionlint, shellcheck on `scripts/*.sh` and `tools/*.sh`, ruff on `scripts` and `tools`, `scripts/check-links.sh`, `scripts/fetch-fonts.sh --check`, `scripts/check-resource-collisions.py` and `scripts/check-verbatim.sh`. On a tag, it also makes sure that `CHANGELOG.md` has a section for the tag. |
 | `core-only` | `./gradlew --configure-on-demand :core:test` with only a JDK and the submodules. It does not run `setup.sh` and it hides the Android SDK of the runner. |
 | `build` | `setup.sh --prebuilt-only`, then `ciTest` (with `:ui:verifyRoborazziDebug`), the lint of `:app`, `:data` and `:ui`, the APK, the device test APKs of `:app` and `:data`, and `scripts/package-apk.py`. On a tag, it builds `release` (the APK and the bundle) and `releaseTest` and collects the native sources. |
-| `emulator` | The device checks on API 26, 29, 34 and 35 (x86_64 Google APIs images), with `scripts/ci-emulator-smoke.sh`. If the emulator or adb fails before the tests start, the job does all the checks one more time on a new emulator. If a test fails, the job fails and does not try again. |
+| `emulator` | After `build`, `checks` and `core-only` pass: the device checks on API 26, 29, 34 and 35 (x86_64 Google APIs images), with `scripts/ci-emulator-smoke.sh`. A push that already fails a cheap check starts no emulators; the push that fixes it runs them. If the emulator or adb fails before the tests start, the job does all the checks one more time on a new emulator. If a test fails, the job fails and does not try again. |
 | `release` | On a tag only, after `checks`, `core-only`, `build` and `emulator` pass. It publishes the GitHub release with the files of `dist/` and the notes of the tag from `CHANGELOG.md` ([`release.md`](release.md)). |
 | `play` | On a tag only, after `release`. If the secret `PLAY_SERVICE_ACCOUNT_JSON` is set, it uploads the bundle to the internal testing track of Google Play ([`release.md`](release.md#google-play)). Else it only shows a notice. |
 
