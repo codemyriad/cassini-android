@@ -25,7 +25,7 @@ The app uses the AAR as the Maven coordinate `org.cassini.native:sherpa-onnx-nem
 |---|---|
 | `scripts/setup.sh` | The prebuilt AAR if possible, else a build from source |
 | `scripts/setup.sh --prebuilt-only` | The prebuilt AAR. If the script cannot get it, it stops with an error. CI uses this command. |
-| `scripts/setup.sh --from-source` | Always a build from source. This takes about 25 minutes and needs the NDK. |
+| `scripts/setup.sh --from-source` | Always a build from source. This takes about 10 minutes on a GitHub runner and needs the NDK. |
 
 The prebuilt AAR has the SHA-256 in the `sherpa-onnx-aar` entry of `scripts/native-dependencies.json`. A build from source does not always give the same bytes, because the NDK and JDK versions can change the output. If the hash of a build from source is different, the script installs the AAR and shows a warning.
 
