@@ -8,6 +8,8 @@
 #   scripts/setup.sh --prebuilt-only never build from source; fail when no prebuilt AAR is found (CI)
 #   scripts/setup.sh --from-source   always build the AAR (needs the NDK; about 25 minutes)
 set -euo pipefail
+# A new script, pin or patch that this script or one of its scripts uses must also be in the paths of
+# .github/workflows/native.yml; scripts/check-native-paths.py checks it.
 cd "$(dirname "$0")/.."
 from_source=false
 prebuilt_only=false
