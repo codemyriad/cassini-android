@@ -12,9 +12,12 @@ permissions:
 
 # The weekly model and native runtime checks are in models.yml and native.yml (docs/development.md).
 concurrency:
+  # A newer push to a pull request cancels its older run. Pushes to main and tags never cancel or replace each
+  # other (D66 AND-7): each commit has its own group, because GitHub keeps one pending run per group and drops the
+  # other even without cancel-in-progress (run 41335351975, main's tip f94c3a3c, was dropped 2 s after it was made).
   # Manual runs use main's ref too; their own group keeps a push from cancelling them.
-  group: android-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+  group: android-${{ github.event_name }}-${{ github.ref }}${{ github.event_name == 'push' && format('-{0}', github.sha) || '' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   checks:
@@ -62,8 +65,10 @@ jobs:
         run: scripts/fetch-fonts.sh --check
       - name: No resource name is in both :app and :ui
         run: python3 -I scripts/check-resource-collisions.py
+      - name: native.yml runs on every change to the native build's scripts
+        run: python3 -I scripts/check-native-paths.py
       # The release job publishes this section as the release notes. A tag without one fails here, so the release
-      # job does not run. The build and emulator jobs do not wait for this job.
+      # job does not run. The build job does not wait for this job; the emulator jobs do (D66 AND-11).
       - name: CHANGELOG.md has a section for the tag
         if: startsWith(github.ref, 'refs/tags/')
         run: python3 -I scripts/changelog-section.py "$GITHUB_REF_NAME" > /dev/null
@@ -284,9 +289,12 @@ jobs:
 
   emulator:
     name: Device checks (API ${{ matrix.api }})
-    needs: build
+    # The cheap checks end minutes before build, so waiting for them costs no wall time, and a head that is already
+    # red on detekt, lint scripts, the verbatim diff or :core starts no emulators (D66 AND-11).
+    needs: [build, checks, core-only]
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    # About 2.7x the longest job seen, a retried attempt included (7.5 min): a hung emulator stops early (D66 AND-8).
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -367,6 +375,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     needs: [checks, core-only, build, emulator]
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     permissions:
       contents: write
     steps:

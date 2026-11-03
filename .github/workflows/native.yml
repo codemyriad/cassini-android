@@ -1,9 +1,10 @@
 name: Native runtime
 
 # Builds the sherpa-onnx AAR from the pinned source and compares it with the pinned release build
-# (docs/native-runtime.md). It takes about 40 minutes, so it runs weekly, by hand, and when a change can affect
-# the native build: the scripts (setup.sh, the pins, the patch), the C++ sources and CMake setup of
-# libcassini_opus, or gradle/libs.versions.toml (the NDK and sherpa-onnx versions).
+# (docs/native-runtime.md). It takes about 17 minutes, so it runs weekly, by hand, and when a change can affect
+# the native build: the scripts of the native build (setup.sh and every script, pin and patch it uses), the C++
+# sources and CMake setup of libcassini_opus, or gradle/libs.versions.toml (the NDK and sherpa-onnx versions).
+# scripts/check-native-paths.py (android.yml checks) fails when the scripts listed below are not those setup.sh uses.
 on:
   schedule:
     - cron: '17 4 * * 1'
@@ -11,14 +12,28 @@ on:
   push:
     branches: [main]
     paths:
-      - 'scripts/**'
+      - 'scripts/setup.sh'
+      - 'scripts/native-common.sh'
+      - 'scripts/native-dependencies.json'
+      - 'scripts/streaming-diarization.patch'
+      - 'scripts/build-native-aar.sh'
+      - 'scripts/fetch-native-aar.sh'
+      - 'scripts/fetch-opus-source.sh'
+      - 'scripts/verify-native-runtime.sh'
       - 'engine/src/main/cpp/**'
       - 'engine/build.gradle.kts'
       - 'gradle/libs.versions.toml'
       - '.github/workflows/native.yml'
   pull_request:
     paths:
-      - 'scripts/**'
+      - 'scripts/setup.sh'
+      - 'scripts/native-common.sh'
+      - 'scripts/native-dependencies.json'
+      - 'scripts/streaming-diarization.patch'
+      - 'scripts/build-native-aar.sh'
+      - 'scripts/fetch-native-aar.sh'
+      - 'scripts/fetch-opus-source.sh'
+      - 'scripts/verify-native-runtime.sh'
       - 'engine/src/main/cpp/**'
       - 'engine/build.gradle.kts'
       - 'gradle/libs.versions.toml'
@@ -28,14 +43,16 @@ permissions:
   contents: read
 
 concurrency:
-  group: native-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: true
+  # As in android.yml: only a pull request's newer push cancels its older run; each push to main has its own group.
+  group: native-${{ github.event_name }}-${{ github.ref }}${{ github.event_name == 'push' && format('-{0}', github.sha) || '' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   native:
     name: sherpa-onnx AAR from source
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    # About 2.3x the longest job seen (19.4 min in 65 runs; D66 AND-8).
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

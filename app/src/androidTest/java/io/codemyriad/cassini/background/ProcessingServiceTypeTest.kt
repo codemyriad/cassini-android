@@ -20,7 +20,6 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.runBlocking
 import org.junit.After
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -71,17 +70,24 @@ class ProcessingServiceTypeTest {
             else -> null
         }
         val wanted = expected?.let { "type 0x${Integer.toHexString(it)}" } ?: "no type check below API 29"
-        // The type that Android has for the service (getForegroundServiceType), and the foreground flag of dumpsys.
-        val services = waitFor("ProcessingService runs in the foreground ($wanted)", TYPE_WAIT_MS) {
-            Background.processingService().takeIf { service ->
-                service.contains("isForeground=true") && ProcessingService.currentType() == expected
+        // The type that Android has for the service (getForegroundServiceType), then the foreground flag of dumpsys
+        // and, from API 30, the type it prints, which must be the same. The type is read first: the service runs as
+        // dataSync until inference starts, so a dump taken before the type changed shows 0x1 (API 35, run
+        // 41606854344). A dump that never agrees fails the wait, with the last dump in the message.
+        var last = ""
+        val services = try {
+            waitFor("ProcessingService runs in the foreground ($wanted)", TYPE_WAIT_MS) {
+                if (ProcessingService.currentType() != expected) return@waitFor null
+                Background.processingService().also { last = it }.takeIf { service ->
+                    service.contains("isForeground=true") &&
+                        (expected == null || !Background.showsType(service) || Background.hasType(service, expected))
+                }
             }
+        } catch (timeout: AssertionError) {
+            val type = ProcessingService.currentType()
+            throw AssertionError("${timeout.message}; type $type, dumpsys:\n$last", timeout)
         }
         Log.i(TAG, "API ${Build.VERSION.SDK_INT}, expected type $expected:\n$services")
-        if (expected != null && Background.showsType(services)) {
-            // More evidence from API 30: the type in dumpsys is the same.
-            assertTrue("dumpsys shows $wanted:\n$services", Background.hasType(services, expected))
-        }
         job.finish(JobOutcome.Paused(PauseReason.USER))
         processing.awaitIdle()
     }
