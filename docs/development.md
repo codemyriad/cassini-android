@@ -532,7 +532,7 @@ Three workflows in `.github/workflows/` do the CI checks. All actions have a pin
 |---|---|
 | `android.yml` | Each push to `main`, each pull request, each tag `v*` and a manual start (`workflow_dispatch`) |
 | `models.yml` | Each Monday and a manual start |
-| `native.yml` | Each Monday, a manual start, and a push to `main` or a pull request that changes `scripts/`, `engine/src/main/cpp/`, `engine/build.gradle.kts`, `gradle/libs.versions.toml` or the workflow |
+| `native.yml` | Each Monday, a manual start, and a push to `main` or a pull request that changes a script of the native build (`setup.sh` and the scripts, pins and patch it uses), `engine/src/main/cpp/`, `engine/build.gradle.kts`, `gradle/libs.versions.toml` or the workflow |
 
 If you push a branch and do not open a pull request, CI does not run. A new run of the same workflow on the same pull request or branch stops the earlier run. A run on a tag always continues to its end.
 
@@ -580,7 +580,7 @@ The `models` job runs the `@NeedsModels` tests on an API 34 emulator with the re
 
 ### native.yml
 
-The `native` job builds the sherpa-onnx AAR from the pinned source with `setup.sh --from-source` (about 40 minutes). It writes the SHA-256 of the built AAR and of the pinned AAR in the job summary. If they are different, the job shows a warning and does not fail ([`native-runtime.md`](native-runtime.md)). Then it builds the app and runs the JVM tests with the built AAR. If the tests fail, the job uploads the test reports as the artifact `native-aar-test-reports`.
+The `native` job builds the sherpa-onnx AAR from the pinned source with `setup.sh --from-source` (about 17 minutes for the whole job). Its path triggers list the scripts of the native build one by one: `setup.sh` and every file of `scripts/` it uses, directly or through another of its scripts. A change to the other scripts (the device checks, `check-verbatim.sh` and so on) does not run it. `scripts/check-native-paths.py`, in the `checks` job of `android.yml`, fails when the list and those scripts differ, so a new helper script of the native build must be added to the list. It writes the SHA-256 of the built AAR and of the pinned AAR in the job summary. If they are different, the job shows a warning and does not fail ([`native-runtime.md`](native-runtime.md)). Then it builds the app and runs the JVM tests with the built AAR. If the tests fail, the job uploads the test reports as the artifact `native-aar-test-reports`.
 
 ## Pre-release gate
 
