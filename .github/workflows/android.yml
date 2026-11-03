@@ -64,6 +64,8 @@ jobs:
         run: scripts/fetch-fonts.sh --check
       - name: No resource name is in both :app and :ui
         run: python3 -I scripts/check-resource-collisions.py
+      - name: native.yml runs on every change to the native build's scripts
+        run: python3 -I scripts/check-native-paths.py
       # The release job publishes this section as the release notes. A tag without one fails here, so the release
       # job does not run. The build and emulator jobs do not wait for this job.
       - name: CHANGELOG.md has a section for the tag
@@ -142,8 +144,11 @@ jobs:
           } >> "$GITHUB_ENV"
       # setup.sh fetches the pinned release AAR and fails fast when it cannot. Only native.yml builds the AAR from
       # source (weekly, by hand, and on changes to the native inputs). The NDK above compiles libcassini_opus.so.
-      - name: Cache the native runtime
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # Every ref restores the caches; only main saves them (D66 AND-6). Each PR ref used to save its own copy, and the
+      # repository went over its 10 GB cache quota, so GitHub evicted the Gradle entries that keep builds warm.
+      - name: Restore the native runtime
+        id: native-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             native/m2/org
@@ -151,11 +156,34 @@ jobs:
           key: native-${{ hashFiles('scripts/native-dependencies.json', 'scripts/streaming-diarization.patch', 'gradle/libs.versions.toml') }}
       - name: Fetch the pinned native runtime
         run: ./scripts/setup.sh --prebuilt-only
-      - name: Cache Robolectric's Android runtime
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - name: Save the native runtime
+        if: github.ref == 'refs/heads/main' && steps.native-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            native/m2/org
+            .tools/opus/source.tar.gz
+          key: native-${{ hashFiles('scripts/native-dependencies.json', 'scripts/streaming-diarization.patch', 'gradle/libs.versions.toml') }}
+      # Robolectric downloads one android-all jar for each SDK the tests use (robolectric.properties and @Config).
+      # The entry follows the Robolectric version only, not the whole catalog, and main saves a new one only when the
+      # tests added a jar. native.yml restores the same entry.
+      - name: Find the Robolectric version
+        id: robolectric
+        run: |
+          version=$(sed -n 's/^robolectric = "\(.*\)"$/\1/p' gradle/libs.versions.toml)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Restore Robolectric's Android runtime
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.m2/repository/org/robolectric
-          key: robolectric-${{ hashFiles('gradle/libs.versions.toml', '**/src/test/resources/robolectric.properties') }}
+          key: robolectric-${{ steps.robolectric.outputs.version }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: robolectric-${{ steps.robolectric.outputs.version }}-
+      - name: List the restored Robolectric jars
+        id: robolectric-restored
+        run: |
+          mkdir -p ~/.m2/repository/org/robolectric
+          echo "jars=$(find ~/.m2/repository/org/robolectric -name '*.jar' | sort | sha256sum | cut -c1-64)" >> "$GITHUB_OUTPUT"
       # On tags the device tests run against releaseTest (the release build without R8), because R8
       # removes members the tests call; the emulator job then launch-checks the published release APK.
       - name: Build APK, run unit and conformance tests, and lint
@@ -174,6 +202,16 @@ jobs:
           ./gradlew --no-daemon \
             -PdeviceTestBuildType="$DEVICE_TEST_TYPE" \
             ":app:assemble${DEVICE_TEST_TYPE^}" ":app:assemble${DEVICE_TEST_TYPE^}AndroidTest"
+      - name: List the Robolectric jars after the tests
+        id: robolectric-used
+        if: github.ref == 'refs/heads/main'
+        run: echo "jars=$(find ~/.m2/repository/org/robolectric -name '*.jar' | sort | sha256sum | cut -c1-64)" >> "$GITHUB_OUTPUT"
+      - name: Save Robolectric's Android runtime
+        if: github.ref == 'refs/heads/main' && steps.robolectric-used.outputs.jars != steps.robolectric-restored.outputs.jars
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-${{ steps.robolectric.outputs.version }}-${{ github.run_id }}-${{ github.run_attempt }}
       # ciTest runs verifyRoborazziDebug in :ui. It writes the actual image and a diff of each changed golden to
       # <module>/build/outputs/roborazzi.
       - name: Upload the screenshot diffs
