@@ -73,6 +73,14 @@ jobs:
             .tools/native-build/sherpa-onnx.tar.gz
             .tools/opus/source.tar.gz
           key: native-source-${{ hashFiles('scripts/native-dependencies.json') }}
+      # The app's Robolectric tests below need android-all; without this cache every run downloaded it from Maven
+      # Central and failed when that download did (D66 AND-3). Restore only: android.yml saves the entry on main.
+      - name: Restore Robolectric's Android runtime
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-${{ hashFiles('gradle/libs.versions.toml', '**/src/test/resources/robolectric.properties') }}
+          restore-keys: robolectric-
       # setup.sh finds the pinned NDK inside ANDROID_HOME. The job reports drift and does not fail
       # on it: a source build is not yet known to match the release byte for byte. The summary
       # records both hashes and a mismatch raises a warning annotation.
