@@ -528,7 +528,7 @@ The command does not search `CHANGELOG.md`, `docs/notes/` and this file, because
 
 ## Continuous integration
 
-Three workflows in `.github/workflows/` do the CI checks, and a fourth records the screenshot goldens when started by hand. All actions have a pin to a full commit SHA. Dependabot (`.github/dependabot.yml`) updates the Gradle dependencies, the actions and the submodule each week.
+Three workflows in `.github/workflows/` do the CI checks, and a fourth records the screenshot goldens when started by hand. All actions have a pin to a full commit SHA. Dependabot (`.github/dependabot.yml`) updates the Gradle dependencies, the actions and the submodule each week. The action updates of a week come as one pull request.
 
 | Workflow | Triggers |
 |---|---|
