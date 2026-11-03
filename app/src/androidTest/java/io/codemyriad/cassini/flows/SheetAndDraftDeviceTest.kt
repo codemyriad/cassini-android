@@ -249,7 +249,7 @@ class SheetAndDraftDeviceTest {
         const val LARGE_FONT_SCALE = "1.3"
         const val FONT_SCALE_MS = 10_000L
         const val FONT_SCALE_DELTA = 0.01f
-        const val KEYBOARD_MS = 5_000L
+        const val KEYBOARD_MS = Flows.SCREEN_MS
         const val PNG_QUALITY = 100
         const val TURNS = 14
         const val MINUTE = 60_000L

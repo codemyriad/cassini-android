@@ -1,6 +1,8 @@
 # shellcheck shell=bash
 # Shared helpers for the native runtime scripts. Source it from the repository root:
 #   . scripts/native-common.sh
+# A new script or file of scripts/ named here must also be in the paths of .github/workflows/native.yml
+# (scripts/check-native-paths.py checks it).
 
 # pin <entry name> <field>: print one field of scripts/native-dependencies.json.
 pin() {
