@@ -1,9 +1,10 @@
 name: Native runtime
 
 # Builds the sherpa-onnx AAR from the pinned source and compares it with the pinned release build
-# (docs/native-runtime.md). It takes about 40 minutes, so it runs weekly, by hand, and when a change can affect
-# the native build: the scripts (setup.sh, the pins, the patch), the C++ sources and CMake setup of
-# libcassini_opus, or gradle/libs.versions.toml (the NDK and sherpa-onnx versions).
+# (docs/native-runtime.md). It takes about 17 minutes, so it runs weekly, by hand, and when a change can affect
+# the native build: the scripts of the native build (setup.sh and every script, pin and patch it uses), the C++
+# sources and CMake setup of libcassini_opus, or gradle/libs.versions.toml (the NDK and sherpa-onnx versions).
+# scripts/check-native-paths.py (android.yml checks) fails when the scripts listed below are not those setup.sh uses.
 on:
   schedule:
     - cron: '17 4 * * 1'
@@ -11,14 +12,28 @@ on:
   push:
     branches: [main]
     paths:
-      - 'scripts/**'
+      - 'scripts/setup.sh'
+      - 'scripts/native-common.sh'
+      - 'scripts/native-dependencies.json'
+      - 'scripts/streaming-diarization.patch'
+      - 'scripts/build-native-aar.sh'
+      - 'scripts/fetch-native-aar.sh'
+      - 'scripts/fetch-opus-source.sh'
+      - 'scripts/verify-native-runtime.sh'
       - 'engine/src/main/cpp/**'
       - 'engine/build.gradle.kts'
       - 'gradle/libs.versions.toml'
       - '.github/workflows/native.yml'
   pull_request:
     paths:
-      - 'scripts/**'
+      - 'scripts/setup.sh'
+      - 'scripts/native-common.sh'
+      - 'scripts/native-dependencies.json'
+      - 'scripts/streaming-diarization.patch'
+      - 'scripts/build-native-aar.sh'
+      - 'scripts/fetch-native-aar.sh'
+      - 'scripts/fetch-opus-source.sh'
+      - 'scripts/verify-native-runtime.sh'
       - 'engine/src/main/cpp/**'
       - 'engine/build.gradle.kts'
       - 'gradle/libs.versions.toml'

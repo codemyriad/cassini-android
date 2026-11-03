@@ -52,7 +52,10 @@ mkdir -p .tools/emulator-results
 # open closes when its process stops. The setting gets its old value at the end. The workflow runs everything again
 # when a dialog stays, because that happens before the tests.
 hide_before=$(adb shell settings get global hide_error_dialogs | tr -d '\r')
+messages=com.google.android.apps.messaging
+messages_disabled=false
 finish() {
+    if $messages_disabled; then adb shell pm enable --user 0 "$messages" >/dev/null || true; fi
     if [ "$hide_before" = null ] || [ -z "$hide_before" ]; then
         adb shell settings delete global hide_error_dialogs >/dev/null || true
     else
@@ -87,6 +90,18 @@ anr_settled() { [ -n "$(error_dialog)" ] || ! not_responding; }
 # Android reports no state for the setting (no API level dumps mShowDialogs), so there is nothing to wait for: the
 # system server applies it when the settings provider notifies it.
 adb shell settings put global hide_error_dialogs 1
+# No test uses Google Messages, but on the google_apis images it crashes in the background, and its Application Error
+# dialog took the input focus from the tests despite hide_error_dialogs (job 124901766143, API 26). So it is disabled
+# for the run (pm returns once it is) and enabled again at the end, as on a phone it was enabled before. A device
+# where it is missing or already disabled keeps it as it is; one where pm refuses keeps the dialog loop below.
+packages=$(adb shell pm list packages -e "$messages" | tr -d '\r')
+if grep -qx "package:$messages" <<<"$packages"; then
+    if adb shell pm disable-user --user 0 "$messages"; then
+        messages_disabled=true
+    else
+        printf 'Could not disable %s; continuing\n' "$messages" >&2
+    fi
+fi
 # The launcher ANR starts before this script (the runner's `input keyevent` returns when the key is dropped and the
 # ANR raised), and its dialog can open after the first look: in run 41188862768 the window list had no dialog at
 # 09:44:07.0 and the dialog opened at 09:44:07.05, after the trace dumps. So each ANR in progress ends first.
