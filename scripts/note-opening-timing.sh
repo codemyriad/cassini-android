@@ -7,6 +7,10 @@
 #   scripts/note-opening-timing.sh [--serial SERIAL]
 # Install the debug app and its test APK first (adb install -r), for example with scripts/device-smoke.sh.
 set -euo pipefail
+# One heavy run at a time on this machine (scripts/heavy-lock.sh).
+# shellcheck source=scripts/heavy-lock.sh
+. "$(dirname "$0")/heavy-lock.sh"
+heavy_lock "$0" "$@"
 cd "$(dirname "$0")/.."
 
 while [ $# -gt 0 ]; do

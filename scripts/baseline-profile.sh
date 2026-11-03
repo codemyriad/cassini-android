@@ -2,6 +2,10 @@
 # Generates app/src/main/baseline-prof.txt on a device or emulator with direct adb instrumentation, which keeps the
 # app data (Gradle's connected tasks can uninstall the app). docs/development.md, "Baseline Profile", explains it.
 set -euo pipefail
+# One heavy run at a time on this machine (scripts/heavy-lock.sh).
+# shellcheck source=scripts/heavy-lock.sh
+. "$(dirname "$0")/heavy-lock.sh"
+heavy_lock "$0" "$@"
 cd "$(dirname "$0")/.."
 
 usage() {
