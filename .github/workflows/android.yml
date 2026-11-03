@@ -286,7 +286,8 @@ jobs:
     name: Device checks (API ${{ matrix.api }})
     needs: build
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    # About 2.7x the longest job seen, a retried attempt included (7.5 min): a hung emulator stops early (D66 AND-8).
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -367,6 +368,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     needs: [checks, core-only, build, emulator]
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     permissions:
       contents: write
     steps:
