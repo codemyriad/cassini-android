@@ -22,7 +22,7 @@ concurrency:
 jobs:
   checks:
     name: Wrapper, detekt, actionlint, shellcheck, ruff, links, fonts and the verbatim diff
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.CM_RUNNER != '' && fromJSON(vars.CM_RUNNER) || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -78,7 +78,7 @@ jobs:
   # The :core module needs only a JDK: no Android SDK, NDK, sherpa-onnx AAR or Opus source.
   core-only:
     name: Engine tests with a JDK alone
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.CM_RUNNER != '' && fromJSON(vars.CM_RUNNER) || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -105,7 +105,7 @@ jobs:
           if-no-files-found: ignore
 
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.CM_RUNNER != '' && fromJSON(vars.CM_RUNNER) || 'ubuntu-24.04' }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
