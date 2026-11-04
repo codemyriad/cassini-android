@@ -6,6 +6,10 @@ We made the entries for 0.0.1-beta to 0.1.0 again from the release notes of thes
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-04
+
+The APK file of this release is `cassini-android-0.4.0.apk`. It operates on Android 8.0 or later, on a 64-bit ARM phone (`arm64-v8a`). The APK also has `x86_64` for emulators. Cassini talk 0.4.0 is a new app, `io.codemyriad.cassini`. It installs beside 0.3.0 (`org.cassini.android`) and does not update it. To keep a note of 0.3.0, save it there as a Cassini document (`.opus`) and open the file in the new app. Your saved voices and settings do not move. The new app downloads the models again (about 530 MB). Testers get the new app from the internal testing track of Google Play, signed with the same key as this APK. The release also has the native sources (`cassini-native-sources.tar`) and the notices. The APK has no models. After you agree, the app downloads them separately.
+
 ### Added
 
 - "Open with" offers Cassini talk for any audio file, for example an MP3, M4A or WAV from a file manager or a chat app, not only for Ogg and Opus files. The file is imported as from the Library.
@@ -210,7 +214,8 @@ Version 0.2.0 is a new build of the app. It keeps the speech engine and the port
 - A one-time model download in Settings: INT8 (about 640 MiB) or FP32 (about 2.37 GiB).
 - Recordings of up to 2:59 and imports of up to 3 minutes.
 
-[Unreleased]: https://github.com/codemyriad/cassini-android/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/codemyriad/cassini-android/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/codemyriad/cassini-android/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/codemyriad/cassini-android/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/codemyriad/cassini-android/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/codemyriad/cassini-android/compare/v0.0.6-beta...v0.1.0

@@ -18,8 +18,8 @@ android {
         applicationId = "io.codemyriad.cassini"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 13
-        versionName = "0.3.0"
+        versionCode = 14
+        versionName = "0.4.0"
         // Builds the graph on a scratch root (docs/architecture.md section 9).
         testInstrumentationRunner = "io.codemyriad.cassini.CassiniTestRunner"
         // Library modules cannot filter packaged ABIs; this line must stay in :app.
