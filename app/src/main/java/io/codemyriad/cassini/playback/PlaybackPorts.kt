@@ -158,10 +158,25 @@ class ExoAudioPlayer(context: Context) : AudioPlayer {
     }
 }
 
+/** A change of the audio focus that [PlaybackPlatform.requestFocus] asked for. */
+enum class FocusChange {
+    /** Another app took the focus for good (`AUDIOFOCUS_LOSS`). */
+    LOST,
+
+    /**
+     * Another app took the focus for a while (`AUDIOFOCUS_LOSS_TRANSIENT`, or `_CAN_DUCK`: speech pauses instead of
+     * ducking). The request stays, so [GAINED] follows when the other app gives the focus back.
+     */
+    LOST_FOR_NOW,
+
+    /** The focus came back after [LOST_FOR_NOW] (`AUDIOFOCUS_GAIN`). */
+    GAINED,
+}
+
 /** Audio focus and the headphones-unplugged broadcast. Main thread only. */
 interface PlaybackPlatform {
-    /** Requests AUDIOFOCUS_GAIN; [onLoss] runs when another app takes it. False when it was refused. */
-    fun requestFocus(onLoss: () -> Unit): Boolean
+    /** Requests AUDIOFOCUS_GAIN; [onChange] gets each change until [abandonFocus]. False when it was refused. */
+    fun requestFocus(onChange: (FocusChange) -> Unit): Boolean
 
     fun abandonFocus()
 
@@ -185,7 +200,7 @@ class AndroidPlaybackPlatform(context: Context) : PlaybackPlatform {
     private var focus: AudioFocusRequest? = null
     private var noisy: BroadcastReceiver? = null
 
-    override fun requestFocus(onLoss: () -> Unit): Boolean {
+    override fun requestFocus(onChange: (FocusChange) -> Unit): Boolean {
         val manager = audio ?: return true
         abandonFocus()
         val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
@@ -193,7 +208,16 @@ class AndroidPlaybackPlatform(context: Context) : PlaybackPlatform {
             // Speech is hard to follow ducked: pause instead.
             .setWillPauseWhenDucked(true)
             .setOnAudioFocusChangeListener(
-                { change -> if (change < 0) onLoss() },
+                { change ->
+                    when (change) {
+                        AudioManager.AUDIOFOCUS_LOSS -> onChange(FocusChange.LOST)
+                        AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
+                        AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK,
+                        -> onChange(FocusChange.LOST_FOR_NOW)
+                        AudioManager.AUDIOFOCUS_GAIN -> onChange(FocusChange.GAINED)
+                        else -> Unit
+                    }
+                },
                 main,
             )
             .build()

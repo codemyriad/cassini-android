@@ -189,6 +189,110 @@ class PlaybackControllerTest {
         assertEquals(Save(NOTE, 3_000, final = true), saves.last())
     }
 
+    @Test fun aTransientFocusLossPausesAndTheFocusThatComesBackResumes() = runTest {
+        // PlaybackSessionTest on API 34: a SystemUI notification sound took the focus for 1 s while the note played in
+        // the background, and the note never played on.
+        val playback = controller()
+        playback.open(NOTE, audio, positionMs = 0)
+        playback.play()
+        advanceTimeBy(2_000)
+        platform.loseFocusForNow()
+        runCurrent()
+        assertFalse(playback.state.value.playing)
+        assertTrue("the focus request stays", platform.focused)
+        assertTrue(platform.noisyWatched)
+        assertEquals(Save(NOTE, 2_000, final = true), saves.last())
+
+        advanceTimeBy(5_000)
+        assertEquals(2_000L, players.single().positionMs)
+        platform.regainFocus()
+        runCurrent()
+        assertTrue("the focus came back: play on", playback.state.value.playing)
+        advanceTimeBy(1_000)
+        assertEquals(3_000L, players.single().positionMs)
+
+        // A second transient loss works the same way.
+        platform.loseFocusForNow()
+        runCurrent()
+        assertFalse(playback.state.value.playing)
+        platform.regainFocus()
+        runCurrent()
+        assertTrue(playback.state.value.playing)
+    }
+
+    @Test fun aPauseASeekOrUnpluggedHeadphonesDuringATransientLossDoNotResume() = runTest {
+        val playback = controller()
+        playback.open(NOTE, audio, positionMs = 0)
+        val userActions = listOf(
+            playback::pause,
+            { playback.seekTo(5_000) },
+            { playback.skip(10_000) },
+            platform::unplug,
+        )
+        userActions.forEachIndexed { index, act ->
+            playback.play()
+            advanceTimeBy(1_000)
+            platform.loseFocusForNow()
+            runCurrent()
+            act()
+            runCurrent()
+            assertFalse("action $index: the focus is given back", platform.focused)
+            platform.regainFocus()
+            runCurrent()
+            assertFalse("action $index: no resume", playback.state.value.playing)
+        }
+    }
+
+    @Test fun leavingDuringATransientLossGivesTheFocusBack() = runTest {
+        val playback = controller()
+        playback.open(NOTE, audio, positionMs = 0)
+        playback.play()
+        advanceTimeBy(1_000)
+        platform.loseFocusForNow()
+        runCurrent()
+        playback.leave()
+        runCurrent()
+        assertFalse(platform.focused)
+        assertFalse(platform.noisyWatched)
+        platform.regainFocus()
+        runCurrent()
+        assertEquals(PlaybackState(), playback.state.value)
+    }
+
+    @Test fun aFocusLossForGoodAfterATransientOneStaysPaused() = runTest {
+        val playback = controller()
+        playback.open(NOTE, audio, positionMs = 0)
+        playback.play()
+        advanceTimeBy(1_000)
+        platform.loseFocusForNow()
+        runCurrent()
+        platform.loseFocus()
+        runCurrent()
+        assertFalse(playback.state.value.playing)
+        assertFalse("AUDIOFOCUS_LOSS gives the focus back", platform.focused)
+        platform.regainFocus()
+        runCurrent()
+        assertFalse(playback.state.value.playing)
+    }
+
+    @Test fun playDuringATransientLossAsksForTheFocusAgain() = runTest {
+        val playback = controller()
+        playback.open(NOTE, audio, positionMs = 0)
+        playback.play()
+        advanceTimeBy(1_000)
+        platform.loseFocusForNow()
+        runCurrent()
+        playback.play()
+        runCurrent()
+        assertTrue(playback.state.value.playing)
+        assertTrue(platform.focused)
+        assertEquals("a new request", 2, platform.requests)
+        // Its focus change then pauses again, as a fresh request does.
+        platform.loseFocus()
+        runCurrent()
+        assertFalse(playback.state.value.playing)
+    }
+
     @Test fun aSpeakerSampleRestoresThePreviousPosition() = runTest {
         val playback = controller()
         playback.open(NOTE, audio, positionMs = 10_000)
@@ -546,22 +650,29 @@ private class FakePlayer(
 private class FakePlaybackPlatform : PlaybackPlatform {
     var focused = false
     var noisyWatched = false
-    private var onLoss: (() -> Unit)? = null
+    var requests = 0
+    private var onChange: ((FocusChange) -> Unit)? = null
     private var onNoisy: (() -> Unit)? = null
 
-    fun loseFocus() = onLoss?.invoke()
+    fun loseFocus() = onChange?.invoke(FocusChange.LOST)
+
+    /** AUDIOFOCUS_LOSS_TRANSIENT, or _CAN_DUCK: another app plays for a while, for example a notification sound. */
+    fun loseFocusForNow() = onChange?.invoke(FocusChange.LOST_FOR_NOW)
+
+    fun regainFocus() = onChange?.invoke(FocusChange.GAINED)
 
     fun unplug() = onNoisy?.invoke()
 
-    override fun requestFocus(onLoss: () -> Unit): Boolean {
+    override fun requestFocus(onChange: (FocusChange) -> Unit): Boolean {
+        requests++
         focused = true
-        this.onLoss = onLoss
+        this.onChange = onChange
         return true
     }
 
     override fun abandonFocus() {
         focused = false
-        onLoss = null
+        onChange = null
     }
 
     override fun watchNoisy(onNoisy: () -> Unit) {

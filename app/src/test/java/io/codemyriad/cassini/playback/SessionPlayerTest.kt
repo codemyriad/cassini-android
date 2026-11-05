@@ -47,7 +47,7 @@ class SessionPlayerTest {
     }
 
     private val focus = object : PlaybackPlatform {
-        override fun requestFocus(onLoss: () -> Unit) = true
+        override fun requestFocus(onChange: (FocusChange) -> Unit) = true
         override fun abandonFocus() = Unit
         override fun watchNoisy(onNoisy: () -> Unit) = Unit
         override fun unwatchNoisy() = Unit
