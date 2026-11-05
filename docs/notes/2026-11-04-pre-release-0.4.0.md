@@ -1,10 +1,10 @@
 # Pre-release gate for 0.4.0 (2026-11-04)
 
-This file records the [pre-release gate](../development.md#pre-release-gate) for Cassini talk for Android 0.4.0, the first release of `io.codemyriad.cassini`. We did steps 3 to 9 on an emulator on 2026-11-04. Steps 1 and 2 need a Pixel 8 and are not done yet.
+This file records the [pre-release gate](../development.md#pre-release-gate) for Cassini talk for Android 0.4.0, the first release of `io.codemyriad.cassini`. We did steps 3 to 9 on an emulator on 2026-11-04. Steps 1 and 2 need a Pixel 8. On 2026-11-05 the project made them a check after the release, so they do not block the tag.
 
 ## Result
 
-Steps 3 and 5 to 9 passed. Step 4 passed with one finding: after a call, the first **Resume** pauses the recording again at once, and only a second **Resume** continues it ([Steps 3 and 4](#steps-3-and-4-a-call-pauses-the-recording)). No audio is lost. Steps 1 and 2 are still to do.
+Steps 3 and 5 to 9 passed. Step 4 passed with one finding: after a call, the first **Resume** pauses the recording again at once, and only a second **Resume** continues it ([Steps 3 and 4](#steps-3-and-4-a-call-pauses-the-recording)). No audio is lost. 0.4.0 ships with this finding as a known limitation in the changelog. Steps 1 and 2 follow the release.
 
 ## Release candidate
 
@@ -31,8 +31,8 @@ We installed the RC over the debug build with `adb install -r`. The models staye
 
 | Step | Device | Result |
 | --- | --- | --- |
-| 1. Record, transcribe with speakers, name a speaker, export, transcribe again | Pixel 8 | Not done yet |
-| 2. Music while you record | Pixel 8 | Not done yet |
+| 1. Record, transcribe with speakers, name a speaker, export, transcribe again | Pixel 8 | After the release |
+| 2. Music while you record | Pixel 8 | After the release |
 | 3. A call pauses the recording | Emulator | Pass |
 | 4. The recording stays paused after the call | Emulator | Pass, with a finding (see the text that follows) |
 | 5. The type `mediaProcessing` | Emulator (API 35) | Pass |
@@ -77,7 +77,7 @@ The manifest gives Parakeet TDT (`moondream/parakeet-ultra INT8`), sherpa-onnx 1
 
 ## Not done or changed
 
-- Steps 1 and 2 need a Pixel 8 (API 37), and the owner's phone is not used by the agents. The owner does them on the release candidate before the tag.
+- Steps 1 and 2 need a Pixel 8 (API 37), and the owner's phone is not used by the agents. The owner does them on the release build after the tag, and the results go in this file.
 - On the emulator the first incoming call did not reach telecom (steps 3 and 4). We called again and waited for telecom to ring before the answer.
 - For step 4, we pushed **Resume** twice (the finding above).
 - The gate did not operate zstd-jni with a download in the app: the models came from `scripts/push-models.sh`. `libzstd-jni-1.5.7-25.so` is in the APK. CI's model-download device test covers the download.
