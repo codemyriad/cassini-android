@@ -17,6 +17,7 @@ import io.codemyriad.cassini.background.Background
 import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.flows.Flows.backAfterOpenWith
+import io.codemyriad.cassini.flows.Flows.closeKeyboard
 import io.codemyriad.cassini.flows.Flows.import
 import io.codemyriad.cassini.flows.Flows.logScreen
 import io.codemyriad.cassini.flows.Flows.meetingDocument
@@ -97,13 +98,15 @@ class LibraryFlowTest {
         rule.onNode(hasSetTextAction()).performTextReplacement("")
         rule.waitShown(row)
 
-        // Long press: the actions sheet; Move to trash, then Undo.
+        // Long press: the actions sheet; Move to trash, then Undo. The search field still has the keyboard, so close
+        // it first. A sheet opened over the keyboard stands above it and grows when it closes, and on a 16:9 screen
+        // Move to trash is below the visible part of the sheet: a tap there falls on the scrim and closes the sheet.
+        // Before API 30 the sheet's IME inset can read 0 while the keyboard still closes (API 26, #71), so the inset
+        // wait alone let the tap through too early.
+        rule.closeKeyboard()
         rule.onNode(row).performTouchInput { longClick() }
         val trash = rule.text(UiR.string.ui_action_move_to_trash)
         rule.waitText(trash)
-        // The search field still has the keyboard. Until the keyboard closes, the sheet stands above it, and on a 16:9
-        // screen Move to trash is below the visible part of the sheet: a tap there falls on the scrim and closes the
-        // sheet. A slow emulator keeps the keyboard open for more than a second after the sheet opens.
         rule.waitKeyboardClosed(hasText(trash))
         rule.onNodeWithText(trash).performScrollTo()
         val placement = rule.placementReport(hasText(trash))
@@ -114,7 +117,9 @@ class LibraryFlowTest {
             rule.waitFor("Move to trash did not trash the note; the tap missed? $placement") { row(CLIP_TITLE) == null }
         } catch (notTrashed: AssertionError) {
             rule.logScreen()
-            throw AssertionError("${notTrashed.message}; ${Flows.focusReport()}", notTrashed)
+            val keyboard = if (Flows.keyboardShown()) "shows" else "does not show"
+            val report = "${Flows.focusReport()}; the input method $keyboard the keyboard"
+            throw AssertionError("${notTrashed.message}; $report", notTrashed)
         }
         val trashedAt = SystemClock.elapsedRealtime()
         val moved = rule.text(UiR.string.ui_library_moved_to_trash, CLIP_TITLE)
