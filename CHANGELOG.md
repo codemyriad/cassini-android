@@ -6,6 +6,14 @@ We made the entries for 0.0.1-beta to 0.1.0 again from the release notes of thes
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-11-05
+
+The APK file of this release is `cassini-android-0.4.1.apk`. It operates on Android 8.0 or later, on a 64-bit ARM phone (`arm64-v8a`). The APK also has `x86_64` for emulators. It updates Cassini talk 0.4.0 (`io.codemyriad.cassini`) and keeps your notes, voices, models and settings. Testers get it from the internal testing track of Google Play, signed with the same key as this APK. The release also has the native sources (`cassini-native-sources.tar`) and the notices.
+
+### Changed
+
+- The build retries the download of Gradle: up to four attempts, 2, 4 and 8 s apart, with 30 s for the connection and each read. One slow answer of the download server no longer fails a build.
+
 ### Fixed
 
 - After a phone call, one push on **Resume** continues the recording. Before, the recording could pause again at once with "Paused — another app is using audio", and only a second push continued it.
@@ -223,7 +231,8 @@ Version 0.2.0 is a new build of the app. It keeps the speech engine and the port
 - A one-time model download in Settings: INT8 (about 640 MiB) or FP32 (about 2.37 GiB).
 - Recordings of up to 2:59 and imports of up to 3 minutes.
 
-[Unreleased]: https://github.com/codemyriad/cassini-android/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/codemyriad/cassini-android/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/codemyriad/cassini-android/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/codemyriad/cassini-android/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/codemyriad/cassini-android/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/codemyriad/cassini-android/compare/v0.1.0...v0.2.0

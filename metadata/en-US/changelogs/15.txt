@@ -1,0 +1,4 @@
+Cassini talk 0.4.1 fixes two interruptions.
+
+* After a phone call, one tap on Resume continues the recording.
+* A note that plays, also in the background, goes on after a short sound of another app, such as a notification.
