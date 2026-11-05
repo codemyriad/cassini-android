@@ -336,7 +336,7 @@ To find Storage almost full, the test sets the free space to the floor of the re
 
 The screenshots in the README come from this walk. To make them again, use these steps:
 
-1. Do the walk for the light and dark variants with `--part models`.
+1. Do the walk for the light and dark variants with `--part models`. Use the Pixel 5 profile (1080 × 2340). On an emulator without a display cutout, first turn on the emulated one with `adb shell cmd overlay enable com.android.internal.display.cutout.emulation.hole`. Without it, the screenshots of the API 35 arm64 image cut the status bar in half.
 2. Select these screenshots of each variant: `00-library`, `03-read-and-listen`, `02-transcribing`, `04-name-a-speaker` and `08-settings`.
 3. Make sure that they show only the FLEURS clip and the test names.
 4. Make them 540 pixels wide with Pillow, and make the files smaller with `optipng -o5 -strip all`.
