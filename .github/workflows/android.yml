@@ -126,9 +126,12 @@ jobs:
       # The only job that saves the Gradle User Home (on main; pull requests only read it). Every other job of the
       # workflows has cache-read-only (D66 AND-12): they share the exact key, and core-only, which ends first, saved
       # a home without the Android dependencies or task outputs, so build could not save its own and started cold.
+      # Only GitHub-hosted runs save caches: a tag build restores them while it holds the release signing key, so
+      # nothing a self-hosted (cm-hetzner) machine wrote may reach it. Those machines keep their own Gradle home.
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
           cache-provider: basic
+          cache-read-only: ${{ runner.environment != 'github-hosted' }}
       # The release key signs the GitHub APK and the Play bundle (docs/release.md, "Signing"). No fallbacks: a tag
       # build without the four secrets fails here.
       - name: Restore the release signing key
@@ -166,7 +169,7 @@ jobs:
       - name: Fetch the pinned native runtime
         run: ./scripts/setup.sh --prebuilt-only
       - name: Save the native runtime
-        if: github.ref == 'refs/heads/main' && steps.native-cache.outputs.cache-hit != 'true'
+        if: github.ref == 'refs/heads/main' && runner.environment == 'github-hosted' && steps.native-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -216,7 +219,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: echo "jars=$(find ~/.m2/repository/org/robolectric -name '*.jar' | sort | sha256sum | cut -c1-64)" >> "$GITHUB_OUTPUT"
       - name: Save Robolectric's Android runtime
-        if: github.ref == 'refs/heads/main' && steps.robolectric-used.outputs.jars != steps.robolectric-restored.outputs.jars
+        if: github.ref == 'refs/heads/main' && runner.environment == 'github-hosted' && steps.robolectric-used.outputs.jars != steps.robolectric-restored.outputs.jars
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.m2/repository/org/robolectric

@@ -550,13 +550,24 @@ Three workflows in `.github/workflows/` do the CI checks, and a fourth records t
 
 If you push a branch and do not open a pull request, CI does not run. A new push to a pull request stops the earlier run of the same workflow on it. Runs on `main` and on tags are never stopped by a newer push, so every commit on `main` gets a complete run.
 
-All runs restore the caches (the native runtime, the pinned source archives, Robolectric's `android-all` jars and the models). Only runs on `main` save them, because GitHub keeps at most 10 GB of caches for the repository and a pull request can only read its own entries and those of `main`. The Robolectric entry follows the Robolectric version. `main` saves a new one only when the tests downloaded a jar that the restored entry did not have, for example after a new `@Config(sdk = …)`. Until that commit is on `main`, the pull request runs download the jar.
+All runs restore the caches (the native runtime, the pinned source archives, Robolectric's `android-all` jars and the models). Only runs on `main` save them, because GitHub keeps at most 10 GB of caches for the repository and a pull request can only read its own entries and those of `main`. The Robolectric entry follows the Robolectric version. `main` saves a new one only when the tests downloaded a jar that the restored entry did not have, for example after a new `@Config(sdk = …)`. Until that commit is on `main`, the pull request runs download the jar. With `CM_RUNNER=hetzner` (below), only GitHub-hosted runs save them, so nothing a self-hosted machine wrote reaches a tag build, which restores them while it holds the release signing key.
+
+### Runners
+
+Every job runs on GitHub-hosted runners unless the repository variable `CM_RUNNER` is exactly `hetzner`. Then
+`checks`, `core-only`, `build` and `native` run on the self-hosted `cm-hetzner` runners (scale-to-zero Hetzner Cloud
+hosts, one fresh container per job; operated from codemyriad/systems, `systems/codemyriad/gha-runners/scaler/`).
+**Tag builds never move:** they restore the release signing key, so on a tag ref those jobs stay on `ubuntu-24.04`,
+like `emulator` (no KVM on the cloud hosts), `release` and `play` always do. Any other value of the variable (unset,
+empty, a typo, JSON) also keeps `ubuntu-24.04`: the runner labels are a constant in the workflow and the variable is
+never parsed. To switch: `gh variable set CM_RUNNER --body hetzner` or `gh variable delete CM_RUNNER`.
+`scripts/check-runner-selection.py` (run by `checks`) evaluates these rules for every job.
 
 ### android.yml
 
 | Job | What it does |
 |---|---|
-| `checks` | The Gradle wrapper validation, detekt, actionlint, shellcheck on `scripts/*.sh` and `tools/*.sh`, ruff on `scripts` and `tools`, `scripts/check-links.sh`, `scripts/fetch-fonts.sh --check`, `scripts/check-resource-collisions.py` and `scripts/check-verbatim.sh`. On a tag, it also makes sure that `CHANGELOG.md` has a section for the tag. |
+| `checks` | The Gradle wrapper validation, detekt, actionlint, shellcheck on `scripts/*.sh` and `tools/*.sh`, ruff on `scripts` and `tools`, `scripts/check-links.sh`, `scripts/fetch-fonts.sh --check`, `scripts/check-resource-collisions.py`, `scripts/check-runner-selection.py` and `scripts/check-verbatim.sh`. On a tag, it also makes sure that `CHANGELOG.md` has a section for the tag. |
 | `core-only` | `./gradlew --configure-on-demand :core:test` with only a JDK and the submodules. It does not run `setup.sh` and it hides the Android SDK of the runner. |
 | `build` | `setup.sh --prebuilt-only`, then `ciTest` (with `:ui:verifyRoborazziDebug`), the lint of `:app`, `:data` and `:ui`, the APK, the device test APKs of `:app` and `:data`, and `scripts/package-apk.py`. On a tag, it builds `release` (the APK and the bundle) and `releaseTest` and collects the native sources. |
 | `emulator` | After `build`, `checks` and `core-only` pass: the device checks on API 26, 29, 34 and 35 (x86_64 Google APIs images), with `scripts/ci-emulator-smoke.sh`. A push that already fails a cheap check starts no emulators; the push that fixes it runs them. If the emulator or adb fails before the tests start, the job does all the checks one more time on a new emulator. If a test fails, the job fails and does not try again. |
