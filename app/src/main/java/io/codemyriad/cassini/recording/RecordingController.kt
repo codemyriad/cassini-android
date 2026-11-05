@@ -79,6 +79,8 @@ class RecordingController(private val parts: Parts) {
         val serviceWaitMs: Long = 10_000,
         /** How often the policy loop renews the wake lock, in loop time (a paused recording also counts). */
         val wakeLockRenewMs: Long = 60_000,
+        /** How long a silence must last before it pauses the recording; a "not silenced" in that time cancels it. */
+        val silenceConfirmMs: Long = 250,
     )
 
     private enum class Stop { USER, SPACE, FILE_LIMIT, MICROPHONE }
@@ -101,6 +103,9 @@ class RecordingController(private val parts: Parts) {
     private var sinceWakeLockMs = 0L
     private var titleWrite: Job? = null
     private var silence: SilenceWatch? = null
+
+    /** The OTHER_APP pause that waits for [Timing.silenceConfirmMs]; a "not silenced" report cancels it. */
+    private var silenceCheck: Job? = null
     private var fallbackTitle = ""
 
     val state: StateFlow<RecordingState> = mutableState.asStateFlow()
@@ -196,6 +201,11 @@ class RecordingController(private val parts: Parts) {
     @VisibleForTesting
     internal suspend fun awaitPosted() = withContext(parts.dispatcher) {}
 
+    /** Tests: returns when the pending OTHER_APP pause has paused the recording or was cancelled. */
+    internal suspend fun awaitSilenceCheck() {
+        withContext(parts.dispatcher) { silenceCheck }?.join()
+    }
+
     // Start. ------------------------------------------------------------------------------------------------------
 
     @Suppress("TooGenericExceptionCaught") // every failure of the start ends in CouldNotStart and is cleaned up
@@ -255,6 +265,8 @@ class RecordingController(private val parts: Parts) {
     private suspend fun couldNotStart(noteId: String?) {
         silence?.close()
         silence = null
+        silenceCheck?.cancel()
+        silenceCheck = null
         capture?.release()
         capture = null
         parts.platform.releaseWakeLock()
@@ -330,12 +342,24 @@ class RecordingController(private val parts: Parts) {
         return if (measured > 0) measured else format.nominalBytesPerSecond
     }
 
+    /**
+     * A silence pauses the recording only when no "not silenced" report withdraws it within
+     * [Timing.silenceConfirmMs]. After a call, Android's first configuration of the resumed capture can still say
+     * silenced, and an update 1 ms later says it is not (pre-release gate of 0.4.0): that must not pause again. When
+     * the other app lets go of a confirmed silence, the recording stays paused until the user resumes (architecture
+     * 5.8).
+     */
     private fun onSilence(silenced: Boolean) {
-        // When the other app lets go, the recording stays paused until the user resumes (architecture 5.8).
+        silenceCheck?.cancel()
+        silenceCheck = null
         val mic = capture
         if (!silenced || mic == null || mic.paused) return
-        mic.togglePause()
-        update { it.copy(pause = RecordingPause.OTHER_APP, elapsedMs = mic.elapsedMs) }
+        silenceCheck = parts.scope.launch(parts.dispatcher) {
+            delay(timing.silenceConfirmMs)
+            if (capture !== mic || mic.paused) return@launch
+            mic.togglePause()
+            update { it.copy(pause = RecordingPause.OTHER_APP, elapsedMs = mic.elapsedMs) }
+        }
     }
 
     private fun scheduleTitle() {
@@ -359,6 +383,8 @@ class RecordingController(private val parts: Parts) {
         titleWrite = null
         silence?.close()
         silence = null
+        silenceCheck?.cancel()
+        silenceCheck = null
         val typed = title ?: current.title
         mutableState.value = RecordingState.Finishing(current.noteId, typed, mic.elapsedMs)
         var kept: String? = current.noteId

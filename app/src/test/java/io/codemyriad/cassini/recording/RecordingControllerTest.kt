@@ -75,7 +75,12 @@ class RecordingControllerTest {
                 }
             },
             consent = consent,
-            timing = RecordingController.Timing(tickMs = 10, serviceWaitMs = 2_000, wakeLockRenewMs = 50),
+            timing = RecordingController.Timing(
+                tickMs = 10,
+                serviceWaitMs = 2_000,
+                wakeLockRenewMs = 50,
+                silenceConfirmMs = 50,
+            ),
         )
         val config = AppGraph.Config(
             paths = paths,
@@ -285,6 +290,30 @@ class RecordingControllerTest {
         assertEquals("a user pause stays a user pause", RecordingPause.USER, activeState().pause)
     }
 
+    @Test fun oneResumeAfterACallKeepsRecording() = runBlocking {
+        // The pre-release gate of 0.4.0 (API 35): after the call, the first Resume restarted the capture, Android's
+        // first configuration of it still said silenced, and an update 1 ms later said it was not.
+        startRecording("Dopo la telefonata")
+        val mic = capture.latest
+        platform.watch.silence(true)
+        waitFor { activeState().pause == RecordingPause.OTHER_APP }
+        platform.watch.silence(false)
+        controller.resume()
+        waitFor { activeState().pause == null }
+
+        // Both reports wait behind a held policy tick, so they reach the recorder thread together, as from Android.
+        val hold = FakePlatform.Hold()
+        platform.hold = hold
+        assertTrue("a policy tick holds the recorder thread", hold.entered.await(TIMEOUT_MS, TimeUnit.MILLISECONDS))
+        platform.watch.silence(true)
+        platform.watch.silence(false)
+        hold.release.countDown()
+        controller.awaitPosted()
+        controller.awaitSilenceCheck()
+        assertNull("a silence withdrawn at once does not pause", activeState().pause)
+        assertFalse(mic.paused)
+    }
+
     // Failed starts. ------------------------------------------------------------------------------------------------
 
     @Test fun couldNotStartRemovesTheRow() = runBlocking {
@@ -475,6 +504,14 @@ class FakePlatform : RecordingPlatform {
 
     @Volatile lateinit var watch: FakeSilenceWatch
 
+    /** When set, the next [usableBytes] (on the recorder thread) signals [Hold.entered] and waits for [Hold.release]. */
+    @Volatile var hold: Hold? = null
+
+    class Hold {
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+    }
+
     /** False: the test runs RecordingService itself, which reports the foreground. */
     @Volatile var reportForeground = true
     val starts = AtomicInteger()
@@ -495,7 +532,18 @@ class FakePlatform : RecordingPlatform {
         wakeLockHeld = false
     }
 
-    override fun usableBytes(directory: File): Long = usable
+    override fun usableBytes(directory: File): Long {
+        hold?.let {
+            hold = null
+            it.entered.countDown()
+            it.release.await(HOLD_SECONDS, TimeUnit.SECONDS)
+        }
+        return usable
+    }
+
+    private companion object {
+        const val HOLD_SECONDS = 10L
+    }
 
     override fun watchSilence(capture: MicrophoneCapture, onSilenced: (Boolean) -> Unit): SilenceWatch =
         FakeSilenceWatch(onSilenced).also { watch = it }
