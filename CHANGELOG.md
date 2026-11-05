@@ -9,6 +9,7 @@ We made the entries for 0.0.1-beta to 0.1.0 again from the release notes of thes
 ### Fixed
 
 - After a phone call, one push on **Resume** continues the recording. Before, the recording could pause again at once with "Paused — another app is using audio", and only a second push continued it.
+- A note that plays, also in the background, goes on after a short sound of another app, for example a notification sound. Before, the note paused and did not play on. A pause, a seek or leaving the note in the meantime keeps it paused, and when another app takes the audio for good, the note still pauses.
 
 ## [0.4.0] - 2026-11-05
 

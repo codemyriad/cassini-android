@@ -40,8 +40,10 @@ data class PlaybackState(
  *   every jump, for the frame-accurate active word of the Note screen.
  * - The position is saved every 5 s while playing, and with `final = true` (which also stores the Library preview
  *   excerpt) on pause and on [leave].
- * - [play] requests AUDIOFOCUS_GAIN (USAGE_MEDIA, CONTENT_TYPE_SPEECH); a focus loss and ACTION_AUDIO_BECOMING_NOISY
- *   pause.
+ * - [play] requests AUDIOFOCUS_GAIN (USAGE_MEDIA, CONTENT_TYPE_SPEECH). AUDIOFOCUS_LOSS and
+ *   ACTION_AUDIO_BECOMING_NOISY pause and give the focus back. A transient loss (AUDIOFOCUS_LOSS_TRANSIENT, or
+ *   _CAN_DUCK, since speech pauses instead of ducking) pauses and keeps the request: AUDIOFOCUS_GAIN resumes, unless
+ *   the user paused, sought or left the note since.
  * - [reload] prepares the file again after a document replace and keeps the position.
  * - [playRange] plays a speaker sample, stops at its end and restores the previous position and play state. A pause,
  *   a focus loss or unplugged headphones during a sample restore the previous position and stay paused.
@@ -79,6 +81,9 @@ class PlaybackController(private val parts: Parts) {
     private var file: File? = null
     private var ticker: Job? = null
     private var sample: Sample? = null
+
+    /** A transient focus loss paused playback, and the focus request stays: AUDIOFOCUS_GAIN resumes it. */
+    private var resumeOnFocus = false
     private var lastSaved = 0L
     private var epoch = 0L
     private var speed = 1f
@@ -203,7 +208,9 @@ class PlaybackController(private val parts: Parts) {
     fun play() {
         val active = player ?: return
         if (active.playing) return
-        if (!parts.platform.requestFocus(::pause)) return
+        // Play during a transient loss: a new request, which takes the focus from the other app.
+        if (resumeOnFocus) release()
+        if (!parts.platform.requestFocus(::onFocusChange)) return
         parts.platform.watchNoisy(::pause)
         if (sample == null && active.positionMs >= active.durationMs) {
             active.seekTo(0)
@@ -216,8 +223,9 @@ class PlaybackController(private val parts: Parts) {
     }
 
     /**
-     * Pauses and saves the position (final). It is also the focus-loss and noisy callback. During a speaker sample,
-     * the sample ends, the previous position returns and playback stays paused.
+     * Pauses, saves the position (final) and gives the focus back. It is also the callback of AUDIOFOCUS_LOSS and of
+     * unplugged headphones, and it ends a transient pause, which then no longer resumes. During a speaker sample, the
+     * sample ends, the previous position returns and playback stays paused.
      */
     fun pause() {
         val active = player ?: return
@@ -237,6 +245,8 @@ class PlaybackController(private val parts: Parts) {
     /** Seeks to [positionMs]; during a sample, the sample is dropped and the previous position is not restored. */
     fun seekTo(positionMs: Long) {
         val active = player ?: return
+        // The user sought during a transient loss: the focus that comes back does not resume.
+        if (resumeOnFocus) release()
         sample = null
         active.seekTo(positionMs.coerceIn(0, active.durationMs))
         epoch++
@@ -375,6 +385,42 @@ class PlaybackController(private val parts: Parts) {
         if (interrupted) save(ended.restoreMs, final = true)
     }
 
+    private fun onFocusChange(change: FocusChange) {
+        when (change) {
+            FocusChange.LOST -> pause()
+            FocusChange.LOST_FOR_NOW -> pauseForNow()
+            FocusChange.GAINED -> resumeAfterFocus()
+        }
+    }
+
+    /**
+     * A transient focus loss: pauses and saves (final) but keeps the focus request, so that [resumeAfterFocus] plays
+     * on. During a speaker sample, or when nothing plays, it is a [pause].
+     */
+    private fun pauseForNow() {
+        val active = player ?: return
+        if (resumeOnFocus) return
+        if (sample != null || !active.playing) {
+            pause()
+            return
+        }
+        active.pause()
+        stopTicker()
+        resumeOnFocus = true
+        publish()
+        save(active.positionMs, final = true)
+    }
+
+    private fun resumeAfterFocus() {
+        val active = player ?: return
+        if (!resumeOnFocus) return
+        resumeOnFocus = false
+        active.play()
+        lastSaved = parts.clock()
+        startTicker()
+        publish()
+    }
+
     private fun startTicker() {
         if (ticker?.isActive == true) return
         ticker = parts.scope.launch(parts.main) {
@@ -420,8 +466,9 @@ class PlaybackController(private val parts: Parts) {
         )
     }
 
-    /** Gives back focus and stops watching for unplugged headphones. */
+    /** Gives back focus and stops watching for unplugged headphones; a transient pause no longer resumes. */
     private fun release() {
+        resumeOnFocus = false
         parts.platform.unwatchNoisy()
         parts.platform.abandonFocus()
     }
