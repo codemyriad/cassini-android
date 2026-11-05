@@ -6,6 +6,10 @@ We made the entries for 0.0.1-beta to 0.1.0 again from the release notes of thes
 
 ## [Unreleased]
 
+### Fixed
+
+- After a phone call, one push on **Resume** continues the recording. Before, the recording could pause again at once with "Paused — another app is using audio", and only a second push continued it.
+
 ## [0.4.0] - 2026-11-05
 
 The APK file of this release is `cassini-android-0.4.0.apk`. It operates on Android 8.0 or later, on a 64-bit ARM phone (`arm64-v8a`). The APK also has `x86_64` for emulators. Cassini talk 0.4.0 is a new app, `io.codemyriad.cassini`. It installs beside 0.3.0 (`org.cassini.android`) and does not update it. To keep a note of 0.3.0, save it there as a Cassini document (`.opus`) and open the file in the new app. Your saved voices and settings do not move. The new app downloads the models again (about 530 MB). Testers get the new app from the internal testing track of Google Play, signed with the same key as this APK. The release also has the native sources (`cassini-native-sources.tar`) and the notices. The APK has no models. After you agree, the app downloads them separately.

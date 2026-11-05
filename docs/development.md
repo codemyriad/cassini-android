@@ -605,7 +605,7 @@ CI does not do these checks. Before the owner makes a release tag, do them by ha
 1. On a Pixel 8 (API 37), record a note, transcribe it with speakers, name a speaker, export the note and transcribe it again.
 2. Play music in another app. Then start a recording. Make sure that the music continues and the recording does not pause.
 3. Start a recording on an emulator. Send a call with `adb emu gsm call 5551234`, then answer it with `adb emu gsm accept 5551234`. Make sure that the recording pauses and shows "Paused — another app is using audio". Android silences the recording only when the call is active, not while the phone rings.
-4. End the call with `adb emu gsm cancel 5551234`. Make sure that the recording stays paused until you push Resume.
+4. End the call with `adb emu gsm cancel 5551234`. Make sure that the recording stays paused until you push Resume, and that one push on Resume continues it.
 5. On an API 35 or 36 AVD, start a transcription. Make sure that `adb shell dumpsys activity services io.codemyriad.cassini` shows the type `mediaProcessing`.
 6. Make the time limit short with `adb shell device_config put activity_manager media_processing_fgs_timeout_duration 60000`.
 7. Wait for the limit. Make sure that the notification "Paused by Android" ("Paused at … of …. Open to resume.") shows and that the note shows Paused, not an error.
