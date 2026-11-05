@@ -22,7 +22,7 @@ concurrency:
 jobs:
   checks:
     name: Wrapper, detekt, actionlint, shellcheck, ruff, links, fonts and the verbatim diff
-    runs-on: ${{ vars.CM_RUNNER != '' && fromJSON(vars.CM_RUNNER) || 'ubuntu-24.04' }}
+    runs-on: ${{ vars.CM_RUNNER == 'hetzner' && !startsWith(github.ref, 'refs/tags/') && fromJSON('["self-hosted","cm-hetzner"]') || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -67,6 +67,8 @@ jobs:
         run: python3 -I scripts/check-resource-collisions.py
       - name: native.yml runs on every change to the native build's scripts
         run: python3 -I scripts/check-native-paths.py
+      - name: CM_RUNNER moves jobs only for "hetzner" and never on tags
+        run: python3 -I scripts/check-runner-selection.py
       # The release job publishes this section as the release notes. A tag without one fails here, so the release
       # job does not run. The build job does not wait for this job; the emulator jobs do (D66 AND-11).
       - name: CHANGELOG.md has a section for the tag
@@ -78,7 +80,7 @@ jobs:
   # The :core module needs only a JDK: no Android SDK, NDK, sherpa-onnx AAR or Opus source.
   core-only:
     name: Engine tests with a JDK alone
-    runs-on: ${{ vars.CM_RUNNER != '' && fromJSON(vars.CM_RUNNER) || 'ubuntu-24.04' }}
+    runs-on: ${{ vars.CM_RUNNER == 'hetzner' && !startsWith(github.ref, 'refs/tags/') && fromJSON('["self-hosted","cm-hetzner"]') || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -105,7 +107,9 @@ jobs:
           if-no-files-found: ignore
 
   build:
-    runs-on: ${{ vars.CM_RUNNER != '' && fromJSON(vars.CM_RUNNER) || 'ubuntu-24.04' }}
+    # CM_RUNNER=hetzner moves this job to the cm-hetzner runners, never on a tag: tag builds restore the release
+    # signing key (below) and only run GitHub-hosted. scripts/check-runner-selection.py checks every runs-on.
+    runs-on: ${{ vars.CM_RUNNER == 'hetzner' && !startsWith(github.ref, 'refs/tags/') && fromJSON('["self-hosted","cm-hetzner"]') || 'ubuntu-24.04' }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -52,7 +52,7 @@ concurrency:
 jobs:
   native:
     name: sherpa-onnx AAR from source
-    runs-on: ${{ vars.CM_RUNNER != '' && fromJSON(vars.CM_RUNNER) || 'ubuntu-24.04' }}
+    runs-on: ${{ vars.CM_RUNNER == 'hetzner' && !startsWith(github.ref, 'refs/tags/') && fromJSON('["self-hosted","cm-hetzner"]') || 'ubuntu-24.04' }}
     # About 2.3x the longest job seen (19.4 min in 65 runs; D66 AND-8).
     timeout-minutes: 45
     steps:
