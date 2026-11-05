@@ -1,6 +1,8 @@
 package io.codemyriad.cassini.flows
 
 import android.os.SystemClock
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -17,6 +19,7 @@ import io.codemyriad.cassini.background.Background
 import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.flows.Flows.backAfterOpenWith
+import io.codemyriad.cassini.flows.Flows.closeKeyboard
 import io.codemyriad.cassini.flows.Flows.import
 import io.codemyriad.cassini.flows.Flows.logScreen
 import io.codemyriad.cassini.flows.Flows.meetingDocument
@@ -45,7 +48,8 @@ import io.codemyriad.cassini.ui.R as UiR
  * from a `file://` copy in the scratch cache opens its note with the Library under it, and a second ACTION_VIEW of
  * the same file opens the same note; the row is Audio only (or Queued); search finds a spoken word of another note;
  * a long press opens the actions sheet, which closes the search keyboard; Move to trash shows the snackbar and Undo
- * restores the note.
+ * restores the note. The flow closes the search keyboard before the long press, so that its taps do not race the
+ * keyboard; [actionsOpenedWithTheSearchKeyboardStillMoveToTrash] opens the sheet with the keyboard up, as a user does.
  */
 @CiSmoke
 class LibraryFlowTest {
@@ -97,13 +101,15 @@ class LibraryFlowTest {
         rule.onNode(hasSetTextAction()).performTextReplacement("")
         rule.waitShown(row)
 
-        // Long press: the actions sheet; Move to trash, then Undo.
+        // Long press: the actions sheet; Move to trash, then Undo. The search field still has the keyboard, so close
+        // it first. A sheet opened over the keyboard stands above it and grows when it closes, and on a 16:9 screen
+        // Move to trash is below the visible part of the sheet: a tap there falls on the scrim and closes the sheet.
+        // Before API 30 the sheet's IME inset can read 0 while the keyboard still closes (API 26, #71), so the inset
+        // wait alone let the tap through too early.
+        rule.closeKeyboard()
         rule.onNode(row).performTouchInput { longClick() }
         val trash = rule.text(UiR.string.ui_action_move_to_trash)
         rule.waitText(trash)
-        // The search field still has the keyboard. Until the keyboard closes, the sheet stands above it, and on a 16:9
-        // screen Move to trash is below the visible part of the sheet: a tap there falls on the scrim and closes the
-        // sheet. A slow emulator keeps the keyboard open for more than a second after the sheet opens.
         rule.waitKeyboardClosed(hasText(trash))
         rule.onNodeWithText(trash).performScrollTo()
         val placement = rule.placementReport(hasText(trash))
@@ -114,7 +120,9 @@ class LibraryFlowTest {
             rule.waitFor("Move to trash did not trash the note; the tap missed? $placement") { row(CLIP_TITLE) == null }
         } catch (notTrashed: AssertionError) {
             rule.logScreen()
-            throw AssertionError("${notTrashed.message}; ${Flows.focusReport()}", notTrashed)
+            val keyboard = if (Flows.keyboardShown()) "shows" else "does not show"
+            val report = "${Flows.focusReport()}; the input method $keyboard the keyboard"
+            throw AssertionError("${notTrashed.message}; $report", notTrashed)
         }
         val trashedAt = SystemClock.elapsedRealtime()
         val moved = rule.text(UiR.string.ui_library_moved_to_trash, CLIP_TITLE)
@@ -129,8 +137,80 @@ class LibraryFlowTest {
         rule.waitShown(row)
     }
 
+    /**
+     * The user's path: search, then a long press while the search keyboard is still up. The sheet's window takes the
+     * focus, so the keyboard closes and the sheet grows to its full height. Once the input method no longer shows the
+     * keyboard, the sheet's window has no keyboard inset and Move to trash stays where it is across an idle frame, its
+     * tap must trash the note. The API 26 and 29 failures of [importSearchActionsTrashAndUndo] happened on this path
+     * (D66 AND-2): if this test fails, the app has a bug.
+     */
+    @Test fun actionsOpenedWithTheSearchKeyboardStillMoveToTrash() {
+        val showIme = Background.shell("settings get secure $SHOW_IME").trim()
+        Background.shell("settings put secure $SHOW_IME 1")
+        try {
+            runBlocking { import(meetingDocument(MEETING_TITLE)) }
+            val row = hasContentDescription(MEETING_TITLE, substring = true)
+            rule.waitShown(row)
+            rule.onNode(hasSetTextAction()).performClick()
+            rule.onNode(hasSetTextAction()).performTextInput("cominciam")
+            rule.waitForKeyboard("The search keyboard did not open") { Flows.keyboardShown() }
+            rule.waitShown(row)
+
+            rule.onNode(row).performTouchInput { longClick() }
+            val trash = rule.text(UiR.string.ui_action_move_to_trash)
+            rule.waitText(trash)
+            rule.waitForKeyboard("The actions sheet left the search keyboard open") { !Flows.keyboardShown() }
+            rule.waitKeyboardClosed(hasText(trash))
+            rule.onNodeWithText(trash).performScrollTo()
+            val settled = rule.settledBounds(hasText(trash))
+            val placement = rule.placementReport(hasText(trash))
+            rule.onNodeWithText(trash).performClick()
+            try {
+                rule.waitFor("Move to trash, settled at $settled, did not trash the note: $placement") {
+                    row(MEETING_TITLE) == null
+                }
+            } catch (notTrashed: AssertionError) {
+                rule.logScreen()
+                val keyboard = if (Flows.keyboardShown()) "shows" else "does not show"
+                val report = "${Flows.focusReport()}; the input method $keyboard the keyboard"
+                throw AssertionError("${notTrashed.message}; $report", notTrashed)
+            }
+            rule.waitText(rule.text(UiR.string.ui_library_moved_to_trash, MEETING_TITLE))
+        } finally {
+            val unset = showIme == "null" || showIme.isEmpty()
+            Background.shell(
+                if (unset) "settings delete secure $SHOW_IME" else "settings put secure $SHOW_IME $showIme",
+            )
+        }
+    }
+
+    /** [Flows.waitFor] whose failure also names the focused window, read when the wait fails. */
+    private fun AppRule.waitForKeyboard(message: String, condition: () -> Boolean) {
+        try {
+            waitFor(message) { condition() }
+        } catch (timeout: AssertionError) {
+            throw AssertionError("${timeout.message}; ${Flows.focusReport()}", timeout)
+        }
+    }
+
+    /** The bounds of [matcher]'s node once an idle sync no longer moves them; fails after [Flows.SCREEN_MS]. */
+    private fun AppRule.settledBounds(matcher: SemanticsMatcher): Rect {
+        val deadline = SystemClock.uptimeMillis() + Flows.SCREEN_MS
+        var before = onNode(matcher).fetchSemanticsNode().boundsInWindow
+        while (true) {
+            waitForIdle()
+            val now = onNode(matcher).fetchSemanticsNode().boundsInWindow
+            if (now == before) return now
+            assertTrue("${matcher.description} still moves: $before, then $now", SystemClock.uptimeMillis() < deadline)
+            before = now
+        }
+    }
+
     private companion object {
         const val CLIP_TITLE = "fleurs-it-short"
         const val MEETING_TITLE = "Riunione"
+
+        /** The soft keyboard opens also on an emulator with a hardware keyboard, as in SheetAndDraftDeviceTest. */
+        const val SHOW_IME = "show_ime_with_hard_keyboard"
     }
 }

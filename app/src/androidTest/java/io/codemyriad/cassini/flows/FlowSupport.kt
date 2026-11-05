@@ -26,6 +26,7 @@ import androidx.core.content.FileProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
+import androidx.test.espresso.Espresso
 import androidx.test.platform.app.InstrumentationRegistry
 import io.codemyriad.cassini.BuildConfig
 import io.codemyriad.cassini.MainActivity
@@ -148,6 +149,22 @@ internal object Flows {
                 (insets?.getInsets(WindowInsetsCompat.Type.ime())?.bottom ?: 0) == 0
             }
         }
+    }
+
+    /**
+     * Whether the input method service shows the keyboard now. Before API 30 the IME inset of a window is an estimate
+     * (WindowInsetsCompat), and a sheet's window read 0 while the keyboard was still closing (D66 AND-2, #71 on API
+     * 26); the service knows on every API level.
+     */
+    fun keyboardShown(): Boolean {
+        val report = Background.shell("dumpsys input_method")
+        return "mInputShown=true" in report || "isInputViewShown=true" in report
+    }
+
+    /** Closes the keyboard (Espresso waits for the input method's answer) and waits until the service hides it. */
+    fun AppRule.closeKeyboard(timeoutMs: Long = SCREEN_MS) {
+        Espresso.closeSoftKeyboard()
+        waitFor("The input method still shows the keyboard", timeoutMs) { !keyboardShown() }
     }
 
     /**
