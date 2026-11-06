@@ -141,7 +141,7 @@ class ScreenAccessibilityTest {
             tone = SpeakerTone.Teal,
             startMs = 11 * MINUTE + 41 * SECOND,
             auto = true,
-            words = words("Sì, quattrocento. Il problema è la seconda consegna.", 11 * MINUTE + 41 * SECOND),
+            words = words("Yes, four hundred. The problem is the second delivery.", 11 * MINUTE + 41 * SECOND),
         )
         val speaker3 = TurnUi(
             id = "t3",

@@ -93,11 +93,11 @@ class CassiniDocumentSetDefaultTest {
         val notes = JSONArray().put(JSONObject().put("text", "Ricorda"))
         val x = JSONObject().put("gocassini.com", JSONObject().put("notes", notes))
             .put("codemyriad.io", JSONObject().put("future", JSONObject().put("kept", 1)))
-        val words = Transcript(listOf(Word("s1", 0, 20, "Ciao")), "und")
+        val words = Transcript(listOf(Word("s1", 0, 20, "Hello")), "und")
         val first = File(folder.root, "first.opus")
         val one = CassiniDocument.create(audio, words, "Note", JSONObject(), null, emptyMap(), first, x)
         val second = File(folder.root, "second.opus")
-        val again = Transcript(listOf(Word("s1", 0, 20, "Salve")), "und")
+        val again = Transcript(listOf(Word("s1", 0, 20, "Hi")), "und")
         val two = CassiniDocument.create(first, again, "Note", JSONObject(), one, emptyMap(), second)
         assertEquals(two.variants[1].id, two.defaultId)
 

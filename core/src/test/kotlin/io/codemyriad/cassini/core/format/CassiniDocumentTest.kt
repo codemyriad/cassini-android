@@ -31,12 +31,12 @@ class CassiniDocumentTest {
             listOf(byteArrayOf(-8, -1, -2)), 960, true), CassiniDocument.tagsPacket(listOf("X_CUSTOM=keep=me")))
     }
     @Test fun retiredAsrProvenanceSurvivesAnInt8Retranscription() {
-        val transcript = Transcript(listOf(Word("spk_1", 0, 20, "Prima.")), "it")
+        val transcript = Transcript(listOf(Word("spk_1", 0, 20, "Before.")), "it")
         val provenance = JSONObject().put("model", "nvidia/parakeet-tdt-0.6b-v3 FP32")
             .put("x-segmentation", "live 5 s steps with 1 s recorded overlap, 0.5 s synthetic tail, seams spliced at an aligned word")
         val bytes = CassiniDocument.create(silence(), transcript, "Old live note", provenance)
         val original = CassiniDocument.read(bytes)
-        val nextBytes = CassiniDocument.create(bytes, transcript.copy(words = listOf(Word("spk_1", 0, 20, "Dopo."))),
+        val nextBytes = CassiniDocument.create(bytes, transcript.copy(words = listOf(Word("spk_1", 0, 20, "After."))),
             "Ignored", JSONObject().put("model", "nvidia/parakeet-tdt-0.6b-v3 INT8"), original)
         val next = CassiniDocument.read(nextBytes)
         assertEquals("ok", next.state)
@@ -47,7 +47,7 @@ class CassiniDocumentTest {
         assertEquals(OggOpus.read(bytes).digest(), OggOpus.read(nextBytes).digest())
     }
     @Test fun newDocumentSealsAudioAndAppendedVariantPreservesExtensions() {
-        val transcript = Transcript(listOf(Word("spk_1", 0, 20, "Ciao")), "it")
+        val transcript = Transcript(listOf(Word("spk_1", 0, 20, "Hi")), "it")
         val bytes = CassiniDocument.create(silence(), transcript, "Italian sample", JSONObject().put("engine", "sherpa-onnx"))
         val original = CassiniDocument.read(bytes)
         assertEquals("ok", original.state); assertEquals(transcript, original.selected(null)?.transcript)
@@ -73,7 +73,7 @@ class CassiniDocumentTest {
     }
     private fun tags(doc: CassiniDocument, filter: (String) -> Boolean) = doc.comments.filter { filter(it.substringBefore('=')) }
     @Test fun relabelChangesOnlyTheLabels() {
-        val transcript = Transcript(listOf(Word("spk_1", 0, 20, "Ciao"), Word("spk_2", 20, 40, "Salve")), "it")
+        val transcript = Transcript(listOf(Word("spk_1", 0, 20, "Hi"), Word("spk_2", 20, 40, "Hi")), "it")
         val bytes = CassiniDocument.create(silence(), transcript, "Two", JSONObject().put("engine", "sherpa-onnx"))
         val base = CassiniDocument.read(bytes)
         base.manifest!!.put("x", JSONObject().put("keep", true)).getJSONArray("speakers").getJSONObject(0).put("pronouns", "she")
@@ -93,7 +93,7 @@ class CassiniDocumentTest {
         assertEquals(before.manifest.toString(), after.manifest.toString())
     }
     @Test fun relabelRejectsUnknownSpeakersAndBlankLabels() {
-        val bytes = CassiniDocument.create(silence(), Transcript(listOf(Word("spk_1", 0, 20, "Ciao")), "it"), "One", JSONObject())
+        val bytes = CassiniDocument.create(silence(), Transcript(listOf(Word("spk_1", 0, 20, "Hi")), "it"), "One", JSONObject())
         for (labels in listOf(mapOf("spk_9" to "Anna"), mapOf("spk_1" to "  "))) {
             try { relabelled(bytes, labels); fail("$labels") } catch (_: IllegalArgumentException) {}
         }

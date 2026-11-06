@@ -234,8 +234,8 @@ class NoticeCenterTest {
         val loading = LibraryFacts(loading = true)
         assertTrue("no empty banner while loading", Notices.library(NoticeFacts(), loading).isEmpty())
         assertEquals(
-            BannerSpec(BannerKind.LIB_NO_MATCH, BannerArgs(text = "fattura")),
-            only(Notices.library(NoticeFacts(), LibraryFacts(liveNotes = 0, query = " fattura ", results = 0))),
+            BannerSpec(BannerKind.LIB_NO_MATCH, BannerArgs(text = "invoice")),
+            only(Notices.library(NoticeFacts(), LibraryFacts(liveNotes = 0, query = " invoice ", results = 0))),
         )
         assertTrue(Notices.library(NoticeFacts(), LibraryFacts(liveNotes = 3, query = "x", results = null)).isEmpty())
 

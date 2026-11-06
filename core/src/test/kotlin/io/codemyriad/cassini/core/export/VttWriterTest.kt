@@ -4,27 +4,27 @@ import org.junit.Test
 
 class VttWriterTest {
     @Test fun oneSpeakerHasNoVoiceSpan() {
-        val words = said("spk_0", 1_000, "Prova uno due tre.")
+        val words = said("spk_0", 1_000, "Test one two three.")
         val vtt = VttWriter.write(transcript(words))
-        assertExport("WEBVTT\n\n00:00:01.000 --> 00:00:02.500\nProva uno due tre.\n", vtt)
+        assertExport("WEBVTT\n\n00:00:01.000 --> 00:00:02.500\nTest one two three.\n", vtt)
     }
 
     @Test fun manySpeakersWrapEveryCue() {
-        val words = said("spk_0", 0, "Allora, la consegna slitta?") +
-            said("spk_1", 1_800, "Sì, a giovedì.") +
-            said("spk_1", 4_400, "Il camion è già partito.")
+        val words = said("spk_0", 0, "So, the delivery slips?") +
+            said("spk_1", 1_800, "Yes, on Thursday.") +
+            said("spk_1", 4_400, "The truck has already left.")
         assertExport(
             """
             |WEBVTT
             |
             |00:00:00.000 --> 00:00:01.500
-            |<v Paolo>Allora, la consegna slitta?</v>
+            |<v Paolo>So, the delivery slips?</v>
             |
             |00:00:01.800 --> 00:00:02.900
-            |<v Speaker 2>Sì, a giovedì.</v>
+            |<v Speaker 2>Yes, on Thursday.</v>
             |
             |00:00:04.400 --> 00:00:06.300
-            |<v Speaker 2>Il camion è già partito.</v>
+            |<v Speaker 2>The truck has already left.</v>
             |
             """.trimMargin(),
             VttWriter.write(transcript(words)),
@@ -32,10 +32,10 @@ class VttWriterTest {
     }
 
     @Test fun twoLinesStayInsideOneSpan() {
-        val words = said("spk_0", 0, "Abbiamo deciso che la data è giusta, ma prima di chiudere", stepMs = 300) +
+        val words = said("spk_0", 0, "We agreed that the date is right, but before closing", stepMs = 300) +
             said("spk_1", 4_000, "Ok")
         assertExport(
-            "WEBVTT\n\n00:00:00.000 --> 00:00:03.200\n<v Paolo>Abbiamo deciso che la data è\ngiusta, ma prima di chiudere</v>\n\n" +
+            "WEBVTT\n\n00:00:00.000 --> 00:00:02.900\n<v Paolo>We agreed that the date is\nright, but before closing</v>\n\n" +
                 "00:00:04.000 --> 00:00:05.000\n<v Speaker 2>Ok</v>\n",
             VttWriter.write(transcript(words)),
         )

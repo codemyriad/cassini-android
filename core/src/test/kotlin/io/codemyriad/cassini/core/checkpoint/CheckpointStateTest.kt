@@ -25,7 +25,7 @@ class CheckpointStateTest {
     @get:Rule val folder = TemporaryFolder()
 
     private val prefix = "diar_0123_"
-    private val words = listOf(Word("${prefix}1", 1308, 1548, "La"), Word("${prefix}1", 1548, 1788, "parte"))
+    private val words = listOf(Word("${prefix}1", 1308, 1548, "La"), Word("${prefix}1", 1548, 1788, "part"))
 
     /** A job stopped after its first 28 s window over [source], with the files a checkpoint directory holds. */
     private inner class Job {

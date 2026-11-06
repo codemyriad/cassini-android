@@ -14,31 +14,31 @@ class SubtitleCuesTest {
     }
 
     @Test fun rule1SpeakerChange() {
-        assertEquals(listOf("Sì Bene"), texts(listOf(w("spk_0", 0, 400, "Sì"), w("spk_0", 500, 900, "Bene"))))
-        assertEquals(listOf("Sì", "Bene"), texts(listOf(w("spk_0", 0, 400, "Sì"), w("spk_1", 500, 900, "Bene"))))
+        assertEquals(listOf("Yes Good"), texts(listOf(w("spk_0", 0, 400, "Yes"), w("spk_0", 500, 900, "Good"))))
+        assertEquals(listOf("Yes", "Good"), texts(listOf(w("spk_0", 0, 400, "Yes"), w("spk_1", 500, 900, "Good"))))
     }
 
     @Test fun rule2PauseOfAtLeast1500Ms() {
-        assertEquals(listOf("uno due"), texts(listOf(w("spk_0", 0, 400, "uno"), w("spk_0", 1899, 2300, "due"))))
-        assertEquals(listOf("uno", "due"), texts(listOf(w("spk_0", 0, 400, "uno"), w("spk_0", 1900, 2300, "due"))))
+        assertEquals(listOf("one two"), texts(listOf(w("spk_0", 0, 400, "one"), w("spk_0", 1899, 2300, "two"))))
+        assertEquals(listOf("one", "two"), texts(listOf(w("spk_0", 0, 400, "one"), w("spk_0", 1900, 2300, "two"))))
     }
 
     @Test fun rule3CueLongerThan6000Ms() {
-        assertEquals(listOf("uno due"), texts(listOf(w("spk_0", 0, 5000, "uno"), w("spk_0", 5000, 6000, "due"))))
-        assertEquals(listOf("uno", "due"), texts(listOf(w("spk_0", 0, 5000, "uno"), w("spk_0", 5000, 6001, "due"))))
+        assertEquals(listOf("one two"), texts(listOf(w("spk_0", 0, 5000, "one"), w("spk_0", 5000, 6000, "two"))))
+        assertEquals(listOf("one", "two"), texts(listOf(w("spk_0", 0, 5000, "one"), w("spk_0", 5000, 6001, "two"))))
     }
 
     @Test fun rule4TextLongerThan84() {
-        val eleven = List(11) { "parola" }.joinToString(" ")
-        val fits = said("spk_0", 0, "$eleven settimo x", stepMs = 100)
-        assertEquals(listOf("$eleven settimo", "x"), texts(fits))
+        val eleven = List(11) { "sample" }.joinToString(" ")
+        val fits = said("spk_0", 0, "$eleven seventh x", stepMs = 100)
+        assertEquals(listOf("$eleven seventh", "x"), texts(fits))
         assertEquals(84, texts(fits).first().length)
-        val over = said("spk_0", 0, "$eleven ottavo_8", stepMs = 100)
-        assertEquals(listOf(eleven, "ottavo_8"), texts(over))
+        val over = said("spk_0", 0, "$eleven eighth_8", stepMs = 100)
+        assertEquals(listOf(eleven, "eighth_8"), texts(over))
     }
 
     @Test fun rule4CountsTheSrtPrefixOfASpeakersFirstCue() {
-        val eleven = List(11) { "parola" }.joinToString(" ")
+        val eleven = List(11) { "sample" }.joinToString(" ")
         // "Paolo: " (7) + 76 + " x" would be 85 characters.
         val words = said("spk_0", 0, "$eleven x", stepMs = 100) + w("spk_1", 3000, 3300, "Ok")
         assertEquals(listOf("$eleven x", "Ok"), texts(words, srt = false))
@@ -48,19 +48,19 @@ class SubtitleCuesTest {
     }
 
     @Test fun rule4WithOneSpeakerHasNoPrefixBudget() {
-        val eleven = List(11) { "parola" }.joinToString(" ")
+        val eleven = List(11) { "sample" }.joinToString(" ")
         val one = cues(said("spk_0", 0, "$eleven x", stepMs = 100), srt = true)
         assertEquals(listOf("$eleven x"), one.map { it.text })
         assertEquals("", one.single().prefix)
     }
 
     @Test fun rule5SentenceEndOnceTheCueLasts1500Ms() {
-        assertEquals(listOf("Sì. Bene"), texts(listOf(w("spk_0", 0, 1499, "Sì."), w("spk_0", 1499, 1800, "Bene"))))
+        assertEquals(listOf("Yes. Good"), texts(listOf(w("spk_0", 0, 1499, "Yes."), w("spk_0", 1499, 1800, "Good"))))
         for (end in listOf(".", "?", "!", "…", "。", "？", "！")) {
-            val words = listOf(w("spk_0", 0, 1500, "Sì$end"), w("spk_0", 1500, 1800, "Bene"))
-            assertEquals(end, listOf("Sì$end", "Bene"), texts(words))
+            val words = listOf(w("spk_0", 0, 1500, "Yes$end"), w("spk_0", 1500, 1800, "Good"))
+            assertEquals(end, listOf("Yes$end", "Good"), texts(words))
         }
-        assertEquals(listOf("Sì, Bene"), texts(listOf(w("spk_0", 0, 1600, "Sì,"), w("spk_0", 1600, 1800, "Bene"))))
+        assertEquals(listOf("Yes, Good"), texts(listOf(w("spk_0", 0, 1600, "Yes,"), w("spk_0", 1600, 1800, "Good"))))
     }
 
     @Test fun shortCuesLastOneSecond() {
@@ -71,49 +71,49 @@ class SubtitleCuesTest {
 
     @Test fun theMinimumStopsAtTheSameSpeakersNextCue() {
         // Rule 3 splits the two words; the second starts 600 ms after the first.
-        val split = cues(listOf(w("spk_0", 0, 200, "Ok"), w("spk_0", 600, 6700, "lunghissima")))
+        val split = cues(listOf(w("spk_0", 0, 200, "Ok"), w("spk_0", 600, 6700, "lengthyword")))
         assertEquals(listOf(0L to 600L, 600L to 6700L), split.map { it.startMs to it.endMs })
         // The next cue after a pause leaves the full second.
-        val pause = cues(listOf(w("spk_0", 0, 200, "Ok"), w("spk_0", 1700, 1900, "Bene")))
+        val pause = cues(listOf(w("spk_0", 0, 200, "Ok"), w("spk_0", 1700, 1900, "Good")))
         assertEquals(listOf(0L to 1000L, 1700L to 2700L), pause.map { it.startMs to it.endMs })
     }
 
     @Test fun differentSpeakersMayOverlap() {
-        val overlap = cues(listOf(w("spk_0", 0, 200, "Ok"), w("spk_1", 300, 700, "Sì")))
+        val overlap = cues(listOf(w("spk_0", 0, 200, "Ok"), w("spk_1", 300, 700, "Yes")))
         assertEquals(listOf(0L to 1000L, 300L to 1300L), overlap.map { it.startMs to it.endMs })
     }
 
     @Test fun cuesAreSortedWhileWordsKeepCanonicalOrder() {
         val words = listOf(
-            w("spk_0", 5000, 5400, "seconda"),
-            w("spk_0", 4900, 5600, "frase"),
-            w("spk_1", 1000, 1400, "prima"),
-            w("spk_1", 1500, 1900, "parte"),
+            w("spk_0", 5000, 5400, "second"),
+            w("spk_0", 4900, 5600, "phrase"),
+            w("spk_1", 1000, 1400, "first"),
+            w("spk_1", 1500, 1900, "part"),
         )
         val sorted = cues(words)
-        assertEquals(listOf("prima parte", "seconda frase"), sorted.map { it.text })
+        assertEquals(listOf("first part", "second phrase"), sorted.map { it.text })
         assertEquals(listOf(1000L to 2000L, 5000L to 6000L), sorted.map { it.startMs to it.endMs })
     }
 
     @Test fun equalStartsKeepCanonicalOrder() {
-        val words = listOf(w("spk_1", 1000, 1400, "uno"), w("spk_0", 1000, 1400, "due"))
-        assertEquals(listOf("uno", "due"), texts(words))
+        val words = listOf(w("spk_1", 1000, 1400, "one"), w("spk_0", 1000, 1400, "two"))
+        assertEquals(listOf("one", "two"), texts(words))
     }
 
     @Test fun srtPrefixFollowsOutputOrder() {
         // Canonical order: Speaker 2, then Paolo twice (a pause splits Paolo). Sorted: Paolo, Speaker 2, Paolo.
         val words = listOf(
-            w("spk_1", 1000, 1400, "Allora"),
-            w("spk_0", 0, 300, "Io"),
-            w("spk_0", 400, 700, "direi"),
-            w("spk_0", 2500, 2900, "comunque"),
-            w("spk_0", 4500, 4900, "basta"),
+            w("spk_1", 1000, 1400, "So"),
+            w("spk_0", 0, 300, "I"),
+            w("spk_0", 400, 700, "suggest"),
+            w("spk_0", 2500, 2900, "anyway"),
+            w("spk_0", 4500, 4900, "enough"),
         )
         val srt = cues(words, srt = true)
-        assertEquals(listOf("Io direi", "Allora", "comunque", "basta"), srt.map { it.text })
+        assertEquals(listOf("I suggest", "So", "anyway", "enough"), srt.map { it.text })
         assertEquals(listOf("Paolo: ", "Speaker 2: ", "Paolo: ", ""), srt.map { it.prefix })
         assertEquals(
-            listOf("Paolo: Io direi", "Speaker 2: Allora", "Paolo: comunque", "basta"),
+            listOf("Paolo: I suggest", "Speaker 2: So", "Paolo: anyway", "enough"),
             srt.map { it.lines.single() },
         )
     }
@@ -124,10 +124,10 @@ class SubtitleCuesTest {
     }
 
     @Test fun longTextIsBalancedOnTwoLines() {
-        // 71 characters; the spaces at 28, 36 and 39 give two lines of at most 42, and 36 gives 36 + 34.
-        val text = "Abbiamo deciso che la data è giusta, ma prima di chiudere servono firme"
+        // The balanced split keeps both English lines within 42 characters.
+        val text = "We agreed that the date is right, but we still need signatures to finish"
         assertEquals(
-            listOf("Abbiamo deciso che la data è giusta,", "ma prima di chiudere servono firme"),
+            listOf("We agreed that the date is right, but", "we still need signatures to finish"),
             SubtitleCues.lines(text),
         )
         // The spaces at 20 and 22 of 43 characters balance equally (20 + 22, 22 + 20): the shorter first line wins.
@@ -138,7 +138,7 @@ class SubtitleCuesTest {
 
     @Test fun withoutABalancedSplitTheLastSpaceWithin42Wins() {
         val long = "x".repeat(45)
-        assertEquals(listOf("Il codice è", long), SubtitleCues.lines("Il codice è $long"))
+        assertEquals(listOf("The code is", long), SubtitleCues.lines("The code is $long"))
         val giant = "y".repeat(50)
         assertEquals(listOf(giant, "e poi"), SubtitleCues.lines("$giant e poi"))
         assertEquals(listOf("z".repeat(90)), SubtitleCues.lines("z".repeat(90)))

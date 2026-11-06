@@ -24,9 +24,9 @@ internal object TranscriptFixtures {
         692_000,
     )
 
-    /** Board 03's second turn; word 8 is "quindi", the active word. */
+    /** Board 03's second turn; word 8 is "so", the active word. */
     val paolo = words(
-        "Sì, quattrocento. Il problema è la seconda consegna: quindi la consegna slitta a giovedì, but the price " +
+        "Yes, four hundred. It's the second delivery problem: so the delivery slips to Thursday, but the price " +
             "stays as agreed in the March order.",
         701_000,
     )
@@ -49,7 +49,7 @@ internal object TranscriptFixtures {
 
     /** Board 02's last paragraph; from word 9 on the words are unsettled. */
     val draftAfterCard = words(
-        "Va bene, però allora dobbiamo avvisare il supporto entro venerdì, otherwise they'll get the tickets " +
+        "All right, but we must notify support by Friday, otherwise they'll get the tickets " +
             "before the",
         1_745_000,
     )

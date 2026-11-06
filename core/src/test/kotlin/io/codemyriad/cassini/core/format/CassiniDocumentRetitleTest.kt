@@ -15,7 +15,7 @@ class CassiniDocumentRetitleTest {
     @get:Rule val folder = TemporaryFolder()
 
     private val transcript = Transcript(
-        listOf(Word("spk_1", 0, 20, "Ciao"), Word("spk_2", 20, 40, "Salve")),
+        listOf(Word("spk_1", 0, 20, "Hello"), Word("spk_2", 20, 40, "Hi")),
         "it",
     )
 
@@ -28,7 +28,7 @@ class CassiniDocumentRetitleTest {
 
     private fun document(
         sourceTags: List<String> = listOf("X_CUSTOM=keep=me", "ARTIST=Anna"),
-        title: String = "Riunione",
+        title: String = "Meeting",
     ): File {
         val processing = JSONObject().put("engine", "sherpa-onnx")
         val bytes = CassiniDocument.create(silence(sourceTags), transcript, title, processing)
@@ -46,12 +46,12 @@ class CassiniDocumentRetitleTest {
     @Test fun theTitleChangesInTheManifestAndTheTag() {
         val source = document()
         val before = CassiniDocument.read(source)
-        assertEquals(listOf("TITLE=Riunione"), titleTags(before))
-        val after = retitle(source, "Standup del lunedì")
+        assertEquals(listOf("TITLE=Meeting"), titleTags(before))
+        val after = retitle(source, "Monday standup")
         assertEquals("ok", after.state)
         assertTrue(after.warnings.isEmpty())
-        assertEquals("Standup del lunedì", after.title)
-        assertEquals(listOf("TITLE=Standup del lunedì"), titleTags(after))
+        assertEquals("Monday standup", after.title)
+        assertEquals(listOf("TITLE=Monday standup"), titleTags(after))
     }
 
     @Test fun theAudioAndItsDigestAreUnchanged() {
@@ -143,7 +143,7 @@ class CassiniDocumentRetitleTest {
         val python = listOf("python3").firstOrNull { command ->
             runCatching { ProcessBuilder(command, "--version").start().waitFor() == 0 }.getOrDefault(false)
         } ?: return assumeTrue("SKIPPED: no python3 on PATH, so the independent reader check did not run", false)
-        retitle(document(), "Verifica è fatta")
+        retitle(document(), "Check is done")
         val process = ProcessBuilder(python, "-I", "-X", "utf8", tool.path, File(folder.root, "target.opus").path)
             .redirectErrorStream(true)
             .start()
@@ -152,9 +152,9 @@ class CassiniDocumentRetitleTest {
         val lines = output.lines()
         // The metadata profile verifies every payload digest but never the audio, so its best state is unverified.
         assertEquals(output, "state: unverified", lines[0])
-        assertTrue(output, lines[1].startsWith("Verifica è fatta - "))
-        assertTrue(output, lines.any { Regex("""\s+0 ms\s+spk_1\s+Ciao""").matches(it) })
-        assertTrue(output, lines.any { Regex("""\s+20 ms\s+spk_2\s+Salve""").matches(it) })
+        assertTrue(output, lines[1].startsWith("Check is done - "))
+        assertTrue(output, lines.any { Regex("""\s+0 ms\s+spk_1\s+Hello""").matches(it) })
+        assertTrue(output, lines.any { Regex("""\s+20 ms\s+spk_2\s+Hi""").matches(it) })
     }
 
     @Test fun aRetitledDocumentReadsBackAndRelabels() {

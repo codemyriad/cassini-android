@@ -94,12 +94,12 @@ internal val SPEAKERS = listOf(
 )
 
 internal val WORDS = listOf(
-    WordEntity(NOTE, "v1", 0, 0, 400, "a", "Ciao"),
-    WordEntity(NOTE, "v1", 1, 500, 900, "a", "giovedì"),
-    WordEntity(NOTE, "v1", 2, 1_000, 1_400, "b", "Buongiorno"),
-    WordEntity(NOTE, "v1", 3, 2_000, 2_300, "c", "Eccomi,"),
-    WordEntity(NOTE, "v1", 4, 2_400, 2_900, "c", "giovedi"),
-    WordEntity(NOTE, "v1", 5, 3_000, 3_900, "a", "bene."),
+    WordEntity(NOTE, "v1", 0, 0, 400, "a", "Hello"),
+    WordEntity(NOTE, "v1", 1, 500, 900, "a", "café"),
+    WordEntity(NOTE, "v1", 2, 1_000, 1_400, "b", "Morning"),
+    WordEntity(NOTE, "v1", 3, 2_000, 2_300, "c", "Here,"),
+    WordEntity(NOTE, "v1", 4, 2_400, 2_900, "c", "cafe"),
+    WordEntity(NOTE, "v1", 5, 3_000, 3_900, "a", "good."),
 )
 
 internal fun job(state: JobState, kind: JobKind = JobKind.TRANSCRIBE, doneMs: Long = 0, failure: String? = null) =

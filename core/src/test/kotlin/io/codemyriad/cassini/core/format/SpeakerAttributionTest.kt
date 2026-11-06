@@ -8,7 +8,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SpeakerAttributionTest {
-    private val source = Transcript(listOf(Word("spk_1", 0, 10, "Ciao"), Word("spk_1", 10, 20, "mondo.")), "it")
+    private val source = Transcript(listOf(Word("spk_1", 0, 10, "Hello"), Word("spk_1", 10, 20, "world.")), "it")
     private val turns = listOf(SpeakerTurn(0, 10, 3), SpeakerTurn(10, 20, 9))
     private fun silence(): ByteArray {
         val head = "OpusHead".toByteArray() + byteArrayOf(1, 1, 0, 0, -128, -69, 0, 0, 0, 0, 0)

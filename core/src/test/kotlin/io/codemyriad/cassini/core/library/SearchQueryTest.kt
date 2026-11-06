@@ -18,22 +18,22 @@ class SearchQueryTest {
     }
 
     @Test fun golden() {
-        assertEquals("\"consegna*\" \"giov*\"", fts("consegna giov"))
+        assertEquals("\"delivery*\" \"caf*\"", fts("delivery caf"))
     }
 
     @Test fun quotesAndStarsAreDropped() {
-        assertEquals("\"consegna*\" \"giov*\"", fts("\"consegna giov\""))
-        assertEquals("\"cons*\"", fts("cons*"))
-        assertEquals("\"cons*\"", fts("*cons**"))
-        assertEquals("\"consegna*\"", fts("consegna \" *"))
+        assertEquals("\"delivery*\" \"caf*\"", fts("\"delivery caf\""))
+        assertEquals("\"deli*\"", fts("deli*"))
+        assertEquals("\"deli*\"", fts("*deli**"))
+        assertEquals("\"delivery*\"", fts("delivery \" *"))
     }
 
     @Test fun ftsOperatorsAreDropped() {
-        assertEquals("\"inizio*\"", fts("^inizio"))
-        assertEquals("\"body prezzo*\"", fts("body:prezzo"))
+        assertEquals("\"start*\"", fts("^start"))
+        assertEquals("\"body price*\"", fts("body:price"))
         assertEquals("\"a*\" \"b*\"", fts("(a) (b)"))
-        assertEquals("\"prezzo*\"", fts("-prezzo"))
-        assertEquals("\"con segna*\"", fts("con*segna"))
+        assertEquals("\"price*\"", fts("-price"))
+        assertEquals("\"del ivery*\"", fts("del*ivery"))
         assertNull(fts("-- : () ^ \"\" *"))
     }
 
@@ -41,15 +41,15 @@ class SearchQueryTest {
         // unicode61 indexes "e-mail" as the tokens "e" and "mail", so the phrase must have the same two tokens.
         assertEquals("\"e mail*\" \"follow*\" \"up*\"", fts("e-mail follow- -up"))
         assertEquals("\"follow up*\"", fts("follow-up"))
-        assertEquals("\"l ordine*\"", fts("l'ordine"))
+        assertEquals("\"it s*\"", fts("it's"))
         assertEquals("\"snake case*\"", fts("snake_case"))
     }
 
     @Test fun trailingPunctuationKeepsThePrefixMatch() {
-        // "consegn,*" would end the phrase on a comma: the star would not follow a token and match only "consegn".
-        assertEquals("\"consegn*\"", fts("consegn,"))
-        assertEquals("\"giov*\"", fts("giov."))
-        assertEquals("\"davvero*\"", fts("¿davvero?!"))
+        // "deliver,*" would end the phrase on a comma: the star would not follow a token and match only "deliver".
+        assertEquals("\"deliver*\"", fts("deliver,"))
+        assertEquals("\"caf*\"", fts("caf."))
+        assertEquals("\"really*\"", fts("¿really?!"))
     }
 
     @Test fun combiningMarksStayInTheirToken() {
@@ -65,7 +65,7 @@ class SearchQueryTest {
 
     @Test fun accentsAndCaseAreKept() {
         // The unicode61 tokenizer with remove_diacritics=1 folds them; the query keeps what was typed.
-        assertEquals("\"giovedì*\" \"CONSEGNA*\"", fts("giovedì CONSEGNA"))
+        assertEquals("\"café*\" \"DELIVERY*\"", fts("café DELIVERY"))
         assertEquals("\"Élodie*\"", fts("Élodie"))
     }
 
@@ -80,46 +80,46 @@ class SearchQueryTest {
     }
 
     @Test fun termsWithoutLettersOrDigitsAreDropped() {
-        // FTS4 matches nothing when one phrase has no token, so "consegna ," would find nothing.
-        assertEquals("\"consegna*\"", fts("consegna , … ?!"))
+        // FTS4 matches nothing when one phrase has no token, so "delivery ," would find nothing.
+        assertEquals("\"delivery*\"", fts("delivery , … ?!"))
         assertEquals("\"2026*\"", fts("2026"))
     }
 
     @Test fun highlightsInTheMiddle() {
-        val parsed = SearchQuery.highlights("quindi la \u0002consegna\u0003 slitta a \u0002giovedì\u0003, but")
-        assertEquals("quindi la consegna slitta a giovedì, but", parsed.text)
-        assertEquals(listOf(10..17, 28..34), parsed.ranges)
-        assertEquals("consegna", parsed.text.substring(parsed.ranges[0]))
-        assertEquals("giovedì", parsed.text.substring(parsed.ranges[1]))
+        val parsed = SearchQuery.highlights("so the \u0002delivery\u0003 slips to \u0002café\u0003, but")
+        assertEquals("so the delivery slips to café, but", parsed.text)
+        assertEquals(listOf(7..14, 25..28), parsed.ranges)
+        assertEquals("delivery", parsed.text.substring(parsed.ranges[0]))
+        assertEquals("café", parsed.text.substring(parsed.ranges[1]))
         assertFalse(parsed.leadingEllipsis)
         assertFalse(parsed.trailingEllipsis)
     }
 
     @Test fun highlightsAtStartAndEnd() {
-        val start = SearchQuery.highlights("\u0002Consegna\u0003 slitta")
-        assertEquals("Consegna slitta", start.text)
+        val start = SearchQuery.highlights("\u0002Delivery\u0003 slips")
+        assertEquals("Delivery slips", start.text)
         assertEquals(listOf(0..7), start.ranges)
-        val end = SearchQuery.highlights("la \u0002consegna\u0003")
-        assertEquals("la consegna", end.text)
-        assertEquals(listOf(3..10), end.ranges)
-        val whole = SearchQuery.highlights("\u0002consegna\u0003")
+        val end = SearchQuery.highlights("the \u0002delivery\u0003")
+        assertEquals("the delivery", end.text)
+        assertEquals(listOf(4..11), end.ranges)
+        val whole = SearchQuery.highlights("\u0002delivery\u0003")
         assertEquals(listOf(0..7), whole.ranges)
     }
 
     @Test fun adjacentHighlightsStaySeparate() {
-        val parsed = SearchQuery.highlights("\u0002con\u0003\u0002segna\u0003 x")
-        assertEquals("consegna x", parsed.text)
+        val parsed = SearchQuery.highlights("\u0002del\u0003\u0002ivery\u0003 x")
+        assertEquals("delivery x", parsed.text)
         assertEquals(listOf(0..2, 3..7), parsed.ranges)
     }
 
     @Test fun ellipsesBecomeFlags() {
-        val parsed = SearchQuery.highlights("…prima \u0002consegna\u0003 slitta…")
-        assertEquals("prima consegna slitta", parsed.text)
+        val parsed = SearchQuery.highlights("…first \u0002delivery\u0003 slips…")
+        assertEquals("first delivery slips", parsed.text)
         assertEquals(listOf(6..13), parsed.ranges)
         assertTrue(parsed.leadingEllipsis)
         assertTrue(parsed.trailingEllipsis)
-        val atEdges = SearchQuery.highlights("…\u0002consegna\u0003…")
-        assertEquals(Highlighted("consegna", listOf(0..7), leadingEllipsis = true, trailingEllipsis = true), atEdges)
+        val atEdges = SearchQuery.highlights("…\u0002delivery\u0003…")
+        assertEquals(Highlighted("delivery", listOf(0..7), leadingEllipsis = true, trailingEllipsis = true), atEdges)
         val onlyEllipsis = Highlighted("", emptyList(), leadingEllipsis = true, trailingEllipsis = false)
         assertEquals(onlyEllipsis, SearchQuery.highlights("…"))
     }

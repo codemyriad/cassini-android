@@ -117,7 +117,7 @@ class OggOpusStreamTest {
     @Test fun fileDocumentsVerifyFromDiskAndHeadersOnlyStayUnverified() {
         val audio = folder.newFile().also { it.writeBytes(fixture()) }
         val target = File(folder.root, "doc.opus")
-        val transcript = Transcript(listOf(Word("spk_1", 0, 20, "Ciao")), "it")
+        val transcript = Transcript(listOf(Word("spk_1", 0, 20, "Hello")), "it")
         val doc = CassiniDocument.create(audio, transcript, "Streamed", JSONObject(), null, emptyMap(), target)
         assertEquals("ok", doc.state)
         assertEquals("ok", CassiniDocument.read(target).state)

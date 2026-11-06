@@ -13,19 +13,20 @@ class PreviewTextTest {
             Word(speaker, startMs + i * msPerWord, startMs + (i + 1) * msPerWord - 50, word)
         }
 
-    // The words of board 03 ("Call with supplier"). Paolo's turn starts at 11:41 and "quindi" plays at 11:44.
+    // The words of board 03 ("Call with supplier"). Paolo's turn starts at 11:41 and "so" plays at 11:44.
     private val board03 = turn(
         "spk_0", 692_000,
         "Ok, then let's confirm the quantities first. We said four hundred units for the first batch, right?",
     ) + turn(
         "spk_1", 701_000,
-        "Sì, quattrocento. Il problema è la seconda consegna: quindi la consegna slitta a giovedì, " +
+        "Yes, four hundred. It's the second delivery problem: so the delivery slips to Thursday, " +
             "but the price stays as agreed in the March order.",
+        msPerWord = 375,
     ) + turn("spk_2", 740_000, "Can you send that in writing? I need it for the purchase order before Friday.")
 
     @Test fun reproducesBoard00() {
         val preview = PreviewText.of(board03, (11 * 60 + 44) * 1000L)!!
-        val board00 = "quindi la consegna slitta a giovedì, but the price stays as agreed in the March order"
+        val board00 = "so the delivery slips to Thursday, but the price stays as agreed in the March order"
         assertEquals("…$board00…", preview.display)
         assertEquals(board00, preview.text)
         assertTrue(preview.leadingEllipsis)
@@ -36,7 +37,7 @@ class PreviewTextTest {
         val preview = PreviewText.of(board03, 0)!!
         assertEquals(
             "Ok, then let's confirm the quantities first. We said four hundred units for the first batch, right? " +
-                "Sì, quattrocento. Il problema è la seconda consegna: quindi…",
+                "Yes, four hundred. It's the second delivery problem: so the…",
             preview.display,
         )
         assertFalse(preview.leadingEllipsis)
@@ -63,21 +64,21 @@ class PreviewTextTest {
     }
 
     @Test fun aShortTurnContinuesIntoTheNextTurns() {
-        val words = turn("spk_0", 0, "Allora, quando arriva la seconda consegna?") +
-            turn("spk_1", 5_000, "Sì.") +
-            turn("spk_0", 6_000, "Quindi giovedì va bene per tutti, anche per il magazzino.") +
-            turn("spk_1", 12_000, "Va bene.")
+        val words = turn("spk_0", 0, "So, when does the second delivery arrive?") +
+            turn("spk_1", 5_000, "Yes.") +
+            turn("spk_0", 6_000, "So Thursday works for everyone, including the warehouse.") +
+            turn("spk_1", 12_000, "All right.")
         val preview = PreviewText.of(words, 5_000)!!
-        // "Sì." alone is shorter than MIN_BEFORE_TURN_END, so the next turn follows; then the excerpt stops.
-        assertEquals("…Sì. Quindi giovedì va bene per tutti, anche per il magazzino…", preview.display)
+        // "Yes." alone is shorter than MIN_BEFORE_TURN_END, so the next turn follows; then the excerpt stops.
+        assertEquals("…Yes. So Thursday works for everyone, including the warehouse…", preview.display)
         assertTrue(preview.text.length >= PreviewText.MIN_BEFORE_TURN_END)
     }
 
     @Test fun cutAtAWordWithPunctuationDropped() {
-        val long = turn("spk_0", 0, (1..40).joinToString(" ") { "parola$it," })
+        val long = turn("spk_0", 0, (1..40).joinToString(" ") { "sample$it," })
         val preview = PreviewText.of(long, long[5].startMs)!!
         assertTrue(preview.display, preview.text.length <= PreviewText.LIMIT)
-        assertTrue(preview.text.startsWith("parola6, parola7, "))
+        assertTrue(preview.text.startsWith("sample6, sample7, "))
         // Whole words only: the excerpt is a prefix of the words from the playing one.
         val words = long.drop(5).map { it.text.trimEnd(',') }
         assertTrue(preview.text, words.joinToString(", ").startsWith(preview.text))
@@ -99,8 +100,8 @@ class PreviewTextTest {
     }
 
     @Test fun shortTranscriptHasNoEllipses() {
-        val words = turn("spk_0", 0, "Ciao mondo.")
-        val whole = Preview("Ciao mondo.", leadingEllipsis = false, trailingEllipsis = false)
+        val words = turn("spk_0", 0, "Hello world.")
+        val whole = Preview("Hello world.", leadingEllipsis = false, trailingEllipsis = false)
         assertEquals(whole, PreviewText.of(words, 0))
     }
 

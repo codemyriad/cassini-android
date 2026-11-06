@@ -56,7 +56,7 @@ class ProcessingNotificationsTest {
         assertEquals("Finishing the previous note…", notifications.content(running(JobPhase.WaitingForPrevious)).text)
 
         val queued = running(JobPhase.Starting).copy(queue = listOf(QueuedNote("b", "B")))
-        assertEquals("Transcribing “Riunione”", notifications.content(queued).title)
+        assertEquals("Transcribing “Meeting”", notifications.content(queued).title)
         assertEquals("1 more in queue", notifications.content(queued).subText)
 
         val mib = 1_048_576L
@@ -79,9 +79,9 @@ class ProcessingNotificationsTest {
         shadowOf(context as android.app.Application).grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
         val manager = shadowOf(context.getSystemService(NotificationManager::class.java))
         val text = { manager.allNotifications.single().extras.getCharSequence(Notification.EXTRA_TEXT).toString() }
-        notifications.pausedByAndroid(NOTE, "Riunione", 0, 0)
+        notifications.pausedByAndroid(NOTE, "Meeting", 0, 0)
         assertEquals("Paused before any words were found. $DAILY_LIMIT", text())
-        notifications.pausedByAndroid(NOTE, "Riunione", 760_000, 2_052_000)
+        notifications.pausedByAndroid(NOTE, "Meeting", 760_000, 2_052_000)
         assertEquals("Paused at 12:40 of 34:12. $DAILY_LIMIT", text())
     }
 
@@ -90,27 +90,27 @@ class ProcessingNotificationsTest {
         shadowOf(context as android.app.Application).grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
         val manager = context.getSystemService(NotificationManager::class.java)
         val text = { shadowOf(manager).allNotifications.single().extras.getCharSequence(Notification.EXTRA_TEXT) }
-        notifications.pausedByAndroid(NOTE, "Riunione", 288_000, 950_000)
-        notifications.pausedByAndroidSaved(NOTE, "Riunione", 314_000, 950_000)
+        notifications.pausedByAndroid(NOTE, "Meeting", 288_000, 950_000)
+        notifications.pausedByAndroidSaved(NOTE, "Meeting", 314_000, 950_000)
         assertEquals("Paused at 05:14 of 15:50. $DAILY_LIMIT", text().toString())
 
         // Another result of the note, or no notification at all: nothing is posted.
-        notifications.readyToTranscribe(NOTE, "Riunione")
-        notifications.pausedByAndroidSaved(NOTE, "Riunione", 340_000, 950_000)
-        assertEquals("Riunione is waiting. Open Cassini to start.", text().toString())
+        notifications.readyToTranscribe(NOTE, "Meeting")
+        notifications.pausedByAndroidSaved(NOTE, "Meeting", 340_000, 950_000)
+        assertEquals("Meeting is waiting. Open Cassini to start.", text().toString())
         manager.cancelAll()
-        notifications.pausedByAndroidSaved(NOTE, "Riunione", 340_000, 950_000)
+        notifications.pausedByAndroidSaved(NOTE, "Meeting", 340_000, 950_000)
         assertEquals(0, shadowOf(manager).allNotifications.size)
     }
 
     @Test fun resultsAreReplacedPerNoteAndHideTheTitleInPublic() {
         shadowOf(context as android.app.Application).grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
-        notifications.readyToTranscribe(NOTE, "Riunione")
-        notifications.failed(NOTE, "Riunione", "CHECKPOINT_MISMATCH")
+        notifications.readyToTranscribe(NOTE, "Meeting")
+        notifications.failed(NOTE, "Meeting", "CHECKPOINT_MISMATCH")
         val posted = shadowOf(context.getSystemService(NotificationManager::class.java)).allNotifications
         assertEquals(1, posted.size)
         val failed = posted.single()
-        assertEquals("Couldn't transcribe Riunione", failed.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
+        assertEquals("Couldn't transcribe Meeting", failed.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
         assertEquals(
             "Saved progress no longer matches. Your recording is kept.",
             failed.extras.getCharSequence(Notification.EXTRA_TEXT).toString(),
@@ -123,7 +123,7 @@ class ProcessingNotificationsTest {
     }
 
     private fun running(phase: JobPhase) =
-        ProcessingState(loading = false, running = RunningJob(NOTE, "Riunione", phase))
+        ProcessingState(loading = false, running = RunningJob(NOTE, "Meeting", phase))
 
     private fun progress(left: TimeLeft, headline: ProgressHeadline = ProgressHeadline.FINDING_WORDS_AND_SPEAKERS) =
         RunningProgress(

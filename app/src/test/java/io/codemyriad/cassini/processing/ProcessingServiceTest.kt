@@ -199,7 +199,7 @@ class ProcessingServiceTest {
         graph.ready.await()
         graph.models.recordConsent()
         val catalogue = graph.awaitCatalogue()
-        val id = catalogue.notes.createRecording("Riunione", 1_000, "opus")
+        val id = catalogue.notes.createRecording("Meeting", 1_000, "opus")
         withContext(Dispatchers.IO) { fixture.copyTo(File(paths.note(id), "capture.opus")) }
         catalogue.notes.finishRecording(id, 4_000)
         catalogue.jobs.enqueue(id, io.codemyriad.cassini.core.library.JobKind.TRANSCRIBE)

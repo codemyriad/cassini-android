@@ -126,7 +126,7 @@ class AppShellTest {
         // The Note state is built off the main thread, so each step waits for the state that the one before makes.
         rule.onNodeWithContentDescription("Search in transcript").performClick()
         waitFor(hasSetTextAction())
-        rule.onNode(hasSetTextAction()).performTextInput("allora")
+        rule.onNode(hasSetTextAction()).performTextInput("so")
         waitFor(SPEAKER_2)
         rule.onNode(SPEAKER_2).performClick()
         waitFor(hasText("Save name"))
@@ -414,14 +414,14 @@ class AppShellTest {
     /** The document of [importDocument], written to a scratch folder. */
     private fun writeDocument(): File {
         val fixture = File(checkNotNull(System.getProperty("cassini.fixtures")), "audio/fleurs-it-short.opus")
-        val document = File(folder.newFolder(), "riunione.opus")
+        val document = File(folder.newFolder(), "meeting.opus")
         val words = listOf(
-            Word("S1", 0, 400, "ciao"),
-            Word("S1", 450, 900, "a"),
-            Word("S1", 950, 1_400, "tutti"),
-            Word("S2", 2_000, 2_400, "allora"),
-            Word("S2", 2_450, 2_900, "cominciamo"),
-            Word("S2", 2_950, 3_400, "subito"),
+            Word("S1", 0, 400, "hello"),
+            Word("S1", 450, 900, "to"),
+            Word("S1", 950, 1_400, "everyone"),
+            Word("S2", 2_000, 2_400, "so"),
+            Word("S2", 2_450, 2_900, "start"),
+            Word("S2", 2_950, 3_400, "now"),
         )
         CassiniDocument.create(
             fixture,
@@ -439,10 +439,10 @@ class AppShellTest {
         /** The label of the second speaker as its own node (merged tree). */
         val SPEAKER_2 = hasContentDescription("Speaker 2", substring = true)
         const val ANDROID_NS = "http://schemas.android.com/apk/res/android"
-        const val TITLE = "Riunione"
-        const val QUERY = "Riun"
+        const val TITLE = "Meeting"
+        const val QUERY = "Meet"
         const val HALF = 0.5f
-        const val SECOND_TURN = "allora cominciamo subito"
+        const val SECOND_TURN = "so start now"
         const val TIMEOUT_MS = 10_000L
         const val STATUS_PX = 60
         const val NAVIGATION_PX = 96

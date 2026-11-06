@@ -102,14 +102,14 @@ internal object VariantFixtures {
 
     // Library (features.md section 1).
 
-    /** Search "consegna": a transcript match with an FTS snippet, and a title-only match without a snippet. */
+    /** Search "delivery": a transcript match with an FTS snippet, and a title-only match without a snippet. */
     val searchResults: ImmutableList<NoteRowUi> = run {
-        val snippet = "Il problema è la seconda consegna: quindi la consegna slitta a giovedì"
+        val snippet = "The problem is the second delivery: so the delivery slips to Thursday"
         persistentListOf(
             NoteRowUi(
                 id = "deliveries",
-                title = "Consegne di ottobre",
-                titleRanges = rangesOf("Consegne di ottobre", "consegn"),
+                title = "October deliveries",
+                titleRanges = rangesOf("October deliveries", "deliver"),
                 durationMs = clock(6, 3),
                 time = LocalTime.of(9, 12),
                 day = DayLabel.Today,
@@ -119,7 +119,7 @@ internal object VariantFixtures {
                 day = DayLabel.Yesterday,
                 preview = Highlighted(
                     text = snippet,
-                    ranges = rangesOf(snippet, "consegn"),
+                    ranges = rangesOf(snippet, "deliver"),
                     leadingEllipsis = true,
                     trailingEllipsis = true,
                 ),
@@ -131,12 +131,12 @@ internal object VariantFixtures {
         "library-loading" to LibraryUiState(loading = true),
         "library-empty" to LibraryUiState(banners = persistentListOf(banner(BannerKind.LIB_EMPTY))),
         "library-no-results" to b.library.copy(
-            query = "fattura",
+            query = "invoice",
             progress = null,
             results = persistentListOf(),
             banners = persistentListOf(banner(BannerKind.LIB_NO_MATCH)),
         ),
-        "library-search" to b.library.copy(query = "consegn", progress = null, results = searchResults),
+        "library-search" to b.library.copy(query = "deliver", progress = null, results = searchResults),
         "library-recording-card" to b.library.copy(
             recording = RecordingPillUi(title = "Standup", elapsedMs = clock(24, 7), paused = false),
         ),
@@ -430,11 +430,11 @@ internal object VariantFixtures {
             playback = b.readAndListen.playback?.copy(playing = false),
         ),
         "read-search" to b.readAndListen.copy(
-            search = TranscriptSearchUi(query = "consegna", matches = matchesOf(b.readAndListen.turns, "consegna"), current = 1),
+            search = TranscriptSearchUi(query = "delivery", matches = matchesOf(b.readAndListen.turns, "delivery"), current = 1),
             playback = b.readAndListen.playback?.copy(playing = false),
         ),
         "read-search-no-matches" to b.readAndListen.copy(
-            search = TranscriptSearchUi(query = "fattura"),
+            search = TranscriptSearchUi(query = "invoice"),
             playback = b.readAndListen.playback?.copy(playing = false),
         ),
         "read-follow-paused" to b.readAndListen.copy(playback = b.readAndListen.playback?.copy(following = false)),

@@ -64,7 +64,7 @@ groups=(
     "Limits|verbatim|$old/Limits.kt|$core/audio/AudioLimits.kt $core/audio/PcmBuilder.kt|split into AudioLimits and PcmBuilder; the app's clock() retired with the 0.1.0 UI (P10); no recording cap: MAX_RECORDING_MS (2 h) becomes MAX_TRANSCRIBE_MS (36 h, the transcription bound), RECORDING_WARNING_MS retired, MAX_IMPORT_BYTES 4 GiB (docs/architecture.md 3.7); a heap that looks too short is measured again after a garbage collection (heapAllows, Heap)"
     "AudioDecoder|verbatim|$old/AudioDecoder.kt|$engine/decode/AudioDecoder.kt $core/audio/WavDecoder.kt|ContentResolver + cacheDir instead of Context; framePosition/decodeWav in core WavDecoder; PcmAudio in PcmSource.kt; MP3 with a LAME tag (core Mp3Gapless): platform trim off, contiguous output, delay and padding trimmed here, as the platforms differ (API 26/29 keep them; API 34 drops them but keeps the timestamps); source frame positions as Long (an Int passes 2^31 after 12.4 h at 48 kHz) and MAX_TRANSCRIBE_MS for the duration bound (docs/architecture.md 3.7)"
     "SpeechWindows|verbatim|$old/SpeechWindows.kt|$core/asr/SpeechWindows.kt|package only"
-    "SeamMerge|verbatim|$old/SeamMerge.kt|$core/asr/SeamMerge.kt|package only"
+    "SeamMerge|verbatim|$old/SeamMerge.kt|$core/asr/SeamMerge.kt|package and English comment example (D70.1)"
     "WordGate|verbatim|$old/WordGate.kt|$core/asr/WordGate.kt|package only"
     "IncrementalTranscript|verbatim|$old/IncrementalTranscript.kt|$core/asr/IncrementalTranscript.kt|typed IncrementalState instead of JSONObject; OVERLAP_SAMPLES named for the D26.1 carry"
     "TranscriptionProgress|verbatim|$old/TranscriptionProgress.kt|$core/asr/TranscriptionProgress.kt|package only"

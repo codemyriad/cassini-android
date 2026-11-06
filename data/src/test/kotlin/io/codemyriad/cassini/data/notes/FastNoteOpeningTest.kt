@@ -25,7 +25,7 @@ class FastNoteOpeningTest {
     @get:Rule val folder = TemporaryFolder()
     private lateinit var h: NotesHarness
 
-    private val words = transcript("allora vediamo la consegna di giovedì e poi decidiamo chi parla per primo")
+    private val words = transcript("so we review delivery on Thursday and then decide who speaks first")
 
     @org.junit.Before fun setUp() {
         h = NotesHarness(folder)

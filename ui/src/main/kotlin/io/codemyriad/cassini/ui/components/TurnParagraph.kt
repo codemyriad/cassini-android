@@ -374,7 +374,7 @@ private class WordRects {
 @Composable
 internal fun TurnParagraphPreview() {
     val words = (
-        "Sì, quattrocento. Il problema è la seconda consegna: quindi la consegna slitta a giovedì, but the price " +
+        "Yes, four hundred. It's the second delivery problem: so the delivery slips to Thursday, but the price " +
             "stays as agreed in the March order."
         ).split(' ').mapIndexed { index, word -> WordUi(word, index * 400L) }.toImmutableList()
     CassiniTheme {

@@ -196,7 +196,7 @@ data class NoteTextEntity(
 
 /**
  * The external-content FTS4 index over [NoteTextEntity]. unicode61 with `remove_diacritics=1` makes search case- and
- * diacritic-insensitive ("giovedi" finds "giovedì"). Room writes the triggers that keep it in step with note_text.
+ * diacritic-insensitive ("cafe" finds "café"). Room writes the triggers that keep it in step with note_text.
  */
 @Fts4(
     contentEntity = NoteTextEntity::class,

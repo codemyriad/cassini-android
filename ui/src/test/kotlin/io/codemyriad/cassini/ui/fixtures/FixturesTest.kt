@@ -28,7 +28,7 @@ class FixturesTest {
         assertNull("board 03 has no subtitle", state.subtitle)
         val active = requireNotNull(state.activeWord)
         val word = state.turns.single { it.id == active.turnId }.words[active.index]
-        assertEquals("quindi", word.text)
+        assertEquals("so", word.text)
         assertEquals(requireNotNull(state.playback).positionMs, word.startMs)
     }
 
@@ -36,7 +36,7 @@ class FixturesTest {
     fun libraryPreviewIsTheExcerptAtThePlayingWord() {
         val preview = requireNotNull(b.supplier.preview)
         val paolo = turnText(b.readPaolo.words)
-        val start = paolo.indexOf("quindi")
+        val start = paolo.indexOf("so")
         assertTrue(paolo.substring(start).startsWith(preview.text))
         assertTrue(preview.leadingEllipsis && preview.trailingEllipsis)
     }

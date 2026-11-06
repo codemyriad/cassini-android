@@ -8,7 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SpeakerStatsTest {
-    private fun w(speaker: String, start: Long, end: Long, text: String = "parola") = Word(speaker, start, end, text)
+    private fun w(speaker: String, start: Long, end: Long, text: String = "sample") = Word(speaker, start, end, text)
 
     @Test fun anEmptyTranscriptHasNoSpeakers() {
         assertTrue(SpeakerStats.of(emptyList()).isEmpty())
@@ -16,10 +16,10 @@ class SpeakerStatsTest {
 
     @Test fun countsComeFromTheTurns() {
         val words = listOf(
-            w("b", 500, 900, "Allora,"),
-            w("b", 1000, 2500, "giovedì."),
-            w("a", 2600, 3000, "Sì."),
-            w("b", 3100, 3600, "Bene."),
+            w("b", 500, 900, "So,"),
+            w("b", 1000, 2500, "café."),
+            w("a", 2600, 3000, "Yes."),
+            w("b", 3100, 3600, "Good."),
             w("a", 3700, 4000, "Certo"),
             w("a", 4100, 4600, "Élodie."),
         )

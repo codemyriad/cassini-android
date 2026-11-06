@@ -170,8 +170,8 @@ card at the top. In Italian, the tag "Le parole possono ancora cambiare" goes be
 |---|---|---|---|
 | 7.70 | 5.14 % | 16.62 % (364-416 dp) | turn 1 +2.0 dp, other rows -1.0 to +1.5 dp |
 
-- The highest band holds the active word "quindi". The app draws the background of the active word and does not
-  pad the word. As a result, "giovedì," fits on line 2 and the text after "quindi" does not move (accepted
+- The highest band holds the active word "so". The app draws the background of the active word and does not
+  pad the word. As a result, "café," fits on line 2 and the text after "so" does not move (accepted
   deviation 3).
 - Turn 1 is 2 dp lower than on the board (accepted deviation 6).
 - The paragraph is 1.5 dp below the speaker header, and the transcript pane has a top padding of 0.5 dp. These

@@ -86,11 +86,11 @@ internal class LongRun(private val wordsPerHour: Int = WORDS_PER_HOUR) {
         const val DIARIZER_STATE = 7 + 188 * 512 + 188 * 4 + 188 * 512
         const val CLIP_SAMPLES = SPEAKERS * 16_000
 
-        /** Real word lengths: Italian and English words, some with the punctuation Parakeet attaches. */
+        /** Real word lengths: English words, some with the punctuation Parakeet attaches. */
         val TEXT = (
-            "Allora, partiamo dal punto principale della riunione di oggi. The quarterly numbers look better than " +
-                "expected, ma dobbiamo ancora verificare le consegne di giovedì e il budget del progetto. " +
-                "Can everyone confirm their availability for next week? Perfetto, grazie mille a tutti."
+            "So, let us start with the main point of today's meeting. The quarterly numbers look better than " +
+                "expected, but we still need to check Thursday deliveries and the project budget. " +
+                "Can everyone confirm their availability for next week? Perfect, thank you very much everyone."
             ).split(' ')
     }
 }

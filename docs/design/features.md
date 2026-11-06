@@ -52,7 +52,7 @@ The activity area shows these items, in this sequence:
 
 - Day groups: by the local day of `created_at`, the newest first, with overline headers.
 - Row: the title (up to 2 lines) and the duration, an optional preview (up to 2 lines), and a meta line with the time, the status chip and the suffix.
-- Preview without a query (`PreviewText` in `:core`, stored in `notes.preview`): if the saved playback position is after the first word, the preview is about 160 characters of the selected variant. It starts at the word that plays at that position. It has a "…" at the start, and a "…" at the end when the text is cut. Board 00 shows "…quindi la consegna slitta a giovedì, but the price stays as agreed in the March order…".
+- Preview without a query (`PreviewText` in `:core`, stored in `notes.preview`): if the saved playback position is after the first word, the preview is about 160 characters of the selected variant. It starts at the word that plays at that position. It has a "…" at the start, and a "…" at the end when the text is cut. Board 00 shows "…so the delivery slips to Thursday, but the price stays as agreed in the March order…".
 - Else the preview is the start of the transcript (`note_text.body`): the first 160 characters, cut at a word, with a "…" at the end when the text is cut. The app calculates the preview again when the playback pauses, when the user leaves the Note screen, and when the selected variant changes. A note without a transcript has no preview.
 - Preview during a search: the FTS snippet, with the matches in weight 600 on the accent tint (not only by color). A match in the title only highlights the title and shows no snippet.
 - The row of the RUNNING note is on `surface`. The other rows are transparent.
@@ -75,7 +75,7 @@ The activity area shows these items, in this sequence:
 
 ### Search [CHANGED: FTS4 with highlights]
 
-- `SearchQuery.fts(input)` splits the input at white space. It removes the characters `" * ^ : ( ) -` from each term, and it removes the terms that become empty. It writes each term as a quoted prefix phrase, with the star inside the quotes (`"consegn*"`, the FTS3/4 syntax). It joins the terms with spaces (implicit AND). The golden is `consegna giov` → `"consegna*" "giov*"`. The function quotes `AND`, `OR`, `NOT` and `NEAR` from the user, so that they are words.
+- `SearchQuery.fts(input)` splits the input at white space. It removes the characters `" * ^ : ( ) -` from each term, and it removes the terms that become empty. It writes each term as a quoted prefix phrase, with the star inside the quotes (`"deliver*"`, the FTS3/4 syntax). It joins the terms with spaces (implicit AND). The golden is `delivery caf` → `"delivery*" "caf*"`. The function quotes `AND`, `OR`, `NOT` and `NEAR` from the user, so that they are words.
 - The search ignores case and diacritics (unicode61, `remove_diacritics=1`).
 - The results are a flat list, the newest first, with the date in the meta line. The debounce is 150 ms. `SavedStateHandle` keeps the query. The results do not include the notes in the trash.
 - `SearchQuery.highlights` changes the snippet markers `char(2)`/`char(3)` into ranges. The markers never go to the UI.
@@ -89,7 +89,7 @@ The activity area shows these items, in this sequence:
 ### Acceptance
 
 - JVM: the `NoteStatus` table, each row. `DayGroups` (today, yesterday, this year, other year, zone change at midnight). `SearchQuery.fts` (special characters, operators, empty input, the golden of this section) and `highlights`. `PreviewText` (position 0, in the middle of the transcript, at the end of the transcript, cut at a word, ellipses).
-- Robo: the DAO search finds "giovedì" from "giovedi", and "consegna" from "CONSEGNA" and from "consegn". The results do not include the notes in the trash. The code parses the snippet markers.
+- Robo: the DAO search finds "café" from "cafe", and "delivery" from "DELIVERY" and from "deliver". The results do not include the notes in the trash. The code parses the snippet markers.
 - Shot: `00-library` is equal to board 00 within the tolerances of ui.md. Variants: empty, no results, recording card, search with highlights.
 - Device: two imports of the FLEURS clip give one note (`Existing`). A long press opens the actions sheet. Record during a recording opens the Recording screen again.
 
@@ -186,7 +186,7 @@ The other parts of the screen are:
 - Speaker rename is disabled for trust states other than OK ("Fix the transcript first: Transcribe again").
 - `refreshIfStale` runs when the screen opens.
 
-**Acceptance**: Shot `03-read-and-listen` (active word "quindi", auto badge on Paolo Ferri, no subtitle). Variants: Not verified, Audio changed, Unreadable, Newer format, one voice, search mode, Queued over a document, no words (`variants/read-no-words.png`). Robo/Compose: a word tap seeks, a speaker tap opens the sheet, and back closes the search before it leaves the screen. A document with no words shows "No speech" only after its transcript loads. Device: play, seek with a word tap, and the position stays after the user leaves and comes back.
+**Acceptance**: Shot `03-read-and-listen` (active word "so", auto badge on Paolo Ferri, no subtitle). Variants: Not verified, Audio changed, Unreadable, Newer format, one voice, search mode, Queued over a document, no words (`variants/read-no-words.png`). Robo/Compose: a word tap seeks, a speaker tap opens the sheet, and back closes the search before it leaves the screen. A document with no words shows "No speech" only after its transcript loads. Device: play, seek with a word tap, and the position stays after the user leaves and comes back.
 
 ### 3.4 Versions sheet [CHANGED: replaces "Choose transcript"]
 
@@ -399,7 +399,7 @@ A failure of a best-effort part never shows a red banner. It shows in Settings. 
 | Kind | Tone | Copy | Trigger | Actions |
 |---|---|---|---|---|
 | LIB_EMPTY | plain | "No notes yet" — "Record something, or import an audio file." | No live notes and no query | Record, Import |
-| LIB_NO_MATCH | plain | "Nothing matches “fattura”" — "Try another word or title." | The search found nothing | – |
+| LIB_NO_MATCH | plain | "Nothing matches “invoice”" — "Try another word or title." | The search found nothing | – |
 | IMPORTING | info | "Importing <name>…" (not on the board) | An import operates | – |
 | IMPORT_TOO_LARGE | error | "File too large" — "Choose a file under 4 GB." (the board has 2 GB, ui.md section 11) | Rejected(LARGE) | Choose another |
 | IMPORT_NO_SPACE | error | "Not enough space to import" — "This file needs about 1.4 GB free. Free some space and try again." | Rejected(SPACE) | Try again |

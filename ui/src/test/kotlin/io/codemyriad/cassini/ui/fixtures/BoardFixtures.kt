@@ -102,11 +102,11 @@ internal object BoardFixtures {
     )
 
     /**
-     * The `PreviewText` excerpt at the saved position 11:44 (board 03's active word "quindi"): it starts at the
+     * The `PreviewText` excerpt at the saved position 11:44 (board 03's active word "so"): it starts at the
      * playing word with a leading ellipsis and is cut with a trailing one.
      */
     val supplierPreview = Highlighted(
-        text = "quindi la consegna slitta a giovedì, but the price stays as agreed in the March order",
+        text = "so the delivery slips to Thursday, but the price stays as agreed in the March order",
         leadingEllipsis = true,
         trailingEllipsis = true,
     )
@@ -202,7 +202,7 @@ internal object BoardFixtures {
         tone = SpeakerTone.Amber,
         startMs = clock(29, 2),
         words = timedWords(
-            "Va bene, però allora dobbiamo avvisare il supporto entro venerdì, otherwise they'll get the tickets " +
+            "All right, but we must notify support by Friday, otherwise they'll get the tickets " +
                 "before the",
             clock(29, 2),
         ),
@@ -232,7 +232,7 @@ internal object BoardFixtures {
         ),
     )
 
-    /** Paolo Ferri, named automatically; word 8, "quindi", starts at 11:44, the player position. */
+    /** Paolo Ferri, named automatically; word 8, "so", starts at 11:44, the player position. */
     val readPaolo = TurnUi(
         id = "t2",
         speakerId = "s2",
@@ -241,7 +241,7 @@ internal object BoardFixtures {
         startMs = clock(11, 41),
         auto = true,
         words = timedWords(
-            "Sì, quattrocento. Il problema è la seconda consegna: quindi la consegna slitta a giovedì, but the price " +
+            "Yes, four hundred. It's the second delivery problem: so the delivery slips to Thursday, but the price " +
                 "stays as agreed in the March order.",
             clock(11, 41),
             stepMs = 375,

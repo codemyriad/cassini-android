@@ -151,7 +151,7 @@ class RecordingServiceTest {
 
     /** start() as the Recording screen calls it, then the service start that the platform asked for. */
     private fun startService(): RecordingService {
-        assertTrue(controller.start("Riunione"))
+        assertTrue(controller.start("Meeting"))
         until { platform.starts.get() == 1 }
         val created = Robolectric.buildService(RecordingService::class.java).create().get()
         service = created

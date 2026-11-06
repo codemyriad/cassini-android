@@ -40,8 +40,8 @@ class DocumentRepositoryTest {
     @get:Rule val folder = TemporaryFolder()
     private lateinit var h: NotesHarness
 
-    private val first = transcript("buongiorno a tutti oggi parliamo della consegna di giovedì")
-    private val second = transcript("buongiorno a tutti oggi parliamo della consegna di venerdì", turn = 4)
+    private val first = transcript("good morning everyone today we discuss the delivery on Thursday")
+    private val second = transcript("good morning everyone today we discuss the delivery on Friday", turn = 4)
 
     @Before fun setUp() {
         h = NotesHarness(folder)
@@ -61,9 +61,9 @@ class DocumentRepositoryTest {
     // Adopt.
 
     @Test fun adoptSealedReplacesTheCaptureAndDeletesIt() = runTest {
-        h.plainNote("a", title = "Registrazione del mattino")
+        h.plainNote("a", title = "Morning recording")
         val capture = File(h.dir("a"), "capture.opus")
-        seal("a", capture, first, "Registrazione del mattino")
+        seal("a", capture, first, "Morning recording")
         assertTrue(File(work("a"), "sealed").isFile)
         assertTrue(File(work("a"), "sealed.opus").isFile)
         assertFalse("seal never touches document.opus", h.document("a").exists())
@@ -111,7 +111,7 @@ class DocumentRepositoryTest {
     @Test fun adoptRemovesTheJobRowBeforeWorkGoes() = runTest {
         h.plainNote("a")
         insertJob("a", JobState.RUNNING)
-        seal("a", File(h.dir("a"), "capture.opus"), first, "Registrazione")
+        seal("a", File(h.dir("a"), "capture.opus"), first, "Recording")
 
         assertEquals(AdoptOutcome.Adopted(DocumentState.OK), h.notes.adoptSealed("a"))
 
@@ -133,7 +133,7 @@ class DocumentRepositoryTest {
 
     @Test fun aCrashAfterTheRenameIsRepairedByRunningAdoptAgain() = runTest {
         h.plainNote("a")
-        seal("a", File(h.dir("a"), "capture.opus"), first, "Registrazione")
+        seal("a", File(h.dir("a"), "capture.opus"), first, "Recording")
         Files.move(File(work("a"), "sealed.opus").toPath(), h.document("a").toPath(), StandardCopyOption.ATOMIC_MOVE)
         assertEquals(AudioKind.PLAIN, h.row("a").audioKind)
 
@@ -150,7 +150,7 @@ class DocumentRepositoryTest {
 
     @Test fun aCrashAfterTheRenameIsRepairedByRefreshIfStale() = runTest {
         h.plainNote("a")
-        seal("a", File(h.dir("a"), "capture.opus"), first, "Registrazione")
+        seal("a", File(h.dir("a"), "capture.opus"), first, "Recording")
         Files.move(File(work("a"), "sealed.opus").toPath(), h.document("a").toPath(), StandardCopyOption.ATOMIC_MOVE)
 
         h.restart()
@@ -180,7 +180,7 @@ class DocumentRepositoryTest {
 
     @Test fun anUnreadableSealedOutputIsDroppedWithItsMarker() = runTest {
         h.plainNote("a")
-        seal("a", File(h.dir("a"), "capture.opus"), first, "Registrazione")
+        seal("a", File(h.dir("a"), "capture.opus"), first, "Recording")
         val sealed = File(work("a"), "sealed.opus")
         sealed.writeBytes(sealed.readBytes().copyOf(sealed.length().toInt() - 1)) // Unverified: the last page is cut.
 
@@ -196,16 +196,16 @@ class DocumentRepositoryTest {
     // Titles.
 
     @Test fun aRenameWhileAJobRowExistsSetsTitleDirtyAndAdoptWritesIt() = runTest {
-        h.documentNote("a", first, title = "Riunione")
+        h.documentNote("a", first, title = "Meeting")
         h.notes.refreshIfStale("a")
         insertJob("a", JobState.RUNNING)
 
-        assertEquals(RenameOutcome.Renamed, h.notes.rename("a", "  Riunione di lunedì  "))
+        assertEquals(RenameOutcome.Renamed, h.notes.rename("a", "  Monday meeting  "))
         h.awaitBackground()
 
-        assertEquals("Riunione di lunedì", h.row("a").title)
+        assertEquals("Monday meeting", h.row("a").title)
         assertTrue(h.row("a").titleDirty)
-        assertEquals("the document is the job's source", "Riunione", h.readFile("a").title)
+        assertEquals("the document is the job's source", "Meeting", h.readFile("a").title)
         assertEquals(EditOutcome.JobPending, h.documents.retitle("a"))
 
         val title = offMain { h.notes.titleBlocking("a") }!!
@@ -213,22 +213,22 @@ class DocumentRepositoryTest {
         assertEquals(AdoptOutcome.Adopted(DocumentState.OK), h.notes.adoptSealed("a"))
 
         val written = h.readFile("a")
-        assertEquals("Riunione di lunedì", written.title)
-        assertTrue(written.comments.contains("TITLE=Riunione di lunedì"))
+        assertEquals("Monday meeting", written.title)
+        assertTrue(written.comments.contains("TITLE=Monday meeting"))
         assertEquals(2, written.variants.size)
         assertFalse(h.row("a").titleDirty)
         assertEquals(DocumentSignature.of(h.document("a")), h.row("a").documentSignature)
     }
 
     @Test fun aTitleThatNoBackgroundWriteWroteIsWrittenBeforeACopyAndAtStart() = runTest {
-        h.documentNote("a", first, title = "Riunione")
-        h.documentNote("b", first, title = "Telefonata")
+        h.documentNote("a", first, title = "Meeting")
+        h.documentNote("b", first, title = "Phone call")
         h.documentNote("c", first, title = "Intervista")
         listOf("a", "b", "c").forEach { h.notes.refreshIfStale(it) }
         // A job row stops the background write; then the job goes without an adopt (removed from the queue).
         listOf("a", "b", "c").forEach { insertJob(it, JobState.QUEUED) }
-        h.notes.rename("a", "Riunione di lunedì")
-        h.notes.rename("b", "Telefonata con Marco")
+        h.notes.rename("a", "Monday meeting")
+        h.notes.rename("b", "Phone call with Marco")
         h.notes.rename("c", "Intervista a Bea")
         h.awaitBackground()
         h.db.jobs().delete("a")
@@ -238,14 +238,14 @@ class DocumentRepositoryTest {
         val copy = File(folder.newFolder("out"), "copy.opus")
         assertTrue(h.documents.exportCopy("a", Uri.fromFile(copy)) is ExportOutcome.Saved)
 
-        assertEquals("Riunione di lunedì", CassiniDocument.read(copy).title)
+        assertEquals("Monday meeting", CassiniDocument.read(copy).title)
         assertArrayEquals(h.document("a").readBytes(), copy.readBytes())
         assertFalse(h.row("a").titleDirty)
 
         // At the next start: "b" is written; "c" still has a job, whose adopt writes the title.
         h.restart()
         assertEquals(listOf("b"), h.documents.retitleDirty())
-        assertEquals("Telefonata con Marco", h.readFile("b").title)
+        assertEquals("Phone call with Marco", h.readFile("b").title)
         assertFalse(h.row("b").titleDirty)
         assertEquals("Intervista", h.readFile("c").title)
         assertTrue(h.row("c").titleDirty)
@@ -253,7 +253,7 @@ class DocumentRepositoryTest {
     }
 
     @Test fun aRenameOfAnUnverifiedDocumentStaysInRoomAndSurvivesRefreshIfStale() = runTest {
-        h.documentNote("a", first, title = "Riunione")
+        h.documentNote("a", first, title = "Meeting")
         val file = h.document("a")
         file.writeBytes(file.readBytes().copyOf(file.length().toInt() - 1))
         assertEquals(RefreshOutcome.Refreshed(DocumentState.UNVERIFIED), h.notes.refreshIfStale("a"))
@@ -338,10 +338,10 @@ class DocumentRepositoryTest {
     // Exports.
 
     @Test fun exportsEqualTheExpectedBytes() = runTest {
-        h.documentNote("a", first, title = "Consegna: giovedì?")
+        h.documentNote("a", first, title = "Delivery: Thursday?")
         h.notes.refreshIfStale("a")
         val labels = mapOf("S1" to "Giulia", "S2" to "Speaker 2")
-        val expected = ExportTranscript("Consegna: giovedì?", h.row("a").durationMs, first.words, labels)
+        val expected = ExportTranscript("Delivery: Thursday?", h.row("a").durationMs, first.words, labels)
         val out = folder.newFolder("out")
 
         val copy = File(out, "copy.opus")

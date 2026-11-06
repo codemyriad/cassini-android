@@ -117,7 +117,7 @@ class EllipsisTextTest {
         const val MAX_WIDTH = 220
         const val SETTLE_FRAMES = 3
         const val TEXT =
-            "e quindi il cliente ha detto che la consegna di giovedì va bene se il fornitore conferma entro la " +
-                "fine della settimana e se il prezzo resta quello del preventivo di marzo"
+            "and then the client said Thursday delivery works if the supplier confirms by the " +
+                "end of the week and if the price stays as quoted in March"
     }
 }

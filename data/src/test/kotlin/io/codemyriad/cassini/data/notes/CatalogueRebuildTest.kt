@@ -86,7 +86,7 @@ class CatalogueRebuildTest {
 
     private fun file(id: String, name: String) = File(h.dir(id), name).apply { parentFile!!.mkdirs() }
 
-    private val meetingWords = transcript("buongiorno a tutti oggi parliamo della consegna di giovedì")
+    private val meetingWords = transcript("good morning everyone today we discuss the delivery on Thursday")
 
     private fun checkpoint(source: String) = CheckpointState(
         source = source,
@@ -95,7 +95,7 @@ class CatalogueRebuildTest {
         speakers = "diarizer-sha",
         recognition = RecognitionState(
             inferenceMs = 1_200,
-            chunks = IncrementalState(0, 28_000, FloatArray(4), transcript("uno due tre").words),
+            chunks = IncrementalState(0, 28_000, FloatArray(4), transcript("one two three").words),
         ),
         encoder = null,
         diarizer = null,
@@ -116,7 +116,7 @@ class CatalogueRebuildTest {
 
     /** The note directories and voice files of a catalogue that was lost. */
     private fun writeTree() {
-        file(documentId, "document.opus").writeBytes(documentBytes(meetingWords, "Seduta del consiglio"))
+        file(documentId, "document.opus").writeBytes(documentBytes(meetingWords, "Board meeting"))
 
         file(captureId, "capture.opus").also { truncatedCopy(fleurs("opus"), it, 0.6) }.setLastModified(recordedAt)
 
@@ -126,7 +126,7 @@ class CatalogueRebuildTest {
         file(pausedId, "work/checkpoint.json").writeText(CheckpointState.encode(checkpoint("capture.opus")).toString())
 
         fleurs("opus").copyTo(file(sealedId, "capture.opus"))
-        file(sealedId, "work/sealed.opus").writeBytes(documentBytes(transcript("la seduta è aperta"), "Verbale"))
+        file(sealedId, "work/sealed.opus").writeBytes(documentBytes(transcript("the session is open"), "Minutes"))
         file(sealedId, "work/sealed").createNewFile()
 
         fleurs("opus").copyTo(file(badSealId, "capture.opus"))
@@ -164,7 +164,7 @@ class CatalogueRebuildTest {
         val document = h.row(documentId)
         assertEquals(AudioKind.DOCUMENT, document.audioKind)
         assertEquals(Origin.RECORDED, document.origin) // The vendor is cassini-android.
-        assertEquals("Seduta del consiglio", document.title)
+        assertEquals("Board meeting", document.title)
         assertFalse(document.titleDirty)
         assertEquals(DocumentState.OK, document.documentState)
         val meeting = h.readFile(documentId).manifest!!.getJSONObject("meeting")
@@ -206,7 +206,7 @@ class CatalogueRebuildTest {
         // The pending adopt was finished: the sealed document is the note's audio and work/ is gone.
         val sealed = h.row(sealedId)
         assertEquals(AudioKind.DOCUMENT, sealed.audioKind)
-        assertEquals("Verbale", sealed.title)
+        assertEquals("Minutes", sealed.title)
         assertFalse(sealed.titleDirty)
         assertEquals(DocumentState.OK, sealed.documentState)
         assertEquals(listOf("document.opus"), h.dir(sealedId).list()!!.toList())
@@ -321,7 +321,7 @@ class CatalogueRebuildTest {
 
     @Test fun aRebuildThatStoppedPartwayIsFinishedByTheNextStart() = runTest {
         // The process died after the rebuild added the first note: the catalogue is not empty any more.
-        file(documentId, "document.opus").writeBytes(documentBytes(meetingWords, "Seduta del consiglio"))
+        file(documentId, "document.opus").writeBytes(documentBytes(meetingWords, "Board meeting"))
         catalogue().rebuild()
         writeTree()
 
@@ -373,7 +373,7 @@ class CatalogueRebuildTest {
     }
 
     @Test fun aDocumentWithAShortTagsPacketIsCatalogued() = runTest {
-        val stream = io.codemyriad.cassini.core.format.OggOpus.read(documentBytes(meetingWords, "Seduta"))
+        val stream = io.codemyriad.cassini.core.format.OggOpus.read(documentBytes(meetingWords, "Session"))
         val document = file(documentId, "document.opus")
         // "OpusTags" and two bytes: too short for the vendor length.
         document.writeBytes(
@@ -391,7 +391,7 @@ class CatalogueRebuildTest {
     @Test fun aCorruptDatabaseIsSetAsideAndRebuilt() = runTest {
         writeTree()
         catalogue().rebuild()
-        h.notes.rename(captureId, "Telefonata con Marco") // Room-only state that a lost database loses.
+        h.notes.rename(captureId, "Phone call with Marco") // Room-only state that a lost database loses.
         h.db.close()
         val database = h.paths.database
         listOf("-wal", "-shm", "-journal").forEach { File(database.path + it).delete() }
@@ -416,9 +416,9 @@ class CatalogueRebuildTest {
             assertNotNull(report)
             assertEquals(listOf(documentId, captureId, importId, pausedId, sealedId, badSealId), report!!.created)
             val rows = opened.database.notes().all().associateBy { it.id }
-            assertEquals("Seduta del consiglio", rows.getValue(documentId).title)
+            assertEquals("Board meeting", rows.getValue(documentId).title)
             assertEquals("Recovered recording 9 Oct", rows.getValue(captureId).title)
-            assertEquals("Verbale", rows.getValue(sealedId).title)
+            assertEquals("Minutes", rows.getValue(sealedId).title)
             assertEquals(AudioKind.DOCUMENT, rows.getValue(sealedId).audioKind)
             assertEquals(JobState.PAUSED, opened.database.jobs().job(pausedId)!!.state)
             assertEquals(2, opened.database.voiceLinks().all().size)
@@ -441,7 +441,7 @@ class CatalogueRebuildTest {
         fleurs("opus").copyTo(file(pausedId, "capture.opus"))
         val plainCheckpoint = file(pausedId, "work/checkpoint.json")
         plainCheckpoint.writeText(CheckpointState.encode(checkpoint("capture.opus")).toString())
-        file(documentId, "document.opus").writeBytes(documentBytes(meetingWords, "Seduta del consiglio"))
+        file(documentId, "document.opus").writeBytes(documentBytes(meetingWords, "Board meeting"))
         val documentCheckpoint = file(documentId, "work/checkpoint.json")
         documentCheckpoint.writeText(CheckpointState.encode(checkpoint("document.opus")).toString())
         failJobInserts(true)

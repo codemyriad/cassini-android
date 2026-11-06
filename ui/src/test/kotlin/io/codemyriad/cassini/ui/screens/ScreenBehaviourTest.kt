@@ -140,7 +140,7 @@ class ScreenBehaviourTest {
         val many = (1..12).flatMap { n -> base.turns.map { it.copy(id = "${it.id}-$n") } }
         var state by mutableStateOf(base.copy(turns = many.toPersistentList()))
         setThemed { NoteScreen(state, onEvent = {}) }
-        val newest = BoardFixtures.draftGiulia.copy(id = "newest", words = timedWords("Ultima frase nuova.", 0))
+        val newest = BoardFixtures.draftGiulia.copy(id = "newest", words = timedWords("Latest new sentence.", 0))
         rule.runOnIdle { state = state.copy(turns = (many + newest).toPersistentList()) }
         rule.onNodeWithText(turnText(newest.words)).assertIsDisplayed()
         rule.onNodeWithText("Stop and keep progress").assertIsDisplayed()

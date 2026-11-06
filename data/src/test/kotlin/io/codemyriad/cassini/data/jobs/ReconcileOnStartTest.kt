@@ -115,7 +115,7 @@ class ReconcileOnStartTest {
     private suspend fun writeTree() {
         row(sealed, JobState.RUNNING)
         save(sealed)
-        seal(sealed, documentBytes(transcript("la seduta è aperta"), "Verbale"))
+        seal(sealed, documentBytes(transcript("the session is open"), "Minutes"))
 
         row(badSeal, JobState.RUNNING)
         save(badSeal)
@@ -238,7 +238,7 @@ class ReconcileOnStartTest {
 
     @Test fun aMarkerWithoutARowIsAdopted() = runTest {
         row(sealed, null)
-        seal(sealed, documentBytes(transcript("la seduta è aperta"), "Verbale"))
+        seal(sealed, documentBytes(transcript("the session is open"), "Minutes"))
 
         assertEquals(listOf(sealed), jobs.reconcileOnStart(null).adopted)
         assertEquals(AudioKind.DOCUMENT, h.row(sealed).audioKind)
@@ -248,7 +248,7 @@ class ReconcileOnStartTest {
     @Test fun aCrashAfterTheRowUpdateOfAnAdoptIsFinishedWithoutAnotherRun() = runTest {
         row(sealed, JobState.RUNNING)
         save(sealed)
-        seal(sealed, documentBytes(transcript("la seduta è aperta"), "Verbale"))
+        seal(sealed, documentBytes(transcript("the session is open"), "Minutes"))
         val print = SpeakerPrint(FloatArray(ModelCatalog.VOICEPRINT_DIM) { 0.5f }, 10.0, null)
         assertTrue(offMain { voices.savePendingBlocking(sealed, mapOf("words/S1" to print), 0) })
         // The process died after adoptSealed: the document and the rows are in place, the job row is gone,
@@ -270,7 +270,7 @@ class ReconcileOnStartTest {
         row(sealed, JobState.RUNNING)
         save(sealed)
         checkpoints.draftNames(sealed).mutate { it.rename("S1", "Anna") }
-        seal(sealed, documentBytes(transcript("la seduta è aperta"), "Verbale"))
+        seal(sealed, documentBytes(transcript("the session is open"), "Minutes"))
 
         jobs.reconcileOnStart(null)
 
@@ -281,7 +281,7 @@ class ReconcileOnStartTest {
         row(sealed, JobState.RUNNING)
         save(sealed)
         checkpoints.draftNames(sealed).mutate { it.rename("S1", "Anna") }
-        seal(sealed, documentBytes(transcript("la seduta è aperta"), "Verbale"))
+        seal(sealed, documentBytes(transcript("the session is open"), "Minutes"))
 
         SealedAdopter.of(h.documents, voices).adopt(sealed)
 
@@ -311,7 +311,7 @@ class ReconcileOnStartTest {
     @Test fun aVoiceFileThatCannotBeReadKeepsTheMarkerForTheNextStart() = runTest {
         row(sealed, JobState.RUNNING)
         save(sealed)
-        seal(sealed, documentBytes(transcript("la seduta è aperta"), "Verbale"))
+        seal(sealed, documentBytes(transcript("the session is open"), "Minutes"))
         val print = SpeakerPrint(FloatArray(ModelCatalog.VOICEPRINT_DIM) { 0.5f }, 10.0, null)
         assertTrue(offMain { voices.savePendingBlocking(sealed, mapOf("words/S1" to print), 0) })
         val model = ModelCatalog.voiceprintModel.sha256
@@ -339,7 +339,7 @@ class ReconcileOnStartTest {
         row(pausedSaved, JobState.PAUSED, reason = PauseReason.USER, doneMs = 28_000)
         save(pausedSaved)
         checkpoints.clips(pausedSaved).writeBytes(ByteArray(64))
-        seal(pausedSaved, documentBytes(transcript("la seduta è aperta"), "Verbale"))
+        seal(pausedSaved, documentBytes(transcript("the session is open"), "Minutes"))
         val work = h.paths.work(pausedSaved)
         // The process died after the first step of dropSealed: the marker is gone, sealed.opus is not.
         assertTrue(File(work, "sealed").delete())
@@ -362,7 +362,7 @@ class ReconcileOnStartTest {
     @Test fun aNewJobNeverStartsOverAnAdoptThatDidNotFinish() = runTest {
         row(sealed, JobState.RUNNING)
         save(sealed)
-        seal(sealed, documentBytes(transcript("la seduta è aperta"), "Verbale"))
+        seal(sealed, documentBytes(transcript("the session is open"), "Minutes"))
         val print = SpeakerPrint(FloatArray(ModelCatalog.VOICEPRINT_DIM) { 0.5f }, 10.0, null)
         assertTrue(offMain { voices.savePendingBlocking(sealed, mapOf("words/S1" to print), 0) })
         // The voice step of the adopt fails: the document is in place, the job row is gone, the marker stays.

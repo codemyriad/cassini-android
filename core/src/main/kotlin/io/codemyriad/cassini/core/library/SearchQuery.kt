@@ -24,15 +24,15 @@ object SearchQuery {
 
     /**
      * The FTS4 MATCH expression for what the user typed, or null when nothing searchable is left. Each
-     * whitespace-separated term becomes a quoted prefix phrase with the star INSIDE the quotes (`"consegn*"`, the
+     * whitespace-separated term becomes a quoted prefix phrase with the star INSIDE the quotes (`"deliver*"`, the
      * FTS3/4 syntax; a star after the closing quote is FTS5 syntax). The phrases are joined with spaces, an implicit
      * AND, so AND, OR, NOT and NEAR typed by the user are plain words.
      *
      * Inside a term, every character that is not a letter, a digit or a combining mark becomes a space, as the
      * unicode61 tokenizer splits the transcript there: `e-mail` gives `"e mail*"`, which matches the indexed tokens
-     * `e` and `mail`, and `giov.` gives `"giov*"`, so the star follows a token and stays a prefix match. That also
+     * `e` and `mail`, and `caf.` gives `"caf*"`, so the star follows a token and stays a prefix match. That also
      * removes `" * ^ : ( )` and `-`. A term with no letter or digit is dropped: FTS4 matches nothing at all for a query
-     * that contains an empty phrase, so `consegna ,` would find nothing.
+     * that contains an empty phrase, so `delivery ,` would find nothing.
      */
     fun fts(input: String): String? {
         val phrases = terms(input)

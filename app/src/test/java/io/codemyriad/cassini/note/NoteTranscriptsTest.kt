@@ -19,12 +19,12 @@ import org.junit.Test
 /** Turns, tints, badges, suggestion cards and the active word (features.md sections 3.1 and 3.3). */
 class NoteTranscriptsTest {
     private val words = listOf(
-        Word("a", 0, 400, "Ciao"),
-        Word("a", 500, 900, "a tutti."),
-        Word("b", 1_000, 1_400, "Buongiorno"),
-        Word("c", 2_000, 2_300, "Eccomi"),
-        Word("a", 3_000, 3_500, "Bene,"),
-        Word("a", 3_500, 3_900, "quindi"),
+        Word("a", 0, 400, "Hello"),
+        Word("a", 500, 900, "everyone."),
+        Word("b", 1_000, 1_400, "Morning"),
+        Word("c", 2_000, 2_300, "Here"),
+        Word("a", 3_000, 3_500, "Good,"),
+        Word("a", 3_500, 3_900, "so"),
     )
     private val speakers = listOf(
         speaker("a", 0, "Giulia", placeholder = false),
@@ -45,7 +45,7 @@ class NoteTranscriptsTest {
         // Placeholders are amber and take no slot: Giulia blue, Paolo teal.
         val tones = listOf(SpeakerTone.Blue, SpeakerTone.Amber, SpeakerTone.Teal, SpeakerTone.Blue)
         assertEquals(tones, turns.map { it.tone })
-        assertEquals("Ciao a tutti.", turnText(turns[0].words))
+        assertEquals("Hello everyone.", turnText(turns[0].words))
         assertEquals(500L, turns[0].words[1].startMs)
         assertEquals(listOf("a", "b", "c"), transcript.speakers)
     }
@@ -110,7 +110,7 @@ class NoteTranscriptsTest {
         assertTrue(turns[2].auto)
         assertNull("the card sits at the speaker's most recent turn", turns[0].suggestion)
         assertEquals(SuggestionUi("luca", "Luca"), turns[3].suggestion)
-        assertEquals("quindi ends after 3.6 s", 1, turns[3].unsettledFrom)
+        assertEquals("so ends after 3.6 s", 1, turns[3].unsettledFrom)
         assertNull(turns[0].unsettledFrom)
         assertEquals(WordRef("w4", 0), draft.activeWord(3_100))
     }
@@ -149,19 +149,19 @@ class NoteTranscriptsTest {
     @Test
     fun searchIgnoresCaseAndAccents() {
         val turns = NoteTranscripts.sealed(
-            listOf(Word("a", 0, 1, "Giovedì"), Word("a", 1, 2, "CONSEGNA"), Word("b", 2, 3, "giovedi consegna")),
+            listOf(Word("a", 0, 1, "Café"), Word("a", 1, 2, "DELIVERY"), Word("b", 2, 3, "cafe delivery")),
             emptyList(),
             emptyMap(),
             emptyList(),
         ).turns
-        val giovedi = TranscriptSearch.matches(turns, "giovedi")
-        assertEquals(2, giovedi.size)
-        assertEquals("w0", giovedi[0].turnId)
-        assertEquals(0..6, giovedi[0].range)
-        assertEquals(0..6, giovedi[1].range)
-        assertEquals(listOf(8..15, 8..15), TranscriptSearch.matches(turns, "Consegna").map { it.range })
+        val cafe = TranscriptSearch.matches(turns, "cafe")
+        assertEquals(2, cafe.size)
+        assertEquals("w0", cafe[0].turnId)
+        assertEquals(0..3, cafe[0].range)
+        assertEquals(0..3, cafe[1].range)
+        assertEquals(listOf(5..12, 5..12), TranscriptSearch.matches(turns, "Delivery").map { it.range })
         assertTrue(TranscriptSearch.matches(turns, "  ").isEmpty())
-        assertTrue(TranscriptSearch.matches(turns, "domani").isEmpty())
+        assertTrue(TranscriptSearch.matches(turns, "tomorrow").isEmpty())
     }
 
     @Test

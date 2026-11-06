@@ -24,7 +24,7 @@ class WordBodyBudgetTest {
             Word("s1", 0, 1, "\"quoted\""),
             Word("s1", 1, 2, "back\\slash"),
             Word("s1", 2, 3, "e/o"),
-            Word("s1", 3, 4, "giovedì"),
+            Word("s1", 3, 4, "café"),
             Word("s1", 4, 5, "東京"),
             Word("s1", 5, 6, "😀"),
             Word("s1", 6, 7, "a\u0001b"),

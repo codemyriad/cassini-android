@@ -89,7 +89,7 @@ class ComponentSemanticsTest {
             // Everything fits in the 844 dp window: touch bounds are clipped to it.
             FlowRow(Modifier.width(390.dp)) {
                 Banner(RECOVERED, onAction = {}, onDismiss = {})
-                PillSearchField(query = "consegna", onQueryChange = {}, placeholder = "Search")
+                PillSearchField(query = "delivery", onQueryChange = {}, placeholder = "Search")
                 SegmentedControl(persistentListOf("Phone", "English", "Italiano"), selectedIndex = 0, onSelect = {})
                 IconButton44(Glyph.Back, "Back to library", onClick = {})
                 InkButton("Ink small", onClick = {})
@@ -205,7 +205,7 @@ class ComponentSemanticsTest {
         rule.onNode(
             hasContentDescription(
                 "Call with supplier, 23 minutes 50 seconds, yesterday 15:10, transcribed, 3 speakers, " +
-                    "quindi la consegna slitta a giovedì, but the price stays as agreed",
+                    "so the delivery slips to Thursday, but the price stays as agreed",
             ),
         ).assertExists()
         rule.onNode(hasContentDescription("no speech", substring = true)).assertExists()

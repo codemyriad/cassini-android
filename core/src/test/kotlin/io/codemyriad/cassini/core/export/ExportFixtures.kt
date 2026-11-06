@@ -15,7 +15,7 @@ internal fun transcript(
     words: List<Word>,
     labels: Map<String, String> = mapOf("spk_0" to "Paolo", "spk_1" to "Speaker 2", "spk_2" to "Élodie"),
     durationMs: Long = 23 * 60_000L + 50_000,
-    title: String = "Chiamata con il fornitore",
+    title: String = "Call with supplier",
 ) = ExportTranscript(title, durationMs, words, labels)
 
 internal fun resource(name: String): String =

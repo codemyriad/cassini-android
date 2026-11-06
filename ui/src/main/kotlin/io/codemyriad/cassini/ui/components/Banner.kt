@@ -197,7 +197,7 @@ internal fun BannerPreview() {
                 onAction = {},
                 onDismiss = {},
             )
-            Banner(BannerSpec(BannerKind.LIB_NO_MATCH, BannerArgs(text = "fattura")), onAction = {})
+            Banner(BannerSpec(BannerKind.LIB_NO_MATCH, BannerArgs(text = "invoice")), onAction = {})
         }
     }
 }

@@ -121,7 +121,7 @@ class SheetAndDraftDeviceTest {
         var state by mutableStateOf(processing(turns(TURNS)))
         rule.setContent { CassiniTheme(darkTheme = false) { NoteScreen(state, onEvent = {}) } }
         rule.waitForIdle()
-        val newest = turn(TURNS, "Ultima frase della bozza, appena trascritta.")
+        val newest = turn(TURNS, "The latest draft sentence, just transcribed.")
         rule.runOnIdle { state = processing((turns(TURNS) + newest).toPersistentList()) }
         rule.waitForIdle()
         rule.onNode(hasText(turnText(newest.words))).assertIsDisplayed()
@@ -267,7 +267,7 @@ class SheetAndDraftDeviceTest {
         )
 
         fun turns(count: Int) = (0 until count).map { index ->
-            turn(index, "Va bene, allora confermiamo le quantità e la consegna di giovedì per il fornitore.")
+            turn(index, "All right, let us confirm the quantities and Thursday delivery with the supplier.")
         }.toPersistentList()
 
         fun processing(turns: ImmutableList<TurnUi>) = NoteUiState(

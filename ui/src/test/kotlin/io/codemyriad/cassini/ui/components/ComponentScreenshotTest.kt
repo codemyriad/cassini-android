@@ -105,8 +105,8 @@ class ComponentScreenshotTest : BoardTest() {
         Label("PillSearchField: empty, with a query, compact; PrivacyLine")
         Padded {
             PillSearchField(query = "", onQueryChange = {}, placeholder = "Search titles and what was said")
-            PillSearchField(query = "consegna", onQueryChange = {}, placeholder = "Search titles and what was said")
-            PillSearchField(query = "giovedì", onQueryChange = {}, placeholder = "Search in transcript", compact = true)
+            PillSearchField(query = "delivery", onQueryChange = {}, placeholder = "Search titles and what was said")
+            PillSearchField(query = "café", onQueryChange = {}, placeholder = "Search in transcript", compact = true)
         }
         Box(Modifier.padding(horizontal = 16.dp)) {
             PrivacyLine("Transcribed on this phone. Audio never leaves it.")
