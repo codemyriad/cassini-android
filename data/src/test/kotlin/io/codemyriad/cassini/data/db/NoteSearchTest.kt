@@ -135,10 +135,10 @@ class NoteSearchTest {
         db.notes().insert(row)
         val before = db.notes().text("a")!!.rowId
         db.cache().replaceCache(cache(row, listOf("v1" to words("one two three"))))
-        db.cache().replaceCache(cache(row, listOf("v1" to words("quattro cinque"))))
+        db.cache().replaceCache(cache(row, listOf("v1" to words("four five"))))
         assertEquals(before, db.notes().text("a")!!.rowId)
         assertTrue(search("one").isEmpty())
-        assertEquals(listOf("a"), search("cinque").map { it.row.id })
+        assertEquals(listOf("a"), search("five").map { it.row.id })
     }
 
     @Test fun audioOnlyNotesAreFoundByTitle() = runTest {

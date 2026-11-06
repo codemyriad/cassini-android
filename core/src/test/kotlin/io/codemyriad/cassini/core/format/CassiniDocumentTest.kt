@@ -36,8 +36,13 @@ class CassiniDocumentTest {
             .put("x-segmentation", "live 5 s steps with 1 s recorded overlap, 0.5 s synthetic tail, seams spliced at an aligned word")
         val bytes = CassiniDocument.create(silence(), transcript, "Old live note", provenance)
         val original = CassiniDocument.read(bytes)
-        val nextBytes = CassiniDocument.create(bytes, transcript.copy(words = listOf(Word("spk_1", 0, 20, "After."))),
-            "Ignored", JSONObject().put("model", "nvidia/parakeet-tdt-0.6b-v3 INT8"), original)
+        val nextBytes = CassiniDocument.create(
+            bytes,
+            transcript.copy(words = listOf(Word("spk_1", 0, 20, "After."))),
+            "Ignored",
+            JSONObject().put("model", "nvidia/parakeet-tdt-0.6b-v3 INT8"),
+            original,
+        )
         val next = CassiniDocument.read(nextBytes)
         assertEquals("ok", next.state)
         assertEquals(2, next.variants.size)
@@ -93,7 +98,8 @@ class CassiniDocumentTest {
         assertEquals(before.manifest.toString(), after.manifest.toString())
     }
     @Test fun relabelRejectsUnknownSpeakersAndBlankLabels() {
-        val bytes = CassiniDocument.create(silence(), Transcript(listOf(Word("spk_1", 0, 20, "Hi")), "it"), "One", JSONObject())
+        val transcript = Transcript(listOf(Word("spk_1", 0, 20, "Hi")), "en")
+        val bytes = CassiniDocument.create(silence(), transcript, "One", JSONObject())
         for (labels in listOf(mapOf("spk_9" to "Anna"), mapOf("spk_1" to "  "))) {
             try { relabelled(bytes, labels); fail("$labels") } catch (_: IllegalArgumentException) {}
         }

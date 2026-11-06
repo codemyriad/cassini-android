@@ -49,7 +49,7 @@ class CatalogueDaoTest {
     @Test fun deletingANoteCascadesToEveryRow() = runTest {
         val row = note("a")
         db.notes().insert(row)
-        db.cache().replaceCache(cache(row, listOf("v1" to words("one two three quattro"), "v2" to words("cinque sei"))))
+        db.cache().replaceCache(cache(row, listOf("v1" to words("one two three four"), "v2" to words("five six"))))
         db.jobs().insert(job("a", 1))
         db.voiceLinks().replaceForNote("a", listOf(link("a", "v1", "S1", "voice-1", Match.State.CONFIRMED)))
         db.notes().insert(note("b"))
@@ -68,8 +68,8 @@ class CatalogueDaoTest {
     @Test fun replacingTheCacheDropsTheOldVariantsWithTheirSpeakersAndWords() = runTest {
         val row = note("a")
         db.notes().insert(row)
-        db.cache().replaceCache(cache(row, listOf("v1" to words("one two three quattro"), "v2" to words("cinque sei"))))
-        db.cache().replaceCache(cache(row, listOf("v3" to words("sette"))))
+        db.cache().replaceCache(cache(row, listOf("v1" to words("one two three four"), "v2" to words("five six"))))
+        db.cache().replaceCache(cache(row, listOf("v3" to words("seven"))))
         assertEquals(listOf("v3"), db.cache().variants("a").map { it.variantId })
         assertEquals(listOf("v3"), db.column("SELECT DISTINCT variant_id FROM speakers WHERE note_id = 'a'"))
         assertEquals(listOf("v3"), db.column("SELECT DISTINCT variant_id FROM words WHERE note_id = 'a'"))
@@ -99,11 +99,11 @@ class CatalogueDaoTest {
         // a: selected v2. AUTO on v2 counts for X; CONFIRMED on v1 (not selected) does not count for Y.
         val a = note("a")
         db.notes().insert(a)
-        val two = listOf("v1" to words("one two three quattro"), "v2" to words("cinque sei sette otto"))
+        val two = listOf("v1" to words("one two three four"), "v2" to words("five six seven eight"))
         db.cache().replaceCache(cache(a, two, selected = "v2"))
         // b: no selected_variant, so its default v1 is selected. CONFIRMED X counts; SUGGESTED Y does not.
         db.notes().insert(note("b"))
-        val b = cache(note("b"), listOf("v1" to words("one two three quattro")))
+        val b = cache(note("b"), listOf("v1" to words("one two three four")))
         db.cache().replaceCache(b.copy(note = b.note.copy(selectedVariant = null)))
         // c: trashed, its AUTO X does not count.
         db.notes().insert(note("c"))
@@ -181,7 +181,7 @@ class CatalogueDaoTest {
     @Test fun noteFlowCarriesVariantsSpeakersAndJob() = runTest {
         val a = note("a")
         db.notes().insert(a)
-        db.cache().replaceCache(cache(a, listOf("v1" to words("one two three quattro"))))
+        db.cache().replaceCache(cache(a, listOf("v1" to words("one two three four"))))
         db.jobs().insert(job("a", 4))
         val details = db.notes().noteFlow("a").first()!!
         assertEquals("a", details.note.id)

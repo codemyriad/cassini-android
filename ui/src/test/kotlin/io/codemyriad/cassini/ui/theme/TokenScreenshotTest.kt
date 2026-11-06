@@ -184,7 +184,7 @@ class TokenScreenshotTest : BoardTest() {
         "percent" -> "62"
         "percentSign" -> "%"
         "skip" -> "10"
-        "overline", "section" -> "Yesterday · Yesterday".uppercase()
+        "overline", "section" -> "Yesterday · Today".uppercase()
         "monoTime", "monoSmall", "monoValue", "monoSize" -> "48:13 · 640 MB"
         else -> "Product sync, café"
     }

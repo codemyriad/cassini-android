@@ -34,7 +34,7 @@ private val BOARD_ARGS: Map<BannerKind, BannerArgs> = mapOf(
         BannerArgs(part = ModelPartUi.SPEECH, percent = 46, bytes = 296 * MIB, bytes2 = ModelBytes.SPEECH),
     BannerKind.DL_CHECKING to BannerArgs(percent = 80),
     BannerKind.DL_NO_SPACE to BannerArgs(bytes = ModelBytes.REQUIRED_FREE),
-    BannerKind.LIB_NO_MATCH to BannerArgs(text = "fattura"),
+    BannerKind.LIB_NO_MATCH to BannerArgs(text = "invoice"),
     BannerKind.IMPORTING to BannerArgs(text = "call.m4a"),
     BannerKind.IMPORT_NO_SPACE to BannerArgs(bytes = 1_500_000_000L),
     BannerKind.NO_ENCODER to BannerArgs(m4a = true),
@@ -165,7 +165,7 @@ private val ENGLISH: Map<BannerKind, Triple<String, String?, List<String>>> = ma
     ),
     BannerKind.LIB_EMPTY to
         Triple("No notes yet", "Record something, or import an audio file.", listOf("Record", "Import")),
-    BannerKind.LIB_NO_MATCH to Triple("Nothing matches “fattura”", "Try another word or title.", listOf()),
+    BannerKind.LIB_NO_MATCH to Triple("Nothing matches “invoice”", "Try another word or title.", listOf()),
     BannerKind.IMPORTING to Triple("Importing call.m4a…", null, listOf()),
     BannerKind.IMPORT_TOO_LARGE to Triple("File too large", "Choose a file under 4 GB.", listOf("Choose another")),
     BannerKind.IMPORT_NO_SPACE to Triple(
@@ -374,7 +374,7 @@ class BannerKindItalianTest {
             "Questo file richiede circa 1,4 GB liberi. Libera spazio e riprova.",
             body(BannerKind.IMPORT_NO_SPACE),
         )
-        assertEquals("Nessun risultato per “fattura”", title(BannerKind.LIB_NO_MATCH))
+        assertEquals("Nessun risultato per “fattura”", title(BannerKind.LIB_NO_MATCH, BannerArgs(text = "fattura")))
         assertEquals("Riproduci comunque", BannerText.action(res, BannerAction.PLAY_ANYWAY))
     }
 }

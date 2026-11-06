@@ -112,7 +112,7 @@ class LibraryMappingTest {
         val row = libraryRow("a", createdAt = daysAgo(1))
         val results = LibraryMapping.results(
             listOf(
-                SearchRow(row, snippet = "…la \u0002delivery\u0003 slips…", titleSnippet = "Call with supplier"),
+                SearchRow(row, snippet = "…the \u0002delivery\u0003 slips…", titleSnippet = "Call with supplier"),
                 SearchRow(libraryRow("b"), snippet = "no markers here", titleSnippet = "\u0002Invoice\u0003 March"),
             ),
             context,
@@ -121,7 +121,7 @@ class LibraryMappingTest {
         )
         val first = results[0]
         assertEquals(DayLabel.Yesterday, first.day)
-        assertEquals(Highlighted("the delivery slips", persistentListOf(3..10), true, true), first.preview)
+        assertEquals(Highlighted("the delivery slips", persistentListOf(4..11), true, true), first.preview)
         assertTrue(first.titleRanges.isEmpty())
         val second = results[1]
         assertEquals("Invoice March", second.title)
