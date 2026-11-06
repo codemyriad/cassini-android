@@ -772,7 +772,7 @@ Accepted deviations from the boards. The reviewer examines each one, and the tol
 
 1. `text4` #687180 in place of #6B7480.
 2. A 48 dp layout for each control. In the draft transcript, this adds about 6 dp for each turn.
-3. The app draws the background of the active word and does not pad the word. Thus "café," can wrap one word later than on the board.
+3. The app draws the background of the active word and does not pad the word. Thus the highlight does not change the line breaks.
 4. Sub-pixel differences of the text advance (a snippet line can wrap one word earlier).
 5. Compose makes Plex Mono 600 from 500.
 6. Turn 1 of Read & listen is 2 dp lower than on the board.

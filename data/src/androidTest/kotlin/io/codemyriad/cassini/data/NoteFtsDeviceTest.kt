@@ -46,7 +46,7 @@ class NoteFtsDeviceTest {
                 updatedAt = 1,
             )
             db.notes().insert(note)
-            val variant = VariantEntity("n1", "v1", ordinal = 0, isDefault = true, wordCount = 7)
+            val variant = VariantEntity("n1", "v1", ordinal = 0, isDefault = true, wordCount = 6)
             val body = "so the delivery reaches the café"
             db.cache().replaceCache(NoteCache(note, listOf(variant), emptyList(), emptyList(), body))
         }
