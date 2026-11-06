@@ -49,7 +49,7 @@ class WordCacheDeviceTest {
     }
 
     private fun oneHour(): List<Word> {
-        val vocabulary = listOf("quindi", "la", "consegna", "slitta", "a", "giovedì,", "but", "the", "price", "stays.")
+        val vocabulary = listOf("so", "the", "delivery", "slips", "to", "Thursday,", "but", "the", "price", "stays.")
         return List(WORDS) { index ->
             Word("S${(index / 25) % 4}", index * 380L, index * 380L + 300, vocabulary[index % vocabulary.size])
         }

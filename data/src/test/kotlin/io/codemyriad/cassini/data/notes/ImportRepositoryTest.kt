@@ -81,10 +81,10 @@ class ImportRepositoryTest {
     }
 
     @Test fun aWavBecomesSourceWavWithItsHashAndDuration() = runTest {
-        val uri = input(fleurs("wav"), "Riunione di lunedì.wav")
+        val uri = input(fleurs("wav"), "Monday meeting.wav")
         val id = created(importer().import(uri))
 
-        val row = assertPlain(id, "source.wav", FLEURS_WAV_MS, "Riunione di lunedì")
+        val row = assertPlain(id, "source.wav", FLEURS_WAV_MS, "Monday meeting")
         assertEquals(sha256(fleurs("wav")), row.sourceSha256)
         assertEquals(h.now, row.createdAt)
         assertEquals(sha256(fleurs("wav")), sha256(File(h.dir(id), "source.wav")))
@@ -115,8 +115,8 @@ class ImportRepositoryTest {
     }
 
     @Test fun aCassiniDocumentIsVerifiedOnceAndOpensFromTheCache() = runTest {
-        val words = transcript("buongiorno a tutti oggi parliamo della consegna di giovedì")
-        val file = File(inputs, "export.opus").apply { writeBytes(documentBytes(words, "Seduta del consiglio")) }
+        val words = transcript("good morning everyone today we discuss the delivery on Thursday")
+        val file = File(inputs, "export.opus").apply { writeBytes(documentBytes(words, "Board meeting")) }
 
         val id = created(importer().import(Uri.fromFile(file)))
 
@@ -124,7 +124,7 @@ class ImportRepositoryTest {
         assertEquals(AudioKind.DOCUMENT, row.audioKind)
         assertEquals(Origin.IMPORTED_DOCUMENT, row.origin)
         assertEquals("document.opus", row.audioFile)
-        assertEquals("Seduta del consiglio", row.title)
+        assertEquals("Board meeting", row.title)
         assertFalse(row.titleDirty)
         assertEquals(DocumentState.OK, row.documentState)
         assertEquals(sha256(file), row.sourceSha256)
@@ -143,8 +143,8 @@ class ImportRepositoryTest {
     }
 
     @Test fun aDocumentWithBrokenMetadataIsStillADocument() = runTest {
-        val words = transcript("una prova")
-        val bytes = documentBytes(words, "Prova")
+        val words = transcript("a test")
+        val bytes = documentBytes(words, "Test")
         val stream = OggOpus.read(bytes)
         val comments = CassiniDocument.readComments(stream.tags)
             .map { if (it.startsWith("CASSINI_PROFILE=")) "CASSINI_PROFILE=other" else it }
@@ -331,7 +331,7 @@ class ImportRepositoryTest {
     @Test fun titlesAndExtensionsFollowTheDisplayName() {
         assertEquals("Meeting.final", ImportRepository.titleOf("Meeting.final.MP3"))
         assertEquals(".opus", ImportRepository.titleOf(".opus"))
-        assertEquals("riunione", ImportRepository.titleOf("  riunione  "))
+        assertEquals("meeting", ImportRepository.titleOf("  meeting  "))
         assertEquals(ImportRepository.FALLBACK_TITLE, ImportRepository.titleOf(null))
         assertEquals(ImportRepository.FALLBACK_TITLE, ImportRepository.titleOf("   "))
         assertEquals("Audio importato", ImportRepository.titleOf(null, "Audio importato"))

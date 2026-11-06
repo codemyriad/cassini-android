@@ -727,7 +727,7 @@ class ProcessingCoordinatorTest {
     private suspend fun checkpoint(noteId: String, doneMs: Long) = withContext(Dispatchers.IO) {
         val checkpoints = catalogue().checkpoints
         checkpoints.openWorkBlocking(noteId)
-        val words = listOf(Word("S1", 0, 400, "uno"), Word("S2", 500, 900, "due"))
+        val words = listOf(Word("S1", 0, 400, "one"), Word("S2", 500, 900, "two"))
         val state = CheckpointState(
             source = "capture.opus",
             signature = CheckpointState.signature(File(paths.note(noteId), "capture.opus")),

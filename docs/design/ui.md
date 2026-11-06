@@ -723,7 +723,7 @@ Library fixture:
 
 - Today: Weekly product sync, 48:13, 10:02, Transcribing, highlighted.
 - Today: Interview — Marta, 1:12:05, 08:40, Queued.
-- Yesterday: Call with supplier, 23:50, with the excerpt preview "…quindi la consegna slitta a giovedì, but the price stays as agreed in the March order…", 15:10, Transcribed · 3 speakers.
+- Yesterday: Call with supplier, 23:50, with the excerpt preview "…so the delivery slips to Thursday, but the price stays as agreed in the March order…", 15:10, Transcribed · 3 speakers.
 - Yesterday: Board review prep, 34:12, 11:00, Paused at 12:40 · Resume.
 - Yesterday: Voice note 8 Oct, 08:14, 02:41, Audio only.
 - The banner: 62 %, "About 6–9 min left · 1 more in queue".
@@ -772,7 +772,7 @@ Accepted deviations from the boards. The reviewer examines each one, and the tol
 
 1. `text4` #687180 in place of #6B7480.
 2. A 48 dp layout for each control. In the draft transcript, this adds about 6 dp for each turn.
-3. The app draws the background of the active word and does not pad the word. Thus "giovedì," can wrap one word later than on the board.
+3. The app draws the background of the active word and does not pad the word. Thus the highlight does not change the line breaks.
 4. Sub-pixel differences of the text advance (a snippet line can wrap one word earlier).
 5. Compose makes Plex Mono 600 from 500.
 6. Turn 1 of Read & listen is 2 dp lower than on the board.

@@ -3,8 +3,8 @@ package io.codemyriad.cassini.core.export
 import org.junit.Test
 
 /**
- * A 1 h 03 min call in Italian and English with three speakers: a named one, a placeholder and a named one with an
- * accent. Speaker 2's "Sì, sì." comes after Élodie's turn in canonical order but starts while she speaks, so the
+ * A 1 h 03 min call in English with three speakers: a named one, a placeholder and a named one with an
+ * accent. Speaker 2's "Yes, yes." comes after Élodie's turn in canonical order but starts while she speaks, so the
  * subtitles sort it into her cues.
  */
 class ExportGoldenTest {
@@ -14,7 +14,7 @@ class ExportGoldenTest {
             w(field[0], field[1].toLong(), field[2].toLong(), field[3])
         }.toList(),
         durationMs = 3_790_000,
-        title = "Chiamata con il fornitore",
+        title = "Call with supplier",
     )
 
     @Test fun text() {

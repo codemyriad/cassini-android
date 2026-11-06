@@ -288,7 +288,7 @@ internal fun NoteRowPreview() {
                     day = DayLabel.Yesterday,
                     status = NoteStatusUi.Transcribed(speakers = 3, words = 4_812),
                     preview = Highlighted(
-                        text = "quindi la consegna slitta a giovedì, but the price stays as agreed",
+                        text = "so the delivery slips to Thursday, but the price stays as agreed",
                         ranges = persistentListOf(10..17),
                         leadingEllipsis = true,
                         trailingEllipsis = true,

@@ -101,7 +101,7 @@ class RecordingControllerTest {
     @Test fun finishNeverRunsOnTheMainThread() = runBlocking {
         val main = Looper.getMainLooper().thread
         assertEquals("Robolectric runs the test on the main thread", main, Thread.currentThread())
-        val active = startRecording("Riunione")
+        val active = startRecording("Meeting")
         assertEquals(CaptureFormat.OPUS, active.format)
         assertEquals(48_000, active.sampleRateHz)
         assertTrue("the wake lock is held", platform.wakeLocks.get() >= 1)
@@ -110,7 +110,7 @@ class RecordingControllerTest {
         mic.elapsedMs = 61_000
 
         val before = System.nanoTime()
-        controller.finish("Riunione di lunedì")
+        controller.finish("Monday meeting")
         val tookMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - before)
         assertTrue("finish returned after $tookMs ms", tookMs < 100)
         waitFor { mic.stopThread != null }
@@ -125,7 +125,7 @@ class RecordingControllerTest {
         val row = row(active.noteId)
         assertEquals(AudioKind.PLAIN, row?.audioKind)
         assertEquals(61_000L, row?.durationMs)
-        assertEquals("Riunione di lunedì", row?.title)
+        assertEquals("Monday meeting", row?.title)
         assertEquals(listOf(active.noteId), handoffs)
         assertNull(controller.activeNoteId.value)
         assertFalse(platform.wakeLockHeld)
@@ -136,17 +136,17 @@ class RecordingControllerTest {
         val active = startRecording("Nota")
         assertEquals("Nota", row(active.noteId)?.title)
 
-        controller.setTitle("Prova")
-        controller.setTitle("Prova del")
-        controller.setTitle("Prova del coro ")
-        waitFor { row(active.noteId)?.title == "Prova del coro" }
+        controller.setTitle("Test")
+        controller.setTitle("Choir")
+        controller.setTitle("Choir rehearsal ")
+        waitFor { row(active.noteId)?.title == "Choir rehearsal" }
         delay(DEBOUNCE_MS)
         assertEquals("one write after the last change", 1, renames.get())
-        assertEquals("the state keeps the text as typed", "Prova del coro ", activeState().title)
+        assertEquals("the state keeps the text as typed", "Choir rehearsal ", activeState().title)
 
         controller.finish()
         awaitEnded()
-        assertEquals("Prova del coro", row(active.noteId)?.title)
+        assertEquals("Choir rehearsal", row(active.noteId)?.title)
     }
 
     @Test fun aBlankTitleBecomesTheDefault() = runBlocking {
@@ -220,7 +220,7 @@ class RecordingControllerTest {
 
     @Test fun anAacFileStopsAtItsSizeLimitAndSavesTheAudio() = runBlocking {
         capture.format = CaptureFormat.M4A
-        val active = startRecording("Vecchio telefono")
+        val active = startRecording("Old phone")
         assertEquals(CaptureFormat.M4A, active.format)
         val file = capture.latest.file
         // 10 minutes of room left in the file: the hint counts the file, not the free space.
@@ -250,7 +250,7 @@ class RecordingControllerTest {
 
     @Test fun withoutConsentTheDownloadIsAskedOrTheNoteStaysAudioOnly() = runBlocking {
         consent.consented = false
-        val asked = startRecording("Prima")
+        val asked = startRecording("Before")
         controller.finish()
         assertEquals(RecordingOutcome.Saved(AfterFinish.ASK_CONSENT), awaitEnded().outcome)
 
@@ -266,7 +266,7 @@ class RecordingControllerTest {
     // Pauses. -----------------------------------------------------------------------------------------------------
 
     @Test fun aSilencedCaptureStaysPausedUntilTheUserResumes() = runBlocking {
-        startRecording("Telefonata")
+        startRecording("Phone call")
         val mic = capture.latest
 
         platform.watch.silence(true)
@@ -293,7 +293,7 @@ class RecordingControllerTest {
     @Test fun oneResumeAfterACallKeepsRecording() = runBlocking {
         // The pre-release gate of 0.4.0 (API 35): after the call, the first Resume restarted the capture, Android's
         // first configuration of it still said silenced, and an update 1 ms later said it was not.
-        startRecording("Dopo la telefonata")
+        startRecording("After the phone call")
         val mic = capture.latest
         platform.watch.silence(true)
         waitFor { activeState().pause == RecordingPause.OTHER_APP }

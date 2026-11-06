@@ -61,10 +61,10 @@ class PortableDocumentTest {
             val durationMs = StreamingOpusEncoder(audio).use { encoder ->
                 audioDecoder(context).stream(Uri.fromFile(source), encoder::accept).also { encoder.finish() }
             }
-            val words = listOf(Word("S1", 100, 600, "Ciao."), Word("S2", 8_000, 8_500, "Benvenuti."))
+            val words = listOf(Word("S1", 100, 600, "Hello."), Word("S2", 8_000, 8_500, "Welcome."))
             CassiniDocument.create(
                 audio,
-                Transcript(words, "it"),
+                Transcript(words, "en"),
                 "Portable",
                 JSONObject().put("model", "test"),
                 null,

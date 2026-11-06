@@ -40,7 +40,7 @@ internal object ComponentFixtures {
         time = LocalTime.of(15, 10),
         status = NoteStatusUi.Transcribed(speakers = 3, words = 4_812),
         preview = Highlighted(
-            text = "quindi la consegna slitta a giovedì, but the price stays as agreed in the March order",
+            text = "so the delivery slips to Thursday, but the price stays as agreed in the March order",
             leadingEllipsis = true,
             trailingEllipsis = true,
         ),
@@ -122,7 +122,7 @@ internal object ComponentFixtures {
             day = DayLabel.Yesterday,
             status = NoteStatusUi.Transcribed(speakers = 3, words = 4_812),
             preview = Highlighted(
-                text = "quindi la consegna slitta a giovedì, but the price stays as agreed",
+                text = "so the delivery slips to Thursday, but the price stays as agreed",
                 ranges = persistentListOf(10..17, 28..34),
                 leadingEllipsis = true,
                 trailingEllipsis = true,

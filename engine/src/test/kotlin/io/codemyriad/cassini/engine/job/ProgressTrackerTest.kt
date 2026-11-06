@@ -455,11 +455,11 @@ class ProgressTrackerTest {
         )
         t.send(started(totalMs = 70_000))
         val words = listOf(
-            Word("a", 0, 500, "uno"),
-            Word("d", 1_000, 1_500, "due"),
-            Word("c", 2_000, 2_500, "tre"),
-            Word("e", 3_000, 3_500, "quattro"),
-            Word("b", 4_000, 4_500, "cinque"),
+            Word("a", 0, 500, "one"),
+            Word("d", 1_000, 1_500, "two"),
+            Word("c", 2_000, 2_500, "three"),
+            Word("e", 3_000, 3_500, "four"),
+            Word("b", 4_000, 4_500, "five"),
         )
         t.send(JobEvent.WindowDone(28_000, 70_000, words))
         tick()

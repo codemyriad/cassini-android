@@ -10,8 +10,8 @@ import java.util.Locale
 
 /**
  * In-note search (features.md section 3.3): case- and diacritic-insensitive matching over each turn's paragraph
- * text (`turnText`), whose character ranges the screen highlights. "giovedi" finds "giovedì", "CONSEGNA" finds
- * "consegna".
+ * text (`turnText`), whose character ranges the screen highlights. "cafe" finds "café", "DELIVERY" finds
+ * "delivery".
  */
 object TranscriptSearch {
     private val combining = Regex("\\p{Mn}+")

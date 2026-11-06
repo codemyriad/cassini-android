@@ -34,7 +34,7 @@ class NoteRepositoryTest {
     private lateinit var h: NotesHarness
 
     private val words = transcript(
-        "allora iniziamo con la consegna di giovedì poi passiamo al budget e chiudiamo con le domande aperte di tutti",
+        "so we start with delivery on Thursday then discuss the budget and close with open questions from everyone",
         turn = 5,
     )
 
@@ -48,11 +48,11 @@ class NoteRepositoryTest {
         h.db.jobs().insert(JobEntity(id, 1, kind, state, enqueuedAt = 1, updatedAt = 1))
 
     @Test fun aRecordingStartsLiveAndEndsPlain() = runTest {
-        val id = h.notes.createRecording(" Registrazione 9 ott ", createdAt = 42, format = "opus")
+        val id = h.notes.createRecording(" Recording 9 Oct ", createdAt = 42, format = "opus")
 
         assertTrue(h.dir(id).isDirectory)
         val row = h.row(id)
-        assertEquals("Registrazione 9 ott", row.title)
+        assertEquals("Recording 9 Oct", row.title)
         assertEquals(AudioKind.LIVE_CAPTURE, row.audioKind)
         assertEquals("capture.opus", row.audioFile)
         assertEquals(Origin.RECORDED, row.origin)
@@ -82,13 +82,13 @@ class NoteRepositoryTest {
     }
 
     @Test fun aRenameOfAnOkDocumentIsWrittenIntoItInTheBackground() = runTest {
-        h.documentNote("a", words, title = "Riunione")
+        h.documentNote("a", words, title = "Meeting")
         h.notes.refreshIfStale("a")
 
-        assertEquals(RenameOutcome.Renamed, h.notes.rename("a", "Riunione di budget"))
+        assertEquals(RenameOutcome.Renamed, h.notes.rename("a", "Budget meeting"))
         h.awaitBackground()
 
-        assertEquals("Riunione di budget", h.readFile("a").title)
+        assertEquals("Budget meeting", h.readFile("a").title)
         assertFalse(h.row("a").titleDirty)
         assertEquals(RefreshOutcome.Fresh, h.notes.refreshIfStale("a"))
         assertEquals(listOf("a"), h.notes.search("budget").first().map { it.row.id })
@@ -107,7 +107,7 @@ class NoteRepositoryTest {
     }
 
     @Test fun invalidTitlesAreRefused() = runTest {
-        h.plainNote("a", title = "Prima")
+        h.plainNote("a", title = "Before")
         assertEquals(RenameOutcome.Invalid, h.notes.rename("a", "   "))
         assertEquals(RenameOutcome.Invalid, h.notes.rename("a", "x".repeat(NoteTitles.MAX_LENGTH + 1)))
         assertEquals(RenameOutcome.Renamed, h.notes.rename("a", "x".repeat(NoteTitles.MAX_LENGTH)))
@@ -125,7 +125,7 @@ class NoteRepositoryTest {
 
         h.notes.setPosition("a", 2_600, final = true)
         val expected = PreviewText.of(words.words, 2_600)!!.display
-        assertTrue(expected, expected.startsWith("…di giovedì"))
+        assertTrue(expected, expected.startsWith("…on Thursday"))
         assertEquals(expected, h.row("a").preview)
         assertEquals(expected, h.notes.library().first().single().preview)
     }
@@ -189,7 +189,7 @@ class NoteRepositoryTest {
         h.notes.refreshIfStale("a")
 
         assertEquals(setOf("a", "b"), h.notes.search("  ").first().map { it.row.id }.toSet())
-        assertEquals(listOf("a"), h.notes.search("GIOVEDI").first().map { it.row.id })
+        assertEquals(listOf("a"), h.notes.search("THURSDAY").first().map { it.row.id })
     }
 
     @Test fun trashRecordsTheJobAndRestoreRequeuesAQueuedOne() = runTest {

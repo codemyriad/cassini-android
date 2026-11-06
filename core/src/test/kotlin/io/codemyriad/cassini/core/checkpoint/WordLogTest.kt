@@ -25,9 +25,9 @@ class WordLogTest {
 
     @Test fun linesRoundTripWithEscapesAndWideCharacters() {
         val words = listOf(
-            Word("diar_x_1", 0, 240, "\"Ciao\","),
+            Word("diar_x_1", 0, 240, "\"Hello\","),
             Word("diar_x_2", 240, 480, "e/o"),
-            Word("diar_x_1", 480, 720, "giovedì\\"),
+            Word("diar_x_1", 480, 720, "café\\"),
             Word("diar_x_1", 720, 960, "東京😀"),
         )
         val bytes = WordLog.lines(words, 0, words.size)

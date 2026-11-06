@@ -37,7 +37,7 @@ class NoteFtsDeviceTest {
         runBlocking {
             val note = NoteEntity(
                 id = "n1",
-                title = "Fornitori",
+                title = "Suppliers",
                 createdAt = 1,
                 addedAt = 1,
                 origin = Origin.RECORDED,
@@ -47,7 +47,7 @@ class NoteFtsDeviceTest {
             )
             db.notes().insert(note)
             val variant = VariantEntity("n1", "v1", ordinal = 0, isDefault = true, wordCount = 6)
-            val body = "quindi la consegna slitta a giovedì"
+            val body = "so the delivery reaches the café"
             db.cache().replaceCache(NoteCache(note, listOf(variant), emptyList(), emptyList(), body))
         }
     }
@@ -62,14 +62,14 @@ class NoteFtsDeviceTest {
     }
 
     @Test fun prefixFindsTheWholeWord() {
-        assertEquals(listOf("n1"), search("consegn"))
+        assertEquals(listOf("n1"), search("deliver"))
     }
 
     @Test fun diacriticsAreIgnored() {
-        assertEquals(listOf("n1"), search("giovedi"))
+        assertEquals(listOf("n1"), search("cafe"))
     }
 
     @Test fun caseIsIgnored() {
-        assertEquals(listOf("n1"), search("CONSEGNA"))
+        assertEquals(listOf("n1"), search("DELIVERY"))
     }
 }

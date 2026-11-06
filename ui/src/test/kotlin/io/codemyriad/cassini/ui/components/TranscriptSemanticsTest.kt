@@ -349,7 +349,7 @@ class TranscriptSemanticsTest {
     @Test fun searchMatchesKeepTheWordsTappable() {
         val taps = mutableListOf<Int>()
         val words = TranscriptFixtures.paolo
-        val match = TranscriptFixtures.matchesOf(words, "consegna").first()
+        val match = TranscriptFixtures.matchesOf(words, "delivery").first()
         setThemed {
             TurnParagraph(
                 words = words,

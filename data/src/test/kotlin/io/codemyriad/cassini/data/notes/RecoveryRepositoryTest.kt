@@ -35,7 +35,7 @@ class RecoveryRepositoryTest {
 
     /** A LIVE_CAPTURE note in [format] whose capture file is written by [write] (nothing written when null). */
     private suspend fun capture(format: String, write: ((File) -> Unit)?): String {
-        val id = h.notes.createRecording("Registrazione", h.now, format)
+        val id = h.notes.createRecording("Recording", h.now, format)
         write?.invoke(File(h.dir(id), "capture.$format"))
         return id
     }

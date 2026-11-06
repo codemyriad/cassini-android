@@ -17,8 +17,8 @@ data class Preview(val text: String, val leadingEllipsis: Boolean, val trailingE
  * When the saved playback position is after the first word and before the end of the last word, the excerpt starts
  * at the word playing at that position and has a leading ellipsis. It takes whole words up to about [LIMIT]
  * characters and stops at the first end of a speaker's turn reached once it holds at least [MIN_BEFORE_TURN_END]
- * characters, so one preview does not run two speakers' words together: board 00 shows Paolo's turn from "quindi"
- * (board 03 at 11:44) and stops before Speaker 3, although that text is shorter than [LIMIT]. A shorter turn ("Sì.")
+ * characters, so one preview does not run two speakers' words together: board 00 shows Paolo's turn from "so"
+ * (board 03 at 11:44) and stops before Speaker 3, although that text is shorter than [LIMIT]. A shorter turn ("Yes.")
  * continues into the next turns, so the row never shows a one-word excerpt while more words follow.
  *
  * Otherwise (position 0, before or in the first word, or at or after the end of the last word, which is where a

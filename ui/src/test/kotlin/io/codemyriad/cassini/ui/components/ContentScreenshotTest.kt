@@ -60,7 +60,7 @@ class ContentScreenshotTest : BoardTest() {
     /** Read turns (named, auto with the active word, placeholder), a wrapped active word, search, the draft. */
     @Composable
     private fun TranscriptStrip() = Strip {
-        Label("Read: TurnHeader + TurnParagraph (named; auto, active “quindi”; placeholder, not renamable)")
+        Label("Read: TurnHeader + TurnParagraph (named; auto, active “so”; placeholder, not renamable)")
         Pane {
             TurnHeader("Giulia", SpeakerTone.Blue, 692_000, auto = false, onClick = {})
             TurnParagraph(TranscriptFixtures.giulia, activeIndex = null, onWordTap = {})
@@ -81,7 +81,7 @@ class ContentScreenshotTest : BoardTest() {
                         activeIndex = null,
                         onWordTap = {},
                         matches = TurnMatches(
-                            ranges = TranscriptFixtures.matchesOf(TranscriptFixtures.paolo, "consegna"),
+                            ranges = TranscriptFixtures.matchesOf(TranscriptFixtures.paolo, "delivery"),
                             current = 1,
                         ),
                     )

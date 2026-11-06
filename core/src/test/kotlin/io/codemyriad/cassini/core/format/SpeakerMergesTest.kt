@@ -11,11 +11,15 @@ class SpeakerMergesTest {
         val first = SpeakerMerges.merge(emptyMap(), "b", "a")
         val next = SpeakerMerges.merge(first, "a", "c")
         assertEquals(mapOf("b" to "c", "a" to "c"), next)
-        val raw = Transcript(listOf(Word("b", 200, 400, "Ciao"), Word("a", 300, 500, "mondo"), Word("d", 600, 700, "!")), "it")
+        val raw = Transcript(
+            listOf(Word("b", 200, 400, "Hi"), Word("a", 300, 500, "world"), Word("d", 600, 700, "!")),
+            "en",
+        )
         val edited = SpeakerMerges.apply(raw, next)
         assertEquals(listOf("c", "c", "d"), edited.words.map { it.speaker })
         assertEquals(raw, edited.copy(words = edited.words.zip(raw.words).map { (word, original) -> word.copy(speaker = original.speaker) }))
-        assertEquals("c", SpeakerMerges.apply(Transcript(listOf(Word("b", 10000, 11000, "Poi"))), next).words.single().speaker)
+        val future = Transcript(listOf(Word("b", 10000, 11000, "Then")))
+        assertEquals("c", SpeakerMerges.apply(future, next).words.single().speaker)
     }
     @Test(expected = IllegalArgumentException::class) fun anExistingMergeCannotBecomeACycle() {
         SpeakerMerges.merge(mapOf("b" to "a"), "a", "b")

@@ -7,7 +7,10 @@ import org.junit.Test
 
 class TranscriptTest {
     @Test fun sessionRoundTripPreservesLanguageAndOverlappingTurnOrder() {
-        val original = Transcript(listOf(Word("a", 2000, 2500, "perché?"), Word("b", 1000, 2200, "Ciao.")), "it")
+        val original = Transcript(
+            listOf(Word("a", 2000, 2500, "why?"), Word("b", 1000, 2200, "Hi.")),
+            "en",
+        )
         assertEquals(original, Transcript.fromJson(original.json()))
     }
 
@@ -18,7 +21,9 @@ class TranscriptTest {
     }
 
     @Test(expected = IllegalArgumentException::class) fun rejectsCorruptPersistedWordExtents() {
-        Transcript.fromJson("""{"format":"cassini.words.v1","items":[{"speaker":"a","startMs":900,"endMs":100,"text":"ciao"}]}""")
+        Transcript.fromJson(
+            """{"format":"cassini.words.v1","items":[{"speaker":"a","startMs":900,"endMs":100,"text":"hi"}]}""",
+        )
     }
 
     @Test fun italianPiecesAndDelayedPunctuationKeepAcousticExtent() {
@@ -48,7 +53,7 @@ class TranscriptTest {
     }
 
     @Test fun preservesSpeakerTurnOrderEvenWithOverlappingSpeakers() {
-        val transcript = Transcript(listOf(Word("a", 2000, 2500, "Sì."), Word("b", 1000, 2200, "Ciao.")))
+        val transcript = Transcript(listOf(Word("a", 2000, 2500, "Yes."), Word("b", 1000, 2200, "Hi.")))
         val items = JSONObject(transcript.json()).getJSONArray("items")
         assertEquals("a", items.getJSONObject(0).getString("speaker"))
         assertEquals(1000L, items.getJSONObject(1).getLong("startMs"))
@@ -61,17 +66,17 @@ class TranscriptTest {
     }
 
     @Test(expected = IllegalArgumentException::class) fun rejectsMissingAlignment() {
-        TokenWords.fromTokens(arrayOf("▁ciao"), floatArrayOf(), floatArrayOf())
+        TokenWords.fromTokens(arrayOf("▁hello"), floatArrayOf(), floatArrayOf())
     }
     @Test(expected = IllegalArgumentException::class) fun rejectsNonfiniteAlignment() {
-        TokenWords.fromTokens(arrayOf("▁ciao"), floatArrayOf(Float.NaN), floatArrayOf(.1f))
+        TokenWords.fromTokens(arrayOf("▁hello"), floatArrayOf(Float.NaN), floatArrayOf(.1f))
     }
     @Test(expected = IllegalArgumentException::class) fun rejectsBackwardTimes() {
-        TokenWords.fromTokens(arrayOf("▁ciao", "▁ciao"), floatArrayOf(1f, .5f), floatArrayOf(.1f, .1f))
+        TokenWords.fromTokens(arrayOf("▁hello", "▁hello"), floatArrayOf(1f, .5f), floatArrayOf(.1f, .1f))
     }
 
     @Test fun undIsWrittenAndRoundTripsButIsNoKnownLanguage() {
-        val und = Transcript(listOf(Word("s", 0, 1, "ciao")), Transcript.UNDETERMINED)
+        val und = Transcript(listOf(Word("s", 0, 1, "hello")), Transcript.UNDETERMINED)
         assertEquals("und", JSONObject(und.json()).getString("language"))
         assertEquals("und", Transcript.fromJson(und.json()).language)
         assertNull(Transcript.knownLanguage("und"))

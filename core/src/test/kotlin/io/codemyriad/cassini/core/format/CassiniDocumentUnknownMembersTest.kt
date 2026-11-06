@@ -19,7 +19,7 @@ import java.io.File
 class CassiniDocumentUnknownMembersTest {
     @get:Rule val folder = TemporaryFolder()
 
-    private val first = Transcript(listOf(Word("diar_a_1", 0, 20, "Ciao"), Word("diar_a_2", 20, 40, "Salve")), "it")
+    private val first = Transcript(listOf(Word("diar_a_1", 0, 20, "Hello"), Word("diar_a_2", 20, 40, "Hi")), "it")
 
     private val stamp = JSONObject().put("inputSHA256", "a".repeat(64)).put("turnsSHA256", "b".repeat(64))
 
@@ -36,7 +36,7 @@ class CassiniDocumentUnknownMembersTest {
      */
     private fun foreign(): File {
         val audio = silence()
-        val plain = CassiniDocument.read(CassiniDocument.create(audio, first, "Riunione", JSONObject()))
+        val plain = CassiniDocument.read(CassiniDocument.create(audio, first, "Meeting", JSONObject()))
         val manifest = plain.manifest!!
         manifest.getJSONArray("speakers").getJSONObject(0)
             .put("voiceSource", stamp)
@@ -97,7 +97,7 @@ class CassiniDocumentUnknownMembersTest {
     @Test fun aNewVersionKeepsEverySpeakerAsItIsAndStampsNoNewOne() {
         val source = foreign()
         val before = CassiniDocument.read(source)
-        val words = listOf(Word("diar_b_1", 0, 20, "Ciao"), Word("diar_a_1", 20, 40, "Salve"))
+        val words = listOf(Word("diar_b_1", 0, 20, "Hello"), Word("diar_a_1", 20, 40, "Hi"))
         val again = Transcript(words, "it")
         val after = CassiniDocument.create(
             source,

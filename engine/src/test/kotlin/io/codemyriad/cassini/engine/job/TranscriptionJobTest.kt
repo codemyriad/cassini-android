@@ -468,7 +468,7 @@ class TranscriptionJobTest {
         val x = JSONObject().put("gocassini.com", JSONObject().put("notes", notes))
         val old = CassiniDocument.create(
             FIXTURE_OPUS,
-            Transcript(listOf(Word("old_a", 0, 500, "ciao"))),
+            Transcript(listOf(Word("old_a", 0, 500, "hello"))),
             "Weekly sync",
             JSONObject(),
             null,
@@ -874,7 +874,7 @@ class TranscriptionJobTest {
     /** A sealed document of one word by "old_a" (called Anna when [anna]), written as [name] in the temp folder. */
     private fun oldDocument(name: String, anna: Boolean = false): CassiniDocument = CassiniDocument.create(
         FIXTURE_OPUS,
-        Transcript(listOf(Word("old_a", 0, 500, "ciao"))),
+        Transcript(listOf(Word("old_a", 0, 500, "hello"))),
         "Weekly sync",
         JSONObject().put("source", "test"),
         null,

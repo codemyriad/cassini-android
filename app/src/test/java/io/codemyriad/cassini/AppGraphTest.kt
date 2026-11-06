@@ -120,7 +120,7 @@ class AppGraphTest {
         val catalogue = first.awaitCatalogue()
         val live = catalogue.notes.createRecording("Live", 1_000, "opus")
         fixture.copyTo(File(paths.note(live), "capture.opus"))
-        val plain = plainNote(first, "Riunione")
+        val plain = plainNote(first, "Meeting")
         catalogue.jobs.enqueue(plain, JobKind.TRANSCRIBE)
         assertTrue(catalogue.jobs.claimNext() is ClaimOutcome.Claimed)
         first.close()
@@ -140,7 +140,7 @@ class AppGraphTest {
         graph.awaitReady()
         val catalogue = graph.awaitCatalogue()
         val storage = catalogue.jobStorage
-        val id = plainNote(graph, "Riunione")
+        val id = plainNote(graph, "Meeting")
         assertTrue(catalogue.jobs.enqueue(id, JobKind.TRANSCRIBE) is EnqueueOutcome.Queued)
         assertTrue(catalogue.jobs.claimNext() is ClaimOutcome.Claimed)
 
@@ -173,7 +173,7 @@ class AppGraphTest {
                 val title = storage.titleBlocking(id)
                 CassiniDocument.create(
                     audio,
-                    Transcript(listOf(Word("S1", 0, 400, "ciao"), Word("S2", 500, 900, "allora"))),
+                    Transcript(listOf(Word("S1", 0, 400, "hello"), Word("S2", 500, 900, "so"))),
                     title,
                     JSONObject().put("engine", "test"),
                     null,
@@ -199,7 +199,7 @@ class AppGraphTest {
         val graph = graph(online = false)
         graph.awaitReady()
         val catalogue = graph.awaitCatalogue()
-        val id = plainNote(graph, "Riunione")
+        val id = plainNote(graph, "Meeting")
         val voices = catalogue.jobVoices
         val models = graph.modelAccess
 

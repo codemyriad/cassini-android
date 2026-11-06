@@ -121,7 +121,7 @@ class NotesHarness(folder: TemporaryFolder) {
     fun document(id: String): File = File(dir(id), NoteFiles.DOCUMENT)
 
     /** A DOCUMENT note whose file is written but whose cache was never derived (as after an import). */
-    suspend fun documentNote(id: String, transcript: Transcript, title: String = "Riunione"): NoteEntity {
+    suspend fun documentNote(id: String, transcript: Transcript, title: String = "Meeting"): NoteEntity {
         dir(id).mkdirs()
         document(id).writeBytes(documentBytes(transcript, title))
         val row = NoteEntity(
@@ -139,7 +139,7 @@ class NotesHarness(folder: TemporaryFolder) {
     }
 
     /** A PLAIN note whose audio is a copy of the FLEURS clip named [audioFile]. */
-    suspend fun plainNote(id: String, title: String = "Registrazione", audioFile: String = "capture.opus"): NoteEntity {
+    suspend fun plainNote(id: String, title: String = "Recording", audioFile: String = "capture.opus"): NoteEntity {
         dir(id).mkdirs()
         fixtureOpus.copyTo(File(dir(id), audioFile))
         val row = NoteEntity(

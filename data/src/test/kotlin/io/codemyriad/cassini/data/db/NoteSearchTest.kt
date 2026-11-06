@@ -40,10 +40,10 @@ class NoteSearchTest {
         val raw = SQLiteDatabase.create(null)
         try {
             raw.execSQL("CREATE VIRTUAL TABLE probe USING fts4(body, tokenize=unicode61 \"remove_diacritics=1\")")
-            raw.execSQL("INSERT INTO probe(body) VALUES ('giovedì')")
-            raw.rawQuery("SELECT COUNT(*) FROM probe WHERE probe MATCH 'giovedi'", null).use { cursor ->
+            raw.execSQL("INSERT INTO probe(body) VALUES ('café')")
+            raw.rawQuery("SELECT COUNT(*) FROM probe WHERE probe MATCH 'cafe'", null).use { cursor ->
                 cursor.moveToFirst()
-                assertEquals("unicode61 remove_diacritics=1 did not fold 'giovedì'", 1, cursor.getInt(0))
+                assertEquals("unicode61 remove_diacritics=1 did not fold 'café'", 1, cursor.getInt(0))
             }
         } catch (error: SQLiteException) {
             fail("This SQLite lacks FTS4 with the unicode61 tokenizer and remove_diacritics=1: ${error.message}")
@@ -62,60 +62,60 @@ class NoteSearchTest {
     }
 
     @Test fun prefixFindsTheWholeWord() = runTest {
-        insertTranscribed("a", "la consegna slitta a giovedì")
-        assertEquals(listOf("a"), search("consegn").map { it.row.id })
+        insertTranscribed("a", "the delivery slips to the café")
+        assertEquals(listOf("a"), search("deliver").map { it.row.id })
     }
 
     @Test fun diacriticsAreIgnored() = runTest {
-        insertTranscribed("a", "la consegna slitta a giovedì")
-        assertEquals(listOf("a"), search("giovedi").map { it.row.id })
-        assertEquals(listOf("a"), search("GIOVEDÌ").map { it.row.id })
+        insertTranscribed("a", "the delivery slips to the café")
+        assertEquals(listOf("a"), search("cafe").map { it.row.id })
+        assertEquals(listOf("a"), search("CAFÉ").map { it.row.id })
     }
 
     @Test fun caseIsIgnored() = runTest {
-        insertTranscribed("a", "la consegna slitta a giovedì")
-        assertEquals(listOf("a"), search("CONSEGNA").map { it.row.id })
+        insertTranscribed("a", "the delivery slips to the café")
+        assertEquals(listOf("a"), search("DELIVERY").map { it.row.id })
     }
 
     @Test fun everyTermMustMatchAndOperatorsAreWords() = runTest {
-        insertTranscribed("a", "la consegna slitta a giovedì")
-        insertTranscribed("b", "la consegna è puntuale")
-        assertEquals(listOf("a"), search("consegna giov").map { it.row.id })
-        assertTrue(search("consegna OR puntuale").isEmpty())
+        insertTranscribed("a", "the delivery slips to the café")
+        insertTranscribed("b", "the delivery is on time")
+        assertEquals(listOf("a"), search("delivery caf").map { it.row.id })
+        assertTrue(search("delivery OR timely").isEmpty())
     }
 
     @Test fun trashedNotesAreExcluded() = runTest {
-        insertTranscribed("a", "la consegna slitta", createdAt = 1)
-        insertTranscribed("b", "nessuna consegna oggi", createdAt = 2)
+        insertTranscribed("a", "the delivery slips", createdAt = 1)
+        insertTranscribed("b", "no delivery today", createdAt = 2)
         db.notes().moveToTrash("b", at = 5_000, job = null)
-        assertEquals(listOf("a"), search("consegna").map { it.row.id })
+        assertEquals(listOf("a"), search("delivery").map { it.row.id })
         db.notes().restore("b", now = 6_000)
-        assertEquals(listOf("b", "a"), search("consegna").map { it.row.id })
+        assertEquals(listOf("b", "a"), search("delivery").map { it.row.id })
     }
 
     @Test fun snippetMarksTheMatchWithControlCharacters() = runTest {
-        insertTranscribed("a", "quindi la consegna slitta a giovedì but the price stays")
-        val row = search("consegn").single()
-        assertTrue(row.snippet, row.snippet.contains("\u0002consegna\u0003"))
+        insertTranscribed("a", "so the delivery slips to Thursday but the price stays")
+        val row = search("deliver").single()
+        assertTrue(row.snippet, row.snippet.contains("\u0002delivery\u0003"))
         val highlighted = SearchQuery.highlights(row.snippet)
         assertFalse(highlighted.text.contains('\u0002'))
-        assertEquals(listOf("consegna"), highlighted.ranges.map { highlighted.text.substring(it.first, it.last + 1) })
+        assertEquals(listOf("delivery"), highlighted.ranges.map { highlighted.text.substring(it.first, it.last + 1) })
     }
 
     @Test fun titleOnlyMatchMarksTheTitleAndNotTheBody() = runTest {
-        insertTranscribed("a", "nothing relevant here", title = "Riunione fornitori")
-        val row = search("fornit").single()
-        assertTrue(row.titleSnippet, row.titleSnippet.contains("\u0002fornitori\u0003"))
+        insertTranscribed("a", "nothing relevant here", title = "Supplier meeting")
+        val row = search("suppli").single()
+        assertTrue(row.titleSnippet, row.titleSnippet.contains("\u0002Supplier\u0003"))
         assertFalse(row.snippet.contains('\u0002'))
     }
 
     @Test fun renameReindexesTheTitle() = runTest {
         insertTranscribed("a", "nothing relevant", title = "Old name")
-        assertTrue(db.notes().rename("a", "Riunione budget", titleDirty = true, now = 2_000))
+        assertTrue(db.notes().rename("a", "Budget meeting", titleDirty = true, now = 2_000))
         assertTrue(search("old").isEmpty())
         assertEquals(listOf("a"), search("budget").map { it.row.id })
         val stored = db.notes().note("a")!!
-        assertEquals("Riunione budget", stored.title)
+        assertEquals("Budget meeting", stored.title)
         assertTrue(stored.titleDirty)
         assertFalse(db.notes().rename("missing", "x", titleDirty = false, now = 2_000))
     }
@@ -123,10 +123,10 @@ class NoteSearchTest {
     @Test fun selectingAnotherVariantReindexesTheBody() = runTest {
         val row = note("a")
         db.notes().insert(row)
-        db.cache().replaceCache(cache(row, listOf("v1" to words("prima versione"), "v2" to words("seconda stesura"))))
-        assertEquals(listOf("a"), search("prima").map { it.row.id })
-        db.notes().selectVariant("a", "v2", body = "seconda stesura", preview = null, now = 2_000)
-        assertTrue(search("prima").isEmpty())
+        db.cache().replaceCache(cache(row, listOf("v1" to words("first versione"), "v2" to words("second stesura"))))
+        assertEquals(listOf("a"), search("first").map { it.row.id })
+        db.notes().selectVariant("a", "v2", body = "second stesura", preview = null, now = 2_000)
+        assertTrue(search("first").isEmpty())
         assertEquals(listOf("a"), search("stesura").map { it.row.id })
     }
 
@@ -134,11 +134,11 @@ class NoteSearchTest {
         val row = note("a")
         db.notes().insert(row)
         val before = db.notes().text("a")!!.rowId
-        db.cache().replaceCache(cache(row, listOf("v1" to words("uno due tre"))))
-        db.cache().replaceCache(cache(row, listOf("v1" to words("quattro cinque"))))
+        db.cache().replaceCache(cache(row, listOf("v1" to words("one two three"))))
+        db.cache().replaceCache(cache(row, listOf("v1" to words("four five"))))
         assertEquals(before, db.notes().text("a")!!.rowId)
-        assertTrue(search("uno").isEmpty())
-        assertEquals(listOf("a"), search("cinque").map { it.row.id })
+        assertTrue(search("one").isEmpty())
+        assertEquals(listOf("a"), search("five").map { it.row.id })
     }
 
     @Test fun audioOnlyNotesAreFoundByTitle() = runTest {

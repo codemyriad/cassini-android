@@ -49,27 +49,27 @@ class CatalogueDaoTest {
     @Test fun deletingANoteCascadesToEveryRow() = runTest {
         val row = note("a")
         db.notes().insert(row)
-        db.cache().replaceCache(cache(row, listOf("v1" to words("uno due tre quattro"), "v2" to words("cinque sei"))))
+        db.cache().replaceCache(cache(row, listOf("v1" to words("one two three four"), "v2" to words("five six"))))
         db.jobs().insert(job("a", 1))
         db.voiceLinks().replaceForNote("a", listOf(link("a", "v1", "S1", "voice-1", Match.State.CONFIRMED)))
         db.notes().insert(note("b"))
-        db.cache().replaceCache(cache(note("b"), listOf("v1" to words("uno"))))
+        db.cache().replaceCache(cache(note("b"), listOf("v1" to words("one"))))
 
         db.notes().delete("a")
 
         for (table in listOf("variants", "speakers", "words", "note_text", "jobs", "note_voice_links")) {
             assertEquals(table, 0, count(table, "a"))
         }
-        assertEquals(listOf("1"), db.column("SELECT COUNT(*) FROM note_fts WHERE note_fts MATCH 'uno'"))
-        assertEquals(listOf("b"), db.notes().searchFlow("\"uno*\"").first().map { it.row.id })
+        assertEquals(listOf("1"), db.column("SELECT COUNT(*) FROM note_fts WHERE note_fts MATCH 'one'"))
+        assertEquals(listOf("b"), db.notes().searchFlow("\"one*\"").first().map { it.row.id })
         assertEquals(1, count("words", "b"))
     }
 
     @Test fun replacingTheCacheDropsTheOldVariantsWithTheirSpeakersAndWords() = runTest {
         val row = note("a")
         db.notes().insert(row)
-        db.cache().replaceCache(cache(row, listOf("v1" to words("uno due tre quattro"), "v2" to words("cinque sei"))))
-        db.cache().replaceCache(cache(row, listOf("v3" to words("sette"))))
+        db.cache().replaceCache(cache(row, listOf("v1" to words("one two three four"), "v2" to words("five six"))))
+        db.cache().replaceCache(cache(row, listOf("v3" to words("seven"))))
         assertEquals(listOf("v3"), db.cache().variants("a").map { it.variantId })
         assertEquals(listOf("v3"), db.column("SELECT DISTINCT variant_id FROM speakers WHERE note_id = 'a'"))
         assertEquals(listOf("v3"), db.column("SELECT DISTINCT variant_id FROM words WHERE note_id = 'a'"))
@@ -77,9 +77,9 @@ class CatalogueDaoTest {
 
     @Test fun replaceCacheInsertsTheNoteWhenItHasNoRow() = runTest {
         val row = note("rebuilt", title = "Recovered")
-        db.cache().replaceCache(cache(row, listOf("v1" to words("ciao a tutti"))))
+        db.cache().replaceCache(cache(row, listOf("v1" to words("hello to everyone"))))
         assertEquals("Recovered", db.notes().note("rebuilt")!!.title)
-        assertEquals("ciao a tutti", db.notes().text("rebuilt")!!.body)
+        assertEquals("hello to everyone", db.notes().text("rebuilt")!!.body)
     }
 
     @Test fun wordCacheKeepsCanonicalOrderAndPages() = runTest {
@@ -99,15 +99,15 @@ class CatalogueDaoTest {
         // a: selected v2. AUTO on v2 counts for X; CONFIRMED on v1 (not selected) does not count for Y.
         val a = note("a")
         db.notes().insert(a)
-        val two = listOf("v1" to words("uno due tre quattro"), "v2" to words("cinque sei sette otto"))
+        val two = listOf("v1" to words("one two three four"), "v2" to words("five six seven eight"))
         db.cache().replaceCache(cache(a, two, selected = "v2"))
         // b: no selected_variant, so its default v1 is selected. CONFIRMED X counts; SUGGESTED Y does not.
         db.notes().insert(note("b"))
-        val b = cache(note("b"), listOf("v1" to words("uno due tre quattro")))
+        val b = cache(note("b"), listOf("v1" to words("one two three four")))
         db.cache().replaceCache(b.copy(note = b.note.copy(selectedVariant = null)))
         // c: trashed, its AUTO X does not count.
         db.notes().insert(note("c"))
-        db.cache().replaceCache(cache(note("c"), listOf("v1" to words("uno"))))
+        db.cache().replaceCache(cache(note("c"), listOf("v1" to words("one"))))
         db.notes().moveToTrash("c", at = 9_000, job = null)
         db.voiceLinks().replaceForNote(
             "a",
@@ -152,12 +152,12 @@ class CatalogueDaoTest {
     @Test fun libraryListsLiveNotesNewestFirstWithJobVariantAndPreview() = runTest {
         val a = note("a", createdAt = 1_000)
         db.notes().insert(a)
-        val two = listOf("v1" to words("prima versione del testo"), "v2" to words("seconda"))
+        val two = listOf("v1" to words("first version of the text"), "v2" to words("second"))
         db.cache().replaceCache(cache(a, two, selected = "v1"))
         db.notes().insert(note("b", createdAt = 3_000, audioKind = AudioKind.PLAIN))
         db.jobs().insert(job("b", 1).copy(state = JobState.PAUSED, pauseReason = PauseReason.USER, doneMs = 760_000))
         db.notes().insert(note("c", createdAt = 2_000))
-        db.notes().setPositionAndPreview("c", 5_000, "…quindi la consegna…")
+        db.notes().setPositionAndPreview("c", 5_000, "…so the delivery…")
         db.notes().insert(note("gone", createdAt = 4_000))
         db.notes().moveToTrash("gone", at = 5_000, job = null)
 
@@ -169,19 +169,19 @@ class CatalogueDaoTest {
         assertEquals(760_000L, b.doneMs)
         assertNull(b.preview)
         assertNull(b.wordCount)
-        assertEquals("…quindi la consegna…", rows[1].preview)
+        assertEquals("…so the delivery…", rows[1].preview)
         val first = rows[2]
         assertNull(first.jobState)
         assertEquals("v1", first.selectedVariant)
-        assertEquals(4, first.wordCount)
+        assertEquals(5, first.wordCount)
         assertEquals(2, first.speakerCount)
-        assertEquals("prima versione del testo", first.preview)
+        assertEquals("first version of the text", first.preview)
     }
 
     @Test fun noteFlowCarriesVariantsSpeakersAndJob() = runTest {
         val a = note("a")
         db.notes().insert(a)
-        db.cache().replaceCache(cache(a, listOf("v1" to words("uno due tre quattro"))))
+        db.cache().replaceCache(cache(a, listOf("v1" to words("one two three four"))))
         db.jobs().insert(job("a", 4))
         val details = db.notes().noteFlow("a").first()!!
         assertEquals("a", details.note.id)

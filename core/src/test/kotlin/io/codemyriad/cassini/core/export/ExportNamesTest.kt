@@ -5,7 +5,10 @@ import org.junit.Test
 
 class ExportNamesTest {
     @Test fun plainTitleKeepsAccentsAndGetsTheExtension() {
-        assertEquals("Consegna di giovedì — prezzo €.opus", ExportNames.file("Consegna di giovedì — prezzo €", "opus"))
+        assertEquals(
+            "Thursday delivery — café price €.opus",
+            ExportNames.file("Thursday delivery — café price €", "opus"),
+        )
     }
 
     @Test fun forbiddenCharactersBecomeUnderscores() {
@@ -17,12 +20,12 @@ class ExportNamesTest {
     }
 
     @Test fun whitespaceRunsCollapse() {
-        assertEquals("Riunione di lunedì.vtt", ExportNames.file("Riunione   di   lunedì", "vtt"))
+        assertEquals("Monday café meeting.vtt", ExportNames.file("Monday   café   meeting", "vtt"))
     }
 
     @Test fun dotsAndSpacesAreTrimmedAtBothEnds() {
-        assertEquals("nota.txt", ExportNames.file(" ..nota. . ", "txt"))
-        assertEquals("v1.2 bozza.txt", ExportNames.file("v1.2 bozza", "txt"))
+        assertEquals("note.txt", ExportNames.file(" ..note. . ", "txt"))
+        assertEquals("v1.2 draft.txt", ExportNames.file("v1.2 draft", "txt"))
     }
 
     @Test fun nothingLeftFallsBack() {

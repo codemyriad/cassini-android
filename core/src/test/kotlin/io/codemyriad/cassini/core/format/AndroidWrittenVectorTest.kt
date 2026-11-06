@@ -26,19 +26,19 @@ class AndroidWrittenVectorTest {
 
     @Test fun theBytesAreThePinnedOnes() {
         val digest = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
-        assertEquals("29d8a4666d37fe01cee999652470b7c1ba5893af4dbc92a04092005bc777f725", digest)
+        assertEquals("9779dafeeb3348eb21be0caf933335e2bba158e9ff3ae01c0baf028ca04e93aa", digest)
     }
 
     @Test fun itOpensOnTheMergedVersion() {
         assertEquals("ok", document.state)
         assertTrue(document.warnings.isEmpty())
-        assertEquals(listOf("words", "words-78fd7ee6"), document.variants.map { it.id })
-        assertEquals("words-78fd7ee6", document.defaultId)
+        assertEquals(listOf("words", "words-50285e50"), document.variants.map { it.id })
+        assertEquals("words-50285e50", document.defaultId)
         val opened = checkNotNull(document.selected(null)?.transcript)
-        assertEquals(listOf("Buongiorno", "a", "tutti.", "Grazie,", "iniziamo."), opened.words.map { it.text })
+        assertEquals(listOf("Good", "morning", "everyone.", "Thanks,", "let’s", "begin."), opened.words.map { it.text })
         assertEquals("the merge gave every word to speaker 1", setOf(one), opened.words.map { it.speaker }.toSet())
         val first = checkNotNull(document.selected("words")?.transcript)
-        assertEquals(listOf(one, one, one, two, two), first.words.map { it.speaker })
+        assertEquals(listOf(one, one, one, two, two, two), first.words.map { it.speaker })
     }
 
     @Test fun storedLabelsAreShownAsStored() {
@@ -57,9 +57,9 @@ class AndroidWrittenVectorTest {
         val tags = document.comments.map { it.substringBefore('=').uppercase() }
         assertFalse("no DATE tag", "DATE" in tags)
         val titles = document.comments.filter { it.substringBefore('=').equals("TITLE", ignoreCase = true) }
-        assertEquals("Android's own TITLE", listOf("TITLE=Riunione di prova"), titles)
+        assertEquals("Android's own TITLE", listOf("TITLE=Test meeting"), titles)
         val provenance = document.manifest!!.getJSONObject("provenance").getJSONObject("speechToText")
-        val merged = provenance.getJSONObject("words-78fd7ee6")
+        val merged = provenance.getJSONObject("words-50285e50")
         assertEquals(one, merged.getJSONObject("x-speakerMerges").getString(two))
         assertEquals("words", merged.getString("x-derivedFromTranscript"))
         assertTrue(provenance.getJSONObject("words").has("x-speakerDiarization"))

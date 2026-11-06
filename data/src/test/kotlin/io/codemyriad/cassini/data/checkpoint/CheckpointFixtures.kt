@@ -13,7 +13,7 @@ import java.util.UUID
 /** A note id: a canonical UUID v4 string built from [n]. */
 fun noteId(n: Int): String = UUID(0x5eedL, n.toLong()).toString().replaceRange(14, 15, "4")
 
-/** Words "uno due tre …" with the speakers [speakers] in turn, one word per 500 ms. */
+/** Words "one two three …" with the speakers [speakers] in turn, one word per 500 ms. */
 fun draftWords(vararg speakers: String): List<Word> =
     speakers.mapIndexed { index, speaker -> Word(speaker, index * 500L, index * 500L + 400, "w$index") }
 

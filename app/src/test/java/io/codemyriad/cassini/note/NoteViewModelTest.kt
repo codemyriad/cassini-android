@@ -252,7 +252,7 @@ class NoteViewModelTest {
         assertNotNull(viewModel.now().subtitle)
 
         val draft = DraftState(
-            words = listOf(Word("s1", 0, 400, "Prima"), Word("s2", 500, 900, "bozza")),
+            words = listOf(Word("s1", 0, 400, "Before"), Word("s2", 500, 900, "draft")),
             labels = emptyMap(),
             automatic = emptySet(),
             suggestions = emptyList(),
@@ -266,7 +266,7 @@ class NoteViewModelTest {
         assertEquals(ProgressHeadline.FINDING_WORDS, mode.card.headline)
         assertEquals(40, mode.card.percent)
         val texts = running.turns.flatMap { turn -> turn.words.map { it.text } }
-        assertEquals("the draft replaces the sealed transcript", listOf("Prima", "bozza"), texts)
+        assertEquals("the draft replaces the sealed transcript", listOf("Before", "draft"), texts)
         assertEquals("the second word ends after tentativeFromMs", 0, running.turns[1].unsettledFrom)
         assertNull("Transcribing has no player", running.playback)
         assertNull(running.chips)
@@ -399,10 +399,10 @@ class NoteViewModelTest {
 
     @Test
     fun searchFromTheLibraryIsPrefilledAndStepsThroughMatches() = runTest(dispatcher) {
-        val viewModel = viewModel(query = " giovedi ")
+        val viewModel = viewModel(query = " cafe ")
         val search = viewModel.now().search!!
-        assertEquals("giovedi", search.query)
-        assertEquals("giovedì and giovedi", listOf("w0", "w3"), search.matches.map { it.turnId })
+        assertEquals("cafe", search.query)
+        assertEquals("café and cafe", listOf("w0", "w3"), search.matches.map { it.turnId })
         assertEquals(0, search.current)
         send(viewModel, NoteEvent.NextMatch)
         assertEquals(1, viewModel.now().search!!.current)
@@ -411,9 +411,9 @@ class NoteViewModelTest {
         send(viewModel, NoteEvent.PreviousMatch)
         assertEquals(1, viewModel.now().search!!.current)
 
-        send(viewModel, NoteEvent.SearchQuery("BUONGIORNO"))
+        send(viewModel, NoteEvent.SearchQuery("MORNING"))
         assertEquals(listOf("w2"), viewModel.now().search!!.matches.map { it.turnId })
-        send(viewModel, NoteEvent.SearchQuery("domani"))
+        send(viewModel, NoteEvent.SearchQuery("tomorrow"))
         assertEquals(0, viewModel.now().search!!.total)
         send(viewModel, NoteEvent.CloseSearch)
         assertNull(viewModel.now().search)
@@ -684,7 +684,7 @@ class NoteViewModelTest {
     fun aDraftSpeakerIsNamedThroughTheDraftNames() = runTest(dispatcher) {
         val viewModel = viewModel()
         val draft = DraftState(
-            words = listOf(Word("s1", 0, 5_000, "Lunga"), Word("s2", 5_000, 6_000, "frase")),
+            words = listOf(Word("s1", 0, 5_000, "Lunga"), Word("s2", 5_000, 6_000, "phrase")),
             labels = emptyMap(),
             automatic = emptySet(),
             suggestions = emptyList(),

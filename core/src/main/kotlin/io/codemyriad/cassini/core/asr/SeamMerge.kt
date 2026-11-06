@@ -48,7 +48,7 @@ object SeamMerge {
         val cutMs = overlapStartMs + overlapMs / 2
         val aligned = align(acc, next, overlapStartMs, overlapEndMs, DUPLICATE_TOLERANCE_MS)
         // A lone pair further apart than the singleton tolerance is still the best evidence when nothing firmer exists.
-        // Known trade-off: two distinct, quickly repeated words ("sì sì") inside the overlap can collapse into one
+        // Known trade-off: two distinct, quickly repeated words ("yes yes") inside the overlap can collapse into one
         // here, in exchange for never doubling a word the decodes timed 220-240 ms apart (measured on the phone).
         val agreed = confidentMatches(aligned, acc, next, overlapEndMs).ifEmpty { aligned }
         val anchor = agreed.minByOrNull { Math.abs((midpointMs(acc[it.acc]) + midpointMs(next[it.next])) / 2 - cutMs) }

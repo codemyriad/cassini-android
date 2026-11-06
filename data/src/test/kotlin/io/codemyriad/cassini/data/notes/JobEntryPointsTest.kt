@@ -53,8 +53,8 @@ class JobEntryPointsTest {
         val work = h.paths.work(id).apply { mkdirs() }
         return CassiniDocument.create(
             File(h.dir(id), "capture.opus"),
-            transcript("uno due tre quattro cinque sei"),
-            "Riunione",
+            transcript("one two three quattro cinque sei"),
+            "Meeting",
             JSONObject().put("engine", "test"),
             null,
             emptyMap(),

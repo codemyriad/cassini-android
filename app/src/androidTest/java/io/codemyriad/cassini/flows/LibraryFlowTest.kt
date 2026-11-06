@@ -95,7 +95,7 @@ class LibraryFlowTest {
         runBlocking { import(meetingDocument(MEETING_TITLE)) }
         rule.waitShown(hasContentDescription(MEETING_TITLE, substring = true))
         rule.onNode(hasSetTextAction()).performClick()
-        rule.onNode(hasSetTextAction()).performTextInput("cominciam")
+        rule.onNode(hasSetTextAction()).performTextInput("star")
         rule.waitGone(row)
         rule.waitShown(hasContentDescription(MEETING_TITLE, substring = true))
         rule.onNode(hasSetTextAction()).performTextReplacement("")
@@ -152,7 +152,7 @@ class LibraryFlowTest {
             val row = hasContentDescription(MEETING_TITLE, substring = true)
             rule.waitShown(row)
             rule.onNode(hasSetTextAction()).performClick()
-            rule.onNode(hasSetTextAction()).performTextInput("cominciam")
+            rule.onNode(hasSetTextAction()).performTextInput("star")
             rule.waitForKeyboard("The search keyboard did not open") { Flows.keyboardShown() }
             rule.waitShown(row)
 
@@ -208,7 +208,7 @@ class LibraryFlowTest {
 
     private companion object {
         const val CLIP_TITLE = "fleurs-it-short"
-        const val MEETING_TITLE = "Riunione"
+        const val MEETING_TITLE = "Meeting"
 
         /** The soft keyboard opens also on an emulator with a hardware keyboard, as in SheetAndDraftDeviceTest. */
         const val SHOW_IME = "show_ime_with_hard_keyboard"

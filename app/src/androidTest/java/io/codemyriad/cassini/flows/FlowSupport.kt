@@ -263,23 +263,23 @@ internal object Flows {
     }
 
     /**
-     * A sealed two-speaker document over the FLEURS Opus clip, written to the scratch cache: "ciao a tutti" by Ada,
-     * then "allora cominciamo subito" by a placeholder speaker.
+     * A sealed two-speaker document over the FLEURS Opus clip, written to the scratch cache: "hello to everyone" by Ada,
+     * then "so start now" by a placeholder speaker.
      */
     fun meetingDocument(title: String): File {
         val audio = Background.assetCopy("fleurs-it-short.opus")
         val document = File(audio.parentFile, "$title.opus")
         val words = listOf(
-            Word("S1", 0, 400, "ciao"),
-            Word("S1", 450, 900, "a"),
-            Word("S1", 950, 1_400, "tutti"),
-            Word("S2", 2_000, 2_400, "allora"),
-            Word("S2", 2_450, 2_900, "cominciamo"),
-            Word("S2", 2_950, 3_400, "subito"),
+            Word("S1", 0, 400, "hello"),
+            Word("S1", 450, 900, "to"),
+            Word("S1", 950, 1_400, "everyone"),
+            Word("S2", 2_000, 2_400, "so"),
+            Word("S2", 2_450, 2_900, "start"),
+            Word("S2", 2_950, 3_400, "now"),
         )
         CassiniDocument.create(
             audio,
-            Transcript(words, language = "it"),
+            Transcript(words, language = "en"),
             title,
             JSONObject().put("engine", "test"),
             null,

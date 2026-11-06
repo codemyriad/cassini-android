@@ -112,8 +112,8 @@ class LibraryMappingTest {
         val row = libraryRow("a", createdAt = daysAgo(1))
         val results = LibraryMapping.results(
             listOf(
-                SearchRow(row, snippet = "…la \u0002consegna\u0003 slitta…", titleSnippet = "Call with supplier"),
-                SearchRow(libraryRow("b"), snippet = "no markers here", titleSnippet = "\u0002Fattura\u0003 marzo"),
+                SearchRow(row, snippet = "…the \u0002delivery\u0003 slips…", titleSnippet = "Call with supplier"),
+                SearchRow(libraryRow("b"), snippet = "no markers here", titleSnippet = "\u0002Invoice\u0003 March"),
             ),
             context,
             NOW,
@@ -121,10 +121,10 @@ class LibraryMappingTest {
         )
         val first = results[0]
         assertEquals(DayLabel.Yesterday, first.day)
-        assertEquals(Highlighted("la consegna slitta", persistentListOf(3..10), true, true), first.preview)
+        assertEquals(Highlighted("the delivery slips", persistentListOf(4..11), true, true), first.preview)
         assertTrue(first.titleRanges.isEmpty())
         val second = results[1]
-        assertEquals("Fattura marzo", second.title)
+        assertEquals("Invoice March", second.title)
         assertEquals(listOf(0..6), second.titleRanges)
         assertNull("a title-only match shows no snippet", second.preview)
         assertEquals(DayLabel.Today, second.day)
@@ -133,18 +133,18 @@ class LibraryMappingTest {
     @Test
     fun storedPreviewKeepsItsEllipsesAndCutsTheFallbackAtAWord() {
         assertEquals(
-            Highlighted("quindi la consegna slitta", leadingEllipsis = true, trailingEllipsis = true),
-            LibraryMapping.storedPreview("…quindi la consegna slitta…"),
+            Highlighted("so the delivery slips", leadingEllipsis = true, trailingEllipsis = true),
+            LibraryMapping.storedPreview("…so the delivery slips…"),
         )
         assertEquals(Highlighted("Short transcript."), LibraryMapping.storedPreview("Short transcript."))
         assertNull(LibraryMapping.storedPreview(null))
         assertNull(LibraryMapping.storedPreview(""))
-        val body = ("parola ".repeat(30)).take(160)
+        val body = ("sample ".repeat(30)).take(160)
         val cut = LibraryMapping.storedPreview(body)!!
         assertTrue(cut.trailingEllipsis)
         assertFalse(cut.text.endsWith(" "))
         assertTrue(cut.text.length < 160 && body.startsWith(cut.text))
-        assertTrue(cut.text.endsWith("parola"))
+        assertTrue(cut.text.endsWith("sample"))
     }
 
     @Test

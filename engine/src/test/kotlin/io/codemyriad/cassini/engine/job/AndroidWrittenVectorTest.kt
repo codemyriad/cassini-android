@@ -47,11 +47,12 @@ class AndroidWrittenVectorTest {
         val one = "${run}1"
         val two = "${run}2"
         val words = listOf(
-            Word(one, 0, 400, "Buongiorno"),
-            Word(one, 400, 800, "a"),
-            Word(one, 800, 1300, "tutti."),
-            Word(two, 1500, 1900, "Grazie,"),
-            Word(two, 1900, 2400, "iniziamo."),
+            Word(one, 0, 400, "Good"),
+            Word(one, 400, 800, "morning"),
+            Word(one, 800, 1300, "everyone."),
+            Word(two, 1500, 1900, "Thanks,"),
+            Word(two, 1900, 2100, "let’s"),
+            Word(two, 2100, 2400, "begin."),
         )
         val transcript = Transcript(words, Transcript.UNDETERMINED)
         val turns = listOf(SpeakerTurn(0, 1300, 0), SpeakerTurn(1500, 2400, 1))
@@ -63,14 +64,14 @@ class AndroidWrittenVectorTest {
         )
         val first = JobProvenance.diarization(words, turns, recognition, diarizationMs = 321)
         val labels = mapOf(one to "Voce 1", two to "Voce 2")
-        val sealed = CassiniDocument.create(audio, transcript, "Riunione di prova", first, null, labels)
+        val sealed = CassiniDocument.create(audio, transcript, "Test meeting", first, null, labels)
 
         // The merge of speaker 2 into speaker 1, as DocumentRepository.mergeSpeakers writes it.
         val before = CassiniDocument.read(sealed)
         val aliases = mapOf(two to one)
         val merged = SpeakerMerges.apply(transcript, aliases)
         val second = SpeakerMerges.processing(first, aliases, before.defaultId)
-        val withMerge = CassiniDocument.create(sealed, merged, "Riunione di prova", second, before, emptyMap())
+        val withMerge = CassiniDocument.create(sealed, merged, "Test meeting", second, before, emptyMap())
 
         // The rename of speaker 1, as DocumentRepository.relabel writes it.
         val work = Files.createTempDirectory("android-vector").toFile()
