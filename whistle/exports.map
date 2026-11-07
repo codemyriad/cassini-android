@@ -1,0 +1,8 @@
+{
+  global:
+    needle_load;
+    needle_models;
+    needle_last_error;
+    needle_transcribe;
+  local: *;
+};
