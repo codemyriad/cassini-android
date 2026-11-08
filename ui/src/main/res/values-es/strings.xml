@@ -437,7 +437,7 @@
     <string name="ui_settings_model_checking">Comprobando archivos</string>
     <string name="ui_settings_model_pending">Se descarga con la próxima transcripción</string>
     <string name="ui_settings_model_not_downloaded">Sin descargar</string>
-    <string name="ui_settings_model_failed">Error en la descarga — se reintentará la próxima vez</string>
+    <string name="ui_settings_model_failed">Error de descarga — toca para reintentar</string>
     <string name="ui_settings_models_footnote">La transcripción se hace en este teléfono. El audio nunca sale de él.</string>
     <string name="ui_settings_privacy">Privacidad</string>
     <string name="ui_settings_voices">Voces guardadas</string>

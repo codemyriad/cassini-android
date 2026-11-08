@@ -430,7 +430,7 @@
     <string name="ui_settings_model_checking">Verifica dei file</string>
     <string name="ui_settings_model_pending">Si scarica con la prossima trascrizione</string>
     <string name="ui_settings_model_not_downloaded">Non scaricato</string>
-    <string name="ui_settings_model_failed">Download non riuscito — riprova la prossima volta</string>
+    <string name="ui_settings_model_failed">Download non riuscito — tocca per riprovare</string>
     <string name="ui_settings_models_footnote">La trascrizione avviene su questo telefono. L’audio non lo lascia mai.</string>
     <string name="ui_settings_privacy">Privacy</string>
     <string name="ui_settings_voices">Voci salvate</string>

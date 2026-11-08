@@ -690,15 +690,16 @@ internal object VariantFixtures {
         ),
         "settings-notifications-off" to b.settings.copy(notificationsOff = true),
         "settings-downloading" to b.settings.copy(
+            speechModel = SpeechModelUi.PARAKEET,
             models = persistentListOf(
-                ModelRowUi(ModelPartUi.SPEECH, ModelBytes.SPEECH, ModelStatusUi.Downloading(46)),
+                ModelRowUi(ModelPartUi.SPEECH, 440L * 1024 * 1024, ModelStatusUi.Downloading(46)),
                 ModelRowUi(ModelPartUi.SPEAKERS, ModelBytes.SPEAKERS, ModelStatusUi.Pending),
                 ModelRowUi(ModelPartUi.VOICES, ModelBytes.VOICES, ModelStatusUi.Pending),
             ),
         ),
         "settings-model-statuses" to b.settings.copy(
             models = persistentListOf(
-                ModelRowUi(ModelPartUi.SPEECH, ModelBytes.SPEECH, ModelStatusUi.Checking),
+                ModelRowUi(ModelPartUi.SPEECH, 440L * 1024 * 1024, ModelStatusUi.Checking),
                 ModelRowUi(ModelPartUi.SPEAKERS, ModelBytes.SPEAKERS, ModelStatusUi.Failed),
                 ModelRowUi(ModelPartUi.VOICES, ModelBytes.VOICES, ModelStatusUi.NotDownloaded),
             ),

@@ -343,9 +343,9 @@ internal object BoardFixtures {
         includedAvailable = true,
         language = LanguageChoice.PHONE,
         models = persistentListOf(
-            ModelRowUi(ModelPartUi.SPEECH, ModelBytes.SPEECH, ModelStatusUi.Ready),
+            ModelRowUi(ModelPartUi.SPEECH, 440L * 1024 * 1024, ModelStatusUi.Ready),
             ModelRowUi(ModelPartUi.SPEAKERS, ModelBytes.SPEAKERS, ModelStatusUi.Ready),
-            ModelRowUi(ModelPartUi.VOICES, ModelBytes.VOICES, ModelStatusUi.Pending),
+            ModelRowUi(ModelPartUi.VOICES, ModelBytes.VOICES, ModelStatusUi.NotDownloaded),
         ),
         voices = 4,
         trash = 2,

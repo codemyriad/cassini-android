@@ -438,7 +438,7 @@
     <string name="ui_settings_model_checking">A verificar ficheiros</string>
     <string name="ui_settings_model_pending">Será transferido na próxima transcrição</string>
     <string name="ui_settings_model_not_downloaded">Não transferido</string>
-    <string name="ui_settings_model_failed">Falha na transferência — tenta novamente da próxima vez</string>
+    <string name="ui_settings_model_failed">Falha na transferência — toque para tentar novamente</string>
     <string name="ui_settings_models_footnote">A transcrição acontece neste telemóvel. O áudio nunca sai dele.</string>
     <string name="ui_settings_privacy">Privacidade</string>
     <string name="ui_settings_voices">Vozes guardadas</string>

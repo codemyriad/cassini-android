@@ -312,6 +312,7 @@ class StateVariantsTest : BoardTest() {
     // Settings (features.md section 11).
 
     @Test fun settingsIncludedUnavailable() = settings("settings-included-unavailable")
+
     @Test fun settingsNotificationsOff() = settings("settings-notifications-off")
 
     @Test fun settingsDownloading() = settings("settings-downloading")

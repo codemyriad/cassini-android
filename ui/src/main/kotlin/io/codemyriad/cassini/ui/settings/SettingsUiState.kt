@@ -66,7 +66,7 @@ sealed interface ModelStatusUi {
     /** "Not downloaded" (no consent); the row opens Model download. */
     data object NotDownloaded : ModelStatusUi
 
-    /** "Download failed — tries again next time" (red). */
+    /** "Download failed — tap to try again" (red). */
     data object Failed : ModelStatusUi
 }
 

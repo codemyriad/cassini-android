@@ -438,7 +438,7 @@
     <string name="ui_settings_model_checking">Vérification des fichiers</string>
     <string name="ui_settings_model_pending">Se télécharge à la prochaine transcription</string>
     <string name="ui_settings_model_not_downloaded">Non téléchargé</string>
-    <string name="ui_settings_model_failed">Échec du téléchargement — nouvel essai la prochaine fois</string>
+    <string name="ui_settings_model_failed">Échec du téléchargement — touchez pour réessayer</string>
     <string name="ui_settings_models_footnote">La transcription se fait sur ce téléphone. L’audio n’en sort jamais.</string>
     <string name="ui_settings_privacy">Confidentialité</string>
     <string name="ui_settings_voices">Voix mémorisées</string>
