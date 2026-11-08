@@ -44,6 +44,7 @@ object BannerText {
         when (kind) {
             BannerKind.RECOVERED -> res.getString(kind.body, Durations.clock(args.ms1))
             BannerKind.REC_STOPPED_STORAGE -> res.getString(kind.body, Sizes.megabytes(res, args.bytes, format))
+            BannerKind.PARAKEET_RECOMMENDED -> res.getString(kind.body, Sizes.megabytes(res, args.bytes, format))
             // The app's reason why there is no transcript (too long to transcribe), else "No transcript yet."
             BannerKind.PLAIN_AUDIO -> args.text?.takeIf { it.isNotBlank() } ?: res.getString(kind.body)
             BannerKind.TX_FAILED ->

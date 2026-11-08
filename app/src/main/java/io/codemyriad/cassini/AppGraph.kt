@@ -46,6 +46,7 @@ import io.codemyriad.cassini.engine.job.JobEnvironment
 import io.codemyriad.cassini.engine.job.JobStorage
 import io.codemyriad.cassini.engine.job.JobVoices
 import io.codemyriad.cassini.engine.job.ModelAccess
+import io.codemyriad.cassini.models.ParakeetRecommendation
 import io.codemyriad.cassini.models.SpeechSelection
 import io.codemyriad.cassini.nav.ViewedImports
 import io.codemyriad.cassini.note.RecentWords
@@ -179,7 +180,8 @@ class AppGraph(context: Context, val config: Config) {
     val settings: SettingsRepository =
         SettingsRepository.create(paths, CoroutineScope(appScope.coroutineContext + dispatchers.io))
     val models = ModelRepository(paths, settings, dispatchers, config.fetcher, config.clock)
-    val speech = SpeechSelection(app, settings, appScope, dispatchers.io)
+    val speech = SpeechSelection(app, settings, models, appScope, dispatchers.io)
+    val parakeetRecommendation = ParakeetRecommendation(app, paths, models, settings, dispatchers.io)
     val installOwner = ModelInstallOwner(models, paths.modelRoot, network, appScope, dispatchers.io)
     val modelAccess: ModelAccess = RepositoryModelAccess(models, paths.modelRoot, installOwner, network)
 

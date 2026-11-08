@@ -71,7 +71,18 @@ class TranscriptionJobFactory(private val graph: AppGraph) : ProcessingJobFactor
 
             override fun stop(reason: PauseReason) = job.stop(reason)
 
-            override suspend fun run(): JobOutcome = job.run()
+            override suspend fun run(): JobOutcome {
+                val outcome = job.run()
+                if (model == SpeechModel.INCLUDED && outcome == JobOutcome.Done) {
+                    try {
+                        graph.settings.recordWhistleCompleted(noteId)
+                        graph.parakeetRecommendation.refresh()
+                    } catch (error: java.io.IOException) {
+                        Log.w("ParakeetSuggestion", "Could not remember the completed Whistle transcription", error)
+                    }
+                }
+                return outcome
+            }
         }
     }
 }

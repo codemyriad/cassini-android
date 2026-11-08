@@ -63,6 +63,21 @@ class SettingsViewModelTest {
 
     private fun SettingsViewModel.now(): SettingsUiState = state.value
 
+    @Test fun recommendationOpensOnlyParakeetConsentAndDismissesWithoutChangingTheModel() = runTest(dispatcher) {
+        ports.notices.value = NoticeFacts(
+            parakeet = io.codemyriad.cassini.models.ParakeetRecommendationState(true, 123L),
+        )
+        val viewModel = viewModel()
+        assertEquals(123L, requireNotNull(viewModel.now().parakeetSuggestion).args.bytes)
+        viewModel.onEvent(SettingsEvent.DownloadParakeet)
+        advanceUntilIdle()
+        assertEquals(listOf(SettingsEffect.Open(ModelDownloadKey(parakeetOnly = true))), effects)
+        viewModel.onEvent(SettingsEvent.DismissParakeet)
+        advanceUntilIdle()
+        assertEquals(null, viewModel.now().parakeetSuggestion)
+        assertEquals(SpeechModel.PARAKEET, ports.speech.value.selected)
+    }
+
     @Test fun includedChoiceNeverOpensDownloadAndUnavailableChoiceIsRefused() = runTest(dispatcher) {
         val viewModel = viewModel()
         val included = SpeechModelUi.INCLUDED
@@ -243,6 +258,12 @@ class SettingsViewModelTest {
     }
 
     private class FakeSettingsPorts : SettingsPorts {
+        override fun dismissParakeetDefault() {
+            notices.value = notices.value.copy(parakeetNowDefault = false)
+        }
+        override fun dismissParakeetSuggestion() {
+            notices.value = notices.value.copy(parakeet = notices.value.parakeet.copy(visible = false))
+        }
         val languages = mutableListOf<LanguageChoice>()
         var current = LanguageChoice.PHONE
         var refreshed = 0

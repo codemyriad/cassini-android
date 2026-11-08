@@ -99,6 +99,10 @@ class NoticeCenter(private val graph: AppGraph, context: Context, val imports: I
         voicesProblem.distinctUntilChanged(),
     ) { facts, off, imports, download, voices ->
         facts.copy(notificationsOff = off, imports = imports, downloadFailure = download, voicesProblem = voices)
+    }.combine(graph.parakeetRecommendation.state) { facts, parakeet ->
+        facts.copy(parakeet = parakeet)
+    }.combine(settings.parakeetDefaultNotice) { facts, announcement ->
+        facts.copy(parakeetNowDefault = announcement)
     }.stateIn(graph.appScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), NoticeFacts())
 
     init {
@@ -108,11 +112,18 @@ class NoticeCenter(private val graph: AppGraph, context: Context, val imports: I
     /** Reads the notification permission again (a screen calls it at ON_RESUME, after the system settings). */
     fun refreshNotifications() {
         notificationsOff.value = !notificationsEnabled()
+        graph.parakeetRecommendation.refresh()
     }
 
     /** The user closed the banner of [kind], or acted on it in a way that ends it. */
     fun dismiss(kind: BannerKind) {
         when (kind) {
+            BannerKind.PARAKEET_NOW_DEFAULT -> graph.appScope.launch {
+                guarded("dismiss the Parakeet default announcement") { settings.dismissParakeetDefaultNotice() }
+            }
+            BannerKind.PARAKEET_RECOMMENDED -> graph.appScope.launch {
+                guarded("dismiss the Parakeet suggestion") { settings.dismissParakeetSuggestion() }
+            }
             BannerKind.RECOVERED -> graph.appScope.launch {
                 guarded("acknowledge the recovered recordings") {
                     facts.value.recovered?.let { settings.acknowledgeRecovered(it.latestAt) }

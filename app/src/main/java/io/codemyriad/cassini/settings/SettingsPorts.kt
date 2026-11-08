@@ -53,6 +53,10 @@ interface SettingsPorts {
     /** Reads the notification permission again (ON_RESUME). */
     fun refreshNotices()
 
+    fun dismissParakeetSuggestion()
+
+    fun dismissParakeetDefault()
+
     /** The app's `versionName`. */
     val version: String
 }
@@ -80,6 +84,10 @@ class GraphSettingsPorts(private val graph: AppGraph) : SettingsPorts {
     override val notices: Flow<NoticeFacts> get() = graph.notices.facts
 
     override fun refreshNotices() = graph.notices.refreshNotifications()
+
+    override fun dismissParakeetSuggestion() = graph.notices.dismiss(io.codemyriad.cassini.ui.banner.BannerKind.PARAKEET_RECOMMENDED)
+
+    override fun dismissParakeetDefault() = graph.notices.dismiss(io.codemyriad.cassini.ui.banner.BannerKind.PARAKEET_NOW_DEFAULT)
 
     override val version: String get() = BuildConfig.VERSION_NAME
 

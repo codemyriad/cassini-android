@@ -53,6 +53,7 @@ enum class BannerArg { COUNT, TEXT, MS1, MS2, BYTES, BYTES2, PERCENT, M4A, PART,
 
 /** A banner button (ui.md section 7) with its label. */
 enum class BannerAction(@StringRes val label: Int) {
+    NOT_NOW(R.string.ui_action_not_now),
     RESUME(R.string.ui_action_resume),
     START_OVER(R.string.ui_action_start_over),
     TRY_AGAIN(R.string.ui_action_try_again),

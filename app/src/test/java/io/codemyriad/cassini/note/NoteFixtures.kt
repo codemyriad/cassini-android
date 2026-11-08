@@ -388,5 +388,9 @@ internal class FakeNotePorts : NotePorts {
         calls += "refreshNotices"
     }
 
+    override fun dismissParakeetSuggestion() {
+        calls += "dismissParakeetSuggestion"
+    }
+
     override fun snackbarTimeoutMs(): Long = 12_000
 }

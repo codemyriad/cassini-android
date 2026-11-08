@@ -46,10 +46,15 @@ class GraphModelDownloadPorts(
     private val graph: AppGraph,
     context: Context,
     private val noteId: String? = null,
+    private val parakeetOnly: Boolean = false,
 ) : ModelDownloadPorts {
     private val app = context.applicationContext
 
-    override suspend fun plan(): ModelPlan = graph.downloadPlan(targetModel())
+    override suspend fun plan(): ModelPlan = if (parakeetOnly) {
+        ModelPlan(graph.models.plan().missing.filter { it.part == ModelPart.SPEECH })
+    } else {
+        graph.downloadPlan(targetModel())
+    }
 
     private suspend fun targetModel(): SpeechModel {
         val identity = noteId?.let { graph.awaitCatalogue().jobs.job(it)?.speechIdentity }
@@ -64,7 +69,7 @@ class GraphModelDownloadPorts(
     }
 
     override suspend fun recordConsent() =
-        graph.models.recordConsent(includeSpeech = targetModel() == SpeechModel.PARAKEET)
+        graph.models.recordConsent(includeSpeech = parakeetOnly || targetModel() == SpeechModel.PARAKEET)
 
     override suspend fun recordDeclined() = graph.models.recordDeclined()
 

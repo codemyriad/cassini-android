@@ -24,6 +24,7 @@ private const val MIB = 1_048_576L
 
 /** The arguments of the board 10 copy for each kind that reads arguments. */
 private val BOARD_ARGS: Map<BannerKind, BannerArgs> = mapOf(
+    BannerKind.PARAKEET_RECOMMENDED to BannerArgs(bytes = 440 * MIB),
     BannerKind.REC_STORAGE_LOW to BannerArgs(ms1 = 10 * MIN + 20_000),
     BannerKind.REC_STOPPED_STORAGE to BannerArgs(bytes = 200 * MIB),
     BannerKind.RECOVERED to BannerArgs(count = 1, ms1 = 5 * MIN + 12_000),
@@ -44,6 +45,12 @@ internal fun boardArgs(kind: BannerKind): BannerArgs = BOARD_ARGS[kind] ?: Banne
 
 /** The English copy of every kind with [boardArgs]: title, body and action labels (features.md section 13). */
 private val ENGLISH: Map<BannerKind, Triple<String, String?, List<String>>> = mapOf(
+    BannerKind.PARAKEET_NOW_DEFAULT to Triple("New meetings now use Parakeet Ultra.", null, listOf()),
+    BannerKind.PARAKEET_RECOMMENDED to Triple(
+        "Get better transcripts with Parakeet Ultra",
+        "Whistle is built in so you can start right away. Parakeet Ultra is more accurate. It’s a 440 MB download.",
+        listOf("Download", "Not now"),
+    ),
     BannerKind.TRUST_VERIFIED to
         Triple("Verified", "Audio matches the transcript exactly. Everything works.", listOf()),
     BannerKind.TRUST_NOT_VERIFIED to
@@ -298,14 +305,23 @@ class BannerKindTest {
             BannerKind.entries.filterNot { it.appEmitted }.toSet(),
         )
         val dismissible = BannerKind.entries.filter { it.dismissible }.toSet()
-        assertEquals(setOf(BannerKind.RECOVERED, BannerKind.NO_ENCODER, BannerKind.DL_MODEL_UNAVAILABLE), dismissible)
+        assertEquals(
+            setOf(
+                BannerKind.RECOVERED,
+                BannerKind.NO_ENCODER,
+                BannerKind.DL_MODEL_UNAVAILABLE,
+                BannerKind.PARAKEET_RECOMMENDED,
+                BannerKind.PARAKEET_NOW_DEFAULT,
+            ),
+            dismissible,
+        )
         assertEquals(
             mapOf(
                 BannerGroup.TRUST to 7,
                 BannerGroup.RECORDING to 8,
                 BannerGroup.TRANSCRIPTION to 9,
                 BannerGroup.DOWNLOAD to 9,
-                BannerGroup.LIBRARY to 11,
+                BannerGroup.LIBRARY to 13,
             ),
             BannerKind.entries.groupingBy { it.group }.eachCount(),
         )

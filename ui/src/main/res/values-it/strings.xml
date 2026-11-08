@@ -568,4 +568,10 @@
     <string name="ui_settings_unavailable">Non disponibile</string>
     <string name="ui_settings_model_choice_footnote">Usato per le nuove trascrizioni. Le trascrizioni in coda e in pausa mantengono il proprio modello.</string>
     <string name="ui_settings_not_available">Non disponibile su questo dispositivo.</string>
+
+    <!-- Coordinator D78; ux-draft/strings.json. -->
+    <string name="ui_action_not_now">Non ora</string>
+    <string name="ui_parakeet_suggestion_title">Trascrizioni migliori con Parakeet Ultra</string>
+    <string name="ui_parakeet_suggestion_body">Whistle è incluso per iniziare subito. Parakeet Ultra è più preciso. Il download è di %1$s.</string>
+    <string name="ui_parakeet_now_default">Le nuove riunioni ora usano Parakeet Ultra.</string>
 </resources>

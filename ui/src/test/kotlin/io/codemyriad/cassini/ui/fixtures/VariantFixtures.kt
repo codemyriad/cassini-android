@@ -684,6 +684,13 @@ internal object VariantFixtures {
     // Settings (features.md section 11).
 
     val settings = mapOf(
+        "settings-parakeet-suggestion" to b.settings.copy(
+            parakeetSuggestion = BannerSpec(BannerKind.PARAKEET_RECOMMENDED, BannerArgs(bytes = 465378233L)),
+        ),
+        "settings-parakeet-default" to b.settings.copy(
+            speechModel = SpeechModelUi.PARAKEET,
+            parakeetNowDefault = true,
+        ),
         "settings-included-unavailable" to b.settings.copy(
             speechModel = SpeechModelUi.PARAKEET,
             includedAvailable = false,

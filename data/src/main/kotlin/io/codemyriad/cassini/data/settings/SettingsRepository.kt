@@ -133,7 +133,46 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         SpeechModel.setting(it[Keys.SPEECH_MODEL])
     }.distinctUntilChanged()
 
-    suspend fun setSpeechModel(model: SpeechModel) = set(Keys.SPEECH_MODEL, model.setting)
+    suspend fun setSpeechModel(model: SpeechModel) {
+        store.edit {
+            it[Keys.SPEECH_MODEL] = model.setting
+            if (model == SpeechModel.INCLUDED) it[Keys.PARAKEET_DEFAULT_NOTICE] = false
+        }
+    }
+
+    /** Promote once per verified installation; a later explicit Whistle choice is kept across restarts. */
+    suspend fun resolveSpeechModel(parakeetReady: Boolean): SpeechModel? {
+        var selected: SpeechModel? = null
+        store.edit { prefs ->
+            val activated = prefs[Keys.PARAKEET_ACTIVATED] ?: false
+            if (parakeetReady && !activated) {
+                prefs[Keys.SPEECH_MODEL] = SpeechModel.PARAKEET.setting
+                prefs[Keys.PARAKEET_DEFAULT_NOTICE] = true
+            } else if (!parakeetReady && activated && SpeechModel.setting(prefs[Keys.SPEECH_MODEL]) == SpeechModel.PARAKEET) {
+                // Removal or invalidation returns new work to the starter, without changing a queued job's pin.
+                prefs.remove(Keys.SPEECH_MODEL)
+                prefs[Keys.PARAKEET_DEFAULT_NOTICE] = false
+            }
+            prefs[Keys.PARAKEET_ACTIVATED] = parakeetReady
+            selected = SpeechModel.setting(prefs[Keys.SPEECH_MODEL])
+        }
+        return selected
+    }
+
+    val firstWhistleNote: Flow<String?> = key(Keys.FIRST_WHISTLE_NOTE)
+
+    /** Only a completed transcription counts; later completions cannot repeat the first-use suggestion. */
+    suspend fun recordWhistleCompleted(noteId: String) {
+        store.edit { if (it[Keys.FIRST_WHISTLE_NOTE] == null) it[Keys.FIRST_WHISTLE_NOTE] = noteId }
+    }
+
+    val parakeetSuggestionDismissed: Flow<Boolean> = flag(Keys.PARAKEET_SUGGESTION_DISMISSED)
+
+    suspend fun dismissParakeetSuggestion() = set(Keys.PARAKEET_SUGGESTION_DISMISSED, true)
+
+    val parakeetDefaultNotice: Flow<Boolean> = flag(Keys.PARAKEET_DEFAULT_NOTICE)
+
+    suspend fun dismissParakeetDefaultNotice() = set(Keys.PARAKEET_DEFAULT_NOTICE, false)
 
     private fun <T> key(key: Preferences.Key<T>): Flow<T?> = preferences.map { it[key] }.distinctUntilChanged()
 
@@ -161,6 +200,10 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
 
     /** The stored key names of architecture 3.4. They are persisted: never rename one. */
     object Keys {
+        val PARAKEET_DEFAULT_NOTICE = booleanPreferencesKey("notices.parakeetDefault")
+        val FIRST_WHISTLE_NOTE = stringPreferencesKey("recognition.firstWhistleNote")
+        val PARAKEET_SUGGESTION_DISMISSED = booleanPreferencesKey("notices.parakeetSuggestionDismissed")
+        val PARAKEET_ACTIVATED = booleanPreferencesKey("recognition.parakeetActivated")
         val SPEECH_MODEL = stringPreferencesKey("recognition.model")
         val SPEECH_CONSENT_AT = longPreferencesKey("models.speechConsentAt")
         val CONSENT_AT = longPreferencesKey("models.consentAt")

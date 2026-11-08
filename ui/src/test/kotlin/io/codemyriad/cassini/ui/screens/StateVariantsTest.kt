@@ -313,6 +313,10 @@ class StateVariantsTest : BoardTest() {
 
     @Test fun settingsIncludedUnavailable() = settings("settings-included-unavailable")
 
+    @Test fun settingsParakeetSuggestion() = settings("settings-parakeet-suggestion")
+
+    @Test fun settingsParakeetDefault() = settings("settings-parakeet-default")
+
     @Test fun settingsNotificationsOff() = settings("settings-notifications-off")
 
     @Test fun settingsDownloading() = settings("settings-downloading")

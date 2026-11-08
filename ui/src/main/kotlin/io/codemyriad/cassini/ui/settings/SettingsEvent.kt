@@ -5,6 +5,12 @@ import io.codemyriad.cassini.ui.format.ModelPartUi
 
 /** What Settings asks for (features.md section 11). */
 sealed interface SettingsEvent {
+    data object DownloadParakeet : SettingsEvent
+
+    data object DismissParakeet : SettingsEvent
+
+    data object DismissParakeetDefault : SettingsEvent
+
     data object Back : SettingsEvent
 
     @Immutable

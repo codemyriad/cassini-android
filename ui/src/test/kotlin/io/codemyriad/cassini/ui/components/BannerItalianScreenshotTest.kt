@@ -34,12 +34,14 @@ class BannerItalianScreenshotTest : BoardTest() {
 
     @Test fun banners3() = strip(3)
 
+    @Test fun banners4() = strip(4)
+
     @Test fun everyKindIsInAStrip() {
         assertEquals(STRIPS, BannerKind.entries.chunked(PER_STRIP).size)
     }
 
     private companion object {
-        const val STRIPS = 3
+        const val STRIPS = 4
         const val PER_STRIP = 15
     }
 }

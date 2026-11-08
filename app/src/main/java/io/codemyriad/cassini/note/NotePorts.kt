@@ -45,6 +45,7 @@ import io.codemyriad.cassini.processing.ProcessingState
 import io.codemyriad.cassini.processing.TranscribeOutcome
 import io.codemyriad.cassini.recording.RecordingState
 import io.codemyriad.cassini.stringRes
+import io.codemyriad.cassini.ui.banner.BannerKind
 import io.codemyriad.cassini.ui.format.Counts
 import io.codemyriad.cassini.ui.format.Dates
 import io.codemyriad.cassini.ui.format.Durations
@@ -218,6 +219,8 @@ interface NotePorts {
     suspend fun markNotificationsAsked()
 
     fun refreshNotices()
+
+    fun dismissParakeetSuggestion()
 
     fun snackbarTimeoutMs(): Long
 }
@@ -453,6 +456,8 @@ class GraphNotePorts(private val graph: AppGraph, context: Context) : NotePorts 
     override suspend fun markNotificationsAsked() = graph.settings.markNotificationsAsked()
 
     override fun refreshNotices() = graph.notices.refreshNotifications()
+
+    override fun dismissParakeetSuggestion() = graph.notices.dismiss(BannerKind.PARAKEET_RECOMMENDED)
 
     override fun snackbarTimeoutMs(): Long = library.snackbarTimeoutMs()
 

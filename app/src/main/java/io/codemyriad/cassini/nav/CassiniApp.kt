@@ -171,7 +171,7 @@ private fun EntryProviderScope<NavKey>.screenEntries(
         val viewModel = viewModel {
             ModelDownloadViewModel(
                 key.noteId,
-                GraphModelDownloadPorts(graph, context, key.noteId),
+                GraphModelDownloadPorts(graph, context, key.noteId, key.parakeetOnly),
                 createSavedStateHandle(),
             )
         }

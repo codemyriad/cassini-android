@@ -58,9 +58,48 @@ class SettingsRepositoryTest {
         }
     }
 
+    @Test fun verifiedInstallationPromotesOnceAndLaterUserChoiceSurvivesRestart() = runTest {
+        withStore { store ->
+            assertNull(store.resolveSpeechModel(false))
+            store.setSpeechModel(SpeechModel.INCLUDED)
+            assertEquals(SpeechModel.PARAKEET, store.resolveSpeechModel(true))
+            store.setSpeechModel(SpeechModel.INCLUDED)
+        }
+        withStore { store ->
+            assertEquals(SpeechModel.INCLUDED, store.resolveSpeechModel(true))
+            assertEquals(SpeechModel.INCLUDED, store.resolveSpeechModel(false))
+            assertEquals(SpeechModel.PARAKEET, store.resolveSpeechModel(true))
+        }
+    }
+
+    @Test fun incompleteDownloadNeverPromotesAndRemovedParakeetFallsBack() = runTest {
+        withStore { store ->
+            assertNull(store.resolveSpeechModel(false))
+            store.setSpeechModel(SpeechModel.PARAKEET)
+            assertEquals(SpeechModel.PARAKEET, store.resolveSpeechModel(false))
+            assertEquals(SpeechModel.PARAKEET, store.resolveSpeechModel(true))
+            assertNull(store.resolveSpeechModel(false))
+            assertEquals(SpeechModel.PARAKEET, store.resolveSpeechModel(true))
+        }
+    }
+
     @Test fun defaultsBeforeAnyWrite() = runTest {
         val settings = withStore { it.snapshot() }
         assertEquals(Settings(null, null, null, null, null, 0, false, false, null), settings)
+    }
+
+    @Test fun firstWhistleCompletionAndSuggestionDismissalSurviveReopen() = runTest {
+        withStore { store ->
+            assertNull(store.firstWhistleNote.first())
+            assertFalse(store.parakeetSuggestionDismissed.first())
+            store.recordWhistleCompleted("first")
+            store.recordWhistleCompleted("second")
+            store.dismissParakeetSuggestion()
+        }
+        withStore { store ->
+            assertEquals("first", store.firstWhistleNote.first())
+            assertTrue(store.parakeetSuggestionDismissed.first())
+        }
     }
 
     @Test fun everyKeyRoundTripsThroughTheFile() = runTest {

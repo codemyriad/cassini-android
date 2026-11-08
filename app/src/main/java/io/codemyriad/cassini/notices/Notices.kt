@@ -12,6 +12,7 @@ import io.codemyriad.cassini.engine.job.DownloadError
 import io.codemyriad.cassini.engine.job.DownloadProgress
 import io.codemyriad.cassini.engine.job.JobFailure
 import io.codemyriad.cassini.engine.job.JobPhase
+import io.codemyriad.cassini.models.ParakeetRecommendationState
 import io.codemyriad.cassini.recording.RecordingOutcome
 import io.codemyriad.cassini.recording.RecordingPause
 import io.codemyriad.cassini.recording.RecordingState
@@ -60,6 +61,8 @@ data class NoticeFacts(
     val imports: ImportState = ImportState(),
     val downloadFailure: DownloadFailure? = null,
     val voicesProblem: VoiceProblem? = null,
+    val parakeet: ParakeetRecommendationState = ParakeetRecommendationState(),
+    val parakeetNowDefault: Boolean = false,
 )
 
 /**
@@ -109,6 +112,10 @@ object Notices {
         if (facts.notificationsOff && facts.jobRunning) notices += Notice(BannerSpec(BannerKind.NOTIFICATIONS_OFF))
         if (facts.encoderMissing) notices += Notice(BannerSpec(BannerKind.NO_ENCODER, BannerArgs(m4a = facts.m4a)))
         notices += imports(facts.imports)
+        if (facts.parakeetNowDefault) notices += Notice(BannerSpec(BannerKind.PARAKEET_NOW_DEFAULT))
+        if (facts.parakeet.firstWhistleNote != null) {
+            parakeetSuggestion(facts)?.let { notices += Notice(it) }
+        }
         if (!library.loading) notices += listState(library)
         return ordered(notices)
     }
@@ -323,6 +330,10 @@ object Notices {
     }
 
     // Settings and Saved voices (13.5). ----------------------------------------------------------------------------
+
+    fun parakeetSuggestion(facts: NoticeFacts): BannerSpec? = facts.parakeet.takeIf { it.visible }?.let {
+        BannerSpec(BannerKind.PARAKEET_RECOMMENDED, BannerArgs(bytes = it.downloadBytes))
+    }
 
     /** Settings: "Notifications are off" whenever they are; "Saved voices can't be read" for a newer or bad file. */
     fun settings(facts: NoticeFacts): ImmutableList<BannerSpec> {

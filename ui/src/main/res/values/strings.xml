@@ -600,4 +600,10 @@
     <string name="ui_settings_unavailable">Unavailable</string>
     <string name="ui_settings_model_choice_footnote">Used for new transcriptions. Queued and paused transcriptions keep their model.</string>
     <string name="ui_settings_not_available">Not available on this device.</string>
+
+    <!-- Coordinator D78; ux-draft/strings.json. -->
+    <string name="ui_action_not_now">Not now</string>
+    <string name="ui_parakeet_suggestion_title">Get better transcripts with Parakeet Ultra</string>
+    <string name="ui_parakeet_suggestion_body">Whistle is built in so you can start right away. Parakeet Ultra is more accurate. It’s a %1$s download.</string>
+    <string name="ui_parakeet_now_default">New meetings now use Parakeet Ultra.</string>
 </resources>

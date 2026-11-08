@@ -82,6 +82,8 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
             trash = trash,
             version = ports.version,
             notificationsOff = facts.notificationsOff,
+            parakeetSuggestion = Notices.parakeetSuggestion(facts),
+            parakeetNowDefault = facts.parakeetNowDefault,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), initial())
 
@@ -99,6 +101,9 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
 
     fun onEvent(event: SettingsEvent) {
         when (event) {
+            SettingsEvent.DownloadParakeet -> emit(SettingsEffect.Open(ModelDownloadKey(parakeetOnly = true)))
+            SettingsEvent.DismissParakeet -> ports.dismissParakeetSuggestion()
+            SettingsEvent.DismissParakeetDefault -> ports.dismissParakeetDefault()
             SettingsEvent.Back -> emit(SettingsEffect.Close)
             is SettingsEvent.Language -> choose(event.language)
             is SettingsEvent.ChooseSpeech -> chooseSpeech(event.model)

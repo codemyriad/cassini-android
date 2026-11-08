@@ -338,7 +338,11 @@ The test APK instruments itself and does not touch the data of the app. If the S
 
 | Key | Type | Meaning |
 |---|---|---|
-| `recognition.model` | String | Explicit Included or Parakeet preference; absent resolves to verified Included eligibility. Each queued job keeps its own pinned `speech_identity`. |
+| `recognition.model` | String | Included or Parakeet preference. First verified Parakeet installation promotes it; a later explicit choice persists. Each queued job keeps its own pinned `speech_identity`. |
+| `recognition.parakeetActivated` | Boolean | Whether this verified Parakeet installation has been promoted; removal/invalidation resets it. |
+| `recognition.firstWhistleNote` | String | First completed Whistle job, for the D78 post-transcription suggestion. |
+| `notices.parakeetSuggestionDismissed` | Boolean | Persistent dismissal of the Settings and post-Whistle recommendation. |
+| `notices.parakeetDefault` | Boolean | Pending one-time announcement after verified Parakeet promotion. |
 | `models.speechConsentAt` | Long | Explicit consent to download Parakeet. Consent to optional speaker/voice downloads alone does not authorize it. |
 | `models.consentAt` | Long | The user pushed "Download and transcribe" or "Download". Consent means that this key exists or that Parakeet is installed. |
 | `models.declinedAt` | Long | The user pushed "Not now — keep the audio". After later recordings, the consent screen does not open automatically. |

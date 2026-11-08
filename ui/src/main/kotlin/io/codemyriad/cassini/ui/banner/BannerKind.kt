@@ -307,6 +307,7 @@ enum class BannerKind(
     ),
 
     // 13.5 Library and import
+
     LIB_EMPTY(
         PLAIN,
         LIB,
@@ -382,6 +383,16 @@ enum class BannerKind(
         R.string.ui_banner_lib_unavailable_title,
         R.string.ui_banner_lib_unavailable_body,
     ),
+    PARAKEET_RECOMMENDED(
+        INFO,
+        LIB,
+        R.string.ui_parakeet_suggestion_title,
+        R.string.ui_parakeet_suggestion_body,
+        uses = setOf(BYTES),
+        actions = listOf(DOWNLOAD, BannerAction.NOT_NOW),
+        dismissible = true,
+    ),
+    PARAKEET_NOW_DEFAULT(OK, LIB, R.string.ui_parakeet_now_default, 0, dismissible = true),
     ;
 
     /** The catalogue actions, the default of [BannerSpec.actions]. */

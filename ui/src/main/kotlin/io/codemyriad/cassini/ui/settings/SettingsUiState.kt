@@ -1,6 +1,7 @@
 package io.codemyriad.cassini.ui.settings
 
 import androidx.compose.runtime.Immutable
+import io.codemyriad.cassini.ui.banner.BannerSpec
 import io.codemyriad.cassini.ui.format.ModelPartUi
 import kotlinx.collections.immutable.ImmutableList
 
@@ -20,6 +21,8 @@ data class SettingsUiState(
     val speechModel: SpeechModelUi = SpeechModelUi.PARAKEET,
     val includedAvailable: Boolean = false,
     val speechChecking: Boolean = false,
+    val parakeetSuggestion: BannerSpec? = null,
+    val parakeetNowDefault: Boolean = false,
 )
 
 /**
