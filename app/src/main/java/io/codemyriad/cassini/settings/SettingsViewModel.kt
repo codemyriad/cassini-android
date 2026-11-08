@@ -139,7 +139,8 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
                 if (model == SpeechModelUi.PARAKEET && status != ModelStatusUi.Ready) {
                     emit(SettingsEffect.Open(ModelDownloadKey(parakeetOnly = true)))
                 } else {
-                    ports.chooseSpeech(if (model == SpeechModelUi.INCLUDED) SpeechModel.INCLUDED else SpeechModel.PARAKEET)
+                    val selected = if (model == SpeechModelUi.INCLUDED) SpeechModel.INCLUDED else SpeechModel.PARAKEET
+                    ports.chooseSpeech(selected)
                 }
             } catch (error: CancellationException) {
                 throw error

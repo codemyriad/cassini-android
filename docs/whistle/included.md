@@ -50,6 +50,14 @@ Android locales. The explicit memory bench measures cold Parakeet + VAD on the
 public English DC input; its PSS samples and process RSS high-water mark are
 reported separately, with no long-meeting or whole-device guarantee.
 
+The [initial measured run](../../whistle/memory/parakeet-api35.json) on the owned
+4 GiB/two-CPU API 35/16 KiB arm64 emulator observed peak app PSS of 985,818 KiB
+(962.7 MiB), from 170 samples with at most 58.7 ms between samples. The process
+RSS high-water mark was 1,097,424 KiB (1,071.7 MiB). This used Parakeet + VAD,
+warm model files, a cold app process, and the public English DC fixture, without
+optional speaker models. Artifact/source/model/input/report hashes are retained.
+These bounded-workload measurements do not justify reducing the 4 GB floor.
+
 The decoder policy is explicit: 48 kHz uses `cassini-fir-48k-16k-v1`, 16 kHz is
 unchanged, and other supported rates use the established Hann-windowed sinc
 conversion. Those other-rate decodes do not claim desktop FIR bit parity.
@@ -80,7 +88,7 @@ identity, no-download Included policy, typed replay mismatch and exact WAV FIR
 resume output. Linux records only intentional Settings screenshot changes.
 The owned arm64 worker bench also runs the real default production job in a
 fresh scratch graph with a refusing downloader and no models or consent. It
-pauses on a checkpoint event, changes the default to Parakeet, resumes the pinned
+pauses on a checkpoint event, requests Parakeet, resumes the pinned
 Whistle job, and compares portable words/times with the unchanged public English
 DC/control desktop references. It writes an `included-job.json` report beside
 the existing worker report. Neither benchmark uses a user's device or data.

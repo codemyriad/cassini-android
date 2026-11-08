@@ -12,7 +12,11 @@ enum class SpeechModel(val setting: String, val identity: String) {
     ;
 
     companion object {
-        fun chosen(saved: SpeechModel?, includedAvailable: Boolean, parakeetReady: Boolean = false): SpeechModel = when {
+        fun chosen(
+            saved: SpeechModel?,
+            includedAvailable: Boolean,
+            parakeetReady: Boolean = false,
+        ): SpeechModel = when {
             !includedAvailable -> PARAKEET
             saved == INCLUDED -> INCLUDED
             parakeetReady -> PARAKEET

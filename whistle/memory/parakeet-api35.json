@@ -1,0 +1,31 @@
+{
+  "date": "2026-11-08",
+  "sourceRevision": "97d3e792802ab14ccb2c5b234574e125072b3800",
+  "appApkSha256": "97d1a00164415eca273aab5c79addcbd7ec577412437ee28e2759fffd957cbbb",
+  "benchApkSha256": "9878001b34a0bc7562f308fc77b3e8a9d34032686c193ebca8f86ab9a3bb4140",
+  "emulatorRamMiB": 4096,
+  "emulatorCpus": 2,
+  "abi": "arm64-v8a",
+  "pageSize": 16384,
+  "fingerprint": "google/sdk_gphone16k_arm64/emu64a16k:15/AE3A.240806.043/12960925:userdebug/dev-keys",
+  "kernel": "Linux localhost 6.6.30-android15-8-gdd9c02ccfe27-ab11987101 #1 SMP PREEMPT Tue Jun 18 20:50:32 UTC 2024 aarch64 Toybox",
+  "measurement": {
+    "sdk": 35,
+    "pid": 4939,
+    "model": "18cb623004dd6c15999b93cb70b14d8a1f6e8f3a2a97ff733f104bfc3494f6a9",
+    "vad": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
+    "verifiedDefaultAndExplicitChoiceAfterRestart": true,
+    "inputSha256": "071f051241d394587c85463272e9414f133ee18c4bb835d1382b662e4154efda",
+    "words": 33,
+    "peakPssKiB": 985818,
+    "samples": 170,
+    "maxSampleIntervalMs": 58.720375,
+    "processPeakRssKiB": 1097424,
+    "scope": "Cold app process; Parakeet + VAD on public English DC input; no optional speaker models"
+  },
+  "reportSha256": "dd70ecc83c521e330afc886180cb9130a6dfeb8912064e919e0a180e0b8b1c06",
+  "instrumentationSha256": "56a0d272447fc6ad12c986afe75300b16c0479fa62059be2ff3b5305898d4bd6",
+  "scope": "Cold app process, warm file cache; one public English DC fixture; no optional speaker models",
+  "limits": "Sampled PSS is not an exact high-water mark; RSS high-water is process-wide. Not a long-meeting or phone minimum-RAM acceptance result.",
+  "minimumRecommendationRamBytes": 4000000000
+}

@@ -15,8 +15,8 @@ import io.codemyriad.cassini.data.models.ModelFetcher
 import io.codemyriad.cassini.engine.asr.Parakeet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
-import org.junit.Assert.assertEquals
 import org.json.JSONObject
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -81,7 +81,8 @@ class ParakeetMemoryTest {
                 )
                 try {
                     graph.ready.await()
-                    assertEquals(if (round == 0) SpeechModel.PARAKEET else SpeechModel.INCLUDED, graph.speech.selected())
+                    val expected = if (round == 0) SpeechModel.PARAKEET else SpeechModel.INCLUDED
+                    assertEquals(expected, graph.speech.selected())
                     graph.speech.choose(SpeechModel.INCLUDED)
                 } finally {
                     graph.close()
