@@ -20,3 +20,10 @@ target_link_options(cassini_opus PRIVATE "-Wl,-z,max-page-size=16384" "-Wl,--no-
 add_library(cassini_capability SHARED whistle-capability.c)
 target_compile_options(cassini_capability PRIVATE -Wall -Wextra -Werror -fvisibility=hidden)
 target_link_options(cassini_capability PRIVATE "-Wl,-z,max-page-size=16384" "-Wl,--no-undefined")
+
+# Private worker bootstrap: neural libraries are verified and dlopened only after live privacy/capability checks.
+add_library(cassini_whistle_jni SHARED whistle/worker.c)
+target_include_directories(cassini_whistle_jni PRIVATE "${WHISTLE_INCLUDES}")
+target_compile_options(cassini_whistle_jni PRIVATE -Wall -Wextra -Werror -fvisibility=hidden -ffp-contract=off)
+target_link_libraries(cassini_whistle_jni PRIVATE dl m)
+target_link_options(cassini_whistle_jni PRIVATE "-Wl,-z,max-page-size=16384" "-Wl,--no-undefined")

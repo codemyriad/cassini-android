@@ -31,6 +31,7 @@ android {
         // The committed FLEURS clip, the local-only YouTube clips (tools/fetch-youtube-audio.sh) and the private
         // meeting clips of VoiceprintCalibrationTest (tools/private-fixtures, never committed).
         getByName("main") {
+            assets.directories.add(rootDir.resolve(".tools/whistle-probe-assets").path)
             assets.directories.add(rootDir.resolve("fixtures/audio").path)
             assets.directories.add(rootDir.resolve("app/src/androidTest/assets").path)
             assets.directories.add(rootDir.resolve("tools/private-fixtures").path)

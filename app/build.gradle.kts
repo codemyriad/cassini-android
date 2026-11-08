@@ -76,6 +76,12 @@ android {
         // No baseline: every finding is fixed or, in lint.xml, ignored with its reason.
         lintConfig = file("lint.xml")
     }
+    sourceSets.getByName("main") {
+        assets.srcDir(rootDir.resolve(".tools/whistle-package/assets"))
+        jniLibs.srcDir(rootDir.resolve(".tools/whistle-package/jni"))
+    }
+    androidResources { noCompress += listOf("cact", "onnx") }
+    packaging.jniLibs.keepDebugSymbols += setOf("**/libcassini_needle.so", "**/libcassini_whistle_ort.so")
     // The conformance vectors and the golden checkpoint are :core test data, not :app test inputs.
     testOptions {
         unitTests {
@@ -183,3 +189,11 @@ dependencies {
     "releaseTestImplementation"(platform(libs.compose.bom))
     "releaseTestImplementation"(libs.compose.ui.test.manifest)
 }
+
+val checkWhistlePackage = tasks.register("checkWhistlePackage") {
+    val manifest = rootDir.resolve(".tools/whistle-package/assets/whistle/manifest.json")
+    doLast {
+        if (!manifest.isFile) throw GradleException("Whistle worker assets missing. Run scripts/setup.sh.")
+    }
+}
+tasks.named("preBuild") { dependsOn(checkWhistlePackage) }

@@ -20,7 +20,7 @@ def closure(start: Path) -> set[str]:
         if path.name in found:
             continue
         found.add(path.name)
-        if path.suffix == '.sh':
+        if path.suffix in ('.sh', '.py'):
             for name in NAME.findall(path.read_text()):
                 candidate = Path('scripts') / name
                 # The comments of the native scripts name this check; it is not part of the build.

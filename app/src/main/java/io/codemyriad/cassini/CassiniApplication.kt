@@ -1,7 +1,9 @@
 package io.codemyriad.cassini
 
 import android.app.Application
+import android.os.Build
 import android.os.StrictMode
+import android.system.Os
 import android.util.Log
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
@@ -29,6 +31,12 @@ class CassiniApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && Application.getProcessName() == "$packageName:whistle") {
+            Os.setenv("NEEDLE_TELEMETRY", "0", true)
+            Os.setenv("DO_NOT_TRACK", "1", true)
+            Os.setenv("ORT_DISABLE_TELEMETRY", "1", true)
+            return // The private worker must not initialize the main graph or load sherpa's ORT.
+        }
         paths = AppRoots.resolve(filesDir, cacheDir, BuildConfig.DEBUG)
         if (paths.root != filesDir) Log.i(TAG, "Debug root: ${paths.root}")
         if (BuildConfig.DEBUG) {

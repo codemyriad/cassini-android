@@ -1,0 +1,131 @@
+package io.codemyriad.cassini.whistle
+
+import android.app.Application
+import android.app.Service
+import android.content.Intent
+import android.os.Build
+import android.os.Bundle
+import android.os.Handler
+import android.os.IBinder
+import android.os.Looper
+import android.os.Message
+import android.os.Messenger
+import android.os.Process
+import androidx.annotation.RequiresApi
+import io.codemyriad.cassini.engine.whistle.WhistleAssets
+import io.codemyriad.cassini.engine.whistle.WhistleNative
+import io.codemyriad.cassini.engine.whistle.WhistleStream
+import java.util.concurrent.Executors
+
+/** Private process; no graph, model-store, network client or system NN runtime. Reclaimed on client unbind. */
+@RequiresApi(Build.VERSION_CODES.Q)
+class WhistleService : Service() {
+    private val executor = Executors.newSingleThreadExecutor()
+    private var assets: WhistleAssets? = null // Retain both read-only mappings until process exit.
+    private var stream: WhistleStream? = null
+    private var owner: IBinder? = null
+    private var busy = false
+    private var failed = false
+    private val segments = ArrayList<Bundle>()
+    private val main = Handler(Looper.getMainLooper())
+    private val messenger = Messenger(Handler(Looper.getMainLooper()) { message ->
+        val reply = message.replyTo ?: return@Handler true
+        if (message.sendingUid != applicationInfo.uid || busy || failed || (owner != null && owner != reply.binder)) {
+            sendError(reply, "Whistle worker unavailable or busy")
+        } else {
+            owner = reply.binder
+            busy = true
+            val command = message.what
+            val data = message.data
+            executor.execute { execute(reply, command, data) }
+        }
+        true
+    })
+
+    private fun execute(reply: Messenger, command: Int, data: Bundle) {
+        segments.clear()
+        try {
+            val result = when (command) {
+                WhistleProtocol.OPEN -> open(data.getInt("rate"))
+                WhistleProtocol.ACCEPT -> {
+                    requireNotNull(stream).accept(requireNotNull(data.getFloatArray("samples")))
+                    Bundle.EMPTY
+                }
+                WhistleProtocol.FINISH -> {
+                    val hashes = requireNotNull(stream).finish()
+                    Bundle().apply {
+                        putString("rawSha256", hashes.rawSha256)
+                        putString("vadSha256", hashes.vadSha256)
+                        putInt("vadFrames", hashes.frames)
+                        putInt("voicedFrames", hashes.voiced)
+                        putFloat("maxProbability", hashes.maximum)
+                    }
+                }
+                else -> error("Invalid Whistle worker command")
+            }
+            val completed = segments.toList()
+            main.post {
+                busy = false
+                // Same sender/handler: all results precede their ACK. No next command races the busy flag.
+                for (segment in completed) reply.send(Message.obtain(null, WhistleProtocol.SEGMENT).apply { this.data = segment })
+                reply.send(Message.obtain(null, command).apply { this.data = result })
+            }
+        } catch (
+            @Suppress("TooGenericExceptionCaught") // IPC boundary; every failure is returned, never a fallback.
+            error: Exception,
+        ) {
+            failure(reply, error.message ?: "Whistle worker failed")
+        } catch (_: LinkageError) {
+            failure(reply, "Verified Whistle runtime could not load")
+        } catch (_: OutOfMemoryError) {
+            failure(reply, "Whistle worker out of memory")
+        }
+    }
+
+    private fun open(rate: Int): Bundle {
+        check(stream == null && assets == null)
+        require(rate == SPEECH_RATE || rate == SOURCE_RATE)
+        assets = WhistleAssets.verified(this)
+        WhistleNative.bootstrap()
+        val verified = requireNotNull(assets)
+        WhistleNative.open(verified.needle, verified.ort, verified.model, verified.vad)
+        stream = WhistleStream(rate) { range, json, hash ->
+            segments.add(Bundle().apply {
+                putLong("start", range.startSample)
+                putLong("end", range.endSample)
+                putString("reason", range.reason)
+                putString("pcmSha256", hash)
+                putByteArray("json", json)
+            })
+        }
+        return Bundle().apply { putInt("pid", Process.myPid()) }
+    }
+
+    private fun failure(reply: Messenger, message: String) {
+        main.post {
+            busy = false
+            failed = true
+            sendError(reply, message)
+        }
+    }
+
+    private fun sendError(reply: Messenger, message: String) {
+        reply.send(Message.obtain(null, WhistleProtocol.ERROR).apply {
+            data = Bundle().apply { putString("error", message) }
+        })
+    }
+
+    companion object {
+        private const val SPEECH_RATE = 16000
+        private const val SOURCE_RATE = 48000
+    }
+
+    override fun onBind(intent: Intent): IBinder = messenger.binder
+
+    override fun onUnbind(intent: Intent): Boolean {
+        check(Application.getProcessName() == "$packageName${WhistleProtocol.SERVICE_PROCESS}")
+        // Needle has no ownership-safe unload. Kill only this process, including an in-flight native call.
+        Process.killProcess(Process.myPid())
+        return false
+    }
+}

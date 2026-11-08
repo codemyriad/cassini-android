@@ -22,6 +22,9 @@ esac
 . scripts/native-common.sh
 
 scripts/fetch-opus-source.sh
+# Whistle is bundled offline; prepare only pinned build inputs, never fetch from the installed app.
+ANDROID_NDK=$(ndk_directory) || { printf 'Install the pinned NDK before preparing Whistle.\n' >&2; exit 1; }
+scripts/heavy-lock.sh python3 scripts/package-whistle.py --ndk "$ANDROID_NDK"
 
 if ! $from_source; then
     if scripts/verify-native-runtime.sh --quiet; then
