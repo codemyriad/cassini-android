@@ -126,7 +126,8 @@ class ModelInstallOwnerTest {
 
     @Test fun parakeetOnlyPermissionCannotFetchOptionalPartsOrScheduleThemForTheNextJob() = runBlocking {
         val separate = AppPaths(folder.newFolder("speech-root"), folder.newFolder("speech-cache"))
-        val settings = SettingsRepository.create(separate, CoroutineScope(scope.coroutineContext + Dispatchers.IO))
+        val settingsScope = CoroutineScope(scope.coroutineContext + Dispatchers.IO)
+        val settings = SettingsRepository.create(separate, settingsScope)
         val repository = ModelRepository(separate, settings, CassiniDispatchers(), fetcher)
         repository.recordConsent(includeOptional = false)
         val installer = ModelInstallOwner(repository, separate.modelRoot, { true }, scope, Dispatchers.IO)

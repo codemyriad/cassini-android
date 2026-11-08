@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import io.codemyriad.cassini.ui.recording.CaptureFormat as CaptureFormatUi
 
 /** What the Recording ViewModel reads and changes (features.md section 2); [GraphRecordingPorts] binds it. */
@@ -83,7 +84,7 @@ class GraphRecordingPorts(private val graph: AppGraph) : RecordingPorts {
 
     override fun dismissEnded() = controller.dismissEnded()
 
-    override suspend fun modelsMissing(): Boolean = kotlinx.coroutines.withContext(graph.dispatchers.io) {
+    override suspend fun modelsMissing(): Boolean = withContext(graph.dispatchers.io) {
         graph.speech.selected() != SpeechModel.INCLUDED && !graph.modelAccess.plan().isEmpty
     }
 

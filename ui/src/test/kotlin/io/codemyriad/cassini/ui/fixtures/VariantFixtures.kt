@@ -666,7 +666,7 @@ internal object VariantFixtures {
     val modelDownload: Map<String, ModelDownloadUiState> = mapOf(
         "models-parakeet-only" to b.modelDownload.copy(
             parts = persistentListOf(ModelPartSizeUi(ModelPartUi.SPEECH, 465378233L)),
-            requiredFreeBytes = 1_224_058_693L,
+            requiredFreeBytes = 1_157_082_403L, // Pinned speech artifacts + largest packed file + 32 MiB slack.
             withNote = false,
         ),
         "models-no-space" to b.modelDownload.copy(banner = banner(BannerKind.DL_NO_SPACE, announce = true)),
