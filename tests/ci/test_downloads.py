@@ -137,7 +137,7 @@ class DownloadTests(unittest.TestCase):
 
     def test_detekt_prefetch_preserves_published_module_and_metadata(self):
         pin = DOWNLOADS.input_pin('kotlinCompiler')
-        with patch.object(DOWNLOADS, 'github_asset') as fetch, patch.object(DOWNLOADS, 'pinned_pom') as pom:
+        with patch.object(DOWNLOADS, 'github_asset') as fetch, patch.object(DOWNLOADS, 'pinned_file') as pom:
             DOWNLOADS.prepare_detekt()
         target = fetch.call_args.args[3]
         expected = DOWNLOADS.ROOT / '.tools/ci-maven/org/jetbrains/kotlin/kotlin-compiler-embeddable/2.0.21'
@@ -153,8 +153,18 @@ class DownloadTests(unittest.TestCase):
                        sha256=hashlib.sha256(b'good').hexdigest())
             with patch.object(DOWNLOADS.urllib.request, 'urlopen', return_value=io.BytesIO(b'evil')):
                 with self.assertRaises(ValueError):
-                    DOWNLOADS.pinned_pom(pin, target)
+                    DOWNLOADS.pinned_file(pin, target)
             self.assertFalse(target.exists())
+
+    def test_pinned_source_reuses_verified_file_without_network(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / 'source.zip'
+            target.write_bytes(b'original archive')
+            pin = dict(url='https://example.invalid/source.zip', size=16,
+                       sha256=hashlib.sha256(b'original archive').hexdigest())
+            with patch.object(DOWNLOADS.urllib.request, 'urlopen', side_effect=AssertionError('offline')):
+                DOWNLOADS.pinned_file(pin, target)
+            self.assertEqual(target.read_bytes(), b'original archive')
 
     def test_gradle_info_is_keyed_by_committed_wrapper_checksum(self):
         info = DOWNLOADS.gradle_info()

@@ -40,7 +40,9 @@ The vendor JAR and original published POM have independent SHA-256 pins. A CI
 init script verifies both and routes only this exact module/version locally;
 all transitive dependencies remain those in the original POM. The
 native source build reuses the exact pinned ORT archive for both ABIs through
-upstream's supported external-runtime directory. Versions and bytes remain
+upstream's supported external-runtime directory. The KissFFT archive is staged
+at upstream's supported pre-download location; its original CMake SHA-256
+remains enforced, and the direct codeload bytes match that existing pin. Versions and bytes remain
 unchanged. The helper and its pins are included in the native source package.
 
 The existing actionlint version/checksum is also fetched through the verified

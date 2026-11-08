@@ -27,5 +27,11 @@
     "version": "8.6",
     "tag": "v8.6.0",
     "sha256": "9631d53cf3e74bfa726893aee1f8994fee4e060c401335946dba2156f440f24c"
+  },
+  "kissfft": {
+    "url": "https://codeload.github.com/mborgerding/kissfft/zip/febd4caeed32e33ad8b2e0bb5ea77542c40f18ec",
+    "name": "kissfft-febd4caeed32e33ad8b2e0bb5ea77542c40f18ec.zip",
+    "size": 74252,
+    "sha256": "497103e664168ebe39580b757adbe616f6cf85a16572af581ca7bc42d0ab13fd"
   }
 }

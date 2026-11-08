@@ -190,10 +190,10 @@ def input_pin(name):
     return json.loads((ROOT / 'scripts/ci-download-pins.json').read_text())[name]
 
 
-def pinned_pom(pin, target):
+def pinned_file(pin, target):
     if target.exists():
         if sha(target) != pin['sha256']:
-            raise ValueError('Cached compiler POM SHA-256 mismatch')
+            raise ValueError('Cached pinned input SHA-256 mismatch')
         return
 
     def fetch():
@@ -202,8 +202,8 @@ def pinned_pom(pin, target):
 
     body = network(fetch)
     if len(body) != pin['size'] or hashlib.sha256(body).hexdigest() != pin['sha256']:
-        raise ValueError('Compiler POM size/SHA-256 mismatch')
-    # Publish metadata last, after the pinned JAR and POM are both verified.
+        raise ValueError('Pinned input size/SHA-256 mismatch')
+    target.parent.mkdir(parents=True, exist_ok=True)
     partial = target.with_name(target.name + f'.{os.getpid()}.part')
     try:
         partial.write_bytes(body)
@@ -217,7 +217,8 @@ def prepare_detekt():
     target = (ROOT / '.tools/ci-maven' / pin['group'].replace('.', '/') / pin['artifact']
               / pin['version'] / pin['name'])
     github_asset(pin['repo'], pin['tag'], pin['name'], target, pin['sha256'], size=pin['size'])
-    pinned_pom(pin['pom'], target.with_suffix('.pom'))
+    # Publish metadata last, after the pinned JAR and POM are both verified.
+    pinned_file(pin['pom'], target.with_suffix('.pom'))
 
 
 def prepare_native(output):
@@ -225,6 +226,8 @@ def prepare_native(output):
     archive = output.parent / pin['name']
     github_asset(pin['repo'], pin['tag'], pin['name'], archive, pin['sha256'], size=pin['size'])
     unpack_native(archive, output)
+    source = input_pin('kissfft')
+    pinned_file(source, output.parent / source['name'])
 
 
 def pin_native_wrapper(path):
