@@ -1,0 +1,13 @@
+// Measurement only: preserve normal release settings, varying only the packaged ABI set.
+gradle.beforeProject { project ->
+    project.pluginManager.withPlugin('com.android.application') {
+        project.extensions.getByName('androidComponents').finalizeDsl { android ->
+            def abi = System.getenv('CASSINI_MEASURE_ABI')
+            if (!(abi in ['arm64-v8a', 'x86_64', 'universal'])) {
+                throw new GradleException('Explicit measured ABI required')
+            }
+            android.defaultConfig.ndk.abiFilters.clear()
+            android.defaultConfig.ndk.abiFilters.addAll(abi == 'universal' ? ['arm64-v8a', 'x86_64'] : [abi])
+        }
+    }
+}

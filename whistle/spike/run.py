@@ -15,6 +15,8 @@ import time
 import uuid
 from pathlib import Path
 
+from worker_profile import WorkerProfile
+
 PACKAGE = "io.codemyriad.cassini.whistlespike"
 
 
@@ -47,23 +49,31 @@ def worker_bench(command, args, output):
         case.mkdir(exist_ok=True)
         if command("shell", "pm", "path", package).stdout.strip():
             command("shell", "run-as", package, "rm", "-f", f"files/whistle-worker-{name}.json")
-        result = subprocess.run(
-            [
-                str(script),
-                "--bench",
-                "--serial",
-                "emulator-5584",
-                "--class",
-                "io.codemyriad.cassini.bench.WhistleWorkerParityTest",
-                "--arg",
-                f"whistleCase={name}",
-            ],
-            env=env,
-            capture_output=True,
-            timeout=1800,
-        )
+        with WorkerProfile(args.sdk / "platform-tools/adb", "emulator-5584", case, args.profile_worker):
+            result = subprocess.run(
+                [
+                    str(script),
+                    "--bench",
+                    "--serial",
+                    "emulator-5584",
+                    "--class",
+                    "io.codemyriad.cassini.bench.WhistleWorkerParityTest",
+                    "--arg",
+                    f"whistleCase={name}",
+                ],
+                env=env,
+                capture_output=True,
+                timeout=1800,
+            )
         (case / "instrumentation.txt").write_bytes(result.stdout + result.stderr)
         row = dict(name=name, instrumentationExit=result.returncode)
+        if args.profile_worker:
+            profile = json.loads((case / "pss.json").read_text())
+            row["memory"] = {key: profile[key] for key in ["sampleCount", "sampledPeakPssKiB", "maximumSampleGapMs"]}
+            row["memory"]["workerPids"] = sorted({sample["pid"] for sample in profile["samples"]})
+            row["memory"]["workerUids"] = sorted({sample["uid"] for sample in profile["samples"]})
+            if not profile["sampleCount"]:
+                row["profileError"] = "No owned worker PSS sample; no peak claimed"
         try:
             raw = command("exec-out", "run-as", package, "cat", f"files/whistle-worker-{name}.json").stdout
             (case / "result.json").write_bytes(raw)
@@ -71,6 +81,11 @@ def worker_bench(command, args, output):
             page = 16384 if args.tag == "google_apis_ps16k" else 4096
             if report["sdk"] != args.api or report["pageSize"] != page:
                 raise ValueError("Actual worker image API/page size mismatch")
+            if args.profile_worker and (
+                row["memory"]["workerPids"] != [report["workerPid"]]
+                or row["memory"]["workerUids"] != [report["workerUid"]]
+            ):
+                row["profileError"] = "Sampled PID/UID does not match the reported isolated worker"
             row.update(
                 segments=len(report["segments"]),
                 workerPid=report["workerPid"],
@@ -79,7 +94,7 @@ def worker_bench(command, args, output):
             )
         except (subprocess.SubprocessError, ValueError, KeyError) as error:
             row["reportError"] = str(error)
-        if result.returncode or "reportError" in row:
+        if result.returncode or "reportError" in row or "profileError" in row:
             failures.append(name)
         rows.append(row)
         print(json.dumps(row), flush=True)
@@ -111,6 +126,7 @@ def main():
     parser.add_argument(
         "--worker-bench", type=Path, help="Production app plus explicit Whistle bench APK on the owned AVD"
     )
+    parser.add_argument("--profile-worker", action="store_true", help="Sample child PSS on the owned worker bench run")
     parser.add_argument("--worker-tests", type=Path, help="Model-free worker privacy instrumentation APK")
     parser.add_argument("--api", type=int, default=35)
     parser.add_argument("--tag", default="google_apis")

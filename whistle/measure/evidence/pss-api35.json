@@ -1,0 +1,266 @@
+{
+  "scope": "Debug isolated child on an owned arm64 API35 4KB emulator, 2GiB guest RAM and two CPUs; warm owned userdata reboot, fresh worker/model process for each DC/control case. Sampling does not measure an exact kernel high-water mark, whole-app total, worst-case/long-meeting or phone RAM acceptance.",
+  "batch": {
+    "status": "completed",
+    "apkSha256": "cfbe6beb6f207b5c0c6e602dd2103c1829aac30bae2bdeea958dac35ced9d322",
+    "benchSha256": "0d024e014be8a3b90f67c2e84e31aa9a8d09835b8f5ddf464bd6cb68e760e399",
+    "kernel": "Linux localhost 6.6.30-android15-8-gdd9c02ccfe27-ab11987101-4k #1 SMP PREEMPT Tue Jun 18 20:50:32 UTC 2024 aarch64 Toybox",
+    "fingerprint": "google/sdk_gphone64_arm64/emu64a:15/AE3A.240806.043/12960925:userdebug/dev-keys",
+    "privacyRefusals": 6,
+    "cases": [
+      {
+        "name": "dc-quiet-jfk-v1",
+        "instrumentationExit": 0,
+        "memory": {
+          "sampleCount": 7,
+          "sampledPeakPssKiB": 154058,
+          "maximumSampleGapMs": 116.560583,
+          "workerPids": [
+            2283
+          ],
+          "workerUids": [
+            99000
+          ]
+        },
+        "segments": 6,
+        "workerPid": 2283,
+        "vadSha256": "eeaeee543bc328acf6f0c4557e8aba86652e0144d9763264e1e5d62a3d13f968",
+        "reportSha256": "a3807388098adb2af77062c11e52c928f8520f2d00b446772ac48a80b7b59547"
+      },
+      {
+        "name": "dc-quiet-jfk-v1-control",
+        "instrumentationExit": 0,
+        "memory": {
+          "sampleCount": 18,
+          "sampledPeakPssKiB": 153789,
+          "maximumSampleGapMs": 279.739125,
+          "workerPids": [
+            2729
+          ],
+          "workerUids": [
+            99001
+          ]
+        },
+        "segments": 6,
+        "workerPid": 2729,
+        "vadSha256": "6ece4c5cacfc2456cb79d0aa1b16f4aa3912fef6697912e633886d7b0da545ab",
+        "reportSha256": "0d4bd147ea8ed4ec899d3b7c26fd1ba4ea41f72fe51593b3a4c141fdaec180d6"
+      }
+    ],
+    "failures": []
+  },
+  "cases": [
+    {
+      "case": "dc-quiet-jfk-v1",
+      "profile": {
+        "schemaVersion": 1,
+        "processPrefix": "io.codemyriad.cassini:whistle",
+        "readinessMarker": "30ff3c711a0c4560bd4078de4a210dc7",
+        "readyObserved": true,
+        "observedProcesses": {
+          "2283": {
+            "uid": 99000,
+            "name": "io.codemyriad.cassini:whistle:io.codemyriad.cassini.whistle.WhistleService"
+          }
+        },
+        "samples": [
+          {
+            "monotonicNs": 47628249000,
+            "pid": 2283,
+            "uid": 99000,
+            "pssKiB": 144291
+          },
+          {
+            "monotonicNs": 47721719000,
+            "pid": 2283,
+            "uid": 99000,
+            "pssKiB": 152033
+          },
+          {
+            "monotonicNs": 47824056291,
+            "pid": 2283,
+            "uid": 99000,
+            "pssKiB": 151143
+          },
+          {
+            "monotonicNs": 47925088750,
+            "pid": 2283,
+            "uid": 99000,
+            "pssKiB": 154058
+          },
+          {
+            "monotonicNs": 48041649333,
+            "pid": 2283,
+            "uid": 99000,
+            "pssKiB": 152635
+          },
+          {
+            "monotonicNs": 48137963500,
+            "pid": 2283,
+            "uid": 99000,
+            "pssKiB": 152585
+          },
+          {
+            "monotonicNs": 48236573458,
+            "pid": 2283,
+            "uid": 99000,
+            "pssKiB": 153876
+          }
+        ],
+        "sampleCount": 7,
+        "requestedCadenceMs": 50,
+        "sampledPeakPssKiB": 154058,
+        "maximumSampleGapMs": 116.560583,
+        "errors": [],
+        "scope": "Debug owned arm64 AVD; sampled child PSS, not an exact kernel high-water mark. dumpsys collection adds overhead; no recording/model data is read."
+      },
+      "workerReportSha256": "a3807388098adb2af77062c11e52c928f8520f2d00b446772ac48a80b7b59547",
+      "sdk": 35,
+      "pageSize": 4096,
+      "workerPid": 2283,
+      "workerUid": 99000,
+      "callerPid": 2238,
+      "callerUid": 10207,
+      "elapsedMs": 1264
+    },
+    {
+      "case": "dc-quiet-jfk-v1-control",
+      "profile": {
+        "schemaVersion": 1,
+        "processPrefix": "io.codemyriad.cassini:whistle",
+        "readinessMarker": "4ca8f1999f484fe3b51b21510b44d368",
+        "readyObserved": true,
+        "observedProcesses": {
+          "2729": {
+            "uid": 99001,
+            "name": "io.codemyriad.cassini:whistle:io.codemyriad.cassini.whistle.WhistleService"
+          }
+        },
+        "samples": [
+          {
+            "monotonicNs": 58907402666,
+            "pid": 2729,
+            "uid": 99001,
+            "pssKiB": 22279
+          },
+          {
+            "monotonicNs": 59031174125,
+            "pid": 2729,
+            "uid": 99001,
+            "pssKiB": 48837
+          },
+          {
+            "monotonicNs": 59161450500,
+            "pid": 2729,
+            "uid": 99001,
+            "pssKiB": 64270
+          },
+          {
+            "monotonicNs": 59291503041,
+            "pid": 2729,
+            "uid": 99001,
+            "pssKiB": 116111
+          },
+          {
+            "monotonicNs": 59423551041,
+            "pid": 2729,
+            "uid": 99001,
+            "pssKiB": 139854
+          },
+          {
+            "monotonicNs": 59544126000,
+            "pid": 2729,
+            "uid": 99001,
+            "pssKiB": 140402
+          },
+          {
+            "monotonicNs": 59653221166,
+            "pid": 2729,
+            "uid": 99001,
+            "pssKiB": 152186
+          },
+          {
+            "monotonicNs": 59763366416,
+            "pid": 2729,
+            "uid": 99001,
+            "pssKiB": 153789
+          },
+          {
+            "monotonicNs": 59992546041,
+            "pid": 2729,
+            "uid": 99001,
+            "pssKiB": 151652
+          },
+          {
+            "monotonicNs": 60174376958,
+            "pid": 2729,
+            "uid": 99001,
+            "pssKiB": 151732
+          },
+          {
+            "monotonicNs": 60365936708,
+            "pid": 2729,
+            "uid": 99001,
+            "pssKiB": 151274
+          },
+          {
+            "monotonicNs": 60587052666,
+            "pid": 2729,
+            "uid": 99001,
+            "pssKiB": 151589
+          },
+          {
+            "monotonicNs": 60866791791,
+            "pid": 2729,
+            "uid": 99001,
+            "pssKiB": 151880
+          },
+          {
+            "monotonicNs": 61033086416,
+            "pid": 2729,
+            "uid": 99001,
+            "pssKiB": 147536
+          },
+          {
+            "monotonicNs": 61137543833,
+            "pid": 2729,
+            "uid": 99001,
+            "pssKiB": 147737
+          },
+          {
+            "monotonicNs": 61251482458,
+            "pid": 2729,
+            "uid": 99001,
+            "pssKiB": 147258
+          },
+          {
+            "monotonicNs": 61356702541,
+            "pid": 2729,
+            "uid": 99001,
+            "pssKiB": 149314
+          },
+          {
+            "monotonicNs": 61457642083,
+            "pid": 2729,
+            "uid": 99001,
+            "pssKiB": 148717
+          }
+        ],
+        "sampleCount": 18,
+        "requestedCadenceMs": 50,
+        "sampledPeakPssKiB": 153789,
+        "maximumSampleGapMs": 279.739125,
+        "errors": [],
+        "scope": "Debug owned arm64 AVD; sampled child PSS, not an exact kernel high-water mark. dumpsys collection adds overhead; no recording/model data is read."
+      },
+      "workerReportSha256": "0d4bd147ea8ed4ec899d3b7c26fd1ba4ea41f72fe51593b3a4c141fdaec180d6",
+      "sdk": 35,
+      "pageSize": 4096,
+      "workerPid": 2729,
+      "workerUid": 99001,
+      "callerPid": 2655,
+      "callerUid": 10207,
+      "elapsedMs": 2768
+    }
+  ]
+}
