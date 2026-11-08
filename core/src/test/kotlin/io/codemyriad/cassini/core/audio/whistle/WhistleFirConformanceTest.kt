@@ -18,14 +18,18 @@ class WhistleFirConformanceTest {
         val directory = System.getProperty("cassini.whistleVectors", "")
         require(directory.isNotBlank()) { "Set -PcassiniWhistleVectorsDir to coordination/ux-draft" }
         val root = File(directory)
-        val clean = pcm(File(root, "whistle/pipeline-input-48k.wav"), "b7062e41f452236812aa3417a68eb50372a99851ab4a18d1c4f4f99e2e2e3963")
+        val clean = pcm(
+            File(root, "whistle/pipeline-input-48k.wav"),
+            "b7062e41f452236812aa3417a68eb50372a99851ab4a18d1c4f4f99e2e2e3963",
+        )
         val cleanHash = "1fb2707f7556fd1d2431b29cfe15e2118cea334fe55278be8c47298833ff5263"
         for (chunk in listOf(511, 8192)) assertEquals(cleanHash, sha(bytes(resample(clean, chunk))))
         println("clean FIR SHA-256=$cleanHash")
 
-        val pins = JSONArray(requireNotNull(javaClass.getResourceAsStream("/whistle/dc-segment-pins.json")).use {
+        val pinsData = requireNotNull(javaClass.getResourceAsStream("/whistle/dc-segment-pins.json")).use {
             it.readBytes().toString(Charsets.UTF_8)
-        })
+        }
+        val pins = JSONArray(pinsData)
         val files = listOf(
             Triple(
                 "dc-quiet-jfk-v1",

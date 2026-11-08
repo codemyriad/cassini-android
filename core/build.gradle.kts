@@ -84,9 +84,15 @@ tasks.register<Test>("whistleFirConformance") {
     classpath = sourceSets.test.get().runtimeClasspath
     include("**/WhistleFirConformanceTest.class")
     val directory = providers.gradleProperty("cassiniWhistleVectorsDir").getOrElse("")
-    val vectors = if (directory.isEmpty()) files() else files(fileTree(directory) {
-        include("whistle/pipeline-input-48k.wav", "dc/dc-quiet-jfk-v1.wav", "dc/dc-quiet-jfk-v1-control.wav")
-    })
+    val vectors = if (directory.isEmpty()) {
+        files()
+    } else {
+        files(
+            fileTree(directory) {
+                include("whistle/pipeline-input-48k.wav", "dc/dc-quiet-jfk-v1.wav", "dc/dc-quiet-jfk-v1-control.wav")
+            },
+        )
+    }
     jvmArgumentProviders.add(WhistleFirData(vectors, directory))
 }
 

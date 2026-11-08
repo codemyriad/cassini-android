@@ -38,7 +38,10 @@ class WhistleResamplerTest {
 
     @Test
     fun `published coefficient metadata stays pinned`() {
-        assertEquals("52423b160d7d18e1c535a0750cc615e7df27c33f9e56f0f2b6bd7f27fd204e74", sha(resource("fir-48k-16k.json")))
+        assertEquals(
+            "52423b160d7d18e1c535a0750cc615e7df27c33f9e56f0f2b6bd7f27fd204e74",
+            sha(resource("fir-48k-16k.json")),
+        )
     }
 
     @Test
@@ -78,11 +81,17 @@ class WhistleResamplerTest {
             return out.toFloatArray()
         }
 
-        fun bytes(samples: FloatArray): ByteArray = ByteBuffer.allocate(samples.size * 4).order(ByteOrder.LITTLE_ENDIAN).also {
-            for (sample in samples) it.putFloat(sample)
-        }.array()
+        fun bytes(samples: FloatArray): ByteArray {
+            val buffer = ByteBuffer.allocate(samples.size * 4).order(ByteOrder.LITTLE_ENDIAN)
+            for (sample in samples) buffer.putFloat(sample)
+            return buffer.array()
+        }
 
-        fun sha(data: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(data).joinToString("") { "%02x".format(it) }
+        fun sha(data: ByteArray): String {
+            val digest = MessageDigest.getInstance("SHA-256").digest(data)
+            return digest.joinToString("") { "%02x".format(it) }
+        }
+
         private fun resource(name: String): ByteArray =
             requireNotNull(javaClass.getResourceAsStream("/whistle/$name")).use { it.readBytes() }
     }
