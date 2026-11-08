@@ -120,6 +120,10 @@ jobs:
       # setup.sh finds the pinned NDK inside ANDROID_HOME. The job reports drift and does not fail
       # on it: a source build is not yet known to match the release byte for byte. The summary
       # records both hashes and a mismatch raises a warning annotation.
+      - name: Prefetch checksum-pinned native runtime without forwarding credentials to the build
+        env:
+          CASSINI_GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/ci-downloads.py native --output .tools/native-build/onnxruntime
       - name: Build the AAR from source
         run: ./scripts/setup.sh --from-source
       - name: Save the pinned source archives

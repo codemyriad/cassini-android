@@ -30,6 +30,9 @@ one immutable cache entry is needed per distribution pin; the existing cache
 retention/quota policy remains in place. The first hosted main run after merge
 warms this shared cache. Until then, cold PR runs use the verified API route.
 Once warm, a cache hit needs neither distribution download endpoint.
+Cold API calls use the job-scoped read-only GitHub token to avoid shared
+anonymous rate limits. Authorization is not forwarded to redirected asset
+CDNs. Tokens are scoped to download steps; builds and tests do not receive them.
 
 The helper also prefetches the exact pinned Kotlin compiler JAR into Gradle's
 CI-only local Maven entry because Maven's large-JAR redirect had the same outage.

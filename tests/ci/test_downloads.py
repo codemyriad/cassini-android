@@ -51,6 +51,18 @@ class DownloadTests(unittest.TestCase):
         self.assertEqual([call.args[0] for call in wait.call_args_list], [15, 30, 60])
         self.assertEqual(log.call_count, 3)
 
+    def test_job_token_is_never_forwarded_to_redirected_assets(self):
+        with patch.dict(DOWNLOADS.os.environ, CASSINI_GITHUB_TOKEN='test-job-token'):
+            request = DOWNLOADS.github_request('https://api.github.com/repos/vendor/repo', 'application/octet-stream')
+            self.assertEqual(request.get_header('Authorization'), 'Bearer test-job-token')
+            self.assertNotIn('Authorization', request.headers)
+            redirected = DOWNLOADS.urllib.request.HTTPRedirectHandler().redirect_request(
+                request, None, 302, 'redirect', {}, 'https://release-assets.githubusercontent.com/asset.zip',
+            )
+            self.assertIsNone(redirected.get_header('Authorization'))
+            external = DOWNLOADS.github_request('https://example.invalid/asset.zip', 'application/octet-stream')
+            self.assertIsNone(external.get_header('Authorization'))
+
     def native_archive(self, path, extra=None):
         entries = {
             'headers/onnxruntime_c_api.h': b'header',

@@ -22,6 +22,7 @@ runs:
     - name: Verify ZIP and stage wrapper cache
       shell: bash
       env:
+        CASSINI_GITHUB_TOKEN: ${{ github.token }}
         CASSINI_GRADLE_KIND: ${{ inputs.kind }}
       run: python3 scripts/ci-downloads.py gradle --kind "$CASSINI_GRADLE_KIND"
     - name: Save verified distribution ZIP from hosted main only

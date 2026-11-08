@@ -45,6 +45,8 @@ jobs:
       - name: Restore and verify pinned Gradle distribution
         uses: ./.github/actions/pinned-gradle
       - name: Download detekt dependencies (network only, bounded)
+        env:
+          CASSINI_GITHUB_TOKEN: ${{ github.token }}
         run: python3 scripts/ci-downloads.py detekt
       - name: Prove real wrapper cache use and checksum refusal offline
         run: python3 tests/ci/wrapper-smoke.py

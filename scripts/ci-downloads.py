@@ -38,6 +38,15 @@ def sha(path):
     return digest.hexdigest()
 
 
+def github_request(url, accept):
+    request = urllib.request.Request(url, headers={'Accept': accept})
+    token = os.environ.get('CASSINI_GITHUB_TOKEN')
+    if token and url.startswith('https://api.github.com/'):
+        # urllib deliberately omits these headers on redirected requests to the asset CDN.
+        request.add_unredirected_header('Authorization', 'Bearer ' + token)
+    return request
+
+
 def github_asset(repo, tag, name, target, checksum, *, size=None):
     if target.exists():
         if sha(target) != checksum:
@@ -46,7 +55,8 @@ def github_asset(repo, tag, name, target, checksum, *, size=None):
     metadata_url = f'https://api.github.com/repos/{repo}/releases/tags/{tag}'
 
     def metadata():
-        with urllib.request.urlopen(metadata_url, timeout=60) as response:
+        request = github_request(metadata_url, 'application/vnd.github+json')
+        with urllib.request.urlopen(request, timeout=60) as response:
             return json.loads(response.read(2 * 1024 * 1024))
 
     release = network(metadata)
@@ -58,7 +68,7 @@ def github_asset(repo, tag, name, target, checksum, *, size=None):
     partial = target.with_name(target.name + f'.{os.getpid()}.part')
 
     def download():
-        request = urllib.request.Request(api_url, headers={'Accept': 'application/octet-stream'})
+        request = github_request(api_url, 'application/octet-stream')
         count = 0
         with urllib.request.urlopen(request, timeout=60) as response, partial.open('wb') as output:
             while block := response.read(65536):
