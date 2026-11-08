@@ -35,6 +35,11 @@ class WorkerProfile:
             return self
         for name in ["pss.json", "pss-meminfo.txt", "pss-process-events.txt"]:
             (self.output / name).unlink(missing_ok=True)
+        bookmark = subprocess.check_output(
+            self.adb + ["shell", "date '+%m-%d %H:%M:%S.%3N'"], text=True, timeout=10
+        ).strip()
+        if not re.fullmatch(r"\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}", bookmark):
+            raise RuntimeError("Device did not supply a valid logcat time bookmark")
         self.log = subprocess.Popen(
             self.adb
             + [
@@ -46,7 +51,7 @@ class WorkerProfile:
                 "-v",
                 "brief",
                 "-T",
-                "1",
+                bookmark,
                 "am_proc_start:I",
                 "am_proc_died:I",
                 "CassiniWorkerPss:I",
@@ -60,7 +65,9 @@ class WorkerProfile:
         self.reader.start()
         self.sampler.start()
         try:
-            subprocess.run(self.adb + ["shell", "log", "-t", "CassiniWorkerPss", self.token], check=True, timeout=10)
+            subprocess.run(
+                self.adb + ["shell", "log", "-p", "i", "-t", "CassiniWorkerPss", self.token], check=True, timeout=10
+            )
             if not self.ready.wait(10):
                 raise RuntimeError("PSS sampler did not observe its logcat readiness marker")
         except BaseException:
