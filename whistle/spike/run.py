@@ -25,11 +25,11 @@ def worker_bench(command, args, output):
         CASSINI_HEAVY_LOCK_HELD="1",
         CASSINI_APK=str(args.apk.resolve()),
         CASSINI_TEST_APK=str(args.worker_bench.resolve()),
-        CASSINI_EXPECTED_TESTS="1",
+        CASSINI_EXPECTED_TESTS="2",
     )
     env["PATH"] = str(args.sdk / "platform-tools") + os.pathsep + env.get("PATH", "")
     script = Path(__file__).resolve().parents[2] / "scripts/device-smoke.sh"
-    privacy_env = dict(env, CASSINI_TEST_APK=str(args.worker_tests.resolve()))
+    privacy_env = dict(env, CASSINI_TEST_APK=str(args.worker_tests.resolve()), CASSINI_EXPECTED_TESTS="1")
     privacy = subprocess.run(
         [str(script), "--serial", "emulator-5584", "--class", "io.codemyriad.cassini.WhistlePrivacyDeviceTest"],
         env=privacy_env,
