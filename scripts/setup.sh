@@ -24,7 +24,7 @@ esac
 scripts/fetch-opus-source.sh
 # Whistle is bundled offline; prepare only pinned build inputs, never fetch from the installed app.
 # The AAR recipe can use a different ANDROID_NDK; Whistle requires the project's pinned SDK NDK.
-whistle_ndk=$(ANDROID_NDK= ndk_directory) || { printf 'Install the pinned SDK NDK before preparing Whistle.\n' >&2; exit 1; }
+whistle_ndk=$(ANDROID_NDK='' ndk_directory) || { printf 'Install the pinned SDK NDK before preparing Whistle.\n' >&2; exit 1; }
 scripts/heavy-lock.sh python3 scripts/package-whistle.py --ndk "$whistle_ndk"
 
 if ! $from_source; then

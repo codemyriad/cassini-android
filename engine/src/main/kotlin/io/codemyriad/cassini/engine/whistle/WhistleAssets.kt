@@ -32,6 +32,7 @@ class WhistleAssets private constructor(
             }
             check(manifest.getInt("schemaVersion") == 1)
             check(manifest.getString("engineRevision") == "93e88ede867e4311c39151285e74df513e4b835b")
+            check(manifest.getString("modelRevision") == "ca5287601bef25af26dcf2e1b2bdc0843a7c19e5")
             val libs = manifest.getJSONObject("libraries")
             check(libs.getJSONObject("libcassini_whistle_ort.so").getString("sha256") == ORT_SHA)
             return WhistleAssets(
