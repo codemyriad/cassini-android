@@ -36,7 +36,10 @@ class WhistleSpeechGateTest {
     fun `partial frames never reach VAD and only extend an active segment`() {
         var calls = 0
         val segments = mutableListOf<WhistleSpeechSegment>()
-        val gate = WhistleSpeechGate({ calls++; 1f }, segments::add)
+        val gate = WhistleSpeechGate({
+            calls++
+            1f
+        }, segments::add)
         gate.accept(FloatArray(1024 + 127))
         gate.finish()
         assertEquals(2, calls)
