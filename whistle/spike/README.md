@@ -56,7 +56,7 @@ observations, not phone performance or peak-memory acceptance measurements.
 The runner creates its own AVD/image copy in its output directory, refuses an
 existing transport on its reserved port, installs only the lab package there,
 waits on Android boot events and instrumentation completion, and stops its own
-emulator in `finally`. It uses `-no-audio`, no snapshots and no physical devices.
+emulator in `finally`, awaiting the ADB disconnect event before returning. It uses `-no-audio`, no snapshots and no physical devices.
 There are no fixed settling sleeps, Gradle connected tasks, app-data reads,
 uninstalls or user browser actions. No generated AVD is registered in the user's
 normal Android AVD directory.
@@ -66,9 +66,16 @@ Mac fixtures/model data. This is a compilation check, not Android execution.
 
 ## Evidence boundary
 
-Even a successful API 35/4 KB run does not establish API 26 execution or actual
-16 KB-page execution. The foundation's API 26 strict link, PIC, symbol closure,
+The [recorded experiment](evidence/README.md) executes API 26 and API 35 with
+both 4 KB and actual 16 KB pages. API 26 completes inference but fails desktop
+parity on two word substitutions and one 560 ms timing difference. That blocks
+Included/default; no golden or tolerance is changed. The foundation's API 26 strict link, PIC, symbol closure,
 private C++ runtime and 16 KB ELF alignment checks remain separate evidence.
 This experiment does not run Android's own resampler or VAD, prove network
 isolation of a production worker, measure final app size or enable Included/default
 in Settings. Those are later small PRs. Keep the existing app and user models intact.
+
+For other installed external-disk images, pass `--image` plus the exact `--api`
+and `--tag`: API 26 uses `default`; API 35/16 KB uses `google_apis_ps16k`. The
+runner checks the actual API and page size and refuses a mismatch. The API 26
+comparison currently exits nonzero and preserves its failure results.

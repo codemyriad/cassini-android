@@ -1,0 +1,34 @@
+{
+  "loadAlignments": [
+    16384,
+    16384,
+    16384,
+    16384
+  ],
+  "needed": [
+    "libc.so",
+    "libdl.so"
+  ],
+  "exports": [
+    "Java_io_codemyriad_cassini_whistlespike_Spike_load",
+    "Java_io_codemyriad_cassini_whistlespike_Spike_transcribe"
+  ],
+  "imports": [
+    "__cxa_atexit@LIBC",
+    "__cxa_finalize@LIBC",
+    "__register_atfork@LIBC",
+    "calloc@LIBC",
+    "dlclose@LIBC",
+    "dlerror@LIBC",
+    "dlopen@LIBC",
+    "dlsym@LIBC",
+    "free@LIBC",
+    "getenv@LIBC",
+    "malloc@LIBC",
+    "strcmp@LIBC",
+    "strnlen@LIBC"
+  ],
+  "weakImports": [],
+  "size": 8944,
+  "sha256": "d5c4554421521d56ca9696ba3e5c3e1eb7e13ce6d9379978ad2304a5c817ec9f"
+}

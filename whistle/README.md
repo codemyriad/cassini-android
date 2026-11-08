@@ -44,4 +44,4 @@ Android's current resampler/VAD model/thresholds differ from desktop D11. Follow
 
 ## Packaged JNI experiment
 
-The [standalone spike](spike/README.md) records actual packaged arm64 inference on identical desktop clean/DC raw PCM. Its [evidence](spike/evidence/README.md) keeps candidate pinned-Mac references, Android outputs and exact input hashes for review. It does not enable Whistle in the production app or establish Android FIR/VAD parity.
+The [standalone spike](spike/README.md) records actual packaged arm64 inference on identical desktop clean/DC raw PCM. Its [evidence](spike/evidence/README.md) keeps candidate pinned-Mac references, Android outputs and exact input hashes for review. API 35 passes these engine comparisons on 4 KB and actual 16 KB pages. API 26 executes the engine but fails on two word substitutions and one 560 ms timing difference. These failures block Included/default; no exception or golden is changed. This does not enable Whistle in the production app or establish Android FIR/VAD parity.

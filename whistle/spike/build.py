@@ -64,7 +64,8 @@ def main():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     inspection = module.verify_elf(
-        bootstrap, tools / "llvm-readelf",
+        bootstrap,
+        tools / "llvm-readelf",
         exports_expected={
             "Java_io_codemyriad_cassini_whistlespike_Spike_load",
             "Java_io_codemyriad_cassini_whistlespike_Spike_transcribe",

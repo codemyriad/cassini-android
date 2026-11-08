@@ -24,6 +24,8 @@ def main():
     parser.add_argument("--tag", default="google_apis")
     parser.add_argument("--image", type=Path, help="Already installed external-disk system image")
     args = parser.parse_args()
+    if args.image is None and (args.api != 35 or args.tag != "google_apis"):
+        parser.error("--image is required for a non-default API/tag")
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     adb = args.sdk / "platform-tools/adb"
@@ -159,6 +161,11 @@ def main():
             if not decoded["allWordsEqual"] or not decoded["allTimesWithin80ms"]:
                 raise RuntimeError("Parity differences recorded; no golden changed")
         finally:
+            try:
+                crash = command("logcat", "-d", "-b", "crash", timeout=10)
+                (output / "crash.log").write_bytes(crash.stdout)
+            except (OSError, subprocess.SubprocessError):
+                pass  # Guest failure must not prevent cleanup or hide the original exception.
             if watcher is not None:
                 watcher.terminate()
                 watcher.wait(timeout=10)
@@ -169,6 +176,7 @@ def main():
             except subprocess.TimeoutExpired:
                 emulator.kill()
                 emulator.wait(timeout=10)
+            command("wait-for-disconnect", timeout=30)
 
 
 if __name__ == "__main__":
