@@ -43,6 +43,11 @@ native source build reuses the exact pinned ORT archive for both ABIs through
 upstream's supported external-runtime directory. Versions and bytes remain
 unchanged. The helper and its pins are included in the native source package.
 
+The existing actionlint version/checksum is also fetched through the verified
+API route; its analysis runs separately without the download credential. Native
+main jobs reuse the already-verified ORT ZIP for their existing artifact output
+instead of downloading it again.
+
 There are no build, test or analysis retry loops. Only individual API network
 operations can retry, at most four attempts with logged backoff. Permanent
 HTTP errors and checksum/content failures stop immediately. Normal Gradle

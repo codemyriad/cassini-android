@@ -162,10 +162,8 @@ jobs:
           mkdir -p "$out"
           cp "$aar_installed" "$out/"
           cp scripts/streaming-diarization.patch "$out/"
-          # The build unpacks and deletes this archive; fetch the same file for the mirror.
-          ort=1.27.1
-          curl --fail --location --retry 3 -o "$out/onnxruntime-android-$ort.zip" \
-            "https://github.com/csukuangfj/onnxruntime-libs/releases/download/v$ort/onnxruntime-android-$ort.zip"
+          # Reuse the exact verified archive already fetched for both ABIs.
+          cp .tools/native-build/onnxruntime-android-1.27.1.zip "$out/"
           (cd "$out" && sha256sum -- * > SHA256SUMS && cat SHA256SUMS)
       - name: Upload the AAR for the release
         if: github.event_name != 'pull_request'

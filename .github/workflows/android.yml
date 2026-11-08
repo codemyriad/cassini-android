@@ -52,17 +52,18 @@ jobs:
         run: python3 tests/ci/wrapper-smoke.py
       - name: detekt
         run: ./gradlew --no-daemon --init-script scripts/ci-pinned-compiler.init.gradle detekt
-      - name: actionlint
+      - name: Download checksum-pinned actionlint
         env:
+          CASSINI_GITHUB_TOKEN: ${{ github.token }}
           ACTIONLINT_VERSION: 1.7.12
           ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
         run: |
           archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
-          curl --fail --location --retry 3 --silent --show-error -o "$RUNNER_TEMP/$archive" \
-            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/$archive"
+          python3 scripts/ci-downloads.py actionlint
           printf '%s  %s\n' "$ACTIONLINT_SHA256" "$RUNNER_TEMP/$archive" | sha256sum --check --quiet
           tar xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" actionlint
-          "$RUNNER_TEMP/actionlint" -color
+      - name: actionlint
+        run: '"$RUNNER_TEMP/actionlint" -color'
       - name: shellcheck
         run: shellcheck -x scripts/*.sh tools/*.sh
       - name: ruff

@@ -63,6 +63,16 @@ class DownloadTests(unittest.TestCase):
             external = DOWNLOADS.github_request('https://example.invalid/asset.zip', 'application/octet-stream')
             self.assertIsNone(external.get_header('Authorization'))
 
+    def test_actionlint_download_keeps_existing_workflow_pin(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.dict(DOWNLOADS.os.environ, ACTIONLINT_VERSION='1.7.12', ACTIONLINT_SHA256='a' * 64,
+                            RUNNER_TEMP=tmp):
+                with patch.object(DOWNLOADS, 'github_asset') as fetch:
+                    DOWNLOADS.prepare_actionlint()
+            self.assertEqual(fetch.call_args.args[:3], ('rhysd/actionlint', 'v1.7.12',
+                                                       'actionlint_1.7.12_linux_amd64.tar.gz'))
+            self.assertEqual(fetch.call_args.args[4], 'a' * 64)
+
     def native_archive(self, path, extra=None):
         entries = {
             'headers/onnxruntime_c_api.h': b'header',

@@ -241,13 +241,24 @@ def pin_native_wrapper(path):
             output.write('\ndistributionSha256Sum=' + pin['sha256'] + '\n')
 
 
+def prepare_actionlint():
+    version = os.environ['ACTIONLINT_VERSION']
+    checksum = os.environ['ACTIONLINT_SHA256']
+    if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', version) or not re.fullmatch('[0-9a-f]{64}', checksum):
+        raise ValueError('Committed actionlint version and SHA-256 pin are required')
+    name = f'actionlint_{version}_linux_amd64.tar.gz'
+    github_asset('rhysd/actionlint', 'v' + version, name, Path(os.environ['RUNNER_TEMP']) / name, checksum)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('stage', choices=['gradle-key', 'gradle', 'detekt', 'native', 'native-wrapper'])
+    parser.add_argument('stage', choices=['gradle-key', 'gradle', 'detekt', 'native', 'native-wrapper', 'actionlint'])
     parser.add_argument('--output', type=Path)
     parser.add_argument('--kind', choices=['project', 'native'], default='project')
     args = parser.parse_args()
-    if args.stage == 'native-wrapper':
+    if args.stage == 'actionlint':
+        prepare_actionlint()
+    elif args.stage == 'native-wrapper':
         if args.output is None:
             parser.error('native-wrapper requires --output pointing to the upstream properties')
         pin_native_wrapper(args.output)
