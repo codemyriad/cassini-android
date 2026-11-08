@@ -6,7 +6,9 @@ remain the unchanged Android #78 files. The frozen GNOME differences remain in
 
 | Guest | Pipeline cases | Exact segment/PCM matches | Exact Mac-reference words | Largest boundary difference | Worker / caller UIDs |
 | --- | --- | --- | --- | --- | --- |
+| API29 / 4096-byte pages | DC and control | 12/12 | 82/82 | 80ms | 99000,99001 / 10116 |
 | API35 / 4096-byte pages | DC and control | 12/12 | 82/82 | 80ms | 99000,99002 / 10207 |
+| API35 / 16384-byte pages | DC and control | 12/12 | 82/82 | 80ms | 99001,99002 / 10207 |
 
 Each case has 1181 VAD frames and the exact complete-frame desktop HPF hash.
 The successful isolated OPEN requires denied INTERNET permission and actual
@@ -33,6 +35,7 @@ and is stopped afterward. No model, runtime, WAV, key or AVD bytes are committed
   failed owned run was stopped after preserving the crash. The process-namespace
   check now handles the appended component in both startup and cleanup.
 
-The table is the subsequent real isolated-UID run after that fix. API29 and
-actual16KB-page worker runs, release package deltas and sampled peak PSS remain
-separate measurements; no unmeasured result is implied by this table.
+The table contains the subsequent real isolated-UID runs after that fix,
+including the production minimum API29 and actual16KB pages. Release package
+deltas and sampled peak PSS remain separate measurements; no unmeasured
+result is implied by this table.
