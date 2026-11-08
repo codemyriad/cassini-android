@@ -218,7 +218,10 @@ data class CheckpointState(
             val inline = if (logged == 0) chunks else chunks.withWords(chunks.words.subList(logged, chunks.words.size))
             return JSONObject().put("inferenceMs", recognition.inferenceMs).put("chunks", json(inline)).apply {
                 recognition.whistle?.let {
-                    val marker = JSONObject().put("pipeline", it.pipeline).put("finished", it.finished).put("pcmSha256", it.pcmSha256)
+                    val marker = JSONObject()
+                        .put("pipeline", it.pipeline)
+                        .put("finished", it.finished)
+                        .put("pcmSha256", it.pcmSha256)
                     put("whistle", marker)
                 }
             }
