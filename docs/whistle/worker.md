@@ -47,5 +47,8 @@ The test writes measured output before parity assertions, checks six exact deskt
 segments and raw PCM hashes, then exact word strings/counts and the existing 80 ms
 boundary bound. It checks the complete-frame HPF hash separately and records VAD
 frame/probability diagnostics. The frozen GNOME/Mac raw-engine discrepancy remains
-103 versus104 total words; no existing reference is rewritten or generalized into
-an exception. Actual results, not a mocked native engine, determine readiness.
+103 versus104 total words. Four unchanged raw inputs differ in words/case:
+`dc-quiet-jfk-v1-2.f32`, `dc-quiet-jfk-v1-4.f32`,
+`dc-quiet-jfk-v1-control-0.f32`, and `dc-quiet-jfk-v1-control-5.f32`.
+The bench's Mac reference does not establish equality with frozen GNOME output;
+no existing reference is rewritten or generalized into an exception. Actual results, not a mocked native engine, determine readiness.
