@@ -191,7 +191,10 @@ class ModelInstallOwnerTest {
         withTimeout(WAIT_MS) { installer.startDownload(optional).join() }
         assertEquals(InstallOutcome.Installed(skipped = optional), installer.lastOutcome.value)
         optional.forEach {
-            assertEquals(ModelStatus.Failed(Failure.DOWNLOAD, DownloadError.NO_CONNECTION.name), models.status.value[it])
+            assertEquals(
+                ModelStatus.Failed(Failure.DOWNLOAD, DownloadError.NO_CONNECTION.name),
+                models.status.value[it],
+            )
         }
         assertTrue(fetched.isEmpty())
 
