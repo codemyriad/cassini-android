@@ -213,12 +213,15 @@ class AppGraphTest {
 
             assertFalse(models.ready(ModelPart.SPEECH))
             assertFalse(models.detectorReady())
-            assertEquals(ModelPart.entries.toSet(), models.plan().missing.map { it.part }.toSet())
+            assertEquals(setOf(ModelPart.SPEECH), models.plan().missing.map { it.part }.toSet())
             assertFalse(models.hasValidatedNetwork())
         }
         assertFalse(models.consented())
         graph.models.recordConsent()
         assertTrue(models.consented())
+        withContext(Dispatchers.IO) {
+            assertEquals(ModelPart.entries.toSet(), models.plan().missing.map { it.part }.toSet())
+        }
     }
 
     /** A PLAIN note over a copy of the FLEURS clip, as a finished recording leaves it. */
