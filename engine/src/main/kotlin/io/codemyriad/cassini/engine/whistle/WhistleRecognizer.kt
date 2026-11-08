@@ -171,14 +171,17 @@ class WhistleRecognizer(
             val placed = place(relative.words, result.start)
             for (word in placed) {
                 val saved = words.getOrNull(replayed++)
-                require(saved != null && saved.text == word.text && saved.startMs == word.startMs && saved.endMs == word.endMs) {
+                val matches = saved != null && saved.text == word.text && saved.startMs == word.startMs && saved.endMs == word.endMs
+                require(matches) {
                     "Whistle replayed words differ from saved progress"
                 }
             }
         } else {
             val startMs = result.start * MS / RATE
             callbacks.onStage(startMs, result.end * MS / RATE, false)
-            val pcm = FloatArray((result.end - result.start).toInt()) { raw[((result.start + it) and RING_MASK).toInt()] }
+            val pcm = FloatArray((result.end - result.start).toInt()) {
+                raw[((result.start + it) and RING_MASK).toInt()]
+            }
             val assigned = callbacks.onChunk(PcmAudio(pcm, RATE), startMs, relative)
             words.addAll(place(assigned.words, result.start))
             requireUser(WordBodyBudget.fits(words), Failure.LONG)
@@ -196,8 +199,14 @@ class WhistleRecognizer(
             val text = item.getString("word").trim()
             val start = item.getDouble("start")
             val end = item.getDouble("end")
-            require(text.isNotEmpty() && text.none(Char::isWhitespace) && start.isFinite() && end.isFinite() && end >= start)
-            Word("speaker_0", (start * MS).roundToLong().coerceIn(0, duration), (end * MS).roundToLong().coerceIn(0, duration), text)
+            val valid = text.isNotEmpty() && text.none(Char::isWhitespace) && start.isFinite() && end.isFinite() && end >= start
+            require(valid)
+            Word(
+                "speaker_0",
+                (start * MS).roundToLong().coerceIn(0, duration),
+                (end * MS).roundToLong().coerceIn(0, duration),
+                text,
+            )
         }
         return Transcript(found, language)
     }
@@ -208,7 +217,12 @@ class WhistleRecognizer(
     }
 
     private fun progress(done: Long) = callbacks.onProgress(
-        Parakeet.Progress(done, totalMs.takeIf { it > 0 }?.coerceAtLeast(done) ?: 0, (nanoTime() - began) / NANOS_PER_MS, words.toList()),
+        Parakeet.Progress(
+            done,
+            totalMs.takeIf { it > 0 }?.coerceAtLeast(done) ?: 0,
+            (nanoTime() - began) / NANOS_PER_MS,
+            words.toList(),
+        ),
     )
 
     private inline fun measured(block: () -> Unit) {

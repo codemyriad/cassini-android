@@ -202,9 +202,13 @@ data class CheckpointState(
         fun recognition(json: JSONObject) = RecognitionState(
             json.optLong("inferenceMs"),
             incremental(json.getJSONObject("chunks")),
-            if (json.has("whistle")) json.getJSONObject("whistle").let {
-                WhistleResume(it.getString("pipeline"), it.getBoolean("finished"), it.getString("pcmSha256"))
-            } else null,
+            if (json.has("whistle")) {
+                json.getJSONObject("whistle").let {
+                    WhistleResume(it.getString("pipeline"), it.getBoolean("finished"), it.getString("pcmSha256"))
+                }
+            } else {
+                null
+            },
         )
 
         /** `recognition`, without its first [logged] words, which are in `words.log`. */
@@ -214,7 +218,8 @@ data class CheckpointState(
             val inline = if (logged == 0) chunks else chunks.withWords(chunks.words.subList(logged, chunks.words.size))
             return JSONObject().put("inferenceMs", recognition.inferenceMs).put("chunks", json(inline)).apply {
                 recognition.whistle?.let {
-                    put("whistle", JSONObject().put("pipeline", it.pipeline).put("finished", it.finished).put("pcmSha256", it.pcmSha256))
+                    val marker = JSONObject().put("pipeline", it.pipeline).put("finished", it.finished).put("pcmSha256", it.pcmSha256)
+                    put("whistle", marker)
                 }
             }
         }

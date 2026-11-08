@@ -38,7 +38,8 @@ class WhistleRecognizerTest {
         var cleanupFailure = false
         private fun emit() {
             sent = true
-            result(WhistleResult(512, 1536, """{"words":[{"word":" $text ","start":0.010,"end":0.050}]}""".toByteArray()))
+            val json = """{"words":[{"word":" $text ","start":0.010,"end":0.050}]}""".toByteArray()
+            result(WhistleResult(512, 1536, json))
         }
         override fun accept(samples: FloatArray, count: Int) {
             received += count
@@ -55,7 +56,10 @@ class WhistleRecognizerTest {
     }
 
     private fun fresh(eof: Boolean = false): WhistleRecognizer = WhistleRecognizer(
-        null, callbacks, { _, _ -> error("Fresh run must not replay") }, { Fake(it, eof) },
+        null,
+        callbacks,
+        { _, _ -> error("Fresh run must not replay") },
+        { Fake(it, eof) },
     )
 
     @Test
@@ -92,7 +96,10 @@ class WhistleRecognizerTest {
 
     @Test
     fun replaysSavedPrefixWithoutRepeatingSpeakerOrProgressCallbacks() {
-        val state = fresh().use { it.accept(pcm, pcm.size); it.checkpoint() }
+        val state = fresh().use {
+            it.accept(pcm, pcm.size)
+            it.checkpoint()
+        }
         chunks.clear()
         progress.clear()
         var replayed = 0L
@@ -109,11 +116,64 @@ class WhistleRecognizerTest {
     }
 
     @Test
+    fun newSegmentsAfterResumeKeepSavedSpeakersAndOnlyCallBackForNewWords() {
+        val state = fresh().use {
+            it.accept(pcm, pcm.size)
+            it.checkpoint()
+        }
+        val starts = mutableListOf<Long>()
+        val nextCallbacks = Recognizer.Callbacks(
+            { audio, start, transcript ->
+                starts += start
+                assertArrayEquals(pcm.copyOfRange(512, 1536), audio.samples, 0f)
+                transcript.copy(words = transcript.words.map { it.copy(speaker = "next_speaker") })
+            },
+            { _, _, _ -> },
+            {},
+        )
+        WhistleRecognizer(
+            state,
+            nextCallbacks,
+            { _, sink -> sink(pcm, pcm.size) },
+            { result ->
+                val first = Fake(result)
+                object : WhistleTransport {
+                    override fun accept(samples: FloatArray, count: Int) {
+                        first.accept(samples, count)
+                        if (first.received == 8192) {
+                            val json = """{"words":[{"word":"Again.","start":0.010,"end":0.050}]}""".toByteArray()
+                            result(WhistleResult(4608, 5632, json))
+                        }
+                    }
+                    override fun finish() = first.finish()
+                    override fun close() = first.close()
+                }
+            },
+        ).use {
+            it.accept(pcm, pcm.size)
+            val transcript = it.finish(512)
+            assertEquals(listOf(288L), starts)
+            assertEquals(state.chunks.words.single(), transcript.words.first())
+            assertEquals(Word("next_speaker", 298, 338, "Again."), transcript.words.last())
+            assertEquals(2, transcript.words.size)
+        }
+    }
+
+    @Test
     fun resumeAlsoReplaysTrueEofBeforeReturningSavedWords() {
-        val state = fresh(true).use { it.accept(pcm, pcm.size); it.finish(256); it.checkpoint() }
+        val state = fresh(true).use {
+            it.accept(pcm, pcm.size)
+            it.finish(256)
+            it.checkpoint()
+        }
         chunks.clear()
         lateinit var worker: Fake
-        WhistleRecognizer(state, callbacks, { _, sink -> sink(pcm, pcm.size) }, { Fake(it, true).also { worker = it } }).use {
+        WhistleRecognizer(
+            state,
+            callbacks,
+            { _, sink -> sink(pcm, pcm.size) },
+            { Fake(it, true).also { worker = it } },
+        ).use {
             assertTrue(chunks.isEmpty())
             assertEquals(state.chunks.words, it.finish(256).words)
             assertEquals(1, worker.finishes)
@@ -123,11 +183,18 @@ class WhistleRecognizerTest {
 
     @Test
     fun mismatchedReplayClosesWorkerAndPreservesTheOriginalFailure() {
-        val state = fresh().use { it.accept(pcm, pcm.size); it.checkpoint() }
+        val state = fresh().use {
+            it.accept(pcm, pcm.size)
+            it.checkpoint()
+        }
         lateinit var worker: Fake
         val error = assertThrows(IllegalArgumentException::class.java) {
             WhistleRecognizer(state, callbacks, { _, sink -> sink(pcm, pcm.size) }, {
-                Fake(it).also { fake -> worker = fake; fake.text = "Different."; fake.cleanupFailure = true }
+                Fake(it).also { fake ->
+                    worker = fake
+                    fake.text = "Different."
+                    fake.cleanupFailure = true
+                }
             })
         }
         assertEquals("Whistle replayed words differ from saved progress", error.message)
@@ -152,10 +219,18 @@ class WhistleRecognizerTest {
 
     @Test
     fun changedPcmIsRefusedEvenWhenWordsAndTimesHappenToMatch() {
-        val state = fresh().use { it.accept(pcm, pcm.size); it.checkpoint() }
+        val state = fresh().use {
+            it.accept(pcm, pcm.size)
+            it.checkpoint()
+        }
         lateinit var worker: Fake
         val error = assertThrows(IllegalArgumentException::class.java) {
-            WhistleRecognizer(state, callbacks, { _, sink -> sink(FloatArray(pcm.size), pcm.size) }, { Fake(it).also { worker = it } })
+            WhistleRecognizer(
+                state,
+                callbacks,
+                { _, sink -> sink(FloatArray(pcm.size), pcm.size) },
+                { Fake(it).also { worker = it } },
+            )
         }
         assertEquals("Whistle replay PCM differs from saved progress", error.message)
         assertEquals(1, worker.closes)
@@ -163,11 +238,19 @@ class WhistleRecognizerTest {
 
     @Test
     fun incompleteOrOverlongReplayIsRefusedAndClosesTheWorker() {
-        val state = fresh().use { it.accept(pcm, pcm.size); it.checkpoint() }
+        val state = fresh().use {
+            it.accept(pcm, pcm.size)
+            it.checkpoint()
+        }
         for (count in listOf(2048, 4097)) {
             lateinit var worker: Fake
             assertThrows(IllegalArgumentException::class.java) {
-                WhistleRecognizer(state, callbacks, { _, sink -> sink(FloatArray(count), count) }, { Fake(it).also { worker = it } })
+                WhistleRecognizer(
+                    state,
+                    callbacks,
+                    { _, sink -> sink(FloatArray(count), count) },
+                    { Fake(it).also { worker = it } },
+                )
             }
             assertEquals(1, worker.closes)
         }
