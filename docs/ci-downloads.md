@@ -41,9 +41,11 @@ init script verifies both and routes only this exact module/version locally;
 all transitive dependencies remain those in the original POM. The
 native source build reuses the exact pinned ORT archive for both ABIs through
 upstream's supported external-runtime directory. Native GitHub source archives,
-including KissFFT and Kaldi decoder, are staged at upstream's supported
+including KissFFT, Kaldi decoder and its Kaldifst/OpenFst dependencies, are staged at upstream's supported
 pre-download locations. Direct codeload bytes must match the existing source
-SHA-256 pins; upstream CMake still enforces its original hashes. Versions and
+SHA-256 pins; upstream CMake still enforces its original hashes. The nested
+Kaldifst/OpenFst pins come from kaldi-decoder v0.3.0 `cmake/kaldifst.cmake`
+and Kaldifst v1.8.0 `cmake/openfst.cmake`. Versions and
 bytes remain unchanged. The helper and its pins are included in the native source package.
 
 The existing actionlint version/checksum is also fetched through the verified

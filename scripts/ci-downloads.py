@@ -228,8 +228,8 @@ def prepare_native(output):
     github_asset(pin['repo'], pin['tag'], pin['name'], archive, pin['sha256'], size=pin['size'])
     unpack_native(archive, output)
     sources = output.parent / 'cmake-inputs'
-    source = input_pin('kissfft')
-    pinned_file(source, sources / source['name'])
+    for source in [input_pin('kissfft'), *input_pin('nativeNestedSources')]:
+        pinned_file(source, sources / source['name'])
     # The pinned upstream CMake declarations support these local filenames.
     names = {'json', 'kaldi-native-fbank', 'kaldi-decoder', 'openfst', 'simple-sentencepiece', 'hclust-cpp'}
     for pin in json.loads((ROOT / 'scripts/native-dependencies.json').read_text()):

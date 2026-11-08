@@ -33,5 +33,17 @@
     "name": "kissfft-febd4caeed32e33ad8b2e0bb5ea77542c40f18ec.zip",
     "size": 74252,
     "sha256": "497103e664168ebe39580b757adbe616f6cf85a16572af581ca7bc42d0ab13fd"
-  }
+  },
+  "nativeNestedSources": [
+    {
+      "url": "https://codeload.github.com/k2-fsa/kaldifst/tar.gz/refs/tags/v1.8.0",
+      "name": "kaldifst-1.8.0.tar.gz",
+      "sha256": "3f247b7e5a2409071202f5e2bc6200060f66728c0a3443c03923ad2723e040b3"
+    },
+    {
+      "url": "https://codeload.github.com/csukuangfj/openfst/tar.gz/refs/tags/v1.8.5-2026-04-10",
+      "name": "openfst-1.8.5-2026-04-10.tar.gz",
+      "sha256": "c3549940384cbe4fa9f18c2bcfb1bfbd0a80492fd1b0bfa27433cee395a6a199"
+    }
+  ]
 }
