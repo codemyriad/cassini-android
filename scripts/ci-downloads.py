@@ -155,8 +155,21 @@ def unpack_native(archive, output):
             target.write_bytes(source.read(member))
 
 
+def input_pin(name):
+    return json.loads((ROOT / 'scripts/ci-download-pins.json').read_text())[name]
+
+
+def prepare_detekt():
+    pin = input_pin('kotlinCompiler')
+    home = Path(os.environ.get('GRADLE_USER_HOME', Path.home() / '.gradle'))
+    # Gradle's content-addressed artifact cache. SHA-1 is only its directory key; SHA-256 verifies bytes.
+    target = (home / 'caches/modules-2/files-2.1' / pin['group'] / pin['artifact']
+              / pin['version'] / pin['cacheSha1'] / pin['name'])
+    github_asset(pin['repo'], pin['tag'], pin['name'], target, pin['sha256'], size=pin['size'])
+
+
 def prepare_native(output):
-    pin = json.loads((ROOT / 'scripts/ci-download-pins.json').read_text())['ort']
+    pin = input_pin('ort')
     archive = output.parent / pin['name']
     github_asset(pin['repo'], pin['tag'], pin['name'], archive, pin['sha256'], size=pin['size'])
     unpack_native(archive, output)
@@ -174,6 +187,7 @@ def main():
     elif args.stage == 'gradle':
         prepare_gradle()
     else:
+        prepare_detekt()
         # Dedicated resolve-only task. The detekt analysis itself runs once in the next CI step.
         run_download(['./gradlew', '--no-daemon', '--configure-on-demand', 'downloadDetekt'])
 

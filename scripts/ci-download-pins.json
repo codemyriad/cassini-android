@@ -5,5 +5,16 @@
     "name": "onnxruntime-android-1.27.1.zip",
     "size": 32785641,
     "sha256": "defade26209f72cf4fa9769b18052c842833d6bef12924595d26f03b995548ca"
+  },
+  "kotlinCompiler": {
+    "repo": "JetBrains/kotlin",
+    "tag": "v2.0.21",
+    "name": "kotlin-compiler-embeddable-2.0.21.jar",
+    "size": 58272093,
+    "sha256": "9fa8cdd1de0dccffe154c997d423ec6b5f53cd6d9177e3a77a9b0de03fb1bc81",
+    "group": "org.jetbrains.kotlin",
+    "artifact": "kotlin-compiler-embeddable",
+    "version": "2.0.21",
+    "cacheSha1": "79346ed53db48b18312a472602eb5c057070c54d"
   }
 }

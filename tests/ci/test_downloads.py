@@ -135,6 +135,17 @@ class DownloadTests(unittest.TestCase):
                 DOWNLOADS.github_asset('official/repo', 'v1', 'input.zip', target, '0' * 64)
             fetch.assert_not_called()
 
+    def test_detekt_prefetch_preserves_gradle_artifact_identity(self):
+        pin = DOWNLOADS.input_pin('kotlinCompiler')
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(DOWNLOADS.os.environ, GRADLE_USER_HOME=tmp):
+            with patch.object(DOWNLOADS, 'github_asset') as fetch:
+                DOWNLOADS.prepare_detekt()
+            target = fetch.call_args.args[3]
+            expected = Path(tmp) / 'caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-compiler-embeddable/2.0.21'
+            self.assertEqual(target, expected / '79346ed53db48b18312a472602eb5c057070c54d' / pin['name'])
+            self.assertEqual(fetch.call_args.args[4], pin['sha256'])
+            self.assertEqual(fetch.call_args.kwargs['size'], 58272093)
+
     def test_gradle_uses_existing_wrapper_cache_layout_and_pin(self):
         with tempfile.TemporaryDirectory() as tmp, patch.dict(DOWNLOADS.os.environ, GRADLE_USER_HOME=tmp):
             with patch.object(DOWNLOADS, 'github_asset') as fetch:
