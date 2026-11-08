@@ -16,7 +16,10 @@ it does not change queued or paused work. Every Room job stores `speech_identity
 which includes the full engine revision, model/VAD hashes and decoder/gate policy
 versions for Whistle. Unknown job identities never select another recognizer.
 Checkpoint validation, worker creation, consent and output provenance use this
-recorded identity. A rebuild or Trash restore retains a valid checkpoint's model.
+recorded identity. A rebuild or Trash restore retains a valid checkpoint's model. Trash also
+stores the queued job pin before its first checkpoint; restoring never stamps
+the current Settings choice over that pin. Older two-field Trash snapshots name
+the legacy Parakeet engine, and unknown pins remain unknown for strict refusal.
 
 Whistle's basic path uses bundled VAD and needs no downloaded model or consent.
 Without optional speaker/voice models, it uses one speaker and no saved-voice
@@ -25,7 +28,12 @@ authorize Parakeet: `models.speechConsentAt` is recorded only for a download pla
 that includes Parakeet. Conversely, Parakeet-only consent never authorizes the
 optional speaker downloads, including a retry or the next Parakeet job. Recording
 and note storage checks use the same authorized job plan. The speech-only consent
-screen uses existing size/privacy copy and does not promise speaker separation. Existing
+screen uses existing size/privacy copy and does not promise speaker separation.
+Consent and installation retain only the shown roles, including across a
+notification-permission recreation. Standalone retries keep their original
+part set even if earlier consent would allow more models. Failed or offline
+optional standalone downloads produce a retry notice rather than silently
+looking successful. Existing
 installed Parakeet remains usable. Download
 screens for a paused job use that job's model, even after the default changes.
 
@@ -70,7 +78,9 @@ conversion. Those other-rate decodes do not claim desktop FIR bit parity.
 Whistle decodes from the origin on resume and drops samples only after
 resampling; it never creates a false FIR edge at the checkpoint. The recognizer
 then rebuilds the saved prefix as described in [the adapter](job-adapter.md).
-A replay mismatch offers Start over. Worker/capability/asset failures never
+Stop is checked before opening the worker and between replay blocks. A stopped
+replay releases its worker and leaves the prior checkpoint unchanged. A replay
+mismatch offers Start over. Worker/capability/asset failures never
 substitute Parakeet or start a download.
 
 Whistle's portable transcript records Needle, its actual engine/model revisions,
