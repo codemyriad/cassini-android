@@ -42,5 +42,6 @@ Verification uses `python3 -m unittest discover -s tests/ci -v`. Tests refuse
 corrupt ZIPs, missing pins and unsafe native archive paths, and stage a valid
 cache hit with network calls forbidden. A real cached ZIP was also verified
 and staged offline on the shared Mac; the local wrapper process was not run
-because the memory admission gate refused it. CI runs the unmodified wrapper
-and the existing full test gates. No assertion, golden or coverage is removed.
+because the memory admission gate refused it. CI also tests a fresh real-wrapper home with an unreachable network proxy:
+the verified ZIP must start, and incorrect bytes must fail the wrapper checksum.
+The existing full test gates still run. No assertion, golden or coverage is removed.
