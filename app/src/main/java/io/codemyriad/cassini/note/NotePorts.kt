@@ -443,8 +443,10 @@ class GraphNotePorts(private val graph: AppGraph, context: Context) : NotePorts 
     override suspend fun requiredFreeBytes(noteId: String): Long {
         val identity = graph.awaitCatalogue().jobs.job(noteId)?.speechIdentity
         val model = identity?.let(SpeechModel::identity) ?: graph.speech.selected()
-        return if (model == SpeechModel.INCLUDED) 0 else withContext(graph.dispatchers.io) {
-            graph.modelAccess.plan().requiredFreeBytes
+        return if (model == SpeechModel.INCLUDED) {
+            0
+        } else {
+            withContext(graph.dispatchers.io) { graph.modelAccess.plan().requiredFreeBytes }
         }
     }
 
