@@ -64,6 +64,7 @@ class SettingsViewModelTest {
     private fun SettingsViewModel.now(): SettingsUiState = state.value
 
     @Test fun recommendationOpensOnlyParakeetConsentAndDismissesWithoutChangingTheModel() = runTest(dispatcher) {
+        ports.speech.value = SpeechChoice(SpeechModel.INCLUDED, true)
         ports.notices.value = NoticeFacts(
             parakeet = io.codemyriad.cassini.models.ParakeetRecommendationState(true, 123L),
         )
@@ -75,7 +76,7 @@ class SettingsViewModelTest {
         viewModel.onEvent(SettingsEvent.DismissParakeet)
         advanceUntilIdle()
         assertEquals(null, viewModel.now().parakeetSuggestion)
-        assertEquals(SpeechModel.PARAKEET, ports.speech.value.selected)
+        assertEquals(SpeechModel.INCLUDED, ports.speech.value.selected)
     }
 
     @Test fun includedChoiceNeverOpensDownloadAndUnavailableChoiceIsRefused() = runTest(dispatcher) {

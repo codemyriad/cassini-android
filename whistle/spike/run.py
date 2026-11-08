@@ -240,7 +240,7 @@ def main():
                 "-no-snapshot",
                 "-no-boot-anim",
                 "-memory",
-                "2048",
+                "4096" if args.parakeet_memory_models else "2048",
                 "-cores",
                 "2",
                 "-gpu",

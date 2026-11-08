@@ -84,25 +84,7 @@ fun SettingsScreen(
             )
         }
         SectionHeader(stringResource(R.string.ui_settings_models))
-        if (state.parakeetNowDefault) {
-            Banner(
-                BannerSpec(BannerKind.PARAKEET_NOW_DEFAULT),
-                onAction = {},
-                onDismiss = { onEvent(SettingsEvent.DismissParakeetDefault) },
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
-            )
-        }
-        state.parakeetSuggestion?.let { suggestion ->
-            Banner(
-                suggestion,
-                onAction = {
-                    val event = if (it == BannerAction.DOWNLOAD) SettingsEvent.DownloadParakeet else SettingsEvent.DismissParakeet
-                    onEvent(event)
-                },
-                onDismiss = { onEvent(SettingsEvent.DismissParakeet) },
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
-            )
-        }
+        ParakeetNotices(state, onEvent)
         SpeechModels(state, onEvent)
         GroupCard(Modifier.padding(horizontal = 16.dp)) {
             state.models.filterNot { it.part == ModelPartUi.SPEECH }.forEach { row ->
@@ -116,6 +98,30 @@ fun SettingsScreen(
             version = state.version,
             onSourceClick = { onEvent(SettingsEvent.OpenLicenses) },
             modifier = Modifier.padding(horizontal = 16.dp),
+        )
+    }
+}
+
+/** D78 recommendation and one-time verified-default announcement. */
+@Composable
+private fun ParakeetNotices(state: SettingsUiState, onEvent: (SettingsEvent) -> Unit) {
+    if (state.parakeetNowDefault) {
+        Banner(
+            BannerSpec(BannerKind.PARAKEET_NOW_DEFAULT),
+            onAction = {},
+            onDismiss = { onEvent(SettingsEvent.DismissParakeetDefault) },
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+        )
+    }
+    state.parakeetSuggestion?.let { suggestion ->
+        Banner(
+            suggestion,
+            onAction = {
+                val event = if (it == BannerAction.DOWNLOAD) SettingsEvent.DownloadParakeet else SettingsEvent.DismissParakeet
+                onEvent(event)
+            },
+            onDismiss = { onEvent(SettingsEvent.DismissParakeet) },
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
         )
     }
 }

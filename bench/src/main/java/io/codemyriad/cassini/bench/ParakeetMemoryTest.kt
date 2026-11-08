@@ -1,12 +1,21 @@
 package io.codemyriad.cassini.bench
 
+import android.content.Context
 import android.net.Uri
 import android.os.Build
 import android.os.Debug
 import android.os.Process
 import androidx.test.platform.app.InstrumentationRegistry
+import io.codemyriad.cassini.AppGraph
+import io.codemyriad.cassini.adapters.NetworkCheck
 import io.codemyriad.cassini.core.models.ModelCatalog
+import io.codemyriad.cassini.core.models.SpeechModel
+import io.codemyriad.cassini.data.AppPaths
+import io.codemyriad.cassini.data.models.ModelFetcher
 import io.codemyriad.cassini.engine.asr.Parakeet
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
 import org.json.JSONObject
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -25,6 +34,7 @@ class ParakeetMemoryTest {
         val context = instrumentation.targetContext
         val models = InstalledModels(File(context.filesDir, "parakeet-memory"))
         check(models.ready(ModelCatalog.PARAKEET) && models.ready(ModelCatalog.VAD))
+        verifiedDefaultAndExplicitChoice(context, File(context.filesDir, "parakeet-memory"))
         val file = File(context.cacheDir, "parakeet-memory-english.wav")
         instrumentation.context.assets.open("whistle-probe/dc-quiet-jfk-v1.wav").use { input ->
             file.outputStream().use { input.copyTo(it) }
@@ -42,6 +52,7 @@ class ParakeetMemoryTest {
             val report = JSONObject()
                 .put("sdk", Build.VERSION.SDK_INT).put("pid", Process.myPid())
                 .put("model", ModelCatalog.PARAKEET_REVISION).put("vad", ModelCatalog.VAD.sourceSha256)
+                .put("verifiedDefaultAndExplicitChoiceAfterRestart", true)
                 .put("inputSha256", sourceHash).put("words", transcript.words.size)
                 .put("peakPssKiB", samples.peakKiB).put("samples", samples.count)
                 .put("maxSampleIntervalMs", samples.maxIntervalNs / 1_000_000.0)
@@ -52,6 +63,32 @@ class ParakeetMemoryTest {
             assertTrue(samples.count > 1 && samples.peakKiB > 0)
         } finally {
             file.delete()
+        }
+    }
+
+    private fun verifiedDefaultAndExplicitChoice(context: Context, modelRoot: File) = runBlocking(Dispatchers.IO) {
+        val root = File(context.cacheDir, "parakeet-choice-proof").apply { mkdirs() }
+        val paths = AppPaths(root, File(root, "cache").apply { mkdirs() }, modelRoot)
+        try {
+            repeat(2) { round ->
+                val graph = AppGraph(
+                    context,
+                    AppGraph.Config(
+                        paths,
+                        fetcher = ModelFetcher { _, _, _ -> error("Selection proof must not download") },
+                        network = NetworkCheck { false },
+                    ),
+                )
+                try {
+                    graph.ready.await()
+                    assertEquals(if (round == 0) SpeechModel.PARAKEET else SpeechModel.INCLUDED, graph.speech.selected())
+                    graph.speech.choose(SpeechModel.INCLUDED)
+                } finally {
+                    graph.close()
+                }
+            }
+        } finally {
+            root.deleteRecursively()
         }
     }
 }

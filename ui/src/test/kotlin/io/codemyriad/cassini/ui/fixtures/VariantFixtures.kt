@@ -686,6 +686,9 @@ internal object VariantFixtures {
     val settings = mapOf(
         "settings-parakeet-suggestion" to b.settings.copy(
             parakeetSuggestion = BannerSpec(BannerKind.PARAKEET_RECOMMENDED, BannerArgs(bytes = 465378233L)),
+            models = b.settings.models.map {
+                if (it.part == ModelPartUi.SPEECH) it.copy(status = ModelStatusUi.NotDownloaded) else it
+            }.toImmutableList(),
         ),
         "settings-parakeet-default" to b.settings.copy(
             speechModel = SpeechModelUi.PARAKEET,
