@@ -6,6 +6,28 @@ We made the entries for 0.0.1-beta to 0.1.0 again from the release notes of thes
 
 ## [Unreleased]
 
+## [0.4.2-beta.1] - 2026-11-08
+
+Test build 16 from reviewed `main`, distributed as a GitHub prerelease. The universal APK is `cassini-android-0.4.2-beta.1.apk`; smaller packages end in `-arm64-v8a.apk` or `-x86_64.apk`. Requires Android 8.0 or later and a 64-bit device. The APKs use the existing release signing identity; native sources, notices and checksums accompany them.
+
+### Added
+
+- Whistle is Included and available immediately without a speech-model download on eligible devices: Android 10 or later, arm64, and CPU dot-product support. It runs in a restricted worker. Other devices show Whistle as unavailable and retain Parakeet.
+- A calm, dismissible suggestion offers the more accurate Parakeet Ultra in Settings and after the first Whistle transcription, with its download size. It appears only where Whistle is available and the runtime, memory and storage checks pass, including at least 6 GB of OS-reported total RAM.
+- Once Parakeet is installed and verified, new meetings use it by default. A later explicit Whistle choice is kept.
+
+### Fixed
+
+- Queued and paused meetings keep their chosen speech model through Settings changes and Trash restore.
+- Speech-only and optional speaker/voice download permissions stay separate. Speech-only Parakeet jobs complete without asking again for optional models. Failed optional downloads can be retried without fetching Parakeet unexpectedly, including from Settings after an offline attempt.
+- Stop works during Whistle resume replay and preserves saved progress.
+- Devices without Whistle do not show a false notice that new meetings changed from Whistle to Parakeet.
+
+### Changed
+
+- ABI-specific APKs and Play bundle splits keep the arm64 Whistle payload out of x86_64 packages.
+- CI uses pinned, checksum-verified Gradle distribution caching.
+
 ## [0.4.1] - 2026-11-05
 
 The APK file of this release is `cassini-android-0.4.1.apk`. It operates on Android 8.0 or later, on a 64-bit ARM phone (`arm64-v8a`). The APK also has `x86_64` for emulators. It updates Cassini talk 0.4.0 (`io.codemyriad.cassini`) and keeps your notes, voices, models and settings. Testers get it from the internal testing track of Google Play, signed with the same key as this APK. The release also has the native sources (`cassini-native-sources.tar`) and the notices.
@@ -231,7 +253,8 @@ Version 0.2.0 is a new build of the app. It keeps the speech engine and the port
 - A one-time model download in Settings: INT8 (about 640 MiB) or FP32 (about 2.37 GiB).
 - Recordings of up to 2:59 and imports of up to 3 minutes.
 
-[Unreleased]: https://github.com/codemyriad/cassini-android/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/codemyriad/cassini-android/compare/v0.4.2-beta.1...HEAD
+[0.4.2-beta.1]: https://github.com/codemyriad/cassini-android/compare/v0.4.1...v0.4.2-beta.1
 [0.4.1]: https://github.com/codemyriad/cassini-android/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/codemyriad/cassini-android/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/codemyriad/cassini-android/compare/v0.2.0...v0.3.0
