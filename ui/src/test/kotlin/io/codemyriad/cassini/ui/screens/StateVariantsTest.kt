@@ -299,6 +299,8 @@ class StateVariantsTest : BoardTest() {
 
     @Test fun modelsNoSpace() = models("models-no-space")
 
+    @Test fun modelsParakeetOnly() = models("models-parakeet-only")
+
     @Test fun modelsNoConnection() = models("models-no-connection")
 
     @Test fun modelsWithoutNote() = models("models-without-note")

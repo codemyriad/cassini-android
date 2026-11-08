@@ -38,6 +38,7 @@ import io.codemyriad.cassini.ui.components.PrimaryButtonSize
 import io.codemyriad.cassini.ui.components.TextButton
 import io.codemyriad.cassini.ui.components.TextButtonSize
 import io.codemyriad.cassini.ui.components.screenContentWidth
+import io.codemyriad.cassini.ui.format.ModelPartUi
 import io.codemyriad.cassini.ui.format.Sizes
 import io.codemyriad.cassini.ui.theme.CassiniIcon
 import io.codemyriad.cassini.ui.theme.CassiniTheme
@@ -137,7 +138,13 @@ private fun ModelDownloadBody(state: ModelDownloadUiState) {
     val c = CassiniTheme.colors
     // A no-break space keeps the bold figure and its unit on one line.
     val total = Sizes.totalMegabytes(state.parts.map { it.bytes }).replace(' ', '\u00A0')
-    val full = stringResource(R.string.ui_models_body, total)
+    val speechOnly = state.parts.singleOrNull()?.part == ModelPartUi.SPEECH
+    val full = if (speechOnly) {
+        stringResource(R.string.ui_settings_optional_size, total) + "\n\n" +
+            stringResource(R.string.ui_settings_models_footnote)
+    } else {
+        stringResource(R.string.ui_models_body, total)
+    }
     val at = full.indexOf(total)
     Text(
         text = buildAnnotatedString {

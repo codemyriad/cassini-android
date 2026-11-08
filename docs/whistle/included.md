@@ -23,7 +23,9 @@ Without optional speaker/voice models, it uses one speaker and no saved-voice
 matching. Settings can download those parts explicitly. That consent does not
 authorize Parakeet: `models.speechConsentAt` is recorded only for a download plan
 that includes Parakeet. Conversely, Parakeet-only consent never authorizes the
-optional speaker downloads, including a retry or the next Parakeet job. Existing
+optional speaker downloads, including a retry or the next Parakeet job. Recording
+and note storage checks use the same authorized job plan. The speech-only consent
+screen uses existing size/privacy copy and does not promise speaker separation. Existing
 installed Parakeet remains usable. Download
 screens for a paused job use that job's model, even after the default changes.
 

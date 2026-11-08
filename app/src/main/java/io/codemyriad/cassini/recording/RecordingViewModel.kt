@@ -83,8 +83,9 @@ class GraphRecordingPorts(private val graph: AppGraph) : RecordingPorts {
 
     override fun dismissEnded() = controller.dismissEnded()
 
-    override suspend fun modelsMissing(): Boolean =
-        graph.speech.selected() != SpeechModel.INCLUDED && !graph.models.plan().isEmpty
+    override suspend fun modelsMissing(): Boolean = kotlinx.coroutines.withContext(graph.dispatchers.io) {
+        graph.speech.selected() != SpeechModel.INCLUDED && !graph.modelAccess.plan().isEmpty
+    }
 
     override suspend fun lastFormat(): CaptureFormat? =
         graph.settings.lastRecordingFormat.first()?.let(CaptureFormat::of)
