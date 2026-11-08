@@ -28,6 +28,10 @@ def main():
     spec.loader.exec_module(helper)
     pins = json.loads((ROOT / "whistle/worker-pins.json").read_text())
     needle = json.loads((ROOT / "whistle/pins.json").read_text())
+    # The source-tag notices differ from sherpa's newer ORT; ship and verify this version's own copy.
+    helper.fetch(
+        ROOT / "app/src/main/assets/licenses/whistle/ONNXRuntime-ThirdPartyNotices.txt", pins["ortNotices"], True
+    )
     native = args.output / "native"
     cmd = [sys.executable, ROOT / "scripts/build-whistle-runtime.py", "--ndk", args.ndk, "--output", native]
     if args.offline:

@@ -94,7 +94,8 @@ weights at revision ca5287601bef25af26dcf2e1b2bdc0843a7c19e5 and Needle 3.3.0
 at revision 93e88ede867e4311c39151285e74df513e4b835b, under Apache-2.0.
 Its separate VAD path uses the MIT-licensed Silero v6.2.1 model at revision
 7e30209a3e901f9842f81b225f3e93d8199902b1 and Microsoft's ONNX Runtime 1.23.2
-Android library (MIT). License texts are included under `licenses/whistle/`.
+Android library (MIT, with its v1.23.2 upstream third-party notices). License
+texts and those component notices are included under `licenses/whistle/`.
 The private worker does not use sherpa's ONNX Runtime. Pins are in
 `whistle/pins.json` and `whistle/worker-pins.json`; model/runtime fetches happen
 at build time, with no model download performed by this worker.
