@@ -35,11 +35,6 @@ class WorkerProfile:
             return self
         for name in ["pss.json", "pss-meminfo.txt", "pss-process-events.txt"]:
             (self.output / name).unlink(missing_ok=True)
-        bookmark = subprocess.check_output(
-            self.adb + ["shell", "date '+%m-%d %H:%M:%S.%3N'"], text=True, timeout=10
-        ).strip()
-        if not re.fullmatch(r"\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}", bookmark):
-            raise RuntimeError("Device did not supply a valid logcat time bookmark")
         self.log = subprocess.Popen(
             self.adb
             + [
@@ -50,8 +45,6 @@ class WorkerProfile:
                 "main",
                 "-v",
                 "brief",
-                "-T",
-                bookmark,
                 "am_proc_start:I",
                 "am_proc_died:I",
                 "CassiniWorkerPss:I",
@@ -85,6 +78,8 @@ class WorkerProfile:
                     events.write(line)
                     if self.token.encode() in line:
                         self.ready.set()
+                    if not self.ready.is_set():
+                        continue  # Ignore retained history until this subscription observes its unique marker.
                     found = start.search(line)
                     if found:
                         pid = int(found[1])
@@ -151,6 +146,8 @@ class WorkerProfile:
         report = dict(
             schemaVersion=1,
             processPrefix="io.codemyriad.cassini:whistle",
+            readinessMarker=self.token,
+            readyObserved=self.ready.is_set(),
             observedProcesses=self.processes,
             samples=self.samples,
             sampleCount=len(self.samples),
