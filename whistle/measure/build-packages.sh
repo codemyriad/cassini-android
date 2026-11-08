@@ -19,10 +19,20 @@ baseline=$(cd "$1" && pwd)
 candidate=$(cd "$2" && pwd)
 mkdir -p "$3"
 output=$(cd "$3" && pwd)
+if [ "$baseline" = "$candidate" ]; then
+    echo 'Baseline and candidate must be different clean worktrees' >&2
+    exit 2
+fi
+active_repo=
+trap 'if [ -n "$active_repo" ]; then "$active_repo/gradlew" --stop > "$output/daemon-stop.log" 2>&1 || true; fi' EXIT
 for variant in baseline candidate; do
     if [ "$variant" = baseline ]; then repo=$baseline; else repo=$candidate; fi
     cd "$repo"
-    git diff --exit-code > /dev/null
+    if [ -n "$(git status --porcelain --untracked-files=normal)" ]; then
+        echo "Measurement worktree is not clean: $repo" >&2
+        exit 2
+    fi
+    active_repo=$repo
     for abi in universal arm64-v8a x86_64; do
         python3 "$script_dir/../drift/host.py" --baseline "${CASSINI_MEMORY_BASELINE:-$output/host-memory.json}"
         export CASSINI_MEASURE_ABI=$abi
