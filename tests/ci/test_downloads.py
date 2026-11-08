@@ -142,7 +142,7 @@ class DownloadTests(unittest.TestCase):
 
     def distribution(self, root):
         checksum = hashlib.sha256(b'pinned distribution').hexdigest()
-        return dict(name='gradle-9.8.2-bin', version='9.8.2', checksum=checksum,
+        return dict(name='gradle-9.8.2-bin', version='9.8.2', tag='v9.8.2', checksum=checksum,
                     url='https://services.gradle.org/distributions/gradle-9.8.2-bin.zip',
                     archive=root / 'cache/gradle-9.8.2-bin.zip')
 
@@ -177,6 +177,43 @@ class DownloadTests(unittest.TestCase):
                         DOWNLOADS.prepare_gradle()
                     fetch.assert_not_called()
             self.assertFalse((wrapper / 'gradle-9.8.2-bin.zip').exists())
+
+    def native_properties(self, path):
+        path.write_text(
+            'distributionBase=GRADLE_USER_HOME\ndistributionPath=wrapper/dists\n'
+            'distributionUrl=https\\://services.gradle.org/distributions/gradle-8.6-bin.zip\n'
+            'zipStoreBase=GRADLE_USER_HOME\nzipStorePath=wrapper/dists\n',
+        )
+
+    def test_native_wrapper_adds_pin_idempotently_without_version_change(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'gradle-wrapper.properties'
+            self.native_properties(path)
+            DOWNLOADS.pin_native_wrapper(path)
+            DOWNLOADS.pin_native_wrapper(path)
+            properties = DOWNLOADS.read_properties(path)
+            self.assertEqual(properties['distributionUrl'], DOWNLOADS.input_pin('nativeGradle')['url'])
+            self.assertEqual(properties['distributionSha256Sum'], DOWNLOADS.input_pin('nativeGradle')['sha256'])
+            self.assertEqual(path.read_text().count('distributionSha256Sum='), 1)
+
+    def test_native_wrapper_refuses_existing_wrong_pin(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'gradle-wrapper.properties'
+            self.native_properties(path)
+            with path.open('a') as output:
+                output.write('distributionSha256Sum=' + '0' * 64 + '\n')
+            before = path.read_bytes()
+            with self.assertRaises(ValueError):
+                DOWNLOADS.pin_native_wrapper(path)
+            self.assertEqual(path.read_bytes(), before)
+
+    def test_native_cache_is_separate_and_checksum_addressed(self):
+        native = DOWNLOADS.gradle_info('native')
+        project = DOWNLOADS.gradle_info()
+        self.assertEqual(native['version'], '8.6')
+        self.assertEqual(native['tag'], 'v8.6.0')
+        self.assertTrue(native['cache_key'].endswith(native['checksum']))
+        self.assertNotEqual(native['cache_key'], project['cache_key'])
 
     def test_wrapper_without_sha256_pin_is_refused(self):
         with tempfile.TemporaryDirectory() as tmp:

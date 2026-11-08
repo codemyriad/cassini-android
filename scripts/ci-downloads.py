@@ -85,39 +85,60 @@ def base36(number):
     return result or '0'
 
 
-def gradle_info():
+def read_properties(path):
     properties = {}
-    for line in (ROOT / 'gradle/wrapper/gradle-wrapper.properties').read_text().splitlines():
+    for line in path.read_text().splitlines():
         key, separator, value = line.partition('=')
         if separator:
             properties[key] = value.replace('\\:', ':')
-    url = properties['distributionUrl']
-    match = re.fullmatch(r'https://(?:services|downloads)\.gradle\.org/distributions/(gradle-([0-9.]+)-bin)\.zip', url)
-    if (not match or properties['distributionBase'] != 'GRADLE_USER_HOME'
-            or properties['distributionPath'] != 'wrapper/dists'):
-        raise ValueError('Unsupported wrapper distribution/cache layout')
-    name, version = match.groups()
-    checksum = properties.get('distributionSha256Sum', '')
+    return properties
+
+
+def validate_layout(properties):
+    for key in ['distributionBase', 'zipStoreBase']:
+        if properties[key] != 'GRADLE_USER_HOME':
+            raise ValueError('Unsupported wrapper distribution/cache layout')
+    for key in ['distributionPath', 'zipStorePath']:
+        if properties[key] != 'wrapper/dists':
+            raise ValueError('Unsupported wrapper distribution/cache layout')
+
+
+def gradle_info(kind='project'):
+    if kind == 'native':
+        pin = input_pin('nativeGradle')
+        name, version, checksum, url, tag = (pin[key] for key in ['name', 'version', 'sha256', 'url', 'tag'])
+    else:
+        properties = read_properties(ROOT / 'gradle/wrapper/gradle-wrapper.properties')
+        validate_layout(properties)
+        url = properties['distributionUrl']
+        match = re.fullmatch(
+            r'https://(?:services|downloads)\.gradle\.org/distributions/(gradle-([0-9.]+)-bin)\.zip', url,
+        )
+        if not match:
+            raise ValueError('Unsupported wrapper distribution/cache layout')
+        name, version = match.groups()
+        tag = 'v' + version
+        checksum = properties.get('distributionSha256Sum', '')
     if not re.fullmatch('[0-9a-f]{64}', checksum):
         raise ValueError('A committed Gradle distribution SHA-256 pin is required')
     # One exact key; no restore-prefix fallback to a different distribution or checksum.
     cache = Path(os.environ.get('CASSINI_CI_DOWNLOAD_CACHE', ROOT / '.tools/ci-download-cache'))
-    return dict(name=name, version=version, checksum=checksum, url=url,
+    return dict(name=name, version=version, checksum=checksum, url=url, tag=tag,
                 cache_key=f'cassini-gradle-zip-v1-{version}-{checksum}', archive=cache / (name + '.zip'))
 
 
-def gradle_output():
-    info = gradle_info()
+def gradle_output(kind='project'):
+    info = gradle_info(kind)
     with Path(os.environ['GITHUB_OUTPUT']).open('a') as output:
         for key, value in {'key': info['cache_key'], 'path': info['archive']}.items():
             output.write(f'{key}={value}\n')
 
 
-def prepare_gradle():
-    info = gradle_info()
+def prepare_gradle(kind='project'):
+    info = gradle_info(kind)
     archive = info['archive']
     # Verifies restored ZIPs even when setup-gradle also restored an installed wrapper distribution.
-    github_asset('gradle/gradle-distributions', 'v' + info['version'], archive.name, archive, info['checksum'])
+    github_asset('gradle/gradle-distributions', info['tag'], archive.name, archive, info['checksum'])
     home = Path(os.environ.get('GRADLE_USER_HOME', Path.home() / '.gradle'))
     # MD5/base36 is Gradle PathAssembler's URL directory key, not an integrity check.
     key = base36(int(hashlib.md5(info['url'].encode(), usedforsecurity=False).hexdigest(), 16))
@@ -196,19 +217,38 @@ def prepare_native(output):
     unpack_native(archive, output)
 
 
+def pin_native_wrapper(path):
+    pin = input_pin('nativeGradle')
+    properties = read_properties(path)
+    validate_layout(properties)
+    if properties['distributionUrl'] != pin['url']:
+        raise ValueError('Upstream wrapper differs from the pinned source distribution')
+    existing = properties.get('distributionSha256Sum')
+    if existing is not None and existing != pin['sha256']:
+        raise ValueError('Upstream wrapper checksum differs from the committed pin')
+    if existing is None:
+        with path.open('a') as output:
+            output.write('\ndistributionSha256Sum=' + pin['sha256'] + '\n')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('stage', choices=['gradle-key', 'gradle', 'detekt', 'native'])
+    parser.add_argument('stage', choices=['gradle-key', 'gradle', 'detekt', 'native', 'native-wrapper'])
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--kind', choices=['project', 'native'], default='project')
     args = parser.parse_args()
-    if args.stage == 'native':
+    if args.stage == 'native-wrapper':
+        if args.output is None:
+            parser.error('native-wrapper requires --output pointing to the upstream properties')
+        pin_native_wrapper(args.output)
+    elif args.stage == 'native':
         if args.output is None:
             parser.error('native requires --output')
         prepare_native(args.output)
     elif args.stage == 'gradle-key':
-        gradle_output()
+        gradle_output(args.kind)
     elif args.stage == 'gradle':
-        prepare_gradle()
+        prepare_gradle(args.kind)
     else:
         prepare_detekt()
 

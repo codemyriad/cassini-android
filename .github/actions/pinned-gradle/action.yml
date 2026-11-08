@@ -1,12 +1,18 @@
 name: Pinned Gradle distribution
 description: Restore an exact SHA-256-keyed ZIP and verify it before the wrapper uses it.
+inputs:
+  kind:
+    description: Project wrapper or pinned native-source wrapper.
+    default: project
 runs:
   using: composite
   steps:
     - name: Read committed wrapper pin
       id: pin
       shell: bash
-      run: python3 scripts/ci-downloads.py gradle-key
+      env:
+        CASSINI_GRADLE_KIND: ${{ inputs.kind }}
+      run: python3 scripts/ci-downloads.py gradle-key --kind "$CASSINI_GRADLE_KIND"
     - name: Restore distribution ZIP
       id: restore
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -15,7 +21,9 @@ runs:
         key: ${{ steps.pin.outputs.key }}
     - name: Verify ZIP and stage wrapper cache
       shell: bash
-      run: python3 scripts/ci-downloads.py gradle
+      env:
+        CASSINI_GRADLE_KIND: ${{ inputs.kind }}
+      run: python3 scripts/ci-downloads.py gradle --kind "$CASSINI_GRADLE_KIND"
     - name: Save verified distribution ZIP from hosted main only
       if: github.ref == 'refs/heads/main' && runner.environment == 'github-hosted' && steps.restore.outputs.cache-hit != 'true'
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

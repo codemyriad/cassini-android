@@ -34,6 +34,8 @@ if [ -z "${SHERPA_ONNX_SRC:-}" ]; then
     SHERPA_ONNX_SRC=$work/sherpa-onnx
 fi
 src=$(cd "$SHERPA_ONNX_SRC" && pwd)
+python3 scripts/ci-downloads.py native-wrapper --output "$src/android/SherpaOnnxAar/gradle/wrapper/gradle-wrapper.properties"
+python3 scripts/ci-downloads.py gradle --kind native
 
 # D66: fetch the identical pinned ORT archive once through the official API, avoiding broken browser redirects.
 python3 scripts/ci-downloads.py native --output "$work/onnxruntime"

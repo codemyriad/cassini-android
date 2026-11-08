@@ -20,5 +20,12 @@
       "size": 2666,
       "sha256": "bd4656a46ec418252e5bc5e1c20eb2029fb2a8e0e3cc94eeddfac7e87c8cd5b6"
     }
+  },
+  "nativeGradle": {
+    "url": "https://services.gradle.org/distributions/gradle-8.6-bin.zip",
+    "name": "gradle-8.6-bin",
+    "version": "8.6",
+    "tag": "v8.6.0",
+    "sha256": "9631d53cf3e74bfa726893aee1f8994fee4e060c401335946dba2156f440f24c"
   }
 }

@@ -21,7 +21,11 @@ Every Gradle workflow now uses the local `pinned-gradle` composite action:
 On a cache miss, the helper obtains the same vendor release asset through the
 working official GitHub release API and checks the committed SHA-256 before
 publication. It does not change the wrapper URL, Gradle version or checksum.
-The raw Gradle ZIP costs 151,620,138 cache bytes for the current version. Only
+The project ZIP costs 151,620,138 cache bytes. The native-source build also
+uses a separately keyed Gradle 8.6 ZIP with the official SHA-256 pin recorded
+in ci-download-pins.json. The helper refuses an unexpected upstream wrapper
+URL or existing wrong pin, adds that pin to the extracted source wrapper, and
+stages its ZIP before building. Neither wrapper version changes. Only
 one immutable cache entry is needed per distribution pin; the existing cache
 retention/quota policy remains in place. The first hosted main run after merge
 warms this shared cache. Until then, cold PR runs use the verified API route.
