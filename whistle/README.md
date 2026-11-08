@@ -45,3 +45,29 @@ Android's current resampler/VAD model/thresholds differ from desktop D11. Follow
 ## Packaged JNI experiment
 
 The [standalone spike](spike/README.md) records actual packaged arm64 inference on identical desktop clean/DC raw PCM. Its [evidence](spike/evidence/README.md) keeps candidate pinned-Mac references, Android outputs and exact input hashes for review. API 35 passes these engine comparisons on 4 KB and actual 16 KB pages. API 26 executes the engine but fails on two word substitutions and one 560 ms timing difference. These failures block Included/default; no exception or golden is changed. This does not enable Whistle in the production app or establish Android FIR/VAD parity.
+
+## Production capability policy
+
+The Included Whistle path requires **API 29 or newer**, an **arm64 process**,
+and the kernel's real **HWCAP_ASIMDDP** bit (bit 20). `WhistleCapability.assess`
+contains the policy; `WhistleDeviceCapability` reads it through a small,
+system-only JNI library. It neither loads Needle nor runs an optional instruction.
+An absent JNI library, unresolved symbol, denied load or failed HWCAP query makes
+the CPU probe unknown and Whistle ineligible. The device's supported-ABI list is
+not evidence that the app is running an arm64 process.
+
+The controlled #79 experiment establishes this conservative policy: the
+unmodified API 29 and 35 guests match the frozen desktop words and timing bound;
+API 26 does not. API 27/28 are unvalidated. Disabling dot-product dispatch breaks
+parity on the newer guests too. An API floor alone is insufficient. The API 26
+lab override must not be used as a production feature detector, even if SDOT can
+execute. No capability override or on-device instruction smoke is shipped.
+
+Eligibility is necessary, not Included readiness. Verified packaged model and
+runtime, accepted desktop-equivalent preprocessing/worker, and memory/size gates
+remain required before exposing Whistle as ready or making it the default.
+This increment adds the policy and real probe with distinct unavailable reasons;
+Settings and the current Parakeet worker are unchanged. Later selection must
+check this gate before any Needle load, honestly show Whistle unavailable on
+unsupported devices, keep Parakeet available, and never relabel a fallback as
+Whistle. No download, removal or durable-job migration follows from this probe.
