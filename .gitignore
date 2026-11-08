@@ -1,6 +1,7 @@
-.gradle/
-.kotlin/
-**/build/
+# These may be symlinks to external caches/build outputs.
+.gradle
+.kotlin
+**/build
 local.properties
 .idea/
 *.iml
@@ -22,7 +23,7 @@ app/src/main/jniLibs/
 !core/src/test/resources/cross-app/*.opus
 dist/
 play/
-**/.cxx/
+**/.cxx
 
 # Device test audio. Only the CC-BY-4.0 FLEURS clip is committed (fixtures/README.md), so a recording
 # copied next to it stays ignored. Local clips (tools/fetch-youtube-audio.sh) stay in

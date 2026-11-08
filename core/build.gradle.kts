@@ -74,3 +74,31 @@ class CoreTestData(
 ) : CommandLineArgumentProvider {
     override fun asArguments() = properties.map { (name, value) -> "-D$name=$value" }
 }
+
+// External public speech stays out of commits. This explicit task fails on missing/corrupt fixtures.
+tasks.test { exclude("**/WhistleFirConformanceTest.class") }
+tasks.register<Test>("whistleFirConformance") {
+    group = "verification"
+    description = "Verify Whistle FIR and VAD-input hashes against the frozen desktop vectors."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    include("**/WhistleFirConformanceTest.class")
+    val directory = providers.gradleProperty("cassiniWhistleVectorsDir").getOrElse("")
+    val vectors = if (directory.isEmpty()) {
+        files()
+    } else {
+        files(
+            fileTree(directory) {
+                include("whistle/pipeline-input-48k.wav", "dc/dc-quiet-jfk-v1.wav", "dc/dc-quiet-jfk-v1-control.wav")
+            },
+        )
+    }
+    jvmArgumentProviders.add(WhistleFirData(vectors, directory))
+}
+
+class WhistleFirData(
+    @get:InputFiles @get:PathSensitive(PathSensitivity.RELATIVE) val vectors: FileCollection,
+    @get:Input val directory: String,
+) : CommandLineArgumentProvider {
+    override fun asArguments() = listOf("-Dcassini.whistleVectors=$directory")
+}
