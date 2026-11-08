@@ -3,6 +3,7 @@ package io.codemyriad.cassini.ui.screens
 import androidx.activity.OnBackPressedDispatcher
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
@@ -109,7 +110,7 @@ class SettingsBehaviourTest {
         rule.onAllNodesWithText("Download and transcribe").assertCountEquals(0)
     }
 
-    @Test fun unavailableWhistleHasNoActionAndIncludedCanBeSelected() {
+    @Test fun unavailableWhistleHasNoActionAndParakeetCanBeSelected() {
         val events = mutableListOf<SettingsEvent>()
         val state = VariantFixtures.settings.getValue("settings-included-unavailable")
         setThemed { SettingsScreen(state, onEvent = { events += it }) }
@@ -184,7 +185,8 @@ class SettingsBehaviourTest {
             "Português (Brasil)",
             "Português (Portugal)",
         )
-        rule.onAllNodes(isSelectable()).assertCountEquals(names.size)
+        val languageOptions = isSelectable() and SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton)
+        rule.onAllNodes(languageOptions).assertCountEquals(names.size)
         for (name in names) {
             val row = rule.onNode(hasText(name) and isSelectable())
             if (name == "Español") row.assertIsSelected() else row.assertIsNotSelected()
@@ -199,8 +201,9 @@ class SettingsBehaviourTest {
         val state = BoardFixtures.settings.copy(language = LanguageChoice.OTHER)
         setThemed { SettingsScreen(state, onEvent = { events += it }) }
         rule.onNode(hasText("English (United States)") and hasClickAction()).performClick()
-        rule.onAllNodes(isSelectable()).assertCountEquals(LanguageChoice.offered.size)
-        for (choice in LanguageChoice.offered) rule.onAllNodes(isSelectable())[choice.ordinal].assertIsNotSelected()
+        val languageOptions = isSelectable() and SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton)
+        rule.onAllNodes(languageOptions).assertCountEquals(LanguageChoice.offered.size)
+        for (choice in LanguageChoice.offered) rule.onAllNodes(languageOptions)[choice.ordinal].assertIsNotSelected()
         rule.onNode(hasText("Phone") and isSelectable()).performClick()
         rule.runOnIdle { assertEquals(listOf(SettingsEvent.Language(LanguageChoice.PHONE)), events) }
     }

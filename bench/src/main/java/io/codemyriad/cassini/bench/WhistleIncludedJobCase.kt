@@ -8,20 +8,21 @@ import io.codemyriad.cassini.adapters.NetworkCheck
 import io.codemyriad.cassini.core.format.CassiniDocument
 import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobKind
-import io.codemyriad.cassini.core.library.PauseReason
 import io.codemyriad.cassini.core.library.Origin
+import io.codemyriad.cassini.core.library.PauseReason
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.AppPaths
+import io.codemyriad.cassini.data.checkpoint.CheckpointLoad
 import io.codemyriad.cassini.data.db.NoteEntity
 import io.codemyriad.cassini.data.models.ModelFetcher
-import io.codemyriad.cassini.engine.job.JobOutcome
 import io.codemyriad.cassini.engine.job.JobEvent
+import io.codemyriad.cassini.engine.job.JobOutcome
 import io.codemyriad.cassini.processing.TranscriptionJobFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -36,6 +37,7 @@ import kotlin.math.abs
 /** Real offline production job over the unchanged public English DC/control fixtures, in a fresh scratch graph. */
 @RequiresApi(Build.VERSION_CODES.Q)
 internal object WhistleIncludedJobCase {
+    @Suppress("LongMethod") // One end-to-end scenario: keep its setup, measured output and assertions together.
     fun run(name: String, expected: List<JSONObject>) = runBlocking(Dispatchers.IO) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
@@ -89,8 +91,15 @@ internal object WhistleIncludedJobCase {
             val paused = job.run()
             watcher.join()
             assertEquals(JobOutcome.Paused(PauseReason.USER), paused)
-            val saved = requireNotNull(catalogue.checkpoints.load(id) as? io.codemyriad.cassini.data.checkpoint.CheckpointLoad.Valid).state
-            catalogue.jobs.markPaused(id, PauseReason.USER, saved.doneMs, saved.durationMs, saved.recognition.chunks.words.size)
+            val checkpoint = catalogue.checkpoints.load(id) as? CheckpointLoad.Valid
+            val saved = requireNotNull(checkpoint).state
+            catalogue.jobs.markPaused(
+                id,
+                PauseReason.USER,
+                saved.doneMs,
+                saved.durationMs,
+                saved.recognition.chunks.words.size,
+            )
             graph.speech.choose(SpeechModel.PARAKEET)
             assertTrue(graph.transcriptionConsented(id))
             catalogue.jobs.enqueue(id, JobKind.TRANSCRIBE)

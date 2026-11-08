@@ -56,7 +56,12 @@ class SpeechSelection(
     }
 
     suspend fun consented(models: ModelRepository, identity: String? = null): Boolean {
-        val model = identity?.let(SpeechModel::identity) ?: selected()
+        // Unknown persisted pins may enter validation, but the factory refuses them before any engine/download.
+        val model = if (identity == null) {
+            selected()
+        } else {
+            SpeechModel.entries.firstOrNull { it.identity == identity } ?: return true
+        }
         return model == SpeechModel.INCLUDED || models.speechConsented()
     }
 }

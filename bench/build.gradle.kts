@@ -53,6 +53,8 @@ dependencies {
     // classes come from the app's APK, which the bench instruments in the same process.
     compileOnly(project(":core"))
     compileOnly(project(":engine"))
+    compileOnly(project(":data"))
+    compileOnly(libs.bundles.room)
     // The instrumentation APK shares the app process. Match its Lifecycle version so the test runner's older
     // transitive lifecycle-common cannot shadow the app's LifecycleRegistry/Event ABI during Startup.
     implementation(libs.lifecycle.process)

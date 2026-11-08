@@ -102,7 +102,10 @@ class WhistleRecognizer(
                     finished = true
                     settled = position
                 }
-                requireSaved(position == limit && replayed == words.size, "Whistle replay does not match saved progress")
+                requireSaved(
+                    position == limit && replayed == words.size,
+                    "Whistle replay does not match saved progress",
+                )
                 requireSaved(hash() == it.whistle?.pcmSha256, "Whistle replay PCM differs from saved progress")
             }
             replaying = false
@@ -236,10 +239,6 @@ class WhistleRecognizer(
         }
     }
 
-    private fun requireSaved(condition: Boolean, message: String) {
-        if (!condition) throw RecognitionCheckpointMismatch(message)
-    }
-
     private fun hash(): String = (pcmHash.clone() as MessageDigest).digest().joinToString("") { "%02x".format(it) }
 
     companion object {
@@ -252,4 +251,8 @@ class WhistleRecognizer(
         private const val MAX_SEGMENT = 240512L
         private const val MAX_JSON = 262144
     }
+}
+
+private fun requireSaved(condition: Boolean, message: String) {
+    if (!condition) throw RecognitionCheckpointMismatch(message)
 }

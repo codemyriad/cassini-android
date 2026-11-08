@@ -10,6 +10,8 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import io.codemyriad.cassini.AppGraph
+import io.codemyriad.cassini.core.Failure
+import io.codemyriad.cassini.core.UserFacingException
 import io.codemyriad.cassini.core.library.PauseReason
 import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.engine.job.JobEvent
@@ -47,7 +49,11 @@ class TranscriptionJobFactory(private val graph: AppGraph) : ProcessingJobFactor
     override suspend fun create(noteId: String): ProcessingJob {
         val catalogue = graph.awaitCatalogue()
         val identity = requireNotNull(catalogue.jobs.job(noteId)).speechIdentity
-        val model = SpeechModel.identity(identity)
+        val model = try {
+            SpeechModel.identity(identity)
+        } catch (error: IllegalArgumentException) {
+            throw UserFacingException(Failure.INCLUDED_UNAVAILABLE).apply { initCause(error) }
+        }
         val source = catalogue.jobStorage.audioFile(noteId)
         val engines = graph.jobEngines(model, source)
         val job = TranscriptionJob(
