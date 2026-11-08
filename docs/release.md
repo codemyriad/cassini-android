@@ -40,7 +40,7 @@ The release job attaches these files from `dist/`:
 - The notices.
 - `cassini-native-sources.tar` and its SHA-256 checksum file.
 
-Before that, `scripts/package-apk.py` makes sure that the APK is not debuggable, has no model weights and has the certificate digest in `scripts/release-signing-cert.sha256`. The bundle for Google Play must have the same certificate. It also makes sure that no `assets/licenses/*.md` file in the APK contains the text `TODO(`, because the Licenses screen shows these files.
+Before that, `scripts/package-apk.py` makes sure that the APK is not debuggable, contains only the two size/hash-verified uncompressed Included Whistle models (no other model weights or keystores), and has the certificate digest in `scripts/release-signing-cert.sha256`. The bundle for Google Play must have the same certificate. It also makes sure that no `assets/licenses/*.md` file in the APK contains the text `TODO(`, because the Licenses screen shows these files.
 
 CAUTION: Do not move or delete a published tag. Do not replace a file of a published release. People, checksums and F-Droid refer to the tag. A moved tag gives two different builds the same name. If a release has a problem, publish a new version with a higher `versionCode`.
 
