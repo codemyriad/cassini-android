@@ -30,12 +30,25 @@ def main():
     parser.add_argument("--fixtures", type=Path)
     parser.add_argument("--compile-only", action="store_true", help="Compile JNI/Java without model or Mac fixtures")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--runtime", type=Path, help="Verified lab-only experimental runtime")
+    parser.add_argument("--runtime-report", type=Path)
+    parser.add_argument("--keystore", type=Path, help="Shared disposable signing key for a variant batch")
     args = parser.parse_args()
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     ndk = args.sdk / "ndk/28.2.13676358"
     native = output / "native"
-    run(sys.executable, ROOT / "scripts/build-whistle-runtime.py", "--ndk", ndk, "--output", native)
+    if args.runtime is None:
+        run(sys.executable, ROOT / "scripts/build-whistle-runtime.py", "--ndk", ndk, "--output", native)
+    else:
+        if args.runtime_report is None:
+            raise ValueError("Experimental runtime needs its verification report")
+        native.mkdir(exist_ok=True)
+        report = json.loads(args.runtime_report.read_text())
+        data = args.runtime.read_bytes()
+        if len(data) != report["size"] or hashlib.sha256(data).hexdigest() != report["sha256"]:
+            raise ValueError("Experimental runtime does not match its report")
+        shutil.copyfile(args.runtime, native / "libcassini_needle.so")
     host = {"Darwin": "darwin-x86_64", "Linux": "linux-x86_64"}[platform.system()]
     tools = ndk / "toolchains/llvm/prebuilt" / host / "bin"
     bootstrap = output / "libwhistle_spike.so"
@@ -69,6 +82,7 @@ def main():
         exports_expected={
             "Java_io_codemyriad_cassini_whistlespike_Spike_load",
             "Java_io_codemyriad_cassini_whistlespike_Spike_transcribe",
+            "Java_io_codemyriad_cassini_whistlespike_Spike_environment",
         },
         libraries_expected={"libc.so", "libdl.so"},
     )
@@ -129,7 +143,7 @@ def main():
             package.write(path, "lib/arm64-v8a/" + name)
     aligned = output / "aligned.apk"
     run(build_tools / "zipalign", "-P", "16", "-f", "4", apk, aligned)
-    key = output / "lab.keystore"
+    key = args.keystore or output / "lab.keystore"
     if not key.exists():
         run(
             args.java_home / "bin/keytool",

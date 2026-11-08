@@ -4,12 +4,15 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
+import re
 import selectors
 import shutil
 import subprocess
 import time
+import uuid
 from pathlib import Path
 
 PACKAGE = "io.codemyriad.cassini.whistlespike"
@@ -20,6 +23,9 @@ def main():
     parser.add_argument("--sdk", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--apk", type=Path, required=True)
+    parser.add_argument(
+        "--batch", type=Path, help="Owned lab variant APKs; all must use the same disposable signing key"
+    )
     parser.add_argument("--api", type=int, default=35)
     parser.add_argument("--tag", default="google_apis")
     parser.add_argument("--image", type=Path, help="Already installed external-disk system image")
@@ -28,8 +34,10 @@ def main():
         parser.error("--image is required for a non-default API/tag")
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
+    if args.batch:
+        (output / "batch.json").unlink(missing_ok=True)
     adb = args.sdk / "platform-tools/adb"
-    serial = "emulator-5586"
+    serial = "emulator-5584"
 
     def command(*parts, timeout=1200, **kwargs):
         return subprocess.run(
@@ -71,9 +79,10 @@ def main():
                 "-avd",
                 "cassini-whistle-lab",
                 "-port",
-                "5586",
+                "5584",
                 "-no-window",
                 "-no-audio",
+                "-no-metrics",
                 "-no-snapshot",
                 "-no-boot-anim",
                 "-memory",
@@ -89,76 +98,137 @@ def main():
         )
         watcher = None
         try:
-            command("wait-for-device", timeout=240)
-            watcher = subprocess.Popen(
-                [str(adb), "-s", serial, "logcat", "-b", "events", "-v", "brief"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-            )
-            selector = selectors.DefaultSelector()
-            selector.register(watcher.stdout, selectors.EVENT_READ)
             deadline = time.monotonic() + 240
             boot = bytearray()
-            # Query once initially, then on real Android event-log output. No timer/sleep determines readiness.
-            while command("shell", "getprop", "sys.boot_completed").stdout.strip() != b"1":
-                ready = selector.select(max(0, deadline - time.monotonic()))
-                if not ready or emulator.poll() is not None:
-                    raise RuntimeError("Owned emulator did not complete boot before the event deadline")
-                block = os.read(watcher.stdout.fileno(), 65536)
-                if not block:
-                    raise RuntimeError("Boot event stream closed")
-                boot.extend(block)
-                if len(boot) > 4000000:
-                    raise RuntimeError("Unexpected boot event volume")
+            booted = False
+            # Old guests can restart adbd during boot. Recover from actual stream closure/transport
+            # changes rather than assuming the first online transport is already a stable shell.
+            for connection in range(20):
+                remaining = deadline - time.monotonic()
+                if remaining <= 0 or emulator.poll() is not None:
+                    break
+                command("wait-for-device", timeout=remaining)
+                watcher = subprocess.Popen(
+                    [str(adb), "-s", serial, "logcat", "-b", "events", "-v", "brief"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                )
+                with selectors.DefaultSelector() as selector:
+                    selector.register(watcher.stdout, selectors.EVENT_READ)
+                    while time.monotonic() < deadline and emulator.poll() is None:
+                        try:
+                            booted = (
+                                command("shell", "getprop", "sys.boot_completed", timeout=10).stdout.strip() == b"1"
+                            )
+                        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+                            boot.extend((f"Transport interruption {connection}: {error}\n").encode())
+                            boot.extend((getattr(error, "stderr", None) or b"")[:1024])
+                        if booted:
+                            break
+                        ready = selector.select(max(0, deadline - time.monotonic()))
+                        if not ready:
+                            break
+                        block = os.read(watcher.stdout.fileno(), 65536)
+                        if not block:
+                            break  # Reopen only after a real EOF/transport event, never a settling sleep.
+                        boot.extend(block)
+                        if len(boot) > 4000000:
+                            raise RuntimeError("Unexpected boot event volume")
+                watcher.terminate()
+                watcher.wait(timeout=10)
+                watcher = None
+                if booted:
+                    break
             (output / "boot-events.log").write_bytes(boot)
-            watcher.terminate()
-            watcher.wait(timeout=10)
-            watcher = None
-            command("install", "-r", str(args.apk))
-            result = command("shell", "am", "instrument", "-w", "-r", PACKAGE + "/.Spike")
-            (output / "instrumentation.txt").write_bytes(result.stdout)
-            if b"INSTRUMENTATION_CODE: -1" not in result.stdout and b"INSTRUMENTATION_CODE: 1" not in result.stdout:
-                raise RuntimeError("Lab failed before producing results; see instrumentation.txt")
-            report = command("shell", "run-as", PACKAGE, "cat", "files/result.json").stdout
-            (output / "result.json").write_bytes(report)
-            decoded = json.loads(report)
-            expected_page_size = 16384 if args.tag == "google_apis_ps16k" else 4096
-            if decoded["pageSize"] != expected_page_size:
-                raise RuntimeError("Guest page size does not match the requested image")
-            if decoded["sdk"] != args.api:
-                raise RuntimeError("Guest API does not match the requested image")
-            if b"INSTRUMENTATION_CODE: -1" not in result.stdout:
-                print("Lab completed with parity differences; inspect the recorded JSON, no golden changed.")
-            print(
-                json.dumps(
-                    {
-                        key: decoded[key]
-                        for key in [
-                            "sdk",
-                            "abi",
-                            "pageSize",
-                            "privacyRefusals",
-                            "allWordsEqual",
-                            "allTimesWithin80ms",
-                            "loadMs",
-                        ]
-                    }
+            if not booted:
+                raise RuntimeError("Owned emulator did not complete boot before the event/connection deadline")
+            cases = [{"name": "single", "apk": str(args.apk)}]
+            hardware = {}
+            dotprod_ok = False
+            if args.batch:
+                batch = json.loads(args.batch.read_text())
+                cases = batch["cases"]
+                if not cases or len(cases) > 8:
+                    raise ValueError("Expected one to eight bounded variant cases")
+                hardware["kernel"] = command("shell", "uname", "-a").stdout.decode().strip()
+                hardware["imageProperties"] = (image / "source.properties").read_text().splitlines()
+                hardware["emulatorProperties"] = (args.sdk / "emulator/source.properties").read_text().splitlines()
+                try:
+                    hardware["bionicHashes"] = (
+                        command("shell", "sha256sum", "/system/lib64/libm.so", "/system/lib64/libc.so")
+                        .stdout.decode()
+                        .splitlines()
+                    )
+                except subprocess.CalledProcessError:
+                    hardware["bionicHashes"] = "Unavailable on this image"
+                hardware["fingerprint"] = command("shell", "getprop", "ro.build.fingerprint").stdout.decode().strip()
+                remote = "/data/local/tmp/cassini-drift-" + uuid.uuid4().hex
+                command("shell", "mkdir", remote)
+                try:
+                    command("push", batch["dotprodProbe"], remote + "/dotprod-smoke")
+                    command("shell", "chmod", "700", remote + "/dotprod-smoke")
+                    try:
+                        hardware["dotprodSmoke"] = command("shell", remote + "/dotprod-smoke").stdout.decode().strip()
+                        dotprod_ok = True
+                    except subprocess.CalledProcessError as error:
+                        hardware["dotprodSmoke"] = {
+                            "exit": error.returncode,
+                            "stdout": error.stdout.decode(errors="replace"),
+                        }
+                finally:
+                    command("shell", "rm", "-f", remote + "/dotprod-smoke")
+                    command("shell", "rmdir", remote)
+            summaries = []
+            parity_failures = []
+            for case in cases:
+                name = case["name"]
+                if not re.fullmatch(r"[a-z0-9-]{1,60}", name):
+                    raise ValueError("Invalid owned case name")
+                directory = output / name if args.batch else output
+                directory.mkdir(exist_ok=True)
+                if case.get("forceOn") and not dotprod_ok:
+                    summaries.append({"name": name, "skipped": "Actual SDOT instruction was not verified"})
+                    continue
+                print("Running", args.api, name, flush=True)
+                command("install", "-r", str(case["apk"]))
+                command("shell", "am", "force-stop", PACKAGE)
+                result = command("shell", "am", "instrument", "-w", "-r", PACKAGE + "/.Spike")
+                (directory / "instrumentation.txt").write_bytes(result.stdout)
+                if b"INSTRUMENTATION_CODE: -1" not in result.stdout and b"INSTRUMENTATION_CODE: 1" not in result.stdout:
+                    raise RuntimeError("Lab failed before producing results; see instrumentation.txt")
+                report = command("shell", "run-as", PACKAGE, "cat", "files/result.json").stdout
+                (directory / "result.json").write_bytes(report)
+                decoded = json.loads(report)
+                expected_page_size = 16384 if args.tag == "google_apis_ps16k" else 4096
+                if decoded["pageSize"] != expected_page_size or decoded["sdk"] != args.api:
+                    raise RuntimeError("Guest API/page size does not match the requested image")
+                if not decoded["allWordsEqual"] or not decoded["allTimesWithin80ms"]:
+                    parity_failures.append(name)
+                summary = {
+                    key: decoded[key]
+                    for key in ["sdk", "pageSize", "privacyRefusals", "allWordsEqual", "allTimesWithin80ms", "loadMs"]
+                }
+                summary.update(
+                    name=name,
+                    apkSha256=hashlib.sha256(Path(case["apk"]).read_bytes()).hexdigest(),
+                    environment=decoded.get("environment"),
                 )
-            )
-            for item in decoded["results"]:
-                print(
-                    item["file"],
-                    "wordsEqual=",
-                    item["exactWordsEqual"],
-                    "timeDelta=",
-                    item["maxTimeDifferenceSeconds"],
-                    "ms=",
-                    round(item["elapsedMs"], 1),
-                    "pssKiB=",
-                    item["pssKiB"],
-                    flush=True,
+                summaries.append(summary)
+                print(json.dumps(summary), flush=True)
+            if args.batch:
+                (output / "batch.json").write_text(
+                    json.dumps(
+                        {
+                            "status": "completed",
+                            "hardware": hardware,
+                            "cases": summaries,
+                            "parityFailures": parity_failures,
+                        },
+                        indent=2,
+                    )
+                    + "\n"
                 )
-            if not decoded["allWordsEqual"] or not decoded["allTimesWithin80ms"]:
+            if parity_failures:
                 raise RuntimeError("Parity differences recorded; no golden changed")
         finally:
             try:
@@ -177,6 +247,20 @@ def main():
                 emulator.kill()
                 emulator.wait(timeout=10)
             command("wait-for-disconnect", timeout=30)
+            # ADB can report disconnect while an offline row still exists. Wait for the
+            # host transport-list removal event before allowing the next owned guest.
+            tracking = subprocess.Popen([str(adb), "track-devices"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            try:
+                with selectors.DefaultSelector() as selector:
+                    selector.register(tracking.stdout, selectors.EVENT_READ)
+                    until = time.monotonic() + 30
+                    while serial in subprocess.check_output([str(adb), "devices"], text=True):
+                        ready = selector.select(max(0, until - time.monotonic()))
+                        if not ready or not os.read(tracking.stdout.fileno(), 65536):
+                            raise RuntimeError("Owned ADB transport row did not disappear")
+            finally:
+                tracking.terminate()
+                tracking.wait(timeout=10)
 
 
 if __name__ == "__main__":
