@@ -72,8 +72,9 @@ class WhistleRecognizer(
 
     init {
         restored?.chunks?.let {
-            require(restored.whistle?.pipeline == PIPELINE) { "Not a compatible Whistle checkpoint" }
-            require(restored.whistle.pcmSha256.matches(Regex("[0-9a-f]{64}"))) { "Invalid saved PCM hash" }
+            val marker = requireNotNull(restored.whistle) { "Not a Whistle checkpoint" }
+            require(marker.pipeline == PIPELINE) { "Not a compatible Whistle checkpoint" }
+            require(marker.pcmSha256.matches(Regex("[0-9a-f]{64}"))) { "Invalid saved PCM hash" }
             require(it.start == it.end && it.window.isEmpty()) { "Not a Whistle replay checkpoint" }
             require(it.start in 0..Limits.MAX_SAMPLES)
             requireUser(WordBodyBudget.fits(it.words), Failure.LONG)
