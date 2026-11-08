@@ -63,6 +63,10 @@ class SettingsRepositoryTest {
             assertNull(store.resolveSpeechModel(false))
             store.setSpeechModel(SpeechModel.INCLUDED)
             assertEquals(SpeechModel.PARAKEET, store.resolveSpeechModel(true))
+            assertTrue(store.parakeetDefaultNotice.first())
+            store.dismissParakeetDefaultNotice()
+            assertEquals(SpeechModel.PARAKEET, store.resolveSpeechModel(true))
+            assertFalse(store.parakeetDefaultNotice.first())
             store.setSpeechModel(SpeechModel.INCLUDED)
         }
         withStore { store ->

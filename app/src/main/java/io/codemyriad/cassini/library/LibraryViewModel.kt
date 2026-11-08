@@ -442,9 +442,10 @@ class LibraryViewModel(
                 ports.dismissNotice(BannerKind.RECOVERED)
                 emit(LibraryEffect.OpenNote(NoteKey(recovered.latestNoteId)))
             }
-            BannerAction.DOWNLOAD -> emit(
-                LibraryEffect.OpenModelDownload(ModelDownloadKey(parakeetOnly = kind == BannerKind.PARAKEET_RECOMMENDED)),
-            )
+            BannerAction.DOWNLOAD -> {
+                val key = ModelDownloadKey(parakeetOnly = kind == BannerKind.PARAKEET_RECOMMENDED)
+                emit(LibraryEffect.OpenModelDownload(key))
+            }
             BannerAction.RETRY, BannerAction.DOWNLOAD_AGAIN -> {
                 ports.dismissNotice(kind)
                 ports.downloadModels()

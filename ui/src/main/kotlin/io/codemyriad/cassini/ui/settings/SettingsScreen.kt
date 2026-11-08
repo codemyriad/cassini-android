@@ -96,7 +96,8 @@ fun SettingsScreen(
             Banner(
                 suggestion,
                 onAction = {
-                    onEvent(if (it == BannerAction.DOWNLOAD) SettingsEvent.DownloadParakeet else SettingsEvent.DismissParakeet)
+                    val event = if (it == BannerAction.DOWNLOAD) SettingsEvent.DownloadParakeet else SettingsEvent.DismissParakeet
+                    onEvent(event)
                 },
                 onDismiss = { onEvent(SettingsEvent.DismissParakeet) },
                 modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),

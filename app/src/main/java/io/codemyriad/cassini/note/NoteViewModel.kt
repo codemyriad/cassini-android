@@ -1010,11 +1010,14 @@ class NoteViewModel(
             BannerAction.CONTINUE -> ports.continueQueue()
             BannerAction.CANCEL -> ports.cancelDownload()
             BannerAction.TURN_ON, BannerAction.OPEN_SETTINGS -> emit(NoteEffect.OpenNotificationSettings)
-            BannerAction.DOWNLOAD -> emit(
-                NoteEffect.OpenModelDownload(
-                    if (id == BannerKind.PARAKEET_RECOMMENDED.name) ModelDownloadKey(parakeetOnly = true) else ModelDownloadKey(noteId),
-                ),
-            )
+            BannerAction.DOWNLOAD -> {
+                val key = if (id == BannerKind.PARAKEET_RECOMMENDED.name) {
+                    ModelDownloadKey(parakeetOnly = true)
+                } else {
+                    ModelDownloadKey(noteId)
+                }
+                emit(NoteEffect.OpenModelDownload(key))
+            }
             BannerAction.NOT_NOW -> ports.dismissParakeetSuggestion()
             else -> Log.w(TAG, "No Note handler for $action on $id")
         }

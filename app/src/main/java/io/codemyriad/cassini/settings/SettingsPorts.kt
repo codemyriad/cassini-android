@@ -9,6 +9,7 @@ import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.models.ModelStatus
 import io.codemyriad.cassini.models.SpeechChoice
 import io.codemyriad.cassini.notices.NoticeFacts
+import io.codemyriad.cassini.ui.banner.BannerKind
 import io.codemyriad.cassini.ui.settings.LanguageChoice
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
@@ -85,9 +86,9 @@ class GraphSettingsPorts(private val graph: AppGraph) : SettingsPorts {
 
     override fun refreshNotices() = graph.notices.refreshNotifications()
 
-    override fun dismissParakeetSuggestion() = graph.notices.dismiss(io.codemyriad.cassini.ui.banner.BannerKind.PARAKEET_RECOMMENDED)
+    override fun dismissParakeetSuggestion() = graph.notices.dismiss(BannerKind.PARAKEET_RECOMMENDED)
 
-    override fun dismissParakeetDefault() = graph.notices.dismiss(io.codemyriad.cassini.ui.banner.BannerKind.PARAKEET_NOW_DEFAULT)
+    override fun dismissParakeetDefault() = graph.notices.dismiss(BannerKind.PARAKEET_NOW_DEFAULT)
 
     override val version: String get() = BuildConfig.VERSION_NAME
 
