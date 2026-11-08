@@ -33,6 +33,7 @@ class ParakeetRecognizers(
     private val detector: () -> String?,
 ) : RecognizerFactory {
     override fun open(restored: RecognitionState?, callbacks: Recognizer.Callbacks): Recognizer {
+        require(restored?.whistle == null) { "Whistle progress cannot resume through Parakeet" }
         val detectorModel = detector()
         val recognizer = IncrementalRecognizer(
             parakeet(),

@@ -15,7 +15,10 @@ import java.io.File
 import java.security.MessageDigest
 
 /** `recognition`: decode time so far and the incremental transcript's window. */
-data class RecognitionState(val inferenceMs: Long, val chunks: IncrementalState)
+data class RecognitionState(val inferenceMs: Long, val chunks: IncrementalState, val whistle: WhistleResume? = null)
+
+/** Whistle rebuilds native state from the exact source prefix; [finished] also replays the true EOF flush. */
+data class WhistleResume(val pipeline: String, val finished: Boolean, val pcmSha256: String)
 
 /** `encoder`: the Ogg clock, the unencoded tail and the last two encoded frames of the resumable Opus encoder. */
 @Suppress("LongParameterList") // One property per checkpoint member.
@@ -198,7 +201,10 @@ data class CheckpointState(
 
         fun recognition(json: JSONObject) = RecognitionState(
             json.optLong("inferenceMs"),
-            incremental(json.getJSONObject("chunks"))
+            incremental(json.getJSONObject("chunks")),
+            if (json.has("whistle")) json.getJSONObject("whistle").let {
+                WhistleResume(it.getString("pipeline"), it.getBoolean("finished"), it.getString("pcmSha256"))
+            } else null,
         )
 
         /** `recognition`, without its first [logged] words, which are in `words.log`. */
@@ -206,7 +212,11 @@ data class CheckpointState(
             val chunks = recognition.chunks
             require(logged in 0..chunks.words.size) { "More logged words than words" }
             val inline = if (logged == 0) chunks else chunks.withWords(chunks.words.subList(logged, chunks.words.size))
-            return JSONObject().put("inferenceMs", recognition.inferenceMs).put("chunks", json(inline))
+            return JSONObject().put("inferenceMs", recognition.inferenceMs).put("chunks", json(inline)).apply {
+                recognition.whistle?.let {
+                    put("whistle", JSONObject().put("pipeline", it.pipeline).put("finished", it.finished).put("pcmSha256", it.pcmSha256))
+                }
+            }
         }
 
         fun incremental(json: JSONObject) = IncrementalState(
