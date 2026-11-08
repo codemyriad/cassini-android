@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+#include <unistd.h>
 #if defined(__aarch64__)
 #include <sys/auxv.h>
 #endif
@@ -35,6 +36,10 @@ static int privacy(JNIEnv *env) {
         const char *value = getenv(names[i]);
         if (!value || strcmp(value, values[i])) { fail(env, "Privacy guard before neural load"); return 0; }
     }
+    // AOSP per-user app IDs 90000..99999 are reserved for app-zygote/isolated processes.
+    // Do not accept an app UID even if a caller sets all telemetry flags correctly.
+    unsigned long app_id = (unsigned long)getuid() % 100000UL;
+    if (app_id < 90000UL || app_id > 99999UL) { fail(env, "Whistle requires an isolated UID before neural load"); return 0; }
 #if defined(__aarch64__)
     if (!(getauxval(AT_HWCAP) & (1UL << 20))) { fail(env, "Whistle requires reported dot-product support"); return 0; }
 #else

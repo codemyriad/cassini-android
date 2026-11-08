@@ -131,6 +131,7 @@ def main() -> None:
     ]
     run(command)
     run([tools / 'llvm-strip', '--strip-unneeded', library])
+    checked(library, pins['linkedRuntime'][platform.system()])
     report = verify_elf(library, tools / 'llvm-readelf')
     probe = output / 'load-smoke'
     run([

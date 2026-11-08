@@ -6,13 +6,13 @@ PAGE_SIZE = 16 * 1024
 MACHINES = {'arm64-v8a': 183, 'x86_64': 62}
 
 
-def check_apk_compatibility(path):
+def check_apk_compatibility(path, expected_abis=None):
     """Reject native binaries that cannot load on a supported 16 KB system."""
     with zipfile.ZipFile(path) as apk, open(path, 'rb') as raw:
         libraries = [entry for entry in apk.infolist()
                      if entry.filename.startswith('lib/') and entry.filename.endswith('.so')]
         architectures = {entry.filename.split('/')[1] for entry in libraries}
-        if architectures != set(MACHINES):
+        if architectures != (set(MACHINES) if expected_abis is None else set(expected_abis)):
             raise ValueError(f'Unexpected APK architectures: {architectures}')
         for entry in libraries:
             name = entry.filename

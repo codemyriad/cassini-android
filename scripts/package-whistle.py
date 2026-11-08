@@ -13,6 +13,9 @@ import sys
 import zipfile
 from pathlib import Path
 
+# whistle_payload.py supplies the deterministic ABI-only model container.
+from whistle_payload import payload
+
 ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -55,8 +58,12 @@ def main():
         raise ValueError("Private ORT member pin mismatch")
     (jni / "libcassini_whistle_ort.so").write_bytes(ort)
     shutil.copyfile(native / "libcassini_needle.so", jni / "libcassini_needle.so")
+    weights = payload((cache / "whistle.cact").read_bytes(), (cache / "silero_vad.onnx").read_bytes())
+    if len(weights) != pins["payload"]["size"] or hashlib.sha256(weights).hexdigest() != pins["payload"]["sha256"]:
+        raise ValueError("ABI weight container pin mismatch")
+    (jni / "libcassini_whistle_weights.so").write_bytes(weights)
     for name in ["whistle.cact", "silero_vad.onnx"]:
-        shutil.copyfile(cache / name, assets / name)
+        (assets / name).unlink(missing_ok=True)
     libraries = {
         p.name: dict(size=p.stat().st_size, sha256=hashlib.sha256(p.read_bytes()).hexdigest()) for p in jni.glob("*.so")
     }

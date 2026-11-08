@@ -4,7 +4,9 @@ import android.content.Context
 import io.codemyriad.cassini.core.models.WhistleCapability
 import io.codemyriad.cassini.engine.asr.WhistleDeviceCapability
 import org.json.JSONObject
+import java.io.File
 import java.io.InputStream
+import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import java.security.MessageDigest
@@ -20,7 +22,6 @@ class WhistleAssets private constructor(
     companion object {
         const val MODEL_SHA = "b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb"
         const val VAD_SHA = "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3"
-        private const val ORT_SHA = "e40f09d07dc53726b8bfbf48a7907673b8f86718a057655a62790a39874a7302"
         private const val MODEL_BYTES = 16919407L
         private const val VAD_BYTES = 2327524L
 
@@ -34,28 +35,31 @@ class WhistleAssets private constructor(
             check(manifest.getString("engineRevision") == "93e88ede867e4311c39151285e74df513e4b835b")
             check(manifest.getString("modelRevision") == "ca5287601bef25af26dcf2e1b2bdc0843a7c19e5")
             val libs = manifest.getJSONObject("libraries")
-            check(libs.getJSONObject("libcassini_whistle_ort.so").getString("sha256") == ORT_SHA)
+            val weights = library(context, WhistleArtifactPins.WEIGHTS, libs.getJSONObject(WhistleArtifactPins.WEIGHTS))
             return WhistleAssets(
-                library(context, "libcassini_needle.so", libs.getJSONObject("libcassini_needle.so")),
-                library(context, "libcassini_whistle_ort.so", libs.getJSONObject("libcassini_whistle_ort.so")),
-                model(context, "whistle.cact", MODEL_BYTES, MODEL_SHA),
-                model(context, "silero_vad.onnx", VAD_BYTES, VAD_SHA),
+                library(context, "libcassini_needle.so", libs.getJSONObject("libcassini_needle.so")).path,
+                library(context, "libcassini_whistle_ort.so", libs.getJSONObject("libcassini_whistle_ort.so")).path,
+                model(weights, WhistleArtifactPins.MODEL_OFFSET, MODEL_BYTES, MODEL_SHA),
+                model(weights, WhistleArtifactPins.VAD_OFFSET, VAD_BYTES, VAD_SHA),
             )
         }
 
-        private fun model(context: Context, name: String, size: Long, sha: String): ByteBuffer =
-            context.assets.openFd("whistle/$name").use { asset ->
-                check(asset.length == size) { "Whistle model size mismatch" }
-                asset.createInputStream().channel.use { channel ->
-                    val mapped = channel.map(FileChannel.MapMode.READ_ONLY, asset.startOffset, size).asReadOnlyBuffer()
-                    val digest = MessageDigest.getInstance("SHA-256")
-                    digest.update(mapped.duplicate())
-                    check(hex(digest.digest()) == sha) { "Whistle model integrity mismatch" }
-                    mapped
-                }
-            }
+        private data class Artifact(val apk: String, val entry: String, val size: Long) {
+            val path: String get() = "$apk!/$entry"
+        }
 
-        private fun library(context: Context, name: String, pin: JSONObject): String {
+        private fun model(weights: Artifact, offset: Long, size: Long, sha: String): ByteBuffer {
+            val start = ApkStoredEntry.offset(File(weights.apk), weights.entry, weights.size)
+            return RandomAccessFile(weights.apk, "r").use { input ->
+                val mapped = input.channel.map(FileChannel.MapMode.READ_ONLY, start + offset, size).asReadOnlyBuffer()
+                val digest = MessageDigest.getInstance("SHA-256")
+                digest.update(mapped.duplicate())
+                check(hex(digest.digest()) == sha) { "Whistle model integrity mismatch" }
+                mapped
+            }
+        }
+
+        private fun library(context: Context, name: String, pin: JSONObject): Artifact {
             val info = context.applicationInfo
             val apks = listOf(info.sourceDir) + (info.splitSourceDirs?.toList() ?: emptyList())
             val entry = "lib/arm64-v8a/$name"
@@ -65,7 +69,8 @@ class WhistleAssets private constructor(
                     check(member.size == pin.getLong("size")) { "Whistle runtime size mismatch" }
                     val actual = zip.getInputStream(member).use(::sha)
                     check(actual == pin.getString("sha256")) { "Whistle runtime integrity mismatch" }
-                    return "$path!/$entry"
+                    WhistleArtifactPins.requireHash(name, actual)
+                    return Artifact(path, entry, member.size)
                 }
             }
             error("Verified private Whistle runtime missing")

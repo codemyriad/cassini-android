@@ -1,8 +1,8 @@
-# Whistle native input (D75.2, first increment)
+# Whistle native input and isolated worker (D75.2)
 
 This directory pins the published Needle 3.3.0 Android arm64 archive and C header, the D5 Whistle weights and the Apache-2.0 license. Published, hash-verified artifacts are accepted inputs under D75.2; an unavailable native-source mapping is a follow-up, not a rebuild prerequisite. No upstream contact is needed. `x86_64: null` means there is no approved Android engine for that ABI. A desktop Linux wheel is not an Android replacement.
 
-The native-input foundation builds and checks a private runtime. It does **not** package weights into the production APK, load an engine in the app, add Settings choices or change the Parakeet path. Follow-up PRs add the guarded worker, measured size/memory, desktop/DC parity and Included/default only after their gates pass. On x86_64, Whistle must remain honestly unavailable and Parakeet remains usable.
+The native-input foundation builds and checks a private runtime. The isolated worker now packages and loads it behind the capability and privacy gates described below. Settings selection and Included/default remain later steps. On x86_64, Whistle must remain honestly unavailable and Parakeet remains usable.
 
 ## Build and inspect
 
@@ -14,11 +14,11 @@ python3 scripts/build-whistle-runtime.py --ndk "$ANDROID_HOME/ndk/28.2.13676358"
 python3 -m unittest discover -s whistle -p 'test_*.py' -v
 ```
 
-The first command fetches the pinned static archive, header and license into ignored `.tools/whistle/inputs`. Existing corrupt inputs fail; they are never silently replaced. Downloads are bounded and verified before publication. Offline mode never fetches anything. A separately recorded model pin will be used by the later bundled-weight step, never a runtime/dist download. Outputs and model bytes are not committed.
+The first command fetches the pinned static archive, header and license into ignored `.tools/whistle/inputs`. Existing corrupt inputs fail; they are never silently replaced. Downloads are bounded and verified before publication. Offline mode never fetches anything. The worker uses the separately recorded model pin at build time, never a runtime download. Outputs and model bytes are not committed.
 
 `aarch64-linux-android26-clang++` links the complete archive with `--no-undefined` against the API 26 NDK sysroot. `-z text` rejects non-PIC text relocations. ELF inspection independently checks AArch64, 16 KB load-segment alignment/congruence, no TEXTREL/RPATH/RUNPATH, and the exact exported C ABI. C++ is statically linked and localized by the export map; no C++ object ownership crosses the C interface. The only permitted DT_NEEDED entries are Android's `libc.so`, `libm.so` and `libdl.so`, not a system Needle/ORT/C++ runtime. Unexpected dependency/symbol changes fail. The compiled header assertions protect the desktop-compatible load/transcribe signatures. The ELF report records compiler, commands, imported symbols, size and output SHA-256; it does not claim a native-source rebuild.
 
-The version map exports only `needle_load`, `needle_models`, `needle_last_error` and `needle_transcribe`. The production app has no JNI entry point. The separate [lab APK](spike/README.md) exercises a guarded bootstrap and packaged model on an owned emulator. The later worker must validate all three privacy flags **before** loading this library, including its constructors; a guard inside a function called after load would be too late. It must use the verified packaged private path, retain model memory and serialize calls, respecting the engine's global model state.
+The version map exports only `needle_load`, `needle_models`, `needle_last_error` and `needle_transcribe`. The production app uses a separate guarded JNI bootstrap. The separate [lab APK](spike/README.md) exercises a guarded bootstrap and packaged model on an owned emulator. The worker validates all three privacy flags **before** loading this library, including its constructors; a guard inside a function called after load would be too late. It uses the verified packaged private path, retains model memory and serializes calls, respecting the engine's global model state.
 
 ## Explicit native load test
 
@@ -36,7 +36,7 @@ Use the shared host heavy-job lock when starting emulators or subsequent model/G
 
 Local NDK 28.2 build on macOS produced a stripped arm64 library of **1,856,488 bytes**, SHA-256 `f067271e71fb8aec52aca4cc41db135f6642d40eec5a32ab69d81fd3e4446a79`. All four load segments have 16,384-byte alignment; no text relocations, extra dependency or exported C++ symbol. The actual C API loaded on a read-only arm64 API 35 emulator with **4,096-byte** pages, `models=0`; all six pre-load guard cases passed. The emulator was stopped afterward. Build-host differences are recorded in reports rather than hidden by accepting a new pinned input.
 
-API 26 **strong-symbol linking** is checked against the API 26 sysroot; a run on API 35 is not an API 26 runtime test. The report also lists weak imports (`__cxa_thread_atexit_impl@LIBC`, `memfd_create` in this build), which a strict link does not require to exist; runtime/model tests must exercise fallback behavior on the supported minimum OS. ELF alignment is not a 16 KB-page runtime test. No model/inference, unsupported-CPU, peak memory, full APK/AAB size, network isolation, desktop/DC parity or Included/default claim follows from this probe. Those remain release/default gates. In particular, no app worker loads this library before a separate guarded-worker PR, and actual model execution must be tested on arm64.
+API 26 **strong-symbol linking** is checked against the API 26 sysroot; a run on API 35 is not an API 26 runtime test. The report also lists weak imports (`__cxa_thread_atexit_impl@LIBC`, `memfd_create` in this build), which a strict link does not require to exist; runtime/model tests must exercise fallback behavior on the supported minimum OS. ELF alignment is not a 16 KB-page runtime test. No model/inference, unsupported-CPU, peak memory, full APK/AAB size, network isolation, desktop/DC parity or Included/default claim follows from this probe. Those remain release/default gates. The isolated worker has separate arm64 model-execution and privacy evidence under `worker/evidence`.
 
 The pinned weights are 16,919,407 bytes. Their bytes plus this native library total 18,775,895 bytes, before the worker, VAD/private dependencies, APK compression/alignment or any extracted copy. This is an incremental input total, not an APK/AAB size or peak-RSS result. The app retains sherpa for its current functions; adding Whistle does not remove that cost automatically.
 
@@ -71,3 +71,29 @@ Settings and the current Parakeet worker are unchanged. Later selection must
 check this gate before any Needle load, honestly show Whistle unavailable on
 unsupported devices, keep Parakeet available, and never relabel a fallback as
 Whistle. No download, removal or durable-job migration follows from this probe.
+
+## Review hardening after the isolated worker
+
+The linked Needle library has independent SHA-256 pins for the pinned NDK on
+Darwin and Linux in `pins.json`. Packaging refuses a different linked output;
+the worker also checks a compiled allowlist, independently of its generated
+manifest. The native entry point requires an isolated app UID as well as all
+three privacy flags before any neural `dlopen`. The worker proves denial of
+IPv4/IPv6 TCP/UDP socket creation before loading either neural runtime.
+
+The two models are now stored in `lib/arm64-v8a/libcassini_whistle_weights.so`.
+This is a deterministic, read-only ELF data container, not executable model
+code: one read-only load segment, no executable segment, dynamic table,
+initializers or symbols. It is never passed to `dlopen`. The loader verifies
+the entire container against a source pin, locates its uncompressed APK member,
+and maps the two pinned model ranges read-only. Both original model hashes and
+sizes are checked again. No extraction or second on-disk model copy is needed.
+The header and model offsets are aligned to 16 KB. `keepDebugSymbols` prevents
+AGP from rewriting the container, and the APK guard checks its exact bytes.
+
+APK builds emit arm64-v8a, x86_64 and universal outputs. AAB ABI splitting is
+explicitly enabled. The weight container, private Needle and private ORT live
+only in the arm64 native directory, so the x86_64 APK and delivered ABI split
+omit them. The universal APK necessarily includes both ABIs. Parakeet and the
+existing Whistle capability policy remain in place. Included/default is still
+a later step.

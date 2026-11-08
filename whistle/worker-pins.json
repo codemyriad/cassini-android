@@ -30,5 +30,11 @@
     "url": "https://raw.githubusercontent.com/microsoft/onnxruntime/v1.23.2/ThirdPartyNotices.txt",
     "size": 326866,
     "sha256": "e9e90971a8e75a9a8ac0c6412e29c1202d079998389915aa485f46c816c3b4cc"
+  },
+  "payload": {
+    "size": 19268580,
+    "sha256": "1dc7d517d825daf0f57dc2eca06b04c5c03d06cefa5612ab8ca9b5abb7edc72b",
+    "modelOffset": 16384,
+    "vadOffset": 16941056
   }
 }

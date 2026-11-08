@@ -14,6 +14,7 @@ on:
     paths:
       - 'scripts/setup.sh'
       - 'scripts/package-whistle.py'
+      - 'scripts/whistle_payload.py'
       - 'scripts/build-whistle-runtime.py'
       - 'whistle/worker-pins.json'
       - 'whistle/pins.json'
@@ -37,6 +38,7 @@ on:
     paths:
       - 'scripts/setup.sh'
       - 'scripts/package-whistle.py'
+      - 'scripts/whistle_payload.py'
       - 'scripts/build-whistle-runtime.py'
       - 'whistle/worker-pins.json'
       - 'whistle/pins.json'
