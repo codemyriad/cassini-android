@@ -92,12 +92,12 @@ class JobRepository(
      * is missing. A new row takes the numbers of a valid checkpoint, which stayed in `work/` while the note was in
      * Trash. A RUNNING job is left alone.
      */
-    override suspend fun requeueAtBack(noteId: String, kind: JobKind) {
+    override suspend fun requeueAtBack(noteId: String, kind: JobKind, speechIdentity: String?) {
         val load = checkpoints.load(noteId)
         database.withTransaction {
             val existing = jobs.job(noteId)
             if (existing?.state != JobState.RUNNING && notes.note(noteId) != null) {
-                val job = putAtBack(noteId, kind, existing)
+                val job = putAtBack(noteId, kind, existing, speechIdentity)
                 if (existing == null && load is CheckpointLoad.Valid) jobs.update(job.withCheckpoint(load))
             }
         }
@@ -291,7 +291,12 @@ class JobRepository(
     }
 
     /** Back of the queue: QUEUED, `seq = max + 1`, failure and pause cleared, attempts 0. In a transaction. */
-    private suspend fun putAtBack(noteId: String, kind: JobKind, existing: JobEntity?): JobEntity {
+    private suspend fun putAtBack(
+        noteId: String,
+        kind: JobKind,
+        existing: JobEntity?,
+        speechIdentity: String? = null,
+    ): JobEntity {
         val now = clock()
         val seq = (jobs.maxSeq() ?: 0) + 1
         val job = existing?.copy(
@@ -307,7 +312,7 @@ class JobRepository(
             seq = seq,
             kind = kind,
             state = JobState.QUEUED,
-            speechIdentity = speechChoice().identity,
+            speechIdentity = speechIdentity ?: speechChoice().identity,
             enqueuedAt = now,
             updatedAt = now,
         )

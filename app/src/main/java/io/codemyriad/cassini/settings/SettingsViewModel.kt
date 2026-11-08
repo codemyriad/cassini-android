@@ -66,10 +66,12 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
         ports.notices,
     ) { language, modelState, voices, trash, facts ->
         val (models, speech) = modelState
+        val speechStatus = models[ModelPart.SPEECH]
+        val canStartParakeet = speechStatus == ModelStatus.Ready || (speechStatus as? ModelStatus.Missing)?.consented == true
         SettingsUiState(
             language = language,
             models = rows(models).map {
-                if (speech.selected == SpeechModel.INCLUDED && it.status == ModelStatusUi.Pending) {
+                if ((speech.selected == SpeechModel.INCLUDED || !canStartParakeet) && it.status == ModelStatusUi.Pending) {
                     it.copy(status = ModelStatusUi.NotDownloaded)
                 } else {
                     it

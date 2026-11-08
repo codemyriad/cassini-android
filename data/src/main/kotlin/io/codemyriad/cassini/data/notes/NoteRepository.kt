@@ -233,7 +233,9 @@ class NoteRepository(
         val trashed = locks.withNoteLock(id, dispatchers.io) {
             if (id in purging) null else notes.untrashBlocking(id, clock())
         } ?: return false
-        trashed.trashedJob?.takeIf { it.state == JobState.QUEUED }?.let { queue.requeueAtBack(id, it.kind) }
+        trashed.trashedJob?.takeIf { it.state == JobState.QUEUED }?.let {
+            queue.requeueAtBack(id, it.kind, it.speechIdentity)
+        }
         return true
     }
 

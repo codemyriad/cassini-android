@@ -123,6 +123,16 @@ class ModelRepositoryTest {
         assertEquals(ModelStatus.Missing(consented = true), repo.status.value[ModelPart.SPEECH])
     }
 
+    @Test fun optionalConsentNeverMarksSpeechConsented() = runTest {
+        val repo = repository()
+        repo.recordConsent(includeSpeech = false)
+        assertEquals(ModelStatus.Missing(false), repo.status.value[ModelPart.SPEECH])
+        assertEquals(ModelStatus.Missing(true), repo.status.value[ModelPart.SPEAKERS])
+        assertEquals(ModelStatus.Missing(true), repo.status.value[ModelPart.VOICES])
+        assertFalse(repo.speechConsented())
+        assertTrue(repo.consented())
+    }
+
     @Test fun anInstallReportsProgressAndEndsReady() = runTest {
         val repo = repository()
         repo.refresh()

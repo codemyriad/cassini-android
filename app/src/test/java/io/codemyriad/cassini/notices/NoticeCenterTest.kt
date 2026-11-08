@@ -11,6 +11,7 @@ import io.codemyriad.cassini.data.db.JobEntity
 import io.codemyriad.cassini.data.voices.VoiceProblem
 import io.codemyriad.cassini.engine.job.DownloadError
 import io.codemyriad.cassini.engine.job.DownloadProgress
+import io.codemyriad.cassini.engine.job.InstallOutcome
 import io.codemyriad.cassini.engine.job.JobFailure
 import io.codemyriad.cassini.engine.job.JobPhase
 import io.codemyriad.cassini.recording.AfterFinish
@@ -37,6 +38,14 @@ import org.junit.Test
  * tone. The trust rows of 13.1 are the Note ViewModel's (P10 step 4).
  */
 class NoticeCenterTest {
+    @Test fun standaloneOptionalFailuresAndOfflineSkipsProduceRetryNotices() {
+        val expected = DownloadFailure(DownloadError.NO_CONNECTION, at = 7)
+        val failed = InstallOutcome.Installed(failed = mapOf(ModelPart.SPEAKERS to DownloadError.NO_CONNECTION))
+        val offline = InstallOutcome.Installed(skipped = setOf(ModelPart.SPEAKERS))
+        assertEquals(expected, standaloneFailure(failed, 7, true))
+        assertEquals(expected, standaloneFailure(offline, 7, false))
+        assertNull(standaloneFailure(InstallOutcome.Installed(), 7, true))
+    }
     private val active = RecordingState.Active(
         noteId = "rec",
         title = "Standup",

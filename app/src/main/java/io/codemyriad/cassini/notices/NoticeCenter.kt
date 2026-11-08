@@ -5,10 +5,12 @@ import android.util.Log
 import androidx.core.app.NotificationManagerCompat
 import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.core.models.ModelPart
+import io.codemyriad.cassini.core.models.ModelPlan
 import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.db.LibraryRow
 import io.codemyriad.cassini.data.models.ModelStatus
 import io.codemyriad.cassini.data.voices.VoiceProblem
+import io.codemyriad.cassini.engine.job.DownloadError
 import io.codemyriad.cassini.engine.job.InstallOutcome
 import io.codemyriad.cassini.processing.InstallState
 import io.codemyriad.cassini.processing.ProcessingState
@@ -155,9 +157,8 @@ class NoticeCenter(private val graph: AppGraph, context: Context, val imports: I
                 }
                 InstallState.Idle -> {
                     val outcome = graph.installOwner.lastOutcome.value
-                    if (standalone && outcome is InstallOutcome.Failed) {
-                        downloadFailure.value =
-                            DownloadFailure(outcome.error, outcome.requiredFreeBytes, graph.config.clock())
+                    if (standalone && outcome != null) {
+                        downloadFailure.value = standaloneFailure(outcome, graph.config.clock(), graph.network.validated())
                     }
                     standalone = false
                 }
@@ -181,6 +182,27 @@ class NoticeCenter(private val graph: AppGraph, context: Context, val imports: I
         const val TAG = "CassiniNotices"
         const val STOP_TIMEOUT_MS = 5_000L
     }
+}
+
+/** Explicit standalone optional downloads report their failures too; a job can still treat those as best effort. */
+internal fun standaloneFailure(outcome: InstallOutcome, at: Long, online: Boolean): DownloadFailure? = when (outcome) {
+    is InstallOutcome.Failed -> DownloadFailure(outcome.error, outcome.requiredFreeBytes, at)
+    is InstallOutcome.Installed -> {
+        val failed = outcome.failed.entries.firstOrNull()
+        val part = failed?.key ?: outcome.skipped.firstOrNull()
+        if (part == null) {
+            null
+        } else {
+            val error = failed?.value ?: if (online) DownloadError.INSTALL else DownloadError.NO_CONNECTION
+            val free = if (error == DownloadError.NOT_ENOUGH_STORAGE) {
+                ModelPlan(listOf(ModelPlan.Item(part, part.models))).requiredFreeBytes
+            } else {
+                0L
+            }
+            DownloadFailure(error, free, at)
+        }
+    }
+    is InstallOutcome.NeedsConsent -> null
 }
 
 /** Whether `libcassini_opus` can be loaded: the Cassini document writer needs it (features.md 13.5 NO_ENCODER). */

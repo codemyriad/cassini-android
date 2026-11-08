@@ -9,7 +9,9 @@ import io.codemyriad.cassini.core.library.PauseReason
 import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.checkpoint.CheckpointRepository
 import io.codemyriad.cassini.data.checkpoint.noteId
+import io.codemyriad.cassini.data.db.Converters
 import io.codemyriad.cassini.data.db.JobEntity
+import io.codemyriad.cassini.data.db.TrashedJob
 import io.codemyriad.cassini.data.notes.NoteRepository
 import io.codemyriad.cassini.data.notes.NotesHarness
 import io.codemyriad.cassini.data.notes.SealedAdopter
@@ -72,6 +74,42 @@ class JobRepositoryTest {
         assertEquals(SpeechModel.INCLUDED.identity, job(a).speechIdentity)
         assertEquals(choice.identity, job(b).speechIdentity)
         assertEquals(job(a).speechIdentity, h.db.jobs().job(a)?.speechIdentity)
+    }
+
+    @Test fun trashBeforeFirstCheckpointKeepsBothEnginePinsAcrossDefaultChanges() = runTest {
+        val repository = NoteRepository(
+            h.db,
+            h.paths,
+            h.dispatchers,
+            h.locks,
+            h.documents,
+            h.background,
+            jobs,
+            h.ports,
+        ) { h.now }
+        val ids = notes(2)
+        for ((index, original) in SpeechModel.entries.withIndex()) {
+            val id = ids[index]
+            choice = original
+            jobs.enqueue(id, JobKind.TRANSCRIBE)
+            assertTrue(repository.moveToTrash(id))
+            assertNull(jobs.job(id))
+            assertEquals(original.identity, h.row(id).trashedJob?.speechIdentity)
+            choice = SpeechModel.entries.first { it != original }
+            assertTrue(repository.restore(id))
+            assertEquals(original.identity, job(id).speechIdentity)
+            assertEquals(JobState.QUEUED, job(id).state)
+        }
+    }
+
+    @Test fun trashCodecKeepsUnknownPinsAndReadsLegacyParakeetWithoutUsingSettings() {
+        val converters = Converters()
+        val snapshot = TrashedJob(JobState.QUEUED, JobKind.TRANSCRIBE, "unknown/pin")
+        assertEquals(snapshot, converters.toTrashedJob(converters.fromTrashedJob(snapshot)))
+        assertEquals(
+            SpeechModel.PARAKEET.identity,
+            converters.toTrashedJob("QUEUED/TRANSCRIBE").speechIdentity,
+        )
     }
 
     @Test fun enqueueAddsAtTheBack() = runTest {

@@ -88,6 +88,8 @@ class ModelInstallOwner(
 
     @Volatile private var current: Shared? = null
 
+    @Volatile private var lastStandaloneParts: Set<ModelPart>? = null
+
     /** The standalone downloads ([startDownload]) that have not ended. */
     private val downloads = CopyOnWriteArraySet<Job>()
 
@@ -116,7 +118,8 @@ class ModelInstallOwner(
     fun startDownload(parts: Set<ModelPart>? = null): Job {
         val job = scope.launch(start = CoroutineStart.LAZY) {
             try {
-                install(parts ?: allowedRetryParts(), {}, standalone = true)
+                val requested = (parts ?: lastStandaloneParts ?: allowedRetryParts()).toSet()
+                install(requested, {}, standalone = true)
             } catch (_: CancellationException) {
                 // A cancelled download keeps its .part files; there is nothing more to do.
             }
@@ -194,7 +197,10 @@ class ModelInstallOwner(
         if (running != null && (!running.task.isActive || running.parts != parts)) return running to false
         val shared = running ?: Shared(parts)
         shared.waiters++
-        if (standalone) shared.standalone++
+        if (standalone) {
+            shared.standalone++
+            lastStandaloneParts = parts.toSet()
+        }
         shared.listeners += listener
         if (running == null) {
             shared.task = scope.async(io, CoroutineStart.LAZY) { run(shared) }

@@ -63,6 +63,19 @@ class SettingsViewModelTest {
 
     private fun SettingsViewModel.now(): SettingsUiState = state.value
 
+    @Test fun optionalRowsStayActionableWhileParakeetStillNeedsConsent() = runTest(dispatcher) {
+        ports.models.value = mapOf(
+            ModelPart.SPEECH to Missing(false),
+            ModelPart.SPEAKERS to Missing(true),
+            ModelPart.VOICES to Missing(true),
+        )
+        val viewModel = viewModel()
+        assertTrue(viewModel.now().models.all { it.status == ModelStatusUi.NotDownloaded })
+        viewModel.onEvent(SettingsEvent.OpenModel(ModelPartUi.SPEAKERS))
+        advanceUntilIdle()
+        assertEquals(listOf(SettingsEffect.Open(ModelDownloadKey())), effects)
+    }
+
     @Test fun recommendationOpensOnlyParakeetConsentAndDismissesWithoutChangingTheModel() = runTest(dispatcher) {
         ports.speech.value = SpeechChoice(SpeechModel.INCLUDED, true)
         ports.notices.value = NoticeFacts(

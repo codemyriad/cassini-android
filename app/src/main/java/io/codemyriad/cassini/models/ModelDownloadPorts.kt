@@ -25,7 +25,7 @@ interface ModelDownloadPorts {
     /** Free bytes where the models go. */
     suspend fun usableBytes(): Long
 
-    suspend fun recordConsent()
+    suspend fun recordConsent(parts: Set<ModelPart>)
 
     suspend fun recordDeclined()
 
@@ -68,9 +68,9 @@ class GraphModelDownloadPorts(
             ?.usableSpace ?: 0L
     }
 
-    override suspend fun recordConsent() = graph.models.recordConsent(
-        includeSpeech = parakeetOnly || targetModel() == SpeechModel.PARAKEET,
-        includeOptional = !parakeetOnly,
+    override suspend fun recordConsent(parts: Set<ModelPart>) = graph.models.recordConsent(
+        includeSpeech = ModelPart.SPEECH in parts,
+        includeOptional = parts.any { it != ModelPart.SPEECH },
     )
 
     override suspend fun recordDeclined() = graph.models.recordDeclined()

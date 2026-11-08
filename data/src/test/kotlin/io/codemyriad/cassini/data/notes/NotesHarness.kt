@@ -55,7 +55,7 @@ class RecordingPorts : JobQueueWriter, NoteFilesCleaner {
     val calls: MutableList<String> = Collections.synchronizedList(mutableListOf())
     var onDeleteForNote: (String) -> Unit = {}
 
-    override suspend fun requeueAtBack(noteId: String, kind: JobKind) {
+    override suspend fun requeueAtBack(noteId: String, kind: JobKind, speechIdentity: String?) {
         calls += "requeue $noteId $kind"
     }
 

@@ -49,12 +49,14 @@ class Converters {
 
     @TypeConverter fun toMatchState(value: String): Match.State = Match.State.valueOf(value)
 
-    /** `<STATE>/<KIND>`, for example `QUEUED/TRANSCRIBE`. */
-    @TypeConverter fun fromTrashedJob(value: TrashedJob): String = "${value.state.name}/${value.kind.name}"
+    /** The state, kind and pinned engine. The older two-field development format always used Parakeet. */
+    @TypeConverter fun fromTrashedJob(value: TrashedJob): String =
+        "${value.state.name}/${value.kind.name}/${value.speechIdentity}"
 
     @TypeConverter fun toTrashedJob(value: String): TrashedJob {
-        val (state, kind) = value.split('/', limit = 2)
-        return TrashedJob(JobState.valueOf(state), JobKind.valueOf(kind))
+        val fields = value.split('/', limit = 3)
+        val legacy = TrashedJob(JobState.valueOf(fields[0]), JobKind.valueOf(fields[1]))
+        return fields.getOrNull(2)?.let { legacy.copy(speechIdentity = it) } ?: legacy
     }
 
     /** A JSON array of strings. */

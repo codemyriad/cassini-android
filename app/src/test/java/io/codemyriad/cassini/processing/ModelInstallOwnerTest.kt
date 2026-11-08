@@ -124,6 +124,37 @@ class ModelInstallOwnerTest {
 
     private val everyModel = ModelPart.entries.flatMap { it.models }.map(::key).sorted()
 
+    @Test fun optionalRetryKeepsItsOriginalPlanWithOrWithoutEarlierSpeechConsent() = runBlocking {
+        for (speechConsent in listOf(false, true)) {
+            val root = folder.newFolder("optional-$speechConsent")
+            val separate = AppPaths(root, File(root, "cache").apply { mkdirs() })
+            val settingsScope = CoroutineScope(scope.coroutineContext + Dispatchers.IO)
+            val settings = SettingsRepository.create(separate, settingsScope)
+            val failedOnce = AtomicBoolean(false)
+            val requested = Collections.synchronizedList(mutableListOf<ModelDescriptor>())
+            val fetch = ModelFetcher { model, directory, _ ->
+                requested += model
+                if (model == ModelCatalog.DIARIZATION && !failedOnce.getAndSet(true)) {
+                    throw java.io.IOException("Lab optional download failed")
+                }
+                model.artifacts.forEach { artifact ->
+                    RandomAccessFile(File(directory, artifact.name), "rw").use { it.setLength(artifact.size) }
+                }
+            }
+            val repository = ModelRepository(separate, settings, CassiniDispatchers(), fetch)
+            repository.recordConsent(includeSpeech = speechConsent)
+            val installer = ModelInstallOwner(repository, root, { true }, scope, Dispatchers.IO)
+            val optional = setOf(ModelPart.SPEAKERS, ModelPart.VOICES)
+            withTimeout(WAIT_MS) { installer.startDownload(optional).join() }
+            assertTrue((installer.lastOutcome.value as InstallOutcome.Installed).failed.containsKey(ModelPart.SPEAKERS))
+            withTimeout(WAIT_MS) { installer.startDownload().join() }
+            assertEquals(InstallOutcome.Installed(), installer.lastOutcome.value)
+            assertEquals(listOf(ModelCatalog.DIARIZATION, ModelCatalog.DIARIZATION, ModelCatalog.VOICEPRINT), requested)
+            assertTrue(repository.ready(ModelPart.SPEAKERS) && repository.ready(ModelPart.VOICES))
+            assertTrue(!repository.ready(ModelPart.SPEECH))
+        }
+    }
+
     @Test fun parakeetOnlyPermissionCannotFetchOptionalPartsOrScheduleThemForTheNextJob() = runBlocking {
         val separate = AppPaths(folder.newFolder("speech-root"), folder.newFolder("speech-cache"))
         val settingsScope = CoroutineScope(scope.coroutineContext + Dispatchers.IO)

@@ -5,6 +5,7 @@ import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.core.library.PauseReason
 import io.codemyriad.cassini.core.library.TrashPolicy
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.core.speakers.Match
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -145,7 +146,8 @@ class CatalogueDaoTest {
         assertEquals(listOf("old", "mid", "new"), db.notes().trashFlow().first().map { it.id })
         assertEquals(listOf("old"), db.notes().expired(TrashPolicy.purgeCutoff(now, zone)))
         assertEquals(TrashedJob(JobState.QUEUED, JobKind.TRANSCRIBE_AGAIN), db.notes().note("old")!!.trashedJob)
-        assertEquals(listOf("QUEUED/TRANSCRIBE_AGAIN"), db.column("SELECT trashed_job FROM notes WHERE id = 'old'"))
+        val encoded = "QUEUED/TRANSCRIBE_AGAIN/${SpeechModel.PARAKEET.identity}"
+        assertEquals(listOf(encoded), db.column("SELECT trashed_job FROM notes WHERE id = 'old'"))
         assertEquals(Counts(live = 1, trashed = 3, queued = 0), db.notes().counts().first())
     }
 

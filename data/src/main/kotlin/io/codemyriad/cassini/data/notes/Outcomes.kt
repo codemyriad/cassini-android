@@ -90,7 +90,7 @@ interface JobQueueWriter {
      * Puts the job of [noteId] back in the queue at the back (`seq = max + 1`) as QUEUED with [kind], creating the
      * row when it is missing. Restore calls it for a note that was QUEUED when it was trashed.
      */
-    suspend fun requeueAtBack(noteId: String, kind: JobKind)
+    suspend fun requeueAtBack(noteId: String, kind: JobKind, speechIdentity: String? = null)
 
     /** Stops the job of [noteId] if it runs and removes its row: step 1 of the purge (architecture 4.10). */
     suspend fun cancelAndRemove(noteId: String)

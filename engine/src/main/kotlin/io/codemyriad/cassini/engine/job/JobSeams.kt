@@ -60,6 +60,7 @@ interface Recognizer : AutoCloseable {
         val onChunk: (PcmAudio, Long, Transcript) -> Transcript,
         val onStage: (Long, Long, Boolean) -> Unit,
         val onProgress: (Parakeet.Progress) -> Unit,
+        val checkReplayActive: () -> Unit = {},
     )
 }
 

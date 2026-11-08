@@ -233,7 +233,7 @@ abstract class NoteDao {
     open suspend fun trash(id: String, at: Long): Boolean {
         val row = note(id)
         if (row == null || row.trashedAt != null) return false
-        moveToTrash(id, at, jobOf(id)?.let { TrashedJob(it.state, it.kind) })
+        moveToTrash(id, at, jobOf(id)?.let { TrashedJob(it.state, it.kind, it.speechIdentity) })
         deleteQueuedJob(id)
         return true
     }

@@ -264,6 +264,33 @@ class TranscriptionJobTest {
         assertTrue("$wholeRecord\n$resumedRecord", sameJson(wholeRecord, resumedRecord))
     }
 
+    @Test fun stopDuringRecognizerReplayKeepsTheExistingCheckpoint() = runBlocking {
+        val h = Harness(source = "source.mp3")
+        val first = h.job()
+        h.script.beforeDecode = { start -> if (start == 26_000L) first.stop() }
+        assertEquals(JobOutcome.Paused(PauseReason.USER), h.run(first).first)
+        val checkpoint = h.storage.checkpointJson
+        val replayStarted = CountDownLatch(1)
+        val proceed = CountDownLatch(1)
+        h.recognizerFactory = RecognizerFactory { _, callbacks ->
+            replayStarted.countDown()
+            check(proceed.await(20, TimeUnit.SECONDS))
+            callbacks.checkReplayActive()
+            error("A stopped replay must not continue")
+        }
+        val resumed = h.job()
+        val result = async(Dispatchers.Default) { resumed.run() }
+        try {
+            assertTrue(replayStarted.await(20, TimeUnit.SECONDS))
+            resumed.stop(PauseReason.USER)
+        } finally {
+            proceed.countDown()
+        }
+        assertEquals(JobOutcome.Paused(PauseReason.USER), withTimeout(20_000) { result.await() })
+        assertNotNull(checkpoint)
+        assertEquals(checkpoint, h.storage.checkpointJson)
+    }
+
     @Test fun cancelInsideASlowNativeCallKeepsThePreviousCheckpointAndReleasesHandles() = runBlocking {
         val h = Harness()
         val entered = CountDownLatch(1)
@@ -833,6 +860,7 @@ class TranscriptionJobTest {
         val audio = File(noteDir, source)
         val log: MutableList<String> = Collections.synchronizedList(mutableListOf())
         val script = Script()
+        var recognizerFactory: RecognizerFactory? = null
         val storage = FakeStorage(noteDir, audio, log)
         val voices = FakeVoices(log)
         val models = FakeModels()
@@ -841,7 +869,8 @@ class TranscriptionJobTest {
         private val clock = AtomicLong(1_000_000_000L)
         private val engines = JobEngines(
             recognizers = { restored, callbacks ->
-                FakeRecognizer(restored, callbacks, script).also { script.recognizers += it }
+                recognizerFactory?.open(restored, callbacks)
+                    ?: FakeRecognizer(restored, callbacks, script).also { script.recognizers += it }
             },
             diarizers = { restored -> FakeDiarizer(restored, script).also { script.diarizers += it } },
             prints = FakePrints(script),

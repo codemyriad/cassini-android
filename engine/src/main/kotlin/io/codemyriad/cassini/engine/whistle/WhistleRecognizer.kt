@@ -82,6 +82,7 @@ class WhistleRecognizer(
             requireUser(WordBodyBudget.fits(it.words), Failure.LONG)
             words.addAll(it.words)
         }
+        callbacks.checkReplayActive()
         transport = open { result ->
             val start = nanoTime()
             try {
@@ -91,12 +92,14 @@ class WhistleRecognizer(
             }
         }
         try {
+            callbacks.checkReplayActive()
             restored?.let {
                 val limit = it.chunks.start
                 replay.prefix(limit) { samples, count ->
                     requireSaved(count >= 0 && position + count <= limit, "Replay exceeded saved position")
                     accept(samples, count)
                 }
+                callbacks.checkReplayActive()
                 if (it.whistle?.finished == true) {
                     measured { transport.finish() }
                     finished = true
@@ -126,6 +129,7 @@ class WhistleRecognizer(
         var at = 0
         while (at < count) {
             requireUser(!Thread.currentThread().isInterrupted, Failure.CANCELLED)
+            if (replaying) callbacks.checkReplayActive()
             val size = minOf(WhistleStream.INPUT_BLOCK, count - at)
             val block = samples.copyOfRange(at, at + size)
             require(block.all { it.isFinite() })

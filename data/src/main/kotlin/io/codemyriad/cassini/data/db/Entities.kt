@@ -21,7 +21,11 @@ import io.codemyriad.cassini.core.speakers.Match
 // state and the queue; everything else is a cache of the files under notes/<id>/ and voices/, rebuilt from them.
 
 /** The job a note had when it was trashed, so Restore can bring it back (features.md section 8). */
-data class TrashedJob(val state: JobState, val kind: JobKind)
+data class TrashedJob(
+    val state: JobState,
+    val kind: JobKind,
+    val speechIdentity: String = ModelCatalog.PARAKEET_REVISION,
+)
 
 /** One note: a directory `notes/<id>/` and its current audio file. */
 @Entity(

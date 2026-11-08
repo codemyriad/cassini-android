@@ -335,6 +335,10 @@ class TranscriptionJob(
     }
 
     private fun callbacks(run: Run) = Recognizer.Callbacks(
+        checkReplayActive = {
+            checkActive()
+            if (stopReason.get() != null) throw ProcessingPaused()
+        },
         onChunk = { chunk, startMs, words -> onWindow(run, chunk, startMs, words) },
         onStage = { startMs, endMs, loading ->
             checkActive()
