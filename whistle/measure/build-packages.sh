@@ -44,6 +44,6 @@ for variant in baseline candidate; do
             :app:assembleRelease :app:bundleRelease > "$result/build.log" 2>&1
         cp app/build/outputs/apk/release/app-release-unsigned.apk "$result/app-release-unsigned.apk"
         cp app/build/outputs/bundle/release/app-release.aab "$result/app-release.aab"
-        python3 "$script_dir/package.py" "$result/app-release-unsigned.apk" "$result/app-release.aab" > "$result/size.json"
+        python3 "$script_dir/package.py" --expected-abi "$abi" "$result/app-release-unsigned.apk" "$result/app-release.aab" > "$result/size.json"
     done
 done

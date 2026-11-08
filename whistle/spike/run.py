@@ -71,6 +71,7 @@ def worker_bench(command, args, output):
             profile = json.loads((case / "pss.json").read_text())
             row["memory"] = {key: profile[key] for key in ["sampleCount", "sampledPeakPssKiB", "maximumSampleGapMs"]}
             row["memory"]["workerPids"] = sorted({sample["pid"] for sample in profile["samples"]})
+            row["memory"]["workerUids"] = sorted({sample["uid"] for sample in profile["samples"]})
             if not profile["sampleCount"]:
                 row["profileError"] = "No owned worker PSS sample; no peak claimed"
         try:
@@ -80,8 +81,11 @@ def worker_bench(command, args, output):
             page = 16384 if args.tag == "google_apis_ps16k" else 4096
             if report["sdk"] != args.api or report["pageSize"] != page:
                 raise ValueError("Actual worker image API/page size mismatch")
-            if args.profile_worker and row["memory"]["workerPids"] != [report["workerPid"]]:
-                row["profileError"] = "Sampled process identity does not match the reported worker"
+            if args.profile_worker and (
+                row["memory"]["workerPids"] != [report["workerPid"]]
+                or row["memory"]["workerUids"] != [report["workerUid"]]
+            ):
+                row["profileError"] = "Sampled PID/UID does not match the reported isolated worker"
             row.update(
                 segments=len(report["segments"]),
                 workerPid=report["workerPid"],

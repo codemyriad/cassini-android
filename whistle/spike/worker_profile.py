@@ -23,6 +23,7 @@ class WorkerProfile:
         self.started = threading.Event()
         self.pid = None
         self.samples = []
+        self.processes = {}
         self.errors = []
         self.token = uuid.uuid4().hex
         self.log = None
@@ -68,8 +69,9 @@ class WorkerProfile:
         return self
 
     def read_events(self):
-        start = re.compile(rb"am_proc_start.*\[\d+,(\d+),\d+,io\.codemyriad\.cassini:whistle,")
-        died = re.compile(rb"am_proc_died.*\[\d+,(\d+),io\.codemyriad\.cassini:whistle,")
+        name = rb"io\.codemyriad\.cassini:whistle(?::[^,\]\s]+)?"
+        start = re.compile(rb"am_proc_start.*\[\d+,(\d+),(\d+),(" + name + rb"),")
+        died = re.compile(rb"am_proc_died.*\[\d+,(\d+)," + name + rb",")
         try:
             with (self.output / "pss-process-events.txt").open("wb") as events:
                 for line in self.log.stdout:
@@ -78,7 +80,9 @@ class WorkerProfile:
                         self.ready.set()
                     found = start.search(line)
                     if found:
-                        self.pid = int(found[1])
+                        pid = int(found[1])
+                        self.processes[pid] = dict(uid=int(found[2]), name=found[3].decode())
+                        self.pid = pid
                         self.started.set()
                     found = died.search(line)
                     if found and self.pid == int(found[1]):
@@ -101,10 +105,15 @@ class WorkerProfile:
                         check=True,
                     )
                     text = result.stdout.decode()
-                    header = f"MEMINFO in pid {pid} [io.codemyriad.cassini:whistle]"
+                    header = f"MEMINFO in pid {pid} [{self.processes[pid]['name']}]"
                     total = re.search(r"TOTAL PSS:\s*(\d+)", text)
                     if header in text and total:
-                        row = dict(monotonicNs=time.monotonic_ns(), pid=pid, pssKiB=int(total[1]))
+                        row = dict(
+                            monotonicNs=time.monotonic_ns(),
+                            pid=pid,
+                            uid=self.processes[pid]["uid"],
+                            pssKiB=int(total[1]),
+                        )
                         self.samples.append(row)
                         with (self.output / "pss-meminfo.txt").open("a") as raw:
                             raw.write(json.dumps(row) + "\n" + text + "\n")
@@ -131,10 +140,11 @@ class WorkerProfile:
                 if thread.is_alive():
                     self.errors.append("Sampler thread did not finish before deadline")
         times = [s["monotonicNs"] for s in self.samples]
-        gaps = [(b - a) / 1e6 for a, b in zip(times, times[1:], strict=False)]
+        gaps = [(times[i] - times[i - 1]) / 1e6 for i in range(1, len(times))]
         report = dict(
             schemaVersion=1,
-            process="io.codemyriad.cassini:whistle",
+            processPrefix="io.codemyriad.cassini:whistle",
+            observedProcesses=self.processes,
             samples=self.samples,
             sampleCount=len(self.samples),
             requestedCadenceMs=50,
