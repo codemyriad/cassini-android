@@ -24,5 +24,15 @@
       "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
     }
   },
-  "x86_64": null
+  "x86_64": null,
+  "linkedRuntime": {
+    "Darwin": {
+      "size": 1856488,
+      "sha256": "f067271e71fb8aec52aca4cc41db135f6642d40eec5a32ab69d81fd3e4446a79"
+    },
+    "Linux": {
+      "size": 1856304,
+      "sha256": "0b3cc2dd6da47bd4ebf8f23bf90c1d69a7bf75765bc33878bfb5303ab5fc21fe"
+    }
+  }
 }

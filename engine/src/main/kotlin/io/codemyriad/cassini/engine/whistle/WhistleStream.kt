@@ -9,7 +9,15 @@ import java.nio.ByteOrder
 import java.security.MessageDigest
 
 /** One track in the dedicated worker. Bounded raw PCM remains separate from VAD-only high-pass samples. */
-class WhistleStream(rate: Int, private val segment: (WhistleSpeechSegment, ByteArray, String) -> Unit) {
+class WhistleStream internal constructor(
+    rate: Int,
+    private val probability: (FloatArray) -> Float,
+    private val transcribe: (FloatArray) -> ByteArray,
+    private val segment: (WhistleSpeechSegment, ByteArray, String) -> Unit,
+) {
+    constructor(rate: Int, segment: (WhistleSpeechSegment, ByteArray, String) -> Unit) :
+        this(rate, WhistleNative::probability, WhistleNative::transcribe, segment)
+
     private val raw = FloatArray(RING_SIZE)
     private var count = 0L
     private val filter = SileroInputFilter()
@@ -21,7 +29,7 @@ class WhistleStream(rate: Int, private val segment: (WhistleSpeechSegment, ByteA
     private val gate = WhistleSpeechGate({ frame ->
         val filtered = filter.process(frame)
         updateHash(vadHash, filtered, filtered.size)
-        WhistleNative.probability(filtered).also { value ->
+        probability(filtered).also { value ->
             frames++
             if (value >= VAD_ATTACK) voiced++
             maximum = maxOf(maximum, value)
@@ -54,7 +62,7 @@ class WhistleStream(rate: Int, private val segment: (WhistleSpeechSegment, ByteA
         val samples = FloatArray(length.toInt()) { raw[((range.startSample + it) and RING_MASK).toInt()] }
         val digest = MessageDigest.getInstance("SHA-256")
         updateHash(digest, samples, samples.size)
-        segment(range, WhistleNative.transcribe(samples), hex(digest.digest()))
+        segment(range, transcribe(samples), hex(digest.digest()))
     }
 
     companion object {

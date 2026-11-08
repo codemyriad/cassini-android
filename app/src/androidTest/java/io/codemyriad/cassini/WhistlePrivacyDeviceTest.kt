@@ -18,6 +18,16 @@ class WhistlePrivacyDeviceTest {
         val original = flags.keys.associateWith { Os.getenv(it) }
         WhistleNative.bootstrap()
         try {
+            flags.forEach { (name, value) -> Os.setenv(name, value, true) }
+            val uidError = assertThrows(IllegalStateException::class.java) {
+                WhistleNative.open(
+                    "missing-needle",
+                    "missing-ort",
+                    ByteBuffer.allocateDirect(0),
+                    ByteBuffer.allocateDirect(0),
+                )
+            }
+            assertTrue(requireNotNull(uidError.message).contains("isolated UID"))
             for (key in flags.keys) {
                 for (value in listOf(null, "wrong")) refuse(key, value)
             }

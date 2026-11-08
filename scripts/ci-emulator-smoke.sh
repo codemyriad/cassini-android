@@ -3,7 +3,7 @@
 # Any device on API 35 or above also works, with the rules of API 35.
 #   TEST_API=<level> scripts/ci-emulator-smoke.sh
 # Input, as the emulator job downloads it:
-#   .tools/ci-apk          the published APK (minified on tags)
+#   .tools/ci-apk          the published ABI APKs (minified on tags)
 #   .tools/ci-tests        the APK under test (debug, or releaseTest on tags: the release build without R8) and its
 #                          instrumentation APK under androidTest/
 #   .tools/ci-data-tests   the :data instrumentation APK (API 26 only)
@@ -11,12 +11,14 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 shopt -s globstar nullglob
-published=(.tools/ci-apk/**/*.apk)
-apks=(.tools/ci-tests/debug/*.apk .tools/ci-tests/releaseTest/*.apk)
+# The matrix uses x86_64. ABI splitting also emits ARM and universal APKs; select the actual target explicitly.
+published=(.tools/ci-apk/**/*-x86_64.apk)
+apks=(.tools/ci-tests/debug/app-x86_64-*.apk .tools/ci-tests/releaseTest/app-x86_64-*.apk)
 test_apks=(.tools/ci-tests/androidTest/**/*.apk)
-test "${#published[@]}" -eq 1
-test "${#apks[@]}" -eq 1
-test "${#test_apks[@]}" -eq 1
+if [ "${#published[@]}" -ne 1 ] || [ "${#apks[@]}" -ne 1 ] || [ "${#test_apks[@]}" -ne 1 ]; then
+    echo 'Expected exactly one x86_64 published APK, x86_64 APK under test and instrumentation APK' >&2
+    exit 1
+fi
 export CASSINI_APK="${apks[0]}" CASSINI_TEST_APK="${test_apks[0]}"
 test "$(adb shell getprop ro.build.version.sdk | tr -d '\r')" = "${TEST_API:?Set TEST_API to the emulator API level}"
 

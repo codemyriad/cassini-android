@@ -1,0 +1,363 @@
+{
+  "scope": "Unsigned minified/resource-shrunk release ZIP bytes, not installed disk or Play delivery. Baseline measurements reused from PR84; measured b128fa6 tree equals merged main6067cff.",
+  "candidateCommit": "63278d29d20e0566f7fc927b731164d894ad81bc",
+  "baselineTree": "3a6f879761453f628d4e29bc0bff43a798109ef0",
+  "baselineMergedCommit": "6067cff643da3a698055b29093b08c91ba0520e8",
+  "baseline": {
+    "universal": {
+      "commit": "b128fa699126158dc352de8a4e6fac7fcfb6e076",
+      "artifacts": [
+        {
+          "file": "app-release-unsigned.apk",
+          "bytes": 114212776,
+          "sha256": "f42e81cf2ba75687e03747bc77f3defb86cd9b7b2af9ddda38ed0bfa8d6c71a2"
+        },
+        {
+          "file": "app-release.aab",
+          "bytes": 77702285,
+          "sha256": "2bd9d51fcb2d04516c085f3c95ef174c076a09a862b74526b45573f16442c792"
+        }
+      ]
+    },
+    "arm64-v8a": {
+      "commit": "b128fa699126158dc352de8a4e6fac7fcfb6e076",
+      "artifacts": [
+        {
+          "file": "app-release-unsigned.apk",
+          "bytes": 77375540,
+          "sha256": "da363d5b830096b045e20d5bf16e6a0ee5f065d0afa51a7e17e4ed52fb630456"
+        },
+        {
+          "file": "app-release.aab",
+          "bytes": 55141716,
+          "sha256": "d7de2efe0e8358d13547b126b159760535a4300a660cfcd3d2157cadaaaa55c5"
+        }
+      ]
+    },
+    "x86_64": {
+      "commit": "b128fa699126158dc352de8a4e6fac7fcfb6e076",
+      "artifacts": [
+        {
+          "file": "app-release-unsigned.apk",
+          "bytes": 60554177,
+          "sha256": "19bb02c71b5ee5be90beca7c08112671af21019f112040847889c5888dd32782"
+        },
+        {
+          "file": "app-release.aab",
+          "bytes": 49828765,
+          "sha256": "6085eb10721c994db8ae61d6d872e36130434fe0a37d4fdc48da55281703701c"
+        }
+      ]
+    }
+  },
+  "candidate": {
+    "universal": {
+      "file": "app-universal-release-unsigned.apk",
+      "bytes": 114249688,
+      "sha256": "5ef3855375486c6b587c1cbe9766e56aea91bdc6b6db44824ea6f5911eab56b5",
+      "native": {
+        "lib/arm64-v8a/libandroidx.graphics.path.so": {
+          "bytes": 10096,
+          "zipBytes": 10096
+        },
+        "lib/arm64-v8a/libcassini_capability.so": {
+          "bytes": 4136,
+          "zipBytes": 4136
+        },
+        "lib/arm64-v8a/libcassini_needle.so": {
+          "bytes": 1856488,
+          "zipBytes": 1856488
+        },
+        "lib/arm64-v8a/libcassini_opus.so": {
+          "bytes": 311392,
+          "zipBytes": 311392
+        },
+        "lib/arm64-v8a/libcassini_whistle_jni.so": {
+          "bytes": 10336,
+          "zipBytes": 10336
+        },
+        "lib/arm64-v8a/libcassini_whistle_ort.so": {
+          "bytes": 19347616,
+          "zipBytes": 19347616
+        },
+        "lib/arm64-v8a/libcassini_whistle_weights.so": {
+          "bytes": 19268580,
+          "zipBytes": 19268580
+        },
+        "lib/arm64-v8a/libdatastore_shared_counter.so": {
+          "bytes": 10376,
+          "zipBytes": 10376
+        },
+        "lib/arm64-v8a/libonnxruntime.so": {
+          "bytes": 21684872,
+          "zipBytes": 21684872
+        },
+        "lib/arm64-v8a/libsherpa-onnx-c-api.so": {
+          "bytes": 4550248,
+          "zipBytes": 4550248
+        },
+        "lib/arm64-v8a/libsherpa-onnx-cxx-api.so": {
+          "bytes": 438384,
+          "zipBytes": 438384
+        },
+        "lib/arm64-v8a/libsherpa-onnx-jni.so": {
+          "bytes": 4856248,
+          "zipBytes": 4856248
+        },
+        "lib/arm64-v8a/libzstd-jni-1.5.7-25.so": {
+          "bytes": 485968,
+          "zipBytes": 485968
+        },
+        "lib/x86_64/libandroidx.graphics.path.so": {
+          "bytes": 10760,
+          "zipBytes": 10760
+        },
+        "lib/x86_64/libcassini_capability.so": {
+          "bytes": 3912,
+          "zipBytes": 3912
+        },
+        "lib/x86_64/libcassini_opus.so": {
+          "bytes": 373672,
+          "zipBytes": 373672
+        },
+        "lib/x86_64/libcassini_whistle_jni.so": {
+          "bytes": 5240,
+          "zipBytes": 5240
+        },
+        "lib/x86_64/libdatastore_shared_counter.so": {
+          "bytes": 7416,
+          "zipBytes": 7416
+        },
+        "lib/x86_64/libonnxruntime.so": {
+          "bytes": 25000408,
+          "zipBytes": 25000408
+        },
+        "lib/x86_64/libsherpa-onnx-c-api.so": {
+          "bytes": 5057528,
+          "zipBytes": 5057528
+        },
+        "lib/x86_64/libsherpa-onnx-cxx-api.so": {
+          "bytes": 423928,
+          "zipBytes": 423928
+        },
+        "lib/x86_64/libsherpa-onnx-jni.so": {
+          "bytes": 5328184,
+          "zipBytes": 5328184
+        },
+        "lib/x86_64/libzstd-jni-1.5.7-25.so": {
+          "bytes": 556704,
+          "zipBytes": 556704
+        }
+      },
+      "modelAssets": []
+    },
+    "x86_64": {
+      "file": "app-x86_64-release-unsigned.apk",
+      "bytes": 41307032,
+      "sha256": "80d8642604a4079701a53e47538ea1547a116469f107bd6c4d07f8163f587e15",
+      "native": {
+        "lib/x86_64/libandroidx.graphics.path.so": {
+          "bytes": 10760,
+          "zipBytes": 10760
+        },
+        "lib/x86_64/libcassini_capability.so": {
+          "bytes": 3912,
+          "zipBytes": 3912
+        },
+        "lib/x86_64/libcassini_opus.so": {
+          "bytes": 373672,
+          "zipBytes": 373672
+        },
+        "lib/x86_64/libcassini_whistle_jni.so": {
+          "bytes": 5240,
+          "zipBytes": 5240
+        },
+        "lib/x86_64/libdatastore_shared_counter.so": {
+          "bytes": 7416,
+          "zipBytes": 7416
+        },
+        "lib/x86_64/libonnxruntime.so": {
+          "bytes": 25000408,
+          "zipBytes": 25000408
+        },
+        "lib/x86_64/libsherpa-onnx-c-api.so": {
+          "bytes": 5057528,
+          "zipBytes": 5057528
+        },
+        "lib/x86_64/libsherpa-onnx-cxx-api.so": {
+          "bytes": 423928,
+          "zipBytes": 423928
+        },
+        "lib/x86_64/libsherpa-onnx-jni.so": {
+          "bytes": 5328184,
+          "zipBytes": 5328184
+        },
+        "lib/x86_64/libzstd-jni-1.5.7-25.so": {
+          "bytes": 556704,
+          "zipBytes": 556704
+        }
+      },
+      "modelAssets": []
+    },
+    "arm64-v8a": {
+      "file": "app-arm64-v8a-release-unsigned.apk",
+      "bytes": 77412452,
+      "sha256": "5eef402569fec8cfb30c1546ecd284ad17edb2d590e76933806b70144b9e9ec9",
+      "native": {
+        "lib/arm64-v8a/libandroidx.graphics.path.so": {
+          "bytes": 10096,
+          "zipBytes": 10096
+        },
+        "lib/arm64-v8a/libcassini_capability.so": {
+          "bytes": 4136,
+          "zipBytes": 4136
+        },
+        "lib/arm64-v8a/libcassini_needle.so": {
+          "bytes": 1856488,
+          "zipBytes": 1856488
+        },
+        "lib/arm64-v8a/libcassini_opus.so": {
+          "bytes": 311392,
+          "zipBytes": 311392
+        },
+        "lib/arm64-v8a/libcassini_whistle_jni.so": {
+          "bytes": 10336,
+          "zipBytes": 10336
+        },
+        "lib/arm64-v8a/libcassini_whistle_ort.so": {
+          "bytes": 19347616,
+          "zipBytes": 19347616
+        },
+        "lib/arm64-v8a/libcassini_whistle_weights.so": {
+          "bytes": 19268580,
+          "zipBytes": 19268580
+        },
+        "lib/arm64-v8a/libdatastore_shared_counter.so": {
+          "bytes": 10376,
+          "zipBytes": 10376
+        },
+        "lib/arm64-v8a/libonnxruntime.so": {
+          "bytes": 21684872,
+          "zipBytes": 21684872
+        },
+        "lib/arm64-v8a/libsherpa-onnx-c-api.so": {
+          "bytes": 4550248,
+          "zipBytes": 4550248
+        },
+        "lib/arm64-v8a/libsherpa-onnx-cxx-api.so": {
+          "bytes": 438384,
+          "zipBytes": 438384
+        },
+        "lib/arm64-v8a/libsherpa-onnx-jni.so": {
+          "bytes": 4856248,
+          "zipBytes": 4856248
+        },
+        "lib/arm64-v8a/libzstd-jni-1.5.7-25.so": {
+          "bytes": 485968,
+          "zipBytes": 485968
+        }
+      },
+      "modelAssets": []
+    },
+    "bundle": {
+      "file": "app-release.aab",
+      "bytes": 77708223,
+      "sha256": "4575ada69fa2fe69d3a9ab660c7e6b6afe30081eae36608f6731babb8f326be5",
+      "native": {
+        "base/lib/arm64-v8a/libandroidx.graphics.path.so": {
+          "bytes": 10096,
+          "zipBytes": 4386
+        },
+        "base/lib/arm64-v8a/libcassini_capability.so": {
+          "bytes": 4136,
+          "zipBytes": 1463
+        },
+        "base/lib/arm64-v8a/libcassini_needle.so": {
+          "bytes": 1856488,
+          "zipBytes": 785167
+        },
+        "base/lib/arm64-v8a/libcassini_opus.so": {
+          "bytes": 311392,
+          "zipBytes": 198813
+        },
+        "base/lib/arm64-v8a/libcassini_whistle_jni.so": {
+          "bytes": 10336,
+          "zipBytes": 4358
+        },
+        "base/lib/arm64-v8a/libcassini_whistle_ort.so": {
+          "bytes": 19347616,
+          "zipBytes": 6974611
+        },
+        "base/lib/arm64-v8a/libcassini_whistle_weights.so": {
+          "bytes": 19268580,
+          "zipBytes": 17892054
+        },
+        "base/lib/arm64-v8a/libdatastore_shared_counter.so": {
+          "bytes": 10376,
+          "zipBytes": 4253
+        },
+        "base/lib/arm64-v8a/libonnxruntime.so": {
+          "bytes": 21684872,
+          "zipBytes": 7679731
+        },
+        "base/lib/arm64-v8a/libsherpa-onnx-c-api.so": {
+          "bytes": 4550248,
+          "zipBytes": 1939288
+        },
+        "base/lib/arm64-v8a/libsherpa-onnx-cxx-api.so": {
+          "bytes": 438384,
+          "zipBytes": 143211
+        },
+        "base/lib/arm64-v8a/libsherpa-onnx-jni.so": {
+          "bytes": 4856248,
+          "zipBytes": 2016661
+        },
+        "base/lib/arm64-v8a/libzstd-jni-1.5.7-25.so": {
+          "bytes": 485968,
+          "zipBytes": 223504
+        },
+        "base/lib/x86_64/libandroidx.graphics.path.so": {
+          "bytes": 10760,
+          "zipBytes": 4614
+        },
+        "base/lib/x86_64/libcassini_capability.so": {
+          "bytes": 3912,
+          "zipBytes": 1349
+        },
+        "base/lib/x86_64/libcassini_opus.so": {
+          "bytes": 373672,
+          "zipBytes": 211438
+        },
+        "base/lib/x86_64/libcassini_whistle_jni.so": {
+          "bytes": 5240,
+          "zipBytes": 2032
+        },
+        "base/lib/x86_64/libdatastore_shared_counter.so": {
+          "bytes": 7416,
+          "zipBytes": 2810
+        },
+        "base/lib/x86_64/libonnxruntime.so": {
+          "bytes": 25000408,
+          "zipBytes": 8677016
+        },
+        "base/lib/x86_64/libsherpa-onnx-c-api.so": {
+          "bytes": 5057528,
+          "zipBytes": 2147255
+        },
+        "base/lib/x86_64/libsherpa-onnx-cxx-api.so": {
+          "bytes": 423928,
+          "zipBytes": 142380
+        },
+        "base/lib/x86_64/libsherpa-onnx-jni.so": {
+          "bytes": 5328184,
+          "zipBytes": 2233848
+        },
+        "base/lib/x86_64/libzstd-jni-1.5.7-25.so": {
+          "bytes": 556704,
+          "zipBytes": 232977
+        }
+      },
+      "modelAssets": []
+    }
+  }
+}
