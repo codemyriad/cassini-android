@@ -7,6 +7,7 @@ import sys
 import zipfile
 from pathlib import Path
 
+
 def sha256(path):
     digest = hashlib.sha256()
     with path.open("rb") as source:
