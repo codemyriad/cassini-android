@@ -1,0 +1,47 @@
+{
+  "firSourceSha256": "cefc18cff31fa136e9fe9359f4e7444804adcc205a9b34bcea9fa435387e30c9",
+  "coefficientJsonSha256": "52423b160d7d18e1c535a0750cc615e7df27c33f9e56f0f2b6bd7f27fd204e74",
+  "inputRule": "float32(((i * 7919 + 12345) % 65536 - 32768) / 32768)",
+  "cases": [
+    {
+      "inputSamples": 0,
+      "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "inputSamples": 1,
+      "outputSha256": "6295d47657009db8d3ddb3b0a3a5fe1b8da5caaee62454d8f3bf1b648c9a9235"
+    },
+    {
+      "inputSamples": 2,
+      "outputSha256": "a93f5b050e98f9d72041c2fe504a27e9e79a9367ad60c4ebbc9871b8d163fb85"
+    },
+    {
+      "inputSamples": 3,
+      "outputSha256": "067ca4205b403cbc4f2f914df57bbe0d9bedff48eee7008e8f42d8315200052d"
+    },
+    {
+      "inputSamples": 48,
+      "outputSha256": "a4c587eb3a328aef5be7ec5b1633db7ccaae6bf73aa30427127233e280b7db96"
+    },
+    {
+      "inputSamples": 49,
+      "outputSha256": "3691464a36076c0f1e127b3849e7e29b9756d3209d1436161d239931a175d399"
+    },
+    {
+      "inputSamples": 50,
+      "outputSha256": "a2eda4d10185b3f7844278578ae151cc6238e897f53ef72b71ea836d04a5e790"
+    },
+    {
+      "inputSamples": 97,
+      "outputSha256": "56ab9c15eef255a8a6fb3e27650e9cf2bc79c784b92bc6ba4b468ff15fe8049a"
+    },
+    {
+      "inputSamples": 4097,
+      "outputSha256": "4216767767f69ac6390060387ee2389f6fffcf8d9a9373e9a8ef17929073b7cf"
+    },
+    {
+      "inputSamples": 16001,
+      "outputSha256": "61e496865a076e5583b2ee6dfdf967e9ff518ab38bc8e6f79d6ffe788a190051"
+    }
+  ]
+}
