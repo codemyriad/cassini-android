@@ -59,7 +59,7 @@ class ParakeetRecommendation(
         val memory = manager?.let { ActivityManager.MemoryInfo().also(it::getMemoryInfo) }
         val free = generateSequence(paths.modelRoot.absoluteFile) { it.parentFile }
             .firstOrNull { it.exists() }?.usableSpace ?: 0L
-        val supported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && Process.is64Bit() &&
+        val supported = Process.is64Bit() &&
             Build.SUPPORTED_ABIS.any { it == "arm64-v8a" || it == "x86_64" }
         val eligible = ParakeetSuggestion.eligible(
             supported && memory != null,
