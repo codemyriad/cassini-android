@@ -42,6 +42,10 @@ jobs:
         with:
           cache-provider: basic
           cache-read-only: true
+      - name: Restore and verify pinned Gradle distribution
+        uses: ./.github/actions/pinned-gradle
+      - name: Download detekt dependencies (network only, bounded)
+        run: python3 scripts/ci-downloads.py detekt
       - name: detekt
         run: ./gradlew --no-daemon detekt
       - name: actionlint
@@ -59,6 +63,8 @@ jobs:
         run: shellcheck -x scripts/*.sh tools/*.sh
       - name: ruff
         run: pipx run --spec ruff==0.14.0 ruff check --config config/ruff.toml scripts tools
+      - name: CI download failure tests
+        run: python3 -m unittest discover -s tests/ci -p 'test_*.py' -v
       - name: Relative links in the Markdown files
         run: scripts/check-links.sh
       - name: Bundled fonts match their pins
@@ -96,6 +102,8 @@ jobs:
           cache-read-only: true
       # No setup.sh. The runner image ships an Android SDK; hiding it proves :core does not need one.
       # --configure-on-demand keeps Gradle from configuring the Android modules (docs/development.md).
+      - name: Restore and verify pinned Gradle distribution
+        uses: ./.github/actions/pinned-gradle
       - name: Run the :core tests
         run: env -u ANDROID_HOME -u ANDROID_SDK_ROOT ./gradlew --no-daemon --configure-on-demand :core:test
       - name: Upload the :core test reports
@@ -134,6 +142,8 @@ jobs:
           cache-read-only: ${{ runner.environment != 'github-hosted' }}
       # The release key signs the GitHub APK and the Play bundle (docs/release.md, "Signing"). No fallbacks: a tag
       # build without the four secrets fails here.
+      - name: Restore and verify pinned Gradle distribution
+        uses: ./.github/actions/pinned-gradle
       - name: Restore the release signing key
         if: startsWith(github.ref, 'refs/tags/')
         env:
