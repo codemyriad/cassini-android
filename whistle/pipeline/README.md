@@ -52,6 +52,8 @@ word parity**. VAD model/runtime, SpeechGate decisions, worker lifecycle and
 checkpoint parity remain separate work. No default, Settings, model storage or
 Parakeet behavior changes in this increment.
 
+The completed JVM measurement is recorded in [the evidence](evidence/README.md).
+
 ## Reference boundary
 
 Coordination `ux-draft/dc/whistle-reference/v1` preserves an observed desktop

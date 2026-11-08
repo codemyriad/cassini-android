@@ -1,0 +1,23 @@
+{
+  "scope": "Mac arm64 JDK 17; JVM FIR and existing high-pass only; no Android VAD/ASR/worker inference",
+  "coreUnitResults": {
+    "tests": 542,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 2
+  },
+  "syntheticTestMethods": 6,
+  "desktopConformanceTests": 1,
+  "assertions": [
+    "clean FIR SHA-256=1fb2707f7556fd1d2431b29cfe15e2118cea334fe55278be8c47298833ff5263",
+    "dc-quiet-jfk-v1: raw segment hashes=6/6; filtered complete-frame SHA-256=eeaeee543bc328acf6f0c4557e8aba86652e0144d9763264e1e5d62a3d13f968",
+    "dc-quiet-jfk-v1-control: raw segment hashes=6/6; filtered complete-frame SHA-256=6ece4c5cacfc2456cb79d0aa1b16f4aa3912fef6697912e633886d7b0da545ab"
+  ],
+  "conformanceJUnitSha256": "82f4e2de926a92ae6a1400388a754cc12d54d90ec75ce9b9de41e1416fc6376a",
+  "unitJUnitSha256": "39f7ce12dca9873789786d385247227a1b4886c7ebd374b6b47414baa1ddd7b5",
+  "sources": {
+    "core/src/main/kotlin/io/codemyriad/cassini/core/audio/whistle/WhistleResampler.kt": "30105d077ede78dd8acfb43b2dfa39a936db86edb243d998522fdee2089a5e34",
+    "core/src/test/resources/whistle/fir-synthetic.json": "8bcb3480cd23a9c6251d8149843f31e14ff2f82fc7eb49f4b3824653a7db9594",
+    "core/src/test/resources/whistle/dc-segment-pins.json": "a7d611db3b037a3ea73c7a415fd618db3e8237cb490fbd79a0a6d9ff225f4e3e"
+  }
+}
