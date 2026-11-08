@@ -1,0 +1,49 @@
+{
+  "ort": {
+    "repo": "csukuangfj/onnxruntime-libs",
+    "tag": "v1.27.1",
+    "name": "onnxruntime-android-1.27.1.zip",
+    "size": 32785641,
+    "sha256": "defade26209f72cf4fa9769b18052c842833d6bef12924595d26f03b995548ca"
+  },
+  "kotlinCompiler": {
+    "repo": "JetBrains/kotlin",
+    "tag": "v2.0.21",
+    "name": "kotlin-compiler-embeddable-2.0.21.jar",
+    "size": 58272093,
+    "sha256": "9fa8cdd1de0dccffe154c997d423ec6b5f53cd6d9177e3a77a9b0de03fb1bc81",
+    "group": "org.jetbrains.kotlin",
+    "artifact": "kotlin-compiler-embeddable",
+    "version": "2.0.21",
+    "pom": {
+      "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-compiler-embeddable/2.0.21/kotlin-compiler-embeddable-2.0.21.pom",
+      "size": 2666,
+      "sha256": "bd4656a46ec418252e5bc5e1c20eb2029fb2a8e0e3cc94eeddfac7e87c8cd5b6"
+    }
+  },
+  "nativeGradle": {
+    "url": "https://services.gradle.org/distributions/gradle-8.6-bin.zip",
+    "name": "gradle-8.6-bin",
+    "version": "8.6",
+    "tag": "v8.6.0",
+    "sha256": "9631d53cf3e74bfa726893aee1f8994fee4e060c401335946dba2156f440f24c"
+  },
+  "kissfft": {
+    "url": "https://codeload.github.com/mborgerding/kissfft/zip/febd4caeed32e33ad8b2e0bb5ea77542c40f18ec",
+    "name": "kissfft-febd4caeed32e33ad8b2e0bb5ea77542c40f18ec.zip",
+    "size": 74252,
+    "sha256": "497103e664168ebe39580b757adbe616f6cf85a16572af581ca7bc42d0ab13fd"
+  },
+  "nativeNestedSources": [
+    {
+      "url": "https://codeload.github.com/k2-fsa/kaldifst/tar.gz/refs/tags/v1.8.0",
+      "name": "kaldifst-1.8.0.tar.gz",
+      "sha256": "3f247b7e5a2409071202f5e2bc6200060f66728c0a3443c03923ad2723e040b3"
+    },
+    {
+      "url": "https://codeload.github.com/csukuangfj/openfst/tar.gz/refs/tags/v1.8.5-2026-04-10",
+      "name": "openfst-1.8.5-2026-04-10.tar.gz",
+      "sha256": "c3549940384cbe4fa9f18c2bcfb1bfbd0a80492fd1b0bfa27433cee395a6a199"
+    }
+  ]
+}

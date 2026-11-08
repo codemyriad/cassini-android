@@ -23,6 +23,8 @@ on:
       - 'scripts/native-dependencies.json'
       - 'scripts/streaming-diarization.patch'
       - 'scripts/build-native-aar.sh'
+      - 'scripts/ci-downloads.py'
+      - 'scripts/ci-download-pins.json'
       - 'scripts/fetch-native-aar.sh'
       - 'scripts/fetch-opus-source.sh'
       - 'scripts/verify-native-runtime.sh'
@@ -44,6 +46,8 @@ on:
       - 'scripts/native-dependencies.json'
       - 'scripts/streaming-diarization.patch'
       - 'scripts/build-native-aar.sh'
+      - 'scripts/ci-downloads.py'
+      - 'scripts/ci-download-pins.json'
       - 'scripts/fetch-native-aar.sh'
       - 'scripts/fetch-opus-source.sh'
       - 'scripts/verify-native-runtime.sh'
@@ -84,6 +88,12 @@ jobs:
           cache-provider: basic
           cache-read-only: true
       # Every ref restores the archives; only main saves them, after the build below has fetched them (D66 AND-6).
+      - name: Restore and verify pinned Gradle distribution
+        uses: ./.github/actions/pinned-gradle
+      - name: Restore and verify native-source Gradle distribution
+        uses: ./.github/actions/pinned-gradle
+        with:
+          kind: native
       - name: Restore the pinned source archives
         id: source-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -110,6 +120,10 @@ jobs:
       # setup.sh finds the pinned NDK inside ANDROID_HOME. The job reports drift and does not fail
       # on it: a source build is not yet known to match the release byte for byte. The summary
       # records both hashes and a mismatch raises a warning annotation.
+      - name: Prefetch checksum-pinned native runtime without forwarding credentials to the build
+        env:
+          CASSINI_GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/ci-downloads.py native --output .tools/native-build/onnxruntime
       - name: Build the AAR from source
         run: ./scripts/setup.sh --from-source
       - name: Save the pinned source archives
@@ -148,10 +162,8 @@ jobs:
           mkdir -p "$out"
           cp "$aar_installed" "$out/"
           cp scripts/streaming-diarization.patch "$out/"
-          # The build unpacks and deletes this archive; fetch the same file for the mirror.
-          ort=1.27.1
-          curl --fail --location --retry 3 -o "$out/onnxruntime-android-$ort.zip" \
-            "https://github.com/csukuangfj/onnxruntime-libs/releases/download/v$ort/onnxruntime-android-$ort.zip"
+          # Reuse the exact verified archive already fetched for both ABIs.
+          cp .tools/native-build/onnxruntime-android-1.27.1.zip "$out/"
           (cd "$out" && sha256sum -- * > SHA256SUMS && cat SHA256SUMS)
       - name: Upload the AAR for the release
         if: github.event_name != 'pull_request'
