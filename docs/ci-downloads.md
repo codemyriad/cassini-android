@@ -28,7 +28,10 @@ warms this shared cache. Until then, cold PR runs use the verified API route.
 Once warm, a cache hit needs neither distribution download endpoint.
 
 The helper also prefetches the exact pinned Kotlin compiler JAR into Gradle's
-artifact cache because Maven's large-JAR redirect had the same outage. The
+CI-only local Maven entry because Maven's large-JAR redirect had the same outage.
+The vendor JAR and original published POM have independent SHA-256 pins. A CI
+init script verifies both and routes only this exact module/version locally;
+all transitive dependencies remain those in the original POM. The
 native source build reuses the exact pinned ORT archive for both ABIs through
 upstream's supported external-runtime directory. Versions and bytes remain
 unchanged. The helper and its pins are included in the native source package.

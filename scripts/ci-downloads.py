@@ -159,13 +159,34 @@ def input_pin(name):
     return json.loads((ROOT / 'scripts/ci-download-pins.json').read_text())[name]
 
 
+def pinned_pom(pin, target):
+    if target.exists():
+        if sha(target) != pin['sha256']:
+            raise ValueError('Cached compiler POM SHA-256 mismatch')
+        return
+
+    def fetch():
+        with urllib.request.urlopen(pin['url'], timeout=60) as response:
+            return response.read(pin['size'] + 1)
+
+    body = network(fetch)
+    if len(body) != pin['size'] or hashlib.sha256(body).hexdigest() != pin['sha256']:
+        raise ValueError('Compiler POM size/SHA-256 mismatch')
+    # Publish metadata last, after the pinned JAR and POM are both verified.
+    partial = target.with_name(target.name + f'.{os.getpid()}.part')
+    try:
+        partial.write_bytes(body)
+        partial.replace(target)
+    finally:
+        partial.unlink(missing_ok=True)
+
+
 def prepare_detekt():
     pin = input_pin('kotlinCompiler')
-    home = Path(os.environ.get('GRADLE_USER_HOME', Path.home() / '.gradle'))
-    # Gradle's content-addressed artifact cache. SHA-1 is only its directory key; SHA-256 verifies bytes.
-    target = (home / 'caches/modules-2/files-2.1' / pin['group'] / pin['artifact']
-              / pin['version'] / pin['cacheSha1'] / pin['name'])
+    target = (ROOT / '.tools/ci-maven' / pin['group'].replace('.', '/') / pin['artifact']
+              / pin['version'] / pin['name'])
     github_asset(pin['repo'], pin['tag'], pin['name'], target, pin['sha256'], size=pin['size'])
+    pinned_pom(pin['pom'], target.with_suffix('.pom'))
 
 
 def prepare_native(output):

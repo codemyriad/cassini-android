@@ -113,16 +113,26 @@ class DownloadTests(unittest.TestCase):
                 DOWNLOADS.github_asset('official/repo', 'v1', 'input.zip', target, '0' * 64)
             fetch.assert_not_called()
 
-    def test_detekt_prefetch_preserves_gradle_artifact_identity(self):
+    def test_detekt_prefetch_preserves_published_module_and_metadata(self):
         pin = DOWNLOADS.input_pin('kotlinCompiler')
-        with tempfile.TemporaryDirectory() as tmp, patch.dict(DOWNLOADS.os.environ, GRADLE_USER_HOME=tmp):
-            with patch.object(DOWNLOADS, 'github_asset') as fetch:
-                DOWNLOADS.prepare_detekt()
-            target = fetch.call_args.args[3]
-            expected = Path(tmp) / 'caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-compiler-embeddable/2.0.21'
-            self.assertEqual(target, expected / '79346ed53db48b18312a472602eb5c057070c54d' / pin['name'])
-            self.assertEqual(fetch.call_args.args[4], pin['sha256'])
-            self.assertEqual(fetch.call_args.kwargs['size'], 58272093)
+        with patch.object(DOWNLOADS, 'github_asset') as fetch, patch.object(DOWNLOADS, 'pinned_pom') as pom:
+            DOWNLOADS.prepare_detekt()
+        target = fetch.call_args.args[3]
+        expected = DOWNLOADS.ROOT / '.tools/ci-maven/org/jetbrains/kotlin/kotlin-compiler-embeddable/2.0.21'
+        self.assertEqual(target, expected / pin['name'])
+        self.assertEqual(fetch.call_args.args[4], pin['sha256'])
+        self.assertEqual(fetch.call_args.kwargs['size'], 58272093)
+        pom.assert_called_once_with(pin['pom'], target.with_suffix('.pom'))
+
+    def test_changed_pom_is_refused_before_repository_publication(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / 'compiler.pom'
+            pin = dict(url='https://example.invalid/compiler.pom', size=4,
+                       sha256=hashlib.sha256(b'good').hexdigest())
+            with patch.object(DOWNLOADS.urllib.request, 'urlopen', return_value=io.BytesIO(b'evil')):
+                with self.assertRaises(ValueError):
+                    DOWNLOADS.pinned_pom(pin, target)
+            self.assertFalse(target.exists())
 
     def test_gradle_info_is_keyed_by_committed_wrapper_checksum(self):
         info = DOWNLOADS.gradle_info()

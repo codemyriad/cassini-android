@@ -49,7 +49,7 @@ jobs:
       - name: Prove real wrapper cache use and checksum refusal offline
         run: python3 tests/ci/wrapper-smoke.py
       - name: detekt
-        run: ./gradlew --no-daemon detekt
+        run: ./gradlew --no-daemon --init-script scripts/ci-pinned-compiler.init.gradle detekt
       - name: actionlint
         env:
           ACTIONLINT_VERSION: 1.7.12
