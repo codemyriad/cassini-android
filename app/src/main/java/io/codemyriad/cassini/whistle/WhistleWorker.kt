@@ -152,18 +152,47 @@ class WhistleWorker(
     override fun close() {
         if (closed) return
         closed = true
+        var interrupted = Thread.interrupted()
         try {
             if (bound) {
                 app.unbindService(connection)
                 bound = false
-                if (remote != null) death.get(CLOSE_SECONDS, TimeUnit.SECONDS)
+                if (remote != null) {
+                    interrupted = cleanupWait { death.get(it, TimeUnit.NANOSECONDS) } || interrupted
+                }
             }
         } finally {
-            thread.quitSafely()
-            remote = null
-            if (ownsPermit) {
-                ownsPermit = false
-                permit.release()
+            try {
+                thread.quitSafely()
+                if (thread.isAlive && thread !== Thread.currentThread()) {
+                    interrupted = cleanupWait {
+                        thread.join(maxOf(1L, TimeUnit.NANOSECONDS.toMillis(it)))
+                        check(!thread.isAlive) { "Whistle reply thread did not terminate" }
+                    } || interrupted
+                }
+            } finally {
+                remote = null
+                if (ownsPermit) {
+                    ownsPermit = false
+                    permit.release()
+                }
+                if (interrupted) Thread.currentThread().interrupt()
+            }
+        }
+    }
+
+    /** Finish bounded cleanup even when cancellation interrupted the owner; restore the flag afterward. */
+    private fun cleanupWait(event: (Long) -> Unit): Boolean {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(CLOSE_SECONDS)
+        var interrupted = false
+        while (true) {
+            val remaining = deadline - System.nanoTime()
+            check(remaining > 0) { "Whistle cleanup timed out" }
+            try {
+                event(remaining)
+                return interrupted
+            } catch (_: InterruptedException) {
+                interrupted = true
             }
         }
     }
