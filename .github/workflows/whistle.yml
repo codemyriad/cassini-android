@@ -52,6 +52,7 @@ jobs:
         run: |
           python3 whistle/spike/prepare.py --help > /dev/null
           python3 whistle/spike/run.py --help > /dev/null
+          python3 whistle/drift/image.py --help > /dev/null
       - name: Compile the standalone lab JNI and Java
         run: >-
           python3 whistle/spike/build.py --compile-only

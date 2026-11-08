@@ -18,9 +18,10 @@ probe executed and returned four exact lanes of 24. FPCR was 0.
 - Forced-on dispatch passes all 13 fixtures and the 80 ms bound, with both system
   and pinned musl math. It runs only after SDOT has executed successfully in the
   owned guest. This is a lab override, not a production capability policy.
-- Pinned math alone does not recover the two word substitutions or the 560 ms
-  alignment failure. It does change returned numerical values, so the evidence
-  does not claim libm has no effect. Counters show the actual FFT/recognition
+- Pinned math alone still fails strict parity and the 560 ms alignment bound.
+  It fixes `Your` versus `our`, retains `American.` versus `Americans.`, and
+  introduces `our` versus `Our` in control segment 4. Math therefore affects
+  decoding; this experiment does not claim libm has no effect. Counters show the actual FFT/recognition
   math paths were exercised (including expf/logf and double exp/sincos).
 - Forced-on/system math has the same word timestamps as #78's API 35 output,
   but probabilities still differ by up to 0.025. Exact word parity is the gate;

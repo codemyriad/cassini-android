@@ -116,7 +116,9 @@ def main():
                     selector.register(watcher.stdout, selectors.EVENT_READ)
                     while time.monotonic() < deadline and emulator.poll() is None:
                         try:
-                            booted = command("shell", "getprop", "sys.boot_completed", timeout=10).stdout.strip() == b"1"
+                            booted = (
+                                command("shell", "getprop", "sys.boot_completed", timeout=10).stdout.strip() == b"1"
+                            )
                         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
                             boot.extend((f"Transport interruption {connection}: {error}\n").encode())
                             boot.extend((getattr(error, "stderr", None) or b"")[:1024])
