@@ -79,7 +79,8 @@ JDK17 and external output/cache paths, then run the build under the shared
 heavy-job lock:
 
 ```sh
-./gradlew --no-daemon :app:assembleRelease :app:bundleRelease
+./gradlew --no-daemon :app:assembleRelease
+./gradlew --no-daemon -PcassiniBundle=true :app:bundleRelease
 python3 whistle/worker/review_measure.py \
   --apk-dir app/build/outputs/apk/release \
   --bundle app/build/outputs/bundle/release/app-release.aab \

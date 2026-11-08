@@ -8,6 +8,10 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+// AGP cannot shrink ABI APK resources and build an AAB in one configuration (Google issue 402800800).
+// Bundle invocations use the same native inputs with ABI delivery controlled by the bundle itself.
+val abiApks = !providers.gradleProperty("cassiniBundle").map { it.toBooleanStrict() }.getOrElse(false)
+
 android {
     namespace = "io.codemyriad.cassini"
     compileSdk = libs.versions.compileSdk.get().toInt()
@@ -20,12 +24,13 @@ android {
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = 15
         versionName = "0.4.1"
+        if (!abiApks) ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         // Builds the graph on a scratch root (docs/architecture.md section 9).
         testInstrumentationRunner = "io.codemyriad.cassini.CassiniTestRunner"
     }
     splits {
         abi {
-            isEnable = true
+            isEnable = abiApks
             reset()
             include("arm64-v8a", "x86_64")
             isUniversalApk = true
