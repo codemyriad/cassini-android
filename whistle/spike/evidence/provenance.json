@@ -1,0 +1,104 @@
+{
+  "engineRevision": "93e88ede867e4311c39151285e74df513e4b835b",
+  "modelRevision": "ca5287601bef25af26dcf2e1b2bdc0843a7c19e5",
+  "apk": {
+    "size": 19986063,
+    "sha256": "435679b65d004d1a1e08bd7780829cc9b5b5230432850d222e83b39a6893591c"
+  },
+  "engine": {
+    "size": 1856488,
+    "sha256": "f067271e71fb8aec52aca4cc41db135f6642d40eec5a32ab69d81fd3e4446a79"
+  },
+  "bootstrap": {
+    "size": 8944,
+    "sha256": "d5c4554421521d56ca9696ba3e5c3e1eb7e13ce6d9379978ad2304a5c817ec9f"
+  },
+  "model": {
+    "size": 16919407,
+    "sha256": "b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb"
+  },
+  "packagedFixtureManifest": {
+    "size": 22331,
+    "sha256": "e8c3ddd7e82e8dc9e2f2ac2dd97b005696ae112b9721faef2f3229ca09231ed6"
+  },
+  "runtimeSources": {
+    "whistle/spike/Spike.java": {
+      "size": 8414,
+      "sha256": "59d9026d0e3c4f5381d11c46e0fcdefb6b4ac0b324cc9de3aab691cdccbc784f"
+    },
+    "whistle/spike/bootstrap.c": {
+      "size": 3914,
+      "sha256": "b070d36028c9fe46052854135abdfdbe95661d3242c972cf764c7e172a63c1df"
+    },
+    "whistle/spike/AndroidManifest.xml": {
+      "size": 570,
+      "sha256": "7370f8c81fa85d7f88233cf12aad088b82c6245bf75e5cf6686a4e439a231aaa"
+    }
+  },
+  "guests": {
+    "api26": {
+      "systemImageProperties": [
+        "Pkg.Desc=Android SDK System Image arm64-v8a.",
+        "Pkg.Revision=1",
+        "Pkg.Dependencies=emulator#31.1.1",
+        "AndroidVersion.ApiLevel=26",
+        "SystemImage.Abi=arm64-v8a",
+        "SystemImage.TagId=default",
+        "SystemImage.TagDisplay=Default Android System Image",
+        "SystemImage.GpuSupport=true"
+      ],
+      "report": {
+        "size": 20658,
+        "sha256": "e9b3f066dd792c98f3ba6f6bf4364557251b00f747023d1d9f52905fce39840f"
+      },
+      "apkSha256": "435679b65d004d1a1e08bd7780829cc9b5b5230432850d222e83b39a6893591c",
+      "modelLoader": "corrected exact-size model buffer"
+    },
+    "api35": {
+      "systemImageProperties": [
+        "Pkg.Desc=System Image arm64-v8a with Google APIs.",
+        "Pkg.Revision=9",
+        "Pkg.Dependencies=emulator#33.1.24",
+        "AndroidVersion.ApiLevel=35",
+        "AndroidVersion.ExtensionLevel=13",
+        "AndroidVersion.IsBaseSdk=true",
+        "SystemImage.Abi=arm64-v8a",
+        "SystemImage.TagId=google_apis",
+        "SystemImage.TagDisplay=Google APIs",
+        "SystemImage.GpuSupport=true",
+        "Addon.VendorId=google",
+        "Addon.VendorDisplay=Google Inc.",
+        ""
+      ],
+      "report": {
+        "size": 20570,
+        "sha256": "c7ac705fe1c6b7deb4dfbdc7138136a03c41e2802c468a55f8216ab6d8aa82cf"
+      },
+      "apkSha256": "23b4f19b8e7f1e23ee04a6843bbe26b4dd5d594f575e3a628d410a14c62780f7",
+      "modelLoader": "initial growing buffer"
+    },
+    "api35-16k": {
+      "systemImageProperties": [
+        "Pkg.Desc=System Image Page Size 16k arm64-v8a with Google APIs.",
+        "Pkg.Revision=5",
+        "Pkg.Dependencies=emulator#33.1.24",
+        "AndroidVersion.ApiLevel=35",
+        "AndroidVersion.ExtensionLevel=13",
+        "AndroidVersion.IsBaseSdk=true",
+        "SystemImage.Abi=arm64-v8a",
+        "SystemImage.TagId=google_apis,page_size_16kb",
+        "SystemImage.TagDisplay=Google APIs,16 KB Page Size",
+        "SystemImage.GpuSupport=true",
+        "Addon.VendorId=google",
+        "Addon.VendorDisplay=Google Inc."
+      ],
+      "report": {
+        "size": 20581,
+        "sha256": "0efa1af5ef0bba33f861f327e2df2740f90eb035c65dd5ff6bf39522654de6de"
+      },
+      "apkSha256": "435679b65d004d1a1e08bd7780829cc9b5b5230432850d222e83b39a6893591c",
+      "modelLoader": "corrected exact-size model buffer"
+    }
+  },
+  "scope": "API26 and API35/16K use the corrected APK. API35/4K is the initial model-loader baseline; engine/bootstrap/model/PCM unchanged. No production app or Android FIR/VAD acceptance"
+}
