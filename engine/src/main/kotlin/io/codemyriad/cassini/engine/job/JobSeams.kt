@@ -63,6 +63,9 @@ interface Recognizer : AutoCloseable {
     )
 }
 
+/** A recognizer refused saved state; the job offers Start over instead of retrying the same incompatible prefix. */
+class RecognitionCheckpointMismatch(message: String) : IllegalArgumentException(message)
+
 /** Opens a [Recognizer] over the installed Parakeet (and the speech detector, when installed). */
 fun interface RecognizerFactory {
     /** [restored] continues a checkpoint's windows. The caller already holds [NativeBudget]. */

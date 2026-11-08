@@ -82,7 +82,8 @@ import java.util.concurrent.atomic.AtomicReference
  * ([JobEnvironment.maxBodyBytes], about 11 h of continuous speech): the job counts them after each window and fails
  * with `Failure.LONG` as soon as they do not fit, not hours later at the seal.
  */
-@Suppress("TooManyFunctions", "LargeClass", "LongParameterList") // one function per named step of architecture section 5.4
+// One function per named step and one pinned model choice (architecture section 5.4).
+@Suppress("TooManyFunctions", "LargeClass", "LongParameterList")
 class TranscriptionJob(
     val noteId: String,
     private val storage: JobStorage,
@@ -775,6 +776,7 @@ class TranscriptionJob(
             (error is CancellationException && stopReason.get() == null)
         return when {
             cancelled -> JobOutcome.Cancelled
+            error is RecognitionCheckpointMismatch -> JobOutcome.Failed(JobFailure.CheckpointMismatch)
             error is DocumentRefusal -> JobOutcome.Failed(JobFailure.DocumentRefused(error.state))
             error is ProcessingPaused || error is CancellationException ->
                 JobOutcome.Paused(stopReason.get() ?: PauseReason.USER)

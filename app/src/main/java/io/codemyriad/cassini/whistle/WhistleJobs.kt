@@ -7,6 +7,7 @@ import io.codemyriad.cassini.engine.decode.AudioDecoder
 import io.codemyriad.cassini.engine.job.AudioSource
 import io.codemyriad.cassini.engine.job.DecoderAudioSource
 import io.codemyriad.cassini.engine.job.JobEngines
+import io.codemyriad.cassini.engine.job.RecognitionCheckpointMismatch
 import io.codemyriad.cassini.engine.whistle.WhistleReplay
 import java.io.File
 
@@ -32,7 +33,7 @@ object WhistleJobs {
         } catch (_: PrefixComplete) {
             // Stop the decoder at the saved sample, preserving the worker's unflushed track state.
         }
-        check(remaining == 0L) { "Source ended before saved Whistle progress" }
+        if (remaining != 0L) throw RecognitionCheckpointMismatch("Source ended before saved Whistle progress")
     }
 
     private class PrefixComplete : RuntimeException()

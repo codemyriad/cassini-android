@@ -37,6 +37,13 @@ class WhistleWorkerParityTest {
     )
 
     @Test
+    fun includedDefaultWritesAPortableTranscriptWithoutAnyModelDownload() {
+        val fixture = fixture()
+        assertEquals(fixture.source, sourceHash(fixture.name))
+        WhistleIncludedJobCase.run(fixture.name, fixture.expected)
+    }
+
+    @Test
     fun fullDcTrackUsesPrivateWorkerAndExactDesktopSegments() {
         val fixture = fixture()
         assertEquals(6, fixture.expected.size)

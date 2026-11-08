@@ -12,6 +12,7 @@ import io.codemyriad.cassini.core.format.WordBodyBudget
 import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.core.requireUser
 import io.codemyriad.cassini.engine.asr.Parakeet
+import io.codemyriad.cassini.engine.job.RecognitionCheckpointMismatch
 import io.codemyriad.cassini.engine.job.Recognizer
 import org.json.JSONObject
 import java.nio.ByteBuffer
@@ -73,11 +74,11 @@ class WhistleRecognizer(
 
     init {
         restored?.chunks?.let {
-            val marker = requireNotNull(restored.whistle) { "Not a Whistle checkpoint" }
-            require(marker.pipeline == PIPELINE) { "Not a compatible Whistle checkpoint" }
-            require(marker.pcmSha256.matches(Regex("[0-9a-f]{64}"))) { "Invalid saved PCM hash" }
-            require(it.start == it.end && it.window.isEmpty()) { "Not a Whistle replay checkpoint" }
-            require(it.start in 0..Limits.MAX_SAMPLES)
+            val marker = restored.whistle ?: throw RecognitionCheckpointMismatch("Not a Whistle checkpoint")
+            requireSaved(marker.pipeline == PIPELINE, "Not a compatible Whistle checkpoint")
+            requireSaved(marker.pcmSha256.matches(Regex("[0-9a-f]{64}")), "Invalid saved PCM hash")
+            requireSaved(it.start == it.end && it.window.isEmpty(), "Not a Whistle replay checkpoint")
+            requireSaved(it.start in 0..Limits.MAX_SAMPLES, "Invalid saved position")
             requireUser(WordBodyBudget.fits(it.words), Failure.LONG)
             words.addAll(it.words)
         }
@@ -93,7 +94,7 @@ class WhistleRecognizer(
             restored?.let {
                 val limit = it.chunks.start
                 replay.prefix(limit) { samples, count ->
-                    require(count >= 0 && position + count <= limit) { "Replay exceeded saved position" }
+                    requireSaved(count >= 0 && position + count <= limit, "Replay exceeded saved position")
                     accept(samples, count)
                 }
                 if (it.whistle?.finished == true) {
@@ -101,8 +102,8 @@ class WhistleRecognizer(
                     finished = true
                     settled = position
                 }
-                require(position == limit && replayed == words.size) { "Whistle replay does not match saved progress" }
-                require(hash() == it.whistle?.pcmSha256) { "Whistle replay PCM differs from saved progress" }
+                requireSaved(position == limit && replayed == words.size, "Whistle replay does not match saved progress")
+                requireSaved(hash() == it.whistle?.pcmSha256, "Whistle replay PCM differs from saved progress")
             }
             replaying = false
         } catch (@Suppress("TooGenericExceptionCaught") error: Throwable) {
@@ -174,9 +175,7 @@ class WhistleRecognizer(
             for (word in placed) {
                 val saved = words.getOrNull(replayed++)
                 val matches = saved != null && saved.text == word.text && saved.startMs == word.startMs && saved.endMs == word.endMs
-                require(matches) {
-                    "Whistle replayed words differ from saved progress"
-                }
+                requireSaved(matches, "Whistle replayed words differ from saved progress")
             }
         } else {
             val startMs = result.start * MS / RATE
@@ -235,6 +234,10 @@ class WhistleRecognizer(
         } finally {
             inferenceMs += (nanoTime() - start - (callbackNanos - callbacksBefore)).coerceAtLeast(0) / NANOS_PER_MS
         }
+    }
+
+    private fun requireSaved(condition: Boolean, message: String) {
+        if (!condition) throw RecognitionCheckpointMismatch(message)
     }
 
     private fun hash(): String = (pcmHash.clone() as MessageDigest).digest().joinToString("") { "%02x".format(it) }

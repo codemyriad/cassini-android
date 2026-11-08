@@ -204,11 +204,11 @@ class AppGraph(context: Context, val config: Config) {
 
     suspend fun jobEngines(model: SpeechModel, file: java.io.File): JobEngines {
         if (model == SpeechModel.PARAKEET) return engines
-        requireUser(speech.included.await(), Failure.MODEL_UNAVAILABLE)
+        requireUser(speech.included.await(), Failure.INCLUDED_UNAVAILABLE)
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             WhistleJobs.of(app, engines, paths.cache, file)
         } else {
-            throw UserFacingException(Failure.MODEL_UNAVAILABLE)
+            throw UserFacingException(Failure.INCLUDED_UNAVAILABLE)
         }
     }
 

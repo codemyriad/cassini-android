@@ -225,7 +225,7 @@ jobs:
         run: |
           ./gradlew --no-daemon \
             ":app:assemble$BUILD_TYPE" :data:assembleDebugAndroidTest \
-            ciTest ":app:lint$BUILD_TYPE" ":data:lint$BUILD_TYPE" ":ui:lint$BUILD_TYPE"
+            ciTest :bench:compileDebugKotlin ":app:lint$BUILD_TYPE" ":data:lint$BUILD_TYPE" ":ui:lint$BUILD_TYPE"
           ./gradlew --no-daemon \
             -PdeviceTestBuildType="$DEVICE_TEST_TYPE" \
             ":app:assemble${DEVICE_TEST_TYPE^}" ":app:assemble${DEVICE_TEST_TYPE^}AndroidTest"

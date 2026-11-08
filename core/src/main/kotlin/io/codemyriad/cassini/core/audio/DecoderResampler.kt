@@ -32,12 +32,18 @@ class DecoderResampler(
             if (included) 0 else firstOutput,
             output,
         )
-    } else null
+    } else {
+        null
+    }
 
     init { require(!included || initialFrame == 0L) }
 
     fun push(samples: FloatArray, offset: Int, count: Int) {
-        if (fir != null) fir.accept(samples.copyOfRange(offset, offset + count)) else legacy!!.push(samples, offset, count)
+        if (fir != null) {
+            fir.accept(samples.copyOfRange(offset, offset + count))
+        } else {
+            requireNotNull(legacy).push(samples, offset, count)
+        }
     }
 
     fun silence(count: Long) {

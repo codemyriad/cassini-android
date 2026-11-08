@@ -67,6 +67,9 @@ def worker_bench(command, args, output):
         try:
             raw = command("exec-out", "run-as", package, "cat", f"files/whistle-worker-{name}.json").stdout
             (case / "result.json").write_bytes(raw)
+            included = command("exec-out", "run-as", package, "cat", f"files/whistle-included-job-{name}.json").stdout
+            (case / "included-job.json").write_bytes(included)
+            row["includedJob"] = json.loads(included)
             report = json.loads(raw)
             page = 16384 if args.tag == "google_apis_ps16k" else 4096
             if report["sdk"] != args.api or report["pageSize"] != page:

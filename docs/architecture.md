@@ -42,7 +42,7 @@ Disk space: on 2026-10-09, the root file system had 12 GB of free space. Each ph
 
 ## 1. Scope and constraints
 
-Cassini records audio and makes the transcript on the phone with sherpa-onnx and Parakeet Ultra INT8 (a post-train of Parakeet TDT 0.6B v3 by Moondream). It labels the speakers with Nemotron-3 Sortformer streaming diarization (diarization finds who speaks when). It recognizes named voices with CAM++ voiceprints. It saves all of this as one portable `.opus` document. The engine is good and has tests. Version 0.2 keeps the engine and replaces the app around it.
+Cassini records audio and makes the transcript on the phone with Included Whistle on verified eligible devices, or optional sherpa-onnx and Parakeet Ultra INT8 (a post-train of Parakeet TDT 0.6B v3 by Moondream). It labels the speakers with Nemotron-3 Sortformer streaming diarization (diarization finds who speaks when). It recognizes named voices with CAM++ voiceprints. It saves all of this as one portable `.opus` document. The engine is good and has tests. Version 0.2 keeps the engine and replaces the app around it.
 
 These constraints are mandatory:
 
@@ -338,6 +338,8 @@ The test APK instruments itself and does not touch the data of the app. If the S
 
 | Key | Type | Meaning |
 |---|---|---|
+| `recognition.model` | String | Explicit Included or Parakeet preference; absent resolves to verified Included eligibility. Each queued job keeps its own pinned `speech_identity`. |
+| `models.speechConsentAt` | Long | Explicit consent to download Parakeet. Consent to optional speaker/voice downloads alone does not authorize it. |
 | `models.consentAt` | Long | The user pushed "Download and transcribe" or "Download". Consent means that this key exists or that Parakeet is installed. |
 | `models.declinedAt` | Long | The user pushed "Not now — keep the audio". After later recordings, the consent screen does not open automatically. |
 | `processing.finalizationMs` | Long | The estimate of the time for matching and saving, `(old*3 + new)/4`. |

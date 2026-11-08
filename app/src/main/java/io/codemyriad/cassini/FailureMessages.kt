@@ -28,4 +28,5 @@ val Failure.stringRes: Int
         Failure.PLAYBACK -> R.string.error_playback
         Failure.OPUS_ENCODER -> R.string.error_opus_encoder
         Failure.MODEL_UNAVAILABLE -> UiR.string.ui_banner_dl_model_unavailable_body
+        Failure.INCLUDED_UNAVAILABLE -> UiR.string.ui_settings_not_available
     }

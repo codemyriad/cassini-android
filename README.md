@@ -1,6 +1,6 @@
 # Cassini talk for Android
 
-Cassini records audio and makes the transcript on your phone. It labels the speakers and can remember the voices of the people that you name. It keeps the audio and the timed words together in one `.opus` file. Any audio player plays this file, and other Cassini software reads the transcript in it. Speech recognition operates without a network connection after a one-time model download from `dist.gocassini.com`, the model host of Cassini. The speech model is [Parakeet Ultra](https://huggingface.co/moondream/parakeet-ultra) by Moondream, a further-trained NVIDIA Parakeet TDT 0.6B v3 for 25 European languages.
+Cassini records audio and makes the transcript on your phone. It labels the speakers and can remember the voices of the people that you name. It keeps the audio and the timed words together in one `.opus` file. Any audio player plays this file, and other Cassini software reads the transcript in it. On compatible arm64 phones with Android 10 or later, Whistle is included and is the default: basic transcription needs no model download or network connection. Parakeet is an optional download from `dist.gocassini.com`, and remains the default on other devices. The Parakeet model is [Parakeet Ultra](https://huggingface.co/moondream/parakeet-ultra) by Moondream, a further-trained NVIDIA Parakeet TDT 0.6B v3 for 25 European languages.
 
 **[Download the latest release](https://github.com/codemyriad/cassini-android/releases/latest)** · [Changelog](CHANGELOG.md)
 
@@ -11,7 +11,8 @@ Cassini does all speech recognition and speaker analysis on the phone. It does n
 ## Requirements
 
 - Android 8.0 (API 26) or later, on a 64-bit ARM phone (`arm64-v8a`). The APK also has `x86_64` for emulators.
-- About 1.3 GB of free storage while the models install, and about 0.8 GB after. The download is about 530 MB.
+- Included Whistle requires Android 10 or later and an arm64 CPU with dot-product support. Settings shows when it is unavailable.
+- The optional Parakeet, speaker and voice models need about 1.3 GB free while installing and about 0.8 GB afterwards. Their total download is about 530 MB.
 - 4 GB of RAM is a good start. This is not a tested minimum.
 
 ## Screenshots

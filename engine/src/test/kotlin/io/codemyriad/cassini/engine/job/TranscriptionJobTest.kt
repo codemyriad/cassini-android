@@ -69,6 +69,13 @@ class TranscriptionJobTest {
     private val sp2 = "diar_test_2"
     private val sp3 = "diar_test_3"
 
+    @Test fun aReplayMismatchOffersStartOverInsteadOfAnUnknownFailure() = runBlocking {
+        val h = Harness(speechModel = SpeechModel.INCLUDED)
+        h.script.beforeDecode = { throw RecognitionCheckpointMismatch("Saved prefix changed") }
+        val (outcome, _) = h.run()
+        assertEquals(JobOutcome.Failed(JobFailure.CheckpointMismatch), outcome)
+    }
+
     @Test fun includedDoesNotRequestDownloadsOrConsentAndWritesItsOwnIdentity() = runBlocking {
         val h = Harness(speechModel = SpeechModel.INCLUDED)
         h.models.readyParts = emptySet()
