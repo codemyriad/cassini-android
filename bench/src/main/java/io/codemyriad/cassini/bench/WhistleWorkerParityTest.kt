@@ -48,6 +48,7 @@ class WhistleWorkerParityTest {
         assertEquals(fixture.source, report.getString("sourceWavSha256"))
         assertEquals(fixture.filtered, report.getString("vadSha256"))
         assertNotEquals(android.os.Process.myPid(), report.getInt("workerPid"))
+        assertNotEquals(android.os.Process.myUid(), report.getInt("workerUid"))
         compareSegments(fixture.expected, report.getJSONArray("segments"))
     }
 
@@ -90,10 +91,12 @@ class WhistleWorkerParityTest {
         val digest = MessageDigest.getInstance("SHA-256")
         var hashes = Bundle.EMPTY
         var pid = 0
+        var uid = 0
         val began = System.nanoTime()
         val worker = WhistleWorker(instrumentation.targetContext, 48000) { actual.add(segment(it)) }
         worker.use {
             pid = it.pid
+            uid = it.uid
             feedWav(it, name, digest)
             hashes = it.finish()
         }
@@ -102,6 +105,8 @@ class WhistleWorkerParityTest {
             put("sdk", Build.VERSION.SDK_INT)
             put("pageSize", Os.sysconf(OsConstants._SC_PAGESIZE))
             put("workerPid", pid)
+            put("workerUid", uid)
+            put("callerUid", android.os.Process.myUid())
             put("callerPid", android.os.Process.myPid())
             put("elapsedMs", (System.nanoTime() - began) / 1_000_000)
             put("sourceWavSha256", hex(digest.digest()))

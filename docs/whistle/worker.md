@@ -6,14 +6,17 @@ prepares verified build inputs under the host lock. `scripts/package-whistle.py`
 checks the artifact/member/header pins before publishing its package manifest.
 The installed worker has no download code or system-runtime lookup.
 
-`WhistleWorker` binds a non-exported `:whistle` service from the inference thread.
+`WhistleWorker` binds a non-exported isolated-UID `:whistle` service from the inference thread.
 The private Application process sets all three privacy flags before any neural
 load and does not initialize the main AppGraph/sherpa runtime. The worker checks
 API/architecture/dot-product eligibility, runtime ZIP-entry hashes and both
 model hashes before dlopen/session creation. Models are read-only APK mappings;
 the libraries and mappings remain alive until the private process exits. The
 ORT file is named separately and loaded from its verified APK entry; sherpa's
-ORT is never loaded in that process.
+ORT is never loaded in that process. Before either neural load, it verifies a
+separate UID, denied INTERNET permission and actual EACCES/EPERM from creating
+IPv4/IPv6 TCP/UDP sockets, with no host connection. Parent and bench verify the
+returned worker UID. A failed isolation check refuses loading.
 
 The synchronous protocol permits one outstanding command. A bounded PCM chunk
 produces segment messages before its acknowledgement. The client waits on Binder

@@ -47,6 +47,7 @@ class WhistleWorker(
     private var ownsPermit = false
     private val death = CompletableFuture<Unit>()
     val pid: Int
+    val uid: Int
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, binder: IBinder) {
             try {
@@ -75,7 +76,10 @@ class WhistleWorker(
             bound = app.bindService(Intent(app, WhistleService::class.java), connection, Context.BIND_AUTO_CREATE)
             check(bound) { "Whistle worker could not bind" }
             remote = connected.get(DEADLINE_SECONDS, TimeUnit.SECONDS)
-            pid = command(WhistleProtocol.OPEN, Bundle().apply { putInt("rate", rate) }).getInt("pid")
+            val identity = command(WhistleProtocol.OPEN, Bundle().apply { putInt("rate", rate) })
+            pid = identity.getInt("pid")
+            uid = identity.getInt("uid")
+            check(uid > 0 && uid != android.os.Process.myUid()) { "Whistle must use an isolated UID" }
             check(pid > 0 && pid != android.os.Process.myPid()) { "Whistle must run in a private process" }
             opened = true
         } finally {

@@ -1,8 +1,10 @@
 package io.codemyriad.cassini.whistle
 
+import android.Manifest
 import android.app.Application
 import android.app.Service
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -11,6 +13,9 @@ import android.os.Looper
 import android.os.Message
 import android.os.Messenger
 import android.os.Process
+import android.system.ErrnoException
+import android.system.Os
+import android.system.OsConstants
 import androidx.annotation.RequiresApi
 import io.codemyriad.cassini.core.asr.whistle.WhistleSpeechSegment
 import io.codemyriad.cassini.engine.whistle.WhistleAssets
@@ -94,12 +99,39 @@ class WhistleService : Service() {
     private fun open(rate: Int): Bundle {
         check(stream == null && assets == null)
         require(rate == SPEECH_RATE || rate == SOURCE_RATE)
+        verifyIsolation()
         assets = WhistleAssets.verified(this)
         WhistleNative.bootstrap()
         val verified = requireNotNull(assets)
         WhistleNative.open(verified.needle, verified.ort, verified.model, verified.vad)
         stream = WhistleStream(rate, ::segment)
-        return Bundle().apply { putInt("pid", Process.myPid()) }
+        return Bundle().apply {
+            putInt("pid", Process.myPid())
+            putInt("uid", Process.myUid())
+        }
+    }
+
+    /** No host/contact is opened. Exercise the kernel/SELinux boundary before loading either neural runtime. */
+    private fun verifyIsolation() {
+        check(Process.myUid() != applicationInfo.uid) { "Whistle requires an isolated UID" }
+        check(checkSelfPermission(Manifest.permission.INTERNET) == PackageManager.PERMISSION_DENIED)
+        for (family in listOf(OsConstants.AF_INET, OsConstants.AF_INET6)) {
+            for (type in listOf(OsConstants.SOCK_STREAM, OsConstants.SOCK_DGRAM)) {
+                deniedSocket(family, type)
+            }
+        }
+    }
+
+    private fun deniedSocket(family: Int, type: Int) {
+        try {
+            val socket = Os.socket(family, type, 0)
+            Os.close(socket)
+            error("Whistle isolated process unexpectedly permits Internet sockets")
+        } catch (error: ErrnoException) {
+            check(error.errno == OsConstants.EACCES || error.errno == OsConstants.EPERM) {
+                "Whistle socket check failed without proving network denial"
+            }
+        }
     }
 
     private fun segment(range: WhistleSpeechSegment, json: ByteArray, hash: String) {
