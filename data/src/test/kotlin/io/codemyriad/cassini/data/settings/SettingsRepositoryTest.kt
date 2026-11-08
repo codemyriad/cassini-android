@@ -92,6 +92,21 @@ class SettingsRepositoryTest {
         assertEquals(Settings(null, null, null, null, null, 0, false, false, null), settings)
     }
 
+    @Test fun parakeetOnlyConsentDoesNotAuthorizeOptionalDownloads() = runTest {
+        withStore { store ->
+            store.recordConsent(100, includeOptional = false)
+            assertEquals(100L, store.speechConsentAt.first())
+            assertNull(store.consentAt.first())
+        }
+        withStore { store ->
+            assertEquals(100L, store.speechConsentAt.first())
+            assertNull(store.consentAt.first())
+            store.recordConsent(200, includeSpeech = false)
+            assertEquals(100L, store.speechConsentAt.first())
+            assertEquals(200L, store.consentAt.first())
+        }
+    }
+
     @Test fun firstWhistleCompletionAndSuggestionDismissalSurviveReopen() = runTest {
         withStore { store ->
             assertNull(store.firstWhistleNote.first())

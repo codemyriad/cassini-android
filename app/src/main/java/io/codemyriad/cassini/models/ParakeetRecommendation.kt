@@ -14,6 +14,7 @@ import io.codemyriad.cassini.data.models.ModelStatus
 import io.codemyriad.cassini.data.settings.SettingsRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
@@ -31,6 +32,7 @@ class ParakeetRecommendation(
     private val paths: AppPaths,
     private val models: ModelRepository,
     private val settings: SettingsRepository,
+    private val included: Deferred<Boolean>,
     private val io: CoroutineDispatcher,
 ) {
     private val refreshes = MutableStateFlow(0L)
@@ -45,7 +47,9 @@ class ParakeetRecommendation(
         if (dismissed || speech !is ModelStatus.Missing && speech !is ModelStatus.Failed) {
             ParakeetRecommendationState()
         } else {
-            withContext(io) { inspect(first) }
+            withContext(io) {
+                if (included.await()) inspect(first) else ParakeetRecommendationState()
+            }
         }
     }
 

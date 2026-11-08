@@ -380,7 +380,7 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
     // Models (architecture 5.6). ------------------------------------------------------------------------------------
 
     /** The standalone download through `ModelInstallOwner`, inside the foreground service. */
-    fun downloadModels(parts: Set<ModelPart> = ModelPart.entries.toSet()): Job {
+    fun downloadModels(parts: Set<ModelPart>? = null): Job {
         val job = graph.installOwner.startDownload(parts)
         synchronized(workLock) { downloadJobs += job }
         work.update { it.copy(downloading = true) }

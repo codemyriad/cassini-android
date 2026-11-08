@@ -68,8 +68,10 @@ class GraphModelDownloadPorts(
             ?.usableSpace ?: 0L
     }
 
-    override suspend fun recordConsent() =
-        graph.models.recordConsent(includeSpeech = parakeetOnly || targetModel() == SpeechModel.PARAKEET)
+    override suspend fun recordConsent() = graph.models.recordConsent(
+        includeSpeech = parakeetOnly || targetModel() == SpeechModel.PARAKEET,
+        includeOptional = !parakeetOnly,
+    )
 
     override suspend fun recordDeclined() = graph.models.recordDeclined()
 

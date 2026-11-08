@@ -181,7 +181,14 @@ class AppGraph(context: Context, val config: Config) {
         SettingsRepository.create(paths, CoroutineScope(appScope.coroutineContext + dispatchers.io))
     val models = ModelRepository(paths, settings, dispatchers, config.fetcher, config.clock)
     val speech = SpeechSelection(app, settings, models, appScope, dispatchers.io)
-    val parakeetRecommendation = ParakeetRecommendation(app, paths, models, settings, dispatchers.io)
+    val parakeetRecommendation = ParakeetRecommendation(
+        app,
+        paths,
+        models,
+        settings,
+        speech.included,
+        dispatchers.io,
+    )
     val installOwner = ModelInstallOwner(models, paths.modelRoot, network, appScope, dispatchers.io)
     val modelAccess: ModelAccess = RepositoryModelAccess(models, paths.modelRoot, installOwner, network)
 

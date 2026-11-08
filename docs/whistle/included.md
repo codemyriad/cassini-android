@@ -22,7 +22,9 @@ Whistle's basic path uses bundled VAD and needs no downloaded model or consent.
 Without optional speaker/voice models, it uses one speaker and no saved-voice
 matching. Settings can download those parts explicitly. That consent does not
 authorize Parakeet: `models.speechConsentAt` is recorded only for a download plan
-that includes Parakeet. Existing installed Parakeet remains usable. Download
+that includes Parakeet. Conversely, Parakeet-only consent never authorizes the
+optional speaker downloads, including a retry or the next Parakeet job. Existing
+installed Parakeet remains usable. Download
 screens for a paused job use that job's model, even after the default changes.
 
 ## Parakeet recommendation (D78)
@@ -32,7 +34,9 @@ job, the same suggestion appears in the Library and that note. It never opens a
 download itself. The action enters the existing consent screen with only the
 missing Parakeet/VAD part, and the displayed bytes come from that exact pinned
 plan. Optional speaker downloads are excluded. Not now or close persists across
-restarts and both surfaces. Failed/paused jobs do not count as a first completion.
+restarts and both surfaces. Per coordinator clarification, the suggestion is also
+suppressed wherever Whistle is unavailable, so its starter copy never makes a
+false promise. Failed/paused jobs do not count as a first completion.
 
 The suggestion requires a supported 64-bit runtime, at least 4,000,000,000 bytes
 of OS-reported total RAM, neither Android low-RAM nor low-memory warning, and

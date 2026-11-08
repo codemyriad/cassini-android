@@ -130,8 +130,8 @@ private class NetworkFetcher(
  * (read by [refresh]) with the progress of an install in flight, which [installBlocking] and the app's install owner
  * push. It is empty until the first [refresh]. There is no delete API: the design has no surface for it.
  *
- * Consent is `models.consentAt` present or Parakeet installed. It is recorded only by [recordConsent] (the Model
- * download screen's primary button); callers check [consented] before any install, and [installBlocking] does not.
+ * Optional-download consent is `models.consentAt`. Speech uses `models.speechConsentAt` or installed Parakeet.
+ * Only [recordConsent] records the permissions of the plan shown; [installBlocking] does not check consent.
  */
 // Status, consent, plan and install of one area, as architecture 4.6 lists them.
 @Suppress("TooManyFunctions")
@@ -146,6 +146,7 @@ class ModelRepository(
     private val lock = ReentrantLock()
     private var ready: Map<ModelPart, Boolean> = emptyMap()
     private var consentRecorded = false
+    private var speechConsentRecorded = false
     private val inFlight = HashMap<ModelPart, ModelStatus>()
     private val state = MutableStateFlow<Map<ModelPart, ModelStatus>>(emptyMap())
 
@@ -154,10 +155,12 @@ class ModelRepository(
     /** Reads the readiness of every part and the consent again, and returns the new [status]. */
     suspend fun refresh(): Map<ModelPart, ModelStatus> {
         val recorded = settings.consentAt.first() != null
+        val speechRecorded = settings.speechConsentAt.first() != null
         return withContext(dispatchers.io) {
             val readiness = readiness()
             lock.withLock {
                 consentRecorded = recorded
+                speechConsentRecorded = speechRecorded
                 ready = readiness
                 // A failure is shown until the part is installed or a new install starts.
                 inFlight.keys.removeAll { readiness[it] == true }
@@ -166,16 +169,18 @@ class ModelRepository(
         }
     }
 
-    /** `models.consentAt` present or Parakeet installed. */
-    suspend fun consented(): Boolean =
-        settings.consentAt.first() != null || withContext(dispatchers.io) { ModelCatalog.PARAKEET.ready(paths.modelRoot) }
+    /** Explicit optional-model consent. Installed Parakeet authorizes only speech, never optional downloads. */
+    suspend fun consented(): Boolean = settings.consentAt.first() != null
+
+    /** Last refreshed optional-download permission, for the synchronous job plan on its IO thread. */
+    fun optionalDownloadsConsented(): Boolean = lock.withLock { consentRecorded }
 
     /** "Download and transcribe" or "Download" was pressed. */
     suspend fun speechConsented(): Boolean =
         settings.speechConsentAt.first() != null || withContext(dispatchers.io) { ModelCatalog.PARAKEET.ready(paths.modelRoot) }
 
-    suspend fun recordConsent(includeSpeech: Boolean = true) {
-        settings.recordConsent(clock(), includeSpeech)
+    suspend fun recordConsent(includeSpeech: Boolean = true, includeOptional: Boolean = true) {
+        settings.recordConsent(clock(), includeSpeech, includeOptional)
         refresh()
     }
 
@@ -324,8 +329,12 @@ class ModelRepository(
 
     /** The [state] from the fields; the caller holds [lock]. A part whose readiness is unknown is left out. */
     private fun publish(): Map<ModelPart, ModelStatus> {
-        val consent = consentRecorded || ready[ModelPart.SPEECH] == true
         val next = ModelPart.entries.mapNotNull { part ->
+            val consent = if (part == ModelPart.SPEECH) {
+                speechConsentRecorded || ready[ModelPart.SPEECH] == true
+            } else {
+                consentRecorded
+            }
             val status = inFlight[part] ?: ready[part]?.let { if (it) ModelStatus.Ready else ModelStatus.Missing(consent) }
             status?.let { part to it }
         }.toMap()

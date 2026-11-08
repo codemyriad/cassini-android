@@ -1,5 +1,6 @@
 package io.codemyriad.cassini.processing
 
+import io.codemyriad.cassini.adapters.RepositoryModelAccess
 import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.models.ModelCatalog
 import io.codemyriad.cassini.core.models.ModelDescriptor
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -121,6 +123,31 @@ class ModelInstallOwnerTest {
     private fun key(model: ModelDescriptor) = "${model.directory}/${model.markerFile}"
 
     private val everyModel = ModelPart.entries.flatMap { it.models }.map(::key).sorted()
+
+    @Test fun parakeetOnlyPermissionCannotFetchOptionalPartsOrScheduleThemForTheNextJob() = runBlocking {
+        val separate = AppPaths(folder.newFolder("speech-root"), folder.newFolder("speech-cache"))
+        val settings = SettingsRepository.create(separate, CoroutineScope(scope.coroutineContext + Dispatchers.IO))
+        val repository = ModelRepository(separate, settings, CassiniDispatchers(), fetcher)
+        repository.recordConsent(includeOptional = false)
+        val installer = ModelInstallOwner(repository, separate.modelRoot, { true }, scope, Dispatchers.IO)
+        val access = RepositoryModelAccess(repository, separate.modelRoot, installer) { true }
+        assertEquals(listOf(ModelPart.SPEECH), withContext(Dispatchers.IO) { access.plan().parts })
+        val mixed = withTimeout(WAIT_MS) { installer.install(setOf(ModelPart.SPEECH, ModelPart.SPEAKERS)) }
+        assertTrue(mixed is InstallOutcome.NeedsConsent)
+        assertTrue(fetched.isEmpty())
+        release.countDown()
+        val speech = withTimeout(WAIT_MS) { installer.install(setOf(ModelPart.SPEECH)) }
+        assertEquals(InstallOutcome.Installed(), speech)
+        val expected = listOf(key(ModelCatalog.PARAKEET), key(ModelCatalog.VAD)).sorted()
+        assertEquals(expected, fetched.sorted())
+        assertTrue(withContext(Dispatchers.IO) { access.plan().isEmpty })
+        assertTrue(installer.install(setOf(ModelPart.SPEAKERS)) is InstallOutcome.NeedsConsent)
+        withTimeout(WAIT_MS) { installer.startDownload().join() }
+        assertEquals("A speech-only retry cannot add optional models", expected, fetched.sorted())
+        repository.recordConsent(includeSpeech = false)
+        val authorized = withContext(Dispatchers.IO) { access.plan().parts }
+        assertEquals(listOf(ModelPart.SPEAKERS, ModelPart.VOICES), authorized)
+    }
 
     @Test fun aJobJoiningTheStandaloneDownloadFetchesEachArtifactOnce() = runBlocking {
         owner.startDownload()

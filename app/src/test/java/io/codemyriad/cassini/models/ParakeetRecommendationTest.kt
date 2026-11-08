@@ -8,12 +8,14 @@ import io.codemyriad.cassini.data.CassiniDispatchers
 import io.codemyriad.cassini.data.models.ModelFetcher
 import io.codemyriad.cassini.data.models.ModelRepository
 import io.codemyriad.cassini.data.settings.SettingsRepository
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -50,7 +52,14 @@ class ParakeetRecommendationTest {
         try {
             models.refresh()
             settings.recordWhistleCompleted("first")
-            val recommendation = ParakeetRecommendation(context, paths, models, settings, Dispatchers.IO)
+            val recommendation = ParakeetRecommendation(
+                context,
+                paths,
+                models,
+                settings,
+                CompletableDeferred(true),
+                Dispatchers.IO,
+            )
             val collector = launch { recommendation.state.collect { reports.send(it) } }
             try {
                 assertFalse(reports.receive().visible)
@@ -60,6 +69,16 @@ class ParakeetRecommendationTest {
             } finally {
                 collector.cancelAndJoin()
             }
+            val unavailable = ParakeetRecommendation(
+                context,
+                paths,
+                models,
+                settings,
+                CompletableDeferred(false),
+                Dispatchers.IO,
+            )
+            assertFalse(unavailable.state.first().visible)
+            assertEquals("Whistle unavailable: no suggestion inspection or misleading body", 2, probes.get())
         } finally {
             settingsJob.cancelAndJoin()
             reports.close()

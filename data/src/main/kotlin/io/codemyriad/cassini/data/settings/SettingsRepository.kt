@@ -58,12 +58,16 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
 
     suspend fun snapshot(): Settings = settings.first()
 
-    /** When the user agreed to the model download; null when they never did. */
+    /** Explicit optional-model download consent; a Parakeet-only plan does not set this. */
     val consentAt: Flow<Long?> = key(Keys.CONSENT_AT)
 
-    suspend fun recordConsent(at: Long, includeSpeech: Boolean = true) {
+    suspend fun recordConsent(
+        at: Long,
+        includeSpeech: Boolean = true,
+        includeOptional: Boolean = true,
+    ) {
         store.edit {
-            it[Keys.CONSENT_AT] = at
+            if (includeOptional) it[Keys.CONSENT_AT] = at
             if (includeSpeech) it[Keys.SPEECH_CONSENT_AT] = at
         }
     }

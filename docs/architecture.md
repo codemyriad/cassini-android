@@ -344,7 +344,7 @@ The test APK instruments itself and does not touch the data of the app. If the S
 | `notices.parakeetSuggestionDismissed` | Boolean | Persistent dismissal of the Settings and post-Whistle recommendation. |
 | `notices.parakeetDefault` | Boolean | Pending one-time announcement after verified Parakeet promotion. |
 | `models.speechConsentAt` | Long | Explicit consent to download Parakeet. Consent to optional speaker/voice downloads alone does not authorize it. |
-| `models.consentAt` | Long | The user pushed "Download and transcribe" or "Download". Consent means that this key exists or that Parakeet is installed. |
+| `models.consentAt` | Long | Explicit optional-model consent from the shown plan. Parakeet-only consent and installed Parakeet do not authorize optional downloads. |
 | `models.declinedAt` | Long | The user pushed "Not now — keep the audio". After later recordings, the consent screen does not open automatically. |
 | `processing.finalizationMs` | Long | The estimate of the time for matching and saving, `(old*3 + new)/4`. |
 | `queue.hold` | String | `USER`, `SYSTEM`, or no key (section 5.2). |

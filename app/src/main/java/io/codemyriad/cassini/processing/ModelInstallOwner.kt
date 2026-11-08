@@ -113,10 +113,10 @@ class ModelInstallOwner(
      * The download from Settings or a banner, with no note (architecture 5.6): installs [parts] in the background
      * and shows its progress through [state] and `ModelRepository.status`. [cancel] stops it.
      */
-    fun startDownload(parts: Set<ModelPart> = ModelPart.entries.toSet()): Job {
+    fun startDownload(parts: Set<ModelPart>? = null): Job {
         val job = scope.launch(start = CoroutineStart.LAZY) {
             try {
-                install(parts, {}, standalone = true)
+                install(parts ?: allowedRetryParts(), {}, standalone = true)
             } catch (_: CancellationException) {
                 // A cancelled download keeps its .part files; there is nothing more to do.
             }
@@ -125,6 +125,15 @@ class ModelInstallOwner(
         job.invokeOnCompletion { downloads -= job }
         job.start()
         return job
+    }
+
+    /** A retry never adds a model role that the original consent did not authorize. */
+    private suspend fun allowedRetryParts(): Set<ModelPart> {
+        val speech = models.speechConsented()
+        val optional = models.consented()
+        val allowed = ModelPart.entries.filter { if (it == ModelPart.SPEECH) speech else optional }.toSet()
+        // With no permission, preserve NeedsConsent rather than reporting an empty successful install.
+        return allowed.ifEmpty { ModelPart.entries.toSet() }
     }
 
     /**
@@ -212,7 +221,9 @@ class ModelInstallOwner(
         // A new install drops the failure an earlier one left in the status.
         shared.parts.forEach(models::clearProgress)
         try {
-            val consented = if (ModelPart.SPEECH in shared.parts) models.speechConsented() else models.consented()
+            val speechConsent = ModelPart.SPEECH !in shared.parts || models.speechConsented()
+            val optionalConsent = shared.parts.all { it == ModelPart.SPEECH } || models.consented()
+            val consented = speechConsent && optionalConsent
             val store = RepositoryModelStore(models, modelRoot, network, consented)
             val outcome = ModelInstaller(store, io).install(shared.parts) { progress ->
                 shared.progress = progress

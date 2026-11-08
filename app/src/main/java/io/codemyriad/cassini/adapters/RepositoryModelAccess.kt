@@ -26,7 +26,9 @@ class RepositoryModelAccess(
 
     override fun ready(part: ModelPart): Boolean = models.readyBlocking(part)
 
-    override fun plan(): ModelPlan = ModelPlan.of(modelRoot)
+    override fun plan(): ModelPlan = ModelPlan(
+        ModelPlan.of(modelRoot).missing.filter { it.part == ModelPart.SPEECH || models.optionalDownloadsConsented() },
+    )
 
     override fun detectorReady(): Boolean = ModelCatalog.VAD.ready(modelRoot)
 

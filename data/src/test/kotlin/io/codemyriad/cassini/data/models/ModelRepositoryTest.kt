@@ -100,15 +100,16 @@ class ModelRepositoryTest {
         val status = repository().refresh()
 
         assertEquals(ModelStatus.Ready, status[ModelPart.SPEECH])
-        // Parakeet installed counts as consent.
-        assertEquals(ModelStatus.Missing(consented = true), status[ModelPart.SPEAKERS])
-        assertEquals(ModelStatus.Missing(consented = true), status[ModelPart.VOICES])
-        assertTrue(repository().consented())
+        // Installed Parakeet authorizes speech, without consenting to optional downloads.
+        assertEquals(ModelStatus.Missing(consented = false), status[ModelPart.SPEAKERS])
+        assertEquals(ModelStatus.Missing(consented = false), status[ModelPart.VOICES])
+        assertFalse(repository().consented())
+        assertTrue(repository().speechConsented())
         assertEquals(listOf(ModelPart.SPEAKERS, ModelPart.VOICES), repository().plan().parts)
         assertTrue("the speech detector is best effort", offMain { repository().readyBlocking(ModelPart.SPEECH) })
     }
 
-    @Test fun consentIsTheStoredTimeOrParakeet() = runTest {
+    @Test fun explicitConsentAuthorizesSpeechAndOptionalParts() = runTest {
         val repo = repository()
         repo.refresh()
         repo.recordDeclined()
