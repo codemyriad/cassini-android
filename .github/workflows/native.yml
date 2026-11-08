@@ -25,6 +25,7 @@ on:
       - 'scripts/streaming-diarization.patch'
       - 'scripts/build-native-aar.sh'
       - 'scripts/ci-downloads.py'
+      - 'scripts/ci-download-pins.json'
       - 'scripts/fetch-native-aar.sh'
       - 'scripts/fetch-opus-source.sh'
       - 'scripts/verify-native-runtime.sh'
@@ -48,6 +49,7 @@ on:
       - 'scripts/streaming-diarization.patch'
       - 'scripts/build-native-aar.sh'
       - 'scripts/ci-downloads.py'
+      - 'scripts/ci-download-pins.json'
       - 'scripts/fetch-native-aar.sh'
       - 'scripts/fetch-opus-source.sh'
       - 'scripts/verify-native-runtime.sh'
@@ -88,6 +90,8 @@ jobs:
           cache-provider: basic
           cache-read-only: true
       # Every ref restores the archives; only main saves them, after the build below has fetched them (D66 AND-6).
+      - name: Cache SHA-pinned Gradle distribution through official API
+        run: python3 scripts/ci-downloads.py gradle
       - name: Restore the pinned source archives
         id: source-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

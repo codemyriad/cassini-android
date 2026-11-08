@@ -35,8 +35,9 @@ if [ -z "${SHERPA_ONNX_SRC:-}" ]; then
 fi
 src=$(cd "$SHERPA_ONNX_SRC" && pwd)
 
-# D66: upstream quiet wget exits on transient HTTP failures; bound and log only those downloads.
-python3 scripts/ci-downloads.py native --source "$src"
+# D66: fetch the identical pinned ORT archive once through the official API, avoiding broken browser redirects.
+python3 scripts/ci-downloads.py native --output "$work/onnxruntime"
+export SHERPA_ONNX_ONNXRUNTIME_ROOT="$work/onnxruntime"
 
 # Keep the incremental JNI API reproducible against the pinned source archive. The source sits
 # inside this repository's .tools/, where git apply would silently skip every path; stop discovery.

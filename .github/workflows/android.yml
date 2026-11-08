@@ -42,6 +42,8 @@ jobs:
         with:
           cache-provider: basic
           cache-read-only: true
+      - name: Cache SHA-pinned Gradle distribution through official API
+        run: python3 scripts/ci-downloads.py gradle
       - name: Download detekt dependencies (network only, bounded)
         run: python3 scripts/ci-downloads.py detekt
       - name: detekt
@@ -100,6 +102,8 @@ jobs:
           cache-read-only: true
       # No setup.sh. The runner image ships an Android SDK; hiding it proves :core does not need one.
       # --configure-on-demand keeps Gradle from configuring the Android modules (docs/development.md).
+      - name: Cache SHA-pinned Gradle distribution through official API
+        run: python3 scripts/ci-downloads.py gradle
       - name: Run the :core tests
         run: env -u ANDROID_HOME -u ANDROID_SDK_ROOT ./gradlew --no-daemon --configure-on-demand :core:test
       - name: Upload the :core test reports
@@ -138,6 +142,8 @@ jobs:
           cache-read-only: ${{ runner.environment != 'github-hosted' }}
       # The release key signs the GitHub APK and the Play bundle (docs/release.md, "Signing"). No fallbacks: a tag
       # build without the four secrets fails here.
+      - name: Cache SHA-pinned Gradle distribution through official API
+        run: python3 scripts/ci-downloads.py gradle
       - name: Restore the release signing key
         if: startsWith(github.ref, 'refs/tags/')
         env:

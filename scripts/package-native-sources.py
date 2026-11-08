@@ -37,7 +37,8 @@ if __name__ == '__main__':
         # Files keep their repository paths, so the packaged scripts find the manifest and the
         # patch where they look for them.
         build_files = [manifest, Path('scripts/streaming-diarization.patch'),
-                       Path('scripts/build-native-aar.sh'), Path('scripts/fetch-opus-source.sh'),
+                       Path('scripts/build-native-aar.sh'), Path('scripts/ci-downloads.py'),
+                       Path('scripts/ci-download-pins.json'), Path('scripts/fetch-opus-source.sh'),
                        Path('scripts/native-common.sh'), Path('engine/build.gradle.kts'),
                        *sorted(Path('engine/src/main/cpp').glob('*')),
                        Path('docs/native-runtime.md'), Path('THIRD_PARTY_NOTICES.md')]

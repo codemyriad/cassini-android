@@ -36,6 +36,8 @@ jobs:
           cache-provider: basic
           cache-read-only: true
       # Restore only: android.yml saves this entry on main.
+      - name: Cache SHA-pinned Gradle distribution through official API
+        run: python3 scripts/ci-downloads.py gradle
       - name: Restore the native runtime
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
