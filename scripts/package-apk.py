@@ -17,7 +17,7 @@ if variant not in {'debug', 'release'}:
     raise SystemExit('APK_VARIANT must be debug or release')
 output = Path('app/build/outputs/apk') / variant
 metadata = json.loads((output / 'output-metadata.json').read_text())
-element, = metadata['elements']
+element, = [item for item in metadata['elements'] if not item['filters']]
 version = element['versionName']
 if os.environ.get('IS_TAG') == 'true' and os.environ['TAG'] != f'v{version}':
     raise SystemExit(f'Tag does not match APK version {version}')
@@ -56,6 +56,19 @@ name = f'cassini-android-{version}.apk'
 shutil.copyfile(output / element['outputFile'], destination / name)
 checksum = hashlib.sha256((destination / name).read_bytes()).hexdigest()
 (destination / f'{name}.sha256').write_text(f'{checksum}  {name}\n')
+# Validate and stage every ABI APK too; the universal remains available for existing install scripts.
+for split in metadata['elements']:
+    if not split['filters']:
+        continue
+    abi, = [item['identifier'] for item in split['filters'] if item['filterType'] == 'ABI']
+    split_source = output / split['outputFile']
+    with zipfile.ZipFile(split_source) as apk:
+        check_apk_models(apk, whistle_model_pins())
+    check_apk_compatibility(split_source, {abi})
+    split_name = f'cassini-android-{version}-{abi}.apk'
+    shutil.copyfile(split_source, destination / split_name)
+    split_sha = hashlib.sha256((destination / split_name).read_bytes()).hexdigest()
+    (destination / f'{split_name}.sha256').write_text(f'{split_sha}  {split_name}\n')
 shutil.copyfile('THIRD_PARTY_NOTICES.md', destination / 'THIRD_PARTY_NOTICES.md')
 # R8 renames classes in the release APK; keep its mapping so crash traces can be decoded.
 mapping = Path('app/build/outputs/mapping') / variant / 'mapping.txt'

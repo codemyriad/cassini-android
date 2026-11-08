@@ -28,17 +28,31 @@ import java.util.concurrent.TimeUnit
  * Main-thread calls are rejected; waits use Binder/queue events with a failure deadline, never sleeps.
  */
 @RequiresApi(Build.VERSION_CODES.Q)
-class WhistleWorker(
+class WhistleWorker internal constructor(
     context: Context,
     rate: Int,
     private val onSegment: (Bundle) -> Unit,
+    private val admission: Semaphore,
+    private val deadlineSeconds: Long,
+    capability: () -> WhistleCapability,
 ) : AutoCloseable {
+    constructor(context: Context, rate: Int, onSegment: (Bundle) -> Unit) : this(
+        context,
+        rate,
+        onSegment,
+        permit,
+        DEADLINE_SECONDS,
+        WhistleDeviceCapability::current,
+    )
+
     private val app = context.applicationContext
     private val thread = HandlerThread("WhistleReplies")
     private val connected = CompletableFuture<Messenger>()
     private val replies = ArrayBlockingQueue<Message>(REPLY_CAPACITY)
     private var remote: Messenger? = null
-    private var bound = false
+    private var bindAttempted = false
+
+    @Volatile private var linked = false
 
     @Volatile private var closed = false
 
@@ -52,6 +66,7 @@ class WhistleWorker(
         override fun onServiceConnected(name: ComponentName, binder: IBinder) {
             try {
                 binder.linkToDeath({ died() }, 0)
+                linked = true
                 connected.complete(Messenger(binder))
             } catch (_: RemoteException) {
                 died()
@@ -65,25 +80,28 @@ class WhistleWorker(
 
     init {
         check(Looper.myLooper() != Looper.getMainLooper()) { "Whistle worker requires the inference thread" }
-        check(WhistleDeviceCapability.current() == WhistleCapability.ELIGIBLE) { "Whistle unavailable on this device" }
-        permit.acquire()
-        ownsPermit = true
-        var opened = false
+        check(capability() == WhistleCapability.ELIGIBLE) { "Whistle unavailable on this device" }
         try {
+            check(admission.tryAcquire(deadlineSeconds, TimeUnit.SECONDS)) { "Whistle worker is busy" }
+            ownsPermit = true
             thread.start()
             val incoming = Handler(thread.looper) { receive(it) }
             receiver = Messenger(incoming)
-            bound = app.bindService(Intent(app, WhistleService::class.java), connection, Context.BIND_AUTO_CREATE)
+            bindAttempted = true
+            val bound = app.bindService(Intent(app, WhistleService::class.java), connection, Context.BIND_AUTO_CREATE)
             check(bound) { "Whistle worker could not bind" }
-            remote = connected.get(DEADLINE_SECONDS, TimeUnit.SECONDS)
+            remote = connected.get(deadlineSeconds, TimeUnit.SECONDS)
             val identity = command(WhistleProtocol.OPEN, Bundle().apply { putInt("rate", rate) })
             pid = identity.getInt("pid")
             uid = identity.getInt("uid")
             check(uid > 0 && uid != android.os.Process.myUid()) { "Whistle must use an isolated UID" }
             check(pid > 0 && pid != android.os.Process.myPid()) { "Whistle must run in a private process" }
-            opened = true
-        } finally {
-            if (!opened) close()
+        } catch (
+            @Suppress("TooGenericExceptionCaught") // Constructor boundary: preserve the original failure after cleanup.
+            error: Throwable,
+        ) {
+            closePreserving(error)
+            throw error
         }
     }
 
@@ -97,10 +115,30 @@ class WhistleWorker(
         }
     }
 
-    fun finish(): Bundle = try {
-        command(WhistleProtocol.FINISH, Bundle.EMPTY)
-    } finally {
+    fun finish(): Bundle {
+        val result = try {
+            command(WhistleProtocol.FINISH, Bundle.EMPTY)
+        } catch (
+            @Suppress("TooGenericExceptionCaught") // Preserve inference/cancellation failure if cleanup also fails.
+            error: Throwable,
+        ) {
+            closePreserving(error)
+            throw error
+        }
         close()
+        return result
+    }
+
+    private fun closePreserving(error: Throwable) {
+        if (error is InterruptedException) Thread.currentThread().interrupt()
+        try {
+            close()
+        } catch (
+            @Suppress("TooGenericExceptionCaught") // Cleanup never replaces the primary error, including OOM/linkage.
+            cleanup: Throwable,
+        ) {
+            error.addSuppressed(cleanup)
+        }
     }
 
     private fun receive(message: Message): Boolean {
@@ -127,7 +165,7 @@ class WhistleWorker(
                 replyTo = receiver
             }
             remote?.send(request) ?: error("Whistle worker disconnected")
-            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(DEADLINE_SECONDS)
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(deadlineSeconds)
             while (true) {
                 val remaining = deadline - System.nanoTime()
                 check(remaining > 0) { "Whistle worker timed out" }
@@ -140,6 +178,9 @@ class WhistleWorker(
                     else -> error("Unexpected Whistle worker reply")
                 }
             }
+        } catch (error: InterruptedException) {
+            Thread.currentThread().interrupt()
+            throw error
         } finally {
             inCommand = false
         }
@@ -158,12 +199,13 @@ class WhistleWorker(
         closed = true
         var interrupted = Thread.interrupted()
         try {
-            if (bound) {
-                app.unbindService(connection)
-                bound = false
-                if (remote != null) {
-                    cleanupWait({ interrupted = true }) { death.get(it, TimeUnit.NANOSECONDS) }
+            try {
+                if (bindAttempted) {
+                    bindAttempted = false
+                    app.unbindService(connection)
                 }
+            } finally {
+                if (linked) cleanupWait({ interrupted = true }) { death.get(it, TimeUnit.NANOSECONDS) }
             }
         } finally {
             try {
@@ -176,9 +218,9 @@ class WhistleWorker(
                 }
             } finally {
                 remote = null
-                if (ownsPermit) {
+                if (ownsPermit && (!linked || death.isDone)) {
                     ownsPermit = false
-                    permit.release()
+                    admission.release()
                 }
                 if (interrupted) Thread.currentThread().interrupt()
             }

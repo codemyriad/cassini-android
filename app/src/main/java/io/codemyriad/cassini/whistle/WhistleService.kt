@@ -1,10 +1,8 @@
 package io.codemyriad.cassini.whistle
 
-import android.Manifest
 import android.app.Application
 import android.app.Service
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -13,9 +11,7 @@ import android.os.Looper
 import android.os.Message
 import android.os.Messenger
 import android.os.Process
-import android.system.ErrnoException
-import android.system.Os
-import android.system.OsConstants
+import android.os.RemoteException
 import androidx.annotation.RequiresApi
 import io.codemyriad.cassini.core.asr.whistle.WhistleSpeechSegment
 import io.codemyriad.cassini.engine.whistle.WhistleAssets
@@ -80,9 +76,9 @@ class WhistleService : Service() {
                 // Same sender/handler: all results precede their ACK. No next command races the busy flag.
                 for (segment in completed) {
                     val response = Message.obtain(null, WhistleProtocol.SEGMENT).apply { this.data = segment }
-                    reply.send(response)
+                    if (!send(reply, response)) return@post
                 }
-                reply.send(Message.obtain(null, command).apply { this.data = result })
+                send(reply, Message.obtain(null, command).apply { this.data = result })
             }
         } catch (
             @Suppress("TooGenericExceptionCaught") // IPC boundary; every failure is returned, never a fallback.
@@ -99,7 +95,7 @@ class WhistleService : Service() {
     private fun open(rate: Int): Bundle {
         check(stream == null && assets == null)
         require(rate == SPEECH_RATE || rate == SOURCE_RATE)
-        verifyIsolation()
+        WhistleIsolation.verify(this)
         assets = WhistleAssets.verified(this)
         WhistleNative.bootstrap()
         val verified = requireNotNull(assets)
@@ -108,29 +104,6 @@ class WhistleService : Service() {
         return Bundle().apply {
             putInt("pid", Process.myPid())
             putInt("uid", Process.myUid())
-        }
-    }
-
-    /** No host/contact is opened. Exercise the kernel/SELinux boundary before loading either neural runtime. */
-    private fun verifyIsolation() {
-        check(Process.myUid() != applicationInfo.uid) { "Whistle requires an isolated UID" }
-        check(checkSelfPermission(Manifest.permission.INTERNET) == PackageManager.PERMISSION_DENIED)
-        for (family in listOf(OsConstants.AF_INET, OsConstants.AF_INET6)) {
-            for (type in listOf(OsConstants.SOCK_STREAM, OsConstants.SOCK_DGRAM)) {
-                deniedSocket(family, type)
-            }
-        }
-    }
-
-    private fun deniedSocket(family: Int, type: Int) {
-        try {
-            val socket = Os.socket(family, type, 0)
-            Os.close(socket)
-            error("Whistle isolated process unexpectedly permits Internet sockets")
-        } catch (error: ErrnoException) {
-            check(error.errno == OsConstants.EACCES || error.errno == OsConstants.EPERM) {
-                "Whistle socket check failed without proving network denial"
-            }
         }
     }
 
@@ -157,7 +130,15 @@ class WhistleService : Service() {
         val response = Message.obtain(null, WhistleProtocol.ERROR).apply {
             data = Bundle().apply { putString("error", message) }
         }
-        reply.send(response)
+        send(reply, response)
+    }
+
+    private fun send(reply: Messenger, message: Message): Boolean = try {
+        reply.send(message)
+        true
+    } catch (_: RemoteException) {
+        failed = true
+        false
     }
 
     companion object {

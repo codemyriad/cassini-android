@@ -22,8 +22,14 @@ android {
         versionName = "0.4.1"
         // Builds the graph on a scratch root (docs/architecture.md section 9).
         testInstrumentationRunner = "io.codemyriad.cassini.CassiniTestRunner"
-        // Library modules cannot filter packaged ABIs; this line must stay in :app.
-        ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
+    }
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "x86_64")
+            isUniversalApk = true
+        }
     }
     // debug, or releaseTest for tag builds. The minified release build cannot be instrumented.
     testBuildType = providers.gradleProperty("deviceTestBuildType").getOrElse("debug")
@@ -81,7 +87,12 @@ android {
         jniLibs.srcDir(rootDir.resolve(".tools/whistle-package/jni"))
     }
     androidResources { noCompress += listOf("cact", "onnx") }
-    packaging.jniLibs.keepDebugSymbols += setOf("**/libcassini_needle.so", "**/libcassini_whistle_ort.so")
+    packaging.jniLibs.excludes += setOf("lib/armeabi-v7a/**", "lib/x86/**")
+    packaging.jniLibs.keepDebugSymbols += setOf(
+        "**/libcassini_needle.so",
+        "**/libcassini_whistle_ort.so",
+        "**/libcassini_whistle_weights.so",
+    )
     // The conformance vectors and the golden checkpoint are :core test data, not :app test inputs.
     testOptions {
         unitTests {
@@ -113,7 +124,10 @@ android {
             }
         }
     }
-    bundle { language { enableSplit = false } }
+    bundle {
+        abi { enableSplit = true }
+        language { enableSplit = false }
+    }
     sourceSets {
         // Device tests read the committed CC-BY-4.0 FLEURS clip from fixtures/audio. The local-only YouTube clips
         // (tools/fetch-youtube-audio.sh output in src/androidTest/assets) are packaged when present and never
@@ -197,3 +211,19 @@ val checkWhistlePackage = tasks.register("checkWhistlePackage") {
     }
 }
 tasks.named("preBuild") { dependsOn(checkWhistlePackage) }
+
+// Keep the documented install paths while publishing ABI-specific outputs in the generated metadata.
+for (variant in listOf("debug", "release", "releaseTest")) {
+    val capitalized = variant.replaceFirstChar { it.uppercase() }
+    val signed = providers.environmentVariable("CASSINI_RELEASE_KEYSTORE_FILE").isPresent
+    val suffix = if (variant == "debug" || signed) "" else "-unsigned"
+    val universal = layout.buildDirectory.file("outputs/apk/$variant/app-universal-$variant$suffix.apk")
+    val legacy = layout.buildDirectory.file("outputs/apk/$variant/app-$variant$suffix.apk")
+    val alias = tasks.register("stage${capitalized}UniversalApk") {
+        dependsOn("package$capitalized")
+        inputs.file(universal)
+        outputs.file(legacy)
+        doLast { universal.get().asFile.copyTo(legacy.get().asFile, overwrite = true) }
+    }
+    tasks.matching { it.name == "assemble$capitalized" }.configureEach { finalizedBy(alias) }
+}

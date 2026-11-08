@@ -169,3 +169,12 @@ Builds:
 AutoUpdateMode: Version
 UpdateCheckMode: Tags ^v[0-9.]+$
 ```
+
+### ABI APKs
+
+The build emits `arm64-v8a`, `x86_64` and universal APKs. `scripts/package-apk.py`
+validates and stages all three with checksums. The existing APK name is the
+universal APK; the ABI APK names append `-arm64-v8a` or `-x86_64` before `.apk`.
+Use the ABI APK for a smaller download. The x86_64 package excludes the arm64
+Whistle runtime and model payload. The Play bundle explicitly enables ABI
+splitting. The bundle's ZIP size does not measure a Play-delivered download.
