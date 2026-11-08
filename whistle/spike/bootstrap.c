@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <sys/auxv.h>
 
 static void *library;
 static unsigned char *weights; // Needle retains model memory; retain until this dedicated process exits.
@@ -73,4 +75,15 @@ JNIEXPORT jbyteArray JNICALL Java_io_codemyriad_cassini_whistlespike_Spike_trans
     if (result) (*env)->SetByteArrayRegion(env, result, 0, (jsize)length, (jbyte *)output);
     free(output);
     return result;
+}
+
+JNIEXPORT jstring JNICALL Java_io_codemyriad_cassini_whistlespike_Spike_environment(
+        JNIEnv *env, jclass type) {
+    (void)type;
+    const char *(*probe)(void) = library ? dlsym(library, "cassini_whistle_probe") : NULL;
+    if (probe) return (*env)->NewStringUTF(env, probe());
+    char value[256];
+    snprintf(value, sizeof(value), "{\"realHwcap\":\"0x%lx\",\"realHwcap2\":\"0x%lx\",\"interposed\":false}",
+             getauxval(AT_HWCAP), getauxval(AT_HWCAP2));
+    return (*env)->NewStringUTF(env, value);
 }

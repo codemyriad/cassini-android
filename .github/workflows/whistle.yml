@@ -57,6 +57,10 @@ jobs:
           python3 whistle/spike/build.py --compile-only
           --sdk "$ANDROID_HOME" --java-home "$JAVA_HOME"
           --output .tools/whistle-spike
+      - name: Compile lab dispatch and pinned-math variants
+        run: >-
+          python3 whistle/drift/build.py --ndk "$ANDROID_HOME/ndk/28.2.13676358"
+          --inputs .tools/whistle/inputs --output .tools/whistle-drift
       - name: Record compatibility evidence
         run: |
           python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
@@ -71,5 +75,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: whistle-native-report
-          path: .tools/whistle/report.json
+          path: |
+            .tools/whistle/report.json
+            .tools/whistle-drift/*/report.json
           if-no-files-found: error

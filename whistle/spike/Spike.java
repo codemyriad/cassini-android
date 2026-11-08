@@ -23,6 +23,7 @@ import org.json.JSONObject;
 public final class Spike extends Instrumentation {
     private static native void load(String path, byte[] model);
     private static native byte[] transcribe(byte[] pcm);
+    private static native String environment();
     private static final String[] FLAGS = {"NEEDLE_TELEMETRY", "DO_NOT_TRACK", "ORT_DISABLE_TELEMETRY"};
     private static final String[] VALUES = {"0", "1", "1"};
 
@@ -99,6 +100,7 @@ public final class Spike extends Instrumentation {
             report.put("loadMs", (SystemClock.elapsedRealtimeNanos() - before) / 1000000.0);
             model = null;
             report.put("privacyRefusals", 6);
+            report.put("engineSha256", manifest.getString("androidEngineSha256"));
             report.put("sdk", Build.VERSION.SDK_INT);
             report.put("abi", Build.SUPPORTED_ABIS[0]);
             report.put("pageSize", Os.sysconf(android.system.OsConstants._SC_PAGESIZE));
@@ -137,6 +139,7 @@ public final class Spike extends Instrumentation {
             }
             report.put("results", results).put("allWordsEqual", allWordsEqual)
                 .put("allTimesWithin80ms", allTimesWithin80ms);
+            report.put("environment", new JSONObject(environment()));
             report.put("status", "completed"); // A completed run can still have parity differences.
             try (FileOutputStream out = context.openFileOutput("result.json", Context.MODE_PRIVATE)) {
                 out.write(report.toString(2).getBytes(StandardCharsets.UTF_8));
