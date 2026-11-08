@@ -100,8 +100,38 @@ class ModelDownloadViewModelTest {
         advanceUntilIdle()
         assertEquals(1, ports.consents)
         assertEquals(listOf(setOf(ModelPart.SPEAKERS, ModelPart.VOICES)), ports.downloads)
+        assertEquals(ports.downloads, ports.consentParts)
         assertTrue(ports.transcribed.isEmpty())
         assertEquals(listOf<ModelDownloadEffect>(ModelDownloadEffect.Close), effects)
+    }
+
+    @Test fun consentUsesTheShownSpeechOnlyPlanEvenIfReadinessChangesBeforeTheClick() = runTest(dispatcher) {
+        ports.plan = ModelPlan(FRESH.missing.filter { it.part == ModelPart.SPEECH })
+        val viewModel = viewModel(noteId = null)
+        ports.plan = FRESH
+        viewModel.onEvent(ModelDownloadEvent.Download)
+        advanceUntilIdle()
+        val shown = listOf(setOf(ModelPart.SPEECH))
+        assertEquals(shown, ports.consentParts)
+        assertEquals(shown, ports.downloads)
+    }
+
+    @Test fun notificationRecreationKeepsTheOriginalSpeechOnlyPermission() = runTest(dispatcher) {
+        ports.plan = ModelPlan(FRESH.missing.filter { it.part == ModelPart.SPEECH })
+        ports.askNotifications = true
+        val first = viewModel(noteId = null)
+        first.onEvent(ModelDownloadEvent.Download)
+        advanceUntilIdle()
+        ports.plan = FRESH
+        val recreated = viewModel(noteId = null)
+        recreated.onNotificationsAnswered()
+        advanceUntilIdle()
+        val shown = listOf(setOf(ModelPart.SPEECH))
+        assertEquals(shown, ports.consentParts)
+        assertEquals(shown, ports.downloads)
+        first.onNotificationsAnswered()
+        advanceUntilIdle()
+        assertEquals(1, ports.consents)
     }
 
     @Test
@@ -193,6 +223,7 @@ class ModelDownloadViewModelTest {
         var askNotifications = false
         var notificationsMarked = false
         var consents = 0
+        val consentParts = mutableListOf<Set<ModelPart>>()
         var declines = 0
         val transcribed = mutableListOf<String>()
         val downloads = mutableListOf<Set<ModelPart>>()
@@ -201,8 +232,9 @@ class ModelDownloadViewModelTest {
 
         override suspend fun usableBytes(): Long = usable
 
-        override suspend fun recordConsent() {
+        override suspend fun recordConsent(parts: Set<ModelPart>) {
             consents++
+            consentParts += parts
         }
 
         override suspend fun recordDeclined() {

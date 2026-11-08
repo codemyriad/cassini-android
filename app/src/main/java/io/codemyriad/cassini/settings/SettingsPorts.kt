@@ -5,8 +5,11 @@ import androidx.core.os.LocaleListCompat
 import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.BuildConfig
 import io.codemyriad.cassini.core.models.ModelPart
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.models.ModelStatus
+import io.codemyriad.cassini.models.SpeechChoice
 import io.codemyriad.cassini.notices.NoticeFacts
+import io.codemyriad.cassini.ui.banner.BannerKind
 import io.codemyriad.cassini.ui.settings.LanguageChoice
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
@@ -30,6 +33,10 @@ interface SettingsPorts {
      */
     fun setLanguage(language: LanguageChoice)
 
+    val speech: Flow<SpeechChoice>
+
+    suspend fun chooseSpeech(model: SpeechModel)
+
     /** The status of each model part. */
     val models: Flow<Map<ModelPart, ModelStatus>>
 
@@ -47,6 +54,10 @@ interface SettingsPorts {
     /** Reads the notification permission again (ON_RESUME). */
     fun refreshNotices()
 
+    fun dismissParakeetSuggestion()
+
+    fun dismissParakeetDefault()
+
     /** The app's `versionName`. */
     val version: String
 }
@@ -56,6 +67,10 @@ class GraphSettingsPorts(private val graph: AppGraph) : SettingsPorts {
     override fun language(): LanguageChoice = languageOf(AppCompatDelegate.getApplicationLocales())
 
     override fun setLanguage(language: LanguageChoice) = AppCompatDelegate.setApplicationLocales(localesOf(language))
+
+    override val speech: Flow<SpeechChoice> get() = graph.speech.state
+
+    override suspend fun chooseSpeech(model: SpeechModel) = graph.speech.choose(model)
 
     override val models: Flow<Map<ModelPart, ModelStatus>> get() = graph.models.status
 
@@ -70,6 +85,10 @@ class GraphSettingsPorts(private val graph: AppGraph) : SettingsPorts {
     override val notices: Flow<NoticeFacts> get() = graph.notices.facts
 
     override fun refreshNotices() = graph.notices.refreshNotifications()
+
+    override fun dismissParakeetSuggestion() = graph.notices.dismiss(BannerKind.PARAKEET_RECOMMENDED)
+
+    override fun dismissParakeetDefault() = graph.notices.dismiss(BannerKind.PARAKEET_NOW_DEFAULT)
 
     override val version: String get() = BuildConfig.VERSION_NAME
 

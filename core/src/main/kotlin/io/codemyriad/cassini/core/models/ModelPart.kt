@@ -6,7 +6,7 @@ package io.codemyriad.cassini.core.models
  * whose absence never makes the part missing. Names may be stored (settings, job rows): never rename them.
  */
 enum class ModelPart(val primary: ModelDescriptor, val extras: List<ModelDescriptor> = emptyList()) {
-    /** Parakeet (required for any transcription), plus the speech detector. */
+    /** Optional downloaded Parakeet, plus the speech detector. */
     SPEECH(ModelCatalog.PARAKEET, listOf(ModelCatalog.VAD)),
 
     /** The Nemotron diarizer. Without it every word is one voice. */

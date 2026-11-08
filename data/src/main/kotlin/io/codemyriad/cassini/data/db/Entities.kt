@@ -14,13 +14,18 @@ import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.core.library.Origin
 import io.codemyriad.cassini.core.library.PauseReason
 import io.codemyriad.cassini.core.library.VariantKind
+import io.codemyriad.cassini.core.models.ModelCatalog
 import io.codemyriad.cassini.core.speakers.Match
 
 // The Room catalogue of docs/architecture.md, section 3.3. Room is the authority for the title, trash state, playback
 // state and the queue; everything else is a cache of the files under notes/<id>/ and voices/, rebuilt from them.
 
 /** The job a note had when it was trashed, so Restore can bring it back (features.md section 8). */
-data class TrashedJob(val state: JobState, val kind: JobKind)
+data class TrashedJob(
+    val state: JobState,
+    val kind: JobKind,
+    val speechIdentity: String = ModelCatalog.PARAKEET_REVISION,
+)
 
 /** One note: a directory `notes/<id>/` and its current audio file. */
 @Entity(
@@ -238,6 +243,7 @@ data class JobEntity(
     val words: Int = 0,
     /** Automatic restarts since the last user action; bumped only by `reconcileOnStart`. */
     val attempts: Int = 0,
+    @ColumnInfo(name = "speech_identity") val speechIdentity: String = ModelCatalog.PARAKEET_REVISION,
     @ColumnInfo(name = "enqueued_at") val enqueuedAt: Long,
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
 )

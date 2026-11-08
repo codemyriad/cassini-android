@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.AppPaths
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -57,10 +58,21 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
 
     suspend fun snapshot(): Settings = settings.first()
 
-    /** When the user agreed to the model download; null when they never did. */
+    /** Explicit optional-model download consent; a Parakeet-only plan does not set this. */
     val consentAt: Flow<Long?> = key(Keys.CONSENT_AT)
 
-    suspend fun recordConsent(at: Long) = set(Keys.CONSENT_AT, at)
+    suspend fun recordConsent(
+        at: Long,
+        includeSpeech: Boolean = true,
+        includeOptional: Boolean = true,
+    ) {
+        store.edit {
+            if (includeOptional) it[Keys.CONSENT_AT] = at
+            if (includeSpeech) it[Keys.SPEECH_CONSENT_AT] = at
+        }
+    }
+
+    val speechConsentAt: Flow<Long?> = key(Keys.SPEECH_CONSENT_AT)
 
     /** When the user pressed "Not now — keep the audio"; it suppresses the automatic consent screen. */
     val declinedAt: Flow<Long?> = key(Keys.DECLINED_AT)
@@ -120,6 +132,53 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
 
     suspend fun setPlaybackSpeed(speed: Float) = set(Keys.PLAYBACK_SPEED, speed)
 
+    /** New installs resolve the absent choice from verified Included availability (D5/D75). */
+    val speechModel: Flow<SpeechModel?> = preferences.map {
+        SpeechModel.setting(it[Keys.SPEECH_MODEL])
+    }.distinctUntilChanged()
+
+    suspend fun setSpeechModel(model: SpeechModel) {
+        store.edit {
+            it[Keys.SPEECH_MODEL] = model.setting
+            if (model == SpeechModel.INCLUDED) it[Keys.PARAKEET_DEFAULT_NOTICE] = false
+        }
+    }
+
+    /** Promote once per verified installation; a later explicit Whistle choice is kept across restarts. */
+    suspend fun resolveSpeechModel(parakeetReady: Boolean, includedAvailable: Boolean = true): SpeechModel? {
+        var selected: SpeechModel? = null
+        store.edit { prefs ->
+            val activated = prefs[Keys.PARAKEET_ACTIVATED] ?: false
+            if (parakeetReady && !activated) {
+                prefs[Keys.SPEECH_MODEL] = SpeechModel.PARAKEET.setting
+                prefs[Keys.PARAKEET_DEFAULT_NOTICE] = includedAvailable
+            } else if (!parakeetReady && activated && SpeechModel.setting(prefs[Keys.SPEECH_MODEL]) == SpeechModel.PARAKEET) {
+                // Removal or invalidation returns new work to the starter, without changing a queued job's pin.
+                prefs.remove(Keys.SPEECH_MODEL)
+                prefs[Keys.PARAKEET_DEFAULT_NOTICE] = false
+            }
+            prefs[Keys.PARAKEET_ACTIVATED] = parakeetReady
+            if (!includedAvailable) prefs[Keys.PARAKEET_DEFAULT_NOTICE] = false
+            selected = SpeechModel.setting(prefs[Keys.SPEECH_MODEL])
+        }
+        return selected
+    }
+
+    val firstWhistleNote: Flow<String?> = key(Keys.FIRST_WHISTLE_NOTE)
+
+    /** Only a completed transcription counts; later completions cannot repeat the first-use suggestion. */
+    suspend fun recordWhistleCompleted(noteId: String) {
+        store.edit { if (it[Keys.FIRST_WHISTLE_NOTE] == null) it[Keys.FIRST_WHISTLE_NOTE] = noteId }
+    }
+
+    val parakeetSuggestionDismissed: Flow<Boolean> = flag(Keys.PARAKEET_SUGGESTION_DISMISSED)
+
+    suspend fun dismissParakeetSuggestion() = set(Keys.PARAKEET_SUGGESTION_DISMISSED, true)
+
+    val parakeetDefaultNotice: Flow<Boolean> = flag(Keys.PARAKEET_DEFAULT_NOTICE)
+
+    suspend fun dismissParakeetDefaultNotice() = set(Keys.PARAKEET_DEFAULT_NOTICE, false)
+
     private fun <T> key(key: Preferences.Key<T>): Flow<T?> = preferences.map { it[key] }.distinctUntilChanged()
 
     private fun flag(key: Preferences.Key<Boolean>): Flow<Boolean> =
@@ -146,6 +205,12 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
 
     /** The stored key names of architecture 3.4. They are persisted: never rename one. */
     object Keys {
+        val PARAKEET_DEFAULT_NOTICE = booleanPreferencesKey("notices.parakeetDefault")
+        val FIRST_WHISTLE_NOTE = stringPreferencesKey("recognition.firstWhistleNote")
+        val PARAKEET_SUGGESTION_DISMISSED = booleanPreferencesKey("notices.parakeetSuggestionDismissed")
+        val PARAKEET_ACTIVATED = booleanPreferencesKey("recognition.parakeetActivated")
+        val SPEECH_MODEL = stringPreferencesKey("recognition.model")
+        val SPEECH_CONSENT_AT = longPreferencesKey("models.speechConsentAt")
         val CONSENT_AT = longPreferencesKey("models.consentAt")
         val DECLINED_AT = longPreferencesKey("models.declinedAt")
         val FINALIZATION_MS = longPreferencesKey("processing.finalizationMs")

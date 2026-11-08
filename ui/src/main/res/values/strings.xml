@@ -463,7 +463,7 @@
     <string name="ui_settings_model_checking">Checking files</string>
     <string name="ui_settings_model_pending">Downloads with next transcription</string>
     <string name="ui_settings_model_not_downloaded">Not downloaded</string>
-    <string name="ui_settings_model_failed">Download failed — tries again next time</string>
+    <string name="ui_settings_model_failed">Download failed — tap to try again</string>
     <string name="ui_settings_models_footnote">Transcription runs on this phone. Audio never leaves it.</string>
     <string name="ui_settings_privacy">Privacy</string>
     <string name="ui_settings_voices">Saved voices</string>
@@ -593,4 +593,17 @@
     <string name="ui_banner_voices_unreadable_body">They were made by a newer Cassini or are damaged. Nothing was changed.</string>
     <string name="ui_banner_lib_unavailable_title">Your notes can’t be opened</string>
     <string name="ui_banner_lib_unavailable_body">Your files are kept. Free some storage, then open Cassini again.</string>
+    <string name="ui_settings_included">Included · 17 MB</string>
+    <string name="ui_settings_optional">Optional download</string>
+    <string name="ui_settings_optional_size">Optional download · %1$s</string>
+    <string name="ui_settings_default">Default</string>
+    <string name="ui_settings_unavailable">Unavailable</string>
+    <string name="ui_settings_model_choice_footnote">Used for new transcriptions. Queued and paused transcriptions keep their model.</string>
+    <string name="ui_settings_not_available">Not available on this device.</string>
+
+    <!-- Coordinator D78; ux-draft/strings.json. -->
+    <string name="ui_action_not_now">Not now</string>
+    <string name="ui_parakeet_suggestion_title">Get better transcripts with Parakeet Ultra</string>
+    <string name="ui_parakeet_suggestion_body">Whistle is built in so you can start right away. Parakeet Ultra is more accurate. It’s a %1$s download.</string>
+    <string name="ui_parakeet_now_default">New meetings now use Parakeet Ultra.</string>
 </resources>

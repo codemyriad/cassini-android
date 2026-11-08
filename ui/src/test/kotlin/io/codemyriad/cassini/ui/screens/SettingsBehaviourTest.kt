@@ -3,10 +3,12 @@ package io.codemyriad.cassini.ui.screens
 import androidx.activity.OnBackPressedDispatcher
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
@@ -108,6 +110,20 @@ class SettingsBehaviourTest {
         rule.onAllNodesWithText("Download and transcribe").assertCountEquals(0)
     }
 
+    @Test fun unavailableWhistleHasNoActionAndParakeetCanBeSelected() {
+        val events = mutableListOf<SettingsEvent>()
+        val state = VariantFixtures.settings.getValue("settings-included-unavailable")
+        setThemed { SettingsScreen(state, onEvent = { events += it }) }
+        rule.onNode(hasText("Whistle") and hasText("Unavailable")).assertHasNoClickAction()
+        rule.onNodeWithText("Parakeet Ultra").performClick()
+        rule.runOnIdle {
+            assertEquals(
+                listOf(SettingsEvent.ChooseSpeech(io.codemyriad.cassini.ui.settings.SpeechModelUi.PARAKEET)),
+                events,
+            )
+        }
+    }
+
     @Test fun settingsLanguageRowsAndLinkSendTheirEvents() {
         val events = mutableListOf<SettingsEvent>()
         val state = VariantFixtures.settings.getValue("settings-model-statuses").copy(notificationsOff = true)
@@ -116,12 +132,16 @@ class SettingsBehaviourTest {
         rule.onNode(hasText("Phone") and hasClickAction()).performClick()
         rule.onNode(hasText("Phone") and isSelectable()).assertIsSelected()
         rule.onNodeWithText("Italiano").performClick()
-        rule.onAllNodes(isSelectable()).assertCountEquals(0)
+        rule.onAllNodes(isSelectable()).assertCountEquals(2)
         rule.onNodeWithText("Turn on").performClick()
         // A Not downloaded row and a Failed row open Model download; the other model rows are not buttons.
-        rule.onNode(hasText("Recognising saved voices", substring = true) and hasClickAction()).performClick()
-        rule.onNode(hasText("Telling speakers apart", substring = true) and hasClickAction()).performClick()
-        rule.onNode(hasText("Speech recognition", substring = true)).assertHasNoClickAction()
+        rule.onNode(
+            hasText("Recognising saved voices", substring = true) and hasClickAction(),
+        ).performScrollTo().performClick()
+        rule.onNode(
+            hasText("Telling speakers apart", substring = true) and hasClickAction(),
+        ).performScrollTo().performClick()
+        rule.onNode(hasText("Parakeet Ultra", substring = true)).assertHasClickAction()
         rule.onNodeWithText("Saved voices").performScrollTo().performClick()
         rule.onNodeWithText("Trash").performScrollTo().performClick()
         rule.onNodeWithText("Free software under GPLv3", substring = true).performScrollTo().performFirstLinkClick()
@@ -165,7 +185,8 @@ class SettingsBehaviourTest {
             "Português (Brasil)",
             "Português (Portugal)",
         )
-        rule.onAllNodes(isSelectable()).assertCountEquals(names.size)
+        val languageOptions = isSelectable() and SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton)
+        rule.onAllNodes(languageOptions).assertCountEquals(names.size)
         for (name in names) {
             val row = rule.onNode(hasText(name) and isSelectable())
             if (name == "Español") row.assertIsSelected() else row.assertIsNotSelected()
@@ -180,15 +201,16 @@ class SettingsBehaviourTest {
         val state = BoardFixtures.settings.copy(language = LanguageChoice.OTHER)
         setThemed { SettingsScreen(state, onEvent = { events += it }) }
         rule.onNode(hasText("English (United States)") and hasClickAction()).performClick()
-        rule.onAllNodes(isSelectable()).assertCountEquals(LanguageChoice.offered.size)
-        for (choice in LanguageChoice.offered) rule.onAllNodes(isSelectable())[choice.ordinal].assertIsNotSelected()
+        val languageOptions = isSelectable() and SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton)
+        rule.onAllNodes(languageOptions).assertCountEquals(LanguageChoice.offered.size)
+        for (choice in LanguageChoice.offered) rule.onAllNodes(languageOptions)[choice.ordinal].assertIsNotSelected()
         rule.onNode(hasText("Phone") and isSelectable()).performClick()
         rule.runOnIdle { assertEquals(listOf(SettingsEvent.Language(LanguageChoice.PHONE)), events) }
     }
 
     @Test fun aModelRowReadsItsStatusWithItsName() {
         setThemed { SettingsScreen(BoardFixtures.settings, onEvent = {}) }
-        rule.onNode(hasText("Speech recognition") and hasText("Ready") and hasText("INT8 · 640 MB")).assertExists()
+        rule.onNode(hasText("Whistle") and hasText("Default") and hasText("Included · 17 MB")).assertExists()
     }
 
     @Test fun theOptionsMenuRenamesAndForgets() {

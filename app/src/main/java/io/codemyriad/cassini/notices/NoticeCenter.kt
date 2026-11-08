@@ -5,9 +5,12 @@ import android.util.Log
 import androidx.core.app.NotificationManagerCompat
 import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.core.models.ModelPart
+import io.codemyriad.cassini.core.models.ModelPlan
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.db.LibraryRow
 import io.codemyriad.cassini.data.models.ModelStatus
 import io.codemyriad.cassini.data.voices.VoiceProblem
+import io.codemyriad.cassini.engine.job.DownloadError
 import io.codemyriad.cassini.engine.job.InstallOutcome
 import io.codemyriad.cassini.processing.InstallState
 import io.codemyriad.cassini.processing.ProcessingState
@@ -68,8 +71,8 @@ class NoticeCenter(private val graph: AppGraph, context: Context, val imports: I
         }
 
     private val consented: Flow<Boolean> =
-        combine(settings.consentAt, graph.models.status) { consentAt, status ->
-            consentAt != null || status[ModelPart.SPEECH] == ModelStatus.Ready
+        combine(settings.speechConsentAt, graph.models.status, graph.speech.state) { consentAt, status, speech ->
+            speech.selected == SpeechModel.INCLUDED || consentAt != null || status[ModelPart.SPEECH] == ModelStatus.Ready
         }
 
     private val encoder: Flow<Pair<Boolean, Boolean>> =
@@ -98,6 +101,10 @@ class NoticeCenter(private val graph: AppGraph, context: Context, val imports: I
         voicesProblem.distinctUntilChanged(),
     ) { facts, off, imports, download, voices ->
         facts.copy(notificationsOff = off, imports = imports, downloadFailure = download, voicesProblem = voices)
+    }.combine(graph.parakeetRecommendation.state) { facts, parakeet ->
+        facts.copy(parakeet = parakeet)
+    }.combine(settings.parakeetDefaultNotice) { facts, announcement ->
+        facts.copy(parakeetNowDefault = announcement)
     }.stateIn(graph.appScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), NoticeFacts())
 
     init {
@@ -107,11 +114,18 @@ class NoticeCenter(private val graph: AppGraph, context: Context, val imports: I
     /** Reads the notification permission again (a screen calls it at ON_RESUME, after the system settings). */
     fun refreshNotifications() {
         notificationsOff.value = !notificationsEnabled()
+        graph.parakeetRecommendation.refresh()
     }
 
     /** The user closed the banner of [kind], or acted on it in a way that ends it. */
     fun dismiss(kind: BannerKind) {
         when (kind) {
+            BannerKind.PARAKEET_NOW_DEFAULT -> graph.appScope.launch {
+                guarded("dismiss the Parakeet default announcement") { settings.dismissParakeetDefaultNotice() }
+            }
+            BannerKind.PARAKEET_RECOMMENDED -> graph.appScope.launch {
+                guarded("dismiss the Parakeet suggestion") { settings.dismissParakeetSuggestion() }
+            }
             BannerKind.RECOVERED -> graph.appScope.launch {
                 guarded("acknowledge the recovered recordings") {
                     facts.value.recovered?.let { settings.acknowledgeRecovered(it.latestAt) }
@@ -143,9 +157,8 @@ class NoticeCenter(private val graph: AppGraph, context: Context, val imports: I
                 }
                 InstallState.Idle -> {
                     val outcome = graph.installOwner.lastOutcome.value
-                    if (standalone && outcome is InstallOutcome.Failed) {
-                        downloadFailure.value =
-                            DownloadFailure(outcome.error, outcome.requiredFreeBytes, graph.config.clock())
+                    if (standalone && outcome != null) {
+                        downloadFailure.value = standaloneFailure(outcome, graph.config.clock(), graph.network.validated())
                     }
                     standalone = false
                 }
@@ -169,6 +182,27 @@ class NoticeCenter(private val graph: AppGraph, context: Context, val imports: I
         const val TAG = "CassiniNotices"
         const val STOP_TIMEOUT_MS = 5_000L
     }
+}
+
+/** Explicit standalone optional downloads report their failures too; a job can still treat those as best effort. */
+internal fun standaloneFailure(outcome: InstallOutcome, at: Long, online: Boolean): DownloadFailure? = when (outcome) {
+    is InstallOutcome.Failed -> DownloadFailure(outcome.error, outcome.requiredFreeBytes, at)
+    is InstallOutcome.Installed -> {
+        val failed = outcome.failed.entries.firstOrNull()
+        val part = failed?.key ?: outcome.skipped.firstOrNull()
+        if (part == null) {
+            null
+        } else {
+            val error = failed?.value ?: if (online) DownloadError.INSTALL else DownloadError.NO_CONNECTION
+            val free = if (error == DownloadError.NOT_ENOUGH_STORAGE) {
+                ModelPlan(listOf(ModelPlan.Item(part, part.models))).requiredFreeBytes
+            } else {
+                0L
+            }
+            DownloadFailure(error, free, at)
+        }
+    }
+    is InstallOutcome.NeedsConsent -> null
 }
 
 /** Whether `libcassini_opus` can be loaded: the Cassini document writer needs it (features.md 13.5 NO_ENCODER). */

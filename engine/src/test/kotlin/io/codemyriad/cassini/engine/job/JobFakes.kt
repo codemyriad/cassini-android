@@ -432,6 +432,8 @@ class FakeVoices(private val log: MutableList<String>) : JobVoices {
 class FakeModels : ModelAccess {
     @Volatile var readyParts: Set<ModelPart> = ModelPart.entries.toSet()
 
+    @Volatile var authorizedParts: Set<ModelPart> = ModelPart.entries.toSet()
+
     @Volatile var consent = true
 
     /** The speech detector (VAD) is installed. */
@@ -446,7 +448,10 @@ class FakeModels : ModelAccess {
 
     override fun ready(part: ModelPart) = part in readyParts
 
-    override fun plan() = ModelPlan.of { model -> ModelPart.entries.any { it.primary == model && it in readyParts } }
+    override fun plan() = ModelPlan(
+        ModelPlan.of { model -> ModelPart.entries.any { it.primary == model && it in readyParts } }
+            .missing.filter { it.part in authorizedParts },
+    )
 
     override fun detectorReady() = detector
 
@@ -458,6 +463,7 @@ class FakeModels : ModelAccess {
 
     override suspend fun install(parts: Set<ModelPart>, onProgress: (DownloadProgress) -> Unit): InstallOutcome {
         installs += parts
+        if (!authorizedParts.containsAll(parts)) return InstallOutcome.NeedsConsent(plan().totalBytes)
         parts.forEach { onProgress(DownloadProgress(it, 1, 2, verifying = false)) }
         installing.countDown()
         if (hang) kotlinx.coroutines.awaitCancellation()

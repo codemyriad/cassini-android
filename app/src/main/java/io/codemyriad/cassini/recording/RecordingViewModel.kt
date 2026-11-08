@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.navigation3.runtime.NavKey
 import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.core.audio.RecordingSpace
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.nav.ModelDownloadKey
 import io.codemyriad.cassini.nav.NoteKey
 import io.codemyriad.cassini.notices.Notices
@@ -30,6 +31,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import io.codemyriad.cassini.ui.recording.CaptureFormat as CaptureFormatUi
 
 /** What the Recording ViewModel reads and changes (features.md section 2); [GraphRecordingPorts] binds it. */
@@ -82,7 +84,9 @@ class GraphRecordingPorts(private val graph: AppGraph) : RecordingPorts {
 
     override fun dismissEnded() = controller.dismissEnded()
 
-    override suspend fun modelsMissing(): Boolean = !graph.models.plan().isEmpty
+    override suspend fun modelsMissing(): Boolean = withContext(graph.dispatchers.io) {
+        graph.speech.selected() != SpeechModel.INCLUDED && !graph.modelAccess.plan().isEmpty
+    }
 
     override suspend fun lastFormat(): CaptureFormat? =
         graph.settings.lastRecordingFormat.first()?.let(CaptureFormat::of)

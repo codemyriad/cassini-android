@@ -112,7 +112,7 @@ object ModelCatalog {
      * The name the app shows for each speech model id that a document's provenance can name. Only this build's model:
      * the Parakeet TDT 0.6B v3 of 0.1.0 to 0.2.0 made only development-build documents (D51), which show its id.
      */
-    val SPEECH_MODEL_NAMES = mapOf(PARAKEET_MODEL_ID to PARAKEET_DISPLAY_NAME)
+    val SPEECH_MODEL_NAMES = mapOf(PARAKEET_MODEL_ID to PARAKEET_DISPLAY_NAME, "whistle" to "Whistle")
 
     val parakeetArtifacts = listOf(
         dist(

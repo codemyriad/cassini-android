@@ -22,7 +22,7 @@ import java.util.concurrent.CancellationException
  * service. Every function blocks and runs on IO, never on the main thread.
  */
 interface ModelStore {
-    /** Consent recorded, or Parakeet installed (architecture section 5.6). */
+    /** Consent for all requested parts; installed Parakeet authorizes speech alone (architecture section 5.6). */
     fun consented(): Boolean
 
     /** Whether the active network has `NET_CAPABILITY_VALIDATED`. */

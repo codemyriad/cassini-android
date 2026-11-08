@@ -88,6 +88,8 @@ class ModelInstallOwner(
 
     @Volatile private var current: Shared? = null
 
+    @Volatile private var lastStandaloneParts: Set<ModelPart>? = null
+
     /** The standalone downloads ([startDownload]) that have not ended. */
     private val downloads = CopyOnWriteArraySet<Job>()
 
@@ -113,10 +115,11 @@ class ModelInstallOwner(
      * The download from Settings or a banner, with no note (architecture 5.6): installs [parts] in the background
      * and shows its progress through [state] and `ModelRepository.status`. [cancel] stops it.
      */
-    fun startDownload(parts: Set<ModelPart> = ModelPart.entries.toSet()): Job {
+    fun startDownload(parts: Set<ModelPart>? = null): Job {
         val job = scope.launch(start = CoroutineStart.LAZY) {
             try {
-                install(parts, {}, standalone = true)
+                val requested = (parts ?: lastStandaloneParts ?: allowedRetryParts()).toSet()
+                install(requested, {}, standalone = true)
             } catch (_: CancellationException) {
                 // A cancelled download keeps its .part files; there is nothing more to do.
             }
@@ -125,6 +128,15 @@ class ModelInstallOwner(
         job.invokeOnCompletion { downloads -= job }
         job.start()
         return job
+    }
+
+    /** A retry never adds a model role that the original consent did not authorize. */
+    private suspend fun allowedRetryParts(): Set<ModelPart> {
+        val speech = models.speechConsented()
+        val optional = models.consented()
+        val allowed = ModelPart.entries.filter { if (it == ModelPart.SPEECH) speech else optional }.toSet()
+        // With no permission, preserve NeedsConsent rather than reporting an empty successful install.
+        return allowed.ifEmpty { ModelPart.entries.toSet() }
     }
 
     /**
@@ -185,7 +197,10 @@ class ModelInstallOwner(
         if (running != null && (!running.task.isActive || running.parts != parts)) return running to false
         val shared = running ?: Shared(parts)
         shared.waiters++
-        if (standalone) shared.standalone++
+        if (standalone) {
+            shared.standalone++
+            lastStandaloneParts = parts.toSet()
+        }
         shared.listeners += listener
         if (running == null) {
             shared.task = scope.async(io, CoroutineStart.LAZY) { run(shared) }
@@ -212,14 +227,18 @@ class ModelInstallOwner(
         // A new install drops the failure an earlier one left in the status.
         shared.parts.forEach(models::clearProgress)
         try {
-            val store = RepositoryModelStore(models, modelRoot, network, models.consented())
+            val speechConsent = ModelPart.SPEECH !in shared.parts || models.speechConsented()
+            val optionalConsent = shared.parts.all { it == ModelPart.SPEECH } || models.consented()
+            val consented = speechConsent && optionalConsent
+            val store = RepositoryModelStore(models, modelRoot, network, consented)
             val outcome = ModelInstaller(store, io).install(shared.parts) { progress ->
                 shared.progress = progress
                 models.publishProgress(progress.part, statusOf(progress))
                 publishState(shared)
                 shared.listeners.forEach { it(progress) }
             }
-            showOutcome(shared.parts, outcome)
+            val standalone = mutex.withLock { shared.standalone > 0 }
+            showOutcome(shared.parts, outcome, standalone)
             mutableOutcome.value = outcome
             return outcome
         } catch (cancelled: CancellationException) {
@@ -258,11 +277,15 @@ class ModelInstallOwner(
     }
 
     /** Clears the progress of every part, then shows the failures of [outcome] until the next install. */
-    private fun showOutcome(parts: Set<ModelPart>, outcome: InstallOutcome) {
+    private fun showOutcome(parts: Set<ModelPart>, outcome: InstallOutcome, standalone: Boolean) {
         parts.forEach(models::clearProgress)
         val failures = when (outcome) {
             is InstallOutcome.Failed -> mapOf(outcome.part to outcome.error)
-            is InstallOutcome.Installed -> outcome.failed
+            is InstallOutcome.Installed -> {
+                val error = if (network.validated()) DownloadError.INSTALL else DownloadError.NO_CONNECTION
+                val skipped = if (standalone) outcome.skipped.associateWith { error } else emptyMap()
+                skipped + outcome.failed
+            }
             is InstallOutcome.NeedsConsent -> emptyMap()
         }
         failures.forEach { (part, error) ->

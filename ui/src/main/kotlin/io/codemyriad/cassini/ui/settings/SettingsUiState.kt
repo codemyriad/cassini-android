@@ -1,6 +1,7 @@
 package io.codemyriad.cassini.ui.settings
 
 import androidx.compose.runtime.Immutable
+import io.codemyriad.cassini.ui.banner.BannerSpec
 import io.codemyriad.cassini.ui.format.ModelPartUi
 import kotlinx.collections.immutable.ImmutableList
 
@@ -17,6 +18,11 @@ data class SettingsUiState(
     val trash: Int,
     val version: String,
     val notificationsOff: Boolean = false,
+    val speechModel: SpeechModelUi = SpeechModelUi.PARAKEET,
+    val includedAvailable: Boolean = false,
+    val speechChecking: Boolean = false,
+    val parakeetSuggestion: BannerSpec? = null,
+    val parakeetNowDefault: Boolean = false,
 )
 
 /**
@@ -63,6 +69,9 @@ sealed interface ModelStatusUi {
     /** "Not downloaded" (no consent); the row opens Model download. */
     data object NotDownloaded : ModelStatusUi
 
-    /** "Download failed — tries again next time" (red). */
+    /** "Download failed — tap to try again" (red). */
     data object Failed : ModelStatusUi
 }
+
+/** Engine labels for Settings; engine and storage types stay outside :ui. */
+enum class SpeechModelUi { INCLUDED, PARAKEET }

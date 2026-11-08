@@ -23,6 +23,7 @@ import java.security.MessageDigest
 import kotlin.math.abs
 
 /** Mandatory assets when selected: run only on an owned eligible arm64 emulator, never a user's app/device. */
+@Suppress("TooManyFunctions") // Shared immutable fixture checks for the worker and the production job.
 @RunWith(AndroidJUnit4::class)
 @SdkSuppress(minSdkVersion = 29)
 @RequiresApi(Build.VERSION_CODES.Q)
@@ -35,6 +36,13 @@ class WhistleWorkerParityTest {
         val filtered: String,
         val expected: List<JSONObject>,
     )
+
+    @Test
+    fun includedDefaultWritesAPortableTranscriptWithoutAnyModelDownload() {
+        val fixture = fixture()
+        assertEquals(fixture.source, sourceHash(fixture.name))
+        WhistleIncludedJobCase.run(fixture.name, fixture.expected)
+    }
 
     @Test
     fun fullDcTrackUsesPrivateWorkerAndExactDesktopSegments() {

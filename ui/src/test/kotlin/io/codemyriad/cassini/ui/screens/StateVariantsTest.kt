@@ -299,6 +299,8 @@ class StateVariantsTest : BoardTest() {
 
     @Test fun modelsNoSpace() = models("models-no-space")
 
+    @Test fun modelsParakeetOnly() = models("models-parakeet-only")
+
     @Test fun modelsNoConnection() = models("models-no-connection")
 
     @Test fun modelsWithoutNote() = models("models-without-note")
@@ -310,6 +312,12 @@ class StateVariantsTest : BoardTest() {
     @Test fun modelsSpeechSpeakers() = models("models-speech-speakers")
 
     // Settings (features.md section 11).
+
+    @Test fun settingsIncludedUnavailable() = settings("settings-included-unavailable")
+
+    @Test fun settingsParakeetSuggestion() = settings("settings-parakeet-suggestion")
+
+    @Test fun settingsParakeetDefault() = settings("settings-parakeet-default")
 
     @Test fun settingsNotificationsOff() = settings("settings-notifications-off")
 

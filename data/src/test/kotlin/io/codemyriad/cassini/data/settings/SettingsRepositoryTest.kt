@@ -1,5 +1,6 @@
 package io.codemyriad.cassini.data.settings
 
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.AppPaths
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -38,9 +39,110 @@ class SettingsRepositoryTest {
         }
     }
 
+    @Test fun speechChoiceSurvivesReopenAndOptionalConsentDoesNotAuthorizeParakeet() = runTest {
+        withStore { store ->
+            assertNull(store.speechModel.first())
+            store.setSpeechModel(SpeechModel.PARAKEET)
+            store.recordConsent(100, includeSpeech = false)
+        }
+        withStore { store ->
+            assertEquals(SpeechModel.PARAKEET, store.speechModel.first())
+            assertEquals(100L, store.consentAt.first())
+            assertNull(store.speechConsentAt.first())
+            store.setSpeechModel(SpeechModel.INCLUDED)
+            store.recordConsent(200)
+        }
+        withStore { store ->
+            assertEquals(SpeechModel.INCLUDED, store.speechModel.first())
+            assertEquals(200L, store.speechConsentAt.first())
+        }
+    }
+
+    @Test fun verifiedInstallationPromotesOnceAndLaterUserChoiceSurvivesRestart() = runTest {
+        withStore { store ->
+            assertNull(store.resolveSpeechModel(false))
+            store.setSpeechModel(SpeechModel.INCLUDED)
+            assertEquals(SpeechModel.PARAKEET, store.resolveSpeechModel(true))
+            assertTrue(store.parakeetDefaultNotice.first())
+            store.dismissParakeetDefaultNotice()
+            assertEquals(SpeechModel.PARAKEET, store.resolveSpeechModel(true))
+            assertFalse(store.parakeetDefaultNotice.first())
+            store.setSpeechModel(SpeechModel.INCLUDED)
+        }
+        withStore { store ->
+            assertEquals(SpeechModel.INCLUDED, store.resolveSpeechModel(true))
+            assertEquals(SpeechModel.INCLUDED, store.resolveSpeechModel(false))
+            assertEquals(SpeechModel.PARAKEET, store.resolveSpeechModel(true))
+        }
+    }
+
+    @Test fun parakeetOnlyDevicesNeverAnnounceATransitionFromWhistle() = runTest {
+        withStore { store ->
+            assertNull(store.resolveSpeechModel(false, includedAvailable = false))
+            assertEquals(SpeechModel.PARAKEET, store.resolveSpeechModel(true, includedAvailable = false))
+            assertFalse(store.parakeetDefaultNotice.first())
+        }
+        withStore { store ->
+            assertEquals(SpeechModel.PARAKEET, store.resolveSpeechModel(true, includedAvailable = false))
+            assertFalse(store.parakeetDefaultNotice.first())
+            store.resolveSpeechModel(false, includedAvailable = false)
+            store.resolveSpeechModel(true, includedAvailable = false)
+            assertFalse(store.parakeetDefaultNotice.first())
+        }
+    }
+
+    @Test fun unavailableWhistleClearsAnAlreadyPendingTransitionNotice() = runTest {
+        withStore { store ->
+            store.resolveSpeechModel(true)
+            assertTrue(store.parakeetDefaultNotice.first())
+            store.resolveSpeechModel(true, includedAvailable = false)
+            assertFalse(store.parakeetDefaultNotice.first())
+        }
+    }
+
+    @Test fun incompleteDownloadNeverPromotesAndRemovedParakeetFallsBack() = runTest {
+        withStore { store ->
+            assertNull(store.resolveSpeechModel(false))
+            store.setSpeechModel(SpeechModel.PARAKEET)
+            assertEquals(SpeechModel.PARAKEET, store.resolveSpeechModel(false))
+            assertEquals(SpeechModel.PARAKEET, store.resolveSpeechModel(true))
+            assertNull(store.resolveSpeechModel(false))
+            assertEquals(SpeechModel.PARAKEET, store.resolveSpeechModel(true))
+        }
+    }
+
     @Test fun defaultsBeforeAnyWrite() = runTest {
         val settings = withStore { it.snapshot() }
         assertEquals(Settings(null, null, null, null, null, 0, false, false, null), settings)
+    }
+
+    @Test fun parakeetOnlyConsentDoesNotAuthorizeOptionalDownloads() = runTest {
+        withStore { store ->
+            store.recordConsent(100, includeOptional = false)
+            assertEquals(100L, store.speechConsentAt.first())
+            assertNull(store.consentAt.first())
+        }
+        withStore { store ->
+            assertEquals(100L, store.speechConsentAt.first())
+            assertNull(store.consentAt.first())
+            store.recordConsent(200, includeSpeech = false)
+            assertEquals(100L, store.speechConsentAt.first())
+            assertEquals(200L, store.consentAt.first())
+        }
+    }
+
+    @Test fun firstWhistleCompletionAndSuggestionDismissalSurviveReopen() = runTest {
+        withStore { store ->
+            assertNull(store.firstWhistleNote.first())
+            assertFalse(store.parakeetSuggestionDismissed.first())
+            store.recordWhistleCompleted("first")
+            store.recordWhistleCompleted("second")
+            store.dismissParakeetSuggestion()
+        }
+        withStore { store ->
+            assertEquals("first", store.firstWhistleNote.first())
+            assertTrue(store.parakeetSuggestionDismissed.first())
+        }
     }
 
     @Test fun everyKeyRoundTripsThroughTheFile() = runTest {

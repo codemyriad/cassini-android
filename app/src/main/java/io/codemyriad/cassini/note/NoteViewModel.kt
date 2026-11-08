@@ -289,7 +289,7 @@ class NoteViewModel(
         .map { loaded -> loaded?.details?.job?.failure?.takeIf { JobFailure.downloadError(it) != null } }
         .distinctUntilChanged()
         .mapLatest { failure ->
-            if (failure == null) 0L else runCatching { ports.requiredFreeBytes() }.getOrDefault(0L)
+            if (failure == null) 0L else runCatching { ports.requiredFreeBytes(noteId) }.getOrDefault(0L)
         }
         .onStart { emit(0L) }
 
@@ -496,6 +496,9 @@ class NoteViewModel(
         val failure = details.job?.failure?.let { ports.failureText(it) }
         val refused = LibraryMapping.transcribeAgainRefused(details)
         list += Notices.job(details.job, phase, NoteMapping.oneVoice(details), failure, freeBytes, refused)
+        if (overDocument && facts.parakeet.firstWhistleNote == note.id) {
+            Notices.parakeetSuggestion(facts)?.let { list += it }
+        }
         if (mode is NoteMode.Paused && facts.hold && facts.queued > 0) {
             list += BannerSpec(BannerKind.TX_QUEUE_HELD, BannerArgs(count = facts.queued))
         }
@@ -931,6 +934,10 @@ class NoteViewModel(
 
     /** Hides the banner [id]; a dismissed final failure also removes its job row, so the document shows again. */
     private fun dismissBanner(id: String) {
+        if (id == BannerKind.PARAKEET_RECOMMENDED.name) {
+            ports.dismissParakeetSuggestion()
+            return
+        }
         val details = details.value?.details
         val job = details?.job
         val final = id == BannerKind.TX_FAILED.name && job != null &&
@@ -1003,7 +1010,15 @@ class NoteViewModel(
             BannerAction.CONTINUE -> ports.continueQueue()
             BannerAction.CANCEL -> ports.cancelDownload()
             BannerAction.TURN_ON, BannerAction.OPEN_SETTINGS -> emit(NoteEffect.OpenNotificationSettings)
-            BannerAction.DOWNLOAD -> emit(NoteEffect.OpenModelDownload(ModelDownloadKey(noteId)))
+            BannerAction.DOWNLOAD -> {
+                val key = if (id == BannerKind.PARAKEET_RECOMMENDED.name) {
+                    ModelDownloadKey(parakeetOnly = true)
+                } else {
+                    ModelDownloadKey(noteId)
+                }
+                emit(NoteEffect.OpenModelDownload(key))
+            }
+            BannerAction.NOT_NOW -> ports.dismissParakeetSuggestion()
             else -> Log.w(TAG, "No Note handler for $action on $id")
         }
     }

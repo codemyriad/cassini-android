@@ -60,8 +60,12 @@ interface Recognizer : AutoCloseable {
         val onChunk: (PcmAudio, Long, Transcript) -> Transcript,
         val onStage: (Long, Long, Boolean) -> Unit,
         val onProgress: (Parakeet.Progress) -> Unit,
+        val checkReplayActive: () -> Unit = {},
     )
 }
+
+/** A recognizer refused saved state; the job offers Start over instead of retrying the same incompatible prefix. */
+class RecognitionCheckpointMismatch(message: String) : IllegalArgumentException(message)
 
 /** Opens a [Recognizer] over the installed Parakeet (and the speech detector, when installed). */
 fun interface RecognizerFactory {

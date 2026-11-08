@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.models.ModelPlan
 import io.codemyriad.cassini.engine.job.DownloadError
 import io.codemyriad.cassini.notices.Notices
@@ -109,9 +110,12 @@ class ModelDownloadViewModel(
 
     private fun download() {
         if (local.value.busy || closing) return
+        val shownParts = local.value.plan?.parts?.toSet() ?: return
         local.update { it.copy(busy = true) }
         viewModelScope.launch {
-            val plan = guarded("read the model plan") { ports.plan() }
+            val plan = guarded("read the model plan") {
+                ModelPlan(ports.plan().missing.filter { it.part in shownParts })
+            }
             when {
                 plan == null -> local.update { it.copy(busy = false) }
                 plan.isEmpty -> closeStale()
@@ -119,6 +123,7 @@ class ModelDownloadViewModel(
                     local.update { it.copy(plan = plan, busy = false, noSpace = plan.requiredFreeBytes) }
                 else -> {
                     local.update { it.copy(plan = plan, noSpace = null) }
+                    saved[KEY_PARTS] = ArrayList(plan.parts.map { it.name })
                     askNotificationsOrStart()
                 }
             }
@@ -143,7 +148,10 @@ class ModelDownloadViewModel(
             local.update { it.copy(busy = false) }
             return
         }
-        if (guarded("record the consent") { ports.recordConsent() } == null) {
+        val parts = guarded("read the shown parts") {
+            saved.get<ArrayList<String>>(KEY_PARTS)?.map(ModelPart::valueOf)?.toSet() ?: plan.parts.toSet()
+        }
+        if (parts == null || guarded("record the consent") { ports.recordConsent(parts) } == null) {
             local.update { it.copy(busy = false) }
             return
         }
@@ -151,7 +159,7 @@ class ModelDownloadViewModel(
         if (note != null) {
             guarded("queue the note") { ports.transcribe(note) }
         } else {
-            ports.downloadModels(plan.parts.toSet())
+            ports.downloadModels(parts)
         }
         close()
     }
@@ -190,5 +198,6 @@ class ModelDownloadViewModel(
         const val TAG = "CassiniModels"
         const val STOP_TIMEOUT_MS = 5_000L
         const val KEY_AWAITING = "awaitingNotifications"
+        const val KEY_PARTS = "shownModelParts"
     }
 }

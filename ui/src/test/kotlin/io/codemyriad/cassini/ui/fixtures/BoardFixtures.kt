@@ -51,6 +51,7 @@ import io.codemyriad.cassini.ui.settings.LanguageChoice
 import io.codemyriad.cassini.ui.settings.ModelRowUi
 import io.codemyriad.cassini.ui.settings.ModelStatusUi
 import io.codemyriad.cassini.ui.settings.SettingsUiState
+import io.codemyriad.cassini.ui.settings.SpeechModelUi
 import io.codemyriad.cassini.ui.theme.SpeakerTone
 import io.codemyriad.cassini.ui.trash.TrashBackTo
 import io.codemyriad.cassini.ui.trash.TrashItemUi
@@ -338,11 +339,13 @@ internal object BoardFixtures {
     // Board 08: Settings (the board's About card reads "Cassini 0.1.0"; since the rename it reads "Cassini talk").
 
     val settings = SettingsUiState(
+        speechModel = SpeechModelUi.INCLUDED,
+        includedAvailable = true,
         language = LanguageChoice.PHONE,
         models = persistentListOf(
-            ModelRowUi(ModelPartUi.SPEECH, ModelBytes.SPEECH, ModelStatusUi.Ready),
+            ModelRowUi(ModelPartUi.SPEECH, 440L * 1024 * 1024, ModelStatusUi.Ready),
             ModelRowUi(ModelPartUi.SPEAKERS, ModelBytes.SPEAKERS, ModelStatusUi.Ready),
-            ModelRowUi(ModelPartUi.VOICES, ModelBytes.VOICES, ModelStatusUi.Pending),
+            ModelRowUi(ModelPartUi.VOICES, ModelBytes.VOICES, ModelStatusUi.NotDownloaded),
         ),
         voices = 4,
         trash = 2,

@@ -7,6 +7,7 @@ import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.core.library.PauseReason
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.data.CassiniDispatchers
 import io.codemyriad.cassini.data.NoteIds
@@ -43,6 +44,7 @@ class JobRepository(
     private val adopter: SealedAdopter,
     /** Stops a RUNNING job before its files go (purge step 1); the app passes the coordinator's cancel. */
     private val canceller: RunningJobCanceller,
+    private val speechChoice: suspend () -> SpeechModel = { SpeechModel.PARAKEET },
     private val clock: () -> Long = System::currentTimeMillis,
 ) : JobQueueWriter {
     private val jobs = database.jobs()
@@ -90,12 +92,12 @@ class JobRepository(
      * is missing. A new row takes the numbers of a valid checkpoint, which stayed in `work/` while the note was in
      * Trash. A RUNNING job is left alone.
      */
-    override suspend fun requeueAtBack(noteId: String, kind: JobKind) {
+    override suspend fun requeueAtBack(noteId: String, kind: JobKind, speechIdentity: String?) {
         val load = checkpoints.load(noteId)
         database.withTransaction {
             val existing = jobs.job(noteId)
             if (existing?.state != JobState.RUNNING && notes.note(noteId) != null) {
-                val job = putAtBack(noteId, kind, existing)
+                val job = putAtBack(noteId, kind, existing, speechIdentity)
                 if (existing == null && load is CheckpointLoad.Valid) jobs.update(job.withCheckpoint(load))
             }
         }
@@ -280,6 +282,7 @@ class JobRepository(
 
     private fun JobEntity.withCheckpoint(load: CheckpointLoad): JobEntity = when (load) {
         is CheckpointLoad.Valid -> copy(
+            speechIdentity = load.state.model,
             doneMs = load.state.doneMs,
             totalMs = load.state.durationMs,
             words = load.state.recognition.chunks.words.size,
@@ -288,7 +291,12 @@ class JobRepository(
     }
 
     /** Back of the queue: QUEUED, `seq = max + 1`, failure and pause cleared, attempts 0. In a transaction. */
-    private suspend fun putAtBack(noteId: String, kind: JobKind, existing: JobEntity?): JobEntity {
+    private suspend fun putAtBack(
+        noteId: String,
+        kind: JobKind,
+        existing: JobEntity?,
+        speechIdentity: String? = null,
+    ): JobEntity {
         val now = clock()
         val seq = (jobs.maxSeq() ?: 0) + 1
         val job = existing?.copy(
@@ -304,6 +312,7 @@ class JobRepository(
             seq = seq,
             kind = kind,
             state = JobState.QUEUED,
+            speechIdentity = speechIdentity ?: speechChoice().identity,
             enqueuedAt = now,
             updatedAt = now,
         )

@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "c78b85f51d9e4a26bc020a640dfe5ff9",
+    "identityHash": "f2b833fefa59d740e2b65843f3d02000",
     "entities": [
       {
         "tableName": "notes",
@@ -554,7 +554,7 @@
       },
       {
         "tableName": "jobs",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`note_id` TEXT NOT NULL, `seq` INTEGER NOT NULL, `kind` TEXT NOT NULL, `state` TEXT NOT NULL, `pause_reason` TEXT, `failure` TEXT, `done_ms` INTEGER NOT NULL, `total_ms` INTEGER NOT NULL, `words` INTEGER NOT NULL, `attempts` INTEGER NOT NULL, `enqueued_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, PRIMARY KEY(`note_id`), FOREIGN KEY(`note_id`) REFERENCES `notes`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`note_id` TEXT NOT NULL, `seq` INTEGER NOT NULL, `kind` TEXT NOT NULL, `state` TEXT NOT NULL, `pause_reason` TEXT, `failure` TEXT, `done_ms` INTEGER NOT NULL, `total_ms` INTEGER NOT NULL, `words` INTEGER NOT NULL, `attempts` INTEGER NOT NULL, `speech_identity` TEXT NOT NULL, `enqueued_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, PRIMARY KEY(`note_id`), FOREIGN KEY(`note_id`) REFERENCES `notes`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "noteId",
@@ -612,6 +612,12 @@
             "fieldPath": "attempts",
             "columnName": "attempts",
             "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "speechIdentity",
+            "columnName": "speech_identity",
+            "affinity": "TEXT",
             "notNull": true
           },
           {
@@ -749,7 +755,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'c78b85f51d9e4a26bc020a640dfe5ff9')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'f2b833fefa59d740e2b65843f3d02000')"
     ]
   }
 }

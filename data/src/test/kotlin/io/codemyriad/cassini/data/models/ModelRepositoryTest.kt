@@ -100,15 +100,16 @@ class ModelRepositoryTest {
         val status = repository().refresh()
 
         assertEquals(ModelStatus.Ready, status[ModelPart.SPEECH])
-        // Parakeet installed counts as consent.
-        assertEquals(ModelStatus.Missing(consented = true), status[ModelPart.SPEAKERS])
-        assertEquals(ModelStatus.Missing(consented = true), status[ModelPart.VOICES])
-        assertTrue(repository().consented())
+        // Installed Parakeet authorizes speech, without consenting to optional downloads.
+        assertEquals(ModelStatus.Missing(consented = false), status[ModelPart.SPEAKERS])
+        assertEquals(ModelStatus.Missing(consented = false), status[ModelPart.VOICES])
+        assertFalse(repository().consented())
+        assertTrue(repository().speechConsented())
         assertEquals(listOf(ModelPart.SPEAKERS, ModelPart.VOICES), repository().plan().parts)
         assertTrue("the speech detector is best effort", offMain { repository().readyBlocking(ModelPart.SPEECH) })
     }
 
-    @Test fun consentIsTheStoredTimeOrParakeet() = runTest {
+    @Test fun explicitConsentAuthorizesSpeechAndOptionalParts() = runTest {
         val repo = repository()
         repo.refresh()
         repo.recordDeclined()
@@ -120,6 +121,16 @@ class ModelRepositoryTest {
         assertEquals(42L, settings.snapshot().consentAt)
         assertEquals(42L, settings.snapshot().declinedAt)
         assertEquals(ModelStatus.Missing(consented = true), repo.status.value[ModelPart.SPEECH])
+    }
+
+    @Test fun optionalConsentNeverMarksSpeechConsented() = runTest {
+        val repo = repository()
+        repo.recordConsent(includeSpeech = false)
+        assertEquals(ModelStatus.Missing(false), repo.status.value[ModelPart.SPEECH])
+        assertEquals(ModelStatus.Missing(true), repo.status.value[ModelPart.SPEAKERS])
+        assertEquals(ModelStatus.Missing(true), repo.status.value[ModelPart.VOICES])
+        assertFalse(repo.speechConsented())
+        assertTrue(repo.consented())
     }
 
     @Test fun anInstallReportsProgressAndEndsReady() = runTest {

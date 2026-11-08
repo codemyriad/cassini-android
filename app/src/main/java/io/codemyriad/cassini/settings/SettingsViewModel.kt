@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation3.runtime.NavKey
 import io.codemyriad.cassini.core.models.ModelPart
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.models.ModelStatus
 import io.codemyriad.cassini.nav.LicensesKey
 import io.codemyriad.cassini.nav.ModelDownloadKey
@@ -16,6 +17,7 @@ import io.codemyriad.cassini.ui.settings.ModelRowUi
 import io.codemyriad.cassini.ui.settings.ModelStatusUi
 import io.codemyriad.cassini.ui.settings.SettingsEvent
 import io.codemyriad.cassini.ui.settings.SettingsUiState
+import io.codemyriad.cassini.ui.settings.SpeechModelUi
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
@@ -58,18 +60,32 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
 
     val state: StateFlow<SettingsUiState> = combine(
         language,
-        ports.models.onStart { emit(emptyMap()) },
+        ports.models.onStart { emit(emptyMap()) }.combine(ports.speech) { models, speech -> models to speech },
         ports.voices().guarded("voices"),
         ports.trash().guarded("trash"),
         ports.notices,
-    ) { language, models, voices, trash, facts ->
+    ) { language, modelState, voices, trash, facts ->
+        val (models, speech) = modelState
+        val speechStatus = models[ModelPart.SPEECH]
+        val canStartParakeet = speechStatus == ModelStatus.Ready || (speechStatus as? ModelStatus.Missing)?.consented == true
         SettingsUiState(
             language = language,
-            models = rows(models),
+            models = rows(models).map {
+                if ((speech.selected == SpeechModel.INCLUDED || !canStartParakeet) && it.status == ModelStatusUi.Pending) {
+                    it.copy(status = ModelStatusUi.NotDownloaded)
+                } else {
+                    it
+                }
+            }.toImmutableList(),
+            speechModel = if (speech.selected == SpeechModel.INCLUDED) SpeechModelUi.INCLUDED else SpeechModelUi.PARAKEET,
+            includedAvailable = speech.includedAvailable,
+            speechChecking = false,
             voices = voices,
             trash = trash,
             version = ports.version,
             notificationsOff = facts.notificationsOff,
+            parakeetSuggestion = Notices.parakeetSuggestion(facts),
+            parakeetNowDefault = facts.parakeetNowDefault,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), initial())
 
@@ -87,8 +103,12 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
 
     fun onEvent(event: SettingsEvent) {
         when (event) {
+            SettingsEvent.DownloadParakeet -> emit(SettingsEffect.Open(ModelDownloadKey(parakeetOnly = true)))
+            SettingsEvent.DismissParakeet -> ports.dismissParakeetSuggestion()
+            SettingsEvent.DismissParakeetDefault -> ports.dismissParakeetDefault()
             SettingsEvent.Back -> emit(SettingsEffect.Close)
             is SettingsEvent.Language -> choose(event.language)
+            is SettingsEvent.ChooseSpeech -> chooseSpeech(event.model)
             is SettingsEvent.OpenModel -> openModel(event)
             SettingsEvent.OpenVoices -> emit(SettingsEffect.Open(SavedVoicesKey))
             SettingsEvent.OpenTrash -> emit(SettingsEffect.Open(TrashKey))
@@ -113,6 +133,25 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
         ports.setLanguage(next)
     }
 
+    private fun chooseSpeech(model: SpeechModelUi) {
+        if (model == SpeechModelUi.INCLUDED && !state.value.includedAvailable) return
+        viewModelScope.launch {
+            try {
+                val status = state.value.models.firstOrNull { it.part == io.codemyriad.cassini.ui.format.ModelPartUi.SPEECH }?.status
+                if (model == SpeechModelUi.PARAKEET && status != ModelStatusUi.Ready) {
+                    emit(SettingsEffect.Open(ModelDownloadKey(parakeetOnly = true)))
+                } else {
+                    val selected = if (model == SpeechModelUi.INCLUDED) SpeechModel.INCLUDED else SpeechModel.PARAKEET
+                    ports.chooseSpeech(selected)
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+                Log.w(TAG, "Cannot save the model choice", error)
+            }
+        }
+    }
+
     /**
      * A "Not downloaded" row opens Model download (the consent), with no note. A failed row opens it too: there,
      * Download starts the download again, for example after Android stopped it.
@@ -130,6 +169,7 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
         voices = 0,
         trash = 0,
         version = ports.version,
+        speechChecking = true,
     )
 
     private fun emit(effect: SettingsEffect) {

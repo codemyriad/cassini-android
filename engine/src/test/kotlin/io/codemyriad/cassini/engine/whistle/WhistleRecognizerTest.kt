@@ -1,5 +1,6 @@
 package io.codemyriad.cassini.engine.whistle
 
+import io.codemyriad.cassini.core.ProcessingPaused
 import io.codemyriad.cassini.core.asr.IncrementalState
 import io.codemyriad.cassini.core.checkpoint.CheckpointState
 import io.codemyriad.cassini.core.checkpoint.RecognitionState
@@ -92,6 +93,37 @@ class WhistleRecognizerTest {
             val parakeet = RecognitionState(0, IncrementalState(0, 0, FloatArray(0), emptyList()))
             assertTrue(!CheckpointState.json(parakeet).has("whistle"))
         }
+    }
+
+    @Test fun stopBetweenReplayBlocksClosesTheWorkerWithoutChangingSavedProgress() {
+        val saved = fresh().use {
+            it.accept(pcm, pcm.size)
+            it.checkpoint()
+        }
+        val before = CheckpointState.json(saved).toString()
+        var stop = false
+        lateinit var worker: Fake
+        val callbacks = Recognizer.Callbacks(
+            { _, _, _ -> error("Replay must not repeat speaker work") },
+            { _, _, _ -> },
+            {},
+            checkReplayActive = { if (stop) throw ProcessingPaused() },
+        )
+        assertThrows(ProcessingPaused::class.java) {
+            WhistleRecognizer(
+                saved,
+                callbacks,
+                { _, sink ->
+                    sink(pcm, 2048)
+                    stop = true
+                    sink(pcm.copyOfRange(2048, pcm.size), 2048)
+                },
+                { Fake(it).also { opened -> worker = opened } },
+            )
+        }
+        assertEquals(2048, worker.received)
+        assertEquals(1, worker.closes)
+        assertEquals(before, CheckpointState.json(saved).toString())
     }
 
     @Test

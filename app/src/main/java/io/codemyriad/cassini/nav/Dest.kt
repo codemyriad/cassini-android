@@ -38,7 +38,7 @@ data object RecordingKey : NavKey
 
 /** The model download consent. With [noteId] it transcribes that note once the models are there. */
 @Serializable
-data class ModelDownloadKey(val noteId: String? = null) : NavKey
+data class ModelDownloadKey(val noteId: String? = null, val parakeetOnly: Boolean = false) : NavKey
 
 @Serializable
 data object SettingsKey : NavKey

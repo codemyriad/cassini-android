@@ -16,6 +16,9 @@ enum class Failure {
 
     /** The model host no longer offers the pinned model this build needs ("Model not available", R11). */
     MODEL_UNAVAILABLE,
+
+    /** Included cannot run with the current device capability or verified packaged assets. No network fallback. */
+    INCLUDED_UNAVAILABLE,
 }
 
 /** Keep stable failure codes separate from localized copy and native diagnostic messages. */

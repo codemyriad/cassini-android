@@ -6,9 +6,12 @@ import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.core.library.PauseReason
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.checkpoint.CheckpointRepository
 import io.codemyriad.cassini.data.checkpoint.noteId
+import io.codemyriad.cassini.data.db.Converters
 import io.codemyriad.cassini.data.db.JobEntity
+import io.codemyriad.cassini.data.db.TrashedJob
 import io.codemyriad.cassini.data.notes.NoteRepository
 import io.codemyriad.cassini.data.notes.NotesHarness
 import io.codemyriad.cassini.data.notes.SealedAdopter
@@ -37,6 +40,7 @@ class JobRepositoryTest {
     @get:Rule val folder = TemporaryFolder()
     private lateinit var h: NotesHarness
     private lateinit var jobs: JobRepository
+    private var choice = SpeechModel.PARAKEET
     private val cancelled: MutableList<String> = Collections.synchronizedList(mutableListOf())
 
     @Before fun setUp() {
@@ -50,6 +54,7 @@ class JobRepositoryTest {
             checkpoints,
             SealedAdopter.of(h.documents, VoiceRepository(h.db, h.paths, h.dispatchers, checkpoints.names)),
             RunningJobCanceller { cancelled += it },
+            speechChoice = { choice },
         ) { h.now }
     }
 
@@ -58,6 +63,54 @@ class JobRepositoryTest {
     private suspend fun job(id: String): JobEntity = requireNotNull(jobs.job(id)) { "no job $id" }
 
     private suspend fun notes(count: Int): List<String> = (1..count).map { noteId(it).also { id -> h.plainNote(id) } }
+
+    @Test fun settingsOnlyChangesTheIdentityOfNewJobs() = runTest {
+        val (a, b) = notes(2)
+        choice = SpeechModel.INCLUDED
+        jobs.enqueue(a, JobKind.TRANSCRIBE)
+        choice = SpeechModel.PARAKEET
+        jobs.enqueue(a, JobKind.TRANSCRIBE)
+        jobs.enqueue(b, JobKind.TRANSCRIBE)
+        assertEquals(SpeechModel.INCLUDED.identity, job(a).speechIdentity)
+        assertEquals(choice.identity, job(b).speechIdentity)
+        assertEquals(job(a).speechIdentity, h.db.jobs().job(a)?.speechIdentity)
+    }
+
+    @Test fun trashBeforeFirstCheckpointKeepsBothEnginePinsAcrossDefaultChanges() = runTest {
+        val repository = NoteRepository(
+            h.db,
+            h.paths,
+            h.dispatchers,
+            h.locks,
+            h.documents,
+            h.background,
+            jobs,
+            h.ports,
+        ) { h.now }
+        val ids = notes(2)
+        for ((index, original) in SpeechModel.entries.withIndex()) {
+            val id = ids[index]
+            choice = original
+            jobs.enqueue(id, JobKind.TRANSCRIBE)
+            assertTrue(repository.moveToTrash(id))
+            assertNull(jobs.job(id))
+            assertEquals(original.identity, h.row(id).trashedJob?.speechIdentity)
+            choice = SpeechModel.entries.first { it != original }
+            assertTrue(repository.restore(id))
+            assertEquals(original.identity, job(id).speechIdentity)
+            assertEquals(JobState.QUEUED, job(id).state)
+        }
+    }
+
+    @Test fun trashCodecKeepsUnknownPinsAndReadsLegacyParakeetWithoutUsingSettings() {
+        val converters = Converters()
+        val snapshot = TrashedJob(JobState.QUEUED, JobKind.TRANSCRIBE, "unknown/pin")
+        assertEquals(snapshot, converters.toTrashedJob(converters.fromTrashedJob(snapshot)))
+        assertEquals(
+            SpeechModel.PARAKEET.identity,
+            converters.toTrashedJob("QUEUED/TRANSCRIBE").speechIdentity,
+        )
+    }
 
     @Test fun enqueueAddsAtTheBack() = runTest {
         val (a, b) = notes(2)

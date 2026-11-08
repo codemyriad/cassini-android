@@ -1,6 +1,6 @@
 # Privacy
 
-Cassini for Android keeps your recordings, transcripts and voiceprints on your phone. Cassini does not upload them. Cassini has no accounts, no advertising, no analytics and no crash reports. The app connects to the internet only to download its models, and only after you agree.
+Cassini for Android keeps your recordings, transcripts and voiceprints on your phone. Cassini does not upload them. Cassini has no accounts, no advertising, no analytics and no crash reports. The app connects to the internet only to download optional models, and only after you agree. Whistle is included on supported devices and basic transcription with it needs no model download. Its isolated worker has no internet permission.
 
 This file applies to Cassini for Android 0.2 and later. The app shows the same text on its Licenses screen.
 
@@ -12,7 +12,7 @@ Cassini keeps your data in its private app storage (the `filesDir` directory of 
 - Transcripts: the words and their times, the speaker labels, the speaker names that you give, and the title. Location: `notes/<noteId>/document.opus`. The catalogue database `cassini.db` keeps a copy of the text for the library and for search.
 - Unfinished transcription: the progress of a transcription, the words found so far, the draft speaker names, the matches between speakers and saved voices, short audio clips of each speaker (at most 45 seconds for each speaker), and the state of the speaker model. This state is a list of numbers that the speaker model calculates from the voices in the note, so that the transcription can continue later. It is not a voiceprint, and Cassini does not use it to recognize people. A match is the ID of a saved voice and a score. It is not a voiceprint. Location: `notes/<noteId>/work/`. Cassini deletes this directory when the transcription ends, when you start again, or when it deletes the note.
 - Voiceprints: a voiceprint is a list of numbers that Cassini calculates from the voice of one speaker. Cassini uses voiceprints to recognize the people that you name. Location: `voices/` only. The section "Voiceprints" gives the details.
-- Settings and state: your model download decision and its time, the queue of transcriptions, the trash state of notes, the playback position, and some one-time notices. Location: `settings.preferences_pb` and `cassini.db`. On Android 13 and later, Android keeps the app language. On earlier versions, Cassini keeps the app language in a small file in its private storage.
+- Settings and state: your selected speech model, the pinned model of each queued transcription, your model download decisions and their times, the queue of transcriptions, the trash state of notes, the playback position, and some one-time notices. Location: `settings.preferences_pb` and `cassini.db`. On Android 13 and later, Android keeps the app language. On earlier versions, Cassini keeps the app language in a small file in its private storage.
 - Models: the downloaded speech and speaker models. They contain no personal data. Location: `models/`. Cassini 0.3.0 kept them in `parakeet-ultra/`, `vad/` and `speaker-models/`. Later versions do not read these directories and do not delete them.
 
 When you import a file, or open a file with Cassini from a different app, Cassini copies the file into its storage. The original file stays where it is.

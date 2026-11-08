@@ -10,7 +10,10 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import io.codemyriad.cassini.AppGraph
+import io.codemyriad.cassini.core.Failure
+import io.codemyriad.cassini.core.UserFacingException
 import io.codemyriad.cassini.core.library.PauseReason
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.engine.job.JobEvent
 import io.codemyriad.cassini.engine.job.JobOutcome
 import io.codemyriad.cassini.engine.job.TranscriptionJob
@@ -45,13 +48,22 @@ fun interface ProcessingJobFactory {
 class TranscriptionJobFactory(private val graph: AppGraph) : ProcessingJobFactory {
     override suspend fun create(noteId: String): ProcessingJob {
         val catalogue = graph.awaitCatalogue()
+        val identity = requireNotNull(catalogue.jobs.job(noteId)).speechIdentity
+        val model = try {
+            SpeechModel.identity(identity)
+        } catch (error: IllegalArgumentException) {
+            throw UserFacingException(Failure.INCLUDED_UNAVAILABLE).apply { initCause(error) }
+        }
+        val source = catalogue.jobStorage.audioFile(noteId)
+        val engines = graph.jobEngines(model, source)
         val job = TranscriptionJob(
             noteId,
             catalogue.jobStorage,
             catalogue.jobVoices,
             graph.modelAccess,
-            graph.engines,
+            engines,
             graph.jobEnvironment,
+            model,
         )
         return object : ProcessingJob {
             override val noteId: String = noteId
@@ -59,7 +71,18 @@ class TranscriptionJobFactory(private val graph: AppGraph) : ProcessingJobFactor
 
             override fun stop(reason: PauseReason) = job.stop(reason)
 
-            override suspend fun run(): JobOutcome = job.run()
+            override suspend fun run(): JobOutcome {
+                val outcome = job.run()
+                if (model == SpeechModel.INCLUDED && outcome == JobOutcome.Done) {
+                    try {
+                        graph.settings.recordWhistleCompleted(noteId)
+                        graph.parakeetRecommendation.refresh()
+                    } catch (error: java.io.IOException) {
+                        Log.w("ParakeetSuggestion", "Could not remember the completed Whistle transcription", error)
+                    }
+                }
+                return outcome
+            }
         }
     }
 }

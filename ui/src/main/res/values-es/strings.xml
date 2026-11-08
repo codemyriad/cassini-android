@@ -437,7 +437,7 @@
     <string name="ui_settings_model_checking">Comprobando archivos</string>
     <string name="ui_settings_model_pending">Se descarga con la próxima transcripción</string>
     <string name="ui_settings_model_not_downloaded">Sin descargar</string>
-    <string name="ui_settings_model_failed">Error en la descarga — se reintentará la próxima vez</string>
+    <string name="ui_settings_model_failed">Error de descarga — toca para reintentar</string>
     <string name="ui_settings_models_footnote">La transcripción se hace en este teléfono. El audio nunca sale de él.</string>
     <string name="ui_settings_privacy">Privacidad</string>
     <string name="ui_settings_voices">Voces guardadas</string>
@@ -569,4 +569,17 @@
     <string name="ui_banner_voices_unreadable_body">Las creó una versión más reciente de Cassini o están dañadas. No se cambió nada.</string>
     <string name="ui_banner_lib_unavailable_title">No se pueden abrir tus notas</string>
     <string name="ui_banner_lib_unavailable_body">Tus archivos se conservan. Libera almacenamiento y vuelve a abrir Cassini.</string>
+    <string name="ui_settings_included">Incluido · 17 MB</string>
+    <string name="ui_settings_optional">Descarga opcional</string>
+    <string name="ui_settings_optional_size">Descarga opcional · %1$s</string>
+    <string name="ui_settings_default">Predeterminado</string>
+    <string name="ui_settings_unavailable">No disponible</string>
+    <string name="ui_settings_model_choice_footnote">Se usa para las nuevas transcripciones. Las transcripciones en cola y en pausa conservan su modelo.</string>
+    <string name="ui_settings_not_available">No disponible en este dispositivo.</string>
+
+    <!-- Coordinator D78; ux-draft/strings.json. -->
+    <string name="ui_action_not_now">Ahora no</string>
+    <string name="ui_parakeet_suggestion_title">Mejores transcripciones con Parakeet Ultra</string>
+    <string name="ui_parakeet_suggestion_body">Whistle viene incluido para que empieces enseguida. Parakeet Ultra es más preciso. La descarga ocupa %1$s.</string>
+    <string name="ui_parakeet_now_default">Las reuniones nuevas ahora usan Parakeet Ultra.</string>
 </resources>

@@ -11,6 +11,7 @@ import io.codemyriad.cassini.data.db.JobEntity
 import io.codemyriad.cassini.data.voices.VoiceProblem
 import io.codemyriad.cassini.engine.job.DownloadError
 import io.codemyriad.cassini.engine.job.DownloadProgress
+import io.codemyriad.cassini.engine.job.InstallOutcome
 import io.codemyriad.cassini.engine.job.JobFailure
 import io.codemyriad.cassini.engine.job.JobPhase
 import io.codemyriad.cassini.recording.AfterFinish
@@ -27,6 +28,7 @@ import io.codemyriad.cassini.ui.banner.BannerSpec
 import io.codemyriad.cassini.ui.format.ModelPartUi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -36,6 +38,14 @@ import org.junit.Test
  * tone. The trust rows of 13.1 are the Note ViewModel's (P10 step 4).
  */
 class NoticeCenterTest {
+    @Test fun standaloneOptionalFailuresAndOfflineSkipsProduceRetryNotices() {
+        val expected = DownloadFailure(DownloadError.NO_CONNECTION, at = 7)
+        val failed = InstallOutcome.Installed(failed = mapOf(ModelPart.SPEAKERS to DownloadError.NO_CONNECTION))
+        val offline = InstallOutcome.Installed(skipped = setOf(ModelPart.SPEAKERS))
+        assertEquals(expected, standaloneFailure(failed, 7, true))
+        assertEquals(expected, standaloneFailure(offline, 7, false))
+        assertNull(standaloneFailure(InstallOutcome.Installed(), 7, true))
+    }
     private val active = RecordingState.Active(
         noteId = "rec",
         title = "Standup",
@@ -289,10 +299,25 @@ class NoticeCenterTest {
     /** Every app-emitted kind outside the trust rows is produced above; the catalogue-only kinds never are. */
     @Test
     fun everyAppEmittedRowIsProduced() {
-        val produced = produceAll().map { it.kind }.toSet()
+        val recommendation = io.codemyriad.cassini.models.ParakeetRecommendationState(true, 123L, "first")
+        val recommended = Notices.library(NoticeFacts(parakeet = recommendation), LibraryFacts(loading = true))
+        val promoted = Notices.library(NoticeFacts(parakeetNowDefault = true), LibraryFacts(loading = true))
+        val produced = (produceAll() + recommended + promoted).map { it.kind }.toSet()
         val expected = BannerKind.entries.filter { it.appEmitted && it.group != BannerGroup.TRUST }.toSet()
         assertEquals(expected - produced, emptySet<BannerKind>())
         assertTrue(BannerKind.TX_CALCULATING !in produced && BannerKind.TX_BATTERY !in produced)
+    }
+
+    @Test fun parakeetSuggestionIsAbsentBeforeCompletionOutsideSettingsAndAbsentWhenIneligible() {
+        val offer = io.codemyriad.cassini.models.ParakeetRecommendationState(true, 123L)
+        val before = NoticeFacts(parakeet = offer)
+        assertTrue(Notices.library(before, LibraryFacts(loading = true)).isEmpty())
+        assertEquals(123L, requireNotNull(Notices.parakeetSuggestion(before)).args.bytes)
+        val after = before.copy(parakeet = offer.copy(firstWhistleNote = "first"))
+        assertEquals(BannerKind.PARAKEET_RECOMMENDED, only(Notices.library(after, LibraryFacts(loading = true))).kind)
+        val dismissed = after.copy(parakeet = after.parakeet.copy(visible = false))
+        assertNull(Notices.parakeetSuggestion(dismissed))
+        assertTrue(Notices.library(dismissed, LibraryFacts(loading = true)).isEmpty())
     }
 
     @Test

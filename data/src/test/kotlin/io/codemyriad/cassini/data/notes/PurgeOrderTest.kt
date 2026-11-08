@@ -84,7 +84,8 @@ class PurgeOrderTest {
     /** The note repository with the real queue and voice store, recording what each purge step finds. */
     private fun notes(): NoteRepository {
         val queue = object : JobQueueWriter {
-            override suspend fun requeueAtBack(noteId: String, kind: JobKind) = jobs.requeueAtBack(noteId, kind)
+            override suspend fun requeueAtBack(noteId: String, kind: JobKind, speechIdentity: String?) =
+                jobs.requeueAtBack(noteId, kind, speechIdentity)
 
             override suspend fun cancelAndRemove(noteId: String) {
                 events += "job voices=${voiceFile(noteId).exists()}"

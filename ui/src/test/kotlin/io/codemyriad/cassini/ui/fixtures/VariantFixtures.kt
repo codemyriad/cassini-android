@@ -67,6 +67,7 @@ import io.codemyriad.cassini.ui.recording.RecordingPhase
 import io.codemyriad.cassini.ui.settings.LanguageChoice
 import io.codemyriad.cassini.ui.settings.ModelRowUi
 import io.codemyriad.cassini.ui.settings.ModelStatusUi
+import io.codemyriad.cassini.ui.settings.SpeechModelUi
 import io.codemyriad.cassini.ui.theme.SpeakerTone
 import io.codemyriad.cassini.ui.trash.TrashBackTo
 import io.codemyriad.cassini.ui.trash.TrashDialog
@@ -663,6 +664,11 @@ internal object VariantFixtures {
     // Model download (features.md section 5).
 
     val modelDownload: Map<String, ModelDownloadUiState> = mapOf(
+        "models-parakeet-only" to b.modelDownload.copy(
+            parts = persistentListOf(ModelPartSizeUi(ModelPartUi.SPEECH, 465378233L)),
+            requiredFreeBytes = 1_157_082_403L, // Pinned speech artifacts + largest packed file + 32 MiB slack.
+            withNote = false,
+        ),
         "models-no-space" to b.modelDownload.copy(banner = banner(BannerKind.DL_NO_SPACE, announce = true)),
         "models-no-connection" to b.modelDownload.copy(banner = banner(BannerKind.DL_NO_CONNECTION, announce = true)),
         "models-without-note" to b.modelDownload.copy(withNote = false),
@@ -683,17 +689,32 @@ internal object VariantFixtures {
     // Settings (features.md section 11).
 
     val settings = mapOf(
+        "settings-parakeet-suggestion" to b.settings.copy(
+            parakeetSuggestion = BannerSpec(BannerKind.PARAKEET_RECOMMENDED, BannerArgs(bytes = 465378233L)),
+            models = b.settings.models.map {
+                if (it.part == ModelPartUi.SPEECH) it.copy(status = ModelStatusUi.NotDownloaded) else it
+            }.toImmutableList(),
+        ),
+        "settings-parakeet-default" to b.settings.copy(
+            speechModel = SpeechModelUi.PARAKEET,
+            parakeetNowDefault = true,
+        ),
+        "settings-included-unavailable" to b.settings.copy(
+            speechModel = SpeechModelUi.PARAKEET,
+            includedAvailable = false,
+        ),
         "settings-notifications-off" to b.settings.copy(notificationsOff = true),
         "settings-downloading" to b.settings.copy(
+            speechModel = SpeechModelUi.PARAKEET,
             models = persistentListOf(
-                ModelRowUi(ModelPartUi.SPEECH, ModelBytes.SPEECH, ModelStatusUi.Downloading(46)),
+                ModelRowUi(ModelPartUi.SPEECH, 440L * 1024 * 1024, ModelStatusUi.Downloading(46)),
                 ModelRowUi(ModelPartUi.SPEAKERS, ModelBytes.SPEAKERS, ModelStatusUi.Pending),
                 ModelRowUi(ModelPartUi.VOICES, ModelBytes.VOICES, ModelStatusUi.Pending),
             ),
         ),
         "settings-model-statuses" to b.settings.copy(
             models = persistentListOf(
-                ModelRowUi(ModelPartUi.SPEECH, ModelBytes.SPEECH, ModelStatusUi.Checking),
+                ModelRowUi(ModelPartUi.SPEECH, 440L * 1024 * 1024, ModelStatusUi.Checking),
                 ModelRowUi(ModelPartUi.SPEAKERS, ModelBytes.SPEAKERS, ModelStatusUi.Failed),
                 ModelRowUi(ModelPartUi.VOICES, ModelBytes.VOICES, ModelStatusUi.NotDownloaded),
             ),

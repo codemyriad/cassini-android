@@ -15,6 +15,7 @@ import io.codemyriad.cassini.core.format.WordBodyBudget
 import io.codemyriad.cassini.core.library.PauseReason
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.models.ModelPlan
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.core.speakers.Match
 import io.codemyriad.cassini.core.speakers.SpeakerPrint
 import kotlinx.coroutines.Dispatchers
@@ -67,6 +68,26 @@ class TranscriptionJobTest {
     private val sp1 = "diar_test_1"
     private val sp2 = "diar_test_2"
     private val sp3 = "diar_test_3"
+
+    @Test fun aReplayMismatchOffersStartOverInsteadOfAnUnknownFailure() = runBlocking {
+        val h = Harness(speechModel = SpeechModel.INCLUDED)
+        h.script.beforeDecode = { throw RecognitionCheckpointMismatch("Saved prefix changed") }
+        val (outcome, _) = h.run()
+        assertEquals(JobOutcome.Failed(JobFailure.CheckpointMismatch), outcome)
+    }
+
+    @Test fun includedDoesNotRequestDownloadsOrConsentAndWritesItsOwnIdentity() = runBlocking {
+        val h = Harness(speechModel = SpeechModel.INCLUDED)
+        h.models.readyParts = emptySet()
+        h.models.consent = false
+        val (outcome, events) = h.run()
+        assertEquals(JobOutcome.Done, outcome)
+        assertTrue(events.none { it is JobEvent.Downloading })
+        assertTrue(h.storage.saved.all { it.model == SpeechModel.INCLUDED.identity })
+        val json = JobProvenance.recognition("und", 1, "desktop-gate", 0, SpeechModel.INCLUDED)
+        assertEquals("needle", json.getString("backend"))
+        assertEquals("Whistle", json.getString("engine"))
+    }
 
     @Test fun decodesIn28SecondWindowsAndSavesOneCheckpointPerWindow() = runBlocking {
         val h = Harness()
@@ -243,6 +264,33 @@ class TranscriptionJobTest {
         assertTrue("$wholeRecord\n$resumedRecord", sameJson(wholeRecord, resumedRecord))
     }
 
+    @Test fun stopDuringRecognizerReplayKeepsTheExistingCheckpoint() = runBlocking {
+        val h = Harness(source = "source.mp3")
+        val first = h.job()
+        h.script.beforeDecode = { start -> if (start == 26_000L) first.stop() }
+        assertEquals(JobOutcome.Paused(PauseReason.USER), h.run(first).first)
+        val checkpoint = h.storage.checkpointJson
+        val replayStarted = CountDownLatch(1)
+        val proceed = CountDownLatch(1)
+        h.recognizerFactory = RecognizerFactory { _, callbacks ->
+            replayStarted.countDown()
+            check(proceed.await(20, TimeUnit.SECONDS))
+            callbacks.checkReplayActive()
+            error("A stopped replay must not continue")
+        }
+        val resumed = h.job()
+        val result = async(Dispatchers.Default) { resumed.run() }
+        try {
+            assertTrue(replayStarted.await(20, TimeUnit.SECONDS))
+            resumed.stop(PauseReason.USER)
+        } finally {
+            proceed.countDown()
+        }
+        assertEquals(JobOutcome.Paused(PauseReason.USER), withTimeout(20_000) { result.await() })
+        assertNotNull(checkpoint)
+        assertEquals(checkpoint, h.storage.checkpointJson)
+    }
+
     @Test fun cancelInsideASlowNativeCallKeepsThePreviousCheckpointAndReleasesHandles() = runBlocking {
         val h = Harness()
         val entered = CountDownLatch(1)
@@ -330,6 +378,23 @@ class TranscriptionJobTest {
         full.models.outcome = InstallOutcome.Failed(ModelPart.SPEECH, DownloadError.NOT_ENOUGH_STORAGE, 861L shl 20)
         val noSpace = JobFailure.Download(DownloadError.NOT_ENOUGH_STORAGE, ModelPart.SPEECH, 861L shl 20)
         assertEquals(JobOutcome.Failed(noSpace), full.run().first)
+    }
+
+    @Test fun speechOnlyPlanCompletesParakeetWithOptionalModelsMissing() = runBlocking {
+        for (speechReady in listOf(false, true)) {
+            for (detectorReady in listOf(false, true)) {
+                val h = Harness(speechModel = SpeechModel.PARAKEET)
+                h.models.readyParts = if (speechReady) setOf(ModelPart.SPEECH) else emptySet()
+                h.models.authorizedParts = setOf(ModelPart.SPEECH)
+                h.models.detector = detectorReady
+                assertEquals(JobOutcome.Done, h.run().first)
+                val expected = if (speechReady && detectorReady) emptyList() else listOf(setOf(ModelPart.SPEECH))
+                assertEquals(expected, h.models.installs)
+                assertFalse(h.models.ready(ModelPart.SPEAKERS))
+                assertFalse(h.models.ready(ModelPart.VOICES))
+                assertEquals(1, h.storage.adoptions.size)
+            }
+        }
     }
 
     @Test fun aStopDuringTheDownloadStopsWaitingAndPauses() = runBlocking {
@@ -798,11 +863,13 @@ class TranscriptionJobTest {
      * One note and its fakes. With [recordSyncs] the log also records each fsync ("sync clips.pcm",
      * "sync audio.opus.part", "sync sealed.opus") in order with the checkpoints and the marker.
      */
+    @Suppress("LongParameterList") // One optional test input per job constraint.
     private inner class Harness(
         source: String = "capture.opus",
         totalMs: Long = 70_000,
         reportsTotal: Boolean = true,
         recordSyncs: Boolean = false,
+        private val speechModel: SpeechModel = SpeechModel.PARAKEET,
         private val maxDurationMs: Long = Limits.MAX_TRANSCRIBE_MS,
         private val maxBodyBytes: Long = WordBodyBudget.MAX_BYTES,
     ) {
@@ -810,6 +877,7 @@ class TranscriptionJobTest {
         val audio = File(noteDir, source)
         val log: MutableList<String> = Collections.synchronizedList(mutableListOf())
         val script = Script()
+        var recognizerFactory: RecognizerFactory? = null
         val storage = FakeStorage(noteDir, audio, log)
         val voices = FakeVoices(log)
         val models = FakeModels()
@@ -818,7 +886,8 @@ class TranscriptionJobTest {
         private val clock = AtomicLong(1_000_000_000L)
         private val engines = JobEngines(
             recognizers = { restored, callbacks ->
-                FakeRecognizer(restored, callbacks, script).also { script.recognizers += it }
+                recognizerFactory?.open(restored, callbacks)
+                    ?: FakeRecognizer(restored, callbacks, script).also { script.recognizers += it }
             },
             diarizers = { restored -> FakeDiarizer(restored, script).also { script.diarizers += it } },
             prints = FakePrints(script),
@@ -854,6 +923,7 @@ class TranscriptionJobTest {
                 maxDurationMs = maxDurationMs,
                 maxBodyBytes = maxBodyBytes,
             ),
+            speechModel,
         )
 
         suspend fun run(job: TranscriptionJob = job()): Pair<JobOutcome, List<JobEvent>> {

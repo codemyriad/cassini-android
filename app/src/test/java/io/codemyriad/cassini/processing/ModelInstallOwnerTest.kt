@@ -1,5 +1,6 @@
 package io.codemyriad.cassini.processing
 
+import io.codemyriad.cassini.adapters.RepositoryModelAccess
 import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.models.ModelCatalog
 import io.codemyriad.cassini.core.models.ModelDescriptor
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -121,6 +123,87 @@ class ModelInstallOwnerTest {
     private fun key(model: ModelDescriptor) = "${model.directory}/${model.markerFile}"
 
     private val everyModel = ModelPart.entries.flatMap { it.models }.map(::key).sorted()
+
+    @Test fun optionalRetryKeepsItsOriginalPlanWithOrWithoutEarlierSpeechConsent() = runBlocking {
+        for (speechConsent in listOf(false, true)) {
+            val root = folder.newFolder("optional-$speechConsent")
+            val separate = AppPaths(root, File(root, "cache").apply { mkdirs() })
+            val settingsScope = CoroutineScope(scope.coroutineContext + Dispatchers.IO)
+            val settings = SettingsRepository.create(separate, settingsScope)
+            val failedOnce = AtomicBoolean(false)
+            val requested = Collections.synchronizedList(mutableListOf<ModelDescriptor>())
+            val fetch = ModelFetcher { model, directory, _ ->
+                requested += model
+                if (model == ModelCatalog.DIARIZATION && !failedOnce.getAndSet(true)) {
+                    throw java.io.IOException("Lab optional download failed")
+                }
+                model.artifacts.forEach { artifact ->
+                    RandomAccessFile(File(directory, artifact.name), "rw").use { it.setLength(artifact.size) }
+                }
+            }
+            val repository = ModelRepository(separate, settings, CassiniDispatchers(), fetch)
+            repository.recordConsent(includeSpeech = speechConsent)
+            val installer = ModelInstallOwner(repository, root, { true }, scope, Dispatchers.IO)
+            val optional = setOf(ModelPart.SPEAKERS, ModelPart.VOICES)
+            withTimeout(WAIT_MS) { installer.startDownload(optional).join() }
+            assertTrue((installer.lastOutcome.value as InstallOutcome.Installed).failed.containsKey(ModelPart.SPEAKERS))
+            withTimeout(WAIT_MS) { installer.startDownload().join() }
+            assertEquals(InstallOutcome.Installed(), installer.lastOutcome.value)
+            assertEquals(listOf(ModelCatalog.DIARIZATION, ModelCatalog.DIARIZATION, ModelCatalog.VOICEPRINT), requested)
+            assertTrue(repository.ready(ModelPart.SPEAKERS) && repository.ready(ModelPart.VOICES))
+            assertTrue(!repository.ready(ModelPart.SPEECH))
+        }
+    }
+
+    @Test fun parakeetOnlyPermissionCannotFetchOptionalPartsOrScheduleThemForTheNextJob() = runBlocking {
+        val separate = AppPaths(folder.newFolder("speech-root"), folder.newFolder("speech-cache"))
+        val settingsScope = CoroutineScope(scope.coroutineContext + Dispatchers.IO)
+        val settings = SettingsRepository.create(separate, settingsScope)
+        val repository = ModelRepository(separate, settings, CassiniDispatchers(), fetcher)
+        repository.recordConsent(includeOptional = false)
+        val installer = ModelInstallOwner(repository, separate.modelRoot, { true }, scope, Dispatchers.IO)
+        val access = RepositoryModelAccess(repository, separate.modelRoot, installer) { true }
+        assertEquals(listOf(ModelPart.SPEECH), withContext(Dispatchers.IO) { access.plan().parts })
+        val mixed = withTimeout(WAIT_MS) { installer.install(setOf(ModelPart.SPEECH, ModelPart.SPEAKERS)) }
+        assertTrue(mixed is InstallOutcome.NeedsConsent)
+        assertTrue(fetched.isEmpty())
+        release.countDown()
+        val speech = withTimeout(WAIT_MS) { installer.install(setOf(ModelPart.SPEECH)) }
+        assertEquals(InstallOutcome.Installed(), speech)
+        val expected = listOf(key(ModelCatalog.PARAKEET), key(ModelCatalog.VAD)).sorted()
+        assertEquals(expected, fetched.sorted())
+        assertTrue(withContext(Dispatchers.IO) { access.plan().isEmpty })
+        assertTrue(installer.install(setOf(ModelPart.SPEAKERS)) is InstallOutcome.NeedsConsent)
+        withTimeout(WAIT_MS) { installer.startDownload().join() }
+        assertEquals("A speech-only retry cannot add optional models", expected, fetched.sorted())
+        repository.recordConsent(includeSpeech = false)
+        val authorized = withContext(Dispatchers.IO) { access.plan().parts }
+        assertEquals(listOf(ModelPart.SPEAKERS, ModelPart.VOICES), authorized)
+    }
+
+    @Test fun offlineStandaloneOptionalSkipsStayRetryableWhileJobSkipsRemainBestEffort() = runBlocking {
+        val online = AtomicBoolean(false)
+        val installer = ModelInstallOwner(models, paths.modelRoot, { online.get() }, scope, Dispatchers.IO)
+        val optional = setOf(ModelPart.SPEAKERS, ModelPart.VOICES)
+        assertEquals(InstallOutcome.Installed(skipped = optional), installer.install(optional))
+        optional.forEach { assertEquals(ModelStatus.Missing(true), models.status.value[it]) }
+
+        withTimeout(WAIT_MS) { installer.startDownload(optional).join() }
+        assertEquals(InstallOutcome.Installed(skipped = optional), installer.lastOutcome.value)
+        optional.forEach {
+            assertEquals(
+                ModelStatus.Failed(Failure.DOWNLOAD, DownloadError.NO_CONNECTION.name),
+                models.status.value[it],
+            )
+        }
+        assertTrue(fetched.isEmpty())
+
+        online.set(true)
+        withTimeout(WAIT_MS) { installer.startDownload().join() }
+        assertEquals(InstallOutcome.Installed(), installer.lastOutcome.value)
+        optional.forEach { assertEquals(ModelStatus.Ready, models.status.value[it]) }
+        assertEquals(listOf(key(ModelCatalog.DIARIZATION), key(ModelCatalog.VOICEPRINT)), fetched)
+    }
 
     @Test fun aJobJoiningTheStandaloneDownloadFetchesEachArtifactOnce() = runBlocking {
         owner.startDownload()

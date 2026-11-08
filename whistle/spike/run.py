@@ -25,11 +25,11 @@ def worker_bench(command, args, output):
         CASSINI_HEAVY_LOCK_HELD="1",
         CASSINI_APK=str(args.apk.resolve()),
         CASSINI_TEST_APK=str(args.worker_bench.resolve()),
-        CASSINI_EXPECTED_TESTS="1",
+        CASSINI_EXPECTED_TESTS="2",
     )
     env["PATH"] = str(args.sdk / "platform-tools") + os.pathsep + env.get("PATH", "")
     script = Path(__file__).resolve().parents[2] / "scripts/device-smoke.sh"
-    privacy_env = dict(env, CASSINI_TEST_APK=str(args.worker_tests.resolve()))
+    privacy_env = dict(env, CASSINI_TEST_APK=str(args.worker_tests.resolve()), CASSINI_EXPECTED_TESTS="1")
     privacy = subprocess.run(
         [str(script), "--serial", "emulator-5584", "--class", "io.codemyriad.cassini.WhistlePrivacyDeviceTest"],
         env=privacy_env,
@@ -46,7 +46,10 @@ def worker_bench(command, args, output):
         case = output / name
         case.mkdir(exist_ok=True)
         if command("shell", "pm", "path", package).stdout.strip():
-            command("shell", "run-as", package, "rm", "-f", f"files/whistle-worker-{name}.json")
+            command(
+                "shell", "run-as", package, "rm", "-f",
+                f"files/whistle-worker-{name}.json", f"files/whistle-included-job-{name}.json",
+            )
         result = subprocess.run(
             [
                 str(script),
@@ -67,6 +70,9 @@ def worker_bench(command, args, output):
         try:
             raw = command("exec-out", "run-as", package, "cat", f"files/whistle-worker-{name}.json").stdout
             (case / "result.json").write_bytes(raw)
+            included = command("exec-out", "run-as", package, "cat", f"files/whistle-included-job-{name}.json").stdout
+            (case / "included-job.json").write_bytes(included)
+            row["includedJob"] = json.loads(included)
             report = json.loads(raw)
             page = 16384 if args.tag == "google_apis_ps16k" else 4096
             if report["sdk"] != args.api or report["pageSize"] != page:
@@ -101,6 +107,50 @@ def worker_bench(command, args, output):
         raise RuntimeError("Whistle worker failures recorded; no golden changed")
 
 
+def parakeet_memory(command, args, output):
+    """Run only after this invocation owns the booted AVD; never use an installed user's model directory."""
+    root = Path(__file__).resolve().parents[2]
+    package = "io.codemyriad.cassini"
+    models = json.loads((root / "scripts/ci-models.json").read_text())["models"]
+    models = [model for model in models if model["id"] in {"parakeet-ultra-0.6b-int8", "silero-vad"}]
+    if len(models) != 2:
+        raise ValueError("Expected pinned Parakeet and VAD models")
+    for model in models:
+        home = "files/parakeet-memory/" + model["directory"]
+        command("shell", "run-as", package, "mkdir", "-p", home)
+        for artifact in model["artifacts"]:
+            source = args.parakeet_memory_models / model["directory"] / artifact["name"]
+            hashed = hashlib.sha256()
+            with source.open("rb") as stream:
+                for block in iter(lambda: stream.read(1024 * 1024), b""):
+                    hashed.update(block)
+            digest = hashed.hexdigest()
+            if source.stat().st_size != artifact["size"] or digest != artifact["sha256"]:
+                raise ValueError("Lab model does not match the committed artifact pin")
+            remote = home + "/" + artifact["name"]
+            with source.open("rb") as stream:
+                command("shell", f"run-as {package} sh -c 'umask 077; cat > {remote}'", stdin=stream)
+            actual = command("shell", "run-as", package, "sha256sum", remote).stdout.decode().split()[0]
+            if actual != digest:
+                raise ValueError("Copied lab model does not match its verified source")
+        command("shell", f"run-as {package} sh -c 'cat > {home}/verified'", input=model["markerValue"].encode())
+    command("shell", "am", "force-stop", package)
+    env = dict(os.environ, CASSINI_HEAVY_LOCK_HELD="1", CASSINI_EXPECTED_TESTS="1",
+               CASSINI_APK=str(args.apk.resolve()), CASSINI_TEST_APK=str(args.worker_bench.resolve()))
+    env["PATH"] = str(args.sdk / "platform-tools") + os.pathsep + env.get("PATH", "")
+    result = subprocess.run(
+        [str(root / "scripts/device-smoke.sh"), "--bench", "--serial", "emulator-5584", "--class",
+         "io.codemyriad.cassini.bench.ParakeetMemoryTest", "--arg", "ownedWhistleLab=true"],
+        env=env, capture_output=True, timeout=1800,
+    )
+    (output / "parakeet-memory-instrumentation.txt").write_bytes(result.stdout + result.stderr)
+    raw = command("exec-out", "run-as", package, "cat", "files/parakeet-memory.json").stdout
+    (output / "parakeet-memory.json").write_bytes(raw)
+    if result.returncode:
+        raise RuntimeError("Parakeet memory measurement failed; partial report retained")
+    print(json.dumps(dict(parakeetMemory=json.loads(raw))), flush=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sdk", type=Path, required=True)
@@ -113,10 +163,15 @@ def main():
         "--worker-bench", type=Path, help="Production app plus explicit Whistle bench APK on the owned AVD"
     )
     parser.add_argument("--worker-tests", type=Path, help="Model-free worker privacy instrumentation APK")
+    parser.add_argument(
+        "--parakeet-memory-models", type=Path, help="Verified public lab Parakeet/VAD files for a cold PSS run"
+    )
     parser.add_argument("--api", type=int, default=35)
     parser.add_argument("--tag", default="google_apis")
     parser.add_argument("--image", type=Path, help="Already installed external-disk system image")
     args = parser.parse_args()
+    if args.parakeet_memory_models and (not args.worker_bench or not args.parakeet_memory_models.is_dir()):
+        parser.error("Parakeet memory measurement requires worker mode and an existing pinned lab model directory")
     if args.worker_bench and (
         not args.worker_bench.is_file()
         or not args.apk.is_file()
@@ -185,7 +240,7 @@ def main():
                 "-no-snapshot",
                 "-no-boot-anim",
                 "-memory",
-                "2048",
+                "4096" if args.parakeet_memory_models else "2048",
                 "-cores",
                 "2",
                 "-gpu",
@@ -243,6 +298,8 @@ def main():
                 raise RuntimeError("Owned emulator did not complete boot before the event/connection deadline")
             if args.worker_bench:
                 worker_bench(command, args, output)
+                if args.parakeet_memory_models:
+                    parakeet_memory(command, args, output)
                 return
             cases = [{"name": "single", "apk": str(args.apk)}]
             hardware = {}

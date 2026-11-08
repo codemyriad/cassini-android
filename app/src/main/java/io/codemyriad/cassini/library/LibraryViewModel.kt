@@ -435,13 +435,17 @@ class LibraryViewModel(
     private fun bannerAction(id: String, action: BannerAction) {
         val kind = kindOf(id) ?: return
         when (action) {
+            BannerAction.NOT_NOW -> ports.dismissNotice(kind)
             BannerAction.CONTINUE -> launch { ports.continueQueue() }
             BannerAction.OPEN -> launch {
                 val recovered = ports.notices.first().recovered ?: return@launch
                 ports.dismissNotice(BannerKind.RECOVERED)
                 emit(LibraryEffect.OpenNote(NoteKey(recovered.latestNoteId)))
             }
-            BannerAction.DOWNLOAD -> emit(LibraryEffect.OpenModelDownload(ModelDownloadKey()))
+            BannerAction.DOWNLOAD -> {
+                val key = ModelDownloadKey(parakeetOnly = kind == BannerKind.PARAKEET_RECOMMENDED)
+                emit(LibraryEffect.OpenModelDownload(key))
+            }
             BannerAction.RETRY, BannerAction.DOWNLOAD_AGAIN -> {
                 ports.dismissNotice(kind)
                 ports.downloadModels()

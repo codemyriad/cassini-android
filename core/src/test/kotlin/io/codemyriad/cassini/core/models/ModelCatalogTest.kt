@@ -42,7 +42,10 @@ class ModelCatalogTest {
     }
 
     @Test fun theSpeechModelOfThisBuildHasAName() {
-        assertEquals(mapOf(ModelCatalog.PARAKEET_MODEL_ID to "Parakeet Ultra"), ModelCatalog.SPEECH_MODEL_NAMES)
+        assertEquals(
+            mapOf(ModelCatalog.PARAKEET_MODEL_ID to "Parakeet Ultra", "whistle" to "Whistle"),
+            ModelCatalog.SPEECH_MODEL_NAMES,
+        )
     }
 
     @Test fun theDetectorAndSpeakerModelsLiveInTheirOwnDirectories() {

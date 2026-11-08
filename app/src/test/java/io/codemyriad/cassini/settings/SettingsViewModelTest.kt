@@ -4,8 +4,10 @@ import androidx.core.os.LocaleListCompat
 import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.models.ModelPlan
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.models.ModelStatus
 import io.codemyriad.cassini.data.models.ModelStatus.Missing
+import io.codemyriad.cassini.models.SpeechChoice
 import io.codemyriad.cassini.nav.LicensesKey
 import io.codemyriad.cassini.nav.ModelDownloadKey
 import io.codemyriad.cassini.nav.SavedVoicesKey
@@ -16,6 +18,7 @@ import io.codemyriad.cassini.ui.settings.LanguageChoice
 import io.codemyriad.cassini.ui.settings.ModelStatusUi
 import io.codemyriad.cassini.ui.settings.SettingsEvent
 import io.codemyriad.cassini.ui.settings.SettingsUiState
+import io.codemyriad.cassini.ui.settings.SpeechModelUi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -59,6 +62,76 @@ class SettingsViewModelTest {
     }
 
     private fun SettingsViewModel.now(): SettingsUiState = state.value
+
+    @Test fun optionalRowsStayActionableWhileParakeetStillNeedsConsent() = runTest(dispatcher) {
+        ports.models.value = mapOf(
+            ModelPart.SPEECH to Missing(false),
+            ModelPart.SPEAKERS to Missing(true),
+            ModelPart.VOICES to Missing(true),
+        )
+        val viewModel = viewModel()
+        assertTrue(viewModel.now().models.all { it.status == ModelStatusUi.NotDownloaded })
+        viewModel.onEvent(SettingsEvent.OpenModel(ModelPartUi.SPEAKERS))
+        advanceUntilIdle()
+        assertEquals(listOf(SettingsEffect.Open(ModelDownloadKey())), effects)
+    }
+
+    @Test fun offlineOptionalFailuresRemainRetryableUnderEitherSpeechChoice() = runTest(dispatcher) {
+        ports.models.value = mapOf(
+            ModelPart.SPEECH to ModelStatus.Ready,
+            ModelPart.SPEAKERS to ModelStatus.Failed(Failure.DOWNLOAD, "NO_CONNECTION"),
+            ModelPart.VOICES to ModelStatus.Failed(Failure.DOWNLOAD, "NO_CONNECTION"),
+        )
+        val viewModel = viewModel()
+        for (model in SpeechModel.entries) {
+            ports.speech.value = SpeechChoice(model, true)
+            advanceUntilIdle()
+            assertEquals(
+                listOf(ModelStatusUi.Ready, ModelStatusUi.Failed, ModelStatusUi.Failed),
+                viewModel.now().models.map { it.status },
+            )
+            effects.clear()
+            viewModel.onEvent(SettingsEvent.OpenModel(ModelPartUi.SPEAKERS))
+            viewModel.onEvent(SettingsEvent.OpenModel(ModelPartUi.VOICES))
+            advanceUntilIdle()
+            assertEquals(List<SettingsEffect>(2) { SettingsEffect.Open(ModelDownloadKey()) }, effects)
+        }
+    }
+
+    @Test fun recommendationOpensOnlyParakeetConsentAndDismissesWithoutChangingTheModel() = runTest(dispatcher) {
+        ports.speech.value = SpeechChoice(SpeechModel.INCLUDED, true)
+        ports.notices.value = NoticeFacts(
+            parakeet = io.codemyriad.cassini.models.ParakeetRecommendationState(true, 123L),
+        )
+        val viewModel = viewModel()
+        assertEquals(123L, requireNotNull(viewModel.now().parakeetSuggestion).args.bytes)
+        viewModel.onEvent(SettingsEvent.DownloadParakeet)
+        advanceUntilIdle()
+        assertEquals(listOf(SettingsEffect.Open(ModelDownloadKey(parakeetOnly = true))), effects)
+        effects.clear()
+        viewModel.onEvent(SettingsEvent.ChooseSpeech(SpeechModelUi.PARAKEET))
+        advanceUntilIdle()
+        assertEquals(listOf(SettingsEffect.Open(ModelDownloadKey(parakeetOnly = true))), effects)
+        assertEquals(SpeechModel.INCLUDED, ports.speech.value.selected)
+        viewModel.onEvent(SettingsEvent.DismissParakeet)
+        advanceUntilIdle()
+        assertEquals(null, viewModel.now().parakeetSuggestion)
+        assertEquals(SpeechModel.INCLUDED, ports.speech.value.selected)
+    }
+
+    @Test fun includedChoiceNeverOpensDownloadAndUnavailableChoiceIsRefused() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        val included = SpeechModelUi.INCLUDED
+        viewModel.onEvent(SettingsEvent.ChooseSpeech(included))
+        advanceUntilIdle()
+        assertEquals(SpeechModelUi.PARAKEET, viewModel.now().speechModel)
+        ports.speech.value = ports.speech.value.copy(includedAvailable = true)
+        advanceUntilIdle()
+        viewModel.onEvent(SettingsEvent.ChooseSpeech(included))
+        advanceUntilIdle()
+        assertEquals(included, viewModel.now().speechModel)
+        assertTrue(effects.isEmpty())
+    }
 
     @Test
     fun showsTheModelRowsTheCountsTheVersionAndTheNotificationsBanner() = runTest(dispatcher) {
@@ -226,10 +299,22 @@ class SettingsViewModelTest {
     }
 
     private class FakeSettingsPorts : SettingsPorts {
+        override fun dismissParakeetDefault() {
+            notices.value = notices.value.copy(parakeetNowDefault = false)
+        }
+        override fun dismissParakeetSuggestion() {
+            notices.value = notices.value.copy(parakeet = notices.value.parakeet.copy(visible = false))
+        }
         val languages = mutableListOf<LanguageChoice>()
         var current = LanguageChoice.PHONE
         var refreshed = 0
         var noticeRefreshes = 0
+        override val speech = MutableStateFlow(
+            SpeechChoice(SpeechModel.PARAKEET, false),
+        )
+        override suspend fun chooseSpeech(model: SpeechModel) {
+            speech.value = speech.value.copy(selected = model)
+        }
         override val models = MutableStateFlow<Map<ModelPart, ModelStatus>>(emptyMap())
         val voices = MutableStateFlow(0)
         val trash = MutableStateFlow(0)

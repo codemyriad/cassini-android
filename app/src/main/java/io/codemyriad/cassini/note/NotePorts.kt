@@ -17,6 +17,7 @@ import io.codemyriad.cassini.core.checkpoint.CheckpointNames
 import io.codemyriad.cassini.core.format.DocumentState
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.models.ModelPart
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.core.speakers.Match
 import io.codemyriad.cassini.core.speakers.SpeakerPrint
 import io.codemyriad.cassini.core.speakers.Voice
@@ -44,6 +45,7 @@ import io.codemyriad.cassini.processing.ProcessingState
 import io.codemyriad.cassini.processing.TranscribeOutcome
 import io.codemyriad.cassini.recording.RecordingState
 import io.codemyriad.cassini.stringRes
+import io.codemyriad.cassini.ui.banner.BannerKind
 import io.codemyriad.cassini.ui.format.Counts
 import io.codemyriad.cassini.ui.format.Dates
 import io.codemyriad.cassini.ui.format.Durations
@@ -209,7 +211,7 @@ interface NotePorts {
     fun failureText(code: String): String?
 
     // Notices and permissions.
-    suspend fun requiredFreeBytes(): Long
+    suspend fun requiredFreeBytes(noteId: String): Long
 
     /** POST_NOTIFICATIONS should be asked now: API 33+, not granted, and never asked before. */
     suspend fun shouldAskNotifications(): Boolean
@@ -217,6 +219,8 @@ interface NotePorts {
     suspend fun markNotificationsAsked()
 
     fun refreshNotices()
+
+    fun dismissParakeetSuggestion()
 
     fun snackbarTimeoutMs(): Long
 }
@@ -436,7 +440,15 @@ class GraphNotePorts(private val graph: AppGraph, context: Context) : NotePorts 
 
     // Notices. -----------------------------------------------------------------------------------------------------
 
-    override suspend fun requiredFreeBytes(): Long = graph.models.plan().requiredFreeBytes
+    override suspend fun requiredFreeBytes(noteId: String): Long {
+        val identity = graph.awaitCatalogue().jobs.job(noteId)?.speechIdentity
+        val model = identity?.let(SpeechModel::identity) ?: graph.speech.selected()
+        return if (model == SpeechModel.INCLUDED) {
+            0
+        } else {
+            withContext(graph.dispatchers.io) { graph.modelAccess.plan().requiredFreeBytes }
+        }
+    }
 
     override suspend fun shouldAskNotifications(): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return false
@@ -448,6 +460,8 @@ class GraphNotePorts(private val graph: AppGraph, context: Context) : NotePorts 
     override suspend fun markNotificationsAsked() = graph.settings.markNotificationsAsked()
 
     override fun refreshNotices() = graph.notices.refreshNotifications()
+
+    override fun dismissParakeetSuggestion() = graph.notices.dismiss(BannerKind.PARAKEET_RECOMMENDED)
 
     override fun snackbarTimeoutMs(): Long = library.snackbarTimeoutMs()
 
