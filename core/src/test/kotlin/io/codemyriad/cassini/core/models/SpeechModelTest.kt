@@ -8,7 +8,10 @@ class SpeechModelTest {
     @Test fun includedIsTheNewDefaultOnlyWhenAvailable() {
         assertEquals(SpeechModel.INCLUDED, SpeechModel.chosen(null, true))
         assertEquals(SpeechModel.PARAKEET, SpeechModel.chosen(null, false))
-        assertEquals(SpeechModel.PARAKEET, SpeechModel.chosen(SpeechModel.PARAKEET, true))
+        assertEquals(SpeechModel.INCLUDED, SpeechModel.chosen(SpeechModel.PARAKEET, true))
+        assertEquals(SpeechModel.PARAKEET, SpeechModel.chosen(SpeechModel.PARAKEET, true, parakeetReady = true))
+        assertEquals(SpeechModel.PARAKEET, SpeechModel.chosen(null, true, parakeetReady = true))
+        assertEquals(SpeechModel.INCLUDED, SpeechModel.chosen(SpeechModel.INCLUDED, true, parakeetReady = true))
         assertEquals(SpeechModel.PARAKEET, SpeechModel.chosen(SpeechModel.INCLUDED, false))
     }
 

@@ -64,7 +64,7 @@ class SpeechSelection(
         } else {
             settings.speechModel.first()
         }
-        SpeechChoice(SpeechModel.chosen(saved, available), available)
+        SpeechChoice(SpeechModel.chosen(saved, available, status[ModelPart.SPEECH] == ModelStatus.Ready), available)
     }
 
     suspend fun selected(): SpeechModel {

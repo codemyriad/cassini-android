@@ -135,10 +135,11 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
         if (model == SpeechModelUi.INCLUDED && !state.value.includedAvailable) return
         viewModelScope.launch {
             try {
-                ports.chooseSpeech(if (model == SpeechModelUi.INCLUDED) SpeechModel.INCLUDED else SpeechModel.PARAKEET)
-                if (model == SpeechModelUi.PARAKEET) {
-                    val status = state.value.models.firstOrNull { it.part == io.codemyriad.cassini.ui.format.ModelPartUi.SPEECH }?.status
-                    if (status != ModelStatusUi.Ready) emit(SettingsEffect.Open(ModelDownloadKey()))
+                val status = state.value.models.firstOrNull { it.part == io.codemyriad.cassini.ui.format.ModelPartUi.SPEECH }?.status
+                if (model == SpeechModelUi.PARAKEET && status != ModelStatusUi.Ready) {
+                    emit(SettingsEffect.Open(ModelDownloadKey(parakeetOnly = true)))
+                } else {
+                    ports.chooseSpeech(if (model == SpeechModelUi.INCLUDED) SpeechModel.INCLUDED else SpeechModel.PARAKEET)
                 }
             } catch (error: CancellationException) {
                 throw error
