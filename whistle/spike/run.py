@@ -110,7 +110,8 @@ def main():
                 command("wait-for-device", timeout=remaining)
                 watcher = subprocess.Popen(
                     [str(adb), "-s", serial, "logcat", "-b", "events", "-v", "brief"],
-                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
                 )
                 with selectors.DefaultSelector() as selector:
                     selector.register(watcher.stdout, selectors.EVENT_READ)
@@ -248,8 +249,7 @@ def main():
             command("wait-for-disconnect", timeout=30)
             # ADB can report disconnect while an offline row still exists. Wait for the
             # host transport-list removal event before allowing the next owned guest.
-            tracking = subprocess.Popen([str(adb), "track-devices"], stdout=subprocess.PIPE,
-                                        stderr=subprocess.STDOUT)
+            tracking = subprocess.Popen([str(adb), "track-devices"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             try:
                 with selectors.DefaultSelector() as selector:
                     selector.register(tracking.stdout, selectors.EVENT_READ)

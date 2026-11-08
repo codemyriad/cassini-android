@@ -59,3 +59,6 @@ opens accounts or plays sound. Every emulator has `-no-audio`.
 CI compiles/inspects all variants; it does not execute Android, prove a dispatch
 hypothesis or establish a minimum OS. A tested emulator API is not a device-wide
 CPU feature guarantee. Results, not the hypotheses, determine the conclusion.
+
+Completed results and limits are recorded in [the evidence report](evidence/README.md)
+and [the full matrix](evidence/TABLE.md).
