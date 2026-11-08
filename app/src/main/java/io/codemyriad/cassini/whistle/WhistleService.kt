@@ -57,10 +57,10 @@ class WhistleService : Service() {
         segments.clear()
         try {
             val result = when (command) {
-                WhistleProtocol.OPEN -> open(data.getInt("rate"))
+                WhistleProtocol.OPEN -> open(data)
                 WhistleProtocol.ACCEPT -> {
                     requireNotNull(stream).accept(requireNotNull(data.getFloatArray("samples")))
-                    Bundle.EMPTY
+                    position
                 }
                 WhistleProtocol.FINISH -> {
                     val hashes = requireNotNull(stream).finish()
@@ -70,7 +70,14 @@ class WhistleService : Service() {
                         putInt("vadFrames", hashes.frames)
                         putInt("voicedFrames", hashes.voiced)
                         putFloat("maxProbability", hashes.maximum)
+                        putLong("positionSamples", requireNotNull(stream).positionSamples)
+                        putLong("rawHashStartSample", hashes.rawHashStartSample)
+                        putLong("vadHashStartSample", hashes.vadHashStartSample)
                     }
+                }
+                WhistleProtocol.SNAPSHOT -> {
+                    WhistleStateFiles.write(data, requireNotNull(stream).snapshot())
+                    position
                 }
                 else -> error("Invalid Whistle worker command")
             }
@@ -96,20 +103,26 @@ class WhistleService : Service() {
         }
     }
 
-    private fun open(rate: Int): Bundle {
+    private fun open(data: Bundle): Bundle {
+        val rate = data.getInt("rate")
         check(stream == null && assets == null)
         require(rate == SPEECH_RATE || rate == SOURCE_RATE)
         verifyIsolation()
+        val saved = WhistleStateFiles.read(data)
+        require(saved == null || saved.rate == rate)
         assets = WhistleAssets.verified(this)
         WhistleNative.bootstrap()
         val verified = requireNotNull(assets)
         WhistleNative.open(verified.needle, verified.ort, verified.model, verified.vad)
-        stream = WhistleStream(rate, ::segment)
+        stream = WhistleStream(rate, ::segment).also { value -> saved?.let(value::restore) }
         return Bundle().apply {
             putInt("pid", Process.myPid())
             putInt("uid", Process.myUid())
+            putLong("positionSamples", requireNotNull(stream).positionSamples)
         }
     }
+
+    private val position: Bundle get() = Bundle().apply { putLong("positionSamples", requireNotNull(stream).positionSamples) }
 
     /** No host/contact is opened. Exercise the kernel/SELinux boundary before loading either neural runtime. */
     private fun verifyIsolation() {

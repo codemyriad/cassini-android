@@ -12,11 +12,13 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.Message
 import android.os.Messenger
+import android.os.ParcelFileDescriptor
 import android.os.RemoteException
 import androidx.annotation.RequiresApi
 import io.codemyriad.cassini.core.models.WhistleCapability
 import io.codemyriad.cassini.engine.asr.WhistleDeviceCapability
 import io.codemyriad.cassini.engine.whistle.WhistleStream
+import java.io.File
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Semaphore
@@ -31,6 +33,7 @@ import java.util.concurrent.TimeUnit
 class WhistleWorker(
     context: Context,
     rate: Int,
+    restored: File? = null,
     private val onSegment: (Bundle) -> Unit,
 ) : AutoCloseable {
     private val app = context.applicationContext
@@ -48,6 +51,8 @@ class WhistleWorker(
     private val death = CompletableFuture<Unit>()
     val pid: Int
     val uid: Int
+    var positionSamples: Long = 0
+        private set
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, binder: IBinder) {
             try {
@@ -76,7 +81,8 @@ class WhistleWorker(
             bound = app.bindService(Intent(app, WhistleService::class.java), connection, Context.BIND_AUTO_CREATE)
             check(bound) { "Whistle worker could not bind" }
             remote = connected.get(DEADLINE_SECONDS, TimeUnit.SECONDS)
-            val identity = command(WhistleProtocol.OPEN, Bundle().apply { putInt("rate", rate) })
+            val identity = open(rate, restored)
+            positionSamples = identity.getLong("positionSamples")
             pid = identity.getInt("pid")
             uid = identity.getInt("uid")
             check(uid > 0 && uid != android.os.Process.myUid()) { "Whistle must use an isolated UID" }
@@ -87,18 +93,40 @@ class WhistleWorker(
         }
     }
 
+    private fun open(rate: Int, restored: File?): Bundle {
+        val request = Bundle().apply { putInt("rate", rate) }
+        if (restored == null) return command(WhistleProtocol.OPEN, request)
+        return ParcelFileDescriptor.open(restored, ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
+            request.putParcelable("restore", fd)
+            command(WhistleProtocol.OPEN, request)
+        }
+    }
+
     fun accept(samples: FloatArray, count: Int = samples.size) {
         require(count in 0..samples.size)
         var at = 0
         while (at < count) {
             val end = minOf(at + WhistleStream.INPUT_BLOCK, count)
-            command(WhistleProtocol.ACCEPT, Bundle().apply { putFloatArray("samples", samples.copyOfRange(at, end)) })
+            val ack = command(WhistleProtocol.ACCEPT, Bundle().apply { putFloatArray("samples", samples.copyOfRange(at, end)) })
+            positionSamples = ack.getLong("positionSamples")
             at = end
         }
     }
 
+    /** The caller provides a fresh staging file and publishes it atomically only with a matching job checkpoint. */
+    fun snapshot(target: File) {
+        check(Thread.currentThread() === ownerThread && !closed)
+        require(!target.exists() || target.length() == 0L) { "Whistle snapshot requires a fresh staging file" }
+        ParcelFileDescriptor.open(
+            target, ParcelFileDescriptor.MODE_CREATE or ParcelFileDescriptor.MODE_TRUNCATE or ParcelFileDescriptor.MODE_READ_WRITE,
+        ).use { fd ->
+            val ack = command(WhistleProtocol.SNAPSHOT, Bundle().apply { putParcelable("snapshot", fd) })
+            check(ack.getLong("positionSamples") == positionSamples)
+        }
+    }
+
     fun finish(): Bundle = try {
-        command(WhistleProtocol.FINISH, Bundle.EMPTY)
+        command(WhistleProtocol.FINISH, Bundle.EMPTY).also { positionSamples = it.getLong("positionSamples") }
     } finally {
         close()
     }

@@ -5,6 +5,7 @@ internal object WhistleProtocol {
     const val OPEN = 1
     const val ACCEPT = 2
     const val FINISH = 3
+    const val SNAPSHOT = 4
     const val SEGMENT = 5
     const val ERROR = 6
     const val SERVICE_PROCESS = ":whistle"

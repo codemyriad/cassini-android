@@ -84,6 +84,28 @@ JNIEXPORT void JNICALL Java_io_codemyriad_cassini_engine_whistle_WhistleNative_o
     if (!check(env, api->CreateCpuMemoryInfo(OrtArenaAllocator, OrtMemTypeDefault, &memory))) return;
     // Both mapped model buffers, libraries and runtime state remain alive until this private process exits.
 }
+JNIEXPORT jfloatArray JNICALL Java_io_codemyriad_cassini_engine_whistle_WhistleNative_vadState(
+        JNIEnv *env, jobject self) {
+    (void)self;
+    if (!session) { fail(env, "VAD is not loaded"); return NULL; }
+    jfloatArray result = (*env)->NewFloatArray(env, 320);
+    if (result) {
+        (*env)->SetFloatArrayRegion(env, result, 0, 256, state);
+        if (!(*env)->ExceptionCheck(env)) (*env)->SetFloatArrayRegion(env, result, 256, 64, context);
+    }
+    return result;
+}
+JNIEXPORT void JNICALL Java_io_codemyriad_cassini_engine_whistle_WhistleNative_restoreVad(
+        JNIEnv *env, jobject self, jfloatArray saved) {
+    (void)self;
+    if (!session || (*env)->GetArrayLength(env, saved) != 320) { fail(env, "Invalid VAD state shape"); return; }
+    float values[320];
+    (*env)->GetFloatArrayRegion(env, saved, 0, 320, values);
+    if ((*env)->ExceptionCheck(env)) return;
+    for (int i = 0; i < 320; ++i) if (!isfinite(values[i])) { fail(env, "Invalid VAD state value"); return; }
+    memcpy(state, values, sizeof state);
+    memcpy(context, values + 256, sizeof context);
+}
 JNIEXPORT jfloat JNICALL Java_io_codemyriad_cassini_engine_whistle_WhistleNative_probability(
         JNIEnv *env, jobject self, jfloatArray frame) {
     (void)self;

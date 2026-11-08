@@ -29,6 +29,47 @@ class WhistleSpeechGate(
     private var closed = false
     private var failed = false
 
+    /** Primitive track state only. Callbacks/native pointers are never persisted. Arrays are copied on both sides. */
+    @Suppress("LongParameterList") // One member per bounded gate state field.
+    data class State(
+        val frame: FloatArray,
+        val votes: BooleanArray,
+        val used: Int,
+        val position: Long,
+        val pre: Int,
+        val voteAt: Int,
+        val active: Boolean,
+        val quiet: Int,
+        val duration: Long,
+        val start: Long,
+    )
+
+    fun snapshot(): State {
+        check(!closed && !failed)
+        return State(frame.copyOf(), votes.copyOf(), used, position, pre, voteAt, active, quiet, duration, start)
+    }
+
+    /** Restore only into a fresh gate; validation completes before the live state changes. */
+    fun restore(state: State) {
+        check(position == 0L && used == 0 && !closed && !failed)
+        require(state.frame.size == FRAME && state.frame.all { it.isFinite() })
+        require(state.votes.size == VOTE_WINDOW && state.voteAt in 0 until VOTE_WINDOW)
+        require(state.used in 0 until FRAME && state.position >= 0 && state.position % FRAME == 0L)
+        require(state.pre in 0..PRE_FRAMES && state.pre.toLong() * FRAME <= state.position && state.quiet in 0..MAX_QUIET)
+        require(state.duration in 0..(LIMIT + FRAME) && state.start in 0..state.position)
+        require(!state.active || (state.pre == 0 && state.duration > 0 && state.start + state.duration == state.position))
+        state.frame.copyInto(frame)
+        state.votes.copyInto(votes)
+        used = state.used
+        position = state.position
+        pre = state.pre
+        voteAt = state.voteAt
+        active = state.active
+        quiet = state.quiet
+        duration = state.duration
+        start = state.start
+    }
+
     fun accept(samples: FloatArray, size: Int = samples.size) {
         check(!closed && !failed) { "Whistle speech gate is closed" }
         require(size in 0..samples.size)
@@ -94,6 +135,7 @@ class WhistleSpeechGate(
         private const val ATTACK = 0.5f
         private const val RELEASE = 0.35f
         private const val SILENCE = 9600
+        private const val MAX_QUIET = 19
         private const val PAUSE_AFTER = 224000
         private const val PAUSE = 2048
         private const val LIMIT = 240000

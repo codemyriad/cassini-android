@@ -20,6 +20,25 @@ class WhistleResampler(private val rate: Int, private val sink: (FloatArray, Int
     private var finished = false
     private var failed = false
 
+    data class State(val rate: Int, val history: FloatArray, val count: Long, val next: Long)
+
+    fun snapshot(): State {
+        check(!finished && !failed && used == 0)
+        return State(rate, history.copyOf(), count, next)
+    }
+
+    /** Restores the exact FIR phase/history, without a new track edge or padding at the checkpoint. */
+    fun restore(state: State) {
+        check(count == 0L && next == 0L && !finished && !failed)
+        require(state.rate == rate && state.history.size == HISTORY_SIZE && state.history.all { it.isFinite() })
+        require(state.count >= 0 && state.next >= 0)
+        val expected = if (rate == INPUT_RATE) maxOf(0L, (state.count - HALF_TAPS + DECIMATION - 1) / DECIMATION) else 0L
+        require(state.next == expected && (rate != OUTPUT_RATE || state.count == 0L))
+        state.history.copyInto(history)
+        count = state.count
+        next = state.next
+    }
+
     fun accept(samples: FloatArray, size: Int = samples.size) {
         check(!finished && !failed) { "Whistle resampler is closed" }
         require(size in 0..samples.size)
