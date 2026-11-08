@@ -1,0 +1,48 @@
+{
+  "app": {
+    "tests": 319,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "newTests": [
+      {
+        "name": "io.codemyriad.cassini.whistle.WhistleWorkerTest",
+        "tests": "3",
+        "failures": "0"
+      },
+      {
+        "name": "io.codemyriad.cassini.whistle.WhistleIsolationTest",
+        "tests": "2",
+        "failures": "0"
+      },
+      {
+        "name": "io.codemyriad.cassini.whistle.WhistleProtocolTest",
+        "tests": "1",
+        "failures": "0"
+      }
+    ]
+  },
+  "engine": {
+    "tests": 107,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 1,
+    "newTests": [
+      {
+        "name": "io.codemyriad.cassini.engine.whistle.WhistleArtifactPinsTest",
+        "tests": "1",
+        "failures": "0"
+      },
+      {
+        "name": "io.codemyriad.cassini.engine.whistle.ApkStoredEntryTest",
+        "tests": "1",
+        "failures": "0"
+      },
+      {
+        "name": "io.codemyriad.cassini.engine.whistle.WhistleStreamTest",
+        "tests": "2",
+        "failures": "0"
+      }
+    ]
+  }
+}
