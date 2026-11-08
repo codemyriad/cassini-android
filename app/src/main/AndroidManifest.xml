@@ -46,6 +46,7 @@
                 <data android:mimeType="application/ogg" />
             </intent-filter>
         </activity>
+        <service android:name=".whistle.WhistleService" android:exported="false" android:isolatedProcess="true" android:process=":whistle" />
         <service android:name=".recording.RecordingService" android:exported="false"
             android:foregroundServiceType="microphone" />
         <!-- Holds the read grant of a file another app opened with Cassini or shared until its import ends. -->

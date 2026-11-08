@@ -1,0 +1,34 @@
+{
+  "ort": {
+    "url": "https://repo.maven.apache.org/maven2/com/microsoft/onnxruntime/onnxruntime-android/1.23.2/onnxruntime-android-1.23.2.aar",
+    "size": 30241654,
+    "sha256": "82048d1f462218adae4ba76477089ab0ba76093d84f733540066db1a8ba6b827"
+  },
+  "ortMember": {
+    "name": "jni/arm64-v8a/libonnxruntime.so",
+    "size": 19347616,
+    "sha256": "e40f09d07dc53726b8bfbf48a7907673b8f86718a057655a62790a39874a7302"
+  },
+  "vad": {
+    "url": "https://raw.githubusercontent.com/snakers4/silero-vad/7e30209a3e901f9842f81b225f3e93d8199902b1/src/silero_vad/data/silero_vad.onnx",
+    "size": 2327524,
+    "sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3"
+  },
+  "headers": {
+    "onnxruntime_c_api.h": {
+      "url": "https://raw.githubusercontent.com/microsoft/onnxruntime/v1.23.2/include/onnxruntime/core/session/onnxruntime_c_api.h",
+      "size": 332350,
+      "sha256": "71125e66180a991d65c9bdbad4aa20daaa1f7a48c7a5c0fa5f18f250ac839a02"
+    },
+    "onnxruntime_ep_c_api.h": {
+      "url": "https://raw.githubusercontent.com/microsoft/onnxruntime/v1.23.2/include/onnxruntime/core/session/onnxruntime_ep_c_api.h",
+      "size": 45129,
+      "sha256": "b92778f50c36ecdf53d0344e0129a78b306afed653f81bba8a9597e3e6e9546f"
+    }
+  },
+  "ortNotices": {
+    "url": "https://raw.githubusercontent.com/microsoft/onnxruntime/v1.23.2/ThirdPartyNotices.txt",
+    "size": 326866,
+    "sha256": "e9e90971a8e75a9a8ac0c6412e29c1202d079998389915aa485f46c816c3b4cc"
+  }
+}

@@ -13,6 +13,12 @@ on:
     branches: [main]
     paths:
       - 'scripts/setup.sh'
+      - 'scripts/package-whistle.py'
+      - 'scripts/build-whistle-runtime.py'
+      - 'whistle/worker-pins.json'
+      - 'whistle/pins.json'
+      - 'whistle/abi-check.cpp'
+      - 'whistle/exports.map'
       - 'scripts/native-common.sh'
       - 'scripts/native-dependencies.json'
       - 'scripts/streaming-diarization.patch'
@@ -28,6 +34,12 @@ on:
   pull_request:
     paths:
       - 'scripts/setup.sh'
+      - 'scripts/package-whistle.py'
+      - 'scripts/build-whistle-runtime.py'
+      - 'whistle/worker-pins.json'
+      - 'whistle/pins.json'
+      - 'whistle/abi-check.cpp'
+      - 'whistle/exports.map'
       - 'scripts/native-common.sh'
       - 'scripts/native-dependencies.json'
       - 'scripts/streaming-diarization.patch'

@@ -27,6 +27,7 @@ android {
                 // libopus always gets the Release flags (-O3 -DNDEBUG) of the old hand-run build.
                 arguments += listOf(
                     "-DOPUS_SOURCE=${opusSource.absolutePath}",
+                    "-DWHISTLE_INCLUDES=${rootDir.resolve(".tools/whistle-package/include").absolutePath}",
                     "-DANDROID_STL=c++_static",
                     "-DCMAKE_BUILD_TYPE=Release",
                 )

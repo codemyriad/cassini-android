@@ -31,6 +31,7 @@ android {
         // The committed FLEURS clip, the local-only YouTube clips (tools/fetch-youtube-audio.sh) and the private
         // meeting clips of VoiceprintCalibrationTest (tools/private-fixtures, never committed).
         getByName("main") {
+            assets.directories.add(rootDir.resolve(".tools/whistle-probe-assets").path)
             assets.directories.add(rootDir.resolve("fixtures/audio").path)
             assets.directories.add(rootDir.resolve("app/src/androidTest/assets").path)
             assets.directories.add(rootDir.resolve("tools/private-fixtures").path)
@@ -52,6 +53,9 @@ dependencies {
     // classes come from the app's APK, which the bench instruments in the same process.
     compileOnly(project(":core"))
     compileOnly(project(":engine"))
+    // The instrumentation APK shares the app process. Match its Lifecycle version so the test runner's older
+    // transitive lifecycle-common cannot shadow the app's LifecycleRegistry/Event ABI during Startup.
+    implementation(libs.lifecycle.process)
     implementation(libs.androidx.test.runner)
     implementation(libs.androidx.test.ext.junit)
     implementation(libs.junit)

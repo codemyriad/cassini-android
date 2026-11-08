@@ -10,6 +10,7 @@ import zipfile
 from pathlib import Path
 
 from apk_compatibility import check_apk_compatibility
+from apk_models import check_apk_models, whistle_model_pins
 
 variant = os.environ.get('APK_VARIANT', 'debug')
 if variant not in {'debug', 'release'}:
@@ -26,8 +27,7 @@ with zipfile.ZipFile(source) as apk:
     for required in ['assets/licenses/Cassini-GPL-3.0.txt', 'assets/licenses/THIRD_PARTY_NOTICES.md']:
         if required not in names:
             raise SystemExit(f'APK is missing {required}')
-    if any(name.endswith(('.onnx', '.tflite', '.keystore')) for name in names):
-        raise SystemExit('APK contains model weights or signing material')
+    check_apk_models(apk, whistle_model_pins())
     if os.environ.get('IS_TAG') == 'true':
         # The Licenses screen shows these files. Merge notes ("TODO(") belong in files that do not ship.
         for name in names:
