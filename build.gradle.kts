@@ -75,3 +75,9 @@ subprojects {
         }
     }
 }
+
+// D66: resolve network inputs separately so bounded download retries never repeat analysis or tests.
+tasks.register("downloadDetekt") {
+    inputs.files(configurations.named("detekt"), configurations.named("detektPlugins"))
+    doLast { logger.lifecycle("Detekt dependency downloads complete") }
+}

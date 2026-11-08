@@ -35,6 +35,9 @@ if [ -z "${SHERPA_ONNX_SRC:-}" ]; then
 fi
 src=$(cd "$SHERPA_ONNX_SRC" && pwd)
 
+# D66: upstream quiet wget exits on transient HTTP failures; bound and log only those downloads.
+python3 scripts/ci-downloads.py native --source "$src"
+
 # Keep the incremental JNI API reproducible against the pinned source archive. The source sits
 # inside this repository's .tools/, where git apply would silently skip every path; stop discovery.
 GIT_CEILING_DIRECTORIES=$(dirname "$src")

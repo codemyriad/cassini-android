@@ -42,6 +42,8 @@ jobs:
         with:
           cache-provider: basic
           cache-read-only: true
+      - name: Download detekt dependencies (network only, bounded)
+        run: python3 scripts/ci-downloads.py detekt
       - name: detekt
         run: ./gradlew --no-daemon detekt
       - name: actionlint
@@ -59,6 +61,8 @@ jobs:
         run: shellcheck -x scripts/*.sh tools/*.sh
       - name: ruff
         run: pipx run --spec ruff==0.14.0 ruff check --config config/ruff.toml scripts tools
+      - name: CI download failure tests
+        run: python3 -m unittest discover -s tests/ci -p 'test_*.py' -v
       - name: Relative links in the Markdown files
         run: scripts/check-links.sh
       - name: Bundled fonts match their pins
