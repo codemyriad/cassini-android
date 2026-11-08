@@ -7,6 +7,14 @@ import sys
 import zipfile
 from pathlib import Path
 
+def sha256(path):
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        while block := source.read(65536):
+            digest.update(block)
+    return digest.hexdigest()
+
+
 rows = []
 for arg in sys.argv[1:]:
     path = Path(arg)
@@ -25,7 +33,7 @@ for arg in sys.argv[1:]:
             dict(
                 file=str(path),
                 bytes=path.stat().st_size,
-                sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+                sha256=sha256(path),
                 native=native,
                 whistle=assets,
             )
