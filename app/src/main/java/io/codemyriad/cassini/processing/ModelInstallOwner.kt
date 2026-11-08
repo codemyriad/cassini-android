@@ -237,7 +237,8 @@ class ModelInstallOwner(
                 publishState(shared)
                 shared.listeners.forEach { it(progress) }
             }
-            showOutcome(shared.parts, outcome)
+            val standalone = mutex.withLock { shared.standalone > 0 }
+            showOutcome(shared.parts, outcome, standalone)
             mutableOutcome.value = outcome
             return outcome
         } catch (cancelled: CancellationException) {
@@ -276,11 +277,15 @@ class ModelInstallOwner(
     }
 
     /** Clears the progress of every part, then shows the failures of [outcome] until the next install. */
-    private fun showOutcome(parts: Set<ModelPart>, outcome: InstallOutcome) {
+    private fun showOutcome(parts: Set<ModelPart>, outcome: InstallOutcome, standalone: Boolean) {
         parts.forEach(models::clearProgress)
         val failures = when (outcome) {
             is InstallOutcome.Failed -> mapOf(outcome.part to outcome.error)
-            is InstallOutcome.Installed -> outcome.failed
+            is InstallOutcome.Installed -> {
+                val error = if (network.validated()) DownloadError.INSTALL else DownloadError.NO_CONNECTION
+                val skipped = if (standalone) outcome.skipped.associateWith { error } else emptyMap()
+                skipped + outcome.failed
+            }
             is InstallOutcome.NeedsConsent -> emptyMap()
         }
         failures.forEach { (part, error) ->

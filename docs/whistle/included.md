@@ -32,8 +32,11 @@ screen uses existing size/privacy copy and does not promise speaker separation.
 Consent and installation retain only the shown roles, including across a
 notification-permission recreation. Standalone retries keep their original
 part set even if earlier consent would allow more models. Failed or offline
-optional standalone downloads produce a retry notice rather than silently
-looking successful. Existing
+optional standalone downloads produce a retry notice and retryable failed Settings
+rows rather than silently looking successful. Background jobs still skip unavailable
+optional downloads as best effort. A Parakeet job requests only its authorized plan,
+so speech-only consent or an existing speech installation can complete without
+optional consent. An absent VAD retains its online best-effort retry. Existing
 installed Parakeet remains usable. Download
 screens for a paused job use that job's model, even after the default changes.
 
@@ -66,6 +69,8 @@ dismissed. Coordinator D78 copy comes from `ux-draft/strings.json` in all six
 Android locales. The explicit memory bench measures cold Parakeet + VAD on the
 public English DC input; its PSS samples and process RSS high-water mark are
 reported separately, with no long-meeting or whole-device guarantee.
+The default-change notice is shown only where Included Whistle is available;
+Parakeet-only devices do not announce a transition from a starter they never had.
 
 The [initial measured run](../../whistle/memory/parakeet-api35.json) on the owned
 4 GiB/two-CPU API 35/16 KiB arm64 emulator observed peak app PSS of 985,818 KiB

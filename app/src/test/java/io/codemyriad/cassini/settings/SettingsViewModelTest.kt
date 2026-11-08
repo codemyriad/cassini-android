@@ -76,6 +76,28 @@ class SettingsViewModelTest {
         assertEquals(listOf(SettingsEffect.Open(ModelDownloadKey())), effects)
     }
 
+    @Test fun offlineOptionalFailuresRemainRetryableUnderEitherSpeechChoice() = runTest(dispatcher) {
+        ports.models.value = mapOf(
+            ModelPart.SPEECH to ModelStatus.Ready,
+            ModelPart.SPEAKERS to ModelStatus.Failed(Failure.DOWNLOAD, "NO_CONNECTION"),
+            ModelPart.VOICES to ModelStatus.Failed(Failure.DOWNLOAD, "NO_CONNECTION"),
+        )
+        val viewModel = viewModel()
+        for (model in SpeechModel.entries) {
+            ports.speech.value = SpeechChoice(model, true)
+            advanceUntilIdle()
+            assertEquals(
+                listOf(ModelStatusUi.Ready, ModelStatusUi.Failed, ModelStatusUi.Failed),
+                viewModel.now().models.map { it.status },
+            )
+            effects.clear()
+            viewModel.onEvent(SettingsEvent.OpenModel(ModelPartUi.SPEAKERS))
+            viewModel.onEvent(SettingsEvent.OpenModel(ModelPartUi.VOICES))
+            advanceUntilIdle()
+            assertEquals(List<SettingsEffect>(2) { SettingsEffect.Open(ModelDownloadKey()) }, effects)
+        }
+    }
+
     @Test fun recommendationOpensOnlyParakeetConsentAndDismissesWithoutChangingTheModel() = runTest(dispatcher) {
         ports.speech.value = SpeechChoice(SpeechModel.INCLUDED, true)
         ports.notices.value = NoticeFacts(

@@ -145,19 +145,20 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     }
 
     /** Promote once per verified installation; a later explicit Whistle choice is kept across restarts. */
-    suspend fun resolveSpeechModel(parakeetReady: Boolean): SpeechModel? {
+    suspend fun resolveSpeechModel(parakeetReady: Boolean, includedAvailable: Boolean = true): SpeechModel? {
         var selected: SpeechModel? = null
         store.edit { prefs ->
             val activated = prefs[Keys.PARAKEET_ACTIVATED] ?: false
             if (parakeetReady && !activated) {
                 prefs[Keys.SPEECH_MODEL] = SpeechModel.PARAKEET.setting
-                prefs[Keys.PARAKEET_DEFAULT_NOTICE] = true
+                prefs[Keys.PARAKEET_DEFAULT_NOTICE] = includedAvailable
             } else if (!parakeetReady && activated && SpeechModel.setting(prefs[Keys.SPEECH_MODEL]) == SpeechModel.PARAKEET) {
                 // Removal or invalidation returns new work to the starter, without changing a queued job's pin.
                 prefs.remove(Keys.SPEECH_MODEL)
                 prefs[Keys.PARAKEET_DEFAULT_NOTICE] = false
             }
             prefs[Keys.PARAKEET_ACTIVATED] = parakeetReady
+            if (!includedAvailable) prefs[Keys.PARAKEET_DEFAULT_NOTICE] = false
             selected = SpeechModel.setting(prefs[Keys.SPEECH_MODEL])
         }
         return selected

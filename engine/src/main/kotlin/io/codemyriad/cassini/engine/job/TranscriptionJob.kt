@@ -225,12 +225,13 @@ class TranscriptionJob(
      */
     private suspend fun installModels(): JobOutcome? = withContext(env.io) {
         if (speechModel == SpeechModel.INCLUDED) return@withContext null
-        val missing = ModelPart.entries.filterNot(models::ready).toSet()
+        val plan = models.plan()
+        val missing = plan.parts.toSet()
         val detector = ModelPart.SPEECH !in missing && !models.detectorReady() && models.hasValidatedNetwork()
         val request = if (detector) missing + ModelPart.SPEECH else missing
         when {
             request.isEmpty() -> null
-            !models.consented() -> JobOutcome.NeedsConsent(models.plan().totalBytes)
+            !models.consented() -> JobOutcome.NeedsConsent(plan.totalBytes)
             else -> when (val outcome = download(request)) {
                 is InstallOutcome.Installed -> null
                 is InstallOutcome.Failed ->

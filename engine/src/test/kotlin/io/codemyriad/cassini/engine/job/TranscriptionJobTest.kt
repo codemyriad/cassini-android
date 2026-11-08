@@ -380,6 +380,23 @@ class TranscriptionJobTest {
         assertEquals(JobOutcome.Failed(noSpace), full.run().first)
     }
 
+    @Test fun speechOnlyPlanCompletesParakeetWithOptionalModelsMissing() = runBlocking {
+        for (speechReady in listOf(false, true)) {
+            for (detectorReady in listOf(false, true)) {
+                val h = Harness(speechModel = SpeechModel.PARAKEET)
+                h.models.readyParts = if (speechReady) setOf(ModelPart.SPEECH) else emptySet()
+                h.models.authorizedParts = setOf(ModelPart.SPEECH)
+                h.models.detector = detectorReady
+                assertEquals(JobOutcome.Done, h.run().first)
+                val expected = if (speechReady && detectorReady) emptyList() else listOf(setOf(ModelPart.SPEECH))
+                assertEquals(expected, h.models.installs)
+                assertFalse(h.models.ready(ModelPart.SPEAKERS))
+                assertFalse(h.models.ready(ModelPart.VOICES))
+                assertEquals(1, h.storage.adoptions.size)
+            }
+        }
+    }
+
     @Test fun aStopDuringTheDownloadStopsWaitingAndPauses() = runBlocking {
         val h = Harness()
         h.models.readyParts = emptySet()

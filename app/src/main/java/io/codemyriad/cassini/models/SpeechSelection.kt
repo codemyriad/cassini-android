@@ -60,7 +60,7 @@ class SpeechSelection(
         val available = included.await()
         val status = models.status.value
         val saved = if (ModelPart.SPEECH in status) {
-            settings.resolveSpeechModel(status[ModelPart.SPEECH] == ModelStatus.Ready)
+            settings.resolveSpeechModel(status[ModelPart.SPEECH] == ModelStatus.Ready, available)
         } else {
             settings.speechModel.first()
         }

@@ -183,7 +183,10 @@ interface ModelAccess {
     /** Whether [part]'s primary model is installed and verified. Blocking file checks; not on the main thread. */
     fun ready(part: ModelPart): Boolean
 
-    /** The missing parts and their sizes. Blocking file checks; not on the main thread. */
+    /**
+     * Missing speech and independently authorized optional parts, with their sizes. Jobs must use this scope rather
+     * than adding every missing role. Blocking file checks; not on the main thread.
+     */
     fun plan(): ModelPlan
 
     /**

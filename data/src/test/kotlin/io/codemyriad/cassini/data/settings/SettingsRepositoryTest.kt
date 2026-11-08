@@ -76,6 +76,30 @@ class SettingsRepositoryTest {
         }
     }
 
+    @Test fun parakeetOnlyDevicesNeverAnnounceATransitionFromWhistle() = runTest {
+        withStore { store ->
+            assertNull(store.resolveSpeechModel(false, includedAvailable = false))
+            assertEquals(SpeechModel.PARAKEET, store.resolveSpeechModel(true, includedAvailable = false))
+            assertFalse(store.parakeetDefaultNotice.first())
+        }
+        withStore { store ->
+            assertEquals(SpeechModel.PARAKEET, store.resolveSpeechModel(true, includedAvailable = false))
+            assertFalse(store.parakeetDefaultNotice.first())
+            store.resolveSpeechModel(false, includedAvailable = false)
+            store.resolveSpeechModel(true, includedAvailable = false)
+            assertFalse(store.parakeetDefaultNotice.first())
+        }
+    }
+
+    @Test fun unavailableWhistleClearsAnAlreadyPendingTransitionNotice() = runTest {
+        withStore { store ->
+            store.resolveSpeechModel(true)
+            assertTrue(store.parakeetDefaultNotice.first())
+            store.resolveSpeechModel(true, includedAvailable = false)
+            assertFalse(store.parakeetDefaultNotice.first())
+        }
+    }
+
     @Test fun incompleteDownloadNeverPromotesAndRemovedParakeetFallsBack() = runTest {
         withStore { store ->
             assertNull(store.resolveSpeechModel(false))

@@ -181,6 +181,27 @@ class ModelInstallOwnerTest {
         assertEquals(listOf(ModelPart.SPEAKERS, ModelPart.VOICES), authorized)
     }
 
+    @Test fun offlineStandaloneOptionalSkipsStayRetryableWhileJobSkipsRemainBestEffort() = runBlocking {
+        val online = AtomicBoolean(false)
+        val installer = ModelInstallOwner(models, paths.modelRoot, { online.get() }, scope, Dispatchers.IO)
+        val optional = setOf(ModelPart.SPEAKERS, ModelPart.VOICES)
+        assertEquals(InstallOutcome.Installed(skipped = optional), installer.install(optional))
+        optional.forEach { assertEquals(ModelStatus.Missing(true), models.status.value[it]) }
+
+        withTimeout(WAIT_MS) { installer.startDownload(optional).join() }
+        assertEquals(InstallOutcome.Installed(skipped = optional), installer.lastOutcome.value)
+        optional.forEach {
+            assertEquals(ModelStatus.Failed(Failure.DOWNLOAD, DownloadError.NO_CONNECTION.name), models.status.value[it])
+        }
+        assertTrue(fetched.isEmpty())
+
+        online.set(true)
+        withTimeout(WAIT_MS) { installer.startDownload().join() }
+        assertEquals(InstallOutcome.Installed(), installer.lastOutcome.value)
+        optional.forEach { assertEquals(ModelStatus.Ready, models.status.value[it]) }
+        assertEquals(listOf(key(ModelCatalog.DIARIZATION), key(ModelCatalog.VOICEPRINT)), fetched)
+    }
+
     @Test fun aJobJoiningTheStandaloneDownloadFetchesEachArtifactOnce() = runBlocking {
         owner.startDownload()
         assertTrue(started.await(WAIT_S, TimeUnit.SECONDS))
