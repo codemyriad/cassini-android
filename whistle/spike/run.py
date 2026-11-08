@@ -43,7 +43,6 @@ def worker_bench(command, args, output):
     failures = []
     package = "io.codemyriad.cassini"
     for name in ["dc-quiet-jfk-v1", "dc-quiet-jfk-v1-control"]:
-        script = Path(__file__).resolve().parents[2] / "scripts/device-smoke.sh"
         case = output / name
         case.mkdir(exist_ok=True)
         if command("shell", "pm", "path", package).stdout.strip():
@@ -96,6 +95,8 @@ def worker_bench(command, args, output):
     )
     (output / "worker-batch.json").write_text(json.dumps(summary, indent=2) + "\n")
     if failures:
+        crash = command("logcat", "-d", "-b", "crash").stdout
+        (output / "crash-logcat.txt").write_bytes(crash)
         raise RuntimeError("Whistle worker failures recorded; no golden changed")
 
 
