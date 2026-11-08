@@ -46,7 +46,10 @@ def worker_bench(command, args, output):
         case = output / name
         case.mkdir(exist_ok=True)
         if command("shell", "pm", "path", package).stdout.strip():
-            command("shell", "run-as", package, "rm", "-f", f"files/whistle-worker-{name}.json")
+            command(
+                "shell", "run-as", package, "rm", "-f",
+                f"files/whistle-worker-{name}.json", f"files/whistle-included-job-{name}.json",
+            )
         result = subprocess.run(
             [
                 str(script),

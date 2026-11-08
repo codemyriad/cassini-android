@@ -12,7 +12,7 @@ sealed interface SettingsEvent {
 
     data class ChooseSpeech(val model: SpeechModelUi) : SettingsEvent
 
-    /** A model row; only a Not downloaded row opens Model download. */
+    /** A missing or failed optional model row opens Model download. */
     @Immutable
     data class OpenModel(val part: ModelPartUi) : SettingsEvent
 

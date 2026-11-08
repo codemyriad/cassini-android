@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.core.app.NotificationManagerCompat
 import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.core.models.ModelPart
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.db.LibraryRow
 import io.codemyriad.cassini.data.models.ModelStatus
 import io.codemyriad.cassini.data.voices.VoiceProblem
@@ -68,8 +69,8 @@ class NoticeCenter(private val graph: AppGraph, context: Context, val imports: I
         }
 
     private val consented: Flow<Boolean> =
-        combine(settings.consentAt, graph.models.status) { consentAt, status ->
-            consentAt != null || status[ModelPart.SPEECH] == ModelStatus.Ready
+        combine(settings.speechConsentAt, graph.models.status, graph.speech.state) { consentAt, status, speech ->
+            speech.selected == SpeechModel.INCLUDED || consentAt != null || status[ModelPart.SPEECH] == ModelStatus.Ready
         }
 
     private val encoder: Flow<Pair<Boolean, Boolean>> =
