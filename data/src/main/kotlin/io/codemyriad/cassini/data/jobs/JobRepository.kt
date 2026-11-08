@@ -2,12 +2,12 @@ package io.codemyriad.cassini.data.jobs
 
 import androidx.room.withTransaction
 import io.codemyriad.cassini.core.Failure
-import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.core.format.DocumentState
 import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.core.library.PauseReason
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.data.CassiniDispatchers
 import io.codemyriad.cassini.data.NoteIds

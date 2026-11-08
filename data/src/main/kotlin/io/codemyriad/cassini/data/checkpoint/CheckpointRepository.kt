@@ -1,12 +1,12 @@
 package io.codemyriad.cassini.data.checkpoint
 
-import io.codemyriad.cassini.core.models.ModelCatalog
-import io.codemyriad.cassini.core.models.SpeechModel
 import androidx.annotation.WorkerThread
 import io.codemyriad.cassini.core.audio.Limits
 import io.codemyriad.cassini.core.checkpoint.CheckpointState
 import io.codemyriad.cassini.core.format.SpeakerMerges
 import io.codemyriad.cassini.core.format.Transcript
+import io.codemyriad.cassini.core.models.ModelCatalog
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.core.speakers.DefaultLabels
 import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.data.CassiniDispatchers
@@ -84,7 +84,8 @@ class CheckpointRepository(
         notes.note(noteId)?.let {
             val job = database.jobs().job(noteId)
             val saved = if (job == null) savedModel(noteId) else null
-            CheckpointIdentity.of(paths.note(noteId), it.audioFile).copy(modelRevision = job?.speechIdentity ?: requireNotNull(saved))
+            val model = job?.speechIdentity ?: requireNotNull(saved)
+            CheckpointIdentity.of(paths.note(noteId), it.audioFile).copy(modelRevision = model)
         }
     }
 
@@ -94,6 +95,7 @@ class CheckpointRepository(
         val saved = try {
             if (WorkFiles.exists(file)) JSONObject(WorkFiles.read(file)).optString("model") else null
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+            android.util.Log.w("CassiniCheckpoint", "Cannot read saved model identity", error)
             null // The full checkpoint validator reports corruption; it never opens an engine.
         }
         return if (saved == included) included else ModelCatalog.PARAKEET_REVISION

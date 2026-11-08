@@ -289,7 +289,7 @@ class NoteViewModel(
         .map { loaded -> loaded?.details?.job?.failure?.takeIf { JobFailure.downloadError(it) != null } }
         .distinctUntilChanged()
         .mapLatest { failure ->
-            if (failure == null) 0L else runCatching { ports.requiredFreeBytes() }.getOrDefault(0L)
+            if (failure == null) 0L else runCatching { ports.requiredFreeBytes(noteId) }.getOrDefault(0L)
         }
         .onStart { emit(0L) }
 

@@ -1,6 +1,5 @@
 package io.codemyriad.cassini.recording
 
-import io.codemyriad.cassini.core.models.SpeechModel
 import android.os.Build
 import android.util.Log
 import androidx.lifecycle.SavedStateHandle
@@ -9,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.navigation3.runtime.NavKey
 import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.core.audio.RecordingSpace
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.nav.ModelDownloadKey
 import io.codemyriad.cassini.nav.NoteKey
 import io.codemyriad.cassini.notices.Notices

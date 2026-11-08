@@ -19,7 +19,16 @@ object WavDecoder {
         return if (next != null && kotlin.math.abs(nominal - next) <= sampleRate / 1000) next else nominal
     }
 
-    fun decodeWav(file: RandomAccessFile, onSamples: (FloatArray, Int) -> Unit = { _, _ -> }, retainPcm: Boolean = true, startSample: Long = 0, onProgress: (Long, Long?) -> Unit = { _, _ -> }, included: Boolean = false): PcmAudio {
+    // Keep the established decoder structure; Included adds one explicit resampling policy.
+    @Suppress("LongMethod", "LongParameterList")
+    fun decodeWav(
+        file: RandomAccessFile,
+        onSamples: (FloatArray, Int) -> Unit = { _, _ -> },
+        retainPcm: Boolean = true,
+        startSample: Long = 0,
+        included: Boolean = false,
+        onProgress: (Long, Long?) -> Unit = { _, _ -> },
+    ): PcmAudio {
         var sampleRate = 0
         var channels = 0
         var dataOffset = -1L
@@ -50,7 +59,8 @@ object WavDecoder {
         requireUser(frames >= 1, Failure.LONG)
         Limits.requireDuration(frames * 1000 / sampleRate, retainPcm)
         val out = if (retainPcm) PcmBuilder(((frames * Limits.ASR_RATE + sampleRate / 2) / sampleRate).toInt()) else null
-        val initialFrame = if (included) 0L else (startSample * sampleRate / Limits.ASR_RATE - sampleRate).coerceAtLeast(0)
+        val seekFrame = (startSample * sampleRate / Limits.ASR_RATE - sampleRate).coerceAtLeast(0)
+        val initialFrame = if (included) 0L else seekFrame
         require(initialFrame < frames)
         val resampler = DecoderResampler(sampleRate, initialFrame, startSample, included) { samples, size ->
             out?.append(samples, size)

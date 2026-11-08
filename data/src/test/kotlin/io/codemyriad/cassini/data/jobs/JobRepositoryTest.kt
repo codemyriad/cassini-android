@@ -1,12 +1,12 @@
 package io.codemyriad.cassini.data.jobs
 
-import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.format.DocumentState
 import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.core.library.PauseReason
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.checkpoint.CheckpointRepository
 import io.codemyriad.cassini.data.checkpoint.noteId
 import io.codemyriad.cassini.data.db.JobEntity

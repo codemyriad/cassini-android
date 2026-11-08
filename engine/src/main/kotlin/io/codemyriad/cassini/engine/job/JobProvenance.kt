@@ -42,7 +42,10 @@ object JobProvenance {
         speechModel: SpeechModel = SpeechModel.PARAKEET,
     ): JSONObject =
         SpeakerAttribution.record(words, turns, recognition, null, diarizationMs)
-            .put("x-incrementalDiarization", if (speechModel == SpeechModel.INCLUDED) WHISTLE_DIARIZATION else INCREMENTAL_DIARIZATION)
+            .put(
+                "x-incrementalDiarization",
+                if (speechModel == SpeechModel.INCLUDED) WHISTLE_DIARIZATION else INCREMENTAL_DIARIZATION,
+            )
 
     /**
      * `x-speakerIdentification`: counts only, so which person a voice resembles never enters the document. [prints]
@@ -76,7 +79,9 @@ object JobProvenance {
                 "needle 3.3.0; engine revision 93e88ede867e4311c39151285e74df513e4b835b; " +
                     "model revision ca5287601bef25af26dcf2e1b2bdc0843a7c19e5",
             )
-    } else parakeet()
+    } else {
+        parakeet()
+    }
 
     private fun parakeet(): JSONObject = JSONObject()
         .put("backend", "sherpa-onnx").put("engine", "Parakeet TDT")

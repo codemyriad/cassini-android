@@ -375,7 +375,7 @@ internal class FakeNotePorts : NotePorts {
 
     override fun failureText(code: String): String? = "failed: $code"
 
-    override suspend fun requiredFreeBytes(): Long = 900
+    override suspend fun requiredFreeBytes(noteId: String): Long = 900
 
     override suspend fun shouldAskNotifications(): Boolean = askNotifications
 

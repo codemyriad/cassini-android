@@ -1,6 +1,5 @@
 package io.codemyriad.cassini.note
 
-import io.codemyriad.cassini.core.models.SpeechModel
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -18,6 +17,7 @@ import io.codemyriad.cassini.core.checkpoint.CheckpointNames
 import io.codemyriad.cassini.core.format.DocumentState
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.models.ModelPart
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.core.speakers.Match
 import io.codemyriad.cassini.core.speakers.SpeakerPrint
 import io.codemyriad.cassini.core.speakers.Voice
@@ -210,7 +210,7 @@ interface NotePorts {
     fun failureText(code: String): String?
 
     // Notices and permissions.
-    suspend fun requiredFreeBytes(): Long
+    suspend fun requiredFreeBytes(noteId: String): Long
 
     /** POST_NOTIFICATIONS should be asked now: API 33+, not granted, and never asked before. */
     suspend fun shouldAskNotifications(): Boolean
@@ -437,8 +437,11 @@ class GraphNotePorts(private val graph: AppGraph, context: Context) : NotePorts 
 
     // Notices. -----------------------------------------------------------------------------------------------------
 
-    override suspend fun requiredFreeBytes(): Long =
-        if (graph.speech.selected() == SpeechModel.INCLUDED) 0 else graph.models.plan().requiredFreeBytes
+    override suspend fun requiredFreeBytes(noteId: String): Long {
+        val identity = graph.awaitCatalogue().jobs.job(noteId)?.speechIdentity
+        val model = identity?.let(SpeechModel::identity) ?: graph.speech.selected()
+        return if (model == SpeechModel.INCLUDED) 0 else graph.models.plan().requiredFreeBytes
+    }
 
     override suspend fun shouldAskNotifications(): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return false

@@ -71,7 +71,9 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
             models = rows(models).map {
                 if (speech.selected == SpeechModel.INCLUDED && it.status == ModelStatusUi.Pending) {
                     it.copy(status = ModelStatusUi.NotDownloaded)
-                } else it
+                } else {
+                    it
+                }
             }.toImmutableList(),
             speechModel = if (speech.selected == SpeechModel.INCLUDED) SpeechModelUi.INCLUDED else SpeechModelUi.PARAKEET,
             includedAvailable = speech.includedAvailable,

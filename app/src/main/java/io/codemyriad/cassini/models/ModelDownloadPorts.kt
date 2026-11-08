@@ -1,6 +1,5 @@
 package io.codemyriad.cassini.models
 
-import io.codemyriad.cassini.core.models.SpeechModel
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -10,6 +9,7 @@ import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.models.ModelPlan
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.processing.TranscribeOutcome
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -42,7 +42,11 @@ interface ModelDownloadPorts {
 }
 
 /** [ModelDownloadPorts] over the app's graph. */
-class GraphModelDownloadPorts(private val graph: AppGraph, context: Context, private val noteId: String? = null) : ModelDownloadPorts {
+class GraphModelDownloadPorts(
+    private val graph: AppGraph,
+    context: Context,
+    private val noteId: String? = null,
+) : ModelDownloadPorts {
     private val app = context.applicationContext
 
     override suspend fun plan(): ModelPlan = graph.downloadPlan(targetModel())

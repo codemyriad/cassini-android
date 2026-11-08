@@ -6,8 +6,8 @@ import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.BuildConfig
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.models.SpeechModel
-import io.codemyriad.cassini.models.SpeechChoice
 import io.codemyriad.cassini.data.models.ModelStatus
+import io.codemyriad.cassini.models.SpeechChoice
 import io.codemyriad.cassini.notices.NoticeFacts
 import io.codemyriad.cassini.ui.settings.LanguageChoice
 import kotlinx.coroutines.flow.Flow

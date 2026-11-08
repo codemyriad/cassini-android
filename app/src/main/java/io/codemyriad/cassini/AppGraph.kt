@@ -15,10 +15,8 @@ import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.UserFacingException
 import io.codemyriad.cassini.core.models.ModelCheck
 import io.codemyriad.cassini.core.models.ModelPart
-import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.core.models.ModelPlan
-import io.codemyriad.cassini.models.SpeechSelection
-import io.codemyriad.cassini.whistle.WhistleJobs
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.core.requireUser
 import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.data.CassiniDispatchers
@@ -48,6 +46,7 @@ import io.codemyriad.cassini.engine.job.JobEnvironment
 import io.codemyriad.cassini.engine.job.JobStorage
 import io.codemyriad.cassini.engine.job.JobVoices
 import io.codemyriad.cassini.engine.job.ModelAccess
+import io.codemyriad.cassini.models.SpeechSelection
 import io.codemyriad.cassini.nav.ViewedImports
 import io.codemyriad.cassini.note.RecentWords
 import io.codemyriad.cassini.notices.ImportTracker
@@ -83,6 +82,7 @@ import io.codemyriad.cassini.recording.SettingsConsent
 import io.codemyriad.cassini.recording.TranscriptionHandoff
 import io.codemyriad.cassini.ui.format.Dates
 import io.codemyriad.cassini.ui.format.FormatSettings
+import io.codemyriad.cassini.whistle.WhistleJobs
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -221,7 +221,9 @@ class AppGraph(context: Context, val config: Config) {
         val plan = models.plan()
         return if ((model ?: speech.selected()) == SpeechModel.INCLUDED) {
             ModelPlan(plan.missing.filterNot { it.part == ModelPart.SPEECH })
-        } else plan
+        } else {
+            plan
+        }
     }
 
     /** Whether the UI may change the draft names of a note; the job closes it at step 6. */

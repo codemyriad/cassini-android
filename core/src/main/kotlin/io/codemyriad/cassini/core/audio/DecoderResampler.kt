@@ -18,11 +18,20 @@ class DecoderResampler(
     private val output: (FloatArray, Int) -> Unit = { samples, size ->
         val drop = minOf(skip, size.toLong()).toInt()
         skip -= drop
-        if (drop == 0) sink(samples, size) else if (drop < size) sink(samples.copyOfRange(drop, size), size - drop)
+        if (drop == 0) {
+            sink(samples, size)
+        } else if (drop < size) {
+            sink(samples.copyOfRange(drop, size), size - drop)
+        }
     }
     private val fir = if (included && rate == SOURCE_RATE) WhistleResampler(rate, output) else null
     private val legacy = if (fir == null) {
-        StreamingResampler(rate, if (included) 0 else initialFrame, if (included) 0 else firstOutput, output)
+        StreamingResampler(
+            rate,
+            if (included) 0 else initialFrame,
+            if (included) 0 else firstOutput,
+            output,
+        )
     } else null
 
     init { require(!included || initialFrame == 0L) }

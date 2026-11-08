@@ -22,8 +22,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.R
 import io.codemyriad.cassini.ui.banner.BannerAction
@@ -111,12 +112,17 @@ private fun SpeechModels(state: SettingsUiState, onEvent: (SettingsEvent) -> Uni
         else -> stringResource(R.string.ui_settings_model_ready) to Tone.Ok
     }
     GroupCard(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp)) {
+        val subtitle = if (state.includedAvailable) R.string.ui_settings_included else R.string.ui_settings_not_available
+        val chooseIncluded = { onEvent(SettingsEvent.ChooseSpeech(SpeechModelUi.INCLUDED)) }
         SettingsRow(
             title = "Whistle",
-            subtitle = stringResource(if (state.includedAvailable) R.string.ui_settings_included else R.string.ui_settings_not_available),
+            subtitle = stringResource(subtitle),
             trailing = SettingsTrailing.Status(status, tone),
-            modifier = Modifier.semantics { selected = included },
-            onClick = if (state.includedAvailable) ({ onEvent(SettingsEvent.ChooseSpeech(SpeechModelUi.INCLUDED)) }) else null,
+            modifier = Modifier.semantics {
+                selected = included
+                if (!state.includedAvailable) disabled()
+            },
+            onClick = chooseIncluded.takeIf { state.includedAvailable },
         )
         val parakeet = state.models.firstOrNull { it.part == ModelPartUi.SPEECH }
         val selected = state.speechModel == SpeechModelUi.PARAKEET && !state.speechChecking

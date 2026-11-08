@@ -82,7 +82,7 @@ import java.util.concurrent.atomic.AtomicReference
  * ([JobEnvironment.maxBodyBytes], about 11 h of continuous speech): the job counts them after each window and fails
  * with `Failure.LONG` as soon as they do not fit, not hours later at the seal.
  */
-@Suppress("TooManyFunctions", "LargeClass") // one function per named step of architecture section 5.4
+@Suppress("TooManyFunctions", "LargeClass", "LongParameterList") // one function per named step of architecture section 5.4
 class TranscriptionJob(
     val noteId: String,
     private val storage: JobStorage,

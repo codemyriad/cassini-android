@@ -14,8 +14,8 @@ import io.codemyriad.cassini.core.format.Word
 import io.codemyriad.cassini.core.format.WordBodyBudget
 import io.codemyriad.cassini.core.library.PauseReason
 import io.codemyriad.cassini.core.models.ModelPart
-import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.core.models.ModelPlan
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.core.speakers.Match
 import io.codemyriad.cassini.core.speakers.SpeakerPrint
 import kotlinx.coroutines.Dispatchers
@@ -812,6 +812,7 @@ class TranscriptionJobTest {
      * One note and its fakes. With [recordSyncs] the log also records each fsync ("sync clips.pcm",
      * "sync audio.opus.part", "sync sealed.opus") in order with the checkpoints and the marker.
      */
+    @Suppress("LongParameterList") // One optional test input per job constraint.
     private inner class Harness(
         source: String = "capture.opus",
         totalMs: Long = 70_000,

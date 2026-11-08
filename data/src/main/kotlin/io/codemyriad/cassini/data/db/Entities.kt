@@ -1,6 +1,5 @@
 package io.codemyriad.cassini.data.db
 
-import io.codemyriad.cassini.core.models.ModelCatalog
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
@@ -15,6 +14,7 @@ import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.core.library.Origin
 import io.codemyriad.cassini.core.library.PauseReason
 import io.codemyriad.cassini.core.library.VariantKind
+import io.codemyriad.cassini.core.models.ModelCatalog
 import io.codemyriad.cassini.core.speakers.Match
 
 // The Room catalogue of docs/architecture.md, section 3.3. Room is the authority for the title, trash state, playback

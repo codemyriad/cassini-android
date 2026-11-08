@@ -9,11 +9,11 @@ import android.net.Uri
 import android.util.Log
 import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.UserFacingException
+import io.codemyriad.cassini.core.audio.DecoderResampler
 import io.codemyriad.cassini.core.audio.Limits
 import io.codemyriad.cassini.core.audio.Mp3Gapless
 import io.codemyriad.cassini.core.audio.PcmAudio
 import io.codemyriad.cassini.core.audio.PcmBuilder
-import io.codemyriad.cassini.core.audio.DecoderResampler
 import io.codemyriad.cassini.core.audio.WavDecoder
 import io.codemyriad.cassini.core.audio.firstNeededFrame
 import io.codemyriad.cassini.core.format.OggOpus
@@ -28,7 +28,11 @@ import java.nio.ByteOrder
  * Reject long recordings rather than silently dropping audio. A content uri is first copied into
  * [cacheDir] through [resolver]; a file uri is read in place.
  */
-class AudioDecoder(private val resolver: ContentResolver, private val cacheDir: File, private val included: Boolean = false) {
+class AudioDecoder(
+    private val resolver: ContentResolver,
+    private val cacheDir: File,
+    private val included: Boolean = false,
+) {
     /**
      * [onSamples] receives borrowed 16 kHz mono buffers on the calling thread; consume or copy
      * them before returning. [onProgress] reports source milliseconds read and optional duration.
@@ -79,7 +83,9 @@ class AudioDecoder(private val resolver: ContentResolver, private val cacheDir: 
                 if (file.length() >= 12) {
                     file.readFully(header, 0, minOf(file.length(), header.size.toLong()).toInt())
                     if (String(header, 0, 4, Charsets.US_ASCII) == "RIFF" &&
-                        String(header, 8, 4, Charsets.US_ASCII) == "WAVE") return WavDecoder.decodeWav(file, onSamples, retainPcm, startSample, onProgress, included)
+                        String(header, 8, 4, Charsets.US_ASCII) == "WAVE") {
+                        return WavDecoder.decodeWav(file, onSamples, retainPcm, startSample, included, onProgress)
+                    }
                 }
             }
             return decodeCompressed(local, onSamples, onProgress, retainPcm, startSample)

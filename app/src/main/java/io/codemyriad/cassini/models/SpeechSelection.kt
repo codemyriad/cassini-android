@@ -13,15 +13,20 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.map
 
 data class SpeechChoice(val selected: SpeechModel, val includedAvailable: Boolean)
 
 /** Capability and read-only APK integrity are checked without loading either neural runtime in the app process. */
-class SpeechSelection(context: Context, private val settings: SettingsRepository, scope: CoroutineScope, io: CoroutineDispatcher) {
+class SpeechSelection(
+    context: Context,
+    private val settings: SettingsRepository,
+    scope: CoroutineScope,
+    io: CoroutineDispatcher,
+) {
     val included = scope.async(io) {
         if (WhistleDeviceCapability.current() != WhistleCapability.ELIGIBLE) {
             false

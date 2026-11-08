@@ -1,14 +1,13 @@
 package io.codemyriad.cassini.settings
 
-import io.codemyriad.cassini.ui.settings.SpeechModelUi
-import io.codemyriad.cassini.models.SpeechChoice
-import io.codemyriad.cassini.core.models.SpeechModel
 import androidx.core.os.LocaleListCompat
 import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.models.ModelPlan
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.models.ModelStatus
 import io.codemyriad.cassini.data.models.ModelStatus.Missing
+import io.codemyriad.cassini.models.SpeechChoice
 import io.codemyriad.cassini.nav.LicensesKey
 import io.codemyriad.cassini.nav.ModelDownloadKey
 import io.codemyriad.cassini.nav.SavedVoicesKey
@@ -19,6 +18,7 @@ import io.codemyriad.cassini.ui.settings.LanguageChoice
 import io.codemyriad.cassini.ui.settings.ModelStatusUi
 import io.codemyriad.cassini.ui.settings.SettingsEvent
 import io.codemyriad.cassini.ui.settings.SettingsUiState
+import io.codemyriad.cassini.ui.settings.SpeechModelUi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow

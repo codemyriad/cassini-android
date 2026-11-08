@@ -129,7 +129,9 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     suspend fun setPlaybackSpeed(speed: Float) = set(Keys.PLAYBACK_SPEED, speed)
 
     /** New installs resolve the absent choice from verified Included availability (D5/D75). */
-    val speechModel: Flow<SpeechModel?> = preferences.map { SpeechModel.setting(it[Keys.SPEECH_MODEL]) }.distinctUntilChanged()
+    val speechModel: Flow<SpeechModel?> = preferences.map {
+        SpeechModel.setting(it[Keys.SPEECH_MODEL])
+    }.distinctUntilChanged()
 
     suspend fun setSpeechModel(model: SpeechModel) = set(Keys.SPEECH_MODEL, model.setting)
 

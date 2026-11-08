@@ -1,7 +1,6 @@
 package io.codemyriad.cassini.engine.whistle
 
 import io.codemyriad.cassini.core.Failure
-import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.core.asr.IncrementalState
 import io.codemyriad.cassini.core.audio.Limits
 import io.codemyriad.cassini.core.audio.PcmAudio
@@ -10,6 +9,7 @@ import io.codemyriad.cassini.core.checkpoint.WhistleResume
 import io.codemyriad.cassini.core.format.Transcript
 import io.codemyriad.cassini.core.format.Word
 import io.codemyriad.cassini.core.format.WordBodyBudget
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.core.requireUser
 import io.codemyriad.cassini.engine.asr.Parakeet
 import io.codemyriad.cassini.engine.job.Recognizer

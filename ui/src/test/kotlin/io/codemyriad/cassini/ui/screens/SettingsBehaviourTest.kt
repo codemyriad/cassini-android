@@ -108,6 +108,20 @@ class SettingsBehaviourTest {
         rule.onAllNodesWithText("Download and transcribe").assertCountEquals(0)
     }
 
+    @Test fun unavailableWhistleHasNoActionAndIncludedCanBeSelected() {
+        val events = mutableListOf<SettingsEvent>()
+        val state = VariantFixtures.settings.getValue("settings-included-unavailable")
+        setThemed { SettingsScreen(state, onEvent = { events += it }) }
+        rule.onNode(hasText("Whistle") and hasText("Unavailable")).assertHasNoClickAction()
+        rule.onNodeWithText("Parakeet Ultra").performClick()
+        rule.runOnIdle {
+            assertEquals(
+                listOf(SettingsEvent.ChooseSpeech(io.codemyriad.cassini.ui.settings.SpeechModelUi.PARAKEET)),
+                events,
+            )
+        }
+    }
+
     @Test fun settingsLanguageRowsAndLinkSendTheirEvents() {
         val events = mutableListOf<SettingsEvent>()
         val state = VariantFixtures.settings.getValue("settings-model-statuses").copy(notificationsOff = true)
@@ -119,8 +133,12 @@ class SettingsBehaviourTest {
         rule.onAllNodes(isSelectable()).assertCountEquals(2)
         rule.onNodeWithText("Turn on").performClick()
         // A Not downloaded row and a Failed row open Model download; the other model rows are not buttons.
-        rule.onNode(hasText("Recognising saved voices", substring = true) and hasClickAction()).performScrollTo().performClick()
-        rule.onNode(hasText("Telling speakers apart", substring = true) and hasClickAction()).performScrollTo().performClick()
+        rule.onNode(
+            hasText("Recognising saved voices", substring = true) and hasClickAction(),
+        ).performScrollTo().performClick()
+        rule.onNode(
+            hasText("Telling speakers apart", substring = true) and hasClickAction(),
+        ).performScrollTo().performClick()
         rule.onNode(hasText("Parakeet Ultra", substring = true)).assertHasClickAction()
         rule.onNodeWithText("Saved voices").performScrollTo().performClick()
         rule.onNodeWithText("Trash").performScrollTo().performClick()
