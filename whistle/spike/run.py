@@ -20,9 +20,25 @@ PACKAGE = "io.codemyriad.cassini.whistlespike"
 
 def worker_bench(command, args, output):
     """Only called after this invocation has booted its own disposable AVD."""
-    env = dict(os.environ, CASSINI_HEAVY_LOCK_HELD="1", CASSINI_APK=str(args.apk.resolve()),
-               CASSINI_TEST_APK=str(args.worker_bench.resolve()), CASSINI_EXPECTED_TESTS="1")
+    env = dict(
+        os.environ,
+        CASSINI_HEAVY_LOCK_HELD="1",
+        CASSINI_APK=str(args.apk.resolve()),
+        CASSINI_TEST_APK=str(args.worker_bench.resolve()),
+        CASSINI_EXPECTED_TESTS="1",
+    )
     env["PATH"] = str(args.sdk / "platform-tools") + os.pathsep + env.get("PATH", "")
+    script = Path(__file__).resolve().parents[2] / "scripts/device-smoke.sh"
+    privacy_env = dict(env, CASSINI_TEST_APK=str(args.worker_tests.resolve()))
+    privacy = subprocess.run(
+        [str(script), "--serial", "emulator-5584", "--class", "io.codemyriad.cassini.WhistlePrivacyDeviceTest"],
+        env=privacy_env,
+        capture_output=True,
+        timeout=600,
+    )
+    (output / "privacy-instrumentation.txt").write_bytes(privacy.stdout + privacy.stderr)
+    if privacy.returncode:
+        raise RuntimeError("Worker privacy refusals did not pass; neural inference was not attempted")
     rows = []
     failures = []
     package = "io.codemyriad.cassini"
@@ -32,9 +48,21 @@ def worker_bench(command, args, output):
         case.mkdir(exist_ok=True)
         if command("shell", "pm", "path", package).stdout.strip():
             command("shell", "run-as", package, "rm", "-f", f"files/whistle-worker-{name}.json")
-        result = subprocess.run([str(script), "--bench", "--serial", "emulator-5584", "--class",
-                                 "io.codemyriad.cassini.bench.WhistleWorkerParityTest", "--arg", f"whistleCase={name}"],
-                                env=env, capture_output=True, timeout=1800)
+        result = subprocess.run(
+            [
+                str(script),
+                "--bench",
+                "--serial",
+                "emulator-5584",
+                "--class",
+                "io.codemyriad.cassini.bench.WhistleWorkerParityTest",
+                "--arg",
+                f"whistleCase={name}",
+            ],
+            env=env,
+            capture_output=True,
+            timeout=1800,
+        )
         (case / "instrumentation.txt").write_bytes(result.stdout + result.stderr)
         row = dict(name=name, instrumentationExit=result.returncode)
         try:
@@ -44,19 +72,28 @@ def worker_bench(command, args, output):
             page = 16384 if args.tag == "google_apis_ps16k" else 4096
             if report["sdk"] != args.api or report["pageSize"] != page:
                 raise ValueError("Actual worker image API/page size mismatch")
-            row.update(segments=len(report["segments"]), workerPid=report["workerPid"],
-                       vadSha256=report["vadSha256"], reportSha256=hashlib.sha256(raw).hexdigest())
+            row.update(
+                segments=len(report["segments"]),
+                workerPid=report["workerPid"],
+                vadSha256=report["vadSha256"],
+                reportSha256=hashlib.sha256(raw).hexdigest(),
+            )
         except (subprocess.SubprocessError, ValueError, KeyError) as error:
             row["reportError"] = str(error)
         if result.returncode or "reportError" in row:
             failures.append(name)
         rows.append(row)
         print(json.dumps(row), flush=True)
-    summary = dict(status="completed", apkSha256=hashlib.sha256(args.apk.read_bytes()).hexdigest(),
-                   benchSha256=hashlib.sha256(args.worker_bench.read_bytes()).hexdigest(),
-                   kernel=command("shell", "uname", "-a").stdout.decode().strip(),
-                   fingerprint=command("shell", "getprop", "ro.build.fingerprint").stdout.decode().strip(),
-                   cases=rows, failures=failures)
+    summary = dict(
+        status="completed",
+        apkSha256=hashlib.sha256(args.apk.read_bytes()).hexdigest(),
+        benchSha256=hashlib.sha256(args.worker_bench.read_bytes()).hexdigest(),
+        kernel=command("shell", "uname", "-a").stdout.decode().strip(),
+        fingerprint=command("shell", "getprop", "ro.build.fingerprint").stdout.decode().strip(),
+        privacyRefusals=6,
+        cases=rows,
+        failures=failures,
+    )
     (output / "worker-batch.json").write_text(json.dumps(summary, indent=2) + "\n")
     if failures:
         raise RuntimeError("Whistle worker failures recorded; no golden changed")
@@ -70,12 +107,21 @@ def main():
     parser.add_argument(
         "--batch", type=Path, help="Owned lab variant APKs; all must use the same disposable signing key"
     )
-    parser.add_argument("--worker-bench", type=Path, help="Production app plus explicit Whistle bench APK on the owned AVD")
+    parser.add_argument(
+        "--worker-bench", type=Path, help="Production app plus explicit Whistle bench APK on the owned AVD"
+    )
+    parser.add_argument("--worker-tests", type=Path, help="Model-free worker privacy instrumentation APK")
     parser.add_argument("--api", type=int, default=35)
     parser.add_argument("--tag", default="google_apis")
     parser.add_argument("--image", type=Path, help="Already installed external-disk system image")
     args = parser.parse_args()
-    if args.worker_bench and (not args.worker_bench.is_file() or not args.apk.is_file() or args.api < 29):
+    if args.worker_bench and (
+        not args.worker_bench.is_file()
+        or not args.apk.is_file()
+        or args.api < 29
+        or args.worker_tests is None
+        or not args.worker_tests.is_file()
+    ):
         parser.error("Worker bench requires built APKs and API 29+ before booting a guest")
     if args.worker_bench and args.batch:
         parser.error("Worker bench and runtime-variant batch are separate experiments")

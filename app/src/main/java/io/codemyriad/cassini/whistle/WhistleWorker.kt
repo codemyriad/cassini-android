@@ -158,17 +158,17 @@ class WhistleWorker(
                 app.unbindService(connection)
                 bound = false
                 if (remote != null) {
-                    interrupted = cleanupWait { death.get(it, TimeUnit.NANOSECONDS) } || interrupted
+                    cleanupWait({ interrupted = true }) { death.get(it, TimeUnit.NANOSECONDS) }
                 }
             }
         } finally {
             try {
                 thread.quitSafely()
                 if (thread.isAlive && thread !== Thread.currentThread()) {
-                    interrupted = cleanupWait {
+                    cleanupWait({ interrupted = true }) {
                         thread.join(maxOf(1L, TimeUnit.NANOSECONDS.toMillis(it)))
                         check(!thread.isAlive) { "Whistle reply thread did not terminate" }
-                    } || interrupted
+                    }
                 }
             } finally {
                 remote = null
@@ -182,17 +182,16 @@ class WhistleWorker(
     }
 
     /** Finish bounded cleanup even when cancellation interrupted the owner; restore the flag afterward. */
-    private fun cleanupWait(event: (Long) -> Unit): Boolean {
+    private fun cleanupWait(onInterrupted: () -> Unit, event: (Long) -> Unit) {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(CLOSE_SECONDS)
-        var interrupted = false
         while (true) {
             val remaining = deadline - System.nanoTime()
             check(remaining > 0) { "Whistle cleanup timed out" }
             try {
                 event(remaining)
-                return interrupted
+                return
             } catch (_: InterruptedException) {
-                interrupted = true
+                onInterrupted()
             }
         }
     }

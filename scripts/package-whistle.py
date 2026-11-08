@@ -54,8 +54,7 @@ def main():
     for name in ["whistle.cact", "silero_vad.onnx"]:
         shutil.copyfile(cache / name, assets / name)
     libraries = {
-        p.name: dict(size=p.stat().st_size, sha256=hashlib.sha256(p.read_bytes()).hexdigest())
-        for p in jni.glob("*.so")
+        p.name: dict(size=p.stat().st_size, sha256=hashlib.sha256(p.read_bytes()).hexdigest()) for p in jni.glob("*.so")
     }
     manifest = dict(
         schemaVersion=1,
