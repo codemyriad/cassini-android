@@ -41,6 +41,16 @@ class DownloadTests(unittest.TestCase):
             DOWNLOADS.network(operation, wait=wait)
         operation.assert_called_once()
 
+    def test_persistent_api_failure_stops_at_cap_and_stays_failed(self):
+        error = DOWNLOADS.urllib.error.HTTPError('https://api.github.com', 504, 'gateway', {}, None)
+        operation = Mock(side_effect=error)
+        wait = Mock()
+        with patch('builtins.print') as log, self.assertRaises(DOWNLOADS.urllib.error.HTTPError):
+            DOWNLOADS.network(operation, wait=wait)
+        self.assertEqual(operation.call_count, 4)
+        self.assertEqual([call.args[0] for call in wait.call_args_list], [15, 30, 60])
+        self.assertEqual(log.call_count, 3)
+
     def native_archive(self, path, extra=None):
         entries = {
             'headers/onnxruntime_c_api.h': b'header',
