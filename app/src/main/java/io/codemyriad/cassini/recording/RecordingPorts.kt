@@ -228,9 +228,13 @@ interface RecordingConsent {
     suspend fun declined(): Boolean
 }
 
-class SettingsConsent(private val models: ModelRepository, private val settings: SettingsRepository) :
+class SettingsConsent(
+    private val models: ModelRepository,
+    private val settings: SettingsRepository,
+    private val included: suspend () -> Boolean = { false },
+) :
     RecordingConsent {
-    override suspend fun consented(): Boolean = models.consented()
+    override suspend fun consented(): Boolean = included() || models.speechConsented()
 
     override suspend fun declined(): Boolean = settings.declinedAt.first() != null
 }

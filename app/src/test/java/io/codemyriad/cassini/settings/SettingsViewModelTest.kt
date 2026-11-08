@@ -1,5 +1,8 @@
 package io.codemyriad.cassini.settings
 
+import io.codemyriad.cassini.ui.settings.SpeechModelUi
+import io.codemyriad.cassini.models.SpeechChoice
+import io.codemyriad.cassini.core.models.SpeechModel
 import androidx.core.os.LocaleListCompat
 import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.models.ModelPart
@@ -59,6 +62,20 @@ class SettingsViewModelTest {
     }
 
     private fun SettingsViewModel.now(): SettingsUiState = state.value
+
+    @Test fun includedChoiceNeverOpensDownloadAndUnavailableChoiceIsRefused() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        val included = SpeechModelUi.INCLUDED
+        viewModel.onEvent(SettingsEvent.ChooseSpeech(included))
+        advanceUntilIdle()
+        assertEquals(SpeechModelUi.PARAKEET, viewModel.now().speechModel)
+        ports.speech.value = ports.speech.value.copy(includedAvailable = true)
+        advanceUntilIdle()
+        viewModel.onEvent(SettingsEvent.ChooseSpeech(included))
+        advanceUntilIdle()
+        assertEquals(included, viewModel.now().speechModel)
+        assertTrue(effects.isEmpty())
+    }
 
     @Test
     fun showsTheModelRowsTheCountsTheVersionAndTheNotificationsBanner() = runTest(dispatcher) {
@@ -230,6 +247,12 @@ class SettingsViewModelTest {
         var current = LanguageChoice.PHONE
         var refreshed = 0
         var noticeRefreshes = 0
+        override val speech = MutableStateFlow(
+            SpeechChoice(SpeechModel.PARAKEET, false),
+        )
+        override suspend fun chooseSpeech(model: SpeechModel) {
+            speech.value = speech.value.copy(selected = model)
+        }
         override val models = MutableStateFlow<Map<ModelPart, ModelStatus>>(emptyMap())
         val voices = MutableStateFlow(0)
         val trash = MutableStateFlow(0)

@@ -212,7 +212,8 @@ class ModelInstallOwner(
         // A new install drops the failure an earlier one left in the status.
         shared.parts.forEach(models::clearProgress)
         try {
-            val store = RepositoryModelStore(models, modelRoot, network, models.consented())
+            val consented = if (ModelPart.SPEECH in shared.parts) models.speechConsented() else models.consented()
+            val store = RepositoryModelStore(models, modelRoot, network, consented)
             val outcome = ModelInstaller(store, io).install(shared.parts) { progress ->
                 shared.progress = progress
                 models.publishProgress(progress.part, statusOf(progress))

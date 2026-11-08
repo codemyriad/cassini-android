@@ -1,5 +1,6 @@
 package io.codemyriad.cassini.data.settings
 
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.AppPaths
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -35,6 +36,25 @@ class SettingsRepositoryTest {
             return block(SettingsRepository.create(paths, CoroutineScope(Dispatchers.IO + job)))
         } finally {
             job.cancelAndJoin()
+        }
+    }
+
+    @Test fun speechChoiceSurvivesReopenAndOptionalConsentDoesNotAuthorizeParakeet() = runTest {
+        withStore { store ->
+            assertNull(store.speechModel.first())
+            store.setSpeechModel(SpeechModel.PARAKEET)
+            store.recordConsent(100, includeSpeech = false)
+        }
+        withStore { store ->
+            assertEquals(SpeechModel.PARAKEET, store.speechModel.first())
+            assertEquals(100L, store.consentAt.first())
+            assertNull(store.speechConsentAt.first())
+            store.setSpeechModel(SpeechModel.INCLUDED)
+            store.recordConsent(200)
+        }
+        withStore { store ->
+            assertEquals(SpeechModel.INCLUDED, store.speechModel.first())
+            assertEquals(200L, store.speechConsentAt.first())
         }
     }
 

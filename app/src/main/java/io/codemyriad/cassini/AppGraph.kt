@@ -15,6 +15,11 @@ import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.UserFacingException
 import io.codemyriad.cassini.core.models.ModelCheck
 import io.codemyriad.cassini.core.models.ModelPart
+import io.codemyriad.cassini.core.models.SpeechModel
+import io.codemyriad.cassini.core.models.ModelPlan
+import io.codemyriad.cassini.models.SpeechSelection
+import io.codemyriad.cassini.whistle.WhistleJobs
+import io.codemyriad.cassini.core.requireUser
 import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.data.CassiniDispatchers
 import io.codemyriad.cassini.data.NoteLocks
@@ -174,6 +179,7 @@ class AppGraph(context: Context, val config: Config) {
     val settings: SettingsRepository =
         SettingsRepository.create(paths, CoroutineScope(appScope.coroutineContext + dispatchers.io))
     val models = ModelRepository(paths, settings, dispatchers, config.fetcher, config.clock)
+    val speech = SpeechSelection(app, settings, appScope, dispatchers.io)
     val installOwner = ModelInstallOwner(models, paths.modelRoot, network, appScope, dispatchers.io)
     val modelAccess: ModelAccess = RepositoryModelAccess(models, paths.modelRoot, installOwner, network)
 
@@ -195,6 +201,28 @@ class AppGraph(context: Context, val config: Config) {
         }
     }
     val jobEnvironment: JobEnvironment by lazy { InstalledEngines.environment(app) }
+
+    suspend fun jobEngines(model: SpeechModel, file: java.io.File): JobEngines {
+        if (model == SpeechModel.PARAKEET) return engines
+        requireUser(speech.included.await(), Failure.MODEL_UNAVAILABLE)
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            WhistleJobs.of(app, engines, paths.cache, file)
+        } else {
+            throw UserFacingException(Failure.MODEL_UNAVAILABLE)
+        }
+    }
+
+    suspend fun transcriptionConsented(noteId: String? = null): Boolean {
+        val identity = noteId?.let { awaitCatalogue().jobs.job(it)?.speechIdentity }
+        return speech.consented(models, identity)
+    }
+
+    suspend fun downloadPlan(model: SpeechModel? = null): ModelPlan {
+        val plan = models.plan()
+        return if ((model ?: speech.selected()) == SpeechModel.INCLUDED) {
+            ModelPlan(plan.missing.filterNot { it.part == ModelPart.SPEECH })
+        } else plan
+    }
 
     /** Whether the UI may change the draft names of a note; the job closes it at step 6. */
     val namingGate = NamingGate()
@@ -451,7 +479,7 @@ class AppGraph(context: Context, val config: Config) {
             capture = hooks.capture ?: FactoryCaptureSource(app),
             platform = hooks.platform ?: AndroidRecordingPlatform(app),
             handoff = handoff,
-            consent = hooks.consent ?: SettingsConsent(models, settings),
+            consent = hooks.consent ?: SettingsConsent(models, settings) { speech.selected() == SpeechModel.INCLUDED },
             defaultTitle = ::defaultTitle,
             clock = config.clock,
             timing = hooks.timing,
@@ -527,7 +555,8 @@ class Catalogue internal constructor(
         checkpoints,
         adopter,
         RunningJobCanceller { noteId -> canceller().cancelAndJoin(noteId) },
-        clock,
+        speechChoice = { graph.speech.selected() },
+        clock = clock,
     )
     val notes = NoteRepository(database, paths, dispatchers, locks, documents, graph.appScope, jobs, voices, clock)
     val imports = ImportRepository(

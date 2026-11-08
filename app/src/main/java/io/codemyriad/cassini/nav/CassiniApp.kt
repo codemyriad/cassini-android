@@ -169,7 +169,7 @@ private fun EntryProviderScope<NavKey>.screenEntries(
 ) {
     entry<ModelDownloadKey> { key ->
         val viewModel = viewModel {
-            ModelDownloadViewModel(key.noteId, GraphModelDownloadPorts(graph, context), createSavedStateHandle())
+            ModelDownloadViewModel(key.noteId, GraphModelDownloadPorts(graph, context, key.noteId), createSavedStateHandle())
         }
         ModelDownloadRoute(viewModel, screenNavigator(backStack, key))
     }

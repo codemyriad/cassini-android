@@ -1,5 +1,6 @@
 package io.codemyriad.cassini.models
 
+import io.codemyriad.cassini.core.models.SpeechModel
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -41,10 +42,15 @@ interface ModelDownloadPorts {
 }
 
 /** [ModelDownloadPorts] over the app's graph. */
-class GraphModelDownloadPorts(private val graph: AppGraph, context: Context) : ModelDownloadPorts {
+class GraphModelDownloadPorts(private val graph: AppGraph, context: Context, private val noteId: String? = null) : ModelDownloadPorts {
     private val app = context.applicationContext
 
-    override suspend fun plan(): ModelPlan = graph.models.plan()
+    override suspend fun plan(): ModelPlan = graph.downloadPlan(targetModel())
+
+    private suspend fun targetModel(): SpeechModel {
+        val identity = noteId?.let { graph.awaitCatalogue().jobs.job(it)?.speechIdentity }
+        return identity?.let(SpeechModel::identity) ?: graph.speech.selected()
+    }
 
     /** The model root's file system; a root not created yet counts as its nearest existing parent. */
     override suspend fun usableBytes(): Long = withContext(graph.dispatchers.io) {
@@ -53,7 +59,8 @@ class GraphModelDownloadPorts(private val graph: AppGraph, context: Context) : M
             ?.usableSpace ?: 0L
     }
 
-    override suspend fun recordConsent() = graph.models.recordConsent()
+    override suspend fun recordConsent() =
+        graph.models.recordConsent(includeSpeech = targetModel() == SpeechModel.PARAKEET)
 
     override suspend fun recordDeclined() = graph.models.recordDeclined()
 

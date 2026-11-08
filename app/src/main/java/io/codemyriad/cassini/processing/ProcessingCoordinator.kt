@@ -214,7 +214,7 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
         // A job stopped by Android still finishes in the background; its outcome must not overwrite this request.
         active?.takeIf { it.noteId == noteId && catalogue.jobs.job(noteId)?.state != JobState.RUNNING }
             ?.finished?.await()
-        if (!graph.models.consented()) return queueLock.withLock { needConsent(catalogue, noteId, kind) }
+        if (!graph.transcriptionConsented(noteId)) return queueLock.withLock { needConsent(catalogue, noteId, kind) }
         val resume = catalogue.jobs.job(noteId)?.state == JobState.PAUSED
         clearHold(origin, resume)
         val outcome = when (val enqueued = queueLock.withLock { catalogue.jobs.enqueue(noteId, kind) }) {
@@ -333,7 +333,7 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
     suspend fun restore(noteId: String): Boolean {
         val catalogue = graph.awaitCatalogue()
         val restored = queueLock.withLock { catalogue.notes.restore(noteId) }
-        if (restored && catalogue.jobs.job(noteId)?.state == JobState.QUEUED && graph.models.consented()) {
+        if (restored && catalogue.jobs.job(noteId)?.state == JobState.QUEUED && graph.transcriptionConsented(noteId)) {
             startService()
         }
         return restored
@@ -463,10 +463,10 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
         scope.launch {
             guarded("start the queue") {
                 graph.ready.await()
-                val queued = graph.awaitCatalogue().jobs.queue().first().any { it.job.state == JobState.QUEUED }
+                val queued = graph.awaitCatalogue().jobs.queue().first().firstOrNull { it.job.state == JobState.QUEUED }
                 val idle = active == null && synchronized(workLock) { drainJob == null }
-                val allowed = graph.models.consented() && settings.queueHold.first() == null
-                if (queued && idle && allowed) parts.starter.start()
+                val allowed = queued != null && graph.transcriptionConsented(queued.job.noteId) && settings.queueHold.first() == null
+                if (queued != null && idle && allowed) parts.starter.start()
             }
         }
     }
@@ -569,7 +569,7 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
             error: Exception,
         ) {
             Log.e(TAG, "Cannot create the job of $noteId", error)
-            catalogue.jobs.markFailed(noteId, Failure.UNKNOWN)
+            catalogue.jobs.markFailed(noteId, (error as? io.codemyriad.cassini.core.UserFacingException)?.failure ?: Failure.UNKNOWN)
             null
         } ?: return null
         // ATOMIC: the job always enters run(), so its event channel is closed on every path, also after a cancel.

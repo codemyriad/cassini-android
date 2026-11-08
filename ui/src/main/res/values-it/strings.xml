@@ -561,4 +561,11 @@
     <string name="ui_banner_voices_unreadable_body">Sono state create da una versione più recente di Cassini o sono danneggiate. Non è stato modificato nulla.</string>
     <string name="ui_banner_lib_unavailable_title">Impossibile aprire le note</string>
     <string name="ui_banner_lib_unavailable_body">I file sono al sicuro. Libera spazio, poi apri di nuovo Cassini.</string>
+    <string name="ui_settings_included">Incluso · 17 MB</string>
+    <string name="ui_settings_optional">Download facoltativo</string>
+    <string name="ui_settings_optional_size">Download facoltativo · %1$s</string>
+    <string name="ui_settings_default">Predefinito</string>
+    <string name="ui_settings_unavailable">Non disponibile</string>
+    <string name="ui_settings_model_choice_footnote">Usato per le nuove trascrizioni. Le trascrizioni in coda e in pausa mantengono il proprio modello.</string>
+    <string name="ui_settings_not_available">Non disponibile su questo dispositivo.</string>
 </resources>

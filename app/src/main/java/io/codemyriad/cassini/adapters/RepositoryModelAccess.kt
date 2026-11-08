@@ -22,7 +22,7 @@ class RepositoryModelAccess(
     private val owner: ModelInstallOwner,
     private val network: NetworkCheck,
 ) : ModelAccess {
-    override suspend fun consented(): Boolean = models.consented()
+    override suspend fun consented(): Boolean = models.speechConsented()
 
     override fun ready(part: ModelPart): Boolean = models.readyBlocking(part)
 

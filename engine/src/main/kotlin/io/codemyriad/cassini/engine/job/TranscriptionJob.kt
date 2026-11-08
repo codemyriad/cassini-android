@@ -19,6 +19,7 @@ import io.codemyriad.cassini.core.format.WordBodyBudget
 import io.codemyriad.cassini.core.library.PauseReason
 import io.codemyriad.cassini.core.models.ModelCatalog
 import io.codemyriad.cassini.core.models.ModelPart
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.core.requireUser
 import io.codemyriad.cassini.core.speakers.DefaultLabels
 import io.codemyriad.cassini.core.speakers.Diarization
@@ -89,6 +90,7 @@ class TranscriptionJob(
     private val models: ModelAccess,
     private val engines: JobEngines,
     private val env: JobEnvironment,
+    private val speechModel: SpeechModel = SpeechModel.PARAKEET,
 ) {
     private val channel = Channel<JobEvent>(Channel.UNLIMITED)
     private val stopReason = AtomicReference<PauseReason?>(null)
@@ -221,6 +223,7 @@ class TranscriptionJob(
      * alone (best effort), as 0.1.0 retried it at every start.
      */
     private suspend fun installModels(): JobOutcome? = withContext(env.io) {
+        if (speechModel == SpeechModel.INCLUDED) return@withContext null
         val missing = ModelPart.entries.filterNot(models::ready).toSet()
         val detector = ModelPart.SPEECH !in missing && !models.detectorReady() && models.hasValidatedNetwork()
         val request = if (detector) missing + ModelPart.SPEECH else missing
@@ -479,7 +482,7 @@ class TranscriptionJob(
         CheckpointState(
             source = source,
             signature = signature,
-            model = ModelCatalog.PARAKEET_REVISION,
+            model = speechModel.identity,
             speakers = ModelCatalog.diarizationModel.sha256,
             recognition = recognizer.checkpoint(),
             encoder = run.encoder?.checkpoint(),
@@ -540,11 +543,12 @@ class TranscriptionJob(
             decoded.inferenceMs,
             decoded.segmentation,
             decoded.run.resumed?.doneMs ?: 0L,
+            speechModel,
         )
         val diarization = if (turns.isNullOrEmpty() || transcript.words.isEmpty()) {
             null
         } else {
-            JobProvenance.diarization(transcript.words, turns, recognition, decoded.diarizationMs)
+            JobProvenance.diarization(transcript.words, turns, recognition, decoded.diarizationMs, speechModel)
         }
         checkActive()
         val matching = turns != null && diarization != null && decoded.run.printsReady

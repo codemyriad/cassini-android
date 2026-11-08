@@ -261,6 +261,7 @@ private suspend fun <T : Any> attempt(dir: File, block: suspend () -> T): T? = t
 
 /** The PAUSED(INTERRUPTED) job of a saved [checkpoint] at [now]; its `seq` is set when it is written. */
 private fun pausedJob(id: String, checkpoint: CheckpointState, now: Long) = JobEntity(
+    speechIdentity = checkpoint.model,
     noteId = id,
     seq = 0,
     kind = if (checkpoint.source == NoteFiles.DOCUMENT) JobKind.TRANSCRIBE_AGAIN else JobKind.TRANSCRIBE,

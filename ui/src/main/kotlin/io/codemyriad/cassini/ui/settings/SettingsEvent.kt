@@ -10,6 +10,8 @@ sealed interface SettingsEvent {
     @Immutable
     data class Language(val language: LanguageChoice) : SettingsEvent
 
+    data class ChooseSpeech(val model: SpeechModelUi) : SettingsEvent
+
     /** A model row; only a Not downloaded row opens Model download. */
     @Immutable
     data class OpenModel(val part: ModelPartUi) : SettingsEvent

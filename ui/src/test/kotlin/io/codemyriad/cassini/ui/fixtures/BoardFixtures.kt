@@ -1,5 +1,6 @@
 package io.codemyriad.cassini.ui.fixtures
 
+import io.codemyriad.cassini.ui.settings.SpeechModelUi
 import io.codemyriad.cassini.ui.banner.BannerGroup
 import io.codemyriad.cassini.ui.banner.BannerKind
 import io.codemyriad.cassini.ui.banner.BannerSpec
@@ -338,6 +339,8 @@ internal object BoardFixtures {
     // Board 08: Settings (the board's About card reads "Cassini 0.1.0"; since the rename it reads "Cassini talk").
 
     val settings = SettingsUiState(
+        speechModel = SpeechModelUi.INCLUDED,
+        includedAvailable = true,
         language = LanguageChoice.PHONE,
         models = persistentListOf(
             ModelRowUi(ModelPartUi.SPEECH, ModelBytes.SPEECH, ModelStatusUi.Ready),

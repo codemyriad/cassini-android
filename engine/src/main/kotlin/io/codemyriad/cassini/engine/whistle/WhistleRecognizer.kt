@@ -1,6 +1,7 @@
 package io.codemyriad.cassini.engine.whistle
 
 import io.codemyriad.cassini.core.Failure
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.core.asr.IncrementalState
 import io.codemyriad.cassini.core.audio.Limits
 import io.codemyriad.cassini.core.audio.PcmAudio
@@ -67,7 +68,7 @@ class WhistleRecognizer(
         private set
     override val positionSamples: Long get() = position
     override val doneMs: Long get() = settled * MS / RATE
-    override val segmentation = "cassini-fir-48k-16k-v1; desktop Silero v6.2.1 SpeechGate"
+    override val segmentation = "desktop Silero v6.2.1 SpeechGate; decoder policy: FIR48k, identity16k, Hann-sinc for other rates"
     override val language = Transcript.UNDETERMINED
 
     init {
@@ -239,7 +240,7 @@ class WhistleRecognizer(
     private fun hash(): String = (pcmHash.clone() as MessageDigest).digest().joinToString("") { "%02x".format(it) }
 
     companion object {
-        const val PIPELINE = "whistle-needle-93e88ed-ca52876-fir-v1-silero-6.2.1-gate-v1"
+        val PIPELINE = SpeechModel.INCLUDED.identity
         private const val RATE = 16000
         private const val MS = 1000L
         private const val NANOS_PER_MS = 1_000_000L

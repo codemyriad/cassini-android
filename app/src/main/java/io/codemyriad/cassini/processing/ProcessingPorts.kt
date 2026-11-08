@@ -10,6 +10,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import io.codemyriad.cassini.AppGraph
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.core.library.PauseReason
 import io.codemyriad.cassini.engine.job.JobEvent
 import io.codemyriad.cassini.engine.job.JobOutcome
@@ -45,13 +46,18 @@ fun interface ProcessingJobFactory {
 class TranscriptionJobFactory(private val graph: AppGraph) : ProcessingJobFactory {
     override suspend fun create(noteId: String): ProcessingJob {
         val catalogue = graph.awaitCatalogue()
+        val identity = requireNotNull(catalogue.jobs.job(noteId)).speechIdentity
+        val model = SpeechModel.identity(identity)
+        val source = catalogue.jobStorage.audioFile(noteId)
+        val engines = graph.jobEngines(model, source)
         val job = TranscriptionJob(
             noteId,
             catalogue.jobStorage,
             catalogue.jobVoices,
             graph.modelAccess,
-            graph.engines,
+            engines,
             graph.jobEnvironment,
+            model,
         )
         return object : ProcessingJob {
             override val noteId: String = noteId

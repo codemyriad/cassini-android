@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.AppPaths
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -60,7 +61,14 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     /** When the user agreed to the model download; null when they never did. */
     val consentAt: Flow<Long?> = key(Keys.CONSENT_AT)
 
-    suspend fun recordConsent(at: Long) = set(Keys.CONSENT_AT, at)
+    suspend fun recordConsent(at: Long, includeSpeech: Boolean = true) {
+        store.edit {
+            it[Keys.CONSENT_AT] = at
+            if (includeSpeech) it[Keys.SPEECH_CONSENT_AT] = at
+        }
+    }
+
+    val speechConsentAt: Flow<Long?> = key(Keys.SPEECH_CONSENT_AT)
 
     /** When the user pressed "Not now — keep the audio"; it suppresses the automatic consent screen. */
     val declinedAt: Flow<Long?> = key(Keys.DECLINED_AT)
@@ -120,6 +128,11 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
 
     suspend fun setPlaybackSpeed(speed: Float) = set(Keys.PLAYBACK_SPEED, speed)
 
+    /** New installs resolve the absent choice from verified Included availability (D5/D75). */
+    val speechModel: Flow<SpeechModel?> = preferences.map { SpeechModel.setting(it[Keys.SPEECH_MODEL]) }.distinctUntilChanged()
+
+    suspend fun setSpeechModel(model: SpeechModel) = set(Keys.SPEECH_MODEL, model.setting)
+
     private fun <T> key(key: Preferences.Key<T>): Flow<T?> = preferences.map { it[key] }.distinctUntilChanged()
 
     private fun flag(key: Preferences.Key<Boolean>): Flow<Boolean> =
@@ -146,6 +159,8 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
 
     /** The stored key names of architecture 3.4. They are persisted: never rename one. */
     object Keys {
+        val SPEECH_MODEL = stringPreferencesKey("recognition.model")
+        val SPEECH_CONSENT_AT = longPreferencesKey("models.speechConsentAt")
         val CONSENT_AT = longPreferencesKey("models.consentAt")
         val DECLINED_AT = longPreferencesKey("models.declinedAt")
         val FINALIZATION_MS = longPreferencesKey("processing.finalizationMs")

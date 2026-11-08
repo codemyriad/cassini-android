@@ -1,5 +1,6 @@
 package io.codemyriad.cassini.data.jobs
 
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.format.DocumentState
 import io.codemyriad.cassini.core.library.AudioKind
@@ -37,6 +38,7 @@ class JobRepositoryTest {
     @get:Rule val folder = TemporaryFolder()
     private lateinit var h: NotesHarness
     private lateinit var jobs: JobRepository
+    private var choice = SpeechModel.PARAKEET
     private val cancelled: MutableList<String> = Collections.synchronizedList(mutableListOf())
 
     @Before fun setUp() {
@@ -50,6 +52,7 @@ class JobRepositoryTest {
             checkpoints,
             SealedAdopter.of(h.documents, VoiceRepository(h.db, h.paths, h.dispatchers, checkpoints.names)),
             RunningJobCanceller { cancelled += it },
+            speechChoice = { choice },
         ) { h.now }
     }
 
@@ -58,6 +61,18 @@ class JobRepositoryTest {
     private suspend fun job(id: String): JobEntity = requireNotNull(jobs.job(id)) { "no job $id" }
 
     private suspend fun notes(count: Int): List<String> = (1..count).map { noteId(it).also { id -> h.plainNote(id) } }
+
+    @Test fun settingsOnlyChangesTheIdentityOfNewJobs() = runTest {
+        val (a, b) = notes(2)
+        choice = SpeechModel.INCLUDED
+        jobs.enqueue(a, JobKind.TRANSCRIBE)
+        choice = SpeechModel.PARAKEET
+        jobs.enqueue(a, JobKind.TRANSCRIBE)
+        jobs.enqueue(b, JobKind.TRANSCRIBE)
+        assertEquals(SpeechModel.INCLUDED.identity, job(a).speechIdentity)
+        assertEquals(choice.identity, job(b).speechIdentity)
+        assertEquals(job(a).speechIdentity, h.db.jobs().job(a)?.speechIdentity)
+    }
 
     @Test fun enqueueAddsAtTheBack() = runTest {
         val (a, b) = notes(2)

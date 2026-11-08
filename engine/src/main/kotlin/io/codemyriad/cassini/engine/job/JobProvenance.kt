@@ -4,6 +4,7 @@ import io.codemyriad.cassini.core.format.SpeakerAttribution
 import io.codemyriad.cassini.core.format.SpeakerMerges
 import io.codemyriad.cassini.core.format.Word
 import io.codemyriad.cassini.core.models.ModelCatalog
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.core.speakers.Match
 import io.codemyriad.cassini.core.speakers.SpeakerTurn
 import io.codemyriad.cassini.core.speakers.Voiceprints
@@ -21,8 +22,14 @@ object JobProvenance {
     val PRINT_MODEL: String = ModelCatalog.voiceprintModel.sha256
 
     /** The recognition record: the engine, then `x-inferenceMs`, `x-segmentation` and `x-resumedFromMs`. */
-    fun recognition(language: String, inferenceMs: Long, segmentation: String, resumedFromMs: Long): JSONObject =
-        processing().put("language", language)
+    fun recognition(
+        language: String,
+        inferenceMs: Long,
+        segmentation: String,
+        resumedFromMs: Long,
+        speechModel: SpeechModel = SpeechModel.PARAKEET,
+    ): JSONObject =
+        processing(speechModel).put("language", language)
             .put("x-inferenceMs", inferenceMs).put("x-segmentation", segmentation)
             .put("x-resumedFromMs", resumedFromMs)
 
@@ -32,9 +39,10 @@ object JobProvenance {
         turns: List<SpeakerTurn>,
         recognition: JSONObject,
         diarizationMs: Long,
+        speechModel: SpeechModel = SpeechModel.PARAKEET,
     ): JSONObject =
         SpeakerAttribution.record(words, turns, recognition, null, diarizationMs)
-            .put("x-incrementalDiarization", INCREMENTAL_DIARIZATION)
+            .put("x-incrementalDiarization", if (speechModel == SpeechModel.INCLUDED) WHISTLE_DIARIZATION else INCREMENTAL_DIARIZATION)
 
     /**
      * `x-speakerIdentification`: counts only, so which person a voice resembles never enters the document. [prints]
@@ -60,13 +68,24 @@ object JobProvenance {
     private fun automatic(match: Match?, names: Map<String, String>) =
         match?.state == Match.State.AUTO && match.voiceId in names
 
-    private fun processing(): JSONObject = JSONObject()
+    private fun processing(speechModel: SpeechModel): JSONObject = if (speechModel == SpeechModel.INCLUDED) {
+        JSONObject().put("backend", "needle").put("engine", "Whistle")
+            .put("model", "whistle").put("device", "Android CPU").put("source", "recording")
+            .put(
+                "version",
+                "needle 3.3.0; engine revision 93e88ede867e4311c39151285e74df513e4b835b; " +
+                    "model revision ca5287601bef25af26dcf2e1b2bdc0843a7c19e5",
+            )
+    } else parakeet()
+
+    private fun parakeet(): JSONObject = JSONObject()
         .put("backend", "sherpa-onnx").put("engine", "Parakeet TDT")
         .put("model", "${ModelCatalog.PARAKEET_MODEL_ID} ${ModelCatalog.PARAKEET_PRECISION}")
         .put("device", "Android CPU")
         .put("source", "recording")
         .put("version", "sherpa-onnx 1.13.7; model revision ${ModelCatalog.PARAKEET_REVISION}")
 
+    private const val WHISTLE_DIARIZATION = "desktop Silero SpeechGate segments, persistent Sortformer speaker cache"
     private const val PRINT_MODEL_NAME = "3dspeaker_speech_campplus_sv_en_voxceleb_16k"
     private const val INCREMENTAL_DIARIZATION = "28 s windows with 2 s overlap, persistent Sortformer speaker cache"
 }

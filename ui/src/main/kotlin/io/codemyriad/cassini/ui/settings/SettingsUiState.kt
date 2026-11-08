@@ -17,6 +17,9 @@ data class SettingsUiState(
     val trash: Int,
     val version: String,
     val notificationsOff: Boolean = false,
+    val speechModel: SpeechModelUi = SpeechModelUi.PARAKEET,
+    val includedAvailable: Boolean = false,
+    val speechChecking: Boolean = false,
 )
 
 /**
@@ -66,3 +69,6 @@ sealed interface ModelStatusUi {
     /** "Download failed — tries again next time" (red). */
     data object Failed : ModelStatusUi
 }
+
+/** Engine labels for Settings; engine and storage types stay outside :ui. */
+enum class SpeechModelUi { INCLUDED, PARAKEET }

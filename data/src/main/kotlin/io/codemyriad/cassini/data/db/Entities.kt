@@ -1,5 +1,6 @@
 package io.codemyriad.cassini.data.db
 
+import io.codemyriad.cassini.core.models.ModelCatalog
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
@@ -238,6 +239,7 @@ data class JobEntity(
     val words: Int = 0,
     /** Automatic restarts since the last user action; bumped only by `reconcileOnStart`. */
     val attempts: Int = 0,
+    @ColumnInfo(name = "speech_identity") val speechIdentity: String = ModelCatalog.PARAKEET_REVISION,
     @ColumnInfo(name = "enqueued_at") val enqueuedAt: Long,
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
 )

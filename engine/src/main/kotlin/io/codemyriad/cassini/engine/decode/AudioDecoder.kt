@@ -13,7 +13,7 @@ import io.codemyriad.cassini.core.audio.Limits
 import io.codemyriad.cassini.core.audio.Mp3Gapless
 import io.codemyriad.cassini.core.audio.PcmAudio
 import io.codemyriad.cassini.core.audio.PcmBuilder
-import io.codemyriad.cassini.core.audio.StreamingResampler
+import io.codemyriad.cassini.core.audio.DecoderResampler
 import io.codemyriad.cassini.core.audio.WavDecoder
 import io.codemyriad.cassini.core.audio.firstNeededFrame
 import io.codemyriad.cassini.core.format.OggOpus
@@ -28,7 +28,7 @@ import java.nio.ByteOrder
  * Reject long recordings rather than silently dropping audio. A content uri is first copied into
  * [cacheDir] through [resolver]; a file uri is read in place.
  */
-class AudioDecoder(private val resolver: ContentResolver, private val cacheDir: File) {
+class AudioDecoder(private val resolver: ContentResolver, private val cacheDir: File, private val included: Boolean = false) {
     /**
      * [onSamples] receives borrowed 16 kHz mono buffers on the calling thread; consume or copy
      * them before returning. [onProgress] reports source milliseconds read and optional duration.
@@ -79,7 +79,7 @@ class AudioDecoder(private val resolver: ContentResolver, private val cacheDir: 
                 if (file.length() >= 12) {
                     file.readFully(header, 0, minOf(file.length(), header.size.toLong()).toInt())
                     if (String(header, 0, 4, Charsets.US_ASCII) == "RIFF" &&
-                        String(header, 8, 4, Charsets.US_ASCII) == "WAVE") return WavDecoder.decodeWav(file, onSamples, retainPcm, startSample, onProgress)
+                        String(header, 8, 4, Charsets.US_ASCII) == "WAVE") return WavDecoder.decodeWav(file, onSamples, retainPcm, startSample, onProgress, included)
                 }
             }
             return decodeCompressed(local, onSamples, onProgress, retainPcm, startSample)
@@ -105,7 +105,7 @@ class AudioDecoder(private val resolver: ContentResolver, private val cacheDir: 
             // resampler needs retries further back, so no audio is ever replaced by silence or shifted.
             var backOffUs = 1_000_000L
             fun seekUs() = (startSample * 1_000_000 / Limits.ASR_RATE - backOffUs).coerceAtLeast(0)
-            if (startSample > 0) extractor.seekTo(seekUs(), MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+            if (startSample > 0 && !included) extractor.seekTo(seekUs(), MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
             val format = extractor.getTrackFormat(track)
             // The MP3 decoders remove their own 529-sample delay. Older versions (API 26, 29) keep the encoder delay and
             // padding of the LAME tag; newer ones (API 34) drop them but keep their timestamps. Trim them here instead.
@@ -126,7 +126,7 @@ class AudioDecoder(private val resolver: ContentResolver, private val cacheDir: 
             val codec = MediaCodec.createDecoderByType(mime)
             decoder = codec
             format.setInteger(MediaFormat.KEY_PCM_ENCODING, AudioFormat.ENCODING_PCM_16BIT)
-            if (startSample > 0 && mime == MediaFormat.MIMETYPE_AUDIO_OPUS) {
+            if (startSample > 0 && !included && mime == MediaFormat.MIMETYPE_AUDIO_OPUS) {
                 // Opus pre-skip belongs only to the beginning of the stream. A fresh decoder
                 // at a seek must not trim that delay a second time from the middle of the recording.
                 format.setByteBuffer("csd-1", ByteBuffer.allocate(8).order(ByteOrder.nativeOrder()).putLong(0).apply { flip() })
@@ -137,7 +137,7 @@ class AudioDecoder(private val resolver: ContentResolver, private val cacheDir: 
             var sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
             var channels = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
             var encoding = AudioFormat.ENCODING_PCM_16BIT
-            var resampler: StreamingResampler? = null
+            var resampler: DecoderResampler? = null
             var mono = FloatArray(0)
             var count = 0L
             var next: Long? = null
@@ -201,7 +201,7 @@ class AudioDecoder(private val resolver: ContentResolver, private val cacheDir: 
                                 val firstFrame = gapless?.let { g ->
                                     next ?: (WavDecoder.framePosition(info.presentationTimeUs, sampleRate, null) - g.delay)
                                 } ?: WavDecoder.framePosition(info.presentationTimeUs, sampleRate, next)
-                                if (startSample > 0 && next == null) {
+                                if (startSample > 0 && !included && next == null) {
                                     if (firstFrame > firstNeededFrame(sampleRate, startSample) && seekUs() > 0) {
                                         Log.w("Cassini", "Resume seek landed at frame $firstFrame, after ${firstNeededFrame(sampleRate, startSample)}; seeking earlier")
                                         reseek = true
@@ -219,7 +219,7 @@ class AudioDecoder(private val resolver: ContentResolver, private val cacheDir: 
                                 // An overlap keeps the audio already passed on: the resampler only moves forward.
                                 val skip = (count - firstFrame).coerceIn(0L, playableFrames.toLong()).toInt()
                                 if (playableFrames > skip) {
-                                    val stream = resampler ?: StreamingResampler(sampleRate, count, startSample) { samples, size ->
+                                    val stream = resampler ?: DecoderResampler(sampleRate, count, startSample, included) { samples, size ->
                                         out?.append(samples, size)
                                         onSamples(samples, size)
                                     }.also { resampler = it }

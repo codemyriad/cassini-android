@@ -1,5 +1,6 @@
 package io.codemyriad.cassini.ui.fixtures
 
+import io.codemyriad.cassini.ui.settings.SpeechModelUi
 import io.codemyriad.cassini.ui.banner.BannerAction
 import io.codemyriad.cassini.ui.banner.BannerArgs
 import io.codemyriad.cassini.ui.banner.BannerKind
@@ -683,6 +684,10 @@ internal object VariantFixtures {
     // Settings (features.md section 11).
 
     val settings = mapOf(
+        "settings-included-unavailable" to b.settings.copy(
+            speechModel = SpeechModelUi.PARAKEET,
+            includedAvailable = false,
+        ),
         "settings-notifications-off" to b.settings.copy(notificationsOff = true),
         "settings-downloading" to b.settings.copy(
             models = persistentListOf(

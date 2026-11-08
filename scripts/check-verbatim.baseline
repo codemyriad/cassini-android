@@ -1,6 +1,6 @@
 # Reviewed differences of the verbatim groups from 0.1.0: group, SHA-256 of the changed lines.
 # Written by scripts/check-verbatim.sh --update after a reviewer read every diff.
-AudioDecoder 92b0bc78e602e354afea3295dd722a56efe8f2973d49d62ea9bcc38e309f7430
+AudioDecoder 04e8cbf03c72bd6d8b974db1ae31a5acf122e632ab0a92f9c7e3b831ddca1a84
 BatteryProjection 7d02b7f5c9b37db05a659d5b1cefe39650be73c60974681c95c5077c95fad67f
 CMakeLists.txt 0e8abeecaf9a42ebeb2da077c4a719fde5527835a4534e9e7d155c2ca4bc157a
 CassiniDocument 031030c1ce6c3384d855de9b71ea5cebdfa8bc82164270b91b085ffc5a3fbc20

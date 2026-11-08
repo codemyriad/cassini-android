@@ -1,5 +1,6 @@
 package io.codemyriad.cassini.recording
 
+import io.codemyriad.cassini.core.models.SpeechModel
 import android.os.Build
 import android.util.Log
 import androidx.lifecycle.SavedStateHandle
@@ -82,7 +83,8 @@ class GraphRecordingPorts(private val graph: AppGraph) : RecordingPorts {
 
     override fun dismissEnded() = controller.dismissEnded()
 
-    override suspend fun modelsMissing(): Boolean = !graph.models.plan().isEmpty
+    override suspend fun modelsMissing(): Boolean =
+        graph.speech.selected() != SpeechModel.INCLUDED && !graph.models.plan().isEmpty
 
     override suspend fun lastFormat(): CaptureFormat? =
         graph.settings.lastRecordingFormat.first()?.let(CaptureFormat::of)

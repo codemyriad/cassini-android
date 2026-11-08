@@ -171,8 +171,11 @@ class ModelRepository(
         settings.consentAt.first() != null || withContext(dispatchers.io) { ModelCatalog.PARAKEET.ready(paths.modelRoot) }
 
     /** "Download and transcribe" or "Download" was pressed. */
-    suspend fun recordConsent() {
-        settings.recordConsent(clock())
+    suspend fun speechConsented(): Boolean =
+        settings.speechConsentAt.first() != null || withContext(dispatchers.io) { ModelCatalog.PARAKEET.ready(paths.modelRoot) }
+
+    suspend fun recordConsent(includeSpeech: Boolean = true) {
+        settings.recordConsent(clock(), includeSpeech)
         refresh()
     }
 

@@ -1,5 +1,6 @@
 package io.codemyriad.cassini.note
 
+import io.codemyriad.cassini.core.models.SpeechModel
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -436,7 +437,8 @@ class GraphNotePorts(private val graph: AppGraph, context: Context) : NotePorts 
 
     // Notices. -----------------------------------------------------------------------------------------------------
 
-    override suspend fun requiredFreeBytes(): Long = graph.models.plan().requiredFreeBytes
+    override suspend fun requiredFreeBytes(): Long =
+        if (graph.speech.selected() == SpeechModel.INCLUDED) 0 else graph.models.plan().requiredFreeBytes
 
     override suspend fun shouldAskNotifications(): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return false

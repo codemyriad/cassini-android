@@ -14,6 +14,7 @@ import io.codemyriad.cassini.core.format.Word
 import io.codemyriad.cassini.core.format.WordBodyBudget
 import io.codemyriad.cassini.core.library.PauseReason
 import io.codemyriad.cassini.core.models.ModelPart
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.core.models.ModelPlan
 import io.codemyriad.cassini.core.speakers.Match
 import io.codemyriad.cassini.core.speakers.SpeakerPrint
@@ -67,6 +68,19 @@ class TranscriptionJobTest {
     private val sp1 = "diar_test_1"
     private val sp2 = "diar_test_2"
     private val sp3 = "diar_test_3"
+
+    @Test fun includedDoesNotRequestDownloadsOrConsentAndWritesItsOwnIdentity() = runBlocking {
+        val h = Harness(speechModel = SpeechModel.INCLUDED)
+        h.models.readyParts = emptySet()
+        h.models.consent = false
+        val (outcome, events) = h.run()
+        assertEquals(JobOutcome.Done, outcome)
+        assertTrue(events.none { it is JobEvent.Downloading })
+        assertTrue(h.storage.saved.all { it.model == SpeechModel.INCLUDED.identity })
+        val json = JobProvenance.recognition("und", 1, "desktop-gate", 0, SpeechModel.INCLUDED)
+        assertEquals("needle", json.getString("backend"))
+        assertEquals("Whistle", json.getString("engine"))
+    }
 
     @Test fun decodesIn28SecondWindowsAndSavesOneCheckpointPerWindow() = runBlocking {
         val h = Harness()
@@ -803,6 +817,7 @@ class TranscriptionJobTest {
         totalMs: Long = 70_000,
         reportsTotal: Boolean = true,
         recordSyncs: Boolean = false,
+        private val speechModel: SpeechModel = SpeechModel.PARAKEET,
         private val maxDurationMs: Long = Limits.MAX_TRANSCRIBE_MS,
         private val maxBodyBytes: Long = WordBodyBudget.MAX_BYTES,
     ) {
@@ -854,6 +869,7 @@ class TranscriptionJobTest {
                 maxDurationMs = maxDurationMs,
                 maxBodyBytes = maxBodyBytes,
             ),
+            speechModel,
         )
 
         suspend fun run(job: TranscriptionJob = job()): Pair<JobOutcome, List<JobEvent>> {

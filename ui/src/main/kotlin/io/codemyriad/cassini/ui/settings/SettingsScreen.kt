@@ -22,6 +22,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.R
 import io.codemyriad.cassini.ui.banner.BannerAction
@@ -81,8 +83,9 @@ fun SettingsScreen(
             )
         }
         SectionHeader(stringResource(R.string.ui_settings_models))
+        SpeechModels(state, onEvent)
         GroupCard(Modifier.padding(horizontal = 16.dp)) {
-            state.models.forEach { row ->
+            state.models.filterNot { it.part == ModelPartUi.SPEECH }.forEach { row ->
                 ModelRow(row, onClick = { onEvent(SettingsEvent.OpenModel(row.part)) })
             }
         }
@@ -95,6 +98,47 @@ fun SettingsScreen(
             modifier = Modifier.padding(horizontal = 16.dp),
         )
     }
+}
+
+/** Model choice applies to new jobs; existing queue entries keep their pinned recognizer. */
+@Composable
+private fun SpeechModels(state: SettingsUiState, onEvent: (SettingsEvent) -> Unit) {
+    val included = state.speechModel == SpeechModelUi.INCLUDED && !state.speechChecking
+    val (status, tone) = when {
+        state.speechChecking -> stringResource(R.string.ui_settings_model_checking) to Tone.Info
+        !state.includedAvailable -> stringResource(R.string.ui_settings_unavailable) to Tone.Plain
+        included -> stringResource(R.string.ui_settings_default) to Tone.Ok
+        else -> stringResource(R.string.ui_settings_model_ready) to Tone.Ok
+    }
+    GroupCard(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp)) {
+        SettingsRow(
+            title = "Whistle",
+            subtitle = stringResource(if (state.includedAvailable) R.string.ui_settings_included else R.string.ui_settings_not_available),
+            trailing = SettingsTrailing.Status(status, tone),
+            modifier = Modifier.semantics { selected = included },
+            onClick = if (state.includedAvailable) ({ onEvent(SettingsEvent.ChooseSpeech(SpeechModelUi.INCLUDED)) }) else null,
+        )
+        val parakeet = state.models.firstOrNull { it.part == ModelPartUi.SPEECH }
+        val selected = state.speechModel == SpeechModelUi.PARAKEET && !state.speechChecking
+        val ready = parakeet?.status == ModelStatusUi.Ready
+        val (label, modelTone) = if (ready && selected) {
+            stringResource(R.string.ui_settings_default) to Tone.Ok
+        } else {
+            modelStatus(parakeet?.status ?: ModelStatusUi.Checking)
+        }
+        SettingsRow(
+            title = "Parakeet Ultra",
+            subtitle = if (parakeet == null) {
+                stringResource(R.string.ui_settings_optional)
+            } else {
+                stringResource(R.string.ui_settings_optional_size, Sizes.megabytes(parakeet.bytes))
+            },
+            trailing = SettingsTrailing.Status(label, modelTone),
+            modifier = Modifier.semantics { this.selected = selected },
+            onClick = { onEvent(SettingsEvent.ChooseSpeech(SpeechModelUi.PARAKEET)) },
+        )
+    }
+    HelperText(stringResource(R.string.ui_settings_model_choice_footnote))
 }
 
 /**
@@ -157,19 +201,22 @@ private fun PrivacySection(state: SettingsUiState, onEvent: (SettingsEvent) -> U
 @Composable
 private fun ModelRow(row: ModelRowUi, onClick: () -> Unit) {
     val size = Sizes.megabytes(row.bytes)
-    val (text, tone) = when (val status = row.status) {
-        ModelStatusUi.Ready -> stringResource(R.string.ui_settings_model_ready) to Tone.Ok
-        is ModelStatusUi.Downloading -> stringResource(R.string.ui_settings_model_downloading, status.percent) to
-            Tone.Info
-        ModelStatusUi.Checking -> stringResource(R.string.ui_settings_model_checking) to Tone.Info
-        ModelStatusUi.Pending -> stringResource(R.string.ui_settings_model_pending) to Tone.Warn
-        ModelStatusUi.NotDownloaded -> stringResource(R.string.ui_settings_model_not_downloaded) to Tone.Plain
-        ModelStatusUi.Failed -> stringResource(R.string.ui_settings_model_failed) to Tone.Error
-    }
+    val (text, tone) = modelStatus(row.status)
     SettingsRow(
         title = row.part.label(),
         subtitle = if (row.part == ModelPartUi.SPEECH) stringResource(R.string.ui_models_int8_size, size) else size,
         trailing = SettingsTrailing.Status(text, tone),
         onClick = onClick.takeIf { row.status == ModelStatusUi.NotDownloaded || row.status == ModelStatusUi.Failed },
     )
+}
+
+@Composable
+private fun modelStatus(status: ModelStatusUi): Pair<String, Tone> = when (status) {
+    ModelStatusUi.Ready -> stringResource(R.string.ui_settings_model_ready) to Tone.Ok
+    is ModelStatusUi.Downloading -> stringResource(R.string.ui_settings_model_downloading, status.percent) to
+        Tone.Info
+    ModelStatusUi.Checking -> stringResource(R.string.ui_settings_model_checking) to Tone.Info
+    ModelStatusUi.Pending -> stringResource(R.string.ui_settings_model_pending) to Tone.Warn
+    ModelStatusUi.NotDownloaded -> stringResource(R.string.ui_settings_model_not_downloaded) to Tone.Plain
+    ModelStatusUi.Failed -> stringResource(R.string.ui_settings_model_failed) to Tone.Error
 }

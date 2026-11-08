@@ -116,12 +116,12 @@ class SettingsBehaviourTest {
         rule.onNode(hasText("Phone") and hasClickAction()).performClick()
         rule.onNode(hasText("Phone") and isSelectable()).assertIsSelected()
         rule.onNodeWithText("Italiano").performClick()
-        rule.onAllNodes(isSelectable()).assertCountEquals(0)
+        rule.onAllNodes(isSelectable()).assertCountEquals(2)
         rule.onNodeWithText("Turn on").performClick()
         // A Not downloaded row and a Failed row open Model download; the other model rows are not buttons.
-        rule.onNode(hasText("Recognising saved voices", substring = true) and hasClickAction()).performClick()
-        rule.onNode(hasText("Telling speakers apart", substring = true) and hasClickAction()).performClick()
-        rule.onNode(hasText("Speech recognition", substring = true)).assertHasNoClickAction()
+        rule.onNode(hasText("Recognising saved voices", substring = true) and hasClickAction()).performScrollTo().performClick()
+        rule.onNode(hasText("Telling speakers apart", substring = true) and hasClickAction()).performScrollTo().performClick()
+        rule.onNode(hasText("Parakeet Ultra", substring = true)).assertHasClickAction()
         rule.onNodeWithText("Saved voices").performScrollTo().performClick()
         rule.onNodeWithText("Trash").performScrollTo().performClick()
         rule.onNodeWithText("Free software under GPLv3", substring = true).performScrollTo().performFirstLinkClick()
@@ -188,7 +188,7 @@ class SettingsBehaviourTest {
 
     @Test fun aModelRowReadsItsStatusWithItsName() {
         setThemed { SettingsScreen(BoardFixtures.settings, onEvent = {}) }
-        rule.onNode(hasText("Speech recognition") and hasText("Ready") and hasText("INT8 · 640 MB")).assertExists()
+        rule.onNode(hasText("Whistle") and hasText("Default") and hasText("Included · 17 MB")).assertExists()
     }
 
     @Test fun theOptionsMenuRenamesAndForgets() {

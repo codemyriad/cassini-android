@@ -1,5 +1,7 @@
 package io.codemyriad.cassini.data.checkpoint
 
+import io.codemyriad.cassini.core.models.ModelCatalog
+import io.codemyriad.cassini.core.models.SpeechModel
 import androidx.annotation.WorkerThread
 import io.codemyriad.cassini.core.audio.Limits
 import io.codemyriad.cassini.core.checkpoint.CheckpointState
@@ -35,7 +37,7 @@ import java.io.IOException
 // Manual DI: the repositories take their collaborators explicitly; one API per area of the work directory.
 @Suppress("TooManyFunctions")
 class CheckpointRepository(
-    database: CassiniDatabase,
+    private val database: CassiniDatabase,
     private val paths: AppPaths,
     private val dispatchers: CassiniDispatchers,
     private val locks: NoteLocks,
@@ -79,7 +81,22 @@ class CheckpointRepository(
 
     /** The identity a checkpoint of [noteId] must have now: the row's audio file and this build's models. */
     suspend fun identity(noteId: String): CheckpointIdentity? = withContext(dispatchers.io) {
-        notes.note(noteId)?.let { CheckpointIdentity.of(paths.note(noteId), it.audioFile) }
+        notes.note(noteId)?.let {
+            val job = database.jobs().job(noteId)
+            val saved = if (job == null) savedModel(noteId) else null
+            CheckpointIdentity.of(paths.note(noteId), it.audioFile).copy(modelRevision = job?.speechIdentity ?: requireNotNull(saved))
+        }
+    }
+
+    private fun savedModel(noteId: String): String {
+        val included = SpeechModel.INCLUDED.identity
+        val file = File(work(noteId), WorkFiles.CHECKPOINT)
+        val saved = try {
+            if (WorkFiles.exists(file)) JSONObject(WorkFiles.read(file)).optString("model") else null
+        } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+            null // The full checkpoint validator reports corruption; it never opens an engine.
+        }
+        return if (saved == included) included else ModelCatalog.PARAKEET_REVISION
     }
 
     /**

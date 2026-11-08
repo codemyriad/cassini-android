@@ -5,6 +5,8 @@ import androidx.core.os.LocaleListCompat
 import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.BuildConfig
 import io.codemyriad.cassini.core.models.ModelPart
+import io.codemyriad.cassini.core.models.SpeechModel
+import io.codemyriad.cassini.models.SpeechChoice
 import io.codemyriad.cassini.data.models.ModelStatus
 import io.codemyriad.cassini.notices.NoticeFacts
 import io.codemyriad.cassini.ui.settings.LanguageChoice
@@ -29,6 +31,10 @@ interface SettingsPorts {
      * [LanguageChoice.OTHER], which is no segment.
      */
     fun setLanguage(language: LanguageChoice)
+
+    val speech: Flow<SpeechChoice>
+
+    suspend fun chooseSpeech(model: SpeechModel)
 
     /** The status of each model part. */
     val models: Flow<Map<ModelPart, ModelStatus>>
@@ -56,6 +62,10 @@ class GraphSettingsPorts(private val graph: AppGraph) : SettingsPorts {
     override fun language(): LanguageChoice = languageOf(AppCompatDelegate.getApplicationLocales())
 
     override fun setLanguage(language: LanguageChoice) = AppCompatDelegate.setApplicationLocales(localesOf(language))
+
+    override val speech: Flow<SpeechChoice> get() = graph.speech.state
+
+    override suspend fun chooseSpeech(model: SpeechModel) = graph.speech.choose(model)
 
     override val models: Flow<Map<ModelPart, ModelStatus>> get() = graph.models.status
 

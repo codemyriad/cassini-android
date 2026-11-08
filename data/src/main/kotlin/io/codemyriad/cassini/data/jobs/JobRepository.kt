@@ -2,6 +2,7 @@ package io.codemyriad.cassini.data.jobs
 
 import androidx.room.withTransaction
 import io.codemyriad.cassini.core.Failure
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.core.format.DocumentState
 import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobKind
@@ -43,6 +44,7 @@ class JobRepository(
     private val adopter: SealedAdopter,
     /** Stops a RUNNING job before its files go (purge step 1); the app passes the coordinator's cancel. */
     private val canceller: RunningJobCanceller,
+    private val speechChoice: suspend () -> SpeechModel = { SpeechModel.PARAKEET },
     private val clock: () -> Long = System::currentTimeMillis,
 ) : JobQueueWriter {
     private val jobs = database.jobs()
@@ -280,6 +282,7 @@ class JobRepository(
 
     private fun JobEntity.withCheckpoint(load: CheckpointLoad): JobEntity = when (load) {
         is CheckpointLoad.Valid -> copy(
+            speechIdentity = load.state.model,
             doneMs = load.state.doneMs,
             totalMs = load.state.durationMs,
             words = load.state.recognition.chunks.words.size,
@@ -304,6 +307,7 @@ class JobRepository(
             seq = seq,
             kind = kind,
             state = JobState.QUEUED,
+            speechIdentity = speechChoice().identity,
             enqueuedAt = now,
             updatedAt = now,
         )
