@@ -19,5 +19,7 @@
     "core/src/main/kotlin/io/codemyriad/cassini/core/audio/whistle/WhistleResampler.kt": "30105d077ede78dd8acfb43b2dfa39a936db86edb243d998522fdee2089a5e34",
     "core/src/test/resources/whistle/fir-synthetic.json": "8bcb3480cd23a9c6251d8149843f31e14ff2f82fc7eb49f4b3824653a7db9594",
     "core/src/test/resources/whistle/dc-segment-pins.json": "a7d611db3b037a3ea73c7a415fd618db3e8237cb490fbd79a0a6d9ff225f4e3e"
-  }
+  },
+  "sourceCommit": "9d849f5d9889e76841f6f4afce288aa6ee870491",
+  "baseCommit": "0b877053d2541d2e14cdd6d8c893972eafbcc860"
 }
