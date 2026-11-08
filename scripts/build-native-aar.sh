@@ -40,8 +40,8 @@ python3 scripts/ci-downloads.py gradle --kind native
 # D66: fetch the identical pinned ORT archive once through the official API, avoiding broken browser redirects.
 python3 scripts/ci-downloads.py native --output "$work/onnxruntime"
 export SHERPA_ONNX_ONNXRUNTIME_ROOT="$work/onnxruntime"
-# Upstream kaldi-native-fbank checks this supported local archive before its browser URL.
-cp "$work/kissfft-febd4caeed32e33ad8b2e0bb5ea77542c40f18ec.zip" "$src/"
+# Upstream CMake checks these supported local archives before its browser URLs.
+cp "$work/cmake-inputs/"* "$src/"
 
 # Keep the incremental JNI API reproducible against the pinned source archive. The source sits
 # inside this repository's .tools/, where git apply would silently skip every path; stop discovery.

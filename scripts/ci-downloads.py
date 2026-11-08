@@ -198,10 +198,11 @@ def pinned_file(pin, target):
 
     def fetch():
         with urllib.request.urlopen(pin['url'], timeout=60) as response:
-            return response.read(pin['size'] + 1)
+            return response.read(pin.get('size', 512 * 1024 * 1024) + 1)
 
     body = network(fetch)
-    if len(body) != pin['size'] or hashlib.sha256(body).hexdigest() != pin['sha256']:
+    if ((pin.get('size') is not None and len(body) != pin['size'])
+            or len(body) > 512 * 1024 * 1024 or hashlib.sha256(body).hexdigest() != pin['sha256']):
         raise ValueError('Pinned input size/SHA-256 mismatch')
     target.parent.mkdir(parents=True, exist_ok=True)
     partial = target.with_name(target.name + f'.{os.getpid()}.part')
@@ -226,8 +227,21 @@ def prepare_native(output):
     archive = output.parent / pin['name']
     github_asset(pin['repo'], pin['tag'], pin['name'], archive, pin['sha256'], size=pin['size'])
     unpack_native(archive, output)
+    sources = output.parent / 'cmake-inputs'
     source = input_pin('kissfft')
-    pinned_file(source, output.parent / source['name'])
+    pinned_file(source, sources / source['name'])
+    # The pinned upstream CMake declarations support these local filenames.
+    names = {'json', 'kaldi-native-fbank', 'kaldi-decoder', 'openfst', 'simple-sentencepiece', 'hclust-cpp'}
+    for pin in json.loads((ROOT / 'scripts/native-dependencies.json').read_text()):
+        if pin['name'] not in names:
+            continue
+        match = re.fullmatch(r'https://github.com/([^/]+/[^/]+)/archive/(.+)\.tar\.gz', pin['url'])
+        if not match:
+            raise ValueError('Unexpected pinned native source URL')
+        repo, ref = match.groups()
+        source = dict(url=f'https://codeload.github.com/{repo}/tar.gz/{ref}', sha256=pin['sha256'])
+        filename = pin['name'] + '-' + pin['version'].removeprefix('v') + '.tar.gz'
+        pinned_file(source, sources / filename)
 
 
 def pin_native_wrapper(path):
