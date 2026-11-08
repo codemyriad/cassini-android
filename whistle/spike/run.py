@@ -90,6 +90,7 @@ def worker_bench(command, args, output):
         kernel=command("shell", "uname", "-a").stdout.decode().strip(),
         fingerprint=command("shell", "getprop", "ro.build.fingerprint").stdout.decode().strip(),
         privacyRefusals=6,
+        nativeMainUidRefusals=1,
         cases=rows,
         failures=failures,
     )

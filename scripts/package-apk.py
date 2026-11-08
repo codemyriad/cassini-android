@@ -60,7 +60,7 @@ checksum = hashlib.sha256((destination / name).read_bytes()).hexdigest()
 for split in metadata['elements']:
     if not split['filters']:
         continue
-    abi, = [item['identifier'] for item in split['filters'] if item['filterType'] == 'ABI']
+    abi, = [item['value'] for item in split['filters'] if item['filterType'] == 'ABI']
     split_source = output / split['outputFile']
     with zipfile.ZipFile(split_source) as apk:
         check_apk_models(apk, whistle_model_pins())

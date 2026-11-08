@@ -3,7 +3,7 @@
 This increment packages the pinned arm64 Needle engine and Whistle weights,
 Silero v6.2.1 model, and private ONNX Runtime 1.23.2 library. `scripts/setup.sh`
 prepares verified build inputs under the host lock. `scripts/package-whistle.py`
-checks the artifact/member/header pins before publishing its package manifest.
+checks the artifact/member/header pins and linked Needle hash before publishing its package manifest.
 The installed worker has no download code or system-runtime lookup.
 
 `WhistleWorker` binds a non-exported isolated-UID `:whistle` service from the inference thread.
@@ -55,3 +55,38 @@ frame/probability diagnostics. The frozen GNOME/Mac raw-engine discrepancy remai
 `dc-quiet-jfk-v1-control-0.f32`, and `dc-quiet-jfk-v1-control-5.f32`.
 The bench's Mac reference does not establish equality with frozen GNOME output;
 no existing reference is rewritten or generalized into an exception. Actual results, not a mocked native engine, determine readiness.
+
+
+## Review hardening and ABI delivery
+
+Needle hashes are source-pinned for the pinned Linux and Darwin NDK outputs;
+the generated manifest cannot authorize another runtime. Native OPEN also
+requires an isolated UID before any neural load. Admission waits have a timeout.
+Cleanup unbinds a failed bind, waits for a linked worker's death, restores
+interrupts and attaches cleanup errors to the original failure. A failed reply
+binder marks the worker failed without throwing on its main looper.
+
+Models reside in a pinned arm64-only read-only ELF data container. It is never
+executed or passed to dlopen. The worker verifies the whole container and maps
+its stored ZIP entry at pinned model offsets, then checks both original model
+hashes. This places models together with Needle/private ORT in the ARM ABI
+split; x86_64 retains Parakeet without the ARM payload. APK builds produce ABI
+and universal outputs; AAB ABI splitting is explicit. See the recipe and exact
+sizes in `whistle/worker/review_measure.py` and the review evidence.
+
+To reproduce unsigned package measurements, prepare the pinned inputs, set
+JDK17 and external output/cache paths, then run the build under the shared
+heavy-job lock:
+
+```sh
+./gradlew --no-daemon :app:assembleRelease :app:bundleRelease
+python3 whistle/worker/review_measure.py \
+  --apk-dir app/build/outputs/apk/release \
+  --bundle app/build/outputs/bundle/release/app-release.aab \
+  --output /external/path/review-packages.json
+```
+
+The report verifies ABI sets, ZIP/ELF alignment and pinned payload bytes before
+recording exact bytes and hashes. It reports package ZIP sizes, not installed
+disk usage or Play-served download sizes. Do not set release signing credentials
+for this local measurement.

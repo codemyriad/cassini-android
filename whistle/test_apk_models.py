@@ -43,6 +43,11 @@ class ApkModelsTests(unittest.TestCase):
             with self.subTest(name=name), self.assertRaises(ValueError):
                 self.check(list(self.data.items()) + [(name, b'unexpected')])
 
+    def test_x86_cannot_carry_private_arm64_runtimes(self):
+        for name in ['libcassini_needle.so', 'libcassini_whistle_ort.so']:
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                self.check([(f'lib/x86_64/{name}', b'unexpected')])
+
     def test_missing_duplicate_and_compressed_models_are_refused(self):
         entries = list(self.data.items())
         for bad in [[('lib/arm64-v8a/libtest.so', b'fake code')], entries + [entries[0]]]:

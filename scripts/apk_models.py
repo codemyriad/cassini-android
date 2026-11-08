@@ -20,7 +20,8 @@ def check_apk_models(apk, pins):
         name = entry.filename
         if name.endswith(('.onnx', '.cact', '.tflite', '.keystore')):
             raise ValueError(f'APK contains unexpected model/signing entry: {name}')
-        if name.endswith(('/libcassini_needle.so', '/libcassini_whistle_ort.so')) and not name.startswith('lib/arm64-v8a/'):
+        if (name.endswith(('/libcassini_needle.so', '/libcassini_whistle_ort.so'))
+                and not name.startswith('lib/arm64-v8a/')):
             raise ValueError(f'Private Whistle runtime outside arm64: {name}')
         if name.endswith('/libcassini_whistle_weights.so'):
             if name not in pins or name in seen:

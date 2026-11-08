@@ -21,7 +21,7 @@ app/src/main/jniLibs/
 *.opus
 # The shared cross-app vectors are CC0 conformance files without speech (core/src/test/resources/cross-app/README.md).
 !core/src/test/resources/cross-app/*.opus
-dist/
+dist
 play/
 **/.cxx
 
