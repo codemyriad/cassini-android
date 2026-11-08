@@ -8,4 +8,10 @@ internal object WhistleProtocol {
     const val SEGMENT = 5
     const val ERROR = 6
     const val SERVICE_PROCESS = ":whistle"
+
+    /** Android can append the service component to an isolated process's declared name. */
+    fun ownsProcess(packageName: String, processName: String): Boolean {
+        val prefix = "$packageName$SERVICE_PROCESS"
+        return processName == prefix || processName.startsWith("$prefix:")
+    }
 }

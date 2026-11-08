@@ -10,6 +10,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.processing.NotificationChannels
+import io.codemyriad.cassini.whistle.WhistleProtocol
 
 /** Builds the process's [AppGraph]. The instrumentation runner installs one on a scratch root. */
 fun interface GraphFactory {
@@ -31,7 +32,7 @@ class CassiniApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && Application.getProcessName() == "$packageName:whistle") {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && WhistleProtocol.ownsProcess(packageName, Application.getProcessName())) {
             Os.setenv("NEEDLE_TELEMETRY", "0", true)
             Os.setenv("DO_NOT_TRACK", "1", true)
             Os.setenv("ORT_DISABLE_TELEMETRY", "1", true)

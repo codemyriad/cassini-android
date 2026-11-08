@@ -168,7 +168,7 @@ class WhistleService : Service() {
     override fun onBind(intent: Intent): IBinder = messenger.binder
 
     override fun onUnbind(intent: Intent): Boolean {
-        check(Application.getProcessName() == "$packageName${WhistleProtocol.SERVICE_PROCESS}")
+        check(WhistleProtocol.ownsProcess(packageName, Application.getProcessName()))
         // Needle has no ownership-safe unload. Kill only this process, including an in-flight native call.
         Process.killProcess(Process.myPid())
         return false
