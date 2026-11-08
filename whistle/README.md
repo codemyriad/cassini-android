@@ -2,7 +2,7 @@
 
 This directory pins the published Needle 3.3.0 Android arm64 archive and C header, the D5 Whistle weights and the Apache-2.0 license. Published, hash-verified artifacts are accepted inputs under D75.2; an unavailable native-source mapping is a follow-up, not a rebuild prerequisite. No upstream contact is needed. `x86_64: null` means there is no approved Android engine for that ABI. A desktop Linux wheel is not an Android replacement.
 
-This increment builds and checks a private runtime. It does **not** package weights into the APK, load an engine in the app, add Settings choices or change the Parakeet path. Follow-up PRs add the guarded worker, measured size/memory, desktop/DC parity and Included/default only after their gates pass. On x86_64, Whistle must remain honestly unavailable and Parakeet remains usable.
+The native-input foundation builds and checks a private runtime. It does **not** package weights into the production APK, load an engine in the app, add Settings choices or change the Parakeet path. Follow-up PRs add the guarded worker, measured size/memory, desktop/DC parity and Included/default only after their gates pass. On x86_64, Whistle must remain honestly unavailable and Parakeet remains usable.
 
 ## Build and inspect
 
@@ -18,7 +18,7 @@ The first command fetches the pinned static archive, header and license into ign
 
 `aarch64-linux-android26-clang++` links the complete archive with `--no-undefined` against the API 26 NDK sysroot. `-z text` rejects non-PIC text relocations. ELF inspection independently checks AArch64, 16 KB load-segment alignment/congruence, no TEXTREL/RPATH/RUNPATH, and the exact exported C ABI. C++ is statically linked and localized by the export map; no C++ object ownership crosses the C interface. The only permitted DT_NEEDED entries are Android's `libc.so`, `libm.so` and `libdl.so`, not a system Needle/ORT/C++ runtime. Unexpected dependency/symbol changes fail. The compiled header assertions protect the desktop-compatible load/transcribe signatures. The ELF report records compiler, commands, imported symbols, size and output SHA-256; it does not claim a native-source rebuild.
 
-The version map exports only `needle_load`, `needle_models`, `needle_last_error` and `needle_transcribe`. No JNI/app entry point exists yet. The later worker must validate all three privacy flags **before** loading this library, including its constructors; a guard inside a function called after load would be too late. It must use the verified packaged private path, retain model memory and serialize calls, respecting the engine's global model state.
+The version map exports only `needle_load`, `needle_models`, `needle_last_error` and `needle_transcribe`. The production app has no JNI entry point. The separate [lab APK](spike/README.md) exercises a guarded bootstrap and packaged model on an owned emulator. The later worker must validate all three privacy flags **before** loading this library, including its constructors; a guard inside a function called after load would be too late. It must use the verified packaged private path, retain model memory and serialize calls, respecting the engine's global model state.
 
 ## Explicit native load test
 
@@ -41,3 +41,7 @@ API 26 **strong-symbol linking** is checked against the API 26 sysroot; a run on
 The pinned weights are 16,919,407 bytes. Their bytes plus this native library total 18,775,895 bytes, before the worker, VAD/private dependencies, APK compression/alignment or any extracted copy. This is an incremental input total, not an APK/AAB size or peak-RSS result. The app retains sherpa for its current functions; adding Whistle does not remove that cost automatically.
 
 Android's current resampler/VAD model/thresholds differ from desktop D11. Follow-ups must use the committed clean and DC fixtures, raw recognition PCM with HPF on VAD input only, exact desktop FIR/segment input hashes, and reviewed desktop word expectations. No regeneration of goldens or fuzzy word comparisons. See coordination `REPLIES-ANDROID-whistle-2026-11-08.md` with D75.2 overriding its original source/x86_64 prerequisite.
+
+## Packaged JNI experiment
+
+The [standalone spike](spike/README.md) records actual packaged arm64 inference on identical desktop clean/DC raw PCM. Its [evidence](spike/evidence/README.md) keeps candidate pinned-Mac references, Android outputs and exact input hashes for review. API 35 passes these engine comparisons on 4 KB and actual 16 KB pages. API 26 executes the engine but fails on two word substitutions and one 560 ms timing difference. These failures block Included/default; no exception or golden is changed. This does not enable Whistle in the production app or establish Android FIR/VAD parity.

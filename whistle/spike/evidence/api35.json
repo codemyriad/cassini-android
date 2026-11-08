@@ -1,0 +1,845 @@
+{
+  "loadMs": 41.546333,
+  "privacyRefusals": 6,
+  "sdk": 35,
+  "abi": "arm64-v8a",
+  "pageSize": 4096,
+  "scope": "Packaged JNI on identical desktop raw PCM; no Android resampler\/VAD or production-worker proof",
+  "results": [
+    {
+      "file": "jfk.f32",
+      "inputSha256": "ebd52851100536db02d12c49fddd010372dcdc70243562e057553d476b706ae0",
+      "androidResult": {
+        "text": "And so, my fellow Americans, ask not what your country can do for you, ask what you can do for your country.",
+        "language": "en",
+        "words": [
+          {
+            "word": "And",
+            "start": 0.4,
+            "end": 0.72,
+            "probability": 0.584
+          },
+          {
+            "word": "so,",
+            "start": 0.72,
+            "end": 1.04,
+            "probability": 0.99
+          },
+          {
+            "word": "my",
+            "start": 1.12,
+            "end": 1.28,
+            "probability": 0.995
+          },
+          {
+            "word": "fellow",
+            "start": 1.28,
+            "end": 1.68,
+            "probability": 0.94
+          },
+          {
+            "word": "Americans,",
+            "start": 1.68,
+            "end": 2.24,
+            "probability": 0.968
+          },
+          {
+            "word": "ask",
+            "start": 3.44,
+            "end": 3.84,
+            "probability": 0.955
+          },
+          {
+            "word": "not",
+            "start": 3.84,
+            "end": 4.4,
+            "probability": 0.938
+          },
+          {
+            "word": "what",
+            "start": 4.4,
+            "end": 5.6,
+            "probability": 0.938
+          },
+          {
+            "word": "your",
+            "start": 5.6,
+            "end": 6,
+            "probability": 0.996
+          },
+          {
+            "word": "country",
+            "start": 6,
+            "end": 6.4,
+            "probability": 0.998
+          },
+          {
+            "word": "can",
+            "start": 6.4,
+            "end": 6.72,
+            "probability": 0.996
+          },
+          {
+            "word": "do",
+            "start": 6.72,
+            "end": 6.96,
+            "probability": 1
+          },
+          {
+            "word": "for",
+            "start": 6.96,
+            "end": 7.2,
+            "probability": 0.995
+          },
+          {
+            "word": "you,",
+            "start": 7.2,
+            "end": 7.68,
+            "probability": 0.996
+          },
+          {
+            "word": "ask",
+            "start": 8.48,
+            "end": 8.56,
+            "probability": 0.96
+          },
+          {
+            "word": "what",
+            "start": 8.56,
+            "end": 8.88,
+            "probability": 0.991
+          },
+          {
+            "word": "you",
+            "start": 8.88,
+            "end": 9.2,
+            "probability": 0.997
+          },
+          {
+            "word": "can",
+            "start": 9.2,
+            "end": 9.44,
+            "probability": 0.995
+          },
+          {
+            "word": "do",
+            "start": 9.44,
+            "end": 9.68,
+            "probability": 0.999
+          },
+          {
+            "word": "for",
+            "start": 9.68,
+            "end": 9.92,
+            "probability": 0.998
+          },
+          {
+            "word": "your",
+            "start": 9.92,
+            "end": 10.16,
+            "probability": 0.997
+          },
+          {
+            "word": "country.",
+            "start": 10.16,
+            "end": 10.48,
+            "probability": 0.998
+          }
+        ],
+        "ttft_ms": 644.8,
+        "decode_tps": 71.3
+      },
+      "exactWordsEqual": true,
+      "maxTimeDifferenceSeconds": 0,
+      "elapsedMs": 1052.904251,
+      "pssKiB": 144758
+    },
+    {
+      "file": "dc-quiet-jfk-v1-0.f32",
+      "inputSha256": "d05f99fef3cc70527c5c7406da8c04cf6a78fd3e1bc23858e02c2e4bf5c32f25",
+      "androidResult": {
+        "text": "country can do for you and what you can do for your country.",
+        "language": "en",
+        "words": [
+          {
+            "word": "country",
+            "start": 0,
+            "end": 0.56,
+            "probability": 0.47
+          },
+          {
+            "word": "can",
+            "start": 0.56,
+            "end": 0.88,
+            "probability": 0.998
+          },
+          {
+            "word": "do",
+            "start": 0.88,
+            "end": 1.12,
+            "probability": 0.999
+          },
+          {
+            "word": "for",
+            "start": 1.12,
+            "end": 1.36,
+            "probability": 0.994
+          },
+          {
+            "word": "you",
+            "start": 1.36,
+            "end": 1.84,
+            "probability": 1
+          },
+          {
+            "word": "and",
+            "start": 1.84,
+            "end": 2.72,
+            "probability": 0.449
+          },
+          {
+            "word": "what",
+            "start": 2.72,
+            "end": 3.04,
+            "probability": 0.95
+          },
+          {
+            "word": "you",
+            "start": 3.04,
+            "end": 3.36,
+            "probability": 0.999
+          },
+          {
+            "word": "can",
+            "start": 3.36,
+            "end": 3.68,
+            "probability": 0.998
+          },
+          {
+            "word": "do",
+            "start": 3.68,
+            "end": 3.84,
+            "probability": 1
+          },
+          {
+            "word": "for",
+            "start": 3.84,
+            "end": 4.08,
+            "probability": 1
+          },
+          {
+            "word": "your",
+            "start": 4.08,
+            "end": 4.32,
+            "probability": 0.999
+          },
+          {
+            "word": "country.",
+            "start": 4.32,
+            "end": 4.72,
+            "probability": 0.985
+          }
+        ],
+        "ttft_ms": 394.5,
+        "decode_tps": 116.3
+      },
+      "exactWordsEqual": true,
+      "maxTimeDifferenceSeconds": 0.08000000000000007,
+      "elapsedMs": 561.592917,
+      "pssKiB": 147260
+    },
+    {
+      "file": "dc-quiet-jfk-v1-1.f32",
+      "inputSha256": "d5dd41b037a94832df5db7665629d8a2b055aa00b5d11c2b88b13c9d3310f6df",
+      "androidResult": {
+        "text": "for you.",
+        "language": "en",
+        "words": [
+          {
+            "word": "for",
+            "start": 0,
+            "end": 0.24,
+            "probability": 0.634
+          },
+          {
+            "word": "you.",
+            "start": 0.24,
+            "end": 0.64,
+            "probability": 0.994
+          }
+        ],
+        "ttft_ms": 13.5,
+        "decode_tps": 192.4
+      },
+      "exactWordsEqual": true,
+      "maxTimeDifferenceSeconds": 0,
+      "elapsedMs": 43.119833,
+      "pssKiB": 72018
+    },
+    {
+      "file": "dc-quiet-jfk-v1-2.f32",
+      "inputSha256": "caa178ab55501b698c48cab1bc9208026c8a9910ec8d2f936406de95f8ec689e",
+      "androidResult": {
+        "text": "That's what you can do for your country.",
+        "language": "en",
+        "words": [
+          {
+            "word": "That's",
+            "start": 0,
+            "end": 0.4,
+            "probability": 0.815
+          },
+          {
+            "word": "what",
+            "start": 0.4,
+            "end": 0.48,
+            "probability": 0.999
+          },
+          {
+            "word": "you",
+            "start": 0.48,
+            "end": 0.8,
+            "probability": 0.999
+          },
+          {
+            "word": "can",
+            "start": 0.8,
+            "end": 1.04,
+            "probability": 0.999
+          },
+          {
+            "word": "do",
+            "start": 1.04,
+            "end": 1.28,
+            "probability": 1
+          },
+          {
+            "word": "for",
+            "start": 1.28,
+            "end": 1.52,
+            "probability": 0.998
+          },
+          {
+            "word": "your",
+            "start": 1.52,
+            "end": 1.68,
+            "probability": 0.999
+          },
+          {
+            "word": "country.",
+            "start": 1.68,
+            "end": 2.08,
+            "probability": 0.984
+          }
+        ],
+        "ttft_ms": 692.7,
+        "decode_tps": 154.8
+      },
+      "exactWordsEqual": true,
+      "maxTimeDifferenceSeconds": 0,
+      "elapsedMs": 773.617458,
+      "pssKiB": 71542
+    },
+    {
+      "file": "dc-quiet-jfk-v1-3.f32",
+      "inputSha256": "4b3280c208725266e39dcd9b24e6673e52fbe8cb7c17d6ae24ac8b3fd09e37c8",
+      "androidResult": {
+        "text": "And so my fellow Americans.",
+        "language": "en",
+        "words": [
+          {
+            "word": "And",
+            "start": 0,
+            "end": 0.56,
+            "probability": 0.761
+          },
+          {
+            "word": "so",
+            "start": 0.56,
+            "end": 0.72,
+            "probability": 0.974
+          },
+          {
+            "word": "my",
+            "start": 0.72,
+            "end": 1.12,
+            "probability": 0.667
+          },
+          {
+            "word": "fellow",
+            "start": 1.12,
+            "end": 1.44,
+            "probability": 0.989
+          },
+          {
+            "word": "Americans.",
+            "start": 1.44,
+            "end": 2,
+            "probability": 0.538
+          }
+        ],
+        "ttft_ms": 20.7,
+        "decode_tps": 17
+      },
+      "exactWordsEqual": true,
+      "maxTimeDifferenceSeconds": 0,
+      "elapsedMs": 502.072708,
+      "pssKiB": 71156
+    },
+    {
+      "file": "dc-quiet-jfk-v1-4.f32",
+      "inputSha256": "f005a2f33e0880f6965b8e6a3f9b25de62b3ee3eda7fa35e909dfd090c45ffed",
+      "androidResult": {
+        "text": "our country can do for you.",
+        "language": "en",
+        "words": [
+          {
+            "word": "our",
+            "start": 0,
+            "end": 0.4,
+            "probability": 0.065
+          },
+          {
+            "word": "country",
+            "start": 0.4,
+            "end": 0.72,
+            "probability": 0.999
+          },
+          {
+            "word": "can",
+            "start": 0.72,
+            "end": 1.04,
+            "probability": 0.998
+          },
+          {
+            "word": "do",
+            "start": 1.04,
+            "end": 1.2,
+            "probability": 0.999
+          },
+          {
+            "word": "for",
+            "start": 1.2,
+            "end": 1.52,
+            "probability": 0.998
+          },
+          {
+            "word": "you.",
+            "start": 1.52,
+            "end": 1.84,
+            "probability": 1
+          }
+        ],
+        "ttft_ms": 27.5,
+        "decode_tps": 225.5
+      },
+      "exactWordsEqual": true,
+      "maxTimeDifferenceSeconds": 0.08000000000000007,
+      "elapsedMs": 71.460417,
+      "pssKiB": 71772
+    },
+    {
+      "file": "dc-quiet-jfk-v1-5.f32",
+      "inputSha256": "43eccbd8aa879a17126b529c6269311926539d24edd4eea6d3fd67c7532fee49",
+      "androidResult": {
+        "text": "what you can do for your country.",
+        "language": "en",
+        "words": [
+          {
+            "word": "what",
+            "start": 0,
+            "end": 0.4,
+            "probability": 0.471
+          },
+          {
+            "word": "you",
+            "start": 0.4,
+            "end": 0.8,
+            "probability": 0.999
+          },
+          {
+            "word": "can",
+            "start": 0.8,
+            "end": 1.04,
+            "probability": 0.999
+          },
+          {
+            "word": "do",
+            "start": 1.04,
+            "end": 1.28,
+            "probability": 1
+          },
+          {
+            "word": "for",
+            "start": 1.28,
+            "end": 1.52,
+            "probability": 0.998
+          },
+          {
+            "word": "your",
+            "start": 1.52,
+            "end": 1.68,
+            "probability": 0.999
+          },
+          {
+            "word": "country.",
+            "start": 1.68,
+            "end": 2.08,
+            "probability": 0.989
+          }
+        ],
+        "ttft_ms": 28.3,
+        "decode_tps": 194.8
+      },
+      "exactWordsEqual": true,
+      "maxTimeDifferenceSeconds": 0,
+      "elapsedMs": 77.860459,
+      "pssKiB": 69940
+    },
+    {
+      "file": "dc-quiet-jfk-v1-control-0.f32",
+      "inputSha256": "945cb0555f797b5cfe19e494dd75f11d878fc6a48163ec0ff96c3053500aad79",
+      "androidResult": {
+        "text": "Your country can do for you as what you can do for your country.",
+        "language": "en",
+        "words": [
+          {
+            "word": "Your",
+            "start": 0,
+            "end": 0.32,
+            "probability": 0.348
+          },
+          {
+            "word": "country",
+            "start": 0.32,
+            "end": 0.56,
+            "probability": 1
+          },
+          {
+            "word": "can",
+            "start": 0.56,
+            "end": 0.88,
+            "probability": 0.999
+          },
+          {
+            "word": "do",
+            "start": 0.88,
+            "end": 1.12,
+            "probability": 0.998
+          },
+          {
+            "word": "for",
+            "start": 1.12,
+            "end": 1.36,
+            "probability": 0.986
+          },
+          {
+            "word": "you",
+            "start": 1.36,
+            "end": 1.84,
+            "probability": 1
+          },
+          {
+            "word": "as",
+            "start": 1.84,
+            "end": 2.8,
+            "probability": 0.6
+          },
+          {
+            "word": "what",
+            "start": 2.8,
+            "end": 3.04,
+            "probability": 0.765
+          },
+          {
+            "word": "you",
+            "start": 3.04,
+            "end": 3.36,
+            "probability": 0.999
+          },
+          {
+            "word": "can",
+            "start": 3.36,
+            "end": 3.68,
+            "probability": 0.998
+          },
+          {
+            "word": "do",
+            "start": 3.68,
+            "end": 3.84,
+            "probability": 1
+          },
+          {
+            "word": "for",
+            "start": 3.84,
+            "end": 4.08,
+            "probability": 1
+          },
+          {
+            "word": "your",
+            "start": 4.08,
+            "end": 4.32,
+            "probability": 1
+          },
+          {
+            "word": "country.",
+            "start": 4.32,
+            "end": 4.64,
+            "probability": 0.999
+          }
+        ],
+        "ttft_ms": 992.8,
+        "decode_tps": 41.1
+      },
+      "exactWordsEqual": true,
+      "maxTimeDifferenceSeconds": 0,
+      "elapsedMs": 1563.229001,
+      "pssKiB": 71430
+    },
+    {
+      "file": "dc-quiet-jfk-v1-control-1.f32",
+      "inputSha256": "32558a18867786f0fb769ce17ebdd76ef154b222c7f4d057e6c66a25f73d26d5",
+      "androidResult": {
+        "text": "for you.",
+        "language": "en",
+        "words": [
+          {
+            "word": "for",
+            "start": 0,
+            "end": 0.24,
+            "probability": 0.807
+          },
+          {
+            "word": "you.",
+            "start": 0.24,
+            "end": 0.64,
+            "probability": 0.998
+          }
+        ],
+        "ttft_ms": 4.1,
+        "decode_tps": 452.5
+      },
+      "exactWordsEqual": true,
+      "maxTimeDifferenceSeconds": 0,
+      "elapsedMs": 12.310958,
+      "pssKiB": 71846
+    },
+    {
+      "file": "dc-quiet-jfk-v1-control-2.f32",
+      "inputSha256": "9cab20cba86a8ad802117091ed51cba8fcc6a2960713b5462723410cb44ad378",
+      "androidResult": {
+        "text": "what you can do for your country.",
+        "language": "en",
+        "words": [
+          {
+            "word": "what",
+            "start": 0,
+            "end": 0.4,
+            "probability": 0.143
+          },
+          {
+            "word": "you",
+            "start": 0.4,
+            "end": 0.8,
+            "probability": 1
+          },
+          {
+            "word": "can",
+            "start": 0.8,
+            "end": 1.04,
+            "probability": 0.999
+          },
+          {
+            "word": "do",
+            "start": 1.04,
+            "end": 1.28,
+            "probability": 1
+          },
+          {
+            "word": "for",
+            "start": 1.28,
+            "end": 1.52,
+            "probability": 1
+          },
+          {
+            "word": "your",
+            "start": 1.52,
+            "end": 1.68,
+            "probability": 1
+          },
+          {
+            "word": "country.",
+            "start": 1.68,
+            "end": 2.08,
+            "probability": 0.999
+          }
+        ],
+        "ttft_ms": 9,
+        "decode_tps": 747.1
+      },
+      "exactWordsEqual": true,
+      "maxTimeDifferenceSeconds": 0,
+      "elapsedMs": 28.336834,
+      "pssKiB": 70442
+    },
+    {
+      "file": "dc-quiet-jfk-v1-control-3.f32",
+      "inputSha256": "274f7892b82c4853608a18e1841d74c044d2e2b7e7c55953a8d5cd351d4c0bfd",
+      "androidResult": {
+        "text": "And so my fellow Americans.",
+        "language": "en",
+        "words": [
+          {
+            "word": "And",
+            "start": 0,
+            "end": 0.48,
+            "probability": 0.841
+          },
+          {
+            "word": "so",
+            "start": 0.48,
+            "end": 0.72,
+            "probability": 0.97
+          },
+          {
+            "word": "my",
+            "start": 0.72,
+            "end": 1.04,
+            "probability": 0.679
+          },
+          {
+            "word": "fellow",
+            "start": 1.04,
+            "end": 1.44,
+            "probability": 0.963
+          },
+          {
+            "word": "Americans.",
+            "start": 1.44,
+            "end": 2,
+            "probability": 0.894
+          }
+        ],
+        "ttft_ms": 25.6,
+        "decode_tps": 39.9
+      },
+      "exactWordsEqual": true,
+      "maxTimeDifferenceSeconds": 0.08000000000000007,
+      "elapsedMs": 268.830542,
+      "pssKiB": 70312
+    },
+    {
+      "file": "dc-quiet-jfk-v1-control-4.f32",
+      "inputSha256": "598be43a06dcc091702b3ec6df11dbfe60085f030e54371eed3d1cebbf57fd72",
+      "androidResult": {
+        "text": "Our country can do for you.",
+        "language": "en",
+        "words": [
+          {
+            "word": "Our",
+            "start": 0,
+            "end": 0.32,
+            "probability": 0.777
+          },
+          {
+            "word": "country",
+            "start": 0.32,
+            "end": 0.72,
+            "probability": 0.999
+          },
+          {
+            "word": "can",
+            "start": 0.72,
+            "end": 1.04,
+            "probability": 0.999
+          },
+          {
+            "word": "do",
+            "start": 1.04,
+            "end": 1.2,
+            "probability": 0.998
+          },
+          {
+            "word": "for",
+            "start": 1.2,
+            "end": 1.52,
+            "probability": 0.998
+          },
+          {
+            "word": "you.",
+            "start": 1.52,
+            "end": 1.76,
+            "probability": 1
+          }
+        ],
+        "ttft_ms": 698.4,
+        "decode_tps": 48.9
+      },
+      "exactWordsEqual": true,
+      "maxTimeDifferenceSeconds": 0,
+      "elapsedMs": 1463.510042,
+      "pssKiB": 70782
+    },
+    {
+      "file": "dc-quiet-jfk-v1-control-5.f32",
+      "inputSha256": "8e480cdd9e662936b7d65334d83e6b2305f96d1bef3dde9f3b74c490b6c01936",
+      "androidResult": {
+        "text": "what you can do for your country.",
+        "language": "en",
+        "words": [
+          {
+            "word": "what",
+            "start": 0,
+            "end": 0.4,
+            "probability": 0.227
+          },
+          {
+            "word": "you",
+            "start": 0.4,
+            "end": 0.8,
+            "probability": 1
+          },
+          {
+            "word": "can",
+            "start": 0.8,
+            "end": 1.04,
+            "probability": 0.999
+          },
+          {
+            "word": "do",
+            "start": 1.04,
+            "end": 1.28,
+            "probability": 1
+          },
+          {
+            "word": "for",
+            "start": 1.28,
+            "end": 1.52,
+            "probability": 1
+          },
+          {
+            "word": "your",
+            "start": 1.52,
+            "end": 1.68,
+            "probability": 1
+          },
+          {
+            "word": "country.",
+            "start": 1.68,
+            "end": 2.08,
+            "probability": 0.999
+          }
+        ],
+        "ttft_ms": 206.6,
+        "decode_tps": 86.9
+      },
+      "exactWordsEqual": true,
+      "maxTimeDifferenceSeconds": 0,
+      "elapsedMs": 334.944833,
+      "pssKiB": 68804
+    }
+  ],
+  "allWordsEqual": true,
+  "allTimesWithin80ms": true,
+  "status": "completed"
+}

@@ -1,0 +1,11 @@
+INSTRUMENTATION_RESULT: error=java.lang.OutOfMemoryError: Failed to allocate a 33554448 byte allocation with 6291456 free bytes and 31MB until OOM, max allowed footprint 23473752, growth limit 50331648
+	at java.util.Arrays.copyOf(Arrays.java:3164)
+	at java.io.ByteArrayOutputStream.grow(ByteArrayOutputStream.java:118)
+	at java.io.ByteArrayOutputStream.ensureCapacity(ByteArrayOutputStream.java:93)
+	at java.io.ByteArrayOutputStream.write(ByteArrayOutputStream.java:153)
+	at io.codemyriad.cassini.whistlespike.Spike.read(Spike.java:37)
+	at io.codemyriad.cassini.whistlespike.Spike.asset(Spike.java:42)
+	at io.codemyriad.cassini.whistlespike.Spike.onStart(Spike.java:63)
+	at android.app.Instrumentation$InstrumentationThread.run(Instrumentation.java:2074)
+
+INSTRUMENTATION_CODE: 2

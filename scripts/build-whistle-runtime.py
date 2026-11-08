@@ -51,7 +51,10 @@ def run(command: list[str | Path]) -> str:
     return result.stdout
 
 
-def verify_elf(path: Path, readelf: Path) -> dict:
+def verify_elf(
+    path: Path, readelf: Path, *, exports_expected: set[str] = EXPORTS,
+    libraries_expected: set[str] = SYSTEM_LIBRARIES,
+) -> dict:
     data = path.read_bytes()
     if data[:7] != b'\x7fELF\x02\x01\x01' or struct.unpack_from('<HH', data, 16) != (3, 183):
         raise ValueError('Expected an ELF64 little-endian AArch64 shared library')
@@ -70,7 +73,7 @@ def verify_elf(path: Path, readelf: Path) -> dict:
     if 'TEXTREL' in dynamic or 'RPATH' in dynamic or 'RUNPATH' in dynamic:
         raise ValueError('Whistle has text relocations or a runtime library search path')
     needed = set(re.findall(r'\(NEEDED\).*\[([^]]+)\]', dynamic))
-    if needed != SYSTEM_LIBRARIES:
+    if needed != libraries_expected:
         raise ValueError(f'Unexpected dependency closure: {sorted(needed)}')
     symbols = run([readelf, '--dyn-syms', '--wide', path])
     exports = set()
@@ -84,7 +87,7 @@ def verify_elf(path: Path, readelf: Path) -> dict:
             (weak_imports if fields[4] == 'WEAK' else imports).append(fields[7])
         elif fields[4] in ('GLOBAL', 'WEAK') and fields[5] == 'DEFAULT':
             exports.add(fields[7])
-    if exports != EXPORTS:
+    if exports != exports_expected:
         raise ValueError(f'Unexpected public C ABI: {sorted(exports)}')
     if any('__ndk' in name or name.startswith('_Z') or name.startswith('Ort') for name in imports):
         raise ValueError('Unresolved C++ or ONNX Runtime dependency')

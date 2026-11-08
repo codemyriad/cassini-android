@@ -1,0 +1,850 @@
+{
+  "modelSha256": "b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb",
+  "macEngineSha256": "99b9bd363d2e247626118e7ade04a3dc70c60ebe6bbb0e1bca50bc0bce24b0d3",
+  "firSourceSha256": "cefc18cff31fa136e9fe9359f4e7444804adcc205a9b34bcea9fa435387e30c9",
+  "fixtures": [
+    {
+      "file": "jfk.f32",
+      "inputSha256": "ebd52851100536db02d12c49fddd010372dcdc70243562e057553d476b706ae0",
+      "samples": 176000,
+      "macResult": {
+        "text": "And so, my fellow Americans, ask not what your country can do for you, ask what you can do for your country.",
+        "language": "en",
+        "words": [
+          {
+            "word": "And",
+            "start": 0.4,
+            "end": 0.72,
+            "probability": 0.582
+          },
+          {
+            "word": "so,",
+            "start": 0.72,
+            "end": 1.04,
+            "probability": 0.99
+          },
+          {
+            "word": "my",
+            "start": 1.12,
+            "end": 1.28,
+            "probability": 0.995
+          },
+          {
+            "word": "fellow",
+            "start": 1.28,
+            "end": 1.68,
+            "probability": 0.938
+          },
+          {
+            "word": "Americans,",
+            "start": 1.68,
+            "end": 2.24,
+            "probability": 0.969
+          },
+          {
+            "word": "ask",
+            "start": 3.44,
+            "end": 3.84,
+            "probability": 0.955
+          },
+          {
+            "word": "not",
+            "start": 3.84,
+            "end": 4.4,
+            "probability": 0.938
+          },
+          {
+            "word": "what",
+            "start": 4.4,
+            "end": 5.6,
+            "probability": 0.932
+          },
+          {
+            "word": "your",
+            "start": 5.6,
+            "end": 6.0,
+            "probability": 0.996
+          },
+          {
+            "word": "country",
+            "start": 6.0,
+            "end": 6.4,
+            "probability": 0.998
+          },
+          {
+            "word": "can",
+            "start": 6.4,
+            "end": 6.72,
+            "probability": 0.996
+          },
+          {
+            "word": "do",
+            "start": 6.72,
+            "end": 6.96,
+            "probability": 1.0
+          },
+          {
+            "word": "for",
+            "start": 6.96,
+            "end": 7.2,
+            "probability": 0.995
+          },
+          {
+            "word": "you,",
+            "start": 7.2,
+            "end": 7.68,
+            "probability": 0.996
+          },
+          {
+            "word": "ask",
+            "start": 8.48,
+            "end": 8.56,
+            "probability": 0.958
+          },
+          {
+            "word": "what",
+            "start": 8.56,
+            "end": 8.88,
+            "probability": 0.99
+          },
+          {
+            "word": "you",
+            "start": 8.88,
+            "end": 9.2,
+            "probability": 0.998
+          },
+          {
+            "word": "can",
+            "start": 9.2,
+            "end": 9.44,
+            "probability": 0.995
+          },
+          {
+            "word": "do",
+            "start": 9.44,
+            "end": 9.68,
+            "probability": 0.999
+          },
+          {
+            "word": "for",
+            "start": 9.68,
+            "end": 9.92,
+            "probability": 0.998
+          },
+          {
+            "word": "your",
+            "start": 9.92,
+            "end": 10.16,
+            "probability": 0.997
+          },
+          {
+            "word": "country.",
+            "start": 10.16,
+            "end": 10.48,
+            "probability": 0.998
+          }
+        ],
+        "ttft_ms": 14.2,
+        "decode_tps": 1238.9
+      },
+      "source": "D5 public JFK 16 kHz smoke fixture"
+    },
+    {
+      "file": "dc-quiet-jfk-v1-0.f32",
+      "inputSha256": "d05f99fef3cc70527c5c7406da8c04cf6a78fd3e1bc23858e02c2e4bf5c32f25",
+      "samples": 83456,
+      "macResult": {
+        "text": "country can do for you and what you can do for your country.",
+        "language": "en",
+        "words": [
+          {
+            "word": "country",
+            "start": 0.0,
+            "end": 0.56,
+            "probability": 0.466
+          },
+          {
+            "word": "can",
+            "start": 0.56,
+            "end": 0.88,
+            "probability": 0.998
+          },
+          {
+            "word": "do",
+            "start": 0.88,
+            "end": 1.12,
+            "probability": 0.999
+          },
+          {
+            "word": "for",
+            "start": 1.12,
+            "end": 1.36,
+            "probability": 0.994
+          },
+          {
+            "word": "you",
+            "start": 1.36,
+            "end": 1.84,
+            "probability": 1.0
+          },
+          {
+            "word": "and",
+            "start": 1.84,
+            "end": 2.72,
+            "probability": 0.428
+          },
+          {
+            "word": "what",
+            "start": 2.72,
+            "end": 3.04,
+            "probability": 0.948
+          },
+          {
+            "word": "you",
+            "start": 3.04,
+            "end": 3.36,
+            "probability": 0.999
+          },
+          {
+            "word": "can",
+            "start": 3.36,
+            "end": 3.68,
+            "probability": 0.998
+          },
+          {
+            "word": "do",
+            "start": 3.68,
+            "end": 3.84,
+            "probability": 1.0
+          },
+          {
+            "word": "for",
+            "start": 3.84,
+            "end": 4.08,
+            "probability": 1.0
+          },
+          {
+            "word": "your",
+            "start": 4.08,
+            "end": 4.32,
+            "probability": 0.999
+          },
+          {
+            "word": "country.",
+            "start": 4.32,
+            "end": 4.64,
+            "probability": 0.985
+          }
+        ],
+        "ttft_ms": 7.0,
+        "decode_tps": 1291.8
+      },
+      "sourceWavSha256": "071f051241d394587c85463272e9414f133ee18c4bb835d1382b662e4154efda",
+      "startSample": 105984,
+      "endSample": 189440,
+      "segmentOrigin": "reviewed desktop D26.1 boundaries; no Android VAD execution"
+    },
+    {
+      "file": "dc-quiet-jfk-v1-1.f32",
+      "inputSha256": "d5dd41b037a94832df5db7665629d8a2b055aa00b5d11c2b88b13c9d3310f6df",
+      "samples": 19968,
+      "macResult": {
+        "text": "for you.",
+        "language": "en",
+        "words": [
+          {
+            "word": "for",
+            "start": 0.0,
+            "end": 0.24,
+            "probability": 0.643
+          },
+          {
+            "word": "you.",
+            "start": 0.24,
+            "end": 0.64,
+            "probability": 0.994
+          }
+        ],
+        "ttft_ms": 1.9,
+        "decode_tps": 1319.7
+      },
+      "sourceWavSha256": "071f051241d394587c85463272e9414f133ee18c4bb835d1382b662e4154efda",
+      "startSample": 347648,
+      "endSample": 367616,
+      "segmentOrigin": "reviewed desktop D26.1 boundaries; no Android VAD execution"
+    },
+    {
+      "file": "dc-quiet-jfk-v1-2.f32",
+      "inputSha256": "caa178ab55501b698c48cab1bc9208026c8a9910ec8d2f936406de95f8ec689e",
+      "samples": 41984,
+      "macResult": {
+        "text": "That's what you can do for your country.",
+        "language": "en",
+        "words": [
+          {
+            "word": "That's",
+            "start": 0.0,
+            "end": 0.4,
+            "probability": 0.807
+          },
+          {
+            "word": "what",
+            "start": 0.4,
+            "end": 0.48,
+            "probability": 0.999
+          },
+          {
+            "word": "you",
+            "start": 0.48,
+            "end": 0.8,
+            "probability": 0.999
+          },
+          {
+            "word": "can",
+            "start": 0.8,
+            "end": 1.04,
+            "probability": 0.999
+          },
+          {
+            "word": "do",
+            "start": 1.04,
+            "end": 1.28,
+            "probability": 1.0
+          },
+          {
+            "word": "for",
+            "start": 1.28,
+            "end": 1.52,
+            "probability": 0.998
+          },
+          {
+            "word": "your",
+            "start": 1.52,
+            "end": 1.68,
+            "probability": 0.999
+          },
+          {
+            "word": "country.",
+            "start": 1.68,
+            "end": 2.08,
+            "probability": 0.985
+          }
+        ],
+        "ttft_ms": 3.6,
+        "decode_tps": 1326.6
+      },
+      "sourceWavSha256": "071f051241d394587c85463272e9414f133ee18c4bb835d1382b662e4154efda",
+      "startSample": 371200,
+      "endSample": 413184,
+      "segmentOrigin": "reviewed desktop D26.1 boundaries; no Android VAD execution"
+    },
+    {
+      "file": "dc-quiet-jfk-v1-3.f32",
+      "inputSha256": "4b3280c208725266e39dcd9b24e6673e52fbe8cb7c17d6ae24ac8b3fd09e37c8",
+      "samples": 41984,
+      "macResult": {
+        "text": "And so my fellow Americans.",
+        "language": "en",
+        "words": [
+          {
+            "word": "And",
+            "start": 0.0,
+            "end": 0.56,
+            "probability": 0.764
+          },
+          {
+            "word": "so",
+            "start": 0.56,
+            "end": 0.72,
+            "probability": 0.974
+          },
+          {
+            "word": "my",
+            "start": 0.72,
+            "end": 1.12,
+            "probability": 0.678
+          },
+          {
+            "word": "fellow",
+            "start": 1.12,
+            "end": 1.44,
+            "probability": 0.989
+          },
+          {
+            "word": "Americans.",
+            "start": 1.44,
+            "end": 2.0,
+            "probability": 0.516
+          }
+        ],
+        "ttft_ms": 3.6,
+        "decode_tps": 1320.6
+      },
+      "sourceWavSha256": "071f051241d394587c85463272e9414f133ee18c4bb835d1382b662e4154efda",
+      "startSample": 416256,
+      "endSample": 458240,
+      "segmentOrigin": "reviewed desktop D26.1 boundaries; no Android VAD execution"
+    },
+    {
+      "file": "dc-quiet-jfk-v1-4.f32",
+      "inputSha256": "f005a2f33e0880f6965b8e6a3f9b25de62b3ee3eda7fa35e909dfd090c45ffed",
+      "samples": 39936,
+      "macResult": {
+        "text": "our country can do for you.",
+        "language": "en",
+        "words": [
+          {
+            "word": "our",
+            "start": 0.0,
+            "end": 0.4,
+            "probability": 0.064
+          },
+          {
+            "word": "country",
+            "start": 0.4,
+            "end": 0.72,
+            "probability": 0.999
+          },
+          {
+            "word": "can",
+            "start": 0.72,
+            "end": 1.04,
+            "probability": 0.998
+          },
+          {
+            "word": "do",
+            "start": 1.04,
+            "end": 1.28,
+            "probability": 0.999
+          },
+          {
+            "word": "for",
+            "start": 1.28,
+            "end": 1.52,
+            "probability": 0.998
+          },
+          {
+            "word": "you.",
+            "start": 1.52,
+            "end": 1.84,
+            "probability": 1.0
+          }
+        ],
+        "ttft_ms": 3.2,
+        "decode_tps": 1336.8
+      },
+      "sourceWavSha256": "071f051241d394587c85463272e9414f133ee18c4bb835d1382b662e4154efda",
+      "startSample": 504320,
+      "endSample": 544256,
+      "segmentOrigin": "reviewed desktop D26.1 boundaries; no Android VAD execution"
+    },
+    {
+      "file": "dc-quiet-jfk-v1-5.f32",
+      "inputSha256": "43eccbd8aa879a17126b529c6269311926539d24edd4eea6d3fd67c7532fee49",
+      "samples": 41984,
+      "macResult": {
+        "text": "what you can do for your country.",
+        "language": "en",
+        "words": [
+          {
+            "word": "what",
+            "start": 0.0,
+            "end": 0.4,
+            "probability": 0.472
+          },
+          {
+            "word": "you",
+            "start": 0.4,
+            "end": 0.8,
+            "probability": 0.999
+          },
+          {
+            "word": "can",
+            "start": 0.8,
+            "end": 1.04,
+            "probability": 0.999
+          },
+          {
+            "word": "do",
+            "start": 1.04,
+            "end": 1.28,
+            "probability": 1.0
+          },
+          {
+            "word": "for",
+            "start": 1.28,
+            "end": 1.52,
+            "probability": 0.998
+          },
+          {
+            "word": "your",
+            "start": 1.52,
+            "end": 1.68,
+            "probability": 0.999
+          },
+          {
+            "word": "country.",
+            "start": 1.68,
+            "end": 2.08,
+            "probability": 0.987
+          }
+        ],
+        "ttft_ms": 3.4,
+        "decode_tps": 1354.5
+      },
+      "sourceWavSha256": "071f051241d394587c85463272e9414f133ee18c4bb835d1382b662e4154efda",
+      "startSample": 547328,
+      "endSample": 589312,
+      "segmentOrigin": "reviewed desktop D26.1 boundaries; no Android VAD execution"
+    },
+    {
+      "file": "dc-quiet-jfk-v1-control-0.f32",
+      "inputSha256": "945cb0555f797b5cfe19e494dd75f11d878fc6a48163ec0ff96c3053500aad79",
+      "samples": 83456,
+      "macResult": {
+        "text": "Your country can do for you as what you can do for your country.",
+        "language": "en",
+        "words": [
+          {
+            "word": "Your",
+            "start": 0.0,
+            "end": 0.32,
+            "probability": 0.356
+          },
+          {
+            "word": "country",
+            "start": 0.32,
+            "end": 0.56,
+            "probability": 1.0
+          },
+          {
+            "word": "can",
+            "start": 0.56,
+            "end": 0.88,
+            "probability": 0.999
+          },
+          {
+            "word": "do",
+            "start": 0.88,
+            "end": 1.12,
+            "probability": 0.998
+          },
+          {
+            "word": "for",
+            "start": 1.12,
+            "end": 1.36,
+            "probability": 0.986
+          },
+          {
+            "word": "you",
+            "start": 1.36,
+            "end": 1.84,
+            "probability": 1.0
+          },
+          {
+            "word": "as",
+            "start": 1.84,
+            "end": 2.8,
+            "probability": 0.596
+          },
+          {
+            "word": "what",
+            "start": 2.8,
+            "end": 3.04,
+            "probability": 0.765
+          },
+          {
+            "word": "you",
+            "start": 3.04,
+            "end": 3.36,
+            "probability": 0.999
+          },
+          {
+            "word": "can",
+            "start": 3.36,
+            "end": 3.68,
+            "probability": 0.998
+          },
+          {
+            "word": "do",
+            "start": 3.68,
+            "end": 3.84,
+            "probability": 1.0
+          },
+          {
+            "word": "for",
+            "start": 3.84,
+            "end": 4.08,
+            "probability": 1.0
+          },
+          {
+            "word": "your",
+            "start": 4.08,
+            "end": 4.32,
+            "probability": 1.0
+          },
+          {
+            "word": "country.",
+            "start": 4.32,
+            "end": 4.64,
+            "probability": 0.999
+          }
+        ],
+        "ttft_ms": 6.9,
+        "decode_tps": 1313.6
+      },
+      "sourceWavSha256": "e31ed958621a39baf1d33dab6d10798695b8319e78fcaa1cb672cdb43c5f7830",
+      "startSample": 105984,
+      "endSample": 189440,
+      "segmentOrigin": "reviewed desktop D26.1 boundaries; no Android VAD execution"
+    },
+    {
+      "file": "dc-quiet-jfk-v1-control-1.f32",
+      "inputSha256": "32558a18867786f0fb769ce17ebdd76ef154b222c7f4d057e6c66a25f73d26d5",
+      "samples": 19968,
+      "macResult": {
+        "text": "for you.",
+        "language": "en",
+        "words": [
+          {
+            "word": "for",
+            "start": 0.0,
+            "end": 0.24,
+            "probability": 0.815
+          },
+          {
+            "word": "you.",
+            "start": 0.24,
+            "end": 0.64,
+            "probability": 0.998
+          }
+        ],
+        "ttft_ms": 1.8,
+        "decode_tps": 1340.0
+      },
+      "sourceWavSha256": "e31ed958621a39baf1d33dab6d10798695b8319e78fcaa1cb672cdb43c5f7830",
+      "startSample": 347648,
+      "endSample": 367616,
+      "segmentOrigin": "reviewed desktop D26.1 boundaries; no Android VAD execution"
+    },
+    {
+      "file": "dc-quiet-jfk-v1-control-2.f32",
+      "inputSha256": "9cab20cba86a8ad802117091ed51cba8fcc6a2960713b5462723410cb44ad378",
+      "samples": 41984,
+      "macResult": {
+        "text": "what you can do for your country.",
+        "language": "en",
+        "words": [
+          {
+            "word": "what",
+            "start": 0.0,
+            "end": 0.4,
+            "probability": 0.151
+          },
+          {
+            "word": "you",
+            "start": 0.4,
+            "end": 0.8,
+            "probability": 1.0
+          },
+          {
+            "word": "can",
+            "start": 0.8,
+            "end": 1.04,
+            "probability": 0.999
+          },
+          {
+            "word": "do",
+            "start": 1.04,
+            "end": 1.28,
+            "probability": 1.0
+          },
+          {
+            "word": "for",
+            "start": 1.28,
+            "end": 1.52,
+            "probability": 1.0
+          },
+          {
+            "word": "your",
+            "start": 1.52,
+            "end": 1.68,
+            "probability": 1.0
+          },
+          {
+            "word": "country.",
+            "start": 1.68,
+            "end": 2.08,
+            "probability": 0.999
+          }
+        ],
+        "ttft_ms": 3.4,
+        "decode_tps": 1359.3
+      },
+      "sourceWavSha256": "e31ed958621a39baf1d33dab6d10798695b8319e78fcaa1cb672cdb43c5f7830",
+      "startSample": 371200,
+      "endSample": 413184,
+      "segmentOrigin": "reviewed desktop D26.1 boundaries; no Android VAD execution"
+    },
+    {
+      "file": "dc-quiet-jfk-v1-control-3.f32",
+      "inputSha256": "274f7892b82c4853608a18e1841d74c044d2e2b7e7c55953a8d5cd351d4c0bfd",
+      "samples": 41984,
+      "macResult": {
+        "text": "And so my fellow Americans.",
+        "language": "en",
+        "words": [
+          {
+            "word": "And",
+            "start": 0.0,
+            "end": 0.48,
+            "probability": 0.841
+          },
+          {
+            "word": "so",
+            "start": 0.48,
+            "end": 0.72,
+            "probability": 0.97
+          },
+          {
+            "word": "my",
+            "start": 0.72,
+            "end": 1.04,
+            "probability": 0.681
+          },
+          {
+            "word": "fellow",
+            "start": 1.04,
+            "end": 1.44,
+            "probability": 0.964
+          },
+          {
+            "word": "Americans.",
+            "start": 1.44,
+            "end": 1.92,
+            "probability": 0.901
+          }
+        ],
+        "ttft_ms": 3.5,
+        "decode_tps": 1354.5
+      },
+      "sourceWavSha256": "e31ed958621a39baf1d33dab6d10798695b8319e78fcaa1cb672cdb43c5f7830",
+      "startSample": 416256,
+      "endSample": 458240,
+      "segmentOrigin": "reviewed desktop D26.1 boundaries; no Android VAD execution"
+    },
+    {
+      "file": "dc-quiet-jfk-v1-control-4.f32",
+      "inputSha256": "598be43a06dcc091702b3ec6df11dbfe60085f030e54371eed3d1cebbf57fd72",
+      "samples": 39936,
+      "macResult": {
+        "text": "Our country can do for you.",
+        "language": "en",
+        "words": [
+          {
+            "word": "Our",
+            "start": 0.0,
+            "end": 0.32,
+            "probability": 0.775
+          },
+          {
+            "word": "country",
+            "start": 0.32,
+            "end": 0.72,
+            "probability": 0.999
+          },
+          {
+            "word": "can",
+            "start": 0.72,
+            "end": 1.04,
+            "probability": 0.999
+          },
+          {
+            "word": "do",
+            "start": 1.04,
+            "end": 1.2,
+            "probability": 0.998
+          },
+          {
+            "word": "for",
+            "start": 1.2,
+            "end": 1.52,
+            "probability": 0.998
+          },
+          {
+            "word": "you.",
+            "start": 1.52,
+            "end": 1.76,
+            "probability": 1.0
+          }
+        ],
+        "ttft_ms": 3.2,
+        "decode_tps": 1364.2
+      },
+      "sourceWavSha256": "e31ed958621a39baf1d33dab6d10798695b8319e78fcaa1cb672cdb43c5f7830",
+      "startSample": 504320,
+      "endSample": 544256,
+      "segmentOrigin": "reviewed desktop D26.1 boundaries; no Android VAD execution"
+    },
+    {
+      "file": "dc-quiet-jfk-v1-control-5.f32",
+      "inputSha256": "8e480cdd9e662936b7d65334d83e6b2305f96d1bef3dde9f3b74c490b6c01936",
+      "samples": 41984,
+      "macResult": {
+        "text": "what you can do for your country.",
+        "language": "en",
+        "words": [
+          {
+            "word": "what",
+            "start": 0.0,
+            "end": 0.4,
+            "probability": 0.231
+          },
+          {
+            "word": "you",
+            "start": 0.4,
+            "end": 0.8,
+            "probability": 1.0
+          },
+          {
+            "word": "can",
+            "start": 0.8,
+            "end": 1.04,
+            "probability": 0.999
+          },
+          {
+            "word": "do",
+            "start": 1.04,
+            "end": 1.28,
+            "probability": 1.0
+          },
+          {
+            "word": "for",
+            "start": 1.28,
+            "end": 1.52,
+            "probability": 1.0
+          },
+          {
+            "word": "your",
+            "start": 1.52,
+            "end": 1.68,
+            "probability": 1.0
+          },
+          {
+            "word": "country.",
+            "start": 1.68,
+            "end": 2.08,
+            "probability": 0.999
+          }
+        ],
+        "ttft_ms": 3.4,
+        "decode_tps": 1373.7
+      },
+      "sourceWavSha256": "e31ed958621a39baf1d33dab6d10798695b8319e78fcaa1cb672cdb43c5f7830",
+      "startSample": 547328,
+      "endSample": 589312,
+      "segmentOrigin": "reviewed desktop D26.1 boundaries; no Android VAD execution"
+    }
+  ],
+  "scope": "Identical raw PCM engine comparison; candidate Mac results need review; no Android FIR/VAD proof"
+}
