@@ -1,0 +1,6 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="io.codemyriad.cassini.whistlespike">
+    <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="34" />
+    <!-- Standalone lab package: no audio, network, storage or app-data permissions. -->
+    <application android:label="Whistle lab spike" android:extractNativeLibs="true" android:allowBackup="false" android:debuggable="true" />
+    <instrumentation android:name="io.codemyriad.cassini.whistlespike.Spike" android:targetPackage="io.codemyriad.cassini.whistlespike" />
+</manifest>
