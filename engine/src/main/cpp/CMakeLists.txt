@@ -15,3 +15,8 @@ add_library(cassini_opus SHARED opus-jni.cpp)
 target_link_libraries(cassini_opus PRIVATE opus)
 target_compile_features(cassini_opus PRIVATE cxx_std_17)
 target_link_options(cassini_opus PRIVATE "-Wl,-z,max-page-size=16384" "-Wl,--no-undefined" "-Wl,--exclude-libs,ALL")
+
+# Read the process architecture/HWCAP without loading any model runtime. Supported on both packaged ABIs.
+add_library(cassini_capability SHARED whistle-capability.c)
+target_compile_options(cassini_capability PRIVATE -Wall -Wextra -Werror -fvisibility=hidden)
+target_link_options(cassini_capability PRIVATE "-Wl,-z,max-page-size=16384" "-Wl,--no-undefined")
