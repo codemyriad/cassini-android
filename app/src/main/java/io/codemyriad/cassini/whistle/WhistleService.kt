@@ -35,7 +35,8 @@ class WhistleService : Service() {
     private fun receive(message: Message): Boolean {
         val reply = message.replyTo ?: return true
         val sameOwner = owner == null || owner == reply.binder
-        if (message.sendingUid != applicationInfo.uid || busy || failed || !sameOwner) {
+        val unavailable = busy || failed
+        if (message.sendingUid != applicationInfo.uid || unavailable || !sameOwner) {
             sendError(reply, "Whistle worker unavailable or busy")
         } else {
             owner = reply.binder

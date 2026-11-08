@@ -30,6 +30,8 @@ def worker_bench(command, args, output):
         script = Path(__file__).resolve().parents[2] / "scripts/device-smoke.sh"
         case = output / name
         case.mkdir(exist_ok=True)
+        if command("shell", "pm", "path", package).stdout.strip():
+            command("shell", "run-as", package, "rm", "-f", f"files/whistle-worker-{name}.json")
         result = subprocess.run([str(script), "--bench", "--serial", "emulator-5584", "--class",
                                  "io.codemyriad.cassini.bench.WhistleWorkerParityTest", "--arg", f"whistleCase={name}"],
                                 env=env, capture_output=True, timeout=1800)
@@ -83,6 +85,8 @@ def main():
     output.mkdir(parents=True, exist_ok=True)
     if args.batch:
         (output / "batch.json").unlink(missing_ok=True)
+    if args.worker_bench:
+        (output / "worker-batch.json").unlink(missing_ok=True)
     adb = args.sdk / "platform-tools/adb"
     serial = "emulator-5584"
 

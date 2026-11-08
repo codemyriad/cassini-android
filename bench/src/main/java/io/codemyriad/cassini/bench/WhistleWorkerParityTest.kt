@@ -15,6 +15,7 @@ import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.io.InputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.security.DigestInputStream
@@ -28,7 +29,12 @@ import kotlin.math.abs
 class WhistleWorkerParityTest {
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
     private val assets get() = instrumentation.context.assets
-    private data class Fixture(val name: String, val source: String, val filtered: String, val expected: List<JSONObject>)
+    private data class Fixture(
+        val name: String,
+        val source: String,
+        val filtered: String,
+        val expected: List<JSONObject>,
+    )
 
     @Test
     fun fullDcTrackUsesPrivateWorkerAndExactDesktopSegments() {
@@ -36,7 +42,8 @@ class WhistleWorkerParityTest {
         assertEquals(6, fixture.expected.size)
         assertEquals(fixture.source, sourceHash(fixture.name))
         val report = runWorker(fixture.name)
-        File(instrumentation.targetContext.filesDir, "whistle-worker-${fixture.name}.json").writeText(report.toString(2))
+        val output = File(instrumentation.targetContext.filesDir, "whistle-worker-${fixture.name}.json")
+        output.writeText(report.toString(2))
         // Publish measured failures first; no golden or tolerance changes.
         assertEquals(fixture.source, report.getString("sourceWavSha256"))
         assertEquals(fixture.filtered, report.getString("vadSha256"))
@@ -127,18 +134,23 @@ class WhistleWorkerParityTest {
             assertEquals(16, fields.getShort(34).toInt())
             val block = ByteArray(16384)
             while (true) {
-                var count = 0
-                while (count < block.size) {
-                    val read = input.read(block, count, block.size - count)
-                    if (read < 0) break
-                    count += read
-                }
+                val count = readBlock(input, block)
                 if (count == 0) break
                 require(count % 2 == 0)
                 val bytes = ByteBuffer.wrap(block, 0, count).order(ByteOrder.LITTLE_ENDIAN)
                 worker.accept(FloatArray(count / 2) { bytes.short / 32768f })
             }
         }
+    }
+
+    private fun readBlock(input: InputStream, block: ByteArray): Int {
+        var count = 0
+        while (count < block.size) {
+            val read = input.read(block, count, block.size - count)
+            if (read < 0) break
+            count += read
+        }
+        return count
     }
 
     private fun compareSegments(expected: List<JSONObject>, actual: JSONArray) {
