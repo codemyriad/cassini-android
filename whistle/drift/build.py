@@ -37,6 +37,9 @@ def main():
     spec = importlib.util.spec_from_file_location("native", ROOT / "scripts/build-whistle-runtime.py")
     native = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(native)
+    properties = (args.ndk / "source.properties").read_text()
+    if not re.search(rf"^Pkg\.Revision\s*=\s*{re.escape(native.NDK_VERSION)}\s*$", properties, re.MULTILINE):
+        raise ValueError("Unexpected NDK revision for controlled experiment")
     pins = json.loads((ROOT / "whistle/pins.json").read_text())
     for name, pin in pins["arm64-v8a"].items():
         native.checked(args.inputs / name, pin)
@@ -190,6 +193,8 @@ def main():
                 dispatch=dispatch_name,
                 math=math_name,
                 engineRevision=pins["engineRevision"],
+                ndk=native.NDK_VERSION,
+                compiler=run(clang, "--version").splitlines()[0],
                 inputSha256=pins["arm64-v8a"]["libneedle.a"]["sha256"],
                 musl=pin if pinned_math else None,
                 mathSources={name: selected["src/math/" + name] for name in compiled} if pinned_math else {},

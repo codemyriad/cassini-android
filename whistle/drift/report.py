@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Freeze public numerical outputs and per-run provenance without changing a product golden."""
+
 from __future__ import annotations
 
 import argparse
@@ -47,7 +48,8 @@ def main():
             items = payload(report)
             if len(items) != len(reference['fixtures']):
                 raise ValueError('Wrong fixture count')
-            for actual, expected in zip(items, reference['fixtures']):
+            for index, actual in enumerate(items):
+                expected = reference['fixtures'][index]
                 if (actual['file'], actual['inputSha256']) != (expected['file'], expected['inputSha256']):
                     raise ValueError('Case PCM does not match the frozen reference')
             if report['privacyRefusals'] != 6:
@@ -62,14 +64,15 @@ def main():
                     raise ValueError('Forced-on dispatch did not take effect')
                 if env['pinnedMath'] != case['name'].endswith('-musl'):
                     raise ValueError('Wrong math implementation')
-            encoded = json.dumps(items, sort_keys=True, separators=(',', ':')).encode()
-            digest = fingerprint(encoded)
+            encoded = '[\n' + ',\n'.join(
+                json.dumps(item, sort_keys=True, separators=(',', ':')) for item in items) + '\n]\n'
+            digest = fingerprint(encoded.encode())
             # One fixture per line keeps the full returned words/times/probabilities reviewable,
             # while content addressing deduplicates identical outputs across variants and guests.
-            (numerical / (digest + '.json')).write_text('[\n' + ',\n'.join(
-                json.dumps(item, sort_keys=True, separators=(',', ':')) for item in items) + '\n]\n')
+            (numerical / (digest + '.json')).write_text(encoded)
             current = dict(case)
-            current.update(numericalSha256=digest, rawReportSha256=fingerprint(raw), engineSha256=report['engineSha256'],
+            current.update(numericalSha256=digest, rawReportSha256=fingerprint(raw),
+                           engineSha256=report['engineSha256'],
                            exactWordFixtures=sum(item['exactWordsEqual'] for item in report['results']),
                            maxTimeDifferenceSeconds=max(item['maxTimeDifferenceSeconds'] for item in report['results']))
             results.append(current)

@@ -1,0 +1,280 @@
+{
+  "26": {
+    "hardware": {
+      "kernel": "Linux localhost 3.18.94+ #17 SMP PREEMPT Mon May 1 07:31:27 PDT 2023 aarch64",
+      "imageProperties": [
+        "Pkg.Desc=Android SDK System Image arm64-v8a.",
+        "Pkg.Revision=1",
+        "Pkg.Dependencies=emulator#31.1.1",
+        "AndroidVersion.ApiLevel=26",
+        "SystemImage.Abi=arm64-v8a",
+        "SystemImage.TagId=default",
+        "SystemImage.TagDisplay=Default Android System Image",
+        "SystemImage.GpuSupport=true"
+      ],
+      "emulatorProperties": [
+        "Pkg.UserSrc=false",
+        "Pkg.Revision=37.2.13",
+        "Pkg.Path=emulator",
+        "Pkg.Desc=Android Emulator",
+        "Pkg.BuildId=16740729"
+      ],
+      "bionicHashes": [
+        "0e1b6e55a3aaee002d3ffa2078019cf8ee7020a5734b134f6964cb8e20c867b6  /system/lib64/libm.so",
+        "76fe4fb7cfcbb6646605560cf59ecad6ec74bc56c6daa827adb8cc547bb67d85  /system/lib64/libc.so"
+      ],
+      "fingerprint": "Android/sdk_phone_arm64/generic_arm64:8.0.0/OSR1.180418.028.A2/10042266:userdebug/test-keys",
+      "dotprodSmoke": "SDOT executed: four exact lanes of 24"
+    },
+    "cases": [
+      {
+        "sdk": 26,
+        "pageSize": 4096,
+        "privacyRefusals": 6,
+        "allWordsEqual": false,
+        "allTimesWithin80ms": false,
+        "loadMs": 12.970542,
+        "name": "published",
+        "apkSha256": "c85f142c2f4b5019f7b412c29ed1d269c7b753c3af0fcffae3944ddb3f858b55",
+        "environment": {
+          "realHwcap": "0xff",
+          "realHwcap2": "0x0",
+          "interposed": false
+        },
+        "numericalSha256": "d211ffef7c1cda4f26e234df2e99df9ee143dafa09de1b707fba598daaeb6ffa",
+        "rawReportSha256": "4ccd3465d00f21281880743bc7dd9d4459b3b74d9b96b490e661c2922677a42c",
+        "engineSha256": "f067271e71fb8aec52aca4cc41db135f6642d40eec5a32ab69d81fd3e4446a79",
+        "exactWordFixtures": 11,
+        "maxTimeDifferenceSeconds": 0.5599999999999998
+      },
+      {
+        "sdk": 26,
+        "pageSize": 4096,
+        "privacyRefusals": 6,
+        "allWordsEqual": false,
+        "allTimesWithin80ms": false,
+        "loadMs": 15.670708,
+        "name": "natural-system",
+        "apkSha256": "dbe0a3ec264d5e9a8991a11ea55ca52a3ed95cb44e8f4edd01a8f59e2e41164b",
+        "environment": {
+          "realHwcap": "0xff",
+          "realHwcap2": "0x0",
+          "dispatch": -1,
+          "effectiveDotprod": false,
+          "pinnedMath": false,
+          "getauxvalCalls": 4,
+          "fpcr": "0x0",
+          "mathCalls": {
+            "expf": 568823,
+            "logf": 357463,
+            "sinf": 0,
+            "cosf": 0,
+            "powf": 24,
+            "sincosf": 14184,
+            "exp": 179840,
+            "log": 0,
+            "log10": 4460,
+            "sin": 257,
+            "cos": 657,
+            "sincos": 144384
+          }
+        },
+        "numericalSha256": "d211ffef7c1cda4f26e234df2e99df9ee143dafa09de1b707fba598daaeb6ffa",
+        "rawReportSha256": "3d0f75520810ed3561e0d39d2a98ee75b9d11d48c52be144e011e13b0bf7fdef",
+        "engineSha256": "9fa0edf3eaead67b83948fd6c9f9ef4dadd16a8fd4741111cda4acebc1c0298a",
+        "exactWordFixtures": 11,
+        "maxTimeDifferenceSeconds": 0.5599999999999998
+      },
+      {
+        "sdk": 26,
+        "pageSize": 4096,
+        "privacyRefusals": 6,
+        "allWordsEqual": false,
+        "allTimesWithin80ms": false,
+        "loadMs": 6.174042,
+        "name": "off-system",
+        "apkSha256": "53219013b00ac61ccdb42fd5719bfbbd299db702e045fb5b29d1952f56e310d9",
+        "environment": {
+          "realHwcap": "0xff",
+          "realHwcap2": "0x0",
+          "dispatch": 0,
+          "effectiveDotprod": false,
+          "pinnedMath": false,
+          "getauxvalCalls": 4,
+          "fpcr": "0x0",
+          "mathCalls": {
+            "expf": 568823,
+            "logf": 357463,
+            "sinf": 0,
+            "cosf": 0,
+            "powf": 24,
+            "sincosf": 14184,
+            "exp": 179840,
+            "log": 0,
+            "log10": 4460,
+            "sin": 257,
+            "cos": 657,
+            "sincos": 144384
+          }
+        },
+        "numericalSha256": "d211ffef7c1cda4f26e234df2e99df9ee143dafa09de1b707fba598daaeb6ffa",
+        "rawReportSha256": "a4f4be35bd22082b2daa0e6914cf256b4831adcc6657b5b9c68f754f6dcd3f1d",
+        "engineSha256": "b273eaaff2dc9a24313edac23fd15a5f89f967594573517f895ebe7a4c7e7e94",
+        "exactWordFixtures": 11,
+        "maxTimeDifferenceSeconds": 0.5599999999999998
+      },
+      {
+        "sdk": 26,
+        "pageSize": 4096,
+        "privacyRefusals": 6,
+        "allWordsEqual": true,
+        "allTimesWithin80ms": true,
+        "loadMs": 6.568083,
+        "name": "on-system",
+        "apkSha256": "d818068096715cef5034b24f787af7472029739330bdc9d2a3562976f8a16ec8",
+        "environment": {
+          "realHwcap": "0xff",
+          "realHwcap2": "0x0",
+          "dispatch": 1,
+          "effectiveDotprod": true,
+          "pinnedMath": false,
+          "getauxvalCalls": 4,
+          "fpcr": "0x0",
+          "mathCalls": {
+            "expf": 568823,
+            "logf": 357463,
+            "sinf": 0,
+            "cosf": 0,
+            "powf": 24,
+            "sincosf": 14184,
+            "exp": 179840,
+            "log": 0,
+            "log10": 4460,
+            "sin": 257,
+            "cos": 657,
+            "sincos": 144384
+          }
+        },
+        "numericalSha256": "21fcd48ee7684bdc64d0fab3db69e22d615f2b3b1db0bc38350802039d93b1b9",
+        "rawReportSha256": "ef53d89f81e1fca0a667beeea2721b5bbbbf5371e4afe4442f7fa27cd7bd958b",
+        "engineSha256": "0275f27a32535d064ddeef66eed691276930c48aab9825afa0e799495b4b1e77",
+        "exactWordFixtures": 13,
+        "maxTimeDifferenceSeconds": 0.08000000000000007
+      },
+      {
+        "sdk": 26,
+        "pageSize": 4096,
+        "privacyRefusals": 6,
+        "allWordsEqual": false,
+        "allTimesWithin80ms": false,
+        "loadMs": 6.217416,
+        "name": "natural-musl",
+        "apkSha256": "8c9ee67d66fd81d597c3305d2ebcf53fdb83e1a549aab2eb2cc97fcefd44fe68",
+        "environment": {
+          "realHwcap": "0xff",
+          "realHwcap2": "0x0",
+          "dispatch": -1,
+          "effectiveDotprod": false,
+          "pinnedMath": true,
+          "getauxvalCalls": 4,
+          "fpcr": "0x0",
+          "mathCalls": {
+            "expf": 567179,
+            "logf": 357458,
+            "sinf": 0,
+            "cosf": 0,
+            "powf": 24,
+            "sincosf": 14184,
+            "exp": 179072,
+            "log": 0,
+            "log10": 4460,
+            "sin": 257,
+            "cos": 657,
+            "sincos": 144384
+          }
+        },
+        "numericalSha256": "06efba6460cf020fca34a7ce1d0294b07fa0ba5bb0b66dd5856bc167e77640a1",
+        "rawReportSha256": "89f8255fa4fae60e2973283727ddb635715466996f4b7e3cf9487ec836e95ced",
+        "engineSha256": "f0a6127f4b5a6d4f2c1b1150bc936f8dc9ac71139f08a1cf2154100a758e8cbf",
+        "exactWordFixtures": 11,
+        "maxTimeDifferenceSeconds": 0.5599999999999998
+      },
+      {
+        "sdk": 26,
+        "pageSize": 4096,
+        "privacyRefusals": 6,
+        "allWordsEqual": false,
+        "allTimesWithin80ms": false,
+        "loadMs": 6.468458,
+        "name": "off-musl",
+        "apkSha256": "1f34da0f360f45dbb64af9394c436f4b26671747ce9f6a326947187f50216b47",
+        "environment": {
+          "realHwcap": "0xff",
+          "realHwcap2": "0x0",
+          "dispatch": 0,
+          "effectiveDotprod": false,
+          "pinnedMath": true,
+          "getauxvalCalls": 4,
+          "fpcr": "0x0",
+          "mathCalls": {
+            "expf": 567179,
+            "logf": 357458,
+            "sinf": 0,
+            "cosf": 0,
+            "powf": 24,
+            "sincosf": 14184,
+            "exp": 179072,
+            "log": 0,
+            "log10": 4460,
+            "sin": 257,
+            "cos": 657,
+            "sincos": 144384
+          }
+        },
+        "numericalSha256": "06efba6460cf020fca34a7ce1d0294b07fa0ba5bb0b66dd5856bc167e77640a1",
+        "rawReportSha256": "fe05bc9e74f75853753c0f3b5099a9771710c2dcb03f7222af24fa0f5a25b03b",
+        "engineSha256": "be974a394d0b71102b67282227a0b20a9fb10d0d7592c676023263196ee41f8c",
+        "exactWordFixtures": 11,
+        "maxTimeDifferenceSeconds": 0.5599999999999998
+      },
+      {
+        "sdk": 26,
+        "pageSize": 4096,
+        "privacyRefusals": 6,
+        "allWordsEqual": true,
+        "allTimesWithin80ms": true,
+        "loadMs": 6.568958,
+        "name": "on-musl",
+        "apkSha256": "07027fe0cdab02bd236e64bdf5f87a8b986608785bbc1a673d959719254a169c",
+        "environment": {
+          "realHwcap": "0xff",
+          "realHwcap2": "0x0",
+          "dispatch": 1,
+          "effectiveDotprod": true,
+          "pinnedMath": true,
+          "getauxvalCalls": 4,
+          "fpcr": "0x0",
+          "mathCalls": {
+            "expf": 568823,
+            "logf": 357463,
+            "sinf": 0,
+            "cosf": 0,
+            "powf": 24,
+            "sincosf": 14184,
+            "exp": 179840,
+            "log": 0,
+            "log10": 4460,
+            "sin": 257,
+            "cos": 657,
+            "sincos": 144384
+          }
+        },
+        "numericalSha256": "5e068186b3238e537adabdab3f9666045211111129d3fc7a0fce219ad0886ca7",
+        "rawReportSha256": "46f8eb3b6adb565813633bd85890888bbdfa9657276eac12c7ff04e98ff76e6a",
+        "engineSha256": "82f945ae115ab03658ce50386d860c45d8373994710758150c6372f615b06a0c",
+        "exactWordFixtures": 13,
+        "maxTimeDifferenceSeconds": 0.08000000000000007
+      }
+    ]
+  }
+}
