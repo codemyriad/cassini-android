@@ -11,6 +11,7 @@
 #include "onnxruntime_c_api.h"
 
 static void *needle_library, *ort_library;
+static jobject model_owner, vad_owner; // JNI roots keep mappings alive even after Java/R8 last-use analysis.
 static int (*recognize)(const float *, int, const char *, const char *, int, char *, int);
 static const char *(*needle_error)(void);
 static const OrtApi *api;
@@ -50,6 +51,10 @@ JNIEXPORT void JNICALL Java_io_codemyriad_cassini_engine_whistle_WhistleNative_o
     void *vad_bytes = (*env)->GetDirectBufferAddress(env, vad);
     if (!weights || !vad_bytes || (*env)->GetDirectBufferCapacity(env, model) != 16919407 ||
             (*env)->GetDirectBufferCapacity(env, vad) != 2327524) { fail(env, "Unexpected mapped model size"); return; }
+    model_owner = (*env)->NewGlobalRef(env, model);
+    if (!model_owner) return;
+    vad_owner = (*env)->NewGlobalRef(env, vad);
+    if (!vad_owner) return;
     const char *path = (*env)->GetStringUTFChars(env, needle_path, NULL);
     if (!path) return;
     needle_library = dlopen(path, RTLD_NOW | RTLD_LOCAL);

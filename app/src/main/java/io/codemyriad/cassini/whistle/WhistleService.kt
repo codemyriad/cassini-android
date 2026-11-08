@@ -12,6 +12,7 @@ import android.os.Message
 import android.os.Messenger
 import android.os.Process
 import androidx.annotation.RequiresApi
+import io.codemyriad.cassini.core.asr.whistle.WhistleSpeechSegment
 import io.codemyriad.cassini.engine.whistle.WhistleAssets
 import io.codemyriad.cassini.engine.whistle.WhistleNative
 import io.codemyriad.cassini.engine.whistle.WhistleStream
@@ -28,9 +29,13 @@ class WhistleService : Service() {
     private var failed = false
     private val segments = ArrayList<Bundle>()
     private val main = Handler(Looper.getMainLooper())
-    private val messenger = Messenger(Handler(Looper.getMainLooper()) { message ->
-        val reply = message.replyTo ?: return@Handler true
-        if (message.sendingUid != applicationInfo.uid || busy || failed || (owner != null && owner != reply.binder)) {
+    private val incoming = Handler(Looper.getMainLooper()) { receive(it) }
+    private val messenger = Messenger(incoming)
+
+    private fun receive(message: Message): Boolean {
+        val reply = message.replyTo ?: return true
+        val sameOwner = owner == null || owner == reply.binder
+        if (message.sendingUid != applicationInfo.uid || busy || failed || !sameOwner) {
             sendError(reply, "Whistle worker unavailable or busy")
         } else {
             owner = reply.binder
@@ -39,8 +44,8 @@ class WhistleService : Service() {
             val data = message.data
             executor.execute { execute(reply, command, data) }
         }
-        true
-    })
+        return true
+    }
 
     private fun execute(reply: Messenger, command: Int, data: Bundle) {
         segments.clear()
@@ -67,7 +72,10 @@ class WhistleService : Service() {
             main.post {
                 busy = false
                 // Same sender/handler: all results precede their ACK. No next command races the busy flag.
-                for (segment in completed) reply.send(Message.obtain(null, WhistleProtocol.SEGMENT).apply { this.data = segment })
+                for (segment in completed) {
+                    val response = Message.obtain(null, WhistleProtocol.SEGMENT).apply { this.data = segment }
+                    reply.send(response)
+                }
                 reply.send(Message.obtain(null, command).apply { this.data = result })
             }
         } catch (
@@ -89,16 +97,19 @@ class WhistleService : Service() {
         WhistleNative.bootstrap()
         val verified = requireNotNull(assets)
         WhistleNative.open(verified.needle, verified.ort, verified.model, verified.vad)
-        stream = WhistleStream(rate) { range, json, hash ->
-            segments.add(Bundle().apply {
-                putLong("start", range.startSample)
-                putLong("end", range.endSample)
-                putString("reason", range.reason)
-                putString("pcmSha256", hash)
-                putByteArray("json", json)
-            })
-        }
+        stream = WhistleStream(rate, ::segment)
         return Bundle().apply { putInt("pid", Process.myPid()) }
+    }
+
+    private fun segment(range: WhistleSpeechSegment, json: ByteArray, hash: String) {
+        val message = Bundle().apply {
+            putLong("start", range.startSample)
+            putLong("end", range.endSample)
+            putString("reason", range.reason)
+            putString("pcmSha256", hash)
+            putByteArray("json", json)
+        }
+        segments.add(message)
     }
 
     private fun failure(reply: Messenger, message: String) {
@@ -110,9 +121,10 @@ class WhistleService : Service() {
     }
 
     private fun sendError(reply: Messenger, message: String) {
-        reply.send(Message.obtain(null, WhistleProtocol.ERROR).apply {
+        val response = Message.obtain(null, WhistleProtocol.ERROR).apply {
             data = Bundle().apply { putString("error", message) }
-        })
+        }
+        reply.send(response)
     }
 
     companion object {

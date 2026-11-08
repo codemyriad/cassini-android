@@ -53,7 +53,10 @@ def main():
     shutil.copyfile(native / "libcassini_needle.so", jni / "libcassini_needle.so")
     for name in ["whistle.cact", "silero_vad.onnx"]:
         shutil.copyfile(cache / name, assets / name)
-    libraries = {p.name: dict(size=p.stat().st_size, sha256=hashlib.sha256(p.read_bytes()).hexdigest()) for p in jni.glob("*.so")}
+    libraries = {
+        p.name: dict(size=p.stat().st_size, sha256=hashlib.sha256(p.read_bytes()).hexdigest())
+        for p in jni.glob("*.so")
+    }
     manifest = dict(
         schemaVersion=1,
         engineRevision=needle["engineRevision"],

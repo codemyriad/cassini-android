@@ -4,6 +4,7 @@ import android.content.Context
 import io.codemyriad.cassini.core.models.WhistleCapability
 import io.codemyriad.cassini.engine.asr.WhistleDeviceCapability
 import org.json.JSONObject
+import java.io.InputStream
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import java.security.MessageDigest
@@ -24,7 +25,8 @@ class WhistleAssets private constructor(
         private const val VAD_BYTES = 2327524L
 
         fun verified(context: Context): WhistleAssets {
-            check(WhistleDeviceCapability.current() == WhistleCapability.ELIGIBLE) { "Whistle is unavailable on this device" }
+            val capability = WhistleDeviceCapability.current()
+            check(capability == WhistleCapability.ELIGIBLE) { "Whistle is unavailable on this device" }
             val manifest = context.assets.open("whistle/manifest.json").use {
                 JSONObject(it.readBytes().toString(Charsets.UTF_8))
             }
@@ -44,11 +46,11 @@ class WhistleAssets private constructor(
             context.assets.openFd("whistle/$name").use { asset ->
                 check(asset.length == size) { "Whistle model size mismatch" }
                 asset.createInputStream().channel.use { channel ->
-                    channel.map(FileChannel.MapMode.READ_ONLY, asset.startOffset, size).asReadOnlyBuffer().also { mapped ->
-                        val digest = MessageDigest.getInstance("SHA-256")
-                        digest.update(mapped.duplicate())
-                        check(hex(digest.digest()) == sha) { "Whistle model integrity mismatch" }
-                    }
+                    val mapped = channel.map(FileChannel.MapMode.READ_ONLY, asset.startOffset, size).asReadOnlyBuffer()
+                    val digest = MessageDigest.getInstance("SHA-256")
+                    digest.update(mapped.duplicate())
+                    check(hex(digest.digest()) == sha) { "Whistle model integrity mismatch" }
+                    mapped
                 }
             }
 
@@ -60,20 +62,23 @@ class WhistleAssets private constructor(
                 ZipFile(path).use { zip ->
                     val member = zip.getEntry(entry) ?: return@use
                     check(member.size == pin.getLong("size")) { "Whistle runtime size mismatch" }
-                    val digest = MessageDigest.getInstance("SHA-256")
-                    zip.getInputStream(member).use { input ->
-                        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                        while (true) {
-                            val count = input.read(buffer)
-                            if (count < 0) break
-                            digest.update(buffer, 0, count)
-                        }
-                    }
-                    check(hex(digest.digest()) == pin.getString("sha256")) { "Whistle runtime integrity mismatch" }
+                    val actual = zip.getInputStream(member).use(::sha)
+                    check(actual == pin.getString("sha256")) { "Whistle runtime integrity mismatch" }
                     return "$path!/$entry"
                 }
             }
             error("Verified private Whistle runtime missing")
+        }
+
+        private fun sha(input: InputStream): String {
+            val digest = MessageDigest.getInstance("SHA-256")
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                digest.update(buffer, 0, count)
+            }
+            return hex(digest.digest())
         }
 
         private fun hex(data: ByteArray) = data.joinToString("") { "%02x".format(it) }

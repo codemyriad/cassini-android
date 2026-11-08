@@ -19,8 +19,8 @@ import io.codemyriad.cassini.engine.asr.WhistleDeviceCapability
 import io.codemyriad.cassini.engine.whistle.WhistleStream
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.CompletableFuture
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.Semaphore
+import java.util.concurrent.TimeUnit
 
 /**
  * Blocking streaming client for the inference thread. One command/result ACK at a time bounds IPC and memory.
@@ -39,7 +39,9 @@ class WhistleWorker(
     private val replies = ArrayBlockingQueue<Message>(REPLY_CAPACITY)
     private var remote: Messenger? = null
     private var bound = false
+
     @Volatile private var closed = false
+
     private val ownerThread = Thread.currentThread()
     private var inCommand = false
     private var ownsPermit = false
@@ -68,15 +70,8 @@ class WhistleWorker(
         var opened = false
         try {
             thread.start()
-            receiver = Messenger(Handler(thread.looper) { message ->
-                if (!replies.offer(Message.obtain(message))) {
-                    replies.clear()
-                    replies.offer(Message.obtain(null, WhistleProtocol.ERROR).apply {
-                        data = Bundle().apply { putString("error", "Whistle reply queue overflow") }
-                    })
-                }
-                true
-            })
+            val incoming = Handler(thread.looper) { receive(it) }
+            receiver = Messenger(incoming)
             bound = app.bindService(Intent(app, WhistleService::class.java), connection, Context.BIND_AUTO_CREATE)
             check(bound) { "Whistle worker could not bind" }
             remote = connected.get(DEADLINE_SECONDS, TimeUnit.SECONDS)
@@ -104,15 +99,30 @@ class WhistleWorker(
         close()
     }
 
+    private fun receive(message: Message): Boolean {
+        if (!replies.offer(Message.obtain(message))) {
+            replies.clear()
+            replies.offer(errorReply("Whistle reply queue overflow"))
+        }
+        return true
+    }
+
+    private fun errorReply(error: String): Message {
+        return Message.obtain(null, WhistleProtocol.ERROR).apply {
+            data = Bundle().apply { putString("error", error) }
+        }
+    }
+
     private fun command(command: Int, data: Bundle): Bundle {
         check(Thread.currentThread() === ownerThread) { "Whistle commands require the owning inference thread" }
         check(!closed && !inCommand) { "Whistle worker is closed or already handling a command" }
         inCommand = true
         try {
-            remote?.send(Message.obtain(null, command).apply {
+            val request = Message.obtain(null, command).apply {
                 this.data = data
                 replyTo = receiver
-            }) ?: error("Whistle worker disconnected")
+            }
+            remote?.send(request) ?: error("Whistle worker disconnected")
             val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(DEADLINE_SECONDS)
             while (true) {
                 val remaining = deadline - System.nanoTime()
@@ -135,9 +145,7 @@ class WhistleWorker(
         death.complete(Unit)
         connected.completeExceptionally(IllegalStateException("Whistle worker disconnected"))
         replies.clear()
-        replies.offer(Message.obtain(null, WhistleProtocol.ERROR).apply {
-            data = Bundle().apply { putString("error", "Whistle worker disconnected") }
-        })
+        replies.offer(errorReply("Whistle worker disconnected"))
     }
 
     @Synchronized
