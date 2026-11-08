@@ -27,5 +27,14 @@
   "instrumentationSha256": "56a0d272447fc6ad12c986afe75300b16c0479fa62059be2ff3b5305898d4bd6",
   "scope": "Cold app process, warm file cache; one public English DC fixture; no optional speaker models",
   "limits": "Sampled PSS is not an exact high-water mark; RSS high-water is process-wide. Not a long-meeting or phone minimum-RAM acceptance result.",
-  "minimumRecommendationRamBytes": 4000000000
+  "minimumRecommendationRamBytes": 6000000000,
+  "recommendationMemoryPolicy": {
+    "measuredAndroidProcessPeakRssKiB": 1097424,
+    "peakMultiplier": 2,
+    "osAndOtherAppsReserveBytes": 3221225472,
+    "budgetBeforeRoundingBytes": 5468749824,
+    "roundUpToBytes": 1000000000,
+    "minimumOsReportedTotalBytes": 6000000000,
+    "limits": "Conservative suggestion floor, not long-meeting or phone minimum-RAM acceptance. Short Parakeet + VAD emulator run excludes optional speaker models."
+  }
 }

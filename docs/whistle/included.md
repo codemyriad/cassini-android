@@ -48,12 +48,15 @@ restarts and both surfaces. Per coordinator clarification, the suggestion is als
 suppressed wherever Whistle is unavailable, so its starter copy never makes a
 false promise. Failed/paused jobs do not count as a first completion.
 
-The suggestion requires a supported 64-bit runtime, at least 4,000,000,000 bytes
+The suggestion requires a supported 64-bit runtime, at least 6,000,000,000 bytes
 of OS-reported total RAM, neither Android low-RAM nor low-memory warning, and
 enough actual free disk for the installation plan plus its normal slack. Unknown
 capability and downloads being installed/verified suppress it. Disk/memory are
-rechecked on screen resume and model-state changes. The conservative 4 GB floor
-is retained; a short emulator measurement does not prove a lower phone budget.
+rechecked on screen resume and model-state changes. The 6 GB floor
+uses twice the measured Android process RSS high-water plus a 3 GiB reserve for
+Android and other apps, rounded up to the next decimal GB: 2 × 1,123,762,176 +
+3,221,225,472 = 5,468,749,824 bytes. This is a conservative suggestion policy;
+a short emulator measurement does not establish a safe long-meeting phone budget.
 No new hard execution gate or user-model deletion is introduced.
 
 The first completion note ID and dismissal are private settings:
@@ -70,7 +73,11 @@ The [initial measured run](../../whistle/memory/parakeet-api35.json) on the owne
 RSS high-water mark was 1,097,424 KiB (1,071.7 MiB). This used Parakeet + VAD,
 warm model files, a cold app process, and the public English DC fixture, without
 optional speaker models. Artifact/source/model/input/report hashes are retained.
-These bounded-workload measurements do not justify reducing the 4 GB floor.
+The measured RSS (1.05 GiB) is the larger Android process metric, so the headroom
+calculation uses it rather than sampled PSS. The run excludes optional speaker
+models and long recordings; its 4 GiB emulator size is not a recommendation floor.
+The suggestion now requires 6 GB total RAM; existing low-memory and disk checks
+still apply. Devices below that floor are not prompted to download Parakeet.
 
 The decoder policy is explicit: 48 kHz uses `cassini-fir-48k-16k-v1`, 16 kHz is
 unchanged, and other supported rates use the established Hann-windowed sinc
