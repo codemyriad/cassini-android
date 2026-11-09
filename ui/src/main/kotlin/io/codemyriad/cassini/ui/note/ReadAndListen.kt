@@ -392,7 +392,27 @@ private fun Turn(
                 modifier = Modifier.padding(top = 12.dp),
             )
         } else {
-            TurnHeader(name = name, tone = turn.tone, timeMs = turn.startMs, auto = turn.auto, onClick = onSpeaker)
+            TurnHeader(
+                name = name,
+                tone = turn.tone,
+                timeMs = turn.startMs,
+                auto = turn.auto,
+                onClick = onSpeaker,
+                continuation = turn.continuation,
+                over = turn.over,
+                crosstalk = turn.crosstalk,
+            )
+        }
+        turn.inlineSuggestions.forEach { inline ->
+            SuggestionCard(
+                speaker = inline.name,
+                tone = inline.tone,
+                timeMs = inline.startMs,
+                name = inline.suggestion.name,
+                onYes = { onEvent(NoteEvent.AcceptSuggestion(inline.speakerId, inline.suggestion.voiceId)) },
+                onNo = { onEvent(NoteEvent.RejectSuggestion(inline.speakerId, inline.suggestion.voiceId)) },
+                onSpeaker = if (turn.renamable) ({ onEvent(NoteEvent.SpeakerTap(inline.speakerId)) }) else null,
+            )
         }
         TurnParagraph(
             words = turn.words,

@@ -239,14 +239,26 @@ class NoteViewModel(
 
     private val sealedTranscript: Flow<SealedShown?> = combine(
         sealedWords,
-        details.map { it?.details?.speakers.orEmpty() }.distinctUntilChanged(),
+        details.map { loaded ->
+            val detail = loaded?.details
+            detail?.speakers.orEmpty() to (detail?.let(NoteMapping::selected)?.wordEndsBoundedByAudio == true)
+        }.distinctUntilChanged(),
         prints,
         people,
-    ) { words, speakers, prints, people ->
+    ) { words, speakersAndTiming, prints, people ->
+        val (speakers, bounded) = speakersAndTiming
         words?.let { list ->
             val variant = details.value?.details?.let(NoteMapping::selected)?.variantId
             val shown = speakers.filter { it.variantId == variant }
-            SealedShown(NoteTranscripts.sealed(list, shown, prints, people.voices.map { it.voice }), prints)
+            val transcript = NoteTranscripts.sealed(
+                list,
+                shown,
+                prints,
+                people.voices.map { it.voice },
+                ports::placeholderLabel,
+                bounded,
+            )
+            SealedShown(transcript, prints)
         }
     }.flowOn(compute)
 
@@ -1132,7 +1144,7 @@ class NoteViewModel(
         val speakers = details.speakers.filter { it.variantId == variant.variantId }
         val speaker = speakers.firstOrNull { it.speakerId == speakerId } ?: return null
         val transcript = core.shown()
-        val tones = transcript.turns.associate { it.speakerId to it.tone }
+        val tones = transcript.speakerMetadata.mapValues { it.value.tone }
         val print = runCatching { ports.prints(noteId, variant.variantId)[speakerId] }.getOrNull()
         val sample = speaker.sampleStartMs?.let { start ->
             speaker.sampleEndMs?.let { end -> SampleWindow(start, end) }
@@ -1162,18 +1174,17 @@ class NoteViewModel(
 
     private suspend fun draftInput(core: Core, speakerId: String): NamingInput? {
         val draft = core.draft ?: return null
-        val turns = draft.transcript.turns
-        val turn = turns.firstOrNull { it.speakerId == speakerId } ?: return null
+        val speakers = draft.transcript.speakerMetadata
+        val speaker = speakers[speakerId] ?: return null
         val stats = SpeakerStats.of(draft.words)
-        val firsts = turns.distinctBy { it.speakerId }
-        val targets = firsts.filter { it.speakerId != speakerId }.map {
-            MergeTargetUi(it.speakerId, it.name, it.tone, stats[it.speakerId]?.speakingMs ?: 0)
+        val targets = speakers.filterKeys { it != speakerId }.map { (id, metadata) ->
+            MergeTargetUi(id, metadata.name, metadata.tone, stats[id]?.speakingMs ?: 0)
         }
         val modelReady = ports.voiceModelReady.first()
         return NamingInput(
             speakerId = speakerId,
-            label = turn.name,
-            tone = turn.tone,
+            label = speaker.name,
+            tone = speaker.tone,
             speakingMs = stats[speakerId]?.speakingMs ?: 0,
             sample = stats[speakerId]?.sample,
             draft = true,
@@ -1377,6 +1388,7 @@ class NoteViewModel(
             state.automatic,
             suggestions,
             state.tentativeFromMs,
+            ports::placeholderLabel,
         )
         DraftShown(
             transcript,
@@ -1398,7 +1410,14 @@ class NoteViewModel(
                 .filter { (speaker, match) -> match.voiceId !in names.rejected[speaker].orEmpty() }
                 .mapValues { (_, match) -> SuggestionUi(match.voiceId, voiceNames.getValue(match.voiceId)) }
             val automatic = names.automatic.filter { (id, name) -> draft.labels[id] == name }.keys
-            val transcript = NoteTranscripts.draft(draft.words, draft.labels, automatic, suggestions, null)
+            val transcript = NoteTranscripts.draft(
+                draft.words,
+                draft.labels,
+                automatic,
+                suggestions,
+                null,
+                ports::placeholderLabel,
+            )
             DraftShown(
                 transcript,
                 draft.words,

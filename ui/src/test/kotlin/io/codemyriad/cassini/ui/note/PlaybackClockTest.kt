@@ -100,6 +100,28 @@ class PlaybackClockTest {
         assertEquals(-1, WordStarts(persistentListOf()).indexAt(10))
     }
 
+    @Test fun competingAndRejoinedRowsUseChronologicalStartsAndCanonicalTies() {
+        val host = turn("host", 1000, 0, 5000).copy(
+            words = persistentListOf(
+                WordUi("later", 1000, canonicalIndex = 4),
+                WordUi("first", 0, canonicalIndex = 0),
+                WordUi("last", 5000, canonicalIndex = 6),
+            ),
+        )
+        val competing = turn("other", 50, 1000).copy(
+            words = persistentListOf(
+                WordUi("overlap", 50, canonicalIndex = 1),
+                WordUi("tie", 1000, canonicalIndex = 3),
+            ),
+        )
+        val starts = WordStarts(persistentListOf(host, competing))
+        assertNull(starts.ref(starts.indexAt(-1)))
+        assertEquals(WordRef("host", 1), starts.ref(starts.indexAt(0)))
+        assertEquals(WordRef("other", 0), starts.ref(starts.indexAt(500)))
+        assertEquals("canonical index 4 wins the tie", WordRef("host", 0), starts.ref(starts.indexAt(1000)))
+        assertEquals(WordRef("host", 2), starts.ref(starts.indexAt(5000)))
+    }
+
     private fun turn(id: String, vararg starts: Long) = TurnUi(
         id = id,
         speakerId = "S1",

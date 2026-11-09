@@ -56,19 +56,35 @@ fun TurnHeader(
     auto: Boolean,
     onClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    continuation: Boolean = false,
+    over: String = "",
+    crosstalk: Boolean = false,
 ) {
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(TurnHeaderHeight)
             .turnHeaderSemantics(
-                description = Spoken.turn(name, timeMs, auto),
+                description = listOf(
+                    Spoken.turn(name, timeMs, auto),
+                    over,
+                    if (crosstalk) stringResource(R.string.ui_turn_crosstalk) else "",
+                ).filter { it.isNotEmpty() }.joinToString(" "),
                 clickLabel = stringResource(R.string.ui_turn_name_action),
                 onClick = onClick,
             ),
         contentAlignment = Alignment.BottomStart,
     ) {
-        TurnHeaderLine(name, tone, timeMs, auto, Modifier.padding(bottom = 6.dp))
+        TurnHeaderLine(
+            name = name,
+            tone = tone,
+            timeMs = timeMs,
+            auto = auto,
+            modifier = Modifier.padding(bottom = 6.dp),
+            continuation = continuation,
+            over = over,
+            crosstalk = crosstalk,
+        )
     }
 }
 
@@ -89,12 +105,16 @@ internal fun Modifier.turnHeaderSemantics(description: String, clickLabel: Strin
 
 /** The header's text line, without semantics: the node around it describes it. */
 @Composable
+@Suppress("LongParameterList") // One shared header for initial and continuation rows.
 internal fun TurnHeaderLine(
     name: String,
     tone: SpeakerTone,
     timeMs: Long,
     auto: Boolean,
     modifier: Modifier = Modifier,
+    continuation: Boolean = false,
+    over: String = "",
+    crosstalk: Boolean = false,
 ) {
     val c = CassiniTheme.colors
     val t = CassiniTheme.type
@@ -104,27 +124,26 @@ internal fun TurnHeaderLine(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            Modifier
-                .size(8.dp)
-                .clip(CircleShape)
-                .background(speaker.dot),
-        )
-        Text(
-            text = name,
-            modifier = Modifier.weight(1f, fill = false),
-            style = t.speaker,
-            color = speaker.ink,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        if (!continuation) {
+            Box(Modifier.size(8.dp).clip(CircleShape).background(speaker.dot))
+            Text(
+                text = name,
+                modifier = Modifier.weight(1f, fill = false),
+                style = t.speaker,
+                color = speaker.ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         Text(
             text = Durations.clock(timeMs),
             style = t.monoTime.copy(lineHeight = t.speaker.lineHeight),
             color = c.text2,
             maxLines = 1,
         )
-        if (auto) AutoBadge(stringResource(R.string.ui_turn_auto))
+        if (auto && !continuation) AutoBadge(stringResource(R.string.ui_turn_auto))
+        if (over.isNotEmpty()) Text(over, style = t.monoTime, color = c.text2)
+        if (crosstalk) Text(stringResource(R.string.ui_turn_crosstalk), style = t.monoTime, color = c.text2)
     }
 }
 

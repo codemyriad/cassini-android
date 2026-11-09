@@ -5,11 +5,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import io.codemyriad.cassini.core.format.DocumentState
+import io.codemyriad.cassini.core.format.Transcript
 import io.codemyriad.cassini.core.format.Word
 import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.data.checkpoint.DraftTranscript
+import io.codemyriad.cassini.data.db.SpeakerEntity
 import io.codemyriad.cassini.data.db.WordEntity
 import io.codemyriad.cassini.data.notes.TranscriptFormat
 import io.codemyriad.cassini.engine.job.BatteryLine
@@ -45,6 +47,7 @@ import io.codemyriad.cassini.ui.note.ReadOnlyReason
 import io.codemyriad.cassini.ui.note.SaveState
 import io.codemyriad.cassini.ui.note.TranscribeRowUi
 import io.codemyriad.cassini.ui.note.TrustUi
+import io.codemyriad.cassini.ui.theme.SpeakerTone
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -711,6 +714,53 @@ class NoteViewModelTest {
         send(viewModel, NoteEvent.SpeakerTap("s1"))
         assertEquals(NoteDialog.ReadOnly(ReadOnlyReason.SAVING), viewModel.now().dialog)
     }
+
+    @Test fun anInlineOnlyDraftSpeakerCanBeNamedAndChosenAsAMergeTarget() = runTest(dispatcher) {
+        val words = interjectionWords()
+        val draft = DraftState(
+            words,
+            mapOf("ada" to "Ada", "ben" to "Ben"),
+            emptySet(),
+            emptyList(),
+            8500,
+            namingOpen = true,
+        )
+        ports.setJob(job(JobState.RUNNING), phase = JobPhase.Transcribing(progress(), draft))
+        val vm = viewModel()
+        assertEquals(listOf("ada"), vm.now().turns.map { it.speakerId })
+        send(vm, NoteEvent.SpeakerTap("ben"))
+        val sheet = (vm.now().sheet as NoteSheet.NameSpeaker).ui
+        assertEquals(SpeakerNameUi.Named("Ben"), sheet.label)
+        assertEquals(SpeakerTone.Teal, sheet.tone)
+        send(vm, NoteEvent.NameSheet(NameSheetEvent.Cancel))
+        send(vm, NoteEvent.SpeakerTap("ada"), NoteEvent.NameSheet(NameSheetEvent.MergeInto))
+        val targets = (vm.now().sheet as NoteSheet.Merge).ui.targets
+        assertEquals(listOf("ben"), targets.map { it.speakerId })
+        assertEquals(SpeakerTone.Teal, targets.single().tone)
+    }
+
+    @Test fun anInlineOnlySealedSpeakerKeepsTheAssignedToneInNamingAndMergeTargets() = runTest(dispatcher) {
+        ports.wordRows.value = interjectionWords().mapIndexed { index, word ->
+            WordEntity(NOTE, "v1", index, word.startMs, word.endMs, word.speaker, word.text)
+        }
+        ports.details.value = documentNote().copy(
+            speakers = listOf(
+                SpeakerEntity(NOTE, "v1", "ada", 0, "Ada", isPlaceholder = false, wordCount = 17),
+                SpeakerEntity(NOTE, "v1", "ben", 1, "Ben", isPlaceholder = false, wordCount = 2),
+            ),
+        )
+        val vm = viewModel()
+        assertEquals(listOf("ada"), vm.now().turns.map { it.speakerId })
+        send(vm, NoteEvent.SpeakerTap("ben"))
+        assertEquals(SpeakerTone.Teal, (vm.now().sheet as NoteSheet.NameSpeaker).ui.tone)
+        send(vm, NoteEvent.NameSheet(NameSheetEvent.Cancel))
+        send(vm, NoteEvent.SpeakerTap("ada"), NoteEvent.NameSheet(NameSheetEvent.MergeInto))
+        assertEquals(SpeakerTone.Teal, (vm.now().sheet as NoteSheet.Merge).ui.targets.single().tone)
+    }
+
+    private fun interjectionWords(): List<Word> = Transcript.fromJson(
+        java.io.File(checkNotNull(System.getProperty("cassini.interjections")), "acknowledgment.words.json").readText(),
+    ).words
 
     // Queue actions. --------------------------------------------------------------------------------------------
 

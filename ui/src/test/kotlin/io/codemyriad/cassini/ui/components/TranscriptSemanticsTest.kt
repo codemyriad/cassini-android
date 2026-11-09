@@ -1,5 +1,6 @@
 package io.codemyriad.cassini.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.width
@@ -40,8 +41,14 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.format.FIXED_ZONE
 import io.codemyriad.cassini.ui.format.ProvideFixedFormat
+import io.codemyriad.cassini.ui.note.NoteEvent
+import io.codemyriad.cassini.ui.note.NoteMode
+import io.codemyriad.cassini.ui.note.NoteScreen
+import io.codemyriad.cassini.ui.note.NoteUiState
+import io.codemyriad.cassini.ui.theme.CassiniColors
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import io.codemyriad.cassini.ui.theme.SpeakerTone
+import io.codemyriad.cassini.ui.theme.speaker
 import kotlinx.collections.immutable.persistentListOf
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -365,6 +372,122 @@ class TranscriptSemanticsTest {
         paragraph.performTouchInput { click(centre) }
         rule.runOnIdle { assertEquals(listOf(wordAt(words, middle)), taps) }
     }
+
+    @Test fun chipPrefixesWordsAndSuffixesSeekToTheChipEvenWhenItWraps() {
+        val words = chipWords()
+        val taps = mutableListOf<Int>()
+        setThemed {
+            Column {
+                Box(Modifier.width(350.dp)) {
+                    TurnParagraph(words, null, { taps += it }, Modifier.testTag(PARAGRAPH))
+                }
+                Box(Modifier.width(100.dp)) {
+                    TurnParagraph(words, null, { taps += it }, Modifier.testTag(OTHER))
+                }
+            }
+        }
+        val starts = wordStarts(words)
+        val expected = mutableListOf<Int>()
+        for (tag in listOf(PARAGRAPH, OTHER)) {
+            val node = rule.onNodeWithTag(tag)
+            val layout = node.textLayout()
+            if (tag == OTHER) {
+                assertTrue(layout.getLineForOffset(starts[1] - words[1].prefix.length) > layout.getLineForOffset(0))
+            }
+            val offsets = listOf(
+                starts[1] - words[1].prefix.length,
+                starts[1] - 3,
+                starts[1],
+                starts[2],
+                starts[2] + words[2].text.length,
+            )
+            for (offset in offsets) node.performTouchInput { click(layout.getBoundingBox(offset).center) }
+            expected += listOf(1, 1, 1, 2, 2)
+            if (tag == PARAGRAPH) {
+                val gap = layout.getBoundingBox(starts[1] - words[1].prefix.length - 1)
+                node.performTouchInput { click(Offset(gap.left + 1f, gap.center.y)) }
+                node.performTouchInput { click(Offset(gap.right - 1f, gap.center.y)) }
+                expected += listOf(0, 1)
+            }
+        }
+        rule.runOnIdle { assertEquals(expected, taps) }
+    }
+
+    @Test fun chipSpacesAreTintedAndActiveAndPressedColoursOverrideTheChip() {
+        val words = chipWords()
+        var active by mutableStateOf<Int?>(null)
+        lateinit var colors: CassiniColors
+        setThemed {
+            colors = CassiniTheme.colors
+            Box(Modifier.width(350.dp).background(colors.surface)) {
+                TurnParagraph(words, active, {}, Modifier.testTag(PARAGRAPH))
+            }
+        }
+        val node = rule.onNodeWithTag(PARAGRAPH)
+        val layout = node.textLayout()
+        val starts = wordStarts(words)
+        val gap = layout.getBoundingBox(starts[1] + words[1].text.length).center
+        val image = node.captureToImage().toPixelMap()
+        assertEquals(colors.speaker(SpeakerTone.Teal).tint, image[gap.x.toInt(), gap.y.toInt()])
+        fun contains(index: Int, color: Color): Boolean {
+            val pixels = node.captureToImage().toPixelMap()
+            val box = layout.getPathForRange(starts[index], starts[index] + words[index].text.length).getBounds()
+            return (box.top.toInt() until box.bottom.toInt()).any { y ->
+                (box.left.toInt() until box.right.toInt()).any { x -> pixels[x, y] == color }
+            }
+        }
+        active = 1
+        rule.waitForIdle()
+        assertTrue("active chip glyphs use onAccentFill", contains(1, colors.onAccentFill))
+        assertTrue("active chip uses accentFill", contains(1, colors.accentFill))
+        assertEquals("playback keeps the text layout", layout.layoutInput.text, node.textLayout().layoutInput.text)
+        rule.mainClock.autoAdvance = false
+        node.performTouchInput { down(layout.getBoundingBox(starts[2]).center) }
+        rule.mainClock.advanceTimeUntil(timeoutMillis = 1000) { contains(2, colors.accentTint) }
+        assertTrue("pressed chip uses accentTint inside its word", contains(2, colors.accentTint))
+        node.performTouchInput { up() }
+    }
+
+    @Test fun readInlineSuggestionHeaderRespectsRenamable() = inlineHeader(NoteMode.Reading)
+
+    @Test fun draftInlineSuggestionHeaderRespectsRenamable() =
+        inlineHeader(NoteMode.Paused(doneMs = 1000, totalMs = 2000, hasCheckpoint = true))
+
+    private fun inlineHeader(mode: NoteMode) {
+        val events = mutableListOf<NoteEvent>()
+        var renamable by mutableStateOf(true)
+        val turn = TurnUi(
+            "row",
+            "ada",
+            SpeakerNameUi.Named("Ada"),
+            SpeakerTone.Blue,
+            0,
+            words = chipWords(),
+            inlineSuggestions = persistentListOf(
+                InlineSuggestionUi("ben", "Speaker 2", SpeakerTone.Teal, 1000, SuggestionUi("v", "Ben")),
+            ),
+        )
+        setThemed {
+            NoteScreen(
+                NoteUiState("note", "Test", mode = mode, turns = persistentListOf(turn.copy(renamable = renamable))),
+                onEvent = { events += it },
+            )
+        }
+        val header = rule.onNode(hasContentDescription("Speaker 2", substring = true))
+        header.assertHasClickAction().performClick()
+        rule.runOnIdle {
+            assertEquals(listOf(NoteEvent.SpeakerTap("ben")), events)
+            renamable = false
+        }
+        header.assertHasNoClickAction()
+    }
+
+    private fun chipWords() = persistentListOf(
+        WordUi("Opening", 0),
+        WordUi("Sounds", 1000, prefix = "(Ben: ", interjectionTone = SpeakerTone.Teal),
+        WordUi("good.", 1500, suffix = ")", interjectionTone = SpeakerTone.Teal),
+        WordUi("Next.", 2000),
+    )
 
     private fun wordAt(words: List<WordUi>, offset: Int): Int = wordStarts(words).indexOfLast { it <= offset }
 

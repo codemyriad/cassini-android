@@ -28,6 +28,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
@@ -44,6 +45,7 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -51,13 +53,13 @@ import io.codemyriad.cassini.ui.R
 import io.codemyriad.cassini.ui.theme.CassiniColors
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import io.codemyriad.cassini.ui.theme.SANS_NORMAL_LINE_HEIGHT
+import io.codemyriad.cassini.ui.theme.speaker
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.util.Arrays
 
 /**
  * A test probe: when provided, every composition of a [TurnParagraph] calls it once. The recomposition test uses it
@@ -122,6 +124,7 @@ fun TurnParagraph(
     val activeWord = activeIndex?.takeIf { mode == TurnMode.Read && it in words.indices }
     val active = activeWord?.let { starts[it] until starts[it] + words[it].text.length }?.takeIf { !it.isEmpty() }
     val highlights = remember { Highlights() }
+    val measurer = rememberTextMeasurer()
     val line by rememberUpdatedState(onActiveLine)
     val currentActive by rememberUpdatedState(active)
     if (active != null && onActiveLine != null) {
@@ -132,9 +135,11 @@ fun TurnParagraph(
     }
     // The same callback and tap modifier in each composition, so a new active word does not update the text node
     // or the tap detection.
-    val onLayout = remember(highlights) {
+    val onLayout = remember(highlights, measurer, words, starts, c, mode) {
         fun(result: TextLayoutResult) {
             highlights.layout = result
+            highlights.glyphLayout = if (mode == TurnMode.Read) measurer.highlightLayout(result) else result
+            highlights.chips = chipBackgrounds(words, starts, result, c)
             reportActiveLine(result, currentActive, line)
         }
     }
@@ -164,6 +169,8 @@ fun TurnParagraph(
 private class Highlights {
     var layout by mutableStateOf<TextLayoutResult?>(null)
     var pressed by mutableStateOf<IntRange?>(null)
+    var glyphLayout: TextLayoutResult? = null
+    var chips: List<Pair<Path, Color>> = emptyList()
     private val activeRects = WordRects()
     private val pressedRects = WordRects()
 
@@ -177,11 +184,12 @@ private class Highlights {
             drawContent()
             return
         }
+        for ((path, tint) in chips) drawPath(path, tint)
         pressed?.let { drawWord(pressedRects.of(this, result, it, height), c.accentTint) }
         val rects = if (active != null) activeRects.of(this, result, active, height) else emptyList()
         drawWord(rects, c.accentFill)
         drawContent()
-        drawActiveGlyphs(result, rects, c.accentFill, c.onAccentFill)
+        drawActiveGlyphs(glyphLayout ?: result, rects, c.accentFill, c.onAccentFill)
     }
 
     /** Draws [rects] in [color] with 4 dp corners. */
@@ -287,27 +295,43 @@ private fun wordAt(layout: TextLayoutResult, words: List<WordUi>, starts: IntArr
     if (words.isEmpty()) return null
     val length = layout.layoutInput.text.length
     val offset = layout.getOffsetForPosition(position).coerceIn(0, length)
-    val found = Arrays.binarySearch(starts, offset)
-    var index = if (found >= 0) found else (-found - 2).coerceAtLeast(0)
+    var low = 0
+    var high = starts.size
+    while (low < high) {
+        val mid = (low + high) ushr 1
+        if (starts[mid] - words[mid].prefix.length <= offset) low = mid + 1 else high = mid
+    }
+    var index = (low - 1).coerceAtLeast(0)
+    val first = starts[index] - words[index].prefix.length
     val line = layout.getLineForVerticalPosition(position.y)
     // Right of the last word of a wrapped line, the offset can be the start of the next line.
-    if (index > 0 && starts[index] < length && layout.getLineForOffset(starts[index]) > line) index -= 1
-    return nearerWord(layout, starts, index, offset, position)
+    if (index > 0 && first < length && layout.getLineForOffset(first) > line) index -= 1
+    return nearerWord(layout, words, starts, index, offset, position)
 }
 
 /**
  * [index], or the word after it when [offset] is on the space between the two, both words are on the line of
  * [position] and the next word is nearer to it. The space is the character before the next word's start.
  */
-private fun nearerWord(layout: TextLayoutResult, starts: IntArray, index: Int, offset: Int, position: Offset): Int {
+@Suppress("LongParameterList") // Text geometry and the selected hit.
+private fun nearerWord(
+    layout: TextLayoutResult,
+    words: List<WordUi>,
+    starts: IntArray,
+    index: Int,
+    offset: Int,
+    position: Offset,
+): Int {
     val next = index + 1
-    val space = if (next < starts.size) starts[next] - 1 else -1
+    val nextStart = if (next < starts.size) starts[next] - words[next].prefix.length else -1
+    val space = nextStart - 1
     val line = layout.getLineForVerticalPosition(position.y)
-    val between = space > starts[index] && offset >= space && starts[next] < layout.layoutInput.text.length &&
-        layout.getLineForOffset(space - 1) == line && layout.getLineForOffset(starts[next]) == line
+    val between = space > starts[index] && offset >= space && nextStart < layout.layoutInput.text.length &&
+        layout.getLineForOffset(space - 1) == line && layout.getLineForOffset(nextStart) == line
     if (!between) return index
-    val before = horizontalDistance(layout.getBoundingBox(space - 1), position.x)
-    val after = horizontalDistance(layout.getBoundingBox(starts[next]), position.x)
+    val end = starts[index] + words[index].text.length + words[index].suffix.length
+    val before = horizontalDistance(layout.getBoundingBox(end - 1), position.x)
+    val after = horizontalDistance(layout.getBoundingBox(nextStart), position.x)
     return if (after < before) next else index
 }
 
@@ -325,8 +349,17 @@ private fun paragraph(
     c: CassiniColors,
 ): AnnotatedString = buildAnnotatedString {
     append(turnText(words))
-    if (mode != TurnMode.Read && unsettledFrom != null && unsettledFrom in words.indices) {
-        addStyle(SpanStyle(color = c.text4), starts[unsettledFrom], length)
+    val explicitUnsettled = words.any { it.unsettled }
+    words.forEachIndexed { index, word ->
+        val first = starts[index] - word.prefix.length
+        val end = starts[index] + word.text.length + word.suffix.length
+        word.interjectionTone?.let { tone ->
+            val colors = c.speaker(tone)
+            addStyle(SpanStyle(color = colors.ink), first, end)
+            if (word.prefix.isNotEmpty()) addStyle(SpanStyle(fontWeight = FontWeight.SemiBold), first, starts[index])
+        }
+        val unsettled = word.unsettled || (!explicitUnsettled && unsettledFrom != null && index >= unsettledFrom)
+        if (mode != TurnMode.Read && unsettled) addStyle(SpanStyle(color = c.text4), starts[index], end)
     }
     matches.ranges.forEachIndexed { index, range ->
         val start = range.first.coerceIn(0, length)

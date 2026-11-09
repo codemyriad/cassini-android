@@ -97,14 +97,15 @@ class WordStarts(private val turns: ImmutableList<TurnUi>) {
         starts = LongArray(size)
         turnOf = IntArray(size)
         inTurn = IntArray(size)
-        var i = 0
-        turns.forEachIndexed { t, turn ->
-            turn.words.forEachIndexed { w, word ->
-                starts[i] = word.startMs
-                turnOf[i] = t
-                inTurn[i] = w
-                i++
-            }
+        val entries = turns.flatMapIndexed { t, turn -> turn.words.indices.map { w -> t to w } }
+            .sortedWith(
+                compareBy<Pair<Int, Int>> { (t, w) -> turns[t].words[w].startMs }
+                    .thenBy { (t, w) -> turns[t].words[w].canonicalIndex.takeIf { it >= 0 } ?: w },
+            )
+        entries.forEachIndexed { i, (t, w) ->
+            starts[i] = turns[t].words[w].startMs
+            turnOf[i] = t
+            inTurn[i] = w
         }
     }
 
