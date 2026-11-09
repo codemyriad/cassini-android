@@ -1,5 +1,8 @@
 package io.codemyriad.cassini.core.library
 
+import io.codemyriad.cassini.core.export.ReadingTurns
+import io.codemyriad.cassini.core.export.ReadingTurnsTest
+import io.codemyriad.cassini.core.format.Transcript
 import io.codemyriad.cassini.core.format.Word
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -26,7 +29,7 @@ class PreviewTextTest {
 
     @Test fun reproducesBoard00() {
         val preview = PreviewText.of(board03, (11 * 60 + 44) * 1000L)!!
-        val board00 = "so the delivery slips to Thursday, but the price stays as agreed in the March order"
+        val board00 = "so the delivery slips to Thursday, but the price stays as agreed in the March order."
         assertEquals("…$board00…", preview.display)
         assertEquals(board00, preview.text)
         assertTrue(preview.leadingEllipsis)
@@ -70,29 +73,25 @@ class PreviewTextTest {
             turn("spk_1", 12_000, "All right.")
         val preview = PreviewText.of(words, 5_000)!!
         // "Yes." alone is shorter than MIN_BEFORE_TURN_END, so the next turn follows; then the excerpt stops.
-        assertEquals("…Yes. So Thursday works for everyone, including the warehouse…", preview.display)
+        assertEquals("…Yes. So Thursday works for everyone, including the warehouse.…", preview.display)
         assertTrue(preview.text.length >= PreviewText.MIN_BEFORE_TURN_END)
     }
 
-    @Test fun cutAtAWordWithPunctuationDropped() {
+    @Test fun cutsBetweenAtomsAndPreservesStoredPunctuation() {
         val long = turn("spk_0", 0, (1..40).joinToString(" ") { "sample$it," })
         val preview = PreviewText.of(long, long[5].startMs)!!
         assertTrue(preview.display, preview.text.length <= PreviewText.LIMIT)
         assertTrue(preview.text.startsWith("sample6, sample7, "))
-        // Whole words only: the excerpt is a prefix of the words from the playing one.
-        val words = long.drop(5).map { it.text.trimEnd(',') }
-        assertTrue(preview.text, words.joinToString(", ").startsWith(preview.text))
-        assertTrue(preview.display.endsWith("…"))
-        assertFalse(preview.display, preview.display.endsWith(",…"))
-        // One more word would not fit (the dropped comma counted).
+        assertTrue(long.drop(5).joinToString(" ") { it.text }.startsWith(preview.text))
+        assertTrue(preview.display.endsWith(",…"))
         val next = long[5 + preview.text.split(' ').size].text
-        assertTrue((preview.text + ",").length + 1 + next.length > PreviewText.LIMIT)
+        assertTrue(preview.text.length + 1 + next.length > PreviewText.LIMIT)
     }
 
-    @Test fun sentencePunctuationIsDroppedOnlyWhenCut() {
+    @Test fun sentencePunctuationIsPreservedWhenCut() {
         val long = turn("spk_0", 0, "Then we agreed on the quantities for the first batch.") + turn("spk_1", 9_000, "Ok.")
         val batch = PreviewText.of(long, long[1].startMs)!!.display
-        assertEquals("…we agreed on the quantities for the first batch…", batch)
+        assertEquals("…we agreed on the quantities for the first batch.…", batch)
         val words = turn("spk_0", 0, "Fine. Next.") + turn("spk_1", 2_000, "Yes!")
         assertEquals("…Next. Yes!", PreviewText.of(words, words[1].startMs)!!.display)
         assertEquals("…Yes!", PreviewText.of(words, words[2].startMs)!!.display)
@@ -110,11 +109,67 @@ class PreviewTextTest {
         assertNull(PreviewText.of(emptyList(), 10_000))
     }
 
-    @Test fun aGiantWordIsCutOnACodePoint() {
+    @Test fun aGiantWordRemainsOneStoredAtom() {
         val giant = "a".repeat(PreviewText.LIMIT - 1) + "😀" + "tail"
         val preview = PreviewText.of(listOf(Word("spk_0", 0, 1_000, giant)), 0)!!
-        assertEquals("a".repeat(PreviewText.LIMIT - 1), preview.text)
+        assertEquals(giant, preview.text)
+        assertFalse(preview.trailingEllipsis)
+    }
+
+    @Test fun previewRejoinsTheHostAndKeepsTheBackchannelInline() {
+        val words = Transcript.fromJson(ReadingTurnsTest.resource("acknowledgment.words.json")).words
+        val preview = PreviewText.of(words, 500, mapOf("ben" to "Ben"))!!
+        assertEquals(
+            "…release candidate is ready for testing, (Ben: Sounds good.) and I will send the download link after this call.",
+            preview.display,
+        )
+    }
+
+    @Test fun anUnplayedNoteKeepsItsOpeningAtomsEvenWhenStartsAreUnsortedOrZeroLength() {
+        val cases = listOf(
+            listOf(Word("a", 1000, 3000, "long"), Word("a", 900, 1500, "short")),
+            listOf(Word("a", 0, 0, "Opening"), Word("a", 0, 200, "word.")),
+        )
+        for (words in cases) {
+            for (position in listOf(0L, -1L)) {
+                assertEquals(
+                    Preview(words.joinToString(" ") { it.text }, leadingEllipsis = false, trailingEllipsis = false),
+                    PreviewText.of(words, position),
+                )
+            }
+        }
+    }
+
+    @Test fun pausingInsideAClippedFinalWordUsesItsCanonicalEnd() {
+        val words = listOf(Word("a", 0, 500, "Before"), Word("a", 5000, 8000, "finished."))
+        assertEquals(6000L, ReadingTurns.of(words).words.last().endMs)
+        val expected = Preview("finished.", leadingEllipsis = true, trailingEllipsis = false)
+        assertEquals(expected, PreviewText.of(words, 6500))
+        assertEquals(PreviewText.of(words, 0), PreviewText.of(words, 8000))
+    }
+
+    @Test fun cuttingInsideAChipClosesItsParenthesisWithinTheBudget() {
+        val words = paddedAcknowledgment(PreviewText.LIMIT - " (Ben: Sounds)".length)
+        val preview = PreviewText.of(words, 0, mapOf("ben" to "Ben"))!!
+        assertEquals(words.take(7).joinToString(" ") { it.text } + " (Ben: Sounds)", preview.text)
+        assertEquals(PreviewText.LIMIT, preview.text.length)
         assertTrue(preview.trailingEllipsis)
+        assertFalse(preview.leadingEllipsis)
+    }
+
+    @Test fun aNonfinalChipWordMustLeaveRoomForTheClosingParenthesis() {
+        val words = paddedAcknowledgment(PreviewText.LIMIT - " (Ben: Sounds".length)
+        val preview = PreviewText.of(words, 0, mapOf("ben" to "Ben"))!!
+        assertEquals(words.take(7).joinToString(" ") { it.text }, preview.text)
+        assertTrue(preview.trailingEllipsis)
+    }
+
+    /** Stretch one synthetic atom to put the character budget inside the chip, retaining its timing and word count. */
+    private fun paddedAcknowledgment(hostLength: Int): List<Word> {
+        val words = Transcript.fromJson(ReadingTurnsTest.resource("acknowledgment.words.json")).words.toMutableList()
+        val host = words.take(7).joinToString(" ") { it.text }
+        words[0] = words[0].copy(text = words[0].text + "x".repeat(hostLength - host.length))
+        return words
     }
 
     @Test fun storedPreviewReadsBack() {

@@ -2,28 +2,19 @@ package io.codemyriad.cassini.core.export
 
 import io.codemyriad.cassini.core.format.Word
 
-/** A maximal run of consecutive words (canonical order) with the same speaker. */
+/** A whole reading run, including a run rendered inline as an interjection. */
 data class Turn(val speaker: String, val startMs: Long, val endMs: Long, val words: List<Word>) {
     /** The words joined with one space. */
     val text: String get() = words.joinToString(" ") { it.text }
 }
 
-/** Splits a transcript into turns. Shared by the exports, the UI and `SpeakerStats`. */
+/** Compatibility projection of the shared reading model's whole runs (not paragraphs). */
 object TranscriptTurns {
-    /**
-     * The turns of [words], in canonical order. A turn starts at its first word's start and ends at its last word's
-     * end, as features.md section 9 says, even when an earlier word of the turn ends later.
-     */
-    fun of(words: List<Word>): List<Turn> {
-        val turns = ArrayList<Turn>()
-        var from = 0
-        while (from < words.size) {
-            var to = from + 1
-            while (to < words.size && words[to].speaker == words[from].speaker) to++
-            val run = words.subList(from, to).toList()
-            turns += Turn(run.first().speaker, run.first().startMs, run.last().endMs, run)
-            from = to
+    /** Display runs in reading order; canonical words are not mutated. Chip runs remain countable. */
+    fun of(words: List<Word>, endsBoundedByAudio: Boolean = false): List<Turn> {
+        val reading = ReadingTurns.of(words, endsBoundedByAudio)
+        return reading.runs.map { run ->
+            Turn(run.speaker, run.startMs, run.endMs, run.wordIndices.map { reading.words[it] })
         }
-        return turns
     }
 }

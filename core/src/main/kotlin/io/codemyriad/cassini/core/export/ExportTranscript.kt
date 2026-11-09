@@ -17,6 +17,7 @@ data class ExportTranscript(
     val durationMs: Long,
     val words: List<Word>,
     val labels: Map<String, String>,
+    val endsBoundedByAudio: Boolean = false,
 ) {
     /** The number of distinct speakers that say at least one word. */
     val speakerCount: Int = words.mapTo(HashSet()) { it.speaker }.size

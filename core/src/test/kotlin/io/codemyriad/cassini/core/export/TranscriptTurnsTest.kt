@@ -24,11 +24,11 @@ class TranscriptTurnsTest {
         assertEquals(listOf(900L, 1200L, 2400L), turns.map { it.endMs })
     }
 
-    @Test fun aTurnEndsAtItsLastWordAndKeepsCanonicalOrder() {
+    @Test fun runsKeepCanonicalAtomsAndUseAudibleBounds() {
         val words = listOf(w("a", 1000, 3000, "long"), w("a", 900, 1500, "short"))
         val turn = TranscriptTurns.of(words).single()
-        assertEquals(1000L, turn.startMs)
-        assertEquals(1500L, turn.endMs)
+        assertEquals(900L, turn.startMs)
+        assertEquals(3000L, turn.endMs)
         assertEquals("long short", turn.text)
     }
 }

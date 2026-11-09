@@ -1,5 +1,6 @@
 package io.codemyriad.cassini.core.speakers
 
+import io.codemyriad.cassini.core.export.ReadingTurnsTest
 import io.codemyriad.cassini.core.format.Transcript
 import io.codemyriad.cassini.core.format.Word
 import org.junit.Assert.assertEquals
@@ -27,7 +28,7 @@ class SpeakerStatsTest {
         assertEquals(listOf("b", "a"), stats.keys.toList())
 
         val b = stats.getValue("b")
-        assertEquals(SpeakerStat("b", 0, (2500 - 500) + (3600 - 3100L), 2, 3, 500, SampleWindow(500, 2500)), b)
+        assertEquals(SpeakerStat("b", 0, (2000 - 500) + (3600 - 3100L), 2, 3, 500, SampleWindow(500, 2000)), b)
 
         val a = stats.getValue("a")
         assertEquals(1, a.ordinal)
@@ -96,5 +97,17 @@ class SpeakerStatsTest {
     @Test fun withoutMergesTheDraftOverloadMatchesThePlainOne() {
         val words = listOf(w("a", 0, 1000), w("b", 1000, 3000), w("a", 3000, 3500))
         assertEquals(SpeakerStats.of(words), SpeakerStats.of(Transcript(words), emptyMap()))
+    }
+
+    @Test fun sharedFixturesCountWholeRunsIncludingTheChipSpeaker() {
+        for (fixture in listOf("acknowledgment", "competing")) {
+            val words = Transcript.fromJson(ReadingTurnsTest.resource("$fixture.words.json")).words
+            val stats = SpeakerStats.of(words)
+            assertEquals(listOf(1, 1), stats.values.map { it.turnCount })
+            assertEquals(words.size, stats.values.sumOf { it.wordCount })
+            assertTrue(stats.getValue("ada").sample != null)
+        }
+        val competing = Transcript.fromJson(ReadingTurnsTest.resource("competing.words.json")).words
+        assertEquals(SampleWindow(50, 5550), SpeakerStats.of(competing).getValue("ben").sample)
     }
 }

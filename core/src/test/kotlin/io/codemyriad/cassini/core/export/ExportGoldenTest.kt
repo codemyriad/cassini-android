@@ -5,7 +5,8 @@ import org.junit.Test
 /**
  * A 1 h 03 min call in English with three speakers: a named one, a placeholder and a named one with an
  * accent. Speaker 2's "Yes, yes." comes after Élodie's turn in canonical order but starts while she speaks, so the
- * subtitles sort it into her cues.
+ * subtitles sort it into her cues. Her readable block is not split around it, so the viewer reports competing
+ * speech (over), rather than inventing an interjection seam.
  */
 class ExportGoldenTest {
     private val meeting = transcript(
