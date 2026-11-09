@@ -364,7 +364,13 @@ class DocumentRepository(
                 variantId == null || variants.none { it.variantId == variantId } -> ExportOutcome.NotAvailable
                 else -> {
                     val words = cache.words(noteId, variantId).map { Word(it.speaker, it.startMs, it.endMs, it.text) }
-                    val transcript = ExportTranscript(row.title, row.durationMs, words, request.labels)
+                    val transcript = ExportTranscript(
+                        row.title,
+                        row.durationMs,
+                        words,
+                        request.labels,
+                        variants.first { it.variantId == variantId }.wordEndsBoundedByAudio,
+                    )
                     val name = ExportNames.file(row.title, request.format.extension)
                     stageAndWrite(name, render(transcript, request), dest)
                 }

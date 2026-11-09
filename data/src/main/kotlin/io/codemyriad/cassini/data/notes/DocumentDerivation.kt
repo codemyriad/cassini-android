@@ -1,5 +1,6 @@
 package io.codemyriad.cassini.data.notes
 
+import io.codemyriad.cassini.core.export.ReadingText
 import io.codemyriad.cassini.core.format.CassiniDocument
 import io.codemyriad.cassini.core.format.DocumentState
 import io.codemyriad.cassini.core.format.Word
@@ -38,6 +39,10 @@ internal object DocumentDerivation {
         val selected = (select ?: row.selectedVariant)?.takeIf { id -> readable.any { it.first == id } }
         val shown = readable.firstOrNull { it.first == (selected ?: document.defaultId) } ?: readable.firstOrNull()
         val shownWords = shown?.second.orEmpty()
+        val labels = shownWords.map { it.speaker }.distinct().withIndex().associate { (ordinal, id) ->
+            id to (DefaultLabels.stored(id, document.speakerLabel(id)) ?: "Speaker ${ordinal + 1}")
+        }
+        val bounded = wordEndsBoundedByAudio(document)
         val meeting = document.manifest?.optJSONObject("meeting")
         val note = row.copy(
             audioFile = NoteFiles.DOCUMENT,
@@ -49,7 +54,7 @@ internal object DocumentDerivation {
             documentSignature = signature,
             meetingId = meeting?.optString("id")?.ifEmpty { null } ?: row.meetingId,
             selectedVariant = selected,
-            preview = PreviewText.of(shownWords, row.positionMs)?.display,
+            preview = PreviewText.of(shownWords, row.positionMs, labels, bounded)?.display,
             titleDirty = document.manifest != null && document.title != row.title,
             updatedAt = now,
         )
@@ -64,7 +69,7 @@ internal object DocumentDerivation {
                     WordEntity(row.id, id, index, word.startMs, word.endMs, word.speaker, word.text)
                 }
             },
-            body = shownWords.joinToString(" ") { it.text },
+            body = ReadingText.body(shownWords, { labels[it] ?: it }, bounded),
         )
     }
 
@@ -90,13 +95,14 @@ internal object DocumentDerivation {
             speakerCount = words?.mapTo(HashSet()) { it.speaker }?.size ?: 0,
             speakersToldApart = processing?.has(DIARIZATION) == true,
             inferenceMs = processing?.takeIf { it.has(INFERENCE_MS) }?.optLong(INFERENCE_MS),
+            wordEndsBoundedByAudio = wordEndsBoundedByAudio(document),
             readable = words != null,
             error = variant.error,
         )
     }
 
     private fun speakerRows(noteId: String, document: CassiniDocument, variantId: String, words: List<Word>): List<SpeakerEntity> =
-        SpeakerStats.of(words).values.map { stat ->
+        SpeakerStats.of(words, wordEndsBoundedByAudio(document)).values.map { stat ->
             val label = document.speakerLabel(stat.speakerId) ?: stat.speakerId
             val placeholder = DefaultLabels.isDefault(stat.speakerId, label)
             SpeakerEntity(
@@ -121,6 +127,10 @@ internal object DocumentDerivation {
         DefaultLabels.PREFIXES.firstNotNullOfOrNull { prefix ->
             if (label.startsWith(prefix)) label.removePrefix(prefix).toIntOrNull() else null
         }
+
+    /** Only the literal JSON boolean true attests measured ends, as in the viewer. */
+    fun wordEndsBoundedByAudio(document: CassiniDocument): Boolean =
+        document.manifest?.optJSONObject("provenance")?.optJSONObject("wordTimings")?.opt("endsBoundedByAudio") == true
 
     /** The provenance record of one variant: `provenance.speechToText.<variantId>`. */
     fun processingOf(document: CassiniDocument, variantId: String): JSONObject? =

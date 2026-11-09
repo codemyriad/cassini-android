@@ -7,7 +7,8 @@ import androidx.room.TypeConverters
 /**
  * The Room catalogue (docs/architecture.md, section 3.3), opened by absolute path at `AppPaths.database` through
  * [CassiniDatabaseOpener]. Version 1 is the pre-public schema (D51); its clean switch adds the pinned job
- * recognizer. After the first public release, a later version needs a written Migration with a MigrationTestHelper
+ * recognizer and D84 measured-word-end provenance cache. After the first public release, a later version needs a
+ * written Migration with a MigrationTestHelper
  * test. Destructive fallback migrations are forbidden: a database that cannot be opened is set aside and the
  * catalogue is rebuilt from the files.
  */
