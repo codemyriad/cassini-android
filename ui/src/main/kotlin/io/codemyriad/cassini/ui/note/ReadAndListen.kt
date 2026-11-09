@@ -390,6 +390,9 @@ private fun Turn(
                 onNo = { onEvent(NoteEvent.RejectSuggestion(turn.speakerId, suggestion.voiceId)) },
                 onSpeaker = onSpeaker,
                 modifier = Modifier.padding(top = 12.dp),
+                continuation = turn.continuation,
+                over = turn.over,
+                crosstalk = turn.crosstalk,
             )
         } else {
             TurnHeader(

@@ -312,6 +312,9 @@ private fun DraftTurn(turn: TurnUi, first: Boolean, onEvent: (NoteEvent) -> Unit
                 onNo = { onEvent(NoteEvent.RejectSuggestion(turn.speakerId, suggestion.voiceId)) },
                 onSpeaker = onSpeaker,
                 modifier = Modifier.padding(top = if (first) 4.dp else DraftTurnGap),
+                continuation = turn.continuation,
+                over = turn.over,
+                crosstalk = turn.crosstalk,
             )
         } else {
             TurnHeader(

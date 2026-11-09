@@ -28,3 +28,28 @@ layout, nesting or competing-speech label work. Statistics count whole runs, inc
 paragraphs. TXT keeps the reader's continuation and overlap labels. Excerpts follow reading order
 and paragraph ends, keep chips inline, and preserve stored punctuation and whole oversized atoms;
 ellipses indicate omitted words separately. Subtitle cue segmentation remains time-based.
+
+## Surface audit (D84)
+
+| Surface | Reading path |
+| --- | --- |
+| Sealed Note / Read & listen | `NoteTranscripts.sealed` -> `ReadingTurns` -> `TurnUi` -> `ReadAndListen` |
+| Processing / paused / failed draft | `NoteTranscripts.draft` -> the same rows -> `NoteModes.DraftTurn` |
+| Queued or failed job over a document | `NoteModes.DocumentBelow` delegates to the same Read & listen transcript |
+| Normal and voice-suggestion headers | Both use `TurnHeaderLine`, including continuation, competing speech and crosstalk; naming controls do not replace the reading metadata |
+| In-note search | `TranscriptSearch` indexes `turnText`, including the same inline labels and word offsets |
+| Library search excerpts | `DocumentDerivation` and variant selection index `ReadingText.body`; SQLite FTS snippets select from that body |
+| Library playback-position preview | `PreviewText` uses reading rows and canonical playback anchors; clipped chip wrappers stay balanced |
+| TXT / speaker statistics | `ReadingTurns` / its whole-run compatibility projection |
+
+`SubtitleCues` is called only by `SrtWriter` and `VttWriter`. It is a timed caption
+projection with cue duration, line-length and speaker-overlap constraints, not a reader turn
+assembler. Its canonical words and subtitle timings stay intact; it is not used by any Note
+or search surface. The D84 audit explicitly leaves subtitle cue segmentation unchanged.
+
+The browser companion at protocol main `77b2c62` displays capture/admission/transport status
+and diagnostics, not transcript words. It has no transcript renderer to port. Its popup CSS
+`subtitle` class labels the companion itself and is unrelated to timed captions.
+
+The Note/cache integrations are supplied by the separately reviewed #95/#97 changes. This
+follow-up closes the remaining suggestion-header branch in both reading and draft modes.

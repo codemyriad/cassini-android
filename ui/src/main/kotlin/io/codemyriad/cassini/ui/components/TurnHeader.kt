@@ -65,11 +65,7 @@ fun TurnHeader(
             .fillMaxWidth()
             .height(TurnHeaderHeight)
             .turnHeaderSemantics(
-                description = listOf(
-                    Spoken.turn(name, timeMs, auto),
-                    over,
-                    if (crosstalk) stringResource(R.string.ui_turn_crosstalk) else "",
-                ).filter { it.isNotEmpty() }.joinToString(" "),
+                description = turnHeaderDescription(name, timeMs, auto, over, crosstalk),
                 clickLabel = stringResource(R.string.ui_turn_name_action),
                 onClick = onClick,
             ),
@@ -87,6 +83,20 @@ fun TurnHeader(
         )
     }
 }
+
+/** Normal and naming-suggestion headers announce the same reading metadata. */
+@Composable
+internal fun turnHeaderDescription(
+    name: String,
+    timeMs: Long,
+    auto: Boolean,
+    over: String,
+    crosstalk: Boolean,
+): String = listOf(
+    Spoken.turn(name, timeMs, auto),
+    over,
+    if (crosstalk) stringResource(R.string.ui_turn_crosstalk) else "",
+).filter { it.isNotEmpty() }.joinToString(" ")
 
 /**
  * The button and [description] of a turn header ([clickLabel] is "Name this speaker"); a header that cannot be
