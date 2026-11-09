@@ -22,12 +22,19 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import java.util.Arrays
 
+/** Naming metadata for every speaker, including speakers shown only inside a chip. */
+data class TranscriptSpeaker(val name: SpeakerNameUi, val tone: SpeakerTone)
+
 /**
  * The transcript the Note screen shows: its [turns] (one LazyColumn item each) and an [index] from audio time to
  * word, for the active word. Built off the main thread, once per transcript; the position ticks only search
  * [index].
  */
-class NoteTranscript(val turns: ImmutableList<TurnUi>, internal val index: WordIndex) {
+class NoteTranscript(
+    val turns: ImmutableList<TurnUi>,
+    internal val index: WordIndex,
+    val speakerMetadata: Map<String, TranscriptSpeaker> = emptyMap(),
+) {
     /** The word playing at [positionMs]: the last word that started at or before it; null before the first. */
     fun activeWord(positionMs: Long): WordRef? = index.at(positionMs)
 
@@ -183,7 +190,7 @@ object NoteTranscripts {
                 inlineSuggestions = inline.toImmutableList(),
             )
         }
-        return NoteTranscript(turns.toImmutableList(), transcript.index)
+        return NoteTranscript(turns.toImmutableList(), transcript.index, transcript.speakerMetadata)
     }
 
     // Building. ---------------------------------------------------------------------------------------------------
@@ -263,7 +270,10 @@ object NoteTranscripts {
         val starts = chronological.map { words[it].startMs }.toLongArray()
         val turnIds = chronological.map { checkNotNull(refs[it]).turnId }.toTypedArray()
         val inTurn = chronological.map { checkNotNull(refs[it]).index }.toIntArray()
-        return NoteTranscript(turns.toImmutableList(), WordIndex(starts, turnIds, inTurn))
+        val metadata = words.map { it.speaker }.distinct().associateWith { id ->
+            made(id).let { TranscriptSpeaker(it.name, it.tone) }
+        }
+        return NoteTranscript(turns.toImmutableList(), WordIndex(starts, turnIds, inTurn), metadata)
     }
 
     private fun displayName(name: SpeakerNameUi, placeholder: (Int) -> String): String = when (name) {

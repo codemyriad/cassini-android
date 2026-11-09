@@ -334,7 +334,7 @@ private fun DraftTurn(turn: TurnUi, first: Boolean, onEvent: (NoteEvent) -> Unit
                 name = inline.suggestion.name,
                 onYes = { onEvent(NoteEvent.AcceptSuggestion(inline.speakerId, inline.suggestion.voiceId)) },
                 onNo = { onEvent(NoteEvent.RejectSuggestion(inline.speakerId, inline.suggestion.voiceId)) },
-                onSpeaker = { onEvent(NoteEvent.SpeakerTap(inline.speakerId)) },
+                onSpeaker = if (turn.renamable) ({ onEvent(NoteEvent.SpeakerTap(inline.speakerId)) }) else null,
             )
         }
         TurnParagraph(

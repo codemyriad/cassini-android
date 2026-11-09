@@ -1144,7 +1144,7 @@ class NoteViewModel(
         val speakers = details.speakers.filter { it.variantId == variant.variantId }
         val speaker = speakers.firstOrNull { it.speakerId == speakerId } ?: return null
         val transcript = core.shown()
-        val tones = transcript.turns.associate { it.speakerId to it.tone }
+        val tones = transcript.speakerMetadata.mapValues { it.value.tone }
         val print = runCatching { ports.prints(noteId, variant.variantId)[speakerId] }.getOrNull()
         val sample = speaker.sampleStartMs?.let { start ->
             speaker.sampleEndMs?.let { end -> SampleWindow(start, end) }
@@ -1174,18 +1174,17 @@ class NoteViewModel(
 
     private suspend fun draftInput(core: Core, speakerId: String): NamingInput? {
         val draft = core.draft ?: return null
-        val turns = draft.transcript.turns
-        val turn = turns.firstOrNull { it.speakerId == speakerId } ?: return null
+        val speakers = draft.transcript.speakerMetadata
+        val speaker = speakers[speakerId] ?: return null
         val stats = SpeakerStats.of(draft.words)
-        val firsts = turns.distinctBy { it.speakerId }
-        val targets = firsts.filter { it.speakerId != speakerId }.map {
-            MergeTargetUi(it.speakerId, it.name, it.tone, stats[it.speakerId]?.speakingMs ?: 0)
+        val targets = speakers.filterKeys { it != speakerId }.map { (id, metadata) ->
+            MergeTargetUi(id, metadata.name, metadata.tone, stats[id]?.speakingMs ?: 0)
         }
         val modelReady = ports.voiceModelReady.first()
         return NamingInput(
             speakerId = speakerId,
-            label = turn.name,
-            tone = turn.tone,
+            label = speaker.name,
+            tone = speaker.tone,
             speakingMs = stats[speakerId]?.speakingMs ?: 0,
             sample = stats[speakerId]?.sample,
             draft = true,

@@ -10,6 +10,7 @@ import io.codemyriad.cassini.ui.components.SpeakerNameUi
 import io.codemyriad.cassini.ui.components.SuggestionUi
 import io.codemyriad.cassini.ui.components.WordRef
 import io.codemyriad.cassini.ui.components.turnText
+import io.codemyriad.cassini.ui.note.WordStarts
 import io.codemyriad.cassini.ui.theme.SpeakerTone
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -191,6 +192,8 @@ class NoteTranscriptsTest {
         )
         assertEquals("", row.over)
         assertEquals(listOf("ada", "ben"), transcript.speakers)
+        assertEquals(SpeakerNameUi.Named("Ben"), transcript.speakerMetadata.getValue("ben").name)
+        assertEquals(row.words[7].interjectionTone, transcript.speakerMetadata.getValue("ben").tone)
         val active = transcript.activeWord(3200)!!
         assertEquals(WordRef(row.id, 7), active)
         assertEquals("Sounds", row.words[active.index].text)
@@ -264,6 +267,10 @@ class NoteTranscriptsTest {
             val sealed = NoteTranscripts.sealed(words, speakers, emptyMap(), emptyList())
             val draft = NoteTranscripts.draft(words, labels, emptySet(), emptyMap(), null)
             for (transcript in listOf(sealed, draft)) {
+                val frame = WordStarts(transcript.turns)
+                for (word in words) {
+                    assertEquals(name, transcript.activeWord(word.startMs), frame.ref(frame.indexAt(word.startMs)))
+                }
                 assertEquals(name, expected.length(), transcript.turns.size)
                 transcript.turns.forEachIndexed { index, turn ->
                     val row = expected.getJSONObject(index)
