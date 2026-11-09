@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "f2b833fefa59d740e2b65843f3d02000",
+    "identityHash": "91263e0096bc137d71c0a1189b8d79cd",
     "entities": [
       {
         "tableName": "notes",
@@ -170,7 +170,7 @@
       },
       {
         "tableName": "variants",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`note_id` TEXT NOT NULL, `variant_id` TEXT NOT NULL, `ordinal` INTEGER NOT NULL, `is_default` INTEGER NOT NULL, `created_at_utc` TEXT, `language` TEXT NOT NULL, `kind` TEXT NOT NULL, `derived_from` TEXT, `word_count` INTEGER NOT NULL, `speaker_count` INTEGER NOT NULL, `speakers_told_apart` INTEGER NOT NULL, `inference_ms` INTEGER, `readable` INTEGER NOT NULL, `error` TEXT, PRIMARY KEY(`note_id`, `variant_id`), FOREIGN KEY(`note_id`) REFERENCES `notes`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`note_id` TEXT NOT NULL, `variant_id` TEXT NOT NULL, `ordinal` INTEGER NOT NULL, `is_default` INTEGER NOT NULL, `created_at_utc` TEXT, `language` TEXT NOT NULL, `kind` TEXT NOT NULL, `derived_from` TEXT, `word_count` INTEGER NOT NULL, `speaker_count` INTEGER NOT NULL, `speakers_told_apart` INTEGER NOT NULL, `inference_ms` INTEGER, `word_ends_bounded_by_audio` INTEGER NOT NULL, `readable` INTEGER NOT NULL, `error` TEXT, PRIMARY KEY(`note_id`, `variant_id`), FOREIGN KEY(`note_id`) REFERENCES `notes`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "noteId",
@@ -240,6 +240,12 @@
             "fieldPath": "inferenceMs",
             "columnName": "inference_ms",
             "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "wordEndsBoundedByAudio",
+            "columnName": "word_ends_bounded_by_audio",
+            "affinity": "INTEGER",
+            "notNull": true
           },
           {
             "fieldPath": "readable",
@@ -755,7 +761,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'f2b833fefa59d740e2b65843f3d02000')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '91263e0096bc137d71c0a1189b8d79cd')"
     ]
   }
 }

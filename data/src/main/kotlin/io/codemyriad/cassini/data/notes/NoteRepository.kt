@@ -1,6 +1,7 @@
 package io.codemyriad.cassini.data.notes
 
 import androidx.annotation.WorkerThread
+import io.codemyriad.cassini.core.export.ReadingText
 import io.codemyriad.cassini.core.format.DocumentState
 import io.codemyriad.cassini.core.format.Word
 import io.codemyriad.cassini.core.library.AudioKind
@@ -9,6 +10,7 @@ import io.codemyriad.cassini.core.library.Origin
 import io.codemyriad.cassini.core.library.PreviewText
 import io.codemyriad.cassini.core.library.SearchQuery
 import io.codemyriad.cassini.core.library.TrashPolicy
+import io.codemyriad.cassini.core.speakers.DefaultLabels
 import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.data.CassiniDispatchers
 import io.codemyriad.cassini.data.NoteLocks
@@ -20,6 +22,7 @@ import io.codemyriad.cassini.data.db.NoteDetails
 import io.codemyriad.cassini.data.db.NoteEntity
 import io.codemyriad.cassini.data.db.SearchRow
 import io.codemyriad.cassini.data.db.TrashRow
+import io.codemyriad.cassini.data.db.VariantEntity
 import io.codemyriad.cassini.data.db.WordEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -174,7 +177,10 @@ class NoteRepository(
             notes.setPosition(id, positionMs)
             return
         }
-        val preview = PreviewText.of(selectedWords(id), positionMs)?.display
+        val selected = selectedVariant(id)
+        val words = selected?.let { cache.words(id, it.variantId).map(::word) }.orEmpty()
+        val labels = selected?.let { speakerLabels(id, it.variantId) }.orEmpty()
+        val preview = PreviewText.of(words, positionMs, labels, selected?.wordEndsBoundedByAudio == true)?.display
         notes.setPositionAndPreview(id, positionMs, preview)
     }
 
@@ -192,8 +198,11 @@ class NoteRepository(
         val readable = cache.variants(id).any { it.variantId == variantId && it.readable }
         if (!recorded || row == null || !readable) return false
         val words = cache.words(id, variantId).map(::word)
-        val preview = PreviewText.of(words, row.positionMs)?.display
-        return notes.selectVariant(id, variantId, words.joinToString(" ") { it.text }, preview, clock())
+        val selected = cache.variants(id).first { it.variantId == variantId }
+        val labels = speakerLabels(id, variantId)
+        val preview = PreviewText.of(words, row.positionMs, labels, selected.wordEndsBoundedByAudio)?.display
+        val body = ReadingText.body(words, { labels[it] ?: it }, selected.wordEndsBoundedByAudio)
+        return notes.selectVariant(id, variantId, body, preview, clock())
     }
 
     /** "Play anyway" on a document that is not OK. */
@@ -281,15 +290,19 @@ class NoteRepository(
         }
     }
 
-    /** The cached words of the selected variant (else the default, else the first readable one). */
-    private suspend fun selectedWords(id: String): List<Word> {
+    /** The selected readable variant, else the default, else the first readable one. */
+    private suspend fun selectedVariant(id: String): VariantEntity? {
         val selected = notes.note(id)?.selectedVariant
         val variants = cache.variants(id).filter { it.readable }
-        val variantId = variants.firstOrNull { it.variantId == selected }?.variantId
-            ?: variants.firstOrNull { it.isDefault }?.variantId
-            ?: variants.firstOrNull()?.variantId
-        return variantId?.let { cache.words(id, it).map(::word) }.orEmpty()
+        return variants.firstOrNull { it.variantId == selected }
+            ?: variants.firstOrNull { it.isDefault } ?: variants.firstOrNull()
     }
+
+    private suspend fun speakerLabels(id: String, variantId: String): Map<String, String> =
+        cache.speakers(id, variantId).associate { speaker ->
+            val stored = DefaultLabels.stored(speaker.speakerId, speaker.label)
+            speaker.speakerId to (stored ?: "Speaker ${speaker.placeholderNumber ?: (speaker.ordinal + 1)}")
+        }
 
     private fun word(row: WordEntity) = Word(row.speaker, row.startMs, row.endMs, row.text)
 

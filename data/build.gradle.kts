@@ -10,6 +10,7 @@ plugins {
 }
 
 val fixtures: String = rootProject.file("fixtures").absolutePath
+val readingVectors: String = rootProject.file("core/src/test/resources/interjections").absolutePath
 
 android {
     namespace = "io.codemyriad.cassini.data"
@@ -41,6 +42,12 @@ android {
                 // A local copy: the lambda must not capture the script object (configuration cache).
                 val fixturesPath = fixtures
                 it.jvmArgumentProviders.add(CommandLineArgumentProvider { listOf("-Dcassini.fixtures=$fixturesPath") })
+                it.inputs.dir(rootProject.file("core/src/test/resources/interjections"))
+                    .withPropertyName("readingVectors").withPathSensitivity(PathSensitivity.RELATIVE)
+                val vectorsPath = readingVectors
+                it.jvmArgumentProviders.add(
+                    CommandLineArgumentProvider { listOf("-Dcassini.interjections=$vectorsPath") },
+                )
                 // Robolectric needs these on JDK 17.
                 it.jvmArgs(
                     "--add-opens=java.base/java.lang=ALL-UNNAMED",

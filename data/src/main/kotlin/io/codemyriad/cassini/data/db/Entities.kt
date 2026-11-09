@@ -105,6 +105,8 @@ data class VariantEntity(
     /** The provenance has `x-speakerDiarization`. */
     @ColumnInfo(name = "speakers_told_apart") val speakersToldApart: Boolean = false,
     @ColumnInfo(name = "inference_ms") val inferenceMs: Long? = null,
+    /** Literal provenance.wordTimings.endsBoundedByAudio, cached without reopening the artifact. */
+    @ColumnInfo(name = "word_ends_bounded_by_audio") val wordEndsBoundedByAudio: Boolean = false,
     val readable: Boolean = true,
     val error: String? = null,
 )
