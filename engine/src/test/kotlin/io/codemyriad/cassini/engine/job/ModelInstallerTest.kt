@@ -18,6 +18,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 import java.io.IOException
+import java.io.InterruptedIOException
 import java.net.SocketTimeoutException
 import java.net.URL
 import java.net.UnknownHostException
@@ -219,6 +220,20 @@ class ModelInstallerTest {
         val outcome = ModelInstaller(store).install(all) {}
         assertEquals(DownloadError.NO_CONNECTION, (outcome as InstallOutcome.Failed).error)
         assertEquals(listOf(ModelCatalog.PARAKEET), store.attempts)
+    }
+
+    @Test fun aWrappedInterruptedSocketErrorCancelsInsteadOfReturningAFailure() = runBlocking(Dispatchers.IO) {
+        val store = FakeStore()
+        store.onInstall = { _, _ ->
+            Thread.currentThread().interrupt()
+            throw UserFacingException(Failure.DOWNLOAD).apply { initCause(InterruptedIOException("interrupted")) }
+        }
+        try {
+            val result = runCatching { ModelInstaller(store, Dispatchers.IO).install(setOf(ModelPart.SPEECH)) {} }
+            assertTrue(result.exceptionOrNull() is CancellationException)
+        } finally {
+            Thread.interrupted()
+        }
     }
 
     @Test fun aCancelledFetchIsNeverABestEffortFailure() {

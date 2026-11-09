@@ -26,6 +26,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.io.File
 import java.io.IOException
+import java.io.InterruptedIOException
 import java.io.RandomAccessFile
 import java.util.Collections
 
@@ -205,6 +206,39 @@ class ModelRepositoryTest {
         offMain { repo.installBlocking(ModelPart.VOICES) }
         assertTrue(ModelCatalog.VOICEPRINT.ready(paths.modelRoot))
         assertEquals(ModelStatus.Ready, repo.status.value[ModelPart.VOICES])
+    }
+
+    @Test fun aBlockedModelDirectoryFailsLocallyBeforeCallingTheFetcher() = runTest {
+        var called = false
+        val repo = repository(ModelFetcher { _, _, _ -> called = true })
+        repo.refresh()
+        val blocker = File(paths.modelRoot, "models").apply { writeText("Keep this") }
+        val error = runCatching {
+            offMain { repo.installModelBlocking(ModelCatalog.VOICEPRINT) { _, _ -> } }
+        }.exceptionOrNull()
+        assertEquals(Failure.INSTALL, ((error?.cause ?: error) as UserFacingException).failure)
+        assertFalse(called)
+        assertEquals("Keep this", blocker.readText())
+        assertFalse(ModelCatalog.VOICEPRINT.ready(paths.modelRoot))
+    }
+
+    @Test fun anInterruptedSocketErrorIsCancellationWithoutAFailedStatus() = runTest {
+        val repo = repository(
+            ModelFetcher { _, _, _ ->
+                Thread.currentThread().interrupt()
+                throw InterruptedIOException("interrupted")
+            },
+        )
+        repo.refresh()
+        val error = offMain {
+            try {
+                runCatching { repo.installBlocking(ModelPart.SPEECH) }.exceptionOrNull()
+            } finally {
+                Thread.interrupted()
+            }
+        }
+        assertEquals(Failure.CANCELLED, (error as UserFacingException).failure)
+        assertEquals(ModelStatus.Missing(consented = false), repo.status.value[ModelPart.SPEECH])
     }
 
     @Test fun aMarkerFailureAfterVerificationNeverReportsReadyAndCanRetry() = runTest {

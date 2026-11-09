@@ -31,6 +31,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -39,7 +40,13 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.io.File
+import java.io.IOException
+import java.io.InterruptedIOException
 import java.io.RandomAccessFile
+import java.net.ConnectException
+import java.net.NoRouteToHostException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import java.util.Collections
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -67,6 +74,8 @@ class ModelInstallOwnerTest {
 
     /** The fetch ignores an interrupt, as a socket read blocked until its timeout does. */
     private val stubborn = AtomicBoolean(false)
+    private val interruptAsIo = AtomicBoolean(false)
+    private var fetchFailure: IOException? = null
     private val inFlight = AtomicInteger()
     private val mostInFlight = AtomicInteger()
     private lateinit var paths: AppPaths
@@ -78,6 +87,7 @@ class ModelInstallOwnerTest {
         fetched += key(model)
         mostInFlight.accumulateAndGet(inFlight.incrementAndGet(), ::maxOf)
         try {
+            fetchFailure?.let { throw it }
             if (model == ModelCatalog.PARAKEET) {
                 File(directory, "encoder.int8.onnx.part").writeBytes(ByteArray(PART_BYTES))
                 started.countDown()
@@ -100,7 +110,10 @@ class ModelInstallOwnerTest {
                 return
             } catch (error: InterruptedException) {
                 interrupted.set(true)
-                if (!stubborn.get()) throw error
+                if (stubborn.get()) continue
+                if (!interruptAsIo.get()) throw error
+                Thread.currentThread().interrupt()
+                throw InterruptedIOException("interrupted").apply { initCause(error) }
             }
         }
     }
@@ -123,6 +136,40 @@ class ModelInstallOwnerTest {
     private fun key(model: ModelDescriptor) = "${model.directory}/${model.markerFile}"
 
     private val everyModel = ModelPart.entries.flatMap { it.models }.map(::key).sorted()
+
+    @Test fun transportFailuresThroughTheRepositoryStayNoConnectionOnValidatedWifi() = runBlocking {
+        val failures = listOf(
+            SocketTimeoutException("Read timed out"),
+            UnknownHostException("model host"),
+            ConnectException("Connection refused"),
+            NoRouteToHostException("No route"),
+        )
+        for (failure in failures) {
+            fetchFailure = failure
+            withTimeout(WAIT_MS) { owner.startDownload(setOf(ModelPart.SPEECH)).join() }
+            assertEquals(
+                failure.javaClass.simpleName,
+                DownloadError.NO_CONNECTION,
+                (owner.lastOutcome.value as InstallOutcome.Failed).error,
+            )
+            assertEquals(
+                ModelStatus.Failed(Failure.DOWNLOAD, DownloadError.NO_CONNECTION.name),
+                models.status.value[ModelPart.SPEECH],
+            )
+        }
+    }
+
+    @Test fun anInterruptedSocketCancelThroughTheRepositoryLeavesNoFailureBanner() = runBlocking {
+        interruptAsIo.set(true)
+        val download = owner.startDownload(setOf(ModelPart.SPEECH))
+        assertTrue(started.await(WAIT_S, TimeUnit.SECONDS))
+        owner.cancel()
+        withTimeout(WAIT_MS) { download.join() }
+        assertEquals(InstallState.Idle, owner.state.value)
+        assertNull(owner.lastOutcome.value)
+        assertEquals(ModelStatus.Missing(consented = true), models.status.value[ModelPart.SPEECH])
+        assertTrue(File(ModelCatalog.PARAKEET.directory(paths.modelRoot), "encoder.int8.onnx.part").isFile)
+    }
 
     @Test fun optionalRetryKeepsItsOriginalPlanWithOrWithoutEarlierSpeechConsent() = runBlocking {
         for (speechConsent in listOf(false, true)) {

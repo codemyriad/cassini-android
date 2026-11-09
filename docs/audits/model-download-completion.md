@@ -34,6 +34,14 @@ becoming ready. The audit found these additional gaps:
   connection failures. Local open/write/flush/close and digest errors now keep
   their INSTALL or SPACE classification and original cause. ENOSPC from a
   fetcher or marker write also remains SPACE at the repository boundary.
+- A DOWNLOAD wrapper hid the transport exception from the installer. Interrupted
+  socket I/O with the interrupt flag set now becomes CANCELLED; ordinary timeout,
+  DNS, connect and route errors remain NO_CONNECTION even on validated Wi-Fi.
+  Cancellation and error mapping also inspect the cause of DOWNLOAD wrappers.
+- Ignored directory-creation failures could appear as insufficient storage when
+  the missing path reported zero free bytes. Directory creation now uses
+  `Files.createDirectories`; its errors are INSTALL or SPACE before fetching.
+  Both plain and compressed artifact entry points ensure their directories.
 
 A full verified partial remains reusable after a failed final move. A failed
 marker write leaves the model unavailable; a retry can complete it. A verified
@@ -76,3 +84,9 @@ foreground-service test covers the 100%-checking completion boundary. Model
 files in Android tests are sparse fakes; no large model download, device or
 private audio is used. Gates and completion events provide synchronization;
 wait timeouts are upper bounds, not fixed delays.
+
+Review regressions also cover interruption classification at the repository and
+installer boundaries, cancellation without a failed banner through the real
+install owner, all four transport failures through that owner while online,
+and directory creation/refusal for plain and compressed downloads. Obstructing
+files remain unchanged, and no fetch starts after a directory failure.

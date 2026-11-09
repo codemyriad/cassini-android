@@ -14,6 +14,53 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 class ArtifactFetcherCompletionTest : ArtifactFetcherFixture() {
+    @Test fun blockedDirectoriesAreLocalInstallFailuresBeforeAnyRequest() {
+        val compressed = com.github.luben.zstd.Zstd.compress(weights)
+        for (zstd in listOf(false, true)) {
+            withServer({ Answer(200, if (zstd) compressed else weights) }) { url, directory, requests ->
+                val blocker = File(directory, "occupied").apply { writeText("Keep this") }
+                val target = File(blocker, "models")
+                val result = failure {
+                    if (zstd) {
+                        ArtifactFetcher.fetchZstd(
+                            url,
+                            artifact(compressed).copy(name = "model.zst"),
+                            artifact(weights),
+                            target,
+                            AGENT,
+                        ) { _, _ -> }
+                    } else {
+                        ArtifactFetcher.fetch(url, artifact(weights), target, AGENT) { _, _ -> }
+                    }
+                }
+                assertEquals(Failure.INSTALL, result)
+                assertTrue(requests.isEmpty())
+                assertEquals("Keep this", blocker.readText())
+            }
+        }
+    }
+
+    @Test fun missingDirectoriesAreCreatedForPlainAndCompressedDownloads() {
+        val compressed = com.github.luben.zstd.Zstd.compress(weights)
+        for (zstd in listOf(false, true)) {
+            withServer({ Answer(200, if (zstd) compressed else weights) }) { url, directory, _ ->
+                val target = File(directory, "new/models")
+                if (zstd) {
+                    ArtifactFetcher.fetchZstd(
+                        url,
+                        artifact(compressed).copy(name = "model.zst"),
+                        artifact(weights),
+                        target,
+                        AGENT,
+                    ) { _, _ -> }
+                } else {
+                    ArtifactFetcher.fetch(url, artifact(weights), target, AGENT) { _, _ -> }
+                }
+                assertArrayEquals(weights, File(target, "model.onnx").readBytes())
+            }
+        }
+    }
+
     @Test fun publicDigestKeepsIoFailuresForInstalledModelValidation() {
         val directory = Files.createTempDirectory("cassini-unreadable-model").toFile()
         try {

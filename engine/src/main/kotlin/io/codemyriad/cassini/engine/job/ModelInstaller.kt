@@ -178,10 +178,11 @@ class ModelInstaller(private val store: ModelStore, private val io: CoroutineDis
 
     /** Why [failure] stopped a download; throws CancellationException when it was a cancellation. */
     private fun errorOf(failure: Exception): DownloadError {
-        val interrupted = failure is InterruptedIOException && failure !is SocketTimeoutException &&
+        val cause = if (failure is UserFacingException && failure.failure == Failure.DOWNLOAD) failure.cause ?: failure else failure
+        val interrupted = cause is InterruptedIOException && cause !is SocketTimeoutException &&
             Thread.currentThread().isInterrupted
-        val cancelled = failure is CancellationException || failure is InterruptedException || interrupted ||
-            (failure is UserFacingException && failure.failure == Failure.CANCELLED)
+        val cancelled = cause is CancellationException || cause is InterruptedException || interrupted ||
+            (cause is UserFacingException && cause.failure == Failure.CANCELLED)
         if (cancelled) throw cancelled(failure)
         return downloadError(failure, store::hasValidatedNetwork)
     }
@@ -197,7 +198,8 @@ class ModelInstaller(private val store: ModelStore, private val io: CoroutineDis
         /**
          * The banner a download failure shows (architecture section 5.6, features.md section 13.4). A DOWNLOAD failure
          * or a network exception reads NO_CONNECTION when [online] says the network is not validated, INTERRUPTED
-         * when it is; a timeout or an unknown host is always NO_CONNECTION. A redirect outside the allow-list
+         * when it is; timeout, DNS, connect and route errors are always NO_CONNECTION, including DOWNLOAD wrappers.
+         * A redirect outside the allow-list
          * (`RedirectPolicy` reports "… is not allowed") is HOST_NOT_ALLOWED. SPACE, VERIFY, INSTALL and MODEL_UNAVAILABLE map to
          * their own errors; anything else did not finish installing.
          */
@@ -206,17 +208,20 @@ class ModelInstaller(private val store: ModelStore, private val io: CoroutineDis
                 Failure.SPACE -> DownloadError.NOT_ENOUGH_STORAGE
                 Failure.VERIFY -> DownloadError.FILE_CHECK_FAILED
                 Failure.MODEL_UNAVAILABLE -> DownloadError.MODEL_UNAVAILABLE
-                Failure.DOWNLOAD -> when {
-                    failure.message.orEmpty().endsWith(REDIRECT_REFUSED) -> DownloadError.HOST_NOT_ALLOWED
-                    online() -> DownloadError.INTERRUPTED
-                    else -> DownloadError.NO_CONNECTION
-                }
+                Failure.DOWNLOAD -> transportError(failure, online)
                 else -> DownloadError.INSTALL
             }
             is SocketTimeoutException, is UnknownHostException, is ConnectException, is NoRouteToHostException ->
                 DownloadError.NO_CONNECTION
             is IOException -> if (online()) DownloadError.INTERRUPTED else DownloadError.NO_CONNECTION
             else -> DownloadError.INSTALL
+        }
+
+        private fun transportError(failure: UserFacingException, online: () -> Boolean): DownloadError = when {
+            failure.message.orEmpty().endsWith(REDIRECT_REFUSED) -> DownloadError.HOST_NOT_ALLOWED
+            failure.cause != null -> downloadError(requireNotNull(failure.cause), online)
+            online() -> DownloadError.INTERRUPTED
+            else -> DownloadError.NO_CONNECTION
         }
 
         /** The end of `RedirectPolicy`'s message for a redirect to a host or scheme it does not allow. */

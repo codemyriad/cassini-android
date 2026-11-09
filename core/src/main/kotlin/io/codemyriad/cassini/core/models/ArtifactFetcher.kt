@@ -122,6 +122,7 @@ object ArtifactFetcher {
         redirects: RedirectPolicy = RedirectPolicy.DOWNLOADS,
         progress: (Long, Boolean) -> Unit,
     ) {
+        localIo { Files.createDirectories(directory.toPath()) }
         val destination = File(directory, artifact.name)
         val checking: (Long) -> Unit = { progress(it, true) }
         if (destination.length() == artifact.size && installDigest(destination, checking) == artifact.sha256) {
@@ -333,6 +334,7 @@ object ArtifactFetcher {
         redirects: RedirectPolicy = RedirectPolicy.DOWNLOADS,
         progress: (Long, Boolean) -> Unit,
     ) {
+        localIo { Files.createDirectories(directory.toPath()) }
         val destination = File(directory, artifact.name)
         val existing = scaled(download.size, artifact.size)
         val installed = destination.length() == artifact.size &&
