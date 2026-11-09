@@ -32,7 +32,9 @@ import io.codemyriad.cassini.ui.settings.ModelStatusUi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -73,6 +75,7 @@ class ProcessingCoordinatorTest {
 
     /** Every job the coordinator created, in order. */
     private val created = CopyOnWriteArrayList<FakeJob>()
+    private val createdCount = MutableStateFlow(0)
     private val starts = AtomicInteger()
     private val visibility = FakeVisibility()
     private val notices = RecordingNotices()
@@ -80,6 +83,13 @@ class ProcessingCoordinatorTest {
     private lateinit var graph: AppGraph
 
     private val coordinator: ProcessingCoordinator get() = graph.processing
+
+    private fun createJob(noteId: String, g: AppGraph): FakeJob {
+        val job = FakeJob(noteId, g)
+        created += job
+        createdCount.update { count -> maxOf(count, created.size) }
+        return job
+    }
 
     /** A graph on [root]; the service start is a drain, as `ProcessingService` does it. */
     private fun graph(
@@ -91,7 +101,7 @@ class ProcessingCoordinatorTest {
     ): AppGraph {
         paths = root
         val hooks = AppGraph.ProcessingHooks(
-            jobs = if (realJobs) null else ({ g -> ProcessingJobFactory { FakeJob(it, g).also(created::add) } }),
+            jobs = if (realJobs) null else ({ g -> ProcessingJobFactory { createJob(it, g) } }),
             starter = { g ->
                 ServiceStarter {
                     starts.incrementAndGet()
@@ -766,7 +776,7 @@ class ProcessingCoordinatorTest {
 
     /** The [index]th job the coordinator created, once it runs. */
     private suspend fun job(index: Int): FakeJob {
-        waitUntil { created.size > index }
+        withTimeout(TIMEOUT_MS) { createdCount.first { it > index } }
         return created[index].also { it.started.await() }
     }
 
