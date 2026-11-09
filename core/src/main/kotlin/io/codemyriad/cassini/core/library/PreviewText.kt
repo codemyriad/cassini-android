@@ -24,19 +24,20 @@ object PreviewText {
         if (words.isEmpty()) return null
         val reading = ReadingTurns.of(words, endsBoundedByAudio)
         val atoms = atoms(reading, labels)
-        val first = startAt(reading, atoms, positionMs)
+        val first = startAt(words, atoms, positionMs)
         val text = StringBuilder()
         var next = first
         while (next < atoms.size) {
             val atom = atoms[next]
             val prefix = if (next == first && atom.chipLabel != null) "(${atom.chipLabel}: " else atom.prefix
             val part = prefix + atom.word.text + atom.suffix
-            val budgetReached = next > first && text.length + 1 + part.length > LIMIT
+            val budgetReached = next > first && text.length + 1 + part.length + atom.closingIfCut.length > LIMIT
             if (budgetReached || stopsBefore(atoms, first, next, text.length)) break
             if (next > first) text.append(' ')
             text.append(part)
             next++
         }
+        text.append(atoms[next - 1].closingIfCut)
         return Preview(text.toString(), leadingEllipsis = first > 0, trailingEllipsis = next < atoms.size)
     }
 
@@ -56,9 +57,11 @@ object PreviewText {
         }
     }
 
-    private fun startAt(reading: ReadingTranscript, atoms: List<Atom>, positionMs: Long): Int {
-        val playing = reading.words.indices.sortedBy { reading.words[it].startMs }
-            .firstOrNull { reading.words[it].endMs > positionMs }
+    /** Playback context follows canonical ends, independently of display-only timing repair. */
+    private fun startAt(words: List<Word>, atoms: List<Atom>, positionMs: Long): Int {
+        if (positionMs <= 0) return 0
+        val playing = words.indices.sortedBy { words[it].startMs }
+            .firstOrNull { words[it].endMs > positionMs }
         return playing?.let { canonical -> atoms.indexOfFirst { it.canonical == canonical } } ?: 0
     }
 
@@ -74,5 +77,8 @@ object PreviewText {
         val prefix: String,
         val suffix: String,
         val chipLabel: String?,
-    )
+    ) {
+        /** The chip wrapper must close even when later chip words are omitted. */
+        val closingIfCut: String get() = if (chipLabel != null && suffix.isEmpty()) ")" else ""
+    }
 }
