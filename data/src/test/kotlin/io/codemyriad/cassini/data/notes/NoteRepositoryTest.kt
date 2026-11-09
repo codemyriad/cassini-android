@@ -1,7 +1,11 @@
 package io.codemyriad.cassini.data.notes
 
 import android.net.Uri
+import io.codemyriad.cassini.core.export.ExportTranscript
+import io.codemyriad.cassini.core.export.TextExport
 import io.codemyriad.cassini.core.format.CassiniDocument
+import io.codemyriad.cassini.core.format.Transcript
+import io.codemyriad.cassini.core.format.Word
 import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.library.JobState
@@ -12,6 +16,7 @@ import io.codemyriad.cassini.data.db.TrashedJob
 import io.codemyriad.cassini.data.db.offMain
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -145,6 +150,59 @@ class NoteRepositoryTest {
         assertFalse(h.notes.selectVariant("a", "nope"))
         assertTrue(h.notes.selectVariant("a", merged))
         assertEquals(merged, h.row("a").selectedVariant)
+    }
+
+    @Test fun cachedReadingLabelsAndMeasuredEndsSurvivePositionSelectionAndExport() = runTest {
+        h.documentNote("a", words)
+        val captured = Transcript(
+            listOf(
+                Word("ada", 0, 500, "We"),
+                Word("ada", 500, 1000, "can"),
+                Word("ada", 1000, 1500, "ship"),
+                Word("ada", 1500, 2000, "the"),
+                Word("ada", 2000, 2500, "updated"),
+                Word("ada", 2500, 5700, "build."),
+                Word("ben", 5200, 5500, "Agreed."),
+                Word("ada", 5500, 6000, "today."),
+            ),
+        )
+        val labels = mapOf("ada" to "Ada", "ben" to "Ben")
+        val existing = h.readFile("a")
+        existing.manifest!!.getJSONObject("provenance")
+            .put("wordTimings", JSONObject().put("endsBoundedByAudio", true))
+        h.document("a").writeBytes(
+            CassiniDocument.create(fixtureOpus.readBytes(), captured, "Meeting", JSONObject(), existing, labels),
+        )
+        h.notes.refreshIfStale("a")
+        val selected = h.db.cache().variants("a").single { it.isDefault }.variantId
+        assertTrue(h.db.cache().variants("a").single { it.variantId == selected }.wordEndsBoundedByAudio)
+        val cachedLabels = h.db.cache().speakers("a", selected).associate { it.speakerId to it.label }
+        assertEquals(labels, cachedLabels)
+        // Without measured ends the long final host word is clipped before Ben: no inline chip.
+        val expected = "We can ship the updated build. (Ben: Agreed.) today."
+        assertEquals(expected, PreviewText.of(captured.words, 0, labels, true)!!.display)
+        assertFalse(PreviewText.of(captured.words, 0, labels, false)!!.display.contains("(Ben:"))
+
+        h.notes.setPosition("a", 0, final = true)
+        assertEquals(expected, h.row("a").preview)
+        assertTrue(h.notes.selectVariant("a", "words"))
+        assertTrue(h.notes.selectVariant("a", selected))
+        assertEquals(expected, h.row("a").preview)
+        assertEquals(expected, h.db.notes().text("a")!!.body)
+        assertTrue(h.db.cache().variants("a").single { it.variantId == selected }.wordEndsBoundedByAudio)
+
+        val dest = File(folder.newFolder("reading-export"), "transcript.txt")
+        val request = TranscriptExport(
+            TranscriptFormat.TXT,
+            cachedLabels,
+            subtitle = "Test meeting",
+            emptyText = "No words",
+        )
+        assertTrue(h.documents.exportTranscript("a", request, Uri.fromFile(dest)) is ExportOutcome.Saved)
+        val exported = ExportTranscript("Meeting", h.row("a").durationMs, captured.words, cachedLabels, true)
+        assertEquals(TextExport.write(exported, request.subtitle, request.emptyText), dest.readText())
+        assertTrue(dest.readText().contains("[00:00] Ada\n"))
+        assertTrue(dest.readText().contains("(Ben: Agreed.)"))
     }
 
     @Test fun selectingAVersionMakesItTheFilesDefaultAndTheCopyOpensOnIt() = runTest {
