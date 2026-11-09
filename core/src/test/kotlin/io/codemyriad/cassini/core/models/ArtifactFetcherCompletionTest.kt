@@ -7,11 +7,23 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import java.io.IOException
+import java.nio.file.Files
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 class ArtifactFetcherCompletionTest : ArtifactFetcherFixture() {
+    @Test fun publicDigestKeepsIoFailuresForInstalledModelValidation() {
+        val directory = Files.createTempDirectory("cassini-unreadable-model").toFile()
+        try {
+            val error = runCatching { ArtifactFetcher.digest(directory) }.exceptionOrNull()
+            assertTrue(error is IOException)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
     @Test fun aTruncatedAnswerWithoutLengthKeepsItsPrefixForResume() {
         val resumed = ranged(weights)
         withServer({ headers ->

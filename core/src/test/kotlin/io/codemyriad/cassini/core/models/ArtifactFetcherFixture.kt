@@ -1,5 +1,7 @@
 package io.codemyriad.cassini.core.models
 
+import io.codemyriad.cassini.core.Failure
+import io.codemyriad.cassini.core.UserFacingException
 import org.junit.Assert.fail
 import java.io.File
 import java.net.InetAddress

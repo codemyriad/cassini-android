@@ -62,7 +62,7 @@ object ArtifactFetcher {
      * after the first block, then at most every half second, and always once at the end with the file's length (a
      * block that reaches the end is reported only there, after the last interruption check).
      */
-    fun digest(file: File, onBytes: (Long) -> Unit = {}): String = localIo {
+    fun digest(file: File, onBytes: (Long) -> Unit = {}): String {
         val hash = MessageDigest.getInstance("SHA-256")
         var done = 0L
         var lastUpdate = 0L
@@ -82,7 +82,7 @@ object ArtifactFetcher {
             }
         }
         onBytes(done)
-        hash.digest().joinToString("") { "%02x".format(it) }
+        return hash.digest().joinToString("") { "%02x".format(it) }
     }
 
     /**
@@ -124,7 +124,7 @@ object ArtifactFetcher {
     ) {
         val destination = File(directory, artifact.name)
         val checking: (Long) -> Unit = { progress(it, true) }
-        if (destination.length() == artifact.size && digest(destination, checking) == artifact.sha256) {
+        if (destination.length() == artifact.size && installDigest(destination, checking) == artifact.sha256) {
             progress(artifact.size, true)
             return
         }
@@ -135,7 +135,7 @@ object ArtifactFetcher {
         requireUser(directory.usableSpace > artifact.size - offset + SLACK_BYTES, Failure.SPACE)
         if (offset < artifact.size) download(url, artifact, partial, Ask(userAgent, redirects), progress)
         progress(0, true)
-        if (partial.length() != artifact.size || digest(partial, checking) != artifact.sha256) {
+        if (partial.length() != artifact.size || installDigest(partial, checking) != artifact.sha256) {
             partial.delete()
             throw UserFacingException(Failure.VERIFY)
         }
@@ -194,6 +194,9 @@ object ArtifactFetcher {
     } catch (error: IOException) {
         throw UserFacingException(localFailure(error), error.message ?: "I/O").apply { initCause(error) }
     }
+
+    /** Classify install I/O without changing digest's IOException contract for installed-model validation. */
+    private fun installDigest(file: File, onBytes: (Long) -> Unit): String = localIo { digest(file, onBytes) }
 
     /** Same-directory atomic rename, retaining the I/O cause (including ENOSPC) if it fails. */
     private fun install(source: File, destination: File) = localIo {
@@ -333,7 +336,7 @@ object ArtifactFetcher {
         val destination = File(directory, artifact.name)
         val existing = scaled(download.size, artifact.size)
         val installed = destination.length() == artifact.size &&
-            digest(destination) { progress(existing(it), true) } == artifact.sha256
+            installDigest(destination) { progress(existing(it), true) } == artifact.sha256
         if (installed) {
             progress(download.size, true)
             return
