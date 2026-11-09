@@ -25,6 +25,8 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.io.File
+import java.io.IOException
+import java.io.InterruptedIOException
 import java.io.RandomAccessFile
 import java.util.Collections
 
@@ -183,6 +185,82 @@ class ModelRepositoryTest {
         assertEquals(ModelStatus.Missing(consented = false), repo.status.value[ModelPart.SPEECH])
         val parakeet = "${ModelCatalog.PARAKEET.directory}/verified"
         assertEquals("no detector after a cancelled Parakeet", listOf(parakeet), fetched)
+    }
+
+    @Test fun aFullDiskAfterTheBytesArriveIsSpaceAndRemainsRetryable() = runTest {
+        var full = true
+        val repo = repository(
+            ModelFetcher { model, directory, progress ->
+                progress(model.downloadBytes, false)
+                if (full) throw IOException("write failed: ENOSPC (No space left on device)")
+                sparse(model, directory)
+            },
+        )
+        repo.refresh()
+        val error = runCatching { offMain { repo.installBlocking(ModelPart.VOICES) } }.exceptionOrNull()
+        assertEquals(Failure.SPACE, ((error?.cause ?: error) as UserFacingException).failure)
+        assertEquals(Failure.SPACE, (repo.status.value[ModelPart.VOICES] as ModelStatus.Failed).failure)
+        assertFalse(ModelCatalog.VOICEPRINT.ready(paths.modelRoot))
+
+        full = false
+        offMain { repo.installBlocking(ModelPart.VOICES) }
+        assertTrue(ModelCatalog.VOICEPRINT.ready(paths.modelRoot))
+        assertEquals(ModelStatus.Ready, repo.status.value[ModelPart.VOICES])
+    }
+
+    @Test fun aBlockedModelDirectoryFailsLocallyBeforeCallingTheFetcher() = runTest {
+        var called = false
+        val repo = repository(ModelFetcher { _, _, _ -> called = true })
+        repo.refresh()
+        val blocker = File(paths.modelRoot, "models").apply { writeText("Keep this") }
+        val error = runCatching {
+            offMain { repo.installModelBlocking(ModelCatalog.VOICEPRINT) { _, _ -> } }
+        }.exceptionOrNull()
+        assertEquals(Failure.INSTALL, ((error?.cause ?: error) as UserFacingException).failure)
+        assertFalse(called)
+        assertEquals("Keep this", blocker.readText())
+        assertFalse(ModelCatalog.VOICEPRINT.ready(paths.modelRoot))
+    }
+
+    @Test fun anInterruptedSocketErrorIsCancellationWithoutAFailedStatus() = runTest {
+        val repo = repository(
+            ModelFetcher { _, _, _ ->
+                Thread.currentThread().interrupt()
+                throw InterruptedIOException("interrupted")
+            },
+        )
+        repo.refresh()
+        val error = offMain {
+            try {
+                runCatching { repo.installBlocking(ModelPart.SPEECH) }.exceptionOrNull()
+            } finally {
+                Thread.interrupted()
+            }
+        }
+        assertEquals(Failure.CANCELLED, (error as UserFacingException).failure)
+        assertEquals(ModelStatus.Missing(consented = false), repo.status.value[ModelPart.SPEECH])
+    }
+
+    @Test fun aMarkerFailureAfterVerificationNeverReportsReadyAndCanRetry() = runTest {
+        val model = ModelCatalog.VOICEPRINT
+        val repo = repository(
+            ModelFetcher { current, directory, progress ->
+                sparse(current, directory)
+                progress(current.downloadBytes, true)
+            },
+        )
+        val directory = model.directory(paths.modelRoot).apply { mkdirs() }
+        val obstruction = File(directory, "${model.markerFile}.tmp").apply { mkdir() }
+        repo.refresh()
+        val error = runCatching { offMain { repo.installBlocking(ModelPart.VOICES) } }.exceptionOrNull()
+        assertEquals(Failure.INSTALL, ((error?.cause ?: error) as UserFacingException).failure)
+        assertFalse(model.ready(paths.modelRoot))
+        assertFalse(File(directory, model.markerFile).exists())
+
+        obstruction.delete()
+        offMain { repo.installBlocking(ModelPart.VOICES) }
+        assertTrue(model.ready(paths.modelRoot))
+        assertEquals(ModelStatus.Ready, repo.status.value[ModelPart.VOICES])
     }
 
     @Test fun anInstallSkipsReadyModelsAndKeepsMarkersUntilVerified() = runTest {

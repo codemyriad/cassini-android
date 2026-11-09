@@ -14,16 +14,21 @@ import io.codemyriad.cassini.CassiniApplication
 import io.codemyriad.cassini.GraphFactory
 import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.core.library.PauseReason
+import io.codemyriad.cassini.core.models.ModelCatalog
+import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.data.CassiniDispatchers
 import io.codemyriad.cassini.data.models.ModelFetcher
+import io.codemyriad.cassini.data.models.ModelStatus
 import io.codemyriad.cassini.data.settings.QueueHold
+import io.codemyriad.cassini.engine.job.InstallOutcome
 import io.codemyriad.cassini.engine.job.JobEvent
 import io.codemyriad.cassini.engine.job.JobOutcome
 import io.codemyriad.cassini.testing.NoUncaughtCoroutines
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -38,7 +43,10 @@ import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import java.io.File
+import java.io.RandomAccessFile
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /** The foreground lifetime of architecture 5.7 on Robolectric (SDK 35), over a graph with fake jobs. */
 @RunWith(RobolectricTestRunner::class)
@@ -53,6 +61,7 @@ class ProcessingServiceTest {
     private val notices = RecordingNotices()
     private val fixture = File(checkNotNull(System.getProperty("cassini.fixtures")), "audio/fleurs-it-short.opus")
     private lateinit var paths: AppPaths
+    private var fetcher = ModelFetcher { _, _, _ -> fail("No model is fetched in this test") }
 
     private val graph: AppGraph get() = app.graph
 
@@ -71,7 +80,7 @@ class ProcessingServiceTest {
                 AppGraph.Config(
                     paths = paths,
                     dispatchers = CassiniDispatchers(Dispatchers.IO, Dispatchers.Default, Dispatchers.Unconfined),
-                    fetcher = ModelFetcher { _, _, _ -> fail("No model is fetched in this test") },
+                    fetcher = fetcher,
                     network = { true },
                     processing = hooks,
                 ),
@@ -83,6 +92,54 @@ class ProcessingServiceTest {
     @After fun tearDown() {
         graph.close()
         CassiniApplication.graphFactory = null
+    }
+
+    @Test fun checkingAtHundredPercentKeepsTheServiceUntilTheMarkerIsWritten() {
+        val checking = CountDownLatch(1)
+        val finishChecking = CountDownLatch(1)
+        fetcher = ModelFetcher { model, directory, progress ->
+            model.artifacts.forEach { artifact ->
+                RandomAccessFile(File(directory, artifact.name), "rw").use { it.setLength(artifact.size) }
+            }
+            progress(model.downloadBytes, false)
+            progress(model.downloadBytes, true)
+            checking.countDown()
+            check(finishChecking.await(5, TimeUnit.SECONDS))
+        }
+        runBlocking {
+            graph.ready.await()
+            graph.models.recordConsent()
+        }
+        val download = graph.processing.downloadModels(setOf(ModelPart.SPEAKERS))
+        try {
+            assertTrue(checking.await(5, TimeUnit.SECONDS))
+            val service = Robolectric.buildService(ProcessingService::class.java).create().get()
+            service.onStartCommand(ProcessingService.drainIntent(app), 0, 1)
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(ModelStatus.Verifying(100), graph.models.status.value[ModelPart.SPEAKERS])
+            assertTrue(graph.installOwner.state.value is InstallState.Installing)
+            assertTrue(download.isActive)
+            assertFalse(ModelCatalog.DIARIZATION.ready(paths.modelRoot))
+            assertFalse(shadowOf(service).isStoppedBySelf)
+            assertFalse(shadowOf(service).isForegroundStopped)
+
+            finishChecking.countDown()
+            runBlocking {
+                withTimeout(5_000) {
+                    download.join()
+                    graph.processing.awaitIdle()
+                }
+            }
+            shadowOf(Looper.getMainLooper()).idle()
+            assertTrue(ModelCatalog.DIARIZATION.ready(paths.modelRoot))
+            assertEquals(ModelStatus.Ready, graph.models.status.value[ModelPart.SPEAKERS])
+            assertEquals(InstallOutcome.Installed(), graph.installOwner.lastOutcome.value)
+            assertEquals(InstallState.Idle, graph.installOwner.state.value)
+            assertTrue(shadowOf(service).isStoppedBySelf)
+            assertTrue(shadowOf(service).isForegroundStopped)
+        } finally {
+            finishChecking.countDown()
+        }
     }
 
     @Test fun theServiceRunsInTheForegroundUntilTheDrainJoins() {

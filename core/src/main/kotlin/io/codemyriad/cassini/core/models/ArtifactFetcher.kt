@@ -14,6 +14,8 @@ import java.io.OutputStream
 import java.io.RandomAccessFile
 import java.net.HttpURLConnection
 import java.net.URL
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 
 /**
@@ -104,9 +106,11 @@ object ArtifactFetcher {
      * A `.part` left by an earlier attempt is resumed with `Range: bytes=<length>-` and `If-Range: "<sha256>"`. A
      * `206` answer is accepted
      * only when its `Content-Range` starts at that length and its total is the pinned size; a `200` answer restarts
-     * from zero. A `206` that ends before the artifact's last byte (some servers cap open-ended ranges) keeps what it
+     * from zero. A known Content-Length must match the pinned whole file or the declared range, and a range cannot
+     * deliver bytes past its declared end. A `206` that ends before the artifact's last byte keeps what it
      * brought and fails with [Failure.DOWNLOAD], so the next attempt resumes further on. On a size or SHA-256
-     * mismatch the `.part` is deleted. The 30 s read timeout stays: interrupting the thread does not unblock
+     * mismatch the `.part` is deleted. A shorter lengthless transfer keeps its prefix too. The 30 s read timeout stays:
+     * interrupting the thread does not unblock
      * `HttpURLConnection`.
      */
     @Suppress("LongParameterList") // where from, what, where to, how to ask, and the progress
@@ -118,9 +122,10 @@ object ArtifactFetcher {
         redirects: RedirectPolicy = RedirectPolicy.DOWNLOADS,
         progress: (Long, Boolean) -> Unit,
     ) {
+        localIo { Files.createDirectories(directory.toPath()) }
         val destination = File(directory, artifact.name)
         val checking: (Long) -> Unit = { progress(it, true) }
-        if (destination.length() == artifact.size && digest(destination, checking) == artifact.sha256) {
+        if (destination.length() == artifact.size && installDigest(destination, checking) == artifact.sha256) {
             progress(artifact.size, true)
             return
         }
@@ -131,13 +136,13 @@ object ArtifactFetcher {
         requireUser(directory.usableSpace > artifact.size - offset + SLACK_BYTES, Failure.SPACE)
         if (offset < artifact.size) download(url, artifact, partial, Ask(userAgent, redirects), progress)
         progress(0, true)
-        if (partial.length() != artifact.size || digest(partial, checking) != artifact.sha256) {
+        if (partial.length() != artifact.size || installDigest(partial, checking) != artifact.sha256) {
             partial.delete()
             throw UserFacingException(Failure.VERIFY)
         }
         // On the storage device before the rename makes it the verified file.
         sync(partial)
-        requireUser(partial.renameTo(destination), Failure.INSTALL)
+        install(partial, destination)
         progress(artifact.size, true)
     }
 
@@ -152,16 +157,19 @@ object ArtifactFetcher {
             // Where a 206 answer's range ends (exclusive); null for a whole 200 answer.
             val rangeEnd = resumes(connection, artifact, partial, offset)
             val first = if (rangeEnd != null) offset else 0L
-            // Where the answer says it ends; -1 when it does not say.
-            val announced = connection.contentLengthLong.let { if (it < 0) -1 else first + it }
+            val end = rangeEnd ?: artifact.size
+            // Refuse inconsistent framing before waiting for a body that cannot be this pinned response.
+            val length = connection.contentLengthLong
+            requireUser(length < 0 || length == end - first, Failure.VERIFY)
             val received = connection.inputStream.buffered().use { input ->
-                FileOutputStream(partial, first > 0).buffered().use { output ->
-                    copy(input, output, first, artifact.size) { progress(it, false) }
+                val file = localIo { FileOutputStream(partial, first > 0).buffered() }
+                LocalWrites(file).use { output ->
+                    copy(input, output, first, end) { progress(it, false) }
                 }
             }
             // A connection that closed before the announced end leaves a prefix, and so does a range that stops
             // short of the artifact's end: keep it for the next attempt.
-            val expected = if (rangeEnd != null) artifact.size else announced
+            val expected = artifact.size
             if (received < expected) {
                 throw UserFacingException(Failure.DOWNLOAD, "Transfer ended at $received of $expected bytes")
             }
@@ -172,6 +180,28 @@ object ArtifactFetcher {
         } finally {
             connection.disconnect()
         }
+    }
+
+    /** Keep local write/flush/close errors distinct from socket read errors in the same copy loop. */
+    private class LocalWrites(private val output: OutputStream) : OutputStream() {
+        override fun write(value: Int) = localIo { output.write(value) }
+        override fun write(bytes: ByteArray, offset: Int, length: Int) = localIo { output.write(bytes, offset, length) }
+        override fun flush() = localIo { output.flush() }
+        override fun close() = localIo { output.close() }
+    }
+
+    private inline fun <T> localIo(block: () -> T): T = try {
+        block()
+    } catch (error: IOException) {
+        throw UserFacingException(localFailure(error), error.message ?: "I/O").apply { initCause(error) }
+    }
+
+    /** Classify install I/O without changing digest's IOException contract for installed-model validation. */
+    private fun installDigest(file: File, onBytes: (Long) -> Unit): String = localIo { digest(file, onBytes) }
+
+    /** Same-directory atomic rename, retaining the I/O cause (including ENOSPC) if it fails. */
+    private fun install(source: File, destination: File) = localIo {
+        Files.move(source.toPath(), destination.toPath(), StandardCopyOption.ATOMIC_MOVE)
     }
 
     /**
@@ -304,10 +334,11 @@ object ArtifactFetcher {
         redirects: RedirectPolicy = RedirectPolicy.DOWNLOADS,
         progress: (Long, Boolean) -> Unit,
     ) {
+        localIo { Files.createDirectories(directory.toPath()) }
         val destination = File(directory, artifact.name)
         val existing = scaled(download.size, artifact.size)
         val installed = destination.length() == artifact.size &&
-            digest(destination) { progress(existing(it), true) } == artifact.sha256
+            installDigest(destination) { progress(existing(it), true) } == artifact.sha256
         if (installed) {
             progress(download.size, true)
             return
@@ -360,7 +391,7 @@ object ArtifactFetcher {
             val matches = partial.length() == artifact.size &&
                 digest(partial) { progress(artifact.size + it) } == artifact.sha256
             requireUser(matches, Failure.VERIFY)
-            requireUser(partial.renameTo(destination), Failure.INSTALL)
+            install(partial, destination)
         } catch (error: ZstdIOException) {
             throw UserFacingException(Failure.VERIFY, error.message ?: "Zstandard").apply { initCause(error) }
         } catch (error: IOException) {
@@ -380,7 +411,7 @@ object ArtifactFetcher {
     }
 
     /** [Failure.SPACE] for a full disk (ENOSPC), else [Failure.INSTALL]. */
-    internal fun localFailure(error: IOException): Failure {
+    fun localFailure(error: IOException): Failure {
         val message = generateSequence<Throwable>(error) { it.cause }.mapNotNull { it.message }.joinToString(" ")
         val full = "ENOSPC" in message || message.contains("No space left", ignoreCase = true)
         return if (full) Failure.SPACE else Failure.INSTALL

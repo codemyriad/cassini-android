@@ -23,6 +23,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
+import java.io.InterruptedIOException
+import java.net.SocketTimeoutException
+import java.nio.file.Files
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
@@ -280,7 +283,9 @@ class ModelRepository(
      * files (resuming `.part` files), then writes the marker durably: written to a temporary file and fsynced, renamed,
      * and the directory fsynced, so the renames of the files and the marker survive a power cut. [progress] gets the
      * bytes of the model's download and whether they are being checked. Any failure is thrown: a [UserFacingException]
-     * (an I/O error becomes DOWNLOAD). For the app's `ModelInstaller` store, which decides itself what is best effort,
+     * (an interrupted socket read becomes CANCELLED, ENOSPC becomes SPACE, other raw I/O becomes DOWNLOAD).
+     * For the app's `ModelInstaller` store,
+     * which decides itself what is best effort,
      * on an IO thread.
      */
     /** Runs [block], an install run of several models, as one fetcher session (one manifest read, R11). */
@@ -290,15 +295,35 @@ class ModelRepository(
     fun installModelBlocking(model: ModelDescriptor, progress: (Long, Boolean) -> Unit) {
         Threads.assertOffMain("ModelRepository.installModelBlocking")
         val directory = model.directory(paths.modelRoot)
-        directory.mkdirs()
+        try {
+            Files.createDirectories(directory.toPath())
+        } catch (error: IOException) {
+            throw UserFacingException(ArtifactFetcher.localFailure(error), error.message ?: "model directory")
+                .apply { initCause(error) }
+        }
         val marker = File(directory, model.markerFile)
         marker.delete()
-        try {
+        val failure = try {
             fetcher.fetch(model, directory, progress)
+            null
+        } catch (error: SocketTimeoutException) {
+            fetchFailure(error)
+        } catch (error: InterruptedIOException) {
+            fetchFailure(error, cancelled = Thread.currentThread().isInterrupted)
         } catch (error: IOException) {
-            throw UserFacingException(Failure.DOWNLOAD, error.message ?: "I/O").apply { initCause(error) }
+            fetchFailure(error)
         }
+        if (failure != null) throw failure
         writeMarker(marker, model.markerValue)
+    }
+
+    private fun fetchFailure(error: IOException, cancelled: Boolean = false): UserFacingException {
+        val failure = when {
+            cancelled -> Failure.CANCELLED
+            ArtifactFetcher.localFailure(error) == Failure.SPACE -> Failure.SPACE
+            else -> Failure.DOWNLOAD
+        }
+        return UserFacingException(failure, error.message ?: "I/O").apply { initCause(error) }
     }
 
     private fun writeMarker(marker: File, value: String) {
@@ -310,7 +335,8 @@ class ModelRepository(
             NoteFiles.syncDirectory(marker.parentFile!!)
         } catch (error: IOException) {
             written.delete()
-            throw UserFacingException(Failure.INSTALL, error.message ?: "marker").apply { initCause(error) }
+            val failure = ArtifactFetcher.localFailure(error)
+            throw UserFacingException(failure, error.message ?: "marker").apply { initCause(error) }
         }
     }
 
