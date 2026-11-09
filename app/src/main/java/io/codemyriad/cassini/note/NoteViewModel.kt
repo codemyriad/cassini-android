@@ -239,14 +239,26 @@ class NoteViewModel(
 
     private val sealedTranscript: Flow<SealedShown?> = combine(
         sealedWords,
-        details.map { it?.details?.speakers.orEmpty() }.distinctUntilChanged(),
+        details.map { loaded ->
+            val detail = loaded?.details
+            detail?.speakers.orEmpty() to (detail?.let(NoteMapping::selected)?.wordEndsBoundedByAudio == true)
+        }.distinctUntilChanged(),
         prints,
         people,
-    ) { words, speakers, prints, people ->
+    ) { words, speakersAndTiming, prints, people ->
+        val (speakers, bounded) = speakersAndTiming
         words?.let { list ->
             val variant = details.value?.details?.let(NoteMapping::selected)?.variantId
             val shown = speakers.filter { it.variantId == variant }
-            SealedShown(NoteTranscripts.sealed(list, shown, prints, people.voices.map { it.voice }), prints)
+            val transcript = NoteTranscripts.sealed(
+                list,
+                shown,
+                prints,
+                people.voices.map { it.voice },
+                ports::placeholderLabel,
+                bounded,
+            )
+            SealedShown(transcript, prints)
         }
     }.flowOn(compute)
 
@@ -1377,6 +1389,7 @@ class NoteViewModel(
             state.automatic,
             suggestions,
             state.tentativeFromMs,
+            ports::placeholderLabel,
         )
         DraftShown(
             transcript,
@@ -1398,7 +1411,14 @@ class NoteViewModel(
                 .filter { (speaker, match) -> match.voiceId !in names.rejected[speaker].orEmpty() }
                 .mapValues { (_, match) -> SuggestionUi(match.voiceId, voiceNames.getValue(match.voiceId)) }
             val automatic = names.automatic.filter { (id, name) -> draft.labels[id] == name }.keys
-            val transcript = NoteTranscripts.draft(draft.words, draft.labels, automatic, suggestions, null)
+            val transcript = NoteTranscripts.draft(
+                draft.words,
+                draft.labels,
+                automatic,
+                suggestions,
+                null,
+                ports::placeholderLabel,
+            )
             DraftShown(
                 transcript,
                 draft.words,

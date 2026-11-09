@@ -606,4 +606,5 @@
     <string name="ui_parakeet_suggestion_title">Get better transcripts with Parakeet Ultra</string>
     <string name="ui_parakeet_suggestion_body">Whistle is built in so you can start right away. Parakeet Ultra is more accurate. It’s a %1$s download.</string>
     <string name="ui_parakeet_now_default">New meetings now use Parakeet Ultra.</string>
+    <string name="ui_turn_crosstalk">Probably crosstalk</string>
 </resources>

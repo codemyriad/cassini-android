@@ -1,5 +1,7 @@
 package io.codemyriad.cassini.note
 
+import io.codemyriad.cassini.core.export.ReadingText
+import io.codemyriad.cassini.core.export.ReadingTurns
 import io.codemyriad.cassini.core.format.Word
 import io.codemyriad.cassini.core.speakers.DefaultLabels
 import io.codemyriad.cassini.core.speakers.Match
@@ -8,6 +10,7 @@ import io.codemyriad.cassini.core.speakers.SpeakerPrint
 import io.codemyriad.cassini.core.speakers.SpeakerTint
 import io.codemyriad.cassini.core.speakers.Voice
 import io.codemyriad.cassini.data.db.SpeakerEntity
+import io.codemyriad.cassini.ui.components.InlineSuggestionUi
 import io.codemyriad.cassini.ui.components.SpeakerNameUi
 import io.codemyriad.cassini.ui.components.SuggestionUi
 import io.codemyriad.cassini.ui.components.TurnUi
@@ -36,14 +39,16 @@ class NoteTranscript(val turns: ImmutableList<TurnUi>, internal val index: WordI
         turns.firstOrNull { it.id == word.turnId }?.words?.getOrNull(word.index)?.startMs
 
     /** The speakers in order of their first turn. */
-    val speakers: List<String> get() = turns.map { it.speakerId }.distinct()
+    val speakers: List<String> get() = turns.flatMap { turn ->
+        turn.words.map { it.speakerId.ifEmpty { turn.speakerId } }
+    }.distinct()
 
     companion object {
         val EMPTY = NoteTranscript(persistentListOf(), WordIndex(LongArray(0), emptyArray(), IntArray(0)))
     }
 }
 
-/** Word start times in canonical order, with the turn and the place in the turn of each word. */
+/** Word starts sorted by time, with canonical order breaking ties, mapped to explicit display references. */
 class WordIndex(private val starts: LongArray, private val turnIds: Array<String>, private val inTurn: IntArray) {
     fun at(positionMs: Long): WordRef? {
         val found = Arrays.binarySearch(starts, positionMs)
@@ -59,15 +64,6 @@ class WordIndex(private val starts: LongArray, private val turnIds: Array<String
  * (features.md sections 3.1 and 3.3; ui.md section 7, `TurnUi`).
  */
 object NoteTranscripts {
-    /**
-     * A turn is split into paragraphs of at most this many words, so one long speaker (a single-voice hour) does not
-     * make one huge item. A paragraph ends at a sentence end after [SOFT_TURN_WORDS] words.
-     */
-    const val MAX_TURN_WORDS = 200
-    const val SOFT_TURN_WORDS = 120
-
-    private const val SENTENCE_ENDS = ".?!…。？！"
-
     /** The colour of each speaker ([SpeakerTint] to the theme's tone). */
     fun tone(tint: SpeakerTint): SpeakerTone = when (tint) {
         SpeakerTint.BLUE -> SpeakerTone.Blue
@@ -97,11 +93,14 @@ object NoteTranscripts {
      * - The suggestion card sits at a placeholder speaker's first turn when its link is SUGGESTED to a voice that
      *   still exists.
      */
+    @Suppress("LongParameterList") // Shared words, names, matches and display provenance.
     fun sealed(
         words: List<Word>,
         speakers: List<SpeakerEntity>,
         prints: Map<String, SpeakerPrint>,
         voices: List<Voice>,
+        placeholderLabel: (Int) -> String = { "Speaker $it" },
+        endsBoundedByAudio: Boolean = false,
     ): NoteTranscript {
         val byId = speakers.associateBy { it.speakerId }
         val order = words.map { it.speaker }.distinct()
@@ -109,7 +108,7 @@ object NoteTranscripts {
         val tints = SpeakerTint.assign(order) { id -> names[id] is SpeakerNameUi.Placeholder }
         val voiceNames = voices.associate { it.id to it.name }
         val suggested = HashSet<String>()
-        return build(words) { speaker, first ->
+        return build(words, placeholderLabel, endsBoundedByAudio) { speaker, first ->
             val name = names.getValue(speaker)
             val match = prints[speaker]?.match
             val voiceName = match?.voiceId?.let(voiceNames::get)
@@ -129,12 +128,14 @@ object NoteTranscripts {
      * "auto" badge), [suggestions] by speaker (the card sits at that speaker's most recent turn) and
      * [tentativeFromMs]: words that end after it may change (null for a paused draft, which has no unsettled words).
      */
+    @Suppress("LongParameterList") // Shared words, draft state and localized fallback labels.
     fun draft(
         words: List<Word>,
         labels: Map<String, String>,
         automatic: Set<String>,
         suggestions: Map<String, SuggestionUi>,
         tentativeFromMs: Long?,
+        placeholderLabel: (Int) -> String = { "Speaker $it" },
     ): NoteTranscript {
         val order = words.map { it.speaker }.distinct()
         val names = order.withIndex().associate { (index, id) ->
@@ -146,16 +147,41 @@ object NoteTranscripts {
             }
         }
         val tints = SpeakerTint.assign(order) { id -> names[id] is SpeakerNameUi.Placeholder }
-        val lastTurn = lastTurnStarts(words)
-        val transcript = build(words) { speaker, _ ->
+        val transcript = build(words, placeholderLabel, false) { speaker, _ ->
             TurnTemplate(names.getValue(speaker), tone(tints.getValue(speaker)))
         }
+        val lastTurn = transcript.turns.flatMap { turn ->
+            turn.words.map { word -> Triple(word.speakerId, word.startMs, turn.id) }
+        }.groupBy { it.first }.mapValues { (_, appearances) -> appearances.maxBy { it.second }.third }
         val turns = transcript.turns.map { turn ->
             val name = turn.name
             val suggestion = suggestions[turn.speakerId]
-                ?.takeIf { lastTurn[turn.speakerId] == turn.startMs && name is SpeakerNameUi.Placeholder }
-            val unsettled = tentativeFromMs?.let { from -> unsettledFrom(words, turn, from) }
-            turn.copy(auto = turn.speakerId in automatic, suggestion = suggestion, unsettledFrom = unsettled)
+                ?.takeIf { lastTurn[turn.speakerId] == turn.id && name is SpeakerNameUi.Placeholder }
+            val updatedWords = turn.words.map { word ->
+                word.copy(unsettled = tentativeFromMs != null && words[word.canonicalIndex].endMs > tentativeFromMs)
+            }
+            val unsettled = updatedWords.indexOfFirst { it.unsettled }.takeIf { it >= 0 }
+            val inline = turn.words.distinctBy { it.speakerId }.filter { it.speakerId != turn.speakerId }
+                .mapNotNull { word ->
+                    val id = word.speakerId
+                    val offered = suggestions[id]?.takeIf { lastTurn[id] == turn.id && names[id] is SpeakerNameUi.Placeholder }
+                    offered?.let {
+                        InlineSuggestionUi(
+                            id,
+                            displayName(names.getValue(id), placeholderLabel),
+                            tone(tints.getValue(id)),
+                            word.startMs,
+                            it,
+                        )
+                    }
+                }
+            turn.copy(
+                auto = turn.speakerId in automatic,
+                suggestion = suggestion,
+                unsettledFrom = unsettled,
+                words = updatedWords.toImmutableList(),
+                inlineSuggestions = inline.toImmutableList(),
+            )
         }
         return NoteTranscript(turns.toImmutableList(), transcript.index)
     }
@@ -169,72 +195,79 @@ object NoteTranscripts {
         val suggestion: SuggestionUi? = null,
     )
 
-    /** The turns of [words], each from [template] (speaker id, whether it is the speaker's first turn). */
-    private fun build(words: List<Word>, template: (String, Boolean) -> TurnTemplate): NoteTranscript {
-        val turns = ArrayList<TurnUi>()
-        val starts = LongArray(words.size)
-        val turnIds = arrayOfNulls<String>(words.size)
-        val inTurn = IntArray(words.size)
+    /** Build rows and explicit canonical-to-display references; a rejoined row need not own a contiguous range. */
+    // One pass maps viewer members, naming cards and canonical playback references.
+    @Suppress("LongMethod", "CyclomaticComplexMethod", "ComplexCondition")
+    private fun build(
+        words: List<Word>,
+        placeholderLabel: (Int) -> String,
+        endsBoundedByAudio: Boolean,
+        template: (String, Boolean) -> TurnTemplate,
+    ): NoteTranscript {
+        val reading = ReadingTurns.of(words, endsBoundedByAudio)
         val seen = HashSet<String>()
-        var from = 0
-        while (from < words.size) {
-            val speaker = words[from].speaker
-            val to = paragraphEnd(words, from)
-            val id = "w$from"
-            val made = template(speaker, seen.add(speaker))
-            val turnWords = ArrayList<WordUi>(to - from)
-            for (i in from until to) {
-                turnWords += WordUi(words[i].text, words[i].startMs)
-                starts[i] = words[i].startMs
-                turnIds[i] = id
-                inTurn[i] = i - from
+        val templates = HashMap<String, TurnTemplate>()
+        fun made(speaker: String) = templates.getOrPut(speaker) { template(speaker, seen.add(speaker)) }
+        val refs = arrayOfNulls<WordRef>(words.size)
+        val offered = HashSet<String>()
+        val turns = reading.rows.map { row ->
+            val speaker = made(row.speaker)
+            val id = "w${row.key}"
+            val inline = ArrayList<InlineSuggestionUi>()
+            val turnWords = ArrayList<WordUi>()
+            for (member in row.members) {
+                val chipSpeaker = member.interjectionSpeaker
+                val chip = chipSpeaker?.let(::made)
+                val label = chip?.let { displayName(it.name, placeholderLabel) }
+                if (chipSpeaker != null && chip != null && chip.suggestion != null && offered.add(chipSpeaker)) {
+                    inline += InlineSuggestionUi(
+                        chipSpeaker,
+                        label.orEmpty(),
+                        chip.tone,
+                        reading.words[member.wordIndices.first()].startMs,
+                        chip.suggestion,
+                    )
+                }
+                for ((index, canonical) in member.wordIndices.withIndex()) {
+                    val word = reading.words[canonical]
+                    refs[canonical] = WordRef(id, turnWords.size)
+                    turnWords += WordUi(
+                        text = word.text,
+                        startMs = word.startMs,
+                        canonicalIndex = canonical,
+                        endMs = word.endMs,
+                        speakerId = word.speaker,
+                        prefix = if (label != null && index == 0) "($label: " else "",
+                        suffix = if (label != null && index == member.wordIndices.lastIndex) ")" else "",
+                        interjectionTone = chip?.tone,
+                    )
+                }
             }
-            turns += TurnUi(
+            val over = ReadingText.over(row) { displayName(made(it).name, placeholderLabel) }
+            TurnUi(
                 id = id,
-                speakerId = speaker,
-                name = made.name,
-                tone = made.tone,
-                startMs = words[from].startMs,
-                auto = made.auto,
+                speakerId = row.speaker,
+                name = speaker.name,
+                tone = speaker.tone,
+                startMs = row.startMs,
+                auto = speaker.auto,
                 words = turnWords.toImmutableList(),
-                suggestion = made.suggestion,
+                suggestion = speaker.suggestion?.takeIf { row.key == row.turnKey && offered.add(row.speaker) },
+                continuation = row.continuation,
+                over = over,
+                crosstalk = row.crosstalk,
+                inlineSuggestions = inline.toImmutableList(),
             )
-            from = to
         }
-        @Suppress("UNCHECKED_CAST") // every slot was filled above
-        return NoteTranscript(turns.toImmutableList(), WordIndex(starts, turnIds as Array<String>, inTurn))
+        val chronological = words.indices.sortedWith(compareBy<Int> { words[it].startMs }.thenBy { it })
+        val starts = chronological.map { words[it].startMs }.toLongArray()
+        val turnIds = chronological.map { checkNotNull(refs[it]).turnId }.toTypedArray()
+        val inTurn = chronological.map { checkNotNull(refs[it]).index }.toIntArray()
+        return NoteTranscript(turns.toImmutableList(), WordIndex(starts, turnIds, inTurn))
     }
 
-    /** The end (exclusive) of the paragraph from [from]: the speaker's run, cut as [MAX_TURN_WORDS] says. */
-    private fun paragraphEnd(words: List<Word>, from: Int): Int {
-        val speaker = words[from].speaker
-        var to = from + 1
-        while (to < words.size && words[to].speaker == speaker && !paragraphFull(words, from, to)) to++
-        return to
-    }
-
-    /** Whether the paragraph of words [from] until [to] is long enough to end before word [to]. */
-    private fun paragraphFull(words: List<Word>, from: Int, to: Int): Boolean {
-        val length = to - from
-        val sentenceEnd = words[to - 1].text.lastOrNull()?.let { it in SENTENCE_ENDS } == true
-        return length >= MAX_TURN_WORDS || (length >= SOFT_TURN_WORDS && sentenceEnd)
-    }
-
-    /** The start of each speaker's most recent paragraph. */
-    private fun lastTurnStarts(words: List<Word>): Map<String, Long> {
-        val result = HashMap<String, Long>()
-        var from = 0
-        while (from < words.size) {
-            val to = paragraphEnd(words, from)
-            result[words[from].speaker] = words[from].startMs
-            from = to
-        }
-        return result
-    }
-
-    /** The first word of [turn] that ends after [fromMs], or null when all of it is settled. */
-    private fun unsettledFrom(words: List<Word>, turn: TurnUi, fromMs: Long): Int? {
-        val start = turn.id.removePrefix("w").toIntOrNull() ?: return null
-        return turn.words.indices.firstOrNull { i -> words[start + i].endMs > fromMs }
+    private fun displayName(name: SpeakerNameUi, placeholder: (Int) -> String): String = when (name) {
+        is SpeakerNameUi.Named -> name.text
+        is SpeakerNameUi.Placeholder -> name.stored ?: placeholder(name.number)
     }
 }

@@ -319,8 +319,22 @@ private fun DraftTurn(turn: TurnUi, first: Boolean, onEvent: (NoteEvent) -> Unit
                 tone = turn.tone,
                 timeMs = turn.startMs,
                 auto = turn.auto,
+                continuation = turn.continuation,
+                over = turn.over,
+                crosstalk = turn.crosstalk,
                 onClick = onSpeaker,
                 modifier = if (first) Modifier.trimVertical(top = FirstHeaderLift, bottom = 0.dp) else Modifier,
+            )
+        }
+        turn.inlineSuggestions.forEach { inline ->
+            SuggestionCard(
+                speaker = inline.name,
+                tone = inline.tone,
+                timeMs = inline.startMs,
+                name = inline.suggestion.name,
+                onYes = { onEvent(NoteEvent.AcceptSuggestion(inline.speakerId, inline.suggestion.voiceId)) },
+                onNo = { onEvent(NoteEvent.RejectSuggestion(inline.speakerId, inline.suggestion.voiceId)) },
+                onSpeaker = { onEvent(NoteEvent.SpeakerTap(inline.speakerId)) },
             )
         }
         TurnParagraph(

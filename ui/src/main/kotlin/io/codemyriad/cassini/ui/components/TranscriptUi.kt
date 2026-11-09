@@ -11,7 +11,17 @@ import kotlinx.collections.immutable.persistentListOf
 
 /** One transcript word: its [text] as the paragraph shows it (with its punctuation) and where it starts in the audio. */
 @Immutable
-data class WordUi(val text: String, val startMs: Long)
+data class WordUi(
+    val text: String,
+    val startMs: Long,
+    val canonicalIndex: Int = -1,
+    val endMs: Long = startMs,
+    val speakerId: String = "",
+    val prefix: String = "",
+    val suffix: String = "",
+    val interjectionTone: SpeakerTone? = null,
+    val unsettled: Boolean = false,
+)
 
 /** How a transcript is shown: [Read] is the sealed transcript of Read & listen, [Draft] the Transcribing draft. */
 enum class TurnMode { Read, Draft }
@@ -31,15 +41,15 @@ data class TurnMatches(val ranges: ImmutableList<IntRange>, val current: Int? = 
  * The text of a paragraph: the words joined by single spaces. [TurnMatches] ranges index into this string, so
  * transcript search must match against it.
  */
-fun turnText(words: List<WordUi>): String = words.joinToString(" ") { it.text }
+fun turnText(words: List<WordUi>): String = words.joinToString(" ") { it.prefix + it.text + it.suffix }
 
 /** The start offset of each word in [turnText]. */
 internal fun wordStarts(words: List<WordUi>): IntArray {
     val starts = IntArray(words.size)
     var offset = 0
     words.forEachIndexed { index, word ->
-        starts[index] = offset
-        offset += word.text.length + 1
+        starts[index] = offset + word.prefix.length
+        offset += word.prefix.length + word.text.length + word.suffix.length + 1
     }
     return starts
 }
@@ -93,6 +103,20 @@ data class TurnUi(
     val words: ImmutableList<WordUi>,
     val unsettledFrom: Int? = null,
     val suggestion: SuggestionUi? = null,
+    val continuation: Boolean = false,
+    val over: String = "",
+    val crosstalk: Boolean = false,
+    val inlineSuggestions: ImmutableList<InlineSuggestionUi> = persistentListOf(),
+)
+
+/** An inline speaker still gets their naming suggestion, outside the unchanged transcript paragraph. */
+@Immutable
+data class InlineSuggestionUi(
+    val speakerId: String,
+    val name: String,
+    val tone: SpeakerTone,
+    val startMs: Long,
+    val suggestion: SuggestionUi,
 )
 
 /** One word of the transcript: word [index] of the turn [turnId] (the active word, a word tap). */

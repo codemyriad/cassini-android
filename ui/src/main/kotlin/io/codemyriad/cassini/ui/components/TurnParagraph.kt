@@ -51,6 +51,7 @@ import io.codemyriad.cassini.ui.R
 import io.codemyriad.cassini.ui.theme.CassiniColors
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import io.codemyriad.cassini.ui.theme.SANS_NORMAL_LINE_HEIGHT
+import io.codemyriad.cassini.ui.theme.speaker
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
@@ -325,8 +326,17 @@ private fun paragraph(
     c: CassiniColors,
 ): AnnotatedString = buildAnnotatedString {
     append(turnText(words))
-    if (mode != TurnMode.Read && unsettledFrom != null && unsettledFrom in words.indices) {
-        addStyle(SpanStyle(color = c.text4), starts[unsettledFrom], length)
+    val explicitUnsettled = words.any { it.unsettled }
+    words.forEachIndexed { index, word ->
+        val first = starts[index] - word.prefix.length
+        val end = starts[index] + word.text.length + word.suffix.length
+        word.interjectionTone?.let { tone ->
+            val colors = c.speaker(tone)
+            addStyle(SpanStyle(color = colors.ink, background = colors.tint), first, end)
+            if (word.prefix.isNotEmpty()) addStyle(SpanStyle(fontWeight = FontWeight.SemiBold), first, starts[index])
+        }
+        val unsettled = word.unsettled || (!explicitUnsettled && unsettledFrom != null && index >= unsettledFrom)
+        if (mode != TurnMode.Read && unsettled) addStyle(SpanStyle(color = c.text4), starts[index], end)
     }
     matches.ranges.forEachIndexed { index, range ->
         val start = range.first.coerceIn(0, length)

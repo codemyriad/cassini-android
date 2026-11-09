@@ -583,4 +583,5 @@
     <string name="ui_parakeet_suggestion_title">De meilleures transcriptions avec Parakeet Ultra</string>
     <string name="ui_parakeet_suggestion_body">Whistle est inclus pour commencer tout de suite. Parakeet Ultra est plus précis. Le téléchargement fait %1$s.</string>
     <string name="ui_parakeet_now_default">Les nouvelles réunions utilisent désormais Parakeet Ultra.</string>
+    <string name="ui_turn_crosstalk">Diaphonie probable</string>
 </resources>

@@ -1,5 +1,6 @@
 package io.codemyriad.cassini.note
 
+import io.codemyriad.cassini.core.format.Transcript
 import io.codemyriad.cassini.core.format.Word
 import io.codemyriad.cassini.core.speakers.Match
 import io.codemyriad.cassini.core.speakers.SpeakerPrint
@@ -10,6 +11,7 @@ import io.codemyriad.cassini.ui.components.SuggestionUi
 import io.codemyriad.cassini.ui.components.WordRef
 import io.codemyriad.cassini.ui.components.turnText
 import io.codemyriad.cassini.ui.theme.SpeakerTone
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -89,8 +91,8 @@ class NoteTranscriptsTest {
         val long = (0 until 450).map { i -> Word("a", i * 100L, i * 100L + 90, if (i == 129) "end." else "w$i") }
         val turns = NoteTranscripts.sealed(long, emptyList(), emptyMap(), emptyList()).turns
         val sizes = turns.map { it.words.size }
-        assertEquals("a sentence end after 120 words, then at most 200", listOf(130, 200, 120), sizes)
-        assertEquals(listOf("w0", "w130", "w330"), turns.map { it.id })
+        assertEquals("the viewer readable blocks, not Android word caps", listOf(130, 140, 140, 40), sizes)
+        assertEquals(listOf("w0", "w130", "w270", "w410"), turns.map { it.id })
         assertTrue(turns.all { it.speakerId == "a" })
     }
 
@@ -149,7 +151,12 @@ class NoteTranscriptsTest {
     @Test
     fun searchIgnoresCaseAndAccents() {
         val turns = NoteTranscripts.sealed(
-            listOf(Word("a", 0, 1, "Café"), Word("a", 1, 2, "DELIVERY"), Word("b", 2, 3, "cafe delivery")),
+            listOf(
+                Word("a", 0, 1, "Café"),
+                Word("a", 1, 2, "DELIVERY"),
+                Word("b", 2, 3, "cafe"),
+                Word("b", 3, 4, "delivery"),
+            ),
             emptyList(),
             emptyMap(),
             emptyList(),
@@ -167,10 +174,121 @@ class NoteTranscriptsTest {
     @Test
     fun aDecomposedAccentKeepsTheRangeOnTheSourceText() {
         val text = "Café aperto"
-        val turns = NoteTranscripts.sealed(listOf(Word("a", 0, 1, text)), emptyList(), emptyMap(), emptyList()).turns
+        val atoms = text.split(' ').mapIndexed { index, word -> Word("a", index.toLong(), index + 1L, word) }
+        val turns = NoteTranscripts.sealed(atoms, emptyList(), emptyMap(), emptyList()).turns
         val match = TranscriptSearch.matches(turns, "café").single()
         assertEquals("the combining mark belongs to the match", 0..4, match.range)
     }
+
+    @Test fun acknowledgmentKeepsChipWordsSeekableAndSearchable() {
+        val vector = fixture("acknowledgment")
+        val transcript = NoteTranscripts.sealed(vector, vectorSpeakers, emptyMap(), emptyList())
+        val row = transcript.turns.single()
+        assertEquals(
+            "The release candidate is ready for testing, (Ben: Sounds good.) " +
+                "and I will send the download link after this call.",
+            turnText(row.words),
+        )
+        assertEquals("", row.over)
+        assertEquals(listOf("ada", "ben"), transcript.speakers)
+        val active = transcript.activeWord(3200)!!
+        assertEquals(WordRef(row.id, 7), active)
+        assertEquals("Sounds", row.words[active.index].text)
+        assertEquals(3050L, transcript.wordStart(active))
+        assertEquals(1, TranscriptSearch.matches(transcript.turns, "Sounds good.").size)
+    }
+
+    @Test fun competingWordsKeepCanonicalSeekIndicesAndWholeSentences() {
+        val vector = fixture("competing")
+        val transcript = NoteTranscripts.sealed(vector, vectorSpeakers, emptyMap(), emptyList())
+        assertEquals(2, transcript.turns.size)
+        assertEquals(listOf("(over Ben)", "(over Ada)"), transcript.turns.map { it.over })
+        assertTrue(transcript.turns.none { it.continuation })
+        assertEquals("I can check the Linux build and report any problems today.", turnText(transcript.turns[0].words))
+        assertEquals(1, TranscriptSearch.matches(transcript.turns, "Linux build").size)
+        for ((canonical, word) in vector.withIndex()) {
+            val ref = transcript.activeWord(word.startMs)!!
+            val atom = transcript.turns.first { it.id == ref.turnId }.words[ref.index]
+            assertEquals(canonical, atom.canonicalIndex)
+            assertEquals(word.startMs, transcript.wordStart(ref))
+        }
+    }
+
+    @Test fun draftUnsettledFlagsAndSuggestionFollowChipIndices() {
+        val vector = fixture("acknowledgment")
+        val draft = NoteTranscripts.draft(
+            vector,
+            mapOf("ada" to "Ada"),
+            emptySet(),
+            mapOf("ben" to SuggestionUi("voice", "Ben")),
+            3400,
+        )
+        val row = draft.turns.single()
+        assertFalse(row.words[7].unsettled)
+        assertTrue(row.words[8].unsettled)
+        assertEquals("ben", row.inlineSuggestions.single().speakerId)
+        assertEquals(WordRef(row.id, 8), draft.activeWord(3400))
+    }
+
+    @Test fun canonicalOrderMayDifferFromPlaybackOrder() {
+        val transcript = NoteTranscripts.sealed(
+            listOf(Word("a", 1000, 1100, "later"), Word("b", 0, 100, "earlier")),
+            emptyList(),
+            emptyMap(),
+            emptyList(),
+        )
+        assertEquals(0L, transcript.wordStart(transcript.activeWord(50)!!))
+        assertEquals(1000L, transcript.wordStart(transcript.activeWord(1000)!!))
+    }
+
+    @Test fun measuredWordEndsAreNotRepairedInTheNote() {
+        val words = listOf(Word("a", 0, 4000, "held."))
+        val transcript = NoteTranscripts.sealed(words, emptyList(), emptyMap(), emptyList(), endsBoundedByAudio = true)
+        assertEquals(4000L, transcript.turns.single().words.single().endMs)
+    }
+
+    @Test fun everyViewerVectorKeepsTheSameSealedAndDraftRowMapping() {
+        val labels = mapOf("ada" to "Ada", "ben" to "Ben", "cy" to "Cy")
+        val speakers = vectorSpeakers + speaker("cy", 2, "Cy", false)
+        val fixtures = listOf(
+            "acknowledgment",
+            "competing",
+            "monologue",
+            "overlapping-turns",
+            "brief-reply",
+            "seam-gap",
+        )
+        for (name in fixtures) {
+            val words = fixture(name)
+            val expected = JSONObject(vectorFile("$name.expected.json")).getJSONArray("rows")
+            val sealed = NoteTranscripts.sealed(words, speakers, emptyMap(), emptyList())
+            val draft = NoteTranscripts.draft(words, labels, emptySet(), emptyMap(), null)
+            for (transcript in listOf(sealed, draft)) {
+                assertEquals(name, expected.length(), transcript.turns.size)
+                transcript.turns.forEachIndexed { index, turn ->
+                    val row = expected.getJSONObject(index)
+                    assertEquals(name, row.getString("speaker"), turn.speakerId)
+                    assertEquals(name, row.getLong("startMs"), turn.startMs)
+                    assertEquals(name, row.getBoolean("continuation"), turn.continuation)
+                    assertEquals(name, row.getBoolean("crosstalk"), turn.crosstalk)
+                    val members = row.getJSONArray("members")
+                    val canonical = (0 until members.length()).flatMap { member ->
+                        val indices = members.getJSONObject(member).getJSONArray("wordIndices")
+                        (0 until indices.length()).map(indices::getInt)
+                    }
+                    assertEquals(name, canonical, turn.words.map { it.canonicalIndex })
+                    assertEquals(name, canonical.map { words[it].text }, turn.words.map { it.text })
+                }
+            }
+        }
+    }
+
+    private val vectorSpeakers = listOf(speaker("ada", 0, "Ada", false), speaker("ben", 1, "Ben", false))
+    private fun vectorFile(name: String): String =
+        java.io.File(checkNotNull(System.getProperty("cassini.interjections")), name).readText()
+    private fun fixture(name: String): List<Word> = Transcript.fromJson(
+        vectorFile("$name.words.json"),
+    ).words
 
     private fun speaker(id: String, ordinal: Int, label: String, placeholder: Boolean, number: Int? = null) =
         SpeakerEntity(

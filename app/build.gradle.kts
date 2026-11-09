@@ -119,6 +119,13 @@ android {
                 // A local copy: the lambda must not capture the script object (configuration cache).
                 val fixturesPath = rootDir.resolve("fixtures").absolutePath
                 it.jvmArgumentProviders.add(CommandLineArgumentProvider { listOf("-Dcassini.fixtures=$fixturesPath") })
+                // D84: share the copied core vector as a relocatable input to plain JVM mapping tests.
+                it.inputs.dir(rootDir.resolve("core/src/test/resources/interjections"))
+                    .withPropertyName("readingVectors").withPathSensitivity(PathSensitivity.RELATIVE)
+                val vectorsPath = rootDir.resolve("core/src/test/resources/interjections").absolutePath
+                it.jvmArgumentProviders.add(
+                    CommandLineArgumentProvider { listOf("-Dcassini.interjections=$vectorsPath") },
+                )
                 // Robolectric needs these on JDK 17.
                 it.jvmArgs(
                     "--add-opens=java.base/java.lang=ALL-UNNAMED",
