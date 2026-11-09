@@ -1,6 +1,6 @@
 # Licenses and sources
 
-Cassini Android is licensed under [GNU GPLv3](LICENSE). Copyright © 2026 Codemyriad and contributors. Source and build instructions are available in this repository; each release tag identifies its app source. The APK includes full license texts in `assets/licenses/`, including the app license.
+Cassini Android is licensed under [GNU GPLv3](LICENSE). Copyright © 2026 Codemyriad OÜ and contributors. Source and build instructions are available in this repository; each release tag identifies its app source. The APK includes full license texts in `assets/licenses/`, including the app license.
 
 ## Native Android runtime
 
