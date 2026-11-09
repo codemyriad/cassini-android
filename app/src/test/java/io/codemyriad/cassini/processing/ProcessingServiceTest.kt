@@ -21,6 +21,7 @@ import io.codemyriad.cassini.data.CassiniDispatchers
 import io.codemyriad.cassini.data.models.ModelFetcher
 import io.codemyriad.cassini.data.models.ModelStatus
 import io.codemyriad.cassini.data.settings.QueueHold
+import io.codemyriad.cassini.engine.job.InstallOutcome
 import io.codemyriad.cassini.engine.job.JobEvent
 import io.codemyriad.cassini.engine.job.JobOutcome
 import io.codemyriad.cassini.testing.NoUncaughtCoroutines
@@ -131,6 +132,8 @@ class ProcessingServiceTest {
             }
             shadowOf(Looper.getMainLooper()).idle()
             assertTrue(ModelCatalog.DIARIZATION.ready(paths.modelRoot))
+            assertEquals(ModelStatus.Ready, graph.models.status.value[ModelPart.SPEAKERS])
+            assertEquals(InstallOutcome.Installed(), graph.installOwner.lastOutcome.value)
             assertEquals(InstallState.Idle, graph.installOwner.state.value)
             assertTrue(shadowOf(service).isStoppedBySelf)
             assertTrue(shadowOf(service).isForegroundStopped)
