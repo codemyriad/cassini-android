@@ -14,6 +14,8 @@ import java.io.OutputStream
 import java.io.RandomAccessFile
 import java.net.HttpURLConnection
 import java.net.URL
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 
 /**
@@ -139,7 +141,7 @@ object ArtifactFetcher {
         }
         // On the storage device before the rename makes it the verified file.
         sync(partial)
-        requireUser(partial.renameTo(destination), Failure.INSTALL)
+        install(partial, destination)
         progress(artifact.size, true)
     }
 
@@ -191,6 +193,11 @@ object ArtifactFetcher {
         block()
     } catch (error: IOException) {
         throw UserFacingException(localFailure(error), error.message ?: "I/O").apply { initCause(error) }
+    }
+
+    /** Same-directory atomic rename, retaining the I/O cause (including ENOSPC) if it fails. */
+    private fun install(source: File, destination: File) = localIo {
+        Files.move(source.toPath(), destination.toPath(), StandardCopyOption.ATOMIC_MOVE)
     }
 
     /**
@@ -379,7 +386,7 @@ object ArtifactFetcher {
             val matches = partial.length() == artifact.size &&
                 digest(partial) { progress(artifact.size + it) } == artifact.sha256
             requireUser(matches, Failure.VERIFY)
-            requireUser(partial.renameTo(destination), Failure.INSTALL)
+            install(partial, destination)
         } catch (error: ZstdIOException) {
             throw UserFacingException(Failure.VERIFY, error.message ?: "Zstandard").apply { initCause(error) }
         } catch (error: IOException) {
