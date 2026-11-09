@@ -1,7 +1,7 @@
 package io.codemyriad.cassini.core.speakers
 
-import io.codemyriad.cassini.core.export.TranscriptTurns
-import io.codemyriad.cassini.core.export.Turn
+import io.codemyriad.cassini.core.export.ReadingRun
+import io.codemyriad.cassini.core.export.ReadingTurns
 import io.codemyriad.cassini.core.format.SpeakerMerges
 import io.codemyriad.cassini.core.format.Transcript
 import io.codemyriad.cassini.core.format.Word
@@ -34,17 +34,17 @@ object SpeakerStats {
 
     /**
      * The stats of every speaker in [words] (canonical order), keyed by speaker id in [SpeakerStat.ordinal] order.
-     * Turns come from [TranscriptTurns.of]. The sample is the longest turn (ties: the earliest start, then the first
+     * Turns come from [ReadingTurns.wholeRuns]. The sample is the longest turn (ties: the earliest start, then the first
      * in canonical order), cut to [SAMPLE_MAX_MS].
      */
     fun of(words: List<Word>, endsBoundedByAudio: Boolean = false): Map<String, SpeakerStat> {
-        val turns = TranscriptTurns.of(words, endsBoundedByAudio).groupBy { it.speaker }
+        val turns = ReadingTurns.wholeRuns(words, endsBoundedByAudio).groupBy { it.speaker }
         val wordCounts = words.groupingBy { it.speaker }.eachCount()
         val result = LinkedHashMap<String, SpeakerStat>()
         for ((ordinal, id) in words.map { it.speaker }.distinct().withIndex()) {
             val own = turns.getValue(id)
             val longest = own.withIndex().minWith(
-                compareByDescending<IndexedValue<Turn>> { length(it.value) }
+                compareByDescending<IndexedValue<ReadingRun>> { length(it.value) }
                     .thenBy { it.value.startMs }
                     .thenBy { it.index },
             ).value
@@ -70,5 +70,5 @@ object SpeakerStats {
     fun of(transcript: Transcript, merges: Map<String, String>): Map<String, SpeakerStat> =
         of(SpeakerMerges.apply(transcript, merges).words)
 
-    private fun length(turn: Turn) = (turn.endMs - turn.startMs).coerceAtLeast(0)
+    private fun length(turn: ReadingRun) = (turn.endMs - turn.startMs).coerceAtLeast(0)
 }

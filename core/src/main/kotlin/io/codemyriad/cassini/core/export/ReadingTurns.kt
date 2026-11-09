@@ -40,6 +40,7 @@ data class ReadingTranscript(val words: List<Word>, val rows: List<ReadingRow>, 
  * overlap.ts buildTranscriptRows, and MeetingView's 60-second continuation rule. No Android dependencies.
  * Group in file order, repair display spans, then stable-sort BLOCKS, never the canonical words.
  */
+@Suppress("TooManyFunctions") // Keep both projections on the same viewer algorithm.
 object ReadingTurns {
     private const val HARD_GAP_MS = 4200L
     private const val SOFT_GAP_MS = 2200L
@@ -66,29 +67,17 @@ object ReadingTurns {
     private val terminal = Regex("[.?!,;:…。．！？；：，、।॥؛؟][)\\]}\"'’”»›」』〉》]*$")
 
     // Viewer buildTranscriptRows, in reference order.
-    @Suppress("LongMethod", "CyclomaticComplexMethod", "ComplexCondition")
+    @Suppress("CyclomaticComplexMethod", "ComplexCondition")
     fun of(
         words: List<Word>,
         endsBoundedByAudio: Boolean = false,
         lowConfidenceWords: Set<Int> = emptySet(),
     ): ReadingTranscript {
-        val grouped = readableBlocks(words)
-        val effective = if (endsBoundedByAudio) words else repair(words, grouped)
-        val ordered = grouped.map { block ->
-            if (effective === words || block.indices.none { effective[it] !== words[it] }) {
-                block
-            } else {
-                block.copy(end = maxOf(block.start, minOf(block.end, block.indices.maxOf { effective[it].endMs })))
-            }
-        }.sortedBy { it.start }
-        val spans = ordered.associateWith { block ->
-            merge(
-                block.indices.mapNotNull { index ->
-                    effective[index].let { if (it.endMs > it.startMs) Span(it.startMs, it.endMs) else null }
-                },
-            ).ifEmpty { if (block.end > block.start) listOf(Span(block.start, block.end)) else emptyList() }
-        }
-        val runs = buildRuns(ordered, spans)
+        val prepared = Prepared(words, endsBoundedByAudio)
+        val effective = prepared.effective
+        val ordered = prepared.ordered
+        val spans = prepared.spans
+        val runs = prepared.runs
         val nested = nest(runs, spans)
         val over = competing(runs, nested, spans)
         val positions = ordered.withIndex().associate { it.value.key to it.index }
@@ -138,10 +127,35 @@ object ReadingTurns {
         return ReadingTranscript(
             effective,
             rows,
-            runs.map { run ->
-                ReadingRun(run.speaker, run.start, run.end, total(run.spans(spans)), run.blocks.flatMap { it.indices })
-            },
+            runs.map { it.project(spans) },
         )
+    }
+
+    /** Whole runs, including interjection speakers, without computing unused reading rows or overlap labels. */
+    fun wholeRuns(words: List<Word>, endsBoundedByAudio: Boolean = false): List<ReadingRun> {
+        val prepared = Prepared(words, endsBoundedByAudio)
+        return prepared.runs.map { it.project(prepared.spans) }
+    }
+
+    /** Both projections share the viewer's grouping, timing repair, audible spans and run assembly. */
+    private class Prepared(words: List<Word>, endsBoundedByAudio: Boolean) {
+        private val grouped = readableBlocks(words)
+        val effective = if (endsBoundedByAudio) words else repair(words, grouped)
+        val ordered = grouped.map { block ->
+            if (effective === words || block.indices.none { effective[it] !== words[it] }) {
+                block
+            } else {
+                block.copy(end = maxOf(block.start, minOf(block.end, block.indices.maxOf { effective[it].endMs })))
+            }
+        }.sortedBy { it.start }
+        val spans = ordered.associateWith { block ->
+            merge(
+                block.indices.mapNotNull { index ->
+                    effective[index].let { if (it.endMs > it.startMs) Span(it.startMs, it.endMs) else null }
+                },
+            ).ifEmpty { if (block.end > block.start) listOf(Span(block.start, block.end)) else emptyList() }
+        }
+        val runs = buildRuns(ordered, spans)
     }
 
     private data class Block(val speaker: String, val start: Long, val end: Long, val indices: List<Int>) {
@@ -158,6 +172,8 @@ object ReadingTurns {
         var lastPosition: Int,
     ) {
         fun spans(spans: Map<Block, List<Span>>): List<Span> = merge(blocks.flatMap { spans.getValue(it) })
+        fun project(spans: Map<Block, List<Span>>): ReadingRun =
+            ReadingRun(speaker, start, end, total(this.spans(spans)), blocks.flatMap { it.indices })
     }
     private data class Nest(val host: Run, val before: Block)
 

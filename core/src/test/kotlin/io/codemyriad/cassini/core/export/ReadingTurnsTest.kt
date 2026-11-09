@@ -51,6 +51,12 @@ class ReadingTurnsTest {
             )
             assertEquals(words.map { it.text }, reading.words.map { it.text })
             assertEquals(words.map { it.startMs }, reading.words.map { it.startMs })
+            assertEquals("$fixture: statistics keep every whole run", reading.runs, ReadingTurns.wholeRuns(words))
+            assertEquals(
+                "$fixture: measured ends stay attested in whole runs",
+                ReadingTurns.of(words, endsBoundedByAudio = true).runs,
+                ReadingTurns.wholeRuns(words, endsBoundedByAudio = true),
+            )
         }
     }
 
