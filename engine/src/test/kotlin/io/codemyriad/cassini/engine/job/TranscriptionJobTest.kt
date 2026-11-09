@@ -50,6 +50,7 @@ import java.security.MessageDigest
 import java.util.Collections
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
@@ -294,7 +295,8 @@ class TranscriptionJobTest {
     @Test fun cancelInsideASlowNativeCallKeepsThePreviousCheckpointAndReleasesHandles() = runBlocking {
         val h = Harness()
         val entered = CountDownLatch(1)
-        val cancelSent = CountDownLatch(1)
+        val cancelObserved = CountDownLatch(1)
+        val returnFromNative = Semaphore(0)
         val interrupted = AtomicBoolean()
         val finishedNativeCall = AtomicBoolean()
         // Sampled at the end of the native call: recognizer closed, diarizer closed, budget held.
@@ -302,12 +304,15 @@ class TranscriptionJobTest {
         h.script.beforeDecode = { start ->
             if (start == 26_000L) {
                 entered.countDown()
-                // A native call cannot be interrupted: it ignores the interrupt and runs to its end, here 300 ms after
-                // the cancel. A latch await would notice the interrupt, so the call spins.
-                val began = System.nanoTime()
-                while (cancelSent.count > 0L && System.nanoTime() - began < 10_000_000_000L) Thread.onSpinWait()
-                val cancelled = System.nanoTime()
-                while (System.nanoTime() - cancelled < 300_000_000L) Thread.onSpinWait()
+                // Simulate native work that receives cancellation but cannot return until the test releases it.
+                // acquire clears the interrupt when it throws; restore it before returning to the job.
+                try {
+                    returnFromNative.acquire()
+                } catch (_: InterruptedException) {
+                    cancelObserved.countDown()
+                    returnFromNative.acquireUninterruptibly()
+                    Thread.currentThread().interrupt()
+                }
                 interrupted.set(Thread.currentThread().isInterrupted)
                 val recognizer = h.script.recognizers.single().closed
                 atTheEnd.set(listOf(recognizer, h.script.diarizers.single().closed, NativeBudget.isHeld))
@@ -316,9 +321,20 @@ class TranscriptionJobTest {
         }
         val job = h.job()
         val running = async(Dispatchers.Default) { job.run() }
-        assertTrue(entered.await(10, TimeUnit.SECONDS))
-        running.cancel()
-        cancelSent.countDown()
+        try {
+            assertTrue(entered.await(10, TimeUnit.SECONDS))
+            running.cancel()
+            assertTrue(
+                "native call must receive the cancellation interrupt",
+                cancelObserved.await(10, TimeUnit.SECONDS),
+            )
+            assertFalse(finishedNativeCall.get())
+            assertFalse(h.script.recognizers.single().closed)
+            assertFalse(h.script.diarizers.single().closed)
+            assertTrue(NativeBudget.isHeld)
+        } finally {
+            returnFromNative.release()
+        }
         withTimeout(10_000) { running.join() }
         assertTrue(interrupted.get())
         assertTrue(finishedNativeCall.get())
