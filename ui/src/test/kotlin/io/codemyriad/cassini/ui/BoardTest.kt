@@ -136,7 +136,7 @@ abstract class BoardTest {
 
         /** The compare options of every golden. */
         val OPTIONS: RoborazziOptions = RoborazziOptions(
-            compareOptions = RoborazziOptions.CompareOptions(changeThreshold = CHANGE_THRESHOLD),
+            compareOptions = rowMajorComparison(RoborazziOptions.CompareOptions(changeThreshold = CHANGE_THRESHOLD)),
         )
     }
 }
