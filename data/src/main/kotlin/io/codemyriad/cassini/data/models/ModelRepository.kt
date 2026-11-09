@@ -280,7 +280,8 @@ class ModelRepository(
      * files (resuming `.part` files), then writes the marker durably: written to a temporary file and fsynced, renamed,
      * and the directory fsynced, so the renames of the files and the marker survive a power cut. [progress] gets the
      * bytes of the model's download and whether they are being checked. Any failure is thrown: a [UserFacingException]
-     * (an I/O error becomes DOWNLOAD). For the app's `ModelInstaller` store, which decides itself what is best effort,
+     * (an unclassified I/O error becomes DOWNLOAD; ENOSPC becomes SPACE). For the app's `ModelInstaller` store,
+     * which decides itself what is best effort,
      * on an IO thread.
      */
     /** Runs [block], an install run of several models, as one fetcher session (one manifest read, R11). */
@@ -296,7 +297,8 @@ class ModelRepository(
         try {
             fetcher.fetch(model, directory, progress)
         } catch (error: IOException) {
-            throw UserFacingException(Failure.DOWNLOAD, error.message ?: "I/O").apply { initCause(error) }
+            val failure = if (ArtifactFetcher.localFailure(error) == Failure.SPACE) Failure.SPACE else Failure.DOWNLOAD
+            throw UserFacingException(failure, error.message ?: "I/O").apply { initCause(error) }
         }
         writeMarker(marker, model.markerValue)
     }
@@ -310,7 +312,8 @@ class ModelRepository(
             NoteFiles.syncDirectory(marker.parentFile!!)
         } catch (error: IOException) {
             written.delete()
-            throw UserFacingException(Failure.INSTALL, error.message ?: "marker").apply { initCause(error) }
+            val failure = ArtifactFetcher.localFailure(error)
+            throw UserFacingException(failure, error.message ?: "marker").apply { initCause(error) }
         }
     }
 

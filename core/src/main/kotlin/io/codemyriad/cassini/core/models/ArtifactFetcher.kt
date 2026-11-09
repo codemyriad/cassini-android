@@ -60,7 +60,7 @@ object ArtifactFetcher {
      * after the first block, then at most every half second, and always once at the end with the file's length (a
      * block that reaches the end is reported only there, after the last interruption check).
      */
-    fun digest(file: File, onBytes: (Long) -> Unit = {}): String {
+    fun digest(file: File, onBytes: (Long) -> Unit = {}): String = localIo {
         val hash = MessageDigest.getInstance("SHA-256")
         var done = 0L
         var lastUpdate = 0L
@@ -80,7 +80,7 @@ object ArtifactFetcher {
             }
         }
         onBytes(done)
-        return hash.digest().joinToString("") { "%02x".format(it) }
+        hash.digest().joinToString("") { "%02x".format(it) }
     }
 
     /**
@@ -104,9 +104,11 @@ object ArtifactFetcher {
      * A `.part` left by an earlier attempt is resumed with `Range: bytes=<length>-` and `If-Range: "<sha256>"`. A
      * `206` answer is accepted
      * only when its `Content-Range` starts at that length and its total is the pinned size; a `200` answer restarts
-     * from zero. A `206` that ends before the artifact's last byte (some servers cap open-ended ranges) keeps what it
+     * from zero. A known Content-Length must match the pinned whole file or the declared range, and a range cannot
+     * deliver bytes past its declared end. A `206` that ends before the artifact's last byte keeps what it
      * brought and fails with [Failure.DOWNLOAD], so the next attempt resumes further on. On a size or SHA-256
-     * mismatch the `.part` is deleted. The 30 s read timeout stays: interrupting the thread does not unblock
+     * mismatch the `.part` is deleted. A shorter lengthless transfer keeps its prefix too. The 30 s read timeout stays:
+     * interrupting the thread does not unblock
      * `HttpURLConnection`.
      */
     @Suppress("LongParameterList") // where from, what, where to, how to ask, and the progress
@@ -152,16 +154,19 @@ object ArtifactFetcher {
             // Where a 206 answer's range ends (exclusive); null for a whole 200 answer.
             val rangeEnd = resumes(connection, artifact, partial, offset)
             val first = if (rangeEnd != null) offset else 0L
-            // Where the answer says it ends; -1 when it does not say.
-            val announced = connection.contentLengthLong.let { if (it < 0) -1 else first + it }
+            val end = rangeEnd ?: artifact.size
+            // Refuse inconsistent framing before waiting for a body that cannot be this pinned response.
+            val length = connection.contentLengthLong
+            requireUser(length < 0 || length == end - first, Failure.VERIFY)
             val received = connection.inputStream.buffered().use { input ->
-                FileOutputStream(partial, first > 0).buffered().use { output ->
-                    copy(input, output, first, artifact.size) { progress(it, false) }
+                val file = localIo { FileOutputStream(partial, first > 0).buffered() }
+                LocalWrites(file).use { output ->
+                    copy(input, output, first, end) { progress(it, false) }
                 }
             }
             // A connection that closed before the announced end leaves a prefix, and so does a range that stops
             // short of the artifact's end: keep it for the next attempt.
-            val expected = if (rangeEnd != null) artifact.size else announced
+            val expected = artifact.size
             if (received < expected) {
                 throw UserFacingException(Failure.DOWNLOAD, "Transfer ended at $received of $expected bytes")
             }
@@ -172,6 +177,20 @@ object ArtifactFetcher {
         } finally {
             connection.disconnect()
         }
+    }
+
+    /** Keep local write/flush/close errors distinct from socket read errors in the same copy loop. */
+    private class LocalWrites(private val output: OutputStream) : OutputStream() {
+        override fun write(value: Int) = localIo { output.write(value) }
+        override fun write(bytes: ByteArray, offset: Int, length: Int) = localIo { output.write(bytes, offset, length) }
+        override fun flush() = localIo { output.flush() }
+        override fun close() = localIo { output.close() }
+    }
+
+    private inline fun <T> localIo(block: () -> T): T = try {
+        block()
+    } catch (error: IOException) {
+        throw UserFacingException(localFailure(error), error.message ?: "I/O").apply { initCause(error) }
     }
 
     /**
@@ -380,7 +399,7 @@ object ArtifactFetcher {
     }
 
     /** [Failure.SPACE] for a full disk (ENOSPC), else [Failure.INSTALL]. */
-    internal fun localFailure(error: IOException): Failure {
+    fun localFailure(error: IOException): Failure {
         val message = generateSequence<Throwable>(error) { it.cause }.mapNotNull { it.message }.joinToString(" ")
         val full = "ENOSPC" in message || message.contains("No space left", ignoreCase = true)
         return if (full) Failure.SPACE else Failure.INSTALL
