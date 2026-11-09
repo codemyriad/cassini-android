@@ -199,7 +199,8 @@ class ProcessingCoordinatorTest {
         graph.settings.setQueueHold(QueueHold.USER)
         val a = note("A")
         coordinator.transcribe(a, origin = StartOrigin.AUTOMATIC)
-        delay(SETTLE_MS)
+        // A service wake must finish checking the hold without starting a job.
+        withTimeout(TIMEOUT_MS) { coordinator.drain().join() }
         assertEquals("the automatic enqueue keeps the hold", 0, created.size)
         coordinator.transcribe(a)
         assertEquals(a, job(0).noteId)
@@ -532,7 +533,7 @@ class ProcessingCoordinatorTest {
         // A Transcribe that is not a Resume, or a Resume from a notification, keeps the SYSTEM hold.
         coordinator.transcribe(b)
         coordinator.transcribe(a, origin = StartOrigin.NOTIFICATION)
-        delay(SETTLE_MS)
+        withTimeout(TIMEOUT_MS) { coordinator.drain().join() }
         assertEquals(1, created.size)
         assertEquals(QueueHold.SYSTEM, graph.settings.queueHold.first())
         // Continue from a visible screen clears it; B was queued first.
