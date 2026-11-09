@@ -37,8 +37,8 @@ object SpeakerStats {
      * Turns come from [TranscriptTurns.of]. The sample is the longest turn (ties: the earliest start, then the first
      * in canonical order), cut to [SAMPLE_MAX_MS].
      */
-    fun of(words: List<Word>): Map<String, SpeakerStat> {
-        val turns = TranscriptTurns.of(words).groupBy { it.speaker }
+    fun of(words: List<Word>, endsBoundedByAudio: Boolean = false): Map<String, SpeakerStat> {
+        val turns = TranscriptTurns.of(words, endsBoundedByAudio).groupBy { it.speaker }
         val wordCounts = words.groupingBy { it.speaker }.eachCount()
         val result = LinkedHashMap<String, SpeakerStat>()
         for ((ordinal, id) in words.map { it.speaker }.distinct().withIndex()) {

@@ -21,3 +21,9 @@ inflation. All indices remain usable even when a row owns nonconsecutive canonic
 
 This model is introduced separately from its consumers so the shared-vector port can be reviewed
 on its own. Subsequent changes replace the existing export/statistics/preview and Note builders.
+
+TXT, SpeakerStats (through the compatibility TranscriptTurns projection), and Library previews now
+consume the shared model. Statistics count whole runs, including inline speakers, rather than
+paragraphs. TXT keeps the reader's continuation and overlap labels. Excerpts follow reading order
+and paragraph ends, keep chips inline, and preserve stored punctuation and whole oversized atoms;
+ellipses indicate omitted words separately. Subtitle cue segmentation remains time-based.
