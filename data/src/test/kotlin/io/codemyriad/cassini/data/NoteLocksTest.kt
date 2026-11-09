@@ -11,7 +11,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import java.util.concurrent.CountDownLatch
+import java.util.concurrent.ExecutorCompletionService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -43,21 +43,28 @@ class NoteLocksTest {
         var counter = 0
         val rounds = 2_000
         val pool = Executors.newFixedThreadPool(2)
-        val done = CountDownLatch(2)
-        repeat(2) {
-            pool.execute {
-                repeat(rounds) { locks.withNoteLockBlocking("n") { counter = counter + 1 } }
-                done.countDown()
+        val completed = ExecutorCompletionService<Unit>(pool)
+        try {
+            repeat(2) {
+                completed.submit {
+                    repeat(rounds) { locks.withNoteLockBlocking("n") { counter = counter + 1 } }
+                }
             }
-        }
-        val jobs = List(4) {
-            launch(Dispatchers.Default) {
-                repeat(rounds) { locks.withNoteLock("n", Dispatchers.IO) { counter = counter + 1 } }
+            val jobs = List(4) {
+                launch(Dispatchers.Default) {
+                    repeat(rounds) { locks.withNoteLock("n", Dispatchers.IO) { counter = counter + 1 } }
+                }
             }
+            jobs.forEach { it.join() }
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30)
+            repeat(2) {
+                val worker = completed.poll((deadline - System.nanoTime()).coerceAtLeast(0L), TimeUnit.NANOSECONDS)
+                assertTrue("the blocking workers finish within 30 seconds", worker != null)
+                worker!!.get()
+            }
+            assertEquals(6 * rounds, counter)
+        } finally {
+            pool.shutdownNow()
         }
-        jobs.forEach { it.join() }
-        assertTrue(done.await(30, TimeUnit.SECONDS))
-        pool.shutdown()
-        assertEquals(6 * rounds, counter)
     }
 }
