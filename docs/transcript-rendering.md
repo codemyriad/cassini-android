@@ -40,7 +40,7 @@ ellipses indicate omitted words separately. Subtitle cue segmentation remains ti
 | In-note search | `TranscriptSearch` indexes `turnText`, including the same inline labels and word offsets |
 | Library search excerpts | `DocumentDerivation` and variant selection index `ReadingText.body`; SQLite FTS snippets select from that body |
 | Library playback-position preview | `PreviewText` uses reading rows and canonical playback anchors; clipped chip wrappers stay balanced |
-| TXT / speaker statistics | `ReadingTurns` / its whole-run compatibility projection |
+| TXT / speaker statistics | `ReadingTurns` / `ReadingTurns.wholeRuns` |
 
 `SubtitleCues` is called only by `SrtWriter` and `VttWriter`. It is a timed caption
 projection with cue duration, line-length and speaker-overlap constraints, not a reader turn
