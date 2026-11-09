@@ -26,7 +26,6 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.R
-import io.codemyriad.cassini.ui.format.Spoken
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import io.codemyriad.cassini.ui.theme.SpeakerTone
 import io.codemyriad.cassini.ui.theme.sans
@@ -57,6 +56,9 @@ fun SuggestionCard(
     onNo: () -> Unit,
     onSpeaker: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    continuation: Boolean = false,
+    over: String = "",
+    crosstalk: Boolean = false,
 ) {
     val c = CassiniTheme.colors
     val shape = CassiniTheme.shapes.row
@@ -74,14 +76,22 @@ fun SuggestionCard(
                 .fillMaxWidth()
                 .height(TurnHeaderHeight)
                 .turnHeaderSemantics(
-                    description = Spoken.turn(speaker, timeMs, auto = false),
+                    description = turnHeaderDescription(speaker, timeMs, auto = false, over, crosstalk),
                     clickLabel = stringResource(R.string.ui_turn_name_action),
                     onClick = onSpeaker,
                 ),
         )
         // The board's padding sits inside its 1 dp CSS border; at the bottom, 4 dp below the 48 dp button layout.
         Column(Modifier.padding(start = 13.dp, end = 13.dp, top = 11.dp, bottom = 4.dp)) {
-            TurnHeaderLine(speaker, tone, timeMs, auto = false)
+            TurnHeaderLine(
+                name = speaker,
+                tone = tone,
+                timeMs = timeMs,
+                auto = false,
+                continuation = continuation,
+                over = over,
+                crosstalk = crosstalk,
+            )
             Text(
                 text = question(stringResource(R.string.ui_suggestion_question), name),
                 modifier = Modifier.padding(top = 7.5.dp, bottom = 3.dp),
