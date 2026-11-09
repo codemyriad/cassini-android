@@ -72,8 +72,10 @@ android {
                 it.inputs.dir(designMarkupDir)
                     .withPropertyName("designMarkup")
                     .withPathSensitivity(PathSensitivity.RELATIVE)
-                // Robolectric needs these on JDK 17.
+                // Reduce compiler contention in this short-lived worker; keep C2 for PNG comparison.
+                // Robolectric also needs the JDK 17 opens below.
                 it.jvmArgs(
+                    "-XX:CICompilerCount=2",
                     "--add-opens=java.base/java.lang=ALL-UNNAMED",
                     "--add-opens=java.base/java.util=ALL-UNNAMED",
                     "--add-opens=java.base/java.io=ALL-UNNAMED",
