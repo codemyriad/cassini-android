@@ -126,8 +126,10 @@ android {
                 it.jvmArgumentProviders.add(
                     CommandLineArgumentProvider { listOf("-Dcassini.interjections=$vectorsPath") },
                 )
-                // Robolectric needs these on JDK 17.
+                // C1 reduces warmup in this test worker; :ui keeps full JIT for PNG comparison.
+                // Robolectric also needs the JDK 17 opens below.
                 it.jvmArgs(
+                    "-XX:TieredStopAtLevel=1",
                     "--add-opens=java.base/java.lang=ALL-UNNAMED",
                     "--add-opens=java.base/java.util=ALL-UNNAMED",
                     "--add-opens=java.base/java.io=ALL-UNNAMED",
