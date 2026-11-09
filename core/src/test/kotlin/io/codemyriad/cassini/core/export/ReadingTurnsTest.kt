@@ -107,6 +107,18 @@ class ReadingTurnsTest {
         assertEquals(3, rows(400, 1050).size) // clean air on both sides is a reply, not continuity
     }
 
+    @Test fun separatedSmallIntersectionsAccumulateBeforeTheCredibilityFloor() {
+        val words = listOf(
+            Word("a", 0, 100, "First"),
+            Word("b", 0, 100, "Another"),
+            Word("a", 200, 300, "part"),
+            Word("b", 200, 300, "part"),
+        )
+        val rows = ReadingTurns.of(words).rows
+        assertEquals(listOf(listOf("b"), listOf("a")), rows.map { it.over })
+        assertEquals(listOf(listOf(0, 2), listOf(1, 3)), rows.map { row -> row.members.flatMap { it.wordIndices } })
+    }
+
     companion object {
         private const val REFERENCE = "1111155cb0017b47c072a8662c54f28ad7c44223"
         val fixtures =

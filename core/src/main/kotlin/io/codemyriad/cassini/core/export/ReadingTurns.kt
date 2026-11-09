@@ -344,11 +344,10 @@ object ReadingTurns {
         val collisions = ArrayList<Collision>()
         val audible = runs.associateWith { it.spans(spans) }
         for ((index, left) in runs.withIndex()) {
-            for (right in runs.drop(index + 1)) {
+            for (rightIndex in index + 1 until runs.size) {
+                val right = runs[rightIndex]
                 if (left.speaker == right.speaker || nested[left]?.host === right || nested[right]?.host === left) continue
-                val ms = audible.getValue(left).sumOf { a ->
-                    audible.getValue(right).sumOf { b -> maxOf(0, minOf(a.end, b.end) - maxOf(a.start, b.start)) }
-                }
+                val ms = intersectionMs(audible.getValue(left), audible.getValue(right))
                 if (ms >= OVERLAP_MS) collisions += Collision(left, right, ms)
             }
         }
@@ -363,6 +362,21 @@ object ReadingTurns {
             over.getOrPut(collision.right) { arrayListOf() }.add(collision.left.speaker)
         }
         return over.mapValues { it.value.distinct() }
+    }
+
+    /** Merged, ordered interval pools: reject disjoint envelopes, then intersect in one linear pass. */
+    private fun intersectionMs(left: List<Span>, right: List<Span>): Long {
+        val empty = left.isEmpty() || right.isEmpty()
+        val disjoint = empty || left.last().end <= right.first().start || right.last().end <= left.first().start
+        if (disjoint) return 0
+        var a = 0
+        var b = 0
+        var total = 0L
+        while (a < left.size && b < right.size) {
+            total += maxOf(0, minOf(left[a].end, right[b].end) - maxOf(left[a].start, right[b].start))
+            if (left[a].end <= right[b].end) a++ else b++
+        }
+        return total
     }
 
     private fun merge(intervals: List<Span>): List<Span> {
