@@ -377,7 +377,9 @@ object ReadingTurns {
                 val right = if (left === previous) current else previous
                 if (left.run.speaker == right.run.speaker || nested[left.run]?.host === right.run ||
                     nested[right.run]?.host === left.run
-                ) continue
+                ) {
+                    continue
+                }
                 val ms = intersectionMs(audible.getValue(left.run), audible.getValue(right.run))
                 if (ms >= OVERLAP_MS) collisions += Collision(left.run, right.run, ms, left.index, right.index)
             }
