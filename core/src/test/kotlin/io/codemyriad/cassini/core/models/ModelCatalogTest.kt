@@ -24,10 +24,10 @@ class ModelCatalogTest {
 
     @Test fun parakeetIsTheModelHostsUltraInt8MarkedByItsSourceHash() {
         val parakeet = ModelCatalog.PARAKEET
-        assertEquals("parakeet-ultra-0.6b-int8", parakeet.id)
+        assertEquals("parakeet-ultra-0.6b-int8-v2", parakeet.id)
         assertEquals("50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366", parakeet.sourceSha256)
         assertEquals(
-            "models/parakeet-ultra-0.6b-int8/50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+            "models/parakeet-ultra-0.6b-int8-v2/50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
             parakeet.directory,
         )
         assertEquals("verified", parakeet.markerFile)
