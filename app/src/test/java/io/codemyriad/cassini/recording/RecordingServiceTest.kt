@@ -19,8 +19,11 @@ import io.codemyriad.cassini.data.models.ModelFetcher
 import io.codemyriad.cassini.processing.FakeVisibility
 import io.codemyriad.cassini.processing.ProcessingNotifications
 import io.codemyriad.cassini.testing.NoUncaughtCoroutines
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -47,6 +50,7 @@ class RecordingServiceTest {
     private val app: CassiniApplication = ApplicationProvider.getApplicationContext()
     private val capture = FakeCaptureSource()
     private val platform = FakePlatform().apply { reportForeground = false }
+    private val serviceRequested = CompletableDeferred<Unit>()
     private val visibility = FakeVisibility()
 
     /** Each hand-off, with whether this service had left the foreground by then. */
@@ -61,7 +65,13 @@ class RecordingServiceTest {
         CassiniApplication.graphFactory = GraphFactory { context, _ ->
             val recording = AppGraph.RecordingHooks(
                 capture = capture,
-                platform = platform,
+                platform = object : RecordingPlatform by platform {
+                    override fun startService(): Boolean {
+                        val accepted = this@RecordingServiceTest.platform.startService()
+                        if (accepted) serviceRequested.complete(Unit)
+                        return accepted
+                    }
+                },
                 handoff = {
                     TranscriptionHandoff { noteId ->
                         handoffs += noteId to (service?.let { shadowOf(it).isForegroundStopped } ?: true)
@@ -96,7 +106,7 @@ class RecordingServiceTest {
     @Test fun theNotificationPausesAndFinishesThenTheServiceLeavesAfterTheHandOff() {
         val started = startService()
         assertEquals(RecordingNotifications.RECORDING_ID, shadowOf(started).lastForegroundNotificationId)
-        until { controller.state.value is RecordingState.Active }
+        awaitRecordingState { it is RecordingState.Active }
         val noteId = (controller.state.value as RecordingState.Active).noteId
         // The first notification comes from startForeground; the one with the actions is built off the main thread.
         until { ongoing()?.title() == "Recording" && ongoing()?.actionTitles() == listOf("Pause", "Finish") }
@@ -116,21 +126,21 @@ class RecordingServiceTest {
 
     @Test fun aRefusedForegroundEndsTheStart() {
         assertTrue(controller.start("Nota"))
-        until { platform.starts.get() == 1 }
+        awaitServiceRequest()
         val refused = Robolectric.buildService(RecordingService::class.java).create().get()
         shadowOf(refused).setThrowInStartForeground(ForegroundServiceStartNotAllowedException("background start"))
 
         val result = refused.onStartCommand(RecordingService.startIntent(app), 0, 1)
         assertEquals(Service.START_NOT_STICKY, result)
         assertTrue(shadowOf(refused).isStoppedBySelf)
-        until { controller.state.value is RecordingState.Ended }
+        awaitRecordingState { it is RecordingState.Ended }
         assertEquals(RecordingOutcome.CouldNotStart, (controller.state.value as RecordingState.Ended).outcome)
         assertTrue(runBlocking { graph.awaitCatalogue().database.notes().all() }.isEmpty())
     }
 
     @Test fun aStorageStopInTheBackgroundIsNotified() {
         val started = startService()
-        until { controller.state.value is RecordingState.Active }
+        awaitRecordingState { it is RecordingState.Active }
         val noteId = (controller.state.value as RecordingState.Active).noteId
 
         platform.usable = Limits.MIN_RECORDING_FREE_BYTES - 1
@@ -152,7 +162,7 @@ class RecordingServiceTest {
     /** start() as the Recording screen calls it, then the service start that the platform asked for. */
     private fun startService(): RecordingService {
         assertTrue(controller.start("Meeting"))
-        until { platform.starts.get() == 1 }
+        awaitServiceRequest()
         val created = Robolectric.buildService(RecordingService::class.java).create().get()
         service = created
         assertEquals(Service.START_NOT_STICKY, created.onStartCommand(RecordingService.startIntent(app), 0, 1))
@@ -166,6 +176,20 @@ class RecordingServiceTest {
     private fun Notification.title(): String? = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
 
     private fun Notification.actionTitles(): List<String> = actions.orEmpty().map { it.title.toString() }
+
+    private fun awaitServiceRequest() {
+        runBlocking { withTimeout(TIMEOUT_MS) { serviceRequested.await() } }
+        assertEquals("the platform requested one service start", 1, platform.starts.get())
+    }
+
+    private fun awaitRecordingState(condition: (RecordingState) -> Boolean) {
+        runBlocking {
+            withTimeout(TIMEOUT_MS) {
+                controller.state.first { condition(it) }
+                controller.awaitPosted()
+            }
+        }
+    }
 
     /** Runs the main looper (the service's lifecycleScope) until [condition] holds. */
     private fun until(condition: () -> Boolean) {
