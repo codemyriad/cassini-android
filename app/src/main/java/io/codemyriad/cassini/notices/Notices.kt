@@ -220,9 +220,14 @@ object Notices {
         (phase as? JobPhase.Downloading)?.progress?.let { notices += Notice(downloading(it)) }
         if (job != null) notices += listOfNotNull(jobNotice(job, failureText, requiredFreeBytes, noNewVersion))
         if (oneVoice && job == null) {
+            val unavailable = (speakerModel as? ModelStatus.Failed)?.failure == Failure.MODEL_UNAVAILABLE
             val missing = speakerModel is ModelStatus.Missing || speakerModel is ModelStatus.Failed
-            val kind = if (missing) BannerKind.TX_SPEAKERS_MISSING else BannerKind.TX_ONE_VOICE
-            val actionable = !noNewVersion && (missing || speakerModel == ModelStatus.Ready)
+            val kind = when {
+                unavailable -> BannerKind.DL_MODEL_UNAVAILABLE
+                missing -> BannerKind.TX_SPEAKERS_MISSING
+                else -> BannerKind.TX_ONE_VOICE
+            }
+            val actionable = !noNewVersion && !unavailable && (missing || speakerModel == ModelStatus.Ready)
             notices += Notice(
                 BannerSpec(
                     kind,

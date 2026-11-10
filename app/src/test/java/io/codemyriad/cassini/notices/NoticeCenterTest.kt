@@ -216,6 +216,13 @@ class NoticeCenterTest {
         )
     }
 
+    @Test fun anUnavailableSpeakerPinOffersNoPointlessDownloadOrTranscriptionRetry() {
+        val failed = ModelStatus.Failed(Failure.MODEL_UNAVAILABLE, "pin unavailable")
+        val offer = only(Notices.job(null, oneVoice = true, speakerModel = failed))
+        assertEquals(BannerKind.DL_MODEL_UNAVAILABLE, offer.kind)
+        assertTrue(offer.actions.isEmpty())
+    }
+
     // 13.4 Model download.
 
     @Test
