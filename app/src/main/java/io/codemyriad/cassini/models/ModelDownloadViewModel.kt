@@ -78,7 +78,7 @@ class ModelDownloadViewModel(
         viewModelScope.launch {
             val plan = guarded("read the model plan") { ports.plan() } ?: return@launch
             local.update { it.copy(plan = plan) }
-            if (plan.isEmpty && !local.value.busy && local.value.banner == null) closeStale()
+            if (plan.isEmpty && !local.value.busy && local.value.banner == null) queueNote(noteId)
         }
     }
 
@@ -130,7 +130,7 @@ class ModelDownloadViewModel(
             when {
                 plan.isEmpty -> {
                     local.update { it.copy(plan = plan) }
-                    closeStale()
+                    queueNote(noteId)
                 }
                 (guarded("read the free space") { ports.usableBytes() } ?: 0L) < plan.requiredFreeBytes -> {
                     val banner = Notices.download(DownloadError.NOT_ENOUGH_STORAGE, plan.requiredFreeBytes, announce = true)
@@ -167,33 +167,28 @@ class ModelDownloadViewModel(
             local.update { it.copy(busy = false) }
             return
         }
-        val note = noteId
-        if (note != null) {
-            val plan = guarded("read the model plan") { ports.plan() }
-            if (plan == null) {
-                local.update { it.copy(busy = false) }
-                return
-            }
-            if (hasUnshownSpeech(plan, parts)) {
+        val current = noteId?.let { guarded("read the model plan") { ports.plan() } }
+        when {
+            noteId != null && current == null -> local.update { it.copy(busy = false) }
+            current != null && hasUnshownSpeech(current, parts) -> {
                 saved.remove<ArrayList<String>>(KEY_PARTS)
-                local.value = Local(plan = plan)
-                return
+                local.value = Local(plan = current)
             }
-        }
-        if (guarded("record the consent") { ports.recordConsent(parts) } == null) {
-            local.update { it.copy(busy = false) }
-            return
-        }
-        saved.remove<ArrayList<String>>(KEY_PARTS)
-        if (note != null) {
-            queueNote(note)
-        } else {
-            ports.downloadModels(parts)
-            close()
+            guarded("record the consent") { ports.recordConsent(parts) } != null -> {
+                saved.remove<ArrayList<String>>(KEY_PARTS)
+                if (noteId == null) ports.downloadModels(parts)
+                queueNote(noteId)
+            }
+            else -> local.update { it.copy(busy = false) }
         }
     }
 
-    private suspend fun queueNote(note: String) {
+    /** Close a completed standalone request, or close only after the note is queued. */
+    private suspend fun queueNote(note: String?) {
+        if (note == null) {
+            close()
+            return
+        }
         when (guarded("queue the note") { ports.transcribe(note) }) {
             is TranscribeOutcome.Queued -> close()
             TranscribeOutcome.NeedsConsent -> {
@@ -221,11 +216,6 @@ class ModelDownloadViewModel(
             guarded("record the refusal") { ports.recordDeclined() }
             close()
         }
-    }
-
-    /** Nothing is missing: the note (when there is one) goes in the queue, and the screen goes. */
-    private suspend fun closeStale() {
-        if (noteId == null) close() else queueNote(noteId)
     }
 
     private fun close() {
