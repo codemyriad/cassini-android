@@ -11,9 +11,12 @@ import io.codemyriad.cassini.core.format.Word
 import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.library.JobState
+import io.codemyriad.cassini.core.models.ModelCatalog
+import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.data.checkpoint.DraftTranscript
 import io.codemyriad.cassini.data.db.SpeakerEntity
 import io.codemyriad.cassini.data.db.WordEntity
+import io.codemyriad.cassini.data.models.ModelStatus
 import io.codemyriad.cassini.data.notes.TranscriptFormat
 import io.codemyriad.cassini.engine.job.BatteryLine
 import io.codemyriad.cassini.engine.job.DraftState
@@ -122,16 +125,16 @@ class NoteViewModelTest {
         ports.wordRows.value = WORDS.map { it.copy(speaker = "a") }
         ports.voiceModelReady.value = false
         ports.notices.value = ports.notices.value.copy(
-            speakerModel = io.codemyriad.cassini.data.models.ModelStatus.Missing(consented = false),
+            speakerModel = ModelStatus.Missing(consented = false),
         )
         val viewModel = viewModel()
         val banner = viewModel.now().banners.single { it.kind == BannerKind.TX_SPEAKERS_MISSING }
         assertEquals(listOf(BannerAction.DOWNLOAD), banner.actions)
-        assertEquals(io.codemyriad.cassini.core.models.ModelCatalog.speakerBytes, banner.args.bytes)
+        assertEquals(ModelCatalog.speakerBytes, banner.args.bytes)
         assertTrue(ports.calls.none { it.startsWith("transcribe:") })
         send(viewModel, NoteEvent.BannerAction(banner.id, BannerAction.DOWNLOAD))
         assertEquals(
-            NoteEffect.OpenModelDownload(ModelDownloadKey(NOTE, speakerModelsOnly = true)),
+            NoteEffect.OpenModelDownload(ModelDownloadKey(NOTE, part = ModelPart.SPEAKERS)),
             effects.last(),
         )
         assertTrue("opening consent does not queue or download", ports.calls.none { it.startsWith("transcribe:") })
@@ -141,9 +144,36 @@ class NoteViewModelTest {
         val initial = documentNote()
         ports.details.value = initial.copy(variants = initial.variants.map { it.copy(speakerCount = 1) })
         ports.notices.value = ports.notices.value.copy(
-            speakerModel = io.codemyriad.cassini.data.models.ModelStatus.Ready,
+            speakerModel = ModelStatus.Ready,
         )
         assertTrue(viewModel().now().banners.isEmpty())
+    }
+
+    @Test fun changedAudioCannotUseTheAutomaticSpeakerDownloadPass() = runTest(dispatcher) {
+        val initial = documentNote(DocumentState.STALE_AUDIO)
+        ports.details.value = initial.copy(
+            variants = initial.variants.map { it.copy(speakerCount = 1, speakersToldApart = false) },
+            speakers = initial.speakers.take(1),
+        )
+        ports.notices.value = ports.notices.value.copy(speakerModel = ModelStatus.Missing(false))
+        val viewModel = viewModel()
+        val offer = viewModel.now().banners.single { it.kind == BannerKind.TX_SPEAKERS_MISSING }
+        assertTrue(offer.actions.isEmpty())
+        send(viewModel, NoteEvent.BannerAction(offer.id, BannerAction.DOWNLOAD))
+        assertTrue(effects.none { it is NoteEffect.OpenModelDownload })
+        assertTrue(ports.calls.none { it.startsWith("transcribe:") })
+    }
+
+    @Test fun noWordsNeverOffersTheSpeakerModel() = runTest(dispatcher) {
+        val initial = documentNote()
+        ports.details.value = initial.copy(
+            variants = initial.variants.map { it.copy(wordCount = 0, speakerCount = 1, speakersToldApart = false) },
+        )
+        ports.wordRows.value = emptyList()
+        ports.notices.value = ports.notices.value.copy(speakerModel = ModelStatus.Missing(false))
+        assertTrue(viewModel().now().banners.none {
+            it.kind == BannerKind.TX_SPEAKERS_MISSING || it.kind == BannerKind.TX_ONE_VOICE
+        })
     }
 
     // Opening. --------------------------------------------------------------------------------------------------

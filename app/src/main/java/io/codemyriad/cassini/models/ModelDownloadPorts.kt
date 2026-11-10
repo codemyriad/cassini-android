@@ -49,14 +49,16 @@ class GraphModelDownloadPorts(
     context: Context,
     private val noteId: String? = null,
     private val parakeetOnly: Boolean = false,
-    private val speakerModelsOnly: Boolean = false,
+    private val part: ModelPart? = null,
 ) : ModelDownloadPorts {
     private val app = context.applicationContext
+    private val speakerModelsOnly: Boolean get() = noteId != null && part == ModelPart.SPEAKERS
 
-    override suspend fun plan(): ModelPlan = when {
-        parakeetOnly -> ModelPlan(graph.models.plan().missing.filter { it.part == ModelPart.SPEECH })
-        speakerModelsOnly -> ModelPlan(graph.models.plan().missing.filter { it.part == ModelPart.SPEAKERS })
-        else -> graph.downloadPlan(targetModel())
+    override suspend fun plan(): ModelPlan = if (part != null || parakeetOnly) {
+        val requested = part ?: ModelPart.SPEECH
+        ModelPlan(graph.models.plan().missing.filter { it.part == requested })
+    } else {
+        graph.downloadPlan(targetModel())
     }
 
     private suspend fun targetModel(): SpeechModel {
@@ -71,11 +73,7 @@ class GraphModelDownloadPorts(
             ?.usableSpace ?: 0L
     }
 
-    override suspend fun recordConsent(parts: Set<ModelPart>) = graph.models.recordConsent(
-        includeSpeech = ModelPart.SPEECH in parts,
-        includeOptional = ModelPart.VOICES in parts,
-        includeSpeakers = ModelPart.SPEAKERS in parts,
-    )
+    override suspend fun recordConsent(parts: Set<ModelPart>) = graph.models.recordConsent(parts)
 
     override suspend fun recordDeclined() = graph.models.recordDeclined()
 

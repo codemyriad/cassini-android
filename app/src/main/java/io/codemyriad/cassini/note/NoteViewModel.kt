@@ -13,6 +13,7 @@ import io.codemyriad.cassini.core.format.Word
 import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.library.JobState
+import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.speakers.Match
 import io.codemyriad.cassini.core.speakers.SampleWindow
 import io.codemyriad.cassini.core.speakers.SpeakerPrint
@@ -1034,7 +1035,7 @@ class NoteViewModel(
                     if (id == BannerKind.TX_SPEAKERS_MISSING.name &&
                         (!NoteMapping.oneVoice(details) || details.note.documentState != DocumentState.OK)
                     ) return
-                    ModelDownloadKey(noteId, speakerModelsOnly = id == BannerKind.TX_SPEAKERS_MISSING.name)
+                    ModelDownloadKey(noteId, part = ModelPart.SPEAKERS.takeIf { id == BannerKind.TX_SPEAKERS_MISSING.name })
                 }
                 emit(NoteEffect.OpenModelDownload(key))
             }

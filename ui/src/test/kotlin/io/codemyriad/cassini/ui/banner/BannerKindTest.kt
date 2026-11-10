@@ -25,6 +25,7 @@ private const val MIB = 1_048_576L
 /** The arguments of the board 10 copy for each kind that reads arguments. */
 private val BOARD_ARGS: Map<BannerKind, BannerArgs> = mapOf(
     BannerKind.PARAKEET_RECOMMENDED to BannerArgs(bytes = 440 * MIB),
+    BannerKind.TX_SPEAKERS_MISSING to BannerArgs(bytes = 62 * MIB),
     BannerKind.REC_STORAGE_LOW to BannerArgs(ms1 = 10 * MIN + 20_000),
     BannerKind.REC_STOPPED_STORAGE to BannerArgs(bytes = 200 * MIB),
     BannerKind.RECOVERED to BannerArgs(count = 1, ms1 = 5 * MIN + 12_000),
@@ -124,6 +125,7 @@ private val ENGLISH: Map<BannerKind, Triple<String, String?, List<String>>> = ma
     BannerKind.TX_CALCULATING to
         Triple("Calculating time left…", "An estimate appears after the first few minutes of audio.", listOf()),
     BannerKind.TX_BATTERY to Triple("Measuring battery use…", "Plugged in — no battery estimate needed.", listOf()),
+    BannerKind.TX_SPEAKERS_MISSING to Triple("Telling speakers apart", "Optional download · 62 MB", listOf("Download")),
     BannerKind.TX_ONE_VOICE to Triple(
         "All words shown as one voice",
         "Speakers couldn’t be told apart in this recording.",
