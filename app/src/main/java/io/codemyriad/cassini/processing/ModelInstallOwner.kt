@@ -146,7 +146,7 @@ class ModelInstallOwner(
 
     private fun requestDownload(parts: Set<ModelPart>): Job = synchronized(downloadLock) {
         require(parts.isNotEmpty()) { "No model part to download" }
-        requests[parts]?.takeUnless { it.isCompleted }?.let { return@synchronized it }
+        requests[parts]?.takeUnless { it.isCompleted || it.isCancelled }?.let { return@synchronized it }
         val generation = downloadGeneration
         val job = scope.launch(start = CoroutineStart.LAZY) {
             try {
@@ -161,7 +161,7 @@ class ModelInstallOwner(
         parts.forEach { part ->
             val count = requestedCounts[part] ?: 0
             requestedCounts[part] = count + 1
-            if (count == 0) markRequested(part)
+            markRequested(part)
         }
         track(job)
         job.invokeOnCompletion { completeRequest(parts, job) }
