@@ -189,7 +189,7 @@ class ProcessingCoordinatorTest {
         job(0)
 
         coordinator.stopAll()
-        awaitJobState(a, JobState.PAUSED)
+        catalogue().jobs.awaitJobState(a, JobState.PAUSED, TIMEOUT_MS)
         coordinator.awaitIdle()
         assertEquals(QueueHold.USER, graph.settings.queueHold.first())
         assertEquals(JobState.QUEUED, catalogue().jobs.job(b)?.state)
@@ -262,7 +262,7 @@ class ProcessingCoordinatorTest {
         // Start over on a paused note.
         checkpoint(a, doneMs = 28_000)
         again.finish(JobOutcome.Paused(PauseReason.USER))
-        awaitJobState(a, JobState.PAUSED)
+        catalogue().jobs.awaitJobState(a, JobState.PAUSED, TIMEOUT_MS)
         assertEquals(28_000L, catalogue().jobs.job(a)?.doneMs)
         coordinator.startOver(a)
         assertEquals(a, job(2).noteId)
@@ -315,7 +315,7 @@ class ProcessingCoordinatorTest {
         job(1).send(JobEvent.Downloading(null))
         coordinator.state.first { it.running?.noteId == resumed && it.running?.phase is JobPhase.Downloading }
         coordinator.cancelDownload()
-        awaitJobState(resumed, JobState.PAUSED)
+        catalogue().jobs.awaitJobState(resumed, JobState.PAUSED, TIMEOUT_MS)
         val paused = requireNotNull(catalogue().jobs.job(resumed))
         assertEquals(PauseReason.USER, paused.pauseReason)
         assertEquals(28_000L, paused.doneMs)
@@ -404,7 +404,7 @@ class ProcessingCoordinatorTest {
         val a = note("A")
         coordinator.transcribe(a)
         job(0).finish(JobOutcome.Paused(PauseReason.USER))
-        awaitJobState(a, JobState.PAUSED)
+        catalogue().jobs.awaitJobState(a, JobState.PAUSED, TIMEOUT_MS)
 
         coordinator.prepareTrash(a)
         assertTrue(coordinator.moveToTrash(a))
@@ -566,7 +566,7 @@ class ProcessingCoordinatorTest {
 
         coordinator.systemStopAsync(a)
         assertEquals("the job is stopped at once", PauseReason.SYSTEM, first.stopReason.get())
-        awaitJobState(a, JobState.PAUSED)
+        catalogue().jobs.awaitJobState(a, JobState.PAUSED, TIMEOUT_MS)
         assertEquals(288_000L, catalogue().jobs.job(a)?.doneMs)
         assertTrue(notices.pausedSaved.isEmpty())
 
@@ -672,7 +672,7 @@ class ProcessingCoordinatorTest {
 
         job(0).finish(JobOutcome.Failed(io.codemyriad.cassini.engine.job.JobFailure.CheckpointMismatch))
         job(1).finish(JobOutcome.NeedsConsent(missingBytes = 1))
-        awaitJobState(consentless, JobState.NEEDS_CONSENT)
+        catalogue().jobs.awaitJobState(consentless, JobState.NEEDS_CONSENT, TIMEOUT_MS)
         // The notices of the first two outcomes are posted after their rows; wait for them before the app becomes
         // visible, else a late notice is (rightly) dropped as "visible" and the test races the coordinator.
         waitUntil { failed in notices.failed && consentless in notices.ready }
@@ -785,15 +785,6 @@ class ProcessingCoordinatorTest {
     private suspend fun job(index: Int): FakeJob {
         withTimeout(TIMEOUT_MS) { createdCount.first { it > index } }
         return created[index].also { it.started.await() }
-    }
-
-    /** Room emits every persisted job state for live notes; these waits occur before any Trash action. */
-    private suspend fun awaitJobState(noteId: String, state: JobState) {
-        withTimeout(TIMEOUT_MS) {
-            catalogue().jobs.queue().first { rows ->
-                rows.any { it.job.noteId == noteId && it.job.state == state }
-            }
-        }
     }
 
     private suspend fun waitUntil(condition: suspend () -> Boolean) = withTimeout(TIMEOUT_MS) {
