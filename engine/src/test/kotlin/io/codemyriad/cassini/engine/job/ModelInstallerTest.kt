@@ -46,14 +46,12 @@ class ModelInstallerTest {
     }
 
     @Test fun offlineSkipsTheBestEffortPartsAtOnce() = runBlocking {
-        // An install that ran would wait for the read timeout; the skip must not touch the store at all.
+        // An offline optional install must return without calling the store.
         val store = FakeStore(ready = speechReady, online = false)
-        store.onInstall = { _, _ -> Thread.sleep(30_000) }
-        val began = System.nanoTime()
+        store.onInstall = { _, _ -> fail("Offline optional parts must never invoke the installer") }
         val outcome = ModelInstaller(store).install(setOf(ModelPart.SPEAKERS, ModelPart.VOICES)) {}
         assertEquals(InstallOutcome.Installed(skipped = setOf(ModelPart.SPEAKERS, ModelPart.VOICES)), outcome)
         assertEquals(emptyList<ModelDescriptor>(), store.attempts)
-        assertTrue("took ${(System.nanoTime() - began) / 1_000_000} ms", System.nanoTime() - began < 1_000_000_000L)
     }
 
     @Test fun offlineStillTriesSpeechAndReportsNoConnection() = runBlocking {
@@ -251,10 +249,11 @@ class ModelInstallerTest {
         val store = FakeStore()
         val started = CountDownLatch(1)
         val interrupted = CountDownLatch(1)
+        val release = CountDownLatch(1)
         store.onInstall = { _, _ ->
             started.countDown()
             try {
-                Thread.sleep(30_000)
+                release.await()
             } catch (error: InterruptedException) {
                 interrupted.countDown()
                 // ArtifactFetcher reports an interrupt between blocks this way.
@@ -262,17 +261,23 @@ class ModelInstallerTest {
             }
         }
         val install = async(Dispatchers.Default) { ModelInstaller(store).install(all) {} }
-        assertTrue(started.await(5, TimeUnit.SECONDS))
-        install.cancel()
-        withTimeout(5_000) {
-            try {
-                install.await()
-                fail("The install must end cancelled")
-            } catch (_: CancellationException) {
+        try {
+            assertTrue(started.await(5, TimeUnit.SECONDS))
+            install.cancel()
+            withTimeout(5_000) {
+                try {
+                    install.await()
+                    fail("The install must end cancelled")
+                } catch (_: CancellationException) {
+                }
             }
+            assertTrue(interrupted.await(5, TimeUnit.SECONDS))
+            assertEquals(listOf(ModelCatalog.PARAKEET), store.attempts)
+        } finally {
+            release.countDown()
+            install.cancel()
+            withTimeout(5_000) { install.join() }
         }
-        assertTrue(interrupted.await(5, TimeUnit.SECONDS))
-        assertEquals(listOf(ModelCatalog.PARAKEET), store.attempts)
     }
 
     private class FakeStore(
