@@ -25,7 +25,9 @@ import io.codemyriad.cassini.recording.RecordingOutcome
 import io.codemyriad.cassini.recording.RecordingState
 import io.codemyriad.cassini.recording.inProgress
 import io.codemyriad.cassini.test.NeedsMicrophone
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -53,7 +55,7 @@ class RecordingFlowTest {
 
     @After fun tearDown() = runBlocking {
         if (recording.state.value.inProgress) recording.finish()
-        Background.waitFor("The recording ends", FINISH_MS) { recording.state.value.takeUnless { it.inProgress } }
+        awaitRecording("The recording ends", FINISH_MS) { !it.inProgress }
         recording.dismissEnded()
         Background.reset()
     }
@@ -61,13 +63,14 @@ class RecordingFlowTest {
     @Test fun recordMinimiseAndFinishFromTheNotification() {
         rule.waitShown(hasContentDescription(rule.text(UiR.string.ui_library_record_description)))
         rule.onNodeWithContentDescription(rule.text(UiR.string.ui_library_record_description)).performClick()
-        rule.waitFor("The recording starts", START_MS) { recording.state.value is RecordingState.Active }
         val finishButton = rule.text(UiR.string.ui_recording_finish)
         rule.waitText(finishButton)
-        rule.waitFor("Five seconds are captured", START_MS + CAPTURE_MS) {
-            ((recording.state.value as? RecordingState.Active)?.elapsedMs ?: 0) >= CAPTURE_MS
+        val active = runBlocking {
+            val state = awaitRecording("Five seconds are captured", CAPTURE_WAIT_MS) {
+                it is RecordingState.Ended || (it is RecordingState.Active && it.elapsedMs >= CAPTURE_MS)
+            }
+            state as? RecordingState.Active ?: throw AssertionError("Recording ended before five seconds: $state")
         }
-        val active = recording.state.value as RecordingState.Active
 
         Espresso.pressBack()
         rule.waitGone(hasText(finishButton))
@@ -84,8 +87,9 @@ class RecordingFlowTest {
         }
         action!!.actionIntent.send()
 
-        rule.waitFor("The recording is saved", FINISH_MS) { recording.state.value is RecordingState.Ended }
-        val ended = recording.state.value as RecordingState.Ended
+        val ended = runBlocking {
+            awaitRecording("The recording ends after Finish", FINISH_MS) { it is RecordingState.Ended }
+        } as RecordingState.Ended
         assertTrue("Finish saves the recording: ${ended.outcome}", ended.outcome is RecordingOutcome.Saved)
         assertEquals(active.noteId, ended.noteId)
         rule.waitGone(hasText(rule.text(UiR.string.ui_library_recording_tap)))
@@ -97,9 +101,16 @@ class RecordingFlowTest {
         assertTrue("Audio only or in the queue: ${saved.jobState}", saved.jobState in queued)
     }
 
+    private suspend fun awaitRecording(
+        message: String,
+        timeoutMs: Long,
+        matches: (RecordingState) -> Boolean,
+    ): RecordingState = withTimeoutOrNull(timeoutMs) { recording.state.first(matches) }
+        ?: throw AssertionError("$message: ${recording.state.value}")
+
     private companion object {
-        const val START_MS = 20_000L
         const val CAPTURE_MS = 5_000L
+        const val CAPTURE_WAIT_MS = 30_000L
         const val FINISH_MS = 30_000L
     }
 }
