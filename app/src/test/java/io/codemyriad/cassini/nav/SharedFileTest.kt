@@ -19,6 +19,7 @@ import io.codemyriad.cassini.BuildConfig
 import io.codemyriad.cassini.CassiniApplication
 import io.codemyriad.cassini.GraphFactory
 import io.codemyriad.cassini.MainActivity
+import io.codemyriad.cassini.TestFilesProvider
 import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.data.models.ModelFetcher
@@ -112,12 +113,17 @@ class SharedFileTest {
             .toList()
     }
 
-    @Test fun allDeclaredProviderAuthoritiesUseTheApplicationId() {
+    @Test fun providerAuthoritiesUseTheApplicationId() {
         val applicationId = BuildConfig.APPLICATION_ID
         assertEquals(applicationId, app.packageName)
-        val providers = app.packageManager.getPackageInfo(applicationId, PackageManager.GET_PROVIDERS).providers.orEmpty()
-        assertTrue("the merged manifest declares providers", providers.isNotEmpty())
-        for (provider in providers) {
+        val packageInfo = app.packageManager.getPackageInfo(applicationId, PackageManager.GET_PROVIDERS)
+        val providers = packageInfo.providers.orEmpty()
+        val fixtures = providers.filter { it.name == TestFilesProvider::class.java.name }
+        assertEquals("one deliberately external import fixture", 1, fixtures.size)
+        assertEquals("testfiles.$applicationId", fixtures.single().authority)
+        val shipping = providers.filterNot { it.name == TestFilesProvider::class.java.name }
+        assertTrue("the merged manifest declares shipping providers", shipping.isNotEmpty())
+        for (provider in shipping) {
             for (authority in requireNotNull(provider.authority).split(';')) {
                 assertTrue("${provider.name}: $authority", authority.startsWith("$applicationId."))
             }
