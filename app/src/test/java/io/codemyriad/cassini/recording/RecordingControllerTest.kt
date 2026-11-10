@@ -174,11 +174,11 @@ class RecordingControllerTest {
         platform.usable = Limits.MIN_RECORDING_FREE_BYTES + 16 * 60 * bytesPerSecond
         val active = startRecording("Spazio")
         capture.latest.elapsedMs = 5_000
-        waitFor { activeState().elapsedMs == 5_000L }
+        awaitActiveState { it.elapsedMs == 5_000L }
         assertNull(activeState().warning)
 
         platform.usable = Limits.MIN_RECORDING_FREE_BYTES + 15 * 60 * bytesPerSecond
-        waitFor { activeState().warning != null }
+        awaitActiveState { it.warning != null }
         assertEquals(RecordingWarning.StorageLow(15), activeState().warning)
         assertEquals(15 * 60_000L, activeState().space.spaceMs)
 
@@ -195,7 +195,7 @@ class RecordingControllerTest {
         // Past the old 2 h cap, and far past it: the recording goes on, with no warning.
         for (hours in listOf(2L, 3L, 100L)) {
             capture.latest.elapsedMs = hours * HOUR_MS
-            waitFor { activeState().elapsedMs == hours * HOUR_MS }
+            awaitActiveState { it.elapsedMs == hours * HOUR_MS }
             assertNull(activeState().warning)
         }
         // The policy loop renews the wake lock (each 50 ms in this test, each minute in the app).
@@ -203,11 +203,11 @@ class RecordingControllerTest {
         assertTrue(platform.wakeLockHeld)
         // A paused recording does not advance its clock, and the lock is still renewed.
         controller.pause()
-        waitFor { activeState().pause != null }
+        awaitActiveState { it.pause != null }
         val paused = platform.wakeLocks.get()
         waitFor { platform.wakeLocks.get() >= paused + 2 }
         controller.resume()
-        waitFor { activeState().pause == null }
+        awaitActiveState { it.pause == null }
         // The hint is the space only: 64 GiB at 6000 B/s.
         val spare = (64L shl 30) - Limits.MIN_RECORDING_FREE_BYTES
         assertEquals(spare * 1000 / RecordingPolicy.OPUS_BYTES_PER_SECOND, activeState().space.spaceMs)
@@ -229,9 +229,9 @@ class RecordingControllerTest {
         // 10 minutes of room left in the file: the hint counts the file, not the free space.
         RandomAccessFile(file, "rw").use { it.setLength(RecordingPolicy.AAC_MAX_FILE_BYTES - 600 * 4000L) }
         capture.latest.elapsedMs = 70 * HOUR_MS
-        waitFor { activeState().elapsedMs == 70 * HOUR_MS }
+        awaitActiveState { it.elapsedMs == 70 * HOUR_MS }
         assertTrue(activeState().space.spaceMs <= 10 * 60_000L)
-        waitFor { activeState().warning != null }
+        awaitActiveState { it.warning != null }
         assertTrue("the file limit warns first", activeState().warning is RecordingWarning.FileLimitNear)
 
         RandomAccessFile(file, "rw").use { it.setLength(RecordingPolicy.AAC_MAX_FILE_BYTES) }
@@ -273,7 +273,7 @@ class RecordingControllerTest {
         val mic = capture.latest
 
         platform.watch.silence(true)
-        waitFor { activeState().pause == RecordingPause.OTHER_APP }
+        awaitActiveState { it.pause == RecordingPause.OTHER_APP }
         assertTrue(mic.paused)
 
         platform.watch.silence(false)
@@ -282,12 +282,12 @@ class RecordingControllerTest {
         assertTrue("the end of the silence does not resume", mic.paused)
 
         controller.resume()
-        waitFor { activeState().pause == null }
+        awaitActiveState { it.pause == null }
         assertFalse(mic.paused)
         assertEquals(1, platform.watch.resumed.get())
 
         controller.pause()
-        waitFor { activeState().pause == RecordingPause.USER }
+        awaitActiveState { it.pause == RecordingPause.USER }
         platform.watch.silence(true)
         controller.awaitPosted()
         assertEquals("a user pause stays a user pause", RecordingPause.USER, activeState().pause)
@@ -299,10 +299,10 @@ class RecordingControllerTest {
         startRecording("After the phone call")
         val mic = capture.latest
         platform.watch.silence(true)
-        waitFor { activeState().pause == RecordingPause.OTHER_APP }
+        awaitActiveState { it.pause == RecordingPause.OTHER_APP }
         platform.watch.silence(false)
         controller.resume()
-        waitFor { activeState().pause == null }
+        awaitActiveState { it.pause == null }
 
         // Both reports wait behind a held policy tick, so they reach the recorder thread together, as from Android.
         val hold = FakePlatform.Hold()
@@ -403,6 +403,14 @@ class RecordingControllerTest {
     private suspend fun row(noteId: String): NoteEntity? = graph.awaitCatalogue().database.notes().note(noteId)
 
     private suspend fun rows(): List<NoteEntity> = graph.awaitCatalogue().database.notes().all()
+
+    /** Observes published states, then waits for recorder work that follows publication (such as resumed()). */
+    private suspend fun awaitActiveState(condition: (RecordingState.Active) -> Boolean) = withTimeout(TIMEOUT_MS) {
+        controller.state.first { state ->
+            condition(state as? RecordingState.Active ?: error("Not recording: $state"))
+        }
+        controller.awaitPosted()
+    }
 
     private suspend fun waitFor(condition: suspend () -> Boolean) = withTimeout(TIMEOUT_MS) {
         while (!condition()) delay(POLL_MS)
