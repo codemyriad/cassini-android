@@ -3,6 +3,7 @@ package io.codemyriad.cassini
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import androidx.activity.compose.ReportDrawnAfter
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -34,6 +35,7 @@ class MainActivity : AppCompatActivity() {
         val graph = (application as CassiniApplication).graph
         if (savedInstanceState == null) deliver(intent)
         setContent {
+            ReportDrawnAfter { graph.ready.join() }
             CassiniTheme {
                 CassiniApp(graph, linkFlow)
             }
