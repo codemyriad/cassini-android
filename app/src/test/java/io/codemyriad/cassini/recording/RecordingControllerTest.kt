@@ -144,7 +144,10 @@ class RecordingControllerTest {
         val hold = FakePlatform.Hold()
         platform.hold = hold
         try {
-            assertTrue("the recorder reached the held policy tick", hold.entered.await(TIMEOUT_MS, TimeUnit.MILLISECONDS))
+            assertTrue(
+                "the recorder reached the held policy tick",
+                hold.entered.await(TIMEOUT_MS, TimeUnit.MILLISECONDS),
+            )
             controller.setTitle("Test")
             controller.setTitle("Choir")
             controller.setTitle("Choir rehearsal ")
