@@ -25,9 +25,9 @@ class ModelCatalogTest {
     @Test fun parakeetIsTheModelHostsUltraInt8MarkedByItsSourceHash() {
         val parakeet = ModelCatalog.PARAKEET
         assertEquals("parakeet-ultra-0.6b-int8", parakeet.id)
-        assertEquals("18cb623004dd6c15999b93cb70b14d8a1f6e8f3a2a97ff733f104bfc3494f6a9", parakeet.sourceSha256)
+        assertEquals("50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366", parakeet.sourceSha256)
         assertEquals(
-            "models/parakeet-ultra-0.6b-int8/18cb623004dd6c15999b93cb70b14d8a1f6e8f3a2a97ff733f104bfc3494f6a9",
+            "models/parakeet-ultra-0.6b-int8/50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
             parakeet.directory,
         )
         assertEquals("verified", parakeet.markerFile)
@@ -35,8 +35,10 @@ class ModelCatalogTest {
         assertEquals(ModelCatalog.PARAKEET_REVISION, parakeet.sourceSha256)
         val names = listOf("encoder.int8.onnx", "decoder.int8.onnx", "joiner.int8.onnx", "tokens.txt")
         assertEquals(names, parakeet.artifacts.map { it.name })
-        assertEquals(listOf(652282922L, 11845274L, 6355277L, 93939L), parakeet.artifacts.map { it.size })
-        assertEquals(listOf(452306705L, 8841708L, 3714640L, 45831L), parakeet.artifacts.map { it.download!!.size })
+        assertEquals(listOf(653313528L, 11845274L, 6355277L, 93939L), parakeet.artifacts.map { it.size })
+        assertEquals(listOf(452843967L, 8841708L, 3714640L, 45831L), parakeet.artifacts.map { it.download!!.size })
+        assertEquals(465446146L, parakeet.downloadBytes)
+        assertEquals(671608018L, parakeet.artifactBytes)
         assertEquals("moondream/parakeet-ultra", ModelCatalog.PARAKEET_MODEL_ID)
         assertEquals("Parakeet Ultra", ModelCatalog.PARAKEET_DISPLAY_NAME)
     }

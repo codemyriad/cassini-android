@@ -101,7 +101,7 @@ object ModelCatalog {
      * and checkpoints name is the model's source SHA-256 on the host, which is also its marker value.
      */
     const val PARAKEET_DIST_ID = "parakeet-ultra-0.6b-int8"
-    const val PARAKEET_REVISION = "18cb623004dd6c15999b93cb70b14d8a1f6e8f3a2a97ff733f104bfc3494f6a9"
+    const val PARAKEET_REVISION = "50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366"
     const val PARAKEET_PRECISION = "INT8"
 
     /** The model id that a document's provenance names (`<id> <precision>`), and the name the app shows for it. */
@@ -117,10 +117,10 @@ object ModelCatalog {
     val parakeetArtifacts = listOf(
         dist(
             "encoder.int8.onnx",
-            652282922,
-            "299617fefd4664d1c115b691dcb6413cabcdbcc694cdf3cb4464b72c5fc3ae69",
-            452306705,
-            "caf7a38f2ad3224c1863564fb6e975a11aa3ae6ad1e7ad0bee5c4f5e018babb4",
+            653313528,
+            "f9a8af14deb2e5237eebb9dfb25126180614feaf835a03f307e4077eab247015",
+            452843967,
+            "44060ee9be2ac23ace05d6ea1271dd4cdbb353ac4d822f36c51ce733142d31a0",
         ),
         dist(
             "decoder.int8.onnx",

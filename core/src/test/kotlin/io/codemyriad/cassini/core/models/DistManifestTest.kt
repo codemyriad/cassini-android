@@ -9,12 +9,12 @@ import org.junit.Assert.fail
 import org.junit.Test
 
 /**
- * The model host's manifest against the compiled pins. `manifest-2026-10-27.json` is the published manifest of that
+ * The model host's manifest against the compiled pins. `manifest-2026-11-10.json` is the published manifest of that
  * day, byte for byte: every model of the catalog must resolve in it, and any change to a pinned pair or file must
  * refuse the download.
  */
 class DistManifestTest {
-    private val published: String = checkNotNull(javaClass.getResourceAsStream("/model-host/manifest-2026-10-27.json"))
+    private val published: String = checkNotNull(javaClass.getResourceAsStream("/model-host/manifest-2026-11-10.json"))
         .bufferedReader().use { it.readText() }
 
     private val all = listOf(ModelCatalog.PARAKEET, ModelCatalog.VAD, ModelCatalog.DIARIZATION, ModelCatalog.VOICEPRINT)
@@ -33,7 +33,10 @@ class DistManifestTest {
 
     private fun JSONObject.model(id: String): JSONObject {
         val models = getJSONArray("models")
-        return (0 until models.length()).map(models::getJSONObject).single { it.getString("id") == id }
+        val pinned = all.single { it.id == id }
+        return (0 until models.length()).map(models::getJSONObject).single {
+            it.getString("id") == id && it.getString("source_sha256") == pinned.sourceSha256
+        }
     }
 
     private fun JSONObject.artifact(id: String): JSONObject {

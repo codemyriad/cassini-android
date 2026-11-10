@@ -1,22 +1,22 @@
 {
-  "comment": "The models of ModelCatalog (core/src/main/kotlin/io/codemyriad/cassini/core/models/ModelCatalog.kt) for scripts/fetch-ci-models.py, as dist.gocassini.com publishes them (manifest of 2026-10-27). Each file is downloaded as its own seekable Zstandard object and decompressed. ModelCatalogTest makes sure that this file and the catalog agree.",
+  "comment": "The models of ModelCatalog (core/src/main/kotlin/io/codemyriad/cassini/core/models/ModelCatalog.kt) for scripts/fetch-ci-models.py, as dist.gocassini.com publishes them (manifest of 2026-11-10). Each file is downloaded as its own seekable Zstandard object and decompressed. ModelCatalogTest makes sure that this file and the catalog agree.",
   "models": [
     {
       "id": "parakeet-ultra-0.6b-int8",
-      "sourceSha256": "18cb623004dd6c15999b93cb70b14d8a1f6e8f3a2a97ff733f104bfc3494f6a9",
-      "directory": "models/parakeet-ultra-0.6b-int8/18cb623004dd6c15999b93cb70b14d8a1f6e8f3a2a97ff733f104bfc3494f6a9",
+      "sourceSha256": "50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+      "directory": "models/parakeet-ultra-0.6b-int8/50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
       "marker": "verified",
-      "markerValue": "18cb623004dd6c15999b93cb70b14d8a1f6e8f3a2a97ff733f104bfc3494f6a9",
+      "markerValue": "50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
       "artifacts": [
         {
           "name": "encoder.int8.onnx",
-          "size": 652282922,
-          "sha256": "299617fefd4664d1c115b691dcb6413cabcdbcc694cdf3cb4464b72c5fc3ae69",
+          "size": 653313528,
+          "sha256": "f9a8af14deb2e5237eebb9dfb25126180614feaf835a03f307e4077eab247015",
           "download": {
             "name": "encoder.int8.onnx.zst",
-            "size": 452306705,
-            "sha256": "caf7a38f2ad3224c1863564fb6e975a11aa3ae6ad1e7ad0bee5c4f5e018babb4",
-            "url": "https://dist.gocassini.com/models/files/caf7a38f2ad3224c1863564fb6e975a11aa3ae6ad1e7ad0bee5c4f5e018babb4/encoder.int8.onnx.zst"
+            "size": 452843967,
+            "sha256": "44060ee9be2ac23ace05d6ea1271dd4cdbb353ac4d822f36c51ce733142d31a0",
+            "url": "https://dist.gocassini.com/models/files/44060ee9be2ac23ace05d6ea1271dd4cdbb353ac4d822f36c51ce733142d31a0/encoder.int8.onnx.zst"
           }
         },
         {
