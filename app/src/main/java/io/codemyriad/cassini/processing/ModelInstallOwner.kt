@@ -116,7 +116,7 @@ class ModelInstallOwner(
      * called on an IO thread. Cancelling the caller stops its wait; the install goes on while another caller waits.
      */
     suspend fun install(parts: Set<ModelPart>, onProgress: (DownloadProgress) -> Unit = {}): InstallOutcome =
-        install(parts, onProgress, standalone = false, generation = synchronized(downloadLock) { downloadGeneration })
+        install(parts, onProgress, standalone = false)
 
     /**
      * The download from Settings or a banner, with no note (architecture 5.6): installs [parts] in the background
@@ -230,7 +230,7 @@ class ModelInstallOwner(
             downloads.toList().also { if (it.isNotEmpty()) downloadGeneration++ }
         }
         if (waiting.isEmpty()) return false
-        mutex.withLock { current?.stopped = true }
+        mutex.withLock { current?.takeIf { it.standalone > 0 }?.stopped = true }
         waiting.forEach { it.cancel(CancellationException("Android stopped the download")) }
         waiting.joinAll()
         return true
@@ -249,13 +249,13 @@ class ModelInstallOwner(
         parts: Set<ModelPart>,
         onProgress: (DownloadProgress) -> Unit,
         standalone: Boolean,
-        generation: Long,
+        generation: Long? = null,
     ): InstallOutcome {
         require(parts.isNotEmpty()) { "No model part to install" }
         while (true) {
             val (shared, joined) = mutex.withLock {
                 synchronized(downloadLock) {
-                    checkGeneration(generation)
+                    if (generation != null) checkGeneration(generation)
                     attach(parts, onProgress, standalone)
                 }
             }
@@ -279,7 +279,7 @@ class ModelInstallOwner(
         }
     }
 
-    /** Fence queued requests before cancelling the active task, so its join cannot start the next download. */
+    /** Fence queued standalone requests before cancelling the active task. */
     private fun checkGeneration(generation: Long) {
         if (generation != downloadGeneration) throw CancellationException("Model download cancelled")
     }
@@ -327,7 +327,9 @@ class ModelInstallOwner(
 
     private suspend fun run(shared: Shared): InstallOutcome {
         // A new install drops the failure an earlier one left in the status.
-        if (shared.standalone == 0) shared.parts.forEach(models::clearProgress)
+        synchronized(downloadLock) {
+            shared.parts.filterNot { it in requestedCounts }.forEach(models::clearProgress)
+        }
         try {
             val consented = shared.parts.all { models.consented(it) }
             val store = RepositoryModelStore(models, modelRoot, network, consented)
