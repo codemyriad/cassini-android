@@ -357,6 +357,21 @@ class PlaybackControllerTest {
         assertEquals(Save(NOTE, 5_000, final = true), saves.single())
     }
 
+    @Test fun aReplacementPublishesItsNewEpochOnlyAfterPreparationCompletes() = runTest {
+        val playback = controller()
+        playback.open(NOTE, audio, positionMs = 0)
+        val importedEpoch = playback.state.value.epoch
+        val gate = CompletableDeferred<Unit>()
+        prepareGate = gate
+        val replaced = backgroundScope.async { playback.reload(File("document.opus")) }
+        runCurrent()
+        assertFalse(replaced.isCompleted)
+        assertEquals(importedEpoch, playback.state.value.epoch)
+        gate.complete(Unit)
+        assertTrue(replaced.await())
+        assertTrue(playback.state.value.epoch > importedEpoch)
+    }
+
     @Test fun aReplacedDocumentIsPreparedAgainAtTheSamePosition() = runTest {
         val playback = controller()
         playback.open(NOTE, audio, positionMs = 0)
