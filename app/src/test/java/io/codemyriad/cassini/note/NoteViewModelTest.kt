@@ -112,6 +112,22 @@ class NoteViewModelTest {
         }
     }
 
+    @Test fun firstOneVoiceTranscriptCurrentlyOffersTranscribeAgain() = runTest(dispatcher) {
+        val initial = documentNote()
+        ports.details.value = initial.copy(
+            variants = initial.variants.map { it.copy(speakerCount = 1, speakersToldApart = false) },
+            speakers = initial.speakers.take(1),
+        )
+        ports.wordRows.value = WORDS.map { it.copy(speaker = "a") }
+        ports.voiceModelReady.value = false
+        val viewModel = viewModel()
+        val banner = viewModel.now().banners.single { it.kind == BannerKind.TX_ONE_VOICE }
+        assertEquals(listOf(BannerAction.TRANSCRIBE_AGAIN), banner.actions)
+        send(viewModel, NoteEvent.BannerAction(banner.id, BannerAction.TRANSCRIBE_AGAIN))
+        assertTrue(ports.calls.any { it == "transcribe:TRANSCRIBE_AGAIN" })
+        assertTrue(effects.none { it is NoteEffect.OpenModelDownload })
+    }
+
     // Opening. --------------------------------------------------------------------------------------------------
 
     @Test
