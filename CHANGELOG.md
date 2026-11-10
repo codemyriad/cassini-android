@@ -6,6 +6,10 @@ We made the entries for 0.0.1-beta to 0.1.0 again from the release notes of thes
 
 ## [Unreleased]
 
+## [0.4.2-beta.2] - 2026-11-10
+
+First Google Play test build, version code 17. Whistle is included on compatible Android 10+ arm64 devices with CPU dot-product support. For more accurate transcription, Parakeet Ultra is available as an optional 465 MB model download. This build installs beside earlier Cassini 0.4.x installations and does not update or replace them.
+
 ### Changed
 
 - The package name is now `io.codemyriad.cassini.talk`, the package name of Cassini talk on Google Play, instead of `io.codemyriad.cassini`. This version installs as a new app beside 0.4.x: it does not update it, and it does not take over its notes, voices, models or settings. Before you uninstall 0.4.x, save each note that you want to keep as a Cassini document (`.opus`) and open it in the new app. The new app downloads the models again.
@@ -257,7 +261,8 @@ Version 0.2.0 is a new build of the app. It keeps the speech engine and the port
 - A one-time model download in Settings: INT8 (about 640 MiB) or FP32 (about 2.37 GiB).
 - Recordings of up to 2:59 and imports of up to 3 minutes.
 
-[Unreleased]: https://github.com/codemyriad/cassini-android/compare/v0.4.2-beta.1...HEAD
+[Unreleased]: https://github.com/codemyriad/cassini-android/compare/v0.4.2-beta.2...HEAD
+[0.4.2-beta.2]: https://github.com/codemyriad/cassini-android/compare/v0.4.2-beta.1...v0.4.2-beta.2
 [0.4.2-beta.1]: https://github.com/codemyriad/cassini-android/compare/v0.4.1...v0.4.2-beta.1
 [0.4.1]: https://github.com/codemyriad/cassini-android/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/codemyriad/cassini-android/compare/v0.3.0...v0.4.0

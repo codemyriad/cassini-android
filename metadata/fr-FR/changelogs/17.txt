@@ -1,0 +1,1 @@
+Bienvenue dans les tests de Cassini. Whistle est inclus sur les appareils compatibles. Pour une transcription plus précise, téléchargez le modèle facultatif Parakeet (465 Mo). Cette version s’installe à côté de Cassini 0.4.x ; elle ne met pas à jour et ne remplace pas l’installation précédente.
