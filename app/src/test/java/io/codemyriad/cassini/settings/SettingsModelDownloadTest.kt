@@ -82,9 +82,11 @@ class SettingsModelDownloadTest {
     @get:Rule val chain: RuleChain =
         RuleChain.outerRule(NoUncaughtCoroutines()).around(folder).around(graphRule).around(rule)
 
-    @Test fun speakerRowDownloadsAndRetriesOnlyTheDiarizer() = downloadAndRetry(ModelPart.SPEAKERS, "Telling speakers apart")
+    @Test fun speakerRowDownloadsAndRetriesOnlyTheDiarizer() =
+        downloadAndRetry(ModelPart.SPEAKERS, "Telling speakers apart")
 
-    @Test fun voicesRowDownloadsAndRetriesOnlyTheVoiceprintModel() = downloadAndRetry(ModelPart.VOICES, "Recognising saved voices")
+    @Test fun voicesRowDownloadsAndRetriesOnlyTheVoiceprintModel() =
+        downloadAndRetry(ModelPart.VOICES, "Recognising saved voices")
 
     @Test fun parakeetRowDownloadsAndRetriesOnlyParakeet() = downloadAndRetry(ModelPart.SPEECH, "Parakeet Ultra")
 

@@ -37,6 +37,7 @@ import io.codemyriad.cassini.ui.models.ModelDownloadScreen
 import io.codemyriad.cassini.ui.settings.LanguageChoice
 import io.codemyriad.cassini.ui.settings.SettingsEvent
 import io.codemyriad.cassini.ui.settings.SettingsScreen
+import io.codemyriad.cassini.ui.settings.SpeechModelUi
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import io.codemyriad.cassini.ui.trash.TrashBackTo
 import io.codemyriad.cassini.ui.trash.TrashEvent
@@ -210,12 +211,11 @@ class SettingsBehaviourTest {
 
     @Test fun bundledWhistleSelectsTheIncludedModelWithoutADownloadEvent() {
         val events = mutableListOf<SettingsEvent>()
-        setThemed {
-            SettingsScreen(BoardFixtures.settings.copy(includedAvailable = true, speechChecking = false), onEvent = { events += it })
-        }
+        val state = BoardFixtures.settings.copy(includedAvailable = true, speechChecking = false)
+        setThemed { SettingsScreen(state, onEvent = { events += it }) }
         rule.onNodeWithText("Whistle").performScrollTo().performClick()
         rule.runOnIdle {
-            assertEquals(listOf(SettingsEvent.ChooseSpeech(io.codemyriad.cassini.ui.settings.SpeechModelUi.INCLUDED)), events)
+            assertEquals(listOf(SettingsEvent.ChooseSpeech(SpeechModelUi.INCLUDED)), events)
         }
     }
 

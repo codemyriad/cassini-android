@@ -105,7 +105,8 @@ class SettingsViewModelTest {
     @Test fun selectedModelPartSurvivesNavigationStateSerialization() {
         for (part in ModelPart.entries) {
             val key = ModelDownloadKey(part = part)
-            assertEquals(key, Json.decodeFromString<ModelDownloadKey>(Json.encodeToString(ModelDownloadKey.serializer(), key)))
+            val encoded = Json.encodeToString(ModelDownloadKey.serializer(), key)
+            assertEquals(key, Json.decodeFromString<ModelDownloadKey>(encoded))
         }
     }
 
@@ -124,10 +125,12 @@ class SettingsViewModelTest {
                 advanceUntilIdle()
                 assertEquals(ModelPartUi.entries.toList(), viewModel.now().models.map { it.part })
                 for (row in viewModel.now().models) {
-                    assertEquals(
-                        if (row.part.name == active.name) SettingsViewModel.status(status) else ModelStatusUi.NotDownloaded,
-                        row.status,
-                    )
+                    val expected = if (row.part.name == active.name) {
+                        SettingsViewModel.status(status)
+                    } else {
+                        ModelStatusUi.NotDownloaded
+                    }
+                    assertEquals(expected, row.status)
                 }
             }
         }
