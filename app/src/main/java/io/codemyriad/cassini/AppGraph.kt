@@ -54,6 +54,7 @@ import io.codemyriad.cassini.notices.ImportTracker
 import io.codemyriad.cassini.notices.NoticeCenter
 import io.codemyriad.cassini.notices.TrashUndo
 import io.codemyriad.cassini.playback.AndroidPlaybackPlatform
+import io.codemyriad.cassini.playback.AudioPlayer
 import io.codemyriad.cassini.playback.ExoAudioPlayer
 import io.codemyriad.cassini.playback.PlaybackController
 import io.codemyriad.cassini.playback.PlaybackService
@@ -139,6 +140,7 @@ class AppGraph(context: Context, val config: Config) {
         val onStartupStep: (String) -> Unit = {},
         val processing: ProcessingHooks = ProcessingHooks(),
         val recording: RecordingHooks = RecordingHooks(),
+        val audioPlayer: (Context) -> AudioPlayer = ::ExoAudioPlayer,
     )
 
     /**
@@ -290,7 +292,7 @@ class AppGraph(context: Context, val config: Config) {
             PlaybackController.Parts(
                 scope = appScope,
                 main = dispatchers.main,
-                player = { ExoAudioPlayer(app) },
+                player = { config.audioPlayer(app) },
                 platform = AndroidPlaybackPlatform(app),
                 store = RepositoryPositionStore { awaitCatalogue().notes },
                 speeds = SettingsSpeedStore(settings),

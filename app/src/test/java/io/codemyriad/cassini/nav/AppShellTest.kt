@@ -38,11 +38,15 @@ import io.codemyriad.cassini.core.format.Word
 import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.data.models.ModelFetcher
 import io.codemyriad.cassini.data.notes.ImportOutcome
+import io.codemyriad.cassini.playback.FakePlayer
 import io.codemyriad.cassini.recording.FakeCaptureSource
 import io.codemyriad.cassini.recording.FakeConsent
 import io.codemyriad.cassini.recording.FakePlatform
 import io.codemyriad.cassini.recording.RecordingState
+import io.codemyriad.cassini.testing.MainDispatchEvents
 import io.codemyriad.cassini.testing.NoUncaughtCoroutines
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -70,7 +74,7 @@ import kotlin.math.abs
 
 /**
  * The whole app on Robolectric: [MainActivity] over an [AppGraph] on a scratch root, with fakes for the microphone
- * and no model download (docs/design/ui.md sections 9 and 11, docs/architecture.md section 6). It checks back
+ * and the audio player, and no model download (docs/design/ui.md sections 9 and 11, docs/architecture.md section 6). It checks back
  * (a sheet, then the search, then the screen), the minimised recording, the predictive back callback, the
  * edge-to-edge insets, the system bars of each screen and the TalkBack semantics of the Note screen.
  *
@@ -95,6 +99,7 @@ class AppShellTest {
                         paths = paths,
                         fetcher = ModelFetcher { _, _, _ -> fail("No model is fetched in this test") },
                         network = { false },
+                        audioPlayer = { FakePlayer(clock = { 0L }, durationMs = PLAYER_DURATION_MS) },
                         recording = AppGraph.RecordingHooks(
                             capture = FakeCaptureSource(),
                             platform = platform,
@@ -115,10 +120,11 @@ class AppShellTest {
         }
     }
 
+    private val mainEvents = MainDispatchEvents()
     private val rule = createAndroidComposeRule<MainActivity>()
 
     @get:Rule val chain: RuleChain =
-        RuleChain.outerRule(NoUncaughtCoroutines()).around(folder).around(graphRule).around(rule)
+        RuleChain.outerRule(NoUncaughtCoroutines()).around(folder).around(mainEvents).around(graphRule).around(rule)
 
     @Test fun backClosesTheSheetThenTheSearchThenLeavesTheNote() {
         importDocument()
@@ -296,21 +302,25 @@ class AppShellTest {
         rule.onNodeWithText(TITLE).performClick()
         waitFor(hasContentDescription("Search in transcript"))
         val playback = app.graph.playback
-        // The player opens after the first turns are drawn (or after a timeout on another thread): run the main
-        // looper while waiting, so that the resumption posted there runs.
-        rule.waitUntil(TIMEOUT_MS) {
-            shadowOf(Looper.getMainLooper()).idle()
-            playback.state.value.noteId != null
-        }
-        val noteId = playback.state.value.noteId
-        val seen = CopyOnWriteArrayList<String?>()
-        val watch = app.graph.appScope.launch { playback.state.collect { seen += it.noteId } }
-
-        rule.activityRule.scenario.recreate()
-        waitFor(hasContentDescription("Search in transcript"))
+        // The player opens after the first turns draw. Main dispatches deliver the Note ViewModel's work.
         rule.waitForIdle()
-        watch.cancel()
-        assertTrue("the player was not left: $seen", seen.all { it == noteId })
+        mainEvents.await(TIMEOUT_MS) { playback.state.value.noteId != null }
+        assertFalse("The note is prepared", playback.state.value.failed)
+        val noteId = checkNotNull(playback.state.value.noteId)
+        val seen = CopyOnWriteArrayList<String?>()
+        val watch = app.graph.appScope.launch(Dispatchers.Unconfined, start = CoroutineStart.UNDISPATCHED) {
+            playback.state.collect { seen += it.noteId }
+        }
+
+        try {
+            rule.activityRule.scenario.recreate()
+            waitFor(hasContentDescription("Search in transcript"))
+            rule.waitForIdle()
+            assertEquals(noteId, playback.state.value.noteId)
+            assertTrue("the player was not left: $seen", seen.all { it == noteId })
+        } finally {
+            watch.cancel()
+        }
     }
 
     @Test fun openingAndClosingANoteKeepsTheLibraryVisibleWhileMorphing() {
@@ -454,6 +464,7 @@ class AppShellTest {
         const val HALF = 0.5f
         const val SECOND_TURN = "so start now"
         const val TIMEOUT_MS = 10_000L
+        const val PLAYER_DURATION_MS = 60_000L
         const val STATUS_PX = 60
         const val NAVIGATION_PX = 96
         const val BOTTOM_DP = 24

@@ -596,7 +596,7 @@ class PlaybackControllerTest {
 }
 
 /** A player whose position advances with the virtual clock while it plays. */
-private class FakePlayer(
+internal class FakePlayer(
     private val clock: () -> Long,
     override val durationMs: Long,
     private val gate: () -> CompletableDeferred<Unit>? = { null },
