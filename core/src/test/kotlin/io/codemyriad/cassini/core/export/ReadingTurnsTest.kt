@@ -125,6 +125,45 @@ class ReadingTurnsTest {
         assertEquals(listOf(listOf(0, 2), listOf(1, 3)), rows.map { row -> row.members.flatMap { it.wordIndices } })
     }
 
+    @Test fun equalOverlapsKeepReferenceOrderWhenAudibleStartsDifferFromBlockOrder() {
+        val rows = ReadingTurns.of(
+            listOf(
+                Word("a", 0, 0, "opening"),
+                Word("a", 2000, 6000, "held"),
+                Word("b", 100, 100, "opening"),
+                Word("b", 1000, 7000, "held"),
+                Word("c", 200, 200, "opening"),
+                Word("c", 500, 6500, "held"),
+            ),
+            endsBoundedByAudio = true,
+        ).rows.associateBy { it.speaker }
+        assertEquals(listOf("b", "c"), rows.getValue("a").over)
+        assertEquals(listOf("c", "a"), rows.getValue("b").over)
+        assertEquals(listOf("b", "a"), rows.getValue("c").over)
+    }
+
+    @Test fun touchingAudibleEnvelopesDoNotCompete() {
+        val rows = ReadingTurns.of(
+            listOf(Word("a", 0, 3000, "first"), Word("b", 3000, 6000, "next")),
+            endsBoundedByAudio = true,
+        ).rows
+        assertEquals(listOf(emptyList<String>(), emptyList<String>()), rows.map { it.over })
+    }
+
+    @Test fun expiringAShortRunKeepsALongerActiveRun() {
+        val rows = ReadingTurns.of(
+            listOf(
+                Word("a", 0, 10000, "whole"),
+                Word("b", 1000, 4000, "first"),
+                Word("c", 5000, 8000, "next"),
+            ),
+            endsBoundedByAudio = true,
+        ).rows.associateBy { it.speaker }
+        assertEquals(listOf("b", "c"), rows.getValue("a").over)
+        assertEquals(listOf("a"), rows.getValue("b").over)
+        assertEquals(listOf("a"), rows.getValue("c").over)
+    }
+
     companion object {
         private const val REFERENCE = "1111155cb0017b47c072a8662c54f28ad7c44223"
         val fixtures =
