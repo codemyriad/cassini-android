@@ -18,7 +18,9 @@ import io.codemyriad.cassini.test.CiSmoke
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -58,12 +60,16 @@ class ProcessingServiceTypeTest {
         // run; the drain itself does not ask for it.
         graph.awaitCatalogue().jobs.enqueue(note, JobKind.TRANSCRIBE)
         ContextCompat.startForegroundService(Background.context, ProcessingService.drainIntent(Background.context))
-        waitFor("The scripted job runs") { job.started.takeIf { it.isCompleted } }
+        withTimeoutOrNull(TYPE_WAIT_MS) { job.started.await() }
+            ?: throw AssertionError("The scripted job did not start for $note")
 
         job.send(JobEvent.Started(15_000, restored = null, speakers = false, prints = false, lowMemory = false))
-        waitFor("Inference runs in the foreground service") {
-            processing.state.value.takeIf { it.serviceForeground && it.running?.phase is JobPhase.Transcribing }
-        }
+        withTimeoutOrNull(TYPE_WAIT_MS) {
+            processing.state.first { state ->
+                val running = state.running
+                state.serviceForeground && running?.noteId == note && running.phase is JobPhase.Transcribing
+            }
+        } ?: throw AssertionError("Inference did not run in the foreground service: ${processing.state.value}")
         val expected = when {
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM -> MEDIA_PROCESSING
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q -> DATA_SYNC
