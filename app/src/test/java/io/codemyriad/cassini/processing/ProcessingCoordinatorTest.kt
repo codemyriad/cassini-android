@@ -55,7 +55,6 @@ import java.io.RandomAccessFile
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -638,7 +637,10 @@ class ProcessingCoordinatorTest {
             withTimeout(TIMEOUT_MS) { download.join() }
             withTimeout(TIMEOUT_MS) { graph.installOwner.state.first { it == InstallState.Idle } }
             withTimeout(TIMEOUT_MS) { coordinator.awaitIdle() }
-            assertTrue("the fetch was interrupted", withContext(Dispatchers.IO) { interrupted.await(TIMEOUT_MS, TimeUnit.MILLISECONDS) })
+            val fetchInterrupted = withContext(Dispatchers.IO) {
+                interrupted.await(TIMEOUT_MS, TimeUnit.MILLISECONDS)
+            }
+            assertTrue("the fetch was interrupted", fetchInterrupted)
             assertFalse(withTimeout(TIMEOUT_MS) { coordinator.state.first { !it.downloading } }.downloading)
             val part = File(ModelCatalog.PARAKEET.directory(paths.modelRoot), PART_FILE)
             assertTrue("the .part file stays for a Range resume", part.isFile)
