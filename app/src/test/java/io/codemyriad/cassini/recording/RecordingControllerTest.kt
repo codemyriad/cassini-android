@@ -14,6 +14,7 @@ import io.codemyriad.cassini.data.models.ModelFetcher
 import io.codemyriad.cassini.engine.capture.MicrophoneCapture
 import io.codemyriad.cassini.testing.NoUncaughtCoroutines
 import io.codemyriad.cassini.ui.components.WaveformLevels
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -109,13 +110,15 @@ class RecordingControllerTest {
         mic.gate = CountDownLatch(1)
         mic.elapsedMs = 61_000
 
-        val before = System.nanoTime()
-        controller.finish("Monday meeting")
-        val tookMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - before)
-        assertTrue("finish returned after $tookMs ms", tookMs < 100)
-        waitFor { mic.stopThread != null }
-        assertTrue("the capture is still stopping", controller.state.value is RecordingState.Finishing)
-        mic.gate?.countDown()
+        try {
+            controller.finish("Monday meeting")
+            withTimeout(TIMEOUT_MS) { mic.stopStarted.await() }
+            assertEquals("finish returned while capture stop is held", 1L, mic.gate?.count)
+            assertNotEquals(main, mic.stopThread)
+            assertTrue("the capture is still stopping", controller.state.value is RecordingState.Finishing)
+        } finally {
+            mic.gate?.countDown()
+        }
 
         val ended = awaitEnded()
         assertNotEquals(main, mic.stopThread)
@@ -435,6 +438,8 @@ class FakeCapture(override val file: File, private val onError: () -> Unit) : Mi
 
     @Volatile var stopThread: Thread? = null
 
+    val stopStarted = CompletableDeferred<Unit>()
+
     init {
         file.writeBytes(ByteArray(CAPTURED_BYTES))
     }
@@ -445,7 +450,8 @@ class FakeCapture(override val file: File, private val onError: () -> Unit) : Mi
 
     override suspend fun stop(): File {
         stopThread = Thread.currentThread()
-        gate?.await(GATE_SECONDS, TimeUnit.SECONDS)
+        stopStarted.complete(Unit)
+        check(gate?.await(GATE_SECONDS, TimeUnit.SECONDS) != false) { "The test never released capture stop" }
         return file
     }
 
