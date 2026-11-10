@@ -27,9 +27,17 @@ class RecordingNoticesTest {
             }
             assertFalse(pending.isCompleted)
 
-            if (readyFirst) notices.readyToTranscribe("Consent", "Consent") else notices.failed("Failed", "Failed", "DOWNLOAD")
+            if (readyFirst) {
+                notices.readyToTranscribe("Consent", "Consent")
+            } else {
+                notices.failed("Failed", "Failed", "DOWNLOAD")
+            }
             assertFalse("one notice does not satisfy the combined predicate", pending.isCompleted)
-            if (readyFirst) notices.failed("Failed", "Failed", "DOWNLOAD") else notices.readyToTranscribe("Consent", "Consent")
+            if (readyFirst) {
+                notices.failed("Failed", "Failed", "DOWNLOAD")
+            } else {
+                notices.readyToTranscribe("Consent", "Consent")
+            }
 
             assertTrue("the second recorded fact wakes the existing waiter", pending.isCompleted)
             pending.await()
