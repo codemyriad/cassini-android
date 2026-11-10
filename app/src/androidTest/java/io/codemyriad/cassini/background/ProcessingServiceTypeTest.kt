@@ -75,13 +75,20 @@ class ProcessingServiceTypeTest {
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q -> DATA_SYNC
             else -> null
         }
+        val services = awaitServiceType(expected)
+        Log.i(TAG, "API ${Build.VERSION.SDK_INT}, expected type $expected:\n$services")
+        job.finish(JobOutcome.Paused(PauseReason.USER))
+        processing.awaitIdle()
+    }
+
+    private suspend fun awaitServiceType(expected: Int?): String {
         val wanted = expected?.let { "type 0x${Integer.toHexString(it)}" } ?: "no type check below API 29"
         // The type that Android has for the service (getForegroundServiceType), then the foreground flag of dumpsys
         // and, from API 30, the type it prints, which must be the same. The type is read first: the service runs as
         // dataSync until inference starts, so a dump taken before the type changed shows 0x1 (API 35, run
         // 41606854344). A dump that never agrees fails the wait, with the last dump in the message.
         var last = ""
-        val services = try {
+        return try {
             waitFor("ProcessingService runs in the foreground ($wanted)", TYPE_WAIT_MS) {
                 if (ProcessingService.currentType() != expected) return@waitFor null
                 Background.processingService().also { last = it }.takeIf { service ->
@@ -93,9 +100,6 @@ class ProcessingServiceTypeTest {
             val type = ProcessingService.currentType()
             throw AssertionError("${timeout.message}; type $type, dumpsys:\n$last", timeout)
         }
-        Log.i(TAG, "API ${Build.VERSION.SDK_INT}, expected type $expected:\n$services")
-        job.finish(JobOutcome.Paused(PauseReason.USER))
-        processing.awaitIdle()
     }
 
     /** A job that does nothing until the test sends its events; a stop pauses it at once. */
