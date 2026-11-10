@@ -132,9 +132,7 @@ class ModelInstallOwner(
 
     /** A retry never adds a model role that the original consent did not authorize. */
     private suspend fun allowedRetryParts(): Set<ModelPart> {
-        val speech = models.speechConsented()
-        val optional = models.consented()
-        val allowed = ModelPart.entries.filter { if (it == ModelPart.SPEECH) speech else optional }.toSet()
+        val allowed = ModelPart.entries.filter { models.consented(it) }.toSet()
         // With no permission, preserve NeedsConsent rather than reporting an empty successful install.
         return allowed.ifEmpty { ModelPart.entries.toSet() }
     }
@@ -227,9 +225,7 @@ class ModelInstallOwner(
         // A new install drops the failure an earlier one left in the status.
         shared.parts.forEach(models::clearProgress)
         try {
-            val speechConsent = ModelPart.SPEECH !in shared.parts || models.speechConsented()
-            val optionalConsent = shared.parts.all { it == ModelPart.SPEECH } || models.consented()
-            val consented = speechConsent && optionalConsent
+            val consented = shared.parts.all { models.consented(it) }
             val store = RepositoryModelStore(models, modelRoot, network, consented)
             val outcome = ModelInstaller(store, io).install(shared.parts) { progress ->
                 shared.progress = progress

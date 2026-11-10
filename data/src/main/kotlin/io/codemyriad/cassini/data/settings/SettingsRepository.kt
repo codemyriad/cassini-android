@@ -61,13 +61,18 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     /** Explicit optional-model download consent; a Parakeet-only plan does not set this. */
     val consentAt: Flow<Long?> = key(Keys.CONSENT_AT)
 
+    /** Consent for the single Tell speakers apart download, without speech or saved voices. */
+    val speakerConsentAt: Flow<Long?> = key(Keys.SPEAKER_CONSENT_AT)
+
     suspend fun recordConsent(
         at: Long,
         includeSpeech: Boolean = true,
         includeOptional: Boolean = true,
+        includeSpeakers: Boolean = false,
     ) {
         store.edit {
             if (includeOptional) it[Keys.CONSENT_AT] = at
+            if (includeSpeakers) it[Keys.SPEAKER_CONSENT_AT] = at
             if (includeSpeech) it[Keys.SPEECH_CONSENT_AT] = at
         }
     }
@@ -212,6 +217,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         val SPEECH_MODEL = stringPreferencesKey("recognition.model")
         val SPEECH_CONSENT_AT = longPreferencesKey("models.speechConsentAt")
         val CONSENT_AT = longPreferencesKey("models.consentAt")
+        val SPEAKER_CONSENT_AT = longPreferencesKey("models.speakerConsentAt")
         val DECLINED_AT = longPreferencesKey("models.declinedAt")
         val FINALIZATION_MS = longPreferencesKey("processing.finalizationMs")
         val QUEUE_HOLD = stringPreferencesKey("queue.hold")

@@ -92,6 +92,23 @@ class ModelDownloadViewModelTest {
         assertEquals(listOf<ModelDownloadEffect>(ModelDownloadEffect.Close), effects)
     }
 
+    @Test fun speakerConsentAutomaticallyQueuesTheSameNoteWithoutSpeechOrVoiceprintConsent() = runTest(dispatcher) {
+        ports.plan = ModelPlan(FRESH.missing.filter { it.part == ModelPart.SPEAKERS })
+        val viewModel = viewModel()
+        val shown = viewModel.state.value!!
+        assertTrue(shown.withNote)
+        assertEquals(listOf(ModelPartUi.SPEAKERS), shown.parts.map { it.part })
+        assertEquals(ports.plan.missing.map { it.downloadBytes }, shown.parts.map { it.bytes })
+        assertTrue(ports.transcribed.isEmpty())
+        assertEquals(0, ports.consents)
+        viewModel.onEvent(ModelDownloadEvent.Download)
+        advanceUntilIdle()
+        assertEquals(listOf(setOf(ModelPart.SPEAKERS)), ports.consentParts)
+        assertEquals(listOf(NOTE), ports.transcribed)
+        assertTrue(ports.downloads.isEmpty())
+        assertEquals(listOf<ModelDownloadEffect>(ModelDownloadEffect.Close), effects)
+    }
+
     @Test
     fun downloadWithoutANoteStartsTheStandaloneDownloadOfTheMissingParts() = runTest(dispatcher) {
         ports.plan = ModelPlan(FRESH.missing.drop(1))

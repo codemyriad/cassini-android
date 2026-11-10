@@ -149,6 +149,7 @@ class ModelRepository(
     private val lock = ReentrantLock()
     private var ready: Map<ModelPart, Boolean> = emptyMap()
     private var consentRecorded = false
+    private var speakerConsentRecorded = false
     private var speechConsentRecorded = false
     private val inFlight = HashMap<ModelPart, ModelStatus>()
     private val state = MutableStateFlow<Map<ModelPart, ModelStatus>>(emptyMap())
@@ -159,11 +160,13 @@ class ModelRepository(
     suspend fun refresh(): Map<ModelPart, ModelStatus> {
         val recorded = settings.consentAt.first() != null
         val speechRecorded = settings.speechConsentAt.first() != null
+        val speakerRecorded = settings.speakerConsentAt.first() != null
         return withContext(dispatchers.io) {
             val readiness = readiness()
             if (readiness[ModelPart.SPEECH] == true) removeRetiredParakeet(paths.modelRoot)
             lock.withLock {
                 consentRecorded = recorded
+                speakerConsentRecorded = speakerRecorded
                 speechConsentRecorded = speechRecorded
                 ready = readiness
                 // A failure is shown until the part is installed or a new install starts.
@@ -177,14 +180,27 @@ class ModelRepository(
     suspend fun consented(): Boolean = settings.consentAt.first() != null
 
     /** Last refreshed optional-download permission, for the synchronous job plan on its IO thread. */
-    fun optionalDownloadsConsented(): Boolean = lock.withLock { consentRecorded }
+    fun optionalDownloadsConsented(part: ModelPart): Boolean = lock.withLock {
+        consentRecorded || (part == ModelPart.SPEAKERS && speakerConsentRecorded)
+    }
+
+    /** Rechecked by the install owner before bytes arrive; never inferred from another model's consent. */
+    suspend fun consented(part: ModelPart): Boolean = when (part) {
+        ModelPart.SPEECH -> speechConsented()
+        ModelPart.SPEAKERS -> consented() || settings.speakerConsentAt.first() != null
+        ModelPart.VOICES -> consented()
+    }
 
     /** "Download and transcribe" or "Download" was pressed. */
     suspend fun speechConsented(): Boolean =
         settings.speechConsentAt.first() != null || withContext(dispatchers.io) { ModelCatalog.PARAKEET.ready(paths.modelRoot) }
 
-    suspend fun recordConsent(includeSpeech: Boolean = true, includeOptional: Boolean = true) {
-        settings.recordConsent(clock(), includeSpeech, includeOptional)
+    suspend fun recordConsent(
+        includeSpeech: Boolean = true,
+        includeOptional: Boolean = true,
+        includeSpeakers: Boolean = false,
+    ) {
+        settings.recordConsent(clock(), includeSpeech, includeOptional, includeSpeakers)
         refresh()
     }
 
@@ -361,7 +377,7 @@ class ModelRepository(
             val consent = if (part == ModelPart.SPEECH) {
                 speechConsentRecorded || ready[ModelPart.SPEECH] == true
             } else {
-                consentRecorded
+                consentRecorded || (part == ModelPart.SPEAKERS && speakerConsentRecorded)
             }
             val status = inFlight[part] ?: ready[part]?.let { if (it) ModelStatus.Ready else ModelStatus.Missing(consent) }
             status?.let { part to it }

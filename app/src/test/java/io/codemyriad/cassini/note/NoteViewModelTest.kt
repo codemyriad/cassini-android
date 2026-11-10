@@ -1,5 +1,6 @@
 package io.codemyriad.cassini.note
 
+import io.codemyriad.cassini.core.models.ModelCatalog
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -112,7 +113,7 @@ class NoteViewModelTest {
         }
     }
 
-    @Test fun firstOneVoiceTranscriptCurrentlyOffersTranscribeAgain() = runTest(dispatcher) {
+    @Test fun missingSpeakerModelOffersItsSizedDownloadWithoutRetranscribing() = runTest(dispatcher) {
         val initial = documentNote()
         ports.details.value = initial.copy(
             variants = initial.variants.map { it.copy(speakerCount = 1, speakersToldApart = false) },
@@ -120,12 +121,29 @@ class NoteViewModelTest {
         )
         ports.wordRows.value = WORDS.map { it.copy(speaker = "a") }
         ports.voiceModelReady.value = false
+        ports.notices.value = ports.notices.value.copy(
+            speakerModel = io.codemyriad.cassini.data.models.ModelStatus.Missing(consented = false),
+        )
         val viewModel = viewModel()
-        val banner = viewModel.now().banners.single { it.kind == BannerKind.TX_ONE_VOICE }
-        assertEquals(listOf(BannerAction.TRANSCRIBE_AGAIN), banner.actions)
-        send(viewModel, NoteEvent.BannerAction(banner.id, BannerAction.TRANSCRIBE_AGAIN))
-        assertTrue(ports.calls.any { it == "transcribe:TRANSCRIBE_AGAIN" })
-        assertTrue(effects.none { it is NoteEffect.OpenModelDownload })
+        val banner = viewModel.now().banners.single { it.kind == BannerKind.TX_SPEAKERS_MISSING }
+        assertEquals(listOf(BannerAction.DOWNLOAD), banner.actions)
+        assertEquals(io.codemyriad.cassini.core.models.ModelCatalog.speakerBytes, banner.args.bytes)
+        assertTrue(ports.calls.none { it.startsWith("transcribe:") })
+        send(viewModel, NoteEvent.BannerAction(banner.id, BannerAction.DOWNLOAD))
+        assertEquals(
+            NoteEffect.OpenModelDownload(ModelDownloadKey(NOTE, speakerModelsOnly = true)),
+            effects.last(),
+        )
+        assertTrue("opening consent does not queue or download", ports.calls.none { it.startsWith("transcribe:") })
+    }
+
+    @Test fun aSuccessfulSingleSpeakerPassDoesNotOfferAModelOrRetry() = runTest(dispatcher) {
+        val initial = documentNote()
+        ports.details.value = initial.copy(variants = initial.variants.map { it.copy(speakerCount = 1) })
+        ports.notices.value = ports.notices.value.copy(
+            speakerModel = io.codemyriad.cassini.data.models.ModelStatus.Ready,
+        )
+        assertTrue(viewModel().now().banners.isEmpty())
     }
 
     // Opening. --------------------------------------------------------------------------------------------------

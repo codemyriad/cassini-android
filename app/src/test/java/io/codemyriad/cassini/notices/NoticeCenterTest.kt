@@ -6,8 +6,10 @@ import io.codemyriad.cassini.core.audio.RecordingSpace
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.core.library.PauseReason
+import io.codemyriad.cassini.core.models.ModelCatalog
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.data.db.JobEntity
+import io.codemyriad.cassini.data.models.ModelStatus
 import io.codemyriad.cassini.data.voices.VoiceProblem
 import io.codemyriad.cassini.engine.job.DownloadError
 import io.codemyriad.cassini.engine.job.DownloadProgress
@@ -180,6 +182,27 @@ class NoticeCenterTest {
         val held = only(Notices.library(NoticeFacts(hold = true, queued = 3), LibraryFacts(loading = true)))
         assertEquals(BannerSpec(BannerKind.TX_QUEUE_HELD, BannerArgs(count = 3)), held)
         assertTrue(Notices.library(NoticeFacts(hold = true, queued = 0), LibraryFacts(loading = true)).isEmpty())
+    }
+
+    @Test fun theOneVoiceOfferDependsOnCurrentModelReadinessNotAnAssumedAttributionFailure() {
+        val states = listOf(
+            ModelStatus.Missing(false), ModelStatus.Missing(true), ModelStatus.Failed(Failure.VERIFY, "hash"),
+        )
+        for (status in states) {
+            val offer = only(Notices.job(null, oneVoice = true, speakerModel = status))
+            assertEquals(BannerKind.TX_SPEAKERS_MISSING, offer.kind)
+            assertEquals(listOf(BannerAction.DOWNLOAD), offer.actions)
+            assertEquals(ModelCatalog.speakerBytes, offer.args.bytes)
+            assertTrue(only(Notices.job(null, oneVoice = true, noNewVersion = true, speakerModel = status)).actions.isEmpty())
+        }
+        val ready = only(Notices.job(null, oneVoice = true, speakerModel = ModelStatus.Ready))
+        assertEquals(BannerKind.TX_ONE_VOICE, ready.kind)
+        assertEquals(listOf(BannerAction.TRANSCRIBE_AGAIN), ready.actions)
+        for (status in listOf(null, ModelStatus.Downloading(50, 1, 2), ModelStatus.Verifying(50))) {
+            assertTrue(only(Notices.job(null, oneVoice = true, speakerModel = status)).actions.isEmpty())
+        }
+        assertTrue(Notices.job(null, oneVoice = false, speakerModel = ModelStatus.Missing(false)).isEmpty())
+        assertTrue(Notices.job(job(JobState.RUNNING), oneVoice = true, speakerModel = ModelStatus.Missing(false)).isEmpty())
     }
 
     // 13.4 Model download.
@@ -385,6 +408,7 @@ class NoticeCenterTest {
         addAll(Notices.job(job(JobState.FAILED, failure = JobFailure.CheckpointMismatch.code)))
         addAll(Notices.job(job(JobState.FAILED, failure = "AUDIO")))
         addAll(Notices.job(null, oneVoice = true))
+        addAll(Notices.job(null, oneVoice = true, speakerModel = ModelStatus.Missing(false)))
         val progress = DownloadProgress(ModelPart.SPEECH, 1, 2, verifying = false)
         add(Notices.downloading(progress))
         add(Notices.downloading(progress.copy(verifying = true)))
