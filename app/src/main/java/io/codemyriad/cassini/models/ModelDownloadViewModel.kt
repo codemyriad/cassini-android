@@ -101,8 +101,7 @@ class ModelDownloadViewModel(
     }
 
     private fun build(local: Local): ModelDownloadUiState? {
-        val plan = local.plan ?: return null
-        if (plan.isEmpty && local.banner == null) return null
+        val plan = local.plan?.takeUnless { it.isEmpty && local.banner == null } ?: return null
         return ModelDownloadUiState(
             parts = plan.missing.map { ModelPartSizeUi(Notices.partUi(it.part), it.downloadBytes) }.toImmutableList(),
             requiredFreeBytes = plan.requiredFreeBytes,
@@ -122,7 +121,7 @@ class ModelDownloadViewModel(
                 local.update { it.copy(busy = false) }
                 return@launch
             }
-            if (hasUnshownSpeech(available, shownParts)) {
+            if (noteId != null && available.hasUnshownSpeech(shownParts)) {
                 local.value = Local(plan = available)
                 return@launch
             }
@@ -133,7 +132,11 @@ class ModelDownloadViewModel(
                     queueNote(noteId)
                 }
                 (guarded("read the free space") { ports.usableBytes() } ?: 0L) < plan.requiredFreeBytes -> {
-                    val banner = Notices.download(DownloadError.NOT_ENOUGH_STORAGE, plan.requiredFreeBytes, announce = true)
+                    val banner = Notices.download(
+                        DownloadError.NOT_ENOUGH_STORAGE,
+                        plan.requiredFreeBytes,
+                        announce = true,
+                    )
                     local.value = Local(plan = plan, banner = banner)
                 }
                 else -> {
@@ -144,9 +147,6 @@ class ModelDownloadViewModel(
             }
         }
     }
-
-    private fun hasUnshownSpeech(plan: ModelPlan, approved: Set<ModelPart>): Boolean =
-        noteId != null && ModelPart.SPEECH in plan.parts && ModelPart.SPEECH !in approved
 
     private suspend fun askNotificationsOrStart() {
         if (guarded("read the notification permission") { ports.shouldAskNotifications() } == true) {
@@ -170,7 +170,7 @@ class ModelDownloadViewModel(
         val current = noteId?.let { guarded("read the model plan") { ports.plan() } }
         when {
             noteId != null && current == null -> local.update { it.copy(busy = false) }
-            current != null && hasUnshownSpeech(current, parts) -> {
+            current != null && current.hasUnshownSpeech(parts) -> {
                 saved.remove<ArrayList<String>>(KEY_PARTS)
                 local.value = Local(plan = current)
             }
@@ -197,7 +197,7 @@ class ModelDownloadViewModel(
                     it.copy(
                         plan = plan ?: it.plan,
                         busy = false,
-                        banner = if (plan != null && hasUnshownSpeech(plan, it.plan?.parts?.toSet().orEmpty())) {
+                        banner = if (plan?.hasUnshownSpeech(it.plan?.parts.orEmpty()) == true) {
                             null
                         } else {
                             BannerSpec(BannerKind.TX_FAILED)
@@ -241,3 +241,6 @@ class ModelDownloadViewModel(
         const val KEY_PARTS = "shownModelParts"
     }
 }
+
+private fun ModelPlan.hasUnshownSpeech(approved: Collection<ModelPart>): Boolean =
+    ModelPart.SPEECH in parts && ModelPart.SPEECH !in approved

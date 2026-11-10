@@ -57,9 +57,10 @@ class GraphModelDownloadPorts(
     override suspend fun plan(): ModelPlan = when {
         speakerRemediation -> {
             val model = targetModel()
-            ModelPlan(graph.models.plan().missing.filter {
+            val missing = graph.models.plan().missing.filter {
                 it.part == ModelPart.SPEAKERS || (it.part == ModelPart.SPEECH && model == SpeechModel.PARAKEET)
-            })
+            }
+            ModelPlan(missing)
         }
         part != null || parakeetOnly -> {
             val requested = part ?: ModelPart.SPEECH
