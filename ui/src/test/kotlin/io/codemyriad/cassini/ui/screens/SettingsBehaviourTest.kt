@@ -210,7 +210,9 @@ class SettingsBehaviourTest {
 
     @Test fun bundledWhistleSelectsTheIncludedModelWithoutADownloadEvent() {
         val events = mutableListOf<SettingsEvent>()
-        setThemed { SettingsScreen(BoardFixtures.settings.copy(includedAvailable = true, speechChecking = false), onEvent = { events += it }) }
+        setThemed {
+            SettingsScreen(BoardFixtures.settings.copy(includedAvailable = true, speechChecking = false), onEvent = { events += it })
+        }
         rule.onNodeWithText("Whistle").performScrollTo().performClick()
         rule.runOnIdle {
             assertEquals(listOf(SettingsEvent.ChooseSpeech(io.codemyriad.cassini.ui.settings.SpeechModelUi.INCLUDED)), events)
