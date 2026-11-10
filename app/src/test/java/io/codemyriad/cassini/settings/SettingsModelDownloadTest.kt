@@ -74,13 +74,7 @@ class SettingsModelDownloadTest {
                 )
             }
             shadowOf(app as Application).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
-            runBlocking {
-                withTimeout(TIMEOUT_MS) {
-                    graph.ready.await()
-                    // Permission roundtrips have separate ViewModel coverage; these tests exercise row routing.
-                    graph.settings.markNotificationsAsked()
-                }
-            }
+            runBlocking { withTimeout(TIMEOUT_MS) { graph.ready.await() } }
         }
 
         override fun after() {
@@ -161,7 +155,11 @@ class SettingsModelDownloadTest {
 
     private fun waitUntil(description: String, condition: () -> Boolean) {
         try {
-            rule.waitUntil(timeoutMillis = TIMEOUT_MS, condition = condition)
+            rule.waitUntil(timeoutMillis = TIMEOUT_MS) {
+                // IO continuations need the paused Robolectric main looper to run before state-only checks.
+                rule.waitForIdle()
+                condition()
+            }
         } catch (error: ComposeTimeoutException) {
             throw AssertionError(
                 "Waiting for $description: fetched=$fetched, models=${graph.models.status.value}, " +
