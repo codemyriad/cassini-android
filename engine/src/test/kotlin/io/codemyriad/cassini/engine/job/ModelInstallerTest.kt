@@ -80,6 +80,21 @@ class ModelInstallerTest {
         assertEquals(listOf(ModelCatalog.DIARIZATION), store.attempts)
     }
 
+    @Test fun aVoiceOnlyDownloadDoesNotRequireTheDiarizer() = runBlocking {
+        val store = FakeStore()
+        val outcome = ModelInstaller(store).install(setOf(ModelPart.VOICES)) {}
+        assertEquals(InstallOutcome.Installed(), outcome)
+        assertEquals(listOf(ModelCatalog.VOICEPRINT), store.attempts)
+    }
+
+    @Test fun aFailedVoiceOnlyDownloadReportsTheVoiceModelError() = runBlocking {
+        val store = FakeStore()
+        store.failures[ModelCatalog.VOICEPRINT] = IOException("Synthetic download failure")
+        val outcome = ModelInstaller(store).install(setOf(ModelPart.VOICES)) {}
+        assertEquals(InstallOutcome.Installed(failed = mapOf(ModelPart.VOICES to DownloadError.INTERRUPTED)), outcome)
+        assertEquals(listOf(ModelCatalog.VOICEPRINT), store.attempts)
+    }
+
     @Test fun aFailedDetectorDoesNotFailSpeech() = runBlocking {
         val store = FakeStore()
         store.failures[ModelCatalog.VAD] = UserFacingException(Failure.DOWNLOAD, "HTTP 503")
