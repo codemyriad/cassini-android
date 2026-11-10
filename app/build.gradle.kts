@@ -22,8 +22,8 @@ android {
         applicationId = "io.codemyriad.cassini.talk"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 17
-        versionName = "0.4.2-beta.2"
+        versionCode = 18
+        versionName = "0.4.2-beta.3"
         if (!abiApks) ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         // Builds the graph on a scratch root (docs/architecture.md section 9).
         testInstrumentationRunner = "io.codemyriad.cassini.CassiniTestRunner"

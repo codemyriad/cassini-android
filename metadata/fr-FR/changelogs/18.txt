@@ -1,0 +1,1 @@
+Les paramètres téléchargent désormais le modèle sélectionné pour distinguer les voix ou reconnaître les voix enregistrées. Si une note nécessite le modèle qui distingue les voix, vous pouvez le télécharger depuis la note. Cassini relance ensuite automatiquement la distinction des voix.
