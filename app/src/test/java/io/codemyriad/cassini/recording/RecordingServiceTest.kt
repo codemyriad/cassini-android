@@ -6,7 +6,6 @@ import android.app.ForegroundServiceStartNotAllowedException
 import android.app.Notification
 import android.app.NotificationManager
 import android.app.Service
-import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.CassiniApplication
@@ -18,6 +17,7 @@ import io.codemyriad.cassini.data.CassiniDispatchers
 import io.codemyriad.cassini.data.models.ModelFetcher
 import io.codemyriad.cassini.processing.FakeVisibility
 import io.codemyriad.cassini.processing.ProcessingNotifications
+import io.codemyriad.cassini.testing.MainDispatchEvents
 import io.codemyriad.cassini.testing.NoUncaughtCoroutines
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -46,6 +46,8 @@ class RecordingServiceTest {
     val uncaught = NoUncaughtCoroutines()
 
     @get:Rule val folder = TemporaryFolder()
+
+    @get:Rule val mainDispatches = MainDispatchEvents()
 
     private val app: CassiniApplication = ApplicationProvider.getApplicationContext()
     private val capture = FakeCaptureSource()
@@ -191,18 +193,10 @@ class RecordingServiceTest {
         }
     }
 
-    /** Runs the main looper (the service's lifecycleScope) until [condition] holds. */
-    private fun until(condition: () -> Boolean) {
-        val end = System.currentTimeMillis() + TIMEOUT_MS
-        while (!condition()) {
-            check(System.currentTimeMillis() < end) { "Timed out" }
-            shadowOf(Looper.getMainLooper()).idle()
-            Thread.sleep(POLL_MS)
-        }
-    }
+    /** Waits for the service's actual main-queue deliveries, without polling. */
+    private fun until(condition: () -> Boolean) = mainDispatches.await(TIMEOUT_MS, condition)
 
     private companion object {
         const val TIMEOUT_MS = 20_000L
-        const val POLL_MS = 20L
     }
 }
