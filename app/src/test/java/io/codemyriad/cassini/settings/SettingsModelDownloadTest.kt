@@ -95,7 +95,7 @@ class SettingsModelDownloadTest {
         openSettings()
         tapRow("Recognising saved voices")
         waitFor("Download")
-        rule.onNodeWithText("Download").performScrollTo().performClick()
+        rule.onNodeWithText("Download").performClick()
         rule.waitUntil(TIMEOUT_MS) {
             graph.models.status.value[ModelPart.VOICES] == ModelStatus.Ready && !graph.processing.state.value.downloading
         }
@@ -123,7 +123,7 @@ class SettingsModelDownloadTest {
             for ((candidate, label) in PART_LABELS) {
                 rule.onAllNodes(hasText(label)).assertCountEquals(if (candidate == part) 1 else 0)
             }
-            rule.onNodeWithText("Download").performScrollTo().performClick()
+            rule.onNodeWithText("Download").performClick()
             rule.waitUntil(TIMEOUT_MS) {
                 fetched.size == attempt + 1 && graph.models.status.value[part] is ModelStatus.Failed &&
                     !graph.processing.state.value.downloading

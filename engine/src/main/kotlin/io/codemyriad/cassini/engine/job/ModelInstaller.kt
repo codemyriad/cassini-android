@@ -125,11 +125,10 @@ class ModelInstaller(private val store: ModelStore, private val io: CoroutineDis
             // Each part is checked against what is free now, after the parts installed before it.
             val requiredFreeBytes = ModelPlan(listOf(item)).requiredFreeBytes
             val space = store.usableBytes() >= requiredFreeBytes
-            val error = when {
-                !space -> DownloadError.NOT_ENOUGH_STORAGE
-                // A voice-only Settings request must not silently skip the model it names.
-                missing.size == 1 && item.part == ModelPart.VOICES -> installPart(item, onProgress)
-                else -> attempt(item, skipped, onProgress)
+            val error = if (space) {
+                attempt(item, skipped, onProgress, singlePart = missing.size == 1)
+            } else {
+                DownloadError.NOT_ENOUGH_STORAGE
             }
             if (item.part == ModelPart.SPEECH) {
                 speechError = error
@@ -145,13 +144,14 @@ class ModelInstaller(private val store: ModelStore, private val io: CoroutineDis
             ?: InstallOutcome.Installed(skipped, failed)
     }
 
-    /** Installs [item], unless it is VOICES and the diarizer is missing: then it joins [skipped]. */
+    /** A combined plan waits for the diarizer before installing VOICES; a single-part download is independent. */
     private fun attempt(
         item: ModelPlan.Item,
         skipped: MutableSet<ModelPart>,
         onProgress: (DownloadProgress) -> Unit,
+        singlePart: Boolean,
     ): DownloadError? {
-        val waits = item.part == ModelPart.VOICES && !store.ready(ModelCatalog.DIARIZATION)
+        val waits = !singlePart && item.part == ModelPart.VOICES && !store.ready(ModelCatalog.DIARIZATION)
         if (waits) skipped += item.part
         return if (waits) null else installPart(item, onProgress)
     }
