@@ -321,7 +321,7 @@ class BannerKindTest {
             mapOf(
                 BannerGroup.TRUST to 7,
                 BannerGroup.RECORDING to 8,
-                BannerGroup.TRANSCRIPTION to 9,
+                BannerGroup.TRANSCRIPTION to 10,
                 BannerGroup.DOWNLOAD to 9,
                 BannerGroup.LIBRARY to 13,
             ),
