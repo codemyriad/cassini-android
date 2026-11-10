@@ -68,17 +68,8 @@ class PlaybackSessionTest {
         // Not runBlocking on the main thread: the prepare ends with a callback on the main looper.
         val opened = withContext(Dispatchers.Main) { playback.open(noteId, clip, positionMs = 0) }
         assertTrue("The clip opens in the player", opened)
-        // A controller binds to the session service, as the system's media controls do.
-        val token = SessionToken(Background.context, ComponentName(Background.context, PlaybackService::class.java))
         val disconnected = CompletableDeferred<Unit>()
-        val connected = MediaController.Builder(Background.context, token)
-            .setListener(object : MediaController.Listener {
-                override fun onDisconnected(controller: MediaController) {
-                    disconnected.complete(Unit)
-                }
-            })
-            .buildAsync().get(CONNECT_S, TimeUnit.SECONDS)
-        controller = connected
+        val connected = connect(disconnected)
         connected.awaitEvent(Player.EVENT_AVAILABLE_COMMANDS_CHANGED, "The session offers play for the open note") {
             isCommandAvailable(Player.COMMAND_PLAY_PAUSE)
         }
@@ -143,6 +134,18 @@ class PlaybackSessionTest {
             Unit.takeIf { media.isEmpty() }
         }
         Unit
+    }
+
+    private fun connect(disconnected: CompletableDeferred<Unit>): MediaController {
+        val token = SessionToken(Background.context, ComponentName(Background.context, PlaybackService::class.java))
+        return MediaController.Builder(Background.context, token)
+            .setListener(object : MediaController.Listener {
+                override fun onDisconnected(controller: MediaController) {
+                    disconnected.complete(Unit)
+                }
+            })
+            .buildAsync().get(CONNECT_S, TimeUnit.SECONDS)
+            .also { controller = it }
     }
 
     private suspend fun awaitPlayback(message: String, matches: (PlaybackState) -> Boolean) {
