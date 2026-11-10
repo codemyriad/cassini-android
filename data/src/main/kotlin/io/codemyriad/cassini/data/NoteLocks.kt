@@ -21,6 +21,11 @@ import kotlin.concurrent.withLock
 class NoteLocks(stripes: Int = DEFAULT_STRIPES) {
     private val locks = Array(stripes.coerceAtLeast(1)) { ReentrantLock() }
 
+    /** An observable lock for deterministic contention tests; normal callers keep the striped constructor. */
+    internal constructor(lock: ReentrantLock) : this(1) {
+        locks[0] = lock
+    }
+
     /** The lock of [noteId]. The same id always gives the same lock. */
     fun lockFor(noteId: String): ReentrantLock = locks[Math.floorMod(noteId.hashCode(), locks.size)]
 

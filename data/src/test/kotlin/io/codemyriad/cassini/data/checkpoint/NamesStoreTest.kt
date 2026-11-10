@@ -4,6 +4,7 @@ import io.codemyriad.cassini.core.checkpoint.CheckpointNames
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.core.speakers.Match
+import io.codemyriad.cassini.data.NoteLocks
 import io.codemyriad.cassini.data.db.JobEntity
 import io.codemyriad.cassini.data.db.offMain
 import io.codemyriad.cassini.data.notes.NotesHarness
@@ -30,6 +31,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
 /** The draft names owner (architecture 3.6): one AtomicReference per note, reducers only, the latest value on disk. */
@@ -181,24 +183,37 @@ class NamesStoreTest {
      * must still hold the UI's later change, so the writer stores the current value, not its own result.
      */
     @Test fun aLateWriteNeverStoresAnOlderValue() {
+        val writeAttempted = CountDownLatch(1)
+        val observed = object : ReentrantLock() {
+            override fun lock() {
+                if (isLocked && !isHeldByCurrentThread) writeAttempted.countDown()
+                super.lock()
+            }
+        }
+        val locks = NoteLocks(observed)
+        repo = CheckpointRepository(h.db, h.paths, h.dispatchers, locks)
         val draft = repo.draftNames(id)
         offMain { draft.currentBlocking() }
-        val lock = h.locks.lockFor(id)
+        val lock = locks.lockFor(id)
         val pool = Executors.newFixedThreadPool(2)
         val holder: Future<Future<CheckpointNames>> = pool.submit(
             Callable {
                 lock.withLock {
                     // The job changes the names, then waits for the lock to write.
                     val job = pool.submit(Callable { draft.mutateBlocking { it.rename("S1", "Anna") } })
-                    while (!lock.hasQueuedThreads()) Thread.sleep(1)
+                    assertTrue("the older mutation reached its write lock", writeAttempted.await(1, TimeUnit.MINUTES))
                     // Meanwhile the UI changes them and writes first (this thread holds the lock already).
                     draft.mutateBlocking { it.rename("S2", "Bruno") }
                     job
                 }
             },
         )
-        holder.get(1, TimeUnit.MINUTES).get(1, TimeUnit.MINUTES)
-        pool.shutdown()
+        try {
+            holder.get(1, TimeUnit.MINUTES).get(1, TimeUnit.MINUTES)
+        } finally {
+            pool.shutdownNow()
+            assertTrue("the test workers finished", pool.awaitTermination(1, TimeUnit.MINUTES))
+        }
 
         val onDisk = CheckpointNames.decode(JSONObject(namesFile.readText()))
         assertEquals(mapOf("S1" to "Anna", "S2" to "Bruno"), onDisk.labels)
