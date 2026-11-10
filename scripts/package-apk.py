@@ -107,7 +107,9 @@ if os.environ.get('IS_TAG') == 'true':
     notes = Path('metadata/en-US/changelogs') / f'{element["versionCode"]}.txt'
     if not notes.is_file():
         raise SystemExit(f'Tag build has no Play release notes at {notes}')
-    if len(notes.read_text().strip()) > 500:
-        raise SystemExit(f'{notes} is longer than the 500 characters that Play accepts')
     (play / 'whatsnew').mkdir(exist_ok=True)
-    shutil.copyfile(notes, play / 'whatsnew' / 'whatsnew-en-US')
+    for notes in sorted(Path('metadata').glob(f'*/changelogs/{element["versionCode"]}.txt')):
+        if len(notes.read_text().strip()) > 500:
+            raise SystemExit(f'{notes} is longer than the 500 characters that Play accepts')
+        locale = notes.parent.parent.name
+        shutil.copyfile(notes, play / 'whatsnew' / f'whatsnew-{locale}')
