@@ -2,8 +2,15 @@ package io.codemyriad.cassini.engine.job
 
 import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.UserFacingException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Delay
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.InternalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -12,7 +19,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.CoroutineContext
 
 class NativeBudgetTest {
     @After fun budgetIsFree() {
@@ -22,10 +31,46 @@ class NativeBudgetTest {
     @Test fun acquireAndReleaseOnAPlainThread() {
         NativeBudget.acquire()
         assertTrue(NativeBudget.isHeld)
-        assertFalse(NativeBudget.tryAcquire(timeoutMs = 50))
+        assertFalse(NativeBudget.tryAcquire(timeoutMs = 0))
         NativeBudget.release()
-        assertTrue(NativeBudget.tryAcquire(timeoutMs = 50))
+        assertTrue(NativeBudget.tryAcquire(timeoutMs = 0))
         NativeBudget.release()
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class, InternalCoroutinesApi::class)
+    @Test
+    fun aContendedAttemptExpiresOnlyWhenItsVirtualDeadlineIsAdvanced() = runTest {
+        val scheduled = CountDownLatch(1)
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val observed = object : CoroutineDispatcher(), Delay by dispatcher {
+            override fun dispatch(context: CoroutineContext, block: Runnable) {
+                dispatcher.dispatch(context, block)
+                scheduled.countDown()
+            }
+        }
+        val mutex = ContendedMutex()
+        val permit = NativePermit(mutex, observed)
+        permit.acquire()
+        val result = FutureTask { permit.tryAcquire(timeoutMs = 50) }
+        val waiter = Thread(result)
+        try {
+            waiter.start()
+            assertTrue(scheduled.await(5, TimeUnit.SECONDS))
+            testScheduler.runCurrent()
+            assertEquals("the contended lock was entered", 0L, mutex.waiting.count)
+            assertFalse("no expiry before virtual time advances", result.isDone)
+            testScheduler.advanceTimeBy(50)
+            testScheduler.runCurrent()
+            waiter.join(5000)
+            assertFalse("the timed attempt completed", waiter.isAlive)
+            assertFalse(result.get(5, TimeUnit.SECONDS))
+            assertTrue("timeout leaves the original holder intact", permit.isHeld)
+        } finally {
+            permit.release()
+            waiter.interrupt()
+            testScheduler.runCurrent()
+            waiter.join(5000)
+        }
     }
 
     @Test fun holdingReleasesWhenTheBlockThrows() {
@@ -38,15 +83,15 @@ class NativeBudgetTest {
     }
 
     @Test fun anInterruptWhileWaitingEndsInCancelledAndKeepsTheFlag() {
-        NativeBudget.acquire()
+        val mutex = ContendedMutex()
+        val permit = NativePermit(mutex)
+        permit.acquire()
         val outcome = arrayOfNulls<Any>(2)
-        val waiting = CountDownLatch(1)
         val waiter = Thread {
-            waiting.countDown()
             try {
-                NativeBudget.acquire()
+                permit.acquire()
                 outcome[0] = "acquired"
-                NativeBudget.release()
+                permit.release()
             } catch (error: UserFacingException) {
                 outcome[0] = error.failure
             }
@@ -54,27 +99,30 @@ class NativeBudgetTest {
         }
         try {
             waiter.start()
-            assertTrue(waiting.await(5, TimeUnit.SECONDS))
-            Thread.sleep(100)
+            assertTrue("entered contended Mutex.lock", mutex.waiting.await(5, TimeUnit.SECONDS))
             waiter.interrupt()
             waiter.join(5000)
             assertFalse(waiter.isAlive)
         } finally {
-            NativeBudget.release()
+            permit.release()
+            waiter.interrupt()
+            waiter.join(5000)
         }
+        assertFalse("the interrupted waiter released no permit of its own", permit.isHeld)
         assertEquals(Failure.CANCELLED, outcome[0])
         assertEquals(true, outcome[1])
     }
 
     @Test fun anInterruptWhileTryingEndsInCancelledAndKeepsTheFlag() {
-        NativeBudget.acquire()
+        val mutex = ContendedMutex()
+        val permit = NativePermit(mutex)
+        permit.acquire()
         val outcome = arrayOfNulls<Any>(2)
-        val waiting = CountDownLatch(1)
         val waiter = Thread {
-            waiting.countDown()
             try {
-                outcome[0] = NativeBudget.tryAcquire(timeoutMs = 60_000)
-                NativeBudget.release()
+                val acquired = permit.tryAcquire(timeoutMs = 60_000)
+                outcome[0] = acquired
+                if (acquired) permit.release()
             } catch (error: UserFacingException) {
                 outcome[0] = error.failure
             }
@@ -82,14 +130,16 @@ class NativeBudgetTest {
         }
         try {
             waiter.start()
-            assertTrue(waiting.await(5, TimeUnit.SECONDS))
-            Thread.sleep(100)
+            assertTrue("entered contended Mutex.lock", mutex.waiting.await(5, TimeUnit.SECONDS))
             waiter.interrupt()
             waiter.join(5000)
             assertFalse(waiter.isAlive)
         } finally {
-            NativeBudget.release()
+            permit.release()
+            waiter.interrupt()
+            waiter.join(5000)
         }
+        assertFalse("the interrupted waiter released no permit of its own", permit.isHeld)
         assertEquals(Failure.CANCELLED, outcome[0])
         assertEquals(true, outcome[1])
     }
@@ -97,7 +147,7 @@ class NativeBudgetTest {
     @Test fun anAlreadyInterruptedThreadDoesNotTryForAFreeBudget() {
         Thread.currentThread().interrupt()
         try {
-            NativeBudget.tryAcquire(timeoutMs = 50)
+            NativeBudget.tryAcquire(timeoutMs = 0)
             NativeBudget.release()
             fail()
         } catch (error: UserFacingException) {
@@ -129,5 +179,15 @@ class NativeBudgetTest {
         first.await()
         second.await()
         assertEquals(listOf(1, 2), order)
+    }
+
+    private class ContendedMutex(private val inner: Mutex = Mutex()) : Mutex by inner {
+        val waiting = CountDownLatch(1)
+
+        override suspend fun lock(owner: Any?) {
+            check(inner.isLocked) { "The fixture must hold the permit before the waiter enters" }
+            waiting.countDown()
+            inner.lock(owner)
+        }
     }
 }
