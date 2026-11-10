@@ -21,7 +21,8 @@ class MainDispatchEventsTest {
     @get:Rule val mainDispatches = MainDispatchEvents()
 
     @Config(sdk = [26])
-    @Test fun aPostBeforeObservationIsDrainedOnAndroidMain() {
+    @Test
+    fun aPostBeforeObservationIsDrainedOnAndroidMain() {
         var delivered = false
         Dispatchers.Main.dispatch(EmptyCoroutineContext) {
             assertSame(Looper.getMainLooper(), Looper.myLooper())
