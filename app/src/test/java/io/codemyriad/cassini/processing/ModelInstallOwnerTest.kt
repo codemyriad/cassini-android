@@ -16,13 +16,14 @@ import io.codemyriad.cassini.engine.job.DownloadProgress
 import io.codemyriad.cassini.engine.job.InstallOutcome
 import io.codemyriad.cassini.testing.NoUncaughtCoroutines
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
@@ -53,6 +54,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.coroutines.CoroutineContext
 
 /**
  * ModelInstallOwner (architecture 5.6): one install at a time, a request for the same parts joins it, a request for
@@ -71,6 +73,7 @@ class ModelInstallOwnerTest {
     private val started = CountDownLatch(1)
     private val release = CountDownLatch(1)
     private val interrupted = AtomicBoolean(false)
+    private val interruptSeen = CountDownLatch(1)
 
     /** The fetch ignores an interrupt, as a socket read blocked until its timeout does. */
     private val stubborn = AtomicBoolean(false)
@@ -110,6 +113,7 @@ class ModelInstallOwnerTest {
                 return
             } catch (error: InterruptedException) {
                 interrupted.set(true)
+                interruptSeen.countDown()
                 if (stubborn.get()) continue
                 if (!interruptAsIo.get()) throw error
                 Thread.currentThread().interrupt()
@@ -271,10 +275,13 @@ class ModelInstallOwnerTest {
     }
 
     @Test fun aRequestForOtherPartsWaitsAndFetchesNothingTwice() = runBlocking {
+        val io = ownerWithObservableDispatch()
         owner.startDownload(setOf(ModelPart.SPEECH))
         assertTrue(started.await(WAIT_S, TimeUnit.SECONDS))
-        val job = async { owner.install(ModelPart.entries.toSet()) }
-        delay(SETTLE_MS)
+        val dispatches = io.dispatches.get()
+        val job = async(start = CoroutineStart.UNDISPATCHED) { owner.install(ModelPart.entries.toSet()) }
+        assertTrue("the second request is waiting", job.isActive)
+        assertEquals("no second install was dispatched", dispatches, io.dispatches.get())
         assertEquals("the second install waits for the first", listOf(key(ModelCatalog.PARAKEET)), fetched.toList())
 
         release.countDown()
@@ -298,13 +305,17 @@ class ModelInstallOwnerTest {
     }
 
     @Test fun aRequestRightAfterACancelWaitsForTheCancelledFetchToEnd() = runBlocking {
+        val io = ownerWithObservableDispatch()
         stubborn.set(true)
         owner.startDownload()
         assertTrue(started.await(WAIT_S, TimeUnit.SECONDS))
 
         owner.cancel()
-        val again = async { owner.install(ModelPart.entries.toSet()) }
-        delay(SETTLE_MS)
+        val dispatches = io.dispatches.get()
+        val again = async(start = CoroutineStart.UNDISPATCHED) { owner.install(ModelPart.entries.toSet()) }
+        assertTrue("the replacement request is waiting", again.isActive)
+        assertEquals("no replacement install was dispatched", dispatches, io.dispatches.get())
+        assertTrue("the fetch observed its interrupt", interruptSeen.await(WAIT_S, TimeUnit.SECONDS))
         assertTrue(interrupted.get())
         assertEquals("no second fetch while the first one runs", listOf(key(ModelCatalog.PARAKEET)), fetched.toList())
 
@@ -356,10 +367,27 @@ class ModelInstallOwnerTest {
         assertEquals(ModelStatus.Downloading(25, 50, 200), status)
     }
 
+    /** Unconfined attachment runs through its first wait before returning; file work remains on real IO. */
+    private fun ownerWithObservableDispatch(): ObservedIo {
+        val io = ObservedIo()
+        val attaching = CoroutineScope(scope.coroutineContext + Dispatchers.Unconfined)
+        owner = ModelInstallOwner(models, paths.modelRoot, { true }, attaching, io)
+        return io
+    }
+
+    /** Count an attempted dispatch even if its worker has not got CPU time yet. */
+    private class ObservedIo : CoroutineDispatcher() {
+        val dispatches = AtomicInteger()
+
+        override fun dispatch(context: CoroutineContext, block: Runnable) {
+            dispatches.incrementAndGet()
+            Dispatchers.IO.dispatch(context, block)
+        }
+    }
+
     private companion object {
         const val PART_BYTES = 1024
         const val WAIT_S = 20L
         const val WAIT_MS = 20_000L
-        const val SETTLE_MS = 300L
     }
 }
