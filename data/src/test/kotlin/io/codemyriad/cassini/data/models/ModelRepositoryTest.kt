@@ -205,7 +205,7 @@ class ModelRepositoryTest {
 
     @Test fun speakerConsentSurvivesRefreshWithoutAuthorisingSpeechOrSavedVoices() = runTest {
         val repo = repository()
-        repo.recordConsent(includeSpeech = false, includeOptional = false, includeSpeakers = true)
+        repo.recordConsent(setOf(ModelPart.SPEAKERS))
         val reopened = repository()
         reopened.refresh()
         assertEquals(ModelStatus.Missing(false), reopened.status.value[ModelPart.SPEECH])
@@ -216,7 +216,7 @@ class ModelRepositoryTest {
         assertFalse(reopened.consented(ModelPart.SPEECH))
         assertFalse(reopened.consented(ModelPart.VOICES))
         assertFalse(reopened.optionalDownloadsConsented(ModelPart.VOICES))
-        assertTrue(reopened.consented())
+        assertFalse(reopened.consented())
         assertTrue("consent alone installs nothing", fetched.isEmpty())
     }
 
@@ -225,7 +225,7 @@ class ModelRepositoryTest {
         repo.recordConsent(setOf(ModelPart.VOICES))
         val reopened = repository()
         reopened.refresh()
-        assertTrue(reopened.consented())
+        assertFalse(reopened.consented())
         assertTrue(reopened.consented(ModelPart.VOICES))
         assertTrue(reopened.optionalDownloadsConsented(ModelPart.VOICES))
         assertFalse(reopened.consented(ModelPart.SPEAKERS))

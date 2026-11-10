@@ -52,13 +52,20 @@ class GraphModelDownloadPorts(
     private val part: ModelPart? = null,
 ) : ModelDownloadPorts {
     private val app = context.applicationContext
-    private val speakerModelsOnly: Boolean get() = noteId != null && part == ModelPart.SPEAKERS
+    private val speakerRemediation: Boolean get() = noteId != null && part == ModelPart.SPEAKERS
 
-    override suspend fun plan(): ModelPlan = if (part != null || parakeetOnly) {
-        val requested = part ?: ModelPart.SPEECH
-        ModelPlan(graph.models.plan().missing.filter { it.part == requested })
-    } else {
-        graph.downloadPlan(targetModel())
+    override suspend fun plan(): ModelPlan = when {
+        speakerRemediation -> {
+            val model = targetModel()
+            ModelPlan(graph.models.plan().missing.filter {
+                it.part == ModelPart.SPEAKERS || (it.part == ModelPart.SPEECH && model == SpeechModel.PARAKEET)
+            })
+        }
+        part != null || parakeetOnly -> {
+            val requested = part ?: ModelPart.SPEECH
+            ModelPlan(graph.models.plan().missing.filter { it.part == requested })
+        }
+        else -> graph.downloadPlan(targetModel())
     }
 
     private suspend fun targetModel(): SpeechModel {
@@ -78,12 +85,12 @@ class GraphModelDownloadPorts(
     override suspend fun recordDeclined() = graph.models.recordDeclined()
 
     override suspend fun transcribe(noteId: String): TranscribeOutcome {
-        if (speakerModelsOnly && graph.awaitCatalogue().database.notes().note(noteId)?.documentState !=
+        if (speakerRemediation && graph.awaitCatalogue().database.notes().note(noteId)?.documentState !=
             DocumentState.OK
         ) {
             return TranscribeOutcome.Refused(EnqueueRefusal.DOCUMENT_NOT_VERIFIED)
         }
-        val kind = if (speakerModelsOnly) {
+        val kind = if (speakerRemediation) {
             JobKind.TRANSCRIBE_AGAIN
         } else {
             graph.awaitCatalogue().jobs.job(noteId)?.kind ?: JobKind.TRANSCRIBE

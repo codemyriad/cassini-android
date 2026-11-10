@@ -20,6 +20,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
@@ -133,7 +135,8 @@ private class NetworkFetcher(
  * (read by [refresh]) with the progress of an install in flight, which [installBlocking] and the app's install owner
  * push. It is empty until the first [refresh]. There is no delete API: the design has no surface for it.
  *
- * Optional-download consent is `models.consentAt`. Speech uses `models.speechConsentAt` or installed Parakeet.
+ * Optional consent is stored per part; legacy `models.consentAt` authorizes both. Speech uses
+ * `models.speechConsentAt` or installed Parakeet.
  * Only [recordConsent] records the permissions of the plan shown; [installBlocking] does not check consent.
  */
 // Status, consent, plan and install of one area, as architecture 4.6 lists them.
@@ -147,10 +150,11 @@ class ModelRepository(
 ) {
     /** Guards the fields below and the [state] updates. Never held across a suspension point or a download. */
     private val lock = ReentrantLock()
+
+    /** Serializes snapshots so a slow refresh cannot overwrite a newer part consent. */
+    private val refreshMutex = Mutex()
     private var ready: Map<ModelPart, Boolean> = emptyMap()
-    private var consentRecorded = false
-    private var speakerConsentRecorded = false
-    private var voiceConsentRecorded = false
+    private var consentRecorded: Set<ModelPart> = emptySet()
     private var speechConsentRecorded = false
     private val inFlight = HashMap<ModelPart, ModelStatus>()
     private val state = MutableStateFlow<Map<ModelPart, ModelStatus>>(emptyMap())
@@ -158,18 +162,14 @@ class ModelRepository(
     val status: StateFlow<Map<ModelPart, ModelStatus>> = state.asStateFlow()
 
     /** Reads the readiness of every part and the consent again, and returns the new [status]. */
-    suspend fun refresh(): Map<ModelPart, ModelStatus> {
-        val recorded = settings.consentAt.first() != null
-        val speechRecorded = settings.speechConsentAt.first() != null
-        val speakerRecorded = settings.speakerConsentAt.first() != null
-        val voiceRecorded = settings.voiceConsentAt.first() != null
-        return withContext(dispatchers.io) {
+    suspend fun refresh(): Map<ModelPart, ModelStatus> = refreshMutex.withLock {
+        val recorded = settings.consentedParts.first()
+        val speechRecorded = ModelPart.SPEECH in recorded
+        withContext(dispatchers.io) {
             val readiness = readiness()
             if (readiness[ModelPart.SPEECH] == true) removeRetiredParakeet(paths.modelRoot)
             lock.withLock {
                 consentRecorded = recorded
-                speakerConsentRecorded = speakerRecorded
-                voiceConsentRecorded = voiceRecorded
                 speechConsentRecorded = speechRecorded
                 ready = readiness
                 // A failure is shown until the part is installed or a new install starts.
@@ -179,48 +179,28 @@ class ModelRepository(
         }
     }
 
-    /** Whether any optional role has consent. Install permission must use the part-specific overload. */
-    suspend fun consented(): Boolean = settings.consentAt.first() != null ||
-        settings.speakerConsentAt.first() != null || settings.voiceConsentAt.first() != null
+    /** Explicit optional-model consent. Installed Parakeet authorizes only speech, never optional downloads. */
+    suspend fun consented(): Boolean = settings.consentAt.first() != null
+
+    suspend fun consented(part: ModelPart): Boolean =
+        if (part == ModelPart.SPEECH) speechConsented() else part in settings.consentedParts.first()
 
     /** Last refreshed optional-download permission, for the synchronous job plan on its IO thread. */
-    fun optionalDownloadsConsented(part: ModelPart): Boolean = lock.withLock { optionalConsentLocked(part) }
+    fun optionalDownloadsConsented(part: ModelPart): Boolean = lock.withLock { part in consentRecorded }
 
-    /** The caller holds [lock]; an optional grant never authorises speech. */
-    private fun optionalConsentLocked(part: ModelPart): Boolean = when (part) {
-        ModelPart.SPEAKERS -> consentRecorded || speakerConsentRecorded
-        ModelPart.VOICES -> consentRecorded || voiceConsentRecorded
-        ModelPart.SPEECH -> false
-    }
-
-    /** Rechecked by the install owner before bytes arrive; never inferred from another model's consent. */
-    suspend fun consented(part: ModelPart): Boolean = when (part) {
-        ModelPart.SPEECH -> speechConsented()
-        ModelPart.SPEAKERS -> settings.consentAt.first() != null || settings.speakerConsentAt.first() != null
-        ModelPart.VOICES -> settings.consentAt.first() != null || settings.voiceConsentAt.first() != null
+    suspend fun recordConsent(parts: Set<ModelPart>) {
+        settings.recordConsent(clock(), parts)
+        refresh()
     }
 
     /** "Download and transcribe" or "Download" was pressed. */
     suspend fun speechConsented(): Boolean =
         settings.speechConsentAt.first() != null || withContext(dispatchers.io) { ModelCatalog.PARAKEET.ready(paths.modelRoot) }
 
-    suspend fun recordConsent(
-        includeSpeech: Boolean = true,
-        includeOptional: Boolean = true,
-        includeSpeakers: Boolean = false,
-        includeVoices: Boolean = false,
-    ) {
-        settings.recordConsent(clock(), includeSpeech, includeOptional, includeSpeakers, includeVoices)
+    suspend fun recordConsent(includeSpeech: Boolean = true, includeOptional: Boolean = true) {
+        settings.recordConsent(clock(), includeSpeech, includeOptional)
         refresh()
     }
-
-    /** Records only the roles actually shown on this consent screen; legacy grouped grants stay readable. */
-    suspend fun recordConsent(parts: Set<ModelPart>) = recordConsent(
-        includeSpeech = ModelPart.SPEECH in parts,
-        includeOptional = false,
-        includeSpeakers = ModelPart.SPEAKERS in parts,
-        includeVoices = ModelPart.VOICES in parts,
-    )
 
     /** "Not now — keep the audio" was pressed. */
     suspend fun recordDeclined() = settings.recordDeclined(clock())
@@ -395,7 +375,7 @@ class ModelRepository(
             val consent = if (part == ModelPart.SPEECH) {
                 speechConsentRecorded || ready[ModelPart.SPEECH] == true
             } else {
-                optionalConsentLocked(part)
+                part in consentRecorded
             }
             val status = inFlight[part] ?: ready[part]?.let { if (it) ModelStatus.Ready else ModelStatus.Missing(consent) }
             status?.let { part to it }

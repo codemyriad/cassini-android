@@ -3,6 +3,7 @@ package io.codemyriad.cassini.models
 import androidx.lifecycle.SavedStateHandle
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.models.ModelPlan
+import io.codemyriad.cassini.data.jobs.EnqueueRefusal
 import io.codemyriad.cassini.processing.TranscribeOutcome
 import io.codemyriad.cassini.ui.banner.BannerAction
 import io.codemyriad.cassini.ui.banner.BannerKind
@@ -107,6 +108,59 @@ class ModelDownloadViewModelTest {
         assertEquals(listOf(NOTE), ports.transcribed)
         assertTrue(ports.downloads.isEmpty())
         assertEquals(listOf<ModelDownloadEffect>(ModelDownloadEffect.Close), effects)
+    }
+
+    @Test fun newSpeechRequirementMustBeShownAndApprovedAfterNotificationPermission() = runTest(dispatcher) {
+        ports.plan = ModelPlan(FRESH.missing.filter { it.part == ModelPart.SPEAKERS })
+        ports.askNotifications = true
+        val viewModel = viewModel()
+        viewModel.onEvent(ModelDownloadEvent.Download)
+        advanceUntilIdle()
+        ports.plan = ModelPlan(FRESH.missing.filterNot { it.part == ModelPart.VOICES })
+        viewModel.onNotificationsAnswered()
+        advanceUntilIdle()
+        assertEquals(listOf(ModelPartUi.SPEECH, ModelPartUi.SPEAKERS), viewModel.state.value!!.parts.map { it.part })
+        assertEquals(ports.plan.missing.map { it.downloadBytes }, viewModel.state.value!!.parts.map { it.bytes })
+        assertEquals(0, ports.consents)
+        assertTrue(ports.transcribed.isEmpty())
+        assertFalse(viewModel.state.value!!.busy)
+        assertEquals(listOf<ModelDownloadEffect>(ModelDownloadEffect.RequestNotifications), effects)
+
+        ports.askNotifications = false
+        viewModel.onEvent(ModelDownloadEvent.Download)
+        advanceUntilIdle()
+        assertEquals(listOf(setOf(ModelPart.SPEECH, ModelPart.SPEAKERS)), ports.consentParts)
+        assertEquals(listOf(NOTE), ports.transcribed)
+        assertEquals(ModelDownloadEffect.Close, effects.last())
+    }
+
+    @Test fun needsConsentKeepsTheDialogOpenAndDisplaysTheNewPrerequisite() = runTest(dispatcher) {
+        val speakerPlan = ModelPlan(FRESH.missing.filter { it.part == ModelPart.SPEAKERS })
+        val required = ModelPlan(FRESH.missing.filterNot { it.part == ModelPart.VOICES })
+        ports.plan = speakerPlan
+        ports.enqueue = {
+            ports.plan = required
+            TranscribeOutcome.NeedsConsent
+        }
+        val viewModel = viewModel()
+        viewModel.onEvent(ModelDownloadEvent.Download)
+        advanceUntilIdle()
+        assertEquals(listOf(setOf(ModelPart.SPEAKERS)), ports.consentParts)
+        assertEquals(listOf(ModelPartUi.SPEECH, ModelPartUi.SPEAKERS), viewModel.state.value!!.parts.map { it.part })
+        assertFalse(viewModel.state.value!!.busy)
+        assertTrue(effects.isEmpty())
+    }
+
+    @Test fun stalePlanWithRefusedEnqueueShowsTheFailureAndStaysOpen() = runTest(dispatcher) {
+        ports.plan = ModelPlan(emptyList())
+        ports.enqueue = { TranscribeOutcome.Refused(EnqueueRefusal.DOCUMENT_NOT_VERIFIED) }
+        val viewModel = viewModel()
+        val failed = viewModel.state.value!!
+        assertEquals(BannerKind.TX_FAILED, failed.banner?.kind)
+        assertTrue(failed.parts.isEmpty())
+        assertFalse(failed.busy)
+        assertTrue(effects.isEmpty())
+        assertEquals(0, ports.consents)
     }
 
     @Test
@@ -236,6 +290,7 @@ class ModelDownloadViewModelTest {
 
     private class FakeModelDownloadPorts : ModelDownloadPorts {
         var plan: ModelPlan = FRESH
+        var enqueue: () -> TranscribeOutcome = { TranscribeOutcome.Queued(changed = true) }
         var usable: Long = Long.MAX_VALUE
         var askNotifications = false
         var notificationsMarked = false
@@ -260,7 +315,7 @@ class ModelDownloadViewModelTest {
 
         override suspend fun transcribe(noteId: String): TranscribeOutcome {
             transcribed += noteId
-            return TranscribeOutcome.Queued(changed = true)
+            return enqueue()
         }
 
         override fun downloadModels(parts: Set<ModelPart>) {

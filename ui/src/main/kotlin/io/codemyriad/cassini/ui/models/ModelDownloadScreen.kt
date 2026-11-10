@@ -99,11 +99,13 @@ fun ModelDownloadScreen(
                 style = CassiniTheme.type.hero,
                 color = c.ink,
             )
-            ModelDownloadBody(state)
-            GroupCard(bordered = true) {
-                state.parts.forEach { PartRow(it) }
+            if (state.parts.isNotEmpty()) {
+                ModelDownloadBody(state)
+                GroupCard(bordered = true) {
+                    state.parts.forEach { PartRow(it) }
+                }
+                ModelDownloadFootnote(state, onEvent)
             }
-            ModelDownloadFootnote(state, onEvent)
         }
         ModelDownloadActions(state, onEvent)
     }
@@ -198,14 +200,16 @@ private fun ModelDownloadActions(state: ModelDownloadUiState, onEvent: (ModelDow
                 modifier = Modifier.padding(bottom = 6.dp),
             )
         }
-        PrimaryButton(
-            text = stringResource(
-                if (state.withNote) R.string.ui_models_download_and_transcribe else R.string.ui_models_download,
-            ),
-            onClick = { onEvent(ModelDownloadEvent.Download) },
-            size = PrimaryButtonSize.Large,
-            busy = state.busy,
-        )
+        if (state.parts.isNotEmpty()) {
+            PrimaryButton(
+                text = stringResource(
+                    if (state.withNote) R.string.ui_models_download_and_transcribe else R.string.ui_models_download,
+                ),
+                onClick = { onEvent(ModelDownloadEvent.Download) },
+                size = PrimaryButtonSize.Large,
+                busy = state.busy,
+            )
+        }
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             TextButton(
                 text = stringResource(R.string.ui_models_not_now),
