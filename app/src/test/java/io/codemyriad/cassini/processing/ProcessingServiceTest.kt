@@ -26,6 +26,9 @@ import io.codemyriad.cassini.engine.job.JobEvent
 import io.codemyriad.cassini.engine.job.JobOutcome
 import io.codemyriad.cassini.testing.NoUncaughtCoroutines
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -58,6 +61,7 @@ class ProcessingServiceTest {
 
     private val app: CassiniApplication = ApplicationProvider.getApplicationContext()
     private val created = CopyOnWriteArrayList<FakeJob>()
+    private val createdCount = MutableStateFlow(0)
     private val notices = RecordingNotices()
     private val fixture = File(checkNotNull(System.getProperty("cassini.fixtures")), "audio/fleurs-it-short.opus")
     private lateinit var paths: AppPaths
@@ -69,7 +73,14 @@ class ProcessingServiceTest {
         paths = AppPaths(folder.newFolder(), folder.newFolder(), modelRoot = folder.newFolder())
         CassiniApplication.graphFactory = GraphFactory { context, _ ->
             val hooks = AppGraph.ProcessingHooks(
-                jobs = { g -> ProcessingJobFactory { id -> FakeJob(id, g).also { created += it } } },
+                jobs = { g ->
+                    ProcessingJobFactory { id ->
+                        FakeJob(id, g).also { job ->
+                            created += job
+                            createdCount.update { count -> maxOf(count, created.size) }
+                        }
+                    }
+                },
                 // The test starts the service itself.
                 starter = { ServiceStarter { true } },
                 notices = notices,
@@ -151,7 +162,7 @@ class ProcessingServiceTest {
         val shadow = shadowOf(service)
         assertEquals(ProcessingNotifications.PROCESSING_ID, shadow.lastForegroundNotificationId)
         // The state is a stateIn of the coordinator scope: it follows the foreground flag a moment later.
-        until { graph.processing.state.value.serviceForeground }
+        awaitProcessingState { it.serviceForeground }
         assertEquals(ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC, ProcessingService.typeOf(ForegroundNeed.DATA_SYNC))
         assertEquals(
             ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING,
@@ -164,7 +175,7 @@ class ProcessingServiceTest {
         job.finish(JobOutcome.Done)
         until { shadow.isStoppedBySelf }
         assertTrue(shadow.isForegroundStopped)
-        until { !graph.processing.state.value.serviceForeground }
+        awaitProcessingState { !it.serviceForeground }
     }
 
     /**
@@ -180,7 +191,11 @@ class ProcessingServiceTest {
         assertEquals(ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC, service.foregroundServiceType)
 
         job.send(JobEvent.Started(4_000, restored = null, speakers = false, prints = false, lowMemory = false))
-        until { graph.processing.foregroundNeed.value == ForegroundNeed.MEDIA_PROCESSING }
+        runBlocking {
+            withTimeout(TIMEOUT_MS) {
+                graph.processing.foregroundNeed.first { it == ForegroundNeed.MEDIA_PROCESSING }
+            }
+        }
         until { service.foregroundServiceType == ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING }
         assertEquals(ProcessingNotifications.PROCESSING_ID, shadowOf(service).lastForegroundNotificationId)
         assertFalse(shadowOf(service).isForegroundStopped)
@@ -210,7 +225,7 @@ class ProcessingServiceTest {
         service.onStartCommand(ProcessingService.drainIntent(app), 0, 1)
         val job = awaitJob()
         job.pauseOnStop = false
-        until { graph.processing.state.value.running != null }
+        awaitProcessingState { it.running != null }
 
         service.onTimeout(1, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)
         val shadow = shadowOf(service)
@@ -220,12 +235,15 @@ class ProcessingServiceTest {
         assertTrue(
             posted.any { it.extras.getCharSequence(Notification.EXTRA_TITLE) == "Transcription paused by Android" },
         )
-        until { job.stopReason.get() == PauseReason.SYSTEM && row(id)?.state == JobState.PAUSED }
+        runBlocking {
+            graph.awaitCatalogue().jobs.awaitJobState(id, JobState.PAUSED, TIMEOUT_MS)
+        }
+        assertEquals(PauseReason.SYSTEM, job.stopReason.get())
         assertEquals(PauseReason.SYSTEM, row(id)?.pauseReason)
         assertEquals(QueueHold.SYSTEM, runBlocking { graph.settings.snapshot().queueHold })
 
         job.finish(JobOutcome.Paused(PauseReason.SYSTEM))
-        until { graph.processing.state.value.let { !it.draining && it.running == null } }
+        awaitProcessingState { !it.draining && it.running == null }
         assertEquals(JobState.QUEUED, row(other)?.state)
         assertEquals(1, created.size)
     }
@@ -265,9 +283,18 @@ class ProcessingServiceTest {
 
     private fun row(id: String) = runBlocking { graph.awaitCatalogue().jobs.job(id) }
 
-    private fun awaitJob(): FakeJob {
-        until { created.isNotEmpty() && created[0].started.isCompleted }
-        return created[0]
+    private fun awaitJob(): FakeJob = runBlocking {
+        withTimeout(TIMEOUT_MS) {
+            createdCount.first { it > 0 }
+            created[0].also { it.started.await() }
+        }
+    }
+
+    /** These facts are produced by the coordinator scope; Android main-loop work has separate waits below. */
+    private fun awaitProcessingState(condition: (ProcessingState) -> Boolean) {
+        runBlocking {
+            withTimeout(TIMEOUT_MS) { graph.processing.state.first { condition(it) } }
+        }
     }
 
     /** Runs the main looper (the service's lifecycleScope) until [condition] holds. */
