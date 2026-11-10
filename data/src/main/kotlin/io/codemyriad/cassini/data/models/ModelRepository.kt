@@ -161,6 +161,7 @@ class ModelRepository(
         val speechRecorded = settings.speechConsentAt.first() != null
         return withContext(dispatchers.io) {
             val readiness = readiness()
+            if (readiness[ModelPart.SPEECH] == true) removeRetiredParakeet(paths.modelRoot)
             lock.withLock {
                 consentRecorded = recorded
                 speechConsentRecorded = speechRecorded
@@ -315,6 +316,7 @@ class ModelRepository(
         }
         if (failure != null) throw failure
         writeMarker(marker, model.markerValue)
+        if (model == ModelCatalog.PARAKEET) removeRetiredParakeet(paths.modelRoot)
     }
 
     private fun fetchFailure(error: IOException, cancelled: Boolean = false): UserFacingException {

@@ -2,9 +2,9 @@
   "comment": "The models of ModelCatalog (core/src/main/kotlin/io/codemyriad/cassini/core/models/ModelCatalog.kt) for scripts/fetch-ci-models.py, as dist.gocassini.com publishes them (manifest of 2026-11-10). Each file is downloaded as its own seekable Zstandard object and decompressed. ModelCatalogTest makes sure that this file and the catalog agree.",
   "models": [
     {
-      "id": "parakeet-ultra-0.6b-int8",
+      "id": "parakeet-ultra-0.6b-int8-v2",
       "sourceSha256": "50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
-      "directory": "models/parakeet-ultra-0.6b-int8/50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+      "directory": "models/parakeet-ultra-0.6b-int8-v2/50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
       "marker": "verified",
       "markerValue": "50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
       "artifacts": [

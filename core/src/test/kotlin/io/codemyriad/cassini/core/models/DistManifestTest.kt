@@ -96,7 +96,7 @@ class DistManifestTest {
 
     @Test fun aFileListThatDiffersFromThePinsIsNotDownloaded() {
         val otherArtifact = edited { json ->
-            json.model("parakeet-ultra-0.6b-int8").getJSONArray("files").getJSONObject(0)
+            json.model("parakeet-ultra-0.6b-int8-v2").getJSONArray("files").getJSONObject(0)
                 .put("artifact", "models/files/${"3".repeat(64)}/encoder.int8.onnx.zst")
         }
         assertEquals(Failure.MODEL_UNAVAILABLE, refusal(otherArtifact, ModelCatalog.PARAKEET).failure)
