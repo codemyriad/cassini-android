@@ -1,7 +1,7 @@
 package io.codemyriad.cassini.flows
 
-import android.os.SystemClock
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
@@ -18,6 +18,7 @@ import io.codemyriad.cassini.MainActivity
 import io.codemyriad.cassini.background.Background
 import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobState
+import io.codemyriad.cassini.data.db.LibraryRow
 import io.codemyriad.cassini.flows.Flows.backAfterOpenWith
 import io.codemyriad.cassini.flows.Flows.closeKeyboard
 import io.codemyriad.cassini.flows.Flows.import
@@ -34,7 +35,9 @@ import io.codemyriad.cassini.flows.Flows.waitKeyboardClosed
 import io.codemyriad.cassini.flows.Flows.waitShown
 import io.codemyriad.cassini.flows.Flows.waitText
 import io.codemyriad.cassini.test.CiSmoke
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -69,8 +72,7 @@ class LibraryFlowTest {
         // ACTION_VIEW: the note opens over the Library.
         val clip = Background.assetCopy("fleurs-it-short.wav")
         rule.view(clip, "audio/wav")
-        rule.waitFor("The import makes one note") { rows().size == 1 }
-        val noteId = runBlocking { rows().single().id }
+        val noteId = awaitRows("The import makes one note") { it.size == 1 }.single().id
         rule.waitShown(hasContentDescription(rule.text(UiR.string.ui_back_to_library)))
         rule.waitText(CLIP_TITLE)
         rule.backAfterOpenWith()
@@ -114,26 +116,9 @@ class LibraryFlowTest {
         rule.onNodeWithText(trash).performScrollTo()
         val placement = rule.placementReport(hasText(trash))
         rule.onNodeWithText(trash).performClick()
-        // On CI the snackbar was sometimes not seen (D66 AND-2). Either the tap missed Move to trash (the note stays),
-        // or the note was trashed and its snackbar had gone before the wait saw it; the two messages tell them apart.
-        try {
-            rule.waitFor("Move to trash did not trash the note; the tap missed? $placement") { row(CLIP_TITLE) == null }
-        } catch (notTrashed: AssertionError) {
-            rule.logScreen()
-            val keyboard = if (Flows.keyboardShown()) "shows" else "does not show"
-            val report = "${Flows.focusReport()}; the input method $keyboard the keyboard"
-            throw AssertionError("${notTrashed.message}; $report", notTrashed)
-        }
-        val trashedAt = SystemClock.elapsedRealtime()
-        val moved = rule.text(UiR.string.ui_library_moved_to_trash, CLIP_TITLE)
-        try {
-            rule.waitText(moved)
-        } catch (notShown: AssertionError) {
-            val seconds = (SystemClock.elapsedRealtime() - trashedAt) / 1_000
-            throw AssertionError("The note is in the trash, but its snackbar was not seen in $seconds s", notShown)
-        }
+        rule.waitForTrashSnackbar(noteId, CLIP_TITLE, placement)
         rule.onNode(hasText(rule.text(UiR.string.ui_action_undo))).performClick()
-        rule.waitFor("Undo restores the note") { row(CLIP_TITLE)?.id == noteId }
+        awaitRows("Undo restores the note") { rows -> rows.any { it.id == noteId } }
         rule.waitShown(row)
     }
 
@@ -148,7 +133,7 @@ class LibraryFlowTest {
         val showIme = Background.shell("settings get secure $SHOW_IME").trim()
         Background.shell("settings put secure $SHOW_IME 1")
         try {
-            runBlocking { import(meetingDocument(MEETING_TITLE)) }
+            val noteId = runBlocking { import(meetingDocument(MEETING_TITLE)) }
             val row = hasContentDescription(MEETING_TITLE, substring = true)
             rule.waitShown(row)
             rule.onNode(hasSetTextAction()).performClick()
@@ -165,17 +150,7 @@ class LibraryFlowTest {
             val settled = rule.settledBounds(hasText(trash))
             val placement = rule.placementReport(hasText(trash))
             rule.onNodeWithText(trash).performClick()
-            try {
-                rule.waitFor("Move to trash, settled at $settled, did not trash the note: $placement") {
-                    row(MEETING_TITLE) == null
-                }
-            } catch (notTrashed: AssertionError) {
-                rule.logScreen()
-                val keyboard = if (Flows.keyboardShown()) "shows" else "does not show"
-                val report = "${Flows.focusReport()}; the input method $keyboard the keyboard"
-                throw AssertionError("${notTrashed.message}; $report", notTrashed)
-            }
-            rule.waitText(rule.text(UiR.string.ui_library_moved_to_trash, MEETING_TITLE))
+            rule.waitForTrashSnackbar(noteId, MEETING_TITLE, "Settled at $settled. $placement")
         } finally {
             val unset = showIme == "null" || showIme.isEmpty()
             Background.shell(
@@ -193,17 +168,39 @@ class LibraryFlowTest {
         }
     }
 
-    /** The bounds of [matcher]'s node once an idle sync no longer moves them; fails after [Flows.SCREEN_MS]. */
-    private fun AppRule.settledBounds(matcher: SemanticsMatcher): Rect {
-        val deadline = SystemClock.uptimeMillis() + Flows.SCREEN_MS
-        var before = onNode(matcher).fetchSemanticsNode().boundsInWindow
-        while (true) {
-            waitForIdle()
-            val now = onNode(matcher).fetchSemanticsNode().boundsInWindow
-            if (now == before) return now
-            assertTrue("${matcher.description} still moves: $before, then $now", SystemClock.uptimeMillis() < deadline)
-            before = now
+    private fun awaitRows(message: String, matches: (List<LibraryRow>) -> Boolean): List<LibraryRow> = runBlocking {
+        withTimeoutOrNull(Flows.SCREEN_MS) { Flows.graph.awaitCatalogue().notes.library().first(matches) }
+            ?: throw AssertionError(message)
+    }
+
+    private fun AppRule.waitForTrashSnackbar(noteId: String, title: String, placement: String) {
+        // Move to trash commits before the snackbar appears. Observe the short-lived UI first (D66 AND-2).
+        try {
+            waitText(text(UiR.string.ui_library_moved_to_trash, title))
+        } catch (notShown: AssertionError) {
+            logScreen()
+            val stillLive = runBlocking { rows().any { it.id == noteId } }
+            val outcome = if (stillLive) "The note stayed in the library" else "The note was moved to trash"
+            throw AssertionError("$outcome, and the snackbar was missing. $placement. ${Flows.focusReport()}", notShown)
         }
+        assertTrue("The snackbar appears after the note leaves the library", runBlocking { rows().none { it.id == noteId } })
+    }
+
+    /** The bounds of [matcher]'s node once an idle sync no longer moves them. */
+    private fun AppRule.settledBounds(matcher: SemanticsMatcher): Rect {
+        var bounds = onNode(matcher).fetchSemanticsNode().boundsInWindow
+        try {
+            waitUntil(Flows.SCREEN_MS) {
+                waitForIdle()
+                val next = onNode(matcher).fetchSemanticsNode().boundsInWindow
+                val settled = next == bounds
+                bounds = next
+                settled
+            }
+        } catch (timeout: ComposeTimeoutException) {
+            throw AssertionError("${matcher.description} still moves, last bounds $bounds", timeout)
+        }
+        return bounds
     }
 
     private companion object {
