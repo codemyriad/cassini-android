@@ -16,8 +16,9 @@ import io.codemyriad.cassini.testing.NoUncaughtCoroutines
 import io.codemyriad.cassini.ui.components.WaveformLevels
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
@@ -139,11 +140,26 @@ class RecordingControllerTest {
         val active = startRecording("Nota")
         assertEquals("Nota", row(active.noteId)?.title)
 
-        controller.setTitle("Test")
-        controller.setTitle("Choir")
-        controller.setTitle("Choir rehearsal ")
-        waitFor { row(active.noteId)?.title == "Choir rehearsal" }
-        delay(DEBOUNCE_MS)
+        // Queue all edits before the recorder can run them; host scheduling cannot separate the edits.
+        val hold = FakePlatform.Hold()
+        platform.hold = hold
+        try {
+            assertTrue(
+                "the recorder reached the held policy tick",
+                hold.entered.await(TIMEOUT_MS, TimeUnit.MILLISECONDS),
+            )
+            controller.setTitle("Test")
+            controller.setTitle("Choir")
+            controller.setTitle("Choir rehearsal ")
+        } finally {
+            hold.release.countDown()
+        }
+        withTimeout(TIMEOUT_MS) {
+            graph.awaitCatalogue().database.notes().noteFlow(active.noteId).first {
+                it?.note?.title == "Choir rehearsal"
+            }
+        }
+        assertEquals("Choir rehearsal", row(active.noteId)?.title)
         assertEquals("one write after the last change", 1, renames.get())
         assertEquals("the state keeps the text as typed", "Choir rehearsal ", activeState().title)
 
@@ -199,13 +215,13 @@ class RecordingControllerTest {
             assertNull(activeState().warning)
         }
         // The policy loop renews the wake lock (each 50 ms in this test, each minute in the app).
-        waitFor { platform.wakeLocks.get() >= 3 }
+        withTimeout(TIMEOUT_MS) { platform.wakeLockCounts.first { it >= 3 } }
         assertTrue(platform.wakeLockHeld)
         // A paused recording does not advance its clock, and the lock is still renewed.
         controller.pause()
         awaitActiveState { it.pause != null }
         val paused = platform.wakeLocks.get()
-        waitFor { platform.wakeLocks.get() >= paused + 2 }
+        withTimeout(TIMEOUT_MS) { platform.wakeLockCounts.first { it >= paused + 2 } }
         controller.resume()
         awaitActiveState { it.pause == null }
         // The hint is the space only: 64 GiB at 6000 B/s.
@@ -412,10 +428,6 @@ class RecordingControllerTest {
         controller.awaitPosted()
     }
 
-    private suspend fun waitFor(condition: suspend () -> Boolean) = withTimeout(TIMEOUT_MS) {
-        while (!condition()) delay(POLL_MS)
-    }
-
     private inner class CountingNotes(private val inner: RecordingNotes) : RecordingNotes by inner {
         override suspend fun rename(noteId: String, title: String) {
             renames.incrementAndGet()
@@ -426,8 +438,6 @@ class RecordingControllerTest {
     private companion object {
         const val TIMEOUT_MS = 10_000L
         const val HOUR_MS = 3_600_000L
-        const val POLL_MS = 10L
-        const val DEBOUNCE_MS = 600L
     }
 }
 
@@ -515,6 +525,7 @@ class FakePlatform : RecordingPlatform {
 
     @Volatile var wakeLockHeld = false
     val wakeLocks = AtomicInteger()
+    val wakeLockCounts = MutableStateFlow(0)
 
     @Volatile lateinit var watch: FakeSilenceWatch
 
@@ -538,8 +549,9 @@ class FakePlatform : RecordingPlatform {
     }
 
     override fun acquireWakeLock() {
-        wakeLocks.incrementAndGet()
+        val count = wakeLocks.incrementAndGet()
         wakeLockHeld = true
+        wakeLockCounts.update { maxOf(it, count) }
     }
 
     override fun releaseWakeLock() {
