@@ -70,10 +70,7 @@ class GraphModelDownloadPorts(
             ?.usableSpace ?: 0L
     }
 
-    override suspend fun recordConsent(parts: Set<ModelPart>) = graph.models.recordConsent(
-        includeSpeech = ModelPart.SPEECH in parts,
-        includeOptional = parts.any { it != ModelPart.SPEECH },
-    )
+    override suspend fun recordConsent(parts: Set<ModelPart>) = graph.models.recordConsent(parts)
 
     override suspend fun recordDeclined() = graph.models.recordDeclined()
 

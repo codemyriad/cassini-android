@@ -344,7 +344,9 @@ The test APK instruments itself and does not touch the data of the app. If the S
 | `notices.parakeetSuggestionDismissed` | Boolean | Persistent dismissal of the Settings and post-Whistle recommendation. |
 | `notices.parakeetDefault` | Boolean | Pending one-time announcement after verified Parakeet promotion. |
 | `models.speechConsentAt` | Long | Explicit consent to download Parakeet. Consent to optional speaker/voice downloads alone does not authorize it. |
-| `models.consentAt` | Long | Explicit optional-model consent from the shown plan. Parakeet-only consent and installed Parakeet do not authorize optional downloads. |
+| `models.consentAt` | Long | Legacy consent for both optional model parts. New downloads write the keys below. |
+| `models.speakersConsentAt` | Long | Consent to download the diarizer. |
+| `models.voicesConsentAt` | Long | Consent to download the saved-voice model. |
 | `models.declinedAt` | Long | The user pushed "Not now — keep the audio". After later recordings, the consent screen does not open automatically. |
 | `processing.finalizationMs` | Long | The estimate of the time for matching and saving, `(old*3 + new)/4`. |
 | `queue.hold` | String | `USER`, `SYSTEM`, or no key (section 5.2). |
@@ -771,7 +773,8 @@ At step 9, the job writes the final prints and matches to `voices/pending/<id>.j
 
 ### 5.6 Models and consent
 
-- Consent means that `models.consentAt` exists or that Parakeet is installed. Only the primary button of the Model download screen records it.
+- The primary button of Model download records consent for each shown part. Installed Parakeet authorizes speech only. Legacy `models.consentAt` still authorizes both optional parts on older installations.
+- Standalone requests wait for the current install. Settings shows a waiting row at 0% and does not start it twice. Cancel stops the active and waiting requests. Retry keeps unfinished requested parts and drops installed parts.
 - The app enforces consent two times: in `ProcessingCoordinator.transcribe`, and again in `TranscriptionJob.installModels` through `ModelAccess.consented`. Without consent, the job ends in NEEDS_CONSENT and makes no network call. JVM tests make sure that no code calls `ArtifactFetcher` in this case.
 - `ModelInstallOwner` runs at most one installation. A request during an installation joins it. Each set of parts has one shared `Deferred`, and a `Mutex` protects it. A job in `installModels` shows the shared progress as `JobPhase.Downloading`.
 - Cancel in a banner cancels the shared installation only when no job waits for it. Else Cancel stops the job, and the `.part` files stay. The note goes back to its earlier state (features.md 13.4): PAUSED(USER) when it has a checkpoint, else the app removes the row.

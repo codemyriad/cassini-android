@@ -8,7 +8,7 @@ We made the entries for 0.0.1-beta to 0.1.0 again from the release notes of thes
 
 ### Fixed
 
-- Settings downloads and retries the model named by the tapped row. The speaker and saved-voice model rows no longer start the Parakeet download. A saved-voice model download also works before the diarizer is installed.
+- Settings downloads and retries the model named by the tapped row. The speaker and saved-voice model rows no longer start the Parakeet download. A saved-voice model download also works before the diarizer is installed. Consent applies to each model shown, and Cancel stops both active and queued downloads.
 
 ## [0.4.2-beta.2] - 2026-11-10
 

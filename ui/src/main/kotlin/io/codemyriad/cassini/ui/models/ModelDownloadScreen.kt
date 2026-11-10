@@ -138,8 +138,9 @@ private fun ModelDownloadBody(state: ModelDownloadUiState) {
     val c = CassiniTheme.colors
     // A no-break space keeps the bold figure and its unit on one line.
     val total = Sizes.totalMegabytes(state.parts.map { it.bytes }).replace(' ', '\u00A0')
-    val speechOnly = state.parts.singleOrNull()?.part == ModelPartUi.SPEECH
-    val full = if (speechOnly) {
+    val singlePart = state.parts.singleOrNull()?.part
+    val neutralCopy = singlePart != null && (!state.withNote || singlePart == ModelPartUi.SPEECH)
+    val full = if (neutralCopy) {
         stringResource(R.string.ui_settings_optional_size, total) + "\n\n" +
             stringResource(R.string.ui_settings_models_footnote)
     } else {

@@ -20,6 +20,7 @@ import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.CassiniApplication
 import io.codemyriad.cassini.GraphFactory
 import io.codemyriad.cassini.MainActivity
+import io.codemyriad.cassini.core.models.ModelDescriptor
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.data.models.ModelFetcher
@@ -50,7 +51,7 @@ class SettingsModelDownloadTest {
     private val folder = TemporaryFolder()
     private val app: CassiniApplication = ApplicationProvider.getApplicationContext()
     private val fetched = CopyOnWriteArrayList<String>()
-    private var completeDownload = false
+    @Volatile private var completeDownload = false
     private val graph: AppGraph get() = app.graph
     private val graphRule = object : ExternalResource() {
         override fun before() {
@@ -63,9 +64,7 @@ class SettingsModelDownloadTest {
                         fetcher = ModelFetcher { model, directory, progress ->
                             fetched += model.id
                             if (!completeDownload) throw IOException("Synthetic download failure")
-                            model.artifacts.forEach { artifact ->
-                                RandomAccessFile(File(directory, artifact.name), "rw").use { it.setLength(artifact.size) }
-                            }
+                            writeArtifacts(model, directory)
                             progress(model.downloadBytes, true)
                         },
                         network = { true },
@@ -108,7 +107,43 @@ class SettingsModelDownloadTest {
         rule.runOnIdle {
             assertEquals(listOf(ModelPart.VOICES.primary.id), fetched.toList())
             assertEquals(ModelStatus.Missing(false), graph.models.status.value[ModelPart.SPEECH])
+            assertEquals(ModelStatus.Missing(false), graph.models.status.value[ModelPart.SPEAKERS])
         }
+    }
+
+    @Test fun theOtherOptionalRowStaysNotDownloadedWithParakeetReady() {
+        completeDownload = true
+        val speech = ModelPart.SPEECH.primary
+        val directory = speech.directory(graph.paths.modelRoot).apply { mkdirs() }
+        writeArtifacts(speech, directory)
+        File(directory, speech.markerFile).writeText(speech.markerValue)
+        runBlocking { withTimeout(TIMEOUT_MS) { graph.models.refresh() } }
+
+        openSettings()
+        tapRow("Telling speakers apart")
+        waitFor("Download")
+        rule.onNodeWithText("Download").performClick()
+        waitForReady(ModelPart.SPEAKERS)
+        assertEquals(ModelStatus.Missing(false), graph.models.status.value[ModelPart.VOICES])
+        rule.onNode(hasText("Recognising saved voices") and hasText("Not downloaded")).performScrollTo().performClick()
+        waitFor("Download")
+        rule.onNodeWithText("Download").performClick()
+        waitForReady(ModelPart.VOICES)
+        assertEquals(listOf(ModelPart.SPEAKERS.primary.id, ModelPart.VOICES.primary.id), fetched.toList())
+    }
+
+    @Test fun recreatedConsentStillDownloadsOnlyTheTappedModel() {
+        openSettings()
+        tapRow("Telling speakers apart")
+        waitFor("Download")
+        rule.activityRule.scenario.recreate()
+        waitFor("Download")
+        rule.onNodeWithText("Download").performClick()
+        waitUntil("recreated speaker download") {
+            graph.models.status.value[ModelPart.SPEAKERS] is ModelStatus.Failed &&
+                !graph.processing.state.value.downloading
+        }
+        assertEquals(listOf(ModelPart.SPEAKERS.primary.id), fetched.toList())
     }
 
     @Test fun closingOptionalConsentDoesNotStartAnyModel() {
@@ -136,6 +171,16 @@ class SettingsModelDownloadTest {
             rule.runOnIdle {
                 assertEquals(List(attempt + 1) { part.primary.id }, fetched.toList())
             }
+        }
+    }
+
+    private fun waitForReady(part: ModelPart) = waitUntil("$part ready") {
+        graph.models.status.value[part] == ModelStatus.Ready && !graph.processing.state.value.downloading
+    }
+
+    private fun writeArtifacts(model: ModelDescriptor, directory: File) {
+        model.artifacts.forEach { artifact ->
+            RandomAccessFile(File(directory, artifact.name), "rw").use { it.setLength(artifact.size) }
         }
     }
 

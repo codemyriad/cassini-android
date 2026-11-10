@@ -136,11 +136,10 @@ class SettingsViewModelTest {
         }
     }
 
-    @Test fun optionalRowsIgnoreTapsWhileReadyPendingDownloadingOrChecking() = runTest(dispatcher) {
+    @Test fun optionalRowsIgnoreTapsWhileReadyDownloadingOrChecking() = runTest(dispatcher) {
         val viewModel = viewModel()
         for (status in listOf(
             ModelStatus.Ready,
-            Missing(true),
             ModelStatus.Downloading(37, 37, 100),
             ModelStatus.Verifying(100),
         )) {
@@ -155,6 +154,34 @@ class SettingsViewModelTest {
             advanceUntilIdle()
             assertTrue(effects.isEmpty())
         }
+    }
+
+    @Test fun pendingRowsCanRestartTheirOwnDownloadsAfterCancelOrProcessDeath() = runTest(dispatcher) {
+        ports.models.value = ModelPart.entries.associateWith { Missing(true) }
+        val viewModel = viewModel()
+        viewModel.onEvent(SettingsEvent.OpenModel(ModelPartUi.SPEAKERS))
+        viewModel.onEvent(SettingsEvent.OpenModel(ModelPartUi.VOICES))
+        advanceUntilIdle()
+        assertEquals(
+            listOf(ModelPart.SPEAKERS, ModelPart.VOICES).map { SettingsEffect.Open(ModelDownloadKey(part = it)) },
+            effects,
+        )
+    }
+
+    @Test fun parakeetCannotOpenConsentDuringLoadingDownloadingOrVerification() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        for (status in listOf(ModelStatus.Downloading(10, 1, 10), ModelStatus.Verifying(10))) {
+            ports.models.value = mapOf(ModelPart.SPEECH to status)
+            advanceUntilIdle()
+            viewModel.onEvent(SettingsEvent.ChooseSpeech(SpeechModelUi.PARAKEET))
+            advanceUntilIdle()
+            assertTrue(effects.isEmpty())
+        }
+        val loading = SettingsViewModel(ports)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { loading.effects.collect { effects += it } }
+        loading.onEvent(SettingsEvent.ChooseSpeech(SpeechModelUi.PARAKEET))
+        advanceUntilIdle()
+        assertTrue(effects.isEmpty())
     }
 
     @Test fun recommendationOpensOnlyParakeetConsentAndDismissesWithoutChangingTheModel() = runTest(dispatcher) {

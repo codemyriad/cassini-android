@@ -30,8 +30,10 @@ optional speaker downloads, including a retry or the next Parakeet job. Recordin
 and note storage checks use the same authorized job plan. The speech-only consent
 screen uses existing size/privacy copy and does not promise speaker separation.
 Consent and installation retain only the shown roles, including across a
-notification-permission recreation. Standalone retries keep their original
-part set even if earlier consent would allow more models. Failed or offline
+notification-permission recreation. Consent to one optional model leaves the
+other untouched. The legacy optional consent key still authorizes both for
+existing installations. Standalone retries keep their unfinished requested
+parts, even if earlier consent would allow more models. Failed or offline
 optional standalone downloads produce a retry notice and retryable failed Settings
 rows rather than silently looking successful. Background jobs still skip unavailable
 optional downloads as best effort. A Parakeet job requests only its authorized plan,

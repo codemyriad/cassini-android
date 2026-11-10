@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.AppPaths
 import kotlinx.coroutines.CoroutineScope
@@ -58,18 +59,37 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
 
     suspend fun snapshot(): Settings = settings.first()
 
-    /** Explicit optional-model download consent; a Parakeet-only plan does not set this. */
-    val consentAt: Flow<Long?> = key(Keys.CONSENT_AT)
+    /** Both optional parts are authorized; legacy group consent remains valid for existing installations. */
+    val consentAt: Flow<Long?> = preferences.map(::optionalConsentAt).distinctUntilChanged()
 
-    suspend fun recordConsent(
-        at: Long,
-        includeSpeech: Boolean = true,
-        includeOptional: Boolean = true,
-    ) {
-        store.edit {
-            if (includeOptional) it[Keys.CONSENT_AT] = at
-            if (includeSpeech) it[Keys.SPEECH_CONSENT_AT] = at
-        }
+    /** Only explicitly authorized parts; the legacy optional key authorizes SPEAKERS and VOICES together. */
+    val consentedParts: Flow<Set<ModelPart>> = preferences.map { prefs ->
+        ModelPart.entries.filter { consentAt(prefs, it) != null }.toSet()
+    }.distinctUntilChanged()
+
+    suspend fun recordConsent(at: Long, parts: Set<ModelPart>) {
+        store.edit { prefs -> parts.forEach { prefs[consentKey(it)] = at } }
+    }
+
+    /** Compatibility for callers whose consent screen covers all optional parts together. */
+    suspend fun recordConsent(at: Long, includeSpeech: Boolean = true, includeOptional: Boolean = true) = recordConsent(
+        at,
+        ModelPart.entries.filter { if (it == ModelPart.SPEECH) includeSpeech else includeOptional }.toSet(),
+    )
+
+    private fun consentKey(part: ModelPart): Preferences.Key<Long> = when (part) {
+        ModelPart.SPEECH -> Keys.SPEECH_CONSENT_AT
+        ModelPart.SPEAKERS -> Keys.SPEAKERS_CONSENT_AT
+        ModelPart.VOICES -> Keys.VOICES_CONSENT_AT
+    }
+
+    private fun consentAt(prefs: Preferences, part: ModelPart): Long? =
+        prefs[consentKey(part)] ?: prefs[Keys.CONSENT_AT].takeIf { part != ModelPart.SPEECH }
+
+    private fun optionalConsentAt(prefs: Preferences): Long? {
+        val speakers = consentAt(prefs, ModelPart.SPEAKERS) ?: return null
+        val voices = consentAt(prefs, ModelPart.VOICES) ?: return null
+        return maxOf(speakers, voices)
     }
 
     val speechConsentAt: Flow<Long?> = key(Keys.SPEECH_CONSENT_AT)
@@ -192,7 +212,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         prefs[Keys.QUEUE_HOLD]?.let { name -> QueueHold.entries.firstOrNull { it.name == name } }
 
     private fun settings(prefs: Preferences) = Settings(
-        consentAt = prefs[Keys.CONSENT_AT],
+        consentAt = optionalConsentAt(prefs),
         declinedAt = prefs[Keys.DECLINED_AT],
         finalizationMs = prefs[Keys.FINALIZATION_MS],
         queueHold = hold(prefs),
@@ -212,6 +232,8 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         val SPEECH_MODEL = stringPreferencesKey("recognition.model")
         val SPEECH_CONSENT_AT = longPreferencesKey("models.speechConsentAt")
         val CONSENT_AT = longPreferencesKey("models.consentAt")
+        val SPEAKERS_CONSENT_AT = longPreferencesKey("models.speakersConsentAt")
+        val VOICES_CONSENT_AT = longPreferencesKey("models.voicesConsentAt")
         val DECLINED_AT = longPreferencesKey("models.declinedAt")
         val FINALIZATION_MS = longPreferencesKey("processing.finalizationMs")
         val QUEUE_HOLD = stringPreferencesKey("queue.hold")
