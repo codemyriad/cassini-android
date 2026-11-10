@@ -603,7 +603,8 @@ class ProcessingCoordinatorTest {
         // The first fetch of Parakeet writes a .part file and blocks until the install is cancelled; later fetches
         // write sparse files of the pinned sizes.
         val started = CountDownLatch(1)
-        val interrupted = AtomicBoolean(false)
+        val interrupted = CountDownLatch(1)
+        val held = CountDownLatch(1)
         val fetches = AtomicInteger()
         val fetcher = ModelFetcher { model, directory, progress ->
             if (model == ModelCatalog.PARAKEET && fetches.getAndIncrement() == 0) {
@@ -611,9 +612,9 @@ class ProcessingCoordinatorTest {
                 progress(PART_BYTES.toLong(), false)
                 started.countDown()
                 try {
-                    Thread.sleep(TIMEOUT_MS)
+                    held.await()
                 } catch (error: InterruptedException) {
-                    interrupted.set(true)
+                    interrupted.countDown()
                     throw error
                 }
                 fail("The stopped download went on")
@@ -627,30 +628,34 @@ class ProcessingCoordinatorTest {
         // The banners follow the downloads from their first use, as the Library makes it at the start.
         val notices = graph.notices
         consent()
-        val download = coordinator.downloadModels()
-        assertTrue(withContext(Dispatchers.IO) { started.await(TIMEOUT_MS, TimeUnit.MILLISECONDS) })
-        withTimeout(TIMEOUT_MS) { coordinator.state.first { it.downloading } }
+        try {
+            val download = coordinator.downloadModels()
+            assertTrue(withContext(Dispatchers.IO) { started.await(TIMEOUT_MS, TimeUnit.MILLISECONDS) })
+            withTimeout(TIMEOUT_MS) { coordinator.state.first { it.downloading } }
 
-        // onTimeout with no running job: the service has stopped, so the download must stop too.
-        coordinator.systemStop(null)
-        withTimeout(TIMEOUT_MS) { download.join() }
-        withTimeout(TIMEOUT_MS) { graph.installOwner.state.first { it == InstallState.Idle } }
-        withTimeout(TIMEOUT_MS) { coordinator.awaitIdle() }
-        assertTrue("the fetch was interrupted", interrupted.get())
-        assertFalse(withTimeout(TIMEOUT_MS) { coordinator.state.first { !it.downloading } }.downloading)
-        val part = File(ModelCatalog.PARAKEET.directory(paths.modelRoot), PART_FILE)
-        assertTrue("the .part file stays for a Range resume", part.isFile)
-        val stopped = ModelStatus.Failed(Failure.DOWNLOAD, DownloadError.STOPPED_BY_SYSTEM.name)
-        assertEquals("Settings shows the stop", stopped, graph.models.status.value[ModelPart.SPEECH])
-        assertEquals(ModelStatusUi.Failed, SettingsViewModel.status(stopped))
-        val failure = withTimeout(TIMEOUT_MS) { notices.facts.first { it.downloadFailure != null } }
-        assertEquals("the Library offers Retry", DownloadError.STOPPED_BY_SYSTEM, failure.downloadFailure?.error)
-        assertEquals(1, fetches.get())
+            // onTimeout with no running job: the service has stopped, so the download must stop too.
+            withTimeout(TIMEOUT_MS) { coordinator.systemStop(null) }
+            withTimeout(TIMEOUT_MS) { download.join() }
+            withTimeout(TIMEOUT_MS) { graph.installOwner.state.first { it == InstallState.Idle } }
+            withTimeout(TIMEOUT_MS) { coordinator.awaitIdle() }
+            assertTrue("the fetch was interrupted", withContext(Dispatchers.IO) { interrupted.await(TIMEOUT_MS, TimeUnit.MILLISECONDS) })
+            assertFalse(withTimeout(TIMEOUT_MS) { coordinator.state.first { !it.downloading } }.downloading)
+            val part = File(ModelCatalog.PARAKEET.directory(paths.modelRoot), PART_FILE)
+            assertTrue("the .part file stays for a Range resume", part.isFile)
+            val stopped = ModelStatus.Failed(Failure.DOWNLOAD, DownloadError.STOPPED_BY_SYSTEM.name)
+            assertEquals("Settings shows the stop", stopped, graph.models.status.value[ModelPart.SPEECH])
+            assertEquals(ModelStatusUi.Failed, SettingsViewModel.status(stopped))
+            val failure = withTimeout(TIMEOUT_MS) { notices.facts.first { it.downloadFailure != null } }
+            assertEquals("the Library offers Retry", DownloadError.STOPPED_BY_SYSTEM, failure.downloadFailure?.error)
+            assertEquals(1, fetches.get())
 
-        // Retry starts it again; it finishes and every part is ready.
-        coordinator.downloadModels().join()
-        withTimeout(TIMEOUT_MS) { coordinator.awaitIdle() }
-        assertEquals(ModelPart.entries.associateWith { ModelStatus.Ready }, graph.models.status.value)
+            // Retry starts it again; it finishes and every part is ready.
+            coordinator.downloadModels().join()
+            withTimeout(TIMEOUT_MS) { coordinator.awaitIdle() }
+            assertEquals(ModelPart.entries.associateWith { ModelStatus.Ready }, graph.models.status.value)
+        } finally {
+            held.countDown()
+        }
     }
 
     // Outcomes and notifications. ----------------------------------------------------------------------------------
