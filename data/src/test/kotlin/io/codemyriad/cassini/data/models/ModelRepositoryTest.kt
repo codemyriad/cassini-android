@@ -108,7 +108,9 @@ class ModelRepositoryTest {
         val repo = repository(
             FakeFetcher(mapOf(ModelCatalog.PARAKEET to Failure.VERIFY)),
         )
-        val error = runCatching { offMain { repo.installModelBlocking(ModelCatalog.PARAKEET) { _, _ -> } } }.exceptionOrNull()
+        val error = runCatching {
+            offMain { repo.installModelBlocking(ModelCatalog.PARAKEET) { _, _ -> } }
+        }.exceptionOrNull()
         assertEquals(Failure.VERIFY, ((error?.cause ?: error) as UserFacingException).failure)
         assertTrue(previous.isFile)
         assertFalse(ModelCatalog.PARAKEET.ready(paths.modelRoot))
