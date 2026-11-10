@@ -24,6 +24,7 @@ import io.codemyriad.cassini.data.settings.QueueHold
 import io.codemyriad.cassini.engine.job.InstallOutcome
 import io.codemyriad.cassini.engine.job.JobEvent
 import io.codemyriad.cassini.engine.job.JobOutcome
+import io.codemyriad.cassini.testing.MainDispatchEvents
 import io.codemyriad.cassini.testing.NoUncaughtCoroutines
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -58,6 +59,8 @@ class ProcessingServiceTest {
     val uncaught = NoUncaughtCoroutines()
 
     @get:Rule val folder = TemporaryFolder()
+
+    @get:Rule val mainDispatches = MainDispatchEvents()
 
     private val app: CassiniApplication = ApplicationProvider.getApplicationContext()
     private val created = CopyOnWriteArrayList<FakeJob>()
@@ -141,7 +144,7 @@ class ProcessingServiceTest {
                     graph.processing.awaitIdle()
                 }
             }
-            shadowOf(Looper.getMainLooper()).idle()
+            until { shadowOf(service).isStoppedBySelf }
             assertTrue(ModelCatalog.DIARIZATION.ready(paths.modelRoot))
             assertEquals(ModelStatus.Ready, graph.models.status.value[ModelPart.SPEAKERS])
             assertEquals(InstallOutcome.Installed(), graph.installOwner.lastOutcome.value)
@@ -212,7 +215,7 @@ class ProcessingServiceTest {
         val result = service.onStartCommand(ProcessingService.drainIntent(app), 0, 1)
         assertEquals(Service.START_NOT_STICKY, result)
         assertTrue(shadowOf(service).isStoppedBySelf)
-        until { notices.ready.isNotEmpty() }
+        runBlocking { notices.awaitNotice(TIMEOUT_MS) { notices.ready.isNotEmpty() } }
         assertEquals(listOf(id), notices.ready.toList())
         assertTrue(created.isEmpty())
         assertEquals(JobState.QUEUED, row(id)?.state)
@@ -297,18 +300,10 @@ class ProcessingServiceTest {
         }
     }
 
-    /** Runs the main looper (the service's lifecycleScope) until [condition] holds. */
-    private fun until(condition: () -> Boolean) {
-        val end = System.currentTimeMillis() + TIMEOUT_MS
-        while (!condition()) {
-            check(System.currentTimeMillis() < end) { "Timed out" }
-            shadowOf(Looper.getMainLooper()).idle()
-            Thread.sleep(POLL_MS)
-        }
-    }
+    /** Waits for the service's actual main-queue deliveries, without polling. */
+    private fun until(condition: () -> Boolean) = mainDispatches.await(TIMEOUT_MS, condition)
 
     private companion object {
         const val TIMEOUT_MS = 20_000L
-        const val POLL_MS = 20L
     }
 }

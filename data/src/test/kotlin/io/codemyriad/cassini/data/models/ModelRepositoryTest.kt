@@ -179,6 +179,21 @@ class ModelRepositoryTest {
         assertTrue("the speech detector is best effort", offMain { repository().readyBlocking(ModelPart.SPEECH) })
     }
 
+    @Test fun singlePartConsentDoesNotChangeOtherRowsAndSurvivesRepositoryRecreation() = runTest {
+        val repo = repository()
+        repo.recordConsent(setOf(ModelPart.VOICES))
+        val recreated = repository()
+        recreated.refresh()
+        assertEquals(ModelStatus.Missing(false), recreated.status.value[ModelPart.SPEECH])
+        assertEquals(ModelStatus.Missing(false), recreated.status.value[ModelPart.SPEAKERS])
+        assertEquals(ModelStatus.Missing(true), recreated.status.value[ModelPart.VOICES])
+        assertTrue(recreated.consented(ModelPart.VOICES))
+        assertFalse(recreated.consented(ModelPart.SPEAKERS))
+        assertFalse(recreated.consented(ModelPart.SPEECH))
+        assertTrue(recreated.optionalDownloadsConsented(ModelPart.VOICES))
+        assertFalse(recreated.optionalDownloadsConsented(ModelPart.SPEAKERS))
+    }
+
     @Test fun explicitConsentAuthorizesSpeechAndOptionalParts() = runTest {
         val repo = repository()
         repo.refresh()

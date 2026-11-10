@@ -18,9 +18,11 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -92,6 +94,11 @@ class ModelInstallOwner(
 
     /** The standalone downloads ([startDownload]) that have not ended. */
     private val downloads = CopyOnWriteArraySet<Job>()
+    private val downloadLock = Any()
+    private var downloadGeneration = 0L
+    private val requests = mutableMapOf<Set<ModelPart>, Job>()
+    private val requestedCounts = mutableMapOf<ModelPart, Int>()
+    private val standaloneFailures = mutableMapOf<ModelPart, DownloadError>()
 
     private val mutableState = MutableStateFlow<InstallState>(InstallState.Idle)
     private val mutableOutcome = MutableStateFlow<InstallOutcome?>(null)
@@ -99,8 +106,8 @@ class ModelInstallOwner(
     val state: StateFlow<InstallState> = mutableState.asStateFlow()
 
     /**
-     * How the last install ended: its outcome, or INTERRUPTED when Android stopped it ([stopDownloads]). Null before
-     * the first one and after an install that was cancelled in another way.
+     * The last standalone outcome, including unrelated failures that are still retryable. A user cancel does not
+     * add a failure. A stop by Android ([stopDownloads]) reports STOPPED_BY_SYSTEM.
      */
     val lastOutcome: StateFlow<InstallOutcome?> = mutableOutcome.asStateFlow()
 
@@ -116,18 +123,92 @@ class ModelInstallOwner(
      * and shows its progress through [state] and `ModelRepository.status`. [cancel] stops it.
      */
     fun startDownload(parts: Set<ModelPart>? = null): Job {
+        if (parts != null) return requestDownload(parts.toSet())
+        return synchronized(downloadLock) {
+            val generation = downloadGeneration
+            val retry = scope.launch(start = CoroutineStart.LAZY) {
+                val requested = lastStandaloneParts?.takeIf { it.isNotEmpty() } ?: allowedRetryParts()
+                val download = synchronized(downloadLock) {
+                    checkGeneration(generation)
+                    requestDownload(requested)
+                }
+                try {
+                    download.join()
+                } finally {
+                    if (!isActive) withContext(NonCancellable) { download.cancelAndJoin() }
+                }
+            }
+            track(retry)
+            retry.start()
+            retry
+        }
+    }
+
+    private fun requestDownload(parts: Set<ModelPart>): Job = synchronized(downloadLock) {
+        require(parts.isNotEmpty()) { "No model part to download" }
+        requests[parts]?.takeUnless { it.isCompleted || it.isCancelled }?.let { return@synchronized it }
+        val generation = downloadGeneration
         val job = scope.launch(start = CoroutineStart.LAZY) {
             try {
-                val requested = (parts ?: lastStandaloneParts ?: allowedRetryParts()).toSet()
-                install(requested, {}, standalone = true)
+                install(parts, {}, standalone = true, generation = generation)
             } catch (_: CancellationException) {
-                // A cancelled download keeps its .part files; there is nothing more to do.
+                // A user cancel leaves resumable files, without reporting a download failure.
             }
         }
+        requests[parts] = job
+        lastStandaloneParts = (lastStandaloneParts.orEmpty() + parts).filterNot(::ready).toSet()
+        if (standaloneFailures.keys.removeAll(parts) || standaloneFailures.isEmpty()) publishFailures()
+        parts.forEach { part ->
+            val count = requestedCounts[part] ?: 0
+            requestedCounts[part] = count + 1
+            markRequested(part)
+        }
+        track(job)
+        job.invokeOnCompletion { completeRequest(parts, job) }
+        job.start()
+        job
+    }
+
+    private fun markRequested(part: ModelPart) {
+        when (models.status.value[part]) {
+            ModelStatus.Ready, is ModelStatus.Downloading, is ModelStatus.Verifying -> Unit
+            else -> models.publishProgress(part, ModelStatus.Downloading(0, 0, part.models.sumOf { it.downloadBytes }))
+        }
+    }
+
+    private fun track(job: Job) {
         downloads += job
         job.invokeOnCompletion { downloads -= job }
-        job.start()
-        return job
+    }
+
+    private fun completeRequest(parts: Set<ModelPart>, job: Job) = synchronized(downloadLock) {
+        if (requests[parts] === job) requests.remove(parts)
+        parts.forEach { part ->
+            val remaining = (requestedCounts[part] ?: 1) - 1
+            if (remaining == 0) {
+                requestedCounts.remove(part)
+                val running = current?.let { it.task.isActive && part in it.parts } == true
+                val status = models.status.value[part]
+                if (!running && (status is ModelStatus.Downloading || status is ModelStatus.Verifying)) {
+                    models.clearProgress(part)
+                }
+            } else {
+                requestedCounts[part] = remaining
+            }
+        }
+        pruneCompletedParts()
+    }
+
+    private fun ready(part: ModelPart): Boolean = models.status.value[part] == ModelStatus.Ready
+
+    private fun pruneCompletedParts() = synchronized(downloadLock) {
+        lastStandaloneParts = lastStandaloneParts?.filterNot(::ready)?.toSet()
+        if (standaloneFailures.keys.removeAll { ready(it) }) publishFailures()
+    }
+
+    private fun publishFailures() {
+        mutableOutcome.value = standaloneFailures.takeIf { it.isNotEmpty() }
+            ?.let { InstallOutcome.Installed(failed = it.toMap()) }
     }
 
     /** A retry never adds a model role that the original consent did not authorize. */
@@ -145,27 +226,39 @@ class ModelInstallOwner(
      * when no standalone download ran.
      */
     suspend fun stopDownloads(): Boolean {
-        val waiting = downloads.toList()
+        val waiting = synchronized(downloadLock) {
+            downloads.toList().also { if (it.isNotEmpty()) downloadGeneration++ }
+        }
         if (waiting.isEmpty()) return false
-        mutex.withLock { current?.stopped = true }
+        mutex.withLock { current?.takeIf { it.standalone > 0 }?.stopped = true }
         waiting.forEach { it.cancel(CancellationException("Android stopped the download")) }
         waiting.joinAll()
         return true
     }
 
-    /** Cancels the install that runs now, if any. Its `.part` files stay. */
+    /** Cancels the active install and queued requests. Their `.part` files stay. */
     fun cancel() {
-        current?.task?.cancel(CancellationException("Model install cancelled"))
+        synchronized(downloadLock) {
+            downloadGeneration++
+            downloads.toList().forEach { it.cancel(CancellationException("Model download cancelled")) }
+            current?.task?.cancel(CancellationException("Model install cancelled"))
+        }
     }
 
     private suspend fun install(
         parts: Set<ModelPart>,
         onProgress: (DownloadProgress) -> Unit,
         standalone: Boolean,
+        generation: Long? = null,
     ): InstallOutcome {
         require(parts.isNotEmpty()) { "No model part to install" }
         while (true) {
-            val (shared, joined) = mutex.withLock { attach(parts, onProgress, standalone) }
+            val (shared, joined) = mutex.withLock {
+                synchronized(downloadLock) {
+                    if (generation != null) checkGeneration(generation)
+                    attach(parts, onProgress, standalone)
+                }
+            }
             if (!joined) {
                 // Another part set installs, or a cancelled install has not ended: wait for its end, then try again.
                 shared.task.join()
@@ -174,9 +267,21 @@ class ModelInstallOwner(
             try {
                 return shared.task.await()
             } finally {
-                withContext(NonCancellable) { mutex.withLock { detach(shared, onProgress, standalone) } }
+                withContext(NonCancellable) {
+                    val last = mutex.withLock {
+                        detach(shared, onProgress, standalone)
+                        shared.waiters == 0
+                    }
+                    // A user-cancelled standalone job is done after its cleanup; Android timeout still returns promptly.
+                    if (standalone && last && !shared.stopped) shared.task.join()
+                }
             }
         }
+    }
+
+    /** Fence queued standalone requests before cancelling the active task. */
+    private fun checkGeneration(generation: Long) {
+        if (generation != downloadGeneration) throw CancellationException("Model download cancelled")
     }
 
     /**
@@ -197,7 +302,6 @@ class ModelInstallOwner(
         shared.waiters++
         if (standalone) {
             shared.standalone++
-            lastStandaloneParts = parts.toSet()
         }
         shared.listeners += listener
         if (running == null) {
@@ -223,7 +327,9 @@ class ModelInstallOwner(
 
     private suspend fun run(shared: Shared): InstallOutcome {
         // A new install drops the failure an earlier one left in the status.
-        shared.parts.forEach(models::clearProgress)
+        synchronized(downloadLock) {
+            shared.parts.filterNot { it in requestedCounts }.forEach(models::clearProgress)
+        }
         try {
             val consented = shared.parts.all { models.consented(it) }
             val store = RepositoryModelStore(models, modelRoot, network, consented)
@@ -235,7 +341,7 @@ class ModelInstallOwner(
             }
             val standalone = mutex.withLock { shared.standalone > 0 }
             showOutcome(shared.parts, outcome, standalone)
-            mutableOutcome.value = outcome
+            if (standalone) rememberOutcome(shared.parts, outcome)
             return outcome
         } catch (cancelled: CancellationException) {
             if (shared.stopped) {
@@ -244,16 +350,15 @@ class ModelInstallOwner(
                 val error = DownloadError.STOPPED_BY_SYSTEM
                 shared.parts.forEach { models.publishProgress(it, ModelStatus.Failed(failureOf(error), error.name)) }
                 val part = shared.progress?.part ?: shared.parts.min()
-                mutableOutcome.value = InstallOutcome.Failed(part, error, requiredFreeBytes = 0)
+                rememberOutcome(shared.parts, InstallOutcome.Failed(part, error, requiredFreeBytes = 0))
             } else {
                 shared.parts.forEach(models::clearProgress)
-                // A Cancel of the user is no failure: an older failure must not show again.
-                mutableOutcome.value = null
             }
             throw cancelled
         } finally {
             withContext(NonCancellable) {
                 models.refresh()
+                pruneCompletedParts()
                 mutex.withLock { release(shared) }
             }
         }
@@ -272,21 +377,35 @@ class ModelInstallOwner(
             InstallState.Installing(shared.parts, shared.progress, shared.standalone > 0, shared.waiters)
     }
 
+    /** Only explicitly retried or successfully installed roles can remove an earlier standalone failure. */
+    private fun rememberOutcome(parts: Set<ModelPart>, outcome: InstallOutcome) = synchronized(downloadLock) {
+        val previous = standaloneFailures.toMap()
+        val unrelated = previous.keys.any { it !in parts }
+        standaloneFailures.keys.removeAll(parts)
+        standaloneFailures.putAll(failures(outcome, standalone = true))
+        if (!unrelated) {
+            mutableOutcome.value = outcome
+        } else if (standaloneFailures != previous) {
+            publishFailures()
+        }
+    }
+
     /** Clears the progress of every part, then shows the failures of [outcome] until the next install. */
     private fun showOutcome(parts: Set<ModelPart>, outcome: InstallOutcome, standalone: Boolean) {
         parts.forEach(models::clearProgress)
-        val failures = when (outcome) {
-            is InstallOutcome.Failed -> mapOf(outcome.part to outcome.error)
-            is InstallOutcome.Installed -> {
-                val error = if (network.validated()) DownloadError.INSTALL else DownloadError.NO_CONNECTION
-                val skipped = if (standalone) outcome.skipped.associateWith { error } else emptyMap()
-                skipped + outcome.failed
-            }
-            is InstallOutcome.NeedsConsent -> emptyMap()
-        }
-        failures.forEach { (part, error) ->
+        failures(outcome, standalone).forEach { (part, error) ->
             models.publishProgress(part, ModelStatus.Failed(failureOf(error), error.name))
         }
+    }
+
+    private fun failures(outcome: InstallOutcome, standalone: Boolean): Map<ModelPart, DownloadError> = when (outcome) {
+        is InstallOutcome.Failed -> mapOf(outcome.part to outcome.error)
+        is InstallOutcome.Installed -> {
+            val error = if (network.validated()) DownloadError.INSTALL else DownloadError.NO_CONNECTION
+            val skipped = if (standalone) outcome.skipped.associateWith { error } else emptyMap()
+            skipped + outcome.failed
+        }
+        is InstallOutcome.NeedsConsent -> emptyMap()
     }
 
     internal companion object {

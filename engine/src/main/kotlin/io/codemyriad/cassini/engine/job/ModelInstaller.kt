@@ -76,8 +76,8 @@ sealed interface InstallOutcome {
  * - SPEECH is required: Parakeet must install. Its speech detector (VAD) is best effort, also when Parakeet is
  *   already installed.
  * - SPEAKERS (the diarizer) is best effort.
- * - VOICES (the voiceprint model) is best effort, and only installed once the diarizer is: prints come from the
- *   diarizer's speakers.
+ * - VOICES (the voiceprint model) is best effort. In a combined plan it waits for the diarizer: prints come from
+ *   the diarizer's speakers. A voice-only Settings download can install it independently.
  * - Without a validated network the best-effort parts are skipped at once (no 30 s timeout). SPEECH is still tried:
  *   the check can be stale, and its failure says "No connection".
  * - Consent is checked again on entry: without it nothing is fetched.
@@ -125,7 +125,11 @@ class ModelInstaller(private val store: ModelStore, private val io: CoroutineDis
             // Each part is checked against what is free now, after the parts installed before it.
             val requiredFreeBytes = ModelPlan(listOf(item)).requiredFreeBytes
             val space = store.usableBytes() >= requiredFreeBytes
-            val error = if (space) attempt(item, skipped, onProgress) else DownloadError.NOT_ENOUGH_STORAGE
+            val error = if (space) {
+                attempt(item, skipped, onProgress, singlePart = missing.size == 1)
+            } else {
+                DownloadError.NOT_ENOUGH_STORAGE
+            }
             if (item.part == ModelPart.SPEECH) {
                 speechError = error
                 speechFreeBytes = requiredFreeBytes
@@ -140,13 +144,14 @@ class ModelInstaller(private val store: ModelStore, private val io: CoroutineDis
             ?: InstallOutcome.Installed(skipped, failed)
     }
 
-    /** Installs [item], unless it is VOICES and the diarizer is missing: then it joins [skipped]. */
+    /** A combined plan waits for the diarizer before installing VOICES; a single-part download is independent. */
     private fun attempt(
         item: ModelPlan.Item,
         skipped: MutableSet<ModelPart>,
         onProgress: (DownloadProgress) -> Unit,
+        singlePart: Boolean,
     ): DownloadError? {
-        val waits = item.part == ModelPart.VOICES && !store.ready(ModelCatalog.DIARIZATION)
+        val waits = !singlePart && item.part == ModelPart.VOICES && !store.ready(ModelCatalog.DIARIZATION)
         if (waits) skipped += item.part
         return if (waits) null else installPart(item, onProgress)
     }

@@ -18,6 +18,8 @@ import io.codemyriad.cassini.ui.settings.ModelStatusUi
 import io.codemyriad.cassini.ui.settings.SettingsEvent
 import io.codemyriad.cassini.ui.settings.SettingsUiState
 import io.codemyriad.cassini.ui.settings.SpeechModelUi
+import io.codemyriad.cassini.ui.settings.canOpenDownload
+import io.codemyriad.cassini.ui.settings.isInstalling
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
@@ -134,10 +136,13 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
     }
 
     private fun chooseSpeech(model: SpeechModelUi) {
-        if (model == SpeechModelUi.INCLUDED && !state.value.includedAvailable) return
+        if (state.value.speechChecking || (model == SpeechModelUi.INCLUDED && !state.value.includedAvailable)) return
         viewModelScope.launch {
             try {
                 val status = state.value.models.firstOrNull { it.part == io.codemyriad.cassini.ui.format.ModelPartUi.SPEECH }?.status
+                if (model == SpeechModelUi.PARAKEET && status?.isInstalling == true) {
+                    return@launch
+                }
                 if (model == SpeechModelUi.PARAKEET && status != ModelStatusUi.Ready) {
                     emit(SettingsEffect.Open(ModelDownloadKey(parakeetOnly = true)))
                 } else {
@@ -153,13 +158,14 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
     }
 
     /**
-     * A "Not downloaded" row opens Model download (the consent), with no note. A failed row opens it too: there,
-     * Download starts the download again, for example after Android stopped it.
+     * A missing or failed row opens Model download for its own part, without a note. A pending row can restart
+     * an install after Cancel or process restart.
      */
     private fun openModel(event: SettingsEvent.OpenModel) {
         val status = state.value.models.firstOrNull { it.part == event.part }?.status
-        if (status == ModelStatusUi.NotDownloaded || status == ModelStatusUi.Failed) {
-            emit(SettingsEffect.Open(ModelDownloadKey()))
+        if (status?.canOpenDownload == true) {
+            val part = ModelPart.entries.single { Notices.partUi(it) == event.part }
+            emit(SettingsEffect.Open(ModelDownloadKey(part = part)))
         }
     }
 

@@ -12,7 +12,6 @@ import io.codemyriad.cassini.data.models.ModelStatus
 import io.codemyriad.cassini.data.voices.VoiceProblem
 import io.codemyriad.cassini.engine.job.DownloadError
 import io.codemyriad.cassini.engine.job.InstallOutcome
-import io.codemyriad.cassini.processing.InstallState
 import io.codemyriad.cassini.processing.ProcessingState
 import io.codemyriad.cassini.recording.CaptureFormat
 import io.codemyriad.cassini.ui.banner.BannerKind
@@ -145,25 +144,11 @@ class NoticeCenter(private val graph: AppGraph, context: Context, val imports: I
         }
     }
 
-    /**
-     * Keeps [downloadFailure] for the standalone download: a new install clears it, and the end of a standalone one
-     * sets it when the speech part failed. A job's download failure is the job's own banner on the Note screen.
-     */
+    /** Standalone outcomes retain unrelated failed roles while another model downloads. */
     private suspend fun followDownloads() {
-        var standalone = false
-        graph.installOwner.state.collect { state ->
-            when (state) {
-                is InstallState.Installing -> {
-                    downloadFailure.value = null
-                    standalone = standalone || state.standalone
-                }
-                InstallState.Idle -> {
-                    val outcome = graph.installOwner.lastOutcome.value
-                    if (standalone && outcome != null) {
-                        downloadFailure.value = standaloneFailure(outcome, graph.config.clock(), graph.network.validated())
-                    }
-                    standalone = false
-                }
+        graph.installOwner.lastOutcome.collect { outcome ->
+            downloadFailure.value = outcome?.let {
+                standaloneFailure(it, graph.config.clock(), graph.network.validated())
             }
         }
     }

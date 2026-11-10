@@ -32,6 +32,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -323,6 +324,30 @@ class ModelInstallOwnerTest {
         assertEquals(InstallOutcome.Installed(), withTimeout(WAIT_MS) { again.await() })
         assertEquals("one fetch at a time", 1, mostInFlight.get())
         assertEquals(ModelPart.entries.associateWith { ModelStatus.Ready }, models.status.value)
+    }
+
+    @Test fun retryOfTheSamePartCanQueueWhileTheCancelledFetchUnwinds() = runBlocking {
+        ownerWithObservableDispatch()
+        stubborn.set(true)
+        val parts = setOf(ModelPart.SPEECH)
+        val cancelled = owner.startDownload(parts)
+        assertTrue(started.await(WAIT_S, TimeUnit.SECONDS))
+        owner.cancel()
+        assertTrue(interruptSeen.await(WAIT_S, TimeUnit.SECONDS))
+
+        val retry = owner.startDownload(parts)
+        assertNotSame(cancelled, retry)
+        assertTrue(retry.isActive)
+        assertEquals(listOf(key(ModelCatalog.PARAKEET)), fetched.toList())
+
+        release.countDown()
+        withTimeout(WAIT_MS) {
+            cancelled.join()
+            retry.join()
+        }
+        assertEquals(InstallOutcome.Installed(), owner.lastOutcome.value)
+        assertEquals(ModelStatus.Ready, models.status.value[ModelPart.SPEECH])
+        assertEquals(1, mostInFlight.get())
     }
 
     @Test fun theInstallStopsWhenItsLastWaiterLeaves() = runBlocking {

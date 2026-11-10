@@ -8,6 +8,7 @@ import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.core.library.NoteFacts
 import io.codemyriad.cassini.core.library.NoteStatus
 import io.codemyriad.cassini.core.library.SearchQuery
+import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.data.db.LibraryRow
 import io.codemyriad.cassini.data.db.NoteDetails
 import io.codemyriad.cassini.data.db.SearchRow
@@ -22,7 +23,6 @@ import io.codemyriad.cassini.ui.components.Highlighted
 import io.codemyriad.cassini.ui.components.NoteRowUi
 import io.codemyriad.cassini.ui.components.NoteStatusUi
 import io.codemyriad.cassini.ui.format.DayLabel
-import io.codemyriad.cassini.ui.format.ModelPartUi
 import io.codemyriad.cassini.ui.format.TimeLeftUi
 import io.codemyriad.cassini.ui.library.DaySection
 import io.codemyriad.cassini.ui.library.ProgressBannerUi
@@ -209,12 +209,15 @@ object LibraryMapping {
     private fun standaloneDownload(state: ProcessingState): ProgressBannerUi? {
         val install = state.install as? InstallState.Installing
         if (!state.downloading && install?.standalone != true) return null
-        val line = downloadLine(install?.progress)
+        val line = downloadLine(install?.progress, install?.parts?.minOrNull() ?: ModelPart.SPEECH)
         return ProgressBannerUi(null, null, percent = null, progress = fill(line), line = line, queued = state.waiting)
     }
 
-    private fun downloadLine(progress: DownloadProgress?): ProgressLine = when {
-        progress == null -> ProgressLine.Downloading(ModelPartUi.SPEECH, 0)
+    private fun downloadLine(
+        progress: DownloadProgress?,
+        defaultPart: ModelPart = ModelPart.SPEECH,
+    ): ProgressLine = when {
+        progress == null -> ProgressLine.Downloading(Notices.partUi(defaultPart), 0)
         progress.verifying -> ProgressLine.Checking(progress.percent)
         else -> ProgressLine.Downloading(Notices.partUi(progress.part), progress.percent)
     }

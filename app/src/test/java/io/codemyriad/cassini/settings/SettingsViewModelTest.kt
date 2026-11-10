@@ -31,6 +31,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.serialization.json.Json
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -73,7 +74,7 @@ class SettingsViewModelTest {
         assertTrue(viewModel.now().models.all { it.status == ModelStatusUi.NotDownloaded })
         viewModel.onEvent(SettingsEvent.OpenModel(ModelPartUi.SPEAKERS))
         advanceUntilIdle()
-        assertEquals(listOf(SettingsEffect.Open(ModelDownloadKey())), effects)
+        assertEquals(listOf(SettingsEffect.Open(ModelDownloadKey(part = ModelPart.SPEAKERS))), effects)
     }
 
     @Test fun offlineOptionalFailuresRemainRetryableUnderEitherSpeechChoice() = runTest(dispatcher) {
@@ -94,8 +95,93 @@ class SettingsViewModelTest {
             viewModel.onEvent(SettingsEvent.OpenModel(ModelPartUi.SPEAKERS))
             viewModel.onEvent(SettingsEvent.OpenModel(ModelPartUi.VOICES))
             advanceUntilIdle()
-            assertEquals(List<SettingsEffect>(2) { SettingsEffect.Open(ModelDownloadKey()) }, effects)
+            assertEquals(
+                listOf(ModelPart.SPEAKERS, ModelPart.VOICES).map { SettingsEffect.Open(ModelDownloadKey(part = it)) },
+                effects,
+            )
         }
+    }
+
+    @Test fun selectedModelPartSurvivesNavigationStateSerialization() {
+        for (part in ModelPart.entries) {
+            val key = ModelDownloadKey(part = part)
+            val encoded = Json.encodeToString(ModelDownloadKey.serializer(), key)
+            assertEquals(key, Json.decodeFromString<ModelDownloadKey>(encoded))
+        }
+    }
+
+    @Test fun progressAndCompletionStayWithTheirPartWhenInputOrderChanges() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        for (active in ModelPart.entries) {
+            for (status in listOf(
+                ModelStatus.Downloading(37, 37, 100),
+                ModelStatus.Verifying(100),
+                ModelStatus.Ready,
+                ModelStatus.Failed(Failure.DOWNLOAD, "NO_CONNECTION"),
+            )) {
+                ports.models.value = ModelPart.entries.reversed().associateWith {
+                    if (it == active) status else Missing(false)
+                }
+                advanceUntilIdle()
+                assertEquals(ModelPartUi.entries.toList(), viewModel.now().models.map { it.part })
+                for (row in viewModel.now().models) {
+                    val expected = if (row.part.name == active.name) {
+                        SettingsViewModel.status(status)
+                    } else {
+                        ModelStatusUi.NotDownloaded
+                    }
+                    assertEquals(expected, row.status)
+                }
+            }
+        }
+    }
+
+    @Test fun optionalRowsIgnoreTapsWhileReadyDownloadingOrChecking() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        for (status in listOf(
+            ModelStatus.Ready,
+            ModelStatus.Downloading(37, 37, 100),
+            ModelStatus.Verifying(100),
+        )) {
+            ports.models.value = mapOf(
+                ModelPart.SPEECH to ModelStatus.Ready,
+                ModelPart.SPEAKERS to status,
+                ModelPart.VOICES to status,
+            )
+            advanceUntilIdle()
+            viewModel.onEvent(SettingsEvent.OpenModel(ModelPartUi.SPEAKERS))
+            viewModel.onEvent(SettingsEvent.OpenModel(ModelPartUi.VOICES))
+            advanceUntilIdle()
+            assertTrue(effects.isEmpty())
+        }
+    }
+
+    @Test fun pendingRowsCanRestartTheirOwnDownloadsAfterCancelOrProcessDeath() = runTest(dispatcher) {
+        ports.models.value = ModelPart.entries.associateWith { Missing(true) }
+        val viewModel = viewModel()
+        viewModel.onEvent(SettingsEvent.OpenModel(ModelPartUi.SPEAKERS))
+        viewModel.onEvent(SettingsEvent.OpenModel(ModelPartUi.VOICES))
+        advanceUntilIdle()
+        assertEquals(
+            listOf(ModelPart.SPEAKERS, ModelPart.VOICES).map { SettingsEffect.Open(ModelDownloadKey(part = it)) },
+            effects,
+        )
+    }
+
+    @Test fun parakeetCannotOpenConsentDuringLoadingDownloadingOrVerification() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        for (status in listOf(ModelStatus.Downloading(10, 1, 10), ModelStatus.Verifying(10))) {
+            ports.models.value = mapOf(ModelPart.SPEECH to status)
+            advanceUntilIdle()
+            viewModel.onEvent(SettingsEvent.ChooseSpeech(SpeechModelUi.PARAKEET))
+            advanceUntilIdle()
+            assertTrue(effects.isEmpty())
+        }
+        val loading = SettingsViewModel(ports)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { loading.effects.collect { effects += it } }
+        loading.onEvent(SettingsEvent.ChooseSpeech(SpeechModelUi.PARAKEET))
+        advanceUntilIdle()
+        assertTrue(effects.isEmpty())
     }
 
     @Test fun recommendationOpensOnlyParakeetConsentAndDismissesWithoutChangingTheModel() = runTest(dispatcher) {
@@ -180,7 +266,10 @@ class SettingsViewModelTest {
         // A download that Android stopped (or that failed) starts again from Model download.
         viewModel.onEvent(SettingsEvent.OpenModel(ModelPartUi.SPEAKERS))
         advanceUntilIdle()
-        assertEquals(List<SettingsEffect>(2) { SettingsEffect.Open(ModelDownloadKey()) }, effects)
+        assertEquals(
+            listOf(ModelPart.SPEECH, ModelPart.SPEAKERS).map { SettingsEffect.Open(ModelDownloadKey(part = it)) },
+            effects,
+        )
     }
 
     @Test

@@ -42,7 +42,7 @@ data object RecordingKey : NavKey
 data class ModelDownloadKey(
     val noteId: String? = null,
     val parakeetOnly: Boolean = false,
-    /** The model role requested by this consent screen. */
+    /** A Settings row requests only this part, independent of the selected speech recognizer. */
     val part: ModelPart? = null,
 ) : NavKey
 
