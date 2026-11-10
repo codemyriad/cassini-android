@@ -43,6 +43,7 @@ import io.codemyriad.cassini.recording.FakeConsent
 import io.codemyriad.cassini.recording.FakePlatform
 import io.codemyriad.cassini.recording.RecordingState
 import io.codemyriad.cassini.testing.NoUncaughtCoroutines
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -150,7 +151,10 @@ class AppShellTest {
         // The Library state is built off the main thread: wait for the loaded Library.
         waitFor(hasText("Record"))
         rule.onNodeWithText("Record").performClick()
-        rule.waitUntil(TIMEOUT_MS) { app.graph.recording.state.value is RecordingState.Active }
+        runBlocking {
+            withTimeout(TIMEOUT_MS) { app.graph.recording.state.first { it is RecordingState.Active } }
+        }
+        rule.waitForIdle()
         rule.onNodeWithText("Finish").assertExists()
 
         Espresso.pressBack()
@@ -278,7 +282,9 @@ class AppShellTest {
         // A rotation or a language change while the file imports: the new activity opens the note.
         rule.activityRule.scenario.recreate()
         waitFor(hasContentDescription("Search in transcript"))
-        rule.waitUntil(TIMEOUT_MS) { app.graph.viewedImports.ready.value.isEmpty() }
+        runBlocking {
+            withTimeout(TIMEOUT_MS) { app.graph.viewedImports.ready.first { it.isEmpty() } }
+        }
     }
 
     @Test fun aConfigurationChangeKeepsTheNotePlayer() {
