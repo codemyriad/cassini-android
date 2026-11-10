@@ -206,6 +206,18 @@ class LibraryMappingTest {
         assertEquals(ProgressLine.Downloading(ModelPartUi.SPEAKERS, 46), banner.line)
     }
 
+    @Test fun standaloneBeforeTheFirstByteNamesTheRequestedPart() {
+        for (part in ModelPart.entries) {
+            val state = ProcessingState(
+                loading = false,
+                install = InstallState.Installing(setOf(part), null, true, 1),
+                downloading = true,
+            )
+            val expected = ModelPartUi.valueOf(part.name)
+            assertEquals(ProgressLine.Downloading(expected, 0), LibraryMapping.progress(state)?.line)
+        }
+    }
+
     private fun emptyDraft() = DraftState(
         words = emptyList(),
         labels = emptyMap(),

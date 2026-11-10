@@ -8,7 +8,6 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
@@ -35,14 +34,18 @@ import io.codemyriad.cassini.ui.licenses.LicensesScreen
 import io.codemyriad.cassini.ui.models.ModelDownloadEvent
 import io.codemyriad.cassini.ui.models.ModelDownloadScreen
 import io.codemyriad.cassini.ui.settings.LanguageChoice
+import io.codemyriad.cassini.ui.settings.ModelStatusUi
 import io.codemyriad.cassini.ui.settings.SettingsEvent
 import io.codemyriad.cassini.ui.settings.SettingsScreen
+import io.codemyriad.cassini.ui.settings.SpeechModelUi
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import io.codemyriad.cassini.ui.trash.TrashBackTo
 import io.codemyriad.cassini.ui.trash.TrashEvent
 import io.codemyriad.cassini.ui.trash.TrashScreen
 import io.codemyriad.cassini.ui.voices.SavedVoicesEvent
 import io.codemyriad.cassini.ui.voices.SavedVoicesScreen
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -110,6 +113,33 @@ class SettingsBehaviourTest {
         rule.onAllNodesWithText("Download and transcribe").assertCountEquals(0)
     }
 
+    @Test fun singlePartStandaloneConsentUsesNeutralCopy() {
+        val sample = VariantFixtures.modelDownload.getValue("models-without-note")
+        val state = sample.copy(parts = persistentListOf(sample.parts.last()))
+        setThemed { ModelDownloadScreen(state, onEvent = {}) }
+        rule.onNodeWithText("Optional download", substring = true).assertExists()
+        rule.onAllNodesWithText("recognising words and telling voices apart", substring = true).assertCountEquals(0)
+    }
+
+    @Test fun pendingOptionalRowsHaveAnActionButAnActiveParakeetDoesNot() {
+        val events = mutableListOf<SettingsEvent>()
+        val state = BoardFixtures.settings.copy(
+            models = BoardFixtures.settings.models.map { row ->
+                val status = if (row.part == ModelPartUi.SPEECH) {
+                    ModelStatusUi.Downloading(10)
+                } else {
+                    ModelStatusUi.Pending
+                }
+                row.copy(status = status)
+            }.toImmutableList(),
+            speechChecking = false,
+        )
+        setThemed { SettingsScreen(state, onEvent = { events += it }) }
+        rule.onNodeWithText("Parakeet Ultra").assertHasNoClickAction()
+        rule.onNodeWithText("Telling speakers apart").performScrollTo().performClick()
+        rule.runOnIdle { assertEquals(listOf(SettingsEvent.OpenModel(ModelPartUi.SPEAKERS)), events) }
+    }
+
     @Test fun unavailableWhistleHasNoActionAndParakeetCanBeSelected() {
         val events = mutableListOf<SettingsEvent>()
         val state = VariantFixtures.settings.getValue("settings-included-unavailable")
@@ -141,7 +171,7 @@ class SettingsBehaviourTest {
         rule.onNode(
             hasText("Telling speakers apart", substring = true) and hasClickAction(),
         ).performScrollTo().performClick()
-        rule.onNode(hasText("Parakeet Ultra", substring = true)).assertHasClickAction()
+        rule.onNode(hasText("Parakeet Ultra", substring = true)).assertHasNoClickAction()
         rule.onNodeWithText("Saved voices").performScrollTo().performClick()
         rule.onNodeWithText("Trash").performScrollTo().performClick()
         rule.onNodeWithText("Free software under GPLv3", substring = true).performScrollTo().performFirstLinkClick()
@@ -206,6 +236,16 @@ class SettingsBehaviourTest {
         for (choice in LanguageChoice.offered) rule.onAllNodes(languageOptions)[choice.ordinal].assertIsNotSelected()
         rule.onNode(hasText("Phone") and isSelectable()).performClick()
         rule.runOnIdle { assertEquals(listOf(SettingsEvent.Language(LanguageChoice.PHONE)), events) }
+    }
+
+    @Test fun bundledWhistleSelectsTheIncludedModelWithoutADownloadEvent() {
+        val events = mutableListOf<SettingsEvent>()
+        val state = BoardFixtures.settings.copy(includedAvailable = true, speechChecking = false)
+        setThemed { SettingsScreen(state, onEvent = { events += it }) }
+        rule.onNodeWithText("Whistle").performScrollTo().performClick()
+        rule.runOnIdle {
+            assertEquals(listOf(SettingsEvent.ChooseSpeech(SpeechModelUi.INCLUDED)), events)
+        }
     }
 
     @Test fun aModelRowReadsItsStatusWithItsName() {

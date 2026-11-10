@@ -1,6 +1,7 @@
 package io.codemyriad.cassini.nav
 
 import androidx.navigation3.runtime.NavKey
+import io.codemyriad.cassini.core.models.ModelPart
 import kotlinx.serialization.Serializable
 
 // The destinations of the app (docs/architecture.md section 6). Navigation 3 saves the back stack with
@@ -38,7 +39,12 @@ data object RecordingKey : NavKey
 
 /** The model download consent. With [noteId] it transcribes that note once the models are there. */
 @Serializable
-data class ModelDownloadKey(val noteId: String? = null, val parakeetOnly: Boolean = false) : NavKey
+data class ModelDownloadKey(
+    val noteId: String? = null,
+    val parakeetOnly: Boolean = false,
+    /** A Settings row requests only this part, independent of the selected speech recognizer. */
+    val part: ModelPart? = null,
+) : NavKey
 
 @Serializable
 data object SettingsKey : NavKey

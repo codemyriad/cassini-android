@@ -75,3 +75,13 @@ sealed interface ModelStatusUi {
 
 /** Engine labels for Settings; engine and storage types stay outside :ui. */
 enum class SpeechModelUi { INCLUDED, PARAKEET }
+
+/** A missing or failed part can start from Settings, including after Cancel or restart. */
+val ModelStatusUi.canOpenDownload: Boolean
+    get() = when (this) {
+        ModelStatusUi.NotDownloaded, ModelStatusUi.Failed, ModelStatusUi.Pending -> true
+        else -> false
+    }
+
+val ModelStatusUi.isInstalling: Boolean
+    get() = this is ModelStatusUi.Downloading || this == ModelStatusUi.Checking
