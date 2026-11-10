@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.ContentProvider
 import android.content.ContentValues
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.database.Cursor
 import android.database.MatrixCursor
 import android.net.Uri
@@ -14,6 +15,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import io.codemyriad.cassini.AppGraph
+import io.codemyriad.cassini.BuildConfig
 import io.codemyriad.cassini.CassiniApplication
 import io.codemyriad.cassini.GraphFactory
 import io.codemyriad.cassini.MainActivity
@@ -108,6 +110,18 @@ class SharedFileTest {
         return generateSequence { shadow.nextStartedService }
             .filter { it.component?.className == ImportGrantService::class.java.name }
             .toList()
+    }
+
+    @Test fun allDeclaredProviderAuthoritiesUseTheApplicationId() {
+        val applicationId = BuildConfig.APPLICATION_ID
+        assertEquals(applicationId, app.packageName)
+        val providers = app.packageManager.getPackageInfo(applicationId, PackageManager.GET_PROVIDERS).providers.orEmpty()
+        assertTrue("the merged manifest declares providers", providers.isNotEmpty())
+        for (provider in providers) {
+            for (authority in requireNotNull(provider.authority).split(';')) {
+                assertTrue("${provider.name}: $authority", authority.startsWith("$applicationId."))
+            }
+        }
     }
 
     @Test fun pathsOwnProvidersAndTraversalStartNoImport() {
