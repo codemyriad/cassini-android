@@ -51,7 +51,9 @@ class SettingsModelDownloadTest {
     private val folder = TemporaryFolder()
     private val app: CassiniApplication = ApplicationProvider.getApplicationContext()
     private val fetched = CopyOnWriteArrayList<String>()
+
     @Volatile private var completeDownload = false
+
     private val graph: AppGraph get() = app.graph
     private val graphRule = object : ExternalResource() {
         override fun before() {

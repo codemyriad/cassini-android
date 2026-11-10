@@ -87,9 +87,9 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         prefs[consentKey(part)] ?: prefs[Keys.CONSENT_AT].takeIf { part != ModelPart.SPEECH }
 
     private fun optionalConsentAt(prefs: Preferences): Long? {
-        val speakers = consentAt(prefs, ModelPart.SPEAKERS) ?: return null
-        val voices = consentAt(prefs, ModelPart.VOICES) ?: return null
-        return maxOf(speakers, voices)
+        val speakers = consentAt(prefs, ModelPart.SPEAKERS)
+        val voices = consentAt(prefs, ModelPart.VOICES)
+        return if (speakers != null && voices != null) maxOf(speakers, voices) else null
     }
 
     val speechConsentAt: Flow<Long?> = key(Keys.SPEECH_CONSENT_AT)

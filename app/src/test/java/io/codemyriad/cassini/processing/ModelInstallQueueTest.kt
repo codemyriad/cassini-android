@@ -45,7 +45,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 /** Independent Settings requests share one installer. Gates hold a fake fetch while another request queues. */
 @RunWith(RobolectricTestRunner::class)
 class ModelInstallQueueTest {
-    @get:Rule(order = Int.MIN_VALUE) val uncaught = NoUncaughtCoroutines()
+    @get:Rule(order = Int.MIN_VALUE)
+    val uncaught = NoUncaughtCoroutines()
+
     @get:Rule val folder = TemporaryFolder()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)

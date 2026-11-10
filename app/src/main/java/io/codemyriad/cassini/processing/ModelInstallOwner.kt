@@ -157,8 +157,7 @@ class ModelInstallOwner(
         }
         requests[parts] = job
         lastStandaloneParts = (lastStandaloneParts.orEmpty() + parts).filterNot(::ready).toSet()
-        standaloneFailures.keys.removeAll(parts)
-        publishFailures()
+        if (standaloneFailures.keys.removeAll(parts) || standaloneFailures.isEmpty()) publishFailures()
         parts.forEach { part ->
             val count = requestedCounts[part] ?: 0
             requestedCounts[part] = count + 1
@@ -237,11 +236,13 @@ class ModelInstallOwner(
         return true
     }
 
-    /** Cancels the install that runs now, if any. Its `.part` files stay. */
-    fun cancel() = synchronized(downloadLock) {
-        downloadGeneration++
-        downloads.toList().forEach { it.cancel(CancellationException("Model download cancelled")) }
-        current?.task?.cancel(CancellationException("Model install cancelled"))
+    /** Cancels the active install and queued requests. Their `.part` files stay. */
+    fun cancel() {
+        synchronized(downloadLock) {
+            downloadGeneration++
+            downloads.toList().forEach { it.cancel(CancellationException("Model download cancelled")) }
+            current?.task?.cancel(CancellationException("Model install cancelled"))
+        }
     }
 
     private suspend fun install(
@@ -350,8 +351,6 @@ class ModelInstallOwner(
                 rememberOutcome(shared.parts, InstallOutcome.Failed(part, error, requiredFreeBytes = 0))
             } else {
                 shared.parts.forEach(models::clearProgress)
-                // A Cancel of the user is no failure: an older failure must not show again.
-                synchronized(downloadLock) { publishFailures() }
             }
             throw cancelled
         } finally {
@@ -378,10 +377,15 @@ class ModelInstallOwner(
 
     /** Only explicitly retried or successfully installed roles can remove an earlier standalone failure. */
     private fun rememberOutcome(parts: Set<ModelPart>, outcome: InstallOutcome) = synchronized(downloadLock) {
-        val unrelated = standaloneFailures.keys.any { it !in parts }
+        val previous = standaloneFailures.toMap()
+        val unrelated = previous.keys.any { it !in parts }
         standaloneFailures.keys.removeAll(parts)
         standaloneFailures.putAll(failures(outcome, standalone = true))
-        mutableOutcome.value = if (unrelated) InstallOutcome.Installed(failed = standaloneFailures.toMap()) else outcome
+        if (!unrelated) {
+            mutableOutcome.value = outcome
+        } else if (standaloneFailures != previous) {
+            publishFailures()
+        }
     }
 
     /** Clears the progress of every part, then shows the failures of [outcome] until the next install. */

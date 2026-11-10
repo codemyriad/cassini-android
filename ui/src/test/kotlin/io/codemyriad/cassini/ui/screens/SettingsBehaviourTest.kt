@@ -125,7 +125,11 @@ class SettingsBehaviourTest {
         val events = mutableListOf<SettingsEvent>()
         val state = BoardFixtures.settings.copy(
             models = BoardFixtures.settings.models.map { row ->
-                val status = if (row.part == ModelPartUi.SPEECH) ModelStatusUi.Downloading(10) else ModelStatusUi.Pending
+                val status = if (row.part == ModelPartUi.SPEECH) {
+                    ModelStatusUi.Downloading(10)
+                } else {
+                    ModelStatusUi.Pending
+                }
                 row.copy(status = status)
             }.toImmutableList(),
             speechChecking = false,
