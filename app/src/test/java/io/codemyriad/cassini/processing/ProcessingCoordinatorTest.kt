@@ -29,9 +29,9 @@ import io.codemyriad.cassini.engine.job.JobPhase
 import io.codemyriad.cassini.settings.SettingsViewModel
 import io.codemyriad.cassini.testing.NoUncaughtCoroutines
 import io.codemyriad.cassini.ui.settings.ModelStatusUi
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
@@ -270,7 +270,7 @@ class ProcessingCoordinatorTest {
         assertEquals(0L, catalogue().jobs.job(a)?.doneMs)
     }
 
-    @Test fun startOverAfterTheRunEndedButBeforeItsOutcomeIsWrittenStillDiscards() = runBlocking {
+    @Test fun discardAfterTheRunEndedButBeforeItsOutcomeIsWrittenRemovesTheCheckpoint() = runBlocking {
         graph()
         consent()
         val a = note("A")
@@ -282,12 +282,15 @@ class ProcessingCoordinatorTest {
         // Stop: the run ends Paused, but its events stay open, so the outcome is not written yet.
         assertTrue(coordinator.stop(a))
         withTimeout(TIMEOUT_MS) { first.ended.await() }
-        val over = async { coordinator.startOver(a) }
-        delay(SETTLE_MS)
+        // A true cancellation result proves the discard reached the held active run, not an inactive fallback.
+        val discard = async(start = CoroutineStart.UNDISPATCHED) { coordinator.cancel(a, discard = true) }
+        assertFalse("the outcome is still held", discard.isCompleted)
         first.closeEvents()
 
-        assertEquals(TranscribeOutcome.Queued(changed = true), withTimeout(TIMEOUT_MS) { over.await() })
+        assertTrue("the held active run accepted the discard", withTimeout(TIMEOUT_MS) { discard.await() })
         assertFalse("the checkpoint is discarded", paths.work(a).exists())
+        val over = async { coordinator.startOver(a) }
+        assertEquals(TranscribeOutcome.Queued(changed = true), withTimeout(TIMEOUT_MS) { over.await() })
         assertEquals(a, job(1).noteId)
         assertEquals(0L, catalogue().jobs.job(a)?.doneMs)
     }
@@ -789,7 +792,6 @@ class ProcessingCoordinatorTest {
 
     private companion object {
         const val TIMEOUT_MS = 20_000L
-        const val SETTLE_MS = 300L
         const val DURATION_MS = 4_000L
         const val RACE_ROUNDS = 200
         const val PART_FILE = "encoder.int8.onnx.part"
