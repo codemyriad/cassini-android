@@ -71,7 +71,8 @@ class LongExportTest {
     private companion object {
         const val SAMPLES = 3
         const val CPU_LIMIT_NS = 30_000_000_000L
-        // Measured baseline 3.06; leave margin while rejecting the historical ~4x interval-pair regression.
+
+        // Disjoint runs must avoid the approximately 4x growth of an all-pairs interval scan.
         const val MAX_CPU_GROWTH = 3.5
         const val HANG_GUARD_MS = 300_000L
     }

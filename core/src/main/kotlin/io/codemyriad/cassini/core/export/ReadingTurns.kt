@@ -1,6 +1,7 @@
 package io.codemyriad.cassini.core.export
 
 import io.codemyriad.cassini.core.format.Word
+import java.util.PriorityQueue
 import kotlin.math.abs
 
 /** A viewer paragraph member. Indices always refer to the unchanged canonical word list. */
@@ -356,22 +357,38 @@ object ReadingTurns {
     }
 
     private fun competing(runs: List<Run>, nested: Map<Run, Nest>, spans: Map<Block, List<Span>>): Map<Run, List<String>> {
-        data class Collision(val left: Run, val right: Run, val ms: Long)
+        data class Envelope(val index: Int, val run: Run, val start: Long, val end: Long)
+        data class Collision(val left: Run, val right: Run, val ms: Long, val leftIndex: Int, val rightIndex: Int)
         val collisions = ArrayList<Collision>()
         val audible = runs.associateWith { it.spans(spans) }
-        for ((index, left) in runs.withIndex()) {
-            for (rightIndex in index + 1 until runs.size) {
-                val right = runs[rightIndex]
-                if (left.speaker == right.speaker || nested[left]?.host === right || nested[right]?.host === left) continue
-                val ms = intersectionMs(audible.getValue(left), audible.getValue(right))
-                if (ms >= OVERLAP_MS) collisions += Collision(left, right, ms)
+        val ordered = runs.withIndex().mapNotNull { (index, run) ->
+            val pool = audible.getValue(run)
+            if (pool.isEmpty()) null else Envelope(index, run, pool.first().start, pool.last().end)
+        }.sortedWith(compareBy<Envelope> { it.start }.thenBy { it.index })
+        val active = LinkedHashMap<Int, Envelope>()
+        val ending = PriorityQueue(compareBy<Envelope> { it.end }.thenBy { it.index })
+        for (current in ordered) {
+            // Half-open envelopes that ended cannot contribute any audible intersection.
+            while (ending.isNotEmpty() && ending.peek().end <= current.start) {
+                active.remove(ending.remove().index)
             }
+            for (previous in active.values) {
+                val left = if (previous.index < current.index) previous else current
+                val right = if (left === previous) current else previous
+                if (left.run.speaker == right.run.speaker || nested[left.run]?.host === right.run ||
+                    nested[right.run]?.host === left.run
+                ) continue
+                val ms = intersectionMs(audible.getValue(left.run), audible.getValue(right.run))
+                if (ms >= OVERLAP_MS) collisions += Collision(left.run, right.run, ms, left.index, right.index)
+            }
+            active[current.index] = current
+            ending += current
         }
         val over = HashMap<Run, MutableList<String>>()
         val largestFirst = collisions.sortedWith(
             compareByDescending<Collision> { it.ms }.thenBy {
                 it.left.blocks.first().key.toString().padStart(KEY_DIGITS, '0')
-            },
+            }.thenBy { it.leftIndex }.thenBy { it.rightIndex },
         )
         for (collision in largestFirst) {
             over.getOrPut(collision.left) { arrayListOf() }.add(collision.right.speaker)
