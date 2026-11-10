@@ -11,7 +11,17 @@ export CASSINI_TEST_APK=app/build/outputs/apk/androidTest/debug/app-debug-androi
 test -f "$CASSINI_APK"
 test -f "$CASSINI_TEST_APK"
 mkdir -p .tools/models-results
-trap 'adb logcat -d > .tools/models-results/logcat.txt 2>&1 || true' EXIT
+collect() {
+    adb logcat -d > .tools/models-results/logcat.txt 2>&1 || true
+    mkdir -p .tools/models-results/goldens-candidate
+    for name in fleurs-it-short.txt fleurs-it-short.srt fleurs-it-short.vtt; do
+        adb exec-out run-as io.codemyriad.cassini cat "cache/goldens-candidate/$name" > ".tools/models-results/goldens-candidate/$name" || true
+    done
+}
+trap collect EXIT
 adb install -r "$CASSINI_APK"
+# Temporary D86 baseline encoder: checksum-verified before staging into this disposable CI emulator.
+adb push .tools/d86-old-encoder.onnx /data/local/tmp/d86-old-encoder.onnx
+adb shell run-as io.codemyriad.cassini cp /data/local/tmp/d86-old-encoder.onnx files/d86-old-encoder.onnx
 ./scripts/push-models.sh .tools/ci-models | tee .tools/models-results/push.txt
 ./scripts/device-smoke.sh --sample fleurs --annotation NeedsModels | tee .tools/models-results/instrumentation.txt

@@ -72,6 +72,12 @@ jobs:
         with:
           path: .tools/ci-models
           key: ${{ steps.model-key.outputs.key }}
+      - name: Fetch the D86 baseline encoder for comparison
+        run: |
+          curl --fail --location --max-time 600 https://dist.gocassini.com/models/files/caf7a38f2ad3224c1863564fb6e975a11aa3ae6ad1e7ad0bee5c4f5e018babb4/encoder.int8.onnx.zst -o .tools/d86-old-encoder.onnx.zst
+          echo 'caf7a38f2ad3224c1863564fb6e975a11aa3ae6ad1e7ad0bee5c4f5e018babb4  .tools/d86-old-encoder.onnx.zst' | sha256sum --check
+          zstd --decompress .tools/d86-old-encoder.onnx.zst -o .tools/d86-old-encoder.onnx
+          echo '299617fefd4664d1c115b691dcb6413cabcdbcc694cdf3cb4464b72c5fc3ae69  .tools/d86-old-encoder.onnx' | sha256sum --check
       - name: Fetch and verify the models
         run: python3 -I scripts/fetch-ci-models.py
       # Saved from main only (D66 AND-6): a run started by hand on a branch with other pins restores nothing and
