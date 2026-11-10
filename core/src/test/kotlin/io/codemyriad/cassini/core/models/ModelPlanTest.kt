@@ -29,7 +29,7 @@ class ModelPlanTest {
     /** What one file needs while it installs: its download and its decompressed copy. */
     private fun Artifact.peak() = download!!.size + size
 
-    @Test fun aFreshInstallNeedsAbout1231MiBAndShows528() {
+    @Test fun aFreshInstallNeedsAbout1232MiBAndShows528() {
         val plan = ModelPlan.of { false }
         assertEquals(listOf(ModelPart.SPEECH, ModelPart.SPEAKERS, ModelPart.VOICES), plan.parts)
         assertEquals(listOf(440L, 62L, 26L), plan.missing.map { it.mebibytes })
@@ -42,7 +42,7 @@ class ModelPlanTest {
         // Every installed file, plus the one download being decompressed at a time: at most the speech encoder's.
         val encoder = ModelCatalog.parakeetArtifacts.first { it.name == "encoder.int8.onnx" }.download!!.size
         assertEquals(speech + speakers + voices + encoder + ArtifactFetcher.SLACK_BYTES, plan.requiredFreeBytes)
-        assertEquals(1231L, (plan.requiredFreeBytes / mib).roundToLong())
+        assertEquals(1232L, (plan.requiredFreeBytes / mib).roundToLong())
         assertEquals(1230L, plan.requiredFreeMebibytes)
     }
 
