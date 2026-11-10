@@ -166,7 +166,7 @@ An `Instrumentation.ActivityMonitor` gives the result of the system file picker 
 The export goldens are in `app/src/androidTest/assets/goldens/`. We recorded them on emulator-5554 (API 34, x86_64). In the TXT golden, the second line is `<date> · 00:15`, because the date of the note changes at each run. If a golden is not there or is different, `NoteFlowTest` fails. Then it writes the export to `cache/goldens-candidate/` of the app. To record a golden again, do these steps:
 
 1. Run `scripts/device-smoke.sh --serial emulator-5554 --class io.codemyriad.cassini.flows.NoteFlowTest`.
-2. Copy the candidate with `adb exec-out run-as io.codemyriad.cassini cat cache/goldens-candidate/fleurs-it-short.txt`.
+2. Copy the candidate with `adb exec-out run-as io.codemyriad.cassini.talk cat cache/goldens-candidate/fleurs-it-short.txt`.
 3. Examine the candidate, and then put it in `app/src/androidTest/assets/goldens/`.
 4. Delete `cache/goldens-candidate/` on the device with `run-as`.
 
@@ -174,14 +174,14 @@ The export goldens are in `app/src/androidTest/assets/goldens/`. We recorded the
 
 CAUTION: Do not run the Gradle `connected*` tasks or the managed-device tasks. Their cleanup can uninstall the app, and the uninstall erases the app data and the models (about 770 MB).
 
-CAUTION: Do not run `adb uninstall io.codemyriad.cassini` or `adb shell pm clear io.codemyriad.cassini`. These commands erase the app data and the models.
+CAUTION: Do not run `adb uninstall io.codemyriad.cassini.talk` or `adb shell pm clear io.codemyriad.cassini.talk`. These commands erase the app data and the models.
 
 Install an APK with `adb install -r`. Run instrumentation with `scripts/device-smoke.sh` or `adb shell am instrument`.
 
 Most device tests use a scratch root (see [CassiniTestRunner](#cassinitestrunner)), and the host scripts use a debug root. Before you run a test that has no scratch root, make a backup of the app files without the models:
 
 ```sh
-adb exec-out run-as io.codemyriad.cassini tar c \
+adb exec-out run-as io.codemyriad.cassini.talk tar c \
     --exclude=files/models --exclude=files/parakeet-ultra --exclude=files/vad --exclude=files/speaker-models \
     files > files-backup.tar
 ```
@@ -189,8 +189,8 @@ adb exec-out run-as io.codemyriad.cassini tar c \
 If the test damaged or erased your notes, restore the backup. First stop the app, then extract the backup into the app storage:
 
 ```sh
-adb shell am force-stop io.codemyriad.cassini
-adb exec-in run-as io.codemyriad.cassini tar xf - < files-backup.tar
+adb shell am force-stop io.codemyriad.cassini.talk
+adb exec-in run-as io.codemyriad.cassini.talk tar xf - < files-backup.tar
 ```
 
 The restore writes back each file in the backup. It does not delete the files that the test added.
@@ -272,13 +272,13 @@ The CI artifact `cassini-android-device-tests` holds both APKs. The script refus
 2. It writes `files/debug-root.txt`. This file names a scratch root `files/killtest-<time>`. Only debug builds read it. The models stay in `files/`.
 3. It imports the clip through the debug-only `DebugCommandActivity`. The import starts a transcription job.
 4. It reads a debug status file in the scratch root until the job saved a checkpoint.
-5. It kills the process with `adb shell run-as io.codemyriad.cassini kill -9 <pid>`.
+5. It kills the process with `adb shell run-as io.codemyriad.cassini.talk kill -9 <pid>`.
 6. It waits for the system to deliver the service intent again. If the system does not do this in time, it opens `DebugCommandActivity` with `am start`.
 7. It reads the status file until the job is done.
 8. It copies the document to the host and runs `cassini-extract.py --check` on it. If `../gocassini` exists, it also runs `check-portable-document.mjs`.
 9. It deletes `files/debug-root.txt` and the scratch root.
 
-CAUTION: If the script stops before step 9, delete the debug root file with `adb shell run-as io.codemyriad.cassini rm files/debug-root.txt`. Until you delete it, the debug app uses the scratch root and does not show your notes.
+CAUTION: If the script stops before step 9, delete the debug root file with `adb shell run-as io.codemyriad.cassini.talk rm files/debug-root.txt`. Until you delete it, the debug app uses the scratch root and does not show your notes.
 
 A host script does this test because the two Android tools do not kill the process in the same way as the system:
 
@@ -289,7 +289,7 @@ A host script does this test because the two Android tools do not kill the proce
 
 ### device-language-check.sh
 
-`scripts/device-language-check.sh` makes sure that the app language stays after process death. It opens the App language sheet in Settings and selects Italiano, with `uiautomator dump` and `input tap`. Then it kills the process with `run-as io.codemyriad.cassini kill -9`, starts the app with `am start -W` and finds Italian text in a new `uiautomator dump`. At the end, it sets the language back to Phone.
+`scripts/device-language-check.sh` makes sure that the app language stays after process death. It opens the App language sheet in Settings and selects Italiano, with `uiautomator dump` and `input tap`. Then it kills the process with `run-as io.codemyriad.cassini.talk kill -9`, starts the app with `am start -W` and finds Italian text in a new `uiautomator dump`. At the end, it sets the language back to Phone.
 
 ```sh
 scripts/device-language-check.sh --serial emulator-5554
@@ -401,8 +401,8 @@ The checks 2 to 6, 8 and 9 use a debug root (`files/debug-root.txt`, see [device
 | 5. Font scale 2.0 | `adb shell settings put system font_scale 2.0`, then screenshots of Library, Note, Name a speaker and Settings | Passed after two corrections. See [Font scale 2.0](#font-scale-20). |
 | 6. Reduced motion | `adb shell settings put global animator_duration_scale 0`, then four Recording screenshots 0.3 s apart | Passed with a limit. See [Reduced motion](#reduced-motion). |
 | 7. App language after process death | `scripts/device-language-check.sh --serial emulator-5554` | Passed |
-| 8. Foreground service types | `adb shell dumpsys activity services io.codemyriad.cassini` during check 4 | Passed: `ProcessingService` has `types=00000001` (`dataSync`) and `RecordingService` has `types=00000080` (`microphone`) |
-| 9. Cold start | `adb shell am start -W -n io.codemyriad.cassini/.MainActivity` after `am force-stop`, three times | `TotalTime` 3246, 2886 and 2923 ms |
+| 8. Foreground service types | `adb shell dumpsys activity services io.codemyriad.cassini.talk` during check 4 | Passed: `ProcessingService` has `types=00000001` (`dataSync`) and `RecordingService` has `types=00000080` (`microphone`) |
+| 9. Cold start | `adb shell am start -W -n io.codemyriad.cassini.talk/io.codemyriad.cassini.MainActivity` after `am force-stop`, three times | `TotalTime` 3246, 2886 and 2923 ms |
 | 10. Note opening time | `scripts/note-opening-timing.sh --serial emulator-5554` | Passed. See [Note opening time](#note-opening-time). |
 | Acceptance walk | `scripts/acceptance-walk.sh` | Passed in light, dark and Italian (P12 step 1). See [Acceptance walk runs](#acceptance-walk-runs). |
 
@@ -476,7 +476,7 @@ To examine a document from a device, do these steps:
 1. Copy the document to the host. Use **Save a copy** in the app, or copy the file of a debug build:
 
    ```sh
-   adb exec-out run-as io.codemyriad.cassini cat files/notes/NOTE_ID/document.opus > note.opus
+   adb exec-out run-as io.codemyriad.cassini.talk cat files/notes/NOTE_ID/document.opus > note.opus
    ```
 
 2. Run the reference reader and the digest tool:
@@ -617,7 +617,7 @@ CI does not do these checks. Before the owner makes a release tag, do them by ha
 2. Play music in another app. Then start a recording. Make sure that the music continues and the recording does not pause.
 3. Start a recording on an emulator. Send a call with `adb emu gsm call 5551234`, then answer it with `adb emu gsm accept 5551234`. Make sure that the recording pauses and shows "Paused — another app is using audio". Android silences the recording only when the call is active, not while the phone rings.
 4. End the call with `adb emu gsm cancel 5551234`. Make sure that the recording stays paused until you push Resume, and that one push on Resume continues it.
-5. On an API 35 or 36 AVD, start a transcription. Make sure that `adb shell dumpsys activity services io.codemyriad.cassini` shows the type `mediaProcessing`.
+5. On an API 35 or 36 AVD, start a transcription. Make sure that `adb shell dumpsys activity services io.codemyriad.cassini.talk` shows the type `mediaProcessing`.
 6. Make the time limit short with `adb shell device_config put activity_manager media_processing_fgs_timeout_duration 60000`.
 7. Wait for the limit. Make sure that the notification "Paused by Android" ("Paused at … of …. Open to resume.") shows and that the note shows Paused, not an error.
 8. Reset the limit with `adb shell device_config delete activity_manager media_processing_fgs_timeout_duration`.

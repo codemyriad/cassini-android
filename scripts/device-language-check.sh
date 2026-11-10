@@ -16,7 +16,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-package=io.codemyriad.cassini
+package=io.codemyriad.cassini.talk
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
@@ -73,7 +73,7 @@ tap() {
 
 start() {
     local result
-    result=$(adb shell am start -W -n "$package/.MainActivity" | tr -d '\r')
+    result=$(adb shell am start -W -n "$package/io.codemyriad.cassini.MainActivity" | tr -d '\r')
     if [[ "$result" != *'Status: ok'* ]]; then
         printf '%s\nThe app did not start.\n' "$result" >&2
         exit 1

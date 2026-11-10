@@ -18,4 +18,4 @@
 
 ## Device safety
 
-CAUTION: Do not run the Gradle `connected*` or managed-device tasks, `adb uninstall io.codemyriad.cassini` or `adb shell pm clear io.codemyriad.cassini` on a device with data that you want to keep. They erase the app data and the downloaded models.
+CAUTION: Do not run the Gradle `connected*` or managed-device tasks, `adb uninstall io.codemyriad.cassini.talk` or `adb shell pm clear io.codemyriad.cassini.talk` on a device with data that you want to keep. They erase the app data and the downloaded models.

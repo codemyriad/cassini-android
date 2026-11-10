@@ -46,7 +46,7 @@ class TrustedControllersTest {
     }
 
     @Test fun theAppTheSystemAndTrustedControllersConnect() {
-        assertTrue(TrustedControllers.trusted(session, controller("io.codemyriad.cassini", Process.myUid())))
+        assertTrue(TrustedControllers.trusted(session, controller("io.codemyriad.cassini.talk", Process.myUid())))
         assertTrue(TrustedControllers.trusted(session, controller("android", Process.SYSTEM_UID)))
         assertTrue(TrustedControllers.trusted(session, controller("com.android.systemui", SYSTEM_UI_UID)))
         assertTrue(TrustedControllers.trusted(session, controller("com.android.bluetooth", BLUETOOTH_UID)))
@@ -65,7 +65,7 @@ class TrustedControllersTest {
         assertFalse(TrustedControllers.trusted(session, controller(legacy, UNKNOWN_UID)))
         assertTrue(TrustedControllers.trusted(session, controller(legacy, UNKNOWN_UID, trusted = true)))
         assertFalse(TrustedControllers.trusted(session, controller("com.example.reader", OTHER_APP_UID)))
-        assertTrue(TrustedControllers.trusted(session, controller("io.codemyriad.cassini", Process.myUid())))
+        assertTrue(TrustedControllers.trusted(session, controller("io.codemyriad.cassini.talk", Process.myUid())))
     }
 
     private companion object {

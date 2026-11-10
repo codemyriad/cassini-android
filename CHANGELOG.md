@@ -6,6 +6,10 @@ We made the entries for 0.0.1-beta to 0.1.0 again from the release notes of thes
 
 ## [Unreleased]
 
+### Changed
+
+- The package name is now `io.codemyriad.cassini.talk`, the package name of Cassini talk on Google Play, instead of `io.codemyriad.cassini`. This version installs as a new app beside 0.4.x: it does not update it, and it does not take over its notes, voices, models or settings. Before you uninstall 0.4.x, save each note that you want to keep as a Cassini document (`.opus`) and open it in the new app. The new app downloads the models again.
+
 ## [0.4.2-beta.1] - 2026-11-08
 
 Test build 16 from reviewed `main`, distributed as a GitHub prerelease. The universal APK is `cassini-android-0.4.2-beta.1.apk`; smaller packages end in `-arm64-v8a.apk` or `-x86_64.apk`. Requires Android 8.0 or later and a 64-bit device. The APKs use the existing release signing identity; native sources, notices and checksums accompany them.

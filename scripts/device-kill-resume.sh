@@ -31,7 +31,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-package=io.codemyriad.cassini
+package=io.codemyriad.cassini.talk
 name=killtest-$(date +%s)
 clip=$(scripts/make-long-clip.sh --print-path)
 clip_name=$(basename "$clip")
@@ -107,7 +107,7 @@ adb exec-in "run-as $package sh -c 'cat > cache/$name/$clip_name'" < "$clip"
 printf '%s\n' "$name" | adb exec-in "run-as $package sh -c 'cat > files/debug-root.txt'"
 log "Scratch root files/$name; clip $clip_name ($(stat -c %s "$clip") bytes)"
 
-adb shell am start -W -n "$package/.debug.DebugCommandActivity" --es cmd import --es file "$clip_name" | tr -d '\r'
+adb shell am start -W -n "$package/io.codemyriad.cassini.debug.DebugCommandActivity" --es cmd import --es file "$clip_name" | tr -d '\r'
 deadline=$(( $(date +%s) + 60 ))
 note=
 while [ -z "$note" ] && [ "$(date +%s)" -lt "$deadline" ]; do
@@ -144,7 +144,7 @@ while [ -z "$resumed_by" ] && [ "$(date +%s)" -lt "$deadline" ]; do
 done
 if [ -z "$resumed_by" ]; then
     log 'No redelivery within 90 s; opening the app'
-    adb shell am start -W -n "$package/.debug.DebugCommandActivity" --es cmd open | tr -d '\r'
+    adb shell am start -W -n "$package/io.codemyriad.cassini.debug.DebugCommandActivity" --es cmd open | tr -d '\r'
     wait_for "J['pid'] != $before and J['running'] and J['running']['noteId'] == N['id']" 60 >/dev/null \
         || { printf 'The job did not start again.\n' >&2; exit 1; }
     resumed_by=relaunch

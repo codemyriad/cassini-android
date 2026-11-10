@@ -82,7 +82,7 @@ class BaselineProfileGenerator {
     }
 
     private companion object {
-        const val PACKAGE = "io.codemyriad.cassini"
+        const val PACKAGE = "io.codemyriad.cassini.talk"
         // The English strings of the content descriptions; the device language must be English.
         const val RECORD = "Record a new note"
         const val SETTINGS = "Settings"
