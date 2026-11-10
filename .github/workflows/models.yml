@@ -48,14 +48,8 @@ jobs:
           key: native-${{ hashFiles('scripts/native-dependencies.json', 'scripts/streaming-diarization.patch', 'gradle/libs.versions.toml') }}
       - name: Fetch the pinned native runtime
         run: ./scripts/setup.sh --prebuilt-only
-      # The background tests transcribe the long clip, which is made on the host and packaged into the test APK.
-      - name: Make the long clip of the background tests
-        run: |
-          if ! command -v ffmpeg > /dev/null; then
-            sudo apt-get update
-            sudo apt-get install --yes --no-install-recommends ffmpeg
-          fi
-          ./scripts/make-long-clip.sh
+      # D86 measurement selects only the pin comparison and short NoteFlow export test.
+      # Neither reads generated/fleurs-it-x20.wav; no unused background fixture or ffmpeg install.
       # A debug build: scripts/push-models.sh copies the models into the app's files/ with run-as.
       - name: Build the debug APK and its device test APK
         run: ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest
