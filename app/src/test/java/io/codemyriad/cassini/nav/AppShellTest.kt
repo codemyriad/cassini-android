@@ -151,10 +151,14 @@ class AppShellTest {
         // The Library state is built off the main thread: wait for the loaded Library.
         waitFor(hasText("Record"))
         rule.onNodeWithText("Record").performClick()
-        runBlocking {
-            withTimeout(TIMEOUT_MS) { app.graph.recording.state.first { it is RecordingState.Active } }
-        }
+        // Mount RecordingRoute and run its onEnter before blocking the test thread for the controller event.
         rule.waitForIdle()
+        val started = runBlocking {
+            withTimeout(TIMEOUT_MS) {
+                app.graph.recording.state.first { it is RecordingState.Active || it is RecordingState.Ended }
+            }
+        }
+        assertTrue("the recording starts: $started", started is RecordingState.Active)
         rule.onNodeWithText("Finish").assertExists()
 
         Espresso.pressBack()
