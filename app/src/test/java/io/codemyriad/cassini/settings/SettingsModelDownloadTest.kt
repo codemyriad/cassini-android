@@ -111,7 +111,7 @@ class SettingsModelDownloadTest {
         tapRow("Telling speakers apart")
         waitFor("Download")
         rule.onNodeWithContentDescription("Close").performClick()
-        waitFor("On-device models")
+        waitFor("ON-DEVICE MODELS")
         rule.runOnIdle { assertEquals(emptyList<String>(), fetched.toList()) }
     }
 
@@ -136,7 +136,7 @@ class SettingsModelDownloadTest {
 
     private fun openSettings() {
         rule.onNodeWithContentDescription("Settings").performClick()
-        waitFor("On-device models")
+        waitFor("ON-DEVICE MODELS")
     }
 
     private fun tapRow(title: String) {
