@@ -186,14 +186,19 @@ class NoticeCenterTest {
 
     @Test fun theOneVoiceOfferDependsOnCurrentModelReadinessNotAnAssumedAttributionFailure() {
         val states = listOf(
-            ModelStatus.Missing(false), ModelStatus.Missing(true), ModelStatus.Failed(Failure.VERIFY, "hash"),
+            ModelStatus.Missing(false),
+            ModelStatus.Missing(true),
+            ModelStatus.Failed(Failure.VERIFY, "hash"),
         )
         for (status in states) {
             val offer = only(Notices.job(null, oneVoice = true, speakerModel = status))
             assertEquals(BannerKind.TX_SPEAKERS_MISSING, offer.kind)
             assertEquals(listOf(BannerAction.DOWNLOAD), offer.actions)
             assertEquals(ModelCatalog.speakerBytes, offer.args.bytes)
-            assertTrue(only(Notices.job(null, oneVoice = true, noNewVersion = true, speakerModel = status)).actions.isEmpty())
+            val refused = only(
+                Notices.job(null, oneVoice = true, noNewVersion = true, speakerModel = status),
+            )
+            assertTrue(refused.actions.isEmpty())
         }
         val ready = only(Notices.job(null, oneVoice = true, speakerModel = ModelStatus.Ready))
         assertEquals(BannerKind.TX_ONE_VOICE, ready.kind)
@@ -202,7 +207,13 @@ class NoticeCenterTest {
             assertTrue(only(Notices.job(null, oneVoice = true, speakerModel = status)).actions.isEmpty())
         }
         assertTrue(Notices.job(null, oneVoice = false, speakerModel = ModelStatus.Missing(false)).isEmpty())
-        assertTrue(Notices.job(job(JobState.RUNNING), oneVoice = true, speakerModel = ModelStatus.Missing(false)).isEmpty())
+        assertTrue(
+            Notices.job(
+                job(JobState.RUNNING),
+                oneVoice = true,
+                speakerModel = ModelStatus.Missing(false),
+            ).isEmpty(),
+        )
     }
 
     // 13.4 Model download.

@@ -1034,8 +1034,11 @@ class NoteViewModel(
                 } else {
                     if (id == BannerKind.TX_SPEAKERS_MISSING.name &&
                         (!NoteMapping.oneVoice(details) || details.note.documentState != DocumentState.OK)
-                    ) return
-                    ModelDownloadKey(noteId, part = ModelPart.SPEAKERS.takeIf { id == BannerKind.TX_SPEAKERS_MISSING.name })
+                    ) {
+                        return
+                    }
+                    val requested = ModelPart.SPEAKERS.takeIf { id == BannerKind.TX_SPEAKERS_MISSING.name }
+                    ModelDownloadKey(noteId, part = requested)
                 }
                 emit(NoteEffect.OpenModelDownload(key))
             }

@@ -80,7 +80,9 @@ class GraphModelDownloadPorts(
     override suspend fun transcribe(noteId: String): TranscribeOutcome {
         if (speakerModelsOnly && graph.awaitCatalogue().database.notes().note(noteId)?.documentState !=
             DocumentState.OK
-        ) return TranscribeOutcome.Refused(EnqueueRefusal.DOCUMENT_NOT_VERIFIED)
+        ) {
+            return TranscribeOutcome.Refused(EnqueueRefusal.DOCUMENT_NOT_VERIFIED)
+        }
         val kind = if (speakerModelsOnly) {
             JobKind.TRANSCRIBE_AGAIN
         } else {

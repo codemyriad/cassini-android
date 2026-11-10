@@ -1,6 +1,5 @@
 package io.codemyriad.cassini.note
 
-import io.codemyriad.cassini.core.models.ModelCatalog
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -142,7 +141,11 @@ class NoteViewModelTest {
 
     @Test fun aSuccessfulSingleSpeakerPassDoesNotOfferAModelOrRetry() = runTest(dispatcher) {
         val initial = documentNote()
-        ports.details.value = initial.copy(variants = initial.variants.map { it.copy(speakerCount = 1) })
+        ports.details.value = initial.copy(
+            variants = initial.variants.map { it.copy(speakerCount = 1) },
+            speakers = initial.speakers.take(1),
+        )
+        ports.wordRows.value = WORDS.map { it.copy(speaker = "a") }
         ports.notices.value = ports.notices.value.copy(
             speakerModel = ModelStatus.Ready,
         )
@@ -171,9 +174,11 @@ class NoteViewModelTest {
         )
         ports.wordRows.value = emptyList()
         ports.notices.value = ports.notices.value.copy(speakerModel = ModelStatus.Missing(false))
-        assertTrue(viewModel().now().banners.none {
-            it.kind == BannerKind.TX_SPEAKERS_MISSING || it.kind == BannerKind.TX_ONE_VOICE
-        })
+        assertTrue(
+            viewModel().now().banners.none {
+                it.kind == BannerKind.TX_SPEAKERS_MISSING || it.kind == BannerKind.TX_ONE_VOICE
+            },
+        )
     }
 
     // Opening. --------------------------------------------------------------------------------------------------
