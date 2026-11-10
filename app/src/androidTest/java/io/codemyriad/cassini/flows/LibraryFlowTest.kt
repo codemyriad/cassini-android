@@ -181,7 +181,10 @@ class LibraryFlowTest {
             logScreen()
             val stillLive = runBlocking { rows().any { it.id == noteId } }
             val outcome = if (stillLive) "The note stayed in the library" else "The note was moved to trash"
-            throw AssertionError("$outcome, and the snackbar was missing. $placement. ${Flows.focusReport()}", notShown)
+            throw AssertionError(
+                "$outcome, and the snackbar was missing. $placement. ${Flows.focusReport()}",
+                notShown,
+            )
         }
         assertTrue("The snackbar appears after the note leaves the library", runBlocking { rows().none { it.id == noteId } })
     }
