@@ -136,7 +136,11 @@ internal class MainLooperWatch : Printer {
     }
 
     fun stop(): Dispatch? {
-        Background.instrumentation.runOnMainSync { Looper.getMainLooper().setMessageLogging(null) }
+        Background.instrumentation.runOnMainSync {
+            Looper.getMainLooper().setMessageLogging(null)
+            // The looper can still log the end of the dispatch that removes the logger.
+            current = null
+        }
         return longest
     }
 
