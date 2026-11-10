@@ -1,5 +1,8 @@
 package io.codemyriad.cassini.data.settings
 
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.edit
+import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.AppPaths
 import kotlinx.coroutines.CoroutineScope
@@ -36,6 +39,39 @@ class SettingsRepositoryTest {
             return block(SettingsRepository.create(paths, CoroutineScope(Dispatchers.IO + job)))
         } finally {
             job.cancelAndJoin()
+        }
+    }
+
+    @Test fun singlePartConsentSurvivesReopenWithoutAuthorizingAnyOtherPart() = runTest {
+        withStore { store -> store.recordConsent(100, setOf(ModelPart.VOICES)) }
+        withStore { store ->
+            assertEquals(setOf(ModelPart.VOICES), store.consentedParts.first())
+            assertNull(store.consentAt.first())
+            assertNull(store.speechConsentAt.first())
+            store.recordConsent(200, setOf(ModelPart.SPEAKERS))
+        }
+        withStore { store ->
+            assertEquals(setOf(ModelPart.SPEAKERS, ModelPart.VOICES), store.consentedParts.first())
+            assertEquals(200L, store.consentAt.first())
+            assertNull(store.speechConsentAt.first())
+        }
+    }
+
+    @Test fun legacyConsentAuthorizesBothOptionalPartsButNeverSpeech() = runTest {
+        val job = Job()
+        try {
+            val legacy = PreferenceDataStoreFactory.create(
+                scope = CoroutineScope(Dispatchers.IO + job),
+                produceFile = { paths.settings },
+            )
+            legacy.edit { it[SettingsRepository.Keys.CONSENT_AT] = 100L }
+        } finally {
+            job.cancelAndJoin()
+        }
+        withStore { store ->
+            assertEquals(setOf(ModelPart.SPEAKERS, ModelPart.VOICES), store.consentedParts.first())
+            assertEquals(100L, store.consentAt.first())
+            assertNull(store.speechConsentAt.first())
         }
     }
 
@@ -177,7 +213,9 @@ class SettingsRepositoryTest {
             store.setQueueHold(QueueHold.USER)
         }
         val text = String(paths.settings.readBytes(), Charsets.ISO_8859_1)
-        assertTrue(text.contains("models.consentAt"))
+        assertTrue(text.contains("models.speakersConsentAt"))
+        assertTrue(text.contains("models.voicesConsentAt"))
+        assertEquals("models.consentAt", SettingsRepository.Keys.CONSENT_AT.name)
         assertTrue(text.contains("queue.hold"))
         assertTrue(text.contains("USER"))
     }
