@@ -47,11 +47,13 @@ class GraphModelDownloadPorts(
     context: Context,
     private val noteId: String? = null,
     private val parakeetOnly: Boolean = false,
+    private val part: ModelPart? = null,
 ) : ModelDownloadPorts {
     private val app = context.applicationContext
 
-    override suspend fun plan(): ModelPlan = if (parakeetOnly) {
-        ModelPlan(graph.models.plan().missing.filter { it.part == ModelPart.SPEECH })
+    override suspend fun plan(): ModelPlan = if (part != null || parakeetOnly) {
+        val requested = part ?: ModelPart.SPEECH
+        ModelPlan(graph.models.plan().missing.filter { it.part == requested })
     } else {
         graph.downloadPlan(targetModel())
     }

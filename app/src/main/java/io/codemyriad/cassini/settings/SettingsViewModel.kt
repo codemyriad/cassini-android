@@ -159,7 +159,8 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
     private fun openModel(event: SettingsEvent.OpenModel) {
         val status = state.value.models.firstOrNull { it.part == event.part }?.status
         if (status == ModelStatusUi.NotDownloaded || status == ModelStatusUi.Failed) {
-            emit(SettingsEffect.Open(ModelDownloadKey()))
+            val part = ModelPart.entries.single { Notices.partUi(it) == event.part }
+            emit(SettingsEffect.Open(ModelDownloadKey(part = part)))
         }
     }
 
