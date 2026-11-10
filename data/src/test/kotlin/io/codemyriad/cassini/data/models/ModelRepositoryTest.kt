@@ -78,6 +78,74 @@ class ModelRepositoryTest {
         }
     }
 
+    private fun previousParakeet(): File =
+        File(paths.modelRoot, "models/${ModelCatalog.LEGACY_PARAKEET_DIST_ID}/previous/encoder.onnx").apply {
+            parentFile!!.mkdirs()
+            writeText("previous model")
+        }
+
+    @Test fun thePreviousModelStaysUntilTheReplacementMarkerCommits() = runTest {
+        val previous = previousParakeet()
+        val unrelated = File(paths.modelRoot, "models/other/keep").apply {
+            parentFile!!.mkdirs()
+            writeText("keep")
+        }
+        val repo = repository(
+            ModelFetcher { model, directory, _ ->
+                assertTrue(previous.isFile)
+                assertFalse(ModelCatalog.PARAKEET.ready(paths.modelRoot))
+                sparse(model, directory)
+            },
+        )
+        offMain { repo.installModelBlocking(ModelCatalog.PARAKEET) { _, _ -> } }
+        assertTrue(ModelCatalog.PARAKEET.ready(paths.modelRoot))
+        assertFalse(previous.parentFile!!.parentFile!!.exists())
+        assertEquals("keep", unrelated.readText())
+    }
+
+    @Test fun aFailedReplacementKeepsThePreviousModel() = runTest {
+        val previous = previousParakeet()
+        val repo = repository(
+            FakeFetcher(mapOf(ModelCatalog.PARAKEET to Failure.VERIFY)),
+        )
+        val error = runCatching {
+            offMain { repo.installModelBlocking(ModelCatalog.PARAKEET) { _, _ -> } }
+        }.exceptionOrNull()
+        assertEquals(Failure.VERIFY, ((error?.cause ?: error) as UserFacingException).failure)
+        assertTrue(previous.isFile)
+        assertFalse(ModelCatalog.PARAKEET.ready(paths.modelRoot))
+    }
+
+    @Test fun aFailedReplacementMarkerKeepsThePreviousModel() = runTest {
+        val previous = previousParakeet()
+        val directory = ModelCatalog.PARAKEET.directory(paths.modelRoot).apply { mkdirs() }
+        File(directory, "verified.tmp").mkdir()
+        val error = runCatching {
+            offMain { repository().installModelBlocking(ModelCatalog.PARAKEET) { _, _ -> } }
+        }.exceptionOrNull()
+        assertEquals(Failure.INSTALL, ((error?.cause ?: error) as UserFacingException).failure)
+        assertTrue(previous.isFile)
+        assertFalse(ModelCatalog.PARAKEET.ready(paths.modelRoot))
+    }
+
+    @Test fun refreshRetiresAnOldInstallLeftAfterACommittedReplacementWithoutFollowingLinks() = runTest {
+        val previous = previousParakeet()
+        val outside = folder.newFile("outside").apply { writeText("keep") }
+        java.nio.file.Files.createSymbolicLink(File(previous.parentFile, "link").toPath(), outside.toPath())
+        install(ModelCatalog.PARAKEET)
+        repository().refresh()
+        assertFalse(previous.parentFile!!.parentFile!!.exists())
+        assertEquals("keep", outside.readText())
+        assertTrue(ModelCatalog.PARAKEET.ready(paths.modelRoot))
+    }
+
+    @Test fun optionalModelsDoNotRetireAnOldSpeechInstall() = runTest {
+        val previous = previousParakeet()
+        offMain { repository().installModelBlocking(ModelCatalog.VAD) { _, _ -> } }
+        repository().refresh()
+        assertTrue(previous.isFile)
+    }
+
     @Test fun nothingInstalledAndNoConsent() = runTest {
         val repo = repository()
         assertTrue("unknown until the first refresh", repo.status.value.isEmpty())

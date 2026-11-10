@@ -66,7 +66,7 @@ data class ModelDescriptor(val id: String, val sourceSha256: String, val artifac
 
 /**
  * Every model the app installs, pinned as the model host `dist.gocassini.com` publishes it (manifest schema 2,
- * published 2026-10-27): each model by its pair (manifest id, source SHA-256), each file by its decompressed size
+ * published 2026-11-10): each model by its pair (manifest id, source SHA-256), each file by its decompressed size
  * and SHA-256 and by the size and SHA-256 of its seekable Zstandard download. The app never follows a newer entry
  * of the manifest: a model whose pair or files the manifest no longer lists as pinned here is not downloaded
  * (`DistManifest`). Changing a pin changes the model's directory, so installed models look missing; earlier
@@ -95,13 +95,17 @@ object ModelCatalog {
         )
 
     /**
-     * Parakeet Ultra INT8 on the model host (`parakeet-ultra-0.6b-int8`): Cassini's sherpa-onnx `nemo_transducer`
+     * Parakeet Ultra INT8 on the model host (`parakeet-ultra-0.6b-int8-v2`): Cassini's sherpa-onnx `nemo_transducer`
      * export of moondream/parakeet-ultra (revision 73175eb7), a post-train of NVIDIA Parakeet TDT 0.6B v3, quantized
      * to INT8. The export changes only the format; the token table is the one of v3. The revision that provenance
      * and checkpoints name is the model's source SHA-256 on the host, which is also its marker value.
      */
-    const val PARAKEET_DIST_ID = "parakeet-ultra-0.6b-int8"
-    const val PARAKEET_REVISION = "18cb623004dd6c15999b93cb70b14d8a1f6e8f3a2a97ff733f104bfc3494f6a9"
+    const val PARAKEET_DIST_ID = "parakeet-ultra-0.6b-int8-v2"
+
+    /** Retired after the replacement verifies; never used for a new download. */
+    const val LEGACY_PARAKEET_DIST_ID = "parakeet-ultra-0.6b-int8"
+
+    const val PARAKEET_REVISION = "50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366"
     const val PARAKEET_PRECISION = "INT8"
 
     /** The model id that a document's provenance names (`<id> <precision>`), and the name the app shows for it. */
@@ -117,10 +121,10 @@ object ModelCatalog {
     val parakeetArtifacts = listOf(
         dist(
             "encoder.int8.onnx",
-            652282922,
-            "299617fefd4664d1c115b691dcb6413cabcdbcc694cdf3cb4464b72c5fc3ae69",
-            452306705,
-            "caf7a38f2ad3224c1863564fb6e975a11aa3ae6ad1e7ad0bee5c4f5e018babb4",
+            653313528,
+            "f9a8af14deb2e5237eebb9dfb25126180614feaf835a03f307e4077eab247015",
+            452843967,
+            "44060ee9be2ac23ace05d6ea1271dd4cdbb353ac4d822f36c51ce733142d31a0",
         ),
         dist(
             "decoder.int8.onnx",

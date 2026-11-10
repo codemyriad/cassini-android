@@ -10,7 +10,7 @@ correct are not downloaded again, so a restored cache costs only the hash checks
 into the app on a device.
 It needs Python 3.10 or later, and the zstd tool before Python 3.14. It reads the URLs of scripts/ci-models.json
 (the content-addressed paths of the files), not the manifest, which only the app reads.
---print-key prints a cache key made from the SHA-256 values of the list and downloads nothing.
+--print-key hashes the full pinned model definitions, including their install layout, and downloads nothing.
 """
 
 import argparse
@@ -99,6 +99,11 @@ def install(model: dict, dest: Path) -> None:
     print(f"Ready: {model['directory']}/{model['marker']}")
 
 
+def cache_key(models: list[dict]) -> str:
+    pins = json.dumps(models, sort_keys=True, separators=(",", ":")).encode()
+    return "models-" + hashlib.sha256(pins).hexdigest()[:32]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--dest", type=Path, default=ROOT / ".tools/ci-models")
@@ -106,8 +111,7 @@ def main() -> None:
     arguments = parser.parse_args()
     models = json.loads(MODELS.read_text(encoding="utf-8"))["models"]
     if arguments.print_key:
-        digests = [d["sha256"] for m in models for a in m["artifacts"] for d in (a, a["download"])]
-        print("models-" + hashlib.sha256("\n".join(digests).encode()).hexdigest()[:32])
+        print(cache_key(models))
         return
     for model in models:
         install(model, arguments.dest)

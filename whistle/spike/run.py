@@ -112,7 +112,7 @@ def parakeet_memory(command, args, output):
     root = Path(__file__).resolve().parents[2]
     package = "io.codemyriad.cassini"
     models = json.loads((root / "scripts/ci-models.json").read_text())["models"]
-    models = [model for model in models if model["id"] in {"parakeet-ultra-0.6b-int8", "silero-vad"}]
+    models = [model for model in models if model["id"] in {"parakeet-ultra-0.6b-int8-v2", "silero-vad"}]
     if len(models) != 2:
         raise ValueError("Expected pinned Parakeet and VAD models")
     for model in models:

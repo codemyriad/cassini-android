@@ -43,12 +43,11 @@ import io.codemyriad.cassini.ui.R as UiR
  * Transcribe again adds version 2 to the Versions sheet, Save a copy of the Cassini document is byte-identical to
  * `notes/<id>/document.opus`, and the TXT, SRT and VTT exports equal the goldens in `assets/goldens/`.
  *
- * The goldens were recorded on emulator-5554 (API 34, x86_64) with Parakeet Ultra, as the models workflow runs the
- * test: when a golden is missing or differs, the test writes the export to `cacheDir/goldens-candidate/` of the app
- * and fails, so it can be read and reviewed before it is committed. On an arm64 phone (Pixel 8) the INT8 kernels
- * give "Catena della Sentinella" for the "catena della sentinella" of the goldens, with the same times; this test
- * then fails on that line. The second line of the TXT export is the note's date, which changes per run: it is
- * compared as `<date> · <duration>`.
+ * The goldens were recorded on API 34, x86_64, with Parakeet Ultra source revision 50c15b94 (D86), as the
+ * models workflow runs the test: when a golden is missing or differs, the test writes the export to
+ * `cacheDir/goldens-candidate/` of the app and fails, so it can be read and reviewed before it is committed.
+ * Native INT8 kernels can differ by ABI; regenerate these goldens on x86_64. The second line of the TXT export
+ * is the note's date, which changes per run: it is compared as `<date> · <duration>`.
  */
 @NeedsModels
 class NoteFlowTest {
@@ -72,6 +71,10 @@ class NoteFlowTest {
         // Transcribe from the Audio only banner; the progress card shows while the job runs.
         val transcribe = hasText(rule.text(UiR.string.ui_action_transcribe)) and hasClickAction()
         rule.waitShown(transcribe)
+        rule.waitFor("The imported audio player is prepared") {
+            graph.playback.state.value.let { it.noteId == noteId && it.durationMs > 0 && !it.failed }
+        }
+        val importedAudioEpoch = graph.playback.state.value.epoch
         rule.onAllNodes(transcribe).onFirst().performClick()
         rule.waitText(rule.text(UiR.string.ui_action_stop_keep_progress), timeoutMs = Flows.JOB_MS)
         awaitSealed(noteId, variants = 1)
@@ -79,6 +82,12 @@ class NoteFlowTest {
         // Read & listen: verified, with the words; a word tap seeks there and plays.
         rule.waitText(rule.text(UiR.string.ui_trust_verified), timeoutMs = Flows.SCREEN_MS)
         rule.waitShown(hasText(WORD, substring = true), unmerged = true)
+        // Words can appear before the replacement Opus player finishes preparing. A tap then has no player.
+        rule.waitFor("The sealed document player replaces the imported audio") {
+            graph.playback.state.value.let {
+                it.noteId == noteId && it.durationMs > 0 && !it.failed && it.epoch > importedAudioEpoch
+            }
+        }
         val word = document(noteId).selected(null)!!.transcript!!.words.first { WORD in it.text }
         rule.onNode(hasText(WORD, substring = true), useUnmergedTree = true).tapWord(WORD)
         rule.waitFor("The tap seeks to \"$WORD\" (${word.startMs} ms) and plays") {
