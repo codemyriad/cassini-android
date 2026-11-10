@@ -164,7 +164,7 @@ if $bench; then
     runner=io.codemyriad.cassini.bench/androidx.test.runner.AndroidJUnitRunner
 else
     adb install -r "${CASSINI_TEST_APK:-app/build/outputs/apk/androidTest/$CASSINI_TEST_BUILD_TYPE/app-$CASSINI_TEST_BUILD_TYPE-androidTest.apk}"
-    runner=io.codemyriad.cassini.test/io.codemyriad.cassini.CassiniTestRunner
+    runner=io.codemyriad.cassini.talk.test/io.codemyriad.cassini.CassiniTestRunner
 fi
 arguments=("${selection[@]}" -e downloadModels true -e audioSample "$sample")
 if [ "${#extra[@]}" -gt 0 ]; then arguments+=("${extra[@]}"); fi

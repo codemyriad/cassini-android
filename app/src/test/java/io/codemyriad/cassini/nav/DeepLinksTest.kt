@@ -25,12 +25,12 @@ class DeepLinksTest {
     @Test fun refusesPathsCassinisOwnProvidersAndTraversal() {
         fun external(uri: String) = DeepLinks.external(uri, ownPackage = OWN)
         val refused = listOf(
-            "file:///data/data/io.codemyriad.cassini/databases/cassini.db",
+            "file:///data/data/io.codemyriad.cassini.talk/databases/cassini.db",
             "FILE:///sdcard/a.opus",
             "CONTENT://media/external/audio/1",
             "content:///no-authority",
-            "content://io.codemyriad.cassini/notes/1/document.opus",
-            "content://io.codemyriad.cassini.share/share/x/a.opus",
+            "content://io.codemyriad.cassini.talk/notes/1/document.opus",
+            "content://io.codemyriad.cassini.talk.share/share/x/a.opus",
             "content://media/external/../../data/x",
             "content://media/./x",
             "content://media/%2e%2e/%2e%2e/data/x",
@@ -132,6 +132,6 @@ class DeepLinksTest {
 
     private companion object {
         const val MAIN = "android.intent.action.MAIN"
-        const val OWN = "io.codemyriad.cassini"
+        const val OWN = "io.codemyriad.cassini.talk"
     }
 }

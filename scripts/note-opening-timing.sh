@@ -21,9 +21,9 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-package=io.codemyriad.cassini
-runner=$package.test/$package.CassiniTestRunner
-test=$package.flows.NoteOpeningTimingTest
+package=io.codemyriad.cassini.talk
+runner=$package.test/io.codemyriad.cassini.CassiniTestRunner
+test=io.codemyriad.cassini.flows.NoteOpeningTimingTest
 root=androidTest-kept-timing
 work=$(mktemp -d)
 

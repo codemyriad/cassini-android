@@ -19,7 +19,7 @@ android {
     // libcassini_opus is built in :engine; the app's NDK strips the packaged native libraries.
     ndkVersion = libs.versions.ndk.get()
     defaultConfig {
-        applicationId = "io.codemyriad.cassini"
+        applicationId = "io.codemyriad.cassini.talk"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = 16

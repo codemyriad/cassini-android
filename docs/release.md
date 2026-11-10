@@ -92,7 +92,7 @@ Never commit a keystore or a password.
 
 ## Google Play
 
-The package name on Google Play is `io.codemyriad.cassini` (coordination D62). Versions 0.3.0 and earlier used `org.cassini.android`, which is a different app for Google Play and for Android: the new app does not update the old one, and nothing moves from one to the other (D51).
+The package name on Google Play is `io.codemyriad.cassini.talk`. Versions 0.4.0 to 0.4.2-beta.1 used `io.codemyriad.cassini` (coordination D62), and 0.3.0 and earlier used `org.cassini.android`. Each is a different app for Google Play and for Android: the new app does not update the old one, and nothing moves from one to the other (D51). The code namespace stays `io.codemyriad.cassini`, so an `adb shell am start -n` component is `io.codemyriad.cassini.talk/io.codemyriad.cassini.MainActivity`.
 
 The privacy policy of the Play listing is https://cassini.talk/privacy/android/ (overview of all the Cassini apps: https://cassini.talk/privacy/). It is the public version of [`PRIVACY.md`](../PRIVACY.md). Use the same URL in "App content › Privacy policy" and in the store description (`metadata/en-US/full_description.txt`).
 
@@ -102,11 +102,11 @@ The `play` job uploads the bundle to the internal track when the repository secr
 
 The first bundle of a new app must be uploaded by hand: download `cassini-android-play` from the run of the tag and upload the `.aab` in Play Console (Testing, Internal testing, Create new release). Until the app has a release that is rolled out, Play accepts only draft releases from the API. In this time, set the repository variable `PLAY_RELEASE_STATUS` to `draft`. Then remove it.
 
-### Making the Play app for `io.codemyriad.cassini`
+### Making the Play app for `io.codemyriad.cassini.talk`
 
 The owner does these steps in Play Console once, before the first tag that the `play` job should upload. CI never creates a Play app.
 
-1. Create the app: name "Cassini talk", default language English (United States), app, free. The package name comes from the first bundle (step 4). Fill in the store listing from `metadata/en-US/`, the privacy policy URL above, content rating, data safety, target audience and ads ("no ads"), and add the testers to the internal testing track.
+1. Create the app: name "Cassini talk", default language English (United States), app, free. Play Console asks for the package name when you make the app, and it cannot change later: enter `io.codemyriad.cassini.talk`. Fill in the store listing from `metadata/en-US/`, the privacy policy URL above, content rating, data safety, target audience and ads ("no ads"), and add the testers to the internal testing track.
 2. Set up Play App Signing with the existing release key: choose "Use a key from Java keystore", download PEPK and run the command that Play Console shows on `cassini-release.jks` (alias `cassini`), then upload the encrypted key (section Signing, step 4). Do not make a new key and do not let Google generate one: the GitHub APK and the Play installs must keep the certificate in `scripts/release-signing-cert.sha256`.
 3. In Users and permissions, give the CI service account of `PLAY_SERVICE_ACCOUNT_JSON` the permission "Release to testing tracks" on the new app. A permission on the old `org.cassini.android` app does not carry over.
 4. Set the repository variable `PLAY_RELEASE_STATUS` to `draft`, push the tag, and upload the `.aab` of `cassini-android-play` by hand (Testing, Internal testing, Create new release), as above. After the first rollout, remove the variable.

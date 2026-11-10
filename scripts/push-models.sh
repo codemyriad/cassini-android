@@ -8,7 +8,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source_dir=${1:-.tools/ci-models}
-package=io.codemyriad.cassini
+package=io.codemyriad.cassini.talk
 staging=/data/local/tmp/cassini-model.part
 test -d "$source_dir" || { printf 'No models in %s: run scripts/fetch-ci-models.py first.\n' "$source_dir" >&2; exit 1; }
 adb shell run-as "$package" true || { printf 'run-as %s failed: install a debug build first.\n' "$package" >&2; exit 1; }

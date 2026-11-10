@@ -29,6 +29,6 @@ class AppNameTest {
     }
 
     @Test fun theApplicationIdStays() {
-        assertEquals("io.codemyriad.cassini", context.packageName)
+        assertEquals("io.codemyriad.cassini.talk", context.packageName)
     }
 }

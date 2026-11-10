@@ -10,7 +10,7 @@
             android:theme="@android:style/Theme.Translucent.NoTitleBar" android:excludeFromRecents="true" />
         <!-- Starts the status writer in every process of a debug-root run, also one that Android starts for a
              redelivered service intent. -->
-        <provider android:name=".debug.DebugStatusProvider" android:authorities="io.codemyriad.cassini.debugstatus"
+        <provider android:name=".debug.DebugStatusProvider" android:authorities="${applicationId}.debugstatus"
             android:exported="false" />
         <!-- compose-ui-tooling (the :ui previews) brings an exported activity that would start any composable of the
              app from outside. The app does not need it on a device. MissingClass: lint reads the compile classpath,
