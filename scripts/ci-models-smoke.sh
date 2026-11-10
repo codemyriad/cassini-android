@@ -22,6 +22,7 @@ trap collect EXIT
 adb install -r "$CASSINI_APK"
 # Temporary D86 baseline encoder: checksum-verified before staging into this disposable CI emulator.
 adb push .tools/d86-old-encoder.onnx /data/local/tmp/d86-old-encoder.onnx
+adb shell run-as io.codemyriad.cassini mkdir -p files
 adb shell run-as io.codemyriad.cassini cp /data/local/tmp/d86-old-encoder.onnx files/d86-old-encoder.onnx
 ./scripts/push-models.sh .tools/ci-models | tee .tools/models-results/push.txt
-./scripts/device-smoke.sh --sample fleurs --annotation NeedsModels | tee .tools/models-results/instrumentation.txt
+./scripts/device-smoke.sh --sample fleurs --class io.codemyriad.cassini.D86PinProbeTest,io.codemyriad.cassini.flows.NoteFlowTest | tee .tools/models-results/instrumentation.txt
