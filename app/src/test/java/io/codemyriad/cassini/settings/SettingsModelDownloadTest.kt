@@ -3,13 +3,18 @@ package io.codemyriad.cassini.settings
 import android.Manifest
 import android.app.Application
 import android.os.Looper
+import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.printToString
 import androidx.test.core.app.ApplicationProvider
 import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.CassiniApplication
@@ -69,7 +74,13 @@ class SettingsModelDownloadTest {
                 )
             }
             shadowOf(app as Application).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
-            runBlocking { withTimeout(TIMEOUT_MS) { graph.ready.await() } }
+            runBlocking {
+                withTimeout(TIMEOUT_MS) {
+                    graph.ready.await()
+                    // Permission roundtrips have separate ViewModel coverage; these tests exercise row routing.
+                    graph.settings.markNotificationsAsked()
+                }
+            }
         }
 
         override fun after() {
@@ -95,8 +106,8 @@ class SettingsModelDownloadTest {
         openSettings()
         tapRow("Recognising saved voices")
         waitFor("Download")
-        rule.onNodeWithText("Download").performClick()
-        rule.waitUntil(TIMEOUT_MS) {
+        rule.onNodeWithText("Download").assertIsDisplayed().assertIsEnabled().performClick()
+        waitUntil("voice model completion") {
             graph.models.status.value[ModelPart.VOICES] == ModelStatus.Ready && !graph.processing.state.value.downloading
         }
         rule.onNode(hasText("Recognising saved voices") and hasText("Ready")).performScrollTo().assertExists()
@@ -123,8 +134,8 @@ class SettingsModelDownloadTest {
             for ((candidate, label) in PART_LABELS) {
                 rule.onAllNodes(hasText(label)).assertCountEquals(if (candidate == part) 1 else 0)
             }
-            rule.onNodeWithText("Download").performClick()
-            rule.waitUntil(TIMEOUT_MS) {
+            rule.onNodeWithText("Download").assertIsDisplayed().assertIsEnabled().performClick()
+            waitUntil("$part attempt ${attempt + 1}") {
                 fetched.size == attempt + 1 && graph.models.status.value[part] is ModelStatus.Failed &&
                     !graph.processing.state.value.downloading
             }
@@ -144,8 +155,21 @@ class SettingsModelDownloadTest {
         rule.onNodeWithText(title).performScrollTo().performClick()
     }
 
-    private fun waitFor(text: String) {
-        rule.waitUntil(TIMEOUT_MS) { rule.onAllNodes(hasText(text)).fetchSemanticsNodes().isNotEmpty() }
+    private fun waitFor(text: String) = waitUntil("text '$text'") {
+        rule.onAllNodes(hasText(text)).fetchSemanticsNodes().isNotEmpty()
+    }
+
+    private fun waitUntil(description: String, condition: () -> Boolean) {
+        try {
+            rule.waitUntil(timeoutMillis = TIMEOUT_MS, condition = condition)
+        } catch (error: ComposeTimeoutException) {
+            throw AssertionError(
+                "Waiting for $description: fetched=$fetched, models=${graph.models.status.value}, " +
+                    "install=${graph.installOwner.state.value}, processing=${graph.processing.state.value}\n" +
+                    rule.onRoot().printToString(),
+                error,
+            )
+        }
     }
 
     private companion object {
