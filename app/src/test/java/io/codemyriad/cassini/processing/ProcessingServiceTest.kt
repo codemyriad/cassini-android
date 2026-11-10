@@ -59,6 +59,7 @@ class ProcessingServiceTest {
     val uncaught = NoUncaughtCoroutines()
 
     @get:Rule val folder = TemporaryFolder()
+
     @get:Rule val mainDispatches = MainDispatchEvents()
 
     private val app: CassiniApplication = ApplicationProvider.getApplicationContext()
