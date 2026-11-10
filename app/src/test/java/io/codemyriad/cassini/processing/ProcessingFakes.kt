@@ -1,7 +1,9 @@
 package io.codemyriad.cassini.processing
 
 import io.codemyriad.cassini.AppGraph
+import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.core.library.PauseReason
+import io.codemyriad.cassini.data.jobs.JobRepository
 import io.codemyriad.cassini.engine.job.JobEvent
 import io.codemyriad.cassini.engine.job.JobOutcome
 import kotlinx.coroutines.CancellationException
@@ -10,6 +12,8 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeout
 import java.util.Collections
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
@@ -112,5 +116,14 @@ internal class RecordingNotices : ProcessingNotices {
 
     override fun interrupted(noteId: String, title: String) {
         interrupted += noteId
+    }
+}
+
+/** Room emits every persisted job state for live notes; callers wait before any Trash action. */
+internal suspend fun JobRepository.awaitJobState(noteId: String, state: JobState, timeoutMs: Long) {
+    withTimeout(timeoutMs) {
+        queue().first { rows ->
+            rows.any { it.job.noteId == noteId && it.job.state == state }
+        }
     }
 }
