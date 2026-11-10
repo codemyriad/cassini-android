@@ -6,6 +6,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 
 /**
  * Native work cannot always stop mid-call. Whoever loads native models (recognizer, diarizer, voiceprint extractor)
@@ -17,8 +19,39 @@ import kotlinx.coroutines.withTimeoutOrNull
  * [io.codemyriad.cassini.engine.speakers.SortformerStream.turns]).
  */
 object NativeBudget {
-    private val mutex = Mutex()
+    private val permit = NativePermit()
 
+    /** Whether someone holds the budget now. */
+    val isHeld: Boolean get() = permit.isHeld
+
+    /** Runs [block] while holding the budget; waiting for it can be cancelled. */
+    suspend fun <T> withBudget(block: suspend () -> T): T = permit.withBudget(block)
+
+    /** Blocks until free; interruption throws [Failure.CANCELLED] and preserves the interrupt flag. */
+    fun acquire() = permit.acquire()
+
+    /** Blocks for at most [timeoutMs]; interruption is classified as in [acquire]. */
+    fun tryAcquire(timeoutMs: Long): Boolean = permit.tryAcquire(timeoutMs)
+
+    /** Gives back the budget taken by [acquire] or [tryAcquire]. */
+    fun release() = permit.release()
+
+    /** Runs [block] on the calling thread while holding the budget ([acquire] then [release]). */
+    inline fun <T> holding(block: () -> T): T {
+        acquire()
+        try {
+            return block()
+        } finally {
+            release()
+        }
+    }
+}
+
+/** The shared implementation; injected mutex/context let tests observe contention and advance policy time. */
+internal class NativePermit(
+    private val mutex: Mutex = Mutex(),
+    private val blockingContext: CoroutineContext = EmptyCoroutineContext,
+) {
     /** Whether someone holds the budget now. */
     val isHeld: Boolean get() = mutex.isLocked
 
@@ -33,7 +66,7 @@ object NativeBudget {
         if (Thread.currentThread().isInterrupted) throw UserFacingException(Failure.CANCELLED)
         if (mutex.tryLock()) return
         try {
-            runBlocking { mutex.lock() }
+            runBlocking(blockingContext) { mutex.lock() }
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
             throw UserFacingException(Failure.CANCELLED)
@@ -48,7 +81,7 @@ object NativeBudget {
         if (Thread.currentThread().isInterrupted) throw UserFacingException(Failure.CANCELLED)
         if (mutex.tryLock()) return true
         return try {
-            runBlocking { withTimeoutOrNull(timeoutMs) { mutex.lock() } != null }
+            runBlocking(blockingContext) { withTimeoutOrNull(timeoutMs) { mutex.lock() } != null }
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
             throw UserFacingException(Failure.CANCELLED)
@@ -57,14 +90,4 @@ object NativeBudget {
 
     /** Gives back the budget taken by [acquire] or [tryAcquire]. */
     fun release() = mutex.unlock()
-
-    /** Runs [block] on the calling thread while holding the budget ([acquire] then [release]). */
-    inline fun <T> holding(block: () -> T): T {
-        acquire()
-        try {
-            return block()
-        } finally {
-            release()
-        }
-    }
 }
