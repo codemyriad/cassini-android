@@ -1,7 +1,7 @@
 package io.codemyriad.cassini.testing
 
-import android.os.Handler
 import android.os.Looper
+import androidx.core.os.HandlerCompat
 import kotlinx.coroutines.Delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -25,7 +25,7 @@ class MainDispatchEvents : ExternalResource() {
     private val posted = MutableStateFlow(0L)
 
     override fun before() {
-        Dispatchers.setMain(ObservedMain(Handler.createAsync(Looper.getMainLooper()).asCoroutineDispatcher()))
+        Dispatchers.setMain(ObservedMain(HandlerCompat.createAsync(Looper.getMainLooper()).asCoroutineDispatcher()))
     }
 
     override fun after() = Dispatchers.resetMain()
@@ -45,8 +45,8 @@ class MainDispatchEvents : ExternalResource() {
 
     private inner class ObservedMain(private val delegate: MainCoroutineDispatcher) :
         MainCoroutineDispatcher(), Delay by (delegate as Delay) {
-        override val immediate: MainCoroutineDispatcher
-            get() = if (delegate.immediate === delegate) this else ObservedMain(delegate.immediate)
+        override val immediate: MainCoroutineDispatcher =
+            if (delegate.immediate === delegate) this else ObservedMain(delegate.immediate)
 
         override fun isDispatchNeeded(context: CoroutineContext): Boolean = delegate.isDispatchNeeded(context)
 

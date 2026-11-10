@@ -144,7 +144,7 @@ class ProcessingServiceTest {
                     graph.processing.awaitIdle()
                 }
             }
-            shadowOf(Looper.getMainLooper()).idle()
+            until { shadowOf(service).isStoppedBySelf }
             assertTrue(ModelCatalog.DIARIZATION.ready(paths.modelRoot))
             assertEquals(ModelStatus.Ready, graph.models.status.value[ModelPart.SPEAKERS])
             assertEquals(InstallOutcome.Installed(), graph.installOwner.lastOutcome.value)
