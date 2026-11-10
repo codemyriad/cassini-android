@@ -16,21 +16,27 @@ import java.nio.file.attribute.BasicFileAttributes
 internal fun removeRetiredParakeet(root: File) {
     try {
         if (!ModelCatalog.PARAKEET.ready(root)) return
-        val previous = File(root, "${ModelDescriptor.MODELS_DIRECTORY}/${ModelCatalog.LEGACY_PARAKEET_DIST_ID}").toPath()
+        val previous = File(
+            root,
+            "${ModelDescriptor.MODELS_DIRECTORY}/${ModelCatalog.LEGACY_PARAKEET_DIST_ID}",
+        ).toPath()
         if (!Files.exists(previous, LinkOption.NOFOLLOW_LINKS)) return
         // No FOLLOW_LINKS: a symlink in the retired install never removes its target.
-        Files.walkFileTree(previous, object : SimpleFileVisitor<Path>() {
-            override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
-                Files.delete(file)
-                return FileVisitResult.CONTINUE
-            }
+        Files.walkFileTree(
+            previous,
+            object : SimpleFileVisitor<Path>() {
+                override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
+                    Files.delete(file)
+                    return FileVisitResult.CONTINUE
+                }
 
-            override fun postVisitDirectory(dir: Path, error: IOException?): FileVisitResult {
-                if (error != null) throw error
-                Files.delete(dir)
-                return FileVisitResult.CONTINUE
-            }
-        })
+                override fun postVisitDirectory(dir: Path, error: IOException?): FileVisitResult {
+                    if (error != null) throw error
+                    Files.delete(dir)
+                    return FileVisitResult.CONTINUE
+                }
+            },
+        )
     } catch (error: IOException) {
         // A valid replacement stays usable; refresh retries any leftover cleanup.
         Log.w("RetiredModels", "Could not remove retired Parakeet install", error)

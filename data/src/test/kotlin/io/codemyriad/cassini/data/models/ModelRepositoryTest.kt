@@ -90,11 +90,13 @@ class ModelRepositoryTest {
             parentFile!!.mkdirs()
             writeText("keep")
         }
-        val repo = repository(ModelFetcher { model, directory, _ ->
-            assertTrue(previous.isFile)
-            assertFalse(ModelCatalog.PARAKEET.ready(paths.modelRoot))
-            sparse(model, directory)
-        })
+        val repo = repository(
+            ModelFetcher { model, directory, _ ->
+                assertTrue(previous.isFile)
+                assertFalse(ModelCatalog.PARAKEET.ready(paths.modelRoot))
+                sparse(model, directory)
+            },
+        )
         offMain { repo.installModelBlocking(ModelCatalog.PARAKEET) { _, _ -> } }
         assertTrue(ModelCatalog.PARAKEET.ready(paths.modelRoot))
         assertFalse(previous.parentFile!!.parentFile!!.exists())
@@ -103,7 +105,9 @@ class ModelRepositoryTest {
 
     @Test fun aFailedReplacementKeepsThePreviousModel() = runTest {
         val previous = previousParakeet()
-        val repo = repository(FakeFetcher(mapOf(ModelCatalog.PARAKEET to Failure.VERIFY)))
+        val repo = repository(
+            FakeFetcher(mapOf(ModelCatalog.PARAKEET to Failure.VERIFY)),
+        )
         val error = runCatching { offMain { repo.installModelBlocking(ModelCatalog.PARAKEET) { _, _ -> } } }.exceptionOrNull()
         assertEquals(Failure.VERIFY, ((error?.cause ?: error) as UserFacingException).failure)
         assertTrue(previous.isFile)

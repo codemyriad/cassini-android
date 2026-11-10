@@ -101,8 +101,10 @@ object ModelCatalog {
      * and checkpoints name is the model's source SHA-256 on the host, which is also its marker value.
      */
     const val PARAKEET_DIST_ID = "parakeet-ultra-0.6b-int8-v2"
+
     /** Retired after the replacement verifies; never used for a new download. */
     const val LEGACY_PARAKEET_DIST_ID = "parakeet-ultra-0.6b-int8"
+
     const val PARAKEET_REVISION = "50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366"
     const val PARAKEET_PRECISION = "INT8"
 
