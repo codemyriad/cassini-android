@@ -13,6 +13,7 @@ import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withTimeout
 import java.util.Collections
 import java.util.concurrent.atomic.AtomicBoolean
@@ -85,6 +86,7 @@ internal class FakeVisibility : AppVisibility {
 }
 
 internal class RecordingNotices : ProcessingNotices {
+    private val revision = MutableStateFlow(0L)
     val transcribed: MutableList<String> = Collections.synchronizedList(mutableListOf())
     val failed: MutableList<String> = Collections.synchronizedList(mutableListOf())
     val ready: MutableList<String> = Collections.synchronizedList(mutableListOf())
@@ -94,28 +96,39 @@ internal class RecordingNotices : ProcessingNotices {
     val pausedSaved: MutableList<Pair<String, Long>> = Collections.synchronizedList(mutableListOf())
     val interrupted: MutableList<String> = Collections.synchronizedList(mutableListOf())
 
+    /** Retains notices posted before observation; later revisions follow the recorded fact. */
+    suspend fun awaitNotice(timeoutMs: Long, predicate: () -> Boolean) {
+        withTimeout(timeoutMs) { revision.first { predicate() } }
+    }
+
     override fun transcribed(noteId: String, title: String, speakers: Int, durationMs: Long) {
         transcribed += noteId
+        revision.update { it + 1 }
     }
 
     override fun failed(noteId: String, title: String, failure: String) {
         failed += noteId
+        revision.update { it + 1 }
     }
 
     override fun readyToTranscribe(noteId: String, title: String) {
         ready += noteId
+        revision.update { it + 1 }
     }
 
     override fun pausedByAndroid(noteId: String, title: String, doneMs: Long, totalMs: Long) {
         paused += noteId
+        revision.update { it + 1 }
     }
 
     override fun pausedByAndroidSaved(noteId: String, title: String, doneMs: Long, totalMs: Long) {
         pausedSaved += noteId to doneMs
+        revision.update { it + 1 }
     }
 
     override fun interrupted(noteId: String, title: String) {
         interrupted += noteId
+        revision.update { it + 1 }
     }
 }
 

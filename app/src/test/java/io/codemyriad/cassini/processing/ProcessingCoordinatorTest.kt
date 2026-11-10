@@ -75,7 +75,7 @@ class ProcessingCoordinatorTest {
     /** Every job the coordinator created, in order. */
     private val created = CopyOnWriteArrayList<FakeJob>()
     private val createdCount = MutableStateFlow(0)
-    private val starts = AtomicInteger()
+    private val starts = MutableStateFlow(0)
     private val visibility = FakeVisibility()
     private val notices = RecordingNotices()
     private lateinit var paths: AppPaths
@@ -103,7 +103,7 @@ class ProcessingCoordinatorTest {
             jobs = if (realJobs) null else ({ g -> ProcessingJobFactory { createJob(it, g) } }),
             starter = { g ->
                 ServiceStarter {
-                    starts.incrementAndGet()
+                    starts.update { it + 1 }
                     g.processing.drain()
                     true
                 }
@@ -371,10 +371,10 @@ class ProcessingCoordinatorTest {
         assertTrue(coordinator.moveToTrash(queued))
         job(0).finish(JobOutcome.Done)
         coordinator.awaitIdle()
-        val before = starts.get()
+        val before = starts.value
 
         assertTrue(coordinator.restore(queued))
-        assertEquals("the restore starts the service", before + 1, starts.get())
+        assertEquals("the restore starts the service", before + 1, starts.value)
         assertEquals(queued, job(1).noteId)
     }
 
@@ -440,14 +440,14 @@ class ProcessingCoordinatorTest {
         assertEquals(PauseReason.INTERRUPTED, state.notes.getValue(third).job.pauseReason)
         assertEquals(JobState.PAUSED, state.notes.getValue(pausedBare).state)
         assertEquals("a PAUSED row without a checkpoint starts from 0", 0L, state.notes.getValue(pausedBare).job.doneMs)
-        waitUntil { notices.interrupted.isNotEmpty() }
+        notices.awaitNotice(TIMEOUT_MS) { notices.interrupted.isNotEmpty() }
         assertEquals(listOf(third), notices.interrupted.toList())
-        assertEquals("nothing starts while the app is not visible", 0, starts.get())
+        assertEquals("nothing starts while the app is not visible", 0, starts.value)
 
         // ON_START: the visible app starts the queue, the checkpointed note first.
         visibility.state.value = true
         assertEquals(withCheckpoint, job(0).noteId)
-        assertEquals(1, starts.get())
+        assertEquals(1, starts.value)
         job(0).finish(JobOutcome.Done)
         assertEquals(bare, job(1).noteId)
         job(1).finish(JobOutcome.Done)
@@ -466,11 +466,11 @@ class ProcessingCoordinatorTest {
         // A new process that the launcher opens: nothing here reads graph.processing before the start.
         visibility.state.value = true
         val fresh = graph(paths)
-        waitUntil { starts.get() == 1 }
+        withTimeout(TIMEOUT_MS) { starts.first { it == 1 } }
         assertEquals(id, job(0).noteId)
         job(0).finish(JobOutcome.Done)
         fresh.processing.awaitIdle()
-        assertEquals(1, starts.get())
+        assertEquals(1, starts.value)
     }
 
     // Consent (architecture 5.6). --------------------------------------------------------------------------------
@@ -481,7 +481,7 @@ class ProcessingCoordinatorTest {
 
         assertEquals(TranscribeOutcome.NeedsConsent, coordinator.transcribe(a))
         assertEquals(JobState.NEEDS_CONSENT, catalogue().jobs.job(a)?.state)
-        assertEquals(0, starts.get())
+        assertEquals(0, starts.value)
         assertEquals(0, created.size)
         coordinator.drain().join()
         assertEquals(0, created.size)
@@ -497,7 +497,7 @@ class ProcessingCoordinatorTest {
         // A new process: the service is refused at once, while the startup work still reads the queue.
         graph(paths, awaitReady = false)
         coordinator.onServiceRefused()
-        waitUntil { notices.ready.isNotEmpty() }
+        notices.awaitNotice(TIMEOUT_MS) { notices.ready.isNotEmpty() }
         assertEquals(listOf(a), notices.ready.toList())
         assertEquals(JobState.QUEUED, catalogue().jobs.job(a)?.state)
     }
@@ -675,7 +675,7 @@ class ProcessingCoordinatorTest {
         catalogue().jobs.awaitJobState(consentless, JobState.NEEDS_CONSENT, TIMEOUT_MS)
         // The notices of the first two outcomes are posted after their rows; wait for them before the app becomes
         // visible, else a late notice is (rightly) dropped as "visible" and the test races the coordinator.
-        waitUntil { failed in notices.failed && consentless in notices.ready }
+        notices.awaitNotice(TIMEOUT_MS) { failed in notices.failed && consentless in notices.ready }
         visibility.state.value = true
         job(2).finish(JobOutcome.Failed(io.codemyriad.cassini.engine.job.JobFailure.CheckpointMismatch))
         coordinator.awaitIdle()
@@ -787,13 +787,8 @@ class ProcessingCoordinatorTest {
         return created[index].also { it.started.await() }
     }
 
-    private suspend fun waitUntil(condition: suspend () -> Boolean) = withTimeout(TIMEOUT_MS) {
-        while (!condition()) delay(POLL_MS)
-    }
-
     private companion object {
         const val TIMEOUT_MS = 20_000L
-        const val POLL_MS = 20L
         const val SETTLE_MS = 300L
         const val DURATION_MS = 4_000L
         const val RACE_ROUNDS = 200
