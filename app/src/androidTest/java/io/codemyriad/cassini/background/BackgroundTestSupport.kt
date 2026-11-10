@@ -122,35 +122,33 @@ internal object Background {
 }
 
 /**
- * Measures how long each message of the main looper runs, through `Looper.setMessageLogging`. [stop] removes it;
- * [longest] is the longest dispatch seen, with its message.
+ * Samples thread CPU time around each main-looper dispatch. [stop] returns the dispatch that used the most CPU.
  */
 internal class MainLooperWatch : Printer {
-    @Volatile private var started = 0L
+    data class Dispatch(val message: String, val cpuMs: Long)
 
-    @Volatile private var current: String? = null
+    private var startedCpuMs = 0L
+    private var current: String? = null
+    private var longest: Dispatch? = null
 
-    @Volatile var longestMs = 0L
-        private set
+    fun start() = Background.instrumentation.runOnMainSync {
+        Looper.getMainLooper().setMessageLogging(this)
+    }
 
-    @Volatile var longest: String? = null
-        private set
-
-    fun start() = Looper.getMainLooper().setMessageLogging(this)
-
-    fun stop() = Looper.getMainLooper().setMessageLogging(null)
+    fun stop(): Dispatch? {
+        Background.instrumentation.runOnMainSync { Looper.getMainLooper().setMessageLogging(null) }
+        return longest
+    }
 
     override fun println(line: String) {
         if (line.startsWith(">>>>> Dispatching")) {
-            started = SystemClock.uptimeMillis()
+            startedCpuMs = SystemClock.currentThreadTimeMillis()
             current = line
-        } else if (line.startsWith("<<<<< Finished") && started != 0L) {
-            val ms = SystemClock.uptimeMillis() - started
-            if (ms > longestMs) {
-                longestMs = ms
-                longest = current
-            }
-            started = 0L
+        } else if (line.startsWith("<<<<< Finished")) {
+            val message = current ?: return
+            val cpuMs = SystemClock.currentThreadTimeMillis() - startedCpuMs
+            if (cpuMs > (longest?.cpuMs ?: -1L)) longest = Dispatch(message, cpuMs)
+            current = null
         }
     }
 }

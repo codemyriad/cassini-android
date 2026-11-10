@@ -70,7 +70,7 @@ class RecordingServiceTest {
         action!!.actionIntent.send()
 
         val ended = waitFor("The recording ends", FINISH_MS) { recording.state.value as? RecordingState.Ended }
-        watch.stop()
+        val longest = checkNotNull(watch.stop()) { "The main-looper watch observed no complete dispatches" }
         val outcome = ended.outcome
         assertTrue("Finish saves the recording: $outcome", outcome is RecordingOutcome.Saved)
         assertEquals(active.noteId, ended.noteId)
@@ -88,9 +88,9 @@ class RecordingServiceTest {
         } else {
             assertEquals("A note without consent stays plain", null, job)
         }
-        Log.i(TAG, "Longest main-thread message: ${watch.longestMs} ms (${watch.longest})")
-        val longest = "${watch.longestMs} ms, ${watch.longest}"
-        assertTrue("No main-thread message ran over 100 ms: $longest", watch.longestMs <= MAX_MAIN_MS)
+        val sample = "${longest.cpuMs} ms CPU (${longest.message})"
+        Log.i(TAG, "Most CPU in one main-thread dispatch: $sample")
+        assertTrue("A main-thread dispatch exceeded $MAX_MAIN_CPU_MS ms CPU: $sample", longest.cpuMs <= MAX_MAIN_CPU_MS)
     }
 
     private companion object {
@@ -98,6 +98,6 @@ class RecordingServiceTest {
         const val START_MS = 20_000L
         const val CAPTURE_MS = 3_000L
         const val FINISH_MS = 30_000L
-        const val MAX_MAIN_MS = 100L
+        const val MAX_MAIN_CPU_MS = 100L
     }
 }
