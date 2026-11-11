@@ -40,6 +40,20 @@ class NoteMarkdownTest {
         assertFalse(NoteMarkdown.is24Hour(Locale.FRANCE, "12"))
     }
 
+    @Test fun anUnsupportedPhoneLanguageUsesTheActualEnglishResourceFallbackForDateWords() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val config = Configuration(context.resources.configuration).apply { setLocale(Locale.GERMANY) }
+        val resources = context.createConfigurationContext(config).resources
+        val options = NoteMarkdown.options(
+            resources,
+            FormatSettings(Locale.GERMANY, true, ZoneId.of("Europe/Rome")),
+            1793088000000,
+            0,
+        )
+        assertEquals("Transcript", options.copy.transcriptHeading)
+        assertEquals("Tuesday 27 October 2026, 09:00", options.dateLine)
+    }
+
     @Test fun englishOverlapUsesTheSharedBritishListPattern() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val config = Configuration(context.resources.configuration).apply { setLocale(Locale.UK) }

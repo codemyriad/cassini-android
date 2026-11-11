@@ -28,7 +28,12 @@ internal object NoteMarkdown {
     }
 
     fun options(res: Resources, format: FormatSettings, createdAt: Long, durationMs: Long): MarkdownOptions {
-        val uiLocale = res.configuration.locales[0].let { if (it.language == "en") Locale.UK else it }
+        val configured = res.configuration.locales[0]
+        // Unsupported phone languages use the English resource fallback; English copy uses British date words.
+        val uiLocale = when (configured.language) {
+            "it", "fr", "es", "pt" -> configured
+            else -> Locale.UK
+        }
         val formatter = ListFormatter.getInstance(uiLocale)
         val copy = MarkdownCopy(
             speakersLine = res.getString(UiR.string.ui_markdown_speakers),
