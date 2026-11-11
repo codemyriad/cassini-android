@@ -50,3 +50,46 @@ Actual task durations from that run's archived Gradle profile:
 | engine | 13.149 s | 24.514 s | unit 12.965 s; Android 0.622 s |
 
 These tasks overlap, so their durations must not be summed as wall time. UI unit tests include screenshot verification. Main and test lint analysis remain enabled, including transitive core/engine analysis. The HTML profile is in the android-checks artifact under build/reports/profile/; future runs retain the same breakdown. No slow test or lint rule was skipped to obtain the transfer reduction.
+
+## Follow-up: task and cache profiles, 2026-11-11
+
+`scripts/profile-ci-reports.py` reads downloaded Actions jobs and Gradle HTML profiles offline. It ranks step medians separately for each runner type, and reports individual task timings separately for each runner/cache-state pair. It excludes overlapping module totals and never sums task times into build wall time. This is diagnostic data, with no automatic performance threshold.
+
+The refreshed sample contains successful runs [43034795891](https://github.com/codemyriad/cassini-android/actions/runs/43034795891), [43030649824](https://github.com/codemyriad/cassini-android/actions/runs/43030649824), [43033470789](https://github.com/codemyriad/cassini-android/actions/runs/43033470789) and [43020103181](https://github.com/codemyriad/cassini-android/actions/runs/43020103181). The last uses attempt 2; the others use attempt 1. All four builds and API matrices used GitHub-hosted runners. One run's static/core jobs used self-hosted runners, so those observations are kept outside the hosted ranking. These runs have different source changes and cache histories; they are not a controlled before/after benchmark.
+
+| Hosted job / step | Samples | Median | Range |
+| --- | ---: | ---: | ---: |
+| build / assembly, unit/conformance tests and lint | 4 | 333 s | 152–456 s |
+| API 34 / device checks | 4 | 242.5 s | 193–286 s |
+| API 29 / device checks | 4 | 213.5 s | 181–303 s |
+| API 26 / device checks | 4 | 208 s | 160–227 s |
+| API 35 / device checks | 4 | 207 s | 193–250 s |
+| static / detekt | 3 | 73 s | 70–77 s |
+| JDK only / core tests | 3 | 41 s | 12–64 s |
+| build / Android setup | 4 | 33 s | 29–38 s |
+| static / Gradle setup | 3 | 17 s | 14–18 s |
+| JDK only / Gradle setup | 3 | 14 s | 13–16 s |
+
+The most expensive executed unit-test tasks were UI (median 122.27 s, three executions), app (69.34 s, three) and data (66.32 s, three). Executed core main lint took a median 104.05 s (three), core test lint 71.47 s (three), and app main lint 60.93 s (three). UI main lint executed once at 88.28 s and came from cache three times at 0.040–0.740 s. The UI test task came from cache once at 4.091 s. Combining these cache hits with executions would hide the cost of the work that ran.
+
+The earlier artifact/invocation changes remain the measured waste reduction. This follow-up supplies reproducible task attribution for the remaining build time. A useful next experiment would hold the source and runner fixed while inspecting UI test and core lint cache misses; these observations alone do not justify dropping those checks or tuning worker/heap limits. All four samples' retained memory counters have zero OOM-kill increase. Their peak counters already include preparation work before Gradle, so a peak is not a JVM heap measurement.
+
+### Collect and reproduce
+
+Use one successful attempt per run. Save its complete jobs response as `jobs.json` and the run metadata as `run.json`. Select the `android-checks` artifact created between that build job's start and completion; save its metadata as `artifact.json` and extract it under `checks/`. This avoids taking an earlier failed attempt's artifact when names repeat.
+
+Example for one verified sample (artifact retention can expire; use a current successful run when it does):
+
+```sh
+mkdir -p evidence/43034795891/checks
+gh api repos/codemyriad/cassini-android/actions/runs/43034795891 > evidence/43034795891/run.json
+gh api 'repos/codemyriad/cassini-android/actions/runs/43034795891/attempts/1/jobs?per_page=100' > evidence/43034795891/jobs.json
+gh api repos/codemyriad/cassini-android/actions/artifacts/13863272952 > evidence/43034795891/artifact.json
+gh api repos/codemyriad/cassini-android/actions/artifacts/13863272952/zip > evidence/43034795891/reports.zip
+python3 -m zipfile -e evidence/43034795891/reports.zip evidence/43034795891/checks
+python3 -I scripts/profile-ci-reports.py evidence/43034795891
+```
+
+Pass several run directories to combine observations. Reports label whether artifact metadata was checked; handcrafted inputs without it remain usable but are not marked checked. With metadata supplied, a wrong run, head, attempt, expired artifact or artifact outside the build window fails. Incomplete job pagination, duplicate runs, failed builds/tasks and missing task tables/profiles also fail.
+
+Fixture tests cover parsing, ranking, overlapping module exclusion, host/cache separation and the CLI layout, plus provenance and incomplete-input refusal. Mutations that merge cache states or runner types, include module totals, accept failed builds, duplicate a run, or accept an artifact outside its build window must fail the corresponding regression. No test, lint, ABI, API, model or coverage setting changes in this follow-up; full Android CI validates the PR.
