@@ -1,9 +1,11 @@
 package io.codemyriad.cassini.settings
 
+import android.os.Build
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.BuildConfig
+import io.codemyriad.cassini.core.backup.BackupChoices
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.models.ModelStatus
@@ -14,12 +16,14 @@ import io.codemyriad.cassini.ui.settings.LanguageChoice
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
 /**
  * What the Settings ViewModel reads and changes (features.md section 11). [GraphSettingsPorts] binds it to
  * [AppGraph] and AppCompat's per-app language; the ViewModel tests pass a fake.
  */
+@Suppress("TooManyFunctions") // One command per Settings action, as for LibraryPorts and NotePorts.
 interface SettingsPorts {
     /**
      * The app language now: [LanguageChoice.PHONE] when the app follows the system, [LanguageChoice.OTHER] for a
@@ -32,6 +36,12 @@ interface SettingsPorts {
      * [LanguageChoice.OTHER], which is no segment.
      */
     fun setLanguage(language: LanguageChoice)
+
+    val backup: Flow<BackupChoices?> get() = flowOf(null)
+
+    val transferAvailable: Boolean get() = Build.VERSION.SDK_INT >= BackupChoices.TRANSPORT_FLAGS_API
+
+    suspend fun setTransfer(enabled: Boolean) { error("Backup choices are unavailable") }
 
     val speech: Flow<SpeechChoice>
 
@@ -63,10 +73,15 @@ interface SettingsPorts {
 }
 
 /** [SettingsPorts] over the app's graph. */
+@Suppress("TooManyFunctions") // One binding per Settings port function.
 class GraphSettingsPorts(private val graph: AppGraph) : SettingsPorts {
     override fun language(): LanguageChoice = languageOf(AppCompatDelegate.getApplicationLocales())
 
     override fun setLanguage(language: LanguageChoice) = AppCompatDelegate.setApplicationLocales(localesOf(language))
+
+    override val backup: Flow<BackupChoices?> get() = graph.backupChoices.choices
+
+    override suspend fun setTransfer(enabled: Boolean) = graph.backupChoices.setTransfer(enabled)
 
     override val speech: Flow<SpeechChoice> get() = graph.speech.state
 
@@ -84,7 +99,10 @@ class GraphSettingsPorts(private val graph: AppGraph) : SettingsPorts {
 
     override val notices: Flow<NoticeFacts> get() = graph.notices.facts
 
-    override fun refreshNotices() = graph.notices.refreshNotifications()
+    override fun refreshNotices() {
+        graph.backupChoices.refresh()
+        graph.notices.refreshNotifications()
+    }
 
     override fun dismissParakeetSuggestion() = graph.notices.dismiss(BannerKind.PARAKEET_RECOMMENDED)
 

@@ -21,6 +21,8 @@ import io.codemyriad.cassini.core.requireUser
 import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.data.CassiniDispatchers
 import io.codemyriad.cassini.data.NoteLocks
+import io.codemyriad.cassini.data.backup.BackupChoicesStore
+import io.codemyriad.cassini.data.backup.LibraryBackup
 import io.codemyriad.cassini.data.checkpoint.CheckpointRepository
 import io.codemyriad.cassini.data.db.CassiniDatabase
 import io.codemyriad.cassini.data.db.CassiniDatabaseOpener
@@ -132,6 +134,7 @@ class AppGraph(context: Context, val config: Config) {
      */
     data class Config(
         val paths: AppPaths,
+        val backupDirectory: File = File(paths.cache, "device-backup"),
         val dispatchers: CassiniDispatchers = CassiniDispatchers(),
         val fetcher: ModelFetcher = ModelFetcher.network(MODEL_USER_AGENT),
         val network: NetworkCheck? = null,
@@ -180,6 +183,8 @@ class AppGraph(context: Context, val config: Config) {
 
     val transfers by lazy { io.codemyriad.cassini.transfer.BulkTransfers(app, this) }
     val network: NetworkCheck = config.network ?: NetworkCheck.of(app)
+
+    val backupChoices = BackupChoicesStore(File(config.backupDirectory, "choices.json"), dispatchers.io)
 
     val settings: SettingsRepository =
         SettingsRepository.create(paths, CoroutineScope(appScope.coroutineContext + dispatchers.io))
@@ -400,8 +405,10 @@ class AppGraph(context: Context, val config: Config) {
 
     @Suppress("TooGenericExceptionCaught") // the database open: every failure fails ready and is shown
     private suspend fun runStartup() {
+        var restoreRejection: String? = null
         val (catalogue, setAside) = try {
             config.onStartupStep(STEP_DATABASE)
+            restoreRejection = LibraryBackup(app, paths, File(config.backupDirectory, "restores")).recoverRestore()
             val database = CassiniDatabaseOpener(app, paths, config.clock).open()
             Catalogue(app, this, database.database, ::currentCanceller) to database.setAside
         } catch (error: CancellationException) {
@@ -416,6 +423,7 @@ class AppGraph(context: Context, val config: Config) {
         openedCatalogue = catalogue
         opened.complete(catalogue)
         val failed = LinkedHashMap<String, String>()
+        restoreRejection?.let { failed[STEP_RESTORE] = it }
         val active = activeRecording.get()
         val rebuild = bestEffort(STEP_REBUILD, failed) { catalogue.rebuilder.rebuildIfNeeded(setAside) }
         bestEffort(STEP_METADATA, failed) { catalogue.documents.refreshInvalidatedMetadata() }
@@ -534,6 +542,7 @@ class AppGraph(context: Context, val config: Config) {
 
         // The startup steps in their order (architecture 4.8), as Config.onStartupStep names them.
         const val STEP_DATABASE = "database"
+        const val STEP_RESTORE = "restore"
         const val STEP_REBUILD = "rebuild"
         const val STEP_METADATA = "metadata"
         const val STEP_MODELS = "models"

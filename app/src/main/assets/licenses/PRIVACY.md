@@ -1,6 +1,6 @@
 # Privacy
 
-Cassini for Android keeps your recordings, transcripts and voiceprints on your phone. Cassini does not upload them. Cassini has no accounts, no advertising, no analytics and no crash reports. The app connects to the internet only to download optional models, and only after you agree. Whistle is included on supported devices and basic transcription with it needs no model download. Its isolated worker has no internet permission.
+Cassini for Android processes and stores your recordings, transcripts and voiceprints on your phone. Cassini does not upload them to its servers. Android can copy them directly to a new phone as described below. Cassini has no accounts, no advertising, no analytics and no crash reports. The app connects to the internet only to download optional models, and only after you agree. Whistle is included on supported devices and basic transcription with it needs no model download. Its isolated worker has no internet permission.
 
 This file applies to Cassini for Android 0.2 and later. The app shows the same text on its Licenses screen.
 
@@ -78,7 +78,9 @@ Before Cassini uses a downloaded file, it makes sure that the size and the SHA-2
 
 ## Backup and device transfer
 
-Android does not back up the Cassini data and does not copy it to a new phone. Thus, if you lose the phone or you remove the app, you lose your notes. To keep a note, save a copy of it.
+On Android 9 or later, direct device-to-device transfer copies your notes, the catalogue and saved voices when “Move to a new phone” is on. This choice is on by default and you can turn it off in Settings. Cloud backup is not used. Downloaded models and unfinished work are not copied.
+
+On Android 8, this transfer choice is unavailable. Turning the choice on does not confirm that a transfer has completed. If you lose the phone or remove the app before keeping a copy elsewhere, you lose your notes. To keep a note, save a copy of it.
 
 ## Copies that you save
 

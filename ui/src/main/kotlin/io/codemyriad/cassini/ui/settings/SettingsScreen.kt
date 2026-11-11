@@ -92,6 +92,7 @@ fun SettingsScreen(
             }
         }
         HelperText(stringResource(R.string.ui_settings_models_footnote))
+        state.backup?.let { BackupSection(it, onEvent) }
         PrivacySection(state, onEvent)
         SectionHeader(stringResource(R.string.ui_settings_about))
         AboutCard(

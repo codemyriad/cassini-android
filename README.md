@@ -6,7 +6,7 @@ Cassini records audio and makes the transcript on your phone. It labels the spea
 
 ## Privacy
 
-Cassini does all speech recognition and speaker analysis on the phone. It does not upload audio, transcripts or voiceprints. It has no accounts, no analytics and no advertising. The app uses the network only to download the models, and only after you agree. A voiceprint stays in the private storage of the app. Cassini never writes a voiceprint into a document or an export. [`PRIVACY.md`](PRIVACY.md) gives the full privacy policy.
+Cassini does all speech recognition and speaker analysis on the phone. It does not upload audio, transcripts or voiceprints. It has no accounts, no analytics and no advertising. The app uses the network only to download the models, and only after you agree. Voiceprints stay in the private storage of the app. On Android 9 or later, direct device-to-device transfer copies notes, the catalogue and saved voices when “Move to a new phone” is on (on by default). Cloud backup is not used; downloaded models and unfinished work are not copied. Cassini never writes a voiceprint into a document or an export. [`PRIVACY.md`](PRIVACY.md) gives the full privacy policy.
 
 ## Requirements
 

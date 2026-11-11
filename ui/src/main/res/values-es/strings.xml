@@ -133,7 +133,7 @@
     <string name="ui_library_settings">Ajustes</string>
     <string name="ui_library_search_placeholder">Buscar en títulos y en lo que se dijo</string>
     <string name="ui_search_clear">Borrar búsqueda</string>
-    <string name="ui_library_privacy">Transcrito en este teléfono. El audio nunca sale de él.</string>
+    <string name="ui_library_privacy">La transcripción se hace en este teléfono.</string>
     <string name="ui_library_recording_card">Grabando · %1$s</string>
     <string name="ui_library_recording_paused_card">Grabación en pausa · %1$s</string>
     <string name="ui_library_recording_tap">Toca para volver</string>
@@ -307,8 +307,8 @@
     <string name="ui_name_rename_saved">Renombrar voz guardada</string>
     <string name="ui_name_not">¿No es %1$s?</string>
     <string name="ui_name_remember">Recordar esta voz en este teléfono</string>
-    <string name="ui_name_remember_body">Las próximas notas reconocerán a %1$s automáticamente. La huella de voz nunca sale del teléfono.</string>
-    <string name="ui_name_remember_body_unnamed">Las próximas notas reconocerán a esta persona automáticamente. La huella de voz nunca sale del teléfono.</string>
+    <string name="ui_name_remember_body">En las próximas notas, Cassini reconocerá a %1$s automáticamente. Esta huella de voz pasa a un teléfono nuevo si “Transferir a un teléfono nuevo” está activado.</string>
+    <string name="ui_name_remember_body_unnamed">En las próximas notas, Cassini reconocerá a esta persona automáticamente. Esta huella de voz pasa a un teléfono nuevo si “Transferir a un teléfono nuevo” está activado.</string>
     <string name="ui_name_remember_too_little">No hay suficiente habla para recordar esta voz.</string>
     <string name="ui_name_remember_no_model">El reconocimiento de voces guardadas aún no está instalado.</string>
     <string name="ui_name_merge_into">Fusionar con…</string>
@@ -406,7 +406,7 @@
 
     <!-- Saved voices. -->
     <string name="ui_voices_title">Voces guardadas</string>
-    <string name="ui_voices_privacy">Las huellas de voz se quedan en este teléfono. Nunca se suben ni se escriben en archivos compartidos — solo los nombres que eliges.</string>
+    <string name="ui_voices_privacy">Las huellas de voz se guardan en la aplicación y nunca se incluyen en los archivos compartidos. Pasan a un teléfono nuevo si “Transferir a un teléfono nuevo” está activado. Solo se comparten los nombres que eliges.</string>
     <string name="ui_voices_confirmed_speech">%1$s de habla confirmada</string>
     <string name="ui_voices_options">Opciones de %1$s</string>
     <string name="ui_voices_forget">Olvidar…</string>
@@ -438,7 +438,7 @@
     <string name="ui_settings_model_pending">Se descarga con la próxima transcripción</string>
     <string name="ui_settings_model_not_downloaded">Sin descargar</string>
     <string name="ui_settings_model_failed">Error de descarga — toca para reintentar</string>
-    <string name="ui_settings_models_footnote">La transcripción se hace en este teléfono. El audio nunca sale de él.</string>
+    <string name="ui_settings_models_footnote">La transcripción se hace en este teléfono.</string>
     <string name="ui_settings_privacy">Privacidad</string>
     <string name="ui_settings_voices">Voces guardadas</string>
     <string name="ui_settings_voices_none">Ninguna todavía</string>
@@ -594,6 +594,15 @@
     <string name="ui_meeting_duration_minutes">{m} min</string>
     <!-- cassini-ux library.group.unknownDate (D95); see docs/recorded-at.md. -->
     <string name="ui_day_unknown">Fecha desconocida</string>
+    <string name="ui_settings_transfer_heading">Cambio a un teléfono nuevo</string>
+    <string name="ui_settings_transfer_title">Transferir a un teléfono nuevo</string>
+    <string name="ui_settings_transfer_body">Cuando configuras un teléfono Android nuevo a partir de este, tus notas y voces guardadas se copian directamente en él. No se envía nada a ninguna cuenta en la nube. Los modelos descargados no se copian; el teléfono nuevo los descarga otra vez.</string>
+    <string name="ui_settings_transfer_body_off">No se copia nada a un teléfono nuevo. Si pierdes o cambias este teléfono, tus notas se pierden, salvo que las hayas exportado.</string>
+    <string name="ui_settings_transfer_export_hint">Para guardar una copia en un lugar seguro, usa “Exportar todo como ZIP”.</string>
+    <string name="ui_settings_transfer_too_large">Tus notas y voces guardadas son demasiado grandes para transferirlas de una sola vez. Exporta tus notas como ZIP.</string>
+    <string name="ui_settings_transfer_unavailable">Esta opción necesita Android 9 o posterior.</string>
+    <string name="ui_settings_transfer_choice_failed">No se pudo guardar esta opción. Inténtalo de nuevo.</string>
+    <string name="ui_notice_transfer_enabled">Cassini transferirá tus notas y voces guardadas a un teléfono nuevo cuando lo configures a partir de este. Puedes cambiarlo en Ajustes.</string>
     <string name="ui_search_filter_any_date">Cualquier fecha</string>
     <string name="ui_search_filter_recorded_by_me">Grabadas por mí</string>
     <string name="ui_search_filter_speaker">Hablante: {name}</string>

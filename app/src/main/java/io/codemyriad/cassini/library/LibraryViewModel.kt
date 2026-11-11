@@ -497,6 +497,7 @@ class LibraryViewModel(
         }
     }
 
+    @Suppress("CyclomaticComplexMethod") // One dispatch branch per catalogued Library banner action.
     private fun bannerAction(id: String, action: BannerAction) {
         val kind = kindOf(id) ?: return
         when (action) {
@@ -518,6 +519,10 @@ class LibraryViewModel(
             BannerAction.TRY_AGAIN -> {
                 ports.dismissNotice(kind)
                 if (kind.group == BannerGroup.DOWNLOAD) ports.downloadModels() else emit(LibraryEffect.PickAudio)
+            }
+            BannerAction.OPEN_SETTINGS -> {
+                ports.dismissNotice(kind)
+                emit(LibraryEffect.OpenSettings)
             }
             BannerAction.TURN_ON -> emit(LibraryEffect.OpenNotificationSettings)
             BannerAction.CHOOSE_ANOTHER, BannerAction.IMPORT -> {

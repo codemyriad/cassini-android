@@ -47,6 +47,7 @@ import io.codemyriad.cassini.ui.recording.CaptureFormat
 import io.codemyriad.cassini.ui.recording.RecordingHint
 import io.codemyriad.cassini.ui.recording.RecordingPhase
 import io.codemyriad.cassini.ui.recording.RecordingUiState
+import io.codemyriad.cassini.ui.settings.BackupSettingsUi
 import io.codemyriad.cassini.ui.settings.LanguageChoice
 import io.codemyriad.cassini.ui.settings.ModelRowUi
 import io.codemyriad.cassini.ui.settings.ModelStatusUi
@@ -350,6 +351,7 @@ internal object BoardFixtures {
         voices = 4,
         trash = 2,
         version = "0.1.0",
+        backup = BackupSettingsUi(transfer = true, transferAvailable = true, quotaExceeded = false),
     )
 
     // Board 09: Trash, with the fixture-only "moved to trash" snackbar (ui.md section 11, item 11).

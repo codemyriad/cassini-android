@@ -7,7 +7,10 @@ import kotlin.math.sqrt
 data class PrintWindow(val startSample: Int, val endSample: Int)
 data class Thresholds(val auto: Float, val suggest: Float, val margin: Float)
 
-/** One voiceprint per document speaker, from its clean single-voice speech. Prints never leave this phone. */
+/**
+ * One voiceprint per document speaker, from its clean single-voice speech.
+ * Private prints follow the OS transfer and backup choices; documents never contain them.
+ */
 object Voiceprints {
     const val MIN_SEGMENT_MS = 1_500L; const val EDGE_TRIM_MS = 200L
     const val MAX_SECONDS_PER_SPEAKER = SpeakerBudget.SECONDS_PER_SPEAKER.toDouble(); const val MIN_SECONDS_PER_SPEAKER = 4.0

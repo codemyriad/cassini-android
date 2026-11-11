@@ -160,7 +160,7 @@
     <string name="ui_library_settings">Settings</string>
     <string name="ui_library_search_placeholder">Search titles and what was said</string>
     <string name="ui_search_clear">Clear search</string>
-    <string name="ui_library_privacy">Transcribed on this phone. Audio never leaves it.</string>
+    <string name="ui_library_privacy">Transcription runs on this phone.</string>
     <string name="ui_library_recording_card">Recording · %1$s</string>
     <string name="ui_library_recording_paused_card">Recording paused · %1$s</string>
     <string name="ui_library_recording_tap">Tap to return</string>
@@ -334,8 +334,8 @@
     <string name="ui_name_rename_saved">Rename saved voice</string>
     <string name="ui_name_not">Not %1$s?</string>
     <string name="ui_name_remember">Remember this voice on this phone</string>
-    <string name="ui_name_remember_body">Future notes will name %1$s automatically. The voiceprint never leaves the phone.</string>
-    <string name="ui_name_remember_body_unnamed">Future notes will name this person automatically. The voiceprint never leaves the phone.</string>
+    <string name="ui_name_remember_body">Future notes will name %1$s automatically. This voiceprint moves to a new phone if Move to a new phone is on.</string>
+    <string name="ui_name_remember_body_unnamed">Future notes will name this person automatically. This voiceprint moves to a new phone if Move to a new phone is on.</string>
     <string name="ui_name_remember_too_little">Too little speech to remember this voice.</string>
     <string name="ui_name_remember_no_model">Recognising saved voices isn’t installed yet.</string>
     <string name="ui_name_merge_into">Merge into…</string>
@@ -433,7 +433,7 @@
 
     <!-- Saved voices (board 07, features.md section 10). -->
     <string name="ui_voices_title">Saved voices</string>
-    <string name="ui_voices_privacy">Voiceprints stay on this phone. They are never uploaded or written into shared files — only the names you choose are.</string>
+    <string name="ui_voices_privacy">Voiceprints are kept in the app and are never written into shared files. They move to a new phone if Move to a new phone is on. Only the names you choose are shared.</string>
     <string name="ui_voices_confirmed_speech">%1$s confirmed speech</string>
     <string name="ui_voices_options">Options for %1$s</string>
     <string name="ui_voices_forget">Forget…</string>
@@ -464,7 +464,7 @@
     <string name="ui_settings_model_pending">Downloads with next transcription</string>
     <string name="ui_settings_model_not_downloaded">Not downloaded</string>
     <string name="ui_settings_model_failed">Download failed — tap to try again</string>
-    <string name="ui_settings_models_footnote">Transcription runs on this phone. Audio never leaves it.</string>
+    <string name="ui_settings_models_footnote">Transcription runs on this phone.</string>
     <string name="ui_settings_privacy">Privacy</string>
     <string name="ui_settings_voices">Saved voices</string>
     <string name="ui_settings_voices_none">None yet</string>
@@ -619,6 +619,16 @@
     <string name="ui_meeting_duration_minutes">{m} min</string>
     <!-- cassini-ux library.group.unknownDate (D95); see docs/recorded-at.md. -->
     <string name="ui_day_unknown">Date unknown</string>
+
+    <string name="ui_settings_transfer_title">Move to a new phone</string>
+    <string name="ui_settings_transfer_body">When you set up a new Android phone from this one, your notes and saved voices are copied directly to it. Nothing is sent to a cloud account. Downloaded models are not copied; the new phone downloads them again.</string>
+    <string name="ui_notice_transfer_enabled">Cassini will move your notes and saved voices to a new phone when you set it up from this one. You can change this in Settings.</string>
+    <string name="ui_settings_transfer_unavailable">Choosing this needs Android 9 or newer.</string>
+    <string name="ui_settings_transfer_heading">Moving to a new phone</string>
+    <string name="ui_settings_transfer_body_off">Nothing is copied to a new phone. If this phone is lost or replaced, your notes are gone unless you exported them.</string>
+    <string name="ui_settings_transfer_export_hint">To keep a copy somewhere safe, use Export All as ZIP.</string>
+    <string name="ui_settings_transfer_too_large">Your notes and saved voices are too large to move in one transfer. Export your notes as a ZIP instead.</string>
+    <string name="ui_settings_transfer_choice_failed">Couldn’t save this choice. Try again.</string>
     <string name="ui_search_filter_any_date">Any date</string>
     <string name="ui_search_filter_recorded_by_me">Recorded by me</string>
     <string name="ui_search_filter_speaker">Speaker: {name}</string>

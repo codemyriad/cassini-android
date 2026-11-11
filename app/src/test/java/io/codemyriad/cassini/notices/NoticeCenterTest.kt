@@ -353,13 +353,22 @@ class NoticeCenterTest {
         )
     }
 
+    @Test fun transferNoticeIsGentleDismissibleAndOnlyFollowsTheDeviceLocalFact() {
+        val spec = only(Notices.library(NoticeFacts(transferNotice = true), LibraryFacts(loading = true)))
+        assertEquals(BannerKind.TRANSFER_ENABLED, spec.kind)
+        assertTrue(spec.dismissible)
+        assertEquals(listOf(BannerAction.OPEN_SETTINGS), spec.actions)
+        assertTrue(Notices.library(NoticeFacts(), LibraryFacts(loading = true)).isEmpty())
+    }
+
     /** Every app-emitted kind outside the trust rows is produced above; the catalogue-only kinds never are. */
     @Test
     fun everyAppEmittedRowIsProduced() {
         val recommendation = io.codemyriad.cassini.models.ParakeetRecommendationState(true, 123L, "first")
         val recommended = Notices.library(NoticeFacts(parakeet = recommendation), LibraryFacts(loading = true))
         val promoted = Notices.library(NoticeFacts(parakeetNowDefault = true), LibraryFacts(loading = true))
-        val produced = (produceAll() + recommended + promoted).map { it.kind }.toSet()
+        val transfer = Notices.library(NoticeFacts(transferNotice = true), LibraryFacts(loading = true))
+        val produced = (produceAll() + recommended + promoted + transfer).map { it.kind }.toSet()
         val expected = BannerKind.entries.filter { it.appEmitted && it.group != BannerGroup.TRUST }.toSet()
         assertEquals(expected - produced, emptySet<BannerKind>())
         assertTrue(BannerKind.TX_CALCULATING !in produced && BannerKind.TX_BATTERY !in produced)
