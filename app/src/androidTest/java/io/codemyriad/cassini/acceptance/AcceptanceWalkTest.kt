@@ -43,7 +43,6 @@ import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.models.ModelPlan
-import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.engine.job.JobPhase
 import io.codemyriad.cassini.flows.Flows
 import io.codemyriad.cassini.flows.Flows.awaitUi
@@ -420,24 +419,23 @@ class AcceptanceWalkTest {
         assumeTrue("Run the download walk with -e emptyModelRoot true", CassiniTestRunner.emptyModelRoot)
         language?.let(::useLanguage)
         runBlocking {
-            // Bundled Whistle stays available on an empty model root. This walk covers the optional Parakeet download.
-            graph.speech.choose(SpeechModel.PARAKEET)
-            graph.speech.state.await("Parakeet is selected", Flows.JOB_MS) { it.selected == SpeechModel.PARAKEET }
             val id = Background.import(Background.assetCopy("fleurs-it-short.wav"))
             graph.awaitCatalogue().notes.rename(id, SUPPLIER_CALL)
         }
         library()
-        openRow(SUPPLIER_CALL)
-        val transcribe = hasText(rule.text(UiR.string.ui_action_transcribe)) and hasClickAction()
-        rule.waitShown(transcribe)
-        rule.onAllNodes(transcribe).onFirst().performClick()
+        // Whistle is bundled even on an empty download root. Exercise the real optional Parakeet download action.
+        rule.onNode(hasContentDescription(rule.text(UiR.string.ui_library_settings))).performClick()
+        val parakeet = hasText("Parakeet Ultra") and hasClickAction()
+        rule.waitShown(parakeet)
+        rule.onNode(parakeet).performClick()
 
-        // 05 Model download: every part is missing, 730 MB in all.
+        // 05 Model download: Settings requests only the missing speech model, with its pinned catalog size.
         see(rule.text(UiR.string.ui_models_title))
-        see(TOTAL_MB, substring = true)
+        val speech = ModelPlan.of { false }.missing.single { it.part == ModelPart.SPEECH }
+        see(speech.mebibytes.toString(), substring = true)
         see(rule.text(UiR.string.ui_part_speech))
-        see(rule.text(UiR.string.ui_part_speakers))
-        see(rule.text(UiR.string.ui_part_voices))
+        val unrelated = hasText(rule.text(UiR.string.ui_part_speakers)) or hasText(rule.text(UiR.string.ui_part_voices))
+        assertTrue("Optional speech download excludes speaker and voice models", rule.onAllNodes(unrelated).fetchSemanticsNodes().isEmpty())
         shot("05-model-download")
 
         ScriptedModels.script(
@@ -447,7 +445,7 @@ class AcceptanceWalkTest {
             Step.Fail(Failure.SPACE, online = true),
             Step.Fail(Failure.VERIFY, online = true),
         )
-        val start = hasText(rule.text(UiR.string.ui_models_download_and_transcribe)) and hasClickAction()
+        val start = hasText(rule.text(UiR.string.ui_models_download)) and hasClickAction()
         rule.onNode(start).performClick()
 
         see(rule.text(UiR.string.ui_part_downloading_speech, DOWNLOAD_PERCENT), timeoutMs = Flows.JOB_MS)
@@ -673,7 +671,6 @@ class AcceptanceWalkTest {
             "pt-PT" to "Português (Portugal)",
         )
         val LANGUAGE_TAG = Regex("[a-z]{2}(-[A-Z]{2})?")
-        const val TOTAL_MB = "730"
         const val MANIFEST_SHA = "CASSINI_PAYLOAD_SHA256="
         const val MARK = "\u0000"
         const val NUMBER = 987
