@@ -1,7 +1,9 @@
 """Checks that native.yml's path triggers list exactly the scripts of the native build.
 
-The native build starts at scripts/setup.sh. Every file of scripts/ that one of its scripts names belongs to it, and
-so on. A change to any of them must run native.yml, and a script that no longer belongs to it must not.
+The native build starts at scripts/setup.sh plus any scripts/ helpers invoked directly by native.yml or
+its local composite actions (.github/actions/*). Every file of scripts/ that one of those scripts names
+belongs to it, and so on. A change to any of them must run native.yml, and a script that no longer
+belongs to it must not.
 Run from the repository root: python3 -I scripts/check-native-paths.py
 """
 
@@ -11,17 +13,35 @@ from pathlib import Path
 
 WORKFLOW = Path('.github/workflows/native.yml')
 NAME = re.compile(r'[A-Za-z0-9_.-]+\.(?:sh|json|patch|py)\b')
+LOCAL_ACTION = re.compile(r'^\s*uses:\s+\./(\.github/actions/[A-Za-z0-9_.-]+)\s*(?:#.*)?$', re.MULTILINE)
 
 
-def closure(start: Path) -> set[str]:
-    found, todo = set(), [start]
+def workflow_script_seeds(workflow: Path) -> list[Path]:
+    text = workflow.read_text(encoding='utf-8')
+    non_comment = '\n'.join(line for line in text.splitlines() if not line.lstrip().startswith('#'))
+    sources = [non_comment]
+    for action_dir in LOCAL_ACTION.findall(non_comment):
+        action_file = Path(action_dir) / 'action.yml'
+        if action_file.is_file():
+            sources.append(action_file.read_text(encoding='utf-8'))
+    seeds = [Path('scripts/setup.sh')]
+    for body in sources:
+        for name in NAME.findall(body):
+            candidate = Path('scripts') / name
+            if candidate.is_file() and name != Path(__file__).name and candidate not in seeds:
+                seeds.append(candidate)
+    return seeds
+
+
+def closure(starts: list[Path]) -> set[str]:
+    found, todo = set(), list(starts)
     while todo:
         path = todo.pop()
         if path.name in found:
             continue
         found.add(path.name)
         if path.suffix in ('.sh', '.py'):
-            for name in NAME.findall(path.read_text()):
+            for name in NAME.findall(path.read_text(encoding='utf-8')):
                 candidate = Path('scripts') / name
                 # The comments of the native scripts name this check; it is not part of the build.
                 if candidate.is_file() and name not in found and name != Path(__file__).name:
@@ -47,8 +67,8 @@ def triggers(text: str) -> dict[str, set[str]]:
 
 
 def main() -> int:
-    native = closure(Path('scripts/setup.sh'))
-    lists = triggers(WORKFLOW.read_text())
+    native = closure(workflow_script_seeds(WORKFLOW))
+    lists = triggers(WORKFLOW.read_text(encoding='utf-8'))
     failed = False
     for event in ('push', 'pull_request'):
         listed = lists.get(event, set())

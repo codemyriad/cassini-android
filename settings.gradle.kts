@@ -18,12 +18,19 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "CassiniAndroid"
-include(":core")
-include(":data")
-include(":engine")
-include(":ui")
-include(":app")
-// Device experiments and calibration (com.android.test, instruments :app). Not part of ciTest.
-include(":bench")
-// Generates app/src/main/baseline-prof.txt on a device (com.android.test, scripts/baseline-profile.sh). Not part of ciTest.
-include(":baselineprofile")
+// Static checks (:detekt) run on the root project over explicit source paths in build.gradle.kts;
+// skipping subproject inclusion avoids configuring AGP or touching the Android SDK/NDK.
+val staticChecksOnly = providers.gradleProperty("cassiniStaticChecksOnly")
+    .map { it.toBooleanStrict() }
+    .getOrElse(false)
+if (!staticChecksOnly) {
+    include(":core")
+    include(":data")
+    include(":engine")
+    include(":ui")
+    include(":app")
+    // Device experiments and calibration (com.android.test, instruments :app). Not part of ciTest.
+    include(":bench")
+    // Generates app/src/main/baseline-prof.txt on a device (com.android.test, scripts/baseline-profile.sh). Not part of ciTest.
+    include(":baselineprofile")
+}

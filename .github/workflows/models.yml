@@ -30,8 +30,10 @@ jobs:
           java-version: '17'
       - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
         with:
-          packages: 'platform-tools platforms;android-37.0 build-tools;36.0.0 ndk;28.2.13676358 cmake;3.22.1'
+          packages: 'platform-tools platforms;android-37.0 build-tools;36.0.0 cmake;3.22.1'
           log-accepted-android-sdk-licenses: false
+      - name: Restore and verify pinned Android NDK
+        uses: ./.github/actions/pinned-ndk
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
           cache-provider: basic
@@ -58,7 +60,7 @@ jobs:
           ./scripts/make-long-clip.sh
       # A debug build: scripts/push-models.sh copies the models into the app's files/ with run-as.
       - name: Build the debug APK and its device test APK
-        run: ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest
+        run: ./gradlew --no-daemon -Pandroid.builder.sdkDownload=false :app:assembleDebug :app:assembleDebugAndroidTest
       # The key comes from the SHA-256 values of scripts/ci-models.json, which ModelCatalogTest keeps equal to
       # ModelCatalog. A changed pin makes a new cache.
       - name: Make the model cache key
