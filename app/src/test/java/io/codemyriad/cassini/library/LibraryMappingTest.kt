@@ -58,7 +58,8 @@ class LibraryMappingTest {
         assertEquals(DayLabel.Unknown, LibraryMapping.recordingDay(null, NOW, ROME))
         val actions = LibraryMapping.actions(details(unknown), null, NOW, ROME, false)
         assertEquals(DayLabel.Unknown, actions.recordedDay)
-        assertEquals("2026-10-07T23:59:00", LibraryMapping.actions(details(local), null, NOW, ROME, false).recordedLabel)
+        val localActions = LibraryMapping.actions(details(local), null, NOW, ROME, false)
+        assertEquals("2026-10-07T23:59:00", localActions.recordedLabel)
     }
 
     @Test

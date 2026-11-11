@@ -94,7 +94,12 @@ object NoteMapping {
         if (mode == NoteMode.Reading) return null
         val recording = note.recordingTime()
         val time = recording?.instant?.atZone(zone)?.toLocalTime() ?: java.time.LocalTime.MIDNIGHT
-        return NoteSubtitleUi(LibraryMapping.recordingDay(recording, now, zone), time, note.durationMs, recording?.label)
+        return NoteSubtitleUi(
+            LibraryMapping.recordingDay(recording, now, zone),
+            time,
+            note.durationMs,
+            recording?.label,
+        )
     }
 
     /** The trust chip of a document state. */

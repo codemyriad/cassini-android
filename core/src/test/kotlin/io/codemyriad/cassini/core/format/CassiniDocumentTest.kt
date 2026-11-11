@@ -23,7 +23,9 @@ class CassiniDocumentTest {
             }
             if (expected.has("meetingStart")) {
                 val start = doc.meetingTime
-                if (expected.isNull("meetingStart")) assertNull(id, start) else {
+                if (expected.isNull("meetingStart")) {
+                    assertNull(id, start)
+                } else {
                     val want = expected.getJSONObject("meetingStart")
                     assertEquals(id, want.getString("source"), start?.source)
                     assertEquals(id, want.getString("value"), start?.value)
@@ -33,21 +35,41 @@ class CassiniDocumentTest {
         }
         assertTrue(failures.joinToString("\n"), failures.isEmpty())
     }
+
     @Test fun recordingStartSurvivesSealingAndAppending() {
         val start = java.time.Instant.parse("2026-11-11T12:00:00Z")
         val transcript = Transcript(listOf(Word("spk_1", 0, 20, "Hello")), "en")
-        val bytes = CassiniDocument.create(silence(), transcript, "Meeting", JSONObject(), recordedAtUtc = start, createdAtUtc = start.plusSeconds(540))
+        val bytes = CassiniDocument.create(
+            silence(),
+            transcript,
+            "Meeting",
+            JSONObject(),
+            recordedAtUtc = start,
+            createdAtUtc = start.plusSeconds(540),
+        )
         val doc = CassiniDocument.read(bytes)
         assertEquals(start, doc.meetingTime?.instant)
         assertEquals("2026-11-11T12:09:00Z", doc.manifest!!.getJSONObject("meeting").getString("createdAtUtc"))
         assertTrue(doc.comments.contains("CASSINI_RECORDED_AT_UTC=$start"))
         assertTrue(doc.comments.contains("DATE=$start"))
         assertFalse(doc.manifest.getJSONObject("meeting").has("recordedAtLocal"))
-        val next = CassiniDocument.read(CassiniDocument.create(bytes, transcript, "Again", JSONObject(), doc, recordedAtUtc = start.plusSeconds(900)))
+        val appended = CassiniDocument.create(
+            bytes,
+            transcript,
+            "Again",
+            JSONObject(),
+            doc,
+            recordedAtUtc = start.plusSeconds(900),
+        )
+        val next = CassiniDocument.read(appended)
         assertEquals(doc.meetingTime, next.meetingTime)
-        assertEquals(doc.manifest.getJSONObject("meeting").toString(), next.manifest!!.getJSONObject("meeting").toString())
-        assertEquals(OggOpus.read(bytes).digest(), OggOpus.read(CassiniDocument.create(bytes, transcript, "Again", JSONObject(), doc)).digest())
-        val unknown = CassiniDocument.read(CassiniDocument.create(silence(), transcript, "Unknown", JSONObject(), createdAtUtc = start))
+        assertEquals(
+            doc.manifest.getJSONObject("meeting").toString(),
+            next.manifest!!.getJSONObject("meeting").toString(),
+        )
+        assertEquals(OggOpus.read(bytes).digest(), OggOpus.read(appended).digest())
+        val unknownBytes = CassiniDocument.create(silence(), transcript, "Unknown", JSONObject(), createdAtUtc = start)
+        val unknown = CassiniDocument.read(unknownBytes)
         assertNull(unknown.meetingTime)
         assertTrue(unknown.comments.contains("DATE=$start"))
     }

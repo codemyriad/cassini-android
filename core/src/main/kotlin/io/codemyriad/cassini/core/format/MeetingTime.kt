@@ -32,6 +32,7 @@ data class MeetingTime(val source: String, val value: String) {
             MeetingTime(if (offsetInstant(it) != null) UTC else LOCAL, it)
         }
 
+        @Suppress("ReturnCount") // Ordered D95 fallback clauses, each rejecting unusable evidence.
         fun resolve(manifest: JSONObject?, comments: List<String>): MeetingTime? {
             val meeting = manifest?.optJSONObject("meeting") ?: return null
             val utc = (meeting.opt(UTC) as? String)?.trim()
@@ -43,10 +44,14 @@ data class MeetingTime(val source: String, val value: String) {
             return (meeting.opt(LOCAL) as? String)?.takeIf { it.isNotEmpty() }?.let { MeetingTime(LOCAL, it) }
         }
 
-        private fun offsetInstant(value: String): Instant? = if (!offset.matches(value)) null else try {
-            OffsetDateTime.parse(value).toInstant()
-        } catch (_: DateTimeParseException) {
+        private fun offsetInstant(value: String): Instant? = if (!offset.matches(value)) {
             null
+        } else {
+            try {
+                OffsetDateTime.parse(value).toInstant()
+            } catch (_: DateTimeParseException) {
+                null
+            }
         }
     }
 }

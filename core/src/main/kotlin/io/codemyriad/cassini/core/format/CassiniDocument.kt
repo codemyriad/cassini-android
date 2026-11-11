@@ -211,10 +211,27 @@ data class CassiniDocument(
             return out.toByteArray()
         }
         /** Adds a variant while retaining existing descriptors, bodies, extensions and unrelated tags. */
-        fun create(audioBytes: ByteArray, transcript: Transcript, title: String, processing: JSONObject,
-                   existing: CassiniDocument? = null, speakerLabels: Map<String, String> = emptyMap(),
-                   recordedAtUtc: Instant? = null, createdAtUtc: Instant = Instant.now()): ByteArray {
-            val (comments, digest) = seal(OggOpus.scan(ByteArrayInputStream(audioBytes)), transcript, title, processing, existing, speakerLabels, recordedAtUtc = recordedAtUtc, createdAtUtc = createdAtUtc)
+        @Suppress("LongParameterList") // Existing sealing boundary plus explicit D95 recording/packaging instants.
+        fun create(
+            audioBytes: ByteArray,
+            transcript: Transcript,
+            title: String,
+            processing: JSONObject,
+            existing: CassiniDocument? = null,
+            speakerLabels: Map<String, String> = emptyMap(),
+            recordedAtUtc: Instant? = null,
+            createdAtUtc: Instant = Instant.now(),
+        ): ByteArray {
+            val (comments, digest) = seal(
+                OggOpus.scan(ByteArrayInputStream(audioBytes)),
+                transcript,
+                title,
+                processing,
+                existing,
+                speakerLabels,
+                recordedAtUtc = recordedAtUtc,
+                createdAtUtc = createdAtUtc,
+            )
             val out = ByteArrayOutputStream()
             require(OggOpus.rewrite(ByteArrayInputStream(audioBytes), tagsPacket(comments), out).digest() == digest)
             return out.toByteArray().also { verify(read(it), transcript) }
@@ -225,6 +242,7 @@ data class CassiniDocument(
          * the `x` of a document that can not take a new variant (stale audio): a fresh manifest carries it verbatim
          * (coordination D53.2, "never drop"); with [existing] its own `x` stays and [extensions] is not used.
          */
+        @Suppress("LongParameterList") // Streaming counterpart of the byte-array sealing boundary.
         fun create(
             audio: File,
             transcript: Transcript,
@@ -238,7 +256,17 @@ data class CassiniDocument(
             createdAtUtc: Instant = Instant.now(),
         ): CassiniDocument {
             val stream = OggOpus.scan(audio)
-            val (comments, digest) = seal(stream, transcript, title, processing, existing, speakerLabels, extensions, recordedAtUtc, createdAtUtc)
+            val (comments, digest) = seal(
+                stream,
+                transcript,
+                title,
+                processing,
+                existing,
+                speakerLabels,
+                extensions,
+                recordedAtUtc,
+                createdAtUtc,
+            )
             writeWithTags(audio, comments, digest, target)
             return read(target).also { verify(it, transcript) }
         }
@@ -369,6 +397,8 @@ data class CassiniDocument(
         }
         private fun verify(sealed: CassiniDocument, transcript: Transcript) =
             require(sealed.state == "ok" && sealed.selected(null)?.transcript == transcript)
+        // Preserve the reviewed verbatim encoder; D95 adds metadata without refactoring the format writer.
+        @Suppress("LongParameterList", "CyclomaticComplexMethod")
         private fun seal(
             stream: OggOpus.Info,
             transcript: Transcript,
@@ -393,7 +423,9 @@ data class CassiniDocument(
                     .put("sampleRate", 48000).put("channels", stream.channels).put("sampleCount", stream.sampleCount).put("durationMs", stream.durationMs))
                 .put("speakers", JSONArray()).put("transcripts", JSONArray())
                 .apply { if (extensions != null) put("x", JSONObject(extensions.toString())) }
-            if (existing == null && recordedAtUtc != null) manifest.getJSONObject("meeting").put("recordedAtUtc", recordedAtUtc.toString())
+            if (existing == null && recordedAtUtc != null) {
+                manifest.getJSONObject("meeting").put("recordedAtUtc", recordedAtUtc.toString())
+            }
             val descriptors = manifest.getJSONArray("transcripts")
             val id = if (descriptors.length() == 0) "words" else "words-${UUID.randomUUID().toString().take(8)}"
             for (i in 0 until descriptors.length()) descriptors.getJSONObject(i).put("default", false)
@@ -416,7 +448,8 @@ data class CassiniDocument(
                 val name = it.substringBefore('=').uppercase(Locale.ROOT)
                 name == "CASSINI_FORMAT" || name == "CASSINI_PROFILE" || name == "CASSINI_PAYLOAD_SCHEMA" ||
                     isManifestTag(name) ||
-                    name in setOf("CASSINI_TRANSCRIPT_IDS", "CASSINI_TRANSCRIPT_DEFAULT", "CASSINI_DECODE_HINT", "CASSINI_SPEAKER_COUNT", "CASSINI_MEETING_ID", "CASSINI_CREATED_AT", "CASSINI_RECORDED_AT_UTC", "DATE") || name in setOf("CASSINI_AUDIO_SAMPLE_RATE", "CASSINI_AUDIO_CHANNELS", "CASSINI_AUDIO_SAMPLE_COUNT", "CASSINI_AUDIO_DURATION_MS", "CASSINI_AUDIO_MATCH_POLICY", "CASSINI_AUDIO_OPUS_SHA256")
+                    name in setOf("CASSINI_TRANSCRIPT_IDS", "CASSINI_TRANSCRIPT_DEFAULT", "CASSINI_DECODE_HINT", "CASSINI_SPEAKER_COUNT", "CASSINI_MEETING_ID", "CASSINI_CREATED_AT") || name in setOf("CASSINI_RECORDED_AT_UTC", "DATE") ||
+                    name in setOf("CASSINI_AUDIO_SAMPLE_RATE", "CASSINI_AUDIO_CHANNELS", "CASSINI_AUDIO_SAMPLE_COUNT", "CASSINI_AUDIO_DURATION_MS", "CASSINI_AUDIO_MATCH_POLICY", "CASSINI_AUDIO_OPUS_SHA256")
             }.toMutableList()
             comments += listOf("CASSINI_FORMAT=$FORMAT", "CASSINI_PROFILE=ogg-opus",
                 "CASSINI_PAYLOAD_SCHEMA=https://format.gocassini.com/schema/cassini-portable-meeting-manifest-v1.schema.json",

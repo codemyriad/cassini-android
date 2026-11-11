@@ -50,8 +50,11 @@ object Dates {
 
     /** "Today, 10:02", "Monday 5 Oct, 10:02" (subtitles of the Note screen and the actions sheet). */
     fun dayTime(res: Resources, label: DayLabel, time: LocalTime, format: FormatSettings): String =
-        if (label == DayLabel.Unknown) dayLabel(res, label, format) else
+        if (label == DayLabel.Unknown) {
+            dayLabel(res, label, format)
+        } else {
             res.getString(R.string.ui_day_time, dayLabel(res, label, format), time(time, format))
+        }
 
     /** "8 Oct", or "8 Oct 2025" with the year. */
     fun shortDate(date: LocalDate, withYear: Boolean, format: FormatSettings): String =

@@ -18,9 +18,12 @@ class MeetingTimeTest {
     @Test fun priorityAndInstantEqualityFollowD95() {
         val utc = "2026-11-11T12:00:00Z"
         val local = "2026-11-11T13:00:00"
-        assertEquals(MeetingTime(MeetingTime.UTC, utc), MeetingTime.resolve(manifest(utc, local), listOf("DATE=2026-11-10T12:00:00Z")))
-        assertEquals(MeetingTime.DATE, MeetingTime.resolve(manifest(local = local), listOf("date=2026-11-11T13:00:00+01:00"))?.source)
-        assertEquals(local, MeetingTime.resolve(manifest(local = local), listOf("DATE=2026-11-11T13:09:00+01:00"))?.label)
+        val preferred = MeetingTime.resolve(manifest(utc, local), listOf("DATE=2026-11-10T12:00:00Z"))
+        assertEquals(MeetingTime(MeetingTime.UTC, utc), preferred)
+        val date = MeetingTime.resolve(manifest(local = local), listOf("date=2026-11-11T13:00:00+01:00"))
+        assertEquals(MeetingTime.DATE, date?.source)
+        val equalDate = MeetingTime.resolve(manifest(local = local), listOf("DATE=2026-11-11T13:09:00+01:00"))
+        assertEquals(local, equalDate?.label)
         assertNull(MeetingTime.resolve(manifest(), listOf("DATE=2026-11-11T13:09:00+01:00")))
         assertNull(MeetingTime.resolve(manifest(), emptyList()))
     }

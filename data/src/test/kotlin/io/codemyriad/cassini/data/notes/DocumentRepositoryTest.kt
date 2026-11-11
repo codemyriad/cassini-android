@@ -79,9 +79,11 @@ class DocumentRepositoryTest {
         h.notes.refreshIfStale("imported")
         assertEquals(start, h.row("imported").recordingTime()?.instant?.toEpochMilli())
         assertEquals(start, h.row("imported").createdAt)
-        assertEquals("2026-11-11T12:09:00Z", h.readFile("imported").manifest!!.getJSONObject("meeting").getString("createdAtUtc"))
+        val meeting = h.readFile("imported").manifest!!.getJSONObject("meeting")
+        assertEquals("2026-11-11T12:09:00Z", meeting.getString("createdAtUtc"))
         h.restart()
-        assertEquals(start, h.notes.library().first().single { it.id == "imported" }.recordingTime()?.instant?.toEpochMilli())
+        val imported = h.notes.library().first().single { it.id == "imported" }
+        assertEquals(start, imported.recordingTime()?.instant?.toEpochMilli())
     }
 
     @Test fun packagingOnlyImportHasNoDisplayedRecordingTime() = runTest {

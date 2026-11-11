@@ -89,6 +89,7 @@ object Spoken {
 
     @Composable
     @ReadOnlyComposable
+    @Suppress("LongParameterList") // The row description retains its literal site-local recording label.
     fun noteRow(
         title: String,
         durationMs: Long,

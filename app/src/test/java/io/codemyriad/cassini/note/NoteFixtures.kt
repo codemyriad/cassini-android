@@ -2,6 +2,7 @@ package io.codemyriad.cassini.note
 
 import io.codemyriad.cassini.core.checkpoint.CheckpointNames
 import io.codemyriad.cassini.core.format.DocumentState
+import io.codemyriad.cassini.core.format.MeetingTime
 import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.library.JobState
@@ -370,11 +371,11 @@ internal class FakeNotePorts : NotePorts {
 
     override fun placeholderLabel(number: Int): String = "Speaker $number"
 
-    override fun exportSubtitle(recordedAt: io.codemyriad.cassini.core.format.MeetingTime?, durationMs: Long, speakers: Int): String = "8 Oct 2026 · $speakers"
+    override fun exportSubtitle(recordedAt: MeetingTime?, durationMs: Long, speakers: Int): String = "8 Oct 2026 · $speakers"
 
     override fun exportEmptyText(): String = "No words"
 
-    override fun markdownOptions(recordedAt: io.codemyriad.cassini.core.format.MeetingTime?, durationMs: Long) = io.codemyriad.cassini.core.export.MarkdownOptions(
+    override fun markdownOptions(recordedAt: MeetingTime?, durationMs: Long) = io.codemyriad.cassini.core.export.MarkdownOptions(
         "Thursday 8 October 2026, 15:10",
         io.codemyriad.cassini.core.export.MarkdownCopy("Speakers: {names}", "Transcript", "Notes", "(over {names})") {
             it.joinToString(" and ")

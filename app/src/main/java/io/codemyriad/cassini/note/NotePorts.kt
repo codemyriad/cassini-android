@@ -202,7 +202,11 @@ interface NotePorts {
     fun placeholderLabel(number: Int): String
 
     /** The TXT subtitle line: "8 Oct 2026, 15:10 · 23:50 · 3 speakers" (the speakers part from 2 on). */
-    fun exportSubtitle(recordedAt: io.codemyriad.cassini.core.format.MeetingTime?, durationMs: Long, speakers: Int): String
+    fun exportSubtitle(
+        recordedAt: io.codemyriad.cassini.core.format.MeetingTime?,
+        durationMs: Long,
+        speakers: Int,
+    ): String
 
     /** The TXT body of a transcript without words. */
     fun exportEmptyText(): String
@@ -417,7 +421,11 @@ class GraphNotePorts(private val graph: AppGraph, context: Context) : NotePorts 
 
     override fun placeholderLabel(number: Int): String = InstalledEngines.speakerLabel(app, number)
 
-    override fun exportSubtitle(recordedAt: io.codemyriad.cassini.core.format.MeetingTime?, durationMs: Long, speakers: Int): String {
+    override fun exportSubtitle(
+        recordedAt: io.codemyriad.cassini.core.format.MeetingTime?,
+        durationMs: Long,
+        speakers: Int,
+    ): String {
         val context = localized()
         val res = context.resources
         val format = format(context)
