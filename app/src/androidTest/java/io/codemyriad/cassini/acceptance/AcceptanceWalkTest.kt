@@ -348,14 +348,18 @@ class AcceptanceWalkTest {
     /** The Paused banner, then 04 Name a speaker on the paused draft: "Anna" asks about Anna Ricci. */
     private fun pausedAndNaming() {
         openRow(BOARD_REVIEW)
-        see(prefix(UiR.string.ui_banner_tx_paused_title))
-        see(rule.text(UiR.string.ui_banner_tx_paused_body))
-        // The saved draft loads after the banner: wait for its first speaker, so the shot shows the draft.
+        // Loading the draft can scroll to its words. Wait for it before positioning the banner screenshot.
         val placeholder = rule.text(UiR.string.ui_speaker_label, NUMBER).substringBefore(NUMBER.toString())
         val speaker = hasContentDescription(placeholder, substring = true) and hasClickAction()
         rule.waitShown(speaker)
+        val bannerBody = rule.text(UiR.string.ui_banner_tx_paused_body)
+        val list = rule.onAllNodes(hasScrollToNodeAction()).onFirst()
+        list.performScrollToNode(hasText(bannerBody))
+        see(prefix(UiR.string.ui_banner_tx_paused_title))
+        see(bannerBody)
         shot("10-states-paused")
 
+        list.performScrollToNode(speaker)
         rule.onAllNodes(speaker).onFirst().performSemanticsAction(SemanticsActions.OnClick)
         val save = hasText(rule.text(UiR.string.ui_name_save)) and hasClickAction()
         rule.waitShown(save)
