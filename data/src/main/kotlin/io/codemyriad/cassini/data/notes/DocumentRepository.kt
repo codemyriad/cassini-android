@@ -356,7 +356,7 @@ class DocumentRepository(
      */
     suspend fun exportTranscript(noteId: String, request: TranscriptExport, dest: Uri): ExportOutcome {
         if (refreshIfStale(noteId) == RefreshOutcome.NoNote) return ExportOutcome.NoNote
-        return withContext(dispatchers.io) {
+        return locks.withNoteLock(noteId, dispatchers.io) {
             val row = notes.note(noteId)
             val variants = cache.variants(noteId).filter { it.readable }
             val variantId = request.variantId
