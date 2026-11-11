@@ -50,7 +50,12 @@ data class NoteUiState(
 
 /** The top bar subtitle: "<day>, <time> · <duration>". */
 @Immutable
-data class NoteSubtitleUi(val day: DayLabel, val time: LocalTime, val durationMs: Long)
+data class NoteSubtitleUi(
+    val day: DayLabel,
+    val time: LocalTime,
+    val durationMs: Long,
+    val recordedLabel: String? = null,
+)
 
 /** The mode of the Note screen (features.md section 3, table). */
 sealed interface NoteMode {

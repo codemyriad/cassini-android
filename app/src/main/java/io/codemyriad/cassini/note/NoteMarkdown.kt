@@ -27,7 +27,20 @@ internal object NoteMarkdown {
         ).let { 'H' in it || 'k' in it }
     }
 
-    fun options(res: Resources, format: FormatSettings, createdAt: Long, durationMs: Long): MarkdownOptions {
+    fun options(res: Resources, format: FormatSettings, createdAt: Long, durationMs: Long): MarkdownOptions =
+        options(
+            res,
+            format,
+            io.codemyriad.cassini.core.format.MeetingTime.utc(java.time.Instant.ofEpochMilli(createdAt)),
+            durationMs,
+        )
+
+    fun options(
+        res: Resources,
+        format: FormatSettings,
+        recordedAt: io.codemyriad.cassini.core.format.MeetingTime?,
+        durationMs: Long,
+    ): MarkdownOptions {
         val configured = res.configuration.locales[0]
         // Unsupported phone languages use the English resource fallback; English copy uses British date words.
         val uiLocale = when (configured.language) {
@@ -42,14 +55,17 @@ internal object NoteMarkdown {
             overLine = res.getString(UiR.string.ui_markdown_over),
             speakerList = { formatter.format(it) },
         )
-        val dateLine = MarkdownDate.line(
-            createdAt,
-            format.zone,
-            uiLocale,
-            format.locale,
-            format.is24Hour,
-            Durations.meetingDuration(res, durationMs, format).takeIf { durationMs > 0 },
-        )
+        val duration = Durations.meetingDuration(res, durationMs, format).takeIf { durationMs > 0 }
+        val dateLine = recordedAt?.instant?.let { instant ->
+            MarkdownDate.line(
+                instant.toEpochMilli(),
+                format.zone,
+                uiLocale,
+                format.locale,
+                format.is24Hour,
+                duration,
+            )
+        } ?: listOfNotNull(recordedAt?.label, duration).joinToString(" · ")
         return MarkdownOptions(dateLine, copy)
     }
 }

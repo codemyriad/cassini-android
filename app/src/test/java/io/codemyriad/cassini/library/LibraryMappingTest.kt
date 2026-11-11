@@ -47,6 +47,69 @@ import java.time.LocalTime
 class LibraryMappingTest {
     private val context = RowContext()
 
+    @Test fun mixedUtcAndFloatingLabelsSortByRecordingTimeInLibraryAndSearch() {
+        val zone = java.time.ZoneId.of("UTC")
+        val now = java.time.Instant.parse("2026-11-12T12:00:00Z")
+        val rows = listOf(
+            docRow("unknown", DocumentState.OK).copy(recordedAt = null, createdAt = Long.MAX_VALUE),
+            docRow("old-local", DocumentState.OK).copy(
+                recordedAt = "2026-11-01T10:00:00",
+                createdAt = java.time.Instant.parse("2026-11-10T12:00:00Z").toEpochMilli(),
+            ),
+            docRow("utc", DocumentState.OK).copy(recordedAt = "2026-11-09T12:00:00Z"),
+            docRow("new-local", DocumentState.OK).copy(recordedAt = "2026-11-09T13:00:00", createdAt = 0),
+        )
+        val expected = listOf("new-local", "utc", "old-local", "unknown")
+        val sections = LibraryMapping.sections(rows, context, now, zone)
+        assertEquals(expected, sections.flatMap { it.rows }.map { it.id })
+        assertEquals(
+            listOf(
+                DayLabel.Date(LocalDate.of(2026, 11, 9), false),
+                DayLabel.Date(LocalDate.of(2026, 11, 1), false),
+                DayLabel.Unknown,
+            ),
+            sections.map { it.label },
+        )
+        val results = LibraryMapping.results(rows.map { SearchRow(it, "", it.title) }, context, now, zone)
+        assertEquals(expected, results.map { it.id })
+        assertEquals("2026-11-09T13:00:00", results.first().recordedLabel)
+    }
+
+    @Test fun dateAndClockAlwaysUseTheSameOddOrPosixZone() {
+        val instant = java.time.Instant.parse("2026-11-11T00:30:00Z")
+        val cases = listOf(
+            Triple("Etc/GMT+3", LocalDate.of(2026, 11, 10), LocalTime.of(21, 30)),
+            Triple("GMT+05:45", LocalDate.of(2026, 11, 11), LocalTime.of(6, 15)),
+            Triple("EST5EDT", LocalDate.of(2026, 11, 10), LocalTime.of(19, 30)),
+            Triple("Pacific/Chatham", LocalDate.of(2026, 11, 11), LocalTime.of(14, 15)),
+        )
+        val source = docRow("clock", DocumentState.OK).copy(recordedAt = instant.toString())
+        for ((name, date, clock) in cases) {
+            val zone = java.time.ZoneId.of(name)
+            val row = LibraryMapping.row(source, context, zone)
+            assertEquals(name, clock, row.time)
+            val section = LibraryMapping.sections(listOf(source), context, NOW, zone).single()
+            assertEquals(name, DayLabel.Date(date, false), section.label)
+            val literal = source.copy(recordedAt = "2026-11-11T00:30:00")
+            assertEquals(literal.recordedAt, LibraryMapping.row(literal, context, zone).recordedLabel)
+        }
+    }
+
+    @Test fun recordingDatesNeverUseTheSealTimeAsDisplayFallback() {
+        val unknown = docRow("unknown", DocumentState.OK).copy(recordedAt = null)
+        val local = docRow("local", DocumentState.OK).copy(recordedAt = "2026-10-07T23:59:00")
+        val known = docRow("known", DocumentState.OK).copy(recordedAt = "2026-10-08T07:00:00Z")
+        val sections = LibraryMapping.sections(listOf(unknown, known, local), context, NOW, ROME)
+        assertEquals(listOf(DayLabel.Today, DayLabel.Yesterday, DayLabel.Unknown), sections.map { it.label })
+        assertEquals(LocalTime.of(9, 0), sections.first().rows.single().time)
+        assertEquals("2026-10-07T23:59:00", sections[1].rows.single().recordedLabel)
+        assertEquals(DayLabel.Unknown, LibraryMapping.recordingDay(null, NOW, ROME))
+        val actions = LibraryMapping.actions(details(unknown), null, NOW, ROME, false)
+        assertEquals(DayLabel.Unknown, actions.recordedDay)
+        val localActions = LibraryMapping.actions(details(local), null, NOW, ROME, false)
+        assertEquals("2026-10-07T23:59:00", localActions.recordedLabel)
+    }
+
     @Test
     fun statusChipForEveryRow() {
         val cases = listOf(
@@ -119,11 +182,12 @@ class LibraryMappingTest {
             NOW,
             ROME,
         )
-        val first = results[0]
+        assertEquals(listOf("b", "a"), results.map { it.id })
+        val first = results.single { it.id == "a" }
         assertEquals(DayLabel.Yesterday, first.day)
         assertEquals(Highlighted("the delivery slips", persistentListOf(4..11), true, true), first.preview)
         assertTrue(first.titleRanges.isEmpty())
-        val second = results[1]
+        val second = results.single { it.id == "b" }
         assertEquals("Invoice March", second.title)
         assertEquals(listOf(0..6), second.titleRanges)
         assertNull("a title-only match shows no snippet", second.preview)

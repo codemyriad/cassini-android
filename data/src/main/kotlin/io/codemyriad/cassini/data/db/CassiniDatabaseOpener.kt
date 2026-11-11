@@ -76,6 +76,7 @@ class CassiniDatabaseOpener(
 
     private fun build(onSetAside: (File) -> Unit): CassiniDatabase =
         Room.databaseBuilder(context, CassiniDatabase::class.java, paths.database.absolutePath)
+            .addMigrations(CassiniDatabase.MIGRATION_1_2)
             .openHelperFactory(
                 SetAsideOnCorruption(FrameworkSQLiteOpenHelperFactory()) { path ->
                     setAsideFiles(File(path))?.let(onSetAside)

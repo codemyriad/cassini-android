@@ -3,13 +3,13 @@ package io.codemyriad.cassini.note
 import io.codemyriad.cassini.core.format.DocumentState
 import io.codemyriad.cassini.core.format.Transcript
 import io.codemyriad.cassini.core.library.AudioKind
-import io.codemyriad.cassini.core.library.DayGroups
 import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.core.library.VariantKind
 import io.codemyriad.cassini.core.models.ModelCatalog
 import io.codemyriad.cassini.data.db.NoteDetails
 import io.codemyriad.cassini.data.db.NoteEntity
 import io.codemyriad.cassini.data.db.VariantEntity
+import io.codemyriad.cassini.data.notes.recordingTime
 import io.codemyriad.cassini.engine.job.BatteryLine
 import io.codemyriad.cassini.engine.job.DownloadProgress
 import io.codemyriad.cassini.engine.job.JobPhase
@@ -92,8 +92,14 @@ object NoteMapping {
     /** "Today, 10:02 · 48:13"; null in Reading mode (board 03). */
     fun subtitle(note: NoteEntity, mode: NoteMode, now: Instant, zone: ZoneId): NoteSubtitleUi? {
         if (mode == NoteMode.Reading) return null
-        val time = Instant.ofEpochMilli(note.createdAt).atZone(zone).toLocalTime()
-        return NoteSubtitleUi(LibraryMapping.dayLabel(DayGroups.key(note.createdAt, now, zone)), time, note.durationMs)
+        val recording = note.recordingTime()
+        val time = recording?.instant?.atZone(zone)?.toLocalTime() ?: java.time.LocalTime.MIDNIGHT
+        return NoteSubtitleUi(
+            LibraryMapping.recordingDay(recording, now, zone),
+            time,
+            note.durationMs,
+            recording?.label,
+        )
     }
 
     /** The trust chip of a document state. */
@@ -153,7 +159,8 @@ object NoteMapping {
         val selected = selected(details)
         val ordinals = variants.associate { it.variantId to it.ordinal }
         val rows = variants.mapIndexed { index, variant ->
-            val at = createdAt(variant, details.note).atZone(zone)
+            val instant = createdAt(variant, details.note)
+            val at = (instant ?: Instant.EPOCH).atZone(zone)
             VersionRowUi(
                 index = index,
                 number = variant.ordinal + 1,
@@ -165,19 +172,21 @@ object NoteMapping {
                 language = Transcript.knownLanguage(variant.language),
                 readable = variant.readable,
                 withYear = at.year != now.atZone(zone).year,
+                recordedLabel = if (instant == null) details.note.recordingTime()?.label else null,
+                recordingTimeKnown = instant != null,
             )
         }
         return VersionsUi(rows.toImmutableList(), variants.indexOfFirst { it.variantId == selected?.variantId })
     }
 
     /** When a variant was made: its `createdAtUtc`, else the note's recording time. */
-    fun createdAt(variant: VariantEntity, note: NoteEntity): Instant = variant.createdAtUtc?.let {
+    fun createdAt(variant: VariantEntity, note: NoteEntity): Instant? = variant.createdAtUtc?.let {
         try {
             Instant.parse(it)
         } catch (_: DateTimeParseException) {
             null
         }
-    } ?: Instant.ofEpochMilli(note.createdAt)
+    } ?: note.recordingTime()?.instant
 
     // The progress card. ------------------------------------------------------------------------------------------
 

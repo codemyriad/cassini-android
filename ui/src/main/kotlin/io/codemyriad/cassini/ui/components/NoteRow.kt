@@ -72,7 +72,7 @@ fun NoteRow(row: NoteRowUi, day: DayLabel, onAction: (NoteRowAction) -> Unit, mo
     // that is not a button ("3 speakers", "No speech") and the preview, which tells why a search result matched.
     val locale = LocalFormat.current.locale
     val description = listOfNotNull(
-        Spoken.noteRow(row.title, row.durationMs, row.day ?: day, row.time, status.text),
+        Spoken.noteRow(row.title, row.durationMs, row.day ?: day, row.time, status.text, row.recordedLabel),
         status.suffix?.takeIf { status.suffixAction == null }?.trimStart('·', ' ', '\u00A0')?.lowercase(locale),
         row.preview?.text,
     ).joinToString(", ")
@@ -129,7 +129,11 @@ fun NoteRow(row: NoteRowUi, day: DayLabel, onAction: (NoteRowAction) -> Unit, mo
             itemVerticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = row.day?.let { Dates.dayTime(it, row.time) } ?: Dates.time(row.time),
+                text = row.recordedLabel ?: if (day == DayLabel.Unknown) {
+                    Dates.dayLabel(day)
+                } else {
+                    row.day?.let { Dates.dayTime(it, row.time) } ?: Dates.time(row.time)
+                },
                 style = t.caption,
                 color = c.text2,
             )

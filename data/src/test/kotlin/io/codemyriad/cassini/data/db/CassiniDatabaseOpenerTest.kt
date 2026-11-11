@@ -54,7 +54,7 @@ class CassiniDatabaseOpenerTest {
         SQLiteDatabase.openOrCreateDatabase(catalogue.paths.database, null).use { raw ->
             raw.execSQL("CREATE TABLE future (x TEXT)")
             raw.execSQL("INSERT INTO future VALUES ('keep me')")
-            raw.version = 2
+            raw.version = 3
         }
         catalogue.clock = 42
         val opened = catalogue.open()

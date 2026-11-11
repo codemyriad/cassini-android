@@ -413,6 +413,7 @@ class AppGraph(context: Context, val config: Config) {
         val failed = LinkedHashMap<String, String>()
         val active = activeRecording.get()
         val rebuild = bestEffort(STEP_REBUILD, failed) { catalogue.rebuilder.rebuildIfNeeded(setAside) }
+        bestEffort(STEP_METADATA, failed) { catalogue.documents.refreshInvalidatedMetadata() }
         bestEffort(STEP_MODELS, failed) { models.refresh() }
         val recovered = bestEffort(STEP_RECOVER, failed) { catalogue.recovery.recover(active()) }
         val reconcile = bestEffort(STEP_RECONCILE, failed) { catalogue.jobs.reconcileOnStart(active()) }
@@ -529,6 +530,7 @@ class AppGraph(context: Context, val config: Config) {
         // The startup steps in their order (architecture 4.8), as Config.onStartupStep names them.
         const val STEP_DATABASE = "database"
         const val STEP_REBUILD = "rebuild"
+        const val STEP_METADATA = "metadata"
         const val STEP_MODELS = "models"
         const val STEP_RECOVER = "recover"
         const val STEP_RECONCILE = "reconcile"

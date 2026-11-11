@@ -61,7 +61,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.time.Instant
 import java.time.ZoneId
 
 /** The draft-name actions of one note (`ProcessingCoordinator.draft`): true when the change was applied. */
@@ -203,13 +202,17 @@ interface NotePorts {
     fun placeholderLabel(number: Int): String
 
     /** The TXT subtitle line: "8 Oct 2026, 15:10 · 23:50 · 3 speakers" (the speakers part from 2 on). */
-    fun exportSubtitle(createdAt: Long, durationMs: Long, speakers: Int): String
+    fun exportSubtitle(
+        recordedAt: io.codemyriad.cassini.core.format.MeetingTime?,
+        durationMs: Long,
+        speakers: Int,
+    ): String
 
     /** The TXT body of a transcript without words. */
     fun exportEmptyText(): String
 
     /** S-5 export copy and the D50.3 absolute date. */
-    fun markdownOptions(createdAt: Long, durationMs: Long): MarkdownOptions
+    fun markdownOptions(recordedAt: io.codemyriad.cassini.core.format.MeetingTime?, durationMs: Long): MarkdownOptions
 
     /** The text of a failed job's stored failure code, or null for a code without its own text. */
     fun failureText(code: String): String?
@@ -418,13 +421,17 @@ class GraphNotePorts(private val graph: AppGraph, context: Context) : NotePorts 
 
     override fun placeholderLabel(number: Int): String = InstalledEngines.speakerLabel(app, number)
 
-    override fun exportSubtitle(createdAt: Long, durationMs: Long, speakers: Int): String {
+    override fun exportSubtitle(
+        recordedAt: io.codemyriad.cassini.core.format.MeetingTime?,
+        durationMs: Long,
+        speakers: Int,
+    ): String {
         val context = localized()
         val res = context.resources
         val format = format(context)
-        val at = Instant.ofEpochMilli(createdAt).atZone(format.zone)
+        val at = recordedAt?.instant?.atZone(format.zone)
         val parts = listOfNotNull(
-            Dates.longDateTime(res, at.toLocalDate(), at.toLocalTime(), format),
+            recordedAt?.label ?: at?.let { Dates.longDateTime(res, it.toLocalDate(), it.toLocalTime(), format) },
             Durations.clock(durationMs),
             Counts.speakers(res, speakers, format).takeIf { speakers >= 2 },
         )
@@ -433,7 +440,7 @@ class GraphNotePorts(private val graph: AppGraph, context: Context) : NotePorts 
 
     override fun exportEmptyText(): String = localized().getString(R.string.export_no_words)
 
-    override fun markdownOptions(createdAt: Long, durationMs: Long): MarkdownOptions {
+    override fun markdownOptions(recordedAt: io.codemyriad.cassini.core.format.MeetingTime?, durationMs: Long): MarkdownOptions {
         val numericLocale = android.content.res.Resources.getSystem().configuration.locales[0]
         val clockPreference = android.provider.Settings.System.getString(
             app.contentResolver,
@@ -444,7 +451,7 @@ class GraphNotePorts(private val graph: AppGraph, context: Context) : NotePorts 
             NoteMarkdown.is24Hour(numericLocale, clockPreference),
             ZoneId.systemDefault(),
         )
-        return NoteMarkdown.options(localized().resources, settings, createdAt, durationMs)
+        return NoteMarkdown.options(localized().resources, settings, recordedAt, durationMs)
     }
 
     override fun failureText(code: String): String? {

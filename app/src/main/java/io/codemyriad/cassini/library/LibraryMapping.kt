@@ -2,7 +2,6 @@ package io.codemyriad.cassini.library
 
 import io.codemyriad.cassini.core.format.DocumentState
 import io.codemyriad.cassini.core.library.AudioKind
-import io.codemyriad.cassini.core.library.DayGroups
 import io.codemyriad.cassini.core.library.DayKey
 import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.core.library.NoteFacts
@@ -12,6 +11,7 @@ import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.data.db.LibraryRow
 import io.codemyriad.cassini.data.db.NoteDetails
 import io.codemyriad.cassini.data.db.SearchRow
+import io.codemyriad.cassini.data.notes.recordingTime
 import io.codemyriad.cassini.engine.job.DownloadProgress
 import io.codemyriad.cassini.engine.job.JobPhase
 import io.codemyriad.cassini.engine.job.TimeLeft
@@ -91,7 +91,8 @@ object LibraryMapping {
             title = hit?.title ?: row.title,
             titleRanges = hit?.titleRanges ?: persistentListOf(),
             durationMs = if (recording) context.recordingElapsedMs else row.durationMs,
-            time = Instant.ofEpochMilli(row.createdAt).atZone(zone).toLocalTime(),
+            time = row.recordingTime()?.instant?.atZone(zone)?.toLocalTime() ?: java.time.LocalTime.MIDNIGHT,
+            recordedLabel = row.recordingTime()?.label,
             day = hit?.day,
             status = status(row, context),
             preview = if (hit != null) hit.snippet else storedPreview(row.preview),
@@ -99,10 +100,11 @@ object LibraryMapping {
         )
     }
 
-    /** The day sections of [rows] (newest first), grouped by the local day of `created_at` at [now] in [zone]. */
+    /** Day sections ordered by resolved recording date/time, with packaging order only for unknown starts. */
     fun sections(rows: List<LibraryRow>, context: RowContext, now: Instant, zone: ZoneId): ImmutableList<DaySection> =
-        DayGroups.group(rows, now, zone) { it.createdAt }
-            .map { (key, group) -> DaySection(dayLabel(key), group.map { row(it, context, zone) }.toImmutableList()) }
+        ordered(rows, zone) { it }.groupBy { recordingDay(it.recordingTime(), now, zone) }.entries
+            .sortedBy { if (it.key == DayLabel.Unknown) 1 else 0 }
+            .map { (key, group) -> DaySection(key, group.map { row(it, context, zone) }.toImmutableList()) }
             .toImmutableList()
 
     /**
@@ -110,19 +112,50 @@ object LibraryMapping {
      * match; a title-only match highlights the title and shows no snippet (features.md section 1).
      */
     fun results(rows: List<SearchRow>, context: RowContext, now: Instant, zone: ZoneId): ImmutableList<NoteRowUi> =
-        rows.map { result ->
+        ordered(rows, zone) { it.row }.map { result ->
             // A title snippet that FTS cut (a very long title) is not shown; the plain title is, without ranges.
             val title = SearchQuery.highlights(result.titleSnippet)
                 .takeUnless { it.text.isEmpty() || it.leadingEllipsis || it.trailingEllipsis }
             val snippet = result.snippet.takeIf { SearchQuery.MATCH_START in it }?.let(::highlighted)
             val hit = Hit(
-                day = dayLabel(DayGroups.key(result.row.createdAt, now, zone)),
+                day = recordingDay(result.row.recordingTime(), now, zone),
                 title = title?.text,
                 titleRanges = title?.ranges.orEmpty().toImmutableList(),
                 snippet = snippet,
             )
             row(result.row, context, zone, hit)
         }.toImmutableList()
+
+    private data class Dated<T>(
+        val value: T,
+        val calendar: java.time.LocalDateTime?,
+        val instant: Instant?,
+        val fallback: Long,
+        val id: String,
+    )
+
+    /** Compare displayed calendar fields; no timezone is attached to a floating local label. */
+    private fun <T> ordered(values: List<T>, zone: ZoneId, row: (T) -> LibraryRow): List<T> = values.map { value ->
+        val item = row(value)
+        val time = item.recordingTime()
+        val calendar = time?.calendarTime(zone)
+        Dated(value, calendar, time?.instant, if (calendar == null) item.createdAt else 0, item.id)
+    }.sortedWith(
+        compareByDescending<Dated<T>> { it.calendar }
+            .thenByDescending { it.instant }
+            .thenByDescending { it.fallback }
+            .thenBy { it.id },
+    ).map { it.value }
+
+    fun recordingDay(time: io.codemyriad.cassini.core.format.MeetingTime?, now: Instant, zone: ZoneId): DayLabel {
+        val day = time?.day(zone) ?: return DayLabel.Unknown
+        val today = now.atZone(zone).toLocalDate()
+        return when (day) {
+            today -> DayLabel.Today
+            today.minusDays(1) -> DayLabel.Yesterday
+            else -> DayLabel.Date(day, day.year != today.year)
+        }
+    }
 
     fun dayLabel(key: DayKey): DayLabel = when (key) {
         DayKey.Today -> DayLabel.Today
@@ -259,8 +292,9 @@ object LibraryMapping {
         return NoteActionsUi(
             noteId = note.id,
             title = note.title,
-            recordedDay = dayLabel(DayGroups.key(note.createdAt, now, zone)),
-            recordedAt = Instant.ofEpochMilli(note.createdAt).atZone(zone).toLocalTime(),
+            recordedDay = recordingDay(note.recordingTime(), now, zone),
+            recordedAt = note.recordingTime()?.instant?.atZone(zone)?.toLocalTime() ?: java.time.LocalTime.MIDNIGHT,
+            recordedLabel = note.recordingTime()?.label,
             durationMs = note.durationMs,
             speakers = if (document) selected?.speakerCount ?: 0 else 0,
             documentKind = if (document) {

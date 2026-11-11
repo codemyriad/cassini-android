@@ -137,6 +137,11 @@ class DocumentRepository(
     suspend fun refreshIfStale(noteId: String): RefreshOutcome =
         locks.withNoteLock(noteId, dispatchers.io) { refreshLocked(noteId) }
 
+    /** Refresh the finite invalidated set on IO; unchanged files are not re-scanned on subsequent starts. */
+    suspend fun refreshInvalidatedMetadata(): List<String> = withContext(dispatchers.io) {
+        notes.invalidatedDocuments().also { ids -> ids.forEach { refreshIfStale(it) } }
+    }
+
     /**
      * Adds the note [row] for the `document.opus` already in its directory (import and catalogue rebuild): the
      * document is read and verified once, and the row and every cache row are written in one transaction with its
@@ -203,7 +208,20 @@ class DocumentRepository(
             marker.delete()
             var done = false
             try {
-                val document = CassiniDocument.create(audio, transcript, title, processing, existing, labels, sealed)
+                val row = notes.noteBlocking(noteId)
+                val start = row?.takeIf { it.audioKind != AudioKind.DOCUMENT || existing != null }
+                    ?.knownCaptureStart()
+                val document = CassiniDocument.create(
+                    audio,
+                    transcript,
+                    title,
+                    processing,
+                    existing,
+                    labels,
+                    sealed,
+                    recordedAtUtc = start,
+                    createdAtUtc = Instant.ofEpochMilli(clock()),
+                )
                 NoteFiles.syncFile(sealed)
                 marker.createNewFile()
                 NoteFiles.syncFile(marker)
@@ -309,7 +327,11 @@ class DocumentRepository(
                     val processing = SpeakerMerges.processing(previous, aliases, variantId)
                     // With an existing document, create keeps its manifest (and title) and adds the variant as default.
                     val written = rewrite(noteId, selectDefault = true) { audio, out ->
-                        CassiniDocument.create(audio, merged, row.title, processing, document, emptyMap(), out)
+                        CassiniDocument.create(
+                            audio, merged, row.title, processing, document, emptyMap(), out,
+                            recordedAtUtc = row.captureProvenance(document).start?.let(Instant::ofEpochMilli),
+                            createdAtUtc = Instant.ofEpochMilli(clock()),
+                        )
                     }
                     EditOutcome.Done(written.defaultId)
                 }
@@ -338,13 +360,52 @@ class DocumentRepository(
     private fun needsRetitle(row: NoteEntity): Boolean =
         row.titleDirty && row.audioKind == AudioKind.DOCUMENT && row.documentState == DocumentState.OK
 
-    private suspend fun copyAudio(noteId: String, dest: Uri): ExportOutcome = withContext(dispatchers.io) {
-        val row = notes.note(noteId)
+    private suspend fun copyAudio(noteId: String, dest: Uri): ExportOutcome = locks.withNoteLock(
+        noteId,
+        dispatchers.io,
+    ) {
+        val row = notes.noteBlocking(noteId)
         val file = row?.let { File(paths.note(noteId), it.audioFile) }
         when {
             row == null || file == null -> ExportOutcome.NoNote
             row.audioKind == AudioKind.LIVE_CAPTURE || !file.isFile -> ExportOutcome.NotAvailable
-            else -> writeTo(dest) { out -> file.inputStream().use { it.copyTo(out) } }
+            else -> {
+                val document = if (row.audioKind == AudioKind.DOCUMENT) {
+                    DocumentSignature.of(file)?.let { readLocked(file, it) }
+                } else {
+                    null
+                }
+                val start = if (document != null) {
+                    row.captureProvenance(document).start?.let(Instant::ofEpochMilli)
+                } else {
+                    row.knownCaptureStart()
+                }
+                if (document?.documentState == DocumentState.OK &&
+                    document.meetingTime?.source != io.codemyriad.cassini.core.format.MeetingTime.UTC && start != null
+                ) {
+                    exportTimeMetadata(file, document, start, dest)
+                } else {
+                    writeTo(dest) { out -> file.inputStream().use { it.copyTo(out) } }
+                }
+            }
+        }
+    }
+
+    /** Stage the annotated copy; never change a running job's canonical file or checkpoint signature. */
+    private fun exportTimeMetadata(file: File, document: CassiniDocument, start: Instant, dest: Uri): ExportOutcome {
+        var staged: File? = null
+        return try {
+            java.nio.file.Files.createDirectories(paths.exports.toPath())
+            val output = File.createTempFile("recorded-", ".opus", paths.exports).also { staged = it }
+            CassiniDocument.withRecordedAtUtc(file, document, start, output)
+            writeTo(dest) { out -> output.inputStream().use { it.copyTo(out) } }
+        } catch (error: IOException) {
+            ExportOutcome.Failed(Failure.SAVE, error.message)
+        } catch (error: IllegalArgumentException) {
+            ExportOutcome.Failed(Failure.SAVE, error.message)
+        } finally {
+            staged?.delete()
+            paths.exports.delete() // Only when empty; another export may be staging.
         }
     }
 
@@ -644,7 +705,9 @@ class DocumentRepository(
     /** [row] as [document] describes it: its title, recording time and audio file; a duration when it has no manifest. */
     private fun describedBy(row: NoteEntity, document: CassiniDocument, file: File): NoteEntity {
         val meeting = document.manifest?.optJSONObject("meeting")
-        val createdAt = meeting?.optString("createdAtUtc")?.let { text ->
+        val time = row.recordingTime(document)
+        // Packaging time can order an unknown meeting, but never becomes its displayed time.
+        val createdAt = time?.instant?.toEpochMilli() ?: meeting?.optString("createdAtUtc")?.let { text ->
             try {
                 Instant.parse(text).toEpochMilli()
             } catch (_: DateTimeParseException) {
@@ -655,6 +718,7 @@ class DocumentRepository(
         return row.copy(
             title = NoteTitles.fit(document.title) ?: row.title,
             createdAt = createdAt ?: row.createdAt,
+            recordedAt = time?.cacheValue,
             durationMs = duration ?: row.durationMs,
             audioFile = NoteFiles.DOCUMENT,
             audioKind = AudioKind.DOCUMENT,

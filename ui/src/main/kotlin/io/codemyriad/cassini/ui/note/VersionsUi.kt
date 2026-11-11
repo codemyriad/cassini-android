@@ -39,4 +39,6 @@ data class VersionRowUi(
     val language: String? = null,
     val readable: Boolean = true,
     val withYear: Boolean = false,
+    val recordedLabel: String? = null,
+    val recordingTimeKnown: Boolean = true,
 )
