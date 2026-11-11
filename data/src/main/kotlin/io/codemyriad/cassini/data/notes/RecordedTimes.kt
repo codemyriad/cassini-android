@@ -62,6 +62,7 @@ internal fun CassiniDocument.packagingInstant(): Instant? = manifest?.optJSONObj
         }
     }
 
+@Suppress("CyclomaticComplexMethod") // Independent identity, integrity and legacy-clock trust gates.
 internal fun NoteEntity.captureProvenance(document: CassiniDocument): CaptureProvenance {
     val id = document.manifest?.optJSONObject("meeting")?.optString("id")?.takeIf { it.isNotEmpty() }
     val sha = document.manifest?.optJSONObject("integrity")?.optString("opusAudioSha256")?.takeIf { it.isNotEmpty() }

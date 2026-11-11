@@ -12,15 +12,22 @@ known start show “Date unknown”. Local labels are displayed without zone con
 
 Schema 2 preserves notes and jobs, adds a nullable derived recording-time cache and an independent
 own-capture UTC clock, and
-invalidates old document signatures so opening a document derives its metadata again.
+invalidates old document signatures. Startup re-derives this finite set off Main, before
+the Library is ready; opening individual notes is not required.
 It does not rewrite imported documents or infer a recording start from the old document cache.
-An own non-document row still holds the capture clock in created_at; the migration retains
-that trustworthy value separately. Damaged/unknown-major manifests cannot promote DATE
+Own v1 document clocks are held provisionally until a verified file distinguishes an original
+capture clock from the exact packaging timestamp of a rebuilt catalogue. Real v1 producer
+and rebuild fixtures cover both paths. Audio identity binds the retained capture clock;
+adoption of changed audio clears it, including replacement with the same meeting id. Damaged/unknown-major manifests cannot promote DATE
 tags to a meeting time, matching the pinned Player `when` gate. Re-export of an own
 legacy document fills its independently known UTC in a staged copy, without changing a
 running job's canonical file or checkpoint signature. The production worker and the
 repository sealer both receive the capture clock. Replacing stale audio inherits neither
-the old local label nor its old UTC clock.
+the old local label nor its old UTC clock. Save a copy preserves non-OK files byte for byte.
+
+The cache retains the recording-time source, so even an offset-bearing local label stays
+a label. Library and search order known times by their displayed calendar fields, without
+assigning a zone to floating local labels; packaging time orders unknown starts only.
 
 The Date unknown translations are copied verbatim from cassini-ux
 3216b2db9abd215dc7e283a02dffb9e40f336fe5 (strings/strings.json, library.group.unknownDate).

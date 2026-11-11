@@ -1103,7 +1103,9 @@ class NoteViewModel(
     }
 
     /** Writes the export of [kind] to [uri] with the row showing its progress; true when it was written. */
-    private suspend fun write(details: NoteDetails, kind: ExportKind, uri: String): Boolean {
+    private suspend fun write(initial: NoteDetails, kind: ExportKind, uri: String): Boolean {
+        ports.refreshIfStale(noteId)
+        val details = ports.note(noteId).first() ?: initial
         local.update { it.copy(sheet = SheetKind.ACTIONS, busyRow = NoteExports.row(kind)) }
         val format = NoteExports.format(kind)
         val outcome = if (format == null) {

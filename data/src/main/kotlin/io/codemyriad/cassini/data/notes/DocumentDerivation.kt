@@ -47,7 +47,7 @@ internal object DocumentDerivation {
         val capture = row.captureProvenance(document)
         val time = row.recordingTime(document, capture.start?.let(java.time.Instant::ofEpochMilli))
         val note = row.copy(
-            recordedAt = time?.value,
+            recordedAt = time?.cacheValue,
             captureStartedAt = capture.start,
             captureAudioSha256 = capture.audioSha256,
             legacyCaptureCandidate = capture.legacyCandidate,

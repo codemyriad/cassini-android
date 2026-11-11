@@ -15,6 +15,15 @@ class MeetingTimeTest {
             .put("recordedAtUtc", utc).put("recordedAtLocal", local),
     )
 
+    @Test fun cachedLocalLabelsNeverBecomeInstantsEvenWithAnOffset() {
+        val label = "2026-11-09T10:31:48+02:00"
+        val local = MeetingTime.resolve(org.json.JSONObject().put("meeting", org.json.JSONObject().put("recordedAtLocal", label)), emptyList())!!
+        val cached = MeetingTime.cached(local.cacheValue)!!
+        assertEquals(local, cached)
+        assertNull(cached.instant)
+        assertEquals(label, cached.label)
+    }
+
     @Test fun priorityAndInstantEqualityFollowD95() {
         val utc = "2026-11-11T12:00:00Z"
         val local = "2026-11-11T13:00:00"

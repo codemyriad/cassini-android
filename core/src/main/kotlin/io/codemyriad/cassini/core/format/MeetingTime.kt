@@ -12,6 +12,8 @@ import java.time.format.DateTimeParseException
 data class MeetingTime(val source: String, val value: String) {
     val instant: Instant? get() = if (source == LOCAL) null else offsetInstant(value)
     val label: String? get() = value.takeIf { source == LOCAL }
+    /** Preserve the source, including a local label that happens to contain an offset. */
+    val cacheValue: String get() = "$source=$value"
 
     fun day(zone: ZoneId): LocalDate? = calendarTime(zone)?.toLocalDate()
 
@@ -35,7 +37,9 @@ data class MeetingTime(val source: String, val value: String) {
 
         /** Cached values retain offsets or local-label digits; no viewer zone is attached to a label. */
         fun cached(value: String?): MeetingTime? = value?.takeIf { it.isNotEmpty() }?.let {
-            MeetingTime(if (offsetInstant(it) != null) UTC else LOCAL, it)
+            val source = it.substringBefore('=')
+            if (source in setOf(UTC, DATE, LOCAL)) MeetingTime(source, it.substringAfter('='))
+            else MeetingTime(if (offsetInstant(it) != null) UTC else LOCAL, it)
         }
 
         @Suppress("ReturnCount") // Ordered D95 fallback clauses, each rejecting unusable evidence.

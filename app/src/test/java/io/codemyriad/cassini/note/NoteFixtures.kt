@@ -166,8 +166,11 @@ internal class FakeNotePorts : NotePorts {
 
     override fun note(id: String): Flow<NoteDetails?> = details
 
+    var onRefresh: () -> Unit = {}
+
     override suspend fun refreshIfStale(id: String): RefreshOutcome {
         calls += "refreshIfStale"
+        onRefresh()
         return RefreshOutcome.Fresh
     }
 
@@ -375,12 +378,17 @@ internal class FakeNotePorts : NotePorts {
 
     override fun exportEmptyText(): String = "No words"
 
-    override fun markdownOptions(recordedAt: MeetingTime?, durationMs: Long) = io.codemyriad.cassini.core.export.MarkdownOptions(
-        "Thursday 8 October 2026, 15:10",
-        io.codemyriad.cassini.core.export.MarkdownCopy("Speakers: {names}", "Transcript", "Notes", "(over {names})") {
-            it.joinToString(" and ")
-        },
-    )
+    var markdownTime: MeetingTime? = null
+
+    override fun markdownOptions(recordedAt: MeetingTime?, durationMs: Long): io.codemyriad.cassini.core.export.MarkdownOptions {
+        markdownTime = recordedAt
+        return io.codemyriad.cassini.core.export.MarkdownOptions(
+            "Thursday 8 October 2026, 15:10",
+            io.codemyriad.cassini.core.export.MarkdownCopy("Speakers: {names}", "Transcript", "Notes", "(over {names})") {
+                it.joinToString(" and ")
+            },
+        )
+    }
 
     override fun failureText(code: String): String? = "failed: $code"
 

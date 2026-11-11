@@ -327,7 +327,11 @@ class DocumentRepository(
                     val processing = SpeakerMerges.processing(previous, aliases, variantId)
                     // With an existing document, create keeps its manifest (and title) and adds the variant as default.
                     val written = rewrite(noteId, selectDefault = true) { audio, out ->
-                        CassiniDocument.create(audio, merged, row.title, processing, document, emptyMap(), out)
+                        CassiniDocument.create(
+                            audio, merged, row.title, processing, document, emptyMap(), out,
+                            recordedAtUtc = row.captureProvenance(document).start?.let(Instant::ofEpochMilli),
+                            createdAtUtc = Instant.ofEpochMilli(clock()),
+                        )
                     }
                     EditOutcome.Done(written.defaultId)
                 }
@@ -376,9 +380,7 @@ class DocumentRepository(
                 } else {
                     row.knownCaptureStart()
                 }
-                if (document?.documentState == DocumentState.STALE_AUDIO) {
-                    exportTimeMetadata(file, document, null, dest)
-                } else if (document?.documentState == DocumentState.OK &&
+                if (document?.documentState == DocumentState.OK &&
                     document.meetingTime?.source != io.codemyriad.cassini.core.format.MeetingTime.UTC && start != null
                 ) {
                     exportTimeMetadata(file, document, start, dest)
@@ -390,16 +392,12 @@ class DocumentRepository(
     }
 
     /** Stage the annotated copy; never change a running job's canonical file or checkpoint signature. */
-    private fun exportTimeMetadata(file: File, document: CassiniDocument, start: Instant?, dest: Uri): ExportOutcome {
+    private fun exportTimeMetadata(file: File, document: CassiniDocument, start: Instant, dest: Uri): ExportOutcome {
         var staged: File? = null
         return try {
             java.nio.file.Files.createDirectories(paths.exports.toPath())
             val output = File.createTempFile("recorded-", ".opus", paths.exports).also { staged = it }
-            if (start == null) {
-                CassiniDocument.withoutStaleRecordingTime(file, document, output)
-            } else {
-                CassiniDocument.withRecordedAtUtc(file, document, start, output)
-            }
+            CassiniDocument.withRecordedAtUtc(file, document, start, output)
             writeTo(dest) { out -> output.inputStream().use { it.copyTo(out) } }
         } catch (error: IOException) {
             ExportOutcome.Failed(Failure.SAVE, error.message)
@@ -720,7 +718,7 @@ class DocumentRepository(
         return row.copy(
             title = NoteTitles.fit(document.title) ?: row.title,
             createdAt = createdAt ?: row.createdAt,
-            recordedAt = time?.value,
+            recordedAt = time?.cacheValue,
             durationMs = duration ?: row.durationMs,
             audioFile = NoteFiles.DOCUMENT,
             audioKind = AudioKind.DOCUMENT,

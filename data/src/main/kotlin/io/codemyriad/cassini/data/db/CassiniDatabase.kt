@@ -7,7 +7,7 @@ import androidx.room.TypeConverters
 /**
  * The Room catalogue (docs/architecture.md, section 3.3), opened by absolute path at `AppPaths.database` through
  * [CassiniDatabaseOpener]. Version 2 adds the derived D95 recording time. Its explicit migration preserves authoritative
- * rows and jobs, invalidating legacy document signatures for lazy re-derivation, with a MigrationTestHelper test.
+ * rows and jobs, invalidating legacy document signatures for off-main startup re-derivation, with a MigrationTestHelper test.
  * Destructive fallback migrations are forbidden: a database that cannot be opened is set aside and the catalogue
  * is rebuilt from the files.
  */

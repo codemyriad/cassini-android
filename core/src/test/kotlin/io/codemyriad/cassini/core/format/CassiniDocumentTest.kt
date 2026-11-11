@@ -74,6 +74,30 @@ class CassiniDocumentTest {
         assertTrue(unknown.comments.contains("DATE=$start"))
     }
 
+    @Test fun localMirrorsFollowTheManifestOnFreshSealAppendAndUtcBackfill() {
+        val label = "2026-11-09T10:31:48"
+        val words = Transcript(listOf(Word("spk_1", 0, 20, "Hello")), "en")
+        val input = OggOpus.mux(OggOpus.read(silence()), CassiniDocument.tagsPacket(listOf("CASSINI_RECORDED_AT_LOCAL=$label")))
+        val bytes = CassiniDocument.create(input, words, "Meeting", JSONObject())
+        val doc = CassiniDocument.read(bytes)
+        assertFalse(doc.comments.any { it.startsWith("CASSINI_RECORDED_AT_LOCAL=") })
+        doc.manifest!!.getJSONObject("meeting").put("recordedAtLocal", label)
+        val appended = CassiniDocument.read(CassiniDocument.create(bytes, words, "Ignored", JSONObject(), doc))
+        assertTrue(appended.comments.contains("CASSINI_RECORDED_AT_LOCAL=$label"))
+        val dir = kotlin.io.path.createTempDirectory("recorded-mirror-").toFile()
+        try {
+            val source = File(dir, "source.opus").also { it.writeBytes(bytes) }
+            val target = File(dir, "export.opus")
+            val start = java.time.Instant.parse("2026-11-09T09:31:48Z")
+            val result = CassiniDocument.withRecordedAtUtc(source, doc, start, target)
+            assertEquals(label, result.manifest!!.getJSONObject("meeting").getString("recordedAtLocal"))
+            assertTrue(result.comments.contains("CASSINI_RECORDED_AT_LOCAL=$label"))
+            assertTrue(result.comments.contains("CASSINI_RECORDED_AT_UTC=$start"))
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
     @Test fun appendDoesNotReplaceAValidDateFallbackWithAnInvalidUtcField() {
         val start = java.time.Instant.parse("2026-11-11T12:00:00Z")
         val words = Transcript(listOf(Word("spk_1", 0, 20, "Hello")), "en")
