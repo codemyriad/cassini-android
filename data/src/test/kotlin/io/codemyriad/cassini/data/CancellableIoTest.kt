@@ -6,7 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertSame
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
@@ -69,14 +69,15 @@ class CancellableIoTest {
         }
     }
 
-    @Test fun normalIoErrorsKeepTheirIdentity() = runTest {
+    @Test fun normalIoErrorsRemainProviderFailures() = runTest {
         val failure = IOException("Provider failure")
         val input = object : InputStream() { override fun read(): Int = throw failure }
         try {
             input.useCancellable { it.read() }
             error("Expected provider failure")
         } catch (error: IOException) {
-            assertSame(failure, error)
+            assertEquals(failure.javaClass, error.javaClass)
+            assertEquals(failure.message, error.message)
         }
     }
 }

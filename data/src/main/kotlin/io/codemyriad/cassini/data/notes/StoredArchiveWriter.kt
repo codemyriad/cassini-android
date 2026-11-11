@@ -18,7 +18,7 @@ class StoredArchiveWriter internal constructor(private val zip: ZipOutputStream,
     suspend fun add(suggested: String, file: File, crc: Long) {
         currentCoroutineContext().ensureActive()
         val size = file.length()
-        if (count >= limits.entries || size > remainingBytes) throw IOException("Archive is too large")
+        verify(count < limits.entries && size <= remainingBytes, "Archive is too large")
         val entry = ZipEntry(unique(suggested)).apply {
             method = ZipEntry.STORED
             this.size = size
@@ -35,14 +35,18 @@ class StoredArchiveWriter internal constructor(private val zip: ZipOutputStream,
                 currentCoroutineContext().ensureActive()
                 if (n < 0) break
                 copied += n
-                if (copied > size) throw IOException("Snapshot grew during export")
+                verify(copied <= size, "Snapshot grew during export")
                 zip.write(buffer, 0, n)
             }
         }
-        if (copied != size) throw IOException("Snapshot changed during export")
+        verify(copied == size, "Snapshot changed during export")
         zip.closeEntry()
         count++
         total += size
+    }
+
+    private fun verify(valid: Boolean, message: String) {
+        if (!valid) throw IOException(message)
     }
 
     private fun unique(suggested: String): String {

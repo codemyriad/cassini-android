@@ -6,6 +6,7 @@ import android.provider.DocumentsContract
 import android.util.Log
 import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.core.library.AudioKind
+import io.codemyriad.cassini.data.db.NoteEntity
 import io.codemyriad.cassini.data.notes.ArchiveLimits
 import io.codemyriad.cassini.data.notes.ImportSummary
 import io.codemyriad.cassini.data.notes.NoteArchives
@@ -18,8 +19,8 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -41,6 +42,7 @@ class BulkTransfers(context: Context, private val graph: AppGraph) {
     private var initialized = false
     private val mutable = MutableStateFlow(TransferState())
     val state = mutable.asStateFlow()
+
     @Volatile private var job: Job? = null
     private val snapshots = TransferSnapshots(graph)
 
@@ -58,16 +60,18 @@ class BulkTransfers(context: Context, private val graph: AppGraph) {
 
     val available: Flow<List<Choice>> = flow {
         val catalogue = graph.awaitCatalogue()
-        emitAll(catalogue.notes.library().map { library ->
-            val rows = catalogue.database.notes().all().associateBy { it.id }
-            library.mapNotNull { item ->
-                val row = rows[item.id]
-                if (row != null && row.trashedAt == null && row.audioKind !in setOf(AudioKind.LIVE_CAPTURE, AudioKind.UNPLAYABLE) &&
-                    File(graph.paths.note(row.id), row.audioFile).isFile
-                ) Choice(row.id, row.title) else null
-            }
-        })
+        emitAll(
+            catalogue.notes.library().map { library ->
+                val rows = catalogue.database.notes().all().associateBy { it.id }
+                library.mapNotNull { item -> rows[item.id]?.takeIf(::exportable)?.let { Choice(it.id, it.title) } }
+            },
+        )
     }.flowOn(graph.dispatchers.io)
+
+    private fun exportable(row: NoteEntity): Boolean {
+        if (row.trashedAt != null || row.audioKind in setOf(AudioKind.LIVE_CAPTURE, AudioKind.UNPLAYABLE)) return false
+        return File(graph.paths.note(row.id), row.audioFile).isFile
+    }
 
     suspend fun choices(): List<Choice> = available.first()
 
@@ -126,6 +130,7 @@ class BulkTransfers(context: Context, private val graph: AppGraph) {
     }
 
     @Synchronized fun cancel() { job?.cancel() }
+
     @Synchronized fun dismiss() { if (!mutable.value.running) mutable.value = TransferState() }
 
     @Synchronized private fun start(

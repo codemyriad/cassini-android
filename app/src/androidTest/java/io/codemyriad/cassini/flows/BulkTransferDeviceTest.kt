@@ -1,6 +1,8 @@
 package io.codemyriad.cassini.flows
 
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -9,6 +11,7 @@ import io.codemyriad.cassini.MainActivity
 import io.codemyriad.cassini.R
 import io.codemyriad.cassini.background.Background
 import io.codemyriad.cassini.data.notes.ImportSummary
+import io.codemyriad.cassini.flows.Flows.awaitUi
 import io.codemyriad.cassini.test.CiSmoke
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -40,6 +43,15 @@ class BulkTransferDeviceTest {
         withTimeout(20_000) { Flows.graph.transfers.state.first { !it.running } }
         Flows.graph.transfers.dismiss()
         Background.reset()
+    }
+
+    @Test fun anEmptyLibraryCannotOpenTheZipDestinationPicker() {
+        val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+        val label = context.getString(R.string.export_zip_all)
+        rule.awaitUi(20_000) {
+            rule.onNodeWithText(label).fetchSemanticsNode().config.contains(SemanticsProperties.Disabled)
+        }
+        rule.onNodeWithText(label).assertIsNotEnabled()
     }
 
     @Test fun multipleImportsShowTheirSummaryAndExportOriginalAudio() {
