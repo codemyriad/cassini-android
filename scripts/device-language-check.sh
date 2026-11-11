@@ -6,6 +6,9 @@
 #   scripts/device-language-check.sh [--serial SERIAL]
 # The app must be installed (debug build: run-as needs it) and the device language must not be Italian.
 set -euo pipefail
+# shellcheck source=scripts/heavy-lock.sh
+. "$(dirname "$0")/heavy-lock.sh"
+heavy_lock "$0" "$@"
 cd "$(dirname "$0")/.."
 
 while [ $# -gt 0 ]; do
@@ -30,7 +33,6 @@ dump() {
             adb shell rm -f /sdcard/cassini-window.xml
             return 0
         fi
-        sleep 1
     done
     printf 'uiautomator could not dump the screen.\n' >&2
     return 1
@@ -52,13 +54,12 @@ sys.exit(1)
 PY
 }
 
-# Waits (up to 20 s) until a node labelled $1 is on screen and prints its centre.
+# Each uiautomator dump waits for an idle accessibility tree. The deadline bounds a missing node.
 wait_node() {
-    local _
-    for _ in $(seq 20); do
-        dump
+    local deadline=$((SECONDS + 60))
+    while [ "$SECONDS" -lt "$deadline" ]; do
+        dump || return 1
         if find_node "$1"; then return 0; fi
-        sleep 1
     done
     printf 'Not on screen: %s\n' "$1" >&2
     return 1
@@ -93,11 +94,24 @@ wait_node "Lingua dell’app" > /dev/null
 printf 'Italiano is set; the activity shows Italian.\n'
 
 pid=$(adb shell pidof "$package" | tr -d '\r')
+since=$(adb shell "date '+%m-%d %H:%M:%S.000'" | tr -d '\r')
 adb shell run-as "$package" kill -9 "$pid"
-for _ in $(seq 20); do
-    if [ "$(adb shell pidof "$package" | tr -d '\r')" != "$pid" ]; then break; fi
-    sleep 1
-done
+python3 -I - "$since" "$pid" "$package" <<'PY'
+import re
+import subprocess
+import sys
+
+since, pid, package = sys.argv[1:]
+# am_proc_died carries the user, the exact PID and the process name.
+pattern = rf"^\[[0-9]+,{re.escape(pid)},{re.escape(package)}([,\]])"
+try:
+    subprocess.run(
+        ["adb", "logcat", "-b", "events", "-T", since, "-e", pattern, "-m", "1", "-s", "am_proc_died:I"],
+        check=True, timeout=30,
+    )
+except subprocess.TimeoutExpired:
+    sys.exit(f"Android did not report that pid {pid} exited.")
+PY
 start
 new=$(adb shell pidof "$package" | tr -d '\r')
 if [ -z "$new" ] || [ "$new" = "$pid" ]; then
