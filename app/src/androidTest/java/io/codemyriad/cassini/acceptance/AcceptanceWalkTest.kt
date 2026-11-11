@@ -4,6 +4,8 @@ import android.Manifest
 import android.graphics.Bitmap
 import android.os.Build
 import android.util.Log
+import android.view.View
+import android.view.inspector.WindowInspector
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.getOrNull
@@ -47,6 +49,7 @@ import io.codemyriad.cassini.flows.Flows.tapWord
 import io.codemyriad.cassini.flows.Flows.text
 import io.codemyriad.cassini.flows.Flows.waitFor
 import io.codemyriad.cassini.flows.Flows.waitGone
+import io.codemyriad.cassini.flows.Flows.waitKeyboardClosed
 import io.codemyriad.cassini.flows.Flows.waitShown
 import io.codemyriad.cassini.flows.Flows.waitShownLive
 import io.codemyriad.cassini.processing.StartOrigin
@@ -69,7 +72,6 @@ import java.io.File
 import java.util.Locale
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.TimeoutException
 import io.codemyriad.cassini.ui.R as UiR
 
 /**
@@ -339,6 +341,7 @@ class AcceptanceWalkTest {
         see(rule.text(UiR.string.ui_name_same_person))
         // Board 04 shows the sheet without the keyboard.
         Espresso.closeSoftKeyboard()
+        rule.waitKeyboardClosed(save)
         shot("04-name-a-speaker")
         val cancel = hasText(rule.text(UiR.string.ui_action_cancel)) and hasClickAction()
         rule.onAllNodes(cancel).onLast().performSemanticsAction(SemanticsActions.OnClick)
@@ -544,19 +547,9 @@ class AcceptanceWalkTest {
         }
     }
 
-    /**
-     * Saves a screenshot of the whole screen as `<name>.png` once the screen is still and drawn: Compose is idle (its
-     * animations have ended), the window has sent no accessibility event for [QUIET_MS] (a sheet or activity
-     * transition has ended), and a frame drawn after that has reached the display, all within [STILL_MS]. Without the
-     * last step a Transcribing screenshot on the CI emulator showed the note screen with none of its content.
-     */
+    /** Saves the current screen after Compose is idle and the visible windows have submitted a frame. */
     private fun shot(name: String) {
         rule.waitForIdle()
-        try {
-            Background.instrumentation.uiAutomation.waitForIdle(QUIET_MS, STILL_MS)
-        } catch (timeout: TimeoutException) {
-            throw AssertionError("The screen of $name did not become still (waited ${STILL_MS / 1_000} s)", timeout)
-        }
         awaitDrawnFrame(name)
         val bitmap = checkNotNull(Background.instrumentation.uiAutomation.takeScreenshot()) { "No screenshot" }
         File(shots, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, PNG_QUALITY, it) }
@@ -564,20 +557,30 @@ class AcceptanceWalkTest {
         Log.i(TAG, "Screenshot $name")
     }
 
-    /** Draws the activity's window again and waits until that frame is committed to the display (API 29 and above). */
+    /** Includes dialog and sheet windows in the frame wait when Android exposes their roots. */
     private fun awaitDrawnFrame(name: String) {
-        val committed = CountDownLatch(1)
-        rule.runOnUiThread {
-            val root = rule.activity.window.decorView
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                root.viewTreeObserver.registerFrameCommitCallback { committed.countDown() }
+        val committed = rule.runOnUiThread {
+            val activityRoot = rule.activity.window.decorView
+            val roots = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                WindowInspector.getGlobalWindowViews()
+                    .filter { it.isShown && it.windowVisibility == View.VISIBLE }
+                    .ifEmpty { listOf(activityRoot) }
             } else {
-                root.post { committed.countDown() }
+                listOf(activityRoot)
             }
-            root.invalidate()
+            CountDownLatch(roots.size).also { frames ->
+                roots.forEach { root ->
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && root.isHardwareAccelerated) {
+                        root.viewTreeObserver.registerFrameCommitCallback { frames.countDown() }
+                    } else {
+                        root.post { frames.countDown() }
+                    }
+                    root.invalidate()
+                }
+            }
         }
         if (!committed.await(STILL_MS, TimeUnit.MILLISECONDS)) {
-            throw AssertionError("No frame of $name reached the display (waited ${STILL_MS / 1_000} s)")
+            throw AssertionError("A window of $name did not commit a frame (waited ${STILL_MS / 1_000} s)")
         }
     }
 
@@ -661,7 +664,6 @@ class AcceptanceWalkTest {
         const val FINISH_MS = 30_000L
         const val SEE_MS = 20_000L
         const val PLAYER_MS = 60_000L
-        const val QUIET_MS = 500L
         const val STILL_MS = 10_000L
         const val BACK_TRIES = 3
         const val BACK_MS = 5_000L
