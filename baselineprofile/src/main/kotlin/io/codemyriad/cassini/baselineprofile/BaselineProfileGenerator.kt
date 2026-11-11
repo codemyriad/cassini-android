@@ -7,6 +7,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.BySelector
+import androidx.test.uiautomator.Condition
 import androidx.test.uiautomator.Direction
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
@@ -72,7 +73,7 @@ class BaselineProfileGenerator {
     private fun playBriefly(device: UiDevice) {
         val play = checkNotNull(device.findObject(By.desc(PLAY))) { "The note has no Play control" }
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
-        awaitPlaybackProgress(automation, PACKAGE, TIMEOUT_MS, play::click)
+        awaitPlaybackProgress(device, automation, TIMEOUT_MS, play::click)
         device.findObject(By.desc(PAUSE))?.click()
     }
 
@@ -102,26 +103,21 @@ class BaselineProfileGenerator {
 }
 
 /** Runs the player until two seconds of audio have advanced, or until it reaches the end of a shorter note. */
-@Suppress("DEPRECATION") // AccessibilityEvent.recycle is a no-op on API 33 and newer.
-internal fun awaitPlaybackProgress(automation: UiAutomation, packageName: String, timeoutMs: Long, play: () -> Unit) {
+internal fun awaitPlaybackProgress(device: UiDevice, automation: UiAutomation, timeoutMs: Long, play: () -> Unit) {
     val start = checkNotNull(playbackPosition(automation.rootInActiveWindow)) { "The player has no Position range" }
     val from = if (start.current < start.end) start.current else 0f
     val target = minOf(from + PROFILE_AUDIO_MS, start.end)
     var moved = false
-    val event = automation.executeAndWaitForEvent(
-        { play() },
-        { update ->
-            if (update.packageName?.toString() != packageName) {
-                false
-            } else {
-                val position = playbackPosition(automation.rootInActiveWindow)
-                if (position != null && position.current != start.current) moved = true
-                moved && position != null && position.current >= target
-            }
-        },
-        timeoutMs,
-    )
-    event.recycle()
+    play()
+    // The slider exposes its range on demand. Position ticks do not each send an accessibility event.
+    val reached = device.wait(object : Condition<UiDevice, Boolean>() {
+        override fun apply(device: UiDevice): Boolean {
+            val position = playbackPosition(automation.rootInActiveWindow) ?: return false
+            if (position.current != start.current) moved = true
+            return moved && position.current >= target
+        }
+    }, timeoutMs)
+    check(reached == true) { "Playback did not reach $target ms" }
 }
 
 private data class PlaybackPosition(val current: Float, val end: Float)
