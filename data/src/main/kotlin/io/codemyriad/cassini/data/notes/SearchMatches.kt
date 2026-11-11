@@ -57,5 +57,4 @@ internal class SearchMatches(
         }
         return Cached(key, excerpt)
     }
-
 }
