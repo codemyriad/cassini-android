@@ -66,28 +66,66 @@ finish() {
     adb logcat -d > .tools/emulator-results/logcat.txt 2>&1 || true
 }
 trap finish EXIT
-# Android process and window lifecycle events prompt a fresh check of the preflight state.
+# Subscribe before the retained-state check. Dialog appearance and removal both publish window events.
 wait_for() (
-    local seconds=$1 message=$2 since work watcher remaining _event
+    local seconds=$1 message=$2 work watcher='' remote remote_pid='' line remaining
     shift 2
-    local end=$((SECONDS + seconds))
-    since=$(adb shell "date '+%m-%d %H:%M:%S.000'" | tr -d '\r')
-    if "$@"; then return 0; fi
-
     work=$(mktemp -d)
-    mkfifo "$work/events"
-    adb logcat -b events -T "$since" -s am_anr:I am_proc_died:I wm_set_resumed_activity:I > "$work/events" &
+    remote=/data/local/tmp/cassini-window-events-$$-$RANDOM.apk
+    mkfifo "$work/events" "$work/control"
+    exec 3<>"$work/events"
+    exec 4<>"$work/control"
+    # shellcheck disable=SC2329 # Invoked by this subshell's EXIT trap.
+    cleanup_window_observer() {
+        if [ -n "$watcher" ]; then
+            printf 'stop\n' >&4
+            local cleanup_end=$((SECONDS + 5)) stopped=false
+            while IFS= read -r -t "$((cleanup_end - SECONDS))" line <&3; do
+                line=${line%$'\r'}
+                if [ "$line" = STOPPED ]; then stopped=true; break; fi
+                [ "$SECONDS" -lt "$cleanup_end" ] || break
+            done
+            if ! $stopped && [[ "$remote_pid" =~ ^[0-9]+$ ]]; then
+                adb shell kill "$remote_pid" || true
+            fi
+            kill "$watcher" 2>/dev/null || true
+            wait "$watcher" || cat "$work/error.txt" >&2
+        fi
+        exec 3>&- 4>&-
+        adb shell rm -f "$remote" || true
+        rm -rf "$work"
+    }
+    trap 'cleanup_window_observer' EXIT
+    adb push "$CASSINI_TEST_APK" "$remote" > "$work/push.txt"
+    adb shell "CLASSPATH=$remote app_process / io.codemyriad.cassini.preflight.WindowEvents" \
+        < "$work/control" > "$work/events" 2> "$work/error.txt" &
     watcher=$!
-    trap 'kill "$watcher" 2>/dev/null || true; wait "$watcher" 2>/dev/null || true; rm -rf "$work"' EXIT
-    exec 3<"$work/events"
+    local end=$((SECONDS + seconds))
     while :; do
         remaining=$((end - SECONDS))
-        if [ "$remaining" -le 0 ] || ! IFS= read -r -t "$remaining" _event <&3; then break; fi
-        if "$@"; then return 0; fi
+        if [ "$remaining" -le 0 ] || ! IFS= read -r -t "$remaining" line <&3; then
+            printf 'Could not attach the Android window observer.\n' >&2
+            cat "$work/error.txt" >&2
+            return 1
+        fi
+        line=${line%$'\r'}
+        if [[ "$line" == START\ * ]]; then remote_pid=${line#START }; fi
+        [ "$line" = READY ] && break
+        if [ "$line" = STOPPED ]; then
+            printf 'The Android window observer exited before attaching.\n' >&2
+            cat "$work/error.txt" >&2
+            return 1
+        fi
     done
-    # A dialog can settle without a matching lifecycle log on some API levels.
     if "$@"; then return 0; fi
-    printf '%s (waited %s s)\n' "$message" "$seconds" >&2
+    end=$((SECONDS + seconds))
+    while :; do
+        remaining=$((end - SECONDS))
+        if [ "$remaining" -le 0 ] || ! IFS= read -r -t "$remaining" line <&3; then break; fi
+        line=${line%$'\r'}
+        if [ "$line" = WINDOW ] && "$@"; then return 0; fi
+    done
+    printf '%s (no matching window change within %s s)\n' "$message" "$seconds" >&2
     return 1
 )
 error_dialog() {
