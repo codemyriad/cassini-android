@@ -125,11 +125,6 @@ class AcceptanceWalkTest {
     }
 
     @After fun tearDown() {
-        if (CassiniTestRunner.emptyModelRoot) {
-            // A failed assertion may leave the fake provider waiting for its next progress acknowledgement.
-            ScriptedModels.clear()
-            ScriptedModels.release()
-        }
         try {
             runBlocking {
                 val recording = graph.recording
@@ -137,6 +132,8 @@ class AcceptanceWalkTest {
                 recording.state.await("The recording ends", FINISH_MS) { !it.inProgress }
                 recording.dismissEnded()
                 TestHooks.reset()
+                // Reset clears the fake gate; release afterwards so a failed progress assertion can unwind.
+                if (CassiniTestRunner.emptyModelRoot) ScriptedModels.release()
                 Background.reset()
                 graph.awaitCatalogue().voices.forgetEveryone()
             }
@@ -493,6 +490,7 @@ class AcceptanceWalkTest {
     private fun see(text: String, substring: Boolean = true, ignoreCase: Boolean = false, timeoutMs: Long = SEE_MS) {
         val matcher = hasText(text, substring = substring, ignoreCase = ignoreCase) or
             hasContentDescription(text, substring = substring, ignoreCase = ignoreCase)
+        Log.i(TAG, "Waiting for $text")
         rule.waitShown(matcher, timeoutMs = timeoutMs, unmerged = true)
     }
 
