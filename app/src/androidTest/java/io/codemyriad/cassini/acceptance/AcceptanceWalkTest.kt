@@ -55,7 +55,12 @@ import io.codemyriad.cassini.recording.RecordingWarning
 import io.codemyriad.cassini.recording.inProgress
 import io.codemyriad.cassini.test.Manual
 import io.codemyriad.cassini.ui.components.ActiveWordStart
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -119,9 +124,7 @@ class AcceptanceWalkTest {
             runBlocking {
                 val recording = graph.recording
                 if (recording.state.value.inProgress) recording.finish()
-                Background.waitFor("The recording ends", FINISH_MS) {
-                    recording.state.value.takeUnless { it.inProgress }
-                }
+                recording.state.await("The recording ends", FINISH_MS) { !it.inProgress }
                 recording.dismissEnded()
                 TestHooks.reset()
                 Background.reset()
@@ -165,7 +168,9 @@ class AcceptanceWalkTest {
         // The recording made at the start ends now, from the Library.
         library()
         graph.recording.finish()
-        rule.waitFor("The recording is saved", FINISH_MS) { graph.recording.state.value is RecordingState.Ended }
+        runBlocking {
+            graph.recording.state.await("The recording is saved", FINISH_MS) { it is RecordingState.Ended }
+        }
         if (language != null) chooseLanguage(rule.text(UiR.string.ui_settings_language_phone), null)
     }
 
@@ -202,23 +207,24 @@ class AcceptanceWalkTest {
 
         // A transcription paused after its first words.
         graph.processing.transcribe(paused, JobKind.TRANSCRIBE, StartOrigin.SCREEN)
-        Background.waitFor("The paused note has draft words", Background.WAIT_MS) {
-            graph.processing.state.value.running?.takeIf { it.noteId == paused }
-                ?.let { it.phase as? JobPhase.Transcribing }?.takeIf { it.draft.words.isNotEmpty() }
-        }
+        awaitDraftWords(paused, "The paused note has draft words")
         assertTrue(graph.processing.stop(paused))
-        Background.waitFor("The note is paused with a checkpoint", Background.WAIT_MS) {
-            catalogue.jobs.job(paused)?.takeIf { it.state == JobState.PAUSED && it.words > 0 }
+        catalogue.jobs.queue().await("The note is paused with a checkpoint") { rows ->
+            rows.any { it.job.noteId == paused && it.job.state == JobState.PAUSED && it.job.words > 0 }
         }
 
         // The long note runs during the walk; the short one waits behind it.
         graph.processing.transcribe(running, JobKind.TRANSCRIBE, StartOrigin.SCREEN)
         graph.processing.transcribe(queued, JobKind.TRANSCRIBE, StartOrigin.SCREEN)
-        Background.waitFor("The long note shows draft words", Background.WAIT_MS) {
-            graph.processing.state.value.running?.takeIf { it.noteId == running }
-                ?.let { it.phase as? JobPhase.Transcribing }?.takeIf { it.draft.words.isNotEmpty() }
-        }
+        awaitDraftWords(running, "The long note shows draft words")
         Seeded(done = done, paused = paused, running = running)
+    }
+
+    private suspend fun awaitDraftWords(noteId: String, message: String) {
+        graph.processing.state.await(message) { state ->
+            val phase = state.running?.takeIf { it.noteId == noteId }?.phase as? JobPhase.Transcribing
+            phase?.draft?.words?.isNotEmpty() == true
+        }
     }
 
     private data class Seeded(val done: String, val paused: String, val running: String)
@@ -226,9 +232,11 @@ class AcceptanceWalkTest {
     /** 01 Recording for 8 s, then the Storage almost full banner, then back minimises; the recording goes on. */
     private fun recording() {
         rule.onNode(hasContentDescription(rule.text(UiR.string.ui_library_record_description))).performClick()
-        rule.waitFor("The recording starts", START_MS) { graph.recording.state.value is RecordingState.Active }
-        rule.waitFor("Eight seconds are captured", START_MS + CAPTURE_MS) {
-            ((graph.recording.state.value as? RecordingState.Active)?.elapsedMs ?: 0) >= CAPTURE_MS
+        runBlocking {
+            graph.recording.state.await("The recording starts", START_MS) { it is RecordingState.Active }
+            graph.recording.state.await("Eight seconds are captured", START_MS + CAPTURE_MS) {
+                it is RecordingState.Active && it.elapsedMs >= CAPTURE_MS
+            }
         }
         see(rule.text(UiR.string.ui_recording_finish))
         see(rule.text(UiR.string.ui_recording_hint), substring = true)
@@ -241,15 +249,19 @@ class AcceptanceWalkTest {
             val rate = if (elapsed > 0) bytes * MS_PER_S / elapsed else 0
             Limits.MIN_RECORDING_FREE_BYTES + rate * LOW_SPACE_S
         }
-        rule.waitFor("The recording warns about storage", START_MS) {
-            (graph.recording.state.value as? RecordingState.Active)?.warning is RecordingWarning.StorageLow
+        runBlocking {
+            graph.recording.state.await("The recording warns about storage", START_MS) {
+                (it as? RecordingState.Active)?.warning is RecordingWarning.StorageLow
+            }
         }
         see(prefix(UiR.string.ui_banner_rec_storage_low_title))
         see(rule.text(UiR.string.ui_banner_rec_storage_low_body))
         shot("10-states-storage-low")
         TestHooks.recordingFreeBytes = null
-        rule.waitFor("The warning ends", START_MS) {
-            (graph.recording.state.value as? RecordingState.Active)?.warning == null
+        runBlocking {
+            graph.recording.state.await("The warning ends", START_MS) {
+                it is RecordingState.Active && it.warning == null
+            }
         }
 
         Espresso.pressBack()
@@ -284,18 +296,24 @@ class AcceptanceWalkTest {
         see(ANNA)
         rule.waitShown(hasText(letters, substring = true), unmerged = true)
         // The player opens when the screen does; a tap before it is ready seeks nothing.
-        rule.waitFor("The player opens the note", PLAYER_MS) {
-            graph.playback.state.value.let { it.noteId == noteId && it.durationMs > 0 }
-        }
-        rule.onAllNodes(hasText(letters, substring = true), useUnmergedTree = true).onFirst().tapWord(letters)
-        rule.waitFor("The word tap plays from \"$letters\": ${graph.playback.state.value}", PLAYER_MS) {
-            graph.playback.state.value.playing
+        val playback = graph.playback.state
+        runBlocking {
+            playback.await("The player opens the note", PLAYER_MS) { it.noteId == noteId && it.durationMs > 0 }
+            val playing = async(start = CoroutineStart.UNDISPATCHED) {
+                playback.await("The word tap starts playback from \"$letters\"", PLAYER_MS) {
+                    it.noteId == noteId && it.playing
+                }
+            }
+            rule.onAllNodes(hasText(letters, substring = true), useUnmergedTree = true).onFirst().tapWord(letters)
+            playing.await()
         }
         // The screen shows it: the Pause button and a position past the start of the word. The player redraws every
         // frame while it plays, so these checks read the screen live instead of waiting for it to go idle.
         rule.waitShownLive(hasContentDescription(rule.text(UiR.string.ui_player_pause)))
-        rule.waitFor("The position passes \"$letters\": ${graph.playback.state.value}", PLAYER_MS) {
-            graph.playback.state.value.let { it.playing && it.positionMs > word.startMs }
+        runBlocking {
+            playback.await("The position passes \"$letters\"", PLAYER_MS) {
+                it.noteId == noteId && it.playing && it.positionMs > word.startMs
+            }
         }
         // The transcript shows it: one word is highlighted, from the tapped word on and not past the position.
         rule.waitFor("A word from \"$letters\" on is highlighted: ${graph.playback.state.value}", PLAYER_MS) {
@@ -583,9 +601,8 @@ class AcceptanceWalkTest {
 
     /** Waits for the note's job to end with a verified document, and returns it. */
     private suspend fun awaitDocument(noteId: String): CassiniDocument {
-        Background.waitFor("The job seals a verified document", Background.WAIT_MS) {
-            val row = graph.awaitCatalogue().notes.rowBlocking(noteId)
-            row?.takeIf { graph.awaitCatalogue().jobs.job(noteId) == null && it.documentState == DocumentState.OK }
+        graph.awaitCatalogue().notes.library().await("The job seals a verified document") { rows ->
+            rows.any { it.id == noteId && it.jobState == null && it.documentState == DocumentState.OK }
         }
         return documentOf(noteId)
     }
@@ -670,4 +687,9 @@ class AcceptanceWalkTest {
         const val LOW_SPACE_S = 12 * 60L
         const val PNG_QUALITY = 100
     }
+}
+
+private suspend fun <T : Any> Flow<T>.await(message: String, timeoutMs: Long = Background.WAIT_MS, matches: (T) -> Boolean) {
+    withTimeoutOrNull(timeoutMs) { first(matches) }
+        ?: throw AssertionError("$message (waited ${timeoutMs / 1_000} s)")
 }
