@@ -597,3 +597,10 @@
     <string name="ui_day_unknown">Date inconnue</string>
     <string name="ui_search_filter_any_date">Toutes les dates</string>
     <string name="ui_search_filter_recorded_by_me">Enregistrées par moi</string>
+    <string name="ui_search_filter_speaker">Intervenant : {name}</string>
+    <string name="ui_search_filter_speaker_none">Intervenant</string>
+    <string name="ui_search_filter_any_speaker">Tous les intervenants</string>
+    <string name="ui_search_filter_date_today">Aujourd’hui</string>
+    <string name="ui_search_filter_date_week">7 derniers jours</string>
+    <string name="ui_search_filter_date_month">30 derniers jours</string>
+</resources>

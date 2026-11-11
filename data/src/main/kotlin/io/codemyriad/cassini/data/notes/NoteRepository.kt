@@ -101,7 +101,7 @@ class NoteRepository(
             emitAll(
                 notes.searchFlow(match).map { found ->
                     withContext(dispatchers.io) {
-                        val candidates = found.filter { filters.includes(it.row.createdAt, it.row.origin, today, zone) }
+                        val candidates = found.filter { filters.includes(it.row.recordingTime()?.day(zone), it.row.origin, today) }
                         matches.retain(candidates.mapTo(HashSet()) { it.row.id })
                         SpeakerSearch().use { matcher ->
                             candidates.mapNotNull { matches.match(it, filters.speaker, match, matcher) }

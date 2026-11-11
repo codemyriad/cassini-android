@@ -1,5 +1,6 @@
 package io.codemyriad.cassini.data.notes
 
+import io.codemyriad.cassini.core.format.MeetingTime
 import io.codemyriad.cassini.core.format.Word
 import io.codemyriad.cassini.core.library.Origin
 import io.codemyriad.cassini.core.library.SearchDate
@@ -19,6 +20,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -44,8 +46,9 @@ class SearchFiltersTest {
         origin: Origin = Origin.RECORDED,
         createdAt: Long = at,
         labels: Map<String, String> = mapOf("S1" to "Ada", "S2" to "Ben"),
+        recordedAt: String? = Instant.ofEpochMilli(createdAt).toString(),
     ) {
-        val row = note(id, title, createdAt).copy(origin = origin)
+        val row = note(id, title, createdAt).copy(origin = origin, recordedAt = recordedAt)
         val cache = cache(row, listOf("v1" to words))
         val speakers = cache.speakers.map {
             labels[it.speakerId]?.let { label -> it.copy(label = label, isPlaceholder = false) } ?: it
@@ -84,6 +87,37 @@ class SearchFiltersTest {
         val filters = SearchFilters(speaker = "Ada", date = SearchDate.TODAY, recordedByMe = true)
         assertEquals(listOf("newer", "own"), search("deliv", filters).map { it.row.id })
         assertEquals(listOf("newer", "received", "own", "old"), search("deliv").map { it.row.id })
+    }
+
+    @Test fun dateFiltersUseTheResolvedRecordingDayAndNeverThePackagingTime() = runTest {
+        val words = listOf(Word("S1", 0, 400, "delivery"))
+        val olderPackage = today.minusDays(2).atStartOfDay(zone).toInstant().toEpochMilli()
+        insert("unknown", words, origin = Origin.IMPORTED_DOCUMENT, recordedAt = null)
+        insert(
+            "local-today",
+            words,
+            createdAt = olderPackage,
+            recordedAt = MeetingTime(MeetingTime.LOCAL, "2026-11-11T23:30:00").cacheValue,
+        )
+        insert(
+            "local-old",
+            words,
+            recordedAt = MeetingTime(MeetingTime.LOCAL, "2026-11-01T23:30:00").cacheValue,
+        )
+        insert("utc-today", words, createdAt = olderPackage, recordedAt = "2026-11-10T23:30:00Z")
+        insert("utc-tomorrow", words, recordedAt = "2026-11-11T23:30:00Z")
+        assertEquals(
+            setOf("unknown", "local-today", "local-old", "utc-today", "utc-tomorrow"),
+            search("deliv").mapTo(HashSet()) { it.row.id },
+        )
+        for (date in listOf(SearchDate.TODAY, SearchDate.WEEK)) {
+            val found = search("deliv", SearchFilters(date = date)).mapTo(HashSet()) { it.row.id }
+            assertEquals(setOf("local-today", "utc-today"), found)
+        }
+        assertEquals(
+            setOf("local-today", "local-old", "utc-today"),
+            search("deliv", SearchFilters(date = SearchDate.MONTH)).mapTo(HashSet()) { it.row.id },
+        )
     }
 
     @Test fun namedInventoryExcludesPlaceholdersTrashAndUnselectedVariantsAndDeduplicatesCase() = runTest {
