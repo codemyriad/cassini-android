@@ -1,5 +1,9 @@
 name: Pinned Android NDK
-description: Restore or install the pinned Android NDK with bounded retries and verify it before Gradle runs.
+description: Restore or install the pinned Android NDK with bounded retries and verify it against committed SHA-256 pins before Gradle runs.
+outputs:
+  ndk-path:
+    description: Verified Android NDK directory path.
+    value: ${{ steps.pin.outputs.path }}
 runs:
   using: composite
   steps:

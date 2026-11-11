@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Explicitly cache, install with bounded retries, and verify the pinned Android NDK before Gradle runs."""
+"""Explicitly cache, install with bounded retries, and cryptographically verify the pinned Android NDK."""
 
 from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import os
 import platform
 import re
@@ -14,15 +15,21 @@ import sys
 import time
 from collections.abc import Callable, Mapping
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
-CACHE_SCHEMA = 'v1'
+PINS_FILE = ROOT / 'scripts/ci-download-pins.json'
+CACHE_SCHEMA = 'v2'
 ATTEMPTS = 3
 RETRY_DELAYS = (10, 20)
 SDKMANAGER_TIMEOUT_SECONDS = 300
-REQUIRED_LLVM_TOOLS = (
+IGNORED_TREE_FILES = frozenset({'package.xml', '.cassini-ndk-manifest.json'})
+REQUIRED_LLVM_EXECUTABLES = (
     'clang',
     'clang++',
+    'clang-19',
+    'ld.lld',
+    'lld',
     'aarch64-linux-android26-clang',
     'aarch64-linux-android26-clang++',
     'x86_64-linux-android26-clang',
@@ -31,7 +38,36 @@ REQUIRED_LLVM_TOOLS = (
     'llvm-nm',
     'llvm-objcopy',
     'llvm-readelf',
+    'llvm-readobj',
     'llvm-strip',
+)
+NATIVE_ELF_TOOLS = (
+    'clang-19',
+    'lld',
+    'llvm-ar',
+    'llvm-nm',
+    'llvm-objcopy',
+    'llvm-readobj',
+)
+REQUIRED_SYSROOT_PATHS = (
+    'usr/include/jni.h',
+    'usr/include/c++/v1/__config',
+    'usr/lib/aarch64-linux-android/26/crtbegin_so.o',
+    'usr/lib/aarch64-linux-android/26/crtend_so.o',
+    'usr/lib/aarch64-linux-android/26/libc.so',
+    'usr/lib/aarch64-linux-android/26/libm.so',
+    'usr/lib/aarch64-linux-android/26/libdl.so',
+    'usr/lib/aarch64-linux-android/26/liblog.so',
+    'usr/lib/aarch64-linux-android/libc++_static.a',
+    'usr/lib/aarch64-linux-android/libc++abi.a',
+    'usr/lib/x86_64-linux-android/26/crtbegin_so.o',
+    'usr/lib/x86_64-linux-android/26/crtend_so.o',
+    'usr/lib/x86_64-linux-android/26/libc.so',
+    'usr/lib/x86_64-linux-android/26/libm.so',
+    'usr/lib/x86_64-linux-android/26/libdl.so',
+    'usr/lib/x86_64-linux-android/26/liblog.so',
+    'usr/lib/x86_64-linux-android/libc++_static.a',
+    'usr/lib/x86_64-linux-android/libc++abi.a',
 )
 FATAL_SDKMANAGER_PATTERNS = (
     'Failed to find package',
@@ -41,10 +77,24 @@ FATAL_SDKMANAGER_PATTERNS = (
 )
 
 
+def sha256_file(path: Path) -> str:
+    with path.open('rb') as handle:
+        return hashlib.file_digest(handle, 'sha256').hexdigest()
+
+
+def load_ndk_pin(pins_path: Path = PINS_FILE) -> dict[str, Any]:
+    data = json.loads(pins_path.read_text(encoding='utf-8'))
+    ndk_pin = data.get('ndk')
+    if not isinstance(ndk_pin, dict) or not isinstance(ndk_pin.get('hosts'), dict):
+        raise ValueError(f'Missing committed ndk pin dictionary in {pins_path}')
+    return ndk_pin
+
+
 def read_ndk_version(
     catalog: Path = ROOT / 'gradle/libs.versions.toml',
     *,
     whistle_script: Path | None = ROOT / 'scripts/build-whistle-runtime.py',
+    ndk_pin: Mapping[str, Any] | None = None,
 ) -> str:
     text = catalog.read_text(encoding='utf-8')
     matches = re.findall(r'^ndk\s*=\s*"([^"]+)"\s*$', text, re.MULTILINE)
@@ -58,6 +108,10 @@ def read_ndk_version(
             raise ValueError(
                 f'NDK pin mismatch between {catalog} ({version}) and {whistle_script} ({whistle_match.group(1)})'
             )
+    committed_pin = load_ndk_pin() if ndk_pin is None else ndk_pin
+    pin_version = committed_pin.get('version')
+    if pin_version != version:
+        raise ValueError(f'NDK pin mismatch between {catalog} ({version}) and ci-download-pins.json ({pin_version})')
     return version
 
 
@@ -87,28 +141,97 @@ def _normalize_arch(runner_arch: str | None = None) -> str:
     return normalized
 
 
+def host_pin_for(
+    ndk_pin: Mapping[str, Any],
+    *,
+    runner_os: str | None = None,
+    runner_arch: str | None = None,
+) -> tuple[str, Mapping[str, Any]]:
+    platform_key = f'{_normalize_os(runner_os)}-{_normalize_arch(runner_arch)}'
+    hosts = ndk_pin.get('hosts', {})
+    host_pin = hosts.get(platform_key)
+    if not isinstance(host_pin, Mapping):
+        raise ValueError(f'No committed Android NDK checksum pin for host {platform_key}')
+    return platform_key, host_pin
+
+
+def compute_ndk_tree_digest(ndk_dir: Path) -> tuple[int, str]:
+    """Compute a deterministic SHA-256 digest over every file and symlink in ndk_dir."""
+    records: list[str] = []
+    for root, dirs, filenames in os.walk(ndk_dir, followlinks=False):
+        root_path = Path(root)
+        kept_dirs: list[str] = []
+        for dirname in sorted(dirs):
+            if dirname == '__pycache__':
+                continue
+            dir_path = root_path / dirname
+            if dir_path.is_symlink():
+                rel = dir_path.relative_to(ndk_dir).as_posix()
+                records.append(f'L\t{rel}\t{os.readlink(dir_path)}\n')
+            else:
+                kept_dirs.append(dirname)
+        dirs[:] = kept_dirs
+        for filename in sorted(filenames):
+            if filename in IGNORED_TREE_FILES or filename.endswith('.pyc'):
+                continue
+            file_path = root_path / filename
+            rel = file_path.relative_to(ndk_dir).as_posix()
+            if file_path.is_symlink():
+                records.append(f'L\t{rel}\t{os.readlink(file_path)}\n')
+            elif file_path.is_file():
+                size = file_path.stat().st_size
+                digest = sha256_file(file_path)
+                records.append(f'F\t{rel}\t{size}\t{digest}\n')
+            else:
+                records.append(f'U\t{rel}\n')
+    records.sort()
+    tree_sha256 = hashlib.sha256(''.join(records).encode('utf-8')).hexdigest()
+    return len(records), tree_sha256
+
+
 def cache_key(
     version: str,
     *,
     sdk_root: Path,
     runner_os: str | None = None,
     runner_arch: str | None = None,
+    ndk_pin: Mapping[str, Any] | None = None,
 ) -> str:
     if not re.fullmatch(r'[0-9]+(?:\.[0-9]+)+', version):
         raise ValueError(f'Invalid NDK version for cache key: {version!r}')
-    os_tag = _normalize_os(runner_os)
-    arch_tag = _normalize_arch(runner_arch)
+    committed = load_ndk_pin() if ndk_pin is None else ndk_pin
+    platform_key, host_pin = host_pin_for(committed, runner_os=runner_os, runner_arch=runner_arch)
+    tree_sha = str(host_pin['treeSha256'])
+    if not re.fullmatch(r'[0-9a-f]{64}', tree_sha):
+        raise ValueError(f'Invalid committed treeSha256 for {platform_key}: {tree_sha!r}')
     sdk_norm = os.path.normpath(str(sdk_root))
     sdk_digest = hashlib.sha256(sdk_norm.encode('utf-8')).hexdigest()[:12]
-    return f'ndk-{CACHE_SCHEMA}-{os_tag}-{arch_tag}-{version}-{sdk_digest}'
+    return f'ndk-{CACHE_SCHEMA}-{platform_key}-{version}-{tree_sha[:16]}-{sdk_digest}'
 
 
-def verify_ndk(ndk_dir: Path, version: str, *, system: str | None = None) -> list[str]:
+def verify_ndk(
+    ndk_dir: Path,
+    version: str,
+    *,
+    runner_os: str | None = None,
+    runner_arch: str | None = None,
+    ndk_pin: Mapping[str, Any] | None = None,
+) -> list[str]:
     problems: list[str] = []
     if not ndk_dir.is_dir():
         return [f'missing NDK directory {ndk_dir}']
     if (ndk_dir / '.installer').exists():
         problems.append('incomplete sdkmanager .installer marker present')
+
+    committed = load_ndk_pin() if ndk_pin is None else ndk_pin
+    if committed.get('version') != version:
+        problems.append(f'committed NDK pin version {committed.get("version")!r} != expected {version!r}')
+        return problems
+    try:
+        platform_key, host_pin = host_pin_for(committed, runner_os=runner_os, runner_arch=runner_arch)
+    except ValueError as exc:
+        return [str(exc)]
+
     source_props = ndk_dir / 'source.properties'
     if not source_props.is_file():
         problems.append('missing source.properties')
@@ -116,22 +239,68 @@ def verify_ndk(ndk_dir: Path, version: str, *, system: str | None = None) -> lis
         props_text = source_props.read_text(encoding='utf-8', errors='replace')
         if not re.search(rf'^Pkg\.Revision\s*=\s*{re.escape(version)}\s*$', props_text, re.MULTILINE):
             problems.append(f'source.properties Pkg.Revision does not match {version}')
-    toolchain_cmake = ndk_dir / 'build/cmake/android.toolchain.cmake'
-    if not toolchain_cmake.is_file() or toolchain_cmake.stat().st_size == 0:
-        problems.append('missing or empty build/cmake/android.toolchain.cmake')
-    host_name = _normalize_os(system)
-    host_tag = {'Linux': 'linux-x86_64', 'macOS': 'darwin-x86_64'}.get(host_name)
-    if host_tag is None:
-        problems.append(f'unsupported NDK host {host_name}')
-        return problems
-    llvm_bin = ndk_dir / 'toolchains/llvm/prebuilt' / host_tag / 'bin'
+
+    for cmake_rel in ('build/cmake/android.toolchain.cmake', 'build/cmake/abis.cmake', 'build/cmake/platforms.cmake'):
+        cmake_file = ndk_dir / cmake_rel
+        if not cmake_file.is_file() or cmake_file.stat().st_size == 0:
+            problems.append(f'missing or empty {cmake_rel}')
+
+    host_tag = str(host_pin['hostTag'])
+    toolchain_root = ndk_dir / 'toolchains/llvm/prebuilt' / host_tag
+    llvm_bin = toolchain_root / 'bin'
+    sysroot = toolchain_root / 'sysroot'
     if not llvm_bin.is_dir():
         problems.append(f'missing LLVM toolchain directory {llvm_bin}')
+    else:
+        for tool_name in REQUIRED_LLVM_EXECUTABLES:
+            tool_path = llvm_bin / tool_name
+            if not tool_path.is_file() or not os.access(tool_path, os.X_OK):
+                problems.append(f'missing or non-executable LLVM tool {tool_name}')
+        if platform_key.startswith('Linux-'):
+            for elf_name in NATIVE_ELF_TOOLS:
+                elf_path = llvm_bin / elf_name
+                if elf_path.is_file() and not elf_path.is_symlink():
+                    with elf_path.open('rb') as handle:
+                        magic = handle.read(4)
+                    if magic != b'\x7fELF':
+                        problems.append(f'LLVM tool {elf_name} is not an ELF binary')
+
+    if not sysroot.is_dir():
+        problems.append(f'missing NDK sysroot directory {sysroot}')
+    else:
+        for sysroot_rel in REQUIRED_SYSROOT_PATHS:
+            sysroot_file = sysroot / sysroot_rel
+            if not sysroot_file.is_file() or sysroot_file.stat().st_size == 0:
+                problems.append(f'missing or empty sysroot file {sysroot_rel}')
+
+    for link_rel, expected_target in host_pin.get('symlinks', {}).items():
+        link_path = ndk_dir / link_rel
+        if not link_path.is_symlink():
+            problems.append(f'expected symlink at {link_rel}')
+        elif os.readlink(link_path) != expected_target:
+            problems.append(f'symlink {link_rel} points to {os.readlink(link_path)!r}, expected {expected_target!r}')
+
+    for file_rel, expected_meta in host_pin.get('files', {}).items():
+        file_path = ndk_dir / file_rel
+        if file_path.is_symlink() or not file_path.is_file():
+            problems.append(f'missing regular pinned file {file_rel}')
+            continue
+        actual_size = file_path.stat().st_size
+        if actual_size != expected_meta['size']:
+            problems.append(f'size mismatch for {file_rel}: {actual_size} != {expected_meta["size"]}')
+            continue
+        actual_sha = sha256_file(file_path)
+        if actual_sha != expected_meta['sha256']:
+            problems.append(f'SHA-256 mismatch for {file_rel}: {actual_sha} != {expected_meta["sha256"]}')
+
+    if problems:
         return problems
-    for tool_name in REQUIRED_LLVM_TOOLS:
-        tool_path = llvm_bin / tool_name
-        if not tool_path.is_file() or not os.access(tool_path, os.X_OK):
-            problems.append(f'missing or non-executable LLVM tool {tool_name}')
+
+    entry_count, tree_sha = compute_ndk_tree_digest(ndk_dir)
+    if entry_count != host_pin['entryCount']:
+        problems.append(f'NDK tree entry count mismatch: {entry_count} != {host_pin["entryCount"]}')
+    if tree_sha != host_pin['treeSha256']:
+        problems.append(f'NDK tree SHA-256 mismatch: {tree_sha} != {host_pin["treeSha256"]}')
     return problems
 
 
@@ -170,22 +339,43 @@ def clean_sdk_temp(sdk_root: Path) -> None:
             entry.unlink(missing_ok=True)
 
 
+def export_verified_ndk_env(ndk_dir: Path, environ: Mapping[str, str] = os.environ) -> None:
+    """Override any runner-inherited ANDROID_NDK / ANDROID_NDK_HOME for subsequent workflow steps."""
+    github_env = environ.get('GITHUB_ENV', '').strip()
+    if not github_env:
+        return
+    with Path(github_env).open('a', encoding='utf-8') as handle:
+        handle.write(f'ANDROID_NDK={ndk_dir}\n')
+        handle.write(f'ANDROID_NDK_HOME={ndk_dir}\n')
+
+
 def ndk_info(
     *,
     catalog: Path = ROOT / 'gradle/libs.versions.toml',
     whistle_script: Path | None = ROOT / 'scripts/build-whistle-runtime.py',
+    ndk_pin: Mapping[str, Any] | None = None,
     environ: Mapping[str, str] = os.environ,
 ) -> dict[str, object]:
-    version = read_ndk_version(catalog, whistle_script=whistle_script)
+    committed = load_ndk_pin() if ndk_pin is None else ndk_pin
+    version = read_ndk_version(catalog, whistle_script=whistle_script, ndk_pin=committed)
     sdk_root = resolve_sdk_root(environ)
     ndk_dir = sdk_root / 'ndk' / version
+    runner_os = environ.get('RUNNER_OS')
+    runner_arch = environ.get('RUNNER_ARCH')
     key = cache_key(
         version,
         sdk_root=sdk_root,
-        runner_os=environ.get('RUNNER_OS'),
-        runner_arch=environ.get('RUNNER_ARCH'),
+        runner_os=runner_os,
+        runner_arch=runner_arch,
+        ndk_pin=committed,
     )
-    installed = not verify_ndk(ndk_dir, version, system=environ.get('RUNNER_OS'))
+    installed = not verify_ndk(
+        ndk_dir,
+        version,
+        runner_os=runner_os,
+        runner_arch=runner_arch,
+        ndk_pin=committed,
+    )
     return {
         'version': version,
         'sdk_root': sdk_root,
@@ -199,9 +389,10 @@ def write_key_outputs(
     *,
     catalog: Path = ROOT / 'gradle/libs.versions.toml',
     whistle_script: Path | None = ROOT / 'scripts/build-whistle-runtime.py',
+    ndk_pin: Mapping[str, Any] | None = None,
     environ: Mapping[str, str] = os.environ,
 ) -> dict[str, object]:
-    info = ndk_info(catalog=catalog, whistle_script=whistle_script, environ=environ)
+    info = ndk_info(catalog=catalog, whistle_script=whistle_script, ndk_pin=ndk_pin, environ=environ)
     lines = [
         f"key={info['cache_key']}",
         f"path={info['ndk_dir']}",
@@ -223,17 +414,34 @@ def install_ndk(
     *,
     catalog: Path = ROOT / 'gradle/libs.versions.toml',
     whistle_script: Path | None = ROOT / 'scripts/build-whistle-runtime.py',
+    ndk_pin: Mapping[str, Any] | None = None,
     environ: Mapping[str, str] = os.environ,
     runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
     wait: Callable[[float], None] = time.sleep,
 ) -> str:
-    version = read_ndk_version(catalog, whistle_script=whistle_script)
+    committed = load_ndk_pin() if ndk_pin is None else ndk_pin
+    version = read_ndk_version(catalog, whistle_script=whistle_script, ndk_pin=committed)
     sdk_root = resolve_sdk_root(environ)
     ndk_dir = sdk_root / 'ndk' / version
-    system = environ.get('RUNNER_OS')
-    if not verify_ndk(ndk_dir, version, system=system):
+    runner_os = environ.get('RUNNER_OS')
+    runner_arch = environ.get('RUNNER_ARCH')
+    initial_problems = verify_ndk(
+        ndk_dir,
+        version,
+        runner_os=runner_os,
+        runner_arch=runner_arch,
+        ndk_pin=committed,
+    )
+    if not initial_problems:
+        export_verified_ndk_env(ndk_dir, environ)
         print(f'Verified Android NDK {version} at {ndk_dir}', flush=True)
         return 'verified'
+    if ndk_dir.exists():
+        print(
+            f'::warning title=Android NDK verification::Discarding unverified NDK at {ndk_dir} '
+            f'({"; ".join(initial_problems[:3])}) and reinstalling from sdkmanager.',
+            flush=True,
+        )
 
     sdkmanager = find_sdkmanager(sdk_root, environ=environ)
     last_reason = 'unknown sdkmanager failure'
@@ -270,8 +478,15 @@ def install_ndk(
             if completed.returncode != 0:
                 last_reason = f'sdkmanager exited with status {completed.returncode}'
             else:
-                problems = verify_ndk(ndk_dir, version, system=system)
+                problems = verify_ndk(
+                    ndk_dir,
+                    version,
+                    runner_os=runner_os,
+                    runner_arch=runner_arch,
+                    ndk_pin=committed,
+                )
                 if not problems:
+                    export_verified_ndk_env(ndk_dir, environ)
                     print(
                         f'Installed and verified Android NDK {version} at {ndk_dir} (attempt {attempt}/{ATTEMPTS})',
                         flush=True,

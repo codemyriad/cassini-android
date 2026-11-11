@@ -45,5 +45,155 @@
       "name": "openfst-1.8.5-2026-04-10.tar.gz",
       "sha256": "c3549940384cbe4fa9f18c2bcfb1bfbd0a80492fd1b0bfa27433cee395a6a199"
     }
-  ]
+  ],
+  "ndk": {
+    "version": "28.2.13676358",
+    "hosts": {
+      "Linux-X64": {
+        "hostTag": "linux-x86_64",
+        "archiveUrl": "https://dl.google.com/android/repository/android-ndk-r28c-linux.zip",
+        "archiveSize": 722261334,
+        "archiveSha1": "a7b54a5de87fecd125a17d54f73c446199e72a64",
+        "entryCount": 8449,
+        "treeSha256": "86d0b67d58cdbfae2be0489c3999625182df735b09514843184e925cd8178271",
+        "symlinks": {
+          "toolchains/llvm/prebuilt/linux-x86_64/bin/clang": "clang-19",
+          "toolchains/llvm/prebuilt/linux-x86_64/bin/clang++": "clang",
+          "toolchains/llvm/prebuilt/linux-x86_64/bin/ld.lld": "lld",
+          "toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf": "llvm-readobj",
+          "toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip": "llvm-objcopy"
+        },
+        "files": {
+          "source.properties": {
+            "size": 108,
+            "sha256": "c00aa236fdb205e9be9edd9e2169763e48aca52735efff4e16f34205d49783b5"
+          },
+          "build/cmake/android.toolchain.cmake": {
+            "size": 10344,
+            "sha256": "dbad92d9dcfea0d32b7c5e5f82f5072d878ded5d46a5d3f1f581ea108ca7fe89"
+          },
+          "build/cmake/abis.cmake": {
+            "size": 1723,
+            "sha256": "cbe9b985319b6ef27a2618b6f379e8ac5e9fff3d4813e66d9a1bdf42b96e8956"
+          },
+          "build/cmake/platforms.cmake": {
+            "size": 942,
+            "sha256": "e64b224db7f9844a4083dfa0ff3f03c40dbbba0a51de13e20c1382f3d00ba39b"
+          },
+          "toolchains/llvm/prebuilt/linux-x86_64/bin/clang-19": {
+            "size": 135276024,
+            "sha256": "6156dd4e5e466333197a00b8d20bca72c292186643b749dcaaa3aa9164afb1de"
+          },
+          "toolchains/llvm/prebuilt/linux-x86_64/bin/lld": {
+            "size": 60914016,
+            "sha256": "0bb0398c038e4c8b5e01e61061f6d9349961fb495efb4cbf2552e36058acf0be"
+          },
+          "toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar": {
+            "size": 15131624,
+            "sha256": "fca4e66c591578b67dbd10e17e1112dc06fc02b202753bf91b4d2460083ab09e"
+          },
+          "toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm": {
+            "size": 16122800,
+            "sha256": "03819456497648810122861e4ca20d9b87fde7acdd43dd5c47da883d4df43928"
+          },
+          "toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-objcopy": {
+            "size": 5902232,
+            "sha256": "1da35c6bcee9649adcaadf8a493132c3b7205901149622836d28e42d7fca7267"
+          },
+          "toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readobj": {
+            "size": 7256448,
+            "sha256": "2a28d786027488ebd0e260efe59d15c5dedb939eacbae34a6a9065a3a2f6d054"
+          },
+          "toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang": {
+            "size": 201,
+            "sha256": "c9ec0ccdc82aede75e6724738b833603707c0990061e05a1484860249f7520d5"
+          },
+          "toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang++": {
+            "size": 205,
+            "sha256": "58185593b734e3af5204cfa540cd71c9107e85f0f93bcffbe07856b9fc877f78"
+          },
+          "toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android26-clang": {
+            "size": 200,
+            "sha256": "176e679fe06dd5660a95fd35ee5a95084263b7d2d47bd6a0f58aa254e65d165e"
+          },
+          "toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android26-clang++": {
+            "size": 204,
+            "sha256": "92dd2b74462a3cb1638ada6ed20d6fb02d2074edf51761abf3b60bc21aeff88e"
+          },
+          "toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/jni.h": {
+            "size": 52236,
+            "sha256": "5df9074457c041b372f2c68ff646d6e8600cd673a223885e8df21c44c94ec667"
+          },
+          "toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__config": {
+            "size": 67393,
+            "sha256": "4a2eb47672b4f8c68000044174ba4ea01a00e287483a3fda12b29ed268fa93da"
+          },
+          "toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/26/crtbegin_so.o": {
+            "size": 3648,
+            "sha256": "e42fd78509c4151edbd24c98f104b8894352aefdcd6cfb5d1f6ba4961b3da74c"
+          },
+          "toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/26/crtend_so.o": {
+            "size": 840,
+            "sha256": "60ac71634f21a7b2ba70e0c60deaaeee2058f4aa06b7000dc63677771a87c3b6"
+          },
+          "toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/26/libc.so": {
+            "size": 208272,
+            "sha256": "abfc3e17c2babb61a88aa4a5f399505dffe19a24d7a57d8460406413e1c77edf"
+          },
+          "toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/26/libm.so": {
+            "size": 53696,
+            "sha256": "e38489e92d995f77ceef18918ca27183ac81115979ec295d3c8e74f41949328c"
+          },
+          "toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/26/libdl.so": {
+            "size": 12512,
+            "sha256": "25eefefafd831de263619071cf85bc0cad8f77efcd741e071acc0ad264eedaa5"
+          },
+          "toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/26/liblog.so": {
+            "size": 12312,
+            "sha256": "40a4e3e8c29ab14d7fabfca9d3707b73caf5b96ad9ead41d3f1d5407b5930cac"
+          },
+          "toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_static.a": {
+            "size": 15182348,
+            "sha256": "111648eb99781b8a734f3557aa1bd1efbd875af6b35b545eae1d89d75cd41b2a"
+          },
+          "toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++abi.a": {
+            "size": 3125348,
+            "sha256": "da34de171d83e7e9fb0d7b99ce9b0ac88ce5368dd3b581efe13971ef6152edbe"
+          },
+          "toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/x86_64-linux-android/26/crtbegin_so.o": {
+            "size": 3248,
+            "sha256": "7d22fbc0ab4dc56a9ff4366b9e95bb57f69a5cfeb2657824195767e1f84669b0"
+          },
+          "toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/x86_64-linux-android/26/crtend_so.o": {
+            "size": 696,
+            "sha256": "793ea43b5c52399fdc7a4c7bbf04c02abaf59d2c34d0b630ece694110f6f3b2c"
+          },
+          "toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/x86_64-linux-android/26/libc.so": {
+            "size": 183056,
+            "sha256": "a838ab3f9026b4678f3336eea1456b411345a0acab6cae58b8b0c6a47a8f4a13"
+          },
+          "toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/x86_64-linux-android/26/libm.so": {
+            "size": 49448,
+            "sha256": "03081bd559ed6e10614790686bba2dfcd740d0650a1d8c73864afd1eef8ebb07"
+          },
+          "toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/x86_64-linux-android/26/libdl.so": {
+            "size": 11872,
+            "sha256": "6d129144d4f65a2a18efb28607e1bb7a2f31a3cec2ce423e468541cc7f33cb09"
+          },
+          "toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/x86_64-linux-android/26/liblog.so": {
+            "size": 11704,
+            "sha256": "06cd918bc30ec27315346d2b149850a8c8e5766ff96a2eccb1aa7a5e32480180"
+          },
+          "toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/x86_64-linux-android/libc++_static.a": {
+            "size": 14336094,
+            "sha256": "893dc67b8c7eef4000af6e582421a14ea7e5fdec97249496005fc3a48f7d7099"
+          },
+          "toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/x86_64-linux-android/libc++abi.a": {
+            "size": 2792306,
+            "sha256": "11ff6729a881f3d1a2e72c2a9c4bd2c096e02c5dfb3858d942405e0514b7b95c"
+          }
+        }
+      }
+    }
+  }
 }
