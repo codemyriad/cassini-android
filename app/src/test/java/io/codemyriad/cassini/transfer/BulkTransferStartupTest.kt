@@ -63,7 +63,11 @@ class BulkTransferStartupTest {
             AppGraph.Config(
                 paths = paths,
                 network = { false },
-                onStartupStep = { step -> if (step == AppGraph.STEP_DATABASE) throw IOException("Database unavailable") },
+                onStartupStep = { step ->
+                    if (step == AppGraph.STEP_DATABASE) {
+                        throw IOException("Database unavailable")
+                    }
+                },
             ),
         )
         try {
@@ -172,7 +176,11 @@ class BulkTransferStartupTest {
 
     private class SwitchingDispatcher : CoroutineDispatcher() {
         private var delegate: CoroutineDispatcher = Dispatchers.IO
-        @Synchronized fun use(next: CoroutineDispatcher) { delegate = next }
-        @Synchronized override fun dispatch(context: CoroutineContext, block: Runnable) = delegate.dispatch(context, block)
+
+        @Synchronized
+        fun use(next: CoroutineDispatcher) { delegate = next }
+
+        @Synchronized
+        override fun dispatch(context: CoroutineContext, block: Runnable) = delegate.dispatch(context, block)
     }
 }
