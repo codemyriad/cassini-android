@@ -33,6 +33,7 @@ import io.codemyriad.cassini.data.notes.CatalogueRepository
 import io.codemyriad.cassini.data.notes.DocumentRepository
 import io.codemyriad.cassini.data.notes.ImportRepository
 import io.codemyriad.cassini.data.notes.ImportSource
+import io.codemyriad.cassini.data.notes.NoteFilesCleaner
 import io.codemyriad.cassini.data.notes.NoteRepository
 import io.codemyriad.cassini.data.notes.RebuildReport
 import io.codemyriad.cassini.data.notes.RecoveryRepository
@@ -40,6 +41,7 @@ import io.codemyriad.cassini.data.notes.SealedAdopter
 import io.codemyriad.cassini.data.notes.SweepReport
 import io.codemyriad.cassini.data.settings.SettingsRepository
 import io.codemyriad.cassini.data.voices.VoiceRepository
+import io.codemyriad.cassini.documents.PendingImports
 import io.codemyriad.cassini.engine.job.BatterySource
 import io.codemyriad.cassini.engine.job.JobEngines
 import io.codemyriad.cassini.engine.job.JobEnvironment
@@ -291,6 +293,9 @@ class AppGraph(context: Context, val config: Config) {
     /** ACTION_VIEW imports, through [NoticeCenter.imports]; the navigation opens each note when its import ends. */
     val viewedImports: ViewedImports by lazy { ViewedImports(appScope) { uri -> notices.imports.start(uri) } }
 
+    /** Persistent `DocumentsProvider` creation grants (`filesDir/provider-grants/`), reconciled at startup. */
+    internal val providerGrants: PendingImports = PendingImports.forGraph(app, this)
+
     /** The Note screen's player (architecture 5.9). Main thread only. */
     val playback: PlaybackController by lazy {
         val controller = PlaybackController(
@@ -427,7 +432,9 @@ class AppGraph(context: Context, val config: Config) {
             val now = config.clock()
             catalogue.notes.purgeExpired(Instant.ofEpochMilli(now), config.zone()).also { settings.recordPurge(now) }
         }
-        val sweep = bestEffort(STEP_SWEEP, failed) { catalogue.documents.sweep() }
+        val sweep = bestEffort(STEP_SWEEP, failed) {
+            catalogue.documents.sweep().also { providerGrants.reconcileStartup() }
+        }
         val retitled = bestEffort(STEP_RETITLE, failed) { catalogue.documents.retitleDirty() }
         report.value = StartupReport(
             rebuild = rebuild,
@@ -578,7 +585,20 @@ class Catalogue internal constructor(
         speechChoice = { graph.speech.selected() },
         clock = clock,
     )
-    val notes = NoteRepository(database, paths, dispatchers, locks, documents, graph.appScope, jobs, voices, clock)
+    private val noteCleaner = NoteFilesCleaner { noteId ->
+        voices.deleteForNote(noteId) && graph.providerGrants.deleteForNote(noteId)
+    }
+    val notes = NoteRepository(
+        database,
+        paths,
+        dispatchers,
+        locks,
+        documents,
+        graph.appScope,
+        jobs,
+        noteCleaner,
+        clock,
+    )
     val imports = ImportRepository(
         database,
         paths,

@@ -10,6 +10,7 @@ import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
 import android.provider.DocumentsContract.Root
 import android.provider.DocumentsProvider
+import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.CassiniApplication
 import io.codemyriad.cassini.data.notes.ImportLimits
 import java.io.FileNotFoundException
@@ -34,8 +35,7 @@ class CassiniDocumentsProvider : DocumentsProvider() {
         DocumentsVault(
             context = ctx.applicationContext,
             authority = ::resolvedAuthority,
-            graphProvider = { (ctx.applicationContext as CassiniApplication).graph },
-            limits = { limitsForTesting ?: ImportLimits() },
+            graphProvider = { graphOverrideForTesting?.invoke() ?: (ctx.applicationContext as CassiniApplication).graph },
         )
     }
 
@@ -152,6 +152,9 @@ class CassiniDocumentsProvider : DocumentsProvider() {
 
         @Volatile
         internal var limitsForTesting: ImportLimits? = null
+
+        @Volatile
+        internal var graphOverrideForTesting: (() -> AppGraph)? = null
 
         private val DEFAULT_ROOT_PROJECTION = arrayOf(
             Root.COLUMN_ROOT_ID,

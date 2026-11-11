@@ -65,6 +65,7 @@ import java.io.FileNotFoundException
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -72,8 +73,10 @@ import java.util.concurrent.atomic.AtomicLong
  * - manifest protection (`MANAGE_DOCUMENTS`, URI grants, `DOCUMENTS_PROVIDER`, no self-URI deep-link loop);
  * - read-only exposure of sealed `.opus` documents and plain-audio notes, dirty-title flush, collision numbering;
  * - exclusion of trashed notes, active recordings and notes currently being transcribed or sealed;
- * - inbound `createDocument` + pipe stream write through `ImportRepository` with SHA-256 deduplication;
- * - byte isolation on creation grants (never exposing subsequent private edits or existing deduplicated notes);
+ * - inbound `createDocument` + `"w"`/`"wt"` pipe stream write through `ImportRepository` with SHA-256 deduplication;
+ * - rejection of `"rw"`/`"rwt"`/`"wa"` modes without consuming the write-once `pending:<uuid>` grant;
+ * - byte isolation and note-lifecycle binding (trash, restore, permanent purge across restarts) on creation grants;
+ * - startup reconciliation of interrupted `IMPORTING` grants without querying or reopening the creation URI;
  * - streaming enforcement of `ImportLimits.maxBytes` and `ImportLimits.minFreeBytes` before writer close;
  * - persistent stable `pending:<uuid>` identities across provider recreation and cache eviction thresholds;
  * - native `detachFd()` lifecycle safety;
@@ -95,6 +98,7 @@ class CassiniDocumentsProviderTest {
     private val authority: String get() = "${app.packageName}${CassiniDocumentsProvider.AUTHORITY_SUFFIX}"
     private val nowMs = AtomicLong(1_760_000_000_000L)
     private lateinit var paths: AppPaths
+    private lateinit var currentGraph: AppGraph
     private lateinit var observerThread: HandlerThread
 
     @Before
@@ -104,29 +108,21 @@ class CassiniDocumentsProviderTest {
         FifoPipeParcelFileDescriptorShadow.resetDetached()
         observerThread = HandlerThread("test-content-observer").apply { start() }
         paths = AppPaths(folder.newFolder(), folder.newFolder(), modelRoot = folder.newFolder())
-        CassiniApplication.graphFactory = GraphFactory { context, _ ->
-            AppGraph(
-                context,
-                AppGraph.Config(
-                    paths = paths,
-                    dispatchers = CassiniDispatchers(Dispatchers.IO, Dispatchers.Default, Dispatchers.Unconfined),
-                    fetcher = ModelFetcher { _, _, _ -> fail("No model download expected") },
-                    network = { false },
-                    clock = nowMs::get,
-                ),
-            )
-        }
+        currentGraph = buildGraph()
+        CassiniDocumentsProvider.graphOverrideForTesting = ::currentGraph
+        CassiniApplication.graphFactory = GraphFactory { _, _ -> currentGraph }
         recreateProvider()
-        runBlocking { withTimeout(EVENT_BOUND_MS) { app.graph.ready.await() } }
+        runBlocking { withTimeout(EVENT_BOUND_MS) { currentGraph.ready.await() } }
     }
 
     @After
     fun tearDown() {
         CassiniDocumentsProvider.limitsForTesting = null
+        CassiniDocumentsProvider.graphOverrideForTesting = null
         PendingImports.writerClosedProbeForTesting = null
         FifoPipeParcelFileDescriptorShadow.resetDetached()
         observerThread.quitSafely()
-        app.graph.close { shadowOf(Looper.getMainLooper()).idle() }
+        currentGraph.close { shadowOf(Looper.getMainLooper()).idle() }
         CassiniApplication.graphFactory = null
     }
 
@@ -179,7 +175,7 @@ class CassiniDocumentsProviderTest {
 
     @Test
     fun listsSealedOpusAndPlainAudioNotesReadOnlyAndFlushesDirtyTitles(): Unit = runBlocking {
-        val catalogue = app.graph.awaitCatalogue()
+        val catalogue = currentGraph.awaitCatalogue()
         nowMs.set(1_760_000_010_000L)
         val wavId = importPlainWav("Morning standup", frames = 3_200)
         nowMs.set(1_760_000_020_000L)
@@ -239,7 +235,7 @@ class CassiniDocumentsProviderTest {
 
     @Test
     fun hidesLiveRecordingsTrashedNotesAndNotesBeingSealedUntilAdopted(): Unit = runBlocking {
-        val catalogue = app.graph.awaitCatalogue()
+        val catalogue = currentGraph.awaitCatalogue()
         val liveId = catalogue.notes.createRecording("Ongoing capture", nowMs.incrementAndGet(), "opus")
         writeSyntheticOpus(File(paths.note(liveId), "capture.opus"), packetCount = 5, seed = 1)
 
@@ -285,40 +281,21 @@ class CassiniDocumentsProviderTest {
     }
 
     /**
-     * Review #169 finding 1 (blocker): a creation grant whose bytes match an existing note deduplicates internally in
-     * Cassini's library while exposing ONLY the caller's submitted bytes — never an existing note's edited title,
+     * Review #169 r1 finding 1 (blocker): a creation grant whose bytes match an existing note deduplicates internally
+     * in Cassini's library while exposing ONLY the caller's submitted bytes — never an existing note's edited title,
      * transcript, or speaker names.
      */
     @Test
     fun duplicateCreationGrantExposesOnlySubmittedBytesNotEditedPrivateNote(): Unit = runBlocking {
-        val catalogue = app.graph.awaitCatalogue()
-        val sourceOpus = folder.newFile("initial-import.opus")
-        val rawOpus = folder.newFile("raw.opus").also { writeSyntheticOpus(it, packetCount = 8, seed = 42) }
-        withContext(Dispatchers.IO) {
-            CassiniDocument.create(
-                rawOpus,
-                Transcript(listOf(Word("S1", 0, 500, "Hello"), Word("S1", 550, 950, "world"))),
-                "Customer interview",
-                JSONObject().put("engine", "test"),
-                null,
-                mapOf("S1" to "Sam"),
-                sourceOpus,
-            )
-        }
-        val submittedBytes = sourceOpus.readBytes()
+        val catalogue = currentGraph.awaitCatalogue()
+        val submittedBytes = buildCustomerInterviewOpusBytes()
         val rootUri = DocumentsContract.buildDocumentUri(authority, DocumentsVault.ROOT_DOCUMENT_ID)
 
         // First import through createDocument.
         val firstChange = watchNextChildrenChange()
-        val firstUri = withContext(Dispatchers.IO) {
-            val docUri = createChildDocument(rootUri, "audio/ogg", "Submitted copy.opus")
-            resolver.openOutputStream(docUri).use { out ->
-                requireNotNull(out).write(submittedBytes)
-            }
-            docUri
-        }
+        val firstUri = writeNewChildDocument(rootUri, "audio/ogg", "Submitted copy.opus", submittedBytes)
         withTimeout(EVENT_BOUND_MS) { firstChange.await() }
-        withTimeout(EVENT_BOUND_MS) { app.graph.notices.imports.state.first { it.running.isEmpty() } }
+        awaitNoRunningImports()
 
         val noteId = withContext(Dispatchers.IO) {
             queryChildren().single().documentId.removePrefix(DocumentsVault.NOTE_PREFIX)
@@ -333,14 +310,8 @@ class CassiniDocumentsProviderTest {
         assertEquals("Private HR review.opus", listedBeforeDup.single().displayName)
 
         // External caller submits the original unedited bytes again via createDocument (triggers ImportOutcome.Existing).
-        val dupUri = withContext(Dispatchers.IO) {
-            val docUri = createChildDocument(rootUri, "audio/ogg", "Duplicate upload.opus")
-            resolver.openOutputStream(docUri).use { out ->
-                requireNotNull(out).write(submittedBytes)
-            }
-            docUri
-        }
-        withTimeout(EVENT_BOUND_MS) { app.graph.notices.imports.state.first { it.running.isEmpty() } }
+        val dupUri = writeNewChildDocument(rootUri, "audio/ogg", "Duplicate upload.opus", submittedBytes)
+        awaitNoRunningImports()
 
         // Internal deduplication holds: still 1 note in Cassini's library.
         assertEquals(1, withContext(Dispatchers.IO) { queryChildren().size })
@@ -350,55 +321,186 @@ class CassiniDocumentsProviderTest {
         assertGrantExposesOnlySubmittedBytes(firstUri, "Submitted copy.opus", submittedBytes)
     }
 
-    private suspend fun editNoteWithPrivateMetadata(catalogue: io.codemyriad.cassini.Catalogue, noteId: String) {
-        catalogue.jobs.enqueue(noteId, JobKind.TRANSCRIBE)
-        assertTrue(catalogue.jobs.claimNext() is ClaimOutcome.Claimed)
-        withContext(Dispatchers.IO) {
-            val existingFile = File(paths.note(noteId), "document.opus")
-            val existingDoc = CassiniDocument.read(existingFile)
-            catalogue.documents.sealBlocking(
-                noteId = noteId,
-                audio = existingFile,
-                transcript = Transcript(listOf(Word("S1", 0, 600, "Confidential"), Word("S1", 650, 1100, "budget"))),
-                title = "Private HR review",
-                processing = JSONObject().put("engine", "test-retranscribe"),
-                existing = existingDoc,
-                labels = mapOf("S1" to "Alice Secret"),
-            )
-        }
-        catalogue.adopter.adopt(noteId)
-        catalogue.notes.rename(noteId, "Private HR review")
-    }
+    /**
+     * Review #169 r2 finding 1 (major): creation grants follow the lifecycle of their imported note across restarts —
+     * hidden while trashed, restored when untrashed (preserving strict byte isolation), and permanently deleted from
+     * `provider-grants/` when the note is purged (`deleteNow` / `emptyTrash` / `purgeExpired`) without requiring any
+     * subsequent access to the creation URI.
+     */
+    @Test
+    fun creationGrantsFollowNoteTrashRestoreAndPermanentPurgeAcrossRestart(): Unit = runBlocking {
+        val submittedBytes = buildCustomerInterviewOpusBytes()
+        val rootUri = DocumentsContract.buildDocumentUri(authority, DocumentsVault.ROOT_DOCUMENT_ID)
+        val grantsDir = File(paths.root, PendingImports.GRANTS_DIR)
 
-    private suspend fun assertGrantExposesOnlySubmittedBytes(
-        grantUri: Uri,
-        expectedDisplayName: String,
-        submittedBytes: ByteArray,
-    ) {
-        val grantDocId = DocumentsContract.getDocumentId(grantUri)
-        val meta = withContext(Dispatchers.IO) { querySingle(grantDocId) }
-        assertEquals("Document ID must stay stable on creation grant", grantDocId, meta.documentId)
-        assertEquals(expectedDisplayName, meta.displayName)
-        assertEquals(submittedBytes.size.toLong(), meta.size)
+        val firstUri = writeNewChildDocument(rootUri, "audio/ogg", "Submitted copy.opus", submittedBytes)
+        awaitNoRunningImports()
+        val noteId = withContext(Dispatchers.IO) {
+            queryChildren().single().documentId.removePrefix(DocumentsVault.NOTE_PREFIX)
+        }
+        editNoteWithPrivateMetadata(currentGraph.awaitCatalogue(), noteId)
+        val dupUri = writeNewChildDocument(rootUri, "audio/ogg", "Duplicate upload.opus", submittedBytes)
+        awaitNoRunningImports()
 
-        val readBack = withContext(Dispatchers.IO) {
-            requireNotNull(resolver.openInputStream(grantUri)).use { it.readBytes() }
-        }
-        assertArrayEquals("Creation grant must expose only submitted bytes", submittedBytes, readBack)
-        val parsed = withContext(Dispatchers.IO) {
-            val verifyFile = folder.newFile("verify-${grantDocId.substringAfter(':')}.opus")
-            verifyFile.writeBytes(readBack)
-            CassiniDocument.readChecked(verifyFile, verify = true)
-        }
-        assertEquals("Customer interview", parsed.title)
-        val rawUtf8 = String(readBack, Charsets.UTF_8)
-        assertFalse(rawUtf8.contains("Private HR review"))
-        assertFalse(rawUtf8.contains("Alice Secret"))
-        assertFalse(rawUtf8.contains("Confidential"))
+        // 1. Move to Trash: both grants hide immediately, including across restart, while payloads remain for Restore.
+        assertTrue(currentGraph.awaitCatalogue().notes.moveToTrash(noteId))
+        assertGrantUnavailable(rootUri, firstUri)
+        assertGrantUnavailable(rootUri, dupUri)
+        assertEquals(2, grantsDir.listFiles().orEmpty().size)
+
+        restartAppAndProvider(awaitReady = true)
+        assertGrantUnavailable(rootUri, firstUri)
+        assertGrantUnavailable(rootUri, dupUri)
+        assertEquals(2, grantsDir.listFiles().orEmpty().size)
+
+        // 2. Restore from Trash: both grants become readable again across restart and still serve only submitted bytes.
+        assertTrue(currentGraph.awaitCatalogue().notes.restore(noteId))
+        assertGrantExposesOnlySubmittedBytes(firstUri, "Submitted copy.opus", submittedBytes)
+        assertGrantExposesOnlySubmittedBytes(dupUri, "Duplicate upload.opus", submittedBytes)
+
+        restartAppAndProvider(awaitReady = true)
+        assertGrantExposesOnlySubmittedBytes(firstUri, "Submitted copy.opus", submittedBytes)
+        assertGrantExposesOnlySubmittedBytes(dupUri, "Duplicate upload.opus", submittedBytes)
+
+        // 3. Permanent purge (without touching either creation URI): payloads in provider-grants/ are deleted at once.
+        assertTrue(currentGraph.awaitCatalogue().notes.moveToTrash(noteId))
+        assertTrue(currentGraph.awaitCatalogue().notes.deleteNow(noteId))
+        assertEquals(
+            "Permanent note deletion must reclaim provider-grants/ immediately",
+            emptyList<String>(),
+            grantsDir.listFiles().orEmpty().map { it.name },
+        )
+        assertGrantUnavailable(rootUri, firstUri)
+        assertGrantUnavailable(rootUri, dupUri)
+
+        restartAppAndProvider(awaitReady = true)
+        assertEquals(emptyList<String>(), grantsDir.listFiles().orEmpty().map { it.name })
+        assertGrantUnavailable(rootUri, firstUri)
+        assertGrantUnavailable(rootUri, dupUri)
     }
 
     /**
-     * Review #169 finding 2 (major): incoming writes enforce both the byte cap and the free-space reserve during
+     * Review #169 r2 finding 2 (major): unsupported read-write and append modes (`"rw"`, `"rwt"`, `"wa"`) are rejected
+     * immediately before consuming the write-once `pending:<uuid>` grant, so a subsequent `"w"` or `"wt"` open works.
+     */
+    @Test
+    fun rejectsReadWriteAndAppendModesWithoutConsumingWriteOnceGrant(): Unit = runBlocking {
+        val rootUri = DocumentsContract.buildDocumentUri(authority, DocumentsVault.ROOT_DOCUMENT_ID)
+        val wavFile = folder.newFile("valid-stream.wav").also { writePcm16Wav(it, frames = 1_800) }
+        val wavBytes = wavFile.readBytes()
+
+        val uri = withContext(Dispatchers.IO) {
+            val created = createChildDocument(rootUri, "audio/wav", "Exporter output.wav")
+            for (unsupported in listOf("rw", "rwt", "wa")) {
+                assertThrows(
+                    "Mode $unsupported must be rejected before consuming grant",
+                    UnsupportedOperationException::class.java,
+                ) {
+                    resolver.openFileDescriptor(created, unsupported)
+                }
+            }
+            // Grant is still in AWAITING_WRITE (unconsumed, FLAG_SUPPORTS_WRITE intact).
+            val beforeWrite = querySingle(DocumentsContract.getDocumentId(created))
+            assertEquals(Document.FLAG_SUPPORTS_WRITE, beforeWrite.flags)
+            assertEquals(0L, beforeWrite.size)
+
+            // Subsequent "wt" write succeeds cleanly; querySingle awaits pipe EOF + ImportRepository completion.
+            resolver.openOutputStream(created, "wt").use { out ->
+                requireNotNull(out).write(wavBytes)
+            }
+            querySingle(DocumentsContract.getDocumentId(created))
+            created
+        }
+        awaitNoRunningImports()
+
+        withContext(Dispatchers.IO) {
+            assertEquals(listOf("Exporter output.wav"), queryChildren().map { it.displayName })
+            val readBack = requireNotNull(resolver.openInputStream(uri)).use { it.readBytes() }
+            assertArrayEquals(wavBytes, readBack)
+
+            // Once accepted, write modes throw SecurityException and rw/rwt still throw UnsupportedOperationException.
+            assertThrows(SecurityException::class.java) { resolver.openFileDescriptor(uri, "w") }
+            assertThrows(SecurityException::class.java) { resolver.openFileDescriptor(uri, "wt") }
+            assertThrows(UnsupportedOperationException::class.java) { resolver.openFileDescriptor(uri, "rw") }
+            assertThrows(UnsupportedOperationException::class.java) { resolver.openFileDescriptor(uri, "rwt") }
+        }
+    }
+
+    /**
+     * Review #169 r2 finding 3 (major): an import interrupted after persisting `state = IMPORTING` is reconciled at
+     * `AppGraph` startup idempotently so the note appears in Cassini's library even if the sender never queries or
+     * reopens the creation URI.
+     */
+    @Test
+    fun startupReconcilesInterruptedImportingGrantWithoutQueryingCreationUri(): Unit = runBlocking {
+        val wavFile = folder.newFile("interrupted-source.wav").also { writePcm16Wav(it, frames = 2_000) }
+        val wavBytes = wavFile.readBytes()
+        val token = UUID.randomUUID().toString()
+        val deadWritingToken = UUID.randomUUID().toString()
+
+        // Shut down the active graph to simulate process death before seeding persisted grant states on disk.
+        currentGraph.close { shadowOf(Looper.getMainLooper()).idle() }
+
+        val grantsRoot = File(paths.root, PendingImports.GRANTS_DIR)
+        val importingDir = File(grantsRoot, token).apply { mkdirs() }
+        File(importingDir, "Interrupted capture.wav").writeBytes(wavBytes)
+        File(importingDir, "meta.json").writeText(
+            JSONObject()
+                .put("version", 1)
+                .put("token", token)
+                .put("displayName", "Interrupted capture.wav")
+                .put("mimeType", "audio/wav")
+                .put("createdAt", nowMs.get())
+                .put("updatedAt", nowMs.get())
+                .put("state", "IMPORTING")
+                .put("size", wavBytes.size.toLong())
+                .toString(),
+        )
+        val deadWritingDir = File(grantsRoot, deadWritingToken).apply { mkdirs() }
+        File(deadWritingDir, "payload.tmp").writeBytes(byteArrayOf(1, 2, 3))
+        File(deadWritingDir, "meta.json").writeText(
+            JSONObject()
+                .put("version", 1)
+                .put("token", deadWritingToken)
+                .put("displayName", "Dead stream.wav")
+                .put("mimeType", "audio/wav")
+                .put("createdAt", nowMs.get())
+                .put("updatedAt", nowMs.get())
+                .put("state", "WRITING")
+                .put("size", 0L)
+                .toString(),
+        )
+
+        // Start a brand-new AppGraph and await ready WITHOUT calling query/open/isChildDocument on any provider URI.
+        currentGraph = buildGraph()
+        CassiniDocumentsProvider.graphOverrideForTesting = ::currentGraph
+        CassiniApplication.graphFactory = GraphFactory { _, _ -> currentGraph }
+        withTimeout(EVENT_BOUND_MS) { currentGraph.ready.await() }
+
+        val notesAfterStartup = currentGraph.awaitCatalogue().database.notes().all()
+        assertEquals("Interrupted IMPORTING grant must be imported at startup", 1, notesAfterStartup.size)
+        val importedNote = notesAfterStartup.single()
+        assertEquals("Interrupted capture", importedNote.title)
+        assertFalse("Crashed WRITING grant must be swept at startup", deadWritingDir.exists())
+
+        val persistedMeta = JSONObject(File(importingDir, "meta.json").readText())
+        assertEquals("ACCEPTED", persistedMeta.getString("state"))
+        assertEquals(importedNote.id, persistedMeta.getString("noteId"))
+
+        // Second restart verifies startup reconciliation is idempotent (still 1 note) and creation URI stays readable.
+        restartAppAndProvider(awaitReady = true)
+        assertEquals(1, currentGraph.awaitCatalogue().database.notes().all().size)
+        val grantUri = DocumentsContract.buildDocumentUri(authority, "${PendingImports.PREFIX}$token")
+        withContext(Dispatchers.IO) {
+            val queried = querySingle("${PendingImports.PREFIX}$token")
+            assertEquals("${PendingImports.PREFIX}$token", queried.documentId)
+            assertEquals("Interrupted capture.wav", queried.displayName)
+            assertArrayEquals(wavBytes, requireNotNull(resolver.openInputStream(grantUri)).use { it.readBytes() })
+        }
+    }
+
+    /**
+     * Review #169 r1 finding 2 (major): incoming writes enforce both the byte cap and the free-space reserve during
      * streaming, aborting and deleting staging files before the writer closes its descriptor.
      */
     @Test
@@ -464,7 +566,7 @@ class CassiniDocumentsProviderTest {
     }
 
     /**
-     * Review #169 finding 3 (major): created document URIs keep their exact `pending:<uuid>` ID on query and remain
+     * Review #169 r1 finding 3 (major): created document URIs keep their exact `pending:<uuid>` ID on query and remain
      * readable across >128 creations, >1 hour clock jumps, and full provider recreation.
      */
     @Test
@@ -482,10 +584,11 @@ class CassiniDocumentsProviderTest {
                 resolver.openOutputStream(uri).use { out ->
                     requireNotNull(out).write(bytes)
                 }
+                querySingle(DocumentsContract.getDocumentId(uri))
                 payloads += uri to bytes
             }
         }
-        withTimeout(EVENT_BOUND_MS) { app.graph.notices.imports.state.first { it.running.isEmpty() } }
+        awaitNoRunningImports()
 
         // An unwritten placeholder created before the clock jump must expire cleanly, while completed grants survive.
         val abandonedUnwritten = withContext(Dispatchers.IO) {
@@ -498,8 +601,8 @@ class CassiniDocumentsProviderTest {
             createChildDocument(rootUri, "audio/wav", "Written after restart.wav")
         }
 
-        // Recreate CassiniDocumentsProvider from scratch (fresh DocumentsVault + fresh PendingImports instance).
-        recreateProvider()
+        // Evict in-memory provider state and recreate CassiniDocumentsProvider from scratch.
+        recreateProvider(evictInMemoryGrants = true)
 
         val restartWav = folder.newFile("after-restart.wav").also { writePcm16Wav(it, frames = 900) }.readBytes()
         withContext(Dispatchers.IO) {
@@ -508,7 +611,7 @@ class CassiniDocumentsProviderTest {
                 requireNotNull(out).write(restartWav)
             }
         }
-        withTimeout(EVENT_BOUND_MS) { app.graph.notices.imports.state.first { it.running.isEmpty() } }
+        awaitNoRunningImports()
 
         // Check oldest (evicted from in-memory cache), middle, newest, and post-recreation documents.
         val indicesToVerify = listOf(0, 1, totalCreated / 2, totalCreated - 1)
@@ -536,7 +639,7 @@ class CassiniDocumentsProviderTest {
     }
 
     /**
-     * Review #169 finding 4 (major): native clients that call `ParcelFileDescriptor.detachFd()` and keep writing to
+     * Review #169 r1 finding 4 (major): native clients that call `ParcelFileDescriptor.detachFd()` and keep writing to
      * the detached descriptor complete cleanly when the native descriptor closes instead of losing their audio.
      */
     @Test
@@ -568,7 +671,7 @@ class CassiniDocumentsProviderTest {
             docUri
         }
         withTimeout(EVENT_BOUND_MS) { changed.await() }
-        withTimeout(EVENT_BOUND_MS) { app.graph.notices.imports.state.first { it.running.isEmpty() } }
+        awaitNoRunningImports()
 
         val children = withContext(Dispatchers.IO) { queryChildren() }
         assertEquals(1, children.size)
@@ -600,7 +703,7 @@ class CassiniDocumentsProviderTest {
             }
         }
         val failure = withTimeout(EVENT_BOUND_MS) {
-            app.graph.notices.imports.state.first { it.running.isEmpty() && it.failure != null }.failure
+            currentGraph.notices.imports.state.first { it.running.isEmpty() && it.failure != null }.failure
         }
         assertEquals(Failure.OPEN, failure?.failure)
         assertEquals(emptyList<String>(), grantsDir.listFiles().orEmpty().map { it.name })
@@ -673,7 +776,7 @@ class CassiniDocumentsProviderTest {
 
     @Test
     fun scalesLinearlyWithDuplicateTitlesAndIgnoresLargeCachedWordTables(): Unit = runBlocking {
-        val catalogue = app.graph.awaitCatalogue()
+        val catalogue = currentGraph.awaitCatalogue()
         val words = (0 until 5_000).map { idx -> "word$idx" }
         val longNoteId = createSealedNote("Long board meeting", words)
         val variantId = withContext(Dispatchers.IO) {
@@ -721,7 +824,21 @@ class CassiniDocumentsProviderTest {
 
     // Helpers. --------------------------------------------------------------------------------------------------------
 
-    private fun recreateProvider() {
+    private fun buildGraph(): AppGraph = AppGraph(
+        app,
+        AppGraph.Config(
+            paths = paths,
+            dispatchers = CassiniDispatchers(Dispatchers.IO, Dispatchers.Default, Dispatchers.Unconfined),
+            fetcher = ModelFetcher { _, _, _ -> fail("No model download expected") },
+            network = { false },
+            clock = nowMs::get,
+        ),
+    )
+
+    private fun recreateProvider(evictInMemoryGrants: Boolean = false) {
+        if (evictInMemoryGrants) {
+            currentGraph.providerGrants.clearInMemoryStateForTesting()
+        }
         val info = ProviderInfo().apply {
             authority = this@CassiniDocumentsProviderTest.authority
             exported = true
@@ -732,15 +849,122 @@ class CassiniDocumentsProviderTest {
         Robolectric.buildContentProvider(CassiniDocumentsProvider::class.java).create(info)
     }
 
+    private suspend fun restartAppAndProvider(awaitReady: Boolean) {
+        currentGraph.close { shadowOf(Looper.getMainLooper()).idle() }
+        currentGraph = buildGraph()
+        CassiniDocumentsProvider.graphOverrideForTesting = ::currentGraph
+        CassiniApplication.graphFactory = GraphFactory { _, _ -> currentGraph }
+        recreateProvider()
+        if (awaitReady) {
+            withTimeout(EVENT_BOUND_MS) { currentGraph.ready.await() }
+        }
+    }
+
+    private suspend fun awaitNoRunningImports() {
+        withTimeout(EVENT_BOUND_MS) {
+            currentGraph.notices.imports.state.first { it.running.isEmpty() }
+        }
+    }
+
+    private suspend fun buildCustomerInterviewOpusBytes(): ByteArray = withContext(Dispatchers.IO) {
+        val sourceOpus = folder.newFile("initial-${UUID.randomUUID()}.opus")
+        val rawOpus = folder.newFile("raw-${UUID.randomUUID()}.opus").also {
+            writeSyntheticOpus(it, packetCount = 8, seed = 42)
+        }
+        CassiniDocument.create(
+            rawOpus,
+            Transcript(listOf(Word("S1", 0, 500, "Hello"), Word("S1", 550, 950, "world"))),
+            "Customer interview",
+            JSONObject().put("engine", "test"),
+            null,
+            mapOf("S1" to "Sam"),
+            sourceOpus,
+        )
+        sourceOpus.readBytes()
+    }
+
+    private suspend fun writeNewChildDocument(
+        rootUri: Uri,
+        mimeType: String,
+        displayName: String,
+        bytes: ByteArray,
+    ): Uri = withContext(Dispatchers.IO) {
+        val docUri = createChildDocument(rootUri, mimeType, displayName)
+        resolver.openOutputStream(docUri).use { out ->
+            requireNotNull(out).write(bytes)
+        }
+        querySingle(DocumentsContract.getDocumentId(docUri))
+        docUri
+    }
+
+    private suspend fun editNoteWithPrivateMetadata(catalogue: io.codemyriad.cassini.Catalogue, noteId: String) {
+        catalogue.jobs.enqueue(noteId, JobKind.TRANSCRIBE)
+        assertTrue(catalogue.jobs.claimNext() is ClaimOutcome.Claimed)
+        withContext(Dispatchers.IO) {
+            val existingFile = File(paths.note(noteId), "document.opus")
+            val existingDoc = CassiniDocument.read(existingFile)
+            catalogue.documents.sealBlocking(
+                noteId = noteId,
+                audio = existingFile,
+                transcript = Transcript(listOf(Word("S1", 0, 600, "Confidential"), Word("S1", 650, 1100, "budget"))),
+                title = "Private HR review",
+                processing = JSONObject().put("engine", "test-retranscribe"),
+                existing = existingDoc,
+                labels = mapOf("S1" to "Alice Secret"),
+            )
+        }
+        catalogue.adopter.adopt(noteId)
+        catalogue.notes.rename(noteId, "Private HR review")
+    }
+
+    private suspend fun assertGrantExposesOnlySubmittedBytes(
+        grantUri: Uri,
+        expectedDisplayName: String,
+        submittedBytes: ByteArray,
+    ) {
+        val rootUri = DocumentsContract.buildDocumentUri(authority, DocumentsVault.ROOT_DOCUMENT_ID)
+        val grantDocId = DocumentsContract.getDocumentId(grantUri)
+        val meta = withContext(Dispatchers.IO) {
+            assertTrue(DocumentsContract.isChildDocument(resolver, rootUri, grantUri))
+            querySingle(grantDocId)
+        }
+        assertEquals("Document ID must stay stable on creation grant", grantDocId, meta.documentId)
+        assertEquals(expectedDisplayName, meta.displayName)
+        assertEquals(submittedBytes.size.toLong(), meta.size)
+
+        val readBack = withContext(Dispatchers.IO) {
+            requireNotNull(resolver.openInputStream(grantUri)).use { it.readBytes() }
+        }
+        assertArrayEquals("Creation grant must expose only submitted bytes", submittedBytes, readBack)
+        val parsed = withContext(Dispatchers.IO) {
+            val verifyFile = folder.newFile("verify-${UUID.randomUUID()}.opus")
+            verifyFile.writeBytes(readBack)
+            CassiniDocument.readChecked(verifyFile, verify = true)
+        }
+        assertEquals("Customer interview", parsed.title)
+        val rawUtf8 = String(readBack, Charsets.UTF_8)
+        assertFalse(rawUtf8.contains("Private HR review"))
+        assertFalse(rawUtf8.contains("Alice Secret"))
+        assertFalse(rawUtf8.contains("Confidential"))
+    }
+
+    private suspend fun assertGrantUnavailable(rootUri: Uri, grantUri: Uri) = withContext(Dispatchers.IO) {
+        assertFalse(DocumentsContract.isChildDocument(resolver, rootUri, grantUri))
+        assertNull(resolver.query(grantUri, null, Bundle.EMPTY, null))
+        assertThrows(FileNotFoundException::class.java) {
+            resolver.openInputStream(grantUri)
+        }
+    }
+
     private suspend fun importPlainWav(title: String, frames: Int): String {
         val file = folder.newFile("$title.wav")
         writePcm16Wav(file, frames = frames)
-        val outcome = app.graph.awaitCatalogue().imports.import(Uri.fromFile(file))
+        val outcome = currentGraph.awaitCatalogue().imports.import(Uri.fromFile(file))
         return (outcome as ImportOutcome.Created).noteId
     }
 
     private suspend fun createPlainOpusNote(title: String, seed: Int): String {
-        val catalogue = app.graph.awaitCatalogue()
+        val catalogue = currentGraph.awaitCatalogue()
         val id = catalogue.notes.createRecording(title, nowMs.get(), "opus")
         val target = File(paths.note(id), "capture.opus")
         writeSyntheticOpus(target, packetCount = 6, seed = seed)
@@ -749,7 +973,7 @@ class CassiniDocumentsProviderTest {
     }
 
     private suspend fun createSealedNote(title: String, words: List<String>): String {
-        val catalogue = app.graph.awaitCatalogue()
+        val catalogue = currentGraph.awaitCatalogue()
         val id = createPlainOpusNote(title, seed = title.hashCode())
         catalogue.jobs.enqueue(id, JobKind.TRANSCRIBE)
         assertTrue(catalogue.jobs.claimNext() is ClaimOutcome.Claimed)

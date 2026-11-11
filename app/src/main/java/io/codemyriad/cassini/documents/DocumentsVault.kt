@@ -18,8 +18,6 @@ import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.data.NoteIds
 import io.codemyriad.cassini.data.Threads
 import io.codemyriad.cassini.data.db.NoteEntity
-import io.codemyriad.cassini.data.notes.ImportLimits
-import io.codemyriad.cassini.data.notes.ImportOutcome
 import io.codemyriad.cassini.inAppLanguage
 import io.codemyriad.cassini.note.NoteExports
 import io.codemyriad.cassini.note.NoteMapping
@@ -46,27 +44,18 @@ internal data class ExposedDocument(
  *
  * Listing and opening run strictly off the main thread, read only the lightweight `notes` and `jobs` tables (never
  * loading transcript words or whole files into memory), exclude notes that are trashed or still being recorded or
- * sealed, open note files with `MODE_READ_ONLY` under [AppGraph.locks], and route newly created files through
- * `NoticeCenter.imports` (`ImportRepository` with SHA-256 deduplication).
+ * sealed, open note files with `MODE_READ_ONLY` under [AppGraph.locks], and route newly created files (`"w"` or
+ * `"wt"` only) through [AppGraph.providerGrants] (`ImportRepository` with SHA-256 deduplication and note-lifecycle
+ * binding).
  */
 @Suppress("TooManyFunctions") // read, create, open, dirty-title flush and invalidation helpers of D97
 internal class DocumentsVault(
     private val context: Context,
     private val authority: () -> String,
     private val graphProvider: () -> AppGraph,
-    private val limits: () -> ImportLimits = { ImportLimits() },
 ) {
     private val observedCatalogues: MutableSet<Catalogue> =
         Collections.synchronizedSet(Collections.newSetFromMap(WeakHashMap()))
-
-    private val pending = PendingImports(
-        grantsRoot = { File(graphProvider().paths.root, PendingImports.GRANTS_DIR) },
-        scope = { graphProvider().appScope },
-        io = { graphProvider().dispatchers.io },
-        clock = { graphProvider().config.clock() },
-        limits = limits,
-        importFileUri = ::importStagedFile,
-    )
 
     fun rootTitle(): String = context.inAppLanguage().getString(R.string.app_name)
 
@@ -81,10 +70,17 @@ internal class DocumentsVault(
 
     fun isKnownChildId(documentId: String?): Boolean {
         if (documentId == null) return false
-        return noteIdOf(documentId) != null || pending.isKnown(documentId)
+        val graph = graphProvider()
+        return runBlocking(graph.dispatchers.io) {
+            when {
+                documentId.startsWith(NOTE_PREFIX) -> isNoteExposable(graph, documentId)
+                documentId.startsWith(PendingImports.PREFIX) -> graph.providerGrants.isKnown(documentId)
+                else -> false
+            }
+        }
     }
 
-    /** Lists live, finished, sealed-or-plain notes newest-first without loading transcript bodies. */
+    /** Lists live, finished, sealed-or-plain notes newest-first without loading transcript words. */
     fun listChildren(): List<ExposedDocument> {
         Threads.assertOffMain("CassiniDocumentsProvider.queryChildDocuments")
         val graph = graphProvider()
@@ -104,7 +100,7 @@ internal class DocumentsVault(
         return runBlocking(graph.dispatchers.io) {
             when {
                 id.startsWith(NOTE_PREFIX) -> queryNoteDocument(graph, id)
-                id.startsWith(PendingImports.PREFIX) -> pending.inspect(id)
+                id.startsWith(PendingImports.PREFIX) -> graph.providerGrants.inspect(id)
                 else -> throw FileNotFoundException("Unknown document: $id")
             }
         }
@@ -119,10 +115,10 @@ internal class DocumentsVault(
         if (mimeType == Document.MIME_TYPE_DIR) {
             throw UnsupportedOperationException("Folders are not supported")
         }
-        return pending.create(mimeType, displayName)
+        return graphProvider().providerGrants.create(mimeType, displayName)
     }
 
-    /** Opens an existing note read-only, or streams a newly created document into `ImportRepository`. */
+    /** Opens an existing note read-only, or streams a newly created document (`"w"` / `"wt"`) into `ImportRepository`. */
     fun openDocument(
         documentId: String?,
         mode: String?,
@@ -130,16 +126,18 @@ internal class DocumentsVault(
     ): ParcelFileDescriptor {
         Threads.assertOffMain("CassiniDocumentsProvider.openDocument")
         val id = documentId ?: throw FileNotFoundException("Missing documentId")
-        val parsedMode = parseRequiredMode(mode)
+        val (rawMode, parsedMode) = requireMode(mode)
         return when {
             id.startsWith(NOTE_PREFIX) -> openExistingNote(id, parsedMode, signal)
-            id.startsWith(PendingImports.PREFIX) -> openPending(id, parsedMode, signal)
+            id.startsWith(PendingImports.PREFIX) -> openPending(id, rawMode, parsedMode, signal)
             else -> throw FileNotFoundException("Unknown document: $id")
         }
     }
 
-    private fun parseRequiredMode(mode: String?): Int =
-        ParcelFileDescriptor.parseMode(mode ?: throw IllegalArgumentException("Missing mode"))
+    private fun requireMode(mode: String?): Pair<String, Int> {
+        val raw = mode ?: throw IllegalArgumentException("Missing mode")
+        return raw to ParcelFileDescriptor.parseMode(raw)
+    }
 
     private fun openExistingNote(
         documentId: String,
@@ -155,17 +153,31 @@ internal class DocumentsVault(
 
     private fun openPending(
         documentId: String,
+        rawMode: String,
         parsedMode: Int,
         signal: CancellationSignal?,
     ): ParcelFileDescriptor {
-        if (isWriteMode(parsedMode)) {
-            return pending.openForWrite(documentId, signal)
-        }
-        if (parsedMode != ParcelFileDescriptor.MODE_READ_ONLY) {
-            throw SecurityException("Unsupported mode for $documentId")
-        }
         val graph = graphProvider()
-        return runBlocking(graph.dispatchers.io) { pending.openForRead(documentId, signal) }
+        val grants = graph.providerGrants
+        if (!grants.isSyntacticallyValid(documentId)) {
+            throw FileNotFoundException("Unknown document: $documentId")
+        }
+        return when {
+            isStreamingWriteMode(rawMode, parsedMode) -> grants.openForWrite(documentId, signal)
+            parsedMode == ParcelFileDescriptor.MODE_READ_ONLY ->
+                runBlocking(graph.dispatchers.io) { grants.openForRead(documentId, signal) }
+            else -> throw UnsupportedOperationException(
+                "Mode $rawMode is not supported for $documentId; use \"w\", \"wt\", or \"r\"",
+            )
+        }
+    }
+
+    private suspend fun isNoteExposable(graph: AppGraph, documentId: String): Boolean {
+        val noteId = noteIdOf(documentId) ?: return false
+        val catalogue = graph.awaitCatalogue()
+        val row = catalogue.database.notes().note(noteId)
+        val jobState = catalogue.database.jobs().job(noteId)?.state
+        return row != null && isExposable(row, jobState, graph.paths)
     }
 
     private fun openNoteReadOnly(noteId: String, signal: CancellationSignal?): ParcelFileDescriptor {
@@ -222,14 +234,6 @@ internal class DocumentsVault(
                     flags = 0,
                 )
             }
-    }
-
-    private suspend fun importStagedFile(fileUri: String): Boolean {
-        val graph = graphProvider()
-        graph.ready.await()
-        val outcome = graph.notices.imports.start(fileUri).await()
-        notifyChildrenChanged(context.contentResolver)
-        return outcome is ImportOutcome.Created || outcome is ImportOutcome.Existing
     }
 
     private fun observeChangesOnce(graph: AppGraph, catalogue: Catalogue) {
@@ -340,7 +344,11 @@ internal class DocumentsVault(
             return documentId.removePrefix(NOTE_PREFIX).takeIf(NoteIds::isValid)
         }
 
-        private fun isWriteMode(parsedMode: Int): Boolean =
-            (parsedMode and ParcelFileDescriptor.MODE_WRITE_ONLY) != 0
+        /** Only pure write-only non-append modes (`"w"` / `"wt"`) fit a non-seekable pipe; `"rw"`/`"rwt"`/`"wa"` do not. */
+        private fun isStreamingWriteMode(rawMode: String, parsedMode: Int): Boolean {
+            val access = parsedMode and ParcelFileDescriptor.MODE_READ_WRITE
+            val noAppend = (parsedMode and ParcelFileDescriptor.MODE_APPEND) == 0
+            return (rawMode == "w" || rawMode == "wt") && access == ParcelFileDescriptor.MODE_WRITE_ONLY && noAppend
+        }
     }
 }
