@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated from cassini-ux 4d577376f6360ed352fa75307f4dc47890ed9858; do not edit. -->
+<resources>
+    <string name="common_cancel">Annulla</string>
+    <string name="common_done">Fine</string>
+    <string name="import_filter_cassini_and_zip">File Cassini e archivi ZIP</string>
+    <string name="import_progress">Importazione %1$d di %2$d…</string>
+    <string name="import_cancelled">Importazione annullata</string>
+    <plurals name="import_summary_imported">
+        <item quantity="one">%1$d importata</item>
+        <item quantity="many">%1$d importate</item>
+        <item quantity="other">%1$d importate</item>
+    </plurals>
+    <plurals name="import_summary_duplicates">
+        <item quantity="one">%1$d duplicato saltato</item>
+        <item quantity="many">%1$d duplicati saltati</item>
+        <item quantity="other">%1$d duplicati saltati</item>
+    </plurals>
+    <plurals name="import_summary_unsupported">
+        <item quantity="one">%1$d file non supportato ignorato</item>
+        <item quantity="many">%1$d file non supportati ignorati</item>
+        <item quantity="other">%1$d file non supportati ignorati</item>
+    </plurals>
+    <plurals name="import_summary_failed">
+        <item quantity="one">Impossibile importare %1$d file</item>
+        <item quantity="many">Impossibile importare %1$d file</item>
+        <item quantity="other">Impossibile importare %1$d file</item>
+    </plurals>
+    <string name="import_zip_failed_damaged">Questo archivio ZIP è danneggiato e non può essere aperto.</string>
+    <string name="import_zip_failed_encrypted">Questo archivio ZIP è protetto da password. Cassini non può aprire gli archivi protetti da password.</string>
+    <string name="import_zip_failed_unsafe_paths">Questo archivio ZIP contiene percorsi di file non sicuri. Non è stato importato nulla.</string>
+    <string name="import_zip_failed_too_large">Questo archivio ZIP è troppo grande per essere importato.</string>
+    <string name="import_zip_failed_empty">Questo archivio ZIP non contiene nulla che Cassini possa importare.</string>
+    <string name="export_zip_all">Esporta tutto come ZIP…</string>
+    <string name="export_zip_selected">Esporta la selezione come ZIP…</string>
+    <string name="export_zip_progress">Esportazione %1$d di %2$d…</string>
+    <plurals name="export_zip_done">
+        <item quantity="one">%1$d esportata in un archivio ZIP</item>
+        <item quantity="many">%1$d esportate in un archivio ZIP</item>
+        <item quantity="other">%1$d esportate in un archivio ZIP</item>
+    </plurals>
+</resources>

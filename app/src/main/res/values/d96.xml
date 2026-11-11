@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated from cassini-ux 4d577376f6360ed352fa75307f4dc47890ed9858; do not edit. -->
+<resources>
+    <string name="common_cancel">Cancel</string>
+    <string name="common_done">Done</string>
+    <string name="import_filter_cassini_and_zip">Cassini files and ZIP archives</string>
+    <string name="import_progress">Importing %1$d of %2$d…</string>
+    <string name="import_cancelled">Import cancelled</string>
+    <plurals name="import_summary_imported">
+        <item quantity="one">Imported %1$d</item>
+        <item quantity="other">Imported %1$d</item>
+    </plurals>
+    <plurals name="import_summary_duplicates">
+        <item quantity="one">Skipped %1$d duplicate</item>
+        <item quantity="other">Skipped %1$d duplicates</item>
+    </plurals>
+    <plurals name="import_summary_unsupported">
+        <item quantity="one">Ignored %1$d unsupported file</item>
+        <item quantity="other">Ignored %1$d unsupported files</item>
+    </plurals>
+    <plurals name="import_summary_failed">
+        <item quantity="one">%1$d file could not be imported</item>
+        <item quantity="other">%1$d files could not be imported</item>
+    </plurals>
+    <string name="import_zip_failed_damaged">This ZIP archive is damaged and can’t be opened.</string>
+    <string name="import_zip_failed_encrypted">This ZIP archive is password-protected. Cassini can’t open password-protected archives.</string>
+    <string name="import_zip_failed_unsafe_paths">This ZIP archive contains unsafe file paths. Nothing was imported.</string>
+    <string name="import_zip_failed_too_large">This ZIP archive is too large to import.</string>
+    <string name="import_zip_failed_empty">This ZIP archive contains nothing Cassini can import.</string>
+    <string name="export_zip_all">Export All as ZIP…</string>
+    <string name="export_zip_selected">Export Selected as ZIP…</string>
+    <string name="export_zip_progress">Exporting %1$d of %2$d…</string>
+    <plurals name="export_zip_done">
+        <item quantity="one">Exported %1$d to a ZIP archive</item>
+        <item quantity="other">Exported %1$d to a ZIP archive</item>
+    </plurals>
+</resources>

@@ -106,4 +106,5 @@
     <string name="notif_rec_file_full_text">Cassini arrête les enregistrements M4A à 1 Go, soit environ 74 heures. L’enregistrement effectué jusqu’ici est sauvegardé. Lancez un nouvel enregistrement pour continuer.</string>
     <string name="notif_rec_failed_title">Le microphone a cessé de fonctionner</string>
     <string name="notif_rec_failed_text">Enregistrement terminé. L’audio enregistré jusqu’ici est dans votre bibliothèque.</string>
+
 </resources>

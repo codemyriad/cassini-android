@@ -269,9 +269,9 @@ class LibraryViewModel(
         }
     }
 
-    /** The result of the system picker: null when the user cancelled it. */
-    fun onPicked(uri: String?) {
-        if (uri != null) ports.import(uri)
+    /** The result of the multi-document picker: empty when the user cancelled it. */
+    fun onPicked(uris: List<String>) {
+        if (uris.isNotEmpty()) ports.import(uris)
     }
 
     /** The screen is visible again (ON_RESUME): the notification permission may have changed in Settings. */
@@ -511,7 +511,7 @@ class LibraryViewModel(
 
     companion object {
         /** The picker's types (features.md section 1, item 6). */
-        val IMPORT_TYPES = arrayOf("audio/*", "application/ogg")
+        val IMPORT_TYPES = arrayOf("audio/*", "application/ogg", "application/zip", "application/x-zip-compressed")
 
         const val SEARCH_DEBOUNCE_MS = 150L
         private const val STOP_TIMEOUT_MS = 5_000L
