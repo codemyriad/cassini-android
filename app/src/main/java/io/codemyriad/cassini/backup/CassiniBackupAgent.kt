@@ -31,20 +31,15 @@ class CassiniBackupAgent : BackupAgent() {
         requireQuiescent()
         val flags = if (Build.VERSION.SDK_INT >= BackupChoices.TRANSPORT_FLAGS_API) data.transportFlags else 0
         if (!choices.readBlocking().permits(Build.VERSION.SDK_INT, flags, BuildConfig.CLOUD_BACKUP_ENABLED)) {
-            // Refuse before emitting library bytes; a successful empty archive could replace earlier data.
+            // Never emit library bytes. XML separately excludes cloud; Binder exceptions do not guarantee transport failure.
             throw IOException("This backup transport is disabled")
         }
-        // A prior size refusal is no longer current once a permitted retry begins. A new refusal sets it again.
-        runBlocking(Dispatchers.IO) { choices.recordQuotaExceeded(false) }
         val (manifest, inventory) = library.prepare()
-        // The payload alone is a lower bound; Android also measures tar framing and reports quota callbacks.
-        val bytes = manifest.files.fold(inventory.length()) { total, entry -> Math.addExact(total, entry.bytes) }
-        if (data.quota >= 0 && bytes > data.quota) {
-            onQuotaExceeded(bytes, data.quota)
-            throw IOException("Library exceeds the transfer quota")
-        }
-        fullBackupFile(inventory, data)
+        // Let fullBackupFile account for every tar entry in the platform's measure-only preflight.
+        runBlocking(Dispatchers.IO) { choices.recordQuotaExceeded(false) }
         for (entry in manifest.files) fullBackupFile(File(filesDir, entry.path), data)
+        // Completion metadata is last; an interrupted stream cannot claim a complete dataset.
+        fullBackupFile(inventory, data)
     }
 
     override fun onRestoreFile(data: ParcelFileDescriptor, size: Long, destination: File, type: Int, mode: Long, mtime: Long) {

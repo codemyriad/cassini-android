@@ -12,6 +12,8 @@ import io.codemyriad.cassini.data.notes.NotesHarness
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -42,7 +44,7 @@ class DeferredRestoreTest {
             for (path in listOf(BackupManifest.MANIFEST) + manifest.files.map { it.path }) {
                 val file = File(source, path)
                 file.inputStream().use {
-                    receiver.receive(path, it, file.length(), file.lastModified(), Long.MAX_VALUE)
+                    receiver.receive(path, it, file.length(), file.lastModified() / 1000, Long.MAX_VALUE)
                 }
             }
         }
@@ -89,8 +91,6 @@ class DeferredRestoreTest {
         assertTrue(orphanFile.isFile)
         assertTrue(File(staging, "applying.json").length() in 1..4096)
         val startup = LibraryBackup(context, target, staging)
-        assertThrows(IllegalArgumentException::class.java) { startup.recoverRestore() }
-        assertEquals("Existing note", old.readText())
         Files.move(held.toPath(), incoming.toPath())
         Files.move(heldReceipts.toPath(), receipts.toPath())
         startup.recoverRestore()
@@ -119,11 +119,10 @@ class DeferredRestoreTest {
                 File(stage, "incoming/notes/n/source.opus").writeText("Changed audio!")
             }
             receiver.finishRestore()
-            assertThrows(IllegalArgumentException::class.java) {
-                LibraryBackup(context, target, staging).recoverRestore()
-            }
+            assertNotNull(LibraryBackup(context, target, staging).recoverRestore())
             assertEquals("Existing note", old.readText())
-            assertTrue(File(staging, "applying.json").isFile)
+            assertFalse(File(staging, "applying.json").exists())
+            assertNull(LibraryBackup(context, target, staging).recoverRestore())
         }
     }
 
@@ -140,10 +139,10 @@ class DeferredRestoreTest {
         assertFalse(File(stage, "prepared").exists())
         assertEquals("Unsupported received catalogue", File(stage, "incoming/cassini.db").readText())
         assertEquals("Existing note", old.readText())
-        assertThrows(IllegalArgumentException::class.java) { LibraryBackup(context, target, staging).recoverRestore() }
+        assertNotNull(LibraryBackup(context, target, staging).recoverRestore())
         assertEquals("Existing note", old.readText())
         assertFalse(target.database.exists())
-        assertEquals("Unsupported received catalogue", File(stage, "incoming/cassini.db").readText())
+        assertFalse(stage.exists())
     }
 
     @Test fun deferredPromotionSurvivesEveryInterruptedMoveAndRetainsTheUnmodifiedReceivedCatalogue() = runTest {

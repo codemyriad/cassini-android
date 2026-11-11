@@ -24,13 +24,15 @@ febfcc0 (see `ui/src/test/resources/transfer/UPSTREAM.json` for the full pin and
 
 ## Quota and complete datasets
 
-The agent reads `FullBackupDataOutput.getQuota()` for the actual operation. If the file payload and
-inventory alone exceed that quota, it records the quota failure and refuses before emitting data.
-Android also measures transport framing; `onQuotaExceeded` records a later platform refusal.
+The agent lets `fullBackupFile` measure every tar-framed entry during Android's preflight, even when
+the payload exceeds the reported quota. Android can then report the actual `Quota exceeded` result
+and invoke `onQuotaExceeded` before streaming. Throwing an exception before measurement would report
+zero bytes through the one-way Binder callback, so it is not used for quota detection.
 Settings shows `settings.transfer.tooLarge` after a quota failure and points to ZIP export. The
 normal explanation also recommends Export All as ZIP. No smaller subset is silently substituted.
-Downloaded models are never transferred. A permitted retry clears the previous size warning before
-preparation; a new quota refusal sets it again. A refused transport does not clear that warning.
+Downloaded models are never transferred. A permitted retry clears the previous size warning only
+after snapshot preparation succeeds; a new quota refusal sets it again. Refused transports and failed
+preparation leave the warning intact. Unchanged choices do not create or replace an atomic file.
 
 Android's production D2D limit can differ from the local test transport. We do not hard-code the
 cloud limit as the transfer limit. The test transport retains its 25 MiB quota even when its D2D
@@ -38,7 +40,11 @@ flag is set, which makes a small, deterministic oversized-library test possible.
 
 ## Dataset and restore
 
-The static XML rules are a ceiling. The full-backup agent also emits only its positive file allowlist:
+The XML itself excludes every credential/device-protected domain and external files from cloud.
+API26–27 exclude all backup domains; API28–30 include library files only with the D2D requirement.
+Modern device-transfer rules include the library ceiling separately from cloud exclusions. These
+privacy restrictions do not depend on exceptions from the one-way agent Binder being propagated.
+The full-backup agent also emits only its positive file allowlist:
 the closed, checkpointed `cassini.db`, canonical note audio/documents and committed saved-voice state.
 Models, receipts, download consent, app settings, cache directories, unfinished work files and temporary
 voiceprint updates do not travel. The catalogue can contain derived cache rows and transient jobs;
@@ -46,9 +52,10 @@ restore re-derives the former and removes the latter before publishing the libra
 on the target are retained. Exported Cassini documents never contain saved voiceprints.
 
 The agent refuses to run once graph construction starts. It never creates the graph or starts a
-service or recognizer. Full backup is not allowed in the foreground. A denied transport fails the
-operation rather than publishing a successful empty archive. Backup failure does not promise that
-every transport will retain its previous snapshot; retention belongs to Android and the provider.
+service or recognizer. Full backup is not allowed in the foreground. A denied transport emits no library data. Android's one-way agent Binder may still acknowledge an empty
+archive; an exception alone cannot guarantee a transport failure or preservation of an earlier snapshot.
+The declarative cloud exclusions remain independent of that acknowledgement. Snapshot retention
+belongs to Android and the provider.
 
 Before creating an inventory, preparation recovers any interrupted restore transaction. An unresolved
 or damaged journal refuses the snapshot. It then opens admitted voice files through `AtomicFile`,
@@ -56,8 +63,11 @@ recovering committed `.bak` data on Android 9–10 even when the base is missing
 and unresolved atomic recovery refuse the snapshot; `.bak` files are not copied as separate payloads.
 
 An inventory records every admitted file's path, size and SHA-256. Incoming entries stream into
-private staging and are hashed as they arrive. Each completely received file gets a durable hash
-receipt. The deadline-bound `onRestoreFinished` callback only commits a small, checksum-protected
+private staging and are hashed as they arrive. Tar modification times are epoch seconds and are
+restored in that unit, with negative values clamped to the epoch. Each completely received file gets
+a durable hash receipt. The inventory is emitted last and its expected entry count is parsed while
+receiving; finalization checks completeness using only that count and the received set size.
+A refused entry latches failure for all later file/finish callbacks on that receiver. The deadline-bound `onRestoreFinished` callback only commits a small, checksum-protected
 received-transaction pointer. It does not scan payloads, read the inventory, open Room, rebuild
 transcripts, replace library roots or delete staging trees. Error cleanup is deferred too.
 
@@ -72,8 +82,12 @@ no hard-link permission or duplicate audio storage is required.
 Notes, the repaired catalogue and saved voices are swapped with a durable journal. An interrupted
 replacement first rolls back, retaining the received transaction for a fresh preparation and retry;
 a committed replacement is retained. All validation, catalogue work and recursive cleanup happen on
-the startup worker. Cleanup failures cannot undo a committed restore. Failed recovery retains its
-journal and old roots. A backup requested before a received restore has completed startup is refused,
+the startup worker. Cleanup failures cannot undo a committed restore. A received stage proven incomplete or corrupt is
+retired on startup, leaving the intact live library accessible and recording a rejection diagnostic.
+Transient storage failures and unsupported newer catalogue schemas retain the received transaction.
+A later restore may supersede an unapplied received transaction without deleting its data inside the
+OS callback; startup cleans superseded stages. Interrupted applying transactions must recover before
+they can be replaced. A backup requested before a received restore has completed startup is refused,
 so an incomplete or older library cannot become the next successful snapshot.
 
 ## Package and app-version binding

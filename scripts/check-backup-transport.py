@@ -85,7 +85,7 @@ def main():
             if result != 'Success':
                 raise ValueError(f'{name} did not back up: {result}')
         elif quota:
-            if result == 'Success' or 'Library exceeds the transfer quota' not in logcat:
+            if result != 'Quota exceeded':
                 raise ValueError(f'{name} did not demonstrate the quota refusal: {result}')
             fixture('verifyQuota')
         elif result == 'Success' or 'This backup transport is disabled' not in logcat:
@@ -197,6 +197,9 @@ def main():
         backup('transfer-after-quota-retry', True)
         fixture('verifyQuotaCleared')
         restore('transfer-after-quota-retry')
+        fixture('plainWithoutCatalogue')
+        backup('transfer-without-catalogue', True)
+        restore('transfer-without-catalogue')
         report['success'] = True
     finally:
         (args.output / 'report.json').write_text(json.dumps(report, indent=2) + '\n')

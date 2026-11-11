@@ -60,7 +60,7 @@ class BackupVoiceRecoveryTest {
                 for (path in listOf(BackupManifest.MANIFEST) + manifest.files.map { it.path }) {
                     val file = File(paths.root, path)
                     file.inputStream().use {
-                        receiver.receive(path, it, file.length(), file.lastModified(), Long.MAX_VALUE)
+                        receiver.receive(path, it, file.length(), file.lastModified() / 1000, Long.MAX_VALUE)
                     }
                 }
                 receiver.finishRestore()

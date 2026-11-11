@@ -1,5 +1,6 @@
 package io.codemyriad.cassini.backup
 
+import io.codemyriad.cassini.BuildConfig
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
@@ -29,21 +30,39 @@ class BackupManifestConfigurationTest {
         assertEquals("@xml/data_extraction_rules", attribute("dataExtractionRules"))
     }
 
-    @Test fun bothXmlGenerationsIncludeOnlyTheLibraryCeilingInCredentialProtectedFiles() {
-        val legacy = xml("app/src/main/res/xml/full_backup_content.xml")
-        checkIncludes(legacy)
+    @Test fun cloudAndPre28BackupExcludeEveryDomainWhileTheCloudBuildFlagIsOff() {
+        assertFalse(BuildConfig.CLOUD_BACKUP_ENABLED)
+        checkExcludes(xml("app/src/main/res/xml/full_backup_content.xml"))
         val modern = xml("app/src/main/res/xml/data_extraction_rules.xml")
-        val cloud = modern.getElementsByTagName("cloud-backup").item(0) as Element
-        assertEquals("true", cloud.getAttribute("disableIfNoEncryptionCapabilities"))
-        checkIncludes(cloud)
+        checkExcludes(modern.getElementsByTagName("cloud-backup").item(0) as Element)
         checkIncludes(modern.getElementsByTagName("device-transfer").item(0) as Element)
+        checkIncludes(xml("app/src/main/res/xml-v28/full_backup_content.xml"), "deviceToDeviceTransfer")
     }
 
-    private fun checkIncludes(parent: Element) {
+    private fun checkExcludes(parent: Element) {
+        assertEquals(0, parent.getElementsByTagName("include").length)
+        val nodes = parent.getElementsByTagName("exclude")
+        val domains = (0 until nodes.length).map { index ->
+            val item = nodes.item(index) as Element
+            assertEquals(".", item.getAttribute("path"))
+            item.getAttribute("domain")
+        }
+        assertEquals(
+            setOf(
+                "root", "file", "database", "sharedpref", "external",
+                "device_root", "device_file", "device_database", "device_sharedpref",
+            ),
+            domains.toSet(),
+        )
+        assertEquals(9, domains.size)
+    }
+
+    private fun checkIncludes(parent: Element, flags: String = "") {
         val nodes = parent.getElementsByTagName("include")
         val includes = (0 until nodes.length).map { index ->
             val item = nodes.item(index) as Element
             assertEquals("file", item.getAttribute("domain"))
+            assertEquals(flags, item.getAttribute("requireFlags"))
             item.getAttribute("path")
         }
         assertEquals(setOf("cassini.db", "notes/", "voices/", "backup/manifest.json"), includes.toSet())

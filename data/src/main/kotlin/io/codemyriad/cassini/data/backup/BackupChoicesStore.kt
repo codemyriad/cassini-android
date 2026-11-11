@@ -70,7 +70,9 @@ class BackupChoicesStore(private val file: File, private val io: CoroutineDispat
 
     private suspend fun edit(change: (BackupChoices) -> BackupChoices) = withContext(io) {
         lock.withLock {
-            val value = change(readBlocking())
+            val current = readBlocking()
+            val value = change(current)
+            if (value == current) return@withLock
             Files.createDirectories(file.parentFile!!.toPath())
             val atomic = AtomicFile(file)
             val output = atomic.startWrite()

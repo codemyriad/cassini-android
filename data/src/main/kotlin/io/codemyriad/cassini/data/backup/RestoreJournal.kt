@@ -46,6 +46,18 @@ internal class RestoreJournal(private val staging: File) {
         return JSONObject(payload)
     }
 
+    fun receivedStage(): File? {
+        val value = read() ?: return null
+        return if (value.getString("phase") == "received") {
+            require(value.opt("version") == 1 && value.optBoolean("deferred"))
+            val name = value.getString("stage")
+            require(RestoreStaging.isStage(name))
+            File(staging, name)
+        } else {
+            null
+        }
+    }
+
     private fun readBounded(input: InputStream, bytes: ByteArray): Int {
         var used = 0
         while (used < bytes.size) {

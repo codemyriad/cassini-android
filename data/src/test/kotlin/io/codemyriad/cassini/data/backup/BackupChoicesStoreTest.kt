@@ -16,6 +16,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.io.File
 import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.attribute.BasicFileAttributes
 
 @RunWith(RobolectricTestRunner::class)
 class BackupChoicesStoreTest {
@@ -33,6 +35,22 @@ class BackupChoicesStoreTest {
         assertTrue(restored.noticeAcknowledged)
         val anotherDevice = BackupChoicesStore(File(folder.root, "other-device.json"), Dispatchers.IO)
         assertEquals(BackupChoices(), anotherDevice.choices.first())
+    }
+
+    @Test fun unchangedChoicesDoNotCreateOrReplaceAnAtomicFile() = runTest {
+        val file = File(folder.root, "choices.json")
+        val store = BackupChoicesStore(file, Dispatchers.IO)
+        store.recordQuotaExceeded(false)
+        assertFalse(file.exists())
+        store.acknowledgeNotice()
+        val identity = Files.readAttributes(file.toPath(), BasicFileAttributes::class.java).fileKey()
+        val bytes = file.readText()
+        store.acknowledgeNotice()
+        store.recordQuotaExceeded(false)
+        assertEquals(identity, Files.readAttributes(file.toPath(), BasicFileAttributes::class.java).fileKey())
+        assertEquals(bytes, file.readText())
+        assertFalse(File(file.path + ".new").exists())
+        assertFalse(File(file.path + ".bak").exists())
     }
 
     @Test fun corruptUnsupportedOrOversizedChoicesNeverEnableAnUpload() = runTest {

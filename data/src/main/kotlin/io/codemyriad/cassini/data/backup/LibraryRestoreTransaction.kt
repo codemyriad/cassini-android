@@ -74,7 +74,7 @@ class LibraryRestoreTransaction internal constructor(
     fun complete(stage: File) {
         Threads.assertOffMain("LibraryRestoreTransaction.complete")
         require(stage.parentFile == staging && RestoreStaging.isStage(stage.name))
-        requireIdle()
+        requireReceivable()
         val value = JSONObject()
             .put("version", 1)
             .put("stage", stage.name)
@@ -83,30 +83,31 @@ class LibraryRestoreTransaction internal constructor(
         journal.write(value)
     }
 
-    internal fun requireIdle() {
-        require(journal.read() == null) { "Unrecovered library restore" }
+    internal fun requireReceivable() {
+        val value = journal.read()
+        val retired = value?.opt("version") == 1 && value.optString("phase") == "rolledBack" &&
+            RestoreStaging.isStage(value.optString("stage"))
+        require(value == null || retired || receivedStage != null) { "Unrecovered library restore" }
     }
 
     /** Only startup may turn this received transaction into a validated replacement. */
-    internal fun receivedStage(): File? {
-        val value = journal.read() ?: return null
-        return if (value.getString("phase") == "received") {
-            require(value.opt("version") == 1 && value.optBoolean("deferred"))
-            val name = value.getString("stage")
-            require(RestoreStaging.isStage(name))
-            File(staging, name)
-        } else {
-            null
-        }
+    internal val receivedStage: File? get() = journal.receivedStage()
+
+    /** A proven bad received payload never touched live roots; retire it without blocking that library. */
+    internal fun rejectReceived(stage: File) {
+        require(receivedStage == stage)
+        val value = checkNotNull(journal.read())
+        journal.write(value.put("phase", "rolledBack"))
+        recover()
     }
 
     /** Incoming data has already passed completeness and catalogue validation, and Room is closed. */
     fun install(stage: File) {
         Threads.assertOffMain("LibraryRestoreTransaction.install")
         require(stage.parentFile == staging && RestoreStaging.isStage(stage.name))
-        val pending = receivedStage()
+        val pending = receivedStage
         val deferred = pending != null
-        if (deferred) require(pending == stage) else requireIdle()
+        if (deferred) require(pending == stage) else require(journal.read() == null) { "Unrecovered library restore" }
         val original = ROOTS.filter { exists(File(live, it)) }
         require(original.none { Files.isSymbolicLink(File(live, it).toPath()) }) { "Linked library root" }
         Files.createDirectories(File(stage, "old").toPath())

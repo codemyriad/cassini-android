@@ -47,7 +47,9 @@ class LibraryBackupTest {
     private fun transfer(source: File, manifest: BackupManifest, receiver: LibraryBackup) {
         for (path in listOf(BackupManifest.MANIFEST) + manifest.files.map { it.path }) {
             val file = File(source, path)
-            file.inputStream().use { receiver.receive(path, it, file.length(), file.lastModified(), Long.MAX_VALUE) }
+            file.inputStream().use {
+                receiver.receive(path, it, file.length(), file.lastModified() / 1000, Long.MAX_VALUE)
+            }
         }
     }
 
@@ -135,8 +137,8 @@ class LibraryBackupTest {
             metadata.inputStream().use {
                 receiver.receive(BackupManifest.MANIFEST, it, metadata.length(), 1, Long.MAX_VALUE)
             }
-            receiver.finishRestore()
-            assertThrows(IllegalArgumentException::class.java) { receiver.recoverRestore() }
+            assertThrows(IllegalArgumentException::class.java) { receiver.finishRestore() }
+            receiver.recoverRestore()
             val truncated = LibraryBackup(context, target, folder.newFolder())
             assertThrows(IOException::class.java) {
                 truncated.receive("notes/n/source.opus", ByteArrayInputStream(byteArrayOf(1)), 10, 1, Long.MAX_VALUE)
@@ -156,11 +158,18 @@ class LibraryBackupTest {
                 receiver.receive("models/weights.onnx", ByteArrayInputStream(byteArrayOf(1)), 1, 1, Long.MAX_VALUE)
             }
             assertThrows(IOException::class.java) {
-                receiver.receive("notes/n/source.opus", ByteArrayInputStream(byteArrayOf(1)), 1, 1, 0)
+                LibraryBackup(context, target, folder.newFolder()).receive(
+                    "notes/n/source.opus",
+                    ByteArrayInputStream(byteArrayOf(1)),
+                    1,
+                    1,
+                    0,
+                )
             }
-            receiver.receive("notes/n/source.opus", ByteArrayInputStream(byteArrayOf(1)), 1, 1, Long.MAX_VALUE)
+            val duplicate = LibraryBackup(context, target, folder.newFolder())
+            duplicate.receive("notes/n/source.opus", ByteArrayInputStream(byteArrayOf(1)), 1, 1, Long.MAX_VALUE)
             assertThrows(IllegalArgumentException::class.java) {
-                receiver.receive("notes/n/source.opus", ByteArrayInputStream(byteArrayOf(2)), 1, 1, Long.MAX_VALUE)
+                duplicate.receive("notes/n/source.opus", ByteArrayInputStream(byteArrayOf(2)), 1, 1, Long.MAX_VALUE)
             }
             receiver.abandon()
         }

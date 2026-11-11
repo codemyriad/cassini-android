@@ -1,11 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Static ceiling only: the OFF build flag refuses cloud transport even with a persisted opt-in. -->
+<!-- Cloud is declaratively excluded while the cloud product flag is OFF. -->
 <data-extraction-rules>
-    <cloud-backup disableIfNoEncryptionCapabilities="true">
-        <include domain="file" path="cassini.db" />
-        <include domain="file" path="notes/" />
-        <include domain="file" path="voices/" />
-        <include domain="file" path="backup/manifest.json" />
+    <cloud-backup>
+        <exclude domain="root" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+        <exclude domain="device_root" path="." />
+        <exclude domain="device_file" path="." />
+        <exclude domain="device_database" path="." />
+        <exclude domain="device_sharedpref" path="." />
     </cloud-backup>
     <device-transfer>
         <include domain="file" path="cassini.db" />

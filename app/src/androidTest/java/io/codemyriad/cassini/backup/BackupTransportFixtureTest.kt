@@ -2,6 +2,7 @@ package io.codemyriad.cassini.backup
 
 import android.os.Build
 import androidx.test.platform.app.InstrumentationRegistry
+import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.core.format.CassiniDocument
 import io.codemyriad.cassini.core.format.DocumentState
 import io.codemyriad.cassini.core.format.OggOpus
@@ -19,17 +20,19 @@ import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.data.CassiniDispatchers
 import io.codemyriad.cassini.data.NoteLocks
 import io.codemyriad.cassini.data.backup.BackupChoicesStore
-import io.codemyriad.cassini.data.backup.LibraryBackup
 import io.codemyriad.cassini.data.db.CassiniDatabase
 import io.codemyriad.cassini.data.db.CassiniDatabaseOpener
 import io.codemyriad.cassini.data.db.JobEntity
 import io.codemyriad.cassini.data.db.NoteEntity
+import io.codemyriad.cassini.data.models.ModelFetcher
 import io.codemyriad.cassini.data.notes.DocumentRepository
+import io.codemyriad.cassini.data.notes.RecoveredTitle
 import io.codemyriad.cassini.data.notes.recordingTime
 import io.codemyriad.cassini.test.Manual
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -39,6 +42,7 @@ import org.junit.Test
 import java.io.File
 import java.io.RandomAccessFile
 import java.nio.file.Files
+import java.nio.file.attribute.FileTime
 import java.time.Instant
 
 /** Only for an explicitly owned, empty debug emulator. No commands, receivers or test data ship in the app APK. */
@@ -61,6 +65,7 @@ class BackupTransportFixtureTest {
                 arguments.getString("transfer")?.let { choices.setTransfer(it.toBooleanStrict()) }
             }
             "verify" -> verify()
+            "plainWithoutCatalogue" -> plainWithoutCatalogue()
             "markers" -> markers()
             "oversized" -> {
                 // Synthetic bytes only, beyond LocalTransport's 25 MiB quota even in D2D mode.
@@ -82,7 +87,9 @@ class BackupTransportFixtureTest {
         assertFalse(paths.notes.exists())
         assertFalse(paths.people.exists())
         Files.createDirectories(paths.note(ID).toPath())
-        File(paths.note(ID), "document.opus").writeBytes(documentBytes())
+        val document = File(paths.note(ID), "document.opus")
+        document.writeBytes(documentBytes())
+        Files.setLastModifiedTime(document.toPath(), FileTime.fromMillis(START.toEpochMilli() + 321))
         withDatabase { database ->
             database.notes().insert(
                 NoteEntity(
@@ -104,6 +111,7 @@ class BackupTransportFixtureTest {
         Files.createDirectories(paths.voices.toPath())
         val voice = Voice("ada", "Ada", "synthetic", floatArrayOf(1f, 0f, 0f), 1, 4.0, 1, 1)
         paths.people.writeText(VoiceCodec.encode(listOf(voice)))
+        Files.setLastModifiedTime(paths.people.toPath(), FileTime.fromMillis(START.toEpochMilli() + 321))
         markers()
         assertFalse(choices.choices.first().cloud)
         assertTrue(choices.choices.first().transfer)
@@ -111,11 +119,8 @@ class BackupTransportFixtureTest {
 
     private fun documentBytes(): ByteArray {
         val words = Transcript(listOf(Word("S1", 0, 20, "Welcome")), "en")
-        val head = "OpusHead".toByteArray() + byteArrayOf(1, 1, 0, 0, -128, -69, 0, 0, 0, 0, 0)
-        val tags = CassiniDocument.tagsPacket(emptyList())
-        val silence = OggOpus.mux(OggOpus.Stream(head, tags, listOf(byteArrayOf(-8, -1, -2)), 960, true), tags)
         return CassiniDocument.create(
-            silence,
+            silenceBytes(),
             words,
             "Synthetic backup note",
             JSONObject(),
@@ -123,6 +128,22 @@ class BackupTransportFixtureTest {
             recordedAtUtc = START,
             createdAtUtc = START.plusSeconds(540),
         )
+    }
+
+    private fun silenceBytes(): ByteArray {
+        val head = "OpusHead".toByteArray() + byteArrayOf(1, 1, 0, 0, -128, -69, 0, 0, 0, 0, 0)
+        val tags = CassiniDocument.tagsPacket(emptyList())
+        return OggOpus.mux(OggOpus.Stream(head, tags, listOf(byteArrayOf(-8, -1, -2)), 960, true), tags)
+    }
+
+    private fun plainWithoutCatalogue() {
+        Files.createDirectories(paths.note(PLAIN_ID).toPath())
+        val audio = File(paths.note(PLAIN_ID), "capture.opus")
+        audio.writeBytes(silenceBytes())
+        Files.setLastModifiedTime(audio.toPath(), FileTime.fromMillis(START.toEpochMilli() + 321))
+        for (suffix in listOf("", "-wal", "-shm", "-journal")) {
+            Files.deleteIfExists(File(paths.database.path + suffix).toPath())
+        }
     }
 
     private fun markers() {
@@ -138,21 +159,32 @@ class BackupTransportFixtureTest {
         val staging = File(context.noBackupFilesDir, "restores")
         assertTrue("Restore completion must be durable", File(staging, "applying.json").isFile)
         assertFalse("The OS finalization callback must not publish the Library", paths.database.exists())
-        LibraryBackup(context, paths, staging).recoverRestore()
-        assertFalse("Startup completes the restore journal", File(staging, "applying.json").exists())
+        val received = staging.listFiles()!!.single { it.isDirectory && it.name.startsWith("restore-") }
+        val incoming = File(received, "incoming")
+        val plain = File(incoming, "notes/$PLAIN_ID/capture.opus").exists()
+        assertEquals(START.toEpochMilli(), File(incoming, "notes/$ID/document.opus").lastModified())
+        assertEquals(START.toEpochMilli(), File(incoming, "voices/people.json").lastModified())
+        if (plain) assertEquals(START.toEpochMilli(), File(incoming, "notes/$PLAIN_ID/capture.opus").lastModified())
         assertFalse("Downloaded models must not travel", File(paths.root, "models").exists())
         assertFalse("Unfinished inference work must not travel", paths.work(ID).exists())
         assertFalse("An old device's cloud opt-in must not travel", choices.choices.first().cloud)
         assertTrue(choices.choices.first().transfer)
-        withDatabase { database ->
-            val row = checkNotNull(database.notes().note(ID))
-            assertEquals("Synthetic backup note", row.title)
-            assertEquals(DocumentState.OK, row.documentState)
-            assertEquals(START, row.recordingTime()?.instant)
-            assertNull(database.jobs().job(ID))
-            val variant = database.cache().variants(ID).single()
-            assertEquals(1, variant.wordCount)
-            assertEquals("Ada", database.cache().speakers(ID, variant.variantId).single().label)
+        val graph = AppGraph(
+            context,
+            AppGraph.Config(
+                paths,
+                backupDirectory = context.noBackupFilesDir,
+                network = { false },
+                fetcher = ModelFetcher { _, _, _ -> error("No fixture model downloads") },
+            ),
+        )
+        try {
+            withTimeout(60_000) { graph.ready.await() }
+            assertFalse("Startup completes the restore journal", File(staging, "applying.json").exists())
+            val database = graph.awaitCatalogue().database
+            verifyCatalogue(database, plain)
+        } finally {
+            graph.close()
         }
         val saved = VoiceCodec.decode(paths.people.readText())
         val match = VoiceMatcher.match(
@@ -163,6 +195,24 @@ class BackupTransportFixtureTest {
         )
         assertEquals("ada", match.getValue("speaker").voiceId)
         assertEquals(DocumentState.OK, CassiniDocument.read(File(paths.note(ID), "document.opus")).documentState)
+    }
+
+    private suspend fun verifyCatalogue(database: CassiniDatabase, plain: Boolean) {
+        val row = checkNotNull(database.notes().note(ID))
+        assertEquals("Synthetic backup note", row.title)
+        assertEquals(DocumentState.OK, row.documentState)
+        assertEquals(START, row.recordingTime()?.instant)
+        assertNull(database.jobs().job(ID))
+        val variant = database.cache().variants(ID).single()
+        assertEquals(1, variant.wordCount)
+        assertEquals("Ada", database.cache().speakers(ID, variant.variantId).single().label)
+        if (plain) {
+            val row = checkNotNull(database.notes().note(PLAIN_ID))
+            assertEquals(20L, row.durationMs)
+            val expected = START.toEpochMilli() - 20
+            assertEquals(expected, row.createdAt)
+            assertEquals(RecoveredTitle.english().of(expected), row.title)
+        }
     }
 
     private fun documents(database: CassiniDatabase) =
@@ -179,7 +229,8 @@ class BackupTransportFixtureTest {
     }
 
     private companion object {
-        const val ID = "backup-fixture-note"
+        const val ID = "00000000-0000-4000-8000-000000000001"
+        const val PLAIN_ID = "00000000-0000-4000-8000-000000000002"
         val START: Instant = Instant.parse("2026-11-11T12:00:00Z")
     }
 }

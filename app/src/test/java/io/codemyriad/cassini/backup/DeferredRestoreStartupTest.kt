@@ -6,6 +6,7 @@ import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.core.backup.BackupManifest
 import io.codemyriad.cassini.core.format.CassiniDocument
 import io.codemyriad.cassini.core.format.DocumentState
+import io.codemyriad.cassini.core.format.OggOpus
 import io.codemyriad.cassini.core.format.Transcript
 import io.codemyriad.cassini.core.format.Word
 import io.codemyriad.cassini.core.library.AudioKind
@@ -14,9 +15,11 @@ import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.core.library.Origin
 import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.data.backup.LibraryBackup
+import io.codemyriad.cassini.data.db.CassiniDatabaseOpener
 import io.codemyriad.cassini.data.db.JobEntity
 import io.codemyriad.cassini.data.db.NoteEntity
 import io.codemyriad.cassini.data.models.ModelFetcher
+import io.codemyriad.cassini.data.notes.RecoveredTitle
 import io.codemyriad.cassini.testing.NoUncaughtCoroutines
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -27,7 +30,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -36,6 +38,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.io.File
 import java.nio.file.Files
+import java.nio.file.attribute.FileTime
+import java.time.Instant
 
 @RunWith(RobolectricTestRunner::class)
 class DeferredRestoreStartupTest {
@@ -106,7 +110,7 @@ class DeferredRestoreStartupTest {
             for (path in listOf(BackupManifest.MANIFEST) + manifest.files.map { it.path }) {
                 val file = File(source.root, path)
                 file.inputStream().use {
-                    receiver.receive(path, it, file.length(), file.lastModified(), Long.MAX_VALUE)
+                    receiver.receive(path, it, file.length(), file.lastModified() / 1000, Long.MAX_VALUE)
                 }
             }
             receiver.finishRestore()
@@ -131,8 +135,62 @@ class DeferredRestoreStartupTest {
         }
     }
 
-    @Test fun invalidDeferredPayloadRefusesStartupBeforeOpeningTheLiveCatalogue() = runBlocking {
-        val target = AppPaths(folder.newFolder(), folder.newFolder(), folder.newFolder())
+    @Test fun plainCaptureWithoutACatalogueRebuildsItsActualDateAndTitleFromTarSeconds() = runBlocking {
+        val id = "00000000-0000-4000-8000-000000000002"
+        val source = folder.newFolder()
+        val audio = File(source, "notes/$id/capture.opus")
+        Files.createDirectories(audio.parentFile!!.toPath())
+        val head = "OpusHead".toByteArray() + byteArrayOf(1, 1, 0, 0, -128, -69, 0, 0, 0, 0, 0)
+        val tags = CassiniDocument.tagsPacket(emptyList())
+        audio.writeBytes(OggOpus.mux(OggOpus.Stream(head, tags, listOf(byteArrayOf(-8, -1, -2)), 960, true), tags))
+        val modified = Instant.parse("2026-11-11T12:00:00Z").toEpochMilli()
+        Files.setLastModifiedTime(audio.toPath(), FileTime.fromMillis(modified + 321))
+        val manifest = BackupManifest.create(source).json().toByteArray()
+        val paths = AppPaths(folder.newFolder(), folder.newFolder(), folder.newFolder())
+        val backup = folder.newFolder()
+        withContext(Dispatchers.IO) {
+            val receiver = LibraryBackup(context, paths, File(backup, "restores"))
+            audio.inputStream().use {
+                receiver.receive(
+                    "notes/$id/capture.opus",
+                    it,
+                    audio.length(),
+                    audio.lastModified() / 1000,
+                    Long.MAX_VALUE,
+                )
+            }
+            receiver.receive(
+                BackupManifest.MANIFEST,
+                manifest.inputStream(),
+                manifest.size.toLong(),
+                modified / 1000,
+                Long.MAX_VALUE,
+            )
+            receiver.finishRestore()
+        }
+        val restored = graph(paths, backup)
+        try {
+            withTimeout(30_000) { restored.ready.await() }
+            val row = checkNotNull(restored.awaitCatalogue().database.notes().note(id))
+            assertEquals(modified, File(paths.note(id), "capture.opus").lastModified())
+            assertEquals(20L, row.durationMs)
+            assertEquals(modified - 20, row.createdAt)
+            assertEquals(RecoveredTitle.english().of(modified - 20), row.title)
+        } finally {
+            restored.close()
+        }
+    }
+
+    @Test fun corruptUnappliedTransferKeepsTheExistingLibraryAccessibleAndReportsTheRejection() = runBlocking {
+        val target = sourceWithQueuedWork()
+        withContext(Dispatchers.IO) {
+            val opened = CassiniDatabaseOpener(context, target).open()
+            try {
+                opened.database.openHelper.writableDatabase.execSQL("DELETE FROM jobs")
+            } finally {
+                opened.database.close()
+            }
+        }
         val backup = folder.newFolder()
         val staging = File(backup, "restores")
         val source = folder.newFolder()
@@ -152,12 +210,13 @@ class DeferredRestoreStartupTest {
         File(stage, "incoming/notes/n/source.opus").writeText("Changed audio!")
         val restored = graph(target, backup)
         try {
-            val error = assertThrows(IllegalArgumentException::class.java) {
-                runBlocking { withTimeout(30_000) { restored.awaitCatalogue() } }
-            }
-            assertEquals("Incomplete or changed library backup", error.message)
-            assertFalse(target.database.exists())
-            assertTrue(File(staging, "applying.json").isFile)
+            withTimeout(30_000) { restored.ready.await() }
+            val catalogue = restored.awaitCatalogue()
+            assertEquals("Received meeting", catalogue.database.notes().note("received")?.title)
+            assertNull(catalogue.database.notes().note("n"))
+            assertTrue(target.database.exists())
+            assertNotNull(restored.startupReport.value?.failed?.get(AppGraph.STEP_RESTORE))
+            assertFalse(File(staging, "applying.json").exists())
         } finally {
             restored.close()
         }

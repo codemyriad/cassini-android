@@ -97,24 +97,7 @@ class CassiniBackupAgentTest {
         assertFalse(File(app.filesDir, BackupManifest.MANIFEST).exists())
     }
 
-    @Test fun aTransferOverTheReportedQuotaFailsBeforePublishingAnyPayload() {
-        val people = File(app.filesDir, "voices/people.json").also {
-            it.parentFile!!.mkdirs()
-            it.writeText("Synthetic saved voice")
-        }
-        val output = ReflectionHelpers.newInstance(FullBackupDataOutput::class.java)
-        ReflectionHelpers.setField(output, "mTransportFlags", 2)
-        ReflectionHelpers.setField(output, "mQuota", 1L)
-        val agent = Robolectric.setupBackupAgent(CassiniBackupAgent::class.java)
-        val error = assertThrows(IOException::class.java) { binder { agent.onFullBackup(output) } }
-        assertEquals("Library exceeds the transfer quota", error.message)
-        assertEquals("Synthetic saved voice", people.readText())
-        val choices = BackupChoicesStore(File(app.noBackupFilesDir, "choices.json"), Dispatchers.IO)
-        assertTrue(binder { choices.readBlocking().quotaExceeded })
-        assertFalse(app.hasStartedGraph())
-    }
-
-    @Test fun aPermittedRetryClearsTheOldSizeWarningBeforeSnapshotPreparation() {
+    @Test fun aFailedSnapshotPreparationPreservesTheOldQuotaFailure() {
         val agent = Robolectric.setupBackupAgent(CassiniBackupAgent::class.java)
         binder { agent.onQuotaExceeded(30_000_000, 25_000_000) }
         val choices = BackupChoicesStore(File(app.noBackupFilesDir, "choices.json"), Dispatchers.IO)
@@ -128,7 +111,7 @@ class CassiniBackupAgentTest {
         ReflectionHelpers.setField(output, "mQuota", Long.MAX_VALUE)
         val error = assertThrows(IllegalArgumentException::class.java) { binder { agent.onFullBackup(output) } }
         assertEquals("Damaged restore journal", error.message)
-        assertFalse(binder { choices.readBlocking().quotaExceeded })
+        assertTrue(binder { choices.readBlocking().quotaExceeded })
         assertFalse(File(app.filesDir, BackupManifest.MANIFEST).exists())
         assertFalse(app.hasStartedGraph())
     }
@@ -177,7 +160,8 @@ class CassiniBackupAgentTest {
         val agent = Robolectric.setupBackupAgent(CassiniBackupAgent::class.java)
         assertThrows(IOException::class.java) { binder { restore(agent, "models/injected.bin", "unwanted") } }
         assertThrows(IOException::class.java) { binder { restore(agent, "../outside.bin", "unwanted") } }
-        binder { restore(agent, "voices/people.json", "uncommitted") }
+        assertThrows(IOException::class.java) { binder { restore(agent, "voices/people.json", "uncommitted") } }
+        assertThrows(IOException::class.java) { binder { restore(agent, BackupManifest.MANIFEST, "{}") } }
         assertThrows(IOException::class.java) { binder { agent.onRestoreFinished() } }
         assertEquals("original", old.readText())
         assertFalse(File(app.filesDir, "models/injected.bin").exists())

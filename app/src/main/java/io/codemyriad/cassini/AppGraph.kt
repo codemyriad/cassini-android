@@ -402,9 +402,10 @@ class AppGraph(context: Context, val config: Config) {
 
     @Suppress("TooGenericExceptionCaught") // the database open: every failure fails ready and is shown
     private suspend fun runStartup() {
+        var restoreRejection: String? = null
         val (catalogue, setAside) = try {
             config.onStartupStep(STEP_DATABASE)
-            LibraryBackup(app, paths, File(config.backupDirectory, "restores")).recoverRestore()
+            restoreRejection = LibraryBackup(app, paths, File(config.backupDirectory, "restores")).recoverRestore()
             val database = CassiniDatabaseOpener(app, paths, config.clock).open()
             Catalogue(app, this, database.database, ::currentCanceller) to database.setAside
         } catch (error: CancellationException) {
@@ -419,6 +420,7 @@ class AppGraph(context: Context, val config: Config) {
         openedCatalogue = catalogue
         opened.complete(catalogue)
         val failed = LinkedHashMap<String, String>()
+        restoreRejection?.let { failed[STEP_RESTORE] = it }
         val active = activeRecording.get()
         val rebuild = bestEffort(STEP_REBUILD, failed) { catalogue.rebuilder.rebuildIfNeeded(setAside) }
         bestEffort(STEP_METADATA, failed) { catalogue.documents.refreshInvalidatedMetadata() }
@@ -537,6 +539,7 @@ class AppGraph(context: Context, val config: Config) {
 
         // The startup steps in their order (architecture 4.8), as Config.onStartupStep names them.
         const val STEP_DATABASE = "database"
+        const val STEP_RESTORE = "restore"
         const val STEP_REBUILD = "rebuild"
         const val STEP_METADATA = "metadata"
         const val STEP_MODELS = "models"
