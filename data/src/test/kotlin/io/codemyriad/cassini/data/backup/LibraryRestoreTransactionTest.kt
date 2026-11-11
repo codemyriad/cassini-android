@@ -86,6 +86,31 @@ class LibraryRestoreTransactionTest {
         assertState(live, "new", sidecars = false)
     }
 
+    @Test fun aRecoveryFailureKeepsTheOriginalIoErrorAndRetainsTheJournalForAColdStart() {
+        val live = folder.newFolder()
+        val staging = folder.newFolder()
+        seed(live, "old", sidecars = true)
+        put(live, "models/weights.onnx", "existing model")
+        put(live, "settings.preferences_pb", "existing setting")
+        val journal = File(staging, "applying.json")
+        val original = IOException("Synthetic write failure")
+        var intactJournal = ""
+        val transaction = LibraryRestoreTransaction(live, staging, {
+            intactJournal = journal.readText()
+            journal.writeText("{}")
+            throw original
+        }, {})
+        val stage = stage(staging)
+        val caught = offMain { assertThrows(IOException::class.java) { transaction.install(stage) } }
+        org.junit.Assert.assertSame(original, caught)
+        assertEquals(1, caught.suppressed.size)
+        assertEquals("{}", journal.readText())
+        assertEquals("old note", File(stage, "old/notes/n/document.opus").readText())
+        journal.writeText(intactJournal)
+        offMain { LibraryRestoreTransaction(live, staging).recover() }
+        assertState(live, "old", sidecars = true)
+    }
+
     @Test fun aDamagedJournalNeverMovesUserFilesAndAnEmptyDestinationRollsBackToEmpty() {
         val live = folder.newFolder()
         val staging = folder.newFolder()

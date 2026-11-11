@@ -95,7 +95,11 @@ class LibraryRestoreTransaction internal constructor(
             afterCommit()
             cleanup(stage)
         } catch (error: IOException) {
-            recover()
+            try {
+                recover()
+            } catch (@Suppress("TooGenericExceptionCaught") recovery: Exception) {
+                error.addSuppressed(recovery)
+            }
             throw error
         }
     }

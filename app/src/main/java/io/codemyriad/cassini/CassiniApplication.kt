@@ -9,6 +9,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.processing.NotificationChannels
 import io.codemyriad.cassini.whistle.WhistleProtocol
@@ -27,14 +28,16 @@ class CassiniApplication : Application() {
      * [onCreate]). Creating it starts the startup work of architecture 4.8 on IO, so that work runs once per process,
      * also when only a service starts.
      */
+    private val graphStarted = AtomicBoolean(false)
     private val graphDelegate = lazy {
+        graphStarted.set(true)
         (graphFactory ?: GraphFactory { app, paths -> AppGraph(app, AppGraph.Config(paths, backupDirectory = backupDirectory)) }).create(this, paths)
     }
 
     val graph: AppGraph get() = graphDelegate.value
 
     /** Backup must never open Room or start inference in the backup process. */
-    fun hasStartedGraph(): Boolean = graphDelegate.isInitialized()
+    fun hasStartedGraph(): Boolean = graphStarted.get()
 
     lateinit var backupDirectory: File
         private set

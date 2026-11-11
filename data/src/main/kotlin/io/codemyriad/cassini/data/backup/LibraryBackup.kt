@@ -91,7 +91,13 @@ class LibraryBackup(private val context: Context, private val paths: AppPaths, p
             receivedBytes = 0
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
             // An interrupted transaction owns its old roots until recover() rolls them back.
-            if (noTransaction()) LibraryRestoreTransaction.deleteStage(stage)
+            if (noTransaction()) {
+                try {
+                    LibraryRestoreTransaction.deleteStage(stage)
+                } catch (cleanup: IOException) {
+                    error.addSuppressed(cleanup)
+                }
+            }
             receiving = null
             received.clear()
             receivedBytes = 0

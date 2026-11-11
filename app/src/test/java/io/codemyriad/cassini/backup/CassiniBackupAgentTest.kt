@@ -5,6 +5,10 @@ import android.app.backup.FullBackupDataOutput
 import android.os.ParcelFileDescriptor
 import androidx.test.core.app.ApplicationProvider
 import io.codemyriad.cassini.CassiniApplication
+import io.codemyriad.cassini.GraphFactory
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.Executors
 import io.codemyriad.cassini.core.backup.BackupManifest
 import io.codemyriad.cassini.data.backup.BackupChoicesStore
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +40,35 @@ class CassiniBackupAgentTest {
         input.writeText(text)
         ParcelFileDescriptor.open(input, ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
             agent.onRestoreFile(fd, input.length(), File(app.filesDir, path), BackupAgent.TYPE_FILE, 0, 1)
+        }
+    }
+
+    @Test fun anInitializingGraphIsAlreadyInUseBeforeItsLazyValueHasBeenPublished() {
+        val started = CompletableFuture<Unit>()
+        val release = CompletableFuture<Unit>()
+        val executor = Executors.newSingleThreadExecutor()
+        val agent = Robolectric.setupBackupAgent(CassiniBackupAgent::class.java)
+        val output = ReflectionHelpers.newInstance(FullBackupDataOutput::class.java)
+        CassiniApplication.graphFactory = GraphFactory { _, _ ->
+            started.complete(Unit)
+            release.get(10, TimeUnit.SECONDS)
+            throw IOException("Synthetic constructor failure")
+        }
+        try {
+            val construction = executor.submit {
+                assertThrows(IOException::class.java) { app.graph }
+            }
+            started.get(10, TimeUnit.SECONDS)
+            assertTrue(app.hasStartedGraph())
+            val error = assertThrows(IOException::class.java) { binder { agent.onFullBackup(output) } }
+            assertEquals("Library is in use", error.message)
+            release.complete(Unit)
+            construction.get(10, TimeUnit.SECONDS)
+            assertTrue(app.hasStartedGraph()) // A failed initialization must not enable a snapshot either.
+        } finally {
+            release.complete(Unit)
+            CassiniApplication.graphFactory = null
+            executor.shutdownNow()
         }
     }
 
