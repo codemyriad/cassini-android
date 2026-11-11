@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 2,
-    "identityHash": "5cd22f2e35bfd60968e8ff47f178371b",
+    "identityHash": "137e5fba2c62eba94a0a5e0d1e5a60b8",
     "entities": [
       {
         "tableName": "notes",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `title` TEXT NOT NULL, `title_dirty` INTEGER NOT NULL, `created_at` INTEGER NOT NULL, `added_at` INTEGER NOT NULL, `origin` TEXT NOT NULL, `audio_file` TEXT NOT NULL, `audio_kind` TEXT NOT NULL, `duration_ms` INTEGER NOT NULL, `source_sha256` TEXT, `document_state` TEXT, `document_error` TEXT, `document_warnings` TEXT NOT NULL, `document_signature` TEXT, `meeting_id` TEXT, `selected_variant` TEXT, `position_ms` INTEGER NOT NULL, `preview` TEXT, `trust_acknowledged` INTEGER NOT NULL, `trashed_at` INTEGER, `trashed_job` TEXT, `updated_at` INTEGER NOT NULL, `recorded_at` TEXT, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `title` TEXT NOT NULL, `title_dirty` INTEGER NOT NULL, `created_at` INTEGER NOT NULL, `added_at` INTEGER NOT NULL, `origin` TEXT NOT NULL, `audio_file` TEXT NOT NULL, `audio_kind` TEXT NOT NULL, `duration_ms` INTEGER NOT NULL, `source_sha256` TEXT, `document_state` TEXT, `document_error` TEXT, `document_warnings` TEXT NOT NULL, `document_signature` TEXT, `meeting_id` TEXT, `selected_variant` TEXT, `position_ms` INTEGER NOT NULL, `preview` TEXT, `trust_acknowledged` INTEGER NOT NULL, `trashed_at` INTEGER, `trashed_job` TEXT, `updated_at` INTEGER NOT NULL, `recorded_at` TEXT, `capture_started_at` INTEGER, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -135,6 +135,11 @@
             "fieldPath": "recordedAt",
             "columnName": "recorded_at",
             "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "captureStartedAt",
+            "columnName": "capture_started_at",
+            "affinity": "INTEGER"
           }
         ],
         "primaryKey": {
@@ -766,7 +771,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '5cd22f2e35bfd60968e8ff47f178371b')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '137e5fba2c62eba94a0a5e0d1e5a60b8')"
     ]
   }
 }
