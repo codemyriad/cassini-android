@@ -7,7 +7,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 import java.security.MessageDigest
+import javax.xml.parsers.DocumentBuilderFactory
 import java.time.ZoneId
 import java.util.Locale
 
@@ -55,7 +57,11 @@ class MarkdownExportTest {
             ExportTranscript("Review", 10_000, words, mapOf("ada" to "Ada", "ben" to "Ben")), "", copy("en"),
         )
         assertTrue(actual.contains("Speakers: Ada, Ben\n"))
-        assertTrue(actual.contains("The release candidate is ready for testing, (Ben: Sounds good.) and I will send the download link after this call."))
+        assertTrue(
+            actual.contains(
+                "The release candidate is ready for testing, (Ben: Sounds good.) and I will send the download link after this call.",
+            ),
+        )
         assertEquals(1, Regex("Sounds good\\.").findAll(actual).count())
         assertFalse(actual.contains("**Ben**"))
     }
@@ -76,6 +82,38 @@ class MarkdownExportTest {
         assertTrue(date.startsWith("mardi 27 octobre 2026, "))
         assertTrue(date.endsWith("9:00 AM"))
         assertEquals(original, Locale.getDefault())
+    }
+
+    @Test fun androidHeadingsAndLabelsMatchAllSixPinnedTranslations() {
+        val ids = mapOf(
+            "ui_actions_markdown" to "export.markdown.label", "ui_markdown_description" to "export.markdown.description",
+            "ui_markdown_speakers" to "export.markdown.speakersLine", "ui_markdown_transcript" to "export.markdown.transcriptHeading",
+            "ui_markdown_notes" to "export.markdown.notesHeading",
+            "ui_markdown_over" to "meeting.turn.over",
+        )
+        val catalog = JSONObject(resource("strings.json")).getJSONArray("entries")
+        val entries = (0 until catalog.length()).map(catalog::getJSONObject).associateBy { it.getString("id") }
+        val languages = mapOf(
+            "values" to "en", "values-it" to "it", "values-fr" to "fr", "values-es" to "es",
+            "values-pt-rBR" to "pt-BR", "values-pt-rPT" to "pt-PT",
+        )
+        for ((directory, language) in languages) {
+            val file = File(System.getProperty("cassini.appResources"), "$directory/strings.xml")
+            val elements = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(file).getElementsByTagName("string")
+            val strings = (0 until elements.length).associate {
+                val element = elements.item(it) as org.w3c.dom.Element
+                element.getAttribute("name") to element.textContent.replace("\\'", "'")
+            }
+            for ((name, id) in ids) {
+                val entry = entries.getValue(id)
+                val expected = if (language == "en") {
+                    entry.getString("en")
+                } else {
+                    entry.getJSONObject("l10n").getJSONObject(language).getString("text")
+                }
+                assertEquals("$language/$id", expected, strings[name])
+            }
+        }
     }
 
     @Test fun vendoredFilesMatchTheirCassiniUxPin() {

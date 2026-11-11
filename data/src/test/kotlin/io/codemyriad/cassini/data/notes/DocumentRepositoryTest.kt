@@ -368,7 +368,12 @@ class DocumentRepositoryTest {
 
     @Test fun markdownExportsPrivateNotesWithoutChangingThePortableFile() = runTest {
         h.documentNote("a", first, title = "Review")
-        val privateData = JSONObject("""{"gocassini.com":{"notes":[{"atMs":5000,"text":"Keep *this*"},{"atMs":1000,"text":"Earlier"}],"unknown":"kept"},"example.org":{"secret":"not exported"}}""")
+        val privateData = JSONObject(
+            """{
+                "gocassini.com":{"notes":[{"atMs":5000,"text":"Keep *this*"},{"atMs":1000,"text":"Earlier"}],"unknown":"kept"},
+                "example.org":{"secret":"not exported"}
+            }""".trimIndent(),
+        )
         CassiniDocument.create(
             fixtureOpus, first, "Review", JSONObject().put("engine", "test"), null, mapOf("S1" to "Ada", "S2" to "Ben"),
             h.document("a"), extensions = privateData,

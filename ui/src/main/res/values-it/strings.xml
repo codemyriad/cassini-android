@@ -581,6 +581,5 @@
     <string name="ui_markdown_speakers" formatted="false">Voci: {names}</string>
     <string name="ui_markdown_transcript" formatted="false">Trascrizione</string>
     <string name="ui_markdown_notes" formatted="false">Note</string>
-    <string name="ui_markdown_untitled" formatted="false">Riunione senza titolo</string>
     <string name="ui_markdown_over" formatted="false">(in sovrapposizione con {names})</string>
 </resources>

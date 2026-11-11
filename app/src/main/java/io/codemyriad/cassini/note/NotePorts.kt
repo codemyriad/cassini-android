@@ -210,8 +210,8 @@ interface NotePorts {
     /** The TXT body of a transcript without words. */
     fun exportEmptyText(): String
 
-    /** S-5 export copy and the D50.3 absolute date; absent only for test ports without Markdown. */
-    fun markdownOptions(createdAt: Long, durationMs: Long): MarkdownOptions? = null
+    /** S-5 export copy and the D50.3 absolute date. */
+    fun markdownOptions(createdAt: Long, durationMs: Long): MarkdownOptions
 
     /** The text of a failed job's stored failure code, or null for a code without its own text. */
     fun failureText(code: String): String?

@@ -590,6 +590,5 @@
     <string name="ui_markdown_speakers" formatted="false">Locutores: {names}</string>
     <string name="ui_markdown_transcript" formatted="false">Transcrição</string>
     <string name="ui_markdown_notes" formatted="false">Notas</string>
-    <string name="ui_markdown_untitled" formatted="false">Reunião sem título</string>
     <string name="ui_markdown_over" formatted="false">(ao mesmo tempo que {names})</string>
 </resources>
