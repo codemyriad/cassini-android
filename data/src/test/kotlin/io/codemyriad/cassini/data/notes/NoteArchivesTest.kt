@@ -204,6 +204,45 @@ class NoteArchivesTest {
         assertEquals(ImportSummary(imported = 1), result)
     }
 
+    @Test fun forgedSmallSizesCannotHideArchiveWideRatioOrExpansionFailures() = runTest {
+        val source = zipBytes("good.opus" to "audio", "bomb.opus" to "x".repeat(200_000))
+        source.putInt(source.recordOffsets(0x02014b50).last() + 24, 8)
+        refuses(ArchiveFailure.TOO_LARGE, source)
+        refuses(ArchiveFailure.TOO_LARGE, source, ArchiveLimits(expandedBytes = 20_000, ratio = Int.MAX_VALUE))
+    }
+
+    @Test fun appleDoubleSidecarsAreUnsupportedAndLocalDataDescriptorFlagsMayDiffer() = runTest {
+        val source = zipBytes("Meeting.opus" to "audio", "__MACOSX/._Meeting.opus" to "AppleDouble")
+        // Streaming writers can leave bit 3 only in the local header. UTF-8 and encryption checks still apply.
+        source.recordOffsets(0x02014b50).forEach { offset -> source.putShort(offset + 8, 0x800) }
+        val result = NoteArchives().read(ByteArrayInputStream(source), folder.newFolder()) { _, name ->
+            assertEquals("Meeting.opus", name)
+            ImportOutcome.Created(name)
+        }
+        assertEquals(ImportSummary(imported = 1, unsupported = 1), result)
+    }
+
+    @Test fun everyClassicEndSentinelSelectsTheValidatedSingleDiskZip64Record() = runTest {
+        val original = zip64Bytes()
+        val end = original.recordOffsets(0x06054b50).last()
+        val central = original.recordOffsets(0x02014b50).single()
+        val directoryBytes = original.recordOffsets(0x06064b50).single() - central
+        for (field in listOf(4, 6, 8, 10, 12, 16)) {
+            val bytes = original.copyOf()
+            bytes.putShort(end + 8, 1)
+            bytes.putShort(end + 10, 1)
+            bytes.putInt(end + 12, directoryBytes)
+            bytes.putInt(end + 16, central)
+            if (field < 12) bytes.putShort(end + field, 65_535) else bytes.putInt(end + field, -1)
+            val result = NoteArchives().read(ByteArrayInputStream(bytes), folder.newFolder()) { _, name ->
+                ImportOutcome.Created(name)
+            }
+            assertEquals("EOCD field $field", 1, result.imported)
+        }
+        val multiDisk = original.copyOf().apply { putShort(end + 4, 1) }
+        refuses(ArchiveFailure.DAMAGED, multiDisk)
+    }
+
     private suspend fun refuses(reason: ArchiveFailure, bytes: ByteArray, limits: ArchiveLimits = ArchiveLimits()) {
         val scratch = folder.newFolder()
         var consumed = 0

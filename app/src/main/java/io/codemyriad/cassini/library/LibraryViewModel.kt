@@ -269,9 +269,9 @@ class LibraryViewModel(
         }
     }
 
-    /** The result of the system picker: null when the user cancelled it. */
-    fun onPicked(uri: String?) {
-        if (uri != null) ports.import(uri)
+    /** The result of the multi-document picker: empty when the user cancelled it. */
+    fun onPicked(uris: List<String>) {
+        if (uris.isNotEmpty()) ports.import(uris)
     }
 
     /** The screen is visible again (ON_RESUME): the notification permission may have changed in Settings. */

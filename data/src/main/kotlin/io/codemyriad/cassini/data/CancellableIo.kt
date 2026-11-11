@@ -4,6 +4,8 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import java.io.Closeable
 import java.io.IOException
@@ -24,7 +26,10 @@ suspend fun <T : Closeable, R> T.useCancellable(block: suspend (T) -> R): R = co
         }
     }
     try {
-        this@useCancellable.use { block(it) }
+        this@useCancellable.use { block(it) }.also { currentCoroutineContext().ensureActive() }
+    } catch (@Suppress("TooGenericExceptionCaught") error: Throwable) {
+        currentCoroutineContext().ensureActive()
+        throw error
     } finally {
         finished.set(true)
         closer.cancel()

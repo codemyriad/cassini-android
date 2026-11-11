@@ -18,7 +18,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -39,16 +38,18 @@ fun BulkTransferControls(transfers: BulkTransfers) {
     var choosing by rememberSaveable { mutableStateOf(false) }
     var selected by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
     var selectionInitialized by rememberSaveable { mutableStateOf(false) }
-    var choices by remember { mutableStateOf<List<BulkTransfers.Choice>>(emptyList()) }
+    val choices by transfers.available.collectAsStateWithLifecycle(initialValue = emptyList())
     val save = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
         if (uri != null) transfers.export(selected, uri)
     }
-    LaunchedEffect(choosing) {
+    LaunchedEffect(choosing, choices) {
         if (choosing) {
-            choices = transfers.choices()
             if (!selectionInitialized) {
                 selected = ArrayList(choices.map { it.id })
                 selectionInitialized = true
+            } else {
+                val valid = choices.map { it.id }.toSet()
+                selected = selected.filter { it in valid }
             }
         }
     }
@@ -57,7 +58,7 @@ fun BulkTransferControls(transfers: BulkTransfers) {
             selectionInitialized = false
             choosing = true
         },
-        enabled = !state.running,
+        enabled = !state.running && choices.isNotEmpty(),
     ) { Text(stringResource(R.string.export_zip_all)) }
     if (choosing) {
         AlertDialog(
@@ -96,7 +97,7 @@ private fun ExportChoices(
     onAll: () -> Unit,
 ) {
     Column {
-        TextButton(onClick = onAll) { Text(stringResource(R.string.export_zip_all)) }
+        TextButton(onClick = onAll, enabled = choices.isNotEmpty()) { Text(stringResource(R.string.export_zip_all)) }
         LazyColumn(Modifier.heightIn(max = 360.dp)) {
             items(choices, key = { it.id }) { choice ->
                 Row(

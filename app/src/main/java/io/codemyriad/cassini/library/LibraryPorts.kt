@@ -63,8 +63,8 @@ interface LibraryPorts {
 
     suspend fun rename(id: String, title: String): RenameOutcome
 
-    /** Imports the picked [uri] in the background; the notices show its progress and errors. */
-    fun import(uri: String)
+    /** Imports the picked [uris] as one background batch with a shared summary. */
+    fun import(uris: List<String>)
 
     fun dismissNotice(kind: BannerKind)
 
@@ -125,8 +125,8 @@ class GraphLibraryPorts(private val graph: AppGraph, context: Context) : Library
     override suspend fun rename(id: String, title: String): RenameOutcome =
         graph.awaitCatalogue().notes.rename(id, title)
 
-    override fun import(uri: String) {
-        graph.notices.imports.start(uri)
+    override fun import(uris: List<String>) {
+        graph.transfers.import(uris.map { android.net.Uri.parse(it) })
     }
 
     override fun dismissNotice(kind: BannerKind) = graph.notices.dismiss(kind)

@@ -32,7 +32,7 @@ fun LibraryRoute(viewModel: LibraryViewModel, navigator: LibraryNavigator, modif
     val context = LocalContext.current
     val transfers = (context.applicationContext as io.codemyriad.cassini.CassiniApplication).graph.transfers
     val picker = rememberLauncherForActivityResult(io.codemyriad.cassini.transfer.BulkImportContract()) { uris ->
-        if (uris.isNotEmpty()) transfers.import(uris)
+        viewModel.onPicked(uris.map { it.toString() })
     }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(viewModel, lifecycle) {

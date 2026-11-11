@@ -68,13 +68,14 @@ internal class ArchiveEntries(private val archive: File, private val limits: Arc
                 expanded += n
                 total += n
                 archiveCheck(total <= limits.expandedBytes, ArchiveFailure.TOO_LARGE)
-                dataCheck(expanded <= entry.size)
+                // Declared size may be forged: keep draining without staging excess bytes so archive-wide limits apply.
+                archiveCheck(!overRatio(expanded, entry.compressed, limits.ratio), ArchiveFailure.TOO_LARGE)
                 if (staged != null && expanded >= nextSpaceCheck) {
                     nextSpaceCheck = expanded + SPACE_CHECK_BYTES
                     dataCheck(staged.usableSpace >= Limits.MIN_FREE_BYTES)
                 }
                 crc.update(buffer, 0, n)
-                output?.write(buffer, 0, n)
+                if (expanded <= entry.size) output?.write(buffer, 0, n)
             }
         }
         archiveCheck(!overRatio(expanded, compressed(), limits.ratio), ArchiveFailure.TOO_LARGE)

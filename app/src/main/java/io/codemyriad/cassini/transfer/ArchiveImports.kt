@@ -9,6 +9,8 @@ import io.codemyriad.cassini.data.notes.ImportSummary
 import io.codemyriad.cassini.data.notes.NoteArchives
 import io.codemyriad.cassini.data.useCancellable
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import java.io.File
 import java.io.InputStream
 
@@ -35,10 +37,12 @@ internal class ArchiveImports(context: Context, private val graph: AppGraph) {
                 ImportSummary().add(graph.awaitCatalogue().imports.import(uri))
             }
         } catch (error: ArchiveRejected) {
+            currentCoroutineContext().ensureActive()
             progress + error.summary + ImportSummary(failed = 1, archiveFailures = setOf(error.reason))
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+            currentCoroutineContext().ensureActive()
             // Third-party content providers can throw runtime exceptions as well as IO failures.
             android.util.Log.w("CassiniImport", "Cannot import a selected file", error)
             progress + ImportSummary(failed = 1)

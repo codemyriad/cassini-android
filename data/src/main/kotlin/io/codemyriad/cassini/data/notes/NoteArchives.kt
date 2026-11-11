@@ -9,7 +9,6 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.util.Locale
 import java.util.zip.CRC32
-import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 /** Published D96 limits; GB is decimal. A single entry retains the existing app import limit. */
@@ -118,27 +117,19 @@ class NoteArchives(private val limits: ArchiveLimits = ArchiveLimits()) {
         }
     }
 
-    /** Each input is an immutable private snapshot, so CRC/length and the stored entry describe the same bytes. */
+    /** The caller creates and releases one snapshot around each writer.add call. Nothing stages the complete ZIP. */
+    suspend fun write(output: OutputStream, block: suspend (StoredArchiveWriter) -> Unit) {
+        ZipOutputStream(output.buffered()).use { zip -> block(StoredArchiveWriter(zip, limits)) }
+    }
+
+    /** Convenience for immutable files already owned by a caller; ownership of those files stays with the caller. */
     suspend fun write(output: OutputStream, files: List<Pair<String, File>>) {
         require(files.size <= limits.entries) { "Too many notes" }
-        var total = 0L
-        val names = HashSet<String>()
-        ZipOutputStream(output).use { zip ->
-            for ((suggested, file) in files) {
-                currentCoroutineContext().ensureActive()
-                total += file.length()
-                if (total > limits.expandedBytes) throw IOException("Archive is too large")
+        write(output) { writer ->
+            for ((name, file) in files) {
                 val crc = CRC32()
                 file.inputStream().use { pump(it) { bytes, n -> crc.update(bytes, 0, n) } }
-                val entry = ZipEntry(unique(suggested, names)).apply {
-                    method = ZipEntry.STORED
-                    size = file.length()
-                    compressedSize = size
-                    this.crc = crc.value
-                }
-                zip.putNextEntry(entry)
-                file.inputStream().use { pump(it) { bytes, n -> zip.write(bytes, 0, n) } }
-                zip.closeEntry()
+                writer.add(name, file, crc.value)
             }
         }
     }
@@ -151,17 +142,6 @@ class NoteArchives(private val limits: ArchiveLimits = ArchiveLimits()) {
             if (n < 0) return
             write(buffer, n)
         }
-    }
-
-    private fun unique(suggested: String, used: MutableSet<String>): String {
-        require(safeName(suggested) && '/' !in suggested && '\\' !in suggested)
-        var name = suggested
-        var suffix = 2
-        while (!used.add(name.lowercase(Locale.ROOT))) {
-            name = suggested.substringBeforeLast('.') + " ($suffix)." + suggested.substringAfterLast('.')
-            suffix++
-        }
-        return name
     }
 
     companion object {

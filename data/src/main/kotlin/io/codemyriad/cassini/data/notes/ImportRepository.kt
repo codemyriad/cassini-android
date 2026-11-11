@@ -214,10 +214,13 @@ class ImportRepository(
         val failed = input.useCancellable { tmp.outputStream().use { out -> pump(input, out, size, digest) } }
         failed ?: Copy.Done(Sha256.hex(digest), tmp.length())
     } catch (error: FileNotFoundException) {
+        currentCoroutineContext().ensureActive()
         Copy.Failed(ImportOutcome.Rejected(Failure.OPEN, error.message))
     } catch (error: SecurityException) {
+        currentCoroutineContext().ensureActive()
         Copy.Failed(ImportOutcome.Rejected(Failure.OPEN, error.message))
     } catch (error: IOException) {
+        currentCoroutineContext().ensureActive()
         Copy.Failed(lowSpace(size, tmp.length()) ?: ImportOutcome.Rejected(Failure.OPEN, error.message))
     }
 
@@ -229,7 +232,10 @@ class ImportRepository(
         while (failed == null) {
             currentCoroutineContext().ensureActive()
             val n = input.read(buffer)
-            if (n < 0) break
+            if (n < 0) {
+                currentCoroutineContext().ensureActive()
+                break
+            }
             total += n
             failed = when {
                 total > limits.maxBytes -> Copy.Failed(ImportOutcome.Rejected(Failure.LARGE, "over the cap"))
@@ -244,6 +250,7 @@ class ImportRepository(
                 out.write(buffer, 0, n)
             }
         }
+        currentCoroutineContext().ensureActive()
         if (failed == null) out.fd.sync()
         return failed
     }

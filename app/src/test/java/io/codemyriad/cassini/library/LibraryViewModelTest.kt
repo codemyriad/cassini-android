@@ -158,9 +158,9 @@ class LibraryViewModelTest {
             viewModel.onEvent(LibraryEvent.Import)
             assertEquals(LibraryEffect.PickAudio, awaitItem())
         }
-        viewModel.onPicked("content://picked/1")
-        viewModel.onPicked(null)
-        assertEquals(listOf("import content://picked/1"), ports.actions)
+        viewModel.onPicked(listOf("content://picked/1", "content://picked/2"))
+        viewModel.onPicked(emptyList())
+        assertEquals(listOf("import content://picked/1", "import content://picked/2"), ports.actions)
     }
 
     @Test

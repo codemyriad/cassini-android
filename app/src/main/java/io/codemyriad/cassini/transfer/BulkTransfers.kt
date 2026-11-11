@@ -5,24 +5,27 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import android.util.Log
 import io.codemyriad.cassini.AppGraph
-import io.codemyriad.cassini.core.audio.Limits
-import io.codemyriad.cassini.core.export.ExportNames
 import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.data.notes.ArchiveLimits
 import io.codemyriad.cassini.data.notes.ImportSummary
 import io.codemyriad.cassini.data.notes.NoteArchives
 import io.codemyriad.cassini.data.useCancellable
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
 import java.util.UUID
@@ -38,7 +41,8 @@ class BulkTransfers(context: Context, private val graph: AppGraph) {
     private var initialized = false
     private val mutable = MutableStateFlow(TransferState())
     val state = mutable.asStateFlow()
-    private var job: Job? = null
+    @Volatile private var job: Job? = null
+    private val snapshots = TransferSnapshots(graph)
 
     data class Choice(val id: String, val title: String)
     data class TransferState(
@@ -52,51 +56,56 @@ class BulkTransfers(context: Context, private val graph: AppGraph) {
         val cancelled: Boolean = false,
     )
 
-    suspend fun choices(): List<Choice> = graph.awaitCatalogue().notes.library().first()
-        .filter { it.audioKind != AudioKind.LIVE_CAPTURE }.map { Choice(it.id, it.title) }
-
-    fun import(uris: List<Uri>) = start(total = uris.size) { scratch ->
-        var total = ImportSummary()
-        for ((index, uri) in uris.withIndex()) {
-            mutable.value = mutable.value.copy(done = index + 1)
-            val previous = total
-            val result = importer.importOne(uri, scratch) { partial ->
-                mutable.value = mutable.value.copy(summary = previous + partial)
+    val available: Flow<List<Choice>> = flow {
+        val catalogue = graph.awaitCatalogue()
+        emitAll(catalogue.notes.library().map { library ->
+            val rows = catalogue.database.notes().all().associateBy { it.id }
+            library.mapNotNull { item ->
+                val row = rows[item.id]
+                if (row != null && row.trashedAt == null && row.audioKind !in setOf(AudioKind.LIVE_CAPTURE, AudioKind.UNPLAYABLE) &&
+                    File(graph.paths.note(row.id), row.audioFile).isFile
+                ) Choice(row.id, row.title) else null
             }
-            total += result
-            mutable.value = mutable.value.copy(summary = total)
+        })
+    }.flowOn(graph.dispatchers.io)
+
+    suspend fun choices(): List<Choice> = available.first()
+
+    fun import(uris: List<Uri>) {
+        if (uris.isEmpty()) return
+        start(total = uris.size, beginning = { graph.notices.imports.dismissFailure() }) { scratch ->
+            var total = ImportSummary()
+            for ((index, uri) in uris.withIndex()) {
+                mutable.value = mutable.value.copy(done = index + 1)
+                val previous = total
+                val result = importer.importOne(uri, scratch) { partial ->
+                    mutable.value = mutable.value.copy(summary = previous + partial)
+                }
+                total += result
+                mutable.value = mutable.value.copy(summary = total)
+            }
+            TransferState(summary = total)
         }
-        TransferState(summary = total)
     }
 
     fun export(ids: List<String>, destination: Uri) = start(exporting = true, total = ids.size) { scratch ->
         try {
             require(ids.isNotEmpty() && ids.distinct().size == ids.size && ids.size <= archiveLimits.entries)
-            var total = 0L
-            val files = ids.mapIndexed { index, id ->
-                mutable.value = mutable.value.copy(done = index + 1)
-                val remaining = minOf(Limits.MAX_IMPORT_BYTES, archiveLimits.expandedBytes - total)
-                snapshot(id, scratch, remaining).also { (_, file) ->
-                    total += file.length()
-                    if (total > archiveLimits.expandedBytes) throw IOException("Archive is too large")
-                }
-            }
-            if (scratch.usableSpace < total + FREE_MARGIN) throw IOException("Not enough space")
-            val archive = File(scratch, "notes.zip")
-            archives.write(archive.outputStream(), files)
             val output = resolver.openOutputStream(destination, "wt") ?: throw IOException("Cannot open destination")
             output.useCancellable { out ->
-                archive.inputStream().use { input ->
-                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                    while (true) {
-                        currentCoroutineContext().ensureActive()
-                        val n = input.read(buffer)
-                        if (n < 0) break
-                        out.write(buffer, 0, n)
+                archives.write(out) { writer ->
+                    for ((index, id) in ids.withIndex()) {
+                        mutable.value = mutable.value.copy(done = index + 1)
+                        val copy = snapshots.copy(id, scratch, writer.remainingBytes)
+                        try {
+                            writer.add(copy.name, copy.file, copy.crc)
+                        } finally {
+                            copy.file.delete()
+                        }
                     }
                 }
             }
-            TransferState(exported = files.size, exporting = true)
+            TransferState(exported = ids.size, exporting = true)
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
             removeIncomplete(destination)
             throw error
@@ -106,63 +115,37 @@ class BulkTransfers(context: Context, private val graph: AppGraph) {
     /** Providers may reject deletion of a partially written destination; private staging is always removed. */
     private fun removeIncomplete(destination: Uri) {
         try {
-            DocumentsContract.deleteDocument(resolver, destination)
+            if (destination.scheme == "file") {
+                destination.path?.let { File(it).delete() }
+            } else {
+                DocumentsContract.deleteDocument(resolver, destination)
+            }
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
             Log.w(TAG, "Cannot remove an incomplete export", error)
         }
     }
 
-    /** Retitle through the existing repository, then copy a complete file while its normal writer lock is held. */
-    suspend fun snapshot(
-        id: String,
-        scratch: File,
-        maxBytes: Long = Limits.MAX_IMPORT_BYTES,
-    ): Pair<String, File> = withContext(graph.dispatchers.io) {
-        val catalogue = graph.awaitCatalogue()
-        catalogue.documents.retitle(id)
-        val context = currentCoroutineContext()
-        graph.locks.withNoteLock(id, graph.dispatchers.io) {
-            val row = catalogue.database.notes().noteBlocking(id) ?: throw IOException("Note unavailable")
-            if (row.trashedAt != null || row.audioKind == AudioKind.LIVE_CAPTURE) {
-                throw IOException("Document unavailable")
-            }
-            val file = File(scratch, UUID.randomUUID().toString())
-            File(graph.paths.note(id), row.audioFile).inputStream().use { input ->
-                file.outputStream().use { out ->
-                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                    var copied = 0L
-                    var nextSpaceCheck = 0L
-                    while (true) {
-                        context.ensureActive()
-                        val n = input.read(buffer)
-                        if (n < 0) break
-                        copied += n
-                        if (copied >= nextSpaceCheck || copied > maxBytes) {
-                            nextSpaceCheck = copied + SPACE_CHECK_BYTES
-                            if (copied > maxBytes || scratch.usableSpace < FREE_MARGIN) {
-                                throw IOException("Not enough space for the document")
-                            }
-                        }
-                        out.write(buffer, 0, n)
-                    }
-                }
-            }
-            ExportNames.file(row.title, row.audioFile.substringAfterLast('.', "opus")) to file
-        }
-    }
+    @Synchronized fun cancel() { job?.cancel() }
+    @Synchronized fun dismiss() { if (!mutable.value.running) mutable.value = TransferState() }
 
-    fun cancel() { job?.cancel() }
-    fun dismiss() { if (!mutable.value.running) mutable.value = TransferState() }
-
-    private fun start(exporting: Boolean = false, total: Int, action: suspend (File) -> TransferState) {
+    @Synchronized private fun start(
+        exporting: Boolean = false,
+        total: Int,
+        beginning: () -> Unit = {},
+        action: suspend (File) -> TransferState,
+    ) {
         if (mutable.value.running) return
+        beginning()
         mutable.value = TransferState(running = true, exporting = exporting, total = total.coerceAtLeast(1))
-        val launched = graph.appScope.launch(graph.dispatchers.io) {
+        val launched = graph.appScope.launch(graph.dispatchers.io, start = CoroutineStart.LAZY) {
             try {
-                mutable.value = perform(action)
+                val result = perform(action)
+                currentCoroutineContext().ensureActive()
+                mutable.value = result
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+                currentCoroutineContext().ensureActive()
                 Log.w(TAG, "Transfer failed", error)
                 mutable.value = TransferState(failed = true, exporting = exporting)
             }
@@ -173,6 +156,7 @@ class BulkTransfers(context: Context, private val graph: AppGraph) {
                 mutable.value = if (exporting) TransferState() else mutable.value.copy(running = false, cancelled = true)
             }
         }
+        launched.start()
     }
 
     private suspend fun perform(action: suspend (File) -> TransferState): TransferState {
@@ -194,7 +178,5 @@ class BulkTransfers(context: Context, private val graph: AppGraph) {
 
     private companion object {
         const val TAG = "CassiniTransfer"
-        const val SPACE_CHECK_BYTES = 8L shl 20
-        const val FREE_MARGIN = 128L shl 20
     }
 }

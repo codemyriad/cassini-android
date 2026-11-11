@@ -15,8 +15,9 @@ internal data class ArchiveEntry(
     val crc: Long,
     val method: Int,
     val directory: Boolean,
+    val metadata: Boolean = false,
 ) {
-    val supported: Boolean get() = !directory && NoteArchives.audio(name)
+    val supported: Boolean get() = !directory && !metadata && NoteArchives.audio(name)
 }
 
 /** Bounded central-directory inspection, including ZIP64, before any note is imported. No entry data is inflated here. */
@@ -67,12 +68,14 @@ internal class ZipDirectory(
         val at = (tail.size - 22 downTo 0).firstOrNull {
             tail.u32(it) == 0x06054b50L && it + 22 + tail.u16(it + 20) == tail.size
         } ?: throw ArchiveRejected(ArchiveFailure.DAMAGED)
-        archiveCheck(tail.u16(at + 4) == 0 && tail.u16(at + 6) == 0)
         val entries = tail.u16(at + 10)
-        if (entries == 65_535 || tail.u32(at + 12) == 0xffffffffL || tail.u32(at + 16) == 0xffffffffL) {
+        val extended = listOf(4, 6, 8, 10).any { tail.u16(at + it) == 65_535 } ||
+            listOf(12, 16).any { tail.u32(at + it) == 0xffffffffL }
+        if (extended) {
+            archiveCheck(listOf(4, 6).all { tail.u16(at + it) in setOf(0, 65_535) })
             return zip64(length - tail.size + at)
         }
-        archiveCheck(tail.u16(at + 8) == entries)
+        archiveCheck(tail.u16(at + 4) == 0 && tail.u16(at + 6) == 0 && tail.u16(at + 8) == entries)
         val result = Directory(tail.u32(at + 16), tail.u32(at + 12), entries.toLong())
         archiveCheck(range(result.offset, result.bytes, length - tail.size + at))
         return result
@@ -131,6 +134,7 @@ internal class ZipDirectory(
             header.u32(16),
             header.u16(10),
             name.endsWith('/') || name.endsWith('\\'),
+            name.replace('\\', '/').startsWith("__MACOSX/") && base.startsWith("._"),
         )
     }
 
@@ -148,7 +152,7 @@ internal class ZipDirectory(
             extra.second == null || NoteArchives.safeName(checkNotNull(extra.second)),
             ArchiveFailure.UNSAFE_PATHS,
         )
-        archiveCheck(name.contentEquals(centralName) && (flags and 0x808) == (centralFlags and 0x808))
+        archiveCheck(name.contentEquals(centralName) && (flags and 0x800) == (centralFlags and 0x800))
         return offset + 30 + header.u16(26) + header.u16(28)
     }
 
