@@ -73,16 +73,24 @@ class BackupTransportFixtureTest {
         withDatabase { database ->
             database.notes().insert(
                 NoteEntity(
-                    ID, "Synthetic backup note", createdAt = START.toEpochMilli(), addedAt = START.toEpochMilli(),
-                    origin = Origin.IMPORTED_DOCUMENT, audioFile = "document.opus", audioKind = AudioKind.DOCUMENT,
+                    ID,
+                    "Synthetic backup note",
+                    createdAt = START.toEpochMilli(),
+                    addedAt = START.toEpochMilli(),
+                    origin = Origin.IMPORTED_DOCUMENT,
+                    audioFile = "document.opus",
+                    audioKind = AudioKind.DOCUMENT,
                     updatedAt = START.toEpochMilli(),
                 ),
             )
             documents(database).refreshIfStale(ID)
-            database.jobs().insert(JobEntity(ID, 1, JobKind.TRANSCRIBE_AGAIN, JobState.QUEUED, enqueuedAt = 1, updatedAt = 1))
+            database.jobs().insert(
+                JobEntity(ID, 1, JobKind.TRANSCRIBE_AGAIN, JobState.QUEUED, enqueuedAt = 1, updatedAt = 1),
+            )
         }
         Files.createDirectories(paths.voices.toPath())
-        paths.people.writeText(VoiceCodec.encode(listOf(Voice("ada", "Ada", "synthetic", floatArrayOf(1f, 0f, 0f), 1, 4.0, 1, 1))))
+        val voice = Voice("ada", "Ada", "synthetic", floatArrayOf(1f, 0f, 0f), 1, 4.0, 1, 1)
+        paths.people.writeText(VoiceCodec.encode(listOf(voice)))
         markers()
         assertFalse(choices.choices.first().cloud)
         assertTrue(choices.choices.first().transfer)
@@ -94,8 +102,13 @@ class BackupTransportFixtureTest {
         val tags = CassiniDocument.tagsPacket(emptyList())
         val silence = OggOpus.mux(OggOpus.Stream(head, tags, listOf(byteArrayOf(-8, -1, -2)), 960, true), tags)
         return CassiniDocument.create(
-            silence, words, "Synthetic backup note", JSONObject(), speakerLabels = mapOf("S1" to "Ada"),
-            recordedAtUtc = START, createdAtUtc = START.plusSeconds(540),
+            silence,
+            words,
+            "Synthetic backup note",
+            JSONObject(),
+            speakerLabels = mapOf("S1" to "Ada"),
+            recordedAtUtc = START,
+            createdAtUtc = START.plusSeconds(540),
         )
     }
 
@@ -123,7 +136,12 @@ class BackupTransportFixtureTest {
             assertEquals("Ada", database.cache().speakers(ID, variant.variantId).single().label)
         }
         val saved = VoiceCodec.decode(paths.people.readText())
-        val match = VoiceMatcher.match(mapOf("speaker" to floatArrayOf(1f, 0f, 0f)), saved, "synthetic", Thresholds(0.9f, 0.8f, 0.1f))
+        val match = VoiceMatcher.match(
+            mapOf("speaker" to floatArrayOf(1f, 0f, 0f)),
+            saved,
+            "synthetic",
+            Thresholds(0.9f, 0.8f, 0.1f),
+        )
         assertEquals("ada", match.getValue("speaker").voiceId)
         assertEquals(DocumentState.OK, CassiniDocument.read(File(paths.note(ID), "document.opus")).documentState)
     }

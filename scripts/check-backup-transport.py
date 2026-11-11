@@ -21,7 +21,11 @@ def backup_result(output):
     match = re.search(r'Package ' + re.escape(PACKAGE) + r' with result: ([^\r\n]+)', output)
     if match is None:
         raise ValueError('Missing per-package backup result')
-    return match.group(1).strip()
+    result = match.group(1).strip()
+    finished = re.search(r'Backup finished with result: ([^\r\n]+)', output)
+    if finished is None or (result == 'Success' and finished.group(1).strip() != 'Success'):
+        raise ValueError('Backup did not report a matching completed result')
+    return result
 
 
 def main():
