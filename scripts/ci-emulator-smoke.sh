@@ -66,19 +66,30 @@ finish() {
     adb logcat -d > .tools/emulator-results/logcat.txt 2>&1 || true
 }
 trap finish EXIT
-# Waits up to $1 s until the command after the message succeeds; otherwise prints the message and fails.
-wait_for() {
-    local seconds=$1 message=$2
+# Android process and window lifecycle events prompt a fresh check of the preflight state.
+wait_for() (
+    local seconds=$1 message=$2 since work watcher remaining _event
     shift 2
     local end=$((SECONDS + seconds))
-    until "$@"; do
-        if [ "$SECONDS" -ge "$end" ]; then
-            printf '%s (waited %s s)\n' "$message" "$seconds" >&2
-            return 1
-        fi
-        sleep 0.5
+    since=$(adb shell "date '+%m-%d %H:%M:%S.000'" | tr -d '\r')
+    if "$@"; then return 0; fi
+
+    work=$(mktemp -d)
+    mkfifo "$work/events"
+    adb logcat -b events -T "$since" -s am_anr:I am_proc_died:I wm_set_resumed_activity:I > "$work/events" &
+    watcher=$!
+    trap 'kill "$watcher" 2>/dev/null || true; wait "$watcher" 2>/dev/null || true; rm -rf "$work"' EXIT
+    exec 3<"$work/events"
+    while :; do
+        remaining=$((end - SECONDS))
+        if [ "$remaining" -le 0 ] || ! IFS= read -r -t "$remaining" _event <&3; then break; fi
+        if "$@"; then return 0; fi
     done
-}
+    # A dialog can settle without a matching lifecycle log on some API levels.
+    if "$@"; then return 0; fi
+    printf '%s (waited %s s)\n' "$message" "$seconds" >&2
+    return 1
+)
 error_dialog() {
     adb shell dumpsys window windows | tr -d '\r' | grep -m 1 -oE 'Application (Not Responding|Error): [^ }:]+' || true
 }
