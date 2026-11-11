@@ -7,6 +7,7 @@ import android.os.ParcelFileDescriptor
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
+import androidx.activity.ComponentActivity
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.semantics.SemanticsActions
@@ -23,6 +24,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.printToString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.core.content.FileProvider
+import androidx.core.util.Consumer
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
@@ -38,6 +40,7 @@ import io.codemyriad.cassini.core.format.Word
 import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.data.db.LibraryRow
 import io.codemyriad.cassini.data.notes.ImportOutcome
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
@@ -84,10 +87,16 @@ internal object Flows {
     /** Text of [id] in the activity's language (English on the test devices unless a test changes it). */
     fun AppRule.text(id: Int, vararg args: Any): String = activity.getString(id, *args)
 
+    /** Subscribes before reading retained semantics, window or keyboard state. */
+    fun <A : ComponentActivity> AndroidComposeTestRule<*, A>.awaitUi(
+        timeoutMs: Long = SCREEN_MS,
+        condition: () -> Boolean,
+    ) = UiEvents.await(UiEvents.onMain(timeoutMs) { activity.window.decorView }, timeoutMs, mainClock, condition)
+
     /** Waits until a node matches [matcher]; [timeoutMs] covers async ViewModel loads and the job. */
     fun AppRule.waitShown(matcher: SemanticsMatcher, timeoutMs: Long = SCREEN_MS, unmerged: Boolean = false) =
         logOnTimeout(matcher) {
-            waitUntil(timeoutMs) { onAllNodes(matcher, useUnmergedTree = unmerged).fetchSemanticsNodes().isNotEmpty() }
+            awaitUi(timeoutMs) { onAllNodes(matcher, useUnmergedTree = unmerged).fetchSemanticsNodes().isNotEmpty() }
         }
 
     /**
@@ -96,7 +105,7 @@ internal object Flows {
      */
     fun AppRule.waitShownLive(matcher: SemanticsMatcher, timeoutMs: Long = SCREEN_MS, unmerged: Boolean = false) =
         logOnTimeout(matcher) {
-            waitUntil(timeoutMs) { liveNodes(unmerged).any(matcher::matches) }
+            awaitUi(timeoutMs) { liveNodes(unmerged).any(matcher::matches) }
         }
 
     /** The semantics nodes of the activity's window as they are now, read on the UI thread without an idle sync. */
@@ -155,7 +164,7 @@ internal object Flows {
         waitShown(hasText(text, substring = substring), timeoutMs)
 
     fun AppRule.waitGone(matcher: SemanticsMatcher, timeoutMs: Long = SCREEN_MS) =
-        waitUntil(timeoutMs) { onAllNodes(matcher).fetchSemanticsNodes().isEmpty() }
+        awaitUi(timeoutMs) { onAllNodes(matcher).fetchSemanticsNodes().isEmpty() }
 
     /**
      * Waits until the window that shows the node of [matcher] has no keyboard inset. A sheet opened while a field has
@@ -164,7 +173,7 @@ internal object Flows {
      */
     fun AppRule.waitKeyboardClosed(matcher: SemanticsMatcher, timeoutMs: Long = SCREEN_MS) {
         val window = (onNode(matcher).fetchSemanticsNode().root as ViewRootForTest).view.rootView
-        waitFor("The keyboard closes under ${matcher.description}", timeoutMs) {
+        awaitUi(timeoutMs) {
             runOnUiThread {
                 val insets = ViewCompat.getRootWindowInsets(window)
                 (insets?.getInsets(WindowInsetsCompat.Type.ime())?.bottom ?: 0) == 0
@@ -185,7 +194,7 @@ internal object Flows {
     /** Closes the keyboard (Espresso waits for the input method's answer) and waits until the service hides it. */
     fun AppRule.closeKeyboard(timeoutMs: Long = SCREEN_MS) {
         Espresso.closeSoftKeyboard()
-        waitFor("The input method still shows the keyboard", timeoutMs) { !keyboardShown() }
+        awaitUi(timeoutMs) { !keyboardShown() }
     }
 
     /**
@@ -196,8 +205,10 @@ internal object Flows {
      * still press the Back key. Do not use it to close a sheet or dialog: they have their own window.
      */
     fun AppRule.backAfterOpenWith(timeoutMs: Long = SCREEN_MS) {
-        waitFor("The activity is resumed for Back", timeoutMs) {
-            runOnUiThread { activity.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) }
+        runBlocking {
+            withTimeoutOrNull(timeoutMs) {
+                activity.lifecycle.currentStateFlow.first { it.isAtLeast(Lifecycle.State.RESUMED) }
+            } ?: throw AssertionError("The activity is not resumed for Back")
         }
         runOnUiThread { activity.onBackPressedDispatcher.onBackPressed() }
     }
@@ -220,10 +231,10 @@ internal object Flows {
 
     private val ERROR_DIALOG = Regex("Application (Not Responding|Error): [^ }:]+")
 
-    /** Polls [condition] on the test thread (graph state, files) while the UI keeps running. */
-    fun AppRule.waitFor(message: String, timeoutMs: Long = SCREEN_MS, condition: suspend () -> Boolean) {
+    /** Waits on UI publishers and preserves the caller's diagnostic when a transition is missing. */
+    fun AppRule.waitForUi(message: String, timeoutMs: Long = SCREEN_MS, condition: () -> Boolean) {
         try {
-            waitUntil(timeoutMs) { runBlocking { condition() } }
+            awaitUi(timeoutMs, condition)
         } catch (timeout: ComposeTimeoutException) {
             throw AssertionError("$message (waited ${timeoutMs / 1_000} s)", timeout)
         }
@@ -241,9 +252,28 @@ internal object Flows {
             .setAction(Intent.ACTION_VIEW)
             .setDataAndType(FileProvider.getUriForFile(activity, TEST_FILES, file), mime)
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        activity.startActivity(intent)
-        waitUntil(SCREEN_MS) { activity.intent.action == Intent.ACTION_VIEW }
-        runOnUiThread { activity.intent = launch }
+        val delivered = CompletableDeferred<Unit>()
+        val listener = Consumer<Intent> { received ->
+            if (received.action == Intent.ACTION_VIEW && received.data == intent.data) {
+                // ComponentActivity calls listeners before MainActivity sets and handles its new intent.
+                activity.window.decorView.post { delivered.complete(Unit) }
+            }
+        }
+        runOnUiThread { activity.addOnNewIntentListener(listener) }
+        try {
+            activity.startActivity(intent)
+            runBlocking {
+                withTimeoutOrNull(SCREEN_MS) { delivered.await() }
+                    ?: throw AssertionError("The Activity did not receive ACTION_VIEW")
+            }
+            runOnUiThread {
+                assertTrue("The Activity retains ACTION_VIEW", activity.intent.action == Intent.ACTION_VIEW)
+                assertTrue("The Activity retains the viewed URI", activity.intent.data == intent.data)
+                activity.intent = launch
+            }
+        } finally {
+            runOnUiThread { activity.removeOnNewIntentListener(listener) }
+        }
     }
 
     /** The live (not trashed) Library rows of the scratch root. */

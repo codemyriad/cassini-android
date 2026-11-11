@@ -271,12 +271,12 @@ class AppShellTest {
     private fun waitGone(matcher: SemanticsMatcher) = waitUntilNodes(matcher) { it.isEmpty() }
 
     /**
-     * Waits until the nodes of [matcher] meet [condition]. Each check first runs the main looper: the state built off
-     * the main thread comes back to it as a posted task.
+     * Waits until the nodes of [matcher] meet [condition], waking on main coroutine posts and Compose snapshot
+     * applications. The synchronized semantics query drains pending composition and layout work.
      */
     private fun waitUntilNodes(matcher: SemanticsMatcher, condition: (List<SemanticsNode>) -> Boolean) =
-        rule.waitUntil(TIMEOUT_MS) {
-            shadowOf(Looper.getMainLooper()).idle()
+        mainEvents.await(TIMEOUT_MS, rule.mainClock.scheduler) {
+            rule.mainClock.advanceTimeByFrame()
             condition(rule.onAllNodes(matcher).fetchSemanticsNodes())
         }
 
