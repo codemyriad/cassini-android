@@ -5,8 +5,10 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import android.util.Log
 import io.codemyriad.cassini.AppGraph
+import io.codemyriad.cassini.core.audio.Limits
 import io.codemyriad.cassini.core.export.ExportNames
 import io.codemyriad.cassini.core.library.AudioKind
+import io.codemyriad.cassini.data.notes.ArchiveLimits
 import io.codemyriad.cassini.data.notes.ImportSummary
 import io.codemyriad.cassini.data.notes.NoteArchives
 import io.codemyriad.cassini.data.useCancellable
@@ -29,7 +31,8 @@ import java.util.UUID
 class BulkTransfers(context: Context, private val graph: AppGraph) {
     private val resolver = context.contentResolver
     private val importer = ArchiveImports(context, graph)
-    private val archives = NoteArchives()
+    private val archiveLimits = ArchiveLimits()
+    private val archives = NoteArchives(archiveLimits)
     private val scratchRoot = File(graph.paths.cache, "bulk-transfers")
     private val initialization = Mutex()
     private var initialized = false
@@ -43,26 +46,39 @@ class BulkTransfers(context: Context, private val graph: AppGraph) {
         val summary: ImportSummary? = null,
         val exported: Int? = null,
         val failed: Boolean = false,
+        val exporting: Boolean = false,
+        val done: Int = 1,
+        val total: Int = 1,
+        val cancelled: Boolean = false,
     )
 
     suspend fun choices(): List<Choice> = graph.awaitCatalogue().notes.library().first()
         .filter { it.audioKind != AudioKind.LIVE_CAPTURE }.map { Choice(it.id, it.title) }
 
-    fun import(uris: List<Uri>) = start { scratch ->
+    fun import(uris: List<Uri>) = start(total = uris.size) { scratch ->
         var total = ImportSummary()
-        for (uri in uris.take(MAX_FILES)) total += importer.importOne(uri, scratch)
-        if (uris.size > MAX_FILES) total += ImportSummary(failed = uris.size - MAX_FILES)
+        for ((index, uri) in uris.withIndex()) {
+            mutable.value = mutable.value.copy(done = index + 1)
+            val previous = total
+            val result = importer.importOne(uri, scratch) { partial ->
+                mutable.value = mutable.value.copy(summary = previous + partial)
+            }
+            total += result
+            mutable.value = mutable.value.copy(summary = total)
+        }
         TransferState(summary = total)
     }
 
-    fun export(ids: List<String>, destination: Uri) = start { scratch ->
-        require(ids.isNotEmpty() && ids.distinct().size == ids.size && ids.size <= MAX_FILES)
+    fun export(ids: List<String>, destination: Uri) = start(exporting = true, total = ids.size) { scratch ->
         try {
+            require(ids.isNotEmpty() && ids.distinct().size == ids.size && ids.size <= archiveLimits.entries)
             var total = 0L
-            val files = ids.map {
-                snapshot(it, scratch, MAX_BYTES - total).also { (_, file) ->
+            val files = ids.mapIndexed { index, id ->
+                mutable.value = mutable.value.copy(done = index + 1)
+                val remaining = minOf(Limits.MAX_IMPORT_BYTES, archiveLimits.expandedBytes - total)
+                snapshot(id, scratch, remaining).also { (_, file) ->
                     total += file.length()
-                    if (total > MAX_BYTES) throw IOException("Archive is too large")
+                    if (total > archiveLimits.expandedBytes) throw IOException("Archive is too large")
                 }
             }
             if (scratch.usableSpace < total + FREE_MARGIN) throw IOException("Not enough space")
@@ -80,7 +96,7 @@ class BulkTransfers(context: Context, private val graph: AppGraph) {
                     }
                 }
             }
-            TransferState(exported = files.size)
+            TransferState(exported = files.size, exporting = true)
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
             removeIncomplete(destination)
             throw error
@@ -100,7 +116,7 @@ class BulkTransfers(context: Context, private val graph: AppGraph) {
     suspend fun snapshot(
         id: String,
         scratch: File,
-        maxBytes: Long = MAX_BYTES,
+        maxBytes: Long = Limits.MAX_IMPORT_BYTES,
     ): Pair<String, File> = withContext(graph.dispatchers.io) {
         val catalogue = graph.awaitCatalogue()
         catalogue.documents.retitle(id)
@@ -138,18 +154,23 @@ class BulkTransfers(context: Context, private val graph: AppGraph) {
     fun cancel() { job?.cancel() }
     fun dismiss() { if (!mutable.value.running) mutable.value = TransferState() }
 
-    private fun start(action: suspend (File) -> TransferState) {
+    private fun start(exporting: Boolean = false, total: Int, action: suspend (File) -> TransferState) {
         if (mutable.value.running) return
-        mutable.value = TransferState(running = true)
-        job = graph.appScope.launch(graph.dispatchers.io) {
+        mutable.value = TransferState(running = true, exporting = exporting, total = total.coerceAtLeast(1))
+        val launched = graph.appScope.launch(graph.dispatchers.io) {
             try {
                 mutable.value = perform(action)
             } catch (cancelled: CancellationException) {
-                mutable.value = TransferState()
                 throw cancelled
             } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
                 Log.w(TAG, "Transfer failed", error)
-                mutable.value = TransferState(failed = true)
+                mutable.value = TransferState(failed = true, exporting = exporting)
+            }
+        }
+        job = launched
+        launched.invokeOnCompletion { cause ->
+            if (cause is CancellationException && job === launched && mutable.value.running) {
+                mutable.value = if (exporting) TransferState() else mutable.value.copy(running = false, cancelled = true)
             }
         }
     }
@@ -173,8 +194,6 @@ class BulkTransfers(context: Context, private val graph: AppGraph) {
 
     private companion object {
         const val TAG = "CassiniTransfer"
-        const val MAX_FILES = 1_000
-        const val MAX_BYTES = 4L shl 30
         const val SPACE_CHECK_BYTES = 8L shl 20
         const val FREE_MARGIN = 128L shl 20
     }

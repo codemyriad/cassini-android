@@ -55,13 +55,19 @@ class BulkTransferDeviceTest {
         }
         graph.transfers.import(listOf(archive.toUri(), audio.toUri()))
         val imported = runBlocking { withTimeout(20_000) { graph.transfers.state.first { !it.running } } }
-        assertEquals(ImportSummary(imported = 1, duplicates = 1, ignored = 1), imported.summary)
+        assertEquals(ImportSummary(imported = 1, duplicates = 1, unsupported = 1), imported.summary)
         val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
-        rule.onNodeWithText(context.getString(R.string.bulk_summary, 1, 1, 1, 0)).assertIsDisplayed()
-        rule.onNodeWithText(context.getString(R.string.bulk_done)).performClick()
-        rule.onNodeWithText(context.getString(R.string.bulk_export)).performClick()
-        rule.onNodeWithText(context.getString(R.string.bulk_documents_only)).assertIsDisplayed()
-        rule.onNodeWithText(context.getString(R.string.bulk_cancel)).performClick()
+        for (resource in listOf(
+            R.plurals.import_summary_imported,
+            R.plurals.import_summary_duplicates,
+            R.plurals.import_summary_unsupported,
+        )) {
+            rule.onNodeWithText(context.resources.getQuantityString(resource, 1, 1)).assertIsDisplayed()
+        }
+        rule.onNodeWithText(context.getString(R.string.common_done)).performClick()
+        rule.onNodeWithText(context.getString(R.string.export_zip_all)).performClick()
+        rule.onNodeWithText(context.getString(R.string.common_cancel)).assertIsDisplayed()
+        rule.onNodeWithText(context.getString(R.string.common_cancel)).performClick()
         val choices = runBlocking { graph.transfers.choices() }
         val exported = File(graph.paths.cache, "bulk-device-output.zip")
         graph.transfers.export(choices.map { it.id }, exported.toUri())

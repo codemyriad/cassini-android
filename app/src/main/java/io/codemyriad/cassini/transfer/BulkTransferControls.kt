@@ -22,11 +22,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.codemyriad.cassini.R
+import io.codemyriad.cassini.data.notes.ArchiveFailure
+import io.codemyriad.cassini.data.notes.ImportSummary
+import io.codemyriad.cassini.ui.R as UiR
 
 /** The explicit selector keeps bulk selection separate from a row's Open/long-press actions. */
 @Composable
@@ -54,20 +58,28 @@ fun BulkTransferControls(transfers: BulkTransfers) {
             choosing = true
         },
         enabled = !state.running,
-    ) { Text(stringResource(R.string.bulk_export)) }
+    ) { Text(stringResource(R.string.export_zip_all)) }
     if (choosing) {
         AlertDialog(
             onDismissRequest = { choosing = false },
-            title = { Text(stringResource(R.string.bulk_export)) },
-            text = { ExportChoices(choices, selected) { selected = ArrayList(it) } },
-            confirmButton = {
-                TextButton(enabled = selected.isNotEmpty(), onClick = {
+            title = { Text(stringResource(R.string.export_zip_all)) },
+            text = {
+                ExportChoices(choices, selected, { selected = it }) {
+                    selected = choices.map { it.id }
                     choosing = false
-                    save.launch("Cassini notes.zip")
-                }) { Text(stringResource(R.string.bulk_save)) }
+                    save.launch("Cassini.zip")
+                }
+            },
+            confirmButton = {
+                if (selected.isNotEmpty()) {
+                    TextButton(onClick = {
+                        choosing = false
+                        save.launch("Cassini.zip")
+                    }) { Text(stringResource(R.string.export_zip_selected)) }
+                }
             },
             dismissButton = {
-                TextButton(onClick = { choosing = false }) { Text(stringResource(R.string.bulk_cancel)) }
+                TextButton(onClick = { choosing = false }) { Text(stringResource(R.string.common_cancel)) }
             },
         )
     }
@@ -81,10 +93,10 @@ private fun ExportChoices(
     choices: List<BulkTransfers.Choice>,
     selected: List<String>,
     onChange: (List<String>) -> Unit,
+    onAll: () -> Unit,
 ) {
     Column {
-        Text(stringResource(R.string.bulk_documents_only))
-        TextButton(onClick = { onChange(choices.map { it.id }) }) { Text(stringResource(R.string.bulk_all)) }
+        TextButton(onClick = onAll) { Text(stringResource(R.string.export_zip_all)) }
         LazyColumn(Modifier.heightIn(max = 360.dp)) {
             items(choices, key = { it.id }) { choice ->
                 Row(
@@ -106,29 +118,59 @@ private fun ExportChoices(
 
 @Composable
 private fun TransferResult(state: BulkTransfers.TransferState, transfers: BulkTransfers) {
+    val heading: (@Composable () -> Unit)? = if (state.running || state.cancelled) {
+        { TransferHeading(state) }
+    } else {
+        null
+    }
     AlertDialog(
         onDismissRequest = { transfers.dismiss() },
-        title = { Text(stringResource(if (state.running) R.string.bulk_working else R.string.bulk_finished)) },
+        title = heading,
         text = {
-            val summary = state.summary
-            val message = when {
-                summary != null -> stringResource(
-                    R.string.bulk_summary,
-                    summary.imported,
-                    summary.duplicates,
-                    summary.ignored,
-                    summary.failed,
-                )
-                state.exported != null -> stringResource(R.string.bulk_exported, state.exported)
-                state.failed -> stringResource(R.string.bulk_failed)
-                else -> stringResource(R.string.bulk_working)
+            Column {
+                state.summary?.let { SummaryParts(it) }
+                state.exported?.let { Text(pluralStringResource(R.plurals.export_zip_done, it, it)) }
+                if (state.failed) {
+                    val resource = if (state.exporting) UiR.string.ui_actions_save_failed else UiR.string.ui_banner_import_open_title
+                    Text(stringResource(resource))
+                }
             }
-            Text(message)
         },
         confirmButton = {
             TextButton(onClick = { if (state.running) transfers.cancel() else transfers.dismiss() }) {
-                Text(stringResource(if (state.running) R.string.bulk_cancel else R.string.bulk_done))
+                Text(stringResource(if (state.running) R.string.common_cancel else R.string.common_done))
             }
         },
     )
+}
+
+@Composable
+private fun TransferHeading(state: BulkTransfers.TransferState) {
+    if (state.cancelled) {
+        Text(stringResource(R.string.import_cancelled))
+    } else {
+        val resource = if (state.exporting) R.string.export_zip_progress else R.string.import_progress
+        Text(stringResource(resource, state.done, state.total))
+    }
+}
+
+@Composable
+private fun SummaryParts(summary: ImportSummary) {
+    val parts = listOf(
+        summary.imported to R.plurals.import_summary_imported,
+        summary.duplicates to R.plurals.import_summary_duplicates,
+        summary.unsupported to R.plurals.import_summary_unsupported,
+        summary.failed to R.plurals.import_summary_failed,
+    )
+    parts.filter { it.first > 0 }.forEach { (count, resource) -> Text(pluralStringResource(resource, count, count)) }
+    summary.archiveFailures.forEach { reason ->
+        val resource = when (reason) {
+            ArchiveFailure.DAMAGED -> R.string.import_zip_failed_damaged
+            ArchiveFailure.ENCRYPTED -> R.string.import_zip_failed_encrypted
+            ArchiveFailure.UNSAFE_PATHS -> R.string.import_zip_failed_unsafe_paths
+            ArchiveFailure.TOO_LARGE -> R.string.import_zip_failed_too_large
+            ArchiveFailure.EMPTY -> R.string.import_zip_failed_empty
+        }
+        Text(stringResource(resource))
+    }
 }

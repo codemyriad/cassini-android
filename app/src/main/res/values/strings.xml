@@ -103,16 +103,4 @@
     <string name="notif_rec_failed_title">Microphone stopped working</string>
     <string name="notif_rec_failed_text">Recording ended. The audio so far is in your library.</string>
 
-    <!-- D96 bulk import/export. -->
-    <string name="bulk_export">Export notes as ZIP</string>
-    <string name="bulk_documents_only">Cassini documents keep their .opus format. Plain audio keeps its original format.</string>
-    <string name="bulk_all">Select all</string>
-    <string name="bulk_save">Save ZIP</string>
-    <string name="bulk_cancel">Cancel</string>
-    <string name="bulk_working">Importing or exporting…</string>
-    <string name="bulk_finished">Transfer finished</string>
-    <string name="bulk_summary">Imported: %1$d · duplicates skipped: %2$d · ignored: %3$d · failed: %4$d</string>
-    <string name="bulk_exported">Exported: %1$d</string>
-    <string name="bulk_failed">The transfer could not finish. Check the file and available space.</string>
-    <string name="bulk_done">Done</string>
 </resources>

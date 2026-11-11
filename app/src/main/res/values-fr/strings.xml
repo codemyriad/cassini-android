@@ -107,16 +107,4 @@
     <string name="notif_rec_failed_title">Le microphone a cessé de fonctionner</string>
     <string name="notif_rec_failed_text">Enregistrement terminé. L’audio enregistré jusqu’ici est dans votre bibliothèque.</string>
 
-    <!-- D96 bulk import/export. -->
-    <string name="bulk_export">Exporter les notes en ZIP</string>
-    <string name="bulk_documents_only">Les documents Cassini conservent le format .opus. Les fichiers audio simples conservent leur format d’origine.</string>
-    <string name="bulk_all">Tout sélectionner</string>
-    <string name="bulk_save">Enregistrer le ZIP</string>
-    <string name="bulk_cancel">Annuler</string>
-    <string name="bulk_working">Importation ou exportation…</string>
-    <string name="bulk_finished">Transfert terminé</string>
-    <string name="bulk_summary">Importés : %1$d · doublons ignorés : %2$d · autres fichiers ignorés : %3$d · échecs : %4$d</string>
-    <string name="bulk_exported">Exportés : %1$d</string>
-    <string name="bulk_failed">Le transfert a échoué. Vérifiez le fichier et l’espace disponible.</string>
-    <string name="bulk_done">Terminé</string>
 </resources>

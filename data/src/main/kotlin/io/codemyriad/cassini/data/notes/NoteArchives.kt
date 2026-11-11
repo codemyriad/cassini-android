@@ -1,35 +1,46 @@
 package io.codemyriad.cassini.data.notes
 
+import io.codemyriad.cassini.core.audio.Limits
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import java.io.File
-import java.io.FilterInputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.Locale
 import java.util.zip.CRC32
 import java.util.zip.ZipEntry
-import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
-private const val MAX_ARCHIVE_BYTES = 4L shl 30
-private const val MAX_ARCHIVE_INPUT_BYTES = MAX_ARCHIVE_BYTES + (16L shl 20)
-private const val MAX_ENTRY_NAME = 1_024
-
-/** Archive limits count actual bytes, including ignored entries; nested archives are never expanded. */
+/** Published D96 limits; GB is decimal. A single entry retains the existing app import limit. */
 data class ArchiveLimits(
-    val entries: Int = 1_000,
-    val expandedBytes: Long = MAX_ARCHIVE_BYTES,
-    val inputBytes: Long = MAX_ARCHIVE_INPUT_BYTES,
+    val entries: Int = 2_000,
+    val expandedBytes: Long = 20_000_000_000L,
+    val ratio: Int = 100,
+    val fileBytes: Long = Limits.MAX_IMPORT_BYTES,
+    val inputBytes: Long = Long.MAX_VALUE,
 )
 
-data class ImportSummary(val imported: Int = 0, val duplicates: Int = 0, val ignored: Int = 0, val failed: Int = 0) {
+enum class ArchiveFailure { DAMAGED, ENCRYPTED, UNSAFE_PATHS, TOO_LARGE, EMPTY }
+
+class ArchiveRejected(
+    val reason: ArchiveFailure,
+    val summary: ImportSummary = ImportSummary(),
+) : IOException(reason.name)
+
+data class ImportSummary(
+    val imported: Int = 0,
+    val duplicates: Int = 0,
+    val unsupported: Int = 0,
+    val failed: Int = 0,
+    val archiveFailures: Set<ArchiveFailure> = emptySet(),
+) {
     operator fun plus(other: ImportSummary) = ImportSummary(
         imported + other.imported,
         duplicates + other.duplicates,
-        ignored + other.ignored,
+        unsupported + other.unsupported,
         failed + other.failed,
+        archiveFailures + other.archiveFailures,
     )
 
     fun add(outcome: ImportOutcome) = this + when (outcome) {
@@ -39,7 +50,7 @@ data class ImportSummary(val imported: Int = 0, val duplicates: Int = 0, val ign
     }
 }
 
-/** Streaming ZIP transport. Call on IO; the caller owns streams and the private scratch directory. */
+/** Central-directory preflight, then bounded validation/staging, then normal imports. No path is extracted. */
 class NoteArchives(private val limits: ArchiveLimits = ArchiveLimits()) {
     suspend fun read(
         input: InputStream,
@@ -47,65 +58,64 @@ class NoteArchives(private val limits: ArchiveLimits = ArchiveLimits()) {
         progress: (ImportSummary) -> Unit = {},
         consume: suspend (File, String) -> ImportOutcome,
     ): ImportSummary {
-        var summary = ImportSummary()
-        var total = 0L
-        var count = 0
-        ZipInputStream(BoundedInput(input, limits.inputBytes)).use { zip ->
-            while (true) {
-                currentCoroutineContext().ensureActive()
-                val entry = zip.nextEntry ?: break
-                guard(++count <= limits.entries && safeName(entry.name), "Unsafe archive entry")
-                guard(entry.size <= limits.expandedBytes - total, "Archive is too large")
-                val (bytes, result) = readEntry(zip, entry, scratch, limits.expandedBytes - total, consume)
-                total += bytes
-                summary += result
-                progress(summary)
-                zip.closeEntry()
-            }
-        }
-        return summary
-    }
-
-    private suspend fun readEntry(
-        zip: ZipInputStream,
-        entry: ZipEntry,
-        scratch: File,
-        remaining: Long,
-        consume: suspend (File, String) -> ImportOutcome,
-    ): Pair<Long, ImportSummary> {
-        val staged = if (!entry.isDirectory && audio(entry.name)) {
-            File.createTempFile("entry-", ".tmp", scratch)
-        } else {
-            null
-        }
+        val archive = File.createTempFile("archive-", ".zip", scratch)
+        val staged = ArrayList<Pair<File, String>>()
         try {
-            val bytes = staged?.outputStream().use { copyEntry(zip, it, remaining) }
-            val summary = if (staged != null) {
-                ImportSummary().add(consume(staged, entry.name.substringAfterLast('/')))
-            } else {
-                ImportSummary(ignored = 1)
+            spool(input, archive)
+            val entries = directory(archive)
+            if (entries.none { it.supported }) {
+                val summary = ImportSummary(unsupported = entries.count { !it.directory })
+                throw ArchiveRejected(ArchiveFailure.EMPTY, summary)
             }
-            return bytes to summary
+            val reader = ArchiveEntries(archive, limits)
+            var summary = ImportSummary()
+            for (entry in entries) {
+                currentCoroutineContext().ensureActive()
+                val result = reader.stage(entry, scratch)
+                if (result != null) {
+                    staged += result to entry.name
+                } else if (entry.supported) {
+                    summary += ImportSummary(failed = 1)
+                } else if (!entry.directory) {
+                    summary += ImportSummary(unsupported = 1)
+                }
+            }
+            progress(summary)
+            for ((file, name) in staged) {
+                summary = summary.add(consume(file, name))
+                progress(summary)
+                file.delete()
+            }
+            return summary
         } finally {
-            staged?.delete()
+            staged.forEach { (file, _) -> file.delete() }
+            archive.delete()
         }
     }
 
-    private suspend fun copyEntry(input: InputStream, output: OutputStream?, remaining: Long): Long {
+    private suspend fun directory(file: File): List<ArchiveEntry> = try {
+        val context = currentCoroutineContext()
+        ZipDirectory.inspect(file, limits) { context.ensureActive() }
+    } catch (error: ArchiveRejected) {
+        throw error
+    } catch (_: IOException) {
+        throw ArchiveRejected(ArchiveFailure.DAMAGED)
+    }
+
+    private suspend fun spool(input: InputStream, target: File) {
         var total = 0L
-        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-        while (true) {
-            currentCoroutineContext().ensureActive()
-            val n = input.read(buffer)
-            if (n < 0) return total
-            total += n
-            guard(total <= remaining, "Archive is too large")
-            output?.write(buffer, 0, n)
+        var nextSpaceCheck = 0L
+        target.outputStream().use { output ->
+            pump(input) { bytes, n ->
+                total += n
+                archiveCheck(total <= limits.inputBytes, ArchiveFailure.TOO_LARGE)
+                if (total >= nextSpaceCheck) {
+                    nextSpaceCheck = total + SPACE_CHECK_BYTES
+                    if (target.usableSpace < Limits.MIN_FREE_BYTES) throw IOException("Not enough space")
+                }
+                output.write(bytes, 0, n)
+            }
         }
-    }
-
-    private fun guard(valid: Boolean, message: String) {
-        if (!valid) throw IOException(message)
     }
 
     /** Each input is an immutable private snapshot, so CRC/length and the stored entry describe the same bytes. */
@@ -144,7 +154,7 @@ class NoteArchives(private val limits: ArchiveLimits = ArchiveLimits()) {
     }
 
     private fun unique(suggested: String, used: MutableSet<String>): String {
-        require(safeName(suggested) && '/' !in suggested)
+        require(safeName(suggested) && '/' !in suggested && '\\' !in suggested)
         var name = suggested
         var suffix = 2
         while (!used.add(name.lowercase(Locale.ROOT))) {
@@ -154,42 +164,18 @@ class NoteArchives(private val limits: ArchiveLimits = ArchiveLimits()) {
         return name
     }
 
-    private class BoundedInput(input: InputStream, private val limit: Long) : FilterInputStream(input) {
-        private var count = 0L
-        override fun read(): Int = super.read().also { if (it >= 0) add(1) }
-        override fun read(bytes: ByteArray, offset: Int, length: Int): Int =
-            `in`.read(bytes, offset, length).also { if (it > 0) add(it) }
-        private fun add(n: Int) {
-            count += n
-            if (count > limit) throw IOException("Archive input is too large")
-        }
-    }
-
     companion object {
+        private const val SPACE_CHECK_BYTES = 8L shl 20
+        private val DRIVE = Regex("^[A-Za-z]:/")
         private val AUDIO = setOf(
-            "opus",
-            "ogg",
-            "wav",
-            "mp3",
-            "m4a",
-            "aac",
-            "flac",
-            "3gp",
-            "amr",
-            "awb",
-            "mp4",
-            "m4b",
-            "oga",
-            "webm",
-            "mka",
-            "mkv",
-            "ts",
-            "3gpp",
-            "3g2",
+            "opus", "ogg", "wav", "mp3", "m4a", "aac", "flac", "3gp", "amr", "awb",
+            "mp4", "m4b", "oga", "webm", "mka", "mkv", "ts", "3gpp", "3g2",
         )
         fun audio(name: String): Boolean = name.substringAfterLast('.', "").lowercase(Locale.ROOT) in AUDIO
-        fun safeName(name: String): Boolean = name.isNotEmpty() && name.length <= MAX_ENTRY_NAME &&
-            !name.startsWith('/') && '\\' !in name && ':' !in name && '\u0000' !in name &&
-            name.trimEnd('/').split('/').none { it == ".." || it == "." || it.isEmpty() }
+        fun safeName(name: String): Boolean {
+            val path = name.replace('\\', '/')
+            return path.isNotEmpty() && !path.startsWith('/') && !DRIVE.containsMatchIn(path) &&
+                '\u0000' !in path && path.split('/').none { it == ".." }
+        }
     }
 }

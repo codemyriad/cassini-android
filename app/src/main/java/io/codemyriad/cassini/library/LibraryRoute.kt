@@ -6,7 +6,6 @@ import android.content.Intent
 import android.provider.Settings
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -32,7 +31,7 @@ fun LibraryRoute(viewModel: LibraryViewModel, navigator: LibraryNavigator, modif
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val transfers = (context.applicationContext as io.codemyriad.cassini.CassiniApplication).graph.transfers
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+    val picker = rememberLauncherForActivityResult(io.codemyriad.cassini.transfer.BulkImportContract()) { uris ->
         if (uris.isNotEmpty()) transfers.import(uris)
     }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
