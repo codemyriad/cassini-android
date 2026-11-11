@@ -17,8 +17,8 @@ class RecordedTimeMigrationTest {
 
     @Test fun preservesRowsAndInvalidatesOnlyDocumentTimeCaches() {
         helper.createDatabase("recorded-time-migration", 1).use { db ->
-            db.execSQL("INSERT INTO notes (id,title,created_at,added_at,origin,audio_file,audio_kind,duration_ms,bytes,position_ms,title_dirty,document_warnings,trust_acknowledged,document_signature,updated_at) VALUES ('doc','Keep title',1,2,'IMPORTED_DOCUMENT','document.opus','DOCUMENT',3,4,0,0,'[]',0,'cached',5)")
-            db.execSQL("INSERT INTO notes (id,title,created_at,added_at,origin,audio_file,audio_kind,duration_ms,bytes,position_ms,title_dirty,document_warnings,trust_acknowledged,document_signature,updated_at) VALUES ('own','Own recording',6,7,'RECORDED','capture.opus','PLAIN',8,9,0,0,'[]',0,'keep',10)")
+            db.execSQL("INSERT INTO notes (id,title,created_at,added_at,origin,audio_file,audio_kind,duration_ms,position_ms,title_dirty,document_warnings,trust_acknowledged,document_signature,updated_at) VALUES ('doc','Keep title',1,2,'IMPORTED_DOCUMENT','document.opus','DOCUMENT',3,0,0,'[]',0,'cached',5)")
+            db.execSQL("INSERT INTO notes (id,title,created_at,added_at,origin,audio_file,audio_kind,duration_ms,position_ms,title_dirty,document_warnings,trust_acknowledged,document_signature,updated_at) VALUES ('own','Own recording',6,7,'RECORDED','capture.opus','PLAIN',8,0,0,'[]',0,'keep',10)")
         }
         helper.runMigrationsAndValidate("recorded-time-migration", 2, true, CassiniDatabase.MIGRATION_1_2).use { db ->
             db.query("SELECT title,created_at,document_signature,recorded_at FROM notes ORDER BY id").use { rows ->
