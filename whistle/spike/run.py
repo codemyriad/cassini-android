@@ -41,7 +41,7 @@ def worker_bench(command, args, output):
         raise RuntimeError("Worker privacy refusals did not pass; neural inference was not attempted")
     rows = []
     failures = []
-    package = "io.codemyriad.cassini.talk"
+    package = "io.codemyriad.cassini.talk.debug"
     for name in ["dc-quiet-jfk-v1", "dc-quiet-jfk-v1-control"]:
         case = output / name
         case.mkdir(exist_ok=True)
@@ -110,7 +110,7 @@ def worker_bench(command, args, output):
 def parakeet_memory(command, args, output):
     """Run only after this invocation owns the booted AVD; never use an installed user's model directory."""
     root = Path(__file__).resolve().parents[2]
-    package = "io.codemyriad.cassini.talk"
+    package = "io.codemyriad.cassini.talk.debug"
     models = json.loads((root / "scripts/ci-models.json").read_text())["models"]
     models = [model for model in models if model["id"] in {"parakeet-ultra-0.6b-int8-v2", "silero-vad"}]
     if len(models) != 2:

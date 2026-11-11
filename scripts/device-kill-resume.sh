@@ -34,7 +34,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-package=io.codemyriad.cassini.talk
+package=io.codemyriad.cassini.talk.debug
 name=killtest-$(date +%s)-$$
 clip=$(scripts/make-long-clip.sh --print-path)
 clip_name=$(basename "$clip")

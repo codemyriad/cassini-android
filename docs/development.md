@@ -166,7 +166,7 @@ An `Instrumentation.ActivityMonitor` gives the result of the system file picker 
 The export goldens are in `app/src/androidTest/assets/goldens/`. We recorded them on emulator-5554 (API 34, x86_64). In the TXT golden, the second line is `<date> · 00:15`, because the date of the note changes at each run. If a golden is not there or is different, `NoteFlowTest` fails. Then it writes the export to `cache/goldens-candidate/` of the app. To record a golden again, do these steps:
 
 1. Run `scripts/device-smoke.sh --serial emulator-5554 --class io.codemyriad.cassini.flows.NoteFlowTest`.
-2. Copy the candidate with `adb exec-out run-as io.codemyriad.cassini.talk cat cache/goldens-candidate/fleurs-it-short.txt`.
+2. Copy the candidate with `adb exec-out run-as io.codemyriad.cassini.talk.debug cat cache/goldens-candidate/fleurs-it-short.txt`.
 3. Examine the candidate, and then put it in `app/src/androidTest/assets/goldens/`.
 4. Delete `cache/goldens-candidate/` on the device with `run-as`.
 
@@ -174,14 +174,14 @@ The export goldens are in `app/src/androidTest/assets/goldens/`. We recorded the
 
 CAUTION: Do not run the Gradle `connected*` tasks or the managed-device tasks. Their cleanup can uninstall the app, and the uninstall erases the app data and the models (about 770 MB).
 
-CAUTION: Do not run `adb uninstall io.codemyriad.cassini.talk` or `adb shell pm clear io.codemyriad.cassini.talk`. These commands erase the app data and the models.
+CAUTION: Do not run `adb uninstall io.codemyriad.cassini.talk` or `adb shell pm clear io.codemyriad.cassini.talk` (or the same on `io.codemyriad.cassini.talk.debug` when keeping downloaded models). These commands erase the app data and the models. Debug builds use `applicationId` `io.codemyriad.cassini.talk.debug` ("Cassini debug"), so installing a debug APK leaves the Play app (`io.codemyriad.cassini.talk`) untouched.
 
 Install an APK with `adb install -r`. Run instrumentation with `scripts/device-smoke.sh` or `adb shell am instrument`.
 
-Most device tests use a scratch root (see [CassiniTestRunner](#cassinitestrunner)), and the host scripts use a debug root. Before you run a test that has no scratch root, make a backup of the app files without the models:
+Most device tests use a scratch root (see [CassiniTestRunner](#cassinitestrunner)), and the host scripts use a debug root. Before you run a test that has no scratch root, make a backup of the debug app files without the models:
 
 ```sh
-adb exec-out run-as io.codemyriad.cassini.talk tar c \
+adb exec-out run-as io.codemyriad.cassini.talk.debug tar c \
     --exclude=files/models --exclude=files/parakeet-ultra --exclude=files/vad --exclude=files/speaker-models \
     files > files-backup.tar
 ```
@@ -189,8 +189,8 @@ adb exec-out run-as io.codemyriad.cassini.talk tar c \
 If the test damaged or erased your notes, restore the backup. First stop the app, then extract the backup into the app storage:
 
 ```sh
-adb shell am force-stop io.codemyriad.cassini.talk
-adb exec-in run-as io.codemyriad.cassini.talk tar xf - < files-backup.tar
+adb shell am force-stop io.codemyriad.cassini.talk.debug
+adb exec-in run-as io.codemyriad.cassini.talk.debug tar xf - < files-backup.tar
 ```
 
 The restore writes back each file in the backup. It does not delete the files that the test added.
@@ -272,13 +272,13 @@ The CI artifact `cassini-android-device-tests` holds both APKs. The script refus
 2. It writes `files/debug-root.txt`. This file names a scratch root `files/killtest-<time>`. Only debug builds read it. The models stay in `files/`.
 3. It imports the clip through the debug-only `DebugCommandActivity`. The import starts a transcription job.
 4. It reads a debug status file in the scratch root until the job saved a checkpoint.
-5. It kills the process with `adb shell run-as io.codemyriad.cassini.talk kill -9 <pid>`.
+5. It kills the process with `adb shell run-as io.codemyriad.cassini.talk.debug kill -9 <pid>`.
 6. It waits for the system to deliver the service intent again. If the system does not do this in time, it opens `DebugCommandActivity` with `am start`.
 7. It reads the status file until the job is done.
 8. It copies the document to the host and runs `cassini-extract.py --check` on it. If `../gocassini` exists, it also runs `check-portable-document.mjs`.
 9. It deletes `files/debug-root.txt` and the scratch root.
 
-CAUTION: If the script stops before step 9, delete the debug root file with `adb shell run-as io.codemyriad.cassini.talk rm files/debug-root.txt`. Until you delete it, the debug app uses the scratch root and does not show your notes.
+CAUTION: If the script stops before step 9, delete the debug root file with `adb shell run-as io.codemyriad.cassini.talk.debug rm files/debug-root.txt`. Until you delete it, the debug app uses the scratch root and does not show your notes.
 
 A host script does this test because the two Android tools do not kill the process in the same way as the system:
 
@@ -289,7 +289,7 @@ A host script does this test because the two Android tools do not kill the proce
 
 ### device-language-check.sh
 
-`scripts/device-language-check.sh` makes sure that the app language stays after process death. It opens the App language sheet in Settings and selects Italiano, with `uiautomator dump` and `input tap`. Then it kills the process with `run-as io.codemyriad.cassini.talk kill -9`, starts the app with `am start -W` and finds Italian text in a new `uiautomator dump`. At the end, it sets the language back to Phone.
+`scripts/device-language-check.sh` makes sure that the app language stays after process death. It opens the App language sheet in Settings and selects Italiano, with `uiautomator dump` and `input tap`. Then it kills the process with `run-as io.codemyriad.cassini.talk.debug kill -9`, starts the app with `am start -W` and finds Italian text in a new `uiautomator dump`. At the end, it sets the language back to Phone.
 
 ```sh
 scripts/device-language-check.sh --serial emulator-5554
