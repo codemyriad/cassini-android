@@ -118,7 +118,7 @@ class LibraryBackupTest {
             assertEquals("voice-ada", match.getValue("new-speaker").voiceId)
         } finally {
             opened.database.close()
-    }
+        }
     }
 
     @Test fun missingOrTruncatedPayloadNeverReplacesTheExistingLibrary() {

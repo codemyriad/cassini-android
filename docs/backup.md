@@ -1,7 +1,7 @@
 # Transfer and backup (D97)
 
-Implementation status: draft. The manifest still has `allowBackup=false`. Runtime controls,
-shared translations and the real local-transport checks must be complete before activation.
+Implementation status: draft. The manifest enables the guarded backup agent for device validation.
+Shared translations, privacy-copy updates and real local-transport checks must be complete before ready.
 
 The device-local choices are in `noBackupFilesDir/choices.json`, outside both transport datasets.
 Transfer starts enabled and cloud backup starts disabled. The Library explains transfer once;
