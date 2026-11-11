@@ -19,7 +19,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-package=io.codemyriad.cassini.talk
+package=io.codemyriad.cassini.talk.debug
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 

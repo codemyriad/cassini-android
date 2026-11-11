@@ -3,7 +3,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
     <!-- Plain HTTP to 127.0.0.1 only, for ModelDownloadDeviceTest's loopback model host (src/instrumented/res). -->
-    <application android:networkSecurityConfig="@xml/loopback_network">
+    <application android:label="@string/debug_app_name" android:networkSecurityConfig="@xml/loopback_network"
+        tools:replace="android:label">
         <!-- Exported so that adb shell am start reaches it; a release build has no such entry point. A visible
              start is also what lets it start the processing service on Android 12 and later. -->
         <activity android:name=".debug.DebugCommandActivity" android:exported="true"

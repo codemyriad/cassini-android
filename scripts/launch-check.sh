@@ -3,7 +3,27 @@
 #   scripts/launch-check.sh APK
 set -euo pipefail
 apk=${1:?Usage: scripts/launch-check.sh APK}
-package=io.codemyriad.cassini.talk
+test -f "$apk"
+repo_root=$(cd "$(dirname "$0")/.." && pwd)
+sdk_path=${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}
+if [ -z "$sdk_path" ]; then
+    sdk_path=$(python3 -I - "$repo_root/local.properties" <<'PY'
+from pathlib import Path
+import sys
+props = Path(sys.argv[1])
+if not props.is_file():
+    raise SystemExit("Set ANDROID_HOME or sdk.dir in local.properties.")
+print(next(line.removeprefix("sdk.dir=") for line in props.read_text().splitlines() if line.startswith("sdk.dir=")))
+PY
+    )
+fi
+package=$("$sdk_path/build-tools/36.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | python3 -I -c '
+import re, sys
+match = re.search(r"^\s*A: package=\"([^\"]+)\"", sys.stdin.read(), re.M)
+if not match:
+    raise SystemExit("Could not read package name from AndroidManifest.xml.")
+print(match.group(1))
+')
 component=$package/io.codemyriad.cassini.MainActivity
 adb install -r "$apk"
 adb shell am force-stop "$package"

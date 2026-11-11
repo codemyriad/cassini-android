@@ -21,9 +21,9 @@ import java.io.File
  * only while `files/debug-root.txt` names a scratch root: on the default root it does nothing, so it never touches
  * the user's notes.
  *
- * - `adb shell am start -n io.codemyriad.cassini/.debug.DebugCommandActivity --es cmd import --es file NAME` imports
- *   `<cache>/NAME` (the scratch root's cache directory) and enqueues it as Transcribe from a visible screen, which
- *   starts the processing service.
+ * - `adb shell am start -n io.codemyriad.cassini.talk.debug/.debug.DebugCommandActivity --es cmd import --es file NAME`
+ *   imports `<cache>/NAME` (the scratch root's cache directory) and enqueues it as Transcribe from a visible screen,
+ *   which starts the processing service.
  * - `--es cmd open` (the default) only makes the app visible, so ON_START starts a waiting queue.
  *
  * The activity is translucent and stays until the command has run and the service is in the foreground (at most

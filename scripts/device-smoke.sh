@@ -138,7 +138,7 @@ if $bench && [ "$CASSINI_TEST_BUILD_TYPE" != debug ]; then
     exit 1
 fi
 if [ "$CASSINI_TEST_BUILD_TYPE" = releaseTest ] && [ -z "${CASSINI_RELEASE_KEYSTORE_FILE:-}" ]; then
-    # Without a supplied key, sign with the local debug key, so the APK installs over a debug build.
+    # Without a supplied key, sign releaseTest with the local debug key for local runs.
     export CASSINI_RELEASE_KEYSTORE_FILE=$HOME/.android/debug.keystore
     export CASSINI_RELEASE_STORE_PASSWORD=${CASSINI_RELEASE_STORE_PASSWORD:-android}
     export CASSINI_RELEASE_KEY_PASSWORD=${CASSINI_RELEASE_KEY_PASSWORD:-android}
@@ -164,7 +164,11 @@ if $bench; then
     runner=io.codemyriad.cassini.bench/androidx.test.runner.AndroidJUnitRunner
 else
     adb install -r "${CASSINI_TEST_APK:-app/build/outputs/apk/androidTest/$CASSINI_TEST_BUILD_TYPE/app-$CASSINI_TEST_BUILD_TYPE-androidTest.apk}"
-    runner=io.codemyriad.cassini.talk.test/io.codemyriad.cassini.CassiniTestRunner
+    if [ "$CASSINI_TEST_BUILD_TYPE" = debug ]; then
+        runner=io.codemyriad.cassini.talk.debug.test/io.codemyriad.cassini.CassiniTestRunner
+    else
+        runner=io.codemyriad.cassini.talk.test/io.codemyriad.cassini.CassiniTestRunner
+    fi
 fi
 arguments=("${selection[@]}" -e downloadModels true -e audioSample "$sample")
 if [ "${#extra[@]}" -gt 0 ]; then arguments+=("${extra[@]}"); fi

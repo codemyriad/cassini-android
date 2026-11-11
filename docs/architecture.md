@@ -50,7 +50,7 @@ These constraints are mandatory:
 - The privacy rules apply. The list that follows gives them.
 - Native runtime: `minSdk 26`. The ABIs are `arm64-v8a` and `x86_64` (16 KB aligned). The app uses `libcassini_opus.so` and the custom sherpa-onnx AAR. We build this AAR from the pinned fork and `scripts/streaming-diarization.patch`.
 - Android stays native Kotlin. The iOS app is separate Swift code. The two apps share only the portable format.
-- `applicationId io.codemyriad.cassini.talk`, the package name of the Play app "Cassini talk". The code namespace stays `io.codemyriad.cassini`. 0.4.0 to 0.4.2-beta.1 were `io.codemyriad.cassini` (coordination D62), and 0.3.0 and earlier were `org.cassini.android`. There is no data migration between these apps (D51). The JNI class is `io.codemyriad.cassini.NativeOpus`, and the native symbols use this name. The old plan kept a launcher alias for the library activity of 0.1.0. The app does not need this alias, because no installed shortcuts exist.
+- `applicationId io.codemyriad.cassini.talk`, the package name of the Play app "Cassini talk" (debug builds add `applicationIdSuffix = ".debug"` and launcher label "Cassini debug" so they install beside the Play app). The code namespace stays `io.codemyriad.cassini`. 0.4.0 to 0.4.2-beta.1 were `io.codemyriad.cassini` (coordination D62), and 0.3.0 and earlier were `org.cassini.android`. There is no data migration between these apps (D51). The JNI class is `io.codemyriad.cassini.NativeOpus`, and the native symbols use this name. The old plan kept a launcher alias for the library activity of 0.1.0. The app does not need this alias, because no installed shortcuts exist.
 - UI stack: Jetpack Compose, with Material 3 components under the Cassini tokens. The tokens give all of the style: there is no stock Material look and no dynamic color. The app uses ViewModels, `StateFlow`, a unidirectional data flow, coroutines and manual dependency injection (`AppGraph`).
 - Languages and accessibility: English, Italian, French, Spanish, and Brazilian and European Portuguese (coordination decisions D50 and D50.1), TalkBack support and 48 dp touch targets. The app never shows a state by color alone. It has the light theme of the boards and a dark theme that we made from it. It is edge-to-edge and has predictive back with targetSdk 36 (from P10).
 
@@ -702,7 +702,7 @@ Then the queue starts in one of two ways:
 | Reboot | Nothing runs until the user opens the app. Then the work in the queue continues as this section describes. |
 | Java `OutOfMemoryError` | The job boundary catches it. The job becomes PAUSED(MEMORY), and the checkpoint stays. The checkpoint and the redelivery cover the native out-of-memory kills. |
 
-`adb shell am kill` does not kill a process that runs a foreground service. Thus the device checks use `adb shell run-as io.codemyriad.cassini.talk kill -9 <pid>` (section 9).
+`adb shell am kill` does not kill a process that runs a foreground service. Thus the device checks use `adb shell run-as io.codemyriad.cassini.talk.debug kill -9 <pid>` (section 9).
 
 ### 5.4 `TranscriptionJob` and its ports
 
@@ -1023,8 +1023,8 @@ Process-death and persistence checks are host scripts, not instrumentation. The 
 
 1. It writes `files/debug-root.txt`. Debug builds read this file. The models stay at `filesDir`.
 2. It copies the long clip into the cache of the scratch root.
-3. It starts a job through the debug-only `DebugCommandActivity` (`adb shell am start -n io.codemyriad.cassini.talk/io.codemyriad.cassini.debug.DebugCommandActivity --es cmd import --es file …`).
-4. It kills the process with `adb shell run-as io.codemyriad.cassini.talk kill -9 $(pidof io.codemyriad.cassini.talk)`.
+3. It starts a job through the debug-only `DebugCommandActivity` (`adb shell am start -n io.codemyriad.cassini.talk.debug/io.codemyriad.cassini.debug.DebugCommandActivity --es cmd import --es file …`).
+4. It kills the process with `adb shell run-as io.codemyriad.cassini.talk.debug kill -9 $(pidof io.codemyriad.cassini.talk.debug)`.
 5. It waits for the redelivery, or it opens the app again with `--es cmd open`.
 6. It reads the status file `<root>/debug-status.json` with `run-as cat`.
 7. It makes sure that the sealed document passes the format tools.
