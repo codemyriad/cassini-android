@@ -25,6 +25,7 @@ import io.codemyriad.cassini.recording.RecordingOutcome
 import io.codemyriad.cassini.recording.RecordingState
 import io.codemyriad.cassini.recording.inProgress
 import io.codemyriad.cassini.test.NeedsMicrophone
+import io.codemyriad.cassini.testing.NotificationWatch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
@@ -43,6 +44,8 @@ import io.codemyriad.cassini.ui.R as UiR
  */
 @NeedsMicrophone
 class RecordingFlowTest {
+    @get:Rule val notifications = NotificationWatch()
+
     @get:Rule val rule = createAndroidComposeRule<MainActivity>()
 
     private val recording get() = Flows.graph.recording
@@ -79,13 +82,13 @@ class RecordingFlowTest {
 
         val finish = ContextCompat.getContextForLanguage(rule.activity).getString(R.string.notif_action_finish)
         val manager = rule.activity.getSystemService(NotificationManager::class.java)
-        var action: android.app.Notification.Action? = null
-        rule.waitFor("The recording notification has a Finish action") {
-            action = manager.activeNotifications.firstOrNull { it.id == RecordingNotifications.RECORDING_ID }
-                ?.notification?.actions.orEmpty().firstOrNull { it.title?.toString() == finish }
-            action != null
+        val action = runBlocking {
+            notifications.await("The recording notification has a Finish action", Flows.SCREEN_MS) {
+                manager.activeNotifications.firstOrNull { it.id == RecordingNotifications.RECORDING_ID }
+                    ?.notification?.actions.orEmpty().firstOrNull { it.title?.toString() == finish }
+            }
         }
-        action!!.actionIntent.send()
+        action.actionIntent.send()
 
         val ended = runBlocking {
             awaitRecording("The recording ends after Finish", FINISH_MS) { it is RecordingState.Ended }
