@@ -137,16 +137,30 @@ class LibraryBackup(private val context: Context, private val paths: AppPaths, p
                 val sql = database.openHelper.writableDatabase
                 sql.execSQL("DELETE FROM jobs")
                 sql.execSQL("UPDATE notes SET trashed_job = NULL")
-                sql.execSQL("DELETE FROM variants WHERE note_id IN (SELECT id FROM notes WHERE audio_kind != 'DOCUMENT')")
-                sql.execSQL("UPDATE note_text SET body = '' WHERE note_id IN (SELECT id FROM notes WHERE audio_kind != 'DOCUMENT')")
+                sql.execSQL(
+                    "DELETE FROM variants WHERE note_id IN (SELECT id FROM notes WHERE audio_kind != 'DOCUMENT')"
+                )
+                sql.execSQL(
+                    "UPDATE note_text SET body = '' WHERE note_id IN (SELECT id FROM notes WHERE audio_kind != 'DOCUMENT')"
+                )
                 sql.execSQL("UPDATE notes SET preview = NULL, selected_variant = NULL WHERE audio_kind != 'DOCUMENT'")
-                sql.execSQL("DELETE FROM note_voice_links WHERE note_id IN (SELECT id FROM notes WHERE audio_kind != 'DOCUMENT')")
+                sql.execSQL(
+                    "DELETE FROM note_voice_links WHERE note_id IN (SELECT id FROM notes WHERE audio_kind != 'DOCUMENT')"
+                )
                 sql.execSQL("UPDATE notes SET document_signature = NULL WHERE audio_kind = 'DOCUMENT'")
             }
-            val documents = DocumentRepository(database, restored, CassiniDispatchers(), NoteLocks(), context.contentResolver)
+            val documents = DocumentRepository(
+                database,
+                restored,
+                CassiniDispatchers(),
+                NoteLocks(),
+                context.contentResolver
+            )
             runBlocking {
                 for (note in database.notes().all()) {
-                    require(BackupManifest.admits("notes/${note.id}/${note.audioFile}")) { "Unsafe catalogue audio path" }
+                    require(
+                        BackupManifest.admits("notes/${note.id}/${note.audioFile}")
+                    ) { "Unsafe catalogue audio path" }
                     documents.refreshIfStale(note.id)
                 }
             }

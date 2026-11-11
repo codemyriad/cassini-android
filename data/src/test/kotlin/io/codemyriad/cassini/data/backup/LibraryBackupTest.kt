@@ -61,13 +61,20 @@ class LibraryBackupTest {
             source.notes.finishRecording(id, 1000)
             offMain {
                 source.documents.sealBlocking(
-                    id, capture, Transcript(listOf(Word("S1", 0, 400, "Welcome"))), "Original title", JSONObject(),
-                    null, mapOf("S1" to "Ada"),
+                    id,
+                    capture,
+                    Transcript(listOf(Word("S1", 0, 400, "Welcome"))),
+                    "Original title",
+                    JSONObject(),
+                    null,
+                    mapOf("S1" to "Ada"),
                 )
             }
             source.notes.adoptSealed(id)
             source.db.notes().update(source.row(id).copy(title = "Custom title", titleDirty = true))
-            source.db.jobs().insert(JobEntity(id, 1, JobKind.TRANSCRIBE_AGAIN, JobState.QUEUED, enqueuedAt = 1, updatedAt = 1))
+            source.db.jobs().insert(
+                JobEntity(id, 1, JobKind.TRANSCRIBE_AGAIN, JobState.QUEUED, enqueuedAt = 1, updatedAt = 1)
+            )
             val voice = Voice("voice-ada", "Ada", "synthetic-model", floatArrayOf(1f, 0f, 0f), 1, 4.0, 1, 1)
             put(source.paths.root, "voices/people.json", VoiceCodec.encode(listOf(voice)))
             put(source.paths.root, "models/weights.onnx", "must not transfer")
@@ -96,7 +103,10 @@ class LibraryBackupTest {
                 assertEquals("Ada", opened.database.cache().speakers(id, row.selectedVariant!!).single().label)
                 val restoredVoices = VoiceCodec.decode(target.people.readText())
                 val match = VoiceMatcher.match(
-                    mapOf("new-speaker" to floatArrayOf(1f, 0f, 0f)), restoredVoices, "synthetic-model", Thresholds(0.9f, 0.8f, 0.1f),
+                    mapOf("new-speaker" to floatArrayOf(1f, 0f, 0f)),
+                    restoredVoices,
+                    "synthetic-model",
+                    Thresholds(0.9f, 0.8f, 0.1f),
                 )
                 assertEquals("voice-ada", match.getValue("new-speaker").voiceId)
             } finally {

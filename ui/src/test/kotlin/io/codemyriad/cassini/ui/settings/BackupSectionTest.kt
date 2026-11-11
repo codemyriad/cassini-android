@@ -23,7 +23,10 @@ class BackupSectionTest {
     private val events = mutableListOf<SettingsEvent>()
 
     private fun show(state: BackupSettingsUi) {
-        rule.setContent { CassiniTheme { androidx.compose.foundation.layout.Column { BackupSection(state, events::add) } } }
+        rule.setContent { CassiniTheme { androidx.compose.foundation.layout.Column { BackupSection(
+            state,
+            events::add
+        ) } } }
     }
 
     @Test fun switchesHaveIndependentAccessibleStateAndDoNotInventSuccessfulPersistence() {
@@ -42,7 +45,16 @@ class BackupSectionTest {
     }
 
     @Test fun aWriteInProgressDisablesBothSwitchesAndActualQuotaFailureIsVisible() {
-        show(BackupSettingsUi(transfer = true, cloud = true, transferAvailable = true, quotaExceeded = true, saving = true, error = true))
+        show(
+            BackupSettingsUi(
+                transfer = true,
+                cloud = true,
+                transferAvailable = true,
+                quotaExceeded = true,
+                saving = true,
+                error = true
+            )
+        )
         rule.onNodeWithText("Transfer to a new phone").assertIsNotEnabled()
         rule.onNodeWithText("Android cloud backup").assertIsNotEnabled()
         rule.onNodeWithText("Couldn’t save this choice. Try again.").assertExists()

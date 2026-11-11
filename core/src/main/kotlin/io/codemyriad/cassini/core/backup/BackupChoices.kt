@@ -15,6 +15,7 @@ data class BackupChoices(
 
     companion object {
         const val TRANSPORT_FLAGS_API = 28
+
         // BackupAgent: device-to-device (2), and API 36.1's direct cross-platform transfer (8).
         private const val TRANSFER_FLAGS = 2 or 8
 

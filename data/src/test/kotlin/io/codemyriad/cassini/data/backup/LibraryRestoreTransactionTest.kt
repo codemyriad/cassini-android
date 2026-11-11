@@ -44,8 +44,11 @@ class LibraryRestoreTransactionTest {
         assertEquals("$prefix voice", File(root, "voices/people.json").readText())
         assertEquals("$prefix catalogue", File(root, "cassini.db").readText())
         for (suffix in listOf("-wal", "-shm", "-journal")) {
-            if (sidecars) assertEquals("$prefix $suffix", File(root, "cassini.db$suffix").readText())
-            else assertFalse(File(root, "cassini.db$suffix").exists())
+            if (sidecars) {
+                assertEquals("$prefix $suffix", File(root, "cassini.db$suffix").readText())
+            } else {
+                assertFalse(File(root, "cassini.db$suffix").exists())
+            }
         }
         assertEquals("existing model", File(root, "models/weights.onnx").readText())
         assertEquals("existing setting", File(root, "settings.preferences_pb").readText())
@@ -75,7 +78,8 @@ class LibraryRestoreTransactionTest {
         put(live, "models/weights.onnx", "existing model")
         put(live, "settings.preferences_pb", "existing setting")
         var moved = 0
-        val transaction = LibraryRestoreTransaction(live, staging, { if (++moved == 3) throw IOException("injected") }, {})
+        val transaction =
+            LibraryRestoreTransaction(live, staging, { if (++moved == 3) throw IOException("injected") }, {})
         val incomplete = stage(staging)
         offMain { assertThrows(IOException::class.java) { transaction.install(incomplete) } }
         assertState(live, "old", sidecars = true)
@@ -122,7 +126,9 @@ class LibraryRestoreTransactionTest {
         val valid = journal.readText()
         val wrapper = JSONObject(valid).put("payload", "{}")
         journal.writeText(wrapper.toString())
-        offMain { assertThrows(IllegalArgumentException::class.java) { LibraryRestoreTransaction(live, staging).recover() } }
+        offMain { assertThrows(
+            IllegalArgumentException::class.java
+        ) { LibraryRestoreTransaction(live, staging).recover() } }
         assertEquals("new note", File(live, "notes/n/document.opus").readText())
         journal.writeText(valid)
         offMain { LibraryRestoreTransaction(live, staging).recover() }

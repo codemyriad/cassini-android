@@ -75,7 +75,10 @@ class BackupChoicesStore(private val file: File, private val io: CoroutineDispat
             val atomic = AtomicFile(file)
             val output = atomic.startWrite()
             try {
-                val json = JSONObject().put("version", VERSION).put("transfer", value.transfer).put("cloud", value.cloud)
+                val json = JSONObject().put(
+                    "version",
+                    VERSION
+                ).put("transfer", value.transfer).put("cloud", value.cloud)
                     .put("noticeAcknowledged", value.noticeAcknowledged).put("quotaExceeded", value.quotaExceeded)
                 output.write(json.toString().toByteArray(Charsets.UTF_8))
                 atomic.finishWrite(output)

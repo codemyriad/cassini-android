@@ -47,8 +47,12 @@ class CassiniBackupAgent : BackupAgent() {
             require(file.startsWith(root)) { "Restore destination is outside the library" }
             val path = root.relativize(file).toString().replace(File.separatorChar, '/')
             when (type) {
-                TYPE_DIRECTORY -> require(size == 0L && BackupManifest.directory(path)) { "Unexpected restore directory" }
-                TYPE_FILE -> ParcelFileDescriptor.AutoCloseInputStream(ParcelFileDescriptor.dup(data.fileDescriptor)).use { input ->
+                TYPE_DIRECTORY -> require(
+                    size == 0L && BackupManifest.directory(path)
+                ) { "Unexpected restore directory" }
+                TYPE_FILE -> ParcelFileDescriptor.AutoCloseInputStream(
+                    ParcelFileDescriptor.dup(data.fileDescriptor)
+                ).use { input ->
                     library.receive(path, input, size, mtime, noBackupFilesDir.usableSpace)
                 }
                 else -> throw IOException("Unexpected restore entry type")

@@ -86,7 +86,8 @@ class BackupManifestTest {
             assertThrows(IllegalArgumentException::class.java) { BackupManifest.parse(json.toString()) }
         }
         val duplicate = JSONObject().put("version", 1).put(
-            "files", JSONArray().put(entry("cassini.db")).put(entry("cassini.db")),
+            "files",
+            JSONArray().put(entry("cassini.db")).put(entry("cassini.db")),
         )
         assertThrows(IllegalArgumentException::class.java) { BackupManifest.parse(duplicate.toString()) }
     }

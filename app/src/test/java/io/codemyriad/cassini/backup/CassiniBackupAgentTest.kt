@@ -87,7 +87,10 @@ class CassiniBackupAgentTest {
         File(source, "voices").mkdirs()
         File(source, "voices/people.json").writeText("Synthetic saved voice")
         val manifest = BackupManifest.create(source)
-        val model = File(app.filesDir, "models/synthetic.bin").also { it.parentFile!!.mkdirs(); it.writeText("target model") }
+        val model = File(app.filesDir, "models/synthetic.bin").also {
+            it.parentFile!!.mkdirs()
+            it.writeText("target model")
+        }
         val agent = Robolectric.setupBackupAgent(CassiniBackupAgent::class.java)
         binder {
             restore(agent, BackupManifest.MANIFEST, manifest.json())
@@ -103,7 +106,10 @@ class CassiniBackupAgentTest {
     }
 
     @Test fun unexpectedPathsAndMissingManifestLeaveTheCurrentLibraryUntouched() {
-        val old = File(app.filesDir, "voices/people.json").also { it.parentFile!!.mkdirs(); it.writeText("original") }
+        val old = File(app.filesDir, "voices/people.json").also {
+            it.parentFile!!.mkdirs()
+            it.writeText("original")
+        }
         val agent = Robolectric.setupBackupAgent(CassiniBackupAgent::class.java)
         assertThrows(IOException::class.java) { binder { restore(agent, "models/injected.bin", "unwanted") } }
         assertThrows(IOException::class.java) { binder { restore(agent, "../outside.bin", "unwanted") } }

@@ -37,9 +37,14 @@ class BackupChoicesStoreTest {
 
     @Test fun corruptUnsupportedOrOversizedChoicesNeverEnableAnUpload() = runTest {
         val file = File(folder.root, "choices.json")
-        for (text in listOf("{", "x".repeat(5000), """{"version":99}""", """
+        for (text in listOf(
+            "{",
+            "x".repeat(5000),
+            """{"version":99}""",
+            """
             {"version":1,"transfer":true,"cloud":"true","noticeAcknowledged":false,"quotaExceeded":false}
-        """)) {
+        """
+        )) {
             file.writeText(text)
             val value = BackupChoicesStore(file, Dispatchers.IO).choices.first()
             assertEquals(BackupChoices.UNREADABLE, value)
