@@ -61,6 +61,47 @@ class DeepLinksTest {
         assertEquals(uri, DeepLinks.external(uri, ownPackage = OWN))
     }
 
+    /** Review of #168: side-by-side release and debug builds accept shares from each other while refusing their own. */
+    @Test fun acceptsSharesBetweenReleaseAndDebugVariantsWhileRefusingOwnProviders() {
+        fun send(stream: String, pkg: String) = DeepLinks.parse(
+            DeepLinks.ACTION_SEND,
+            null,
+            null,
+            null,
+            stream = stream,
+            ownPackage = pkg,
+        )
+        fun view(uri: String, pkg: String) = DeepLinks.parse(DeepLinks.ACTION_VIEW, uri, null, null, ownPackage = pkg)
+
+        val releaseShare = "content://$OWN.share/share/x/a.opus"
+        val debugShare = "content://$DEBUG_OWN.share/share/x/a.opus"
+        val releaseDocs = "content://$OWN.documents/document/note%3A1"
+        val debugDocs = "content://$DEBUG_OWN.documents/document/note%3A1"
+
+        // Release accepts debug's providers and refuses its own.
+        assertEquals(DeepLink.Import(debugShare), send(debugShare, OWN))
+        assertEquals(DeepLink.Import(debugDocs), view(debugDocs, OWN))
+        for (own in listOf("content://$OWN/x", releaseShare, releaseDocs, "content://$OWN.androidx-startup/x")) {
+            assertNull(own, send(own, OWN))
+            assertNull(own, view(own, OWN))
+        }
+
+        // Debug accepts release's providers and refuses its own.
+        assertEquals(DeepLink.Import(releaseShare), send(releaseShare, DEBUG_OWN))
+        assertEquals(DeepLink.Import(releaseDocs), view(releaseDocs, DEBUG_OWN))
+        val debugOwn = listOf(
+            "content://$DEBUG_OWN/x",
+            debugShare,
+            debugDocs,
+            "content://$DEBUG_OWN.debugstatus/x",
+            "content://$DEBUG_OWN.androidx-startup/x",
+        )
+        for (own in debugOwn) {
+            assertNull(own, send(own, DEBUG_OWN))
+            assertNull(own, view(own, DEBUG_OWN))
+        }
+    }
+
     @Test fun parsesASharedAudioFile() {
         fun send(stream: String?) =
             DeepLinks.parse(DeepLinks.ACTION_SEND, null, null, null, stream = stream, ownPackage = OWN)
@@ -133,5 +174,6 @@ class DeepLinksTest {
     private companion object {
         const val MAIN = "android.intent.action.MAIN"
         const val OWN = "io.codemyriad.cassini.talk"
+        const val DEBUG_OWN = "io.codemyriad.cassini.talk.debug"
     }
 }

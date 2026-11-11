@@ -54,6 +54,10 @@ android {
         }
     }
     buildTypes {
+        getByName("debug") {
+            // Distinct from the Play package so device checks install beside a user's app without touching its data.
+            applicationIdSuffix = ".debug"
+        }
         getByName("release") {
             isDebuggable = false
             isMinifyEnabled = true

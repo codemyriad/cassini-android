@@ -12,8 +12,8 @@ usage() {
     cat <<'USAGE'
 Usage: scripts/baseline-profile.sh [--serial SERIAL]
 
-Builds the releaseTest app (release without R8, signed with the local debug key so that it installs over a debug
-build and keeps the notes) and the :baselineprofile test APK, installs them, runs BaselineProfileGenerator and copies
+Builds the releaseTest app (release without R8, signed with the local debug key when no release keystore is supplied)
+and the :baselineprofile test APK, installs them, runs BaselineProfileGenerator and copies
 the collected profile to app/src/main/baseline-prof.txt. The device must run API 33 or later (or API 28 or later
 with root), in English, with at least one transcribed note with speech in the Library.
 

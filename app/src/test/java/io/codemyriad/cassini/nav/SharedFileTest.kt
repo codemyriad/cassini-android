@@ -123,9 +123,33 @@ class SharedFileTest {
         assertEquals("testfiles.$applicationId", fixtures.single().authority)
         val shipping = providers.filterNot { it.name == TestFilesProvider::class.java.name }
         assertTrue("the merged manifest declares shipping providers", shipping.isNotEmpty())
+        val ownAuthorities = DeepLinks.ownAuthorities(applicationId)
         for (provider in shipping) {
             for (authority in requireNotNull(provider.authority).split(';')) {
                 assertTrue("${provider.name}: $authority", authority.startsWith("$applicationId."))
+                assertTrue("${provider.name}: $authority in DeepLinks.ownAuthorities", authority in ownAuthorities)
+            }
+        }
+    }
+
+    @Test fun acceptsSharesFromTheSiblingVariantWhileRefusingOwnManifestProviders() {
+        val siblingShare = "io.codemyriad.cassini.talk.share"
+        assertTrue("debug app has .debug applicationId", app.packageName.endsWith(".debug"))
+        Robolectric.setupContentProvider(GrantedProvider::class.java, siblingShare)
+        GrantedProvider.gate.countDown()
+        val uri = "content://$siblingShare/share/x/voice.wav"
+        ActivityScenario.launch<MainActivity>(send(uri)).use {
+            val started = importStarts()
+            assertEquals("sibling release share starts an import", 1, started.size)
+        }
+        val ownRefused = listOf(
+            "content://${app.packageName}.share/share/x/voice.wav",
+            "content://${app.packageName}.debugstatus/status",
+            "content://${app.packageName}.androidx-startup/init",
+        )
+        for (own in ownRefused) {
+            ActivityScenario.launch<MainActivity>(send(own)).use {
+                assertEquals(own, emptyList<Intent>(), importStarts())
             }
         }
     }

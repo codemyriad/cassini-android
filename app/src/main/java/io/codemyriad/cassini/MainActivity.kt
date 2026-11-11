@@ -1,7 +1,9 @@
 package io.codemyriad.cassini
 
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.compose.ReportDrawnAfter
 import androidx.activity.compose.setContent
@@ -28,6 +30,10 @@ class MainActivity : AppCompatActivity() {
 
     /** One flow for the activity's life: a new one would restart the collector in [CassiniApp]. */
     private val linkFlow = links.receiveAsFlow()
+
+    private val ownAuthorities: Set<String> by lazy(LazyThreadSafetyMode.NONE) {
+        DeepLinks.ownAuthorities(packageName) + manifestAuthorities()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -59,6 +65,8 @@ class MainActivity : AppCompatActivity() {
             noteId = intent.getStringExtra(ProcessingNotifications.EXTRA_NOTE_ID),
             resume = intent.getBooleanExtra(ProcessingNotifications.EXTRA_RESUME, false),
             stream = if (intent.action == Intent.ACTION_SEND) sharedStream(intent) else null,
+            ownPackage = packageName,
+            ownAuthorities = ownAuthorities,
         ) ?: return
         intent.putExtra(DeepLinks.EXTRA_HANDLED, true)
         // A file from another app: its read grant ends with this activity, so a service holds it for the import.
@@ -68,4 +76,20 @@ class MainActivity : AppCompatActivity() {
     /** The audio file of an ACTION_SEND from another app's share sheet. */
     private fun sharedStream(intent: Intent): String? =
         IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)?.toString()
+
+    /** Every provider authority declared in this variant's merged manifest, excluding the external-import test stub. */
+    private fun manifestAuthorities(): Set<String> {
+        val info = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val flags = PackageManager.PackageInfoFlags.of(PackageManager.GET_PROVIDERS.toLong())
+            packageManager.getPackageInfo(packageName, flags)
+        } else {
+            @Suppress("DEPRECATION")
+            packageManager.getPackageInfo(packageName, PackageManager.GET_PROVIDERS)
+        }
+        return info.providers.orEmpty()
+            .asSequence()
+            .flatMap { it.authority.orEmpty().splitToSequence(';') }
+            .filter { it.isNotEmpty() && !it.startsWith("testfiles.") }
+            .toSet()
+    }
 }

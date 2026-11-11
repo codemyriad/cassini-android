@@ -33,7 +33,7 @@ internal object Background {
     }
 
     /** The `ProcessingService` part of `dumpsys activity services` (empty when it does not run). */
-    fun processingService(): String = shell("dumpsys activity services io.codemyriad.cassini.talk")
+    fun processingService(): String = shell("dumpsys activity services ${context.packageName}")
         .substringAfter("ServiceRecord", "").substringAfter("ProcessingService", "")
 
     /**
