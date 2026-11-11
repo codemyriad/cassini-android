@@ -5,6 +5,8 @@ import android.os.Looper
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.Snapshot
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -84,6 +86,32 @@ class MainDispatchEventsTest {
             }
             assertTrue(state.value)
             write.get(TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        } finally {
+            worker.shutdownNow()
+        }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun aSchedulerDispatchAfterAFailedCheckWakesTheWaiter() {
+        val scheduler = TestCoroutineScheduler()
+        val dispatcher = StandardTestDispatcher(scheduler)
+        val checked = CountDownLatch(1)
+        val worker = Executors.newSingleThreadExecutor()
+        var delivered = false
+        try {
+            val post = worker.submit {
+                check(checked.await(TIMEOUT_MS, TimeUnit.MILLISECONDS)) { "Missing scheduler query" }
+                dispatcher.dispatch(EmptyCoroutineContext) { delivered = true }
+            }
+            mainDispatches.await(TIMEOUT_MS, scheduler) {
+                scheduler.runCurrent()
+                val current = delivered
+                checked.countDown()
+                current
+            }
+            assertTrue(delivered)
+            post.get(TIMEOUT_MS, TimeUnit.MILLISECONDS)
         } finally {
             worker.shutdownNow()
         }
