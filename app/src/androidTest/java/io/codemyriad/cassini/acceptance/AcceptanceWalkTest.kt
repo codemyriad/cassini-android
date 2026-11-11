@@ -15,7 +15,6 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onFirst
@@ -25,7 +24,6 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
-import androidx.compose.ui.test.printToLog
 import androidx.core.os.LocaleListCompat
 import androidx.test.espresso.Espresso
 import androidx.test.platform.app.InstrumentationRegistry
@@ -520,24 +518,22 @@ class AcceptanceWalkTest {
     }
 
     private fun toLibrary() {
-        // A text button, or an icon with this description while a recording runs.
         val import = rule.text(UiR.string.ui_library_import)
-        val settings = hasText(import) or hasContentDescription(import)
-        fun shown(timeoutMs: Long) = runCatching {
-            rule.awaitUi(timeoutMs) { rule.onAllNodes(settings).fetchSemanticsNodes().isNotEmpty() }
-        }.isSuccess
-        if (shown(FIRST_LOOK_MS)) return
-        // Each back waits for its screen change: one back too many would close the app.
-        repeat(BACK_TRIES) { attempt ->
-            if (attempt > 0) {
-                val roots = rule.onAllNodes(isRoot())
-                roots.fetchSemanticsNodes().indices.forEach { roots[it].printToLog(TAG) }
-                shot("debug-back-$attempt")
+        val library = hasText(import) or hasContentDescription(import)
+        val back = hasContentDescription(rule.text(UiR.string.ui_back_to_library)) or
+            hasContentDescription(rule.text(UiR.string.ui_back_to_settings))
+        repeat(BACK_TRIES) {
+            var atLibrary = false
+            // A slow Library frame must never be interpreted as permission to press Back out of the activity.
+            rule.awaitUi(SEE_MS) {
+                val nodes = rule.liveNodes()
+                atLibrary = nodes.any(library::matches)
+                atLibrary || nodes.any(back::matches)
             }
-            Espresso.pressBack()
-            if (shown(BACK_MS)) return
+            if (atLibrary) return
+            rule.onNode(back).performClick()
         }
-        rule.waitShown(settings)
+        rule.waitShown(library)
     }
 
     /**
@@ -698,8 +694,6 @@ class AcceptanceWalkTest {
         const val PLAYER_MS = 60_000L
         const val STILL_MS = 10_000L
         const val BACK_TRIES = 3
-        const val BACK_MS = 5_000L
-        const val FIRST_LOOK_MS = 200L
         const val MS_PER_S = 1_000L
         const val LOW_SPACE_S = 12 * 60L
         const val PNG_QUALITY = 100
