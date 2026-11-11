@@ -20,6 +20,10 @@ import io.codemyriad.cassini.core.library.VariantKind
 import io.codemyriad.cassini.data.DocumentSignature
 import io.codemyriad.cassini.data.db.JobEntity
 import io.codemyriad.cassini.data.db.offMain
+import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.json.JSONObject
 import org.junit.After
@@ -35,9 +39,6 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
-import java.io.File
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 
 /** DocumentRepository and the adopt path of docs/architecture.md, sections 3.1, 3.2 and 4.3. */
 @RunWith(RobolectricTestRunner::class)
@@ -62,6 +63,34 @@ class DocumentRepositoryTest {
 
     private suspend fun insertJob(id: String, state: JobState = JobState.PAUSED) =
         h.db.jobs().insert(JobEntity(id, 1, JobKind.TRANSCRIBE_AGAIN, state, enqueuedAt = 1, updatedAt = 1))
+
+    @Test fun recordingTimeSurvivesSealExportAndReimport() = runTest {
+        val start = java.time.Instant.parse("2026-11-11T12:00:00Z").toEpochMilli()
+        h.now = start
+        h.plainNote("recorded")
+        h.now = start + 540_000
+        seal("recorded", File(h.dir("recorded"), "capture.opus"), first, "Recorded meeting")
+        h.notes.adoptSealed("recorded")
+        assertEquals(start, h.row("recorded").recordingTime()?.instant?.toEpochMilli())
+        val exported = folder.newFile("export.opus")
+        assertTrue(h.documents.exportCopy("recorded", Uri.fromFile(exported)) is ExportOutcome.Saved)
+        h.documentNote("imported", first)
+        exported.copyTo(h.document("imported"), overwrite = true)
+        h.notes.refreshIfStale("imported")
+        assertEquals(start, h.row("imported").recordingTime()?.instant?.toEpochMilli())
+        assertEquals(start, h.row("imported").createdAt)
+        assertEquals("2026-11-11T12:09:00Z", h.readFile("imported").manifest!!.getJSONObject("meeting").getString("createdAtUtc"))
+        h.restart()
+        assertEquals(start, h.notes.library().first().single { it.id == "imported" }.recordingTime()?.instant?.toEpochMilli())
+    }
+
+    @Test fun packagingOnlyImportHasNoDisplayedRecordingTime() = runTest {
+        h.documentNote("unknown", first)
+        h.notes.refreshIfStale("unknown")
+        assertNull(h.row("unknown").recordingTime())
+        assertNull(h.notes.library().first().single().recordingTime())
+        assertTrue("packaging time remains an ordering fallback", h.row("unknown").createdAt > 0)
+    }
 
     // Adopt.
 

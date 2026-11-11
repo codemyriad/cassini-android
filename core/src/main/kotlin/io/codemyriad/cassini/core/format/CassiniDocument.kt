@@ -1,7 +1,5 @@
 package io.codemyriad.cassini.core.format
 
-import org.json.JSONArray
-import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -9,6 +7,8 @@ import java.io.InputStream
 import java.time.Instant
 import java.util.Locale
 import java.util.UUID
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
  * [CassiniDocument.state] as a type. [code] is the string the reader reports. [UNREADABLE] is reported only by
@@ -38,6 +38,7 @@ data class CassiniDocument(
     val documentState: DocumentState get() = DocumentState.of(state)
     data class Variant(val id: String, val descriptor: JSONObject, val body: String?, val transcript: Transcript?, val error: String? = null)
     val defaultId get() = variants.firstOrNull { it.descriptor.optBoolean("default") }?.id ?: variants.firstOrNull()?.id
+    val meetingTime: MeetingTime? get() = MeetingTime.resolve(manifest, comments)
     val title get() = manifest?.optJSONObject("meeting")?.optString("title").orEmpty()
     fun selected(id: String?) = variants.firstOrNull { it.id == (id ?: defaultId) }
     fun speakerLabel(id: String): String? {
@@ -211,8 +212,9 @@ data class CassiniDocument(
         }
         /** Adds a variant while retaining existing descriptors, bodies, extensions and unrelated tags. */
         fun create(audioBytes: ByteArray, transcript: Transcript, title: String, processing: JSONObject,
-                   existing: CassiniDocument? = null, speakerLabels: Map<String, String> = emptyMap()): ByteArray {
-            val (comments, digest) = seal(OggOpus.scan(ByteArrayInputStream(audioBytes)), transcript, title, processing, existing, speakerLabels)
+                   existing: CassiniDocument? = null, speakerLabels: Map<String, String> = emptyMap(),
+                   recordedAtUtc: Instant? = null, createdAtUtc: Instant = Instant.now()): ByteArray {
+            val (comments, digest) = seal(OggOpus.scan(ByteArrayInputStream(audioBytes)), transcript, title, processing, existing, speakerLabels, recordedAtUtc = recordedAtUtc, createdAtUtc = createdAtUtc)
             val out = ByteArrayOutputStream()
             require(OggOpus.rewrite(ByteArrayInputStream(audioBytes), tagsPacket(comments), out).digest() == digest)
             return out.toByteArray().also { verify(read(it), transcript) }
@@ -232,9 +234,11 @@ data class CassiniDocument(
             speakerLabels: Map<String, String>,
             target: File,
             extensions: JSONObject? = null,
+            recordedAtUtc: Instant? = null,
+            createdAtUtc: Instant = Instant.now(),
         ): CassiniDocument {
             val stream = OggOpus.scan(audio)
-            val (comments, digest) = seal(stream, transcript, title, processing, existing, speakerLabels, extensions)
+            val (comments, digest) = seal(stream, transcript, title, processing, existing, speakerLabels, extensions, recordedAtUtc, createdAtUtc)
             writeWithTags(audio, comments, digest, target)
             return read(target).also { verify(it, transcript) }
         }
@@ -373,10 +377,12 @@ data class CassiniDocument(
             existing: CassiniDocument?,
             speakerLabels: Map<String, String>,
             extensions: JSONObject? = null,
+            recordedAtUtc: Instant? = null,
+            createdAtUtc: Instant = Instant.now(),
         ): Pair<List<String>, String> {
             val digest = stream.digest()
             require(existing == null || existing.state == "ok") // Never rebind stale transcripts to different audio.
-            val now = Instant.now().toString()
+            val now = createdAtUtc.toString()
             val manifest = existing?.manifest?.let { JSONObject(it.toString()) } ?: JSONObject()
                 .put("kind", "cassini-portable-meeting").put("version", 1).put("profile", "ogg-opus")
                 .put("meeting", JSONObject().put("id", "mtg_${UUID.randomUUID()}").put("title", title.ifBlank { "Recording" })
@@ -387,6 +393,7 @@ data class CassiniDocument(
                     .put("sampleRate", 48000).put("channels", stream.channels).put("sampleCount", stream.sampleCount).put("durationMs", stream.durationMs))
                 .put("speakers", JSONArray()).put("transcripts", JSONArray())
                 .apply { if (extensions != null) put("x", JSONObject(extensions.toString())) }
+            if (existing == null && recordedAtUtc != null) manifest.getJSONObject("meeting").put("recordedAtUtc", recordedAtUtc.toString())
             val descriptors = manifest.getJSONArray("transcripts")
             val id = if (descriptors.length() == 0) "words" else "words-${UUID.randomUUID().toString().take(8)}"
             for (i in 0 until descriptors.length()) descriptors.getJSONObject(i).put("default", false)
@@ -409,7 +416,7 @@ data class CassiniDocument(
                 val name = it.substringBefore('=').uppercase(Locale.ROOT)
                 name == "CASSINI_FORMAT" || name == "CASSINI_PROFILE" || name == "CASSINI_PAYLOAD_SCHEMA" ||
                     isManifestTag(name) ||
-                    name in setOf("CASSINI_TRANSCRIPT_IDS", "CASSINI_TRANSCRIPT_DEFAULT", "CASSINI_DECODE_HINT", "CASSINI_SPEAKER_COUNT", "CASSINI_MEETING_ID", "CASSINI_CREATED_AT") || name in setOf("CASSINI_AUDIO_SAMPLE_RATE", "CASSINI_AUDIO_CHANNELS", "CASSINI_AUDIO_SAMPLE_COUNT", "CASSINI_AUDIO_DURATION_MS", "CASSINI_AUDIO_MATCH_POLICY", "CASSINI_AUDIO_OPUS_SHA256")
+                    name in setOf("CASSINI_TRANSCRIPT_IDS", "CASSINI_TRANSCRIPT_DEFAULT", "CASSINI_DECODE_HINT", "CASSINI_SPEAKER_COUNT", "CASSINI_MEETING_ID", "CASSINI_CREATED_AT", "CASSINI_RECORDED_AT_UTC", "DATE") || name in setOf("CASSINI_AUDIO_SAMPLE_RATE", "CASSINI_AUDIO_CHANNELS", "CASSINI_AUDIO_SAMPLE_COUNT", "CASSINI_AUDIO_DURATION_MS", "CASSINI_AUDIO_MATCH_POLICY", "CASSINI_AUDIO_OPUS_SHA256")
             }.toMutableList()
             comments += listOf("CASSINI_FORMAT=$FORMAT", "CASSINI_PROFILE=ogg-opus",
                 "CASSINI_PAYLOAD_SCHEMA=https://format.gocassini.com/schema/cassini-portable-meeting-manifest-v1.schema.json",
@@ -421,6 +428,11 @@ data class CassiniDocument(
                 "DURATION_MS" to stream.durationMs.toString(), "MATCH_POLICY" to "exact-opus-audio-v1", "OPUS_SHA256" to digest)
                 .forEach { (key, value) -> comments += "CASSINI_AUDIO_$key=$value" }
             if (existing == null && comments.none { it.substringBefore('=').equals("TITLE", true) }) comments += "TITLE=${manifest.getJSONObject("meeting").getString("title")}" 
+            val meeting = manifest.getJSONObject("meeting")
+            val start = MeetingTime.resolve(manifest, existing?.comments.orEmpty())
+            val utc = meeting.opt("recordedAtUtc") as? String
+            if (utc != null) comments += "CASSINI_RECORDED_AT_UTC=$utc"
+            comments += "DATE=${utc ?: start?.takeIf { it.source == MeetingTime.DATE }?.value ?: meeting.getString("createdAtUtc")}"
             comments += bodyTags
             comments += CassiniPayload.encode(MANIFEST_PREFIX, CassiniPayload.MIME, manifest.toString()).second
             return comments to digest

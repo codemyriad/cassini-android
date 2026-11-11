@@ -99,7 +99,7 @@ fun NoteActionsSheetContent(ui: NoteActionsUi, onAction: (NoteAction) -> Unit, m
 private fun metaLine(ui: NoteActionsUi, document: Boolean): String {
     val dayDuration = stringResource(
         R.string.ui_join_dot,
-        Dates.dayTime(ui.recordedDay, ui.recordedAt),
+        ui.recordedLabel ?: Dates.dayTime(ui.recordedDay, ui.recordedAt),
         Durations.clock(ui.durationMs),
     )
     if (!document || ui.speakers <= 0) return dayDuration

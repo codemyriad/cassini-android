@@ -17,14 +17,14 @@ import io.codemyriad.cassini.processing.ProcessingState
 import io.codemyriad.cassini.processing.TranscribeOutcome
 import io.codemyriad.cassini.recording.RecordingState
 import io.codemyriad.cassini.ui.banner.BannerKind
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.map
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 
 /** "Now" in the Library tests: Thursday 8 Oct 2026, 10:00 in Rome. */
 internal val ROME: ZoneId = ZoneId.of("Europe/Rome")
@@ -52,6 +52,7 @@ internal fun libraryRow(
     id = id,
     title = title,
     createdAt = createdAt,
+    recordedAt = Instant.ofEpochMilli(createdAt).toString(),
     durationMs = durationMs,
     audioKind = audioKind,
     documentState = documentState,
@@ -76,6 +77,7 @@ internal fun details(row: LibraryRow, job: JobEntity? = null) = NoteDetails(
         id = row.id,
         title = row.title,
         createdAt = row.createdAt,
+        recordedAt = row.recordedAt,
         addedAt = row.createdAt,
         origin = Origin.RECORDED,
         audioFile = if (row.audioKind == AudioKind.DOCUMENT) "document.opus" else "capture.m4a",

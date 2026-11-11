@@ -2,9 +2,9 @@ package io.codemyriad.cassini.ui.components
 
 import androidx.compose.runtime.Immutable
 import io.codemyriad.cassini.ui.format.DayLabel
+import java.time.LocalTime
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
-import java.time.LocalTime
 
 /**
  * A note's status in the Library (features.md section 1, `NoteStatus.of` in :core). The row turns it into the chip
@@ -67,6 +67,7 @@ data class NoteRowUi(
     val status: NoteStatusUi,
     val preview: Highlighted? = null,
     val highlighted: Boolean = false,
+    val recordedLabel: String? = null,
 )
 
 /** What a Library row asks for: open, the long press, the inline suffixes and the TalkBack custom actions. */

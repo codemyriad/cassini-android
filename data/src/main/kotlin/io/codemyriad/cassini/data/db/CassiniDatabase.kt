@@ -23,11 +23,21 @@ import androidx.room.TypeConverters
         JobEntity::class,
         NoteVoiceLinkEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
 abstract class CassiniDatabase : RoomDatabase() {
+    companion object {
+        /** Preserve authoritative rows/jobs; old document-time caches must be derived again from the file. */
+        val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE notes ADD COLUMN recorded_at TEXT")
+                db.execSQL("UPDATE notes SET document_signature = NULL WHERE audio_kind = 'DOCUMENT'")
+            }
+        }
+    }
+
     abstract fun notes(): NoteDao
     abstract fun cache(): CacheDao
     abstract fun jobs(): JobDao

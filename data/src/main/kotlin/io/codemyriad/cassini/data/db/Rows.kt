@@ -7,6 +7,7 @@ import io.codemyriad.cassini.core.format.DocumentState
 import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.library.JobState
+import io.codemyriad.cassini.core.library.Origin
 import io.codemyriad.cassini.core.library.PauseReason
 
 // Query results of the DAOs. They hold domain values; ViewModels in :app turn them into UiState.
@@ -20,7 +21,7 @@ internal object Sql {
 
     /** The [LibraryRow] columns. */
     const val LIBRARY_COLUMNS =
-        "n.id, n.title, n.created_at, n.duration_ms, n.audio_kind, n.document_state, " +
+        "n.id, n.title, n.created_at, n.duration_ms, n.audio_kind, n.document_state, n.origin, n.recorded_at, " +
             "COALESCE(n.preview, NULLIF(substr(t.body, 1, 160), '')) AS preview, " +
             "j.state AS job_state, j.kind AS job_kind, j.pause_reason, j.failure, j.done_ms, j.total_ms, " +
             "v.variant_id AS selected_variant, v.word_count, v.speaker_count"
@@ -54,6 +55,8 @@ data class LibraryRow(
     @ColumnInfo(name = "selected_variant") val selectedVariant: String?,
     @ColumnInfo(name = "word_count") val wordCount: Int?,
     @ColumnInfo(name = "speaker_count") val speakerCount: Int?,
+    val origin: Origin = Origin.RECORDED,
+    @ColumnInfo(name = "recorded_at") val recordedAt: String? = null,
 )
 
 /**

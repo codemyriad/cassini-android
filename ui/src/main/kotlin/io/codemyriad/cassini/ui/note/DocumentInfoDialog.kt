@@ -77,7 +77,11 @@ private fun ColumnScope.InfoRows(ui: InfoUi) {
             LargeChip(text = label, tone = tone, modifier = Modifier.padding(top = 2.dp))
         }
         InfoRow(stringResource(R.string.ui_info_title), ui.title)
-        InfoRow(stringResource(R.string.ui_info_recorded), Dates.longDateTime(ui.recordedDate, ui.recordedTime))
+        InfoRow(stringResource(R.string.ui_info_recorded), ui.recordedLabel ?: if (ui.recordingTimeKnown) {
+            Dates.longDateTime(ui.recordedDate, ui.recordedTime)
+        } else {
+            Dates.dayLabel(io.codemyriad.cassini.ui.format.DayLabel.Unknown)
+        })
         InfoRow(stringResource(R.string.ui_info_duration), Durations.clock(ui.durationMs))
         InfoRow(
             stringResource(R.string.ui_info_contents),

@@ -22,6 +22,7 @@ import io.codemyriad.cassini.data.db.NoteDetails
 import io.codemyriad.cassini.data.db.WordEntity
 import io.codemyriad.cassini.data.notes.EditOutcome
 import io.codemyriad.cassini.data.notes.ExportOutcome
+import io.codemyriad.cassini.data.notes.recordingTime
 import io.codemyriad.cassini.data.voices.SavedVoices
 import io.codemyriad.cassini.engine.job.DraftState
 import io.codemyriad.cassini.engine.job.JobFailure
@@ -65,6 +66,8 @@ import io.codemyriad.cassini.ui.note.TranscriptMatch
 import io.codemyriad.cassini.ui.note.TranscriptSearchUi
 import io.codemyriad.cassini.ui.note.TrustUi
 import io.codemyriad.cassini.ui.theme.SpeakerTone
+import java.time.Clock
+import java.time.Instant
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
@@ -99,8 +102,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import java.time.Clock
-import java.time.Instant
 
 /** What the Note route does for the ViewModel: navigation, the system pickers and the permission request. */
 sealed interface NoteEffect {
@@ -558,7 +559,8 @@ class NoteViewModel(
 
     private fun info(details: NoteDetails, facts: DocumentFacts?): InfoUi {
         val note = details.note
-        val at = Instant.ofEpochMilli(note.createdAt).atZone(clock.zone)
+        val recording = note.recordingTime()
+        val at = (recording?.instant ?: Instant.EPOCH).atZone(clock.zone)
         val selected = NoteMapping.selected(details)
         val inference = selected?.inferenceMs?.takeIf { it > 0 }
         return InfoUi(
@@ -566,6 +568,8 @@ class NoteViewModel(
             title = note.title,
             recordedDate = at.toLocalDate(),
             recordedTime = at.toLocalTime(),
+            recordedLabel = recording?.label,
+            recordingTimeKnown = recording?.instant != null,
             durationMs = note.durationMs,
             versions = details.variants.size,
             speakers = selected?.speakerCount ?: 0,
@@ -1107,7 +1111,7 @@ class NoteViewModel(
         } else {
             val speakers = NoteMapping.selected(details)?.speakerCount ?: 0
             val markdown = if (kind == ExportKind.MARKDOWN) {
-                ports.markdownOptions(details.note.createdAt, details.note.durationMs)
+                ports.markdownOptions(details.note.recordingTime(), details.note.durationMs)
             } else {
                 null
             }
@@ -1115,7 +1119,7 @@ class NoteViewModel(
                 details,
                 format,
                 ports::placeholderLabel,
-                ports.exportSubtitle(details.note.createdAt, details.note.durationMs, speakers),
+                ports.exportSubtitle(details.note.recordingTime(), details.note.durationMs, speakers),
                 ports.exportEmptyText(),
             ).copy(markdown = markdown)
             ports.exportTranscript(noteId, request, uri)

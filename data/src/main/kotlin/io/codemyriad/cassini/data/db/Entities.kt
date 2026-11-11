@@ -38,7 +38,7 @@ data class NoteEntity(
     val title: String,
     /** The document title differs from [title] and must be rewritten when that is allowed. */
     @ColumnInfo(name = "title_dirty") val titleDirty: Boolean = false,
-    /** When the audio was recorded (epoch ms): capture start, the document's `meeting.createdAtUtc`, else import time. */
+    /** Ordering key: known recording instant, else packaging/import time. Never a display-time fallback (D95). */
     @ColumnInfo(name = "created_at") val createdAt: Long,
     @ColumnInfo(name = "added_at") val addedAt: Long,
     val origin: Origin,
@@ -74,6 +74,8 @@ data class NoteEntity(
     @ColumnInfo(name = "trashed_at") val trashedAt: Long? = null,
     @ColumnInfo(name = "trashed_job") val trashedJob: TrashedJob? = null,
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
+    /** D95 recording instant or site-local label; null means unknown for a Cassini document. */
+    @ColumnInfo(name = "recorded_at") val recordedAt: String? = null,
 )
 
 /** One transcript variant of a note's document, in manifest order. */

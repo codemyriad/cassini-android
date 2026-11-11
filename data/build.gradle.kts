@@ -29,6 +29,7 @@ android {
         abortOnError = true
         lintConfig = file("lint.xml")
     }
+    sourceSets.getByName("test").assets.srcDir("schemas")
     testOptions {
         unitTests {
             isIncludeAndroidResources = true

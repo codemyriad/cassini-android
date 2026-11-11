@@ -22,6 +22,7 @@ data class NoteActionsUi(
     val title: String,
     val recordedDay: DayLabel,
     val recordedAt: LocalTime,
+    val recordedLabel: String? = null,
     val durationMs: Long,
     val speakers: Int,
     val documentKind: DocumentKindUi,

@@ -593,4 +593,6 @@
     <string name="ui_markdown_over" formatted="false">(ao mesmo tempo que {names})</string>
     <string name="ui_meeting_duration_hours">{h} h {mm} min</string>
     <string name="ui_meeting_duration_minutes">{m} min</string>
+    <!-- cassini-ux library.group.unknownDate (D95); see docs/recorded-at.md. -->
+    <string name="ui_day_unknown">Data desconhecida</string>
 </resources>

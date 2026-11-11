@@ -35,4 +35,6 @@ data class InfoUi(
     val fileBytes: Long,
     val meetingId: String? = null,
     val readError: String? = null,
+    val recordedLabel: String? = null,
+    val recordingTimeKnown: Boolean = true,
 )

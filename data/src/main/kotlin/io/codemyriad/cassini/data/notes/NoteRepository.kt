@@ -24,14 +24,14 @@ import io.codemyriad.cassini.data.db.SearchRow
 import io.codemyriad.cassini.data.db.TrashRow
 import io.codemyriad.cassini.data.db.VariantEntity
 import io.codemyriad.cassini.data.db.WordEntity
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 
 /** The rules of a note title (features.md section 6, Rename). */
 object NoteTitles {
@@ -117,6 +117,7 @@ class NoteRepository(
                 id = id,
                 title = clean,
                 createdAt = createdAt,
+                recordedAt = Instant.ofEpochMilli(createdAt).toString(),
                 addedAt = now,
                 origin = Origin.RECORDED,
                 audioFile = "capture.$format",

@@ -2,7 +2,6 @@ package io.codemyriad.cassini.library
 
 import io.codemyriad.cassini.core.format.DocumentState
 import io.codemyriad.cassini.core.library.AudioKind
-import io.codemyriad.cassini.core.library.DayGroups
 import io.codemyriad.cassini.core.library.DayKey
 import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.core.library.NoteFacts
@@ -12,6 +11,7 @@ import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.data.db.LibraryRow
 import io.codemyriad.cassini.data.db.NoteDetails
 import io.codemyriad.cassini.data.db.SearchRow
+import io.codemyriad.cassini.data.notes.recordingTime
 import io.codemyriad.cassini.engine.job.DownloadProgress
 import io.codemyriad.cassini.engine.job.JobPhase
 import io.codemyriad.cassini.engine.job.TimeLeft
@@ -31,11 +31,11 @@ import io.codemyriad.cassini.ui.library.RecordingPillUi
 import io.codemyriad.cassini.ui.note.DocumentKindUi
 import io.codemyriad.cassini.ui.note.NoteActionsUi
 import io.codemyriad.cassini.ui.note.TranscribeRowUi
+import java.time.Instant
+import java.time.ZoneId
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
-import java.time.Instant
-import java.time.ZoneId
 
 /**
  * The live facts every Library row needs besides its Room row: the note that records now and its elapsed time, and
@@ -91,7 +91,8 @@ object LibraryMapping {
             title = hit?.title ?: row.title,
             titleRanges = hit?.titleRanges ?: persistentListOf(),
             durationMs = if (recording) context.recordingElapsedMs else row.durationMs,
-            time = Instant.ofEpochMilli(row.createdAt).atZone(zone).toLocalTime(),
+            time = row.recordingTime()?.instant?.atZone(zone)?.toLocalTime() ?: java.time.LocalTime.MIDNIGHT,
+            recordedLabel = row.recordingTime()?.label,
             day = hit?.day,
             status = status(row, context),
             preview = if (hit != null) hit.snippet else storedPreview(row.preview),
@@ -101,8 +102,8 @@ object LibraryMapping {
 
     /** The day sections of [rows] (newest first), grouped by the local day of `created_at` at [now] in [zone]. */
     fun sections(rows: List<LibraryRow>, context: RowContext, now: Instant, zone: ZoneId): ImmutableList<DaySection> =
-        DayGroups.group(rows, now, zone) { it.createdAt }
-            .map { (key, group) -> DaySection(dayLabel(key), group.map { row(it, context, zone) }.toImmutableList()) }
+        rows.groupBy { recordingDay(it.recordingTime(), now, zone) }
+            .map { (key, group) -> DaySection(key, group.map { row(it, context, zone) }.toImmutableList()) }
             .toImmutableList()
 
     /**
@@ -116,13 +117,23 @@ object LibraryMapping {
                 .takeUnless { it.text.isEmpty() || it.leadingEllipsis || it.trailingEllipsis }
             val snippet = result.snippet.takeIf { SearchQuery.MATCH_START in it }?.let(::highlighted)
             val hit = Hit(
-                day = dayLabel(DayGroups.key(result.row.createdAt, now, zone)),
+                day = recordingDay(result.row.recordingTime(), now, zone),
                 title = title?.text,
                 titleRanges = title?.ranges.orEmpty().toImmutableList(),
                 snippet = snippet,
             )
             row(result.row, context, zone, hit)
         }.toImmutableList()
+
+    fun recordingDay(time: io.codemyriad.cassini.core.format.MeetingTime?, now: Instant, zone: ZoneId): DayLabel {
+        val day = time?.day(zone) ?: return DayLabel.Unknown
+        val today = now.atZone(zone).toLocalDate()
+        return when (day) {
+            today -> DayLabel.Today
+            today.minusDays(1) -> DayLabel.Yesterday
+            else -> DayLabel.Date(day, day.year != today.year)
+        }
+    }
 
     fun dayLabel(key: DayKey): DayLabel = when (key) {
         DayKey.Today -> DayLabel.Today
@@ -259,8 +270,9 @@ object LibraryMapping {
         return NoteActionsUi(
             noteId = note.id,
             title = note.title,
-            recordedDay = dayLabel(DayGroups.key(note.createdAt, now, zone)),
-            recordedAt = Instant.ofEpochMilli(note.createdAt).atZone(zone).toLocalTime(),
+            recordedDay = recordingDay(note.recordingTime(), now, zone),
+            recordedAt = note.recordingTime()?.instant?.atZone(zone)?.toLocalTime() ?: java.time.LocalTime.MIDNIGHT,
+            recordedLabel = note.recordingTime()?.label,
             durationMs = note.durationMs,
             speakers = if (document) selected?.speakerCount ?: 0 else 0,
             documentKind = if (document) {

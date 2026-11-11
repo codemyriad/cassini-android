@@ -52,6 +52,7 @@ internal fun documentNote(
         id = NOTE,
         title = "Weekly sync",
         createdAt = daysAgo(0),
+        recordedAt = java.time.Instant.ofEpochMilli(daysAgo(0)).toString(),
         addedAt = daysAgo(0),
         origin = Origin.RECORDED,
         audioFile = if (audioKind == AudioKind.DOCUMENT) "document.opus" else "capture.opus",
@@ -369,11 +370,11 @@ internal class FakeNotePorts : NotePorts {
 
     override fun placeholderLabel(number: Int): String = "Speaker $number"
 
-    override fun exportSubtitle(createdAt: Long, durationMs: Long, speakers: Int): String = "8 Oct 2026 · $speakers"
+    override fun exportSubtitle(recordedAt: io.codemyriad.cassini.core.format.MeetingTime?, durationMs: Long, speakers: Int): String = "8 Oct 2026 · $speakers"
 
     override fun exportEmptyText(): String = "No words"
 
-    override fun markdownOptions(createdAt: Long, durationMs: Long) = io.codemyriad.cassini.core.export.MarkdownOptions(
+    override fun markdownOptions(recordedAt: io.codemyriad.cassini.core.format.MeetingTime?, durationMs: Long) = io.codemyriad.cassini.core.export.MarkdownOptions(
         "Thursday 8 October 2026, 15:10",
         io.codemyriad.cassini.core.export.MarkdownCopy("Speakers: {names}", "Transcript", "Notes", "(over {names})") {
             it.joinToString(" and ")

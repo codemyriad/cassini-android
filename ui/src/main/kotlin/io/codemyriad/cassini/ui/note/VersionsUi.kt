@@ -1,9 +1,9 @@
 package io.codemyriad.cassini.ui.note
 
 import androidx.compose.runtime.Immutable
-import kotlinx.collections.immutable.ImmutableList
 import java.time.LocalDate
 import java.time.LocalTime
+import kotlinx.collections.immutable.ImmutableList
 
 /** The Versions sheet (no board; features.md section 3.4): one row per variant in manifest order. */
 @Immutable
@@ -39,4 +39,6 @@ data class VersionRowUi(
     val language: String? = null,
     val readable: Boolean = true,
     val withYear: Boolean = false,
+    val recordedLabel: String? = null,
+    val recordingTimeKnown: Boolean = true,
 )

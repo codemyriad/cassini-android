@@ -27,9 +27,6 @@ import io.codemyriad.cassini.data.db.CassiniDatabase
 import io.codemyriad.cassini.data.db.JobEntity
 import io.codemyriad.cassini.data.db.NoteCache
 import io.codemyriad.cassini.data.db.NoteEntity
-import kotlinx.coroutines.withContext
-import org.json.JSONException
-import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 import java.io.OutputStream
@@ -37,6 +34,9 @@ import java.time.Instant
 import java.time.format.DateTimeParseException
 import java.util.UUID
 import java.util.concurrent.Callable
+import kotlinx.coroutines.withContext
+import org.json.JSONException
+import org.json.JSONObject
 
 /** The transcript export formats of features.md section 6. */
 enum class TranscriptFormat(val extension: String) { TXT("txt"), MARKDOWN("md"), SRT("srt"), VTT("vtt") }
@@ -203,7 +203,13 @@ class DocumentRepository(
             marker.delete()
             var done = false
             try {
-                val document = CassiniDocument.create(audio, transcript, title, processing, existing, labels, sealed)
+                val row = notes.noteBlocking(noteId)
+                val start = row?.recordingTime()?.instant
+                val document = CassiniDocument.create(
+                    audio, transcript, title, processing, existing, labels, sealed,
+                    recordedAtUtc = start,
+                    createdAtUtc = Instant.ofEpochMilli(clock()),
+                )
                 NoteFiles.syncFile(sealed)
                 marker.createNewFile()
                 NoteFiles.syncFile(marker)
@@ -644,7 +650,9 @@ class DocumentRepository(
     /** [row] as [document] describes it: its title, recording time and audio file; a duration when it has no manifest. */
     private fun describedBy(row: NoteEntity, document: CassiniDocument, file: File): NoteEntity {
         val meeting = document.manifest?.optJSONObject("meeting")
-        val createdAt = meeting?.optString("createdAtUtc")?.let { text ->
+        val time = document.meetingTime
+        // Packaging time can order an unknown meeting, but never becomes its displayed time.
+        val createdAt = time?.instant?.toEpochMilli() ?: meeting?.optString("createdAtUtc")?.let { text ->
             try {
                 Instant.parse(text).toEpochMilli()
             } catch (_: DateTimeParseException) {
@@ -655,6 +663,7 @@ class DocumentRepository(
         return row.copy(
             title = NoteTitles.fit(document.title) ?: row.title,
             createdAt = createdAt ?: row.createdAt,
+            recordedAt = time?.value,
             durationMs = duration ?: row.durationMs,
             audioFile = NoteFiles.DOCUMENT,
             audioKind = AudioKind.DOCUMENT,
