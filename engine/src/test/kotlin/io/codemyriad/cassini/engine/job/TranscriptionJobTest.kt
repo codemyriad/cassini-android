@@ -81,6 +81,7 @@ class TranscriptionJobTest {
         val h = Harness(speechModel = SpeechModel.INCLUDED)
         h.models.readyParts = emptySet()
         h.models.consent = false
+        h.models.authorizedParts = setOf(ModelPart.SPEECH)
         val (outcome, events) = h.run()
         assertEquals(JobOutcome.Done, outcome)
         assertTrue(events.none { it is JobEvent.Downloading })
@@ -88,6 +89,46 @@ class TranscriptionJobTest {
         val json = JobProvenance.recognition("und", 1, "desktop-gate", 0, SpeechModel.INCLUDED)
         assertEquals("needle", json.getString("backend"))
         assertEquals("Whistle", json.getString("engine"))
+    }
+
+    @Test fun includedInstallsAuthorisedSpeakerModelsWithoutSpeechConsentOrParakeet() = runBlocking {
+        val h = Harness(speechModel = SpeechModel.INCLUDED)
+        h.models.readyParts = emptySet()
+        h.models.authorizedParts = setOf(ModelPart.SPEAKERS, ModelPart.VOICES)
+        h.models.consent = false
+        h.models.detector = false
+        val (outcome, events) = h.run()
+        assertEquals(JobOutcome.Done, outcome)
+        assertEquals(listOf(setOf(ModelPart.SPEAKERS, ModelPart.VOICES)), h.models.installs)
+        assertTrue(events.any { it is JobEvent.Downloading })
+        assertTrue(h.provenance().has("x-speakerDiarization"))
+        assertTrue(h.storage.saved.all { it.model == SpeechModel.INCLUDED.identity })
+        assertFalse(h.models.ready(ModelPart.SPEECH))
+    }
+
+    @Test fun failedIncludedSpeakerDownloadKeepsTheWordsWithoutClaimingAttribution() = runBlocking {
+        val h = Harness(speechModel = SpeechModel.INCLUDED)
+        h.models.readyParts = emptySet()
+        h.models.authorizedParts = setOf(ModelPart.SPEAKERS, ModelPart.VOICES)
+        h.models.consent = false
+        h.models.outcome = InstallOutcome.Installed(failed = mapOf(ModelPart.SPEAKERS to DownloadError.NO_CONNECTION))
+        val (outcome, _) = h.run()
+        assertEquals(JobOutcome.Done, outcome)
+        assertTrue(h.sealed().selected(null)!!.transcript!!.words.isNotEmpty())
+        assertFalse(h.provenance().has("x-speakerDiarization"))
+        assertFalse(h.models.ready(ModelPart.SPEAKERS))
+        assertEquals(listOf(setOf(ModelPart.SPEAKERS, ModelPart.VOICES)), h.models.installs)
+    }
+
+    @Test fun includedHonoursAnInstallOwnerConsentRefusalBeforeDecoding() = runBlocking {
+        val h = Harness(speechModel = SpeechModel.INCLUDED)
+        h.models.readyParts = emptySet()
+        h.models.authorizedParts = setOf(ModelPart.SPEAKERS)
+        h.models.outcome = InstallOutcome.NeedsConsent(123)
+        val (outcome, _) = h.run()
+        assertEquals(JobOutcome.NeedsConsent(123), outcome)
+        assertTrue(h.script.recognizers.isEmpty())
+        assertTrue(h.storage.saved.isEmpty())
     }
 
     @Test fun decodesIn28SecondWindowsAndSavesOneCheckpointPerWindow() = runBlocking {

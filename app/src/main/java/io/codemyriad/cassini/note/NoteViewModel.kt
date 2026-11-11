@@ -7,11 +7,13 @@ import androidx.lifecycle.viewModelScope
 import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.audio.Limits
 import io.codemyriad.cassini.core.checkpoint.CheckpointNames
+import io.codemyriad.cassini.core.format.DocumentState
 import io.codemyriad.cassini.core.format.Transcript
 import io.codemyriad.cassini.core.format.Word
 import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.library.JobState
+import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.speakers.Match
 import io.codemyriad.cassini.core.speakers.SampleWindow
 import io.codemyriad.cassini.core.speakers.SpeakerPrint
@@ -506,8 +508,12 @@ class NoteViewModel(
         if (overDocument) trustBanner(details, ui)?.let { list += it }
         val phase = core.job?.phase.takeIf { mode !is NoteMode.Processing }
         val failure = details.job?.failure?.let { ports.failureText(it) }
-        val refused = LibraryMapping.transcribeAgainRefused(details)
-        list += Notices.job(details.job, phase, NoteMapping.oneVoice(details), failure, freeBytes, refused)
+        val refused = LibraryMapping.transcribeAgainRefused(details) ||
+            (NoteMapping.oneVoice(details) && note.documentState != DocumentState.OK)
+        list += Notices.job(
+            details.job, phase, NoteMapping.oneVoice(details), failure, freeBytes, refused,
+            speakerModel = facts.speakerModel,
+        )
         if (overDocument && facts.parakeet.firstWhistleNote == note.id) {
             Notices.parakeetSuggestion(facts)?.let { list += it }
         }
@@ -1026,7 +1032,13 @@ class NoteViewModel(
                 val key = if (id == BannerKind.PARAKEET_RECOMMENDED.name) {
                     ModelDownloadKey(parakeetOnly = true)
                 } else {
-                    ModelDownloadKey(noteId)
+                    if (id == BannerKind.TX_SPEAKERS_MISSING.name &&
+                        (!NoteMapping.oneVoice(details) || details.note.documentState != DocumentState.OK)
+                    ) {
+                        return
+                    }
+                    val requested = ModelPart.SPEAKERS.takeIf { id == BannerKind.TX_SPEAKERS_MISSING.name }
+                    ModelDownloadKey(noteId, part = requested)
                 }
                 emit(NoteEffect.OpenModelDownload(key))
             }

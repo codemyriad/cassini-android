@@ -199,6 +199,14 @@ enum class BannerKind(
         appEmitted = false,
     ),
     TX_BATTERY(INFO, TX, R.string.ui_banner_tx_battery_title, R.string.ui_banner_tx_battery_body, appEmitted = false),
+    TX_SPEAKERS_MISSING(
+        WARN,
+        TX,
+        R.string.ui_part_speakers,
+        R.string.ui_settings_optional_size,
+        uses = setOf(BYTES),
+        actions = listOf(DOWNLOAD),
+    ),
     TX_ONE_VOICE(
         WARN,
         TX,
