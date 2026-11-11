@@ -10,6 +10,8 @@ import io.codemyriad.cassini.data.db.LibraryRow
 import io.codemyriad.cassini.data.db.NoteDetails
 import io.codemyriad.cassini.data.db.NoteEntity
 import io.codemyriad.cassini.data.db.SearchRow
+import io.codemyriad.cassini.core.library.SearchFilters
+import java.time.LocalDate
 import io.codemyriad.cassini.data.notes.RenameOutcome
 import io.codemyriad.cassini.notices.NoticeFacts
 import io.codemyriad.cassini.notices.TrashedNote
@@ -112,7 +114,14 @@ internal class FakeLibraryPorts : LibraryPorts {
 
     override fun library(): Flow<List<LibraryRow>> = libraryError?.let { error -> flow { throw error } } ?: rows
 
-    override fun search(query: String): Flow<List<SearchRow>> {
+    override fun namedSpeakers(): Flow<List<String>> = speakerNames
+
+    val speakerNames = MutableStateFlow<List<String>>(emptyList())
+    override val calendarZone = MutableStateFlow(ROME)
+    val filterRequests = mutableListOf<SearchFilters>()
+
+    override fun search(query: String, filters: SearchFilters, zone: ZoneId, today: LocalDate): Flow<List<SearchRow>> {
+        filterRequests += filters
         searches += query
         return searchRows.map { it[query].orEmpty() }
     }

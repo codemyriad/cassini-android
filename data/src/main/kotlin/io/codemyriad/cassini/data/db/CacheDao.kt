@@ -133,6 +133,14 @@ abstract class CacheDao {
     @Query("SELECT * FROM words WHERE note_id = :noteId AND variant_id = :variantId ORDER BY idx")
     abstract fun wordsBlocking(noteId: String, variantId: String): List<WordEntity>
 
+    /** Refuse a superseded search snapshot instead of combining its labels with another variant/document. */
+    @Query(
+        "SELECT w.* FROM words w JOIN notes n ON n.id = w.note_id " +
+            "WHERE n.id = :noteId AND n.trashed_at IS NULL AND w.variant_id = :variantId " +
+            "AND :variantId = ${Sql.SELECTED_VARIANT} AND n.document_signature IS :signature ORDER BY w.idx",
+    )
+    abstract suspend fun searchWords(noteId: String, variantId: String, signature: String?): List<WordEntity>
+
     /** How many words are cached for a variant; a count below `variants.word_count` means the cache must be rebuilt. */
     @Query("SELECT COUNT(*) FROM words WHERE note_id = :noteId AND variant_id = :variantId")
     abstract suspend fun cachedWordCount(noteId: String, variantId: String): Int

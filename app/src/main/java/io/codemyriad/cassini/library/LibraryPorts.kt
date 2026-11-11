@@ -5,6 +5,7 @@ import android.os.Build
 import android.view.accessibility.AccessibilityManager
 import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.core.library.JobKind
+import io.codemyriad.cassini.core.library.SearchFilters
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.data.db.LibraryRow
 import io.codemyriad.cassini.data.db.NoteDetails
@@ -23,6 +24,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import java.time.LocalDate
+import java.time.ZoneId
 
 /**
  * What the Library ViewModel reads and changes (features.md section 1). [GraphLibraryPorts] binds it to [AppGraph];
@@ -32,7 +35,12 @@ import kotlinx.coroutines.flow.map
 interface LibraryPorts {
     fun library(): Flow<List<LibraryRow>>
 
-    fun search(query: String): Flow<List<SearchRow>>
+    fun search(query: String, filters: SearchFilters, zone: ZoneId, today: LocalDate): Flow<List<SearchRow>>
+
+    fun namedSpeakers(): Flow<List<String>>
+
+    /** Calendar/time-zone broadcasts; repeated zone values still refresh the local day. */
+    val calendarZone: Flow<ZoneId>
 
     /** One note with its variants, speakers and job, for the Note actions sheet. */
     fun details(id: String): Flow<NoteDetails?>
@@ -87,8 +95,12 @@ class GraphLibraryPorts(private val graph: AppGraph, context: Context) : Library
 
     override fun library(): Flow<List<LibraryRow>> = flow { emitAll(graph.awaitCatalogue().notes.library()) }
 
-    override fun search(query: String): Flow<List<SearchRow>> =
-        flow { emitAll(graph.awaitCatalogue().notes.search(query)) }
+    override fun search(query: String, filters: SearchFilters, zone: ZoneId, today: LocalDate): Flow<List<SearchRow>> =
+        flow { emitAll(graph.awaitCatalogue().notes.search(query, filters, zone, today)) }
+
+    override fun namedSpeakers(): Flow<List<String>> = flow { emitAll(graph.awaitCatalogue().notes.namedSpeakers()) }
+
+    override val calendarZone: Flow<ZoneId> = searchCalendar(app)
 
     override fun details(id: String): Flow<NoteDetails?> = flow { emitAll(graph.awaitCatalogue().notes.note(id)) }
 

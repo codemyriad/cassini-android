@@ -12,6 +12,12 @@ sealed interface LibraryEvent {
 
     data object ClearQuery : LibraryEvent
 
+    data class FilterSpeaker(val name: String?) : LibraryEvent
+
+    data class FilterDate(val date: SearchDateUi) : LibraryEvent
+
+    data object ToggleRecordedByMe : LibraryEvent
+
     @Immutable
     data class OpenNote(val id: String) : LibraryEvent
 
