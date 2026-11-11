@@ -523,6 +523,24 @@ class NoteViewModelTest {
     // Exports. --------------------------------------------------------------------------------------------------
 
     @Test
+    fun markdownSavesAndSharesTheSelectedVariantThroughTheRealExportRoute() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        send(viewModel, NoteEvent.More, NoteEvent.SheetAction(NoteAction.SAVE_MARKDOWN))
+        assertEquals(NoteEffect.CreateFile("text/markdown", "Weekly sync.md"), effects.last())
+        viewModel.onExportTarget("content://picked/markdown")
+        advanceUntilIdle()
+        val request = ports.exports.single()
+        assertEquals(TranscriptFormat.MARKDOWN, request.format)
+        assertEquals("v1", request.variantId)
+        assertEquals("Thursday 8 October 2026, 15:10", request.markdown!!.dateLine)
+        assertEquals(mapOf("a" to "Giulia", "b" to "Speaker 2", "c" to "Paolo"), request.labels)
+        send(viewModel, NoteEvent.More, NoteEvent.SheetAction(NoteAction.SHARE_MARKDOWN))
+        val shared = effects.last() as NoteEffect.Share
+        assertEquals("text/markdown", shared.mime)
+        assertEquals(TranscriptFormat.MARKDOWN, ports.exports.last().format)
+    }
+
+    @Test
     fun transcriptExportsUseTheDisplayLabelsOfTheSelectedVersion() = runTest(dispatcher) {
         val viewModel = viewModel()
         send(viewModel, NoteEvent.More, NoteEvent.SheetAction(NoteAction.SAVE_TEXT))

@@ -8,6 +8,9 @@ import io.codemyriad.cassini.core.UserFacingException
 import io.codemyriad.cassini.core.export.ExportNames
 import io.codemyriad.cassini.core.export.ExportTranscript
 import io.codemyriad.cassini.core.export.SrtWriter
+import io.codemyriad.cassini.core.export.MarkdownExport
+import io.codemyriad.cassini.core.export.MarkdownNote
+import io.codemyriad.cassini.core.export.MarkdownOptions
 import io.codemyriad.cassini.core.export.TextExport
 import io.codemyriad.cassini.core.export.VttWriter
 import io.codemyriad.cassini.core.format.CassiniDocument
@@ -37,7 +40,7 @@ import java.util.UUID
 import java.util.concurrent.Callable
 
 /** The transcript export formats of features.md section 6. */
-enum class TranscriptFormat(val extension: String) { TXT("txt"), SRT("srt"), VTT("vtt") }
+enum class TranscriptFormat(val extension: String) { TXT("txt"), MARKDOWN("md"), SRT("srt"), VTT("vtt") }
 
 /**
  * One transcript export. [labels] are the display labels per speaker id, chosen by the caller (named labels verbatim,
@@ -50,6 +53,7 @@ data class TranscriptExport(
     val subtitle: String = "",
     val emptyText: String = "",
     val variantId: String? = null,
+    val markdown: MarkdownOptions? = null,
 )
 
 /**
@@ -361,6 +365,7 @@ class DocumentRepository(
             when {
                 row == null -> ExportOutcome.NoNote
                 row.audioKind != AudioKind.DOCUMENT || row.documentState in NOT_EXPORTABLE -> ExportOutcome.NotAvailable
+                request.format == TranscriptFormat.MARKDOWN && request.markdown == null -> ExportOutcome.NotAvailable
                 variantId == null || variants.none { it.variantId == variantId } -> ExportOutcome.NotAvailable
                 else -> {
                     val words = cache.words(noteId, variantId).map { Word(it.speaker, it.startMs, it.endMs, it.text) }
@@ -372,7 +377,7 @@ class DocumentRepository(
                         variants.first { it.variantId == variantId }.wordEndsBoundedByAudio,
                     )
                     val name = ExportNames.file(row.title, request.format.extension)
-                    stageAndWrite(name, render(transcript, request), dest)
+                    stageAndWrite(name, render(transcript, request, noteId), dest)
                 }
             }
         }
@@ -584,10 +589,28 @@ class DocumentRepository(
         }
     }
 
-    private fun render(transcript: ExportTranscript, request: TranscriptExport): String = when (request.format) {
+    private fun render(transcript: ExportTranscript, request: TranscriptExport, noteId: String): String = when (request.format) {
         TranscriptFormat.TXT -> TextExport.write(transcript, request.subtitle, request.emptyText)
+        TranscriptFormat.MARKDOWN -> requireNotNull(request.markdown).let {
+            MarkdownExport.write(transcript, it.dateLine, it.copy, markdownNotes(noteId))
+        }
         TranscriptFormat.SRT -> SrtWriter.write(transcript)
         TranscriptFormat.VTT -> VttWriter.write(transcript)
+    }
+
+    /** D13: notes live only in their owner's namespace; exporting never rewrites private data. */
+    private fun markdownNotes(noteId: String): List<MarkdownNote> {
+        val notes = readBlocking(noteId)?.manifest?.optJSONObject("x")?.optJSONObject("gocassini.com")
+            ?.optJSONArray("notes") ?: return emptyList()
+        return buildList {
+            for (index in 0 until notes.length()) {
+                val note = notes.optJSONObject(index) ?: continue
+                val time = note.opt("atMs") as? Number ?: continue
+                val atMs = time.toLong()
+                val text = note.opt("text") as? String ?: continue
+                if (atMs >= 0 && time.toDouble() == atMs.toDouble()) add(MarkdownNote(atMs, text))
+            }
+        }
     }
 
     private fun stageAndWrite(name: String, text: String, dest: Uri): ExportOutcome {

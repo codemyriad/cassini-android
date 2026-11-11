@@ -2,6 +2,8 @@ package io.codemyriad.cassini.data.notes
 
 import android.net.Uri
 import io.codemyriad.cassini.core.export.ExportTranscript
+import io.codemyriad.cassini.core.export.MarkdownCopy
+import io.codemyriad.cassini.core.export.MarkdownOptions
 import io.codemyriad.cassini.core.export.SrtWriter
 import io.codemyriad.cassini.core.export.TextExport
 import io.codemyriad.cassini.core.export.VttWriter
@@ -362,6 +364,35 @@ class DocumentRepositoryTest {
             assertArrayEquals(format.name, text.toByteArray(Charsets.UTF_8), dest.readBytes())
         }
         assertFalse("cacheDir/exports is cleaned", h.paths.exports.exists())
+    }
+
+    @Test fun markdownExportsPrivateNotesWithoutChangingThePortableFile() = runTest {
+        h.documentNote("a", first, title = "Review")
+        val privateData = JSONObject("""{"gocassini.com":{"notes":[{"atMs":5000,"text":"Keep *this*"},{"atMs":1000,"text":"Earlier"}],"unknown":"kept"},"example.org":{"secret":"not exported"}}""")
+        CassiniDocument.create(
+            fixtureOpus, first, "Review", JSONObject().put("engine", "test"), null, mapOf("S1" to "Ada", "S2" to "Ben"),
+            h.document("a"), extensions = privateData,
+        )
+        val original = h.document("a").readBytes()
+        val copy = MarkdownCopy("Speakers: {names}", "Transcript", "Notes", "(over {names})") { it.joinToString(" and ") }
+        val request = TranscriptExport(
+            TranscriptFormat.MARKDOWN, mapOf("S1" to "Ada", "S2" to "Ben"),
+            markdown = MarkdownOptions("Thursday 8 October 2026, 15:10", copy),
+        )
+        val dest = folder.newFile("review.md")
+        assertTrue(h.documents.exportTranscript("a", request, Uri.fromFile(dest)) is ExportOutcome.Saved)
+        val exported = dest.readText()
+        assertTrue(exported.startsWith("# Review\n\nThursday 8 October 2026, 15:10\n"))
+        assertTrue(exported.contains("**Ada**"))
+        assertTrue(exported.endsWith("## Notes\n\n- 00:00:01 Earlier\n- 00:00:05 Keep \\*this\\*\n"))
+        assertFalse(exported.contains("secret"))
+        assertFalse(exported.contains("not exported"))
+        assertArrayEquals("export never mutates private metadata or audio", original, h.document("a").readBytes())
+        assertFalse(h.paths.exports.exists())
+        assertEquals(
+            ExportOutcome.NotAvailable,
+            h.documents.exportTranscript("a", request.copy(markdown = null), Uri.fromFile(dest)),
+        )
     }
 
     @Test fun aPlainNoteExportsItsAudioButNoTranscript() = runTest {

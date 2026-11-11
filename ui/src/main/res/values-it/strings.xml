@@ -575,4 +575,12 @@
     <string name="ui_parakeet_suggestion_body">Whistle è incluso per iniziare subito. Parakeet Ultra è più preciso. Il download è di %1$s.</string>
     <string name="ui_parakeet_now_default">Le nuove riunioni ora usano Parakeet Ultra.</string>
     <string name="ui_turn_crosstalk">Probabile diafonia</string>
+    <!-- cassini-ux b86b7b0: Markdown export, D50.2/D50.3. -->
+    <string name="ui_actions_markdown" formatted="false">Markdown</string>
+    <string name="ui_markdown_description" formatted="false">La trascrizione come file di testo, con voci e tempi.</string>
+    <string name="ui_markdown_speakers" formatted="false">Voci: {names}</string>
+    <string name="ui_markdown_transcript" formatted="false">Trascrizione</string>
+    <string name="ui_markdown_notes" formatted="false">Note</string>
+    <string name="ui_markdown_untitled" formatted="false">Riunione senza titolo</string>
+    <string name="ui_markdown_over" formatted="false">(in sovrapposizione con {names})</string>
 </resources>

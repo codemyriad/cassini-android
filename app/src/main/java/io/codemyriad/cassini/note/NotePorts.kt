@@ -10,6 +10,9 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import io.codemyriad.cassini.AppGraph
+import io.codemyriad.cassini.core.export.MarkdownCopy
+import io.codemyriad.cassini.core.export.MarkdownDate
+import io.codemyriad.cassini.core.export.MarkdownOptions
 import io.codemyriad.cassini.R
 import io.codemyriad.cassini.adapters.InstalledEngines
 import io.codemyriad.cassini.core.Failure
@@ -206,6 +209,9 @@ interface NotePorts {
 
     /** The TXT body of a transcript without words. */
     fun exportEmptyText(): String
+
+    /** S-5 export copy and the D50.3 absolute date; absent only for test ports without Markdown. */
+    fun markdownOptions(createdAt: Long, durationMs: Long): MarkdownOptions? = null
 
     /** The text of a failed job's stored failure code, or null for a code without its own text. */
     fun failureText(code: String): String?
@@ -428,6 +434,30 @@ class GraphNotePorts(private val graph: AppGraph, context: Context) : NotePorts 
     }
 
     override fun exportEmptyText(): String = localized().getString(R.string.export_no_words)
+
+    override fun markdownOptions(createdAt: Long, durationMs: Long): MarkdownOptions {
+        val context = localized()
+        val res = context.resources
+        val uiLocale = res.configuration.locales[0].let { if (it.language == "en") java.util.Locale.UK else it }
+        val formatter = android.icu.text.ListFormatter.getInstance(uiLocale)
+        val copy = MarkdownCopy(
+            speakersLine = res.getString(io.codemyriad.cassini.ui.R.string.ui_markdown_speakers),
+            transcriptHeading = res.getString(io.codemyriad.cassini.ui.R.string.ui_markdown_transcript),
+            notesHeading = res.getString(io.codemyriad.cassini.ui.R.string.ui_markdown_notes),
+            overLine = res.getString(io.codemyriad.cassini.ui.R.string.ui_markdown_over),
+            speakerList = { formatter.format(it) },
+        )
+        val dateLine = MarkdownDate.line(
+            createdAt,
+            ZoneId.systemDefault(),
+            uiLocale,
+            android.content.res.Resources.getSystem().configuration.locales[0],
+            android.text.format.DateFormat.is24HourFormat(app),
+            Durations.roughMinutes(res, durationMs).replace('\u00a0', ' ').takeIf { durationMs > 0 },
+        )
+        return MarkdownOptions(dateLine, copy)
+    }
+
 
     override fun failureText(code: String): String? {
         val res = Failure.entries.firstOrNull { it.name == code }?.stringRes ?: when (code) {

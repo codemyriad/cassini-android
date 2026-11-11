@@ -28,6 +28,18 @@ class NoteExportsTest {
     }
 
     @Test
+    fun markdownUsesItsOwnMimeAndSafeSuggestedNameAndSharesTranscriptEligibility() {
+        val details = documentNote()
+        val file = requireNotNull(NoteExports.file(details, io.codemyriad.cassini.ui.note.ExportKind.MARKDOWN))
+        assertEquals("text/markdown", file.mime)
+        assertEquals("Weekly sync.md", file.name)
+        assertEquals(io.codemyriad.cassini.data.notes.TranscriptFormat.MARKDOWN, NoteExports.format(file.kind))
+        assertEquals(io.codemyriad.cassini.ui.note.NoteAction.SAVE_MARKDOWN, NoteExports.row(file.kind))
+        val unreadable = details.copy(note = details.note.copy(documentState = io.codemyriad.cassini.core.format.DocumentState.UNREADABLE))
+        assertEquals(null, NoteExports.file(unreadable, file.kind))
+    }
+
+    @Test
     fun aStoredPlaceholderIsExportedVerbatimUnderAnotherUiLanguage() {
         val labels = NoteExports.labels(italian, english)
         assertEquals(mapOf("a" to "Giulia", "b" to "Voce 2", "c" to "Paolo"), labels)
