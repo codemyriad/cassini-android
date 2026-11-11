@@ -400,7 +400,7 @@ data class CassiniDocument(
             require(sealed.state == "ok" && sealed.selected(null)?.transcript == transcript)
 
         // Preserve the reviewed verbatim encoder; D95 adds metadata without refactoring the format writer.
-        @Suppress("LongParameterList", "CyclomaticComplexMethod")
+        @Suppress("LongParameterList", "CyclomaticComplexMethod", "LongMethod")
         private fun seal(
             stream: OggOpus.Info,
             transcript: Transcript,

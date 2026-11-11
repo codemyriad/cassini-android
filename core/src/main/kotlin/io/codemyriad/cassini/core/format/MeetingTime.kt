@@ -23,7 +23,9 @@ data class MeetingTime(val source: String, val value: String) {
         const val UTC = "recordedAtUtc"
         const val DATE = "DATE"
         const val LOCAL = "recordedAtLocal"
-        private val offset = Regex(".*T.*(?:Z|[+-][0-9]{2}:[0-9]{2})$")
+        private val offset = Regex(
+            """^(\d{4}-\d{2}-\d{2})[Tt ](\d{2}:\d{2}:\d{2})(\.\d+)?([Zz]|[+-]\d{2}:\d{2})$""",
+        )
 
         fun utc(at: Instant): MeetingTime = MeetingTime(UTC, at.toString())
 
@@ -44,11 +46,13 @@ data class MeetingTime(val source: String, val value: String) {
             return (meeting.opt(LOCAL) as? String)?.takeIf { it.isNotEmpty() }?.let { MeetingTime(LOCAL, it) }
         }
 
-        private fun offsetInstant(value: String): Instant? = if (!offset.matches(value)) {
-            null
-        } else {
-            try {
-                OffsetDateTime.parse(value).toInstant()
+        /** Match the pinned reader's RFC 3339 grammar and millisecond comparison precision. */
+        private fun offsetInstant(value: String): Instant? {
+            val match = offset.matchEntire(value.trim()) ?: return null
+            val (date, time, fraction, zone) = match.destructured
+            val normalized = "${date}T$time${fraction.take(4)}${if (zone == "z") "Z" else zone}"
+            return try {
+                OffsetDateTime.parse(normalized).toInstant()
             } catch (_: DateTimeParseException) {
                 null
             }

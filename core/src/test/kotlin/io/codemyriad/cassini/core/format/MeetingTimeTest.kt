@@ -31,6 +31,14 @@ class MeetingTimeTest {
         assertEquals(utc, plain?.value)
     }
 
+    @Test fun dateUsesThePinnedRfc3339GrammarAndPrecision() {
+        assertNull(MeetingTime.resolve(manifest(), listOf("DATE=2026-11-11T12:00Z")))
+        assertEquals(
+            Instant.parse("2026-11-11T12:00:00.123Z"),
+            MeetingTime.resolve(null, listOf("DATE=2026-11-11 12:00:00.123456789z"))?.instant,
+        )
+    }
+
     @Test fun malformedUtcAndOffsetlessDateDoNotInventAnInstant() {
         val local = "2026-11-11T23:00:00"
         val result = MeetingTime.resolve(manifest("invalidZ", local), listOf("DATE=2026-11-11T14:00:00"))!!
