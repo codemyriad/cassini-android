@@ -26,13 +26,16 @@ runner=$package.test/io.codemyriad.cassini.CassiniTestRunner
 test=io.codemyriad.cassini.flows.NoteOpeningTimingTest
 root=androidTest-kept-timing
 work=$(mktemp -d)
+started=false
 
 cleanup() {
     status_code=$?
-    adb shell am force-stop "$package" || true
-    # androidx.sqlite keeps the database lock file at cacheDir/<absolute database path>.lck.
-    adb shell "run-as $package rm -rf files/$root cache/$root cache/data/data/$package/files/$root" \
-        "cache/data/user/0/$package/files/$root" || true
+    if $started; then
+        adb shell am force-stop "$package" || true
+        # androidx.sqlite keeps the database lock file at cacheDir/<absolute database path>.lck.
+        adb shell "run-as $package rm -rf files/$root cache/$root cache/data/data/$package/files/$root" \
+            "cache/data/user/0/$package/files/$root" || true
+    fi
     rm -rf "$work"
     exit "$status_code"
 }
@@ -47,10 +50,13 @@ run() {
     fi
 }
 
-while adb shell ps -A -o ARGS | grep -q '[i]nstrument'; do
-    printf 'An instrumentation run is in progress; waiting for it to end.\n'
-    sleep 30
-done
+# The runner can finish without am_proc_died. Leave an existing run untouched and ask the caller to retry.
+processes=$(adb shell dumpsys activity processes "$package")
+if [[ "$processes" == *'Active instrumentation:'* ]]; then
+    printf 'Instrumentation is active. Run this probe after it finishes.\n' >&2
+    exit 1
+fi
+started=true
 adb shell input keyevent KEYCODE_WAKEUP
 adb shell wm dismiss-keyguard
 adb shell "run-as $package rm -rf files/$root cache/$root"
