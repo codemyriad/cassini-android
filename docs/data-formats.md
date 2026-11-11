@@ -203,6 +203,19 @@ The Note actions sheet has three export rows. Each export uses the selected vers
 
 The `:core` package `io.codemyriad.cassini.core.export` writes the text exports. [`design/features.md`](design/features.md), section 9, gives all the rules.
 
+### ZIP transfer
+
+Bulk export writes a stored ZIP, one locked audio snapshot at a time. It copies the complete stored document,
+including its transcript, even when a new transcription is queued or failed. Plain notes keep their original
+format. Live captures and notes without an audio file are not export choices; a partial encoder output in
+`work/` does not replace the stored source.
+
+Import validates and stages every member before it publishes any note. The 2,000-entry, 20 GB expanded-size and
+100:1 completed-entry ratio limits also cover unsupported files and AppleDouble sidecars. An archive with no
+supported audio is reported as empty only after these checks. Directory entries must have no payload. Unsafe
+paths, encryption and differing local/central compression methods refuse the whole archive. Accepted entries
+use the same transactional digest deduplication as single-file imports; a refused archive never rolls back notes.
+
 ### TXT
 
 ```

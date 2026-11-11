@@ -68,7 +68,9 @@ internal class ArchiveEntries(private val archive: File, private val limits: Arc
                 expanded += n
                 total += n
                 archiveCheck(total <= limits.expandedBytes, ArchiveFailure.TOO_LARGE)
-                // Declared size may be forged: keep draining without staging excess bytes so archive-wide limits apply.
+                // A directory cannot hide data, even when its declared size is zero.
+                archiveCheck(!entry.directory)
+                // This bound uses the complete compressed size, never the bytes consumed at an intermediate prefix.
                 archiveCheck(!overRatio(expanded, entry.compressed, limits.ratio), ArchiveFailure.TOO_LARGE)
                 if (staged != null && expanded >= nextSpaceCheck) {
                     nextSpaceCheck = expanded + SPACE_CHECK_BYTES

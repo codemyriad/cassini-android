@@ -43,6 +43,7 @@ internal class ZipDirectory(
         repeat(directory.entries.toInt()) {
             active()
             val entry = entry()
+            archiveCheck(!entry.directory || entry.size == 0L)
             archiveCheck(entry.size <= limits.expandedBytes - total, ArchiveFailure.TOO_LARGE)
             archiveCheck(!overRatio(entry.size, entry.compressed, limits.ratio), ArchiveFailure.TOO_LARGE)
             total += entry.size

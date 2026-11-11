@@ -62,10 +62,6 @@ class NoteArchives(private val limits: ArchiveLimits = ArchiveLimits()) {
         try {
             spool(input, archive)
             val entries = directory(archive)
-            if (entries.none { it.supported }) {
-                val summary = ImportSummary(unsupported = entries.count { !it.directory })
-                throw ArchiveRejected(ArchiveFailure.EMPTY, summary)
-            }
             val reader = ArchiveEntries(archive, limits)
             var summary = ImportSummary()
             for (entry in entries) {
@@ -79,6 +75,7 @@ class NoteArchives(private val limits: ArchiveLimits = ArchiveLimits()) {
                     summary += ImportSummary(unsupported = 1)
                 }
             }
+            if (entries.none { it.supported }) throw ArchiveRejected(ArchiveFailure.EMPTY, summary)
             progress(summary)
             for ((file, name) in staged) {
                 summary = summary.add(consume(file, name))
