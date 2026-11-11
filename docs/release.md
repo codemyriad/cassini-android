@@ -125,7 +125,8 @@ commit has already reached the internal track. A manual test-tag upload counts t
 The job reserves the next `beta.N` and a higher `versionCode` in the repository's
 `android-play-internal-test` deployment ledger. Failed reservations consume their number. The source stays on
 main: only the runner's workspace version and English Play changelog change. Complete merged-PR titles are in
-`internal-test-release-plan`; Play shows the first 500 characters. Before a manual tagged release, choose a
+`internal-test-release-plan`; Play shows the first 500 characters. Job outputs carry only reserved metadata
+and a notes hash: arbitrary PR titles stay in the artifact so GitHub secret masking cannot discard the plan. Before a manual tagged release, choose a
 versionCode higher than all ledger reservations as well as the earlier Play uploads.
 
 The normal signed build, certificate checks, unit/conformance/screenshot/lint checks and four emulator jobs run

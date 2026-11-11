@@ -237,6 +237,13 @@ jobs:
           echo "jars=$(find ~/.m2/repository/org/robolectric -name '*.jar' | sort | sha256sum | cut -c1-64)" >> "$GITHUB_OUTPUT"
       # On tags the device tests run against releaseTest (the release build without R8), because R8
       # removes members the tests call; the emulator job then launch-checks the published release APK.
+      # Keep arbitrary PR titles in an artifact, not a cross-job output that GitHub may discard as a secret.
+      - name: Download the reserved test plan and complete notes
+        if: inputs.daily_test
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: internal-test-release-plan
+          path: .tools/daily-test-release
       - name: Apply the reserved internal-test version in this workspace
         if: inputs.daily_test
         env:

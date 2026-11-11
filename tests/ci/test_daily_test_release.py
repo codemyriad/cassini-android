@@ -1,6 +1,7 @@
 """Offline release planning, source binding and partial-publication failure checks; never upload a build."""
 
 import importlib.util
+import json
 import os
 import tempfile
 import unittest
@@ -144,6 +145,27 @@ class DailyReleaseTests(unittest.TestCase):
                 with self.subTest(change=change), self.assertRaises(ValueError):
                     DAILY.apply({**value, **change}, SHA, root)
                 self.assertEqual(SOURCE, build.read_text())
+
+    def test_arbitrary_pr_titles_are_not_sent_through_job_outputs(self):
+        value = {'build': True, 'sha': SHA, 'notes': 'A title containing a signing-key alias such as cassini'}
+        metadata = DAILY.plan_metadata(value)
+        self.assertNotIn('notes', metadata)
+        self.assertNotIn('cassini', json.dumps(metadata))
+        self.assertEqual(SHA, metadata['sha'])
+
+    def test_plan_artifact_is_bound_to_metadata_and_complete_notes(self):
+        value = {'build': True, 'sha': SHA, 'version_name': '0.4.2-beta.4', 'version_code': 19, 'notes': '- Title (#7)'}
+        metadata = DAILY.plan_metadata(value)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            file = root / '.tools/daily-test-release/test-release-plan.json'
+            file.parent.mkdir(parents=True)
+            file.write_text(json.dumps(value))
+            self.assertEqual(value, DAILY.load_plan(metadata, root))
+            for change in ({'sha': OLD}, {'version_code': 20}, {'notes': '- Changed title'}):
+                file.write_text(json.dumps({**value, **change}))
+                with self.subTest(change=change), self.assertRaises(ValueError):
+                    DAILY.load_plan(metadata, root)
 
     def test_notes_only_include_merged_main_prs_in_the_commit_range_and_deduplicate(self):
         def pull(number, title, commit, merged=True, base='main'):

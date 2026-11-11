@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -158,6 +159,20 @@ def plan(api: GitHub, sha: str, text: str, run_id: int) -> dict:
     return {'build': True, 'sha': sha, 'deployment_id': deployment['id'], **payload, 'notes': body}
 
 
+def plan_metadata(value: dict) -> dict:
+    metadata = {key: item for key, item in value.items() if key != 'notes'}
+    if 'notes' in value:
+        metadata['notes_sha256'] = hashlib.sha256(value['notes'].encode('utf-8')).hexdigest()
+    return metadata
+
+
+def load_plan(metadata: dict, root: Path) -> dict:
+    value = json.loads((root / '.tools/daily-test-release/test-release-plan.json').read_text())
+    if plan_metadata(value) != metadata:
+        raise ValueError('Release plan artifact does not match its reserved metadata')
+    return value
+
+
 def apply(value: dict, sha: str, root: Path):
     if value.get('build') is not True or value['sha'] != sha or not SHA.fullmatch(sha):
         raise ValueError('Test build is not bound to this main commit')
@@ -209,15 +224,16 @@ def main():
     sha = os.environ['GITHUB_SHA']
     if args.mode == 'plan':
         value = plan(GitHub(), sha, Path('app/build.gradle.kts').read_text(), int(os.environ['GITHUB_RUN_ID']))
+        metadata = json.dumps(plan_metadata(value), separators=(',', ':'))
         with Path(os.environ['GITHUB_OUTPUT']).open('a') as output:
-            output.write(f'build={str(value["build"]).lower()}\nplan={json.dumps(value, separators=(",", ":"))}\n')
+            output.write(f'build={str(value["build"]).lower()}\nplan={metadata}\n')
         Path('test-release-plan.json').write_text(json.dumps(value, indent=2) + '\n')
         report(f'planned: {value["version_name"]} ({value["version_code"]})' if value['build'] else
                f'skipped: {value["reason"]}')
     else:
         value = json.loads(os.environ['DAILY_TEST_PLAN'])
         if args.mode == 'apply':
-            apply(value, sha, Path('.'))
+            apply(load_plan(value, Path('.')), sha, Path('.'))
         else:
             success = os.environ['PUBLISH_RESULT'] == 'success'
             success = finish(GitHub(), value, success, os.environ['RUN_URL'])
