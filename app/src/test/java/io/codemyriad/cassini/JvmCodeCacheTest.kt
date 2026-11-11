@@ -13,8 +13,12 @@ class JvmCodeCacheTest {
         val diagnostic = factory.getMethod("getPlatformMXBean", Class::class.java).invoke(null, diagnosticType)
         val option = diagnosticType.getMethod("getVMOption", String::class.java)
             .invoke(diagnostic, "ReservedCodeCacheSize")
-        val reserved = Class.forName("com.sun.management.VMOption").getMethod("getValue")
-            .invoke(option).toString().toLong()
-        assertTrue("App worker code cache reserves $reserved bytes; needs at least 240 MiB", reserved >= 240L * 1024 * 1024)
+        val value = Class.forName("com.sun.management.VMOption").getMethod("getValue")
+            .invoke(option) as String
+        val reserved = value.toLong()
+        assertTrue(
+            "App worker code cache reserves $reserved bytes; needs at least 240 MiB",
+            reserved >= 240L * 1024 * 1024,
+        )
     }
 }
