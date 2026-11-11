@@ -6,6 +6,7 @@ import java.io.File
 import java.io.RandomAccessFile
 import java.nio.charset.Charset
 import java.util.zip.CRC32
+import java.util.zip.ZipEntry
 
 internal data class ArchiveEntry(
     val name: String,
@@ -43,7 +44,9 @@ internal class ZipDirectory(
         repeat(directory.entries.toInt()) {
             active()
             val entry = entry()
-            archiveCheck(!entry.directory || entry.size == 0L)
+            val emptyDirectory = entry.size == 0L && entry.crc == 0L &&
+                ((entry.method == ZipEntry.STORED && entry.compressed == 0L) || entry.method == ZipEntry.DEFLATED)
+            archiveCheck(!entry.directory || emptyDirectory)
             archiveCheck(entry.size <= limits.expandedBytes - total, ArchiveFailure.TOO_LARGE)
             archiveCheck(!overRatio(entry.size, entry.compressed, limits.ratio), ArchiveFailure.TOO_LARGE)
             total += entry.size

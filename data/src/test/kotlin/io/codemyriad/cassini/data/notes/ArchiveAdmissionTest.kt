@@ -7,7 +7,9 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.util.Random
+import java.util.zip.Deflater
 import java.util.zip.Inflater
+import java.util.zip.ZipEntry
 
 /** Refusals must occur before consume: it publishes a note that the user can immediately edit. */
 class ArchiveAdmissionTest {
@@ -87,6 +89,59 @@ class ArchiveAdmissionTest {
         val bytes = zipBytes("good.opus" to "audio", "late.opus" to "x".repeat(200_000))
         bytes.putInt(bytes.recordOffsets(0x02014b50).last() + 24, 8)
         refuses(bytes, ArchiveFailure.TOO_LARGE)
+    }
+
+    @Test fun malformedZeroSizeDirectoriesRefuseTheWholeArchive() = runTest {
+        val invalid = listOf(
+            ZipEntry.DEFLATED to byteArrayOf(7),
+            ZipEntry.DEFLATED to (byteArrayOf(3, 0) + "trailing payload".toByteArray()),
+            ZipEntry.STORED to "stored payload".toByteArray(),
+            14 to "LZMA payload".toByteArray(),
+            93 to "ZSTD payload".toByteArray(),
+        )
+        for ((method, payload) in invalid) {
+            for (withAudio in listOf(false, true)) {
+                for ((name, attributes) in listOf("folder/" to 0, "folder.opus" to 0x10, "unix.opus" to 0x41ed0000)) {
+                    refuses(
+                        rawMemberZip(name, payload, method, withAudio = withAudio, attributes = attributes),
+                        ArchiveFailure.DAMAGED,
+                    )
+                }
+            }
+        }
+        refuses(rawMemberZip("folder/", byteArrayOf(3, 0), ZipEntry.DEFLATED, crc = 1), ArchiveFailure.DAMAGED)
+    }
+
+    @Test fun validEmptyStoredAndDeflatedDirectoriesRemainAccepted() = runTest {
+        for ((method, payload) in listOf(ZipEntry.STORED to byteArrayOf(), ZipEntry.DEFLATED to byteArrayOf(3, 0))) {
+            val input = rawMemberZip("folder/", payload, method).inputStream()
+            val result = NoteArchives().read(input, folder.newFolder()) { _, name ->
+                assertEquals("good.opus", name)
+                ImportOutcome.Created(name)
+            }
+            assertEquals(ImportSummary(imported = 1), result)
+        }
+    }
+
+    @Test fun corruptDeflateTailsCannotHidePaddedRatioBombs() = runTest {
+        val deflater = Deflater(Deflater.DEFAULT_COMPRESSION, true)
+        val output = ByteArray(10_000)
+        val count = try {
+            deflater.setInput(ByteArray(200_000) { 'x'.code.toByte() })
+            deflater.deflate(output, 0, output.size, Deflater.SYNC_FLUSH)
+        } finally {
+            deflater.end()
+        }
+        // SYNC_FLUSH leaves the stream unfinished. BTYPE=3 is invalid; padding forges a benign declared ratio.
+        output[count] = 7
+        for (name in listOf("ignored.txt", "__MACOSX/._Meeting.opus", "late.opus")) {
+            for (withAudio in listOf(false, true)) {
+                refuses(
+                    rawMemberZip(name, output, ZipEntry.DEFLATED, size = 8, withAudio = withAudio),
+                    ArchiveFailure.TOO_LARGE,
+                )
+            }
+        }
     }
 
     private suspend fun refuses(bytes: ByteArray, reason: ArchiveFailure, limits: ArchiveLimits = ArchiveLimits()) {

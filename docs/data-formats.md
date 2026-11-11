@@ -212,7 +212,9 @@ format. Live captures and notes without an audio file are not export choices; a 
 
 Import validates and stages every member before it publishes any note. The 2,000-entry, 20 GB expanded-size and
 100:1 completed-entry ratio limits also cover unsupported files and AppleDouble sidecars. An archive with no
-supported audio is reported as empty only after these checks. Directory entries must have no payload. Unsafe
+supported audio is reported as empty only after these checks. Directory entries must have zero size and CRC, and a valid empty stored or deflated stream; corrupt or
+trailing data and other methods refuse the archive. The actual ratio is checked on decoder failure too, so a
+corrupt tail cannot hide a bomb behind a padded declared size. Unsafe
 paths, encryption and differing local/central compression methods refuse the whole archive. Accepted entries
 use the same transactional digest deduplication as single-file imports; a refused archive never rolls back notes.
 

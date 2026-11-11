@@ -126,3 +126,43 @@ internal fun unicodePathZip(name: String, unicode: String): ByteArray = ByteArra
         zip.closeEntry()
     }
 }.toByteArray()
+
+/** An untrusted member whose raw payload and declared metadata deliberately disagree. */
+@Suppress("LongParameterList") // ZIP header fields are independently forged by the admission vectors.
+internal fun rawMemberZip(
+    name: String,
+    payload: ByteArray,
+    method: Int,
+    size: Int = 0,
+    crc: Int = 0,
+    withAudio: Boolean = true,
+    attributes: Int = 0,
+): ByteArray {
+    val bytes = ByteArrayOutputStream().also { out ->
+        ZipOutputStream(out).use { zip ->
+            val entries = listOfNotNull(("good.opus" to "audio".toByteArray()).takeIf { withAudio }, name to payload)
+            for ((entryName, body) in entries) {
+                zip.putNextEntry(
+                    ZipEntry(entryName).apply {
+                        this.method = ZipEntry.STORED
+                        this.size = body.size.toLong()
+                        compressedSize = this.size
+                        this.crc = CRC32().apply { update(body) }.value
+                    },
+                )
+                zip.write(body)
+                zip.closeEntry()
+            }
+        }
+    }.toByteArray()
+    val local = bytes.recordOffsets(0x04034b50).last()
+    val central = bytes.recordOffsets(0x02014b50).last()
+    bytes.putShort(local + 8, method)
+    bytes.putShort(central + 10, method)
+    bytes.putInt(local + 22, size)
+    bytes.putInt(central + 24, size)
+    bytes.putInt(local + 14, crc)
+    bytes.putInt(central + 16, crc)
+    bytes.putInt(central + 38, attributes)
+    return bytes
+}

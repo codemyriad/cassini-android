@@ -40,6 +40,7 @@ internal class ArchiveEntries(private val archive: File, private val limits: Arc
         } catch (error: ArchiveRejected) {
             throw error
         } catch (_: IOException) {
+            archiveCheck(!entry.directory)
             return null
         } finally {
             if (!successful) staged?.delete()
@@ -63,7 +64,7 @@ internal class ArchiveEntries(private val archive: File, private val limits: Arc
             val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
             while (true) {
                 currentCoroutineContext().ensureActive()
-                val n = input.read(buffer)
+                val n = boundedRead(input, buffer, expanded, compressed)
                 if (n < 0) break
                 expanded += n
                 total += n
@@ -82,6 +83,16 @@ internal class ArchiveEntries(private val archive: File, private val limits: Arc
         }
         archiveCheck(!overRatio(expanded, compressed(), limits.ratio), ArchiveFailure.TOO_LARGE)
         dataCheck(expanded == entry.size && compressed() == entry.compressed && crc.value == entry.crc)
+    }
+
+    private fun boundedRead(input: InputStream, buffer: ByteArray, expanded: Long, compressed: () -> Long): Int = try {
+        input.read(buffer)
+    } catch (error: ArchiveRejected) {
+        throw error
+    } catch (error: IOException) {
+        // A corrupt tail must not turn a runtime ratio refusal into an ignorable per-entry failure.
+        archiveCheck(!overRatio(expanded, compressed(), limits.ratio), ArchiveFailure.TOO_LARGE)
+        throw error
     }
 
     private fun dataCheck(valid: Boolean) {
