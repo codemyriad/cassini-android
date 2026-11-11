@@ -25,7 +25,12 @@ import io.codemyriad.cassini.flows.Flows.waitGone
 import io.codemyriad.cassini.flows.Flows.waitShown
 import io.codemyriad.cassini.flows.Flows.waitText
 import io.codemyriad.cassini.test.NeedsModels
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -89,12 +94,7 @@ class NoteFlowTest {
             }
         }
         val word = document(noteId).selected(null)!!.transcript!!.words.first { WORD in it.text }
-        rule.onNode(hasText(WORD, substring = true), useUnmergedTree = true).tapWord(WORD)
-        rule.waitFor("The tap seeks to \"$WORD\" (${word.startMs} ms) and plays") {
-            val state = graph.playback.state.value
-            state.playing && state.positionMs in (word.startMs - SEEK_SLACK_MS)..(word.startMs + PLAY_SLACK_MS)
-        }
-        rule.runOnUiThread { graph.playback.pause() }
+        tapAndCheckPlayback(noteId, word.startMs)
 
         // Transcribe again: version 2, and the Versions sheet lists both.
         openActions()
@@ -125,6 +125,26 @@ class NoteFlowTest {
             golden("fleurs-it-short.vtt", vtt.readText()),
         )
         assertTrue(results.filterNotNull().joinToString("\n"), results.all { it == null })
+    }
+
+    private fun tapAndCheckPlayback(noteId: String, startMs: Long) {
+        val playback = graph.playback
+        val epoch = playback.state.value.epoch
+        val firstPlaying = runBlocking {
+            // Observe on the publisher's thread so a later playback tick cannot replace the seek sample.
+            val observed = async(Dispatchers.Unconfined, start = CoroutineStart.UNDISPATCHED) {
+                withTimeoutOrNull(Flows.SCREEN_MS) {
+                    playback.state.first { it.noteId == noteId && it.epoch > epoch && it.playing }
+                }
+            }
+            rule.onNode(hasText(WORD, substring = true), useUnmergedTree = true).tapWord(WORD)
+            observed.await() ?: throw AssertionError("The word tap did not seek and play: ${playback.state.value}")
+        }
+        rule.runOnUiThread { playback.pause() }
+        assertTrue(
+            "The tap on $WORD at $startMs ms started playback at ${firstPlaying.positionMs} ms",
+            firstPlaying.positionMs in (startMs - SEEK_SLACK_MS)..(startMs + PLAY_SLACK_MS),
+        )
     }
 
     /** Waits until the note's job is gone and its document is verified with [variants] transcripts. */
