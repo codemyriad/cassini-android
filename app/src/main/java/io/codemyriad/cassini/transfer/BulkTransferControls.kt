@@ -11,7 +11,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -59,6 +61,7 @@ fun BulkTransferControls(transfers: BulkTransfers) {
             choosing = true
         },
         enabled = !state.running && choices.isNotEmpty(),
+        colors = ButtonDefaults.textButtonColors(disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant),
     ) { Text(stringResource(R.string.export_zip_all)) }
     if (choosing) {
         AlertDialog(
@@ -97,7 +100,11 @@ private fun ExportChoices(
     onAll: () -> Unit,
 ) {
     Column {
-        TextButton(onClick = onAll, enabled = choices.isNotEmpty()) { Text(stringResource(R.string.export_zip_all)) }
+        TextButton(
+            onClick = onAll,
+            enabled = choices.isNotEmpty(),
+            colors = ButtonDefaults.textButtonColors(disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+        ) { Text(stringResource(R.string.export_zip_all)) }
         LazyColumn(Modifier.heightIn(max = 360.dp)) {
             items(choices, key = { it.id }) { choice ->
                 Row(
