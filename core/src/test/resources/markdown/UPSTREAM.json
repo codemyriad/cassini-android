@@ -23,10 +23,13 @@
         "export.markdown.notesHeading",
         "export.markdown.speakersLine",
         "export.markdown.transcriptHeading",
+        "format.meetingDuration.hours",
+        "format.meetingDuration.minutes",
+        "format.meetingDuration.underMinute",
         "library.untitled",
         "meeting.turn.over"
       ],
-      "sha256": "9d4b7ceabc3046baf92351c9526477e7880b9f8433a38780bc48687a6bc685d8"
+      "sha256": "21e0b4130ba6b75f1bdf943f582c87caf176fe8254ec48c5083a74750785d22c"
     }
   }
 }

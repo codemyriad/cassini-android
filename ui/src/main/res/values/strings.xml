@@ -615,4 +615,6 @@
     <string name="ui_markdown_notes" formatted="false">Notes</string>
     <string name="ui_markdown_over" formatted="false">(over {names})</string>
     <string name="ui_ext_md" translatable="false">.md</string>
+    <string name="ui_meeting_duration_hours">{h} h {mm} min</string>
+    <string name="ui_meeting_duration_minutes">{m} min</string>
 </resources>

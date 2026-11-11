@@ -5,7 +5,6 @@ import android.net.Uri
 import androidx.annotation.WorkerThread
 import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.UserFacingException
-import io.codemyriad.cassini.core.export.ExportNames
 import io.codemyriad.cassini.core.export.ExportTranscript
 import io.codemyriad.cassini.core.export.MarkdownExport
 import io.codemyriad.cassini.core.export.MarkdownNote
@@ -378,7 +377,8 @@ class DocumentRepository(
                         request.labels,
                         variants.first { it.variantId == variantId }.wordEndsBoundedByAudio,
                     )
-                    val name = ExportNames.file(row.title, request.format.extension)
+                    // Internal staging is independent of the user title and the provider's suggested name.
+                    val name = "transcript.${request.format.extension}"
                     stageAndWrite(name, render(transcript, request, noteId), dest)
                 }
             }

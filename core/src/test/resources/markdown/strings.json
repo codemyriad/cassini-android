@@ -66,32 +66,32 @@
       }
     },
     {
-      "id": "library.untitled",
-      "en": "Untitled meeting",
+      "id": "export.markdown.notesHeading",
+      "en": "Notes",
       "platforms": [
         "gnome",
         "mac"
       ],
-      "role": "label",
+      "role": "heading",
       "boards": [],
-      "milestone": "UX1b",
+      "milestone": "D50.2",
+      "note": "Coordinator (D50.2). Markdown export (S-5) level-2 heading before the notes (only when there are notes).",
       "status": "harmony",
-      "note": "D6 R6.1: final title fallback. Coordinator normalisation of an undrawn state.",
       "l10n": {
         "it": {
-          "text": "Riunione senza titolo"
+          "text": "Note"
         },
         "fr": {
-          "text": "Réunion sans titre"
+          "text": "Notes"
         },
         "es": {
-          "text": "Reunión sin título"
+          "text": "Notas"
         },
         "pt-BR": {
-          "text": "Reunião sem título"
+          "text": "Notas"
         },
         "pt-PT": {
-          "text": "Reunião sem título"
+          "text": "Notas"
         }
       }
     },
@@ -159,32 +159,144 @@
       }
     },
     {
-      "id": "export.markdown.notesHeading",
-      "en": "Notes",
+      "id": "format.meetingDuration.hours",
+      "en": "{h} h {mm} min",
       "platforms": [
         "gnome",
         "mac"
       ],
-      "role": "heading",
-      "boards": [],
-      "milestone": "D50.2",
-      "note": "Coordinator (D50.2). Markdown export (S-5) level-2 heading before the notes (only when there are notes).",
-      "status": "harmony",
+      "role": "caption",
+      "boards": [
+        "Main",
+        "Library-mac"
+      ],
+      "milestone": "UX1a",
+      "placeholders": {
+        "h": "hours",
+        "mm": "minutes, zero-padded to 2"
+      },
+      "note": "REFERENCE ONLY (HARMONY 6). Sample: '1 h 03 min'.",
+      "status": "drawn",
       "l10n": {
         "it": {
-          "text": "Note"
+          "text": "{h} h {mm} min"
         },
         "fr": {
-          "text": "Notes"
+          "text": "{h} h {mm} min"
         },
         "es": {
-          "text": "Notas"
+          "text": "{h} h {mm} min"
         },
         "pt-BR": {
-          "text": "Notas"
+          "text": "{h} h {mm} min"
         },
         "pt-PT": {
-          "text": "Notas"
+          "text": "{h} h {mm} min"
+        }
+      }
+    },
+    {
+      "id": "format.meetingDuration.minutes",
+      "en": "{m} min",
+      "platforms": [
+        "gnome",
+        "mac"
+      ],
+      "role": "caption",
+      "boards": [
+        "Library-mac",
+        "LibraryReceived",
+        "LibraryReceived-mac",
+        "Main",
+        "Meeting",
+        "Meeting-mac",
+        "Search",
+        "Search-mac"
+      ],
+      "milestone": "UX1a",
+      "placeholders": {
+        "m": "whole minutes, floored"
+      },
+      "note": "REFERENCE ONLY (HARMONY 6, format-vectors meetingDuration). Sample: '52 min'.",
+      "status": "drawn",
+      "l10n": {
+        "it": {
+          "text": "{m} min"
+        },
+        "fr": {
+          "text": "{m} min"
+        },
+        "es": {
+          "text": "{m} min"
+        },
+        "pt-BR": {
+          "text": "{m} min"
+        },
+        "pt-PT": {
+          "text": "{m} min"
+        }
+      }
+    },
+    {
+      "id": "format.meetingDuration.underMinute",
+      "en": "under 1 min",
+      "platforms": [
+        "gnome",
+        "mac"
+      ],
+      "role": "caption",
+      "boards": [
+        "Main",
+        "Library-mac"
+      ],
+      "milestone": "UX1a",
+      "note": "REFERENCE ONLY (HARMONY 6). Not drawn.",
+      "status": "drawn",
+      "l10n": {
+        "it": {
+          "text": "meno di 1 min"
+        },
+        "fr": {
+          "text": "moins d’1 min"
+        },
+        "es": {
+          "text": "menos de 1 min"
+        },
+        "pt-BR": {
+          "text": "menos de 1 min"
+        },
+        "pt-PT": {
+          "text": "menos de 1 min"
+        }
+      }
+    },
+    {
+      "id": "library.untitled",
+      "en": "Untitled meeting",
+      "platforms": [
+        "gnome",
+        "mac"
+      ],
+      "role": "label",
+      "boards": [],
+      "milestone": "UX1b",
+      "status": "harmony",
+      "note": "D6 R6.1: final title fallback. Coordinator normalisation of an undrawn state.",
+      "l10n": {
+        "it": {
+          "text": "Riunione senza titolo"
+        },
+        "fr": {
+          "text": "Réunion sans titre"
+        },
+        "es": {
+          "text": "Reunión sin título"
+        },
+        "pt-BR": {
+          "text": "Reunião sem título"
+        },
+        "pt-PT": {
+          "text": "Reunião sem título"
         }
       }
     },

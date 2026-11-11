@@ -411,6 +411,30 @@ class DocumentRepositoryTest {
         )
     }
 
+    @Test fun transcriptStagingNeverUsesTheLongMultibyteTitleAsAFilename() = runTest {
+        val title = "会".repeat(100)
+        h.documentNote("a", first, title = title)
+        val original = h.document("a").readBytes()
+        val copy = MarkdownCopy("Speakers: {names}", "Transcript", "Notes", "(over {names})") {
+            it.joinToString(" and ")
+        }
+        // Save and Share both use exportTranscript; the destination name is owned by the provider/caller.
+        for (format in TranscriptFormat.entries) {
+            val request = TranscriptExport(
+                format,
+                mapOf("S1" to "Ada", "S2" to "Ben"),
+                markdown = MarkdownOptions("Thursday 8 October 2026, 15:10", copy),
+            )
+            val dest = folder.newFile("long-title.${format.extension}")
+            val outcome = h.documents.exportTranscript("a", request, Uri.fromFile(dest))
+            assertTrue("$format: $outcome", outcome is ExportOutcome.Saved)
+            assertTrue(dest.length() > 0)
+            if (format == TranscriptFormat.MARKDOWN) assertTrue(dest.readText().startsWith("# $title\n"))
+            assertFalse("$format staging is cleaned", h.paths.exports.exists())
+        }
+        assertArrayEquals(original, h.document("a").readBytes())
+    }
+
     @Test fun aPlainNoteExportsItsAudioButNoTranscript() = runTest {
         h.plainNote("a", audioFile = "source.mp3")
         val out = folder.newFolder("out")

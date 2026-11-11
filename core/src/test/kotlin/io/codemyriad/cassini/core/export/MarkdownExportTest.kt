@@ -157,6 +157,9 @@ class MarkdownExportTest {
             "ui_markdown_transcript" to "export.markdown.transcriptHeading",
             "ui_markdown_notes" to "export.markdown.notesHeading",
             "ui_markdown_over" to "meeting.turn.over",
+            "ui_meeting_duration_hours" to "format.meetingDuration.hours",
+            "ui_meeting_duration_minutes" to "format.meetingDuration.minutes",
+            "ui_duration_under_minute" to "format.meetingDuration.underMinute",
         )
         val catalog = JSONObject(resource("strings.json")).getJSONArray("entries")
         val entries = (0 until catalog.length()).map(catalog::getJSONObject).associateBy { it.getString("id") }

@@ -591,4 +591,6 @@
     <string name="ui_markdown_transcript" formatted="false">Transcrição</string>
     <string name="ui_markdown_notes" formatted="false">Notas</string>
     <string name="ui_markdown_over" formatted="false">(ao mesmo tempo que {names})</string>
+    <string name="ui_meeting_duration_hours">{h} h {mm} min</string>
+    <string name="ui_meeting_duration_minutes">{m} min</string>
 </resources>

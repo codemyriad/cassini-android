@@ -48,7 +48,7 @@ internal object NoteMarkdown {
             uiLocale,
             format.locale,
             format.is24Hour,
-            Durations.roughMinutes(res, durationMs).replace('\u00a0', ' ').takeIf { durationMs > 0 },
+            Durations.meetingDuration(res, durationMs, format).takeIf { durationMs > 0 },
         )
         return MarkdownOptions(dateLine, copy)
     }
