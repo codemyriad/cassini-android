@@ -1,11 +1,11 @@
 import json
 import os
-from pathlib import Path
 import shutil
 import signal
 import subprocess
 import tempfile
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE_SCRIPT = ROOT / "scripts" / "device-kill-resume.sh"
