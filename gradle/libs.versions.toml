@@ -1,12 +1,7 @@
 [versions]
-# Build tooling. Verified together on 2026-11-02 with JDK 17:
-# Gradle 9.8.2 + AGP 9.4.1 (android.builtInKotlin=false, android.newDsl=false) + KGP 2.4.21.
-# Both are minor releases past the Kotlin Gradle plugin's documented range (AGP 8.5.2-9.3.1, Gradle 7.6.3-9.7.0);
-# KGP 2.4.21 is the latest stable Kotlin.
-# Not AGP 9.5.0 (checked 2026-11-02): :ui's lint still cannot load the lint checks of lifecycle-runtime 2.11.0
-# ("Library lint checks reference invalid APIs", ObsoleteLintCustomCheck, an error here), and 9.5 deprecates the
-# org.jetbrains.kotlin.android plugin, removed in AGP 10: moving on means migrating to built-in Kotlin.
-agp = "9.4.1"
+# Build tooling: Gradle 9.9.0 + AGP 9.5.1 with JDK 17 and KGP 2.4.21.
+# Legacy Kotlin/DSL opt-outs remain until the separate built-in Kotlin migration (required by AGP 10).
+agp = "9.5.1"
 kotlin = "2.4.21"
 ksp = "2.3.13"
 room = "2.8.5"
@@ -76,6 +71,7 @@ compose-material3 = { group = "androidx.compose.material3", name = "material3" }
 
 # Activity, lifecycle, navigation
 activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
+lifecycle-runtime = { group = "androidx.lifecycle", name = "lifecycle-runtime", version.ref = "lifecycle" }
 lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycle" }
 lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 lifecycle-viewmodel-navigation3 = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-navigation3", version.ref = "lifecycle" }

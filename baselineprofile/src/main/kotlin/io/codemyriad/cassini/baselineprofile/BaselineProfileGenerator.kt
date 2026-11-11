@@ -1,9 +1,14 @@
 package io.codemyriad.cassini.baselineprofile
 
+import android.app.UiAutomation
+import android.os.Bundle
+import android.view.accessibility.AccessibilityNodeInfo
 import androidx.benchmark.macro.junit4.BaselineProfileRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.BySelector
+import androidx.test.uiautomator.Condition
 import androidx.test.uiautomator.Direction
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
@@ -67,9 +72,13 @@ class BaselineProfileGenerator {
     }
 
     private fun playBriefly(device: UiDevice) {
-        device.findObject(By.desc(PLAY))?.click() ?: return
-        device.wait(Until.hasObject(By.desc(PAUSE)), TIMEOUT_MS)
-        Thread.sleep(PLAY_MS)
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        awaitPlaybackProgress(device, automation, TIMEOUT_MS) {
+            val play = checkNotNull(device.wait(Until.findObject(By.desc(PLAY)), TIMEOUT_MS)) {
+                "The note has no Play control"
+            }
+            play.click()
+        }
         device.findObject(By.desc(PAUSE))?.click()
     }
 
@@ -93,8 +102,69 @@ class BaselineProfileGenerator {
         const val NO_SPEECH = "no speech"
         const val OPENINGS = 3
         const val TIMEOUT_MS = 10_000L
-        const val PLAY_MS = 2_000L
         const val SCROLL_PERCENT = 0.8f
         const val GESTURE_MARGIN_PARTS = 5
     }
 }
+
+/** Runs the player until two seconds of audio have advanced, or until it reaches the end of a shorter note. */
+internal fun awaitPlaybackProgress(device: UiDevice, automation: UiAutomation, timeoutMs: Long, play: () -> Unit) {
+    awaitPlaybackProgress(
+        seekToStart = {
+            val accepted = withPositionNode(automation.rootInActiveWindow) { node ->
+                val arguments = Bundle().apply {
+                    putFloat(AccessibilityNodeInfo.ACTION_ARGUMENT_PROGRESS_VALUE, 0f)
+                }
+                node.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_PROGRESS.id, arguments)
+            }
+            check(accepted == true) { "The player did not accept seeking to zero" }
+        },
+        play = play,
+        awaitPosition = { message, matches ->
+            // Position ticks do not each send an accessibility event, so query the slider's current range.
+            checkNotNull(device.wait(object : Condition<UiDevice, PlaybackPosition?> {
+                override fun apply(device: UiDevice): PlaybackPosition? =
+                    withPositionNode(automation.rootInActiveWindow) { node ->
+                        node.rangeInfo?.let { PlaybackPosition(it.current, it.max) }
+                    }?.takeIf(matches)
+            }, timeoutMs)) { message }
+        },
+    )
+}
+
+internal fun awaitPlaybackProgress(
+    seekToStart: () -> Unit,
+    play: () -> Unit,
+    awaitPosition: (String, (PlaybackPosition) -> Boolean) -> PlaybackPosition,
+) {
+    var start = awaitPosition("The player has no Position range") { true }
+    if (start.current >= start.end) {
+        seekToStart()
+        start = awaitPosition("The player did not seek to zero") { it.current == 0f }
+    }
+    val target = minOf(start.current + PROFILE_AUDIO_MS, start.end)
+    var moved = false
+    play()
+    awaitPosition("Playback did not reach $target ms") { position ->
+        if (position.current != start.current) moved = true
+        moved && position.current >= target
+    }
+}
+
+internal data class PlaybackPosition(val current: Float, val end: Float)
+
+@Suppress("DEPRECATION") // AccessibilityNodeInfo.recycle is needed on API 28–32.
+private fun <T : Any> withPositionNode(node: AccessibilityNodeInfo?, use: (AccessibilityNodeInfo) -> T?): T? {
+    node ?: return null
+    return try {
+        if (node.contentDescription?.toString() == "Position" && node.refresh() && node.rangeInfo != null) {
+            use(node)
+        } else {
+            (0 until node.childCount).firstNotNullOfOrNull { withPositionNode(node.getChild(it), use) }
+        }
+    } finally {
+        node.recycle()
+    }
+}
+
+private const val PROFILE_AUDIO_MS = 2_000f

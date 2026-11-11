@@ -5,6 +5,9 @@
 # portable-format tools. The user's notes and the models are never touched: the notes go to the scratch root, and
 # the models stay in files/. At the end it removes debug-root.txt and the scratch root.
 set -euo pipefail
+# shellcheck source=scripts/heavy-lock.sh
+. "$(dirname "$0")/heavy-lock.sh"
+heavy_lock "$0" "$@"
 cd "$(dirname "$0")/.."
 
 usage() {
@@ -32,11 +35,13 @@ while [ $# -gt 0 ]; do
 done
 
 package=io.codemyriad.cassini.talk
-name=killtest-$(date +%s)
+name=killtest-$(date +%s)-$$
 clip=$(scripts/make-long-clip.sh --print-path)
 clip_name=$(basename "$clip")
 work=$(mktemp -d)
 began=$(date +%s)
+watcher=
+scratch_started=false
 
 log() { printf '[%4ss] %s\n' "$(( $(date +%s) - began ))" "$*"; }
 as_app() { adb shell "run-as $package $*" | tr -d '\r'; }
@@ -60,45 +65,87 @@ if value is not None and value is not False:
     print(value)
 PY
 }
-# Polls the expression until it prints something, at most $2 seconds.
-wait_for() {
-    local deadline=$(( $(date +%s) + $2 )) value
-    while [ "$(date +%s)" -lt "$deadline" ]; do
-        value=$(status "$1")
+# Wait for the next atomic status write or process exit. Read the current state first so a publication that
+# preceded this call still satisfies the predicate. The deadline only bounds a missing event.
+wait_for_value() {
+    local seconds=$1 value deadline
+    shift
+    deadline=$((SECONDS + seconds))
+    while :; do
+        value=$("$@")
         if [ -n "$value" ]; then printf '%s\n' "$value"; return 0; fi
-        sleep 2
+        wait_for_update "$deadline" || return 1
     done
-    return 1
 }
+
+wait_for_update() {
+    local remaining=$(( $1 - SECONDS )) _update
+    [ "$remaining" -gt 0 ] && IFS= read -r -t "$remaining" _update <&3
+}
+
+start_updates() {
+    local since
+    since=$(adb shell "date '+%m-%d %H:%M:%S.000'" | tr -d '\r')
+    mkfifo "$work/updates"
+    adb logcat -b main -b events -v raw -T "$since" \
+        -e "^Published debug-(status|command)[.]json in $name$|^\[" -s DebugStatus:I am_proc_died:I > "$work/updates" &
+    watcher=$!
+    exec 3<"$work/updates"
+}
+
+command_note() {
+    read_file debug-command.json | python3 -I -c 'import json, sys
+try:
+    print(json.load(sys.stdin).get("noteId", ""))
+except ValueError:
+    pass'
+}
+
+exited() {
+    if [ "$(pid)" != "$1" ]; then printf 'yes\n'; fi
+}
+
 cleanup() {
     status_code=$?
     if [ "$status_code" -ne 0 ] && [ -s "$work/status.json" ]; then
         printf 'Last status:\n' >&2
         cat "$work/status.json" >&2
     fi
-    # Stop the process first, so that nothing writes into the scratch root while it is removed.
-    adb shell am force-stop "$package" || true
-    # androidx.sqlite keeps the database lock file at cacheDir/<absolute database path>.lck.
-    adb shell "run-as $package rm -rf files/debug-root.txt files/$name cache/$name" \
-        "cache/data/data/$package/files/$name cache/data/user/0/$package/files/$name" || true
-    if [ -n "$(as_app test -e files/debug-root.txt '&&' echo present)" ]; then printf 'Could not remove debug-root.txt\n' >&2; fi
+    if [ -n "$watcher" ]; then
+        exec 3<&-
+        kill "$watcher" 2>/dev/null || true
+        wait "$watcher" 2>/dev/null || true
+    fi
+    if $scratch_started; then
+        # Stop the process first, so that nothing writes into the scratch root while it is removed.
+        adb shell am force-stop "$package" || true
+        # androidx.sqlite keeps the database lock file at cacheDir/<absolute database path>.lck.
+        adb shell "run-as $package rm -rf files/debug-root.txt files/$name cache/$name" \
+            "cache/data/data/$package/files/$name cache/data/user/0/$package/files/$name" || true
+        if [ -n "$(as_app test -e files/debug-root.txt '&&' echo present)" ]; then
+            printf 'Could not remove debug-root.txt\n' >&2
+        fi
+    fi
     rm -rf "$work"
     exit "$status_code"
 }
 
+trap cleanup EXIT
 if [ "$(as_app id -u 2>/dev/null | grep -c '^[0-9]')" -ne 1 ]; then
     printf 'run-as %s fails: install the debug build first.\n' "$package" >&2
     exit 1
 fi
-while adb shell ps -A -o ARGS | grep -q '[i]nstrument'; do
-    log 'An instrumentation run is in progress; waiting for it to end.'
-    sleep 30
-done
+processes=$(adb shell dumpsys activity processes "$package")
+if [[ "$processes" == *'Active instrumentation:'* ]]; then
+    printf 'Instrumentation is active. Run this probe after it finishes.\n' >&2
+    exit 1
+fi
 if [ -n "$(as_app test -e files/debug-root.txt '&&' echo present)" ]; then
     printf 'files/debug-root.txt exists already: another check runs, or an earlier one did not clean up.\n' >&2
     exit 1
 fi
-trap cleanup EXIT
+start_updates
+scratch_started=true
 
 # The debug root is read once, at process start.
 adb shell am force-stop "$package"
@@ -108,60 +155,43 @@ printf '%s\n' "$name" | adb exec-in "run-as $package sh -c 'cat > files/debug-ro
 log "Scratch root files/$name; clip $clip_name ($(stat -c %s "$clip") bytes)"
 
 adb shell am start -W -n "$package/io.codemyriad.cassini.debug.DebugCommandActivity" --es cmd import --es file "$clip_name" | tr -d '\r'
-deadline=$(( $(date +%s) + 60 ))
-note=
-while [ -z "$note" ] && [ "$(date +%s)" -lt "$deadline" ]; do
-    sleep 2
-    note=$(read_file debug-command.json | python3 -I -c 'import json, sys
-try:
-    print(json.load(sys.stdin).get("noteId", ""))
-except ValueError:
-    pass')
-done
+note=$(wait_for_value 60 command_note) || note=
 read_file debug-command.json
 printf '\n'
 if [ -z "$note" ]; then printf 'The import did not start a job.\n' >&2; exit 1; fi
 log "Note $note queued"
 
-checkpoint=$(wait_for "N and N.get('checkpointMs') and J['running'] and J['running']['noteId'] == N['id'] and N['checkpointMs']" 600) \
+checkpoint=$(wait_for_value 600 status "N and N.get('checkpointMs') and J['running'] and J['running']['noteId'] == N['id'] and N['checkpointMs']") \
     || { printf 'No checkpoint within 10 min.\n' >&2; exit 1; }
 before=$(pid)
 log "Checkpoint at $checkpoint ms; kill -9 of pid $before"
 adb shell "run-as $package kill -9 $before"
-deadline=$(( $(date +%s) + 20 ))
-while [ "$(pid)" = "$before" ] && [ "$(date +%s)" -lt "$deadline" ]; do sleep 1; done
-if [ "$(pid)" = "$before" ]; then printf 'The process survived kill -9.\n' >&2; exit 1; fi
+wait_for_value 20 exited "$before" >/dev/null || { printf 'The process survived kill -9.\n' >&2; exit 1; }
 log 'Process killed'
 
-# Android restarts a crashed service with START_REDELIVER_INTENT after a delay, when it allows the start.
+# Android can restart the service with START_REDELIVER_INTENT. If it does not, opening the app resumes the queue.
+resumed="J['pid'] != $before and J['running'] and J['running']['noteId'] == N['id']"
 resumed_by=
-deadline=$(( $(date +%s) + 90 ))
-while [ -z "$resumed_by" ] && [ "$(date +%s)" -lt "$deadline" ]; do
-    sleep 3
-    if [ -n "$(status "J['pid'] != $before and J['running'] and J['running']['noteId'] == N['id']")" ]; then
-        resumed_by=redelivery
-    fi
-done
+if wait_for_value 90 status "$resumed" >/dev/null; then resumed_by=redelivery; fi
 if [ -z "$resumed_by" ]; then
     log 'No redelivery within 90 s; opening the app'
     adb shell am start -W -n "$package/io.codemyriad.cassini.debug.DebugCommandActivity" --es cmd open | tr -d '\r'
-    wait_for "J['pid'] != $before and J['running'] and J['running']['noteId'] == N['id']" 60 >/dev/null \
+    wait_for_value 60 status "$resumed" >/dev/null \
         || { printf 'The job did not start again.\n' >&2; exit 1; }
     resumed_by=relaunch
 fi
 log "Resumed by $resumed_by in pid $(pid): $(status "'attempts %s, running %s' % (N.get('attempts'), J['running'])")"
 
 last=
-deadline=$(( $(date +%s) + 1200 ))
+deadline=$((SECONDS + 1200))
 while :; do
     done_state=$(status "N['jobState'] is None and N['audioKind'] == 'DOCUMENT' and N['documentState']")
     if [ -n "$done_state" ]; then break; fi
     failed=$(status "N['jobState'] in ('FAILED', 'PAUSED', 'NEEDS_CONSENT') and '%s %s %s' % (N['jobState'], N['pauseReason'], N['failure'])")
     if [ -n "$failed" ]; then printf 'The job stopped: %s\n' "$failed" >&2; exit 1; fi
-    if [ "$(date +%s)" -ge "$deadline" ]; then printf 'The job did not end within 20 min.\n' >&2; exit 1; fi
     progress=$(status "J['running'] and '%s %s/%s ms' % (J['running']['phase'], J['running'].get('doneMs'), J['running'].get('totalMs'))")
     if [ -n "$progress" ] && [ "$progress" != "$last" ]; then log "$progress"; last=$progress; fi
-    sleep 5
+    wait_for_update "$deadline" || { printf 'The job did not end within 20 min.\n' >&2; exit 1; }
 done
 log "Done: document $done_state, $(status "'%s words, %s ms' % (N['wordCount'], N['durationMs'])")"
 if [ "$done_state" != OK ]; then printf 'The sealed document is %s, not OK.\n' "$done_state" >&2; exit 1; fi

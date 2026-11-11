@@ -220,23 +220,42 @@ object Notices {
         (phase as? JobPhase.Downloading)?.progress?.let { notices += Notice(downloading(it)) }
         if (job != null) notices += listOfNotNull(jobNotice(job, failureText, requiredFreeBytes, noNewVersion))
         if (oneVoice && job == null) {
-            val unavailable = (speakerModel as? ModelStatus.Failed)?.failure == Failure.MODEL_UNAVAILABLE
-            val missing = speakerModel is ModelStatus.Missing || speakerModel is ModelStatus.Failed
-            val kind = when {
-                unavailable -> BannerKind.DL_MODEL_UNAVAILABLE
-                missing -> BannerKind.TX_SPEAKERS_MISSING
-                else -> BannerKind.TX_ONE_VOICE
-            }
-            val actionable = !noNewVersion && !unavailable && (missing || speakerModel == ModelStatus.Ready)
-            notices += Notice(
-                BannerSpec(
-                    kind,
-                    BannerArgs(bytes = ModelCatalog.speakerBytes),
-                    actions = if (actionable) kind.actions else persistentListOf(),
-                ),
-            )
+            notices += Notice(speakerModelNotice(speakerModel, noNewVersion))
         }
         return ordered(notices)
+    }
+
+    /** A standalone speaker-model install still has progress when this note has no processing job. */
+    private fun speakerModelNotice(speakerModel: ModelStatus?, noNewVersion: Boolean): BannerSpec =
+        when (speakerModel) {
+            is ModelStatus.Downloading -> BannerSpec(
+                BannerKind.DL_DOWNLOADING,
+                BannerArgs(
+                    percent = speakerModel.percent,
+                    bytes = speakerModel.bytes,
+                    bytes2 = speakerModel.total,
+                    part = ModelPartUi.SPEAKERS,
+                ),
+                actions = persistentListOf(),
+            )
+            is ModelStatus.Verifying -> BannerSpec(BannerKind.DL_CHECKING, BannerArgs(percent = speakerModel.percent))
+            else -> oneVoiceNotice(speakerModel, noNewVersion)
+        }
+
+    private fun oneVoiceNotice(speakerModel: ModelStatus?, noNewVersion: Boolean): BannerSpec {
+        val unavailable = (speakerModel as? ModelStatus.Failed)?.failure == Failure.MODEL_UNAVAILABLE
+        val missing = speakerModel is ModelStatus.Missing || speakerModel is ModelStatus.Failed
+        val kind = when {
+            unavailable -> BannerKind.DL_MODEL_UNAVAILABLE
+            missing -> BannerKind.TX_SPEAKERS_MISSING
+            else -> BannerKind.TX_ONE_VOICE
+        }
+        val actionable = !noNewVersion && !unavailable && (missing || speakerModel == ModelStatus.Ready)
+        return BannerSpec(
+            kind,
+            BannerArgs(bytes = ModelCatalog.speakerBytes),
+            actions = if (actionable) kind.actions else persistentListOf(),
+        )
     }
 
     private fun jobNotice(

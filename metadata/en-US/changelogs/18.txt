@@ -1,0 +1,1 @@
+Settings now downloads the selected model for telling speakers apart or recognizing saved voices. When a note needs the model that tells speakers apart, you can download it from the note and Cassini will automatically try to identify the speakers again.

@@ -113,7 +113,7 @@ internal object Background {
         graph.settings.setQueueHold(null)
         withTimeoutOrNull(SERVICE_STOP_MS) {
             processing.state.first { !it.serviceForeground && !it.draining }
-        } ?: throw AssertionError("The processing service leaves the foreground (waited ${SERVICE_STOP_MS / 1_000} s)")
+        } ?: throw AssertionError("The processing service did not leave the foreground: ${processing.state.value}")
     }
 
     const val WAIT_MS = 240_000L
