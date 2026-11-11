@@ -530,7 +530,9 @@ class AcceptanceWalkTest {
         val row = hasContentDescription(title, substring = true) and hasClickAction() and
             SemanticsMatcher.keyIsDefined(SemanticsActions.OnLongClick)
         rule.waitShown(hasScrollToNodeAction())
-        rule.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(row)
+        rule.waitFor("The Library lays out $title") {
+            runCatching { rule.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(row) }.isSuccess
+        }
         rule.waitShown(row)
         rule.onAllNodes(row).onFirst().performSemanticsAction(SemanticsActions.OnClick)
         rule.waitShown(hasContentDescription(rule.text(UiR.string.ui_back_to_library)))
