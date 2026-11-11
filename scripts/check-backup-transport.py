@@ -85,7 +85,7 @@ def main():
             if result != 'Success':
                 raise ValueError(f'{name} did not back up: {result}')
         elif quota:
-            if result != 'Quota exceeded':
+            if result != 'Size quota exceeded':
                 raise ValueError(f'{name} did not demonstrate the quota refusal: {result}')
             fixture('verifyQuota')
         elif result == 'Success' or 'This backup transport is disabled' not in logcat:

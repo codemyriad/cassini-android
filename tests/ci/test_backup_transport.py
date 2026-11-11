@@ -20,6 +20,11 @@ class BackupTransportTests(unittest.TestCase):
         output = f'Package {BACKUP.PACKAGE} with result: Success\nBackup finished with result: Success\n'
         self.assertEqual('Success', BACKUP.backup_result(output))
 
+    def test_quota_refusal_preserves_the_framework_status(self):
+        status = 'Size quota exceeded'
+        output = f'Package {BACKUP.PACKAGE} with result: {status}\nBackup finished with result: {status}\n'
+        self.assertEqual(status, BACKUP.backup_result(output))
+
     def test_agent_refusal_is_kept_as_a_refusal(self):
         output = f'Package {BACKUP.PACKAGE} with result: Agent error\nBackup finished with result: Agent error\n'
         self.assertEqual('Agent error', BACKUP.backup_result(output))
