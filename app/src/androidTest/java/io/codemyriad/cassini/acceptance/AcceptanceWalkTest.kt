@@ -77,12 +77,11 @@ import org.junit.Rule
 import org.junit.Test
 import java.io.File
 import java.util.Locale
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import io.codemyriad.cassini.ui.R as UiR
 
 /**
- * The acceptance walk through every board on emulator-5554 (P12, docs/development.md "Acceptance walk"). It saves a
+ * The acceptance walk through every board on emulator-5554 (P12, docs/development.md "Acceptance walk"). Screenshots
+ * require API 29+ and hardware-accelerated window roots. It saves a
  * screenshot of each board as `<scratch root>/acceptance/NN-board.png` and, when the test ends, copies them to
  * `files/acceptance-out/<label>/`, where `scripts/acceptance-walk.sh` collects them.
  *
@@ -584,31 +583,19 @@ class AcceptanceWalkTest {
         Log.i(TAG, "Screenshot $name")
     }
 
-    /** Includes dialog and sheet windows in the frame wait when Android exposes their roots. */
+    /** Includes dialog and sheet windows when collecting the roots to capture. */
     private fun awaitDrawnFrame(name: String) {
-        val committed = rule.runOnUiThread {
+        val roots = rule.runOnUiThread {
             val activityRoot = rule.activity.window.decorView
-            val roots = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 WindowInspector.getGlobalWindowViews()
                     .filter { it.isShown && it.windowVisibility == View.VISIBLE }
                     .ifEmpty { listOf(activityRoot) }
             } else {
                 listOf(activityRoot)
             }
-            CountDownLatch(roots.size).also { frames ->
-                roots.forEach { root ->
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && root.isHardwareAccelerated) {
-                        root.viewTreeObserver.registerFrameCommitCallback { frames.countDown() }
-                    } else {
-                        root.post { frames.countDown() }
-                    }
-                    root.invalidate()
-                }
-            }
         }
-        if (!committed.await(STILL_MS, TimeUnit.MILLISECONDS)) {
-            throw AssertionError("A window of $name did not commit a frame (waited ${STILL_MS / 1_000} s)")
-        }
+        awaitDrawnFrames(roots, name, STILL_MS)
     }
 
     /** Waits for the note's job to end with a verified document, and returns it. */

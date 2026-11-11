@@ -408,6 +408,8 @@ The checks 2 to 6, 8 and 9 use a debug root (`files/debug-root.txt`, see [device
 
 ### Acceptance walk runs
 
+Screenshot capture requires API 29 or later and hardware-accelerated app windows. Each visible window must commit a frame before capture.
+
 The first walk ran in light, dark and Italian (`build/acceptance/20261011-031058/`). After the corrections of the device review, the `realModels` part ran again in light (`20261011-034439`) and in dark (`20261011-034904`). The first README and store screenshots came from these two runs.
 
 After the last change to the walk (commit `57cc96d`), the full walk passed again on a debug build of that commit: light (`20261011-045343`), dark (`20261011-045602`) and Italian (`20261011-045814`). Each run has the `realModels` part and the `downloadScreens` part. The `build/` directory is not in the repository.
