@@ -11,6 +11,7 @@ import io.codemyriad.cassini.data.backup.BackupChoicesStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
@@ -24,6 +25,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.util.ReflectionHelpers
 import java.io.File
 import java.io.IOException
+import java.nio.file.Files
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -108,6 +110,35 @@ class CassiniBackupAgentTest {
         val choices = BackupChoicesStore(File(app.noBackupFilesDir, "choices.json"), Dispatchers.IO)
         assertTrue(binder { choices.readBlocking().quotaExceeded })
         assertFalse(app.hasStartedGraph())
+    }
+
+    @Test fun aPermittedRetryClearsTheOldSizeWarningBeforeSnapshotPreparation() {
+        val agent = Robolectric.setupBackupAgent(CassiniBackupAgent::class.java)
+        binder { agent.onQuotaExceeded(30_000_000, 25_000_000) }
+        val choices = BackupChoicesStore(File(app.noBackupFilesDir, "choices.json"), Dispatchers.IO)
+        assertTrue(binder { choices.readBlocking().quotaExceeded })
+        // Stop the retry at a different, deterministic error after its transport has been permitted.
+        val journal = File(app.noBackupFilesDir, "restores/applying.json")
+        Files.createDirectories(journal.parentFile!!.toPath())
+        journal.writeText(JSONObject().put("payload", "{}").put("sha256", "0".repeat(64)).toString())
+        val output = ReflectionHelpers.newInstance(FullBackupDataOutput::class.java)
+        ReflectionHelpers.setField(output, "mTransportFlags", 2)
+        ReflectionHelpers.setField(output, "mQuota", Long.MAX_VALUE)
+        val error = assertThrows(IllegalArgumentException::class.java) { binder { agent.onFullBackup(output) } }
+        assertEquals("Damaged restore journal", error.message)
+        assertFalse(binder { choices.readBlocking().quotaExceeded })
+        assertFalse(File(app.filesDir, BackupManifest.MANIFEST).exists())
+        assertFalse(app.hasStartedGraph())
+    }
+
+    @Test fun aRefusedTransportDoesNotClearThePreviousSizeFailure() {
+        val agent = Robolectric.setupBackupAgent(CassiniBackupAgent::class.java)
+        binder { agent.onQuotaExceeded(30_000_000, 25_000_000) }
+        val output = ReflectionHelpers.newInstance(FullBackupDataOutput::class.java)
+        val error = assertThrows(IOException::class.java) { binder { agent.onFullBackup(output) } }
+        assertEquals("This backup transport is disabled", error.message)
+        val choices = BackupChoicesStore(File(app.noBackupFilesDir, "choices.json"), Dispatchers.IO)
+        assertTrue(binder { choices.readBlocking().quotaExceeded })
     }
 
     @Test fun restoredLibraryDoesNotRequireOrRestoreAnOldCloudOptInAndDoesNotLoadModels() {
