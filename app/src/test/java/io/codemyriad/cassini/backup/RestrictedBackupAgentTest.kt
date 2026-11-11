@@ -7,6 +7,8 @@ import android.os.ParcelFileDescriptor
 import androidx.test.core.app.ApplicationProvider
 import io.codemyriad.cassini.core.backup.BackupManifest
 import io.codemyriad.cassini.core.speakers.VoiceCodec
+import io.codemyriad.cassini.data.AppPaths
+import io.codemyriad.cassini.data.backup.LibraryBackup
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -51,6 +53,9 @@ class RestrictedBackupAgentTest {
             }
             assertFalse(File(app.filesDir, "voices/people.json").exists())
             agent.onRestoreFinished()
+            assertFalse(File(app.filesDir, "voices/people.json").exists())
+            val paths = AppPaths(app.filesDir, app.cacheDir)
+            LibraryBackup(app, paths, File(app.noBackupFilesDir, "restores")).recoverRestore()
             assertEquals(people.readText(), File(app.filesDir, "voices/people.json").readText())
         }
     }

@@ -64,6 +64,7 @@ class BackupVoiceRecoveryTest {
                     }
                 }
                 receiver.finishRestore()
+                receiver.recoverRestore()
             }
             assertEquals("Ada", VoiceCodec.decode(target.people.readText()).single().name)
             for ((path, text) in expected) {

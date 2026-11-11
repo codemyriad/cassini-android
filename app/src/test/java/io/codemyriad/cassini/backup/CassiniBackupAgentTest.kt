@@ -7,7 +7,9 @@ import androidx.test.core.app.ApplicationProvider
 import io.codemyriad.cassini.CassiniApplication
 import io.codemyriad.cassini.GraphFactory
 import io.codemyriad.cassini.core.backup.BackupManifest
+import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.data.backup.BackupChoicesStore
+import io.codemyriad.cassini.data.backup.LibraryBackup
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -156,6 +158,9 @@ class CassiniBackupAgentTest {
             restore(agent, "voices/people.json", "Synthetic saved voice")
             assertFalse(File(app.filesDir, "voices/people.json").exists())
             agent.onRestoreFinished()
+            assertFalse(File(app.filesDir, "voices/people.json").exists())
+            val paths = AppPaths(app.filesDir, app.cacheDir)
+            LibraryBackup(app, paths, File(app.noBackupFilesDir, "restores")).recoverRestore()
         }
         assertEquals("Synthetic saved voice", File(app.filesDir, "voices/people.json").readText())
         assertEquals("target model", model.readText())

@@ -56,11 +56,25 @@ recovering committed `.bak` data on Android 9–10 even when the base is missing
 and unresolved atomic recovery refuse the snapshot; `.bak` files are not copied as separate payloads.
 
 An inventory records every admitted file's path, size and SHA-256. Incoming entries stream into
-private staging; missing, changed, duplicate, linked, unexpected or oversized data is rejected before
-live data is replaced. The restored catalogue is opened and repaired in staging. Notes, catalogue
-and saved voices are swapped with a checksum-protected durable journal. Cold startup recovers this
-journal before Room opens. An interrupted replacement rolls back; a committed replacement is retained.
-Cleanup failures cannot undo a committed restore. Failed recovery retains its journal and old roots.
+private staging and are hashed as they arrive. Each completely received file gets a durable hash
+receipt. The deadline-bound `onRestoreFinished` callback only commits a small, checksum-protected
+received-transaction pointer. It does not scan payloads, read the inventory, open Room, rebuild
+transcripts, replace library roots or delete staging trees. Error cleanup is deferred too.
+
+Cold startup finishes the transaction before opening the live Room database or publishing the Library.
+It compares received hash receipts with the inventory and revalidates the staged files. Missing,
+changed, duplicate, linked, unexpected or oversized data refuses startup before live data is replaced.
+A separate preparation root links the read-only notes and voices on the same internal filesystem and
+copies the catalogue before opening and repairing it. The original received catalogue stays unchanged,
+so interrupted migration or cache rebuilding can restart from verified input without copying audio.
+If internal storage cannot create the links, startup refuses promotion and retains the received data.
+
+Notes, the repaired catalogue and saved voices are swapped with a durable journal. An interrupted
+replacement first rolls back, retaining the received transaction for a fresh preparation and retry;
+a committed replacement is retained. All validation, catalogue work and recursive cleanup happen on
+the startup worker. Cleanup failures cannot undo a committed restore. Failed recovery retains its
+journal and old roots. A backup requested before a received restore has completed startup is refused,
+so an incomplete or older library cannot become the next successful snapshot.
 
 ## Package and app-version binding
 
@@ -83,6 +97,15 @@ atomic choices, journaled root replacement, cache repair and saved-voice preserv
 voices. Preparation is tested immediately after each of nine interrupted restore moves, after a
 committed interruption, and with a damaged journal. Deliberately omitting voice recovery, journal
 recovery or quota reset fails the corresponding regression; restored source passes.
+
+Deferred-restore tests hide both the incoming directory and receipt file during finalization, verify
+that no prepared catalogue or live library is created, and restore access before startup. A received
+unsupported catalogue is accepted into durable staging without being opened by finalization, then
+refused at startup without replacing the live library. Tampered payloads/receipts, truncated or
+duplicate receipts and oversized metadata are refused. Every interrupted promotion move is retried
+from unchanged received bytes. AppGraph tests verify that its catalogue cannot expose restored
+jobs or unvalidated rows, and invalid input prevents the live database from opening. These assertions
+use state and injected events, not elapsed-time budgets.
 
 The real API 35 arm64 local-transport matrix checks cloud refusal despite a stored opt-in, transfer
 off/on, a 26 MiB library exceeding the local D2D quota, a smaller successful retry with the warning
@@ -120,6 +143,7 @@ privacy page has been published by this PR.
 
 - [Auto Backup and its 25 MB cloud limit](https://developer.android.com/identity/data/autobackup)
 - [Testing backup and device transfer](https://developer.android.com/identity/data/testingbackup)
+- [Restore finalization deadline](https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/master/services/backup/java/com/android/server/backup/BackupAgentTimeoutParameters.java)
 - [Operation quota](https://developer.android.com/reference/android/app/backup/FullBackupDataOutput#getQuota())
 - [Manifest restoreAnyVersion](https://developer.android.com/guide/topics/manifest/application-element#restoreAnyVersion)
 - [Android package-keyed restore and version checks](https://android.googlesource.com/platform/frameworks/base/+/e0e69f8704cb96f12e8fb1530524443136daaf7e/services/backup/java/com/android/server/backup/restore/PerformUnifiedRestoreTask.java)

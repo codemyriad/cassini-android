@@ -89,6 +89,7 @@ class LibraryBackupTest {
             offMain {
                 transfer(source.paths.root, manifest, receiver)
                 receiver.finishRestore()
+                receiver.recoverRestore()
             }
             assertFalse(File(target.root, "models").exists())
             assertFalse(File(target.root, "notes/$id/work").exists())
@@ -134,11 +135,13 @@ class LibraryBackupTest {
             metadata.inputStream().use {
                 receiver.receive(BackupManifest.MANIFEST, it, metadata.length(), 1, Long.MAX_VALUE)
             }
-            assertThrows(IllegalArgumentException::class.java) { receiver.finishRestore() }
+            receiver.finishRestore()
+            assertThrows(IllegalArgumentException::class.java) { receiver.recoverRestore() }
+            val truncated = LibraryBackup(context, target, folder.newFolder())
             assertThrows(IOException::class.java) {
-                receiver.receive("notes/n/source.opus", ByteArrayInputStream(byteArrayOf(1)), 10, 1, Long.MAX_VALUE)
+                truncated.receive("notes/n/source.opus", ByteArrayInputStream(byteArrayOf(1)), 10, 1, Long.MAX_VALUE)
             }
-            receiver.abandon()
+            truncated.abandon()
         }
         assertEquals("existing library", old.readText())
         assertFalse(File(target.root, "notes/n").exists())

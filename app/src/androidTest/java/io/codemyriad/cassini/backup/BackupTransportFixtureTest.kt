@@ -19,6 +19,7 @@ import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.data.CassiniDispatchers
 import io.codemyriad.cassini.data.NoteLocks
 import io.codemyriad.cassini.data.backup.BackupChoicesStore
+import io.codemyriad.cassini.data.backup.LibraryBackup
 import io.codemyriad.cassini.data.db.CassiniDatabase
 import io.codemyriad.cassini.data.db.CassiniDatabaseOpener
 import io.codemyriad.cassini.data.db.JobEntity
@@ -133,6 +134,12 @@ class BackupTransportFixtureTest {
     }
 
     private suspend fun verify() {
+        // Android has acknowledged receipt; the first cold start must finish recovery before Room opens.
+        val staging = File(context.noBackupFilesDir, "restores")
+        assertTrue("Restore completion must be durable", File(staging, "applying.json").isFile)
+        assertFalse("The OS finalization callback must not publish the Library", paths.database.exists())
+        LibraryBackup(context, paths, staging).recoverRestore()
+        assertFalse("Startup completes the restore journal", File(staging, "applying.json").exists())
         assertFalse("Downloaded models must not travel", File(paths.root, "models").exists())
         assertFalse("Unfinished inference work must not travel", paths.work(ID).exists())
         assertFalse("An old device's cloud opt-in must not travel", choices.choices.first().cloud)

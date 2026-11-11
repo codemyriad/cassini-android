@@ -22,7 +22,7 @@ import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.data.CassiniDispatchers
 import io.codemyriad.cassini.data.NoteLocks
 import io.codemyriad.cassini.data.backup.BackupChoicesStore
-import io.codemyriad.cassini.data.backup.LibraryRestoreTransaction
+import io.codemyriad.cassini.data.backup.LibraryBackup
 import io.codemyriad.cassini.data.checkpoint.CheckpointRepository
 import io.codemyriad.cassini.data.db.CassiniDatabase
 import io.codemyriad.cassini.data.db.CassiniDatabaseOpener
@@ -404,7 +404,7 @@ class AppGraph(context: Context, val config: Config) {
     private suspend fun runStartup() {
         val (catalogue, setAside) = try {
             config.onStartupStep(STEP_DATABASE)
-            LibraryRestoreTransaction(paths.root, File(config.backupDirectory, "restores")).recover()
+            LibraryBackup(app, paths, File(config.backupDirectory, "restores")).recoverRestore()
             val database = CassiniDatabaseOpener(app, paths, config.clock).open()
             Catalogue(app, this, database.database, ::currentCanceller) to database.setAside
         } catch (error: CancellationException) {

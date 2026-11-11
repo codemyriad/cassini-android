@@ -189,7 +189,7 @@ These rules apply:
 
 ### 3.2 File layout under `filesDir`
 
-The backup XML files set a ceiling for the catalogue, note files and saved voices. The backup agent applies the device-local transport choices and a file allowlist. Restore verifies a complete inventory and recovers its journal before Room opens. See [Transfer and backup](backup.md).
+The backup XML files set a ceiling for the catalogue, note files and saved voices. The backup agent applies the device-local transport choices and a file allowlist. Restore finalization commits a received pointer. Startup validates the staged inventory, repairs a separate catalogue and recovers journaled promotion before Room opens. See [Transfer and backup](backup.md).
 
 ```
 cassini.db, cassini.db-wal, cassini.db-shm   Room catalogue (opened by absolute path under AppPaths.root)
