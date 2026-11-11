@@ -104,7 +104,9 @@ class BaselineProfileGenerator {
 
 /** Runs the player until two seconds of audio have advanced, or until it reaches the end of a shorter note. */
 internal fun awaitPlaybackProgress(device: UiDevice, automation: UiAutomation, timeoutMs: Long, play: () -> Unit) {
-    val start = checkNotNull(playbackPosition(automation.rootInActiveWindow)) { "The player has no Position range" }
+    val start = checkNotNull(device.wait(object : Condition<UiDevice, PlaybackPosition?> {
+        override fun apply(device: UiDevice): PlaybackPosition? = playbackPosition(automation.rootInActiveWindow)
+    }, timeoutMs)) { "The player has no Position range" }
     val from = if (start.current < start.end) start.current else 0f
     val target = minOf(from + PROFILE_AUDIO_MS, start.end)
     var moved = false
@@ -126,11 +128,9 @@ private data class PlaybackPosition(val current: Float, val end: Float)
 private fun playbackPosition(node: AccessibilityNodeInfo?): PlaybackPosition? {
     node ?: return null
     return try {
-        if (node.contentDescription?.toString() == "Position") {
-            node.rangeInfo?.let { PlaybackPosition(it.current, it.max) }
-        } else {
-            (0 until node.childCount).firstNotNullOfOrNull { playbackPosition(node.getChild(it)) }
-        }
+        val range = if (node.contentDescription?.toString() == "Position" && node.refresh()) node.rangeInfo else null
+        range?.let { PlaybackPosition(it.current, it.max) }
+            ?: (0 until node.childCount).firstNotNullOfOrNull { playbackPosition(node.getChild(it)) }
     } finally {
         node.recycle()
     }
