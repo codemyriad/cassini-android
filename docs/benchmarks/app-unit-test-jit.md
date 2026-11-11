@@ -78,3 +78,47 @@ and compare the test rosters as well as the times in the JUnit XML. These
 measurement-only cache overrides are not part of ordinary CI.
 
 On the shared Mac, use the heavy lock, memory admission and external outputs.
+
+## Code-cache capacity (2026-11-11)
+
+C1 must be paired with `-XX:ReservedCodeCacheSize=240m`. On the pinned JDK 17,
+`-XX:TieredStopAtLevel=1` implicitly selects a 48 MiB code cache, instead of the
+240 MiB normally selected with full tiered compilation. Running `java` with
+`-XX:TieredStopAtLevel=1 -XX:+PrintFlagsFinal -version` exposes the effective
+`ReservedCodeCacheSize`; compare it with the same command without the C1 flag.
+The explicit limit restores capacity without changing compilation tiers or the
+test roster. It is a reservation limit, not an initial allocation of 240 MiB.
+See the [JDK 17 code-cache option](https://docs.oracle.com/en/java/javase/17/docs/specs/man/java.html#advanced-jit-compiler-options-for-java).
+
+[Main run 43039814205](https://github.com/codemyriad/cassini-android/actions/runs/43039814205)
+on GitHub-hosted Ubuntu 24.04 exhausted this cache: 49,147 KiB used out of
+49,152 KiB, leaving 4 KiB. HotSpot disabled compilation and then threw
+`VirtualMachineError: Out of space in CodeCache for method handle intrinsic`
+while Robolectric linked `SQLiteConnectionPool.obtainConnectionWaiterLocked`.
+That killed the processing coroutine; waiting for its replacement job timed out
+in `discardAfterTheRunEndedButBeforeItsOutcomeIsWrittenRemovesTheCheckpoint`.
+`finishWithConsentOpensTheNote` subsequently reported the **same** error as
+`UncaughtExceptionsBeforeTest`. Both JUnit XML reports retain its complete stack.
+
+The capacity bug predates bulk transfer PR #166: commit `38346a1c` introduced
+the C1 setting on November 9. Neither failure is evidence of a new uncaught I/O
+exception or a changed dispatcher. Fresh-worker runs on the ARM Mac do not
+reproduce the exhaustion, but both versions approach the same capacity ceiling:
+
+| Unmodified source | Tests | Failures | Code-cache peak |
+| --- | ---: | ---: | ---: |
+| Pre-#166 main, `7022f359` | 403 | 0 | 47,849 KiB / 49,152 KiB |
+| Main, `231c4252` | 413 | 0 | 47,846 KiB / 49,152 KiB |
+| Main with explicit capacity and regression check | 414 | 0 | 61,735 KiB / 245,760 KiB |
+
+These runs use the complete `:app:testDebugUnitTest` task with its normal class
+order and worker configuration. This is the app task selected by `ciTest`;
+other modules execute in separate test JVMs. The two reported classes also pass
+together in three fresh workers on unmodified main, 41 tests per run. These are
+reproduction samples, not retries that discard a failed result.
+
+`JvmCodeCacheTest` queries the running HotSpot worker's effective capacity. With
+the old configuration it fails deterministically with 50,331,648 bytes; the
+explicit reservation must supply at least 251,658,240 bytes. Worker shutdown
+also prints code-cache usage for subsequent CI diagnosis. Existing test
+timeouts, coroutine exception reporting, class order and assertions stay intact.
