@@ -435,7 +435,10 @@ class AcceptanceWalkTest {
         see(speech.mebibytes.toString(), substring = true)
         see(rule.text(UiR.string.ui_part_speech))
         val unrelated = hasText(rule.text(UiR.string.ui_part_speakers)) or hasText(rule.text(UiR.string.ui_part_voices))
-        assertTrue("Optional speech download excludes speaker and voice models", rule.onAllNodes(unrelated).fetchSemanticsNodes().isEmpty())
+        assertTrue(
+            "Optional speech download excludes speaker and voice models",
+            rule.onAllNodes(unrelated).fetchSemanticsNodes().isEmpty(),
+        )
         shot("05-model-download")
 
         ScriptedModels.script(
