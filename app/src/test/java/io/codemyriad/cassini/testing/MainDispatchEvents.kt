@@ -1,6 +1,7 @@
 package io.codemyriad.cassini.testing
 
 import android.os.Looper
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.core.os.HandlerCompat
 import kotlinx.coroutines.Delay
 import kotlinx.coroutines.Dispatchers
@@ -30,16 +31,21 @@ class MainDispatchEvents : ExternalResource() {
 
     override fun after() = Dispatchers.resetMain()
 
-    /** Drains actual main work, then suspends for a new post; [timeoutMs] only bounds a hung test. */
+    /** Drains actual main work, then suspends for a post or Compose snapshot apply; [timeoutMs] only bounds a hung test. */
     fun await(timeoutMs: Long, condition: () -> Boolean) = runBlocking {
-        withTimeout(timeoutMs) {
-            while (true) {
-                val revision = posted.value
-                shadowOf(Looper.getMainLooper()).idle()
-                if (condition()) return@withTimeout
-                // A post during idle or the check is retained, so it cannot strand the waiter.
-                posted.first { it != revision }
+        val snapshots = Snapshot.registerApplyObserver { _, _ -> posted.update { it + 1 } }
+        try {
+            withTimeout(timeoutMs) {
+                while (true) {
+                    val revision = posted.value
+                    shadowOf(Looper.getMainLooper()).idle()
+                    if (condition()) return@withTimeout
+                    // Posts and snapshot applies during the check are retained.
+                    posted.first { it != revision }
+                }
             }
+        } finally {
+            snapshots.dispose()
         }
     }
 

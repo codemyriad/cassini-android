@@ -1,6 +1,8 @@
 package io.codemyriad.cassini.testing
 
 import android.os.Looper
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshots.Snapshot
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -58,6 +60,28 @@ class MainDispatchEventsTest {
             }
             assertEquals(checks.size, delivered)
             post.get(TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        } finally {
+            worker.shutdownNow()
+        }
+    }
+
+    @Test fun aSnapshotApplyAfterAFailedCheckWakesTheWaiter() {
+        val state = mutableStateOf(false)
+        val checked = CountDownLatch(1)
+        val worker = Executors.newSingleThreadExecutor()
+        try {
+            val write = worker.submit {
+                check(checked.await(TIMEOUT_MS, TimeUnit.MILLISECONDS)) { "Missing retained-state query" }
+                state.value = true
+                Snapshot.sendApplyNotifications()
+            }
+            mainDispatches.await(TIMEOUT_MS) {
+                val current = state.value
+                checked.countDown()
+                current
+            }
+            assertTrue(state.value)
+            write.get(TIMEOUT_MS, TimeUnit.MILLISECONDS)
         } finally {
             worker.shutdownNow()
         }
