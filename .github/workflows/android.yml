@@ -383,6 +383,8 @@ jobs:
           arch: x86_64
           target: google_apis
           profile: pixel_2
+          avd-name: cassini-ci
+          pre-emulator-launch-script: python3 -I scripts/ci-emulator-heap.py configure "$TEST_API" "$ANDROID_AVD_HOME/cassini-ci.avd/config.ini"
           disable-animations: true
           script: ./scripts/ci-emulator-smoke.sh
       # One retry on a new emulator, for a boot or adb failure of the runner. When device-smoke.sh printed the
@@ -407,6 +409,8 @@ jobs:
           arch: x86_64
           target: google_apis
           profile: pixel_2
+          avd-name: cassini-ci
+          pre-emulator-launch-script: python3 -I scripts/ci-emulator-heap.py configure "$TEST_API" "$ANDROID_AVD_HOME/cassini-ci.avd/config.ini"
           disable-animations: true
           script: ./scripts/ci-emulator-smoke.sh
       - name: Upload emulator results
