@@ -480,7 +480,7 @@ data class CassiniDocument(
             if (existing == null && comments.none { it.substringBefore('=').equals("TITLE", true) }) comments += "TITLE=${manifest.getJSONObject("meeting").getString("title")}" 
             val meeting = manifest.getJSONObject("meeting")
             val start = MeetingTime.resolve(manifest, existing?.comments.orEmpty())
-            val utc = meeting.opt("recordedAtUtc") as? String
+            val utc = start?.takeIf { it.source == MeetingTime.UTC }?.value
             if (utc != null) comments += "CASSINI_RECORDED_AT_UTC=$utc"
             comments += "DATE=${utc ?: start?.takeIf { it.source == MeetingTime.DATE }?.value ?: meeting.getString("createdAtUtc")}"
             comments += bodyTags

@@ -73,6 +73,28 @@ class CassiniDocumentTest {
         assertNull(unknown.meetingTime)
         assertTrue(unknown.comments.contains("DATE=$start"))
     }
+    @Test fun appendDoesNotReplaceAValidDateFallbackWithAnInvalidUtcField() {
+        val start = java.time.Instant.parse("2026-11-11T12:00:00Z")
+        val words = Transcript(listOf(Word("spk_1", 0, 20, "Hello")), "en")
+        val bytes = CassiniDocument.create(
+            silence(),
+            words,
+            "Legacy meeting",
+            JSONObject(),
+            recordedAtUtc = start,
+            createdAtUtc = start.plusSeconds(540),
+        )
+        val original = CassiniDocument.read(bytes)
+        original.manifest!!.getJSONObject("meeting").put("recordedAtUtc", "not-a-UTC-instant")
+        assertEquals(MeetingTime.DATE, original.meetingTime?.source)
+        val appended = CassiniDocument.create(bytes, words, "Ignored", JSONObject(), original)
+        val next = CassiniDocument.read(appended)
+        assertEquals(original.meetingTime, next.meetingTime)
+        assertEquals(start, next.meetingTime?.instant)
+        assertTrue(next.comments.contains("DATE=$start"))
+        assertFalse(next.comments.any { it.startsWith("CASSINI_RECORDED_AT_UTC=") })
+    }
+
     private fun silence(): ByteArray {
         val head = "OpusHead".toByteArray() + byteArrayOf(1, 1, 0, 0, -128, -69, 0, 0, 0, 0, 0)
         return OggOpus.mux(OggOpus.Stream(head, CassiniDocument.tagsPacket(listOf("X_CUSTOM=keep=me")),
