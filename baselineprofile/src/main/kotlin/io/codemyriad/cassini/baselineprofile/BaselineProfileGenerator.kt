@@ -74,7 +74,10 @@ class BaselineProfileGenerator {
     private fun playBriefly(device: UiDevice) {
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
         awaitPlaybackProgress(device, automation, TIMEOUT_MS) {
-            checkNotNull(device.findObject(By.desc(PLAY))) { "The note has no Play control" }.click()
+            val play = checkNotNull(device.wait(Until.findObject(By.desc(PLAY)), TIMEOUT_MS)) {
+                "The note has no Play control"
+            }
+            play.click()
         }
         device.findObject(By.desc(PAUSE))?.click()
     }
