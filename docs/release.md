@@ -115,6 +115,30 @@ The old `org.cassini.android` app stays in Play Console. Tell its testers to sav
 
 Each upload needs a `versionCode` that is more than the `versionCode` of each earlier upload. A tag that failed before the upload does not use a `versionCode`.
 
+## Unattended internal test releases
+
+`daily-test-release.yml` runs at 09:00, 14:00 and 20:00 **Europe/Berlin**, including daylight-saving changes,
+and offers `workflow_dispatch` on main. GitHub added [IANA schedule timezones](https://github.blog/changelog/2026-03-19-github-actions-late-march-2026-updates/).
+It skips with an Actions notice and summary when main has moved, its latest Android CI is not green, or its
+commit has already reached the internal track. A manual test-tag upload counts too.
+
+The job reserves the next `beta.N` and a higher `versionCode` in the repository's
+`android-play-internal-test` deployment ledger. Failed reservations consume their number. The source stays on
+main: only the runner's workspace version and English Play changelog change. Complete merged-PR titles are in
+`internal-test-release-plan`; Play shows the first 500 characters. Before a manual tagged release, choose a
+versionCode higher than all ledger reservations as well as the earlier Play uploads.
+
+The normal signed build, certificate checks, unit/conformance/screenshot/lint checks and four emulator jobs run
+through the same `android.yml`. Its daily signing job always uses GitHub-hosted runners, including when
+`CM_RUNNER=hetzner`, and its Gradle cache stays read-only like a tag build. Upload goes only to the existing Play internal track. Daily builds require the existing
+signing/Play secrets and `PLAY_RELEASE_STATUS=completed` (or unset, which defaults to completed).
+No automatic source commit, Git tag, GitHub release, production track, tester or signing change is made.
+
+The outcome records success only after upload. A lost deployment acknowledgement is reconciled against the
+actual upload step before deciding whether main is unchanged. Failure emits
+`[Android] daily test release failed: <cause>` as an Actions error and job summary, the coordinator's selected
+reporting channel. There is no new retry loop. API calls and subprocesses have outer hang guards.
+
 ## releaseTest
 
 `releaseTest` is a build type for the device tests of a release. It is the release build without R8, with the same signing, and it is not debuggable. R8 removes the members that only the tests call, so the instrumentation cannot operate on the minified `release` APK.
