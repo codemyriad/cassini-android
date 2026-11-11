@@ -14,10 +14,15 @@ The memory limit/peak/current and host availability provide context. Unavailable
 stay unknown, not zero.
 
 The implementation handles the current or namespaced cgroup v2 root and the standard v1
-memory-controller layout. It collects only allowlisted numeric values and aggregate RSS
+memory-controller layout, selecting the nearest readable ancestor when a leaf hides its memory controller. It collects only allowlisted numeric values and aggregate RSS
 counts. It never reads process arguments, environment, JVM crash logs or heap dumps, and
 it does not retain executable paths or process identities. There is no background sampler,
-clock assertion, retry, resource-limit change or altered Gradle failure handling.
+clock assertion, retry or resource-limit change. Both workflow steps use isolated Python
+and continue on diagnostic errors; they cannot fail a successful build or hide a Gradle failure.
+Unavailable or undecodable input, restricted cgroups and a timed-out ps command produce
+partial/unknown evidence. Output or cleanup failures warn without failing the job. A before
+snapshot removes stale after.json first; if that cleanup fails, the warning means retained
+snapshots cannot be trusted as a pair for this run.
 
 These snapshots establish evidence for a separate scheduling or heap fix. They cannot
 identify a particular killed JVM, prove a crash from an unchanged OOM counter, or survive

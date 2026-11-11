@@ -3,6 +3,7 @@
 import argparse
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 HOST_KEYS = {'MemTotal', 'MemAvailable', 'SwapTotal', 'SwapFree'}
@@ -11,9 +12,9 @@ EVENT_KEYS = {'low', 'high', 'max', 'oom', 'oom_kill', 'oom_group_kill', 'under_
 
 def text(path):
     try:
-        with path.open() as stream:
+        with path.open(encoding='utf-8', errors='replace') as stream:
             return stream.read(65536)
-    except OSError:
+    except (OSError, UnicodeError):
         return ''
 
 
@@ -48,17 +49,26 @@ def memory_group(proc, base):
         if version == 1 and 'memory' not in parts[1].split(','):
             continue
         root = base if version == 2 else base / 'memory'
-        # A namespaced mount may hide the host-relative membership path. Never traverse outside it.
-        candidates = [root] if '..' in Path(parts[2]).parts else [root / parts[2].lstrip('/'), root]
+        # A namespaced mount may hide the host-relative path. Never walk outside its mount.
+        candidate = root if '..' in Path(parts[2]).parts else root / parts[2].lstrip('/')
         marker = 'memory.events' if version == 2 else 'memory.limit_in_bytes'
-        for candidate in candidates:
-            if (candidate / marker).is_file():
+        while True:
+            try:
+                with (candidate / marker).open(encoding='utf-8', errors='replace') as stream:
+                    stream.read(1)
                 return version, candidate
+            except (OSError, UnicodeError):
+                pass
+            if candidate == root:
+                break
+            candidate = candidate.parent
     return None, None
 
 
 def process_totals(value):
     totals = {'javaCount': 0, 'javaRssKiB': 0, 'processCount': 0, 'rssKiB': 0}
+    if value is None:
+        return dict.fromkeys(totals)
     for line in value.splitlines():
         parts = line.rsplit(None, 1)
         if len(parts) != 2 or not parts[1].isdigit():
@@ -89,19 +99,31 @@ def snapshot(proc, cgroups, processes):
     }
 
 
-def main():
+def main(argv=None, *, proc=Path('/proc'), cgroups=Path('/sys/fs/cgroup'), output=Path('build/reports/resources')):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('phase', choices=['before', 'after'])
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     try:
-        result = subprocess.run(['ps', '-eo', 'comm=,rss='], check=False, capture_output=True, text=True)
-        processes = result.stdout if result.returncode == 0 else ''
-    except OSError:
-        processes = ''
-    value = snapshot(Path('/proc'), Path('/sys/fs/cgroup'), processes)
-    output = Path('build/reports/resources')
-    output.mkdir(parents=True, exist_ok=True)
-    (output / f'{args.phase}.json').write_text(json.dumps(value, indent=2) + '\n')
+        if args.phase == 'before':
+            (output / 'after.json').unlink(missing_ok=True)
+    except (OSError, UnicodeError):
+        print('Warning: stale memory evidence could not be removed; build result is unchanged.', file=sys.stderr)
+        return 0
+    try:
+        result = subprocess.run(
+            ['ps', '-eo', 'comm=,rss='], check=False, capture_output=True, text=True,
+            encoding='utf-8', errors='replace', timeout=10,
+        )
+        processes = result.stdout if result.returncode == 0 else None
+    except (OSError, subprocess.SubprocessError, UnicodeError):
+        processes = None
+    value = snapshot(proc, cgroups, processes)
+    try:
+        output.mkdir(parents=True, exist_ok=True)
+        (output / f'{args.phase}.json').write_text(json.dumps(value, indent=2) + '\n', encoding='utf-8')
+    except (OSError, UnicodeError):
+        print('Warning: memory evidence could not be written; build result is unchanged.', file=sys.stderr)
+    return 0
 
 
 if __name__ == '__main__':

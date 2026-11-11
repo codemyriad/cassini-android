@@ -214,7 +214,8 @@ jobs:
       # On tags the device tests run against releaseTest (the release build without R8), because R8
       # removes members the tests call; the emulator job then launch-checks the published release APK.
       - name: Snapshot build memory limits before Gradle
-        run: python3 scripts/ci-memory-evidence.py before
+        continue-on-error: true
+        run: python3 -I scripts/ci-memory-evidence.py before
       - name: Build APK, run unit and conformance tests, and lint
         env:
           BUILD_TYPE: ${{ startsWith(github.ref, 'refs/tags/') && 'Release' || 'Debug' }}
@@ -245,7 +246,8 @@ jobs:
           fi
       - name: Snapshot build memory counters after Gradle
         if: always()
-        run: python3 scripts/ci-memory-evidence.py after
+        continue-on-error: true
+        run: python3 -I scripts/ci-memory-evidence.py after
       - name: List the Robolectric jars after the tests
         id: robolectric-used
         if: github.ref == 'refs/heads/main'
