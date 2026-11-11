@@ -36,7 +36,9 @@ class MainDispatchEvents : ExternalResource() {
      * Drains main work, then suspends for a post or snapshot apply. [advanceTimers] runs scheduled Android timers
      * at their virtual deadlines for Compose predicates. [timeoutMs] only bounds a hung test.
      */
-    fun await(timeoutMs: Long, advanceTimers: Boolean = false, condition: () -> Boolean) = runBlocking {
+    fun await(timeoutMs: Long, condition: () -> Boolean) = await(timeoutMs, advanceTimers = false, condition)
+
+    fun await(timeoutMs: Long, advanceTimers: Boolean, condition: () -> Boolean) = runBlocking {
         val snapshots = Snapshot.registerApplyObserver { _, _ -> posted.update { it + 1 } }
         try {
             withTimeout(timeoutMs) {
