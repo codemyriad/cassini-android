@@ -433,16 +433,19 @@ class GraphNotePorts(private val graph: AppGraph, context: Context) : NotePorts 
 
     override fun exportEmptyText(): String = localized().getString(R.string.export_no_words)
 
-    override fun markdownOptions(createdAt: Long, durationMs: Long): MarkdownOptions = NoteMarkdown.options(
-        localized().resources,
-        FormatSettings(
-            android.content.res.Resources.getSystem().configuration.locales[0],
-            android.text.format.DateFormat.is24HourFormat(app),
+    override fun markdownOptions(createdAt: Long, durationMs: Long): MarkdownOptions {
+        val numericLocale = android.content.res.Resources.getSystem().configuration.locales[0]
+        val clockPreference = android.provider.Settings.System.getString(
+            app.contentResolver,
+            android.provider.Settings.System.TIME_12_24,
+        )
+        val settings = FormatSettings(
+            numericLocale,
+            NoteMarkdown.is24Hour(numericLocale, clockPreference),
             ZoneId.systemDefault(),
-        ),
-        createdAt,
-        durationMs,
-    )
+        )
+        return NoteMarkdown.options(localized().resources, settings, createdAt, durationMs)
+    }
 
     override fun failureText(code: String): String? {
         val res = Failure.entries.firstOrNull { it.name == code }?.stringRes ?: when (code) {

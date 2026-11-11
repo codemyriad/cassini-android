@@ -5,6 +5,7 @@ import android.content.res.Configuration
 import androidx.test.core.app.ApplicationProvider
 import io.codemyriad.cassini.ui.format.FormatSettings
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -30,6 +31,13 @@ class NoteMarkdownTest {
         assertTrue(options.dateLine.startsWith("mardi 27 octobre 2026, 9:00 AM"))
         assertTrue(options.dateLine.endsWith(" · 52 min"))
         assertEquals(original, Locale.getDefault())
+    }
+
+    @Test fun phoneClockChoiceOverridesTheNumericLocaleAndItsDefaultStaysIndependentOfTheUi() {
+        assertFalse(NoteMarkdown.is24Hour(Locale.US, null))
+        assertTrue(NoteMarkdown.is24Hour(Locale.UK, null))
+        assertTrue(NoteMarkdown.is24Hour(Locale.US, "24"))
+        assertFalse(NoteMarkdown.is24Hour(Locale.FRANCE, "12"))
     }
 
     @Test fun englishOverlapUsesTheSharedBritishListPattern() {

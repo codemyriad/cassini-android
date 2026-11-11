@@ -7,11 +7,26 @@ import io.codemyriad.cassini.core.export.MarkdownDate
 import io.codemyriad.cassini.core.export.MarkdownOptions
 import io.codemyriad.cassini.ui.format.Durations
 import io.codemyriad.cassini.ui.format.FormatSettings
+import java.time.chrono.IsoChronology
+import java.time.format.DateTimeFormatterBuilder
+import java.time.format.FormatStyle
 import java.util.Locale
 import io.codemyriad.cassini.ui.R as UiR
 
 /** S-5 resource copy and D50.3 formatting, captured together when Save or Share starts. */
 internal object NoteMarkdown {
+    /** With no explicit phone choice, derive the clock cycle from the numeric locale, never the app language. */
+    fun is24Hour(formattingLocale: Locale, preference: String?): Boolean = when (preference) {
+        "24" -> true
+        "12" -> false
+        else -> DateTimeFormatterBuilder.getLocalizedDateTimePattern(
+            null,
+            FormatStyle.SHORT,
+            IsoChronology.INSTANCE,
+            formattingLocale,
+        ).let { 'H' in it || 'k' in it }
+    }
+
     fun options(res: Resources, format: FormatSettings, createdAt: Long, durationMs: Long): MarkdownOptions {
         val uiLocale = res.configuration.locales[0].let { if (it.language == "en") Locale.UK else it }
         val formatter = ListFormatter.getInstance(uiLocale)
