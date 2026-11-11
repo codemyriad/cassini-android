@@ -1,6 +1,7 @@
 package io.codemyriad.cassini.background
 
 import android.os.Build
+import android.os.FileObserver
 import android.util.Log
 import io.codemyriad.cassini.background.Background.graph
 import io.codemyriad.cassini.background.Background.waitFor
@@ -16,6 +17,7 @@ import io.codemyriad.cassini.engine.job.JobPhase
 import io.codemyriad.cassini.processing.ProcessingService
 import io.codemyriad.cassini.processing.ProcessingState
 import io.codemyriad.cassini.test.NeedsModels
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.runBlocking
@@ -100,11 +102,10 @@ class ProcessingServiceTest {
         processing.transcribe(long)
         processing.transcribe(short)
 
-        val saved = waitFor("The long note saves a checkpoint") {
-            val running = processing.state.value.running
-                ?.takeIf { it.noteId == long && it.phase is JobPhase.Transcribing }
-            running?.let { graph.awaitCatalogue().checkpoints.status(long) as? CheckpointStatus.Saved }
+        awaitProcessing("The long note starts inference") {
+            it.running?.let { running -> running.noteId == long && running.phase is JobPhase.Transcribing } == true
         }
+        val saved = awaitCheckpoint(long)
         Log.i(TAG, "Long note checkpoint at ${saved.doneMs} of ${saved.durationMs} ms")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
             // Inference runs as mediaProcessing (0x2000), as Android reports it; dataSync would time out after 6 h.
@@ -124,6 +125,34 @@ class ProcessingServiceTest {
             graph.awaitCatalogue().checkpoints.status(long) is CheckpointStatus.Saved,
         )
         assertNull("Stop holds nothing", processing.state.value.hold)
+    }
+
+    @Suppress("DEPRECATION") // The path constructor supports the API 26 device matrix.
+    private suspend fun awaitCheckpoint(noteId: String): CheckpointStatus.Saved {
+        val checkpoints = graph.awaitCatalogue().checkpoints
+        val changes = Channel<Unit>(Channel.CONFLATED)
+        val directory = checkNotNull(checkpoints.audioPart(noteId).parentFile)
+        val observer = object : FileObserver(directory.path, CLOSE_WRITE or MOVED_TO) {
+            override fun onEvent(event: Int, path: String?) {
+                if (path == "checkpoint.json") changes.trySend(Unit)
+            }
+        }
+        observer.startWatching()
+        try {
+            // The watch is installed before the retained-state query, covering a save during attachment.
+            changes.trySend(Unit)
+            return withTimeoutOrNull(Background.WAIT_MS) {
+                var saved: CheckpointStatus.Saved? = null
+                while (saved == null) {
+                    changes.receive()
+                    saved = checkpoints.status(noteId) as? CheckpointStatus.Saved
+                }
+                saved
+            } ?: throw AssertionError("The long note saves a checkpoint")
+        } finally {
+            observer.stopWatching()
+            changes.close()
+        }
     }
 
     private suspend fun awaitProcessing(message: String, matches: (ProcessingState) -> Boolean) {
