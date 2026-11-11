@@ -81,12 +81,14 @@ class BulkTransferDeviceTest {
 
     @Test fun anImportSummaryRemainsVisibleWhenTheExportHeaderIsDisposed() {
         val graph = Flows.graph
-        val title = runBlocking {
+        val titles = runBlocking {
             repeat(20) { index -> Background.import(Flows.meetingDocument("Scroll note $index")) }
-            graph.awaitCatalogue().notes.library().first().last().title
+            val rows = graph.awaitCatalogue().notes.library().first()
+            rows.first().title to rows.last().title
         }
-        val last = hasContentDescription(title, substring = true)
-        rule.waitShown(hasScrollToNodeAction())
+        val last = hasContentDescription(titles.second, substring = true)
+        // A list exists during loading too; wait for the seeded catalogue to reach the rendered Library.
+        rule.waitShown(hasContentDescription(titles.first, substring = true))
         rule.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(last)
         val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
         rule.onNodeWithText(context.getString(R.string.export_zip_all)).assertDoesNotExist()
