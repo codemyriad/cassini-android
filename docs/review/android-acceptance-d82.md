@@ -24,4 +24,12 @@ Catalog readiness can precede the first Library frame. Setup now waits for the L
 
 The default full walk still selects English light, English dark and Italian, with realModels and downloadScreens in each, and requires all 57 named screenshots. No failing variant, state or screenshot has been removed. Screenshot readiness still uses the existing hardware frame-commit acknowledgement on API 35. All waits remain driven by the existing UI/model events and bounded by hang guards.
 
-Native rerun and route/selector mutation results are pending. The original 4/6 failures remain the baseline until replacement results are recorded. Run the walk with `scripts/acceptance-walk.sh --serial <owned API 35 emulator>` after preparing the committed public audio fixtures and installing the pinned public models. Use debug APKs with `adb install -r`; never uninstall or clear app data.
+The restored standalone download journey passes with all six screenshots. Three negative controls restore stale behavior independently:
+
+| Control | Observed failure |
+| --- | --- |
+| Note Transcribe instead of the optional Settings download | Download consent is absent; the included model remains usable. |
+| Substring/first-match Saved voices selection | Italian opens the wrong Settings row; Anna Ricci is absent and only 11 of 13 model-walk screenshots are collected. |
+| Checking-banner explanatory body on the standalone progress card | The nonexistent body fails its assertion; cleanup releases the held fetcher and reports the failure. |
+
+All three controls fail at their intended assertion without a process crash. Clean source and APKs are restored before the final full walk. The PR records the completed full-walk result and exact-head CI gate; readiness requires every invocation and all 57 screenshots. Run the walk with `scripts/acceptance-walk.sh --serial <owned API 35 emulator>` after preparing the committed public audio fixtures and installing the pinned public models. Use debug APKs with `adb install -r`; never uninstall or clear app data.
