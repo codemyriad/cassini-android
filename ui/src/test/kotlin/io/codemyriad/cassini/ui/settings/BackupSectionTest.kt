@@ -44,8 +44,9 @@ class BackupSectionTest {
     }
 
     @Test fun disabledTransferExplainsTheConsequenceAndOffersExport() {
-        show(BackupSettingsUi(transfer = false, transferAvailable = true, quotaExceeded = false))
+        show(BackupSettingsUi(transfer = false, transferAvailable = true, quotaExceeded = true))
         rule.onNodeWithText("Move to a new phone").assertIsOff()
+        assertNoQuotaWarning()
         rule.onNodeWithText(
             "Nothing is copied to a new phone. If this phone is lost or replaced, your notes are gone unless you exported them.",
         ).assertExists()
@@ -53,9 +54,16 @@ class BackupSectionTest {
     }
 
     @Test fun unavailableTransferCannotBeToggledAndExplainsWhy() {
-        show(BackupSettingsUi(transfer = true, transferAvailable = false, quotaExceeded = false))
+        show(BackupSettingsUi(transfer = true, transferAvailable = false, quotaExceeded = true))
         rule.onNodeWithText("Move to a new phone").assertIsNotEnabled().assertIsOff()
+        assertNoQuotaWarning()
         rule.onNodeWithText("Choosing this needs Android 9 or newer.").assertExists()
+    }
+
+    private fun assertNoQuotaWarning() {
+        rule.onAllNodesWithText(
+            "Your notes and saved voices are too large to move in one transfer. Export your notes as a ZIP instead.",
+        ).assertCountEquals(0)
     }
 
     @Test fun aWriteInProgressDisablesTransferAndActualQuotaFailureOffersZip() {

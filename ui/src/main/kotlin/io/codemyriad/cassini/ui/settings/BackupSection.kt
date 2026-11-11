@@ -40,7 +40,9 @@ internal fun BackupSection(state: BackupSettingsUi, onEvent: (SettingsEvent) -> 
         ) { onEvent(SettingsEvent.Transfer(it)) }
     }
     HelperText(stringResource(R.string.ui_settings_transfer_export_hint))
-    if (state.quotaExceeded) HelperText(stringResource(R.string.ui_settings_transfer_too_large))
+    if (state.transferAvailable && state.transfer && state.quotaExceeded) {
+        HelperText(stringResource(R.string.ui_settings_transfer_too_large))
+    }
     if (state.error) HelperText(stringResource(R.string.ui_settings_transfer_choice_failed))
 }
 

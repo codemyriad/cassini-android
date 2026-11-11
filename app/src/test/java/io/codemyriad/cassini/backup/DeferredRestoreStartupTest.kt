@@ -47,6 +47,7 @@ class DeferredRestoreStartupTest {
     val uncaught = NoUncaughtCoroutines()
 
     @get:Rule val folder = TemporaryFolder()
+    private val receivedId = "00000000-0000-4000-8000-000000000003"
     private val context: Context = ApplicationProvider.getApplicationContext()
 
     private fun graph(paths: AppPaths, backup: File) = AppGraph(
@@ -67,9 +68,9 @@ class DeferredRestoreStartupTest {
             withTimeout(30_000) { first.ready.await() }
             val catalogue = first.awaitCatalogue()
             val audio = File(checkNotNull(System.getProperty("cassini.fixtures")), "audio/fleurs-it-short.opus")
-            Files.createDirectories(source.note("received").toPath())
+            Files.createDirectories(source.note(receivedId).toPath())
             withContext(Dispatchers.IO) {
-                File(source.note("received"), "document.opus").writeBytes(
+                File(source.note(receivedId), "document.opus").writeBytes(
                     CassiniDocument.create(
                         audio.readBytes(),
                         Transcript(listOf(Word("S1", 0, 400, "Welcome"))),
@@ -80,17 +81,17 @@ class DeferredRestoreStartupTest {
                 )
             }
             val selected = withContext(Dispatchers.IO) {
-                CassiniDocument.read(File(source.note("received"), "document.opus")).defaultId
+                CassiniDocument.read(File(source.note(receivedId), "document.opus")).defaultId
             }
             catalogue.database.notes().insert(
                 NoteEntity(
-                    "received", "Received meeting", createdAt = 1, addedAt = 1,
+                    receivedId, "Received meeting", createdAt = 1, addedAt = 1,
                     origin = Origin.IMPORTED_DOCUMENT, audioFile = "document.opus", audioKind = AudioKind.DOCUMENT,
                     selectedVariant = selected, updatedAt = 1,
                 ),
             )
             catalogue.database.jobs().insert(
-                JobEntity("received", 1, JobKind.TRANSCRIBE_AGAIN, JobState.QUEUED, enqueuedAt = 1, updatedAt = 1),
+                JobEntity(receivedId, 1, JobKind.TRANSCRIBE_AGAIN, JobState.QUEUED, enqueuedAt = 1, updatedAt = 1),
             )
         } finally {
             first.close()
@@ -121,13 +122,13 @@ class DeferredRestoreStartupTest {
         try {
             // awaitCatalogue, not the later ready event: no consumer can see unvalidated restored rows/jobs.
             val catalogue = withTimeout(30_000) { restored.awaitCatalogue() }
-            val row = checkNotNull(catalogue.database.notes().note("received"))
+            val row = checkNotNull(catalogue.database.notes().note(receivedId))
             assertEquals(DocumentState.OK, row.documentState)
             assertNotNull(row.selectedVariant)
-            assertNull(catalogue.database.jobs().job("received"))
-            val variant = catalogue.database.cache().variants("received").single()
+            assertNull(catalogue.database.jobs().job(receivedId))
+            val variant = catalogue.database.cache().variants(receivedId).single()
             assertEquals(1, variant.wordCount)
-            assertEquals("Ada", catalogue.database.cache().speakers("received", variant.variantId).single().label)
+            assertEquals("Ada", catalogue.database.cache().speakers(receivedId, variant.variantId).single().label)
             withTimeout(30_000) { restored.ready.await() }
             assertFalse(File(staging, "applying.json").exists())
         } finally {
@@ -212,7 +213,7 @@ class DeferredRestoreStartupTest {
         try {
             withTimeout(30_000) { restored.ready.await() }
             val catalogue = restored.awaitCatalogue()
-            assertEquals("Received meeting", catalogue.database.notes().note("received")?.title)
+            assertEquals("Received meeting", catalogue.database.notes().note(receivedId)?.title)
             assertNull(catalogue.database.notes().note("n"))
             assertTrue(target.database.exists())
             assertNotNull(restored.startupReport.value?.failed?.get(AppGraph.STEP_RESTORE))

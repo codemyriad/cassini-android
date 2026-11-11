@@ -12,7 +12,10 @@ import java.nio.file.NoSuchFileException
 import java.nio.file.attribute.BasicFileAttributes
 
 /** Only demonstrated corruption is disposable. Storage/permission failures remain retryable. */
-internal class CorruptRestoreException(cause: Exception) : IOException("Incomplete or damaged received library", cause)
+internal class CorruptRestoreException(cause: Exception) : IOException(
+    "Incomplete or damaged received library: ${cause.message}",
+    cause,
+)
 
 internal object RestoreValidation {
     fun verify(stage: File) {

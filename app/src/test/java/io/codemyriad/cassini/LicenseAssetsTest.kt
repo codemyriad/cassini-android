@@ -21,6 +21,18 @@ class LicenseAssetsTest {
 
     @Test fun privacyPolicyMatchesTheRepository() = same("PRIVACY.md", "PRIVACY.md")
 
+    @Test fun bundledPrivacyDescribesDefaultDirectTransferAndItsExclusions() {
+        val privacy = File(root, "app/src/main/assets/licenses/PRIVACY.md").readText()
+        for (text in listOf(
+            "On Android 9 or later, direct device-to-device transfer copies your notes, the catalogue and saved voices",
+            "when “Move to a new phone” is on",
+            "This choice is on by default",
+            "Cloud backup is not used",
+            "Downloaded models and unfinished work are not copied",
+        )) assertTrue("Missing transfer disclosure: $text", text in privacy)
+        assertTrue("Obsolete transfer denial", "Android does not back up the Cassini data" !in privacy)
+    }
+
     @Test fun privacyPolicyListsEachDownloadHost() {
         val privacy = File(root, "PRIVACY.md").readText()
         for (host in ModelCatalog.DOWNLOAD_HOSTS) {

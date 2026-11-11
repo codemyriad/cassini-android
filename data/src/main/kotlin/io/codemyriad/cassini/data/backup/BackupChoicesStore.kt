@@ -26,7 +26,9 @@ class BackupChoicesStore(private val file: File, private val io: CoroutineDispat
 
     fun refresh() = revision.update { it + 1 }
 
-    suspend fun setTransfer(enabled: Boolean) = edit { it.copy(transfer = enabled, noticeAcknowledged = true) }
+    suspend fun setTransfer(enabled: Boolean) = edit {
+        it.copy(transfer = enabled, noticeAcknowledged = true, quotaExceeded = false)
+    }
 
     suspend fun setCloud(enabled: Boolean) = edit { it.copy(cloud = enabled, quotaExceeded = false) }
 

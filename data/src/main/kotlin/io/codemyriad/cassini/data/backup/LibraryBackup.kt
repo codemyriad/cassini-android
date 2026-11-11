@@ -143,6 +143,8 @@ class LibraryBackup(context: Context, private val paths: AppPaths, private val s
         val stage = transaction.receivedStage ?: return null
         val rejection = try {
             RestoreValidation.verify(stage)
+            val prepared = RestorePreparation.create(stage)
+            repairCatalogue(prepared)
             null
         } catch (error: CorruptRestoreException) {
             transaction.rejectReceived(stage)
@@ -150,8 +152,6 @@ class LibraryBackup(context: Context, private val paths: AppPaths, private val s
             error.toString()
         }
         if (rejection == null) {
-            val prepared = RestorePreparation.create(stage)
-            repairCatalogue(prepared)
             transaction.install(stage)
             transaction.recover()
         }

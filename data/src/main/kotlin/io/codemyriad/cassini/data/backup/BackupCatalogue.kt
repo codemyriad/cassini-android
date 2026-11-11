@@ -7,7 +7,9 @@ import android.database.sqlite.SQLiteException
 import io.codemyriad.cassini.core.backup.BackupManifest
 import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.data.CassiniDispatchers
+import io.codemyriad.cassini.data.NoteIds
 import io.codemyriad.cassini.data.NoteLocks
+import io.codemyriad.cassini.data.db.CassiniDatabase
 import io.codemyriad.cassini.data.db.CassiniDatabaseOpener
 import io.codemyriad.cassini.data.notes.DocumentRepository
 import io.codemyriad.cassini.data.notes.NoteFiles
@@ -22,6 +24,12 @@ internal class BackupCatalogue(private val context: Context) {
     fun prepare(restored: AppPaths) {
         // A catalogue lost on the source is rebuilt by the normal startup.
         if (Files.notExists(restored.database.toPath(), LinkOption.NOFOLLOW_LINKS)) return
+        val version = RestoredCatalogueValidation.version(restored.database)
+        require(version <= CassiniDatabase.VERSION) { "Unsupported newer restored catalogue" }
+        RestoredCatalogueValidation.checked { prepareSupported(restored) }
+    }
+
+    private fun prepareSupported(restored: AppPaths) {
         val opened = CassiniDatabaseOpener(context, restored).open()
         val database = opened.database
         try {
@@ -52,7 +60,7 @@ internal class BackupCatalogue(private val context: Context) {
             runBlocking {
                 for (note in database.notes().all()) {
                     require(
-                        BackupManifest.admits("notes/${note.id}/${note.audioFile}")
+                        NoteIds.isValid(note.id) && BackupManifest.admits("notes/${note.id}/${note.audioFile}")
                     ) { "Unsafe catalogue audio path" }
                     documents.refreshIfStale(note.id)
                 }

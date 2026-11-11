@@ -22,12 +22,14 @@ import androidx.room.TypeConverters
         JobEntity::class,
         NoteVoiceLinkEntity::class,
     ],
-    version = 2,
+    version = CassiniDatabase.VERSION,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
 abstract class CassiniDatabase : RoomDatabase() {
     companion object {
+        const val VERSION = 2
+
         /** Preserve authoritative rows/jobs; old document-time caches must be derived again from the file. */
         val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {

@@ -82,6 +82,17 @@ class BackupChoicesStoreTest {
         assertFalse(store.choices.first().quotaExceeded)
     }
 
+    @Test fun turningTransferOffClearsThePersistedQuotaWarning() = runTest {
+        val file = File(folder.root, "choices.json")
+        val store = BackupChoicesStore(file, Dispatchers.IO)
+        store.recordQuotaExceeded(true)
+        store.setTransfer(false)
+        val restored = BackupChoicesStore(file, Dispatchers.IO).choices.first()
+        assertFalse(restored.transfer)
+        assertFalse(restored.quotaExceeded)
+        assertTrue(restored.noticeAcknowledged)
+    }
+
     @Test fun anUnwritableParentDoesNotInventAPersistedChoice() {
         val parent = folder.newFile("not-a-directory")
         val store = BackupChoicesStore(File(parent, "choices.json"), Dispatchers.IO)
