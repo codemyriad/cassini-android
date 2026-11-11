@@ -24,11 +24,13 @@ data class NoteKey(val noteId: String, val query: String? = null, val start: Not
 enum class NoteStart {
     SAVE_DOCUMENT,
     SAVE_TEXT,
+    SAVE_MARKDOWN,
     SAVE_SRT,
     SAVE_VTT,
     CHOOSE_SUBTITLES,
     SHARE_DOCUMENT,
     SHARE_TEXT,
+    SHARE_MARKDOWN,
     SHARE_SUBTITLES,
     DOCUMENT_INFO,
 }

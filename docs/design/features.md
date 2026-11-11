@@ -424,3 +424,14 @@ A failure of a best-effort part never shows a red banner. It shows in Settings. 
 - Reduced motion (animator scale 0): no animation of the waveform, the progress or the pulse.
 - The contrast pairs of ui.md section 11. `ContrastTest` enforces them in the two themes.
 - Compose accessibility checks (`enableAccessibilityChecks()`, from `ui-test-junit4-accessibility`). P2 found that these checks do not operate under Robolectric. Thus they run in the device flow tests of P10 on an emulator (`flows/ScreenAccessibilityTest`, `flows/AppAccessibilityTest`). A finding fails the test, except for the inline word links, the row suffixes with an extended hit area, and the low contrast of `rec.barIdle` (ui.md section 11).
+
+## Markdown export (D50.2, D50.3, D84)
+
+The Note actions sheet in the Library and Note view offers Markdown alongside Text and Subtitles. Save a copy and
+Share use the selected readable transcript variant, stored speaker labels and the same D84 reading paragraphs as
+the reader, including inline replies and competing-speech labels. Plain audio and unreadable documents disable it.
+The result is UTF-8 without BOM, LF line endings and one final newline. The absolute date and headings follow the
+app language; the clock follows the system formatting locale and 12/24-hour choice. Imported personal notes from
+`x["gocassini.com"].notes` are included in time order. Export never edits the document or exports voiceprints.
+The system document picker handles name collisions. The S-5 reference and vectors are pinned from cassini-ux in
+`core/src/test/resources/markdown/UPSTREAM.json`.

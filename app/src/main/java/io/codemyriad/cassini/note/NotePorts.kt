@@ -14,6 +14,7 @@ import io.codemyriad.cassini.R
 import io.codemyriad.cassini.adapters.InstalledEngines
 import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.checkpoint.CheckpointNames
+import io.codemyriad.cassini.core.export.MarkdownOptions
 import io.codemyriad.cassini.core.format.DocumentState
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.models.ModelPart
@@ -206,6 +207,9 @@ interface NotePorts {
 
     /** The TXT body of a transcript without words. */
     fun exportEmptyText(): String
+
+    /** S-5 export copy and the D50.3 absolute date. */
+    fun markdownOptions(createdAt: Long, durationMs: Long): MarkdownOptions
 
     /** The text of a failed job's stored failure code, or null for a code without its own text. */
     fun failureText(code: String): String?
@@ -428,6 +432,20 @@ class GraphNotePorts(private val graph: AppGraph, context: Context) : NotePorts 
     }
 
     override fun exportEmptyText(): String = localized().getString(R.string.export_no_words)
+
+    override fun markdownOptions(createdAt: Long, durationMs: Long): MarkdownOptions {
+        val numericLocale = android.content.res.Resources.getSystem().configuration.locales[0]
+        val clockPreference = android.provider.Settings.System.getString(
+            app.contentResolver,
+            android.provider.Settings.System.TIME_12_24,
+        )
+        val settings = FormatSettings(
+            numericLocale,
+            NoteMarkdown.is24Hour(numericLocale, clockPreference),
+            ZoneId.systemDefault(),
+        )
+        return NoteMarkdown.options(localized().resources, settings, createdAt, durationMs)
+    }
 
     override fun failureText(code: String): String? {
         val res = Failure.entries.firstOrNull { it.name == code }?.stringRes ?: when (code) {

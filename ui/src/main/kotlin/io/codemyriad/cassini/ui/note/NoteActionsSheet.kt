@@ -148,6 +148,17 @@ private fun ColumnScope.SaveACopy(ui: NoteActionsUi, document: Boolean, onAction
         busy = ui.busyRow == NoteAction.SAVE_TEXT,
         share = rowShare(textLabel) { onAction(NoteAction.SHARE_TEXT) },
     )
+    val markdownLabel = stringResource(R.string.ui_actions_markdown)
+    SheetActionRow(
+        label = markdownLabel,
+        glyph = Glyph.TextFile,
+        onClick = { onAction(NoteAction.SAVE_MARKDOWN) },
+        extension = stringResource(R.string.ui_ext_md),
+        subtitle = reason ?: stringResource(R.string.ui_markdown_description),
+        enabled = ui.textExportEnabled,
+        busy = ui.busyRow == NoteAction.SAVE_MARKDOWN,
+        share = rowShare(markdownLabel) { onAction(NoteAction.SHARE_MARKDOWN) },
+    )
     val subtitlesLabel = stringResource(R.string.ui_actions_subtitles)
     SheetActionRow(
         label = subtitlesLabel,

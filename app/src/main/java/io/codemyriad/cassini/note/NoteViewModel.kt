@@ -866,9 +866,11 @@ class NoteViewModel(
         when (action) {
             NoteAction.SAVE_DOCUMENT -> requestExport(ExportKind.DOCUMENT)
             NoteAction.SAVE_TEXT -> requestExport(ExportKind.TEXT)
+            NoteAction.SAVE_MARKDOWN -> requestExport(ExportKind.MARKDOWN)
             NoteAction.SAVE_SUBTITLES -> chooseSubtitles(details, share = false)
             NoteAction.SHARE_DOCUMENT -> share(ExportKind.DOCUMENT)
             NoteAction.SHARE_TEXT -> share(ExportKind.TEXT)
+            NoteAction.SHARE_MARKDOWN -> share(ExportKind.MARKDOWN)
             NoteAction.SHARE_SUBTITLES -> chooseSubtitles(details, share = true)
             NoteAction.RENAME -> {
                 closeSheet()
@@ -925,11 +927,13 @@ class NoteViewModel(
         when (row) {
             NoteStart.SAVE_DOCUMENT -> requestExport(ExportKind.DOCUMENT)
             NoteStart.SAVE_TEXT -> requestExport(ExportKind.TEXT)
+            NoteStart.SAVE_MARKDOWN -> requestExport(ExportKind.MARKDOWN)
             NoteStart.SAVE_SRT -> requestExport(ExportKind.SRT)
             NoteStart.SAVE_VTT -> requestExport(ExportKind.VTT)
             NoteStart.CHOOSE_SUBTITLES -> chooseSubtitles(details, share = false)
             NoteStart.SHARE_DOCUMENT -> share(ExportKind.DOCUMENT)
             NoteStart.SHARE_TEXT -> share(ExportKind.TEXT)
+            NoteStart.SHARE_MARKDOWN -> share(ExportKind.MARKDOWN)
             NoteStart.SHARE_SUBTITLES -> chooseSubtitles(details, share = true)
             NoteStart.DOCUMENT_INFO -> openInfo(details)
         }
@@ -1102,13 +1106,18 @@ class NoteViewModel(
             ports.exportCopy(noteId, uri)
         } else {
             val speakers = NoteMapping.selected(details)?.speakerCount ?: 0
+            val markdown = if (kind == ExportKind.MARKDOWN) {
+                ports.markdownOptions(details.note.createdAt, details.note.durationMs)
+            } else {
+                null
+            }
             val request = NoteExports.request(
                 details,
                 format,
                 ports::placeholderLabel,
                 ports.exportSubtitle(details.note.createdAt, details.note.durationMs, speakers),
                 ports.exportEmptyText(),
-            )
+            ).copy(markdown = markdown)
             ports.exportTranscript(noteId, request, uri)
         }
         if (outcome !is ExportOutcome.Saved) Log.w(TAG, "Export of $kind ended $outcome")

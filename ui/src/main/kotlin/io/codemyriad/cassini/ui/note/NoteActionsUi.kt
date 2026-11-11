@@ -69,9 +69,11 @@ sealed interface TranscribeRowUi {
 enum class NoteAction {
     SAVE_DOCUMENT,
     SAVE_TEXT,
+    SAVE_MARKDOWN,
     SAVE_SUBTITLES,
     SHARE_DOCUMENT,
     SHARE_TEXT,
+    SHARE_MARKDOWN,
     SHARE_SUBTITLES,
     RENAME,
     TRANSCRIBE,
@@ -85,4 +87,4 @@ enum class NoteAction {
 }
 
 /** What an export writes (features.md section 6): the Cassini document or plain audio, text, SubRip or WebVTT. */
-enum class ExportKind { DOCUMENT, TEXT, SRT, VTT }
+enum class ExportKind { DOCUMENT, TEXT, MARKDOWN, SRT, VTT }

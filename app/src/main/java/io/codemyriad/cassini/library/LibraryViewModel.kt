@@ -386,8 +386,8 @@ class LibraryViewModel(
                 closeSheet()
                 trash(id)
             }
-            NoteAction.SAVE_DOCUMENT, NoteAction.SAVE_TEXT, NoteAction.SAVE_SUBTITLES, NoteAction.SHARE_DOCUMENT,
-            NoteAction.SHARE_TEXT, NoteAction.SHARE_SUBTITLES, NoteAction.DOCUMENT_INFO,
+            NoteAction.SAVE_DOCUMENT, NoteAction.SAVE_TEXT, NoteAction.SAVE_MARKDOWN, NoteAction.SAVE_SUBTITLES, NoteAction.SHARE_DOCUMENT,
+            NoteAction.SHARE_TEXT, NoteAction.SHARE_MARKDOWN, NoteAction.SHARE_SUBTITLES, NoteAction.DOCUMENT_INFO,
             -> {
                 // The exports, the shares and Document info are the Note screen's: it opens and starts the row.
                 closeSheet()
@@ -399,6 +399,7 @@ class LibraryViewModel(
     private fun start(kind: ExportKind): NoteStart = when (kind) {
         ExportKind.DOCUMENT -> NoteStart.SAVE_DOCUMENT
         ExportKind.TEXT -> NoteStart.SAVE_TEXT
+        ExportKind.MARKDOWN -> NoteStart.SAVE_MARKDOWN
         ExportKind.SRT -> NoteStart.SAVE_SRT
         ExportKind.VTT -> NoteStart.SAVE_VTT
     }
@@ -406,9 +407,11 @@ class LibraryViewModel(
     private fun start(action: NoteAction): NoteStart? = when (action) {
         NoteAction.SAVE_DOCUMENT -> NoteStart.SAVE_DOCUMENT
         NoteAction.SAVE_TEXT -> NoteStart.SAVE_TEXT
+        NoteAction.SAVE_MARKDOWN -> NoteStart.SAVE_MARKDOWN
         NoteAction.SAVE_SUBTITLES -> NoteStart.CHOOSE_SUBTITLES
         NoteAction.SHARE_DOCUMENT -> NoteStart.SHARE_DOCUMENT
         NoteAction.SHARE_TEXT -> NoteStart.SHARE_TEXT
+        NoteAction.SHARE_MARKDOWN -> NoteStart.SHARE_MARKDOWN
         NoteAction.SHARE_SUBTITLES -> NoteStart.SHARE_SUBTITLES
         NoteAction.DOCUMENT_INFO -> NoteStart.DOCUMENT_INFO
         else -> null

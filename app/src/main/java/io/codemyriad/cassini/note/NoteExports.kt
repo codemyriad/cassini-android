@@ -1,6 +1,7 @@
 package io.codemyriad.cassini.note
 
 import io.codemyriad.cassini.core.export.ExportNames
+import io.codemyriad.cassini.core.export.MarkdownExport
 import io.codemyriad.cassini.core.format.DocumentState
 import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.speakers.DefaultLabels
@@ -20,6 +21,7 @@ data class ExportFile(val kind: ExportKind, val mime: String, val name: String)
  */
 object NoteExports {
     const val MIME_TEXT = "text/plain"
+    const val MIME_MARKDOWN = "text/markdown"
     const val MIME_SRT = "application/x-subrip"
     const val MIME_VTT = "text/vtt"
     const val MIME_DOCUMENT = "audio/ogg"
@@ -36,13 +38,18 @@ object NoteExports {
                 ExportFile(kind, NoteMapping.audioMime(ext), ExportNames.file(note.title, ext))
             }
             ExportKind.TEXT -> transcript(details, kind, MIME_TEXT, TranscriptFormat.TXT)
+            ExportKind.MARKDOWN -> transcript(details, kind, MIME_MARKDOWN, TranscriptFormat.MARKDOWN)
             ExportKind.SRT -> transcript(details, kind, MIME_SRT, TranscriptFormat.SRT)
             ExportKind.VTT -> transcript(details, kind, MIME_VTT, TranscriptFormat.VTT)
         }
     }
 
     private fun transcript(details: NoteDetails, kind: ExportKind, mime: String, format: TranscriptFormat): ExportFile? {
-        val name = ExportNames.file(details.note.title, format.extension)
+        val name = if (format == TranscriptFormat.MARKDOWN) {
+            MarkdownExport.filename(details.note.title, details.note.title)
+        } else {
+            ExportNames.file(details.note.title, format.extension)
+        }
         return if (textExportEnabled(details)) ExportFile(kind, mime, name) else null
     }
 
@@ -55,6 +62,7 @@ object NoteExports {
     fun format(kind: ExportKind): TranscriptFormat? = when (kind) {
         ExportKind.DOCUMENT -> null
         ExportKind.TEXT -> TranscriptFormat.TXT
+        ExportKind.MARKDOWN -> TranscriptFormat.MARKDOWN
         ExportKind.SRT -> TranscriptFormat.SRT
         ExportKind.VTT -> TranscriptFormat.VTT
     }
@@ -63,6 +71,7 @@ object NoteExports {
     fun row(kind: ExportKind): NoteAction = when (kind) {
         ExportKind.DOCUMENT -> NoteAction.SAVE_DOCUMENT
         ExportKind.TEXT -> NoteAction.SAVE_TEXT
+        ExportKind.MARKDOWN -> NoteAction.SAVE_MARKDOWN
         ExportKind.SRT, ExportKind.VTT -> NoteAction.SAVE_SUBTITLES
     }
 

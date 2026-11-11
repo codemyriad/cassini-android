@@ -9,7 +9,7 @@ import io.codemyriad.cassini.core.format.Word
  * id to its display label: a named label verbatim, a placeholder as the localized "Speaker N". A speaker without a
  * label is shown by its id.
  *
- * TXT, SRT and VTT exports are word-body derivatives without integrity data; only the sealed `.opus` is a portable
+ * TXT, Markdown, SRT and VTT exports are word-body derivatives without integrity data; only the sealed `.opus` is a portable
  * Cassini artifact (architecture section 12).
  */
 data class ExportTranscript(

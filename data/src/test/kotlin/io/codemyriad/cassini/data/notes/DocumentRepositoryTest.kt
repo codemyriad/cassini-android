@@ -1,7 +1,11 @@
 package io.codemyriad.cassini.data.notes
 
+import android.content.Context
 import android.net.Uri
+import androidx.test.core.app.ApplicationProvider
 import io.codemyriad.cassini.core.export.ExportTranscript
+import io.codemyriad.cassini.core.export.MarkdownCopy
+import io.codemyriad.cassini.core.export.MarkdownOptions
 import io.codemyriad.cassini.core.export.SrtWriter
 import io.codemyriad.cassini.core.export.TextExport
 import io.codemyriad.cassini.core.export.VttWriter
@@ -30,6 +34,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -362,6 +367,85 @@ class DocumentRepositoryTest {
             assertArrayEquals(format.name, text.toByteArray(Charsets.UTF_8), dest.readBytes())
         }
         assertFalse("cacheDir/exports is cleaned", h.paths.exports.exists())
+    }
+
+    @Test fun markdownExportsPrivateNotesWithoutChangingThePortableFile() = runTest {
+        h.documentNote("a", first, title = "Review")
+        val privateData = JSONObject(
+            """
+            {
+                "gocassini.com":{"notes":[{"atMs":5000,"text":"Keep *this*"},{"atMs":1000,"text":"Earlier"}],"unknown":"kept"},
+                "example.org":{"secret":"not exported"}
+            }
+            """.trimIndent(),
+        )
+        CassiniDocument.create(
+            fixtureOpus,
+            first,
+            "Review",
+            JSONObject().put("engine", "test"),
+            null,
+            mapOf("S1" to "Ada", "S2" to "Ben"),
+            h.document("a"),
+            extensions = privateData,
+        )
+        val original = h.document("a").readBytes()
+        val copy = MarkdownCopy("Speakers: {names}", "Transcript", "Notes", "(over {names})") {
+            it.joinToString(" and ")
+        }
+        val request = TranscriptExport(
+            TranscriptFormat.MARKDOWN,
+            mapOf("S1" to "Ada", "S2" to "Ben"),
+            markdown = MarkdownOptions("Thursday 8 October 2026, 15:10", copy),
+        )
+        val dest = folder.newFile("review.md")
+        assertTrue(h.documents.exportTranscript("a", request, Uri.fromFile(dest)) is ExportOutcome.Saved)
+        val exported = dest.readText()
+        assertTrue(exported.startsWith("# Review\n\nThursday 8 October 2026, 15:10\n"))
+        assertTrue(exported.contains("**Ada**"))
+        assertTrue(exported.endsWith("## Notes\n\n- 00:00:01 Earlier\n- 00:00:05 Keep \\*this\\*\n"))
+        assertFalse(exported.contains("secret"))
+        assertFalse(exported.contains("not exported"))
+        assertArrayEquals("export never mutates private metadata or audio", original, h.document("a").readBytes())
+        assertFalse(h.paths.exports.exists())
+        assertEquals(
+            ExportOutcome.NotAvailable,
+            h.documents.exportTranscript("a", request.copy(markdown = null), Uri.fromFile(dest)),
+        )
+    }
+
+    @Test fun transcriptStagingNeverUsesTheLongMultibyteTitleAsAFilename() = runTest {
+        val title = "会".repeat(100)
+        h.documentNote("a", first, title = title)
+        val original = h.document("a").readBytes()
+        val copy = MarkdownCopy("Speakers: {names}", "Transcript", "Notes", "(over {names})") {
+            it.joinToString(" and ")
+        }
+        // Save and Share both use exportTranscript; the destination name is owned by the provider/caller.
+        for (format in TranscriptFormat.entries) {
+            val request = TranscriptExport(
+                format,
+                mapOf("S1" to "Ada", "S2" to "Ben"),
+                markdown = MarkdownOptions("Thursday 8 October 2026, 15:10", copy),
+            )
+            val dest = folder.newFile("long-title.${format.extension}")
+            val uri = Uri.parse("content://export-test/${format.extension}")
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            var stagedNames = emptyList<String>()
+            shadowOf(context.contentResolver).registerOutputStreamSupplier(uri) {
+                stagedNames = h.paths.exports.walkTopDown().filter { it.isFile }.map { it.name }.toList()
+                dest.outputStream()
+            }
+            val outcome = h.documents.exportTranscript("a", request, uri)
+            assertTrue("$format: $outcome", outcome is ExportOutcome.Saved)
+            // APFS can accept names that Android refuses: assert the real byte limit, not just host I/O success.
+            val stagedName = stagedNames.single()
+            assertTrue(stagedName, stagedName.toByteArray(Charsets.UTF_8).size <= 255)
+            assertTrue(dest.length() > 0)
+            if (format == TranscriptFormat.MARKDOWN) assertTrue(dest.readText().startsWith("# $title\n"))
+            assertFalse("$format staging is cleaned", h.paths.exports.exists())
+        }
+        assertArrayEquals(original, h.document("a").readBytes())
     }
 
     @Test fun aPlainNoteExportsItsAudioButNoTranscript() = runTest {

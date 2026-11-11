@@ -57,6 +57,19 @@ object Durations {
         }
     }
 
+    /** Shared S-5 meetingDuration: floored minutes, with two minute digits from one hour (including 00). */
+    fun meetingDuration(res: Resources, ms: Long, format: FormatSettings): String {
+        val minutes = ms.coerceAtLeast(0) / MINUTE_MS
+        return when {
+            minutes == 0L -> res.getString(R.string.ui_duration_under_minute)
+            minutes < MINUTES_PER_HOUR -> res.getString(R.string.ui_meeting_duration_minutes)
+                .replace("{m}", String.format(format.locale, "%d", minutes))
+            else -> res.getString(R.string.ui_meeting_duration_hours)
+                .replace("{h}", String.format(format.locale, "%d", minutes / MINUTES_PER_HOUR))
+                .replace("{mm}", String.format(format.locale, "%02d", minutes % MINUTES_PER_HOUR))
+        }
+    }
+
     /** Whole minutes, floored: "under 1 min" below 60 s, "22 min", then "1 h 5 min" (or "2 h") from 60 min. */
     fun roughMinutes(res: Resources, ms: Long): String =
         if (ms < MINUTE_MS) {

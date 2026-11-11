@@ -5,7 +5,7 @@ This file describes the data that Cassini for Android 0.2 keeps and writes. It h
 - The internal data: the files in the private storage of the app, the Room catalogue and the settings. These formats are not a contract. A later version can change them.
 - The output: the portable `.opus` document and the exports. The portable document is a contract with other Cassini software. The exports are copies for people.
 
-Only the sealed `.opus` document is a complete portable Cassini artifact. It holds the audio, the timed words, the speakers, the provenance and the integrity data. TXT, SRT and VTT exports and the `*.words.json` files of the device tests are word-body derivatives. They hold the words without audio and without integrity data, and Cassini cannot read them back.
+Only the sealed `.opus` document is a complete portable Cassini artifact. It holds the audio, the timed words, the speakers, the provenance and the integrity data. TXT, Markdown, SRT and VTT exports and the `*.words.json` files of the device tests are word-body derivatives. They hold the words without audio and without integrity data, and Cassini cannot read them back.
 
 0.2 starts with a new storage layout. It does not read the app data of 0.1.x. Exported `.opus` documents of 0.1.x open as before.
 
@@ -198,6 +198,7 @@ The Note actions sheet has three export rows. Each export uses the selected vers
 | Cassini document | `.opus`, `audio/ogg` | The sealed document, byte for byte |
 | Audio file | `.opus`, `.m4a` or the import extension | The audio of a note without a transcript, byte for byte |
 | Transcript as text | `.txt`, `text/plain` | The title, a subtitle and the turns |
+| Markdown | `.md`, `text/markdown` | S-5 localized headings/date, D84 reading turns and D13 personal notes |
 | Subtitles | `.srt` (`application/x-subrip`) or `.vtt` (`text/vtt`) | Timed cues |
 
 The `:core` package `io.codemyriad.cassini.core.export` writes the text exports. [`design/features.md`](design/features.md), section 9, gives all the rules.

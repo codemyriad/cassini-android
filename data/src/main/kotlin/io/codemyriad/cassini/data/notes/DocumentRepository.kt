@@ -5,8 +5,10 @@ import android.net.Uri
 import androidx.annotation.WorkerThread
 import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.UserFacingException
-import io.codemyriad.cassini.core.export.ExportNames
 import io.codemyriad.cassini.core.export.ExportTranscript
+import io.codemyriad.cassini.core.export.MarkdownExport
+import io.codemyriad.cassini.core.export.MarkdownNote
+import io.codemyriad.cassini.core.export.MarkdownOptions
 import io.codemyriad.cassini.core.export.SrtWriter
 import io.codemyriad.cassini.core.export.TextExport
 import io.codemyriad.cassini.core.export.VttWriter
@@ -37,7 +39,7 @@ import java.util.UUID
 import java.util.concurrent.Callable
 
 /** The transcript export formats of features.md section 6. */
-enum class TranscriptFormat(val extension: String) { TXT("txt"), SRT("srt"), VTT("vtt") }
+enum class TranscriptFormat(val extension: String) { TXT("txt"), MARKDOWN("md"), SRT("srt"), VTT("vtt") }
 
 /**
  * One transcript export. [labels] are the display labels per speaker id, chosen by the caller (named labels verbatim,
@@ -50,6 +52,7 @@ data class TranscriptExport(
     val subtitle: String = "",
     val emptyText: String = "",
     val variantId: String? = null,
+    val markdown: MarkdownOptions? = null,
 )
 
 /**
@@ -346,24 +349,27 @@ class DocumentRepository(
     }
 
     /**
-     * A TXT, SRT or VTT export of one variant with the :core writers. The words come from the word cache (refreshed
+     * A TXT, Markdown, SRT or VTT export of one variant with the :core writers. The words come from the word cache (refreshed
      * first), the title and duration from the row. The text is staged under `cacheDir/exports/`, which is cleaned
      * after the write. Not available for plain notes and for UNREADABLE or UNKNOWN_FORMAT documents.
      */
     suspend fun exportTranscript(noteId: String, request: TranscriptExport, dest: Uri): ExportOutcome {
         if (refreshIfStale(noteId) == RefreshOutcome.NoNote) return ExportOutcome.NoNote
-        return withContext(dispatchers.io) {
-            val row = notes.note(noteId)
-            val variants = cache.variants(noteId).filter { it.readable }
+        return locks.withNoteLock(noteId, dispatchers.io) {
+            val row = notes.noteBlocking(noteId)
+            val variants = cache.variantsBlocking(noteId).filter { it.readable }
             val variantId = request.variantId
                 ?: row?.selectedVariant?.takeIf { id -> variants.any { it.variantId == id } }
                 ?: variants.firstOrNull { it.isDefault }?.variantId ?: variants.firstOrNull()?.variantId
             when {
                 row == null -> ExportOutcome.NoNote
                 row.audioKind != AudioKind.DOCUMENT || row.documentState in NOT_EXPORTABLE -> ExportOutcome.NotAvailable
+                request.format == TranscriptFormat.MARKDOWN && request.markdown == null -> ExportOutcome.NotAvailable
                 variantId == null || variants.none { it.variantId == variantId } -> ExportOutcome.NotAvailable
                 else -> {
-                    val words = cache.words(noteId, variantId).map { Word(it.speaker, it.startMs, it.endMs, it.text) }
+                    val words = cache.wordsBlocking(noteId, variantId).map {
+                        Word(it.speaker, it.startMs, it.endMs, it.text)
+                    }
                     val transcript = ExportTranscript(
                         row.title,
                         row.durationMs,
@@ -371,8 +377,9 @@ class DocumentRepository(
                         request.labels,
                         variants.first { it.variantId == variantId }.wordEndsBoundedByAudio,
                     )
-                    val name = ExportNames.file(row.title, request.format.extension)
-                    stageAndWrite(name, render(transcript, request), dest)
+                    // Internal staging is independent of the user title and the provider's suggested name.
+                    val name = "transcript.${request.format.extension}"
+                    stageAndWrite(name, render(transcript, request, noteId), dest)
                 }
             }
         }
@@ -584,10 +591,31 @@ class DocumentRepository(
         }
     }
 
-    private fun render(transcript: ExportTranscript, request: TranscriptExport): String = when (request.format) {
+    private fun render(transcript: ExportTranscript, request: TranscriptExport, noteId: String): String = when (request.format) {
         TranscriptFormat.TXT -> TextExport.write(transcript, request.subtitle, request.emptyText)
+        TranscriptFormat.MARKDOWN -> requireNotNull(request.markdown).let {
+            MarkdownExport.write(transcript, it.dateLine, it.copy, markdownNotes(noteId))
+        }
         TranscriptFormat.SRT -> SrtWriter.write(transcript)
         TranscriptFormat.VTT -> VttWriter.write(transcript)
+    }
+
+    /** D13: notes live only in their owner's namespace; exporting never rewrites private data. */
+    private fun markdownNotes(noteId: String): List<MarkdownNote> {
+        val notes = readBlocking(noteId)?.manifest?.optJSONObject("x")?.optJSONObject("gocassini.com")
+            ?.optJSONArray("notes") ?: return emptyList()
+        return (0 until notes.length()).mapNotNull { index ->
+            val note = notes.optJSONObject(index)
+            val atMs = (note?.opt("atMs") as? Number)?.let { time ->
+                time.toLong().takeIf { it >= 0 && time.toDouble() == it.toDouble() }
+            }
+            val text = note?.opt("text") as? String
+            if (atMs != null && text != null) {
+                MarkdownNote(atMs, text)
+            } else {
+                null
+            }
+        }
     }
 
     private fun stageAndWrite(name: String, text: String, dest: Uri): ExportOutcome {
