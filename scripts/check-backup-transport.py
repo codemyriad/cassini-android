@@ -52,6 +52,7 @@ def main():
               'app_sha256': hashlib.sha256(args.app.read_bytes()).hexdigest(),
               'test_apk_sha256': hashlib.sha256(args.test_apk.read_bytes()).hexdigest()}
     serial = None
+    server_port = None
 
     def run(*command, input_text=None, timeout=180):
         result = subprocess.run(command, input=input_text, text=True, stdout=subprocess.PIPE,
@@ -63,7 +64,7 @@ def main():
         return result.stdout
 
     def adb(*command):
-        return run(str(args.sdk / 'platform-tools/adb'), '-s', serial, *command)
+        return run(str(args.sdk / 'platform-tools/adb'), '-P', str(server_port), '-s', serial, *command)
 
     def fixture(stage, **choices):
         command = ['shell', 'am', 'instrument', '-w', '-r', '-e', 'class', FIXTURE,
@@ -107,9 +108,10 @@ def main():
             '--path', str(avd_home / (name + '.avd')), input_text='no\n')
     for port in range(5600, 5620, 2):
         try:
-            with socket.socket() as console, socket.socket() as transport:
+            with socket.socket() as console, socket.socket() as transport, socket.socket() as server:
                 console.bind(('127.0.0.1', port))
                 transport.bind(('127.0.0.1', port + 1))
+                server.bind(('127.0.0.1', port + 100))
             break
         except OSError:
             continue
@@ -117,10 +119,23 @@ def main():
         raise ValueError('No free dedicated emulator port')
     serial = f'emulator-{port}'
     report['serial'] = serial
+    server_port = port + 100
+    report['adb_server_port'] = server_port
+    environment.update({
+        'ANDROID_ADB_SERVER_PORT': str(server_port),
+        'ADB_SERVER_SOCKET': f'tcp:127.0.0.1:{server_port}',
+        'ADB_LOCAL_TRANSPORT_MAX_PORT': '0',  # No scanning of other emulators.
+        'ADB_MDNS_AUTO_CONNECT': '',
+    })
+    # This deliberately unmatched USB serial prevents this task's server from claiming physical devices.
+    started = run(str(args.sdk / 'platform-tools/adb'), '-P', str(server_port),
+                  '--one-device', 'cassini-d97-no-usb', 'start-server')
+    if 'daemon started successfully' not in started:
+        raise ValueError('Cannot establish ownership of the dedicated ADB server')
     emulator = subprocess.Popen(
         [str(args.sdk / 'emulator/emulator'), '-avd', name, '-port', str(port), '-no-audio', '-no-window',
          '-no-snapshot', '-wipe-data', '-no-boot-anim', '-gpu', 'swiftshader_indirect',
-         '-memory', '2048', '-cores', '2'],
+         '-memory', '2048', '-cores', '2', '-camera-back', 'none', '-camera-front', 'none'],
         env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace',
         start_new_session=True,
     )
@@ -182,6 +197,7 @@ def main():
                 os.killpg(emulator.pid, signal.SIGKILL)
                 emulator.wait(timeout=30)
         reader.join(timeout=30)
+        run(str(args.sdk / 'platform-tools/adb'), '-P', str(server_port), 'kill-server')
     print(json.dumps(report))
 
 
