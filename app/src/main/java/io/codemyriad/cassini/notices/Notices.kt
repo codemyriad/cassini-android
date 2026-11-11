@@ -5,8 +5,10 @@ import io.codemyriad.cassini.core.audio.Limits
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.core.library.PauseReason
+import io.codemyriad.cassini.core.models.ModelCatalog
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.data.db.JobEntity
+import io.codemyriad.cassini.data.models.ModelStatus
 import io.codemyriad.cassini.data.voices.VoiceProblem
 import io.codemyriad.cassini.engine.job.DownloadError
 import io.codemyriad.cassini.engine.job.DownloadProgress
@@ -63,6 +65,8 @@ data class NoticeFacts(
     val voicesProblem: VoiceProblem? = null,
     val parakeet: ParakeetRecommendationState = ParakeetRecommendationState(),
     val parakeetNowDefault: Boolean = false,
+    /** Null until readiness is known; installation failures remain missing, never a reason to transcribe again. */
+    val speakerModel: ModelStatus? = null,
 )
 
 /**
@@ -210,13 +214,27 @@ object Notices {
         failureText: String? = null,
         requiredFreeBytes: Long = 0,
         noNewVersion: Boolean = false,
+        speakerModel: ModelStatus? = null,
     ): ImmutableList<BannerSpec> {
         val notices = mutableListOf<Notice>()
         (phase as? JobPhase.Downloading)?.progress?.let { notices += Notice(downloading(it)) }
         if (job != null) notices += listOfNotNull(jobNotice(job, failureText, requiredFreeBytes, noNewVersion))
         if (oneVoice && job == null) {
-            val actions = if (noNewVersion) persistentListOf() else BannerKind.TX_ONE_VOICE.actions
-            notices += Notice(BannerSpec(BannerKind.TX_ONE_VOICE, actions = actions))
+            val unavailable = (speakerModel as? ModelStatus.Failed)?.failure == Failure.MODEL_UNAVAILABLE
+            val missing = speakerModel is ModelStatus.Missing || speakerModel is ModelStatus.Failed
+            val kind = when {
+                unavailable -> BannerKind.DL_MODEL_UNAVAILABLE
+                missing -> BannerKind.TX_SPEAKERS_MISSING
+                else -> BannerKind.TX_ONE_VOICE
+            }
+            val actionable = !noNewVersion && !unavailable && (missing || speakerModel == ModelStatus.Ready)
+            notices += Notice(
+                BannerSpec(
+                    kind,
+                    BannerArgs(bytes = ModelCatalog.speakerBytes),
+                    actions = if (actionable) kind.actions else persistentListOf(),
+                ),
+            )
         }
         return ordered(notices)
     }

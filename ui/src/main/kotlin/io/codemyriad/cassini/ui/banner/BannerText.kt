@@ -43,7 +43,7 @@ object BannerText {
     fun body(res: Resources, kind: BannerKind, args: BannerArgs, format: FormatSettings): String? =
         when (kind) {
             BannerKind.RECOVERED -> res.getString(kind.body, Durations.clock(args.ms1))
-            BannerKind.REC_STOPPED_STORAGE, BannerKind.PARAKEET_RECOMMENDED ->
+            BannerKind.REC_STOPPED_STORAGE, BannerKind.PARAKEET_RECOMMENDED, BannerKind.TX_SPEAKERS_MISSING ->
                 res.getString(kind.body, Sizes.megabytes(res, args.bytes, format))
             // The app's reason why there is no transcript (too long to transcribe), else "No transcript yet."
             BannerKind.PLAIN_AUDIO -> args.text?.takeIf { it.isNotBlank() } ?: res.getString(kind.body)

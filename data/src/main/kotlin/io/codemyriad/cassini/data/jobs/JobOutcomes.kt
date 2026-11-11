@@ -31,6 +31,9 @@ enum class EnqueueRefusal {
 
     /** The output of the last transcription is not fully saved yet (an I/O error); try again later. */
     ADOPT_PENDING,
+
+    /** An automatic attribution pass requires the current document to be verified. */
+    DOCUMENT_NOT_VERIFIED,
 }
 
 /** The result of `JobRepository.claimNext`. */

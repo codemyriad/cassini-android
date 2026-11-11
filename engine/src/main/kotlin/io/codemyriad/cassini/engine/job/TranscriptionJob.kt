@@ -19,6 +19,7 @@ import io.codemyriad.cassini.core.format.WordBodyBudget
 import io.codemyriad.cassini.core.library.PauseReason
 import io.codemyriad.cassini.core.models.ModelCatalog
 import io.codemyriad.cassini.core.models.ModelPart
+import io.codemyriad.cassini.core.models.ModelPlan
 import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.core.requireUser
 import io.codemyriad.cassini.core.speakers.DefaultLabels
@@ -224,14 +225,18 @@ class TranscriptionJob(
      * alone (best effort), as 0.1.0 retried it at every start.
      */
     private suspend fun installModels(): JobOutcome? = withContext(env.io) {
-        if (speechModel == SpeechModel.INCLUDED) return@withContext null
-        val plan = models.plan()
+        val included = speechModel == SpeechModel.INCLUDED
+        val plan = models.plan().let { available ->
+            if (included) ModelPlan(available.missing.filterNot { it.part == ModelPart.SPEECH }) else available
+        }
         val missing = plan.parts.toSet()
-        val detector = ModelPart.SPEECH !in missing && !models.detectorReady() && models.hasValidatedNetwork()
+        val detector = !included && ModelPart.SPEECH !in missing && !models.detectorReady() && models.hasValidatedNetwork()
         val request = if (detector) missing + ModelPart.SPEECH else missing
         when {
             request.isEmpty() -> null
-            !models.consented() -> JobOutcome.NeedsConsent(plan.totalBytes)
+            // Included needs no speech consent. The plan contains only independently authorised optional parts;
+            // the install owner checks that permission again before fetching a byte.
+            !included && !models.consented() -> JobOutcome.NeedsConsent(plan.totalBytes)
             else -> when (val outcome = download(request)) {
                 is InstallOutcome.Installed -> null
                 is InstallOutcome.Failed ->

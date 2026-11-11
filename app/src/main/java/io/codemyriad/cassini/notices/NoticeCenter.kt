@@ -104,6 +104,8 @@ class NoticeCenter(private val graph: AppGraph, context: Context, val imports: I
         facts.copy(parakeet = parakeet)
     }.combine(settings.parakeetDefaultNotice) { facts, announcement ->
         facts.copy(parakeetNowDefault = announcement)
+    }.combine(graph.models.status) { facts, status ->
+        facts.copy(speakerModel = status[ModelPart.SPEAKERS])
     }.stateIn(graph.appScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), NoticeFacts())
 
     init {

@@ -6,10 +6,12 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.content.ContextCompat
 import io.codemyriad.cassini.AppGraph
+import io.codemyriad.cassini.core.format.DocumentState
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.models.ModelPlan
 import io.codemyriad.cassini.core.models.SpeechModel
+import io.codemyriad.cassini.data.jobs.EnqueueRefusal
 import io.codemyriad.cassini.processing.TranscribeOutcome
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -50,12 +52,21 @@ class GraphModelDownloadPorts(
     private val part: ModelPart? = null,
 ) : ModelDownloadPorts {
     private val app = context.applicationContext
+    private val speakerRemediation: Boolean get() = noteId != null && part == ModelPart.SPEAKERS
 
-    override suspend fun plan(): ModelPlan = if (part != null || parakeetOnly) {
-        val requested = part ?: ModelPart.SPEECH
-        ModelPlan(graph.models.plan().missing.filter { it.part == requested })
-    } else {
-        graph.downloadPlan(targetModel())
+    override suspend fun plan(): ModelPlan = when {
+        speakerRemediation -> {
+            val model = targetModel()
+            val missing = graph.models.plan().missing.filter {
+                it.part == ModelPart.SPEAKERS || (it.part == ModelPart.SPEECH && model == SpeechModel.PARAKEET)
+            }
+            ModelPlan(missing)
+        }
+        part != null || parakeetOnly -> {
+            val requested = part ?: ModelPart.SPEECH
+            ModelPlan(graph.models.plan().missing.filter { it.part == requested })
+        }
+        else -> graph.downloadPlan(targetModel())
     }
 
     private suspend fun targetModel(): SpeechModel {
@@ -75,7 +86,16 @@ class GraphModelDownloadPorts(
     override suspend fun recordDeclined() = graph.models.recordDeclined()
 
     override suspend fun transcribe(noteId: String): TranscribeOutcome {
-        val kind = graph.awaitCatalogue().jobs.job(noteId)?.kind ?: JobKind.TRANSCRIBE
+        if (speakerRemediation && graph.awaitCatalogue().database.notes().note(noteId)?.documentState !=
+            DocumentState.OK
+        ) {
+            return TranscribeOutcome.Refused(EnqueueRefusal.DOCUMENT_NOT_VERIFIED)
+        }
+        val kind = if (speakerRemediation) {
+            JobKind.TRANSCRIBE_AGAIN
+        } else {
+            graph.awaitCatalogue().jobs.job(noteId)?.kind ?: JobKind.TRANSCRIBE
+        }
         return graph.processing.transcribe(noteId, kind)
     }
 

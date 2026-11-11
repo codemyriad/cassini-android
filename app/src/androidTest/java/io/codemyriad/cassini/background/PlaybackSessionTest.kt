@@ -13,10 +13,14 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.codemyriad.cassini.MainActivity
 import io.codemyriad.cassini.background.Background.waitFor
 import io.codemyriad.cassini.playback.PlaybackService
+import io.codemyriad.cassini.playback.PlaybackState
 import io.codemyriad.cassini.test.CiSmoke
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -64,21 +68,21 @@ class PlaybackSessionTest {
         // Not runBlocking on the main thread: the prepare ends with a callback on the main looper.
         val opened = withContext(Dispatchers.Main) { playback.open(noteId, clip, positionMs = 0) }
         assertTrue("The clip opens in the player", opened)
-        // A controller binds to the session service, as the system's media controls do.
-        val token = SessionToken(Background.context, ComponentName(Background.context, PlaybackService::class.java))
-        val connected = MediaController.Builder(Background.context, token).buildAsync().get(CONNECT_S, TimeUnit.SECONDS)
-        controller = connected
-        waitFor("The session offers play for the open note") {
-            main { connected.takeIf { it.isCommandAvailable(Player.COMMAND_PLAY_PAUSE) } }
+        val disconnected = CompletableDeferred<Unit>()
+        val connected = connect(disconnected)
+        connected.awaitEvent(Player.EVENT_AVAILABLE_COMMANDS_CHANGED, "The session offers play for the open note") {
+            isCommandAvailable(Player.COMMAND_PLAY_PAUSE)
         }
 
         // The user presses play with the app on screen, then leaves the app: playback goes on in the background.
         val shown = ActivityScenario.launch(MainActivity::class.java).also { screen = it }
+        lateinit var lifecycle: Lifecycle
+        shown.onActivity { lifecycle = it.lifecycle }
         main { playback.play() }
-        waitFor("The session shows the note playing") { main { connected.takeIf { it.isPlaying } } }
+        connected.awaitEvent(Player.EVENT_IS_PLAYING_CHANGED, "The session shows the note playing") { isPlaying }
         Background.shell("input keyevent KEYCODE_HOME")
-        waitFor("The app goes to the background") { shown.state.takeIf { it == Lifecycle.State.CREATED } }
-        waitFor("The note still plays in the background") { playback.state.value.takeIf { it.playing } }
+        await("The app goes to the background") { lifecycle.currentStateFlow.first { it == Lifecycle.State.CREATED } }
+        awaitPlayback("The note still plays in the background") { it.playing }
 
         // Media3 posts the media notification of the session while it plays.
         val manager = Background.context.getSystemService(NotificationManager::class.java)
@@ -88,39 +92,41 @@ class PlaybackSessionTest {
             }
         }
         // The title follows the state once it has been read from the database.
-        waitFor("The session names the note") {
-            main { connected.mediaMetadata.title?.toString()?.takeIf { it == "fleurs-it-short" } }
+        connected.awaitEvent(Player.EVENT_MEDIA_METADATA_CHANGED, "The session names the note") {
+            mediaMetadata.title?.toString() == "fleurs-it-short"
         }
 
         main { connected.pause() }
-        waitFor("Pause from the session pauses the player") { playback.state.value.takeUnless { it.playing } }
+        awaitPlayback("Pause from the session pauses the player") { !it.playing }
 
         main { connected.seekTo(SEEK_MS) }
-        waitFor("A seek from the session moves the player") {
-            playback.state.value.takeIf { it.positionMs in SEEK_MS - TOLERANCE_MS..SEEK_MS + TOLERANCE_MS }
+        awaitPlayback("A seek from the session moves the player") {
+            it.positionMs in SEEK_MS - TOLERANCE_MS..SEEK_MS + TOLERANCE_MS
         }
         main { connected.seekBack() }
-        waitFor("−10 s from the session moves the player back") {
-            playback.state.value.takeIf { it.positionMs <= SEEK_MS - SKIP_MS + TOLERANCE_MS }
+        awaitPlayback("−10 s from the session moves the player back") {
+            it.positionMs <= SEEK_MS - SKIP_MS + TOLERANCE_MS
         }
 
         main { connected.setPlaybackSpeed(SPEED) }
-        waitFor("A speed from the session reaches the player") { playback.state.value.takeIf { it.speed == SPEED } }
-        waitFor("The session shows the speed") { main { connected.takeIf { it.playbackParameters.speed == SPEED } } }
+        awaitPlayback("A speed from the session reaches the player") { it.speed == SPEED }
+        connected.awaitEvent(Player.EVENT_PLAYBACK_PARAMETERS_CHANGED, "The session shows the speed") {
+            playbackParameters.speed == SPEED
+        }
 
         // Resuming from the background, as the lock screen or a headset does: the system delivers the play.
         Background.shell("input keyevent KEYCODE_MEDIA_PLAY")
-        waitFor("The media key resumes the note in the background") { playback.state.value.takeIf { it.playing } }
-        waitFor("The session shows it playing") { main { connected.takeIf { it.isPlaying } } }
+        awaitPlayback("The media key resumes the note in the background") { it.playing }
+        connected.awaitEvent(Player.EVENT_IS_PLAYING_CHANGED, "The session shows it playing") { isPlaying }
 
         // A headset's pause button: the media key goes to the playing session.
         Background.shell("input keyevent KEYCODE_MEDIA_PAUSE")
-        waitFor("The media key pauses the player") { playback.state.value.takeUnless { it.playing } }
+        awaitPlayback("The media key pauses the player") { !it.playing }
 
         // Leaving the note ends the session even though this controller is still bound: Media3 removes the
         // notification and the released session disconnects the controller, so nothing keeps the service alive.
         withContext(Dispatchers.Main) { playback.leave() }
-        waitFor("The session disconnects its controllers") { main { connected.takeUnless { it.isConnected } } }
+        await("The session disconnects its controllers") { disconnected.await() }
         waitFor("The media notification is gone", NOTIFICATION_MS) {
             val media = manager.activeNotifications.filter { posted ->
                 posted.notification.extras.containsKey(Notification.EXTRA_MEDIA_SESSION)
@@ -130,7 +136,45 @@ class PlaybackSessionTest {
         Unit
     }
 
+    private fun connect(disconnected: CompletableDeferred<Unit>): MediaController {
+        val token = SessionToken(Background.context, ComponentName(Background.context, PlaybackService::class.java))
+        return MediaController.Builder(Background.context, token)
+            .setListener(object : MediaController.Listener {
+                override fun onDisconnected(controller: MediaController) {
+                    disconnected.complete(Unit)
+                }
+            })
+            .buildAsync().get(CONNECT_S, TimeUnit.SECONDS)
+            .also { controller = it }
+    }
+
+    private suspend fun awaitPlayback(message: String, matches: (PlaybackState) -> Boolean) {
+        await(message) { playback.state.first(matches) }
+    }
+
+    private suspend fun MediaController.awaitEvent(event: Int, message: String, matches: Player.() -> Boolean) {
+        withContext(Dispatchers.Main) {
+            val observed = CompletableDeferred<Unit>()
+            val listener = object : Player.Listener {
+                override fun onEvents(player: Player, events: Player.Events) {
+                    if (events.contains(event) && player.matches()) observed.complete(Unit)
+                }
+            }
+            // Register and read on the controller's looper. The read also accepts an event that already arrived.
+            addListener(listener)
+            try {
+                if (!matches()) await(message) { observed.await() }
+            } finally {
+                removeListener(listener)
+            }
+        }
+    }
+
+    private suspend fun <T : Any> await(message: String, event: suspend () -> T): T =
+        withTimeoutOrNull(EVENT_MS) { event() } ?: throw AssertionError(message)
+
     private companion object {
+        const val EVENT_MS = 20_000L
         const val NOTIFICATION_MS = 20_000L
         const val CONNECT_S = 20L
         const val SEEK_MS = 12_000L

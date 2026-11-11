@@ -8,7 +8,10 @@ import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.models.ModelPlan
 import io.codemyriad.cassini.engine.job.DownloadError
 import io.codemyriad.cassini.notices.Notices
+import io.codemyriad.cassini.processing.TranscribeOutcome
 import io.codemyriad.cassini.ui.banner.BannerAction
+import io.codemyriad.cassini.ui.banner.BannerKind
+import io.codemyriad.cassini.ui.banner.BannerSpec
 import io.codemyriad.cassini.ui.models.ModelDownloadEvent
 import io.codemyriad.cassini.ui.models.ModelDownloadUiState
 import io.codemyriad.cassini.ui.models.ModelPartSizeUi
@@ -41,8 +44,7 @@ sealed interface ModelDownloadEffect {
  * Model download, "Transcribe on this phone" (board 05, features.md section 5; ui.md section 7). [noteId] is the note
  * that waits for the models ("Download and transcribe"); without one the screen offers a standalone "Download".
  *
- * - The plan is read once on entry. When nothing is missing (a stale entry) the screen pops itself, putting its note
- *   in the queue first.
+ * - The plan is read on entry. A stale entry queues its note before closing. Failed enqueue outcomes stay visible.
  * - Download checks the free space first; when it is short the screen shows "Not enough storage" with Retry and
  *   records no consent. Then POST_NOTIFICATIONS is asked once (API 33+), then the consent is recorded and the note is
  *   queued (or the standalone download starts), and the screen pops.
@@ -62,21 +64,21 @@ class ModelDownloadViewModel(
     private data class Local(
         val plan: ModelPlan? = null,
         val busy: Boolean = false,
-        /** The bytes the no-space banner asks for; null when there is no such banner. */
-        val noSpace: Long? = null,
+        val banner: BannerSpec? = null,
     )
 
     private val local = MutableStateFlow(Local(busy = saved.get<Boolean>(KEY_AWAITING) == true))
     private var closing = false
 
-    /** Null until the plan is read, and when nothing is missing (the screen is never shown with no parts). */
+    /** Null while loading or closing a stale entry. An enqueue failure can show a banner with an empty plan. */
     val state: StateFlow<ModelDownloadUiState?> = local.map(::build)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
     init {
         viewModelScope.launch {
             val plan = guarded("read the model plan") { ports.plan() } ?: return@launch
-            if (plan.isEmpty) closeStale() else local.update { it.copy(plan = plan) }
+            local.update { it.copy(plan = plan) }
+            if (plan.isEmpty && !local.value.busy && local.value.banner == null) queueNote(noteId)
         }
     }
 
@@ -86,7 +88,8 @@ class ModelDownloadViewModel(
             ModelDownloadEvent.Download -> download()
             ModelDownloadEvent.NotNow -> notNow()
             ModelDownloadEvent.OpenSources -> effectChannel.trySend(ModelDownloadEffect.OpenLicenses)
-            is ModelDownloadEvent.BannerAction -> if (event.action == BannerAction.RETRY) download()
+            is ModelDownloadEvent.BannerAction ->
+                if (event.action == BannerAction.RETRY || event.action == BannerAction.TRY_AGAIN) download()
         }
     }
 
@@ -98,13 +101,13 @@ class ModelDownloadViewModel(
     }
 
     private fun build(local: Local): ModelDownloadUiState? {
-        val plan = local.plan?.takeUnless { it.isEmpty } ?: return null
+        val plan = local.plan?.takeUnless { it.isEmpty && local.banner == null } ?: return null
         return ModelDownloadUiState(
             parts = plan.missing.map { ModelPartSizeUi(Notices.partUi(it.part), it.downloadBytes) }.toImmutableList(),
             requiredFreeBytes = plan.requiredFreeBytes,
             withNote = noteId != null,
             busy = local.busy,
-            banner = local.noSpace?.let { Notices.download(DownloadError.NOT_ENOUGH_STORAGE, it, announce = true) },
+            banner = local.banner,
         )
     }
 
@@ -113,16 +116,31 @@ class ModelDownloadViewModel(
         val shownParts = local.value.plan?.parts?.toSet() ?: return
         local.update { it.copy(busy = true) }
         viewModelScope.launch {
-            val plan = guarded("read the model plan") {
-                ModelPlan(ports.plan().missing.filter { it.part in shownParts })
+            val available = guarded("read the model plan") { ports.plan() }
+            if (available == null) {
+                local.update { it.copy(busy = false) }
+                return@launch
             }
+            if (noteId != null && available.hasUnshownSpeech(shownParts)) {
+                local.value = Local(plan = available)
+                return@launch
+            }
+            val plan = ModelPlan(available.missing.filter { it.part in shownParts })
             when {
-                plan == null -> local.update { it.copy(busy = false) }
-                plan.isEmpty -> closeStale()
-                (guarded("read the free space") { ports.usableBytes() } ?: 0L) < plan.requiredFreeBytes ->
-                    local.update { it.copy(plan = plan, busy = false, noSpace = plan.requiredFreeBytes) }
+                plan.isEmpty -> {
+                    local.update { it.copy(plan = plan) }
+                    queueNote(noteId)
+                }
+                (guarded("read the free space") { ports.usableBytes() } ?: 0L) < plan.requiredFreeBytes -> {
+                    val banner = Notices.download(
+                        DownloadError.NOT_ENOUGH_STORAGE,
+                        plan.requiredFreeBytes,
+                        announce = true,
+                    )
+                    local.value = Local(plan = plan, banner = banner)
+                }
                 else -> {
-                    local.update { it.copy(plan = plan, noSpace = null) }
+                    local.update { it.copy(plan = plan, banner = null) }
                     saved[KEY_PARTS] = ArrayList(plan.parts.map { it.name })
                     askNotificationsOrStart()
                 }
@@ -140,28 +158,56 @@ class ModelDownloadViewModel(
         }
     }
 
-    /** Consent, then the note's job or the standalone download, then back. */
+    /** Recheck prerequisites after the permission dialog, then record the parts the user approved. */
     private suspend fun start() {
-        // After process death the answer can come before the plan is read again.
-        val plan = local.value.plan ?: guarded("read the model plan") { ports.plan() }
-        if (plan == null) {
-            local.update { it.copy(busy = false) }
-            return
-        }
         val parts = guarded("read the shown parts") {
-            saved.get<ArrayList<String>>(KEY_PARTS)?.map(ModelPart::valueOf)?.toSet() ?: plan.parts.toSet()
+            saved.get<ArrayList<String>>(KEY_PARTS)?.map(ModelPart::valueOf)?.toSet()
         }
-        if (parts == null || guarded("record the consent") { ports.recordConsent(parts) } == null) {
+        if (parts == null) {
             local.update { it.copy(busy = false) }
             return
         }
-        val note = noteId
-        if (note != null) {
-            guarded("queue the note") { ports.transcribe(note) }
-        } else {
-            ports.downloadModels(parts)
+        val current = noteId?.let { guarded("read the model plan") { ports.plan() } }
+        when {
+            noteId != null && current == null -> local.update { it.copy(busy = false) }
+            current != null && current.hasUnshownSpeech(parts) -> {
+                saved.remove<ArrayList<String>>(KEY_PARTS)
+                local.value = Local(plan = current)
+            }
+            guarded("record the consent") { ports.recordConsent(parts) } != null -> {
+                saved.remove<ArrayList<String>>(KEY_PARTS)
+                if (noteId == null) ports.downloadModels(parts)
+                queueNote(noteId)
+            }
+            else -> local.update { it.copy(busy = false) }
         }
-        close()
+    }
+
+    /** Close a completed standalone request, or close only after the note is queued. */
+    private suspend fun queueNote(note: String?) {
+        if (note == null) {
+            close()
+            return
+        }
+        when (guarded("queue the note") { ports.transcribe(note) }) {
+            is TranscribeOutcome.Queued -> close()
+            TranscribeOutcome.NeedsConsent -> {
+                val plan = guarded("read the required models") { ports.plan() }
+                local.update {
+                    it.copy(
+                        plan = plan ?: it.plan,
+                        busy = false,
+                        banner = if (plan?.hasUnshownSpeech(it.plan?.parts.orEmpty()) == true) {
+                            null
+                        } else {
+                            BannerSpec(BannerKind.TX_FAILED)
+                        },
+                    )
+                }
+            }
+            is TranscribeOutcome.Refused, null ->
+                local.update { it.copy(busy = false, banner = BannerSpec(BannerKind.TX_FAILED)) }
+        }
     }
 
     private fun notNow() {
@@ -170,12 +216,6 @@ class ModelDownloadViewModel(
             guarded("record the refusal") { ports.recordDeclined() }
             close()
         }
-    }
-
-    /** Nothing is missing: the note (when there is one) goes in the queue, and the screen goes. */
-    private suspend fun closeStale() {
-        noteId?.let { note -> guarded("queue the note") { ports.transcribe(note) } }
-        close()
     }
 
     private fun close() {
@@ -201,3 +241,6 @@ class ModelDownloadViewModel(
         const val KEY_PARTS = "shownModelParts"
     }
 }
+
+private fun ModelPlan.hasUnshownSpeech(approved: Collection<ModelPart>): Boolean =
+    ModelPart.SPEECH in parts && ModelPart.SPEECH !in approved
