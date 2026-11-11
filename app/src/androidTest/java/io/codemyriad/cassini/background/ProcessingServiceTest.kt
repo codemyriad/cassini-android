@@ -10,11 +10,16 @@ import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.core.library.PauseReason
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.data.checkpoint.CheckpointStatus
+import io.codemyriad.cassini.data.db.LibraryRow
 import io.codemyriad.cassini.data.settings.QueueHold
 import io.codemyriad.cassini.engine.job.JobPhase
 import io.codemyriad.cassini.processing.ProcessingService
+import io.codemyriad.cassini.processing.ProcessingState
 import io.codemyriad.cassini.test.NeedsModels
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -51,9 +56,9 @@ class ProcessingServiceTest {
         processing.transcribe(wav)
         processing.transcribe(mp3)
 
-        waitFor("The WAV note runs first") { processing.state.value.running?.takeIf { it.noteId == wav } }
+        awaitProcessing("The WAV note runs first") { it.running?.noteId == wav }
         assertEquals(JobState.QUEUED, Background.row(mp3)?.jobState)
-        waitFor("The service is in the foreground") { processing.state.value.serviceForeground.takeIf { it } }
+        awaitProcessing("The service is in the foreground") { it.serviceForeground }
         val service = Background.processingService()
         Log.i(TAG, "ProcessingService in dumpsys activity services:\n$service")
         assertTrue("ProcessingService is in the foreground:\n$service", service.contains("isForeground=true"))
@@ -62,8 +67,8 @@ class ProcessingServiceTest {
             assertEquals("The service type is dataSync", DATA_SYNC, ProcessingService.currentType())
         }
 
-        val document = waitFor("The WAV note is transcribed") {
-            Background.row(wav)?.takeIf { it.jobState == null && it.audioKind == AudioKind.DOCUMENT }
+        val document = awaitRow(wav, "The WAV note is transcribed") {
+            it.jobState == null && it.audioKind == AudioKind.DOCUMENT
         }
         val seconds = (System.currentTimeMillis() - started) / 1_000
         Log.i(TAG, "WAV note sealed in $seconds s: ${document.wordCount} words")
@@ -72,10 +77,10 @@ class ProcessingServiceTest {
         assertEquals(DocumentState.OK, document.documentState)
         assertTrue("The document has words", (document.wordCount ?: 0) > 0)
 
-        waitFor("The MP3 note starts next") { processing.state.value.running?.takeIf { it.noteId == mp3 } }
+        awaitProcessing("The MP3 note starts next") { it.running?.noteId == mp3 }
         processing.stopAll()
-        waitFor("Stop all pauses the MP3 note") {
-            Background.row(mp3)?.takeIf { it.jobState == JobState.PAUSED && it.pauseReason == PauseReason.USER }
+        awaitRow(mp3, "Stop all pauses the MP3 note") {
+            it.jobState == JobState.PAUSED && it.pauseReason == PauseReason.USER
         }
         processing.awaitIdle()
         val held = processing.state.value
@@ -110,18 +115,29 @@ class ProcessingServiceTest {
         }
         assertTrue("Stop is accepted", processing.stop(long))
 
-        val paused = waitFor("Stop pauses the long note") {
-            Background.row(long)?.takeIf { it.jobState == JobState.PAUSED }
-        }
+        val paused = awaitRow(long, "Stop pauses the long note") { it.jobState == JobState.PAUSED }
         assertEquals(PauseReason.USER, paused.pauseReason)
         assertTrue("The paused note keeps its progress", (paused.doneMs ?: 0) >= saved.doneMs)
-        waitFor("The next note starts") { processing.state.value.running?.takeIf { it.noteId == short } }
+        awaitProcessing("The next note starts") { it.running?.noteId == short }
         assertTrue(
             "The long note keeps its checkpoint",
             graph.awaitCatalogue().checkpoints.status(long) is CheckpointStatus.Saved,
         )
         assertNull("Stop holds nothing", processing.state.value.hold)
     }
+
+    private suspend fun awaitProcessing(message: String, matches: (ProcessingState) -> Boolean) {
+        val state = graph.processing.state
+        withTimeoutOrNull(Background.WAIT_MS) { state.first(matches) }
+            ?: throw AssertionError("$message. Current state: ${state.value}")
+    }
+
+    private suspend fun awaitRow(noteId: String, message: String, matches: (LibraryRow) -> Boolean): LibraryRow =
+        withTimeoutOrNull(Background.WAIT_MS) {
+            graph.awaitCatalogue().notes.library()
+                .mapNotNull { rows -> rows.firstOrNull { it.id == noteId } }
+                .first(matches)
+        } ?: throw AssertionError("$message. Current row: ${Background.row(noteId)}")
 
     private companion object {
         const val TAG = "ProcessingServiceTest"
