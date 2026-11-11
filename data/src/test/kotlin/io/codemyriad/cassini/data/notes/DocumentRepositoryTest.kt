@@ -20,6 +20,7 @@ import io.codemyriad.cassini.core.library.VariantKind
 import io.codemyriad.cassini.data.DocumentSignature
 import io.codemyriad.cassini.data.db.JobEntity
 import io.codemyriad.cassini.data.db.offMain
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.json.JSONObject
 import org.junit.After
@@ -62,6 +63,203 @@ class DocumentRepositoryTest {
 
     private suspend fun insertJob(id: String, state: JobState = JobState.PAUSED) =
         h.db.jobs().insert(JobEntity(id, 1, JobKind.TRANSCRIBE_AGAIN, state, enqueuedAt = 1, updatedAt = 1))
+
+    @Test fun recordingTimeSurvivesSealExportAndReimport() = runTest {
+        val start = java.time.Instant.parse("2026-11-11T12:00:00Z").toEpochMilli()
+        h.now = start
+        h.plainNote("recorded")
+        h.now = start + 540_000
+        seal("recorded", File(h.dir("recorded"), "capture.opus"), first, "Recorded meeting")
+        h.notes.adoptSealed("recorded")
+        assertEquals(start, h.row("recorded").recordingTime()?.instant?.toEpochMilli())
+        val exported = folder.newFile("export.opus")
+        assertTrue(h.documents.exportCopy("recorded", Uri.fromFile(exported)) is ExportOutcome.Saved)
+        h.documentNote("imported", first)
+        exported.copyTo(h.document("imported"), overwrite = true)
+        h.notes.refreshIfStale("imported")
+        assertEquals(start, h.row("imported").recordingTime()?.instant?.toEpochMilli())
+        assertEquals(start, h.row("imported").createdAt)
+        val meeting = h.readFile("imported").manifest!!.getJSONObject("meeting")
+        assertEquals("2026-11-11T12:09:00Z", meeting.getString("createdAtUtc"))
+        h.restart()
+        val imported = h.notes.library().first().single { it.id == "imported" }
+        assertEquals(start, imported.recordingTime()?.instant?.toEpochMilli())
+    }
+
+    @Test fun persistedOffsetBearingLocalLabelIsNeverConvertedIntoAnInstant() = runTest {
+        h.documentNote("label", first)
+        val document = h.readFile("label")
+        val label = "2026-11-09T10:31:48+02:00"
+        document.manifest!!.getJSONObject("meeting").put("recordedAtLocal", label)
+        h.document("label").writeBytes(
+            CassiniDocument.create(h.document("label").readBytes(), first, "Ignored", JSONObject(), document),
+        )
+        h.notes.refreshIfStale("label")
+        h.restart()
+        val time = h.notes.library().first().single().recordingTime()!!
+        assertEquals(label, time.label)
+        assertNull(time.instant)
+    }
+
+    @Test fun packagingOnlyImportHasNoDisplayedRecordingTime() = runTest {
+        h.documentNote("unknown", first)
+        h.notes.refreshIfStale("unknown")
+        assertNull(h.row("unknown").recordingTime())
+        assertNull(h.notes.library().first().single().recordingTime())
+        assertTrue("packaging time remains an ordering fallback", h.row("unknown").createdAt > 0)
+    }
+
+    @Test fun ownLegacyDocumentKeepsCaptureClockAndExportsItWithoutChangingTheSource() = runTest {
+        val start = java.time.Instant.parse("2026-11-11T12:00:00Z")
+        h.now = start.toEpochMilli()
+        h.plainNote("own")
+        h.now += 540_000
+        val legacy = CassiniDocument.create(
+            fixtureOpus.readBytes(),
+            first,
+            "Own meeting",
+            JSONObject(),
+            createdAtUtc = java.time.Instant.ofEpochMilli(h.now),
+        )
+        work("own").mkdirs()
+        File(work("own"), "sealed.opus").writeBytes(legacy)
+        File(work("own"), "sealed").createNewFile()
+        assertEquals(AdoptOutcome.Adopted(DocumentState.OK), h.notes.adoptSealed("own"))
+        assertEquals(start.toEpochMilli(), h.row("own").captureStartedAt)
+        h.db.notes().update(h.row("own").copy(documentSignature = null))
+        h.restart()
+        h.notes.refreshIfStale("own")
+        assertEquals(start, h.row("own").recordingTime()?.instant)
+        val before = h.document("own").readBytes()
+        val old = h.readFile("own")
+        insertJob("own", JobState.PAUSED)
+        val exported = folder.newFile("own-export.opus")
+        assertTrue(h.documents.exportCopy("own", Uri.fromFile(exported)) is ExportOutcome.Saved)
+        val written = CassiniDocument.read(exported)
+        assertEquals(start, written.meetingTime?.instant)
+        assertEquals(start.toString(), written.manifest!!.getJSONObject("meeting").getString("recordedAtUtc"))
+        assertEquals(
+            old.manifest!!.getJSONObject("meeting").getString("id"),
+            written.manifest!!.getJSONObject("meeting").getString("id"),
+        )
+        assertEquals(old.variants.map { it.body }, written.variants.map { it.body })
+        assertEquals(OggOpus.read(before).digest(), OggOpus.scan(exported).digest())
+        assertTrue(written.comments.contains("DATE=$start"))
+        assertTrue(written.comments.contains("CASSINI_RECORDED_AT_UTC=$start"))
+        assertArrayEquals(before, h.document("own").readBytes())
+        assertEquals(JobState.PAUSED, h.db.jobs().job("own")?.state)
+        assertTrue(h.paths.exports.listFiles().isNullOrEmpty())
+        h.documentNote("copy", first)
+        exported.copyTo(h.document("copy"), overwrite = true)
+        h.notes.refreshIfStale("copy")
+        assertEquals(start, h.row("copy").recordingTime()?.instant)
+    }
+
+    @Test fun staleExportPreservesTheOriginalBytesAndTimeClaimsWithTheWarning() = runTest {
+        h.documentNote("stale", first)
+        val original = h.readFile("stale")
+        original.manifest!!.getJSONObject("meeting").put("recordedAtLocal", "2026-11-11T13:00:00")
+        val labelled = CassiniDocument.create(h.document("stale").readBytes(), first, "Ignored", JSONObject(), original)
+        val stream = OggOpus.read(labelled)
+        val packets = stream.audio.toMutableList()
+        packets[0] = packets[0].clone().also { it[it.lastIndex] = (it.last().toInt() xor 1).toByte() }
+        val stale = OggOpus.mux(stream.copy(audio = packets), stream.tags)
+        h.document("stale").writeBytes(stale)
+        h.notes.refreshIfStale("stale")
+        assertEquals(DocumentState.STALE_AUDIO, h.row("stale").documentState)
+        val dest = folder.newFile("stale-export.opus")
+        assertTrue(h.documents.exportCopy("stale", Uri.fromFile(dest)) is ExportOutcome.Saved)
+        val exported = CassiniDocument.read(dest)
+        assertEquals(DocumentState.STALE_AUDIO, exported.documentState)
+        assertEquals("2026-11-11T13:00:00", exported.meetingTime?.label)
+        assertArrayEquals(stale, dest.readBytes())
+        assertEquals(OggOpus.read(stale).digest(), OggOpus.scan(dest).digest())
+        assertArrayEquals(stale, h.document("stale").readBytes())
+        // A malformed final granule cannot be hashed; Save a copy still preserves the source for recovery.
+        val damaged = OggOpus.mux(stream.copy(audio = packets, finalGranule = 0), stream.tags)
+        h.document("stale").writeBytes(damaged)
+        h.notes.refreshIfStale("stale")
+        assertEquals(DocumentState.UNVERIFIED, h.row("stale").documentState)
+        val recovery = folder.newFile("damaged-copy.opus")
+        assertTrue(h.documents.exportCopy("stale", Uri.fromFile(recovery)) is ExportOutcome.Saved)
+        assertArrayEquals(damaged, recovery.readBytes())
+    }
+
+    @Test fun staleReplacementAdoptAndExportCannotResurrectTheDiscardedCaptureClock() = runTest {
+        for (sameId in listOf(false, true)) {
+            val id = if (sameId) "same-id" else "new-id"
+            h.plainNote(id)
+            seal(id, File(h.dir(id), "capture.opus"), first, "Original recording")
+            h.notes.adoptSealed(id)
+            val original = h.readFile(id)
+            assertTrue(h.row(id).captureAudioSha256 != null)
+            val stream = OggOpus.read(h.document(id).readBytes())
+            val packets = stream.audio.toMutableList()
+            packets[0] = packets[0].clone().also { it[it.lastIndex] = (it.last().toInt() xor 1).toByte() }
+            h.document(id).writeBytes(OggOpus.mux(stream.copy(audio = packets), stream.tags))
+            // Deliberately do not open/refresh: adoption must catch changed audio even with the old OK cache.
+            assertEquals(DocumentState.OK, h.row(id).documentState)
+            h.now += 60_000
+            val cleaned = folder.newFile("fresh-$id.opus")
+            val changed = OggOpus.read(h.document(id).readBytes())
+            cleaned.writeBytes(OggOpus.mux(changed, CassiniDocument.tagsPacket(emptyList())))
+            val fresh = seal(id, cleaned, second, "Replacement audio")
+            if (sameId) {
+                // A matching meeting ID alone is not proof of the same compressed audio.
+                val meetingId = original.manifest!!.getJSONObject("meeting").getString("id")
+                fresh.manifest!!.getJSONObject("meeting").put("id", meetingId)
+                val target = File(work(id), "same-id.opus")
+                val rewritten = offMain {
+                    CassiniDocument.create(
+                        File(work(id), "sealed.opus"),
+                        second,
+                        "Ignored",
+                        JSONObject(),
+                        fresh,
+                        emptyMap(),
+                        target,
+                    )
+                }
+                Files.move(target.toPath(), File(work(id), "sealed.opus").toPath(), StandardCopyOption.REPLACE_EXISTING)
+                offMain { h.documents.markSealedBlocking(id, rewritten) }
+            }
+            h.notes.adoptSealed(id)
+            val row = h.row(id)
+            assertNull(row.captureStartedAt)
+            assertNull(row.captureAudioSha256)
+            assertNull(row.recordingTime())
+            val destination = folder.newFile("replacement-$id.opus")
+            assertTrue(h.documents.exportCopy(id, Uri.fromFile(destination)) is ExportOutcome.Saved)
+            val exported = CassiniDocument.read(destination)
+            assertFalse(exported.manifest!!.getJSONObject("meeting").has("recordedAtUtc"))
+            assertNull(exported.meetingTime)
+        }
+    }
+
+    @Test fun mergingAnOwnLegacyDocumentWritesItsPreservedCaptureClock() = runTest {
+        val start = java.time.Instant.parse("2026-11-11T12:00:00Z")
+        h.now = start.toEpochMilli()
+        h.plainNote("legacy")
+        h.now += 540_000
+        val bytes = CassiniDocument.create(
+            fixtureOpus.readBytes(),
+            first,
+            "Legacy recording",
+            JSONObject(),
+            createdAtUtc = java.time.Instant.ofEpochMilli(h.now),
+        )
+        work("legacy").mkdirs()
+        File(work("legacy"), "sealed.opus").writeBytes(bytes)
+        File(work("legacy"), "sealed").createNewFile()
+        h.notes.adoptSealed("legacy")
+        val before = h.readFile("legacy")
+        assertFalse(before.manifest!!.getJSONObject("meeting").has("recordedAtUtc"))
+        assertTrue(h.documents.mergeSpeakers("legacy", "words", "S2", "S1") is EditOutcome.Done)
+        val merged = h.readFile("legacy")
+        assertEquals(start.toString(), merged.manifest!!.getJSONObject("meeting").getString("recordedAtUtc"))
+        assertEquals(before.variants.first().body, merged.variants.first().body)
+        assertTrue(merged.comments.contains("CASSINI_RECORDED_AT_UTC=$start"))
+    }
 
     // Adopt.
 

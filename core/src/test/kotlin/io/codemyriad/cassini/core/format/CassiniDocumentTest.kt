@@ -21,10 +21,123 @@ class CassiniDocumentTest {
             expected.optJSONObject("wordCounts")?.let { counts ->
                 assertEquals(id, counts.keys().asSequence().associateWith { counts.getInt(it) }, doc.variants.filter { it.transcript != null }.associate { it.id to it.transcript!!.words.size })
             }
+            if (expected.has("meetingStart")) {
+                val start = doc.meetingTime
+                if (expected.isNull("meetingStart")) {
+                    assertNull(id, start)
+                } else {
+                    val want = expected.getJSONObject("meetingStart")
+                    assertEquals(id, want.getString("source"), start?.source)
+                    assertEquals(id, want.getString("value"), start?.value)
+                }
+            }
             if (doc.manifest == null) assertTrue(id, doc.variants.isEmpty())
         }
         assertTrue(failures.joinToString("\n"), failures.isEmpty())
     }
+
+    @Test fun recordingStartSurvivesSealingAndAppending() {
+        val start = java.time.Instant.parse("2026-11-11T12:00:00Z")
+        val transcript = Transcript(listOf(Word("spk_1", 0, 20, "Hello")), "en")
+        val bytes = CassiniDocument.create(
+            silence(),
+            transcript,
+            "Meeting",
+            JSONObject(),
+            recordedAtUtc = start,
+            createdAtUtc = start.plusSeconds(540),
+        )
+        val doc = CassiniDocument.read(bytes)
+        assertEquals(start, doc.meetingTime?.instant)
+        assertEquals("2026-11-11T12:09:00Z", doc.manifest!!.getJSONObject("meeting").getString("createdAtUtc"))
+        assertTrue(doc.comments.contains("CASSINI_RECORDED_AT_UTC=$start"))
+        assertTrue(doc.comments.contains("DATE=$start"))
+        assertFalse(doc.manifest.getJSONObject("meeting").has("recordedAtLocal"))
+        val appended = CassiniDocument.create(
+            bytes,
+            transcript,
+            "Again",
+            JSONObject(),
+            doc,
+            recordedAtUtc = start.plusSeconds(900),
+        )
+        val next = CassiniDocument.read(appended)
+        assertEquals(doc.meetingTime, next.meetingTime)
+        assertEquals(
+            doc.manifest.getJSONObject("meeting").toString(),
+            next.manifest!!.getJSONObject("meeting").toString(),
+        )
+        assertEquals(OggOpus.read(bytes).digest(), OggOpus.read(appended).digest())
+        val unknownBytes = CassiniDocument.create(silence(), transcript, "Unknown", JSONObject(), createdAtUtc = start)
+        val unknown = CassiniDocument.read(unknownBytes)
+        assertNull(unknown.meetingTime)
+        assertTrue(unknown.comments.contains("DATE=$start"))
+    }
+
+    @Test fun localMirrorsFollowTheManifestOnFreshSealAppendAndUtcBackfill() {
+        val label = "2026-11-09T10:31:48"
+        val words = Transcript(listOf(Word("spk_1", 0, 20, "Hello")), "en")
+        val tags = CassiniDocument.tagsPacket(listOf("CASSINI_RECORDED_AT_LOCAL=$label"))
+        val input = OggOpus.mux(OggOpus.read(silence()), tags)
+        val bytes = CassiniDocument.create(input, words, "Meeting", JSONObject())
+        val doc = CassiniDocument.read(bytes)
+        assertFalse(doc.comments.any { it.startsWith("CASSINI_RECORDED_AT_LOCAL=") })
+        doc.manifest!!.getJSONObject("meeting").put("recordedAtLocal", label)
+        val appended = CassiniDocument.read(CassiniDocument.create(bytes, words, "Ignored", JSONObject(), doc))
+        assertTrue(appended.comments.contains("CASSINI_RECORDED_AT_LOCAL=$label"))
+        val dir = kotlin.io.path.createTempDirectory("recorded-mirror-").toFile()
+        try {
+            val source = File(dir, "source.opus").also { it.writeBytes(bytes) }
+            val target = File(dir, "export.opus")
+            val start = java.time.Instant.parse("2026-11-09T09:31:48Z")
+            val result = CassiniDocument.withRecordedAtUtc(source, doc, start, target)
+            assertEquals(label, result.manifest!!.getJSONObject("meeting").getString("recordedAtLocal"))
+            assertTrue(result.comments.contains("CASSINI_RECORDED_AT_LOCAL=$label"))
+            assertTrue(result.comments.contains("CASSINI_RECORDED_AT_UTC=$start"))
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test fun appendDoesNotReplaceAValidDateFallbackWithAnInvalidUtcField() {
+        val start = java.time.Instant.parse("2026-11-11T12:00:00Z")
+        val words = Transcript(listOf(Word("spk_1", 0, 20, "Hello")), "en")
+        val bytes = CassiniDocument.create(
+            silence(),
+            words,
+            "Legacy meeting",
+            JSONObject(),
+            recordedAtUtc = start,
+            createdAtUtc = start.plusSeconds(540),
+        )
+        val original = CassiniDocument.read(bytes)
+        original.manifest!!.getJSONObject("meeting").put("recordedAtUtc", "not-a-UTC-instant")
+        assertEquals(MeetingTime.DATE, original.meetingTime?.source)
+        val appended = CassiniDocument.create(bytes, words, "Ignored", JSONObject(), original)
+        val next = CassiniDocument.read(appended)
+        assertEquals(original.meetingTime, next.meetingTime)
+        assertEquals(start, next.meetingTime?.instant)
+        assertTrue(next.comments.contains("DATE=$start"))
+        assertFalse(next.comments.any { it.startsWith("CASSINI_RECORDED_AT_UTC=") })
+    }
+
+    @Test fun damagedOrUnknownManifestsNeverPromoteDateTagsToMeetingTime() {
+        val words = Transcript(listOf(Word("spk_1", 0, 20, "Hello")), "en")
+        val original = CassiniDocument.read(CassiniDocument.create(silence(), words, "Meeting", JSONObject()))
+        val dated = original.comments.filterNot { it.startsWith("DATE=") } + "DATE=2026-11-11T12:00:00Z"
+        val unknown = dated.map {
+            if (it.startsWith("CASSINI_FORMAT=")) "CASSINI_FORMAT=org.cassini.portable-meeting/9" else it
+        }
+        val damaged = dated.filterNot { it.startsWith("CASSINI_PAYLOAD_000=") }
+        for ((tags, state) in listOf(unknown to "unknown-cassini-format", damaged to "invalid-cassini-metadata")) {
+            val read = CassiniDocument.read(OggOpus.mux(OggOpus.read(silence()), CassiniDocument.tagsPacket(tags)))
+            assertEquals(state, read.state)
+            assertNull(read.manifest)
+            assertNull(read.meetingTime)
+        }
+        assertNull(CassiniDocument("plain-audio", comments = listOf("DATE=2026-11-11T12:00:00Z")).meetingTime)
+    }
+
     private fun silence(): ByteArray {
         val head = "OpusHead".toByteArray() + byteArrayOf(1, 1, 0, 0, -128, -69, 0, 0, 0, 0, 0)
         return OggOpus.mux(OggOpus.Stream(head, CassiniDocument.tagsPacket(listOf("X_CUSTOM=keep=me")),

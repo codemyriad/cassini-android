@@ -523,6 +523,22 @@ class NoteViewModelTest {
     // Exports. --------------------------------------------------------------------------------------------------
 
     @Test
+    fun exportHeadersUseTheMetadataRefreshedAfterThePickerReturns() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        send(viewModel, NoteEvent.More, NoteEvent.SheetAction(NoteAction.SAVE_MARKDOWN))
+        val time = "2026-11-09T10:31:48+02:00"
+        ports.onRefresh = {
+            val old = ports.details.value!!
+            ports.details.value = old.copy(note = old.note.copy(recordedAt = "recordedAtLocal=$time"))
+        }
+        viewModel.onExportTarget("content://picked/markdown")
+        advanceUntilIdle()
+        assertEquals(time, ports.markdownTime?.label)
+        assertNull(ports.markdownTime?.instant)
+        assertEquals(1, ports.exports.size)
+    }
+
+    @Test
     fun markdownSavesAndSharesTheSelectedVariantThroughTheRealExportRoute() = runTest(dispatcher) {
         val viewModel = viewModel()
         send(viewModel, NoteEvent.More, NoteEvent.SheetAction(NoteAction.SAVE_MARKDOWN))

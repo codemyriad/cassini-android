@@ -280,6 +280,8 @@ class FakeStorage(
 
     @Volatile var existing: CassiniDocument? = null
 
+    @Volatile var captureStart: java.time.Instant? = null
+
     val adoptions = CopyOnWriteArrayList<Adoption>()
 
     @Volatile var adoptFailure: Exception? = null
@@ -359,6 +361,8 @@ class FakeStorage(
     }
 
     override fun existingDocumentBlocking(noteId: String) = existing
+
+    override fun recordedAtUtcBlocking(noteId: String) = captureStart
 
     override fun titleBlocking(noteId: String) = "Weekly sync"
 

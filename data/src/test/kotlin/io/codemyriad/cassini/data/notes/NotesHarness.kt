@@ -43,8 +43,10 @@ fun documentBytes(transcript: Transcript, title: String): ByteArray =
 /** The production reader, counting full reads. */
 class CountingReader : DocumentReader {
     val reads = AtomicInteger()
+    var beforeRead: (File) -> Unit = {}
 
     override fun read(file: File): CassiniDocument {
+        beforeRead(file)
         reads.incrementAndGet()
         return DocumentReader.Verified.read(file)
     }
@@ -74,8 +76,8 @@ class RecordingPorts : JobQueueWriter, NoteFilesCleaner {
  * The note and document repositories over a scratch root. [restart] simulates process death: new repositories (an
  * empty document LRU) over the same files and database.
  */
-class NotesHarness(folder: TemporaryFolder) {
-    private val catalogue = ScratchCatalogue(folder)
+class NotesHarness(folder: TemporaryFolder, seed: (io.codemyriad.cassini.data.AppPaths) -> Unit = {}) {
+    private val catalogue = ScratchCatalogue(folder).also { seed(it.paths) }
     val paths = catalogue.paths
     val db: CassiniDatabase = catalogue.open().database
     val dispatchers =

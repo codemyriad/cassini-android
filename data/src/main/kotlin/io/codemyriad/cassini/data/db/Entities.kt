@@ -38,7 +38,7 @@ data class NoteEntity(
     val title: String,
     /** The document title differs from [title] and must be rewritten when that is allowed. */
     @ColumnInfo(name = "title_dirty") val titleDirty: Boolean = false,
-    /** When the audio was recorded (epoch ms): capture start, the document's `meeting.createdAtUtc`, else import time. */
+    /** Ordering key: known recording instant, else packaging/import time. Never a display-time fallback (D95). */
     @ColumnInfo(name = "created_at") val createdAt: Long,
     @ColumnInfo(name = "added_at") val addedAt: Long,
     val origin: Origin,
@@ -74,6 +74,14 @@ data class NoteEntity(
     @ColumnInfo(name = "trashed_at") val trashedAt: Long? = null,
     @ColumnInfo(name = "trashed_job") val trashedJob: TrashedJob? = null,
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
+    /** Source-tagged D95 recording instant or site-local label; null means unknown for a Cassini document. */
+    @ColumnInfo(name = "recorded_at") val recordedAt: String? = null,
+    /** Authoritative own capture clock, independent of derived metadata and packaging time (D95). */
+    @ColumnInfo(name = "capture_started_at") val captureStartedAt: Long? = null,
+    /** Binds that clock to audio; a replacement must never inherit the discarded start. */
+    @ColumnInfo(name = "capture_audio_sha256") val captureAudioSha256: String? = null,
+    /** A v1 own-document clock, withheld until distinguished from a rebuilt packaging timestamp. */
+    @ColumnInfo(name = "legacy_capture_candidate") val legacyCaptureCandidate: Long? = null,
 )
 
 /** One transcript variant of a note's document, in manifest order. */

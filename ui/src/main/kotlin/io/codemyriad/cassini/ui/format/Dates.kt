@@ -16,6 +16,8 @@ import java.util.Locale
  * [Date.withYear] is false in the current year.
  */
 sealed interface DayLabel {
+    data object Unknown : DayLabel
+
     data object Today : DayLabel
 
     data object Yesterday : DayLabel
@@ -33,6 +35,7 @@ object Dates {
     /** The day label of day headers and subtitles: "Today", "Yesterday", "Monday 5 Oct", "5 Oct 2025". */
     fun dayLabel(res: Resources, label: DayLabel, format: FormatSettings): String =
         when (label) {
+            DayLabel.Unknown -> res.getString(R.string.ui_day_unknown)
             DayLabel.Today -> res.getString(R.string.ui_day_today)
             DayLabel.Yesterday -> res.getString(R.string.ui_day_yesterday)
             is DayLabel.Date -> {
@@ -47,7 +50,11 @@ object Dates {
 
     /** "Today, 10:02", "Monday 5 Oct, 10:02" (subtitles of the Note screen and the actions sheet). */
     fun dayTime(res: Resources, label: DayLabel, time: LocalTime, format: FormatSettings): String =
-        res.getString(R.string.ui_day_time, dayLabel(res, label, format), time(time, format))
+        if (label == DayLabel.Unknown) {
+            dayLabel(res, label, format)
+        } else {
+            res.getString(R.string.ui_day_time, dayLabel(res, label, format), time(time, format))
+        }
 
     /** "8 Oct", or "8 Oct 2025" with the year. */
     fun shortDate(date: LocalDate, withYear: Boolean, format: FormatSettings): String =
@@ -69,6 +76,7 @@ object Dates {
     /** "Deleted today", "Deleted yesterday", "Deleted 2 Oct" (Trash cards). */
     fun deleted(res: Resources, label: DayLabel, format: FormatSettings): String =
         when (label) {
+            DayLabel.Unknown -> res.getString(R.string.ui_day_unknown)
             DayLabel.Today -> res.getString(R.string.ui_trash_deleted_today)
             DayLabel.Yesterday -> res.getString(R.string.ui_trash_deleted_yesterday)
             is DayLabel.Date -> {

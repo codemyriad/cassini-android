@@ -643,7 +643,18 @@ class TranscriptionJob(
                 // A fresh document keeps the `x` of the one it replaces, notes included (D53.2): never dropped.
                 val extensions = if (existing == null) current?.manifest?.optJSONObject("x") else null
                 requireSpace(target, audio.length())
-                CassiniDocument.create(audio, draft.transcript, title, processing, existing, labels, target, extensions)
+                val start = if (current == null || existing != null) storage.recordedAtUtcBlocking(noteId) else null
+                CassiniDocument.create(
+                    audio,
+                    draft.transcript,
+                    title,
+                    processing,
+                    existing,
+                    labels,
+                    target,
+                    extensions,
+                    recordedAtUtc = start,
+                )
             }
             env.syncFile(target) { sync(target) }
             val variant = document.defaultId

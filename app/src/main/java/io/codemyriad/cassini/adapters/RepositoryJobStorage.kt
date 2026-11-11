@@ -10,6 +10,7 @@ import io.codemyriad.cassini.data.notes.AdoptOutcome
 import io.codemyriad.cassini.data.notes.DocumentRepository
 import io.codemyriad.cassini.data.notes.NoteRepository
 import io.codemyriad.cassini.data.notes.SealedAdopter
+import io.codemyriad.cassini.data.notes.knownCaptureStart
 import io.codemyriad.cassini.data.settings.SettingsRepository
 import io.codemyriad.cassini.engine.job.Adoption
 import io.codemyriad.cassini.engine.job.CheckpointLoad
@@ -84,6 +85,9 @@ class RepositoryJobStorage(
     override fun <T> withNoteLockBlocking(noteId: String, block: () -> T): T = locks.withNoteLockBlocking(noteId, block)
 
     override fun existingDocumentBlocking(noteId: String): CassiniDocument? = documents.readBlocking(noteId)
+
+    override fun recordedAtUtcBlocking(noteId: String): java.time.Instant? =
+        notes.rowBlocking(noteId)?.knownCaptureStart()
 
     override fun titleBlocking(noteId: String): String =
         notes.titleBlocking(noteId) ?: throw FileNotFoundException("No note $noteId")

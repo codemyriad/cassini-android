@@ -62,6 +62,7 @@ class NoteRepositoryTest {
         assertEquals("capture.opus", row.audioFile)
         assertEquals(Origin.RECORDED, row.origin)
         assertEquals(42L, row.createdAt)
+        assertEquals(42L, row.captureStartedAt)
         assertEquals(listOf(id), h.notes.library().first().map { it.id })
 
         assertTrue(h.notes.finishRecording(id, 61_000))

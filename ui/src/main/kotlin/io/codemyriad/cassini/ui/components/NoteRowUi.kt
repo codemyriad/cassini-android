@@ -67,6 +67,7 @@ data class NoteRowUi(
     val status: NoteStatusUi,
     val preview: Highlighted? = null,
     val highlighted: Boolean = false,
+    val recordedLabel: String? = null,
 )
 
 /** What a Library row asks for: open, the long press, the inline suffixes and the TalkBack custom actions. */

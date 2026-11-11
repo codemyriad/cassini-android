@@ -111,7 +111,11 @@ private fun VersionRow(row: VersionRowUi, selected: Boolean, onPick: (Int) -> Un
  */
 @Composable
 private fun versionDetail(row: VersionRowUi): String {
-    val at = Dates.shortDateTime(row.date, row.time, withYear = row.withYear)
+    val at = row.recordedLabel ?: if (row.recordingTimeKnown) {
+        Dates.shortDateTime(row.date, row.time, withYear = row.withYear)
+    } else {
+        Dates.dayLabel(io.codemyriad.cassini.ui.format.DayLabel.Unknown)
+    }
     val from = row.fromVersion
     val detail = when {
         !row.readable -> stringResource(R.string.ui_versions_unreadable)

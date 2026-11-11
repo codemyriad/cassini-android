@@ -145,7 +145,11 @@ private val SnackbarOverChip = 40.dp
 private fun NoteTopBar(state: NoteUiState, onEvent: (NoteEvent) -> Unit) {
     val reading = state.mode == NoteMode.Reading
     val subtitle = state.subtitle?.let {
-        stringResource(R.string.ui_join_dot, Dates.dayTime(it.day, it.time), Durations.clock(it.durationMs))
+        stringResource(
+            R.string.ui_join_dot,
+            it.recordedLabel ?: Dates.dayTime(it.day, it.time),
+            Durations.clock(it.durationMs),
+        )
     }
     CassiniTopBar(
         title = state.title,

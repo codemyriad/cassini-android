@@ -31,7 +31,9 @@ object Spoken {
 
     /** "today 10:02", "yesterday 15:10", "Monday 5 Oct 08:14" (Italian "oggi alle 10:02"). */
     fun dayTime(res: Resources, label: DayLabel, time: LocalTime, format: FormatSettings): String {
+        if (label == DayLabel.Unknown) return Dates.dayLabel(res, label, format)
         val day = when (label) {
+            DayLabel.Unknown -> error("Handled above")
             DayLabel.Today -> res.getString(R.string.ui_day_today_inline)
             DayLabel.Yesterday -> res.getString(R.string.ui_day_yesterday_inline)
             is DayLabel.Date -> Dates.dayLabel(res, label, format)
@@ -52,12 +54,13 @@ object Spoken {
         time: LocalTime,
         status: String,
         format: FormatSettings,
+        recordedLabel: String? = null,
     ): String =
         res.getString(
             R.string.ui_join_comma4,
             title,
             duration(res, durationMs, format),
-            dayTime(res, day, time, format),
+            recordedLabel ?: dayTime(res, day, time, format),
             status.lowercase(format.locale),
         )
 
@@ -86,8 +89,15 @@ object Spoken {
 
     @Composable
     @ReadOnlyComposable
-    fun noteRow(title: String, durationMs: Long, day: DayLabel, time: LocalTime, status: String): String =
-        noteRow(resources(), title, durationMs, day, time, status, format())
+    @Suppress("LongParameterList") // The row description retains its literal site-local recording label.
+    fun noteRow(
+        title: String,
+        durationMs: Long,
+        day: DayLabel,
+        time: LocalTime,
+        status: String,
+        recordedLabel: String? = null,
+    ): String = noteRow(resources(), title, durationMs, day, time, status, format(), recordedLabel)
 
     @Composable
     @ReadOnlyComposable
