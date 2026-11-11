@@ -44,7 +44,7 @@ public class FifoPipeParcelFileDescriptorShadow extends ShadowParcelFileDescript
     public static boolean isWriterClosed(FileDescriptor readFd) {
         if (!readFd.valid()) return true;
         SharedPipeState shared = SHARED_BY_READ_FD.get(readFd);
-        return shared == null || shared.openWriters.get() <= 0;
+        return shared == null || shared.openWriters.get() <= 0 || !shared.writeFd.valid();
     }
 
     public static void resetDetached() {
@@ -74,7 +74,7 @@ public class FifoPipeParcelFileDescriptorShadow extends ShadowParcelFileDescript
             });
             FileOutputStream writeStream = new FileOutputStream(fifo);
             FileInputStream readStream = readerFuture.get(OPEN_TIMEOUT_SEC, TimeUnit.SECONDS);
-            SharedPipeState shared = new SharedPipeState(new AtomicInteger(1));
+            SharedPipeState shared = new SharedPipeState(new AtomicInteger(1), writeStream.getFD());
             SHARED_BY_READ_FD.put(readStream.getFD(), shared);
             return new ParcelFileDescriptor[]{
                 wrapEnd(new ReaderEnd(readStream.getFD(), readStream)),
@@ -193,9 +193,11 @@ public class FifoPipeParcelFileDescriptorShadow extends ShadowParcelFileDescript
 
     private static final class SharedPipeState {
         final AtomicInteger openWriters;
+        final FileDescriptor writeFd;
 
-        SharedPipeState(AtomicInteger openWriters) {
+        SharedPipeState(AtomicInteger openWriters, FileDescriptor writeFd) {
             this.openWriters = openWriters;
+            this.writeFd = writeFd;
         }
     }
 

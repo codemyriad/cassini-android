@@ -5,6 +5,7 @@ import android.os.CancellationSignal
 import android.os.OperationCanceledException
 import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract.Document
+import android.system.ErrnoException
 import android.system.Os
 import android.system.OsConstants
 import android.system.StructPollfd
@@ -146,7 +147,7 @@ internal class PendingImports(
                 lastModified = entry.createdAt,
                 flags = Document.FLAG_SUPPORTS_WRITE,
             )
-            is Stage.Writing -> if (!isWriterClosed(stage.readFd)) {
+            is Stage.Writing -> if (!entry.cancelled.get() && !isWriterClosed(stage.readFd)) {
                 ExposedDocument(
                     documentId = entry.documentId,
                     displayName = entry.displayName,
@@ -504,20 +505,28 @@ internal class PendingImports(
             (meta.state == PersistedState.AWAITING_WRITE && meta.createdAt < cutoff)
     }
 
-    private fun isWriterClosed(readFd: FileDescriptor): Boolean = try {
-        if (!readFd.valid()) {
-            true
+    private fun isWriterClosed(readFd: FileDescriptor): Boolean {
+        if (!readFd.valid()) return true
+        // Under Robolectric on the JVM, android.system.Os.poll is an unimplemented stub that returns 0 (revents = 0)
+        // without throwing, so consult the FIFO shadow probe first when installed.
+        val probe = writerClosedProbeForTesting
+        return if (probe != null) {
+            probe(readFd)
         } else {
-            val pollFd = StructPollfd().apply {
-                fd = readFd
-                events = OsConstants.POLLIN.toShort()
-            }
-            Os.poll(arrayOf(pollFd), 0)
-            val closedMask = OsConstants.POLLHUP or OsConstants.POLLERR or OsConstants.POLLNVAL
-            (pollFd.revents.toInt() and closedMask) != 0
+            pollPeerHup(readFd)
         }
-    } catch (_: Throwable) {
-        writerClosedProbeForTesting?.invoke(readFd) ?: true
+    }
+
+    private fun pollPeerHup(readFd: FileDescriptor): Boolean = try {
+        val pollFd = StructPollfd().apply {
+            fd = readFd
+            events = OsConstants.POLLIN.toShort()
+        }
+        Os.poll(arrayOf(pollFd), 0)
+        val closedMask = OsConstants.POLLHUP or OsConstants.POLLERR or OsConstants.POLLNVAL
+        (pollFd.revents.toInt() and closedMask) != 0
+    } catch (_: ErrnoException) {
+        true
     }
 
     private fun grantDir(token: String): File = File(grantsRoot(), token)
