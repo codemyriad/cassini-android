@@ -6,9 +6,14 @@ We made the entries for 0.0.1-beta to 0.1.0 again from the release notes of thes
 
 ## [Unreleased]
 
+## [0.4.2-beta.3] - 2026-11-11
+
+Google Play test build, version code 18.
+
 ### Fixed
 
 - Settings downloads and retries the model named by the tapped row. The speaker and saved-voice model rows no longer start the Parakeet download. A saved-voice model download also works before the diarizer is installed. Consent applies to each model shown, and Cancel stops both active and queued downloads.
+- When a note needs the model that tells speakers apart, the note offers the download with its size and automatically reprocesses the note after installation. If the speech model is also needed, the dialog shows it with its own download size before you approve.
 
 ## [0.4.2-beta.2] - 2026-11-10
 
@@ -265,7 +270,8 @@ Version 0.2.0 is a new build of the app. It keeps the speech engine and the port
 - A one-time model download in Settings: INT8 (about 640 MiB) or FP32 (about 2.37 GiB).
 - Recordings of up to 2:59 and imports of up to 3 minutes.
 
-[Unreleased]: https://github.com/codemyriad/cassini-android/compare/v0.4.2-beta.2...HEAD
+[Unreleased]: https://github.com/codemyriad/cassini-android/compare/v0.4.2-beta.3...HEAD
+[0.4.2-beta.3]: https://github.com/codemyriad/cassini-android/compare/v0.4.2-beta.2...v0.4.2-beta.3
 [0.4.2-beta.2]: https://github.com/codemyriad/cassini-android/compare/v0.4.2-beta.1...v0.4.2-beta.2
 [0.4.2-beta.1]: https://github.com/codemyriad/cassini-android/compare/v0.4.1...v0.4.2-beta.1
 [0.4.1]: https://github.com/codemyriad/cassini-android/compare/v0.4.0...v0.4.1

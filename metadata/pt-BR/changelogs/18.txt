@@ -1,0 +1,1 @@
+As configurações agora baixam o modelo selecionado para distinguir os locutores ou reconhecer vozes salvas. Se uma nota precisar do modelo que distingue os locutores, você pode baixá-lo pela própria nota. O Cassini tenta então distinguir os locutores novamente de forma automática.
