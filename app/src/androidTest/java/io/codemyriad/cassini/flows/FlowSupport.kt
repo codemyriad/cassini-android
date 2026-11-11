@@ -23,6 +23,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.printToString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.core.content.FileProvider
+import androidx.core.util.Consumer
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
@@ -36,8 +37,10 @@ import io.codemyriad.cassini.core.format.Transcript
 import io.codemyriad.cassini.core.format.Word
 import io.codemyriad.cassini.data.db.LibraryRow
 import io.codemyriad.cassini.data.notes.ImportOutcome
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 import org.junit.Assert.assertTrue
 import java.io.File
@@ -220,9 +223,28 @@ internal object Flows {
             .setAction(Intent.ACTION_VIEW)
             .setDataAndType(FileProvider.getUriForFile(activity, TEST_FILES, file), mime)
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        activity.startActivity(intent)
-        waitUntil(SCREEN_MS) { activity.intent.action == Intent.ACTION_VIEW }
-        runOnUiThread { activity.intent = launch }
+        val delivered = CompletableDeferred<Unit>()
+        val listener = Consumer<Intent> { received ->
+            if (received.action == Intent.ACTION_VIEW && received.data == intent.data) {
+                // ComponentActivity calls listeners before MainActivity sets and handles its new intent.
+                activity.window.decorView.post { delivered.complete(Unit) }
+            }
+        }
+        runOnUiThread { activity.addOnNewIntentListener(listener) }
+        try {
+            activity.startActivity(intent)
+            runBlocking {
+                withTimeoutOrNull(SCREEN_MS) { delivered.await() }
+                    ?: throw AssertionError("The Activity did not receive ACTION_VIEW")
+            }
+            runOnUiThread {
+                assertTrue("The Activity retains ACTION_VIEW", activity.intent.action == Intent.ACTION_VIEW)
+                assertTrue("The Activity retains the viewed URI", activity.intent.data == intent.data)
+                activity.intent = launch
+            }
+        } finally {
+            runOnUiThread { activity.removeOnNewIntentListener(listener) }
+        }
     }
 
     /** The live (not trashed) Library rows of the scratch root. */
