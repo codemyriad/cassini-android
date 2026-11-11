@@ -10,6 +10,7 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasClickAction
@@ -86,11 +87,16 @@ class LibraryBehaviourTest {
     private fun assertEvents(vararg expected: LibraryEvent) = rule.runOnIdle { assertEquals(expected.toList(), events) }
 
     @Test fun searchFilterMenusSendOnlyTheirOwnSelectionsAndNeverOfferSummary() {
-        val filters = io.codemyriad.cassini.ui.library.SearchFiltersUi(speakers = persistentListOf("Ada", "Ben"))
+        val filters = io.codemyriad.cassini.ui.library.SearchFiltersUi(
+            speaker = "bEN",
+            speakers = persistentListOf("Ada", "Ben"),
+        )
         show(BoardFixtures.library.copy(query = "delivery", searchFilters = filters))
         rule.onAllNodesWithText("Has summary").assertCountEquals(0)
-        rule.onNodeWithText("Speaker").performClick()
-        rule.onNodeWithText("Ben").performClick()
+        rule.onNodeWithText("Speaker: bEN").performClick()
+        rule.onNodeWithText("Any speaker").assertIsNotSelected()
+        rule.onNodeWithText("Ada").assertIsNotSelected()
+        rule.onNodeWithText("Ben").assertIsSelected().performClick()
         assertEvents(LibraryEvent.FilterSpeaker("Ben"))
         rule.onNodeWithText("Any date").performClick()
         rule.onNodeWithText("Past 7 days").performClick()

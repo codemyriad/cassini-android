@@ -94,7 +94,9 @@ private fun SpeakerMenu(
                 CassiniMenuItem(
                     speaker,
                     onClick = { onSelect(speaker) },
-                    modifier = Modifier.semantics { selected = filters.speaker == speaker },
+                    modifier = Modifier.semantics {
+                        selected = filters.speaker?.equals(speaker, ignoreCase = true) == true
+                    },
                 )
             }
         }
