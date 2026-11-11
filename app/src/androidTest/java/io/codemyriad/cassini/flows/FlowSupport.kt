@@ -32,13 +32,17 @@ import io.codemyriad.cassini.BuildConfig
 import io.codemyriad.cassini.MainActivity
 import io.codemyriad.cassini.background.Background
 import io.codemyriad.cassini.core.format.CassiniDocument
+import io.codemyriad.cassini.core.format.DocumentState
 import io.codemyriad.cassini.core.format.Transcript
 import io.codemyriad.cassini.core.format.Word
+import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.data.db.LibraryRow
 import io.codemyriad.cassini.data.notes.ImportOutcome
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import java.io.File
 
@@ -59,6 +63,23 @@ internal object Flows {
     private const val TAG = "CassiniFlow"
 
     val graph get() = Background.graph
+
+    /** Waits for the Room transaction that publishes the verified document and removes its job. */
+    fun awaitSealedDocument(noteId: String, variants: Int? = null): CassiniDocument = runBlocking {
+        val notes = graph.awaitCatalogue().notes
+        val sealed = withTimeoutOrNull(JOB_MS) {
+            notes.note(noteId).first { details ->
+                details != null && details.job == null && details.note.audioKind == AudioKind.DOCUMENT &&
+                    details.note.documentState == DocumentState.OK &&
+                    (variants == null || details.variants.size == variants)
+            }
+        } ?: throw AssertionError("The job did not seal a verified document for $noteId (expected versions: $variants)")
+        CassiniDocument.read(File(graph.paths.note(noteId), sealed.note.audioFile)).also { document ->
+            if (variants != null) {
+                assertEquals("The sealed document contains $variants versions", variants, document.variants.size)
+            }
+        }
+    }
 
     /** Text of [id] in the activity's language (English on the test devices unless a test changes it). */
     fun AppRule.text(id: Int, vararg args: Any): String = activity.getString(id, *args)

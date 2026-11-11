@@ -12,13 +12,11 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.espresso.Espresso
 import io.codemyriad.cassini.MainActivity
 import io.codemyriad.cassini.background.Background
-import io.codemyriad.cassini.core.format.CassiniDocument
-import io.codemyriad.cassini.core.format.DocumentState
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.flows.Flows.import
+import io.codemyriad.cassini.flows.Flows.awaitSealedDocument
 import io.codemyriad.cassini.flows.Flows.rows
 import io.codemyriad.cassini.flows.Flows.text
-import io.codemyriad.cassini.flows.Flows.waitFor
 import io.codemyriad.cassini.flows.Flows.waitShown
 import io.codemyriad.cassini.flows.Flows.waitText
 import io.codemyriad.cassini.processing.StartOrigin
@@ -74,7 +72,7 @@ class SpeakerNamingFlowTest {
         // The first transcription saves the voice, then its note goes.
         val firstId = runBlocking { import(first) }
         runBlocking { graph.processing.transcribe(firstId, JobKind.TRANSCRIBE, StartOrigin.SCREEN) }
-        val sealed = awaitDocument(firstId)
+        val sealed = awaitSealedDocument(firstId)
         val variant = checkNotNull(sealed.defaultId)
         val speaker = sealed.selected(variant)!!.transcript!!.words.first().speaker
         val luca = runBlocking { catalogue.voices.enrol(firstId, variant, speaker, null, NAME) }
@@ -98,7 +96,7 @@ class SpeakerNamingFlowTest {
         assertNotNull("The question is in the draft, while the job runs", state)
         rule.onNode(yes).performSemanticsAction(SemanticsActions.OnClick)
 
-        val document = awaitDocument(secondId)
+        val document = awaitSealedDocument(secondId)
         val labelled = document.selected(null)!!.transcript!!.words.first().speaker
         assertEquals("The sealed document carries the name", NAME, document.speakerLabel(labelled))
 
@@ -114,19 +112,6 @@ class SpeakerNamingFlowTest {
         rule.waitShown(hasText(notes, substring = true))
         val people = runBlocking { catalogue.voices.people().first() }.voices.associate { it.voice.name to it.notes }
         assertEquals(mapOf(NAME to 1, RIVAL to 0), people)
-    }
-
-    /** Waits for the note's job to end with a verified document, and returns it. */
-    private fun awaitDocument(noteId: String): CassiniDocument {
-        var document: CassiniDocument? = null
-        rule.waitFor("The job seals a verified document", Flows.JOB_MS) {
-            val row = graph.awaitCatalogue().notes.rowBlocking(noteId)
-            val done = row != null && graph.awaitCatalogue().jobs.job(noteId) == null &&
-                row.documentState == DocumentState.OK
-            if (done) document = CassiniDocument.read(File(graph.paths.note(noteId), row.audioFile))
-            done
-        }
-        return checkNotNull(document)
     }
 
     /**
