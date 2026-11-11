@@ -11,6 +11,7 @@ import android.provider.DocumentsContract.Document
 import android.provider.DocumentsContract.Root
 import android.provider.DocumentsProvider
 import io.codemyriad.cassini.CassiniApplication
+import io.codemyriad.cassini.data.notes.ImportLimits
 import java.io.FileNotFoundException
 import io.codemyriad.cassini.ui.R as UiR
 
@@ -34,6 +35,7 @@ class CassiniDocumentsProvider : DocumentsProvider() {
             context = ctx.applicationContext,
             authority = ::resolvedAuthority,
             graphProvider = { (ctx.applicationContext as CassiniApplication).graph },
+            limits = { limitsForTesting ?: ImportLimits() },
         )
     }
 
@@ -147,6 +149,9 @@ class CassiniDocumentsProvider : DocumentsProvider() {
     companion object {
         const val AUTHORITY_SUFFIX = ".documents"
         private const val SUPPORTED_MIME_TYPES = "audio/*\napplication/ogg"
+
+        @Volatile
+        internal var limitsForTesting: ImportLimits? = null
 
         private val DEFAULT_ROOT_PROJECTION = arrayOf(
             Root.COLUMN_ROOT_ID,

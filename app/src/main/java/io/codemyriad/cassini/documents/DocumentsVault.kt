@@ -18,6 +18,7 @@ import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.data.NoteIds
 import io.codemyriad.cassini.data.Threads
 import io.codemyriad.cassini.data.db.NoteEntity
+import io.codemyriad.cassini.data.notes.ImportLimits
 import io.codemyriad.cassini.data.notes.ImportOutcome
 import io.codemyriad.cassini.inAppLanguage
 import io.codemyriad.cassini.note.NoteExports
@@ -53,15 +54,17 @@ internal class DocumentsVault(
     private val context: Context,
     private val authority: () -> String,
     private val graphProvider: () -> AppGraph,
+    private val limits: () -> ImportLimits = { ImportLimits() },
 ) {
     private val observedCatalogues: MutableSet<Catalogue> =
         Collections.synchronizedSet(Collections.newSetFromMap(WeakHashMap()))
 
     private val pending = PendingImports(
-        stagingRoot = { File(graphProvider().paths.cache, PendingImports.STAGING_DIR) },
+        grantsRoot = { File(graphProvider().paths.root, PendingImports.GRANTS_DIR) },
         scope = { graphProvider().appScope },
         io = { graphProvider().dispatchers.io },
         clock = { graphProvider().config.clock() },
+        limits = limits,
         importFileUri = ::importStagedFile,
     )
 
@@ -101,23 +104,15 @@ internal class DocumentsVault(
         return runBlocking(graph.dispatchers.io) {
             when {
                 id.startsWith(NOTE_PREFIX) -> queryNoteDocument(graph, id)
-                id.startsWith(PendingImports.PREFIX) -> queryPendingDocument(graph, id)
+                id.startsWith(PendingImports.PREFIX) -> pending.inspect(id)
                 else -> throw FileNotFoundException("Unknown document: $id")
             }
         }
     }
 
-    private suspend fun queryPendingDocument(graph: AppGraph, documentId: String): ExposedDocument =
-        when (val result = pending.inspect(documentId)) {
-            is PendingImports.Inspection.Pending -> result.document
-            is PendingImports.Inspection.Resolved -> {
-                val noteId = result.noteId ?: throw FileNotFoundException("Import rejected: $documentId")
-                queryNoteDocument(graph, "$NOTE_PREFIX$noteId")
-            }
-        }
-
     /** Allocates a write-once `pending:<uuid>` target under `"root"`. */
     fun createDocument(parentDocumentId: String?, mimeType: String?, displayName: String?): String {
+        Threads.assertOffMain("CassiniDocumentsProvider.createDocument")
         if (parentDocumentId != ROOT_DOCUMENT_ID) {
             throw FileNotFoundException("Cannot create documents under $parentDocumentId")
         }
@@ -164,14 +159,13 @@ internal class DocumentsVault(
         signal: CancellationSignal?,
     ): ParcelFileDescriptor {
         if (isWriteMode(parsedMode)) {
-            return pending.openForWrite(documentId, parsedMode, signal)
+            return pending.openForWrite(documentId, signal)
         }
         if (parsedMode != ParcelFileDescriptor.MODE_READ_ONLY) {
             throw SecurityException("Unsupported mode for $documentId")
         }
         val graph = graphProvider()
-        val noteId = runBlocking(graph.dispatchers.io) { pending.awaitImportedNoteId(documentId) }
-        return openNoteReadOnly(noteId, signal)
+        return runBlocking(graph.dispatchers.io) { pending.openForRead(documentId, signal) }
     }
 
     private fun openNoteReadOnly(noteId: String, signal: CancellationSignal?): ParcelFileDescriptor {
@@ -230,16 +224,12 @@ internal class DocumentsVault(
             }
     }
 
-    private suspend fun importStagedFile(fileUri: String): String? {
+    private suspend fun importStagedFile(fileUri: String): Boolean {
         val graph = graphProvider()
         graph.ready.await()
         val outcome = graph.notices.imports.start(fileUri).await()
         notifyChildrenChanged(context.contentResolver)
-        return when (outcome) {
-            is ImportOutcome.Created -> outcome.noteId
-            is ImportOutcome.Existing -> outcome.noteId
-            is ImportOutcome.Rejected, null -> null
-        }
+        return outcome is ImportOutcome.Created || outcome is ImportOutcome.Existing
     }
 
     private fun observeChangesOnce(graph: AppGraph, catalogue: Catalogue) {
