@@ -48,7 +48,7 @@ class BackupTransportFixtureTest {
     private val paths get() = AppPaths(context.filesDir, context.cacheDir)
     private val choices get() = BackupChoicesStore(File(context.noBackupFilesDir, "choices.json"), Dispatchers.IO)
 
-    @Test fun ownedEmulatorFixture() = runBlocking(Dispatchers.IO) {
+    @Test fun ownedEmulatorFixture() = runBlocking<Unit>(Dispatchers.IO) {
         assertEquals("true", arguments.getString("ownedBackupEmulator"))
         assertEquals("io.codemyriad.cassini.talk.debug", context.packageName)
         assertTrue("Never seed a physical device", Build.HARDWARE in setOf("ranchu", "goldfish"))
