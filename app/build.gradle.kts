@@ -201,6 +201,7 @@ dependencies {
     // Espresso.pressBack in AppShellTest: it reaches the focused window, so a sheet gets back first.
     testImplementation(libs.androidx.test.espresso.core)
     androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.uiautomator)
     androidTestImplementation(libs.coroutines.test)
     // ModelDownloadDeviceTest compresses its loopback model files; the APK already carries the AAR (:engine).
     androidTestImplementation("${libs.zstd.jni.get()}@aar")

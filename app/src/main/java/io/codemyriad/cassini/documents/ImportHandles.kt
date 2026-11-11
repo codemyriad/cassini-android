@@ -14,10 +14,13 @@ internal class ImportHandles(private val directory: File) {
 
     init {
         check(directory.isDirectory || directory.mkdirs())
-        for (file in directory.listFiles().orEmpty()) {
-            if (file.extension != "json") continue
+        val files = directory.listFiles().orEmpty()
+        val records = files.map { it.name.removeSuffix(".bak").removeSuffix(".new") }
+            .filter { it.endsWith(".json") }.distinct()
+        for (name in records) {
+            val file = File(directory, name)
             val handle = runCatching { decode(file) }.getOrNull()
-            if (handle?.target == null) file.delete() else count++
+            if (handle?.target == null) AtomicFile(file).delete() else count++
         }
     }
 
@@ -41,7 +44,11 @@ internal class ImportHandles(private val directory: File) {
     @Synchronized fun complete(id: String, target: String) { write(id, get(id).copy(target = target, writing = false)) }
 
     @Synchronized fun discard(id: String) {
-        if (file(id).delete()) count--
+        val record = file(id)
+        if (record.exists() || File(record.path + ".bak").exists()) {
+            AtomicFile(record).delete()
+            count--
+        }
     }
 
     private fun file(id: String): File {
@@ -50,8 +57,11 @@ internal class ImportHandles(private val directory: File) {
     }
 
     private fun decode(file: File): Handle {
-        if (!file.isFile || file.length() > MAX_RECORD_BYTES) throw FileNotFoundException("Unknown document")
-        val value = JSONObject(String(AtomicFile(file).readFully()))
+        val bytes = AtomicFile(file).openRead().use { input ->
+            if (file.length() > MAX_RECORD_BYTES) throw FileNotFoundException("Unknown document")
+            input.readBytes()
+        }
+        val value = JSONObject(String(bytes))
         return Handle(
             value.getString("name"),
             value.getString("mime"),

@@ -119,6 +119,7 @@ internal class DocumentStorage(
     }
 
     @Suppress("ThrowsCount") // Roll back each acquired resource before propagating open/cancel failures.
+    @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
     private fun upload(id: String, signal: CancellationSignal?): ParcelFileDescriptor {
         if (!uploads.tryAcquire()) throw FileNotFoundException("Too many open imports")
         val handle = try {
@@ -132,7 +133,10 @@ internal class DocumentStorage(
             handles.discard(id)
             throw error
         }
-        val job = graph.appScope.launch(graph.dispatchers.io) { receive(id, handle, pipe[0]) }
+        // ATOMIC guarantees entry into receive's finally even when IO was cancelled before dispatch.
+        val job = graph.appScope.launch(graph.dispatchers.io, start = CoroutineStart.ATOMIC) {
+            receive(id, handle, pipe[0])
+        }
         signal?.setOnCancelListener { job.cancel() }
         job.invokeOnCompletion { signal?.setOnCancelListener(null) }
         if (signal?.isCanceled == true) {
@@ -185,8 +189,9 @@ internal class DocumentStorage(
 
     private suspend fun receiveBytes(pipe: ParcelFileDescriptor, file: File, reserved: AtomicLong): Long = coroutineScope {
         val input = ParcelFileDescriptor.AutoCloseInputStream(pipe)
+        val finished = AtomicBoolean()
         val closer = launch(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
-            try { awaitCancellation() } finally { runCatching { input.close() } }
+            try { awaitCancellation() } finally { if (!finished.get()) runCatching { input.close() } }
         }
         try {
             input.use { stream ->
@@ -208,6 +213,7 @@ internal class DocumentStorage(
                 }
             }
         } finally {
+            finished.set(true)
             closer.cancel()
         }
     }

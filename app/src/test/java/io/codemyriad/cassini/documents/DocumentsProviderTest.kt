@@ -14,7 +14,10 @@ import io.codemyriad.cassini.core.format.CassiniDocument
 import io.codemyriad.cassini.core.format.Transcript
 import io.codemyriad.cassini.core.format.Word
 import io.codemyriad.cassini.data.AppPaths
+import io.codemyriad.cassini.data.CassiniDispatchers
 import io.codemyriad.cassini.data.notes.ImportOutcome
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -35,11 +38,13 @@ import org.robolectric.RobolectricTestRunner
 import java.io.File
 import java.io.FileNotFoundException
 import java.util.UUID
+import kotlin.coroutines.CoroutineContext
 
 @RunWith(RobolectricTestRunner::class)
 class DocumentsProviderTest {
     @get:Rule val folder = TemporaryFolder()
     private val context: Context = ApplicationProvider.getApplicationContext()
+    private val io = GateDispatcher()
     private lateinit var graph: AppGraph
     private lateinit var provider: CassiniDocumentsProvider
     private val changed = Channel<Unit>(Channel.UNLIMITED)
@@ -50,7 +55,7 @@ class DocumentsProviderTest {
 
     @Before fun setUp() = runBlocking {
         val paths = AppPaths(folder.newFolder(), folder.newFolder(), folder.newFolder())
-        graph = AppGraph(context, AppGraph.Config(paths = paths, network = { false }))
+        graph = AppGraph(context, AppGraph.Config(paths = paths, network = { false }, dispatchers = CassiniDispatchers(io = io)))
         CassiniApplication.graphFactory = GraphFactory { _, _ -> graph }
         provider = freshProvider()
         withTimeout(20_000) { graph.ready.await() }
@@ -100,6 +105,7 @@ class DocumentsProviderTest {
         val bytes = document("Monday").readBytes()
         val first = upload(bytes)
         val second = upload(bytes)
+        repeat(8) { upload(bytes) }
         provider.queryChildDocuments(DocumentStorage.ROOT, null, sortOrder = null).use { assertEquals(1, it.count) }
         provider.shutdown()
         provider = freshProvider()
@@ -115,7 +121,10 @@ class DocumentsProviderTest {
 
     @Test fun unknownAndEscapingIdsCannotReadOrCreateFiles() {
         val unknown = listOf(
-            "../notes", "note:../../voices/people.json", "incoming:../models", "note:${UUID.randomUUID()}",
+            "../notes",
+            "note:../../voices/people.json",
+            "incoming:../models",
+            "note:${UUID.randomUUID()}",
         )
         for (id in unknown) {
             assertThrows(FileNotFoundException::class.java) { provider.openDocument(id, "r", null) }
@@ -131,11 +140,56 @@ class DocumentsProviderTest {
         }
     }
 
+    @Test fun interruptedAtomicMetadataRecoversCompletedAliasesAndDropsPendingHandles() {
+        val directory = folder.newFolder()
+        val handles = ImportHandles(directory)
+        val completed = handles.create("Monday.opus", "audio/ogg")
+        val target = UUID.randomUUID().toString()
+        handles.complete(completed, target)
+        val pending = handles.create("Pending.opus", "audio/ogg")
+        val record = File(directory, "$completed.json")
+        assertTrue(record.renameTo(File(directory, "$completed.json.bak")))
+        File(directory, "$pending.json.new").writeText("interrupted")
+        val recovered = ImportHandles(directory)
+        assertEquals(target, recovered.get(completed).target)
+        assertThrows(FileNotFoundException::class.java) { recovered.get(pending) }
+        assertFalse(File(directory, "$pending.json.new").exists())
+    }
+
     private suspend fun upload(bytes: ByteArray): String {
         val id = provider.createDocument(DocumentStorage.ROOT, "audio/ogg", "Monday.opus")
-        ParcelFileDescriptor.AutoCloseOutputStream(provider.openDocument(id, "w", null)).use { it.write(bytes) }
+        // Robolectric's pipe is a regular file: do not let its reader observe EOF before the writer runs.
+        io.pause()
+        try {
+            ParcelFileDescriptor.AutoCloseOutputStream(provider.openDocument(id, "w", null)).use { it.write(bytes) }
+        } finally {
+            io.resume()
+        }
         withTimeout(20_000) { changed.receive() }
+        assertEquals(
+            org.robolectric.shadows.ShadowLog.getLogs().toString(),
+            null,
+            graph.notices.imports.state.value.failure,
+        )
         return id
+    }
+
+    private class GateDispatcher : CoroutineDispatcher() {
+        private var paused = false
+        private val pending = ArrayList<Pair<CoroutineContext, Runnable>>()
+
+        @Synchronized fun pause() { paused = true }
+
+        @Synchronized override fun dispatch(context: CoroutineContext, block: Runnable) {
+            if (paused) pending += context to block else Dispatchers.IO.dispatch(context, block)
+        }
+        fun resume() {
+            val tasks = synchronized(this) {
+                paused = false
+                pending.toList().also { pending.clear() }
+            }
+            tasks.forEach { (context, task) -> Dispatchers.IO.dispatch(context, task) }
+        }
     }
 
     private fun read(id: String): ByteArray =

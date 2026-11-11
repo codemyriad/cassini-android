@@ -6,6 +6,7 @@ import android.os.Binder
 import android.os.CancellationSignal
 import android.os.OperationCanceledException
 import android.os.ParcelFileDescriptor
+import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
 import android.provider.DocumentsContract.Root
 import android.provider.DocumentsProvider
@@ -58,7 +59,14 @@ class CassiniDocumentsProvider : DocumentsProvider() {
         sortOrder: String?,
     ): Cursor = io {
         requireRoot(parentDocumentId)
-        cursor(projection, DOCUMENT_COLUMNS).apply { storage.copies.list().forEach { add(document(it)) } }
+        cursor(projection, DOCUMENT_COLUMNS).apply {
+            storage.copies.list().forEach { add(document(it)) }
+            val app = checkNotNull(context)
+            setNotificationUri(
+                app.contentResolver,
+                DocumentsContract.buildChildDocumentsUri(app.packageName + ".documents", parentDocumentId),
+            )
+        }
     }
 
     override fun isChildDocument(parentDocumentId: String, documentId: String): Boolean = io {
