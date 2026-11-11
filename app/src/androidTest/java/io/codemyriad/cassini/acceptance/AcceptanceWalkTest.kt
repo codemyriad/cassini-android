@@ -60,6 +60,7 @@ import io.codemyriad.cassini.recording.inProgress
 import io.codemyriad.cassini.test.Manual
 import io.codemyriad.cassini.ui.components.ActiveWordStart
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -235,13 +236,14 @@ class AcceptanceWalkTest {
     /** 01 Recording for 8 s, then the Storage almost full banner, then back minimises; the recording goes on. */
     private fun recording() {
         rule.onNode(hasContentDescription(rule.text(UiR.string.ui_library_record_description))).performClick()
+        // Mount the route and let its onEnter start capture before awaiting the recorder.
+        see(rule.text(UiR.string.ui_recording_finish))
         runBlocking {
             graph.recording.state.await("The recording starts", START_MS) { it is RecordingState.Active }
             graph.recording.state.await("Eight seconds are captured", START_MS + CAPTURE_MS) {
                 it is RecordingState.Active && it.elapsedMs >= CAPTURE_MS
             }
         }
-        see(rule.text(UiR.string.ui_recording_finish))
         see(rule.text(UiR.string.ui_recording_hint), substring = true)
         shot("01-recording")
 
@@ -302,7 +304,7 @@ class AcceptanceWalkTest {
         val playback = graph.playback.state
         runBlocking {
             playback.await("The player opens the note", PLAYER_MS) { it.noteId == noteId && it.durationMs > 0 }
-            val playing = async(start = CoroutineStart.UNDISPATCHED) {
+            val playing = async(Dispatchers.Unconfined, start = CoroutineStart.UNDISPATCHED) {
                 playback.await("The word tap starts playback from \"$letters\"", PLAYER_MS) {
                     it.noteId == noteId && it.playing
                 }
