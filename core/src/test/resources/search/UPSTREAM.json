@@ -1,0 +1,21 @@
+{
+  "repository": "https://github.com/codemyriad/cassini-ux",
+  "commit": "b86b7b0ecfa0984e313380578863f2f75fd652f1",
+  "files": {
+    "strings.json": {
+      "source": "strings/strings.json",
+      "source_sha256": "109a72f01e223dcfa92e69186b04d233fa479f49150b4704c9853fd0b87077bb",
+      "selection": [
+        "search.filter.anyDate",
+        "search.filter.recordedByMe",
+        "search.filter.speaker",
+        "search.filter.speakerNone",
+        "search.filter.anySpeaker",
+        "search.filter.date.today",
+        "search.filter.date.week",
+        "search.filter.date.month"
+      ],
+      "sha256": "23b718a7c5213d58fedb1a05f582d7de97aaf11b912be2e4a29138d1823a84d5"
+    }
+  }
+}

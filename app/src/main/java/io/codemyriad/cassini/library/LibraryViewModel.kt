@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.library.JobState
+import io.codemyriad.cassini.core.library.SearchDate
+import io.codemyriad.cassini.core.library.SearchFilters
 import io.codemyriad.cassini.data.db.LibraryRow
 import io.codemyriad.cassini.data.db.NoteDetails
 import io.codemyriad.cassini.data.db.SearchRow
@@ -27,8 +29,11 @@ import io.codemyriad.cassini.ui.library.LibraryDialog
 import io.codemyriad.cassini.ui.library.LibraryEvent
 import io.codemyriad.cassini.ui.library.LibrarySheet
 import io.codemyriad.cassini.ui.library.LibraryUiState
+import io.codemyriad.cassini.ui.library.SearchDateUi
+import io.codemyriad.cassini.ui.library.SearchFiltersUi
 import io.codemyriad.cassini.ui.note.ExportKind
 import io.codemyriad.cassini.ui.note.NoteAction
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -51,10 +56,13 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Clock
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
 /** What the Library route does for the ViewModel: navigation and the system pickers and settings. */
 sealed interface LibraryEffect {
@@ -111,6 +119,24 @@ class LibraryViewModel(
     private var trashed: String? = null
     private var snackbarCount = 0L
     private val listingCache = LibraryListing()
+    private val filters = MutableStateFlow(SearchFiltersUi())
+    private val calendarRefresh = MutableStateFlow(0L)
+    private val controls = combine(
+        filters,
+        ports.namedSpeakers().distinctUntilChanged().catch { emit(emptyList()) },
+    ) { filters, names ->
+        filters.copy(speakers = names.toImmutableList())
+    }
+    private val calendar = combine(ports.calendarZone, calendarRefresh) { zone, _ ->
+        Instant.now(clock).atZone(zone).toLocalDate() to zone
+    }.distinctUntilChanged()
+        .flowOn(compute)
+        .shareIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), replay = 1)
+    private val environment = combine(controls, calendar) { filters, day ->
+        SearchEnvironment(filters, day.first, day.second)
+    }.flowOn(compute).shareIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), replay = 1)
+
+    private data class SearchEnvironment(val filters: SearchFiltersUi, val today: LocalDate, val zone: ZoneId)
 
     /** The catalogue cannot be read (the database did not open): the Library says so, it is not empty. */
     private val unavailable = MutableStateFlow(false)
@@ -125,22 +151,44 @@ class LibraryViewModel(
         }
 
     /** The searched query and its results; null results while not searching. */
-    private val search: Flow<Pair<String, List<SearchRow>?>> = query
-        .map { it.trim() }
-        .distinctUntilChanged()
+    private val searchedText = query.map { it.trim() }.distinctUntilChanged()
         .debounce { if (it.isEmpty()) 0L else SEARCH_DEBOUNCE_MS }
-        .flatMapLatest { text ->
-            if (text.isEmpty()) {
-                flowOf(text to null)
-            } else {
-                ports.search(text)
-                    .map<List<SearchRow>, Pair<String, List<SearchRow>?>> { text to it }
-                    .catch { error ->
-                        Log.w(TAG, "Search failed", error)
-                        emit(text to emptyList())
-                    }
-            }
+
+    // Menu inventory is display state, never a search/cache lifetime input.
+    private val domainFilters = filters.map { it.domain() }.distinctUntilChanged()
+    private val search: Flow<Pair<String, List<SearchRow>?>> = combine(
+        searchedText,
+        domainFilters,
+        calendar,
+    ) { text, filters, day ->
+        SearchRequest(text, filters, day.first, day.second)
+    }.distinctUntilChanged().flatMapLatest { request ->
+        val text = request.text
+        if (text.isEmpty()) {
+            flowOf(text to null)
+        } else {
+            ports.search(text, request.filters, request.zone, request.today)
+                .map<List<SearchRow>, Pair<String, List<SearchRow>?>> { text to it }
+                .onStart { emit(text to null) }
+                .catch { error ->
+                    Log.w(TAG, "Search failed", error)
+                    emit(text to emptyList())
+                }
         }
+    }
+
+    private data class SearchRequest(val text: String, val filters: SearchFilters, val today: LocalDate, val zone: ZoneId)
+
+    private fun SearchFiltersUi.domain(): SearchFilters = SearchFilters(
+        speaker,
+        when (date) {
+            SearchDateUi.ANY -> SearchDate.ANY
+            SearchDateUi.TODAY -> SearchDate.TODAY
+            SearchDateUi.WEEK -> SearchDate.WEEK
+            SearchDateUi.MONTH -> SearchDate.MONTH
+        },
+        recordedByMe,
+    )
 
     private val sheet: Flow<NoteDetails?> = sheetId.flatMapLatest { id ->
         if (id == null) flowOf(null) else ports.details(id).catch { emit(null) }
@@ -154,7 +202,7 @@ class LibraryViewModel(
     ) { processing, rec, facts, voices -> Live(processing, rec, facts, voices) }
 
     val state: StateFlow<LibraryUiState> = combine(
-        combine(rows, search, query, unavailable, ::Listing),
+        combine(rows, search, query, unavailable, environment, ::Listing),
         live,
         sheet,
         dialog,
@@ -179,6 +227,7 @@ class LibraryViewModel(
         val search: Pair<String, List<SearchRow>?>,
         val query: String,
         val unavailable: Boolean,
+        val environment: SearchEnvironment,
     )
 
     private data class Live(
@@ -196,7 +245,7 @@ class LibraryViewModel(
         snackbar: SnackbarSpec?,
     ): LibraryUiState {
         val now = Instant.now(clock)
-        val zone = clock.zone
+        val zone = listing.environment.zone
         val recording = live.recording
         val context = RowContext(
             activeNoteId = activeNoteId(recording),
@@ -218,6 +267,7 @@ class LibraryViewModel(
         return LibraryUiState(
             loading = listing.rows == null,
             query = listing.query,
+            searchFilters = listing.environment.filters,
             recording = LibraryMapping.recordingPill(recording),
             progress = LibraryMapping.progress(live.processing),
             banners = Notices.library(live.facts, facts),
@@ -236,8 +286,17 @@ class LibraryViewModel(
     @Suppress("CyclomaticComplexMethod") // one branch per event of ui.md section 7
     fun onEvent(event: LibraryEvent) {
         when (event) {
-            is LibraryEvent.Query -> saved[KEY_QUERY] = event.text
-            LibraryEvent.ClearQuery -> saved[KEY_QUERY] = ""
+            is LibraryEvent.Query -> {
+                if (event.text.isBlank()) filters.value = SearchFiltersUi()
+                saved[KEY_QUERY] = event.text
+            }
+            LibraryEvent.ClearQuery -> {
+                filters.value = SearchFiltersUi()
+                saved[KEY_QUERY] = ""
+            }
+            is LibraryEvent.FilterSpeaker -> filters.value = filters.value.copy(speaker = event.name)
+            is LibraryEvent.FilterDate -> filters.value = filters.value.copy(date = event.date)
+            LibraryEvent.ToggleRecordedByMe -> filters.value = filters.value.copy(recordedByMe = !filters.value.recordedByMe)
             is LibraryEvent.OpenNote -> openNote(event.id)
             is LibraryEvent.LongPress -> saved[KEY_SHEET] = event.id
             LibraryEvent.Record, LibraryEvent.ReturnToRecording -> emit(LibraryEffect.OpenRecording)
@@ -275,7 +334,10 @@ class LibraryViewModel(
     }
 
     /** The screen is visible again (ON_RESUME): the notification permission may have changed in Settings. */
-    fun onResume() = ports.refreshNotices()
+    fun onResume() {
+        calendarRefresh.value++
+        ports.refreshNotices()
+    }
 
     /** Opens note [id], with the search query when searching (the in-note search starts with it). */
     private fun openNote(id: String) {

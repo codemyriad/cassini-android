@@ -8,6 +8,7 @@ import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.core.library.Origin
 import io.codemyriad.cassini.core.library.PreviewText
+import io.codemyriad.cassini.core.library.SearchFilters
 import io.codemyriad.cassini.core.library.SearchQuery
 import io.codemyriad.cassini.core.library.TrashPolicy
 import io.codemyriad.cassini.core.speakers.DefaultLabels
@@ -26,9 +27,13 @@ import io.codemyriad.cassini.data.db.VariantEntity
 import io.codemyriad.cassini.data.db.WordEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -80,13 +85,47 @@ class NoteRepository(
 
     /**
      * Live notes matching [query] (`SearchQuery.fts`) with snippets. A query with nothing searchable yields the
-     * Library, with an empty snippet and the plain title.
+     * Library narrowed by date/origin, with an empty snippet and the plain title. A speaker requires a text match.
      */
-    fun search(query: String): Flow<List<SearchRow>> {
-        val match = SearchQuery.fts(query) ?: return library().map { rows ->
-            rows.map { SearchRow(it, snippet = "", titleSnippet = it.title) }
+    fun search(
+        query: String,
+        filters: SearchFilters = SearchFilters(),
+        zone: ZoneId = ZoneId.systemDefault(),
+        today: LocalDate = Instant.ofEpochMilli(clock()).atZone(zone).toLocalDate(),
+    ): Flow<List<SearchRow>> {
+        val match = SearchQuery.fts(query) ?: return searchWithoutWords(filters, zone, today)
+        return flow {
+            val matches = SearchMatches(cache::searchWords)
+            emitAll(
+                notes.searchFlow(match).map { found ->
+                    withContext(dispatchers.io) {
+                        val candidates = found.filter { hit ->
+                            filters.includes(hit.row.recordingTime()?.day(zone), hit.row.origin, today)
+                        }
+                        matches.retain(candidates.mapTo(HashSet()) { it.row.id })
+                        SpeakerSearch().use { matcher ->
+                            candidates.mapNotNull { matches.match(it, filters.speaker, match, matcher) }
+                        }
+                    }
+                },
+            )
         }
-        return notes.searchFlow(match)
+    }
+
+    private fun searchWithoutWords(filters: SearchFilters, zone: ZoneId, today: LocalDate): Flow<List<SearchRow>> {
+        // No attributed text can match a speaker without a searchable token.
+        if (filters.speaker != null) return kotlinx.coroutines.flow.flowOf(emptyList())
+        return library().map { rows ->
+            withContext(dispatchers.io) {
+                rows.filter {
+                    filters.includes(it.recordingTime()?.day(zone), it.origin, today)
+                }.map { SearchRow(it, snippet = "", titleSnippet = it.title) }
+            }
+        }
+    }
+
+    fun namedSpeakers(): Flow<List<String>> = notes.namedSpeakersFlow().map { labels ->
+        labels.filter { it.isNotBlank() }.toSortedSet(String.CASE_INSENSITIVE_ORDER).toList()
     }
 
     /** One note with its variants, speakers and job; the Note screen renders from it without reading the document. */

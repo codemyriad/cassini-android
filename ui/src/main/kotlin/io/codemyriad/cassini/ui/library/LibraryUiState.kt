@@ -29,6 +29,7 @@ import kotlinx.collections.immutable.persistentListOf
 data class LibraryUiState(
     val loading: Boolean = false,
     val query: String = "",
+    val searchFilters: SearchFiltersUi = SearchFiltersUi(),
     val recording: RecordingPillUi? = null,
     val progress: ProgressBannerUi? = null,
     val banners: ImmutableList<BannerSpec> = persistentListOf(),
@@ -118,3 +119,14 @@ sealed interface LibraryDialog {
     @Immutable
     data class StopAndTrash(val id: String) : LibraryDialog
 }
+
+/** D14 controls, deliberately absent from saved state. */
+@Immutable
+data class SearchFiltersUi(
+    val speaker: String? = null,
+    val date: SearchDateUi = SearchDateUi.ANY,
+    val recordedByMe: Boolean = false,
+    val speakers: ImmutableList<String> = persistentListOf(),
+)
+
+enum class SearchDateUi { ANY, TODAY, WEEK, MONTH }

@@ -117,7 +117,7 @@ fun LibraryScreen(
                 )
             }
             if (tools != null) item(key = "transfers", contentType = "transfers") { tools() }
-            item(key = "search", contentType = "search") { SearchBlock(state.query, onEvent) }
+            item(key = "search", contentType = "search") { SearchBlock(state.query, state.searchFilters, onEvent) }
             activity(state, onEvent)
             if (!state.loading) {
                 val results = state.results
@@ -149,7 +149,7 @@ fun LibraryScreen(
 
 /** The search field and the privacy line under it. IME Search hides the keyboard; the results follow the query. */
 @Composable
-private fun SearchBlock(query: String, onEvent: (LibraryEvent) -> Unit) {
+private fun SearchBlock(query: String, filters: SearchFiltersUi, onEvent: (LibraryEvent) -> Unit) {
     val keyboard = LocalSoftwareKeyboardController.current
     Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp)) {
         PillSearchField(
@@ -159,6 +159,7 @@ private fun SearchBlock(query: String, onEvent: (LibraryEvent) -> Unit) {
             onSearch = { keyboard?.hide() },
             onClear = { onEvent(LibraryEvent.ClearQuery) },
         )
+        if (query.isNotBlank()) SearchFiltersBar(filters, onEvent)
         PrivacyLine(stringResource(R.string.ui_library_privacy))
     }
 }

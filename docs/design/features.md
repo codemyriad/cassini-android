@@ -77,6 +77,9 @@ The activity area shows these items, in this sequence:
 
 - `SearchQuery.fts(input)` splits the input at white space. It removes the characters `" * ^ : ( ) -` from each term, and it removes the terms that become empty. It writes each term as a quoted prefix phrase, with the star inside the quotes (`"deliver*"`, the FTS3/4 syntax). It joins the terms with spaces (implicit AND). The golden is `delivery caf` → `"delivery*" "caf*"`. The function quotes `AND`, `OR`, `NOT` and `NEAR` from the user, so that they are words.
 - The search ignores case and diacritics (unicode61, `remove_diacritics=1`).
+- D14 filters appear with typed text: Speaker (Any speaker or a named speaker), Any date / Today / Past 7 days / Past 30 days, and Recorded by me. They combine with AND, reset when search closes, and are not persisted. Named choices come from the selected variants of live notes, exclude placeholders, and are deduplicated/sorted case-insensitively. Has summary stays hidden.
+- Date bounds are local calendar midnights: today, today plus six previous days, or today plus 29 previous days; the upper bound is tomorrow. Clock/calendar/zone broadcasts and returning to Library refresh the bounds. Recorded by me accepts only origin RECORDED.
+- A speaker-filtered hit must match that speaker's spoken words in a whole reading run (including an inline reply), never another speaker's words or a generated chip label. SQLite unicode61 and the existing query-prefix rules apply. Android keeps one grouped result per note, with the earliest matching run's excerpt.
 - The results are a flat list, the newest first, with the date in the meta line. The debounce is 150 ms. `SavedStateHandle` keeps the query. The results do not include the notes in the trash.
 - `SearchQuery.highlights` changes the snippet markers `char(2)`/`char(3)` into ranges. The markers never go to the UI.
 
