@@ -33,6 +33,33 @@ class SearchFiltersTest {
         assertFalse(SearchDate.TODAY.includes(sameInstant, today, otherZone))
     }
 
+    @Test fun unknownRecordingDatesDoNotPassABoundedFilter() {
+        val today = LocalDate.of(2026, 11, 11)
+        assertTrue(SearchFilters().includes(null, Origin.IMPORTED_DOCUMENT, today))
+        assertTrue(SearchFilters(recordedByMe = true).includes(null, Origin.RECORDED, today))
+        for (range in listOf(SearchDate.TODAY, SearchDate.WEEK, SearchDate.MONTH)) {
+            assertFalse(SearchFilters(date = range).includes(null, Origin.RECORDED, today))
+            assertTrue(SearchFilters(date = range).includes(today, Origin.IMPORTED_DOCUMENT, today))
+            assertFalse(SearchFilters(date = range).includes(today.plusDays(1), Origin.RECORDED, today))
+        }
+    }
+
+    @Test fun midnightGapAndFoldKeepTheWholeCalendarDay() {
+        for ((name, day) in listOf(
+            "America/Santiago" to LocalDate.of(2023, 9, 3),
+            "America/Havana" to LocalDate.of(2024, 11, 3),
+        )) {
+            val zone = ZoneId.of(name)
+            val first = day.atStartOfDay(zone).toInstant()
+            val after = day.plusDays(1).atStartOfDay(zone).toInstant()
+            assertFalse(name, SearchDate.TODAY.includes(first.toEpochMilli() - 1, day, zone))
+            assertTrue(name, SearchDate.TODAY.includes(first.toEpochMilli(), day, zone))
+            assertTrue(name, SearchDate.TODAY.includes(first.plusSeconds(3600).toEpochMilli(), day, zone))
+            assertTrue(name, SearchDate.TODAY.includes(after.toEpochMilli() - 1, day, zone))
+            assertFalse(name, SearchDate.TODAY.includes(after.toEpochMilli(), day, zone))
+        }
+    }
+
     @Test fun recordedByMeAndDateMustBothMatch() {
         val today = LocalDate.of(2026, 11, 11)
         val at = today.atStartOfDay(zone).toInstant().toEpochMilli()

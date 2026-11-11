@@ -1,5 +1,6 @@
 package io.codemyriad.cassini.core.library
 
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -11,6 +12,10 @@ data class SearchFilters(
 ) {
     fun includes(createdAt: Long, origin: Origin, today: LocalDate, zone: ZoneId): Boolean =
         (!recordedByMe || origin == Origin.RECORDED) && date.includes(createdAt, today, zone)
+
+    /** D95: a resolved calendar day, or null for unknown. Local labels have no viewer-zone conversion. */
+    fun includes(recordedDay: LocalDate?, origin: Origin, today: LocalDate): Boolean =
+        (!recordedByMe || origin == Origin.RECORDED) && date.includes(recordedDay, today)
 }
 
 /** Calendar days, rather than multiples of 24 hours: daylight-saving transitions belong to their local date. */
@@ -22,10 +27,12 @@ enum class SearchDate(private val days: Long?) {
     MONTH(30),
     ;
 
-    fun includes(createdAt: Long, today: LocalDate, zone: ZoneId): Boolean {
+    fun includes(createdAt: Long, today: LocalDate, zone: ZoneId): Boolean =
+        days == null || includes(Instant.ofEpochMilli(createdAt).atZone(zone).toLocalDate(), today)
+
+    fun includes(recordedDay: LocalDate?, today: LocalDate): Boolean {
         val count = days ?: return true
-        val first = today.minusDays(count - 1).atStartOfDay(zone).toInstant().toEpochMilli()
-        val after = today.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
-        return createdAt >= first && createdAt < after
+        val first = today.minusDays(count - 1)
+        return recordedDay != null && !recordedDay.isBefore(first) && !recordedDay.isAfter(today)
     }
 }
