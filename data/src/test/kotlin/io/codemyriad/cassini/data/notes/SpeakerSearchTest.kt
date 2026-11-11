@@ -8,7 +8,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import java.lang.management.ManagementFactory
 
 @RunWith(RobolectricTestRunner::class)
 class SpeakerSearchTest {
@@ -26,18 +25,22 @@ class SpeakerSearchTest {
     }
 
     @Test fun anElevenHourTranscriptUsesNearLinearThreadCpu() = runBlocking {
-        val timer = ManagementFactory.getThreadMXBean()
-        assertTrue("Thread CPU measurement is required", timer.isCurrentThreadCpuTimeSupported)
-        timer.isThreadCpuTimeEnabled = true
+        // Android's compile boot classpath lacks java.management; the test runs on the host JDK.
+        val type = Class.forName("java.lang.management.ThreadMXBean")
+        val timer = Class.forName("java.lang.management.ManagementFactory").getMethod("getThreadMXBean").invoke(null)
+        assertEquals(true, type.getMethod("isCurrentThreadCpuTimeSupported").invoke(timer))
+        type.getMethod("setThreadCpuTimeEnabled", Boolean::class.javaPrimitiveType).invoke(timer, true)
+        val readCpu = type.getMethod("getCurrentThreadCpuTime")
+        fun cpu(): Long = readCpu.invoke(timer) as Long
         fun words(count: Int) = List(count) { index ->
             Word(if (index / 150 % 2 == 0) "Ada" else "Ben", index * 400L, index * 400L + 300, "delivery")
         }
         suspend fun measure(input: List<Word>): Long {
-            val start = timer.currentThreadCpuTime
+            val start = cpu()
             SpeakerSearch().use { matcher ->
                 assertNotNull(matcher.snippet("\"deliver*\"", input, setOf("Ada", "Ben"), true))
             }
-            return timer.currentThreadCpuTime - start
+            return cpu() - start
         }
         measure(words(8000)) // Warm SQLite/JIT; no timing or sleeps control the test.
         val half = words(55_000)
