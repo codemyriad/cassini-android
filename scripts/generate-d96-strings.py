@@ -29,7 +29,8 @@ def generated():
     raw = (VENDOR / 'strings.json').read_bytes()
     pin = json.loads((VENDOR / 'UPSTREAM.json').read_text())
     assert hashlib.sha256(raw).hexdigest() == pin['files']['strings.json']['sha256']
-    entries = [e for e in json.loads(raw)['entries'] if e['milestone'] == 'D96' or e['id'] in {'common.cancel', 'common.done'}]
+    entries = [e for e in json.loads(raw)['entries']
+               if e['milestone'] == 'D96' or e['id'] in {'common.cancel', 'common.done'}]
     for language, directory in LOCALES.items():
         lines = ['<?xml version="1.0" encoding="utf-8"?>',
                  '<!-- Generated from cassini-ux ' + pin['commit'] + '; do not edit. -->', '<resources>']
