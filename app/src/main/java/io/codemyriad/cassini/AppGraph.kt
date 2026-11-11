@@ -272,7 +272,10 @@ class AppGraph(context: Context, val config: Config) {
         val imports = ImportTracker(
             scope = appScope,
             describe = { uri -> withContext(dispatchers.io) { source.describe(uri.toUri()).displayName } },
-            run = { uri -> awaitCatalogue().imports.import(uri.toUri()) },
+            run = { uri ->
+                ready.await()
+                awaitCatalogue().imports.import(uri.toUri())
+            },
             clock = config.clock,
             fallbackName = { app.inAppLanguage().getString(R.string.import_fallback_title) },
         )
