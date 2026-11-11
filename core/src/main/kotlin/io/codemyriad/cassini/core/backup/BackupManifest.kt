@@ -7,6 +7,7 @@ import java.io.File
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.LinkOption
+import java.nio.file.Path
 import java.security.MessageDigest
 
 /** A complete library inventory, separate from OS transport framing. No model or consent/settings path is eligible. */
@@ -23,22 +24,23 @@ data class BackupManifest(val files: List<Entry>) {
         val actual = ArrayList<Entry>()
         Files.walk(root.toPath()).use { stream ->
             val iterator = stream.iterator()
-            while (iterator.hasNext()) {
-                val file = iterator.next()
-                val path = root.toPath().relativize(file).toString().replace(File.separatorChar, '/')
-                if (Files.isDirectory(file, LinkOption.NOFOLLOW_LINKS)) {
-                    require(directory(path)) { "Unexpected backup directory" }
-                } else {
-                    require(Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) { "Non-file backup payload" }
-                    if (path == MANIFEST) continue
-                    require(admits(path) && actual.size < MAX_ENTRIES) { "Unexpected backup file" }
-                    val size = Files.size(file)
-                    require(size in 0..MAX_FILE_BYTES) { "Oversized backup file" }
-                    actual += Entry(path, size, sha256(file.toFile()))
-                }
-            }
+            while (iterator.hasNext()) verifyFile(root, iterator.next(), actual)
         }
         require(actual.sortedBy { it.path } == files) { "Incomplete or changed library backup" }
+    }
+
+    private fun verifyFile(root: File, file: Path, actual: MutableList<Entry>) {
+        val path = root.toPath().relativize(file).toString().replace(File.separatorChar, '/')
+        if (Files.isDirectory(file, LinkOption.NOFOLLOW_LINKS)) {
+            require(directory(path)) { "Unexpected backup directory" }
+            return
+        }
+        require(Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) { "Non-file backup payload" }
+        if (path == MANIFEST) return
+        require(admits(path) && actual.size < MAX_ENTRIES) { "Unexpected backup file" }
+        val size = Files.size(file)
+        require(size in 0..MAX_FILE_BYTES) { "Oversized backup file" }
+        actual += Entry(path, size, sha256(file.toFile()))
     }
 
     companion object {
@@ -47,6 +49,7 @@ data class BackupManifest(val files: List<Entry>) {
         const val MAX_MANIFEST_BYTES = 32 * 1024 * 1024
         const val MAX_FILE_BYTES = 4L * 1024 * 1024 * 1024
         private const val VERSION = 1
+        private const val LEAF_COMPONENTS = 3
         private val id = Regex("[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}")
         private val audio = Regex("(capture|source)\\.[a-z0-9]{1,5}")
         private val hash = Regex("[0-9a-f]{64}")
@@ -56,7 +59,7 @@ data class BackupManifest(val files: List<Entry>) {
             val parts = path.split('/')
             return when {
                 path in setOf("cassini.db", "voices/people.json", "voices/generation") -> true
-                parts.size != 3 -> false
+                parts.size != LEAF_COMPONENTS -> false
                 parts[0] == "notes" && id.matches(parts[1]) ->
                     parts[2] == "document.opus" || audio.matches(parts[2]) && !parts[2].endsWith(".tmp")
                 else -> parts[0] == "voices" && parts[1] == "notes" && parts[2].endsWith(".json") &&
@@ -100,18 +103,21 @@ data class BackupManifest(val files: List<Entry>) {
                 Files.walk(start).use { stream ->
                     val iterator = stream.iterator()
                     while (iterator.hasNext()) {
-                        val file = iterator.next()
-                        val path = root.toPath().relativize(file).toString().replace(File.separatorChar, '/')
-                        require(!Files.isSymbolicLink(file) || !directory(path)) { "Linked backup directory" }
-                        if (!admits(path)) continue
-                        require(Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) { "Non-file backup payload" }
-                        val size = Files.size(file)
-                        require(size in 0..MAX_FILE_BYTES && entries.size < MAX_ENTRIES) { "Backup inventory limit" }
-                        entries += Entry(path, size, sha256(file.toFile()))
+                        inventoryFile(root, iterator.next(), entries)
                     }
                 }
             }
             return entries.sortedBy { it.path }
+        }
+
+        private fun inventoryFile(root: File, file: Path, entries: MutableList<Entry>) {
+            val path = root.toPath().relativize(file).toString().replace(File.separatorChar, '/')
+            require(!Files.isSymbolicLink(file) || !directory(path)) { "Linked backup directory" }
+            if (!admits(path)) return
+            require(Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) { "Non-file backup payload" }
+            val size = Files.size(file)
+            require(size in 0..MAX_FILE_BYTES && entries.size < MAX_ENTRIES) { "Backup inventory limit" }
+            entries += Entry(path, size, sha256(file.toFile()))
         }
 
         fun sha256(file: File): String {

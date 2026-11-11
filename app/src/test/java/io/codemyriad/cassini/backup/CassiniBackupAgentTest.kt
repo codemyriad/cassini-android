@@ -6,9 +6,6 @@ import android.os.ParcelFileDescriptor
 import androidx.test.core.app.ApplicationProvider
 import io.codemyriad.cassini.CassiniApplication
 import io.codemyriad.cassini.GraphFactory
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.Executors
 import io.codemyriad.cassini.core.backup.BackupManifest
 import io.codemyriad.cassini.data.backup.BackupChoicesStore
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +24,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.util.ReflectionHelpers
 import java.io.File
 import java.io.IOException
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 @RunWith(RobolectricTestRunner::class)
 class CassiniBackupAgentTest {

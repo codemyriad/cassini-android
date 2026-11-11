@@ -8,11 +8,11 @@ import android.util.Log
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
-import java.io.File
-import java.util.concurrent.atomic.AtomicBoolean
 import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.processing.NotificationChannels
 import io.codemyriad.cassini.whistle.WhistleProtocol
+import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** Builds the process's [AppGraph]. The instrumentation runner installs one on a scratch root. */
 fun interface GraphFactory {
@@ -31,7 +31,10 @@ class CassiniApplication : Application() {
     private val graphStarted = AtomicBoolean(false)
     private val graphDelegate = lazy {
         graphStarted.set(true)
-        (graphFactory ?: GraphFactory { app, paths -> AppGraph(app, AppGraph.Config(paths, backupDirectory = backupDirectory)) }).create(this, paths)
+        val factory = graphFactory ?: GraphFactory { app, paths ->
+            AppGraph(app, AppGraph.Config(paths, backupDirectory = backupDirectory))
+        }
+        factory.create(this, paths)
     }
 
     val graph: AppGraph get() = graphDelegate.value

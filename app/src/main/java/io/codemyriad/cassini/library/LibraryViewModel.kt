@@ -435,6 +435,7 @@ class LibraryViewModel(
         }
     }
 
+    @Suppress("CyclomaticComplexMethod") // One dispatch branch per catalogued Library banner action.
     private fun bannerAction(id: String, action: BannerAction) {
         val kind = kindOf(id) ?: return
         when (action) {

@@ -2,10 +2,10 @@ package io.codemyriad.cassini.notices
 
 import android.content.Context
 import android.os.Build
-import io.codemyriad.cassini.core.backup.BackupChoices
 import android.util.Log
 import androidx.core.app.NotificationManagerCompat
 import io.codemyriad.cassini.AppGraph
+import io.codemyriad.cassini.core.backup.BackupChoices
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.models.ModelPlan
 import io.codemyriad.cassini.core.models.SpeechModel
@@ -109,7 +109,9 @@ class NoticeCenter(private val graph: AppGraph, context: Context, val imports: I
     }.combine(graph.models.status) { facts, status ->
         facts.copy(speakerModel = status[ModelPart.SPEAKERS])
     }.combine(graph.backupChoices.choices) { facts, choices ->
-        facts.copy(transferNotice = Build.VERSION.SDK_INT >= BackupChoices.TRANSPORT_FLAGS_API && choices.showTransferNotice)
+        facts.copy(
+            transferNotice = Build.VERSION.SDK_INT >= BackupChoices.TRANSPORT_FLAGS_API && choices.showTransferNotice,
+        )
     }.stateIn(graph.appScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), NoticeFacts())
 
     init {

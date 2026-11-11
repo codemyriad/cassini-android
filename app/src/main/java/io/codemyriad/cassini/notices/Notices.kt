@@ -101,6 +101,7 @@ object Notices {
     // Library (features.md section 1, item 4, and 13.5). ------------------------------------------------------------
 
     /** The Library banners: the empty and no-match states, then the app-wide notices. */
+    @Suppress("CyclomaticComplexMethod") // Each independent app-wide notice has its own emission condition.
     fun library(facts: NoticeFacts, library: LibraryFacts): ImmutableList<BannerSpec> {
         val notices = mutableListOf<Notice>()
         if (facts.hold && facts.queued > 0) {

@@ -64,7 +64,16 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
     private val backupSaving = MutableStateFlow(false)
     private val backupError = MutableStateFlow(false)
     private val backup = combine(ports.backup, backupSaving, backupError) { choices, saving, error ->
-        choices?.let { BackupSettingsUi(it.transfer, it.cloud, ports.transferAvailable, it.quotaExceeded, saving, error) }
+        choices?.let {
+            BackupSettingsUi(
+                transfer = it.transfer,
+                cloud = it.cloud,
+                transferAvailable = ports.transferAvailable,
+                quotaExceeded = it.quotaExceeded,
+                saving = saving,
+                error = error,
+            )
+        }
     }
 
     val state: StateFlow<SettingsUiState> = combine(

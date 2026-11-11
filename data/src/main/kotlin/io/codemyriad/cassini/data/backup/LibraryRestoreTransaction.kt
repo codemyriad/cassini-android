@@ -9,10 +9,12 @@ import org.json.JSONObject
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
+import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.LinkOption
-import java.nio.file.StandardCopyOption
+import java.nio.file.Path
 import java.nio.file.NoSuchFileException
+import java.nio.file.StandardCopyOption
 import java.nio.file.attribute.BasicFileAttributes
 import java.security.MessageDigest
 
@@ -135,16 +137,10 @@ class LibraryRestoreTransaction internal constructor(
     }
 
     private fun readJournal(): JSONObject? {
-        val bytes = ByteArray(4097)
+        val bytes = ByteArray(MAX_JOURNAL_BYTES + 1)
         val size = try {
             AtomicFile(journal).openRead().use { input ->
-                var used = 0
-                while (used < bytes.size) {
-                    val count = input.read(bytes, used, bytes.size - used)
-                    if (count < 0) break
-                    used += count
-                }
-                used
+                readBounded(input, bytes)
             }
         } catch (error: FileNotFoundException) {
             if (Files.notExists(journal.toPath()) && Files.notExists(File(journal.path + ".bak").toPath())) return null
@@ -155,6 +151,16 @@ class LibraryRestoreTransaction internal constructor(
         val payload = wrapper.getString("payload")
         require(checksum(payload) == wrapper.getString("sha256")) { "Damaged restore journal" }
         return JSONObject(payload)
+    }
+
+    private fun readBounded(input: InputStream, bytes: ByteArray): Int {
+        var used = 0
+        while (used < bytes.size) {
+            val count = input.read(bytes, used, bytes.size - used)
+            if (count < 0) break
+            used += count
+        }
+        return used
     }
 
     /** Cleanup failure cannot turn an already committed restore into a reported failed restore. */
@@ -173,7 +179,7 @@ class LibraryRestoreTransaction internal constructor(
         try {
             Files.newDirectoryStream(staging.toPath()).use { directories ->
                 for (path in directories) {
-                    if (STAGE.matches(path.fileName.toString())) deleteStage(path.toFile())
+                    cleanupOrphan(path)
                 }
             }
         } catch (error: IOException) {
@@ -181,10 +187,15 @@ class LibraryRestoreTransaction internal constructor(
         }
     }
 
+    private fun cleanupOrphan(path: Path) {
+        if (STAGE.matches(path.fileName.toString())) deleteStage(path.toFile())
+    }
+
     private fun checksum(text: String): String = MessageDigest.getInstance("SHA-256")
         .digest(text.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
 
     companion object {
+        private const val MAX_JOURNAL_BYTES = 4096
         val ROOTS = listOf("notes", "voices", "cassini.db", "cassini.db-wal", "cassini.db-shm", "cassini.db-journal")
         private val STAGE = Regex("restore-[a-f0-9-]{36}")
 

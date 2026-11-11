@@ -127,7 +127,8 @@ class LibraryBackup(private val context: Context, private val paths: AppPaths, p
 
     private fun prepareCatalogue(root: File, cache: File) {
         val restored = AppPaths(root, cache)
-        if (Files.notExists(restored.database.toPath(), LinkOption.NOFOLLOW_LINKS)) return // A catalogue lost on the source is rebuilt by the normal startup.
+        // A catalogue lost on the source is rebuilt by the normal startup.
+        if (Files.notExists(restored.database.toPath(), LinkOption.NOFOLLOW_LINKS)) return
         val opened = CassiniDatabaseOpener(context, restored).open()
         val database = opened.database
         try {

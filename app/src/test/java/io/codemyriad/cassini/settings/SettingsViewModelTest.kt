@@ -1,10 +1,8 @@
 package io.codemyriad.cassini.settings
 
 import androidx.core.os.LocaleListCompat
-import io.codemyriad.cassini.core.backup.BackupChoices
-import java.io.IOException
-import kotlinx.coroutines.CompletableDeferred
 import io.codemyriad.cassini.core.Failure
+import io.codemyriad.cassini.core.backup.BackupChoices
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.models.ModelPlan
 import io.codemyriad.cassini.core.models.SpeechModel
@@ -22,6 +20,7 @@ import io.codemyriad.cassini.ui.settings.ModelStatusUi
 import io.codemyriad.cassini.ui.settings.SettingsEvent
 import io.codemyriad.cassini.ui.settings.SettingsUiState
 import io.codemyriad.cassini.ui.settings.SpeechModelUi
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -42,6 +41,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import java.io.IOException
 
 /** The Settings ViewModel over fake ports (features.md section 11). */
 @OptIn(ExperimentalCoroutinesApi::class)

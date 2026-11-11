@@ -9,6 +9,7 @@ import android.os.ParcelFileDescriptor
 import io.codemyriad.cassini.AppRoots
 import io.codemyriad.cassini.BuildConfig
 import io.codemyriad.cassini.CassiniApplication
+import io.codemyriad.cassini.core.backup.BackupChoices
 import io.codemyriad.cassini.core.backup.BackupManifest
 import io.codemyriad.cassini.data.backup.BackupChoicesStore
 import io.codemyriad.cassini.data.backup.LibraryBackup
@@ -28,7 +29,7 @@ class CassiniBackupAgent : BackupAgent() {
 
     override fun onFullBackup(data: FullBackupDataOutput) {
         requireQuiescent()
-        val flags = if (Build.VERSION.SDK_INT >= 28) data.transportFlags else 0
+        val flags = if (Build.VERSION.SDK_INT >= BackupChoices.TRANSPORT_FLAGS_API) data.transportFlags else 0
         if (!choices.readBlocking().permits(Build.VERSION.SDK_INT, flags)) {
             // A failed operation preserves an earlier OS snapshot; a successful empty one could replace it.
             throw IOException("This backup transport is disabled")
