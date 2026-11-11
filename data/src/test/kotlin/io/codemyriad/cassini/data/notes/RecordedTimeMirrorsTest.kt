@@ -22,9 +22,10 @@ class RecordedTimeMirrorsTest {
         val transcript = Transcript(listOf(Word("S1", 0, 100, "Welcome")), "en")
         val bytes = CassiniDocument.create(fixtureOpus.readBytes(), transcript, "Meeting", JSONObject())
         val original = CassiniDocument.read(bytes)
-        original.manifest!!.getJSONObject("meeting").put("recordedAtLocal", JSONObject.NULL)
+        val meeting = checkNotNull(original.manifest).getJSONObject("meeting")
+        meeting.put("recordedAtLocal", JSONObject.NULL)
         // Demonstrate the Android-specific precondition; a host org.json test would miss this regression.
-        assertEquals("null", original.manifest.getJSONObject("meeting").optString("recordedAtLocal"))
+        assertEquals("null", meeting.optString("recordedAtLocal"))
         val appendedBytes = CassiniDocument.create(bytes, transcript, "Ignored", JSONObject(), original)
         val appended = CassiniDocument.read(appendedBytes)
         assertFalse(appended.comments.any { it.startsWith("CASSINI_RECORDED_AT_LOCAL=") })
