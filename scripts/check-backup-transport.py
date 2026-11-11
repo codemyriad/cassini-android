@@ -2,6 +2,7 @@
 """D97 synthetic local-transport checks on a newly created, muted arm64 emulator."""
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -9,6 +10,7 @@ import signal
 import socket
 import subprocess
 import threading
+from concurrent.futures import Future
 from pathlib import Path
 
 PACKAGE = 'io.codemyriad.cassini.talk.debug'
@@ -40,12 +42,15 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     avd_home = args.output.parent / 'avd'
     owner = avd_home / 'cassini-d97-owner'
-    if avd_home.exists() and not owner.is_file():
+    marker = 'Cassini D97 synthetic backup fixture\n'
+    if avd_home.exists() and (not owner.is_file() or owner.read_text() != marker):
         raise ValueError('Refusing an unowned AVD directory')
     avd_home.mkdir(parents=True, exist_ok=True)
-    owner.write_text('Cassini D97 synthetic backup fixture\n')
+    owner.write_text(marker)
     environment = os.environ | {'ANDROID_AVD_HOME': str(avd_home)}
-    report = {'package': PACKAGE, 'cases': [], 'restores': []}
+    report = {'package': PACKAGE, 'cases': [], 'restores': [],
+              'app_sha256': hashlib.sha256(args.app.read_bytes()).hexdigest(),
+              'test_apk_sha256': hashlib.sha256(args.test_apk.read_bytes()).hexdigest()}
     serial = None
 
     def run(*command, input_text=None, timeout=180):
@@ -119,21 +124,22 @@ def main():
         env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace',
         start_new_session=True,
     )
-    booted = threading.Event()
+    booted = Future()
 
     def emulator_events():
         with (args.output / 'emulator.log').open('w') as log:
             for line in emulator.stdout:
                 log.write(line)
                 log.flush()
-                if 'Boot completed' in line:
-                    booted.set()
+                if 'Boot completed' in line and not booted.done():
+                    booted.set_result(True)
+        if not booted.done():
+            booted.set_exception(RuntimeError('Emulator exited before its boot-completed event'))
 
     reader = threading.Thread(target=emulator_events, daemon=True)
     reader.start()
     try:
-        if not booted.wait(240):  # Actual emulator boot event; upper bound only, never a settling delay.
-            raise TimeoutError('Emulator did not publish its boot-completed event')
+        booted.result(timeout=240)  # Boot-completed or process-exit event; timeout is only a hang guard.
         adb('wait-for-device')
         if adb('emu', 'avd', 'name').splitlines()[0].strip() != name:
             raise ValueError('ADB serial does not belong to this task')

@@ -1,6 +1,10 @@
 """A successful adb/bmgr process is not evidence of a completed application backup."""
 
 import importlib.util
+import os
+import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -31,3 +35,17 @@ class BackupTransportTests(unittest.TestCase):
         for output in (prefix, prefix + 'Backup finished with result: Transport error\n'):
             with self.subTest(output=output), self.assertRaises(ValueError):
                 BACKUP.backup_result(output)
+
+    def test_cli_requires_the_shared_heavy_wrapper_before_writing_anything(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'must-not-exist'
+            environment = dict(os.environ)
+            environment.pop('CASSINI_HEAVY_LOCK_HELD', None)
+            result = subprocess.run(
+                [sys.executable, BACKUP.__file__, '--sdk', directory, '--app', 'unused.apk',
+                 '--test-apk', 'unused-test.apk', '--output', str(output)],
+                env=environment, capture_output=True, text=True, timeout=10, check=False,
+            )
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn('Run through the shared heavy-run wrapper', result.stderr)
+            self.assertFalse(output.exists())
