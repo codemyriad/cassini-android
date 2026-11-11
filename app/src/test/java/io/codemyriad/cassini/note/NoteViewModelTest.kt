@@ -152,6 +152,35 @@ class NoteViewModelTest {
         assertTrue(viewModel().now().banners.isEmpty())
     }
 
+    @Test fun theNoteReplacesItsOneVoiceOfferWithSpeakerModelProgress() = runTest(dispatcher) {
+        val initial = documentNote()
+        ports.details.value = initial.copy(
+            variants = initial.variants.map { it.copy(speakerCount = 1, speakersToldApart = false) },
+            speakers = initial.speakers.take(1),
+        )
+        ports.wordRows.value = WORDS.map { it.copy(speaker = "a") }
+        ports.notices.value = ports.notices.value.copy(speakerModel = ModelStatus.Missing(false))
+        val viewModel = viewModel()
+        assertEquals(BannerKind.TX_SPEAKERS_MISSING, viewModel.now().banners.single().kind)
+
+        ports.notices.value = ports.notices.value.copy(speakerModel = ModelStatus.Downloading(25, 160, 640))
+        advanceUntilIdle()
+        val downloading = viewModel.now().banners.single()
+        assertEquals(BannerKind.DL_DOWNLOADING, downloading.kind)
+        assertEquals(25, downloading.args.percent)
+        assertEquals(160L, downloading.args.bytes)
+        assertEquals(640L, downloading.args.bytes2)
+        assertTrue(downloading.actions.isEmpty())
+
+        ports.notices.value = ports.notices.value.copy(speakerModel = ModelStatus.Verifying(75))
+        advanceUntilIdle()
+        val checking = viewModel.now().banners.single()
+        assertEquals(BannerKind.DL_CHECKING, checking.kind)
+        assertEquals(75, checking.args.percent)
+        assertTrue(checking.actions.isEmpty())
+        assertTrue(ports.calls.none { it.startsWith("transcribe:") })
+    }
+
     @Test fun changedAudioCannotUseTheAutomaticSpeakerDownloadPass() = runTest(dispatcher) {
         val initial = documentNote(DocumentState.STALE_AUDIO)
         ports.details.value = initial.copy(
