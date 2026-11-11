@@ -1,5 +1,7 @@
 package io.codemyriad.cassini.core.format
 
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -7,8 +9,6 @@ import java.io.InputStream
 import java.time.Instant
 import java.util.Locale
 import java.util.UUID
-import org.json.JSONArray
-import org.json.JSONObject
 
 /**
  * [CassiniDocument.state] as a type. [code] is the string the reader reports. [UNREADABLE] is reported only by

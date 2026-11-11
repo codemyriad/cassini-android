@@ -1,12 +1,12 @@
 package io.codemyriad.cassini.core.format
 
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
 class MeetingTimeTest {
     private fun manifest(utc: String? = null, local: String? = null): JSONObject = JSONObject().put(

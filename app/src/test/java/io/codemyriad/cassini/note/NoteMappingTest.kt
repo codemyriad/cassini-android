@@ -13,6 +13,17 @@ import org.junit.Test
 
 /** The Document info texts and the progress card that NoteMapping derives (features.md sections 3.1 and 6). */
 class NoteMappingTest {
+    @Test fun subtitlePreservesALocalLabelAndDoesNotInventUnknownTime() {
+        val note = documentNote().note
+        val mode = io.codemyriad.cassini.ui.note.NoteMode.Reading
+        val now = io.codemyriad.cassini.library.NOW
+        val zone = io.codemyriad.cassini.library.ROME
+        val unknown = NoteMapping.subtitle(note.copy(recordedAt = null), mode, now, zone)!!
+        assertEquals(io.codemyriad.cassini.ui.format.DayLabel.Unknown, unknown.day)
+        val local = NoteMapping.subtitle(note.copy(recordedAt = "2026-10-07T23:59:00"), mode, now, zone)!!
+        assertEquals("2026-10-07T23:59:00", local.recordedLabel)
+    }
+
     @Test
     fun documentInfoNamesTheSpeechModel() {
         assertEquals("Parakeet Ultra, INT8", NoteMapping.modelName("moondream/parakeet-ultra INT8"))

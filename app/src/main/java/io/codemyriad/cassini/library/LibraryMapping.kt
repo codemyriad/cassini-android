@@ -31,11 +31,11 @@ import io.codemyriad.cassini.ui.library.RecordingPillUi
 import io.codemyriad.cassini.ui.note.DocumentKindUi
 import io.codemyriad.cassini.ui.note.NoteActionsUi
 import io.codemyriad.cassini.ui.note.TranscribeRowUi
-import java.time.Instant
-import java.time.ZoneId
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
+import java.time.Instant
+import java.time.ZoneId
 
 /**
  * The live facts every Library row needs besides its Room row: the note that records now and its elapsed time, and
@@ -102,7 +102,8 @@ object LibraryMapping {
 
     /** The day sections of [rows] (newest first), grouped by the local day of `created_at` at [now] in [zone]. */
     fun sections(rows: List<LibraryRow>, context: RowContext, now: Instant, zone: ZoneId): ImmutableList<DaySection> =
-        rows.groupBy { recordingDay(it.recordingTime(), now, zone) }
+        rows.groupBy { recordingDay(it.recordingTime(), now, zone) }.entries
+            .sortedBy { if (it.key == DayLabel.Unknown) 1 else 0 }
             .map { (key, group) -> DaySection(key, group.map { row(it, context, zone) }.toImmutableList()) }
             .toImmutableList()
 

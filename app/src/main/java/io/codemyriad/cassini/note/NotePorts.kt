@@ -51,8 +51,6 @@ import io.codemyriad.cassini.ui.format.Counts
 import io.codemyriad.cassini.ui.format.Dates
 import io.codemyriad.cassini.ui.format.Durations
 import io.codemyriad.cassini.ui.format.FormatSettings
-import java.io.File
-import java.time.ZoneId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -62,6 +60,8 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.time.ZoneId
 
 /** The draft-name actions of one note (`ProcessingCoordinator.draft`): true when the change was applied. */
 interface DraftNaming {

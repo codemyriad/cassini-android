@@ -2,9 +2,9 @@ package io.codemyriad.cassini.ui.components
 
 import androidx.compose.runtime.Immutable
 import io.codemyriad.cassini.ui.format.DayLabel
-import java.time.LocalTime
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
+import java.time.LocalTime
 
 /**
  * A note's status in the Library (features.md section 1, `NoteStatus.of` in :core). The row turns it into the chip

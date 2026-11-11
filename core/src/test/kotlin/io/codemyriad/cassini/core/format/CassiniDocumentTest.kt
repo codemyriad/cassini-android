@@ -1,9 +1,9 @@
 package io.codemyriad.cassini.core.format
 
-import java.io.File
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
+import java.io.File
 
 class CassiniDocumentTest {
     @Test fun publishedConformanceVectors() {

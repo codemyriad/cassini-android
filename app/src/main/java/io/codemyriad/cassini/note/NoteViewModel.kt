@@ -66,8 +66,6 @@ import io.codemyriad.cassini.ui.note.TranscriptMatch
 import io.codemyriad.cassini.ui.note.TranscriptSearchUi
 import io.codemyriad.cassini.ui.note.TrustUi
 import io.codemyriad.cassini.ui.theme.SpeakerTone
-import java.time.Clock
-import java.time.Instant
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
@@ -102,6 +100,8 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import java.time.Clock
+import java.time.Instant
 
 /** What the Note route does for the ViewModel: navigation, the system pickers and the permission request. */
 sealed interface NoteEffect {

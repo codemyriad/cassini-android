@@ -20,9 +20,6 @@ import io.codemyriad.cassini.core.library.VariantKind
 import io.codemyriad.cassini.data.DocumentSignature
 import io.codemyriad.cassini.data.db.JobEntity
 import io.codemyriad.cassini.data.db.offMain
-import java.io.File
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.json.JSONObject
@@ -39,6 +36,9 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
+import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 /** DocumentRepository and the adopt path of docs/architecture.md, sections 3.1, 3.2 and 4.3. */
 @RunWith(RobolectricTestRunner::class)

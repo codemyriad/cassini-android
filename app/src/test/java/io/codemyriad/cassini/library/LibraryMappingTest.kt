@@ -47,6 +47,20 @@ import java.time.LocalTime
 class LibraryMappingTest {
     private val context = RowContext()
 
+    @Test fun recordingDatesNeverUseTheSealTimeAsDisplayFallback() {
+        val unknown = docRow("unknown", DocumentState.OK).copy(recordedAt = null)
+        val local = docRow("local", DocumentState.OK).copy(recordedAt = "2026-10-07T23:59:00")
+        val known = docRow("known", DocumentState.OK).copy(recordedAt = "2026-10-08T07:00:00Z")
+        val sections = LibraryMapping.sections(listOf(unknown, known, local), context, NOW, ROME)
+        assertEquals(listOf(DayLabel.Today, DayLabel.Yesterday, DayLabel.Unknown), sections.map { it.label })
+        assertEquals(LocalTime.of(9, 0), sections.first().rows.single().time)
+        assertEquals("2026-10-07T23:59:00", sections[1].rows.single().recordedLabel)
+        assertEquals(DayLabel.Unknown, LibraryMapping.recordingDay(null, NOW, ROME))
+        val actions = LibraryMapping.actions(details(unknown), null, NOW, ROME, false)
+        assertEquals(DayLabel.Unknown, actions.recordedDay)
+        assertEquals("2026-10-07T23:59:00", LibraryMapping.actions(details(local), null, NOW, ROME, false).recordedLabel)
+    }
+
     @Test
     fun statusChipForEveryRow() {
         val cases = listOf(

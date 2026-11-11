@@ -27,6 +27,9 @@ import io.codemyriad.cassini.data.db.CassiniDatabase
 import io.codemyriad.cassini.data.db.JobEntity
 import io.codemyriad.cassini.data.db.NoteCache
 import io.codemyriad.cassini.data.db.NoteEntity
+import kotlinx.coroutines.withContext
+import org.json.JSONException
+import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 import java.io.OutputStream
@@ -34,9 +37,6 @@ import java.time.Instant
 import java.time.format.DateTimeParseException
 import java.util.UUID
 import java.util.concurrent.Callable
-import kotlinx.coroutines.withContext
-import org.json.JSONException
-import org.json.JSONObject
 
 /** The transcript export formats of features.md section 6. */
 enum class TranscriptFormat(val extension: String) { TXT("txt"), MARKDOWN("md"), SRT("srt"), VTT("vtt") }
@@ -206,7 +206,13 @@ class DocumentRepository(
                 val row = notes.noteBlocking(noteId)
                 val start = row?.recordingTime()?.instant
                 val document = CassiniDocument.create(
-                    audio, transcript, title, processing, existing, labels, sealed,
+                    audio,
+                    transcript,
+                    title,
+                    processing,
+                    existing,
+                    labels,
+                    sealed,
                     recordedAtUtc = start,
                     createdAtUtc = Instant.ofEpochMilli(clock()),
                 )

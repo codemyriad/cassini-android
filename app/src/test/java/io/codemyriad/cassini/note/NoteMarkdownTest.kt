@@ -15,6 +15,14 @@ import java.util.Locale
 
 @RunWith(RobolectricTestRunner::class)
 class NoteMarkdownTest {
+    @Test fun unknownStartOmitsTheDateAndSiteLocalLabelIsUnconverted() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val format = FormatSettings(Locale.UK, true, ZoneId.of("Pacific/Auckland"))
+        assertEquals("", NoteMarkdown.options(context.resources, format, null, 0).dateLine)
+        val local = io.codemyriad.cassini.core.format.MeetingTime.cached("2026-11-11T12:00:00")
+        assertEquals("2026-11-11T12:00:00", NoteMarkdown.options(context.resources, format, local, 0).dateLine)
+    }
+
     @Test fun resourcesAndNumericFormattingAreIndependentInTheActualExportCopy() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val config = Configuration(context.resources.configuration).apply { setLocale(Locale.FRENCH) }

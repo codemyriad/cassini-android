@@ -37,6 +37,15 @@ class FormatTest {
     private val f = FormatSettings(Locale.ENGLISH, is24Hour = true, zone = FIXED_ZONE)
     private val f12 = f.copy(is24Hour = false)
 
+    @Test fun unknownDateHasNoInventedTimeInVisibleOrSpokenCopy() {
+        assertEquals("Date unknown", Dates.dayTime(res, DayLabel.Unknown, LocalTime.MIDNIGHT, f))
+        assertEquals("Date unknown", Spoken.dayTime(res, DayLabel.Unknown, LocalTime.MIDNIGHT, f))
+        val local = "2026-11-11T12:00:00"
+        val row = Spoken.noteRow(res, "Meeting", 0, DayLabel.Today, LocalTime.MIDNIGHT, "Ready", f, local)
+        org.junit.Assert.assertTrue(row.contains(local))
+        org.junit.Assert.assertFalse(row.contains("00:00"))
+    }
+
     @Test fun clock() {
         assertEquals("02:41", Durations.clock(161 * S))
         assertEquals("48:13", Durations.clock(48 * MIN + 13 * S))

@@ -1,12 +1,12 @@
 package io.codemyriad.cassini.core.format
 
+import org.json.JSONObject
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeParseException
-import org.json.JSONObject
 
 /** D95: an attested instant or a site-local label, never the file's packaging time. */
 data class MeetingTime(val source: String, val value: String) {

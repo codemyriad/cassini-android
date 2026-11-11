@@ -22,7 +22,6 @@ data class NoteActionsUi(
     val title: String,
     val recordedDay: DayLabel,
     val recordedAt: LocalTime,
-    val recordedLabel: String? = null,
     val durationMs: Long,
     val speakers: Int,
     val documentKind: DocumentKindUi,
@@ -30,6 +29,7 @@ data class NoteActionsUi(
     val transcribeRow: TranscribeRowUi,
     val busyRow: NoteAction? = null,
     val recording: Boolean = false,
+    val recordedLabel: String? = null,
 )
 
 /** What "Save a copy" saves first: the [Document] (`.opus` with the transcript) or the [Plain] audio file. */

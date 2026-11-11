@@ -34,10 +34,10 @@ import io.codemyriad.cassini.ui.note.VersionChipUi
 import io.codemyriad.cassini.ui.note.VersionKindUi
 import io.codemyriad.cassini.ui.note.VersionRowUi
 import io.codemyriad.cassini.ui.note.VersionsUi
+import kotlinx.collections.immutable.toImmutableList
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeParseException
-import kotlinx.collections.immutable.toImmutableList
 import io.codemyriad.cassini.engine.job.ProgressHeadline as EngineHeadline
 
 /**

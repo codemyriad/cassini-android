@@ -7,9 +7,9 @@ import io.codemyriad.cassini.ui.components.SnackbarSpec
 import io.codemyriad.cassini.ui.components.TurnUi
 import io.codemyriad.cassini.ui.components.WordRef
 import io.codemyriad.cassini.ui.format.DayLabel
-import java.time.LocalTime
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
+import java.time.LocalTime
 
 /**
  * The Note screen (boards 02 and 03, features.md section 3; ui.md section 7). One destination with modes.
