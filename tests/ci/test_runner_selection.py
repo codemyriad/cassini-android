@@ -40,6 +40,29 @@ class RunnerSelectionPolicyTest(unittest.TestCase):
         tag_issues = POLICY.selection_problems('android.yml:build', missing_tag_guard)
         self.assertTrue(any('tag push' in item for item in tag_issues), tag_issues)
 
+    def test_signing_is_limited_to_tags_or_explicit_main_schedule_dispatch(self):
+        guard = '${{ ' + POLICY.SIGNED_TEST.removeprefix('if: ') + ' }}'
+        cases = [
+            ('schedule', 'refs/heads/main', True, True),
+            ('workflow_dispatch', 'refs/heads/main', True, True),
+            ('push', 'refs/heads/main', True, False),
+            ('schedule', 'refs/heads/main', False, False),
+            ('workflow_dispatch', 'refs/heads/feature', True, False),
+            ('pull_request', 'refs/pull/1/merge', True, False),
+            ('push', 'refs/tags/v0.4.2-beta.3', False, True),
+        ]
+        for event, ref, daily, expected in cases:
+            with self.subTest(event=event, ref=ref, daily=daily):
+                self.assertEqual(expected, POLICY.select(guard, 'hetzner', ref, event_name=event, daily_test=daily))
+
+    def test_daily_pipeline_preserves_the_existing_public_release_boundary(self):
+        jobs = dict(POLICY.jobs(ROOT / '.github/workflows/android.yml'))
+        self.assertIn("    if: startsWith(github.ref, 'refs/tags/')", jobs['release'])
+        self.assertIn("inputs.daily_test != true &&", POLICY.runs_on(jobs['build']))
+        for name in ('checks', 'core-only', 'build', 'emulator'):
+            self.assertIn(f"needs.{name}.result == 'success'", jobs['play'])
+        self.assertIn('          path: play/\n', jobs['build'])
+
 
 if __name__ == '__main__':
     unittest.main()

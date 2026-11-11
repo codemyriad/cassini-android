@@ -3,6 +3,7 @@
 import importlib.util
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location('runners', ROOT / 'scripts/check-runner-selection.py')
@@ -17,6 +18,19 @@ class GradleCachePolicyTest(unittest.TestCase):
             text = JOBS[job]
             with self.subTest(job=job):
                 self.assertEqual([], POLICY.movable_job_problems('android.yml:' + job, text))
+
+    def test_signed_daily_build_never_saves_the_shared_gradle_home(self):
+        expression = POLICY.MAIN_GRADLE_CACHE.split('${{ ', 1)[1].removesuffix(' }}').replace('||', ' or ')
+        for daily in (False, True):
+            for ref in ('refs/heads/main', 'refs/pull/1/merge', 'refs/tags/v0.4.2-beta.3'):
+                for environment in ('github-hosted', 'self-hosted'):
+                    context = {
+                        'inputs': SimpleNamespace(daily_test=daily),
+                        'github': SimpleNamespace(ref=ref),
+                        'runner': SimpleNamespace(environment=environment),
+                    }
+                    actual = eval(expression, {'__builtins__': {}}, context)
+                    self.assertEqual(daily or ref != 'refs/heads/main' or environment != 'github-hosted', actual)
 
     def test_regressed_build_policy_and_extra_writers_are_refused(self):
         for unsafe in [

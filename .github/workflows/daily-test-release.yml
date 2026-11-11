@@ -1,0 +1,93 @@
+name: Android internal test release
+
+on:
+  schedule:
+    # GitHub's IANA timezone support follows CET/CEST without a seasonal workflow edit.
+    - cron: '0 9,14,20 * * *'
+      timezone: Europe/Berlin
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Serialize reservations/publication across scheduled and manual slots. Failed reservations consume their number.
+concurrency:
+  group: android-internal-test-release
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+      deployments: write
+    outputs:
+      build: ${{ steps.plan.outputs.build }}
+      plan: ${{ steps.plan.outputs.plan }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - name: Check main, collect merged PR titles and reserve the next test number
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -I scripts/daily-test-release.py plan
+      - name: Keep the release plan and complete notes
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: internal-test-release-plan
+          path: test-release-plan.json
+          if-no-files-found: ignore
+
+  publish:
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
+    # The called workflow contains a tag-only GitHub-release job with contents:write.
+    # Its ordinary jobs still use contents:read; the tag-only job is skipped for daily builds.
+    permissions:
+      contents: write
+    uses: ./.github/workflows/android.yml
+    with:
+      daily_test: true
+      daily_plan: ${{ needs.plan.outputs.plan }}
+    secrets:
+      CASSINI_RELEASE_KEYSTORE: ${{ secrets.CASSINI_RELEASE_KEYSTORE }}
+      CASSINI_RELEASE_STORE_PASSWORD: ${{ secrets.CASSINI_RELEASE_STORE_PASSWORD }}
+      CASSINI_RELEASE_KEY_PASSWORD: ${{ secrets.CASSINI_RELEASE_KEY_PASSWORD }}
+      CASSINI_RELEASE_KEY_ALIAS: ${{ secrets.CASSINI_RELEASE_KEY_ALIAS }}
+      PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+
+  outcome:
+    needs: [plan, publish]
+    if: always() && (needs.plan.outputs.build == 'true' || needs.plan.result == 'failure')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      deployments: write
+    steps:
+      - name: Report preparation failure even if checkout or plan upload failed
+        if: needs.plan.result == 'failure'
+        run: |
+          echo "::error::[Android] daily test release failed: release preparation failed."
+          echo '[Android] daily test release failed: release preparation failed.' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: needs.plan.outputs.build == 'true'
+        with:
+          ref: ${{ github.sha }}
+      - name: Record the internal release or report its failure
+        if: needs.plan.outputs.build == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DAILY_TEST_PLAN: ${{ needs.plan.outputs.plan }}
+          PUBLISH_RESULT: ${{ needs.publish.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: python3 -I scripts/daily-test-release.py finish

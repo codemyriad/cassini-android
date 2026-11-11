@@ -7,8 +7,9 @@ requests must never execute untrusted code on self-hosted runners. The runner la
 never parsed, so any other value (unset, empty, a typo, JSON) keeps ubuntu-24.04 instead of failing the expression or
 queueing jobs for labels no runner has. Each selecting runs-on is evaluated here for those values across trusted,
 fork, prohibited-event, and tag contexts.
-Every other job runs on a literal GitHub-hosted image. In the jobs that can move, secrets are read only by steps
-that run on tags alone, and caches are saved only by GitHub-hosted runs: a tag build restores them while it holds
+Every other job runs on a literal GitHub-hosted image. The signed daily build always stays GitHub-hosted as well.
+Signing secrets are read only on tags or an explicit daily main schedule/dispatch. Caches are saved only by
+GitHub-hosted runs: a tag build restores them while it holds
 the signing key, so nothing written on a self-hosted machine may reach it.
 Only the Android build on GitHub-hosted main writes the Gradle home; other jobs and refs only restore it.
 Run from the repository root: python3 -I scripts/check-runner-selection.py
@@ -31,15 +32,20 @@ EVENT_ALLOWLIST = (
     r"github\.event\.pull_request\.head\.repo\.full_name == github\.repository\)\)"
 )
 SELECTOR = re.compile(
-    rf"^\$\{{\{{ {EVENT_ALLOWLIST} && !startsWith\(github\.ref, 'refs/tags/'\) && "
+    rf"^\$\{{\{{ (?:inputs\.daily_test != true && )?{EVENT_ALLOWLIST} && !startsWith\(github\.ref, 'refs/tags/'\) && "
     r"vars\.CM_RUNNER == 'hetzner' && "
     r"fromJSON\('(?P<labels>\[\"self-hosted\",\"cm-hetzner\"\])'\) \|\| '(?P<default>ubuntu-24\.04)' \}\}$"
 )
 HOSTED_IMAGE = re.compile(r'^(?:ubuntu|macos|windows)-[0-9a-z.-]+$')
 TAG_ONLY = "if: startsWith(github.ref, 'refs/tags/')"
+SIGNED_TEST = (
+    "if: (startsWith(github.ref, 'refs/tags/') || (inputs.daily_test && github.ref == 'refs/heads/main' && "
+    "(github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')))"
+)
 GITHUB_HOSTED = "runner.environment == 'github-hosted'"
 MAIN_GRADLE_CACHE = (
-    "cache-read-only: ${{ github.ref != 'refs/heads/main' || runner.environment != 'github-hosted' }}"
+    "cache-read-only: ${{ inputs.daily_test || github.ref != 'refs/heads/main' || "
+    "runner.environment != 'github-hosted' }}"
 )
 # The jobs that may move. Every other job (emulator, release, play, models, record-goldens) stays GitHub-hosted.
 MOVABLE = {('android.yml', 'checks'), ('android.yml', 'core-only'), ('android.yml', 'build'), ('native.yml', 'native')}
@@ -122,6 +128,7 @@ def select(
     ref: str,
     *,
     event_name: str = 'push',
+    daily_test: bool = False,
     head_repo: str | None = 'codemyriad/cassini-android',
     repository: str = 'codemyriad/cassini-android',
 ) -> object:
@@ -141,6 +148,8 @@ def select(
     vars_ns = SimpleNamespace(CM_RUNNER=_CIString(variable or ''))
     env = {
         'github': github,
+        'inputs': SimpleNamespace(daily_test=daily_test),
+        'true': True,
         'vars': vars_ns,
         'fromJSON': json.loads,
         'startsWith': lambda text, prefix: str(text).casefold().startswith(str(prefix).casefold()),
@@ -184,8 +193,10 @@ def movable_job_problems(where: str, job_text: str) -> list[str]:
         label = f"{where} step {(name.group(1) or name.group(2)) if name else '?'}"
         conditions = re.findall(r'^        if: .+$', step, re.M)
         if re.search(r'\bsecrets\b', step):
-            if [c.strip() for c in conditions] != [TAG_ONLY] or re.search(r'toJSON\(\s*secrets|secrets\[', step):
-                found.append(f'{label}: reads secrets but is not limited to tag builds ({TAG_ONLY})')
+            expected_condition = SIGNED_TEST if where == 'android.yml:build' else TAG_ONLY
+            forbidden = re.search(r'toJSON\(\s*secrets|secrets\[', step)
+            if [c.strip() for c in conditions] != [expected_condition] or forbidden:
+                found.append(f'{label}: reads secrets without the exact signed-build guard ({expected_condition})')
         if re.search(r'uses: actions/cache(?:/save)?@', step) and not any(GITHUB_HOSTED in c for c in conditions):
             found.append(f"{label}: saves a cache without `{GITHUB_HOSTED}` in its if")
         if 'uses: gradle/actions/setup-gradle@' in step:
@@ -208,10 +219,15 @@ def problems() -> list[str]:
                     found.append(f'{where}: must run on a literal GitHub-hosted image, not {value!r}')
                 continue
             moved.add((workflow.name, job))
-            if not SELECTOR.match(value):
+            if not SELECTOR.match(value) or (job == 'build' and 'inputs.daily_test != true &&' not in value):
                 found.append(f'{where}: runs-on is not the allowlisted CM_RUNNER selector: {value!r}')
                 continue
             found += selection_problems(where, value)
+            if where == 'android.yml:build':
+                for event_name, ref, head_repo in TRUSTED_CONTEXTS:
+                    picked = select(value, 'hetzner', ref, event_name=event_name, head_repo=head_repo, daily_test=True)
+                    if picked != 'ubuntu-24.04':
+                        found.append(f'{where}: signed daily mode leaves GitHub-hosted runners')
             found += movable_job_problems(where, text)
     if moved != MOVABLE:
         found.append(f'jobs that can move are {sorted(moved)}, expected {sorted(MOVABLE)}')
