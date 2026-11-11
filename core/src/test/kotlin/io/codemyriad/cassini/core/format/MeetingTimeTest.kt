@@ -17,7 +17,7 @@ class MeetingTimeTest {
 
     @Test fun cachedLocalLabelsNeverBecomeInstantsEvenWithAnOffset() {
         val label = "2026-11-09T10:31:48+02:00"
-        val local = MeetingTime.resolve(org.json.JSONObject().put("meeting", org.json.JSONObject().put("recordedAtLocal", label)), emptyList())!!
+        val local = MeetingTime.resolve(manifest(local = label), emptyList())!!
         val cached = MeetingTime.cached(local.cacheValue)!!
         assertEquals(local, cached)
         assertNull(cached.instant)

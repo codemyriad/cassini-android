@@ -77,7 +77,8 @@ class CassiniDocumentTest {
     @Test fun localMirrorsFollowTheManifestOnFreshSealAppendAndUtcBackfill() {
         val label = "2026-11-09T10:31:48"
         val words = Transcript(listOf(Word("spk_1", 0, 20, "Hello")), "en")
-        val input = OggOpus.mux(OggOpus.read(silence()), CassiniDocument.tagsPacket(listOf("CASSINI_RECORDED_AT_LOCAL=$label")))
+        val tags = CassiniDocument.tagsPacket(listOf("CASSINI_RECORDED_AT_LOCAL=$label"))
+        val input = OggOpus.mux(OggOpus.read(silence()), tags)
         val bytes = CassiniDocument.create(input, words, "Meeting", JSONObject())
         val doc = CassiniDocument.read(bytes)
         assertFalse(doc.comments.any { it.startsWith("CASSINI_RECORDED_AT_LOCAL=") })

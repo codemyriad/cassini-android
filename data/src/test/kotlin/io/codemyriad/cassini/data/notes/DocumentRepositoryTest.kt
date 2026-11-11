@@ -201,7 +201,8 @@ class DocumentRepositoryTest {
             assertEquals(DocumentState.OK, h.row(id).documentState)
             h.now += 60_000
             val cleaned = folder.newFile("fresh-$id.opus")
-            cleaned.writeBytes(OggOpus.mux(OggOpus.read(h.document(id).readBytes()), CassiniDocument.tagsPacket(emptyList())))
+            val changed = OggOpus.read(h.document(id).readBytes())
+            cleaned.writeBytes(OggOpus.mux(changed, CassiniDocument.tagsPacket(emptyList())))
             val fresh = seal(id, cleaned, second, "Replacement audio")
             if (sameId) {
                 // A matching meeting ID alone is not proof of the same compressed audio.
@@ -241,7 +242,10 @@ class DocumentRepositoryTest {
         h.plainNote("legacy")
         h.now += 540_000
         val bytes = CassiniDocument.create(
-            fixtureOpus.readBytes(), first, "Legacy recording", JSONObject(),
+            fixtureOpus.readBytes(),
+            first,
+            "Legacy recording",
+            JSONObject(),
             createdAtUtc = java.time.Instant.ofEpochMilli(h.now),
         )
         work("legacy").mkdirs()
