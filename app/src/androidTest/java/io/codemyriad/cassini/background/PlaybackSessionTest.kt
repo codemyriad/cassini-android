@@ -11,10 +11,10 @@ import androidx.media3.session.SessionToken
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.codemyriad.cassini.MainActivity
-import io.codemyriad.cassini.background.Background.waitFor
 import io.codemyriad.cassini.playback.PlaybackService
 import io.codemyriad.cassini.playback.PlaybackState
 import io.codemyriad.cassini.test.CiSmoke
+import io.codemyriad.cassini.testing.NotificationWatch
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -24,6 +24,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.concurrent.TimeUnit
@@ -42,6 +43,8 @@ import java.util.concurrent.TimeUnit
 @CiSmoke
 @RunWith(AndroidJUnit4::class)
 class PlaybackSessionTest {
+    @get:Rule val notifications = NotificationWatch()
+
     private val graph get() = Background.graph
     private val playback get() = graph.playback
     private var controller: MediaController? = null
@@ -86,7 +89,7 @@ class PlaybackSessionTest {
 
         // Media3 posts the media notification of the session while it plays.
         val manager = Background.context.getSystemService(NotificationManager::class.java)
-        waitFor("The media notification is posted", NOTIFICATION_MS) {
+        notifications.await("The media notification is posted", NOTIFICATION_MS) {
             manager.activeNotifications.firstOrNull { posted ->
                 posted.notification.extras.containsKey(Notification.EXTRA_MEDIA_SESSION)
             }
@@ -127,7 +130,7 @@ class PlaybackSessionTest {
         // notification and the released session disconnects the controller, so nothing keeps the service alive.
         withContext(Dispatchers.Main) { playback.leave() }
         await("The session disconnects its controllers") { disconnected.await() }
-        waitFor("The media notification is gone", NOTIFICATION_MS) {
+        notifications.await("The media notification is gone", NOTIFICATION_MS) {
             val media = manager.activeNotifications.filter { posted ->
                 posted.notification.extras.containsKey(Notification.EXTRA_MEDIA_SESSION)
             }

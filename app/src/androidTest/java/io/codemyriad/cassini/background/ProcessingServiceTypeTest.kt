@@ -5,7 +5,6 @@ import android.util.Log
 import androidx.core.content.ContextCompat
 import io.codemyriad.cassini.TestHooks
 import io.codemyriad.cassini.background.Background.graph
-import io.codemyriad.cassini.background.Background.waitFor
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.library.PauseReason
 import io.codemyriad.cassini.engine.job.JobEvent
@@ -15,6 +14,7 @@ import io.codemyriad.cassini.processing.ProcessingJob
 import io.codemyriad.cassini.processing.ProcessingJobFactory
 import io.codemyriad.cassini.processing.ProcessingService
 import io.codemyriad.cassini.test.CiSmoke
+import io.codemyriad.cassini.testing.NotificationWatch
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
@@ -23,6 +23,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 
 /**
@@ -34,6 +35,8 @@ import org.junit.Test
  */
 @CiSmoke
 class ProcessingServiceTypeTest {
+    @get:Rule val notifications = NotificationWatch()
+
     @Before
     fun setUp() = runBlocking {
         Background.grant()
@@ -89,8 +92,8 @@ class ProcessingServiceTypeTest {
         // 41606854344). A dump that never agrees fails the wait, with the last dump in the message.
         var last = ""
         return try {
-            waitFor("ProcessingService runs in the foreground ($wanted)", TYPE_WAIT_MS) {
-                if (ProcessingService.currentType() != expected) return@waitFor null
+            notifications.await("ProcessingService runs in the foreground ($wanted)", TYPE_WAIT_MS) {
+                if (ProcessingService.currentType() != expected) return@await null
                 Background.processingService().also { last = it }.takeIf { service ->
                     service.contains("isForeground=true") &&
                         (expected == null || !Background.showsType(service) || Background.hasType(service, expected))
