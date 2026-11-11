@@ -43,6 +43,7 @@ import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.models.ModelPlan
+import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.engine.job.JobPhase
 import io.codemyriad.cassini.flows.Flows
 import io.codemyriad.cassini.flows.Flows.awaitUi
@@ -393,18 +394,18 @@ class AcceptanceWalkTest {
         see(rule.text(UiR.string.ui_settings_model_ready))
         shot("08-settings")
 
-        val voices = hasText(rule.text(UiR.string.ui_settings_voices), substring = true) and hasClickAction()
+        val voices = hasText(rule.text(UiR.string.ui_settings_voices)) and hasClickAction()
         rule.waitShown(voices)
-        rule.onAllNodes(voices).onFirst().performClick()
+        rule.onNode(voices).performClick()
         see(ANNA)
         see(PAOLO)
         see(rule.text(UiR.string.ui_voices_privacy))
         shot("07-saved-voices")
         Espresso.pressBack()
 
-        val trash = hasText(rule.text(UiR.string.ui_settings_trash), substring = true) and hasClickAction()
+        val trash = hasText(rule.text(UiR.string.ui_settings_trash)) and hasClickAction()
         rule.waitShown(trash)
-        rule.onAllNodes(trash).onFirst().performScrollTo().performClick()
+        rule.onNode(trash).performScrollTo().performClick()
         see(TEST_RECORDING)
         see(rule.text(UiR.string.ui_trash_restore))
         see(rule.text(UiR.string.ui_trash_intro))
@@ -419,6 +420,9 @@ class AcceptanceWalkTest {
         assumeTrue("Run the download walk with -e emptyModelRoot true", CassiniTestRunner.emptyModelRoot)
         language?.let(::useLanguage)
         runBlocking {
+            // Bundled Whistle stays available on an empty model root. This walk covers the optional Parakeet download.
+            graph.speech.choose(SpeechModel.PARAKEET)
+            graph.speech.state.await("Parakeet is selected", Flows.JOB_MS) { it.selected == SpeechModel.PARAKEET }
             val id = Background.import(Background.assetCopy("fleurs-it-short.wav"))
             graph.awaitCatalogue().notes.rename(id, SUPPLIER_CALL)
         }
