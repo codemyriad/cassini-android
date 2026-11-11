@@ -6,6 +6,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -79,8 +80,9 @@ private fun SpeakerMenu(
     onSelect: (String?) -> Unit,
 ) {
     CassiniMenu(expanded, onDismissRequest = onDismiss, modifier = Modifier.width(280.dp)) {
-        // An explicit width avoids DropdownMenu's intrinsic-width pass through LazyColumn.
-        LazyColumn(Modifier.width(280.dp).heightIn(max = 320.dp).testTag("speaker-filter-menu")) {
+        // DropdownMenu requests both intrinsic dimensions; exact bounded dimensions avoid querying LazyColumn.
+        val visibleRows = minOf(filters.speakers.size, 5) + 1
+        LazyColumn(Modifier.width(280.dp).height((visibleRows * 48).dp).testTag("speaker-filter-menu")) {
             item(key = "any") {
                 CassiniMenuItem(
                     stringResource(R.string.ui_search_filter_any_speaker),
