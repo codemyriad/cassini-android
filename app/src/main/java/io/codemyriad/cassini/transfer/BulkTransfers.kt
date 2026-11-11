@@ -165,6 +165,8 @@ class BulkTransfers(context: Context, private val graph: AppGraph) {
     }
 
     private suspend fun perform(action: suspend (File) -> TransferState): TransferState {
+        // Opening Room does not finish recovery. Its rebuild must not race an import's file/row commit.
+        graph.ready.await()
         val scratch = File(scratchRoot, UUID.randomUUID().toString())
         try {
             initialization.withLock {
