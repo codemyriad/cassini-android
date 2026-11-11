@@ -127,6 +127,11 @@ class AcceptanceWalkTest {
     }
 
     @After fun tearDown() {
+        if (CassiniTestRunner.emptyModelRoot) {
+            // A failed assertion may leave the fake provider waiting for its next progress acknowledgement.
+            ScriptedModels.clear()
+            ScriptedModels.release()
+        }
         try {
             runBlocking {
                 val recording = graph.recording
@@ -460,7 +465,7 @@ class AcceptanceWalkTest {
         shot("10-states-downloading")
         ScriptedModels.release()
         see(rule.text(UiR.string.ui_banner_dl_checking_title, CHECK_PERCENT), timeoutMs = Flows.JOB_MS)
-        see(rule.text(UiR.string.ui_banner_dl_checking_body))
+        see(rule.text(UiR.string.ui_progress_downloading_models))
         shot("10-states-checking")
         ScriptedModels.release()
 
