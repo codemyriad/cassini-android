@@ -6,6 +6,7 @@ import java.io.File
 import java.io.RandomAccessFile
 import java.nio.charset.Charset
 import java.util.zip.CRC32
+import java.util.zip.ZipEntry
 
 internal data class ArchiveEntry(
     val name: String,
@@ -43,6 +44,9 @@ internal class ZipDirectory(
         repeat(directory.entries.toInt()) {
             active()
             val entry = entry()
+            val emptyDirectory = entry.size == 0L && entry.crc == 0L &&
+                ((entry.method == ZipEntry.STORED && entry.compressed == 0L) || entry.method == ZipEntry.DEFLATED)
+            archiveCheck(!entry.directory || emptyDirectory)
             archiveCheck(entry.size <= limits.expandedBytes - total, ArchiveFailure.TOO_LARGE)
             archiveCheck(!overRatio(entry.size, entry.compressed, limits.ratio), ArchiveFailure.TOO_LARGE)
             total += entry.size
@@ -133,7 +137,8 @@ internal class ZipDirectory(
             data,
             header.u32(16),
             header.u16(10),
-            name.endsWith('/') || name.endsWith('\\'),
+            name.endsWith('/') || name.endsWith('\\') ||
+                header.u32(38) and 0x10L != 0L || (header.u32(38) ushr 16) and 0xf000L == 0x4000L,
             name.replace('\\', '/').startsWith("__MACOSX/") && base.startsWith("._"),
         )
     }

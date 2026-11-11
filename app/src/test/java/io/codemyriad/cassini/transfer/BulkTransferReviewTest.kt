@@ -11,7 +11,11 @@ import io.codemyriad.cassini.core.format.OggOpus
 import io.codemyriad.cassini.core.format.Transcript
 import io.codemyriad.cassini.core.format.Word
 import io.codemyriad.cassini.core.library.AudioKind
+import io.codemyriad.cassini.core.library.JobKind
+import io.codemyriad.cassini.core.library.JobState
+import io.codemyriad.cassini.core.library.Origin
 import io.codemyriad.cassini.data.AppPaths
+import io.codemyriad.cassini.data.db.JobEntity
 import io.codemyriad.cassini.data.notes.ImportSummary
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.first
@@ -222,6 +226,60 @@ class BulkTransferReviewTest {
         assertTrue(graph.transfers.choices().isEmpty())
         dao.update(original)
         assertEquals(listOf(original.id), graph.transfers.choices().map { it.id })
+    }
+
+    @Test fun queuedAndFailedTranscriptionExportsKeepTheStoredTranscript() = runBlocking {
+        val source = document("Stored meeting", "Stored meeting")
+        graph.transfers.import(listOf(source.toUri()))
+        assertEquals(1, finished().summary?.imported)
+        val database = graph.awaitCatalogue().database
+        val row = database.notes().all().single()
+        for (state in listOf(JobState.QUEUED, JobState.FAILED)) {
+            database.jobs().insert(JobEntity(row.id, 1, JobKind.TRANSCRIBE_AGAIN, state, enqueuedAt = 1, updatedAt = 1))
+            database.notes().update(row.copy(title = "Pending title", titleDirty = true))
+            val output = folder.newFile("$state.zip")
+            graph.transfers.export(graph.transfers.choices().map { it.id }, output.toUri())
+            assertEquals(1, finished().exported)
+            ZipFile(output).use { zip ->
+                val bytes = zip.getInputStream(zip.entries().toList().single()).readBytes()
+                assertArrayEquals(source.readBytes(), bytes)
+                val exported = folder.newFile().apply { writeBytes(bytes) }
+                assertEquals("Hello", CassiniDocument.read(exported).selected(null)?.transcript?.words?.single()?.text)
+            }
+            database.jobs().delete(row.id)
+        }
+    }
+
+    @Test fun exportAllOmitsCompressingAndRecoveredNotesWithoutAudio() = runBlocking {
+        val source = File(fixtures, "fleurs-it-short.wav")
+        graph.transfers.import(listOf(source.toUri()))
+        assertEquals(1, finished().summary?.imported)
+        val dao = graph.awaitCatalogue().database.notes()
+        val row = dao.all().single()
+        // Encoding a plain source writes only work/audio.opus.part; the original source remains exportable.
+        paths.work(row.id).mkdirs()
+        File(paths.work(row.id), "audio.opus.part").writeText("Incomplete encoder output")
+        graph.awaitCatalogue().database.jobs().insert(
+            JobEntity(row.id, 1, JobKind.TRANSCRIBE, JobState.RUNNING, enqueuedAt = 1, updatedAt = 1),
+        )
+        val active = row.copy(
+            id = UUID.randomUUID().toString(),
+            sourceSha256 = null,
+            audioKind = AudioKind.LIVE_CAPTURE,
+        )
+        paths.note(active.id).mkdirs()
+        source.copyTo(File(paths.note(active.id), active.audioFile))
+        dao.insert(active)
+        dao.insert(row.copy(id = UUID.randomUUID().toString(), sourceSha256 = null, origin = Origin.RECOVERED))
+        val choices = graph.transfers.choices()
+        assertEquals(listOf(row.id), choices.map { it.id })
+        val output = folder.newFile("all-available.zip")
+        graph.transfers.export(choices.map { it.id }, output.toUri())
+        assertEquals(1, finished().exported)
+        ZipFile(output).use { zip ->
+            assertArrayEquals(source.readBytes(), zip.getInputStream(zip.entries().toList().single()).readBytes())
+        }
+        assertNoStaging()
     }
 
     @Test fun aNewBatchClearsThePriorSingleFileImportErrorButAnEmptyPickDoesNot() = runBlocking {
