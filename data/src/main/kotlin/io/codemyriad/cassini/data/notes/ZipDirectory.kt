@@ -134,7 +134,8 @@ internal class ZipDirectory(
             data,
             header.u32(16),
             header.u16(10),
-            name.endsWith('/') || name.endsWith('\\'),
+            name.endsWith('/') || name.endsWith('\\') ||
+                header.u32(38) and 0x10L != 0L || (header.u32(38) ushr 16) and 0xf000L == 0x4000L,
             name.replace('\\', '/').startsWith("__MACOSX/") && base.startsWith("._"),
         )
     }

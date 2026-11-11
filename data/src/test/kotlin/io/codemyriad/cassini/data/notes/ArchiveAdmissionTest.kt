@@ -38,6 +38,18 @@ class ArchiveAdmissionTest {
         assertEquals(ImportSummary(imported = 1), result)
     }
 
+    @Test fun directoryAttributesCannotHideAPayloadBehindAnAudioFilename() = runTest {
+        for (attributes in listOf(0x10, 0x41ed0000)) {
+            for (forged in listOf(false, true)) {
+                val bytes = zipBytes("good.opus" to "audio", "folder.opus" to "hidden payload")
+                val central = bytes.recordOffsets(0x02014b50).last()
+                bytes.putInt(central + 38, attributes)
+                if (forged) bytes.putInt(central + 24, 0)
+                refuses(bytes, ArchiveFailure.DAMAGED)
+            }
+        }
+    }
+
     @Test fun compressionMethodMismatchInALateLocalHeaderRefusesBeforeAnyImport() = runTest {
         val bytes = zipBytes("good.opus" to "audio", "other.opus" to "other audio")
         bytes.putShort(bytes.recordOffsets(0x04034b50).last() + 8, 0)
