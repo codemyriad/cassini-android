@@ -67,14 +67,17 @@ class SearchFiltersTest {
         insert("unknown", words, recordedAt = null)
         for (query in listOf("?", "...", "---")) {
             assertEquals(4, search(query).size)
-            assertEquals(listOf("own"), search(query, SearchFilters(date = SearchDate.TODAY, recordedByMe = true)).map { it.row.id })
-            assertEquals(setOf("own", "received"), search(query, SearchFilters(date = SearchDate.TODAY)).mapTo(HashSet()) { it.row.id })
+            val ownToday = search(query, SearchFilters(date = SearchDate.TODAY, recordedByMe = true))
+            assertEquals(listOf("own"), ownToday.map { it.row.id })
+            val allToday = search(query, SearchFilters(date = SearchDate.TODAY))
+            assertEquals(setOf("own", "received"), allToday.mapTo(HashSet()) { it.row.id })
             assertTrue(search(query, SearchFilters(speaker = "Ada")).isEmpty())
         }
     }
 
     @Test fun anUnreadableOnlyVariantCannotHideATitleHitOrAdvertiseSpeakers() = runTest {
-        val cached = cache(note("unsupported", "Unique heading", at), listOf("v1" to listOf(Word("S1", 0, 400, "hidden"))))
+        val words = listOf(Word("S1", 0, 400, "hidden"))
+        val cached = cache(note("unsupported", "Unique heading", at), listOf("v1" to words))
         h.db.cache().replaceCache(
             cached.copy(
                 note = cached.note.copy(selectedVariant = null),
@@ -97,15 +100,17 @@ class SearchFiltersTest {
             listOf("v1" to listOf(Word("S1", 0, 400, "hidden")), "v2" to listOf(Word("S2", 0, 400, "delivery"))),
             selected = "v2",
         )
+        val readable = cached.copy(
+            variants = cached.variants.map {
+                if (it.variantId == "v1") it.copy(readable = false, wordCount = 42) else it
+            },
+            words = cached.words.filter { it.variantId == "v2" },
+            speakers = cached.speakers.filter { it.variantId == "v2" }.map {
+                it.copy(label = "Ben", isPlaceholder = false)
+            },
+        )
         for (selection in listOf(null, "v1", "v2")) {
-            h.db.cache().replaceCache(
-                cached.copy(
-                    note = cached.note.copy(selectedVariant = selection),
-                    variants = cached.variants.map { if (it.variantId == "v1") it.copy(readable = false, wordCount = 42) else it },
-                    words = cached.words.filter { it.variantId == "v2" },
-                    speakers = cached.speakers.filter { it.variantId == "v2" }.map { it.copy(label = "Ben", isPlaceholder = false) },
-                ),
-            )
+            h.db.cache().replaceCache(readable.copy(note = readable.note.copy(selectedVariant = selection)))
             assertEquals(listOf("Ben"), h.notes.namedSpeakers().first())
             val found = search("deliv", SearchFilters(speaker = "Ben")).single()
             assertEquals("v2", found.row.selectedVariant)

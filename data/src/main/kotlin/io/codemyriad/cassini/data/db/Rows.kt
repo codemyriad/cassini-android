@@ -15,6 +15,7 @@ import io.codemyriad.cassini.core.library.PauseReason
 /** SQL fragments shared by the Library and search queries. Aliases: n = notes, t = note_text, j = jobs, v = variants. */
 internal object Sql {
     /** The readable variant shown for note `n`: explicit selection, else readable default, else first readable. */
+    // Older Android SQLite resolves outer columns in WHERE, but not in a subquery ORDER BY.
     const val SELECTED_VARIANT =
         "COALESCE((SELECT s.variant_id FROM variants s WHERE s.note_id = n.id " +
             "AND s.variant_id = n.selected_variant AND s.readable = 1), " +
