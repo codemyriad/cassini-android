@@ -31,8 +31,9 @@ import io.codemyriad.cassini.ui.library.LibraryScreen
 fun LibraryRoute(viewModel: LibraryViewModel, navigator: LibraryNavigator, modifier: Modifier = Modifier) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        viewModel.onPicked(uri?.toString())
+    val transfers = (context.applicationContext as io.codemyriad.cassini.CassiniApplication).graph.transfers
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isNotEmpty()) transfers.import(uris)
     }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(viewModel, lifecycle) {
@@ -56,7 +57,12 @@ fun LibraryRoute(viewModel: LibraryViewModel, navigator: LibraryNavigator, modif
         viewModel.onResume()
         onPauseOrDispose { }
     }
-    LibraryScreen(state = state, onEvent = viewModel::onEvent, modifier = modifier)
+    LibraryScreen(
+        state = state,
+        onEvent = viewModel::onEvent,
+        modifier = modifier,
+        tools = { io.codemyriad.cassini.transfer.BulkTransferControls(transfers) },
+    )
 }
 
 /** The app's notification settings (API 26+). */

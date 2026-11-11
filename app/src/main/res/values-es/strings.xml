@@ -105,4 +105,17 @@
     <string name="notif_rec_file_full_text">Cassini termina las grabaciones M4A al llegar a 1 GB, unas 74 horas. Lo grabado hasta ahora está guardado. Empieza una grabación nueva para continuar.</string>
     <string name="notif_rec_failed_title">El micrófono dejó de funcionar</string>
     <string name="notif_rec_failed_text">La grabación terminó. Lo grabado hasta ahora está en tu biblioteca.</string>
+
+    <!-- D96 bulk import/export. -->
+    <string name="bulk_export">Exportar notas como ZIP</string>
+    <string name="bulk_documents_only">Los documentos Cassini conservan su formato .opus. El audio sin procesar conserva su formato original.</string>
+    <string name="bulk_all">Seleccionar todo</string>
+    <string name="bulk_save">Guardar ZIP</string>
+    <string name="bulk_cancel">Cancelar</string>
+    <string name="bulk_working">Importando o exportando…</string>
+    <string name="bulk_finished">Transferencia finalizada</string>
+    <string name="bulk_summary">Importados: %1$d · duplicados omitidos: %2$d · ignorados: %3$d · fallidos: %4$d</string>
+    <string name="bulk_exported">Exportados: %1$d</string>
+    <string name="bulk_failed">No se pudo completar la transferencia. Comprueba el archivo y el espacio disponible.</string>
+    <string name="bulk_done">Listo</string>
 </resources>

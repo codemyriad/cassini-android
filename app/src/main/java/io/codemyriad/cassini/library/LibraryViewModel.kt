@@ -511,7 +511,7 @@ class LibraryViewModel(
 
     companion object {
         /** The picker's types (features.md section 1, item 6). */
-        val IMPORT_TYPES = arrayOf("audio/*", "application/ogg")
+        val IMPORT_TYPES = arrayOf("audio/*", "application/ogg", "application/zip", "application/x-zip-compressed")
 
         const val SEARCH_DEBOUNCE_MS = 150L
         private const val STOP_TIMEOUT_MS = 5_000L
