@@ -93,12 +93,16 @@ class NoteRepository(
         zone: ZoneId = ZoneId.systemDefault(),
         today: LocalDate = Instant.ofEpochMilli(clock()).atZone(zone).toLocalDate(),
     ): Flow<List<SearchRow>> {
-        val match = SearchQuery.fts(query) ?: return library().map { rows ->
-            withContext(dispatchers.io) {
-                // No attributed text can match a speaker without a searchable token.
-                if (filters.speaker != null) emptyList() else rows.filter {
-                    filters.includes(it.recordingTime()?.day(zone), it.origin, today)
-                }.map { SearchRow(it, snippet = "", titleSnippet = it.title) }
+        val match = SearchQuery.fts(query)
+        if (match == null) {
+            // No attributed text can match a speaker without a searchable token.
+            if (filters.speaker != null) return kotlinx.coroutines.flow.flowOf(emptyList())
+            return library().map { rows ->
+                withContext(dispatchers.io) {
+                    rows.filter {
+                        filters.includes(it.recordingTime()?.day(zone), it.origin, today)
+                    }.map { SearchRow(it, snippet = "", titleSnippet = it.title) }
+                }
             }
         }
         return flow {
