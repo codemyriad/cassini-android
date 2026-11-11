@@ -3,7 +3,6 @@ package io.codemyriad.cassini.settings
 import android.Manifest
 import android.app.Application
 import android.os.Looper
-import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -26,7 +25,9 @@ import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.data.models.ModelFetcher
 import io.codemyriad.cassini.data.models.ModelStatus
 import io.codemyriad.cassini.processing.ServiceStarter
+import io.codemyriad.cassini.testing.MainDispatchEvents
 import io.codemyriad.cassini.testing.NoUncaughtCoroutines
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
@@ -48,6 +49,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w390dp-h844dp-xhdpi")
 class SettingsModelDownloadTest {
+    private val mainEvents = MainDispatchEvents()
     private val folder = TemporaryFolder()
     private val app: CassiniApplication = ApplicationProvider.getApplicationContext()
     private val fetched = CopyOnWriteArrayList<String>()
@@ -86,7 +88,7 @@ class SettingsModelDownloadTest {
     private val rule = createAndroidComposeRule<MainActivity>()
 
     @get:Rule val chain: RuleChain =
-        RuleChain.outerRule(NoUncaughtCoroutines()).around(folder).around(graphRule).around(rule)
+        RuleChain.outerRule(NoUncaughtCoroutines()).around(mainEvents).around(folder).around(graphRule).around(rule)
 
     @Test fun speakerRowDownloadsAndRetriesOnlyTheDiarizer() =
         downloadAndRetry(ModelPart.SPEAKERS, "Telling speakers apart")
@@ -202,12 +204,12 @@ class SettingsModelDownloadTest {
 
     private fun waitUntil(description: String, condition: () -> Boolean) {
         try {
-            rule.waitUntil(timeoutMillis = TIMEOUT_MS) {
-                // IO continuations need the paused Robolectric main looper to run before state-only checks.
+            mainEvents.await(TIMEOUT_MS, rule.mainClock.scheduler) {
+                rule.mainClock.advanceTimeByFrame()
                 rule.waitForIdle()
                 condition()
             }
-        } catch (error: ComposeTimeoutException) {
+        } catch (error: TimeoutCancellationException) {
             throw AssertionError(
                 "Waiting for $description: fetched=$fetched, models=${graph.models.status.value}, " +
                     "install=${graph.installOwner.state.value}, processing=${graph.processing.state.value}\n" +

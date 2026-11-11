@@ -14,6 +14,7 @@ import androidx.test.espresso.Espresso
 import io.codemyriad.cassini.MainActivity
 import io.codemyriad.cassini.background.Background
 import io.codemyriad.cassini.flows.Flows.awaitSealedDocument
+import io.codemyriad.cassini.flows.Flows.awaitUi
 import io.codemyriad.cassini.flows.Flows.import
 import io.codemyriad.cassini.flows.Flows.tapWord
 import io.codemyriad.cassini.flows.Flows.text
@@ -188,7 +189,7 @@ class NoteFlowTest {
      * it through its semantics action: while the sheet settles, a touch can miss its window.
      */
     private fun clickOnce(matcher: SemanticsMatcher) {
-        rule.waitUntil(Flows.SCREEN_MS) { rule.onAllNodes(matcher).fetchSemanticsNodes().size == 1 }
+        rule.awaitUi(Flows.SCREEN_MS) { rule.onAllNodes(matcher).fetchSemanticsNodes().size == 1 }
         rule.onNode(matcher).performSemanticsAction(SemanticsActions.OnClick)
     }
 

@@ -12,7 +12,6 @@ import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.CassiniApplication
 import io.codemyriad.cassini.data.db.LibraryRow
 import io.codemyriad.cassini.data.notes.ImportOutcome
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Assert.assertTrue
@@ -82,19 +81,6 @@ internal object Background {
     suspend fun row(noteId: String): LibraryRow? =
         graph.awaitCatalogue().notes.library().first().firstOrNull { it.id == noteId }
 
-    /** Polls [value] every 200 ms until it is not null, or fails with [message] after [timeoutMs]. */
-    suspend fun <T : Any> waitFor(message: String, timeoutMs: Long = WAIT_MS, value: suspend () -> T?): T {
-        val found = withTimeoutOrNull(timeoutMs) {
-            var current = value()
-            while (current == null) {
-                delay(POLL_MS)
-                current = value()
-            }
-            current
-        }
-        return found ?: throw AssertionError("$message (waited ${timeoutMs / 1_000} s)")
-    }
-
     /**
      * Ends every job and puts every note of the scratch root in the trash, so the next test starts with an empty
      * queue and its imports are new notes (a trashed note does not count as a duplicate). Then clears the hold and
@@ -118,7 +104,6 @@ internal object Background {
 
     const val WAIT_MS = 240_000L
     private const val SERVICE_STOP_MS = 30_000L
-    private const val POLL_MS = 200L
 }
 
 /**

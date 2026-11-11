@@ -1,6 +1,8 @@
 package io.codemyriad.cassini.flows
 
+import android.os.SystemClock
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasContentDescription
@@ -19,6 +21,7 @@ import io.codemyriad.cassini.background.Background
 import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.data.db.LibraryRow
+import io.codemyriad.cassini.flows.Flows.awaitUi
 import io.codemyriad.cassini.flows.Flows.backAfterOpenWith
 import io.codemyriad.cassini.flows.Flows.closeKeyboard
 import io.codemyriad.cassini.flows.Flows.import
@@ -29,7 +32,6 @@ import io.codemyriad.cassini.flows.Flows.row
 import io.codemyriad.cassini.flows.Flows.rows
 import io.codemyriad.cassini.flows.Flows.text
 import io.codemyriad.cassini.flows.Flows.view
-import io.codemyriad.cassini.flows.Flows.waitFor
 import io.codemyriad.cassini.flows.Flows.waitGone
 import io.codemyriad.cassini.flows.Flows.waitKeyboardClosed
 import io.codemyriad.cassini.flows.Flows.waitShown
@@ -159,12 +161,12 @@ class LibraryFlowTest {
         }
     }
 
-    /** [Flows.waitFor] whose failure also names the focused window, read when the wait fails. */
+    /** A keyboard event wait whose failure also names the focused window. */
     private fun AppRule.waitForKeyboard(message: String, condition: () -> Boolean) {
         try {
-            waitFor(message) { condition() }
-        } catch (timeout: AssertionError) {
-            throw AssertionError("${timeout.message}; ${Flows.focusReport()}", timeout)
+            awaitUi { condition() }
+        } catch (timeout: ComposeTimeoutException) {
+            throw AssertionError("$message; ${Flows.focusReport()}", timeout)
         }
     }
 
@@ -193,18 +195,17 @@ class LibraryFlowTest {
     /** The bounds of [matcher]'s node once an idle sync no longer moves them. */
     private fun AppRule.settledBounds(matcher: SemanticsMatcher): Rect {
         var bounds = onNode(matcher).fetchSemanticsNode().boundsInWindow
-        try {
-            waitUntil(Flows.SCREEN_MS) {
-                waitForIdle()
-                val next = onNode(matcher).fetchSemanticsNode().boundsInWindow
-                val settled = next == bounds
-                bounds = next
-                settled
-            }
-        } catch (timeout: ComposeTimeoutException) {
-            throw AssertionError("${matcher.description} still moves, last bounds $bounds", timeout)
+        val window = (onNode(matcher).fetchSemanticsNode().root as ViewRootForTest).view.rootView
+        val deadline = SystemClock.uptimeMillis() + Flows.SCREEN_MS
+        while (true) {
+            val remaining = deadline - SystemClock.uptimeMillis()
+            if (remaining <= 0) throw AssertionError("${matcher.description} still moves, last bounds $bounds")
+            UiEvents.draw(window, remaining)
+            waitForIdle()
+            val next = onNode(matcher).fetchSemanticsNode().boundsInWindow
+            if (next == bounds) return next
+            bounds = next
         }
-        return bounds
     }
 
     private companion object {

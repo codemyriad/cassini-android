@@ -23,6 +23,7 @@ import androidx.compose.ui.test.performClick
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.test.platform.app.InstrumentationRegistry
+import io.codemyriad.cassini.flows.Flows.awaitUi
 import io.codemyriad.cassini.test.CiSmoke
 import io.codemyriad.cassini.ui.components.ProcessingCardUi
 import io.codemyriad.cassini.ui.components.SpeakerNameUi
@@ -221,7 +222,7 @@ class SheetAndDraftDeviceTest {
     /** Waits until [condition] holds; at [timeoutMs] fails with [message], built then. */
     private fun waitFor(timeoutMs: Long, message: () -> String, condition: () -> Boolean) {
         try {
-            rule.waitUntil(timeoutMs, condition)
+            rule.awaitUi(timeoutMs, condition)
         } catch (timeout: ComposeTimeoutException) {
             throw AssertionError("${message()} (waited ${timeoutMs / 1_000} s)", timeout)
         }
