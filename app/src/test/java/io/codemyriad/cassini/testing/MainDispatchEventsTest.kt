@@ -4,13 +4,20 @@ import android.os.Handler
 import android.os.Looper
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.Snapshot
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -104,16 +111,41 @@ class MainDispatchEventsTest {
                 check(checked.await(TIMEOUT_MS, TimeUnit.MILLISECONDS)) { "Missing scheduler query" }
                 dispatcher.dispatch(EmptyCoroutineContext) { delivered = true }
             }
-            mainDispatches.await(TIMEOUT_MS, scheduler) {
+            mainDispatches.await(TIMEOUT_MS, scheduler, beforeAwait = { checked.countDown() }) {
                 scheduler.runCurrent()
-                val current = delivered
-                checked.countDown()
-                current
+                delivered
             }
             assertTrue(delivered)
             post.get(TIMEOUT_MS, TimeUnit.MILLISECONDS)
         } finally {
             worker.shutdownNow()
+        }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test(timeout = 5_000)
+    fun recurringVirtualWorkCannotStarveTheTimeout() {
+        val scheduler = TestCoroutineScheduler()
+        val scope = CoroutineScope(StandardTestDispatcher(scheduler))
+        var ticks = 0
+        scope.launch {
+            while (isActive) {
+                ticks++
+                delay(1)
+            }
+        }
+        scheduler.runCurrent()
+        try {
+            assertThrows(TimeoutCancellationException::class.java) {
+                mainDispatches.await(100, scheduler) {
+                    scheduler.advanceTimeBy(1)
+                    scheduler.runCurrent()
+                    false
+                }
+            }
+            assertTrue(ticks > 1)
+        } finally {
+            scope.cancel()
         }
     }
 

@@ -13,13 +13,13 @@ import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.InternalCoroutinesApi
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.yield
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.FutureTask
@@ -94,7 +94,7 @@ internal object UiEvents {
         try {
             withTimeoutOrNull(timeoutMs) {
                 while (true) {
-                    ensureActive()
+                    yield()
                     val before = revisions.value
                     if (clock?.autoAdvance == true) clock.advanceTimeByFrame()
                     if (condition()) return@withTimeoutOrNull true

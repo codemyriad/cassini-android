@@ -8,9 +8,16 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import io.codemyriad.cassini.test.CiSmoke
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -107,6 +114,26 @@ class UiEventsTest {
             current
         }
         assertTrue(delivered)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test(timeout = 5_000)
+    fun recurringVirtualWorkCannotStarveTheTimeout() {
+        val scope = CoroutineScope(StandardTestDispatcher(rule.mainClock.scheduler))
+        var ticks = 0
+        scope.launch {
+            while (isActive) {
+                ticks++
+                delay(16)
+            }
+        }
+        rule.mainClock.scheduler.runCurrent()
+        try {
+            assertThrows(ComposeTimeoutException::class.java) { UiEvents.await(root, 1_000, rule.mainClock) { false } }
+            assertTrue(ticks > 1)
+        } finally {
+            scope.cancel()
+        }
     }
 
     @Test fun anInvalidatedWindowMustDraw() = UiEvents.draw(root, WAIT_MS)
