@@ -70,7 +70,9 @@ object MarkdownExport {
 
     /** The system document picker handles collisions; this supplies only the S-5 suggested name. */
     fun filename(title: String, untitled: String): String {
-        val replaced = title.map { if (it == '/' || it == '\\' || Character.isISOControl(it)) '-' else it }.joinToString("").trim()
+        val replaced = title.map {
+            if (it == '/' || it == '\\' || Character.isISOControl(it)) '-' else it
+        }.joinToString("").trim()
         val codePoints = replaced.codePointCount(0, replaced.length).coerceAtMost(MAX_FILENAME)
         val stem = replaced.substring(0, replaced.offsetByCodePoints(0, codePoints)).ifEmpty { untitled }
         return "$stem.md"

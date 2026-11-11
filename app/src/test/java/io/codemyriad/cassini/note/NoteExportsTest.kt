@@ -35,7 +35,9 @@ class NoteExportsTest {
         assertEquals("Weekly sync.md", file.name)
         assertEquals(io.codemyriad.cassini.data.notes.TranscriptFormat.MARKDOWN, NoteExports.format(file.kind))
         assertEquals(io.codemyriad.cassini.ui.note.NoteAction.SAVE_MARKDOWN, NoteExports.row(file.kind))
-        val unreadable = details.copy(note = details.note.copy(documentState = io.codemyriad.cassini.core.format.DocumentState.UNREADABLE))
+        val unreadable = details.copy(
+            note = details.note.copy(documentState = io.codemyriad.cassini.core.format.DocumentState.UNREADABLE),
+        )
         assertEquals(null, NoteExports.file(unreadable, file.kind))
     }
 

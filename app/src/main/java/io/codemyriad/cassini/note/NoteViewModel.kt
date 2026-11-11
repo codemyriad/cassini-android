@@ -1106,14 +1106,18 @@ class NoteViewModel(
             ports.exportCopy(noteId, uri)
         } else {
             val speakers = NoteMapping.selected(details)?.speakerCount ?: 0
+            val markdown = if (kind == ExportKind.MARKDOWN) {
+                ports.markdownOptions(details.note.createdAt, details.note.durationMs)
+            } else {
+                null
+            }
             val request = NoteExports.request(
                 details,
                 format,
                 ports::placeholderLabel,
                 ports.exportSubtitle(details.note.createdAt, details.note.durationMs, speakers),
                 ports.exportEmptyText(),
-                if (kind == ExportKind.MARKDOWN) ports.markdownOptions(details.note.createdAt, details.note.durationMs) else null,
-            )
+            ).copy(markdown = markdown)
             ports.exportTranscript(noteId, request, uri)
         }
         if (outcome !is ExportOutcome.Saved) Log.w(TAG, "Export of $kind ended $outcome")

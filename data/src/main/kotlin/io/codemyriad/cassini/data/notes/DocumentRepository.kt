@@ -7,10 +7,10 @@ import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.UserFacingException
 import io.codemyriad.cassini.core.export.ExportNames
 import io.codemyriad.cassini.core.export.ExportTranscript
-import io.codemyriad.cassini.core.export.SrtWriter
 import io.codemyriad.cassini.core.export.MarkdownExport
 import io.codemyriad.cassini.core.export.MarkdownNote
 import io.codemyriad.cassini.core.export.MarkdownOptions
+import io.codemyriad.cassini.core.export.SrtWriter
 import io.codemyriad.cassini.core.export.TextExport
 import io.codemyriad.cassini.core.export.VttWriter
 import io.codemyriad.cassini.core.format.CassiniDocument
@@ -602,13 +602,15 @@ class DocumentRepository(
     private fun markdownNotes(noteId: String): List<MarkdownNote> {
         val notes = readBlocking(noteId)?.manifest?.optJSONObject("x")?.optJSONObject("gocassini.com")
             ?.optJSONArray("notes") ?: return emptyList()
-        return buildList {
-            for (index in 0 until notes.length()) {
-                val note = notes.optJSONObject(index) ?: continue
-                val time = note.opt("atMs") as? Number ?: continue
-                val atMs = time.toLong()
-                val text = note.opt("text") as? String ?: continue
-                if (atMs >= 0 && time.toDouble() == atMs.toDouble()) add(MarkdownNote(atMs, text))
+        return (0 until notes.length()).mapNotNull { index ->
+            val note = notes.optJSONObject(index)
+            val time = note?.opt("atMs") as? Number
+            val text = note?.opt("text") as? String
+            val atMs = time?.toLong()
+            if (time != null && atMs != null && text != null && atMs >= 0 && time.toDouble() == atMs.toDouble()) {
+                MarkdownNote(atMs, text)
+            } else {
+                null
             }
         }
     }

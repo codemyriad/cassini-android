@@ -310,6 +310,17 @@ class LibraryViewModelTest {
             advanceUntilIdle()
             viewModel.onEvent(LibraryEvent.SheetAction(NoteAction.SAVE_TEXT))
             assertEquals(LibraryEffect.OpenNote(NoteKey("d", start = NoteStart.SAVE_TEXT)), awaitItem())
+            val markdown = listOf(
+                NoteAction.SAVE_MARKDOWN to NoteStart.SAVE_MARKDOWN,
+                NoteAction.SHARE_MARKDOWN to NoteStart.SHARE_MARKDOWN,
+            )
+            for ((action, start) in markdown) {
+                viewModel.onEvent(LibraryEvent.LongPress("d"))
+                advanceUntilIdle()
+                viewModel.onEvent(LibraryEvent.SheetAction(action))
+                assertEquals(LibraryEffect.OpenNote(NoteKey("d", start = start)), awaitItem())
+            }
+
             viewModel.onEvent(LibraryEvent.LongPress("d"))
             advanceUntilIdle()
             viewModel.onEvent(LibraryEvent.SheetAction(NoteAction.DOCUMENT_INFO))

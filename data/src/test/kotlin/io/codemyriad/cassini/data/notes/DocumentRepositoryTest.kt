@@ -369,19 +369,29 @@ class DocumentRepositoryTest {
     @Test fun markdownExportsPrivateNotesWithoutChangingThePortableFile() = runTest {
         h.documentNote("a", first, title = "Review")
         val privateData = JSONObject(
-            """{
+            """
+            {
                 "gocassini.com":{"notes":[{"atMs":5000,"text":"Keep *this*"},{"atMs":1000,"text":"Earlier"}],"unknown":"kept"},
                 "example.org":{"secret":"not exported"}
             }""".trimIndent(),
         )
         CassiniDocument.create(
-            fixtureOpus, first, "Review", JSONObject().put("engine", "test"), null, mapOf("S1" to "Ada", "S2" to "Ben"),
-            h.document("a"), extensions = privateData,
+            fixtureOpus,
+            first,
+            "Review",
+            JSONObject().put("engine", "test"),
+            null,
+            mapOf("S1" to "Ada", "S2" to "Ben"),
+            h.document("a"),
+            extensions = privateData,
         )
         val original = h.document("a").readBytes()
-        val copy = MarkdownCopy("Speakers: {names}", "Transcript", "Notes", "(over {names})") { it.joinToString(" and ") }
+        val copy = MarkdownCopy("Speakers: {names}", "Transcript", "Notes", "(over {names})") {
+            it.joinToString(" and ")
+        }
         val request = TranscriptExport(
-            TranscriptFormat.MARKDOWN, mapOf("S1" to "Ada", "S2" to "Ben"),
+            TranscriptFormat.MARKDOWN,
+            mapOf("S1" to "Ada", "S2" to "Ben"),
             markdown = MarkdownOptions("Thursday 8 October 2026, 15:10", copy),
         )
         val dest = folder.newFile("review.md")

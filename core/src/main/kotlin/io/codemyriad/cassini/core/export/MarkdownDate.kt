@@ -8,6 +8,7 @@ import java.util.Locale
 
 /** D50.3: date words use the UI language; the clock uses the formatting locale and hour-cycle choice. */
 object MarkdownDate {
+    @Suppress("LongParameterList") // D50.3 inputs are independent; never infer one locale from the other.
     fun line(
         atMs: Long,
         zone: ZoneId,

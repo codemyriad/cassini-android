@@ -9,9 +9,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 import java.security.MessageDigest
-import javax.xml.parsers.DocumentBuilderFactory
 import java.time.ZoneId
 import java.util.Locale
+import javax.xml.parsers.DocumentBuilderFactory
 
 class MarkdownExportTest {
     @Test fun sharedS5CasesMatchExactly() {
@@ -36,13 +36,16 @@ class MarkdownExportTest {
             val locale = Locale.forLanguageTag(input.getString("formattingLocale").replace('_', '-'))
             val language = input.getString("uiLanguage")
             val date = MarkdownDate.line(
-                input.getLong("startMs"), ZoneId.of(input.getString("tz")), Locale.forLanguageTag(language), locale,
-                is24Hour = locale != Locale.US, duration = duration?.let { "${it / 60_000} min" },
+                input.getLong("startMs"),
+                ZoneId.of(input.getString("tz")),
+                Locale.forLanguageTag(language),
+                locale,
+                is24Hour = locale != Locale.US,
+                duration = duration?.let { "${it / 60_000} min" },
             )
             val expected = case.getString("expected").replace("{DATE_LINE}", date)
-            val actual = MarkdownExport.write(
-                ExportTranscript(input.getString("title"), duration ?: 0, words, labels), date, copy(language), personal,
-            )
+            val transcript = ExportTranscript(input.getString("title"), duration ?: 0, words, labels)
+            val actual = MarkdownExport.write(transcript, date, copy(language), personal)
             assertEquals(case.getString("name"), expected, actual)
             assertFalse(actual.startsWith("\uFEFF"))
             assertFalse(actual.endsWith("\n\n"))
@@ -54,7 +57,9 @@ class MarkdownExportTest {
             requireNotNull(javaClass.getResource("/interjections/acknowledgment.words.json")).readText(),
         ).words
         val actual = MarkdownExport.write(
-            ExportTranscript("Review", 10_000, words, mapOf("ada" to "Ada", "ben" to "Ben")), "", copy("en"),
+            ExportTranscript("Review", 10_000, words, mapOf("ada" to "Ada", "ben" to "Ben")),
+            "",
+            copy("en"),
         )
         assertTrue(actual.contains("Speakers: Ada, Ben\n"))
         assertTrue(
@@ -69,7 +74,10 @@ class MarkdownExportTest {
     @Test fun escapingAndUnicodeSafeNamesFollowS5() {
         assertEquals("\\# heading", MarkdownExport.escape(" #   heading "))
         assertEquals("123\\. item", MarkdownExport.escape("123. item"))
-        assertEquals("\\- \\_one\\_ \\[two\\] \\<three\\> \\\\ \\`four\\`", MarkdownExport.escape("- _one_ [two] <three> \\ `four`"))
+        assertEquals(
+            "\\- \\_one\\_ \\[two\\] \\<three\\> \\\\ \\`four\\`",
+            MarkdownExport.escape("- _one_ [two] <three> \\ `four`"),
+        )
         assertEquals("A-B-C.md", MarkdownExport.filename(" A/B\\C ", "Untitled meeting"))
         assertEquals("Untitled meeting.md", MarkdownExport.filename("  ", "Untitled meeting"))
         val name = MarkdownExport.filename("😀".repeat(121), "Untitled meeting").removeSuffix(".md")
@@ -78,7 +86,14 @@ class MarkdownExportTest {
 
     @Test fun languageAndClockLocaleAreIndependentWithoutGlobalMutation() {
         val original = Locale.getDefault()
-        val date = MarkdownDate.line(1793088000000, ZoneId.of("Europe/Rome"), Locale.FRENCH, Locale.US, false, null)
+        val date = MarkdownDate.line(
+            1793088000000,
+            ZoneId.of("Europe/Rome"),
+            Locale.FRENCH,
+            Locale.US,
+            false,
+            null,
+        )
         assertTrue(date.startsWith("mardi 27 octobre 2026, "))
         assertTrue(date.endsWith("9:00 AM"))
         assertEquals(original, Locale.getDefault())
@@ -86,20 +101,27 @@ class MarkdownExportTest {
 
     @Test fun androidHeadingsAndLabelsMatchAllSixPinnedTranslations() {
         val ids = mapOf(
-            "ui_actions_markdown" to "export.markdown.label", "ui_markdown_description" to "export.markdown.description",
-            "ui_markdown_speakers" to "export.markdown.speakersLine", "ui_markdown_transcript" to "export.markdown.transcriptHeading",
+            "ui_actions_markdown" to "export.markdown.label",
+            "ui_markdown_description" to "export.markdown.description",
+            "ui_markdown_speakers" to "export.markdown.speakersLine",
+            "ui_markdown_transcript" to "export.markdown.transcriptHeading",
             "ui_markdown_notes" to "export.markdown.notesHeading",
             "ui_markdown_over" to "meeting.turn.over",
         )
         val catalog = JSONObject(resource("strings.json")).getJSONArray("entries")
         val entries = (0 until catalog.length()).map(catalog::getJSONObject).associateBy { it.getString("id") }
         val languages = mapOf(
-            "values" to "en", "values-it" to "it", "values-fr" to "fr", "values-es" to "es",
-            "values-pt-rBR" to "pt-BR", "values-pt-rPT" to "pt-PT",
+            "values" to "en",
+            "values-it" to "it",
+            "values-fr" to "fr",
+            "values-es" to "es",
+            "values-pt-rBR" to "pt-BR",
+            "values-pt-rPT" to "pt-PT",
         )
         for ((directory, language) in languages) {
             val file = File(System.getProperty("cassini.appResources"), "$directory/strings.xml")
-            val elements = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(file).getElementsByTagName("string")
+            val document = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(file)
+            val elements = document.getElementsByTagName("string")
             val strings = (0 until elements.length).associate {
                 val element = elements.item(it) as org.w3c.dom.Element
                 element.getAttribute("name") to element.textContent.replace("\\'", "'")
@@ -133,11 +155,17 @@ class MarkdownExportTest {
         val entries = JSONObject(resource("strings.json")).getJSONArray("entries")
         fun text(id: String): String {
             val entry = (0 until entries.length()).map(entries::getJSONObject).single { it.getString("id") == id }
-            return if (language == "en") entry.getString("en") else entry.getJSONObject("l10n").getJSONObject(language).getString("text")
+            return if (language == "en") {
+                entry.getString("en")
+            } else {
+                entry.getJSONObject("l10n").getJSONObject(language).getString("text")
+            }
         }
         return MarkdownCopy(
-            text("export.markdown.speakersLine"), text("export.markdown.transcriptHeading"),
-            text("export.markdown.notesHeading"), text("meeting.turn.over"),
+            text("export.markdown.speakersLine"),
+            text("export.markdown.transcriptHeading"),
+            text("export.markdown.notesHeading"),
+            text("meeting.turn.over"),
         ) { labels -> labels.dropLast(1).joinToString(", ") + " and " + labels.last() }
     }
 }

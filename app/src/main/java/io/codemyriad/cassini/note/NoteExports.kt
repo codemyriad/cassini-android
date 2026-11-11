@@ -2,7 +2,6 @@ package io.codemyriad.cassini.note
 
 import io.codemyriad.cassini.core.export.ExportNames
 import io.codemyriad.cassini.core.export.MarkdownExport
-import io.codemyriad.cassini.core.export.MarkdownOptions
 import io.codemyriad.cassini.core.format.DocumentState
 import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.speakers.DefaultLabels
@@ -97,14 +96,12 @@ object NoteExports {
         placeholder: (Int) -> String,
         subtitle: String,
         emptyText: String,
-        markdown: MarkdownOptions? = null,
     ): TranscriptExport = TranscriptExport(
         format = format,
         labels = labels(details, placeholder),
         subtitle = subtitle,
         emptyText = emptyText,
         variantId = NoteMapping.selected(details)?.variantId,
-        markdown = markdown,
     )
 
     private val NOT_READABLE =
