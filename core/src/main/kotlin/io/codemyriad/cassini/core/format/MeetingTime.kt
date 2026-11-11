@@ -25,10 +25,14 @@ data class MeetingTime(val source: String, val value: String) {
         LocalDateTime.parse(value)
     } catch (_: DateTimeParseException) {
         val prefix = localPrefix.find(value)?.value?.takeIf { source == LOCAL }
-        if (prefix == null) null else try {
-            LocalDateTime.parse(prefix.replace(' ', 'T'))
-        } catch (_: DateTimeParseException) {
+        if (prefix == null) {
             null
+        } else {
+            try {
+                LocalDateTime.parse(prefix.replace(' ', 'T'))
+            } catch (_: DateTimeParseException) {
+                null
+            }
         }
     }
 
