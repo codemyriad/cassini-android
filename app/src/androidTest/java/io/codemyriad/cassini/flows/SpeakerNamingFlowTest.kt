@@ -13,8 +13,8 @@ import androidx.test.espresso.Espresso
 import io.codemyriad.cassini.MainActivity
 import io.codemyriad.cassini.background.Background
 import io.codemyriad.cassini.core.library.JobKind
-import io.codemyriad.cassini.flows.Flows.import
 import io.codemyriad.cassini.flows.Flows.awaitSealedDocument
+import io.codemyriad.cassini.flows.Flows.import
 import io.codemyriad.cassini.flows.Flows.rows
 import io.codemyriad.cassini.flows.Flows.text
 import io.codemyriad.cassini.flows.Flows.waitShown
