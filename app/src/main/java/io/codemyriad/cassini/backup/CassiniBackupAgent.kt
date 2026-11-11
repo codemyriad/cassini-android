@@ -87,7 +87,9 @@ class CassiniBackupAgent : BackupAgent() {
     }
 
     private fun requireQuiescent() {
-        if ((applicationContext as CassiniApplication).hasStartedGraph()) throw IOException("Library is in use")
+        // Full backup/restore can use the platform's base Application, without our Application.onCreate.
+        val app = applicationContext
+        if (app is CassiniApplication && app.hasStartedGraph()) throw IOException("Library is in use")
     }
 
     private fun abandon(original: Exception) {
