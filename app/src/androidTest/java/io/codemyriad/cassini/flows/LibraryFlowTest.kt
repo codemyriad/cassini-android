@@ -186,7 +186,8 @@ class LibraryFlowTest {
                 notShown,
             )
         }
-        assertTrue("The snackbar appears after the note leaves the library", runBlocking { rows().none { it.id == noteId } })
+        val removed = runBlocking { rows().none { it.id == noteId } }
+        assertTrue("The snackbar appears after the note leaves the library", removed)
     }
 
     /** The bounds of [matcher]'s node once an idle sync no longer moves them. */
