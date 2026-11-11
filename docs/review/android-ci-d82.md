@@ -31,4 +31,22 @@ The workflow now keeps Gradle HTML profiles with the check reports. These expose
 
 ## Validation
 
-The staging tests cover debug and releaseTest layouts, byte-identical copies, exclusion of ARM/universal extras, stale output removal, and missing/ambiguous input refusal. Actionlint and ruff pass locally. Exact-head CI validates the real staged APKs on all four API levels. Candidate artifact bytes and Gradle task timings are recorded after the run.
+The staging tests cover debug and releaseTest layouts, byte-identical copies, exclusion of ARM/universal extras, stale output removal, and missing/ambiguous input refusal. Actionlint and ruff pass locally. Exact-head CI validates the real staged APKs on all four API levels. Run [42979640070](https://github.com/codemyriad/cassini-android/actions/runs/42979640070), head f9998dd4, passed all seven Android jobs, including APIs 26/29/34/35 with the staged APKs. All 31 CI Python tests, actionlint, ruff and links passed locally.
+
+## Candidate measurements
+
+The compact artifact is 129,029,595 bytes versus the old three-input total of 531,747,357: **402,717,762 fewer bytes per API (75.7%)**, or 1,610,871,048 fewer bytes across four downloads. Its upload took 3 s; each matrix download took 1–4 s. The existing full artifact uploads remain, so this adds one compact upload in exchange for four smaller downloads. All four device runs passed without the retry (API 26: 220 s, API 29: 206 s, API 34: 200 s, API 35: 198 s).
+
+The build/unit/lint step took 431 s, within the historical 233–738 s range and above its 351.5 s median. One sample does not establish an end-to-end speedup. The profile's total Gradle build time is 429.76 s, including 4.988 s startup and 4.195 s project configuration. Combining debug assembly avoids a second invocation; it does not remove the instrumentation compilation itself.
+
+Actual task durations from that run's archived Gradle profile:
+
+| Module | Unit test task | Main lint analysis | Test lint analysis |
+| --- | ---: | ---: | ---: |
+| ui | 168.890 s | 115.780 s | unit 27.417 s; Android 1.524 s |
+| app | 89.420 s | 66.290 s | unit 44.052 s; Android 27.556 s |
+| data | 66.880 s | 43.999 s | unit 21.072 s; Android 3.403 s |
+| core | 36.460 s | 156.140 s (JVM main) | JVM test 29.433 s |
+| engine | 13.149 s | 24.514 s | unit 12.965 s; Android 0.622 s |
+
+These tasks overlap, so their durations must not be summed as wall time. UI unit tests include screenshot verification. Main and test lint analysis remain enabled, including transitive core/engine analysis. The HTML profile is in the android-checks artifact under build/reports/profile/; future runs retain the same breakdown. No slow test or lint rule was skipped to obtain the transfer reduction.
