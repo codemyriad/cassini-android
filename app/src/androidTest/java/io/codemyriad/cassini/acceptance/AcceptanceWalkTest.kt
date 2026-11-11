@@ -211,10 +211,12 @@ class AcceptanceWalkTest {
 
         // A transcription paused after its first words.
         graph.processing.transcribe(paused, JobKind.TRANSCRIBE, StartOrigin.SCREEN)
-        awaitDraftWords(paused, "The paused note has draft words")
+        awaitDraftWords(paused, "The paused note has a completed draft window")
         assertTrue(graph.processing.stop(paused))
         catalogue.jobs.queue().await("The note is paused with a checkpoint") { rows ->
-            rows.any { it.job.noteId == paused && it.job.state == JobState.PAUSED && it.job.words > 0 }
+            rows.any {
+                it.job.noteId == paused && it.job.state == JobState.PAUSED && it.job.doneMs > 0 && it.job.words > 0
+            }
         }
 
         // The long note runs during the walk; the short one waits behind it.
@@ -227,7 +229,7 @@ class AcceptanceWalkTest {
     private suspend fun awaitDraftWords(noteId: String, message: String) {
         graph.processing.state.await(message) { state ->
             val phase = state.running?.takeIf { it.noteId == noteId }?.phase as? JobPhase.Transcribing
-            phase?.draft?.words?.isNotEmpty() == true
+            phase != null && phase.progress.doneMs > 0 && phase.draft.words.isNotEmpty()
         }
     }
 
