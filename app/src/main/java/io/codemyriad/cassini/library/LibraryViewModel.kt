@@ -121,7 +121,10 @@ class LibraryViewModel(
     private val listingCache = LibraryListing()
     private val filters = MutableStateFlow(SearchFiltersUi())
     private val calendarRefresh = MutableStateFlow(0L)
-    private val controls = combine(filters, ports.namedSpeakers().distinctUntilChanged().catch { emit(emptyList()) }) { filters, names ->
+    private val controls = combine(
+        filters,
+        ports.namedSpeakers().distinctUntilChanged().catch { emit(emptyList()) },
+    ) { filters, names ->
         filters.copy(speakers = names.toImmutableList())
     }
     private val calendar = combine(ports.calendarZone, calendarRefresh) { zone, _ ->
@@ -153,7 +156,11 @@ class LibraryViewModel(
 
     // Menu inventory is display state, never a search/cache lifetime input.
     private val domainFilters = filters.map { it.domain() }.distinctUntilChanged()
-    private val search: Flow<Pair<String, List<SearchRow>?>> = combine(searchedText, domainFilters, calendar) { text, filters, day ->
+    private val search: Flow<Pair<String, List<SearchRow>?>> = combine(
+        searchedText,
+        domainFilters,
+        calendar,
+    ) { text, filters, day ->
         SearchRequest(text, filters, day.first, day.second)
     }.distinctUntilChanged().flatMapLatest { request ->
         val text = request.text

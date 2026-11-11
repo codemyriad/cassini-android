@@ -47,7 +47,11 @@ internal fun SearchFiltersBar(filters: SearchFiltersUi, onEvent: (LibraryEvent) 
                 selected = name != null,
                 onClick = { speakerMenu = true },
             )
-            CassiniMenu(speakerMenu, onDismissRequest = { speakerMenu = false }, modifier = Modifier.width(280.dp)) {
+            CassiniMenu(
+                speakerMenu,
+                onDismissRequest = { speakerMenu = false },
+                modifier = Modifier.width(280.dp),
+            ) {
                 // An explicit width avoids DropdownMenu's intrinsic-width pass through LazyColumn.
                 LazyColumn(
                     Modifier.width(280.dp).heightIn(max = 320.dp).testTag("speaker-filter-menu"),
