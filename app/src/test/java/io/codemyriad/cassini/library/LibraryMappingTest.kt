@@ -182,11 +182,12 @@ class LibraryMappingTest {
             NOW,
             ROME,
         )
-        val first = results[0]
+        assertEquals(listOf("b", "a"), results.map { it.id })
+        val first = results.single { it.id == "a" }
         assertEquals(DayLabel.Yesterday, first.day)
         assertEquals(Highlighted("the delivery slips", persistentListOf(4..11), true, true), first.preview)
         assertTrue(first.titleRanges.isEmpty())
-        val second = results[1]
+        val second = results.single { it.id == "b" }
         assertEquals("Invoice March", second.title)
         assertEquals(listOf(0..6), second.titleRanges)
         assertNull("a title-only match shows no snippet", second.preview)
