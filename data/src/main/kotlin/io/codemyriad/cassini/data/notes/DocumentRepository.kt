@@ -357,8 +357,8 @@ class DocumentRepository(
     suspend fun exportTranscript(noteId: String, request: TranscriptExport, dest: Uri): ExportOutcome {
         if (refreshIfStale(noteId) == RefreshOutcome.NoNote) return ExportOutcome.NoNote
         return locks.withNoteLock(noteId, dispatchers.io) {
-            val row = notes.note(noteId)
-            val variants = cache.variants(noteId).filter { it.readable }
+            val row = notes.noteBlocking(noteId)
+            val variants = cache.variantsBlocking(noteId).filter { it.readable }
             val variantId = request.variantId
                 ?: row?.selectedVariant?.takeIf { id -> variants.any { it.variantId == id } }
                 ?: variants.firstOrNull { it.isDefault }?.variantId ?: variants.firstOrNull()?.variantId
@@ -368,7 +368,7 @@ class DocumentRepository(
                 request.format == TranscriptFormat.MARKDOWN && request.markdown == null -> ExportOutcome.NotAvailable
                 variantId == null || variants.none { it.variantId == variantId } -> ExportOutcome.NotAvailable
                 else -> {
-                    val words = cache.words(noteId, variantId).map { Word(it.speaker, it.startMs, it.endMs, it.text) }
+                    val words = cache.wordsBlocking(noteId, variantId).map { Word(it.speaker, it.startMs, it.endMs, it.text) }
                     val transcript = ExportTranscript(
                         row.title,
                         row.durationMs,

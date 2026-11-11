@@ -144,6 +144,11 @@ abstract class CacheDao {
     @Query("SELECT * FROM variants WHERE note_id = :noteId ORDER BY ordinal")
     abstract suspend fun variants(noteId: String): List<VariantEntity>
 
+    /** A snapshot for exports while the note's ReentrantLock is held on the IO worker. */
+    @WorkerThread
+    @Query("SELECT * FROM variants WHERE note_id = :noteId ORDER BY ordinal")
+    abstract fun variantsBlocking(noteId: String): List<VariantEntity>
+
     @Query("SELECT * FROM speakers WHERE note_id = :noteId AND variant_id = :variantId ORDER BY ordinal")
     abstract suspend fun speakers(noteId: String, variantId: String): List<SpeakerEntity>
 }
