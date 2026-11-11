@@ -110,7 +110,7 @@ internal fun awaitPlaybackProgress(device: UiDevice, automation: UiAutomation, t
     var moved = false
     play()
     // The slider exposes its range on demand. Position ticks do not each send an accessibility event.
-    val reached = device.wait(object : Condition<UiDevice, Boolean>() {
+    val reached = device.wait(object : Condition<UiDevice, Boolean> {
         override fun apply(device: UiDevice): Boolean {
             val position = playbackPosition(automation.rootInActiveWindow) ?: return false
             if (position.current != start.current) moved = true
