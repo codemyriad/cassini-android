@@ -350,7 +350,7 @@ class DocumentRepository(
     }
 
     /**
-     * A TXT, SRT or VTT export of one variant with the :core writers. The words come from the word cache (refreshed
+     * A TXT, Markdown, SRT or VTT export of one variant with the :core writers. The words come from the word cache (refreshed
      * first), the title and duration from the row. The text is staged under `cacheDir/exports/`, which is cleaned
      * after the write. Not available for plain notes and for UNREADABLE or UNKNOWN_FORMAT documents.
      */
