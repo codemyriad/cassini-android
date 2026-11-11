@@ -64,10 +64,10 @@ transcripts, replace library roots or delete staging trees. Error cleanup is def
 Cold startup finishes the transaction before opening the live Room database or publishing the Library.
 It compares received hash receipts with the inventory and revalidates the staged files. Missing,
 changed, duplicate, linked, unexpected or oversized data refuses startup before live data is replaced.
-A separate preparation root links the read-only notes and voices on the same internal filesystem and
-copies the catalogue before opening and repairing it. The original received catalogue stays unchanged,
-so interrupted migration or cache rebuilding can restart from verified input without copying audio.
-If internal storage cannot create the links, startup refuses promotion and retains the received data.
+Startup reads the received notes in place while it opens and repairs a separate catalogue copy.
+The original received catalogue stays unchanged, so interrupted migration or cache rebuilding can
+restart from verified input. Audio and saved voices are only moved during journaled promotion;
+no hard-link permission or duplicate audio storage is required.
 
 Notes, the repaired catalogue and saved voices are swapped with a durable journal. An interrupted
 replacement first rolls back, retaining the received transaction for a fresh preparation and retry;

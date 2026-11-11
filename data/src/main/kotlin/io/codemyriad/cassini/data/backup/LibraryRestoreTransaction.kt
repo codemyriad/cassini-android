@@ -53,7 +53,7 @@ class LibraryRestoreTransaction internal constructor(
         for (root in ROOTS.reversed()) {
             val target = File(live, root)
             val old = File(File(stage, "old"), root)
-            val replacement = File(File(stage, replacementName(value)), root)
+            val replacement = File(File(stage, replacementName(value, root)), root)
             if (exists(old)) {
                 if (exists(target)) move(target, replacement)
                 move(old, target)
@@ -121,7 +121,7 @@ class LibraryRestoreTransaction internal constructor(
                     move(target, File(File(stage, "old"), root))
                     afterMove()
                 }
-                val replacement = File(File(stage, replacementName(value)), root)
+                val replacement = File(File(stage, replacementName(value, root)), root)
                 if (exists(replacement)) {
                     move(replacement, target)
                     afterMove()
@@ -141,8 +141,8 @@ class LibraryRestoreTransaction internal constructor(
         }
     }
 
-    private fun replacementName(value: JSONObject): String =
-        if (value.optBoolean("deferred")) "prepared" else "incoming"
+    private fun replacementName(value: JSONObject, root: String): String =
+        if (value.optBoolean("deferred") && root.startsWith("cassini.db")) "prepared" else "incoming"
 
     private fun move(from: File, to: File) {
         require(!exists(to)) { "Ambiguous restore recovery" }

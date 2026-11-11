@@ -110,8 +110,8 @@ class LibraryBackup(context: Context, private val paths: AppPaths, private val s
         val manifest = BackupManifest.read(File(incoming, BackupManifest.MANIFEST))
         RestoreReceipts.verify(stage, manifest)
         manifest.verify(incoming)
-        val prepared = RestorePreparation.create(stage, manifest)
-        catalogue.prepare(prepared, File(stage, "cache"))
+        val prepared = RestorePreparation.create(stage)
+        catalogue.prepare(prepared)
         transaction.install(stage)
         transaction.recover()
     }

@@ -19,8 +19,7 @@ import java.nio.file.LinkOption
 
 /** Catalogue I/O belongs to backup preparation or recoverable startup, never restore finalization. */
 internal class BackupCatalogue(private val context: Context) {
-    fun prepare(root: File, cache: File) {
-        val restored = AppPaths(root, cache)
+    fun prepare(restored: AppPaths) {
         // A catalogue lost on the source is rebuilt by the normal startup.
         if (Files.notExists(restored.database.toPath(), LinkOption.NOFOLLOW_LINKS)) return
         val opened = CassiniDatabaseOpener(context, restored).open()
@@ -63,7 +62,7 @@ internal class BackupCatalogue(private val context: Context) {
         }
         checkpoint(restored.database)
         NoteFiles.syncFile(restored.database)
-        NoteFiles.syncDirectory(root)
+        NoteFiles.syncDirectory(restored.database.parentFile!!)
     }
 
     fun checkpoint(file: File) {

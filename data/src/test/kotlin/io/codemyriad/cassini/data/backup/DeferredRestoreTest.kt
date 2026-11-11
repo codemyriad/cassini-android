@@ -48,6 +48,23 @@ class DeferredRestoreTest {
         }
     }
 
+    @Test fun preparationCopiesOnlyTheCatalogueAndReadsReceivedAudioInPlaceWithoutLinks() = offMain {
+        val stage = folder.newFolder()
+        val incoming = File(stage, "incoming")
+        val database = put(incoming, "cassini.db", "Received catalogue")
+        val audio = put(incoming, "notes/n/document.opus", "Received audio")
+        put(incoming, "voices/people.json", "Received voices")
+        val prepared = RestorePreparation.create(stage)
+        assertEquals(incoming, prepared.root)
+        assertEquals(File(stage, "prepared/cassini.db"), prepared.database)
+        assertTrue(Files.isSameFile(audio.toPath(), File(prepared.note("n"), "document.opus").toPath()))
+        assertFalse(File(stage, "prepared/notes").exists())
+        assertFalse(File(stage, "prepared/voices").exists())
+        prepared.database.writeText("Repaired catalogue")
+        assertEquals("Received catalogue", database.readText())
+        assertEquals("Received audio", audio.readText())
+    }
+
     @Test fun finalizationOnlyCommitsAPointerEvenWhenPayloadsAndReceiptsCannotBeScanned() = offMain {
         val source = folder.newFolder()
         put(source, "notes/n/source.opus", "Received audio")
