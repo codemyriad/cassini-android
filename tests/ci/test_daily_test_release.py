@@ -3,10 +3,11 @@
 import importlib.util
 import json
 import os
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location('daily', ROOT / 'scripts/daily-test-release.py')
@@ -17,8 +18,9 @@ SOURCE = 'android {\n    versionCode = 18\n    versionName = "0.4.2-beta.3"\n}\n
 
 
 class API:
-    def __init__(self, main=SHA, green=True, baseline=OLD, records=(), states=None, jobs=()):
+    def __init__(self, main=SHA, green=True, baseline=OLD, baseline_code=18, records=(), states=None, jobs=()):
         self.main, self.is_green, self.baseline = main, green, baseline
+        self.baseline_code = baseline_code
         self.records, self.states, self.jobs = list(records), states or {}, list(jobs)
         self.posts = []
         self.main_reads = 0
@@ -43,7 +45,7 @@ class API:
         return self.is_green
 
     def manual_baseline(self):
-        return self.baseline
+        return (self.baseline, self.baseline_code) if self.baseline else None
 
 
 def reservation(sha=OLD, code=19, beta=4, run_id=20):
@@ -58,7 +60,24 @@ def upload_job(conclusion):
     ]}
 
 
+def workflow_run(status='completed', conclusion='success', sha=SHA, repo='codemyriad/cassini-android',
+                 event='push', branch='main', identifier=1):
+    return {'id': identifier, 'status': status, 'conclusion': conclusion, 'head_sha': sha,
+            'head_branch': branch, 'head_repository': {'full_name': repo}, 'event': event}
+
+
 class DailyReleaseTests(unittest.TestCase):
+    def setUp(self):
+        def git(*args):
+            if args[:3] == ('git', 'tag', '--list'):
+                return ''
+            if args[:2] == ('git', 'merge-base'):
+                return args[2]
+            raise AssertionError(args)
+        git_patch = patch.object(DAILY, 'command', side_effect=git)
+        self.git = git_patch.start()
+        self.addCleanup(git_patch.stop)
+
     def test_red_pending_or_moved_main_never_reserves_or_publishes(self):
         for api in (API(green=False), API(main=OLD)):
             with self.subTest(api=api):
@@ -115,7 +134,7 @@ class DailyReleaseTests(unittest.TestCase):
                 self.assertEqual([], api.posts)
 
     def test_version_changes_reset_beta_but_never_reset_android_version_code(self):
-        self.assertEqual(('0.5.0-beta.1', 43), DAILY.next_version('0.5.0', 20, [
+        self.assertEqual(('0.5.1-beta.1', 43), DAILY.next_version('0.5.0', 20, [
             {'version_name': '0.4.2-beta.27', 'version_code': 42},
         ]))
         self.assertEqual(('0.4.2-beta.4', 19), DAILY.next_version('0.4.2-beta.3', 18, []))
@@ -179,11 +198,27 @@ class DailyReleaseTests(unittest.TestCase):
         with patch.object(DAILY, 'command', return_value=SHA + '\n' + 'c' * 40), patch.object(DAILY.subprocess, 'run'):
             self.assertEqual('- Fix `quoted` title with whitespace (#7)', DAILY.notes(api, OLD, SHA))
 
-    def test_only_a_successful_publish_records_success(self):
-        for success, expected in ((True, 'success'), (False, 'failure')):
+    def test_an_uploaded_bundle_records_success_even_if_a_post_step_failed(self):
+        for workflow_success in (True, False):
             api = API(jobs=[upload_job('success')])
-            DAILY.finish(api, {'deployment_id': 99, 'run_id': 42}, success, 'https://github.com/run')
-            self.assertEqual(expected, api.posts[0][1]['state'])
+            self.assertTrue(DAILY.finish(api, {'deployment_id': 99, 'run_id': 42}, workflow_success, 'https://github.com/run'))
+            self.assertEqual('success', api.posts[0][1]['state'])
+
+    def test_post_upload_job_failure_is_visible_without_forgetting_delivery(self):
+        value = {'deployment_id': 99, 'run_id': 42, 'version_name': '0.4.2-beta.4', 'version_code': 19}
+        api = API(jobs=[upload_job('success')])
+        with tempfile.TemporaryDirectory() as directory, patch.object(DAILY, 'GitHub', return_value=api), \
+                patch('sys.argv', ['daily-test-release.py', 'finish']), patch('builtins.print'), \
+                patch.dict(os.environ, {
+                    'GITHUB_REF': 'refs/heads/main', 'GITHUB_EVENT_NAME': 'workflow_dispatch', 'GITHUB_SHA': SHA,
+                    'DAILY_TEST_PLAN': json.dumps(value), 'PUBLISH_RESULT': 'failure', 'RUN_URL': 'https://github.com/run',
+                    'GITHUB_STEP_SUMMARY': directory + '/summary',
+                }):
+            with self.assertRaises(SystemExit) as raised:
+                DAILY.main()
+            self.assertEqual(1, raised.exception.code)
+            self.assertEqual('success', api.posts[0][1]['state'])
+            self.assertIn('daily test release failed:', Path(directory + '/summary').read_text())
 
     def test_a_successful_workflow_with_a_skipped_upload_is_not_a_test_release(self):
         api = API(jobs=[upload_job('skipped')])
@@ -211,6 +246,12 @@ class DailyReleaseTests(unittest.TestCase):
                 instant = datetime(2026, month, 15, hour, tzinfo=ZoneInfo('Europe/Berlin'))
                 self.assertEqual(expected, instant.astimezone(ZoneInfo('UTC')).hour)
 
+    def test_daily_full_history_and_outcome_checkouts_pin_the_reserved_sha(self):
+        workflow = (ROOT / '.github/workflows/daily-test-release.yml').read_text()
+        self.assertEqual(2, workflow.count('ref: ${{ github.sha }}'))
+        android = (ROOT / '.github/workflows/android.yml').read_text().split('  core-only:', 1)[0]
+        self.assertIn('ref: ${{ github.sha }}', android)
+
     def test_dispatch_from_a_feature_branch_cannot_start_a_release(self):
         with patch.dict(os.environ, {'GITHUB_REF': 'refs/heads/feature', 'GITHUB_EVENT_NAME': 'workflow_dispatch'}):
             with patch('sys.argv', ['daily-test-release.py', 'plan']), self.assertRaises(ValueError):
@@ -218,12 +259,141 @@ class DailyReleaseTests(unittest.TestCase):
 
     def test_latest_ci_must_be_finished_green_for_the_exact_main_sha(self):
         api = object.__new__(DAILY.GitHub)
+        api.repo = 'codemyriad/cassini-android'
         for status, conclusion, sha in [('completed', 'success', SHA), ('in_progress', None, SHA),
                                          ('completed', 'failure', SHA), ('completed', 'success', OLD)]:
             api.request = lambda _, s=status, c=conclusion, h=sha: {'workflow_runs': [
-                {'status': s, 'conclusion': c, 'head_sha': h},
+                workflow_run(status=s, conclusion=c, sha=h),
             ]}
             self.assertEqual(status == 'completed' and conclusion == 'success' and sha == SHA, api.green(SHA))
+
+    def test_pr_runs_at_the_same_sha_cannot_hide_red_main_or_block_green_main(self):
+        api = object.__new__(DAILY.GitHub)
+        api.repo = 'codemyriad/cassini-android'
+        for trusted_green in (True, False):
+            for repository in (api.repo, 'attacker/cassini-android'):
+                api.request = Mock(return_value={'workflow_runs': [
+                    workflow_run(repo=repository, event='pull_request',
+                                 conclusion='failure' if trusted_green else 'success'),
+                    workflow_run(conclusion='success' if trusted_green else 'failure'),
+                ]})
+                self.assertEqual(trusted_green, api.green(SHA))
+        api.request = Mock(return_value={'workflow_runs': [
+            workflow_run(event='workflow_dispatch', status='in_progress', conclusion=None), workflow_run(),
+        ]})
+        self.assertFalse(api.green(SHA))  # Never fall back to an older green trusted run.
+
+    def test_foreign_push_at_the_same_sha_cannot_hide_red_main(self):
+        api = object.__new__(DAILY.GitHub)
+        api.repo = 'codemyriad/cassini-android'
+        api.request = Mock(return_value={'workflow_runs': [
+            workflow_run(repo='attacker/cassini-android'), workflow_run(conclusion='failure'),
+        ]})
+        self.assertFalse(api.green(SHA))
+
+    def test_ci_lookup_paginates_past_fork_and_pr_runs(self):
+        api = object.__new__(DAILY.GitHub)
+        api.repo = 'codemyriad/cassini-android'
+        for conclusion in ('success', 'failure'):
+            api.request = Mock(side_effect=[
+                {'workflow_runs': [workflow_run(repo='attacker/cassini-android', event='pull_request')] * 100},
+                {'workflow_runs': [workflow_run(conclusion=conclusion)]},
+            ])
+            self.assertEqual(conclusion == 'success', api.green(SHA))
+            self.assertEqual(2, api.request.call_count)
+            self.assertIn('page=2', api.request.call_args.args[0])
+
+    def test_manual_baseline_only_accepts_this_repositories_push_run(self):
+        api = object.__new__(DAILY.GitHub)
+        api.repo = 'codemyriad/cassini-android'
+        tag = 'v0.4.2-beta.3'
+        def request(path, data=None):
+            if path.startswith('releases?'):
+                return [{'tag_name': tag, 'draft': False}]
+            if path.startswith('actions/workflows/'):
+                self.assertIn('event=push', path)
+                return {'workflow_runs': [
+                    workflow_run(branch=tag, event='pull_request', identifier=1),
+                    workflow_run(branch=tag, repo='attacker/cassini-android', identifier=2),
+                    workflow_run(branch=tag, identifier=3),
+                ]}
+            self.assertEqual('actions/runs/3/jobs?per_page=100', path)
+            return {'jobs': [{'name': 'play', 'steps': upload_job('success')['steps']}]}
+        api.request = request
+        with patch.object(DAILY, 'command', side_effect=lambda *args: SOURCE if args[1] == 'show' else SHA):
+            self.assertEqual((SHA, 18), api.manual_baseline())
+
+    def test_failed_acknowledgements_do_not_read_expired_workflow_runs(self):
+        api = API(records=[reservation()], states={'deployments/19/statuses': [{'state': 'failure'}]})
+        original = api.request
+        def request(path, data=None):
+            self.assertFalse(path.startswith('actions/runs/'))
+            return original(path, data)
+        api.request = request
+        with patch.object(DAILY, 'notes', return_value='- Fixture'):
+            self.assertTrue(DAILY.plan(api, SHA, SOURCE, 42)['build'])
+
+    def test_missing_orphaned_run_is_not_success_and_other_api_errors_propagate(self):
+        api = API(records=[reservation()])
+        original = api.request
+        def request(path, data=None):
+            if path.startswith('actions/runs/'):
+                raise subprocess.CalledProcessError(1, ['gh'], stderr='gh: Not Found (HTTP 404)')
+            return original(path, data)
+        api.request = request
+        with patch.object(DAILY, 'notes', return_value='- Fixture'):
+            self.assertTrue(DAILY.plan(api, SHA, SOURCE, 42)['build'])
+        api.request = Mock(side_effect=subprocess.CalledProcessError(1, ['gh'], stderr='gh: Forbidden (HTTP 403)'))
+        with self.assertRaises(subprocess.CalledProcessError):
+            DAILY.run_uploaded(api, 20)
+
+    def test_stable_release_advances_to_the_next_patch_beta(self):
+        records = [{'version_name': '0.4.2-beta.8', 'version_code': 24}]
+        self.assertEqual(('0.4.3-beta.1', 25), DAILY.next_version('0.4.2', 24, records))
+        self.assertEqual(('0.4.3-beta.1', 25), DAILY.next_version('0.4.2-beta.3', 18, records, released=True))
+        self.assertEqual(('0.4.3-beta.5', 27), DAILY.next_version('0.4.2', 24, [
+            *records, {'version_name': '0.4.3-beta.4', 'version_code': 26},
+        ]))
+
+    def test_reserved_next_patch_beta_can_be_applied_to_a_stable_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'app').mkdir()
+            file = root / 'app/build.gradle.kts'
+            file.write_text(SOURCE.replace('0.4.2-beta.3', '0.4.2'))
+            value = {'build': True, 'sha': SHA, 'version_name': '0.4.3-beta.1',
+                     'version_code': 19, 'notes': '<Generic>'}
+            DAILY.apply(value, SHA, root)
+            self.assertEqual(('0.4.3-beta.1', 19), DAILY.source_version(file.read_text()))
+            self.assertEqual('[Generic]', (root / 'metadata/en-US/changelogs/19.txt').read_text())
+            self.assertEqual('<Generic>\n', (root / 'test-release-notes.md').read_text())
+
+    def test_a_stable_tag_on_a_beta_source_reserves_the_next_patch(self):
+        api = API()
+        with patch.object(DAILY, 'command', side_effect=lambda *args: 'v0.4.2' if args[1] == 'tag' else OLD), \
+                patch.object(DAILY, 'notes', return_value='- Main changes'):
+            value = DAILY.plan(api, SHA, SOURCE, 42)
+        self.assertTrue(value['stable_released'])
+        self.assertEqual('0.4.3-beta.1', value['version_name'])
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'app').mkdir()
+            file = root / 'app/build.gradle.kts'
+            file.write_text(SOURCE)
+            DAILY.apply(value, SHA, root)
+            self.assertEqual(('0.4.3-beta.1', 19), DAILY.source_version(file.read_text()))
+            file.write_text(SOURCE)
+            with self.assertRaises(ValueError):
+                DAILY.apply({**value, 'stable_released': False}, SHA, root)
+
+    def test_divergent_manual_hotfix_uses_the_merge_base_and_its_code_floor(self):
+        api = API(baseline=OLD, baseline_code=40)
+        common = 'c' * 40
+        with patch.object(DAILY, 'command', side_effect=lambda *args: common if args[1] == 'merge-base' else ''), \
+                patch.object(DAILY, 'notes', return_value='- Main changes') as notes:
+            value = DAILY.plan(api, SHA, SOURCE, 42)
+        self.assertEqual(common, notes.call_args.args[1])
+        self.assertEqual(41, value['version_code'])
 
 
 if __name__ == '__main__':

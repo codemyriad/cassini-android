@@ -123,9 +123,10 @@ It skips with an Actions notice and summary when main has moved, its latest Andr
 commit has already reached the internal track. A manual test-tag upload counts too.
 
 The job reserves the next `beta.N` and a higher `versionCode` in the repository's
-`android-play-internal-test` deployment ledger. Failed reservations consume their number. The source stays on
+`android-play-internal-test` deployment ledger. Failed reservations consume their number. A bare stable source version or an existing stable tag advances
+tests to the next patch beta; tagged manual releases also raise the versionCode floor. The source stays on
 main: only the runner's workspace version and English Play changelog change. Complete merged-PR titles are in
-`internal-test-release-plan`; Play shows the first 500 characters. Job outputs carry only reserved metadata
+`internal-test-release-plan`; Play gets plain text with angle brackets replaced and at most 500 UTF-16 units (without splitting supplementary characters). Job outputs carry only reserved metadata
 and a notes hash: arbitrary PR titles stay in the artifact so GitHub secret masking cannot discard the plan. Before a manual tagged release, choose a
 versionCode higher than all ledger reservations as well as the earlier Play uploads.
 
@@ -135,7 +136,10 @@ through the same `android.yml`. Its daily signing job always uses GitHub-hosted 
 signing/Play secrets and `PLAY_RELEASE_STATUS=completed` (or unset, which defaults to completed).
 No automatic source commit, Git tag, GitHub release, production track, tester or signing change is made.
 
-The outcome records success only after upload. A lost deployment acknowledgement is reconciled against the
+The outcome records whether the actual upload succeeded, even if a later job post-step failed. Closed failures
+never require expired workflow logs; only unacknowledged attempts are reconciled, and an expired HTTP 404 is not success.
+CI eligibility accepts only same-repository push/dispatch runs; PR/fork runs at the same SHA are ignored.
+Full-history and outcome checkouts pin the scheduled SHA. A lost deployment acknowledgement is reconciled against the
 actual upload step before deciding whether main is unchanged. Failure emits
 `[Android] daily test release failed: <cause>` as an Actions error and job summary, the coordinator's selected
 reporting channel. There is no new retry loop. API calls and subprocesses have outer hang guards.

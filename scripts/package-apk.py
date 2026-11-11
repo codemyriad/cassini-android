@@ -11,6 +11,7 @@ from pathlib import Path
 
 from apk_compatibility import check_apk_compatibility
 from apk_models import check_apk_models, whistle_model_pins
+from play_changelog import utf16_units
 
 
 def check_signed_release(apk_source, sdk, expected):
@@ -109,7 +110,7 @@ if os.environ.get('IS_TAG') == 'true':
         raise SystemExit(f'Tag build has no Play release notes at {notes}')
     (play / 'whatsnew').mkdir(exist_ok=True)
     for notes in sorted(Path('metadata').glob(f'*/changelogs/{element["versionCode"]}.txt')):
-        if len(notes.read_text().strip()) > 500:
-            raise SystemExit(f'{notes} is longer than the 500 characters that Play accepts')
+        if utf16_units(notes.read_text().strip()) > 500:
+            raise SystemExit(f'{notes} is longer than the 500 UTF-16 units that Play accepts')
         locale = notes.parent.parent.name
         shutil.copyfile(notes, play / 'whatsnew' / f'whatsnew-{locale}')

@@ -32,6 +32,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          ref: ${{ github.sha }}
       - name: Check main, collect merged PR titles and reserve the next test number
         id: plan
         env:
@@ -80,6 +81,8 @@ jobs:
           echo '[Android] daily test release failed: release preparation failed.' >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: needs.plan.outputs.build == 'true'
+        with:
+          ref: ${{ github.sha }}
       - name: Record the internal release or report its failure
         if: needs.plan.outputs.build == 'true'
         env:

@@ -9,7 +9,12 @@ import json
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
+
+# -I omits the script directory; import only this checkout's trusted helper.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from play_changelog import format_play_notes  # noqa: E402
 
 ENVIRONMENT = 'android-play-internal-test'
 VERSION = re.compile(r'(\d+\.\d+\.\d+)(?:-beta\.(\d+))?')
@@ -34,36 +39,45 @@ class GitHub:
                                 capture_output=True, text=True, timeout=60, check=True)
         return json.loads(result.stdout)
 
-    def pages(self, path: str):
+    def pages(self, path: str, key: str | None = None):
         separator = '&' if '?' in path else '?'
         page = 1
         while True:
-            rows = self.request(f'{path}{separator}per_page=100&page={page}')
+            response = self.request(f'{path}{separator}per_page=100&page={page}')
+            rows = response[key] if key else response
             yield from rows
             if len(rows) < 100:
                 return
             page += 1
 
-    def green(self, sha: str) -> bool:
-        path = f'actions/workflows/android.yml/runs?branch=main&head_sha={sha}&per_page=1'
-        runs = self.request(path)['workflow_runs']
-        return bool(runs and runs[0]['head_sha'] == sha and runs[0]['status'] == 'completed' and
-                    runs[0]['conclusion'] == 'success')
+    def runs(self, branch: str, sha: str, event: str | None = None):
+        path = f'actions/workflows/android.yml/runs?branch={branch}&head_sha={sha}'
+        if event:
+            path += f'&event={event}'
+        for run in self.pages(path, 'workflow_runs'):
+            repository = (run.get('head_repository') or {}).get('full_name')
+            allowed = {event} if event else {'push', 'workflow_dispatch'}
+            if (repository == self.repo and run.get('event') in allowed and
+                    run.get('head_sha') == sha and run.get('head_branch') == branch):
+                yield run
 
-    def manual_baseline(self) -> str | None:
+    def green(self, sha: str) -> bool:
+        run = next(self.runs('main', sha), None)
+        return bool(run and run['status'] == 'completed' and run['conclusion'] == 'success')
+
+    def manual_baseline(self) -> tuple[str, int] | None:
         for release in self.pages('releases'):
             tag = release['tag_name']
             if release['draft'] or not VERSION.fullmatch(tag.removeprefix('v')):
                 continue
             sha = command('git', 'rev-parse', f'{tag}^{{commit}}')
-            path = f'actions/workflows/android.yml/runs?branch={tag}&head_sha={sha}&per_page=1'
-            runs = self.request(path)['workflow_runs']
-            if not runs or runs[0]['conclusion'] != 'success':
+            run = next(self.runs(tag, sha, 'push'), None)
+            if not run or run['conclusion'] != 'success':
                 continue
-            jobs = self.request(f'actions/runs/{runs[0]["id"]}/jobs?per_page=100')['jobs']
+            jobs = self.request(f'actions/runs/{run["id"]}/jobs?per_page=100')['jobs']
             if any(step['name'] == 'Upload to the internal testing track' and step['conclusion'] == 'success'
                    for job in jobs if job['name'] == 'play' for step in job['steps']):
-                return sha
+                return sha, source_version(command('git', 'show', f'{tag}:app/build.gradle.kts'))[1]
         return None
 
 
@@ -75,11 +89,21 @@ def source_version(text: str) -> tuple[str, int]:
     return name[1], int(code[1])
 
 
-def next_version(name: str, code: int, reservations: list[dict]) -> tuple[str, int]:
+def beta_base(name: str, released: bool = False) -> str:
+    match = VERSION.fullmatch(name)
+    base = match[1]
+    if match[2] is None or released:
+        prefix, patch = base.rsplit('.', 1)
+        return f'{prefix}.{int(patch) + 1}'
+    return base
+
+
+def next_version(name: str, code: int, reservations: list[dict], released: bool = False) -> tuple[str, int]:
     match = VERSION.fullmatch(name)
     if match is None:
         raise ValueError('Unsupported source version')
-    base, beta = match[1], int(match[2] or 0)
+    base = beta_base(name, released)
+    beta = int(match[2] or 0) if base == match[1] else 0
     for item in reservations:
         prior_name = item.get('version_name')
         prior = VERSION.fullmatch(prior_name) if isinstance(prior_name, str) else None
@@ -117,6 +141,15 @@ def uploaded(jobs: list[dict]) -> bool:
                for job in jobs if job["name"] == "play" or job["name"].endswith(" / play") for step in job["steps"])
 
 
+def run_uploaded(api: GitHub, run_id: int) -> bool:
+    try:
+        return uploaded(api.request(f'actions/runs/{run_id}/jobs?per_page=100')['jobs'])
+    except subprocess.CalledProcessError as error:
+        if '(HTTP 404)' not in (error.stderr or ''):
+            raise
+        return False
+
+
 def plan(api: GitHub, sha: str, text: str, run_id: int) -> dict:
     if not SHA.fullmatch(sha):
         raise ValueError('Invalid main commit')
@@ -124,6 +157,7 @@ def plan(api: GitHub, sha: str, text: str, run_id: int) -> dict:
         return {'build': False, 'reason': 'main moved before planning'}
     if not api.green(sha):
         return {'build': False, 'reason': 'latest main CI is not green'}
+    source_name, code_floor = source_version(text)
     reservations, baseline = [], None
     for deployment in api.pages(f'deployments?environment={ENVIRONMENT}'):
         payload = deployment['payload']
@@ -131,24 +165,27 @@ def plan(api: GitHub, sha: str, text: str, run_id: int) -> dict:
             raise ValueError('Invalid test-release ledger')
         reservations.append(payload)
         if baseline is None:
-            success = any(status['state'] == 'success' for status in
-                          api.pages(f'deployments/{deployment["id"]}/statuses'))
-            if not success and payload.get('run_id'):
-                # An upload can succeed just before recording its deployment status fails.
-                # Reconcile the actual upload step; do not publish the same main again for a lost acknowledgement.
-                jobs = api.request(f'actions/runs/{payload["run_id"]}/jobs?per_page=100')['jobs']
-                success = uploaded(jobs)
+            states = {status['state'] for status in api.pages(f'deployments/{deployment["id"]}/statuses')}
+            success = 'success' in states
+            if not states.intersection({'success', 'failure'}) and payload.get('run_id'):
+                success = run_uploaded(api, payload['run_id'])
             if success:
                 baseline = deployment['sha']
     if baseline != sha:
         manual = api.manual_baseline()
-        if manual and (baseline is None or manual == sha or subprocess.run(
-            ['git', 'merge-base', '--is-ancestor', baseline, manual], timeout=60, check=False,
-        ).returncode == 0):
-            baseline = manual
+        if manual:
+            manual_sha, manual_code = manual
+            code_floor = max(code_floor, manual_code)
+            common = manual_sha if manual_sha == sha else command('git', 'merge-base', manual_sha, sha)
+            if baseline is None or common == sha or common == baseline or subprocess.run(
+                ['git', 'merge-base', '--is-ancestor', baseline, common], timeout=60, check=False,
+            ).returncode == 0:
+                baseline = common
     if baseline == sha:
         return {'build': False, 'reason': 'main is unchanged since the last internal test release'}
-    name, code = next_version(*source_version(text), reservations)
+    base = VERSION.fullmatch(source_name)[1]
+    released = bool(command('git', 'tag', '--list', f'v{base}'))
+    name, code = next_version(source_name, code_floor, reservations, released)
     body = notes(api, baseline, sha)
     if api.request('commits/main')['sha'] != sha or not api.green(sha):
         return {'build': False, 'reason': 'main or its CI changed while planning'}
@@ -156,7 +193,8 @@ def plan(api: GitHub, sha: str, text: str, run_id: int) -> dict:
     deployment = api.request('deployments', {'ref': sha, 'environment': ENVIRONMENT, 'auto_merge': False,
                                            'required_contexts': [], 'transient_environment': True,
                                            'production_environment': False, 'payload': payload})
-    return {'build': True, 'sha': sha, 'deployment_id': deployment['id'], **payload, 'notes': body}
+    return {'build': True, 'sha': sha, 'deployment_id': deployment['id'], **payload,
+            'stable_released': released, 'notes': body}
 
 
 def plan_metadata(value: dict) -> dict:
@@ -183,7 +221,7 @@ def apply(value: dict, sha: str, root: Path):
     if (not isinstance(value.get('version_name'), str) or not VERSION.fullmatch(value['version_name']) or
             type(value['version_code']) is not int or
             not old_code < value['version_code'] <= 2_100_000_000 or
-            VERSION.fullmatch(old_name)[1] != VERSION.fullmatch(value['version_name'])[1]):
+            VERSION.fullmatch(value['version_name'])[1] != beta_base(old_name, value.get('stable_released', False))):
         raise ValueError('Invalid test version')
     text = re.sub(r'(?m)^(\s*versionCode = )\d+$', lambda m: m[1] + str(value['version_code']), file.read_text())
     text = re.sub(r'(?m)^(\s*versionName = )"[^"]+"$', lambda m: m[1] + json.dumps(value['version_name']), text)
@@ -191,15 +229,13 @@ def apply(value: dict, sha: str, root: Path):
     directory = root / 'metadata/en-US/changelogs'
     directory.mkdir(parents=True, exist_ok=True)
     body = value['notes']
-    # Preserve the full PR titles in the plan artifact; Play permits at most 500 characters.
-    (directory / f'{value["version_code"]}.txt').write_text(body if len(body) <= 500 else body[:497] + '...')
+    # Complete titles remain verbatim; only Play's bounded plain-text copy is sanitized.
+    (directory / f'{value["version_code"]}.txt').write_text(format_play_notes(body))
     (root / 'test-release-notes.md').write_text(body + '\n')
 
 
-def finish(api: GitHub, value: dict, success: bool, url: str) -> bool:
-    if success:
-        jobs = api.request(f'actions/runs/{value["run_id"]}/jobs?per_page=100')['jobs']
-        success = uploaded(jobs)
+def finish(api: GitHub, value: dict, _workflow_success: bool, url: str) -> bool:
+    success = run_uploaded(api, value['run_id'])
     api.request(f'deployments/{value["deployment_id"]}/statuses',
                 {'state': 'success' if success else 'failure', 'log_url': url, 'auto_inactive': False})
     return success
@@ -235,8 +271,11 @@ def main():
         if args.mode == 'apply':
             apply(load_plan(value, Path('.')), sha, Path('.'))
         else:
-            success = os.environ['PUBLISH_RESULT'] == 'success'
-            success = finish(GitHub(), value, success, os.environ['RUN_URL'])
+            workflow_success = os.environ['PUBLISH_RESULT'] == 'success'
+            success = finish(GitHub(), value, workflow_success, os.environ['RUN_URL'])
+            if success and not workflow_success:
+                report(f'failed: publishing workflow ended {os.environ["PUBLISH_RESULT"]} after upload succeeded', True)
+                raise SystemExit(1)
             report(f'published: {value["version_name"]} ({value["version_code"]})' if success else
                    f'failed: build, device checks or internal upload failed ({os.environ["RUN_URL"]})', not success)
             if not success:
