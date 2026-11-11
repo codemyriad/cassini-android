@@ -594,11 +594,5 @@
     <string name="ui_meeting_duration_minutes">{m} min</string>
     <!-- cassini-ux library.group.unknownDate (D95); see docs/recorded-at.md. -->
     <string name="ui_day_unknown">Fecha desconocida</string>
-    <string name="ui_search_filter_anyDate">Cualquier fecha</string>
-    <string name="ui_search_filter_recordedByMe">Grabadas por mí</string>
-    <string name="ui_search_filter_speaker">Hablante: {name}</string>
-    <string name="ui_search_filter_speakerNone">Hablante</string>
-    <string name="ui_search_filter_anySpeaker">Cualquier hablante</string>
-    <string name="ui_search_filter_date_today">Hoy</string>
-    <string name="ui_search_filter_date_week">Últimos 7 días</string>
-    <string name="ui_search_filter_date_month">Últimos 30 días</string>
+    <string name="ui_search_filter_any_date">Cualquier fecha</string>
+    <string name="ui_search_filter_recorded_by_me">Grabadas por mí</string>

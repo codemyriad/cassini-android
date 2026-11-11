@@ -37,10 +37,14 @@ class SearchCatalogTest {
             for (index in 0 until entries.length()) {
                 val entry = entries.getJSONObject(index)
                 val id = entry.getString("id")
-                val expected = if (language == "en") entry.getString("en") else {
+                val expected = if (language == "en") {
+                    entry.getString("en")
+                } else {
                     entry.getJSONObject("l10n").getJSONObject(language).getString("text")
                 }
-                assertEquals("$language/$id", expected, strings["ui_" + id.replace('.', '_')])
+                val name = "ui_" + id.replace('.', '_').replace(Regex("([a-z])([A-Z])"), "$1_$2")
+                    .lowercase(java.util.Locale.ROOT)
+                assertEquals("$language/$id", expected, strings[name])
             }
         }
     }

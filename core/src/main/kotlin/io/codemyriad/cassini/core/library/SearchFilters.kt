@@ -14,6 +14,7 @@ data class SearchFilters(
 }
 
 /** Calendar days, rather than multiples of 24 hours: daylight-saving transitions belong to their local date. */
+@Suppress("MagicNumber") // The exact 7/30-day choices from D14.
 enum class SearchDate(private val days: Long?) {
     ANY(null),
     TODAY(1),

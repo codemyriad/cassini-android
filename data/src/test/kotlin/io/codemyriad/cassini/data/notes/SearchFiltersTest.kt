@@ -47,9 +47,10 @@ class SearchFiltersTest {
     ) {
         val row = note(id, title, createdAt).copy(origin = origin)
         val cache = cache(row, listOf("v1" to words))
-        h.db.cache().replaceCache(cache.copy(speakers = cache.speakers.map {
+        val speakers = cache.speakers.map {
             labels[it.speakerId]?.let { label -> it.copy(label = label, isPlaceholder = false) } ?: it
-        }))
+        }
+        h.db.cache().replaceCache(cache.copy(speakers = speakers))
     }
 
     private suspend fun search(query: String, filters: SearchFilters = SearchFilters()) =
@@ -61,9 +62,8 @@ class SearchFiltersTest {
         val found = search("CAF", SearchFilters(speaker = "bEn")).single()
         assertEquals("café", SearchQuery.highlights(found.snippet).text)
         assertEquals("Café review", found.titleSnippet)
-        assertEquals(listOf("café"), SearchQuery.highlights(found.snippet).ranges.map {
-            SearchQuery.highlights(found.snippet).text.substring(it)
-        })
+        val highlighted = SearchQuery.highlights(found.snippet)
+        assertEquals(listOf("café"), highlighted.ranges.map { highlighted.text.substring(it) })
         assertTrue(search("review", SearchFilters(speaker = "Ben")).isEmpty())
         assertEquals(1, search("review").size)
     }
@@ -103,7 +103,9 @@ class SearchFiltersTest {
             row,
             listOf("v1" to listOf(Word("S1", 0, 400, "delivery")), "v2" to listOf(Word("S2", 0, 400, "delivery"))),
         )
-        val speakers = cached.speakers.map { it.copy(label = if (it.speakerId == "S1") "Ada" else "Ben", isPlaceholder = false) }
+        val speakers = cached.speakers.map {
+            it.copy(label = if (it.speakerId == "S1") "Ada" else "Ben", isPlaceholder = false)
+        }
         h.db.cache().replaceCache(cached.copy(speakers = speakers))
         assertEquals(listOf("Ada"), h.notes.namedSpeakers().first())
         assertEquals(1, search("deliv", SearchFilters(speaker = "Ada")).size)
@@ -132,7 +134,9 @@ class SearchFiltersTest {
         val reading = io.codemyriad.cassini.core.export.ReadingTurns.of(words, true)
         val chip = reading.rows.flatMap { it.members }.first { it.interjectionSpeaker != null }
         val chipWord = words[chip.wordIndices.first()]
-        val labels = words.map { it.speaker }.distinct().associateWith { if (it == chipWord.speaker) "Reply Person" else "Host Person" }
+        val labels = words.map { it.speaker }.distinct().associateWith {
+            if (it == chipWord.speaker) "Reply Person" else "Host Person"
+        }
         insert("chip", words, labels = labels)
         val found = search(chipWord.text, SearchFilters(speaker = "Reply Person")).single()
         assertTrue(found.snippet.contains(SearchQuery.MATCH_START))

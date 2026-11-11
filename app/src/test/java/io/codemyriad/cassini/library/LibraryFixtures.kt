@@ -5,13 +5,12 @@ import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.core.library.Origin
+import io.codemyriad.cassini.core.library.SearchFilters
 import io.codemyriad.cassini.data.db.JobEntity
 import io.codemyriad.cassini.data.db.LibraryRow
 import io.codemyriad.cassini.data.db.NoteDetails
 import io.codemyriad.cassini.data.db.NoteEntity
 import io.codemyriad.cassini.data.db.SearchRow
-import io.codemyriad.cassini.core.library.SearchFilters
-import java.time.LocalDate
 import io.codemyriad.cassini.data.notes.RenameOutcome
 import io.codemyriad.cassini.notices.NoticeFacts
 import io.codemyriad.cassini.notices.TrashedNote
@@ -25,6 +24,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import java.time.Clock
 import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
 

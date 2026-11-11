@@ -33,14 +33,16 @@ internal fun SearchFiltersBar(filters: SearchFiltersUi, onEvent: (LibraryEvent) 
         Box {
             val name = filters.speaker
             SearchChip(
-                if (name == null) stringResource(R.string.ui_search_filter_speakerNone) else {
+                if (name == null) {
+                    stringResource(R.string.ui_search_filter_speaker_none)
+                } else {
                     stringResource(R.string.ui_search_filter_speaker).replace("{name}", name)
                 },
                 selected = name != null,
                 onClick = { speakerMenu = true },
             )
             CassiniMenu(speakerMenu, onDismissRequest = { speakerMenu = false }) {
-                CassiniMenuItem(stringResource(R.string.ui_search_filter_anySpeaker), onClick = {
+                CassiniMenuItem(stringResource(R.string.ui_search_filter_any_speaker), onClick = {
                     speakerMenu = false
                     onEvent(LibraryEvent.FilterSpeaker(null))
                 })
@@ -64,7 +66,7 @@ internal fun SearchFiltersBar(filters: SearchFiltersUi, onEvent: (LibraryEvent) 
             }
         }
         SearchChip(
-            stringResource(R.string.ui_search_filter_recordedByMe),
+            stringResource(R.string.ui_search_filter_recorded_by_me),
             filters.recordedByMe,
             onClick = { onEvent(LibraryEvent.ToggleRecordedByMe) },
         )
@@ -91,7 +93,7 @@ private fun SearchChip(text: String, selected: Boolean, onClick: () -> Unit) {
 @Composable
 private fun dateLabel(date: SearchDateUi): String = stringResource(
     when (date) {
-        SearchDateUi.ANY -> R.string.ui_search_filter_anyDate
+        SearchDateUi.ANY -> R.string.ui_search_filter_any_date
         SearchDateUi.TODAY -> R.string.ui_search_filter_date_today
         SearchDateUi.WEEK -> R.string.ui_search_filter_date_week
         SearchDateUi.MONTH -> R.string.ui_search_filter_date_month
