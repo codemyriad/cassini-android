@@ -31,7 +31,7 @@ class CassiniBackupAgent : BackupAgent() {
         requireQuiescent()
         val flags = if (Build.VERSION.SDK_INT >= BackupChoices.TRANSPORT_FLAGS_API) data.transportFlags else 0
         if (!choices.readBlocking().permits(Build.VERSION.SDK_INT, flags)) {
-            // A failed operation preserves an earlier OS snapshot; a successful empty one could replace it.
+            // Refuse before emitting library bytes; a successful empty archive could replace earlier data.
             throw IOException("This backup transport is disabled")
         }
         val (manifest, inventory) = library.prepare()

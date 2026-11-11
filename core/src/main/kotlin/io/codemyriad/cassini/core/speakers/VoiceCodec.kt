@@ -4,7 +4,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
-/** A person the user named, as the running mean of their confirmed voiceprints. Stored only on this phone. */
+/**
+ * A person the user named, as the running mean of their confirmed voiceprints.
+ * Private app data; enabled OS transfer and backup can include it.
+ */
 data class Voice(val id: String, val name: String, val model: String, val mean: FloatArray,
                  val count: Int, val seconds: Double, val createdAt: Long, val updatedAt: Long) {
     fun json(): JSONObject = JSONObject().put("id", id).put("name", name).put("model", model).put("dim", mean.size)
