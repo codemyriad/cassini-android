@@ -373,7 +373,8 @@ class DocumentRepositoryTest {
             {
                 "gocassini.com":{"notes":[{"atMs":5000,"text":"Keep *this*"},{"atMs":1000,"text":"Earlier"}],"unknown":"kept"},
                 "example.org":{"secret":"not exported"}
-            }""".trimIndent(),
+            }
+            """.trimIndent(),
         )
         CassiniDocument.create(
             fixtureOpus,

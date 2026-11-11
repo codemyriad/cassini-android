@@ -604,10 +604,11 @@ class DocumentRepository(
             ?.optJSONArray("notes") ?: return emptyList()
         return (0 until notes.length()).mapNotNull { index ->
             val note = notes.optJSONObject(index)
-            val time = note?.opt("atMs") as? Number
+            val atMs = (note?.opt("atMs") as? Number)?.let { time ->
+                time.toLong().takeIf { it >= 0 && time.toDouble() == it.toDouble() }
+            }
             val text = note?.opt("text") as? String
-            val atMs = time?.toLong()
-            if (time != null && atMs != null && text != null && atMs >= 0 && time.toDouble() == atMs.toDouble()) {
+            if (atMs != null && text != null) {
                 MarkdownNote(atMs, text)
             } else {
                 null
