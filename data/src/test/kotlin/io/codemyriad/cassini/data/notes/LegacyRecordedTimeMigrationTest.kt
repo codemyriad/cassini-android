@@ -5,11 +5,14 @@ import android.net.Uri
 import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import io.codemyriad.cassini.core.format.CassiniDocument
+import io.codemyriad.cassini.core.format.DocumentState
+import io.codemyriad.cassini.core.format.OggOpus
 import io.codemyriad.cassini.data.AppPaths
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.json.JSONObject
 import org.junit.After
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -77,6 +80,49 @@ class LegacyRecordedTimeMigrationTest {
         assertTrue(imported.toString(), imported is ImportOutcome.Created)
         val copy = h.row((imported as ImportOutcome.Created).noteId)
         assertEquals(start, copy.recordingTime()?.instant)
+    }
+
+    @Test fun realV1UnverifiedAudioWithholdsItsCandidateUntilTheValidAudioReturns() = runTest {
+        migrate("own-v1.db")
+        val file = h.document(id)
+        val valid = file.readBytes()
+        val stream = OggOpus.read(valid)
+        file.writeBytes(OggOpus.mux(stream.copy(finalGranule = 0), stream.tags))
+        assertEquals(listOf(id), h.documents.refreshInvalidatedMetadata())
+        assertEquals(DocumentState.UNVERIFIED, h.row(id).documentState)
+        assertNull(h.row(id).captureStartedAt)
+        assertNull(h.row(id).captureAudioSha256)
+        assertEquals(start.toEpochMilli(), h.row(id).legacyCaptureCandidate)
+        assertNull(h.notes.library().first().single().recordingTime())
+        val oldMtime = file.lastModified()
+        file.writeBytes(valid)
+        assertTrue(file.setLastModified(oldMtime + 1))
+        h.documents.refreshIfStale(id)
+        assertEquals(DocumentState.OK, h.row(id).documentState)
+        assertEquals(start.toEpochMilli(), h.row(id).captureStartedAt)
+        assertNull(h.row(id).legacyCaptureCandidate)
+        assertEquals(start, h.notes.library().first().single().recordingTime()?.instant)
+    }
+
+    @Test fun realV1DigestMismatchNeverPromotesTheClockAndExportsTheExactStaleBytes() = runTest {
+        migrate("own-v1.db")
+        val file = h.document(id)
+        val stream = OggOpus.read(file.readBytes())
+        val packets = stream.audio.toMutableList()
+        packets[0] = packets[0].clone().also { it[it.lastIndex] = (it.last().toInt() xor 1).toByte() }
+        val stale = OggOpus.mux(stream.copy(audio = packets), stream.tags)
+        file.writeBytes(stale)
+        assertEquals(listOf(id), h.documents.refreshInvalidatedMetadata())
+        assertEquals(DocumentState.STALE_AUDIO, h.row(id).documentState)
+        assertNull(h.row(id).captureStartedAt)
+        assertNull(h.row(id).captureAudioSha256)
+        assertNull(h.row(id).legacyCaptureCandidate)
+        assertNull(h.notes.library().first().single().recordingTime())
+        val copy = folder.newFile("stale-export.opus")
+        assertTrue(h.documents.exportCopy(id, Uri.fromFile(copy)) is ExportOutcome.Saved)
+        assertArrayEquals(stale, copy.readBytes())
+        assertArrayEquals(stale, file.readBytes())
+        assertEquals(DocumentState.STALE_AUDIO, CassiniDocument.read(copy).documentState)
     }
 
     @Test fun realV1RebuildPackagingStampIsNeverPromotedToCaptureTime() = runTest {

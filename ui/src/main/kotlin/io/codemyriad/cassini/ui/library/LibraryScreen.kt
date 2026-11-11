@@ -87,6 +87,7 @@ fun LibraryScreen(
     state: LibraryUiState,
     onEvent: (LibraryEvent) -> Unit,
     modifier: Modifier = Modifier,
+    tools: (@Composable () -> Unit)? = null,
 ) {
     BackHandler(enabled = state.query.isNotEmpty() || state.results != null) { onEvent(LibraryEvent.ClearQuery) }
     val density = LocalDensity.current
@@ -115,6 +116,7 @@ fun LibraryScreen(
                     onSettings = { onEvent(LibraryEvent.OpenSettings) },
                 )
             }
+            if (tools != null) item(key = "transfers", contentType = "transfers") { tools() }
             item(key = "search", contentType = "search") { SearchBlock(state.query, state.searchFilters, onEvent) }
             activity(state, onEvent)
             if (!state.loading) {

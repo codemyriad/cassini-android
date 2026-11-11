@@ -169,8 +169,8 @@ internal class FakeLibraryPorts : LibraryPorts {
         return RenameOutcome.Renamed
     }
 
-    override fun import(uri: String) {
-        actions += "import $uri"
+    override fun import(uris: List<String>) {
+        uris.forEach { actions += "import $it" }
     }
 
     override fun dismissNotice(kind: BannerKind) {

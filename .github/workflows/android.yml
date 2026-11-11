@@ -144,7 +144,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
           cache-provider: basic
-          cache-read-only: ${{ runner.environment != 'github-hosted' }}
+          cache-read-only: ${{ github.ref != 'refs/heads/main' || runner.environment != 'github-hosted' }}
       # The release key signs the GitHub APK and the Play bundle (docs/release.md, "Signing"). No fallbacks: a tag
       # build without the four secrets fails here.
       - name: Restore and verify pinned Gradle distribution

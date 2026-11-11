@@ -3,6 +3,7 @@ package io.codemyriad.cassini.library
 import android.content.Context
 import android.os.Build
 import android.view.accessibility.AccessibilityManager
+import androidx.core.net.toUri
 import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.library.SearchFilters
@@ -71,8 +72,8 @@ interface LibraryPorts {
 
     suspend fun rename(id: String, title: String): RenameOutcome
 
-    /** Imports the picked [uri] in the background; the notices show its progress and errors. */
-    fun import(uri: String)
+    /** Imports the picked [uris] as one background batch with a shared summary. */
+    fun import(uris: List<String>)
 
     fun dismissNotice(kind: BannerKind)
 
@@ -137,8 +138,8 @@ class GraphLibraryPorts(private val graph: AppGraph, context: Context) : Library
     override suspend fun rename(id: String, title: String): RenameOutcome =
         graph.awaitCatalogue().notes.rename(id, title)
 
-    override fun import(uri: String) {
-        graph.notices.imports.start(uri)
+    override fun import(uris: List<String>) {
+        graph.transfers.import(uris.map { it.toUri() })
     }
 
     override fun dismissNotice(kind: BannerKind) = graph.notices.dismiss(kind)

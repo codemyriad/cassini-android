@@ -15,7 +15,6 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onFirst
@@ -25,7 +24,6 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
-import androidx.compose.ui.test.printToLog
 import androidx.core.os.LocaleListCompat
 import androidx.test.espresso.Espresso
 import androidx.test.platform.app.InstrumentationRegistry
@@ -121,6 +119,9 @@ class AcceptanceWalkTest {
         }
         shots.deleteRecursively()
         shots.mkdirs()
+        // Activity/VM loading can outlive catalogue readiness; never press Back before the first Library frame.
+        val import = rule.text(UiR.string.ui_library_import)
+        rule.waitShown(hasText(import) or hasContentDescription(import))
     }
 
     @After fun tearDown() {
@@ -131,6 +132,8 @@ class AcceptanceWalkTest {
                 recording.state.await("The recording ends", FINISH_MS) { !it.inProgress }
                 recording.dismissEnded()
                 TestHooks.reset()
+                // Reset clears the fake gate; release afterwards so a failed progress assertion can unwind.
+                if (CassiniTestRunner.emptyModelRoot) ScriptedModels.release()
                 Background.reset()
                 graph.awaitCatalogue().voices.forgetEveryone()
             }
@@ -393,18 +396,18 @@ class AcceptanceWalkTest {
         see(rule.text(UiR.string.ui_settings_model_ready))
         shot("08-settings")
 
-        val voices = hasText(rule.text(UiR.string.ui_settings_voices), substring = true) and hasClickAction()
+        val voices = hasText(rule.text(UiR.string.ui_settings_voices)) and hasClickAction()
         rule.waitShown(voices)
-        rule.onAllNodes(voices).onFirst().performClick()
+        rule.onNode(voices).performScrollTo().performClick()
         see(ANNA)
         see(PAOLO)
         see(rule.text(UiR.string.ui_voices_privacy))
         shot("07-saved-voices")
         Espresso.pressBack()
 
-        val trash = hasText(rule.text(UiR.string.ui_settings_trash), substring = true) and hasClickAction()
+        val trash = hasText(rule.text(UiR.string.ui_settings_trash)) and hasClickAction()
         rule.waitShown(trash)
-        rule.onAllNodes(trash).onFirst().performScrollTo().performClick()
+        rule.onNode(trash).performScrollTo().performClick()
         see(TEST_RECORDING)
         see(rule.text(UiR.string.ui_trash_restore))
         see(rule.text(UiR.string.ui_trash_intro))
@@ -423,17 +426,22 @@ class AcceptanceWalkTest {
             graph.awaitCatalogue().notes.rename(id, SUPPLIER_CALL)
         }
         library()
-        openRow(SUPPLIER_CALL)
-        val transcribe = hasText(rule.text(UiR.string.ui_action_transcribe)) and hasClickAction()
-        rule.waitShown(transcribe)
-        rule.onAllNodes(transcribe).onFirst().performClick()
+        // Whistle is bundled even on an empty download root. Exercise the real optional Parakeet download action.
+        rule.onNode(hasContentDescription(rule.text(UiR.string.ui_library_settings))).performClick()
+        val parakeet = hasText("Parakeet Ultra") and hasClickAction()
+        rule.waitShown(parakeet)
+        rule.onNode(parakeet).performClick()
 
-        // 05 Model download: every part is missing, 730 MB in all.
+        // 05 Model download: Settings requests only the missing speech model, with its pinned catalog size.
         see(rule.text(UiR.string.ui_models_title))
-        see(TOTAL_MB, substring = true)
+        val speech = ModelPlan.of { false }.missing.single { it.part == ModelPart.SPEECH }
+        see(speech.mebibytes.toString(), substring = true)
         see(rule.text(UiR.string.ui_part_speech))
-        see(rule.text(UiR.string.ui_part_speakers))
-        see(rule.text(UiR.string.ui_part_voices))
+        val unrelated = hasText(rule.text(UiR.string.ui_part_speakers)) or hasText(rule.text(UiR.string.ui_part_voices))
+        assertTrue(
+            "Optional speech download excludes speaker and voice models",
+            rule.onAllNodes(unrelated).fetchSemanticsNodes().isEmpty(),
+        )
         shot("05-model-download")
 
         ScriptedModels.script(
@@ -443,14 +451,16 @@ class AcceptanceWalkTest {
             Step.Fail(Failure.SPACE, online = true),
             Step.Fail(Failure.VERIFY, online = true),
         )
-        val start = hasText(rule.text(UiR.string.ui_models_download_and_transcribe)) and hasClickAction()
+        val start = hasText(rule.text(UiR.string.ui_models_download)) and hasClickAction()
         rule.onNode(start).performClick()
+        // Standalone consent returns to Settings; progress/error banners belong to Library.
+        library()
 
         see(rule.text(UiR.string.ui_part_downloading_speech, DOWNLOAD_PERCENT), timeoutMs = Flows.JOB_MS)
         shot("10-states-downloading")
         ScriptedModels.release()
         see(rule.text(UiR.string.ui_banner_dl_checking_title, CHECK_PERCENT), timeoutMs = Flows.JOB_MS)
-        see(rule.text(UiR.string.ui_banner_dl_checking_body))
+        see(rule.text(UiR.string.ui_progress_downloading_models))
         shot("10-states-checking")
         ScriptedModels.release()
 
@@ -480,6 +490,7 @@ class AcceptanceWalkTest {
     private fun see(text: String, substring: Boolean = true, ignoreCase: Boolean = false, timeoutMs: Long = SEE_MS) {
         val matcher = hasText(text, substring = substring, ignoreCase = ignoreCase) or
             hasContentDescription(text, substring = substring, ignoreCase = ignoreCase)
+        Log.i(TAG, "Waiting for $text")
         rule.waitShown(matcher, timeoutMs = timeoutMs, unmerged = true)
     }
 
@@ -505,24 +516,22 @@ class AcceptanceWalkTest {
     }
 
     private fun toLibrary() {
-        // A text button, or an icon with this description while a recording runs.
         val import = rule.text(UiR.string.ui_library_import)
-        val settings = hasText(import) or hasContentDescription(import)
-        fun shown(timeoutMs: Long) = runCatching {
-            rule.awaitUi(timeoutMs) { rule.onAllNodes(settings).fetchSemanticsNodes().isNotEmpty() }
-        }.isSuccess
-        if (shown(FIRST_LOOK_MS)) return
-        // Each back waits for its screen change: one back too many would close the app.
-        repeat(BACK_TRIES) { attempt ->
-            if (attempt > 0) {
-                val roots = rule.onAllNodes(isRoot())
-                roots.fetchSemanticsNodes().indices.forEach { roots[it].printToLog(TAG) }
-                shot("debug-back-$attempt")
+        val library = hasText(import) or hasContentDescription(import)
+        val back = hasContentDescription(rule.text(UiR.string.ui_back_to_library)) or
+            hasContentDescription(rule.text(UiR.string.ui_back_to_settings))
+        repeat(BACK_TRIES) {
+            var atLibrary = false
+            // A slow Library frame must never be interpreted as permission to press Back out of the activity.
+            rule.awaitUi(SEE_MS) {
+                val nodes = rule.onAllNodes(library or back).fetchSemanticsNodes()
+                atLibrary = nodes.any(library::matches)
+                atLibrary || nodes.any(back::matches)
             }
-            Espresso.pressBack()
-            if (shown(BACK_MS)) return
+            if (atLibrary) return
+            rule.onNode(back).performSemanticsAction(SemanticsActions.OnClick)
         }
-        rule.waitShown(settings)
+        rule.waitShown(library)
     }
 
     /**
@@ -669,7 +678,6 @@ class AcceptanceWalkTest {
             "pt-PT" to "Português (Portugal)",
         )
         val LANGUAGE_TAG = Regex("[a-z]{2}(-[A-Z]{2})?")
-        const val TOTAL_MB = "730"
         const val MANIFEST_SHA = "CASSINI_PAYLOAD_SHA256="
         const val MARK = "\u0000"
         const val NUMBER = 987
@@ -684,8 +692,6 @@ class AcceptanceWalkTest {
         const val PLAYER_MS = 60_000L
         const val STILL_MS = 10_000L
         const val BACK_TRIES = 3
-        const val BACK_MS = 5_000L
-        const val FIRST_LOOK_MS = 200L
         const val MS_PER_S = 1_000L
         const val LOW_SPACE_S = 12 * 60L
         const val PNG_QUALITY = 100

@@ -102,4 +102,5 @@
     <string name="notif_rec_file_full_text">Cassini ends M4A recordings at 1 GB, about 74 hours. The recording so far is saved. Start a new recording to continue.</string>
     <string name="notif_rec_failed_title">Microphone stopped working</string>
     <string name="notif_rec_failed_text">Recording ended. The audio so far is in your library.</string>
+
 </resources>

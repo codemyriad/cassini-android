@@ -15,7 +15,10 @@ import io.codemyriad.cassini.data.NoteLocks
 import io.codemyriad.cassini.data.Sha256
 import io.codemyriad.cassini.data.db.CassiniDatabase
 import io.codemyriad.cassini.data.db.NoteEntity
+import io.codemyriad.cassini.data.useCancellable
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileNotFoundException
@@ -118,8 +121,10 @@ class ImportRepository(
 ) {
     private val notes = database.notes()
 
-    suspend fun import(uri: Uri): ImportOutcome = withContext(dispatchers.io) {
-        val description = source.describe(uri)
+    /** [displayName] retains a staged archive/provider file's name without using it as a filesystem path. */
+    suspend fun import(uri: Uri, displayName: String? = null): ImportOutcome = withContext(dispatchers.io) {
+        val described = source.describe(uri)
+        val description = described.copy(displayName = displayName ?: described.displayName)
         val size = description.size?.takeIf { it >= 0 }
         paths.notes.mkdirs()
         when {
@@ -203,27 +208,34 @@ class ImportRepository(
     }
 
     /** Step 3: copies the bytes into [tmp] with their SHA-256, enforcing the size cap and the free space. */
-    private fun copy(uri: Uri, tmp: File, size: Long?): Copy = try {
+    private suspend fun copy(uri: Uri, tmp: File, size: Long?): Copy = try {
         val input = source.open(uri) ?: throw FileNotFoundException("no stream")
         val digest = MessageDigest.getInstance("SHA-256")
-        val failed = input.use { tmp.outputStream().use { out -> pump(input, out, size, digest) } }
+        val failed = input.useCancellable { tmp.outputStream().use { out -> pump(input, out, size, digest) } }
         failed ?: Copy.Done(Sha256.hex(digest), tmp.length())
     } catch (error: FileNotFoundException) {
+        currentCoroutineContext().ensureActive()
         Copy.Failed(ImportOutcome.Rejected(Failure.OPEN, error.message))
     } catch (error: SecurityException) {
+        currentCoroutineContext().ensureActive()
         Copy.Failed(ImportOutcome.Rejected(Failure.OPEN, error.message))
     } catch (error: IOException) {
+        currentCoroutineContext().ensureActive()
         Copy.Failed(lowSpace(size, tmp.length()) ?: ImportOutcome.Rejected(Failure.OPEN, error.message))
     }
 
-    private fun pump(input: InputStream, out: FileOutputStream, size: Long?, digest: MessageDigest): Copy.Failed? {
+    private suspend fun pump(input: InputStream, out: FileOutputStream, size: Long?, digest: MessageDigest): Copy.Failed? {
         val buffer = ByteArray(BUFFER_BYTES)
         var total = 0L
         var nextSpaceCheck = SPACE_CHECK_BYTES
         var failed: Copy.Failed? = null
         while (failed == null) {
+            currentCoroutineContext().ensureActive()
             val n = input.read(buffer)
-            if (n < 0) break
+            if (n < 0) {
+                currentCoroutineContext().ensureActive()
+                break
+            }
             total += n
             failed = when {
                 total > limits.maxBytes -> Copy.Failed(ImportOutcome.Rejected(Failure.LARGE, "over the cap"))
@@ -238,6 +250,7 @@ class ImportRepository(
                 out.write(buffer, 0, n)
             }
         }
+        currentCoroutineContext().ensureActive()
         if (failed == null) out.fd.sync()
         return failed
     }
