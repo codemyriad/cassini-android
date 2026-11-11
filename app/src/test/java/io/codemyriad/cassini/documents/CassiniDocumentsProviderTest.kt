@@ -1,6 +1,7 @@
 package io.codemyriad.cassini.documents
 
 import android.Manifest
+import android.content.ClipDescription
 import android.content.ContentResolver
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -30,7 +31,11 @@ import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.data.CassiniDispatchers
 import io.codemyriad.cassini.data.jobs.ClaimOutcome
 import io.codemyriad.cassini.data.models.ModelFetcher
+import io.codemyriad.cassini.data.notes.AudioProbe
 import io.codemyriad.cassini.data.notes.ImportOutcome
+import io.codemyriad.cassini.data.notes.ImportRepository
+import io.codemyriad.cassini.data.notes.ImportSource
+import io.codemyriad.cassini.data.notes.ProbedAudio
 import io.codemyriad.cassini.nav.DeepLinks
 import io.codemyriad.cassini.testing.NoUncaughtCoroutines
 import kotlinx.coroutines.CompletableDeferred
@@ -47,6 +52,7 @@ import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
@@ -62,6 +68,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import java.io.File
 import java.io.FileNotFoundException
+import java.io.InputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.file.Files
@@ -83,7 +90,7 @@ import java.util.concurrent.atomic.AtomicLong
  *   delete/remove/rename/move/copy, symlinks, path traversal, and main-thread calls;
  * - linear `O(N)` duplicate-title collision naming and zero `words` table reads (D87, D88).
  */
-@Suppress("TooManyFunctions") // one test per D97 read-only contract and D87/review invariant
+@Suppress("TooManyFunctions", "LargeClass") // one test per D97 read-only contract and D87/review invariant
 @RunWith(RobolectricTestRunner::class)
 class CassiniDocumentsProviderTest {
     @get:Rule(order = Int.MIN_VALUE)
@@ -435,6 +442,86 @@ class CassiniDocumentsProviderTest {
         assertEquals(3_999, largeProbes)
     }
 
+    @Test
+    fun rejectsDirectorySymlinksAcrossListQueryReadAndDirtyRetitle(): Unit = runBlocking {
+        val catalogue = currentGraph.awaitCatalogue()
+        val rootUri = DocumentsContract.buildDocumentUri(authority, DocumentsVault.ROOT_DOCUMENT_ID)
+
+        // 1. Live note whose notes/<id> directory is replaced by a symlink leaving notes/ (with titleDirty = true).
+        val outsideAliasId = createSealedNote("Outside alias", listOf("Original", "words"))
+        catalogue.database.notes().rename(
+            outsideAliasId,
+            "Hijacked outside title",
+            titleDirty = true,
+            now = nowMs.incrementAndGet(),
+        )
+        val outsideDir = folder.newFolder("outside-note-target")
+        val outsideBytes = buildCustomerInterviewOpusBytes()
+        File(outsideDir, "document.opus").writeBytes(outsideBytes)
+        replaceNoteDirWithSymlink(outsideAliasId, outsideDir)
+
+        // 2. Live note whose notes/<id> directory is replaced by a symlink to a trashed note's directory inside notes/.
+        val trashedId = createSealedNote("Private trashed note", listOf("Secret", "trash"))
+        val trashedBytes = File(paths.note(trashedId), "document.opus").readBytes()
+        assertTrue(catalogue.notes.moveToTrash(trashedId))
+        val trashAliasId = createSealedNote("Trash alias", listOf("Decoy", "words"))
+        catalogue.database.notes().rename(
+            trashAliasId,
+            "Hijacked trash title",
+            titleDirty = true,
+            now = nowMs.incrementAndGet(),
+        )
+        replaceNoteDirWithSymlink(trashAliasId, paths.note(trashedId))
+
+        // Keep one legitimate live note alongside them so listChildren returns only the legitimate row.
+        val validId = createSealedNote("Legitimate note", listOf("Safe", "content"))
+
+        val listed = withContext(Dispatchers.IO) { queryChildren() }
+        assertEquals(listOf("note:$validId"), listed.map { it.documentId })
+        assertDirectorySymlinkNoteRejected(rootUri, outsideAliasId)
+        assertDirectorySymlinkNoteRejected(rootUri, trashAliasId)
+
+        assertArrayEquals(
+            "Dirty-title flush must never rewrite a document.opus outside notes/ through a directory symlink",
+            outsideBytes,
+            File(outsideDir, "document.opus").readBytes(),
+        )
+        assertArrayEquals(
+            "Dirty-title flush must never rewrite a trashed note's document.opus through a directory symlink",
+            trashedBytes,
+            File(paths.note(trashedId), "document.opus").readBytes(),
+        )
+    }
+
+    @Test
+    fun exposesAccuratePlainAudioMimesAndMatchesAudioWildcardPicker(): Unit = runBlocking {
+        val samples = plainAudioMimeSamples()
+        val imported = samples.map { sample -> sample to importPlainSample(sample) }
+
+        val listedById = withContext(Dispatchers.IO) { queryChildren().associateBy { it.documentId } }
+        assertEquals(imported.size, listedById.size)
+
+        for ((sample, noteId) in imported) {
+            val docId = "note:$noteId"
+            val listedRow = requireNotNull(listedById[docId]) { "Missing listed row for ${sample.label}" }
+            val queriedRow = withContext(Dispatchers.IO) { querySingle(docId) }
+            for (row in listOf(listedRow, queriedRow)) {
+                assertEquals("Unexpected MIME for ${sample.label}", sample.expectedMime, row.mimeType)
+                assertEquals("Unexpected display name for ${sample.label}", sample.expectedDisplayName, row.displayName)
+                assertNotEquals("application/octet-stream", row.mimeType)
+                assertTrue(
+                    "audio/* picker must match ${row.mimeType} (${sample.label})",
+                    ClipDescription.compareMimeTypes(row.mimeType, "audio/*"),
+                )
+            }
+            if (sample.fileName?.endsWith(".aac") == true) {
+                assertNotEquals("Raw .aac must not be mislabeled as audio/mp4", "audio/mp4", listedRow.mimeType)
+            }
+            val streamed = withContext(Dispatchers.IO) { readDocumentBytes(docId) }
+            assertArrayEquals(sample.bytes, streamed)
+        }
+    }
+
     // Helpers. --------------------------------------------------------------------------------------------------------
 
     private fun buildGraph(
@@ -723,49 +810,139 @@ class CassiniDocumentsProviderTest {
         return requireNotNull(resolver.openInputStream(uri)).use { it.readBytes() }
     }
 
-    private fun android.database.Cursor.toExposedDocument() = ExposedDocument(
-        documentId = string(Document.COLUMN_DOCUMENT_ID),
-        displayName = string(Document.COLUMN_DISPLAY_NAME),
-        mimeType = string(Document.COLUMN_MIME_TYPE),
-        size = longOrNull(Document.COLUMN_SIZE),
-        lastModified = longOrNull(Document.COLUMN_LAST_MODIFIED),
-        flags = int(Document.COLUMN_FLAGS),
-    )
-
-    private fun android.database.Cursor.string(col: String): String = getString(getColumnIndexOrThrow(col))
-
-    private fun android.database.Cursor.int(col: String): Int = getInt(getColumnIndexOrThrow(col))
-
-    private fun android.database.Cursor.longOrNull(col: String): Long? {
-        val idx = getColumnIndexOrThrow(col)
-        return if (isNull(idx)) null else getLong(idx)
+    private fun replaceNoteDirWithSymlink(noteId: String, targetDir: File) {
+        val dir = paths.note(noteId)
+        assertTrue(dir.deleteRecursively())
+        Files.createSymbolicLink(dir.toPath(), targetDir.toPath())
     }
 
-    private fun writeSyntheticOpus(file: File, packetCount: Int, seed: Int) {
-        val head = "OpusHead".toByteArray() + byteArrayOf(1, 1, 0x38, 1, -128, -69, 0, 0, 0, 0, 0)
-        val tags = CassiniDocument.tagsPacket(listOf("ENCODER=test"))
-        val packets = (0 until packetCount).map { idx ->
-            byteArrayOf(0xF8.toByte(), ((seed + idx) and 0xFF).toByte(), (idx and 0xFF).toByte())
-        }
-        val stream = OggOpus.Stream(head, tags, packets, packetCount * 960L, true)
-        file.parentFile?.mkdirs()
-        file.writeBytes(OggOpus.mux(stream, tags, 0xCA55 + seed))
+    private suspend fun assertDirectorySymlinkNoteRejected(rootUri: Uri, noteId: String) = withContext(Dispatchers.IO) {
+        val docId = "note:$noteId"
+        val uri = DocumentsContract.buildDocumentUri(authority, docId)
+        assertFalse(DocumentsContract.isChildDocument(resolver, rootUri, uri))
+        assertNull(resolver.query(uri, null, Bundle.EMPTY, null))
+        assertThrows(FileNotFoundException::class.java) { providerInstance.queryDocument(docId, null) }
+        assertThrows(FileNotFoundException::class.java) { providerInstance.openDocument(docId, "r", null) }
+        assertThrows(FileNotFoundException::class.java) { readDocumentBytes(docId) }
     }
 
-    private fun writePcm16Wav(file: File, rate: Int = 16_000, frames: Int = 1_600) {
-        val dataBytes = frames * 2
-        val buffer = ByteBuffer.allocate(44 + dataBytes).order(ByteOrder.LITTLE_ENDIAN)
-        buffer.put("RIFF".toByteArray()).putInt(36 + dataBytes).put("WAVE".toByteArray())
-        buffer.put("fmt ".toByteArray()).putInt(16).putShort(1).putShort(1)
-        buffer.putInt(rate).putInt(rate * 2).putShort(2).putShort(16)
-        buffer.put("data".toByteArray()).putInt(dataBytes)
-        for (i in 0 until frames) {
-            buffer.putShort(((i * 17) % 500).toShort())
+    private suspend fun importPlainSample(sample: PlainAudioSample): String {
+        val catalogue = currentGraph.awaitCatalogue()
+        val uri = Uri.parse("content://external.audio/item/${UUID.randomUUID()}")
+        val source = object : ImportSource {
+            override fun describe(uri: Uri) = ImportSource.Description(sample.fileName, sample.bytes.size.toLong())
+
+            override fun open(uri: Uri): InputStream = sample.bytes.inputStream()
         }
-        file.writeBytes(buffer.array())
+        val probe = AudioProbe { ProbedAudio(sample.trackMime, durationMs = 2_400L) }
+        val importer = ImportRepository(
+            database = catalogue.database,
+            paths = paths,
+            dispatchers = currentGraph.dispatchers,
+            locks = currentGraph.locks,
+            documents = catalogue.documents,
+            source = source,
+            probe = probe,
+            clock = nowMs::incrementAndGet,
+        )
+        val outcome = importer.import(uri)
+        assertTrue("Expected Created for ${sample.label}, got $outcome", outcome is ImportOutcome.Created)
+        return (outcome as ImportOutcome.Created).noteId
     }
 
     private companion object {
         const val EVENT_BOUND_MS = 10_000L
     }
+}
+
+private class PlainAudioSample(
+    val fileName: String?,
+    val trackMime: String,
+    val bytes: ByteArray,
+    val expectedMime: String,
+    val expectedDisplayName: String,
+) {
+    val label: String get() = "${fileName ?: expectedDisplayName} ($expectedMime)"
+}
+
+private fun sample(
+    fileName: String?,
+    trackMime: String,
+    latin1Bytes: String,
+    expectedMime: String,
+    expectedDisplayName: String = checkNotNull(fileName),
+) = PlainAudioSample(
+    fileName = fileName,
+    trackMime = trackMime,
+    bytes = latin1Bytes.toByteArray(Charsets.ISO_8859_1),
+    expectedMime = expectedMime,
+    expectedDisplayName = expectedDisplayName,
+)
+
+private fun plainAudioMimeSamples(): List<PlainAudioSample> = listOf(
+    sample("voice-memo.amr", "audio/3gpp", "#!AMR\n\u0004payload-amr-nb", "audio/amr"),
+    sample("wideband-call.awb", "audio/amr-wb", "#!AMR-WB\n\u0004payload-awb", "audio/amr-wb"),
+    sample("handset-clip.3gp", "audio/3gpp", "\u0000\u0000\u0000\u0014ftyp3gp4\u0000\u00003gp4", "audio/3gpp"),
+    sample("carrier-clip.3g2", "audio/3gpp2", "\u0000\u0000\u0000\u0014ftyp3g2a\u0000\u00003g2a", "audio/3gpp2"),
+    sample("browser-capture.webm", "audio/opus", "\u001a\u0045\u00df\u00a3\u009fwebm-opus-1", "audio/webm"),
+    sample("raw-stream.aac", "audio/aac", "\u00ff\u00f1\u0050\u0080\u0001\u003f\u00fc", "audio/aac"),
+    sample("podcast-clip.m4a", "audio/mp4a-latm", "\u0000\u0000\u0000\u0014ftypM4A 0000", "audio/mp4"),
+    sample("interview.mp3", "audio/mpeg", "ID3\u0004\u0000\u0000\u0000\u0000\u0000\u0000mp3", "audio/mpeg"),
+    sample("studio-take.flac", "audio/flac", "fLaC\u0000\u0000\u0000\u0022flac-stream", "audio/flac"),
+    sample(
+        fileName = null,
+        trackMime = "audio/opus",
+        latin1Bytes = "\u001a\u0045\u00df\u00a3\u009fwebm-nameless",
+        expectedMime = "audio/webm",
+        expectedDisplayName = "Imported audio.bin",
+    ),
+    sample(
+        fileName = null,
+        trackMime = "audio/amr",
+        latin1Bytes = "#!AMR\n\u0004nameless-amr-nb",
+        expectedMime = "audio/amr",
+        expectedDisplayName = "Imported audio (2).bin",
+    ),
+)
+
+private fun android.database.Cursor.toExposedDocument() = ExposedDocument(
+    documentId = string(Document.COLUMN_DOCUMENT_ID),
+    displayName = string(Document.COLUMN_DISPLAY_NAME),
+    mimeType = string(Document.COLUMN_MIME_TYPE),
+    size = longOrNull(Document.COLUMN_SIZE),
+    lastModified = longOrNull(Document.COLUMN_LAST_MODIFIED),
+    flags = int(Document.COLUMN_FLAGS),
+)
+
+private fun android.database.Cursor.string(col: String): String = getString(getColumnIndexOrThrow(col))
+
+private fun android.database.Cursor.int(col: String): Int = getInt(getColumnIndexOrThrow(col))
+
+private fun android.database.Cursor.longOrNull(col: String): Long? {
+    val idx = getColumnIndexOrThrow(col)
+    return if (isNull(idx)) null else getLong(idx)
+}
+
+private fun writeSyntheticOpus(file: File, packetCount: Int, seed: Int) {
+    val head = "OpusHead".toByteArray() + byteArrayOf(1, 1, 0x38, 1, -128, -69, 0, 0, 0, 0, 0)
+    val tags = CassiniDocument.tagsPacket(listOf("ENCODER=test"))
+    val packets = (0 until packetCount).map { idx ->
+        byteArrayOf(0xF8.toByte(), ((seed + idx) and 0xFF).toByte(), (idx and 0xFF).toByte())
+    }
+    val stream = OggOpus.Stream(head, tags, packets, packetCount * 960L, true)
+    file.parentFile?.mkdirs()
+    file.writeBytes(OggOpus.mux(stream, tags, 0xCA55 + seed))
+}
+
+private fun writePcm16Wav(file: File, rate: Int = 16_000, frames: Int = 1_600) {
+    val dataBytes = frames * 2
+    val buffer = ByteBuffer.allocate(44 + dataBytes).order(ByteOrder.LITTLE_ENDIAN)
+    buffer.put("RIFF".toByteArray()).putInt(36 + dataBytes).put("WAVE".toByteArray())
+    buffer.put("fmt ".toByteArray()).putInt(16).putShort(1).putShort(1)
+    buffer.putInt(rate).putInt(rate * 2).putShort(2).putShort(16)
+    buffer.put("data".toByteArray()).putInt(dataBytes)
+    for (i in 0 until frames) {
+        buffer.putShort(((i * 17) % 500).toShort())
+    }
+    file.writeBytes(buffer.array())
 }

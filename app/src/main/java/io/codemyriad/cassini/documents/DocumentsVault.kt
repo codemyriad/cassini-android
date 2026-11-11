@@ -6,6 +6,7 @@ import android.os.CancellationSignal
 import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
+import android.webkit.MimeTypeMap
 import androidx.room.InvalidationTracker
 import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.Catalogue
@@ -18,17 +19,19 @@ import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.data.NoteIds
 import io.codemyriad.cassini.data.Threads
 import io.codemyriad.cassini.data.db.NoteEntity
+import io.codemyriad.cassini.data.notes.AudioProbe
 import io.codemyriad.cassini.inAppLanguage
 import io.codemyriad.cassini.note.NoteExports
-import io.codemyriad.cassini.note.NoteMapping
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.io.File
 import java.io.FileNotFoundException
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.LinkOption
+import java.nio.file.Path
 import java.util.Collections
 import java.util.Locale
 import java.util.WeakHashMap
@@ -154,14 +157,15 @@ internal class DocumentsVault(
                 val catalogue = awaitReadyCatalogue(graph, signal)
                 observeChangesOnce(graph, catalogue)
                 val precheck = catalogue.database.notes().note(noteId)
-                if (precheck != null && needsRetitleBeforeExport(precheck, catalogue.database.jobs().job(noteId)?.state)) {
+                val precheckJob = catalogue.database.jobs().job(noteId)?.state
+                if (precheck != null && needsRetitleBeforeExport(precheck, precheckJob, graph.paths)) {
                     catalogue.documents.retitle(noteId)
                 }
                 graph.locks.withNoteLock(noteId, graph.dispatchers.io) {
                     signal?.throwIfCanceled()
                     val row = catalogue.database.notes().noteBlocking(noteId)
                     val jobState = catalogue.database.jobs().jobBlocking(noteId)?.state
-                    val audio = row?.takeIf { isExposable(it, jobState, graph.paths) }?.let { audioFileOf(it, graph.paths) }
+                    val audio = row?.let { exposableAudioFile(it, jobState, graph.paths) }
                         ?: throw FileNotFoundException("Note is not available: $noteId")
                     ParcelFileDescriptor.open(audio, ParcelFileDescriptor.MODE_READ_ONLY)
                 }
@@ -204,23 +208,26 @@ internal class DocumentsVault(
         val initialJobs = catalogue.database.jobs().all().associate { it.noteId to it.state }
         for (note in catalogue.database.notes().all()) {
             val shouldFlush = flushDirtyNoteId == ALL_DIRTY_NOTES || flushDirtyNoteId == note.id
-            if (shouldFlush && needsRetitleBeforeExport(note, initialJobs[note.id])) {
+            if (shouldFlush && needsRetitleBeforeExport(note, initialJobs[note.id], paths)) {
                 catalogue.documents.retitle(note.id)
             }
         }
         val jobsByNote = catalogue.database.jobs().all().associate { it.noteId to it.state }
+        val exposableFiles = HashMap<String, File>()
         val exposable = catalogue.database.notes().all().filter { note ->
-            isExposable(note, jobsByNote[note.id], paths)
+            val file = exposableAudioFile(note, jobsByNote[note.id], paths)
+            if (file != null) exposableFiles[note.id] = file
+            file != null
         }
         val names = assignDisplayNames(exposable)
         return exposable
             .sortedWith(compareByDescending<NoteEntity> { it.createdAt }.thenBy { it.id })
             .mapNotNull { note ->
-                val file = audioFileOf(note, paths)?.takeIf(::isRegularFileNoFollow) ?: return@mapNotNull null
+                val file = exposableFiles[note.id] ?: return@mapNotNull null
                 ExposedDocument(
                     documentId = "$NOTE_PREFIX${note.id}",
                     displayName = names.getValue(note.id),
-                    mimeType = mimeOf(note),
+                    mimeType = mimeOf(note, file),
                     size = file.length(),
                     lastModified = note.updatedAt,
                     flags = 0,
@@ -248,6 +255,7 @@ internal class DocumentsVault(
         resolver.notifyChange(childrenUri, null)
     }
 
+    @Suppress("TooManyFunctions") // containment, symlink rejection, collision naming, and plain-audio MIME resolution
     companion object {
         const val ROOT_ID = "notes"
         const val ROOT_DOCUMENT_ID = "root"
@@ -261,6 +269,80 @@ internal class DocumentsVault(
         private const val SEALED_MARKER = "sealed"
         private const val SEALED_OUTPUT = "sealed.opus"
         private const val TMP_SUFFIX = ".tmp"
+        private const val AUDIO_MIME_PREFIX = "audio/"
+        private const val FALLBACK_MIME = "application/octet-stream"
+        private const val HEADER_SNIFF_BYTES = 64
+        private const val FTYP_OFFSET = 4
+        private const val BRAND_OFFSET = 8
+        private const val WAVE_TAG_OFFSET = 8
+        private const val EBML_MAGIC_LEN = 4
+        private const val EBML_LAST_INDEX = 3
+        private const val EBML_B0 = 0x1A
+        private const val EBML_B1 = 0x45
+        private const val EBML_B2 = 0xDF
+        private const val EBML_B3 = 0xA3
+        private const val BYTE_MASK = 0xFF
+        private const val SYNC_BYTE_FF = 0xFF
+        private const val ADTS_MASK = 0xF6
+        private const val ADTS_SYNC = 0xF0
+        private const val MPEG_MASK = 0xE0
+        private const val MPEG_SYNC = 0xE0
+        private const val MPEG_LAYER_MASK = 0x06
+
+        private val PLAIN_AUDIO_MIMES = mapOf(
+            "opus" to "audio/ogg",
+            "ogg" to "audio/ogg",
+            "oga" to "audio/ogg",
+            "spx" to "audio/ogg",
+            "wav" to "audio/wav",
+            "wave" to "audio/wav",
+            "mp3" to "audio/mpeg",
+            "mp2" to "audio/mpeg",
+            "mpga" to "audio/mpeg",
+            "mpega" to "audio/mpeg",
+            "m4a" to "audio/mp4",
+            "mp4" to "audio/mp4",
+            "m4b" to "audio/mp4",
+            "aac" to "audio/aac",
+            "adts" to "audio/aac",
+            "flac" to "audio/flac",
+            "amr" to "audio/amr",
+            "awb" to "audio/amr-wb",
+            "3gp" to "audio/3gpp",
+            "3gpp" to "audio/3gpp",
+            "3ga" to "audio/3gpp",
+            "3g2" to "audio/3gpp2",
+            "3gp2" to "audio/3gpp2",
+            "webm" to "audio/webm",
+            "mka" to "audio/x-matroska",
+            "mid" to "audio/midi",
+            "midi" to "audio/midi",
+            "kar" to "audio/midi",
+            "rmi" to "audio/midi",
+            "imy" to "audio/imelody",
+            "xmf" to "audio/mobile-xmf",
+            "mxmf" to "audio/mobile-xmf",
+            "aif" to "audio/x-aiff",
+            "aiff" to "audio/x-aiff",
+            "aifc" to "audio/x-aiff",
+            "caf" to "audio/x-caf",
+            "wma" to "audio/x-ms-wma",
+        )
+
+        private val HEADER_PREFIX_MIMES = listOf(
+            "#!AMR-WB" to "audio/amr-wb",
+            "#!AMR" to "audio/amr",
+            "fLaC" to "audio/flac",
+            "OggS" to "audio/ogg",
+            "MThd" to "audio/midi",
+            "ID3" to "audio/mpeg",
+        )
+
+        private val TRACK_CONTAINER_MIMES = mapOf(
+            "audio/mp4a-latm" to "audio/mp4",
+            "audio/vorbis" to "audio/ogg",
+            "audio/opus" to "audio/ogg",
+        )
 
         /**
          * Deterministic export names across [notes] in O(N) time: oldest notes claim the base `ExportNames.file` name
@@ -300,30 +382,59 @@ internal class DocumentsVault(
             return result
         }
 
-        internal fun isExposable(note: NoteEntity, jobState: JobState?, paths: AppPaths): Boolean {
+        internal fun isExposable(note: NoteEntity, jobState: JobState?, paths: AppPaths): Boolean =
+            exposableAudioFile(note, jobState, paths) != null
+
+        internal fun exposableAudioFile(note: NoteEntity, jobState: JobState?, paths: AppPaths): File? {
             val finishedKind = note.audioKind == AudioKind.DOCUMENT || note.audioKind == AudioKind.PLAIN
-            val work = paths.work(note.id)
-            val sealing = jobState == JobState.RUNNING ||
-                File(work, SEALED_MARKER).isFile ||
-                File(work, SEALED_OUTPUT).isFile
-            return note.trashedAt == null && finishedKind && !sealing &&
-                audioFileOf(note, paths)?.let(::isRegularFileNoFollow) == true
+            val eligible = NoteIds.isValid(note.id) && note.trashedAt == null && finishedKind &&
+                !isSealingOrUnsafeWork(note.id, jobState, paths)
+            return if (eligible) containedAudioFile(note, paths) else null
         }
 
-        internal fun audioFileOf(note: NoteEntity, paths: AppPaths): File? {
-            val name = note.audioFile
-            val safeName = NoteIds.isValid(note.id) && name.isNotEmpty() && '/' !in name && '\\' !in name &&
+        internal fun containedAudioFile(note: NoteEntity, paths: AppPaths): File? {
+            if (!NoteIds.isValid(note.id) || !isSafeAudioName(note.audioFile)) return null
+            return try {
+                resolveContainedFile(paths.notes.toPath(), note.id, note.audioFile)
+            } catch (_: IOException) {
+                null
+            } catch (_: SecurityException) {
+                null
+            }
+        }
+
+        private fun resolveContainedFile(notesRoot: Path, noteId: String, fileName: String): File? {
+            val realNotesRoot = notesRoot.takeIf(::isRealDirectory)?.toRealPath()
+            val realNoteDir = realNotesRoot?.resolve(noteId)?.takeIf(::isRealDirectory)
+                ?.toRealPath(LinkOption.NOFOLLOW_LINKS)
+                ?.takeIf { it.parent == realNotesRoot && it.fileName?.toString() == noteId }
+            val realAudio = realNoteDir?.resolve(fileName)?.takeIf(::isRealRegularFile)
+                ?.toRealPath(LinkOption.NOFOLLOW_LINKS)
+                ?.takeIf { it.parent == realNoteDir && it.fileName?.toString() == fileName }
+            return realAudio?.toFile()
+        }
+
+        private fun isSealingOrUnsafeWork(noteId: String, jobState: JobState?, paths: AppPaths): Boolean {
+            if (jobState == JobState.RUNNING) return true
+            val workDir = paths.work(noteId).toPath()
+            val unsafeWorkDir = Files.exists(workDir, LinkOption.NOFOLLOW_LINKS) && !isRealDirectory(workDir)
+            return unsafeWorkDir ||
+                Files.exists(workDir.resolve(SEALED_MARKER), LinkOption.NOFOLLOW_LINKS) ||
+                Files.exists(workDir.resolve(SEALED_OUTPUT), LinkOption.NOFOLLOW_LINKS)
+        }
+
+        private fun isRealDirectory(path: Path): Boolean =
+            !Files.isSymbolicLink(path) && Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)
+
+        private fun isRealRegularFile(path: Path): Boolean =
+            !Files.isSymbolicLink(path) && Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)
+
+        private fun isSafeAudioName(name: String): Boolean =
+            name.isNotEmpty() && '/' !in name && '\\' !in name &&
                 name != "." && name != ".." && !name.endsWith(TMP_SUFFIX)
-            if (!safeName) return null
-            val dir = paths.note(note.id)
-            return File(dir, name).takeIf { it.parentFile == dir }
-        }
 
-        private fun isRegularFileNoFollow(file: File): Boolean =
-            Files.isRegularFile(file.toPath(), LinkOption.NOFOLLOW_LINKS)
-
-        private fun needsRetitleBeforeExport(note: NoteEntity, jobState: JobState?): Boolean =
-            note.titleDirty && note.audioKind == AudioKind.DOCUMENT &&
+        private fun needsRetitleBeforeExport(note: NoteEntity, jobState: JobState?, paths: AppPaths): Boolean =
+            isExposable(note, jobState, paths) && note.titleDirty && note.audioKind == AudioKind.DOCUMENT &&
                 note.documentState == DocumentState.OK && jobState == null
 
         private fun extensionOf(note: NoteEntity): String =
@@ -333,12 +444,93 @@ internal class DocumentsVault(
                 note.audioFile.substringAfterLast('.', "opus").lowercase(Locale.ROOT)
             }
 
-        private fun mimeOf(note: NoteEntity): String =
+        private fun mimeOf(note: NoteEntity, file: File): String =
             if (note.audioKind == AudioKind.DOCUMENT) {
                 NoteExports.MIME_DOCUMENT
             } else {
-                NoteMapping.audioMime(extensionOf(note))
+                plainAudioMime(extensionOf(note), file)
             }
+
+        internal fun plainAudioMime(ext: String, file: File): String {
+            val fromExtension = PLAIN_AUDIO_MIMES[ext]
+                ?: MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext)
+                    ?.takeIf { it.startsWith(AUDIO_MIME_PREFIX) }
+            return fromExtension
+                ?: sniffAudioContainerMime(file)
+                ?: probedContainerMime(file)
+                ?: FALLBACK_MIME
+        }
+
+        private fun sniffAudioContainerMime(file: File): String? {
+            val head = try {
+                file.inputStream().use { input -> readPrefix(input, HEADER_SNIFF_BYTES) }
+            } catch (_: IOException) {
+                return null
+            }
+            return mimeFromHeader(head)
+        }
+
+        private fun readPrefix(input: java.io.InputStream, maxBytes: Int): ByteArray {
+            val buffer = ByteArray(maxBytes)
+            var offset = 0
+            while (offset < maxBytes) {
+                val read = input.read(buffer, offset, maxBytes - offset)
+                if (read < 0) break
+                offset += read
+            }
+            return buffer.copyOf(offset)
+        }
+
+        private fun mimeFromHeader(head: ByteArray): String? =
+            HEADER_PREFIX_MIMES.firstOrNull { (magic, _) -> hasAsciiAt(head, 0, magic) }?.second
+                ?: mimeFromContainerBox(head)
+
+        private fun mimeFromContainerBox(head: ByteArray): String? = when {
+            hasAsciiAt(head, 0, "RIFF") && hasAsciiAt(head, WAVE_TAG_OFFSET, "WAVE") -> "audio/wav"
+            hasAsciiAt(head, FTYP_OFFSET, "ftyp") -> isoBoxAudioMime(head)
+            isEbmlHeader(head) -> ebmlAudioMime(head)
+            else -> frameSyncAudioMime(head)
+        }
+
+        private fun isoBoxAudioMime(head: ByteArray): String = when {
+            hasAsciiAt(head, BRAND_OFFSET, "3gp") -> "audio/3gpp"
+            hasAsciiAt(head, BRAND_OFFSET, "3g2") -> "audio/3gpp2"
+            else -> "audio/mp4"
+        }
+
+        private fun isEbmlHeader(head: ByteArray): Boolean =
+            head.size >= EBML_MAGIC_LEN &&
+                (head[0].toInt() and BYTE_MASK) == EBML_B0 &&
+                (head[1].toInt() and BYTE_MASK) == EBML_B1 &&
+                (head[2].toInt() and BYTE_MASK) == EBML_B2 &&
+                (head[EBML_LAST_INDEX].toInt() and BYTE_MASK) == EBML_B3
+
+        private fun ebmlAudioMime(head: ByteArray): String =
+            if (String(head, Charsets.ISO_8859_1).lowercase(Locale.ROOT).contains("webm")) {
+                "audio/webm"
+            } else {
+                "audio/x-matroska"
+            }
+
+        private fun frameSyncAudioMime(head: ByteArray): String? {
+            if (head.size < 2 || (head[0].toInt() and BYTE_MASK) != SYNC_BYTE_FF) return null
+            val second = head[1].toInt() and BYTE_MASK
+            return when {
+                (second and ADTS_MASK) == ADTS_SYNC -> "audio/aac"
+                (second and MPEG_MASK) == MPEG_SYNC && (second and MPEG_LAYER_MASK) != 0 -> "audio/mpeg"
+                else -> null
+            }
+        }
+
+        private fun probedContainerMime(file: File): String? {
+            val trackMime = AudioProbe.Extractor.probe(file)?.mime?.lowercase(Locale.ROOT) ?: return null
+            return TRACK_CONTAINER_MIMES[trackMime] ?: trackMime.takeIf { it.startsWith(AUDIO_MIME_PREFIX) }
+        }
+
+        private fun hasAsciiAt(bytes: ByteArray, offset: Int, ascii: String): Boolean {
+            if (offset < 0 || offset + ascii.length > bytes.size) return false
+            return ascii.indices.all { idx -> bytes[offset + idx] == ascii[idx].code.toByte() }
+        }
 
         private fun noteIdOf(documentId: String): String? {
             if (!documentId.startsWith(NOTE_PREFIX)) return null
