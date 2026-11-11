@@ -1,6 +1,8 @@
 package io.codemyriad.cassini.data.notes
 
+import android.content.Context
 import android.net.Uri
+import androidx.test.core.app.ApplicationProvider
 import io.codemyriad.cassini.core.export.ExportTranscript
 import io.codemyriad.cassini.core.export.MarkdownCopy
 import io.codemyriad.cassini.core.export.MarkdownOptions
@@ -32,6 +34,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -426,8 +429,18 @@ class DocumentRepositoryTest {
                 markdown = MarkdownOptions("Thursday 8 October 2026, 15:10", copy),
             )
             val dest = folder.newFile("long-title.${format.extension}")
-            val outcome = h.documents.exportTranscript("a", request, Uri.fromFile(dest))
+            val uri = Uri.parse("content://export-test/${format.extension}")
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            var stagedNames = emptyList<String>()
+            shadowOf(context.contentResolver).registerOutputStreamSupplier(uri) {
+                stagedNames = h.paths.exports.walkTopDown().filter { it.isFile }.map { it.name }.toList()
+                dest.outputStream()
+            }
+            val outcome = h.documents.exportTranscript("a", request, uri)
             assertTrue("$format: $outcome", outcome is ExportOutcome.Saved)
+            // APFS can accept names that Android refuses: assert the real byte limit, not just host I/O success.
+            val stagedName = stagedNames.single()
+            assertTrue(stagedName, stagedName.toByteArray(Charsets.UTF_8).size <= 255)
             assertTrue(dest.length() > 0)
             if (format == TranscriptFormat.MARKDOWN) assertTrue(dest.readText().startsWith("# $title\n"))
             assertFalse("$format staging is cleaned", h.paths.exports.exists())
