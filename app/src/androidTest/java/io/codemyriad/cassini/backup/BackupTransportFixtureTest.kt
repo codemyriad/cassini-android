@@ -59,6 +59,7 @@ class BackupTransportFixtureTest {
                 arguments.getString("transfer")?.let { choices.setTransfer(it.toBooleanStrict()) }
             }
             "verify" -> verify()
+            "markers" -> markers()
             else -> error("Unknown explicit backup fixture stage: $stage")
         }
     }
@@ -68,15 +69,7 @@ class BackupTransportFixtureTest {
         assertFalse(paths.notes.exists())
         assertFalse(paths.people.exists())
         Files.createDirectories(paths.note(ID).toPath())
-        val words = Transcript(listOf(Word("S1", 0, 20, "Welcome")), "en")
-        val head = "OpusHead".toByteArray() + byteArrayOf(1, 1, 0, 0, -128, -69, 0, 0, 0, 0, 0)
-        val tags = CassiniDocument.tagsPacket(emptyList())
-        val silence = OggOpus.mux(OggOpus.Stream(head, tags, listOf(byteArrayOf(-8, -1, -2)), 960, true), tags)
-        val bytes = CassiniDocument.create(
-            silence, words, "Synthetic backup note", JSONObject(), speakerLabels = mapOf("S1" to "Ada"),
-            recordedAtUtc = START, createdAtUtc = START.plusSeconds(540),
-        )
-        File(paths.note(ID), "document.opus").writeBytes(bytes)
+        File(paths.note(ID), "document.opus").writeBytes(documentBytes())
         withDatabase { database ->
             database.notes().insert(
                 NoteEntity(
@@ -90,12 +83,28 @@ class BackupTransportFixtureTest {
         }
         Files.createDirectories(paths.voices.toPath())
         paths.people.writeText(VoiceCodec.encode(listOf(Voice("ada", "Ada", "synthetic", floatArrayOf(1f, 0f, 0f), 1, 4.0, 1, 1))))
+        markers()
+        assertFalse(choices.choices.first().cloud)
+        assertTrue(choices.choices.first().transfer)
+    }
+
+    private fun documentBytes(): ByteArray {
+        val words = Transcript(listOf(Word("S1", 0, 20, "Welcome")), "en")
+        val head = "OpusHead".toByteArray() + byteArrayOf(1, 1, 0, 0, -128, -69, 0, 0, 0, 0, 0)
+        val tags = CassiniDocument.tagsPacket(emptyList())
+        val silence = OggOpus.mux(OggOpus.Stream(head, tags, listOf(byteArrayOf(-8, -1, -2)), 960, true), tags)
+        return CassiniDocument.create(
+            silence, words, "Synthetic backup note", JSONObject(), speakerLabels = mapOf("S1" to "Ada"),
+            recordedAtUtc = START, createdAtUtc = START.plusSeconds(540),
+        )
+    }
+
+    private fun markers() {
+        assertEquals("Synthetic backup note", CassiniDocument.read(File(paths.note(ID), "document.opus")).title)
         Files.createDirectories(File(paths.root, "models").toPath())
         File(paths.root, "models/excluded-fixture.bin").writeText("Synthetic marker; never model weights")
         Files.createDirectories(paths.work(ID).toPath())
         File(paths.work(ID), "checkpoint.json").writeText("Synthetic unfinished work; must not travel")
-        assertFalse(choices.choices.first().cloud)
-        assertTrue(choices.choices.first().transfer)
     }
 
     private suspend fun verify() {
