@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.tryPerformAccessibilityChecks
 import io.codemyriad.cassini.MainActivity
+import io.codemyriad.cassini.flows.Flows.awaitUi
 import io.codemyriad.cassini.test.CiSmoke
 import org.junit.Rule
 import org.junit.Test
@@ -28,14 +29,14 @@ class AppAccessibilityTest {
         val suffixes = setOf(text(UiR.string.ui_action_resume), text(UiR.string.ui_action_try_again))
         rule.enableAccessibilityChecks(accessibilityValidator(suffixes))
         val settings = text(UiR.string.ui_library_settings)
-        rule.waitUntil(TIMEOUT_MS) {
+        rule.awaitUi(TIMEOUT_MS) {
             rule.onAllNodesWithContentDescription(settings).fetchSemanticsNodes().isNotEmpty()
         }
         rule.onRoot().tryPerformAccessibilityChecks()
 
         rule.onNodeWithContentDescription(settings).performClick()
         val back = text(UiR.string.ui_back_to_library)
-        rule.waitUntil(TIMEOUT_MS) { rule.onAllNodesWithContentDescription(back).fetchSemanticsNodes().isNotEmpty() }
+        rule.awaitUi(TIMEOUT_MS) { rule.onAllNodesWithContentDescription(back).fetchSemanticsNodes().isNotEmpty() }
         rule.onRoot().tryPerformAccessibilityChecks()
     }
 

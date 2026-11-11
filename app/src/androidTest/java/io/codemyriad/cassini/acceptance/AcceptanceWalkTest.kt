@@ -45,10 +45,11 @@ import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.models.ModelPlan
 import io.codemyriad.cassini.engine.job.JobPhase
 import io.codemyriad.cassini.flows.Flows
+import io.codemyriad.cassini.flows.Flows.awaitUi
 import io.codemyriad.cassini.flows.Flows.liveNodes
 import io.codemyriad.cassini.flows.Flows.tapWord
 import io.codemyriad.cassini.flows.Flows.text
-import io.codemyriad.cassini.flows.Flows.waitFor
+import io.codemyriad.cassini.flows.Flows.waitForUi
 import io.codemyriad.cassini.flows.Flows.waitGone
 import io.codemyriad.cassini.flows.Flows.waitKeyboardClosed
 import io.codemyriad.cassini.flows.Flows.waitShown
@@ -285,7 +286,7 @@ class AcceptanceWalkTest {
         see(rule.text(UiR.string.ui_action_stop_keep_progress))
         val header = hasText(rule.text(UiR.string.ui_draft_title))
         val toHeader = { rule.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(header) }
-        rule.waitFor("Not shown: the draft header", SEE_MS) { runCatching { toHeader() }.isSuccess }
+        rule.waitForUi("Not shown: the draft header", SEE_MS) { runCatching { toHeader() }.isSuccess }
         see(rule.text(UiR.string.ui_draft_title))
         shot("02-transcribing")
         library()
@@ -322,7 +323,7 @@ class AcceptanceWalkTest {
             }
         }
         // The transcript shows it: one word is highlighted, from the tapped word on and not past the position.
-        rule.waitFor("A word from \"$letters\" on is highlighted: ${graph.playback.state.value}", PLAYER_MS) {
+        rule.waitForUi("A word from \"$letters\" on is highlighted: ${graph.playback.state.value}", PLAYER_MS) {
             val position = graph.playback.state.value.positionMs
             val highlighted = SemanticsMatcher("The active word starts in ${word.startMs}..$position ms") { node ->
                 node.config.getOrNull(ActiveWordStart)?.let { it in word.startMs..position } == true
@@ -508,7 +509,7 @@ class AcceptanceWalkTest {
         val import = rule.text(UiR.string.ui_library_import)
         val settings = hasText(import) or hasContentDescription(import)
         fun shown(timeoutMs: Long) = runCatching {
-            rule.waitUntil(timeoutMs) { rule.onAllNodes(settings).fetchSemanticsNodes().isNotEmpty() }
+            rule.awaitUi(timeoutMs) { rule.onAllNodes(settings).fetchSemanticsNodes().isNotEmpty() }
         }.isSuccess
         if (shown(FIRST_LOOK_MS)) return
         // Each back waits for its screen change: one back too many would close the app.
@@ -533,7 +534,7 @@ class AcceptanceWalkTest {
         val row = hasContentDescription(title, substring = true) and hasClickAction() and
             SemanticsMatcher.keyIsDefined(SemanticsActions.OnLongClick)
         rule.waitShown(hasScrollToNodeAction())
-        rule.waitFor("The Library lays out $title") {
+        rule.waitForUi("The Library lays out $title") {
             runCatching { rule.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(row) }.isSuccess
         }
         rule.waitShown(row)
@@ -570,7 +571,7 @@ class AcceptanceWalkTest {
 
     /** Waits until the app locales and the activity have [language] (null: the phone's, no app locales). */
     private fun waitForLanguage(language: String?) {
-        rule.waitFor("The app language is ${language ?: "the phone's"}") {
+        rule.waitForUi("The app language is ${language ?: "the phone's"}") {
             val locales = AppCompatDelegate.getApplicationLocales()
             val shown = runCatching { rule.activity.resources.configuration.locales[0].language }.getOrNull()
             if (language == null) locales.isEmpty else locales[0]?.language == language && shown == language
