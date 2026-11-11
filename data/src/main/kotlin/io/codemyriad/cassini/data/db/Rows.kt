@@ -71,6 +71,9 @@ data class SearchRow(
     @Embedded val row: LibraryRow,
     val snippet: String,
     @ColumnInfo(name = "title_snippet") val titleSnippet: String,
+    @ColumnInfo(name = "document_signature") val documentSignature: String? = null,
+    @Relation(parentColumn = "id", entityColumn = "note_id")
+    val speakers: List<SpeakerEntity> = emptyList(),
 )
 
 /** One Trash card. */
