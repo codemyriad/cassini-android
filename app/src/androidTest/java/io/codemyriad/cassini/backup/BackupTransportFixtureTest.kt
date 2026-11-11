@@ -65,6 +65,8 @@ class BackupTransportFixtureTest {
                 // Synthetic bytes only, beyond LocalTransport's 25 MiB quota even in D2D mode.
                 RandomAccessFile(File(paths.note(ID), "source.opus"), "rw").use { it.setLength(26L * 1024 * 1024) }
             }
+            "shrink" -> Files.delete(File(paths.note(ID), "source.opus").toPath())
+            "verifyQuotaCleared" -> assertFalse(choices.choices.first().quotaExceeded)
             "verifyQuota" -> {
                 assertTrue("The real refusal must be visible in Settings", choices.choices.first().quotaExceeded)
                 val document = CassiniDocument.read(File(paths.note(ID), "document.opus"))

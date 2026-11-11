@@ -193,6 +193,10 @@ def main():
         restore('transfer')
         fixture('oversized')
         backup('transfer-over-quota', False, quota=True)
+        fixture('shrink')
+        backup('transfer-after-quota-retry', True)
+        fixture('verifyQuotaCleared')
+        restore('transfer-after-quota-retry')
         report['success'] = True
     finally:
         (args.output / 'report.json').write_text(json.dumps(report, indent=2) + '\n')

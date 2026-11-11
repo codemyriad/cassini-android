@@ -32,6 +32,8 @@ class LibraryBackup(private val context: Context, private val paths: AppPaths, p
     /** XML and this allowlist both omit settings, model receipts/weights, and unfinished inference work. */
     fun prepare(): Pair<BackupManifest, File> {
         Threads.assertOffMain("LibraryBackup.prepare")
+        LibraryRestoreTransaction(paths.root, staging).recover()
+        BackupVoiceRecovery.recover(paths.root)
         checkpoint(paths.database)
         val manifest = BackupManifest.create(paths.root)
         val file = File(paths.root, BackupManifest.MANIFEST)

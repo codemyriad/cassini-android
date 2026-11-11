@@ -34,6 +34,8 @@ class CassiniBackupAgent : BackupAgent() {
             // Refuse before emitting library bytes; a successful empty archive could replace earlier data.
             throw IOException("This backup transport is disabled")
         }
+        // A prior size refusal is no longer current once a permitted retry begins. A new refusal sets it again.
+        runBlocking(Dispatchers.IO) { choices.recordQuotaExceeded(false) }
         val (manifest, inventory) = library.prepare()
         // The payload alone is a lower bound; Android also measures tar framing and reports quota callbacks.
         val bytes = manifest.files.fold(inventory.length()) { total, entry -> Math.addExact(total, entry.bytes) }
