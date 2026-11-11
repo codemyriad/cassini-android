@@ -22,8 +22,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.R
 import io.codemyriad.cassini.ui.components.CassiniMenu
@@ -47,36 +47,9 @@ internal fun SearchFiltersBar(filters: SearchFiltersUi, onEvent: (LibraryEvent) 
                 selected = name != null,
                 onClick = { speakerMenu = true },
             )
-            CassiniMenu(
-                speakerMenu,
-                onDismissRequest = { speakerMenu = false },
-                modifier = Modifier.width(280.dp),
-            ) {
-                // An explicit width avoids DropdownMenu's intrinsic-width pass through LazyColumn.
-                LazyColumn(
-                    Modifier.width(280.dp).heightIn(max = 320.dp).testTag("speaker-filter-menu"),
-                ) {
-                    item(key = "any") {
-                        CassiniMenuItem(
-                            stringResource(R.string.ui_search_filter_any_speaker),
-                            onClick = {
-                                speakerMenu = false
-                                onEvent(LibraryEvent.FilterSpeaker(null))
-                            },
-                            modifier = Modifier.semantics { selected = name == null },
-                        )
-                    }
-                    items(filters.speakers, key = { "speaker-$it" }) { speaker ->
-                        CassiniMenuItem(
-                            speaker,
-                            onClick = {
-                                speakerMenu = false
-                                onEvent(LibraryEvent.FilterSpeaker(speaker))
-                            },
-                            modifier = Modifier.semantics { selected = name == speaker },
-                        )
-                    }
-                }
+            SpeakerMenu(filters, speakerMenu, onDismiss = { speakerMenu = false }) { speaker ->
+                speakerMenu = false
+                onEvent(LibraryEvent.FilterSpeaker(speaker))
             }
         }
         Box {
@@ -95,6 +68,34 @@ internal fun SearchFiltersBar(filters: SearchFiltersUi, onEvent: (LibraryEvent) 
             filters.recordedByMe,
             onClick = { onEvent(LibraryEvent.ToggleRecordedByMe) },
         )
+    }
+}
+
+@Composable
+private fun SpeakerMenu(
+    filters: SearchFiltersUi,
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    onSelect: (String?) -> Unit,
+) {
+    CassiniMenu(expanded, onDismissRequest = onDismiss, modifier = Modifier.width(280.dp)) {
+        // An explicit width avoids DropdownMenu's intrinsic-width pass through LazyColumn.
+        LazyColumn(Modifier.width(280.dp).heightIn(max = 320.dp).testTag("speaker-filter-menu")) {
+            item(key = "any") {
+                CassiniMenuItem(
+                    stringResource(R.string.ui_search_filter_any_speaker),
+                    onClick = { onSelect(null) },
+                    modifier = Modifier.semantics { selected = filters.speaker == null },
+                )
+            }
+            items(filters.speakers, key = { "speaker-$it" }) { speaker ->
+                CassiniMenuItem(
+                    speaker,
+                    onClick = { onSelect(speaker) },
+                    modifier = Modifier.semantics { selected = filters.speaker == speaker },
+                )
+            }
+        }
     }
 }
 
