@@ -13,8 +13,11 @@ data class MeetingTime(val source: String, val value: String) {
     val instant: Instant? get() = if (source == LOCAL) null else offsetInstant(value)
     val label: String? get() = value.takeIf { source == LOCAL }
 
-    fun day(zone: ZoneId): LocalDate? = instant?.atZone(zone)?.toLocalDate() ?: try {
-        LocalDateTime.parse(value).toLocalDate()
+    fun day(zone: ZoneId): LocalDate? = calendarTime(zone)?.toLocalDate()
+
+    /** UTC is viewed in [zone]; a floating local label keeps its written calendar fields, with no assumed zone. */
+    fun calendarTime(zone: ZoneId): LocalDateTime? = instant?.atZone(zone)?.toLocalDateTime() ?: try {
+        LocalDateTime.parse(value)
     } catch (_: DateTimeParseException) {
         null
     }

@@ -36,3 +36,6 @@ app/src/androidTest/assets/*
 !app/src/androidTest/assets/goldens/
 # Private meeting speaker fixtures (never commit)
 tools/private-fixtures/
+
+# D95 v1 migration fixture rewraps the existing public CC-BY FLEURS audio; no new recording.
+!fixtures/legacy-recording-time/document.opus

@@ -44,11 +44,14 @@ internal object DocumentDerivation {
         }
         val bounded = wordEndsBoundedByAudio(document)
         val meeting = document.manifest?.optJSONObject("meeting")
-        val time = row.recordingTime(document)
+        val capture = row.captureProvenance(document)
+        val time = row.recordingTime(document, capture.start?.let(java.time.Instant::ofEpochMilli))
         val note = row.copy(
             recordedAt = time?.value,
-            captureStartedAt = row.knownCaptureStart()?.toEpochMilli(),
-            createdAt = time?.instant?.toEpochMilli() ?: row.createdAt,
+            captureStartedAt = capture.start,
+            captureAudioSha256 = capture.audioSha256,
+            legacyCaptureCandidate = capture.legacyCandidate,
+            createdAt = time?.instant?.toEpochMilli() ?: document.packagingInstant()?.toEpochMilli() ?: row.createdAt,
             audioFile = NoteFiles.DOCUMENT,
             audioKind = AudioKind.DOCUMENT,
             durationMs = meeting?.optLong("durationMs", row.durationMs) ?: row.durationMs,

@@ -78,6 +78,10 @@ data class NoteEntity(
     @ColumnInfo(name = "recorded_at") val recordedAt: String? = null,
     /** Authoritative own capture clock, independent of derived metadata and packaging time (D95). */
     @ColumnInfo(name = "capture_started_at") val captureStartedAt: Long? = null,
+    /** Binds that clock to audio; a replacement must never inherit the discarded start. */
+    @ColumnInfo(name = "capture_audio_sha256") val captureAudioSha256: String? = null,
+    /** A v1 own-document clock, withheld until distinguished from a rebuilt packaging timestamp. */
+    @ColumnInfo(name = "legacy_capture_candidate") val legacyCaptureCandidate: Long? = null,
 )
 
 /** One transcript variant of a note's document, in manifest order. */

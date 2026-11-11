@@ -33,10 +33,17 @@ abstract class CassiniDatabase : RoomDatabase() {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE notes ADD COLUMN recorded_at TEXT")
                 db.execSQL("ALTER TABLE notes ADD COLUMN capture_started_at INTEGER")
+                db.execSQL("ALTER TABLE notes ADD COLUMN capture_audio_sha256 TEXT")
+                db.execSQL("ALTER TABLE notes ADD COLUMN legacy_capture_candidate INTEGER")
                 // Only an own non-document row's created_at still means capture start, never a cached seal time.
                 db.execSQL(
                     "UPDATE notes SET capture_started_at = created_at " +
                         "WHERE origin = 'RECORDED' AND audio_kind != 'DOCUMENT'",
+                )
+                // V1 adopt retained the capture clock; rebuild used createdAtUtc. Resolve against the file off-main.
+                db.execSQL(
+                    "UPDATE notes SET legacy_capture_candidate = created_at " +
+                        "WHERE origin = 'RECORDED' AND audio_kind = 'DOCUMENT' AND document_state = 'OK'",
                 )
                 db.execSQL("UPDATE notes SET document_signature = NULL WHERE audio_kind = 'DOCUMENT'")
             }

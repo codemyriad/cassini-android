@@ -137,6 +137,11 @@ class DocumentRepository(
     suspend fun refreshIfStale(noteId: String): RefreshOutcome =
         locks.withNoteLock(noteId, dispatchers.io) { refreshLocked(noteId) }
 
+    /** Refresh the finite invalidated set on IO; unchanged files are not re-scanned on subsequent starts. */
+    suspend fun refreshInvalidatedMetadata(): List<String> = withContext(dispatchers.io) {
+        notes.invalidatedDocuments().also { ids -> ids.forEach { refreshIfStale(it) } }
+    }
+
     /**
      * Adds the note [row] for the `document.opus` already in its directory (import and catalogue rebuild): the
      * document is read and verified once, and the row and every cache row are written in one transaction with its
@@ -361,11 +366,15 @@ class DocumentRepository(
             row == null || file == null -> ExportOutcome.NoNote
             row.audioKind == AudioKind.LIVE_CAPTURE || !file.isFile -> ExportOutcome.NotAvailable
             else -> {
-                val start = row.knownCaptureStart()
                 val document = if (row.audioKind == AudioKind.DOCUMENT) {
                     DocumentSignature.of(file)?.let { readLocked(file, it) }
                 } else {
                     null
+                }
+                val start = if (document != null) {
+                    row.captureProvenance(document).start?.let(Instant::ofEpochMilli)
+                } else {
+                    row.knownCaptureStart()
                 }
                 if (document?.documentState == DocumentState.STALE_AUDIO) {
                     exportTimeMetadata(file, document, null, dest)

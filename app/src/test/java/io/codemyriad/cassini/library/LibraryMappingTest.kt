@@ -47,6 +47,34 @@ import java.time.LocalTime
 class LibraryMappingTest {
     private val context = RowContext()
 
+    @Test fun mixedUtcAndFloatingLabelsSortByRecordingTimeInLibraryAndSearch() {
+        val zone = java.time.ZoneId.of("UTC")
+        val now = java.time.Instant.parse("2026-11-12T12:00:00Z")
+        val rows = listOf(
+            docRow("unknown", DocumentState.OK).copy(recordedAt = null, createdAt = Long.MAX_VALUE),
+            docRow("old-local", DocumentState.OK).copy(
+                recordedAt = "2026-11-01T10:00:00",
+                createdAt = java.time.Instant.parse("2026-11-10T12:00:00Z").toEpochMilli(),
+            ),
+            docRow("utc", DocumentState.OK).copy(recordedAt = "2026-11-09T12:00:00Z"),
+            docRow("new-local", DocumentState.OK).copy(recordedAt = "2026-11-09T13:00:00", createdAt = 0),
+        )
+        val expected = listOf("new-local", "utc", "old-local", "unknown")
+        val sections = LibraryMapping.sections(rows, context, now, zone)
+        assertEquals(expected, sections.flatMap { it.rows }.map { it.id })
+        assertEquals(
+            listOf(
+                DayLabel.Date(LocalDate.of(2026, 11, 9), false),
+                DayLabel.Date(LocalDate.of(2026, 11, 1), false),
+                DayLabel.Unknown,
+            ),
+            sections.map { it.label },
+        )
+        val results = LibraryMapping.results(rows.map { SearchRow(it, "", it.title) }, context, now, zone)
+        assertEquals(expected, results.map { it.id })
+        assertEquals("2026-11-09T13:00:00", results.first().recordedLabel)
+    }
+
     @Test fun dateAndClockAlwaysUseTheSameOddOrPosixZone() {
         val instant = java.time.Instant.parse("2026-11-11T00:30:00Z")
         val cases = listOf(

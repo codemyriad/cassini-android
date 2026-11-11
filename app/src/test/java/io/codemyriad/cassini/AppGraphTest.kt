@@ -15,6 +15,7 @@ import io.codemyriad.cassini.data.CassiniDispatchers
 import io.codemyriad.cassini.data.jobs.ClaimOutcome
 import io.codemyriad.cassini.data.jobs.EnqueueOutcome
 import io.codemyriad.cassini.data.models.ModelFetcher
+import io.codemyriad.cassini.data.notes.recordingTime
 import io.codemyriad.cassini.engine.job.Adoption
 import io.codemyriad.cassini.engine.job.CheckpointLoad
 import io.codemyriad.cassini.testing.NoUncaughtCoroutines
@@ -84,6 +85,34 @@ class AppGraphTest {
         assertEquals(expected, AppGraph.MODEL_USER_AGENT)
     }
 
+    @Test fun migratedImportTimesReachTheLibraryWithoutOpeningANote() = runBlocking {
+        val fixtures = File(checkNotNull(System.getProperty("cassini.fixtures")), "legacy-recording-time")
+        val expected = JSONObject(File(fixtures, "expected.json").readText())
+        val id = expected.getString("id")
+        val start = java.time.Instant.parse(expected.getString("startUtc"))
+        val root = AppPaths(folder.newFolder(), folder.newFolder(), modelRoot = folder.newFolder())
+        File(fixtures, "own-v1.db").copyTo(root.database)
+        android.database.sqlite.SQLiteDatabase.openDatabase(root.database.path, null, 0).use { db ->
+            db.execSQL("UPDATE notes SET origin = 'IMPORTED_DOCUMENT'")
+        }
+        root.note(id).mkdirs()
+        val document = CassiniDocument.create(
+            fixture.readBytes(),
+            Transcript(listOf(Word("S1", 0, 400, "Welcome"))),
+            "Existing own meeting",
+            JSONObject(),
+            recordedAtUtc = start,
+        )
+        File(root.note(id), "document.opus").writeBytes(document)
+        val graph = graph(root)
+        graph.ready.await()
+        val catalogue = graph.awaitCatalogue()
+        val rows = catalogue.notes.library().first()
+        assertEquals(start, rows.single().recordingTime()?.instant)
+        assertEquals(id, rows.single().id)
+        assertTrue(AppGraph.STEP_METADATA in steps)
+    }
+
     @Test fun theGraphBuildsOnAScratchRootAndReadyCompletes() {
         val graph = graph()
         graph.awaitReady()
@@ -102,6 +131,7 @@ class AppGraphTest {
             listOf(
                 AppGraph.STEP_DATABASE,
                 AppGraph.STEP_REBUILD,
+                AppGraph.STEP_METADATA,
                 AppGraph.STEP_MODELS,
                 AppGraph.STEP_RECOVER,
                 AppGraph.STEP_RECONCILE,

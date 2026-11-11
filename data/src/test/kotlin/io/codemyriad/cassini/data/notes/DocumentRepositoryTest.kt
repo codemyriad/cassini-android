@@ -163,6 +163,54 @@ class DocumentRepositoryTest {
         assertArrayEquals(stale, h.document("stale").readBytes())
     }
 
+    @Test fun staleReplacementAdoptAndExportCannotResurrectTheDiscardedCaptureClock() = runTest {
+        for (sameId in listOf(false, true)) {
+            val id = if (sameId) "same-id" else "new-id"
+            h.plainNote(id)
+            seal(id, File(h.dir(id), "capture.opus"), first, "Original recording")
+            h.notes.adoptSealed(id)
+            val original = h.readFile(id)
+            assertTrue(h.row(id).captureAudioSha256 != null)
+            val stream = OggOpus.read(h.document(id).readBytes())
+            val packets = stream.audio.toMutableList()
+            packets[0] = packets[0].clone().also { it[it.lastIndex] = (it.last().toInt() xor 1).toByte() }
+            h.document(id).writeBytes(OggOpus.mux(stream.copy(audio = packets), stream.tags))
+            // Deliberately do not open/refresh: adoption must catch changed audio even with the old OK cache.
+            assertEquals(DocumentState.OK, h.row(id).documentState)
+            h.now += 60_000
+            val fresh = seal(id, h.document(id), second, "Replacement audio")
+            if (sameId) {
+                // A matching meeting ID alone is not proof of the same compressed audio.
+                val meetingId = original.manifest!!.getJSONObject("meeting").getString("id")
+                fresh.manifest!!.getJSONObject("meeting").put("id", meetingId)
+                val target = File(work(id), "same-id.opus")
+                val rewritten = offMain {
+                    CassiniDocument.create(
+                        File(work(id), "sealed.opus"),
+                        second,
+                        "Ignored",
+                        JSONObject(),
+                        fresh,
+                        emptyMap(),
+                        target,
+                    )
+                }
+                Files.move(target.toPath(), File(work(id), "sealed.opus").toPath(), StandardCopyOption.REPLACE_EXISTING)
+                offMain { h.documents.markSealedBlocking(id, rewritten) }
+            }
+            h.notes.adoptSealed(id)
+            val row = h.row(id)
+            assertNull(row.captureStartedAt)
+            assertNull(row.captureAudioSha256)
+            assertNull(row.recordingTime())
+            val destination = folder.newFile("replacement-$id.opus")
+            assertTrue(h.documents.exportCopy(id, Uri.fromFile(destination)) is ExportOutcome.Saved)
+            val exported = CassiniDocument.read(destination)
+            assertFalse(exported.manifest!!.getJSONObject("meeting").has("recordedAtUtc"))
+            assertNull(exported.meetingTime)
+        }
+    }
+
     // Adopt.
 
     @Test fun adoptSealedReplacesTheCaptureAndDeletesIt() = runTest {

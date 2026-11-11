@@ -92,6 +92,10 @@ abstract class NoteDao {
     @Query("SELECT COUNT(*) FROM notes")
     abstract suspend fun noteCount(): Int
 
+    /** D95 migration invalidates only document-derived metadata; startup resolves it without opening notes. */
+    @Query("SELECT id FROM notes WHERE audio_kind = 'DOCUMENT' AND document_signature IS NULL ORDER BY id")
+    abstract suspend fun invalidatedDocuments(): List<String>
+
     /** Notes whose capture is still marked as being written (crash recovery, architecture 4.7). */
     @Query("SELECT * FROM notes WHERE audio_kind = 'LIVE_CAPTURE' ORDER BY created_at")
     abstract suspend fun liveCaptures(): List<NoteEntity>

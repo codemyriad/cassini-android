@@ -116,6 +116,8 @@ android {
                 it.inputs.dir(rootDir.resolve("fixtures/audio"))
                     .withPropertyName("fixtures")
                     .withPathSensitivity(PathSensitivity.RELATIVE)
+                it.inputs.dir(rootDir.resolve("fixtures/legacy-recording-time"))
+                    .withPropertyName("legacyRecordingTime").withPathSensitivity(PathSensitivity.RELATIVE)
                 // A local copy: the lambda must not capture the script object (configuration cache).
                 val fixturesPath = rootDir.resolve("fixtures").absolutePath
                 it.jvmArgumentProviders.add(CommandLineArgumentProvider { listOf("-Dcassini.fixtures=$fixturesPath") })
