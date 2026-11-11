@@ -307,8 +307,10 @@ class AcceptanceWalkTest {
             }
             rule.liveNodes(unmerged = true).count(highlighted::matches) == 1
         }
-        shot("03-read-and-listen")
-        Log.i(TAG, "Read & listen shot at ${graph.playback.state.value}")
+        shot("03-read-and-listen", waitForIdle = false)
+        val captured = graph.playback.state.value
+        assertTrue("Playback is active in the Read & listen screenshot: $captured", captured.playing)
+        Log.i(TAG, "Read & listen shot at $captured")
         rule.runOnUiThread { graph.playback.pause() }
 
         rule.onNode(hasContentDescription(rule.text(UiR.string.ui_note_share_more))).performClick()
@@ -547,9 +549,9 @@ class AcceptanceWalkTest {
         }
     }
 
-    /** Saves the current screen after Compose is idle and the visible windows have submitted a frame. */
-    private fun shot(name: String) {
-        rule.waitForIdle()
+    /** Saves the screen after the visible windows submit a frame. Playback stays live for Read & listen. */
+    private fun shot(name: String, waitForIdle: Boolean = true) {
+        if (waitForIdle) rule.waitForIdle()
         awaitDrawnFrame(name)
         val bitmap = checkNotNull(Background.instrumentation.uiAutomation.takeScreenshot()) { "No screenshot" }
         File(shots, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, PNG_QUALITY, it) }
