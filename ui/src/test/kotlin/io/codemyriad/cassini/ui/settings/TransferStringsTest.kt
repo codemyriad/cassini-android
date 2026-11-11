@@ -17,18 +17,30 @@ class TransferStringsTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
 
     @Test fun allSixLanguagesUseThePinnedTransferAndPrivacyCopy() {
-        val catalog = javaClass.getResourceAsStream("/transfer/strings.json")!!.bufferedReader().use { JSONObject(it.readText()) }
+        val source = javaClass.getResourceAsStream("/transfer/strings.json")!!.bufferedReader().use { it.readText() }
+        val catalog = JSONObject(source)
         val entries = catalog.getJSONArray("entries")
         for (tag in listOf("en", "it", "fr", "es", "pt-BR", "pt-PT")) {
-            val configuration = Configuration(context.resources.configuration).apply { setLocale(Locale.forLanguageTag(tag)) }
+            val configuration = Configuration(context.resources.configuration).apply {
+                setLocale(Locale.forLanguageTag(tag))
+            }
             val resources = context.createConfigurationContext(configuration).resources
             for (index in 0 until entries.length()) {
                 val entry = entries.getJSONObject(index)
                 val id = entry.getString("id")
-                val expected = if (tag == "en") entry.getString("en") else entry.getJSONObject("l10n").getJSONObject(tag).getString("text")
-                assertEquals("$tag $id", expected.replace("{name}", "Ada"), resources.getString(IDS.getValue(id), "Ada"))
+                val expected = if (tag == "en") {
+                    entry.getString("en")
+                } else {
+                    entry.getJSONObject("l10n").getJSONObject(tag).getString("text")
+                }
+                val wanted = expected.replace("{name}", "Ada")
+                val actual = resources.getString(IDS.getValue(id), "Ada")
+                assertEquals("$tag $id", wanted, actual)
             }
-            assertEquals(resources.getString(R.string.ui_library_privacy), resources.getString(R.string.ui_settings_models_footnote))
+            assertEquals(
+                resources.getString(R.string.ui_library_privacy),
+                resources.getString(R.string.ui_settings_models_footnote),
+            )
         }
     }
 

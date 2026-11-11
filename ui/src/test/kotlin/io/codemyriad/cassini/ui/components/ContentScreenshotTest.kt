@@ -12,8 +12,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.BoardTest
+import io.codemyriad.cassini.ui.R
 import io.codemyriad.cassini.ui.format.StageUi
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import io.codemyriad.cassini.ui.theme.SpeakerTone
@@ -229,7 +231,7 @@ class ContentScreenshotTest : BoardTest() {
                 checked = true,
                 onCheckedChange = {},
                 title = "Remember this voice on this phone",
-                subtitle = "Future notes will name Anna automatically. The voiceprint never leaves the phone.",
+                subtitle = stringResource(R.string.ui_name_remember_body, "Anna"),
             )
             CassiniCheckboxRow(checked = false, onCheckedChange = {}, title = "Remember this voice on this phone")
             CassiniCheckboxRow(

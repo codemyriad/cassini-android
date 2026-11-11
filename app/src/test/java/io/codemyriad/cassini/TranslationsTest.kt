@@ -174,7 +174,8 @@ class TranslationsTest {
                 "ui_name_remember_body_unnamed" -> "android.speakers.rememberVoice.description.unnamed"
                 else -> return null
             }
-            val catalog = JSONObject(File("../ui/src/test/resources/transfer/strings.json").readText()).getJSONArray("entries")
+            val source = File("../ui/src/test/resources/transfer/strings.json").readText()
+            val catalog = JSONObject(source).getJSONArray("entries")
             val entry = (0 until catalog.length()).map { catalog.getJSONObject(it) }.single { it.getString("id") == id }
             return entry.getJSONObject("l10n").getJSONObject(tag).getString("text")
         }

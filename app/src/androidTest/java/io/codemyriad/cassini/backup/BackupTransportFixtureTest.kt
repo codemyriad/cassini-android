@@ -67,7 +67,8 @@ class BackupTransportFixtureTest {
             }
             "verifyQuota" -> {
                 assertTrue("The real refusal must be visible in Settings", choices.choices.first().quotaExceeded)
-                assertEquals(DocumentState.OK, CassiniDocument.read(File(paths.note(ID), "document.opus")).documentState)
+                val document = CassiniDocument.read(File(paths.note(ID), "document.opus"))
+                assertEquals(DocumentState.OK, document.documentState)
             }
             else -> error("Unknown explicit backup fixture stage: $stage")
         }

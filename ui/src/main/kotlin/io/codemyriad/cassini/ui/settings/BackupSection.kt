@@ -28,13 +28,18 @@ internal fun BackupSection(state: BackupSettingsUi, onEvent: (SettingsEvent) -> 
     GroupCard(Modifier.padding(horizontal = 16.dp)) {
         BackupSwitch(
             stringResource(R.string.ui_settings_transfer_title),
-            stringResource(if (state.transfer) R.string.ui_settings_transfer_body else R.string.ui_settings_transfer_body_off),
+            stringResource(
+                when {
+                    !state.transferAvailable -> R.string.ui_settings_transfer_unavailable
+                    state.transfer -> R.string.ui_settings_transfer_body
+                    else -> R.string.ui_settings_transfer_body_off
+                },
+            ),
             state.transferAvailable && state.transfer,
             !state.saving && state.transferAvailable,
         ) { onEvent(SettingsEvent.Transfer(it)) }
     }
     HelperText(stringResource(R.string.ui_settings_transfer_export_hint))
-    if (!state.transferAvailable) HelperText(stringResource(R.string.ui_settings_transfer_unavailable))
     if (state.quotaExceeded) HelperText(stringResource(R.string.ui_settings_transfer_too_large))
     if (state.error) HelperText(stringResource(R.string.ui_settings_transfer_choice_failed))
 }
