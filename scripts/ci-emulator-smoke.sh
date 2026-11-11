@@ -211,3 +211,8 @@ fi
 # The published APK (minified on tags) is not instrumented; install it over the tested build and check
 # that it starts and stays up.
 ./scripts/launch-check.sh "${published[0]}" | tee .tools/emulator-results/launch.txt
+
+# Verify the booted property, not just config.ini. This runs after the tests, so bad guest configuration cannot
+# enter the workflow's pre-test boot recovery path or turn a completed test run into a retry.
+python3 -I scripts/ci-emulator-heap.py verify "$TEST_API" \
+    "$(adb shell getprop dalvik.vm.heapsize | tr -d '\r')" | tee .tools/emulator-results/heap.txt
