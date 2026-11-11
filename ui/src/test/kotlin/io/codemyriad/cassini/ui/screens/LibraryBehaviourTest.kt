@@ -10,18 +10,24 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasImeAction
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
@@ -42,7 +48,9 @@ import io.codemyriad.cassini.ui.note.ExportKind
 import io.codemyriad.cassini.ui.note.NoteAction
 import io.codemyriad.cassini.ui.note.NoteSheet
 import io.codemyriad.cassini.ui.theme.CassiniTheme
+import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -79,6 +87,68 @@ class LibraryBehaviourTest {
     private fun show(state: LibraryUiState) = setThemed { LibraryScreen(state, onEvent = { events += it }) }
 
     private fun assertEvents(vararg expected: LibraryEvent) = rule.runOnIdle { assertEquals(expected.toList(), events) }
+
+    @Test fun searchFilterMenusSendOnlyTheirOwnSelectionsAndNeverOfferSummary() {
+        val filters = io.codemyriad.cassini.ui.library.SearchFiltersUi(
+            speaker = "bEN",
+            speakers = persistentListOf("Ada", "Ben"),
+        )
+        show(BoardFixtures.library.copy(query = "delivery", searchFilters = filters))
+        rule.onAllNodesWithText("Has summary").assertCountEquals(0)
+        rule.onNodeWithText("Speaker: bEN").performClick()
+        rule.onNodeWithText("Any speaker").assertIsNotSelected()
+        rule.onNodeWithText("Ada").assertIsNotSelected()
+        rule.onNodeWithText("Ben").assertIsSelected().performClick()
+        assertEvents(LibraryEvent.FilterSpeaker("Ben"))
+        rule.onNodeWithText("Any date").performClick()
+        rule.onNode(hasText("Any date") and hasAnyAncestor(isPopup())).assertIsSelected()
+        rule.onNodeWithText("Past 7 days").assertIsNotSelected().performClick()
+        assertEvents(
+            LibraryEvent.FilterSpeaker("Ben"),
+            LibraryEvent.FilterDate(io.codemyriad.cassini.ui.library.SearchDateUi.WEEK),
+        )
+        rule.onNodeWithText("Recorded by me").performScrollTo().performClick()
+        assertEvents(
+            LibraryEvent.FilterSpeaker("Ben"),
+            LibraryEvent.FilterDate(io.codemyriad.cassini.ui.library.SearchDateUi.WEEK),
+            LibraryEvent.ToggleRecordedByMe,
+        )
+    }
+
+    @Test fun aLargeSpeakerMenuComposesOnlyVisibleRowsAndKeepsAnySpeakerAccessible() {
+        val names = (0 until 5000).map { "Guest ${it.toString().padStart(4, '0')}" }
+        val readIndices = mutableSetOf<Int>()
+        val inventory = object : ImmutableList<String> by names.toImmutableList() {
+            override fun get(index: Int): String {
+                readIndices += index
+                return names[index]
+            }
+
+            override fun iterator(): Iterator<String> = names.indices.asSequence().map { get(it) }.iterator()
+        }
+        val filters = io.codemyriad.cassini.ui.library.SearchFiltersUi(speakers = inventory)
+        show(BoardFixtures.library.copy(query = "delivery", searchFilters = filters))
+        rule.onNodeWithText("Speaker").performClick()
+        rule.onNodeWithText("Any speaker").assertIsEnabled().assertIsSelected()
+        val composed = rule.onAllNodesWithText("Guest ", substring = true).fetchSemanticsNodes().size
+        assertTrue("Only the viewport and prefetch rows should compose; got $composed", composed in 1..20)
+        // Lazy key indexing can look ahead of the viewport; it must not traverse the full inventory.
+        assertTrue("Indexed ${readIndices.size} of ${names.size} names", readIndices.size in 1..500)
+        rule.onNodeWithTag("speaker-filter-menu").performScrollToIndex(names.size)
+        rule.onNodeWithText("Guest 4999").performClick()
+        assertEvents(LibraryEvent.FilterSpeaker("Guest 4999"))
+        rule.onNodeWithText("Speaker").performClick()
+        rule.onNodeWithTag("speaker-filter-menu").performScrollToIndex(0)
+        rule.onNodeWithText("Any speaker").assertIsEnabled().performClick()
+        assertEvents(LibraryEvent.FilterSpeaker("Guest 4999"), LibraryEvent.FilterSpeaker(null))
+    }
+
+    @Test fun filterControlsDisappearWithAnEmptyQuery() {
+        show(BoardFixtures.library.copy(query = ""))
+        rule.onAllNodesWithText("Speaker").assertCountEquals(0)
+        rule.onAllNodesWithText("Any date").assertCountEquals(0)
+        rule.onAllNodesWithText("Recorded by me").assertCountEquals(0)
+    }
 
     /** A query state that arrives late does not remove typed text; a clear from the state empties the field. */
     @Test fun theSearchFieldKeepsTypedTextWhileTheStateIsLate() {

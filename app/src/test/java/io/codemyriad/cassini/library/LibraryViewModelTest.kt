@@ -143,6 +143,38 @@ class LibraryViewModelTest {
     }
 
     @Test
+    fun filtersNarrowTheCurrentQueryAndResetOnClearAndProcessDeath() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        ports.speakerNames.value = listOf("Ada", "Ben")
+        viewModel.onEvent(LibraryEvent.Query("delivery"))
+        advanceUntilIdle()
+        viewModel.onEvent(LibraryEvent.FilterSpeaker("Ada"))
+        viewModel.onEvent(LibraryEvent.FilterDate(io.codemyriad.cassini.ui.library.SearchDateUi.WEEK))
+        viewModel.onEvent(LibraryEvent.ToggleRecordedByMe)
+        advanceUntilIdle()
+        val expected = io.codemyriad.cassini.core.library.SearchFilters(
+            "Ada",
+            io.codemyriad.cassini.core.library.SearchDate.WEEK,
+            true,
+        )
+        assertEquals(expected, ports.filterRequests.last())
+        assertEquals(listOf("Ada", "Ben"), viewModel.now().searchFilters.speakers)
+        // Only the text is in SavedStateHandle; a new ViewModel gets empty transient filters.
+        val restored = viewModel()
+        advanceUntilIdle()
+        assertEquals("delivery", restored.now().query)
+        assertEquals(null, restored.now().searchFilters.speaker)
+        assertEquals(false, restored.now().searchFilters.recordedByMe)
+        viewModel.onEvent(LibraryEvent.ClearQuery)
+        advanceUntilIdle()
+        assertNull(viewModel.now().results)
+        assertEquals(null, viewModel.now().searchFilters.speaker)
+        viewModel.onEvent(LibraryEvent.Query("delivery"))
+        advanceUntilIdle()
+        assertEquals(io.codemyriad.cassini.core.library.SearchFilters(), ports.filterRequests.last())
+    }
+
+    @Test
     fun opensNotesWithTheQueryAndRecording() = runTest(dispatcher) {
         val viewModel = viewModel()
         viewModel.effects.test {
@@ -158,9 +190,9 @@ class LibraryViewModelTest {
             viewModel.onEvent(LibraryEvent.Import)
             assertEquals(LibraryEffect.PickAudio, awaitItem())
         }
-        viewModel.onPicked("content://picked/1")
-        viewModel.onPicked(null)
-        assertEquals(listOf("import content://picked/1"), ports.actions)
+        viewModel.onPicked(listOf("content://picked/1", "content://picked/2"))
+        viewModel.onPicked(emptyList())
+        assertEquals(listOf("import content://picked/1", "import content://picked/2"), ports.actions)
     }
 
     @Test

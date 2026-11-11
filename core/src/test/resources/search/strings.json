@@ -1,0 +1,271 @@
+{
+  "entries": [
+    {
+      "id": "search.filter.anyDate",
+      "en": "Any date",
+      "platforms": [
+        "gnome",
+        "mac"
+      ],
+      "role": "button",
+      "boards": [
+        "Search",
+        "Search-mac"
+      ],
+      "milestone": "UX12",
+      "note": "Filter chip, inactive (outlined pill). The date choices it opens are not drawn.",
+      "status": "drawn",
+      "l10n": {
+        "it": {
+          "text": "Qualsiasi data"
+        },
+        "fr": {
+          "text": "Toutes les dates"
+        },
+        "es": {
+          "text": "Cualquier fecha"
+        },
+        "pt-BR": {
+          "text": "Qualquer data"
+        },
+        "pt-PT": {
+          "text": "Qualquer data"
+        }
+      }
+    },
+    {
+      "id": "search.filter.recordedByMe",
+      "en": "Recorded by me",
+      "platforms": [
+        "gnome",
+        "mac"
+      ],
+      "role": "button",
+      "boards": [
+        "Search",
+        "Search-mac"
+      ],
+      "milestone": "UX12",
+      "note": "Filter chip, inactive. It means origin = own, which excludes Received meetings.",
+      "status": "drawn",
+      "l10n": {
+        "it": {
+          "text": "Registrate da me"
+        },
+        "fr": {
+          "text": "Enregistrées par moi"
+        },
+        "es": {
+          "text": "Grabadas por mí"
+        },
+        "pt-BR": {
+          "text": "Gravadas por mim"
+        },
+        "pt-PT": {
+          "text": "Gravadas por mim"
+        }
+      }
+    },
+    {
+      "id": "search.filter.speaker",
+      "en": "Speaker: {name}",
+      "platforms": [
+        "gnome",
+        "mac"
+      ],
+      "role": "button",
+      "boards": [
+        "Search",
+        "Search-mac"
+      ],
+      "milestone": "UX12",
+      "placeholders": {
+        "name": "speaker display name (a named speaker or common.speaker.unnamed)"
+      },
+      "note": "Filter chip, drawn active (accent fill, white semibold). Not drawn: the text when no speaker is set, and how to pick or clear one. Ask.",
+      "status": "drawn",
+      "l10n": {
+        "it": {
+          "text": "Voce: {name}"
+        },
+        "fr": {
+          "text": "Intervenant : {name}"
+        },
+        "es": {
+          "text": "Hablante: {name}"
+        },
+        "pt-BR": {
+          "text": "Locutor: {name}"
+        },
+        "pt-PT": {
+          "text": "Orador: {name}"
+        }
+      }
+    },
+    {
+      "id": "search.filter.speakerNone",
+      "en": "Speaker",
+      "note": "Coordinator (D14). The Speaker chip when no speaker is chosen. Opens the speaker menu.",
+      "platforms": [
+        "gnome",
+        "mac"
+      ],
+      "role": "label",
+      "boards": [
+        "Search",
+        "Search-mac"
+      ],
+      "milestone": "UX12",
+      "status": "harmony",
+      "l10n": {
+        "it": {
+          "text": "Voce"
+        },
+        "fr": {
+          "text": "Intervenant"
+        },
+        "es": {
+          "text": "Hablante"
+        },
+        "pt-BR": {
+          "text": "Locutor"
+        },
+        "pt-PT": {
+          "text": "Orador"
+        }
+      }
+    },
+    {
+      "id": "search.filter.anySpeaker",
+      "en": "Any speaker",
+      "note": "Coordinator (D14). First item of the speaker menu; clears the speaker filter.",
+      "platforms": [
+        "gnome",
+        "mac"
+      ],
+      "role": "label",
+      "boards": [
+        "Search",
+        "Search-mac"
+      ],
+      "milestone": "UX12",
+      "status": "harmony",
+      "l10n": {
+        "it": {
+          "text": "Qualsiasi voce"
+        },
+        "fr": {
+          "text": "Tous les intervenants"
+        },
+        "es": {
+          "text": "Cualquier hablante"
+        },
+        "pt-BR": {
+          "text": "Qualquer locutor"
+        },
+        "pt-PT": {
+          "text": "Qualquer orador"
+        }
+      }
+    },
+    {
+      "id": "search.filter.date.today",
+      "en": "Today",
+      "note": "Coordinator (D14). Date menu item, and the chip text when chosen.",
+      "platforms": [
+        "gnome",
+        "mac"
+      ],
+      "role": "label",
+      "boards": [
+        "Search",
+        "Search-mac"
+      ],
+      "milestone": "UX12",
+      "status": "harmony",
+      "l10n": {
+        "it": {
+          "text": "Oggi"
+        },
+        "fr": {
+          "text": "Aujourd’hui"
+        },
+        "es": {
+          "text": "Hoy"
+        },
+        "pt-BR": {
+          "text": "Hoje"
+        },
+        "pt-PT": {
+          "text": "Hoje"
+        }
+      }
+    },
+    {
+      "id": "search.filter.date.week",
+      "en": "Past 7 days",
+      "note": "Coordinator (D14). Date menu item and chip text: today and the 6 days before it, local time.",
+      "platforms": [
+        "gnome",
+        "mac"
+      ],
+      "role": "label",
+      "boards": [
+        "Search",
+        "Search-mac"
+      ],
+      "milestone": "UX12",
+      "status": "harmony",
+      "l10n": {
+        "it": {
+          "text": "Ultimi 7 giorni"
+        },
+        "fr": {
+          "text": "7 derniers jours"
+        },
+        "es": {
+          "text": "Últimos 7 días"
+        },
+        "pt-BR": {
+          "text": "Últimos 7 dias"
+        },
+        "pt-PT": {
+          "text": "Últimos 7 dias"
+        }
+      }
+    },
+    {
+      "id": "search.filter.date.month",
+      "en": "Past 30 days",
+      "note": "Coordinator (D14). Date menu item and chip text: today and the 29 days before it, local time.",
+      "platforms": [
+        "gnome",
+        "mac"
+      ],
+      "role": "label",
+      "boards": [
+        "Search",
+        "Search-mac"
+      ],
+      "milestone": "UX12",
+      "status": "harmony",
+      "l10n": {
+        "it": {
+          "text": "Ultimi 30 giorni"
+        },
+        "fr": {
+          "text": "30 derniers jours"
+        },
+        "es": {
+          "text": "Últimos 30 días"
+        },
+        "pt-BR": {
+          "text": "Últimos 30 dias"
+        },
+        "pt-PT": {
+          "text": "Últimos 30 dias"
+        }
+      }
+    }
+  ]
+}

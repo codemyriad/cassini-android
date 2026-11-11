@@ -14,9 +14,12 @@ import io.codemyriad.cassini.core.library.PauseReason
 
 /** SQL fragments shared by the Library and search queries. Aliases: n = notes, t = note_text, j = jobs, v = variants. */
 internal object Sql {
-    /** The selected variant of note `n`: `selected_variant`, else the default variant, else the first one. */
+    /** The readable variant shown for note `n`: explicit selection, else readable default, else first readable. */
+    // Older Android SQLite resolves outer columns in WHERE, but not in a subquery ORDER BY.
     const val SELECTED_VARIANT =
-        "COALESCE(n.selected_variant, (SELECT d.variant_id FROM variants d WHERE d.note_id = n.id " +
+        "COALESCE((SELECT s.variant_id FROM variants s WHERE s.note_id = n.id " +
+            "AND s.variant_id = n.selected_variant AND s.readable = 1), " +
+            "(SELECT d.variant_id FROM variants d WHERE d.note_id = n.id AND d.readable = 1 " +
             "ORDER BY d.is_default DESC, d.ordinal LIMIT 1))"
 
     /** The [LibraryRow] columns. */
@@ -25,7 +28,7 @@ internal object Sql {
             "n.origin, n.recorded_at, n.capture_started_at, " +
             "COALESCE(n.preview, NULLIF(substr(t.body, 1, 160), '')) AS preview, " +
             "j.state AS job_state, j.kind AS job_kind, j.pause_reason, j.failure, j.done_ms, j.total_ms, " +
-            "v.variant_id AS selected_variant, v.word_count, v.speaker_count"
+            "v.variant_id AS selected_variant, v.word_count, v.speaker_count, v.word_ends_bounded_by_audio"
 
     /** The joins [LIBRARY_COLUMNS] needs, after `FROM notes n` or a join that names `n`. */
     const val LIBRARY_JOINS =
@@ -59,6 +62,7 @@ data class LibraryRow(
     val origin: Origin = Origin.RECORDED,
     @ColumnInfo(name = "recorded_at") val recordedAt: String? = null,
     @ColumnInfo(name = "capture_started_at") val captureStartedAt: Long? = null,
+    @ColumnInfo(name = "word_ends_bounded_by_audio") val wordEndsBoundedByAudio: Boolean? = null,
 )
 
 /**
@@ -70,6 +74,9 @@ data class SearchRow(
     @Embedded val row: LibraryRow,
     val snippet: String,
     @ColumnInfo(name = "title_snippet") val titleSnippet: String,
+    @ColumnInfo(name = "document_signature") val documentSignature: String? = null,
+    @Relation(parentColumn = "id", entityColumn = "note_id")
+    val speakers: List<SpeakerEntity> = emptyList(),
 )
 
 /** One Trash card. */

@@ -25,8 +25,9 @@ abstract class NoteDao {
      * Live notes matching the FTS4 expression [match] (from `SearchQuery.fts`), newest first, with snippets of the
      * transcript (15 tokens) and of the title. Trashed notes are excluded.
      */
+    @Transaction
     @Query(
-        "SELECT ${Sql.LIBRARY_COLUMNS}, " +
+        "SELECT ${Sql.LIBRARY_COLUMNS}, n.document_signature, " +
             "snippet(note_fts, char(2), char(3), '…', 1, 15) AS snippet, " +
             "snippet(note_fts, char(2), char(3), '…', 0, 64) AS title_snippet " +
             "FROM note_fts JOIN note_text s ON s.rowid = note_fts.rowid JOIN notes n ON n.id = s.note_id " +
@@ -34,6 +35,14 @@ abstract class NoteDao {
             "WHERE note_fts MATCH :match AND n.trashed_at IS NULL ORDER BY n.created_at DESC",
     )
     abstract fun searchFlow(match: String): Flow<List<SearchRow>>
+
+    /** Names of the currently shown variants, including speakers shown only in inline replies. */
+    @Query(
+        "SELECT s.label FROM speakers s JOIN notes n ON s.note_id = n.id " +
+            "WHERE n.trashed_at IS NULL AND s.variant_id = ${Sql.SELECTED_VARIANT} AND NOT s.is_placeholder " +
+            "ORDER BY n.created_at DESC, n.id, s.ordinal",
+    )
+    abstract fun namedSpeakersFlow(): Flow<List<String>>
 
     /** Trashed notes, the soonest to expire (the oldest `trashed_at`) first. */
     @Query(

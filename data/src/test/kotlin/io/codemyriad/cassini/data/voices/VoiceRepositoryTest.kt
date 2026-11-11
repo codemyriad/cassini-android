@@ -1,6 +1,7 @@
 package io.codemyriad.cassini.data.voices
 
 import io.codemyriad.cassini.core.Failure
+import io.codemyriad.cassini.core.format.Word
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.core.models.ModelCatalog
@@ -13,6 +14,7 @@ import io.codemyriad.cassini.core.speakers.Voiceprints
 import io.codemyriad.cassini.data.checkpoint.CheckpointRepository
 import io.codemyriad.cassini.data.checkpoint.noteId
 import io.codemyriad.cassini.data.db.JobEntity
+import io.codemyriad.cassini.data.db.cache
 import io.codemyriad.cassini.data.db.offMain
 import io.codemyriad.cassini.data.notes.NotesHarness
 import kotlinx.coroutines.flow.first
@@ -376,7 +378,8 @@ class VoiceRepositoryTest {
         val old = voice("voice_old", "Old model", seed = 3, seconds = 900.0).copy(model = "another-model")
         val short = voice("voice_short", "Short print", seed = 4, seconds = 600.0, dim = 192)
         writePeople(luca.copy(seconds = 500.0), anna.copy(seconds = 20.0), old, short)
-        h.db.notes().update(h.row(sealedId).copy(selectedVariant = "v1"))
+        // Counts follow a readable variant, as they do in a real derived note cache.
+        h.db.cache().replaceCache(cache(h.row(sealedId), listOf("v1" to listOf(Word("S1", 0, 400, "Welcome")))))
         writeSealed(sealedId, mapOf("v1/S1" to print(10, Match(anna.id, 0.8f, Match.State.AUTO))))
         voices.syncLinks()
 

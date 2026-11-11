@@ -5,6 +5,7 @@ import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.core.library.Origin
+import io.codemyriad.cassini.core.library.SearchFilters
 import io.codemyriad.cassini.data.db.JobEntity
 import io.codemyriad.cassini.data.db.LibraryRow
 import io.codemyriad.cassini.data.db.NoteDetails
@@ -23,6 +24,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import java.time.Clock
 import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
 
@@ -112,7 +114,14 @@ internal class FakeLibraryPorts : LibraryPorts {
 
     override fun library(): Flow<List<LibraryRow>> = libraryError?.let { error -> flow { throw error } } ?: rows
 
-    override fun search(query: String): Flow<List<SearchRow>> {
+    override fun namedSpeakers(): Flow<List<String>> = speakerNames
+
+    val speakerNames = MutableStateFlow<List<String>>(emptyList())
+    override val calendarZone = MutableStateFlow(ROME)
+    val filterRequests = mutableListOf<SearchFilters>()
+
+    override fun search(query: String, filters: SearchFilters, zone: ZoneId, today: LocalDate): Flow<List<SearchRow>> {
+        filterRequests += filters
         searches += query
         return searchRows.map { it[query].orEmpty() }
     }
@@ -160,8 +169,8 @@ internal class FakeLibraryPorts : LibraryPorts {
         return RenameOutcome.Renamed
     }
 
-    override fun import(uri: String) {
-        actions += "import $uri"
+    override fun import(uris: List<String>) {
+        uris.forEach { actions += "import $it" }
     }
 
     override fun dismissNotice(kind: BannerKind) {

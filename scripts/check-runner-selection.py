@@ -7,8 +7,11 @@ for labels no runner has. Each selecting runs-on is evaluated here for those val
 Every other job runs on a literal GitHub-hosted image. In the jobs that can move, secrets are read only by steps
 that run on tags alone, and caches are saved only by GitHub-hosted runs: a tag build restores them while it holds
 the signing key, so nothing written on a self-hosted machine may reach it.
+Only the Android build on GitHub-hosted main writes the Gradle home; other jobs and refs only restore it.
 Run from the repository root: python3 -I scripts/check-runner-selection.py
 """
+
+from __future__ import annotations
 
 import json
 import re
@@ -24,7 +27,9 @@ SELECTOR = re.compile(
 HOSTED_IMAGE = re.compile(r'^(?:ubuntu|macos|windows)-[0-9a-z.-]+$')
 TAG_ONLY = "if: startsWith(github.ref, 'refs/tags/')"
 GITHUB_HOSTED = "runner.environment == 'github-hosted'"
-READ_ONLY = {'cache-read-only: true', "cache-read-only: ${{ runner.environment != 'github-hosted' }}"}
+MAIN_GRADLE_CACHE = (
+    "cache-read-only: ${{ github.ref != 'refs/heads/main' || runner.environment != 'github-hosted' }}"
+)
 # The jobs that may move. Every other job (emulator, release, play, models, record-goldens) stays GitHub-hosted.
 MOVABLE = {('android.yml', 'checks'), ('android.yml', 'core-only'), ('android.yml', 'build'), ('native.yml', 'native')}
 FALLBACK = [None, '', ' ', 'garbage{', '["self-hosted","cm-hetzner"]', '["self-hosted","cm-hetzner-typo"]',
@@ -101,8 +106,9 @@ def movable_job_problems(where: str, job_text: str) -> list[str]:
             found.append(f"{label}: saves a cache without `{GITHUB_HOSTED}` in its if")
         if 'uses: gradle/actions/setup-gradle@' in step:
             read_only = {line.strip() for line in step.splitlines() if 'cache-read-only:' in line}
-            if not read_only & READ_ONLY:
-                found.append(f'{label}: setup-gradle may save the Gradle home from a self-hosted run')
+            expected = {MAIN_GRADLE_CACHE} if where == 'android.yml:build' else {'cache-read-only: true'}
+            if read_only != expected:
+                found.append(f'{label}: only the GitHub-hosted main build may write the Gradle home')
     return found
 
 

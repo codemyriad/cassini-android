@@ -629,4 +629,12 @@
     <string name="ui_settings_transfer_export_hint">To keep a copy somewhere safe, use Export All as ZIP.</string>
     <string name="ui_settings_transfer_too_large">Your notes and saved voices are too large to move in one transfer. Export your notes as a ZIP instead.</string>
     <string name="ui_settings_transfer_choice_failed">Couldn’t save this choice. Try again.</string>
+    <string name="ui_search_filter_any_date">Any date</string>
+    <string name="ui_search_filter_recorded_by_me">Recorded by me</string>
+    <string name="ui_search_filter_speaker">Speaker: {name}</string>
+    <string name="ui_search_filter_speaker_none">Speaker</string>
+    <string name="ui_search_filter_any_speaker">Any speaker</string>
+    <string name="ui_search_filter_date_today">Today</string>
+    <string name="ui_search_filter_date_week">Past 7 days</string>
+    <string name="ui_search_filter_date_month">Past 30 days</string>
 </resources>

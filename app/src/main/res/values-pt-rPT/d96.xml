@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated from cassini-ux 4d577376f6360ed352fa75307f4dc47890ed9858; do not edit. -->
+<resources>
+    <string name="common_cancel">Cancelar</string>
+    <string name="common_done">Concluído</string>
+    <string name="import_filter_cassini_and_zip">Ficheiros Cassini e ficheiros ZIP</string>
+    <string name="import_progress">A importar %1$d de %2$d…</string>
+    <string name="import_cancelled">Importação cancelada</string>
+    <plurals name="import_summary_imported">
+        <item quantity="one">%1$d importada</item>
+        <item quantity="many">%1$d importadas</item>
+        <item quantity="other">%1$d importadas</item>
+    </plurals>
+    <plurals name="import_summary_duplicates">
+        <item quantity="one">%1$d duplicado omitido</item>
+        <item quantity="many">%1$d duplicados omitidos</item>
+        <item quantity="other">%1$d duplicados omitidos</item>
+    </plurals>
+    <plurals name="import_summary_unsupported">
+        <item quantity="one">%1$d ficheiro não suportado ignorado</item>
+        <item quantity="many">%1$d ficheiros não suportados ignorados</item>
+        <item quantity="other">%1$d ficheiros não suportados ignorados</item>
+    </plurals>
+    <plurals name="import_summary_failed">
+        <item quantity="one">Não foi possível importar %1$d ficheiro</item>
+        <item quantity="many">Não foi possível importar %1$d ficheiros</item>
+        <item quantity="other">Não foi possível importar %1$d ficheiros</item>
+    </plurals>
+    <string name="import_zip_failed_damaged">Este ficheiro ZIP está danificado e não pode ser aberto.</string>
+    <string name="import_zip_failed_encrypted">Este ficheiro ZIP está protegido por palavra-passe. O Cassini não pode abrir ficheiros ZIP protegidos por palavra-passe.</string>
+    <string name="import_zip_failed_unsafe_paths">Este ficheiro ZIP contém caminhos de ficheiro não seguros. Nada foi importado.</string>
+    <string name="import_zip_failed_too_large">Este ficheiro ZIP é demasiado grande para ser importado.</string>
+    <string name="import_zip_failed_empty">Este ficheiro ZIP não contém nada que o Cassini possa importar.</string>
+    <string name="export_zip_all">Exportar tudo como ZIP…</string>
+    <string name="export_zip_selected">Exportar a seleção como ZIP…</string>
+    <string name="export_zip_progress">A exportar %1$d de %2$d…</string>
+    <plurals name="export_zip_done">
+        <item quantity="one">%1$d exportada para um ficheiro ZIP</item>
+        <item quantity="many">%1$d exportadas para um ficheiro ZIP</item>
+        <item quantity="other">%1$d exportadas para um ficheiro ZIP</item>
+    </plurals>
+</resources>

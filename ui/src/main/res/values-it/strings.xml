@@ -595,4 +595,12 @@
     <string name="ui_settings_transfer_unavailable">Per questa scelta serve Android 9 o successivo.</string>
     <string name="ui_settings_transfer_choice_failed">Impossibile salvare questa scelta. Riprova.</string>
     <string name="ui_notice_transfer_enabled">Cassini trasferirà le tue note e le voci salvate su un nuovo telefono quando lo configuri a partire da questo. Puoi cambiare questa scelta nelle impostazioni.</string>
+    <string name="ui_search_filter_any_date">Qualsiasi data</string>
+    <string name="ui_search_filter_recorded_by_me">Registrate da me</string>
+    <string name="ui_search_filter_speaker">Voce: {name}</string>
+    <string name="ui_search_filter_speaker_none">Voce</string>
+    <string name="ui_search_filter_any_speaker">Qualsiasi voce</string>
+    <string name="ui_search_filter_date_today">Oggi</string>
+    <string name="ui_search_filter_date_week">Ultimi 7 giorni</string>
+    <string name="ui_search_filter_date_month">Ultimi 30 giorni</string>
 </resources>

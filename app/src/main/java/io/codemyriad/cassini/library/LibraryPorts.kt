@@ -3,8 +3,10 @@ package io.codemyriad.cassini.library
 import android.content.Context
 import android.os.Build
 import android.view.accessibility.AccessibilityManager
+import androidx.core.net.toUri
 import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.core.library.JobKind
+import io.codemyriad.cassini.core.library.SearchFilters
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.data.db.LibraryRow
 import io.codemyriad.cassini.data.db.NoteDetails
@@ -23,6 +25,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import java.time.LocalDate
+import java.time.ZoneId
 
 /**
  * What the Library ViewModel reads and changes (features.md section 1). [GraphLibraryPorts] binds it to [AppGraph];
@@ -32,7 +36,12 @@ import kotlinx.coroutines.flow.map
 interface LibraryPorts {
     fun library(): Flow<List<LibraryRow>>
 
-    fun search(query: String): Flow<List<SearchRow>>
+    fun search(query: String, filters: SearchFilters, zone: ZoneId, today: LocalDate): Flow<List<SearchRow>>
+
+    fun namedSpeakers(): Flow<List<String>>
+
+    /** Calendar/time-zone broadcasts; repeated zone values still refresh the local day. */
+    val calendarZone: Flow<ZoneId>
 
     /** One note with its variants, speakers and job, for the Note actions sheet. */
     fun details(id: String): Flow<NoteDetails?>
@@ -63,8 +72,8 @@ interface LibraryPorts {
 
     suspend fun rename(id: String, title: String): RenameOutcome
 
-    /** Imports the picked [uri] in the background; the notices show its progress and errors. */
-    fun import(uri: String)
+    /** Imports the picked [uris] as one background batch with a shared summary. */
+    fun import(uris: List<String>)
 
     fun dismissNotice(kind: BannerKind)
 
@@ -87,8 +96,12 @@ class GraphLibraryPorts(private val graph: AppGraph, context: Context) : Library
 
     override fun library(): Flow<List<LibraryRow>> = flow { emitAll(graph.awaitCatalogue().notes.library()) }
 
-    override fun search(query: String): Flow<List<SearchRow>> =
-        flow { emitAll(graph.awaitCatalogue().notes.search(query)) }
+    override fun search(query: String, filters: SearchFilters, zone: ZoneId, today: LocalDate): Flow<List<SearchRow>> =
+        flow { emitAll(graph.awaitCatalogue().notes.search(query, filters, zone, today)) }
+
+    override fun namedSpeakers(): Flow<List<String>> = flow { emitAll(graph.awaitCatalogue().notes.namedSpeakers()) }
+
+    override val calendarZone: Flow<ZoneId> = searchCalendar(app, graph.config.zone)
 
     override fun details(id: String): Flow<NoteDetails?> = flow { emitAll(graph.awaitCatalogue().notes.note(id)) }
 
@@ -125,8 +138,8 @@ class GraphLibraryPorts(private val graph: AppGraph, context: Context) : Library
     override suspend fun rename(id: String, title: String): RenameOutcome =
         graph.awaitCatalogue().notes.rename(id, title)
 
-    override fun import(uri: String) {
-        graph.notices.imports.start(uri)
+    override fun import(uris: List<String>) {
+        graph.transfers.import(uris.map { it.toUri() })
     }
 
     override fun dismissNotice(kind: BannerKind) = graph.notices.dismiss(kind)

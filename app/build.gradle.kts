@@ -135,9 +135,13 @@ android {
                     CommandLineArgumentProvider { listOf("-Dcassini.interjections=$vectorsPath") },
                 )
                 // C1 reduces warmup in this test worker; :ui keeps full JIT for PNG comparison.
+                // C1 otherwise reduces the code-cache default to 48 MiB, which the full Robolectric suite
+                // can exhaust. Retain the normal tiered-JIT capacity and report usage at worker exit.
                 // Robolectric also needs the JDK 17 opens below.
                 it.jvmArgs(
                     "-XX:TieredStopAtLevel=1",
+                    "-XX:ReservedCodeCacheSize=240m",
+                    "-XX:+PrintCodeCache",
                     "--add-opens=java.base/java.lang=ALL-UNNAMED",
                     "--add-opens=java.base/java.util=ALL-UNNAMED",
                     "--add-opens=java.base/java.io=ALL-UNNAMED",

@@ -180,6 +180,8 @@ class AppGraph(context: Context, val config: Config) {
     val paths: AppPaths = config.paths
     val dispatchers: CassiniDispatchers = config.dispatchers
     val locks = NoteLocks()
+
+    val transfers by lazy { io.codemyriad.cassini.transfer.BulkTransfers(app, this) }
     val network: NetworkCheck = config.network ?: NetworkCheck.of(app)
 
     val backupChoices = BackupChoicesStore(File(config.backupDirectory, "choices.json"), dispatchers.io)
