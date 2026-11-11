@@ -10,9 +10,13 @@ The Settings test matched the Saved voices title as a substring of any clickable
 
 An empty downloaded-model root does not remove bundled Whistle. Transcribe on a note therefore does not promise to open model consent. Selecting an uninstalled Parakeet as the active recognizer is also not a valid fixture: active recognition falls back to the included model until the optional model is installed.
 
-The walk now opens Settings and invokes its existing Parakeet download action. It verifies speech-only consent, with the size derived from the pinned catalog, and rejects speaker/voice parts in this optional plan. It retains the Downloading, Checking, No connection, No space and File check failed transitions, plus the assertions that the scripted fetcher wrote no files and every downloadable part remains missing. The scripted fetcher still supplies progress/failure events and never downloads a model. Included-model availability, device capability and production download code are unchanged.
+The walk now opens Settings and invokes its existing Parakeet download action. After consent starts the standalone download, the walk returns to Library before checking its progress and failure banners; dismissing consent leaves Settings visible. It verifies speech-only consent, with the size derived from the pinned catalog, and rejects speaker/voice parts in this optional plan. It retains the Downloading, Checking, No connection, No space and File check failed transitions, plus the assertions that the scripted fetcher wrote no files and every downloadable part remains missing. The scripted fetcher still supplies progress/failure events and never downloads a model. Included-model availability, device capability and production download code are unchanged.
 
 The previous hard-coded 730 MB belonged to an older full-plan fixture. The optional speech plan is a different, actual user path. Full-plan composition and size coverage remains in the model-plan and Model download UI tests; this device walk exercises the installed app's current optional-download action.
+
+## Initial navigation
+
+Catalog readiness can precede the first Library frame. Setup now waits for the Library Import action before the journey can use Back navigation. This prevents a late initial frame from making the helper press Back out of the activity. The wait uses the existing UI event observer.
 
 ## Validation
 
