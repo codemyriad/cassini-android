@@ -204,7 +204,8 @@ class DocumentRepository(
             var done = false
             try {
                 val row = notes.noteBlocking(noteId)
-                val start = row?.recordingTime()?.instant
+                val start = row?.takeIf { it.audioKind != AudioKind.DOCUMENT || existing != null }
+                    ?.knownCaptureStart()
                 val document = CassiniDocument.create(
                     audio,
                     transcript,
@@ -350,13 +351,45 @@ class DocumentRepository(
     private fun needsRetitle(row: NoteEntity): Boolean =
         row.titleDirty && row.audioKind == AudioKind.DOCUMENT && row.documentState == DocumentState.OK
 
-    private suspend fun copyAudio(noteId: String, dest: Uri): ExportOutcome = withContext(dispatchers.io) {
-        val row = notes.note(noteId)
+    private suspend fun copyAudio(noteId: String, dest: Uri): ExportOutcome = locks.withNoteLock(noteId, dispatchers.io) {
+        val row = notes.noteBlocking(noteId)
         val file = row?.let { File(paths.note(noteId), it.audioFile) }
         when {
             row == null || file == null -> ExportOutcome.NoNote
             row.audioKind == AudioKind.LIVE_CAPTURE || !file.isFile -> ExportOutcome.NotAvailable
-            else -> writeTo(dest) { out -> file.inputStream().use { it.copyTo(out) } }
+            else -> {
+                val start = row.knownCaptureStart()
+                val document = if (row.audioKind == AudioKind.DOCUMENT && start != null) {
+                    DocumentSignature.of(file)?.let { readLocked(file, it) }
+                } else {
+                    null
+                }
+                if (document?.documentState == DocumentState.OK &&
+                    document.meetingTime?.source != io.codemyriad.cassini.core.format.MeetingTime.UTC && start != null
+                ) {
+                    exportKnownStart(file, document, start, dest)
+                } else {
+                    writeTo(dest) { out -> file.inputStream().use { it.copyTo(out) } }
+                }
+            }
+        }
+    }
+
+    /** Stage the annotated copy; never change a running job's canonical file or checkpoint signature. */
+    private fun exportKnownStart(file: File, document: CassiniDocument, start: Instant, dest: Uri): ExportOutcome {
+        var staged: File? = null
+        return try {
+            java.nio.file.Files.createDirectories(paths.exports.toPath())
+            val output = File.createTempFile("recorded-", ".opus", paths.exports).also { staged = it }
+            CassiniDocument.withRecordedAtUtc(file, document, start, output)
+            writeTo(dest) { out -> output.inputStream().use { it.copyTo(out) } }
+        } catch (error: IOException) {
+            ExportOutcome.Failed(Failure.SAVE, error.message)
+        } catch (error: IllegalArgumentException) {
+            ExportOutcome.Failed(Failure.SAVE, error.message)
+        } finally {
+            staged?.delete()
+            paths.exports.delete() // Only when empty; another export may be staging.
         }
     }
 
@@ -656,7 +689,7 @@ class DocumentRepository(
     /** [row] as [document] describes it: its title, recording time and audio file; a duration when it has no manifest. */
     private fun describedBy(row: NoteEntity, document: CassiniDocument, file: File): NoteEntity {
         val meeting = document.manifest?.optJSONObject("meeting")
-        val time = document.meetingTime
+        val time = row.recordingTime(document)
         // Packaging time can order an unknown meeting, but never becomes its displayed time.
         val createdAt = time?.instant?.toEpochMilli() ?: meeting?.optString("createdAtUtc")?.let { text ->
             try {

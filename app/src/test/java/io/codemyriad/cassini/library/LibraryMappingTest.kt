@@ -47,6 +47,26 @@ import java.time.LocalTime
 class LibraryMappingTest {
     private val context = RowContext()
 
+    @Test fun dateAndClockAlwaysUseTheSameOddOrPosixZone() {
+        val instant = java.time.Instant.parse("2026-11-11T00:30:00Z")
+        val cases = listOf(
+            Triple("Etc/GMT+3", LocalDate.of(2026, 11, 10), LocalTime.of(21, 30)),
+            Triple("GMT+05:45", LocalDate.of(2026, 11, 11), LocalTime.of(6, 15)),
+            Triple("EST5EDT", LocalDate.of(2026, 11, 10), LocalTime.of(19, 30)),
+            Triple("Pacific/Chatham", LocalDate.of(2026, 11, 11), LocalTime.of(14, 15)),
+        )
+        val source = docRow("clock", DocumentState.OK).copy(recordedAt = instant.toString())
+        for ((name, date, clock) in cases) {
+            val zone = java.time.ZoneId.of(name)
+            val row = LibraryMapping.row(source, context, zone)
+            assertEquals(name, clock, row.time)
+            val section = LibraryMapping.sections(listOf(source), context, NOW, zone).single()
+            assertEquals(name, DayLabel.Date(date, false), section.label)
+            val literal = source.copy(recordedAt = "2026-11-11T00:30:00")
+            assertEquals(literal.recordedAt, LibraryMapping.row(literal, context, zone).recordedLabel)
+        }
+    }
+
     @Test fun recordingDatesNeverUseTheSealTimeAsDisplayFallback() {
         val unknown = docRow("unknown", DocumentState.OK).copy(recordedAt = null)
         val local = docRow("local", DocumentState.OK).copy(recordedAt = "2026-10-07T23:59:00")

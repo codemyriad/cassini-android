@@ -96,6 +96,24 @@ class CassiniDocumentTest {
         assertFalse(next.comments.any { it.startsWith("CASSINI_RECORDED_AT_UTC=") })
     }
 
+
+    @Test fun damagedOrUnknownManifestsNeverPromoteDateTagsToMeetingTime() {
+        val words = Transcript(listOf(Word("spk_1", 0, 20, "Hello")), "en")
+        val original = CassiniDocument.read(CassiniDocument.create(silence(), words, "Meeting", JSONObject()))
+        val dated = original.comments.filterNot { it.startsWith("DATE=") } + "DATE=2026-11-11T12:00:00Z"
+        val unknown = dated.map {
+            if (it.startsWith("CASSINI_FORMAT=")) "CASSINI_FORMAT=org.cassini.portable-meeting/9" else it
+        }
+        val damaged = dated.filterNot { it.startsWith("CASSINI_PAYLOAD_000=") }
+        for ((tags, state) in listOf(unknown to "unknown-cassini-format", damaged to "invalid-cassini-metadata")) {
+            val read = CassiniDocument.read(OggOpus.mux(OggOpus.read(silence()), CassiniDocument.tagsPacket(tags)))
+            assertEquals(state, read.state)
+            assertNull(read.manifest)
+            assertNull(read.meetingTime)
+        }
+        assertNull(CassiniDocument("plain-audio", comments = listOf("DATE=2026-11-11T12:00:00Z")).meetingTime)
+    }
+
     private fun silence(): ByteArray {
         val head = "OpusHead".toByteArray() + byteArrayOf(1, 1, 0, 0, -128, -69, 0, 0, 0, 0, 0)
         return OggOpus.mux(OggOpus.Stream(head, CassiniDocument.tagsPacket(listOf("X_CUSTOM=keep=me")),

@@ -21,7 +21,8 @@ internal object Sql {
 
     /** The [LibraryRow] columns. */
     const val LIBRARY_COLUMNS =
-        "n.id, n.title, n.created_at, n.duration_ms, n.audio_kind, n.document_state, n.origin, n.recorded_at, " +
+        "n.id, n.title, n.created_at, n.duration_ms, n.audio_kind, n.document_state, " +
+            "n.origin, n.recorded_at, n.capture_started_at, " +
             "COALESCE(n.preview, NULLIF(substr(t.body, 1, 160), '')) AS preview, " +
             "j.state AS job_state, j.kind AS job_kind, j.pause_reason, j.failure, j.done_ms, j.total_ms, " +
             "v.variant_id AS selected_variant, v.word_count, v.speaker_count"
@@ -57,6 +58,7 @@ data class LibraryRow(
     @ColumnInfo(name = "speaker_count") val speakerCount: Int?,
     val origin: Origin = Origin.RECORDED,
     @ColumnInfo(name = "recorded_at") val recordedAt: String? = null,
+    @ColumnInfo(name = "capture_started_at") val captureStartedAt: Long? = null,
 )
 
 /**

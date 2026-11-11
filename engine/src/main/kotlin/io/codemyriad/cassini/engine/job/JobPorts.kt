@@ -117,6 +117,9 @@ interface JobStorage {
      */
     fun existingDocumentBlocking(noteId: String): CassiniDocument?
 
+    /** Independently known UTC capture start; never a file's createdAtUtc. Blocking, under the note lock. */
+    fun recordedAtUtcBlocking(noteId: String): java.time.Instant?
+
     /** The note's title (`notes.title`), for a fresh seal. Blocking. */
     fun titleBlocking(noteId: String): String
 

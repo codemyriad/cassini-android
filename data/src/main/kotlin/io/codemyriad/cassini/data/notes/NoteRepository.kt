@@ -118,6 +118,7 @@ class NoteRepository(
                 title = clean,
                 createdAt = createdAt,
                 recordedAt = Instant.ofEpochMilli(createdAt).toString(),
+                captureStartedAt = createdAt,
                 addedAt = now,
                 origin = Origin.RECORDED,
                 audioFile = "capture.$format",

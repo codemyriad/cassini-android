@@ -38,7 +38,13 @@ data class CassiniDocument(
     val documentState: DocumentState get() = DocumentState.of(state)
     data class Variant(val id: String, val descriptor: JSONObject, val body: String?, val transcript: Transcript?, val error: String? = null)
     val defaultId get() = variants.firstOrNull { it.descriptor.optBoolean("default") }?.id ?: variants.firstOrNull()?.id
-    val meetingTime: MeetingTime? get() = MeetingTime.resolve(manifest, comments)
+
+    /** The reference Player's `when` requires a readable supported manifest before considering DATE. */
+    val meetingTime: MeetingTime? get() = when (documentState) {
+        DocumentState.OK, DocumentState.UNVERIFIED, DocumentState.STALE_AUDIO ->
+            if (manifest != null) MeetingTime.resolve(manifest, comments) else null
+        else -> null
+    }
     val title get() = manifest?.optJSONObject("meeting")?.optString("title").orEmpty()
     fun selected(id: String?) = variants.firstOrNull { it.id == (id ?: defaultId) }
     fun speakerLabel(id: String): String? {
@@ -271,6 +277,29 @@ data class CassiniDocument(
             writeWithTags(audio, comments, digest, target)
             return read(target).also { verify(it, transcript) }
         }
+        /** Fill only a trusted own capture start on export; meeting identity, audio and variant bodies stay intact. */
+        fun withRecordedAtUtc(source: File, existing: CassiniDocument, start: Instant, target: File): CassiniDocument {
+            require(existing.documentState == DocumentState.OK && existing.manifest != null)
+            val manifest = JSONObject(existing.manifest.toString())
+            manifest.getJSONObject("meeting").put("recordedAtUtc", start.toString())
+            val comments = existing.comments.filterNot {
+                val name = it.substringBefore('=').uppercase(Locale.ROOT)
+                isManifestComment(it) || name == "DATE" || name == "CASSINI_RECORDED_AT_UTC"
+            } + listOf("DATE=$start", "CASSINI_RECORDED_AT_UTC=$start") +
+                CassiniPayload.encode(MANIFEST_PREFIX, CassiniPayload.MIME, manifest.toString()).second
+            val digest = manifest.getJSONObject("integrity").getString("opusAudioSha256")
+            try {
+                writeWithTags(source, comments, digest, target)
+                val written = read(target)
+                require(written.state == "ok" && same(written.manifest, manifest))
+                require(written.variants.map { it.id to it.body } == existing.variants.map { it.id to it.body })
+                return written
+            } catch (error: Throwable) {
+                target.delete()
+                throw error
+            }
+        }
+
         /** Copies [source]'s audio packet for packet behind [comments]; the audio must still hash to [digest]. */
         private fun writeWithTags(source: File, comments: List<String>, digest: String, target: File) =
             require(OggOpus.rewrite(source, tagsPacket(comments), target).digest() == digest)
@@ -425,7 +454,7 @@ data class CassiniDocument(
                     .put("sampleRate", 48000).put("channels", stream.channels).put("sampleCount", stream.sampleCount).put("durationMs", stream.durationMs))
                 .put("speakers", JSONArray()).put("transcripts", JSONArray())
                 .apply { if (extensions != null) put("x", JSONObject(extensions.toString())) }
-            if (existing == null && recordedAtUtc != null) {
+            if (recordedAtUtc != null && existing?.meetingTime?.source != MeetingTime.UTC) {
                 manifest.getJSONObject("meeting").put("recordedAtUtc", recordedAtUtc.toString())
             }
             val descriptors = manifest.getJSONArray("transcripts")

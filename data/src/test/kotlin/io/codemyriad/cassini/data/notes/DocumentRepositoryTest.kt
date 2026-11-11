@@ -94,6 +94,49 @@ class DocumentRepositoryTest {
         assertTrue("packaging time remains an ordering fallback", h.row("unknown").createdAt > 0)
     }
 
+    @Test fun ownLegacyDocumentKeepsCaptureClockAndExportsItWithoutChangingTheSource() = runTest {
+        val start = java.time.Instant.parse("2026-11-11T12:00:00Z")
+        h.now = start.toEpochMilli()
+        h.plainNote("own")
+        h.now += 540_000
+        val legacy = CassiniDocument.create(
+            fixtureOpus.readBytes(),
+            first,
+            "Own meeting",
+            JSONObject(),
+            createdAtUtc = java.time.Instant.ofEpochMilli(h.now),
+        )
+        work("own").mkdirs()
+        File(work("own"), "sealed.opus").writeBytes(legacy)
+        File(work("own"), "sealed").createNewFile()
+        assertEquals(AdoptOutcome.Adopted(DocumentState.OK), h.notes.adoptSealed("own"))
+        assertEquals(start.toEpochMilli(), h.row("own").captureStartedAt)
+        h.db.notes().update(h.row("own").copy(documentSignature = null))
+        h.restart()
+        h.notes.refreshIfStale("own")
+        assertEquals(start, h.row("own").recordingTime()?.instant)
+        val before = h.document("own").readBytes()
+        val old = h.readFile("own")
+        val exported = folder.newFile("own-export.opus")
+        assertTrue(h.documents.exportCopy("own", Uri.fromFile(exported)) is ExportOutcome.Saved)
+        val written = CassiniDocument.read(exported)
+        assertEquals(start, written.meetingTime?.instant)
+        assertEquals(
+            old.manifest!!.getJSONObject("meeting").getString("id"),
+            written.manifest!!.getJSONObject("meeting").getString("id"),
+        )
+        assertEquals(old.variants.map { it.body }, written.variants.map { it.body })
+        assertEquals(OggOpus.read(before).digest(), OggOpus.scan(exported).digest())
+        assertTrue(written.comments.contains("DATE=$start"))
+        assertTrue(written.comments.contains("CASSINI_RECORDED_AT_UTC=$start"))
+        assertArrayEquals(before, h.document("own").readBytes())
+        assertTrue(h.paths.exports.listFiles().isNullOrEmpty())
+        h.documentNote("copy", first)
+        exported.copyTo(h.document("copy"), overwrite = true)
+        h.notes.refreshIfStale("copy")
+        assertEquals(start, h.row("copy").recordingTime()?.instant)
+    }
+
     // Adopt.
 
     @Test fun adoptSealedReplacesTheCaptureAndDeletesIt() = runTest {

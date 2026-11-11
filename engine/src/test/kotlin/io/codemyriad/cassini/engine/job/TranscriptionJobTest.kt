@@ -558,12 +558,25 @@ class TranscriptionJobTest {
         assertTrue(h.storage.jobNames.none { sp1 in it.automatic || sp1 in it.live })
     }
 
+    @Test fun productionSealWritesTheIndependentCaptureClock() = runBlocking {
+        val h = Harness()
+        val start = java.time.Instant.parse("2026-11-11T12:00:00Z")
+        h.storage.captureStart = start
+        assertEquals(JobOutcome.Done, h.run().first)
+        val document = h.sealed()
+        assertEquals(start, document.meetingTime?.instant)
+        assertTrue(document.comments.contains("DATE=$start"))
+        assertTrue(document.comments.contains("CASSINI_RECORDED_AT_UTC=$start"))
+    }
+
     @Test fun transcribeAgainOnAStaleDocumentSealsAFreshDocument() = runBlocking {
         val h = Harness(source = "document.opus")
         val old = oldDocument("old.tmp", anna = true)
         File(temp.root, "old.tmp").copyTo(h.audio, overwrite = true)
         val before = sha256(h.audio)
         // The audio changed under the transcript: it can not take a new variant (features.md section 6).
+        old.manifest!!.getJSONObject("meeting").put("recordedAtLocal", "2026-11-11T13:00:00")
+        h.storage.captureStart = java.time.Instant.parse("2026-11-11T12:00:00Z")
         h.storage.existing = old.copy(state = "stale-audio")
         h.voices.noteVoices = mapOf("old_a" to SpeakerPrint(axis(1), 30.0, null))
 
@@ -572,6 +585,9 @@ class TranscriptionJobTest {
         assertEquals(before, sha256(h.audio))
         val sealed = h.sealed()
         assertEquals(1, sealed.variants.size)
+        assertFalse(sealed.manifest!!.getJSONObject("meeting").has("recordedAtLocal"))
+        assertFalse(sealed.manifest.getJSONObject("meeting").has("recordedAtUtc"))
+        assertNull(sealed.meetingTime)
         assertEquals(70, sealed.selected(null)!!.transcript!!.words.size)
         val meeting = { doc: CassiniDocument -> doc.manifest!!.getJSONObject("meeting").getString("id") }
         assertNotEquals(meeting(old), meeting(sealed))

@@ -32,6 +32,12 @@ abstract class CassiniDatabase : RoomDatabase() {
         val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE notes ADD COLUMN recorded_at TEXT")
+                db.execSQL("ALTER TABLE notes ADD COLUMN capture_started_at INTEGER")
+                // Only an own non-document row's created_at still means capture start, never a cached seal time.
+                db.execSQL(
+                    "UPDATE notes SET capture_started_at = created_at " +
+                        "WHERE origin = 'RECORDED' AND audio_kind != 'DOCUMENT'",
+                )
                 db.execSQL("UPDATE notes SET document_signature = NULL WHERE audio_kind = 'DOCUMENT'")
             }
         }

@@ -39,6 +39,23 @@ class MeetingTimeTest {
         )
     }
 
+    @Test fun midnightTransitionsKeepTheWholeLocalCalendarDay() {
+        for ((zoneName, day) in listOf(
+            "America/Santiago" to LocalDate.of(2023, 9, 3),
+            "America/Havana" to LocalDate.of(2024, 11, 3),
+        )) {
+            val zone = ZoneId.of(zoneName)
+            val first = day.atStartOfDay(zone).toInstant()
+            val after = day.plusDays(1).atStartOfDay(zone).toInstant()
+            assertEquals(day.minusDays(1), MeetingTime.utc(first.minusMillis(1)).day(zone))
+            assertEquals(day, MeetingTime.utc(first).day(zone))
+            assertEquals(day, MeetingTime.utc(after.minusMillis(1)).day(zone))
+            assertEquals(day.plusDays(1), MeetingTime.utc(after).day(zone))
+        }
+        val gap = LocalDate.of(2023, 9, 3).atStartOfDay(ZoneId.of("America/Santiago"))
+        assertEquals(1, gap.hour)
+    }
+
     @Test fun malformedUtcAndOffsetlessDateDoNotInventAnInstant() {
         val local = "2026-11-11T23:00:00"
         val result = MeetingTime.resolve(manifest("invalidZ", local), listOf("DATE=2026-11-11T14:00:00"))!!
