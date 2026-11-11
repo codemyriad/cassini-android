@@ -20,7 +20,7 @@ authorized by Android; it can restore an earlier valid dataset after the source 
 off. It does not restore the source device's consent or notice state.
 
 The six app languages use the coordinator's canonical catalog entries from cassini-ux commit
-484c604 (see `ui/src/test/resources/transfer/UPSTREAM.json` for the full pin and hashes).
+febfcc0 (see `ui/src/test/resources/transfer/UPSTREAM.json` for the full pin and hashes).
 
 ## Quota and complete datasets
 

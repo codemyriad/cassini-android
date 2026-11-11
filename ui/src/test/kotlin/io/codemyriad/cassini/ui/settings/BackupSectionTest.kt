@@ -72,7 +72,8 @@ class BackupSectionTest {
         rule.onAllNodesWithText("Android cloud backup").assertCountEquals(0)
         rule.onNodeWithText("Couldn’t save this choice. Try again.").assertExists()
         rule.onNodeWithText(
-            "Your library is too large to move in one transfer. Export it as a ZIP instead.",
+            "Your notes and saved voices are too large to move in one transfer. " +
+                "Export your notes as a ZIP instead.",
         ).assertExists()
     }
 }

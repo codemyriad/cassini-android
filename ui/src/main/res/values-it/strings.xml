@@ -591,7 +591,7 @@
     <string name="ui_settings_transfer_body">Quando configuri un nuovo telefono Android a partire da questo, le tue note e le voci salvate vengono copiate direttamente sul nuovo telefono. Nulla viene inviato a un account cloud. I modelli scaricati non vengono copiati: il nuovo telefono li scarica di nuovo.</string>
     <string name="ui_settings_transfer_body_off">Nulla viene copiato su un nuovo telefono. Se questo telefono viene perso o sostituito, le tue note vanno perse, a meno che tu non le abbia esportate.</string>
     <string name="ui_settings_transfer_export_hint">Per conservare una copia in un posto sicuro, usa “Esporta tutto come ZIP”.</string>
-    <string name="ui_settings_transfer_too_large">La tua libreria è troppo grande per essere trasferita in una sola volta. Esportala come ZIP.</string>
+    <string name="ui_settings_transfer_too_large">Le tue note e le voci salvate sono troppo grandi per essere trasferite in una sola volta. Esporta le note come ZIP.</string>
     <string name="ui_settings_transfer_unavailable">Per questa scelta serve Android 9 o successivo.</string>
     <string name="ui_settings_transfer_choice_failed">Impossibile salvare questa scelta. Riprova.</string>
     <string name="ui_notice_transfer_enabled">Cassini trasferirà le tue note e le voci salvate su un nuovo telefono quando lo configuri a partire da questo. Puoi cambiare questa scelta nelle impostazioni.</string>

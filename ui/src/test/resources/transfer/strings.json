@@ -148,7 +148,7 @@
     },
     {
       "id": "settings.transfer.tooLarge",
-      "en": "Your library is too large to move in one transfer. Export it as a ZIP instead.",
+      "en": "Your notes and saved voices are too large to move in one transfer. Export your notes as a ZIP instead.",
       "platforms": [
         "android"
       ],
@@ -159,19 +159,19 @@
       "status": "draft",
       "l10n": {
         "it": {
-          "text": "La tua libreria è troppo grande per essere trasferita in una sola volta. Esportala come ZIP."
+          "text": "Le tue note e le voci salvate sono troppo grandi per essere trasferite in una sola volta. Esporta le note come ZIP."
         },
         "fr": {
-          "text": "Votre bibliothèque est trop volumineuse pour être transférée en une seule fois. Exportez-la plutôt en ZIP."
+          "text": "Vos notes et vos voix mémorisées sont trop volumineuses pour être transférées en une seule fois. Exportez plutôt vos notes en ZIP."
         },
         "es": {
-          "text": "Tu biblioteca es demasiado grande para transferirla de una sola vez. Expórtala como ZIP."
+          "text": "Tus notas y voces guardadas son demasiado grandes para transferirlas de una sola vez. Exporta tus notas como ZIP."
         },
         "pt-BR": {
-          "text": "Sua biblioteca é grande demais para ser transferida de uma só vez. Exporte-a como ZIP."
+          "text": "Suas notas e vozes salvas são grandes demais para serem transferidas de uma só vez. Exporte suas notas como ZIP."
         },
         "pt-PT": {
-          "text": "A sua biblioteca é demasiado grande para ser passada de uma só vez. Exporte-a como ZIP."
+          "text": "As suas notas e vozes guardadas são demasiado grandes para serem passadas de uma só vez. Exporte as suas notas como ZIP."
         }
       }
     },

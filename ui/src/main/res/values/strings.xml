@@ -627,6 +627,6 @@
     <string name="ui_settings_transfer_heading">Moving to a new phone</string>
     <string name="ui_settings_transfer_body_off">Nothing is copied to a new phone. If this phone is lost or replaced, your notes are gone unless you exported them.</string>
     <string name="ui_settings_transfer_export_hint">To keep a copy somewhere safe, use Export All as ZIP.</string>
-    <string name="ui_settings_transfer_too_large">Your library is too large to move in one transfer. Export it as a ZIP instead.</string>
+    <string name="ui_settings_transfer_too_large">Your notes and saved voices are too large to move in one transfer. Export your notes as a ZIP instead.</string>
     <string name="ui_settings_transfer_choice_failed">Couldn’t save this choice. Try again.</string>
 </resources>

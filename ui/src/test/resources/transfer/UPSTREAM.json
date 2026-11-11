@@ -1,10 +1,10 @@
 {
   "repository": "https://github.com/codemyriad/cassini-ux",
-  "commit": "484c6048447381e04fd1d1133e7ae02c6c6d5e58",
+  "commit": "febfcc0bbd7db4b06096e87f5490d6773ab9224e",
   "files": {
     "strings.json": {
       "source": "strings/strings.json",
-      "source_sha256": "2b672fc8a88e62d704e6e2b5a4ed8d999a8aa77e90b8c006e7c7c0e43d26e169",
+      "source_sha256": "e39aeb40326560a4bd15b6531ed81f9f21dfa281b81e8b03526372308e1b68a1",
       "selection": [
         "android.privacy.processing",
         "android.savedVoices.privacy",
@@ -20,7 +20,7 @@
         "settings.transfer.tooLarge",
         "settings.transfer.unavailable"
       ],
-      "sha256": "1252c56cfb204a13ca729d711bf8d7960dd578784f8934169dc37b3461b2738a"
+      "sha256": "ec02b53071ac6cbd2aefc9ec943c2f33b7db78616b4e3f18090d0e9d2fe33637"
     }
   }
 }

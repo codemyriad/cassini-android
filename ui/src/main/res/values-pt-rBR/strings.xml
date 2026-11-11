@@ -600,7 +600,7 @@
     <string name="ui_settings_transfer_body">Quando você configura um novo celular Android a partir deste, suas notas e vozes salvas são copiadas diretamente para ele. Nada é enviado para uma conta na nuvem. Os modelos baixados não são copiados; o novo celular os baixa novamente.</string>
     <string name="ui_settings_transfer_body_off">Nada é copiado para um novo celular. Se este celular for perdido ou substituído, suas notas serão perdidas, a menos que você as tenha exportado.</string>
     <string name="ui_settings_transfer_export_hint">Para guardar uma cópia em um lugar seguro, use “Exportar tudo como ZIP”.</string>
-    <string name="ui_settings_transfer_too_large">Sua biblioteca é grande demais para ser transferida de uma só vez. Exporte-a como ZIP.</string>
+    <string name="ui_settings_transfer_too_large">Suas notas e vozes salvas são grandes demais para serem transferidas de uma só vez. Exporte suas notas como ZIP.</string>
     <string name="ui_settings_transfer_unavailable">Esta opção requer o Android 9 ou mais recente.</string>
     <string name="ui_settings_transfer_choice_failed">Não foi possível salvar esta opção. Tente novamente.</string>
     <string name="ui_notice_transfer_enabled">O Cassini vai transferir suas notas e vozes salvas para um novo celular quando você o configurar a partir deste. Você pode alterar isso nos Ajustes.</string>
