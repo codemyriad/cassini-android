@@ -3,6 +3,8 @@ package io.codemyriad.cassini.flows
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -19,6 +21,7 @@ import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -54,6 +57,23 @@ class BulkTransferDeviceTest {
         rule.onNodeWithText(label).assertIsNotEnabled()
     }
 
+    @Test fun losingTheLastNoteDisablesAllInsideTheOpenChooser() {
+        val graph = Flows.graph
+        val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+        graph.transfers.import(listOf(Background.assetCopy("fleurs-it-short.wav").toUri()))
+        runBlocking { withTimeout(20_000) { graph.transfers.state.first { !it.running } } }
+        rule.onNodeWithText(context.getString(R.string.common_done)).performClick()
+        awaitAllEnabled(true)
+        rule.onNodeWithText(context.getString(R.string.export_zip_all)).performClick()
+        rule.onNodeWithText(context.getString(R.string.common_cancel)).assertIsDisplayed()
+        runBlocking {
+            val id = graph.transfers.choices().single().id
+            assertTrue(graph.processing.moveToTrash(id))
+        }
+        awaitAllEnabled(false)
+        rule.onNodeWithText(context.getString(R.string.common_cancel)).performClick()
+    }
+
     @Test fun multipleImportsShowTheirSummaryAndExportOriginalAudio() {
         val graph = Flows.graph
         val audio = Background.assetCopy("fleurs-it-short.wav")
@@ -77,6 +97,7 @@ class BulkTransferDeviceTest {
             rule.onNodeWithText(context.resources.getQuantityString(resource, 1, 1)).assertIsDisplayed()
         }
         rule.onNodeWithText(context.getString(R.string.common_done)).performClick()
+        awaitAllEnabled(true)
         rule.onNodeWithText(context.getString(R.string.export_zip_all)).performClick()
         rule.onNodeWithText(context.getString(R.string.common_cancel)).assertIsDisplayed()
         rule.onNodeWithText(context.getString(R.string.common_cancel)).performClick()
@@ -93,5 +114,13 @@ class BulkTransferDeviceTest {
         }
         archive.delete()
         exported.delete()
+    }
+    private fun awaitAllEnabled(enabled: Boolean) {
+        val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+        val button = hasText(context.getString(R.string.export_zip_all)) and hasClickAction()
+        rule.awaitUi(20_000) {
+            val nodes = rule.onAllNodes(button).fetchSemanticsNodes()
+            nodes.isNotEmpty() && nodes.all { it.config.contains(SemanticsProperties.Disabled) != enabled }
+        }
     }
 }

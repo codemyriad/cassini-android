@@ -40,6 +40,7 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 
@@ -113,15 +114,16 @@ class BulkTransferReviewTest {
         val choices = graph.transfers.choices()
         val bytes = ByteArrayOutputStream()
         var peak = 0
+        var stagedWhenOpened = -1
+        var sawStagedZip = false
         val destination = "content://bulk-review/stream.zip".toUri()
         shadowOf(context.contentResolver).registerOutputStreamSupplier(destination) {
-            assertEquals("Destination opens before staging", 0, stagedFiles().size)
+            stagedWhenOpened = stagedFiles().size
             object : OutputStream() {
                 override fun write(value: Int) { write(byteArrayOf(value.toByte()), 0, 1) }
                 override fun write(buffer: ByteArray, offset: Int, length: Int) {
                     val files = stagedFiles()
-                    assertTrue("At most one snapshot", files.size <= 1)
-                    assertFalse(files.any { it.name == "notes.zip" })
+                    sawStagedZip = sawStagedZip || files.any { it.name == "notes.zip" }
                     peak = maxOf(peak, files.size)
                     bytes.write(buffer, offset, length)
                 }
@@ -129,7 +131,9 @@ class BulkTransferReviewTest {
         }
         graph.transfers.export(choices.map { it.id }, destination)
         assertEquals(2, finished().exported)
-        assertEquals(1, peak)
+        assertEquals("Destination opens before staging", 0, stagedWhenOpened)
+        assertEquals("At most one snapshot", 1, peak)
+        assertFalse(sawStagedZip)
         val archive = folder.newFile("streamed.zip").apply { writeBytes(bytes.toByteArray()) }
         ZipFile(archive).use { zip ->
             val entries = zip.entries().toList()
@@ -158,6 +162,7 @@ class BulkTransferReviewTest {
                 val result = finished()
                 assertTrue(result.cancelled)
                 assertFalse(result.failed)
+                assertTrue("Blocked read woke on close", streams.any { it.releasedByClose.get() })
                 assertTrue(graph.awaitCatalogue().database.notes().all().isEmpty())
                 assertNull(graph.notices.imports.state.value.failure)
                 assertNoStaging()
@@ -173,11 +178,14 @@ class BulkTransferReviewTest {
         assertEquals(1, finished().summary?.imported)
         val entered = CompletableDeferred<Unit>()
         val closed = CountDownLatch(1)
+        val releasedByClose = AtomicBoolean()
         val destination = "content://bulk-review/cancel.zip".toUri()
         val output = object : OutputStream() {
             override fun write(value: Int) {
                 entered.complete(Unit)
-                check(closed.await(10, TimeUnit.SECONDS)) { "Writer was not closed" }
+                val notified = closed.await(10, TimeUnit.SECONDS)
+                releasedByClose.set(notified)
+                check(notified) { "Writer was not closed" }
                 throw IOException("Provider closed")
             }
             override fun write(buffer: ByteArray, offset: Int, length: Int) { write(0) }
@@ -189,6 +197,7 @@ class BulkTransferReviewTest {
             withTimeout(20_000) { entered.await() }
             graph.transfers.cancel()
             assertEquals(BulkTransfers.TransferState(), finished())
+            assertTrue("Blocked write woke on close", releasedByClose.get())
             assertNoStaging()
         } finally {
             output.close()
@@ -255,6 +264,7 @@ class BulkTransferReviewTest {
     ) : InputStream() {
         private var position = 0
         private val closed = CountDownLatch(1)
+        val releasedByClose = AtomicBoolean()
         override fun read(): Int = error("Buffered reads only")
         override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
             if (position < payload.size) {
@@ -264,7 +274,9 @@ class BulkTransferReviewTest {
                 return count
             }
             entered.complete(Unit)
-            check(closed.await(10, TimeUnit.SECONDS)) { "Reader was not closed" }
+            val notified = closed.await(10, TimeUnit.SECONDS)
+            releasedByClose.set(notified)
+            check(notified) { "Reader was not closed" }
             if (throws) throw IOException("Provider closed")
             return -1
         }

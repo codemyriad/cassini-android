@@ -3,6 +3,7 @@ package io.codemyriad.cassini.library
 import android.content.Context
 import android.os.Build
 import android.view.accessibility.AccessibilityManager
+import androidx.core.net.toUri
 import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.models.ModelPart
@@ -126,7 +127,7 @@ class GraphLibraryPorts(private val graph: AppGraph, context: Context) : Library
         graph.awaitCatalogue().notes.rename(id, title)
 
     override fun import(uris: List<String>) {
-        graph.transfers.import(uris.map { android.net.Uri.parse(it) })
+        graph.transfers.import(uris.map { it.toUri() })
     }
 
     override fun dismissNotice(kind: BannerKind) = graph.notices.dismiss(kind)
