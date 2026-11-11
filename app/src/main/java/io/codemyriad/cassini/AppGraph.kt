@@ -23,6 +23,8 @@ import io.codemyriad.cassini.data.CassiniDispatchers
 import io.codemyriad.cassini.data.NoteLocks
 import io.codemyriad.cassini.data.checkpoint.CheckpointRepository
 import io.codemyriad.cassini.data.db.CassiniDatabase
+import io.codemyriad.cassini.data.backup.BackupChoicesStore
+import io.codemyriad.cassini.data.backup.LibraryRestoreTransaction
 import io.codemyriad.cassini.data.db.CassiniDatabaseOpener
 import io.codemyriad.cassini.data.jobs.JobRepository
 import io.codemyriad.cassini.data.jobs.ReconcileReport
@@ -132,6 +134,7 @@ class AppGraph(context: Context, val config: Config) {
      */
     data class Config(
         val paths: AppPaths,
+        val backupDirectory: File = File(paths.cache, "device-backup"),
         val dispatchers: CassiniDispatchers = CassiniDispatchers(),
         val fetcher: ModelFetcher = ModelFetcher.network(MODEL_USER_AGENT),
         val network: NetworkCheck? = null,
@@ -178,6 +181,8 @@ class AppGraph(context: Context, val config: Config) {
     val dispatchers: CassiniDispatchers = config.dispatchers
     val locks = NoteLocks()
     val network: NetworkCheck = config.network ?: NetworkCheck.of(app)
+
+    val backupChoices = BackupChoicesStore(File(config.backupDirectory, "choices.json"), dispatchers.io)
 
     val settings: SettingsRepository =
         SettingsRepository.create(paths, CoroutineScope(appScope.coroutineContext + dispatchers.io))
@@ -397,6 +402,7 @@ class AppGraph(context: Context, val config: Config) {
     private suspend fun runStartup() {
         val (catalogue, setAside) = try {
             config.onStartupStep(STEP_DATABASE)
+            LibraryRestoreTransaction(paths.root, File(config.backupDirectory, "restores")).recover()
             val database = CassiniDatabaseOpener(app, paths, config.clock).open()
             Catalogue(app, this, database.database, ::currentCanceller) to database.setAside
         } catch (error: CancellationException) {

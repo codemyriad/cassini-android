@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Static ceiling; CassiniBackupAgent also applies the device-local transport choices and file allowlist. -->
+<full-backup-content>
+    <include domain="file" path="cassini.db" />
+    <include domain="file" path="notes/" />
+    <include domain="file" path="voices/" />
+    <include domain="file" path="backup/manifest.json" />
+</full-backup-content>

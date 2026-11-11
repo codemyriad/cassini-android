@@ -1,5 +1,8 @@
 package io.codemyriad.cassini.settings
 
+import android.os.Build
+import io.codemyriad.cassini.core.backup.BackupChoices
+import kotlinx.coroutines.flow.flowOf
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import io.codemyriad.cassini.AppGraph
@@ -32,6 +35,14 @@ interface SettingsPorts {
      * [LanguageChoice.OTHER], which is no segment.
      */
     fun setLanguage(language: LanguageChoice)
+
+    val backup: Flow<BackupChoices?> get() = flowOf(null)
+
+    val transferAvailable: Boolean get() = Build.VERSION.SDK_INT >= BackupChoices.TRANSPORT_FLAGS_API
+
+    suspend fun setTransfer(enabled: Boolean) { error("Backup choices are unavailable") }
+
+    suspend fun setCloudBackup(enabled: Boolean) { error("Backup choices are unavailable") }
 
     val speech: Flow<SpeechChoice>
 
@@ -68,6 +79,12 @@ class GraphSettingsPorts(private val graph: AppGraph) : SettingsPorts {
 
     override fun setLanguage(language: LanguageChoice) = AppCompatDelegate.setApplicationLocales(localesOf(language))
 
+    override val backup: Flow<BackupChoices?> get() = graph.backupChoices.choices
+
+    override suspend fun setTransfer(enabled: Boolean) = graph.backupChoices.setTransfer(enabled)
+
+    override suspend fun setCloudBackup(enabled: Boolean) = graph.backupChoices.setCloud(enabled)
+
     override val speech: Flow<SpeechChoice> get() = graph.speech.state
 
     override suspend fun chooseSpeech(model: SpeechModel) = graph.speech.choose(model)
@@ -84,7 +101,10 @@ class GraphSettingsPorts(private val graph: AppGraph) : SettingsPorts {
 
     override val notices: Flow<NoticeFacts> get() = graph.notices.facts
 
-    override fun refreshNotices() = graph.notices.refreshNotifications()
+    override fun refreshNotices() {
+        graph.backupChoices.refresh()
+        graph.notices.refreshNotifications()
+    }
 
     override fun dismissParakeetSuggestion() = graph.notices.dismiss(BannerKind.PARAKEET_RECOMMENDED)
 

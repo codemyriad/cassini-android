@@ -12,6 +12,7 @@ import io.codemyriad.cassini.nav.ModelDownloadKey
 import io.codemyriad.cassini.nav.SavedVoicesKey
 import io.codemyriad.cassini.nav.TrashKey
 import io.codemyriad.cassini.notices.Notices
+import io.codemyriad.cassini.ui.settings.BackupSettingsUi
 import io.codemyriad.cassini.ui.settings.LanguageChoice
 import io.codemyriad.cassini.ui.settings.ModelRowUi
 import io.codemyriad.cassini.ui.settings.ModelStatusUi
@@ -60,18 +61,26 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
 
     private val language = MutableStateFlow(ports.language())
 
+    private val backupSaving = MutableStateFlow(false)
+    private val backupError = MutableStateFlow(false)
+    private val backup = combine(ports.backup, backupSaving, backupError) { choices, saving, error ->
+        choices?.let { BackupSettingsUi(it.transfer, it.cloud, ports.transferAvailable, it.quotaExceeded, saving, error) }
+    }
+
     val state: StateFlow<SettingsUiState> = combine(
-        language,
+        combine(language, backup) { language, backup -> language to backup },
         ports.models.onStart { emit(emptyMap()) }.combine(ports.speech) { models, speech -> models to speech },
         ports.voices().guarded("voices"),
         ports.trash().guarded("trash"),
         ports.notices,
-    ) { language, modelState, voices, trash, facts ->
+    ) { preferences, modelState, voices, trash, facts ->
+        val (language, backup) = preferences
         val (models, speech) = modelState
         val speechStatus = models[ModelPart.SPEECH]
         val canStartParakeet = speechStatus == ModelStatus.Ready || (speechStatus as? ModelStatus.Missing)?.consented == true
         SettingsUiState(
             language = language,
+            backup = backup,
             models = rows(models).map {
                 if ((speech.selected == SpeechModel.INCLUDED || !canStartParakeet) && it.status == ModelStatusUi.Pending) {
                     it.copy(status = ModelStatusUi.NotDownloaded)
@@ -108,6 +117,8 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
             SettingsEvent.DownloadParakeet -> emit(SettingsEffect.Open(ModelDownloadKey(parakeetOnly = true)))
             SettingsEvent.DismissParakeet -> ports.dismissParakeetSuggestion()
             SettingsEvent.DismissParakeetDefault -> ports.dismissParakeetDefault()
+            is SettingsEvent.Transfer -> saveBackup(transfer = event.enabled)
+            is SettingsEvent.CloudBackup -> saveBackup(cloud = event.enabled)
             SettingsEvent.Back -> emit(SettingsEffect.Close)
             is SettingsEvent.Language -> choose(event.language)
             is SettingsEvent.ChooseSpeech -> chooseSpeech(event.model)
@@ -126,6 +137,25 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
     fun onResume() {
         language.value = ports.language()
         ports.refreshNotices()
+    }
+
+    private fun saveBackup(transfer: Boolean? = null, cloud: Boolean? = null) {
+        if (backupSaving.value || (transfer != null && !ports.transferAvailable)) return
+        backupSaving.value = true
+        backupError.value = false
+        viewModelScope.launch {
+            try {
+                if (transfer != null) ports.setTransfer(transfer)
+                if (cloud != null) ports.setCloudBackup(cloud)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+                backupError.value = true
+                Log.w(TAG, "Cannot save the backup choice", error)
+            } finally {
+                backupSaving.value = false
+            }
+        }
     }
 
     private fun choose(next: LanguageChoice) {

@@ -65,6 +65,7 @@ data class NoticeFacts(
     val voicesProblem: VoiceProblem? = null,
     val parakeet: ParakeetRecommendationState = ParakeetRecommendationState(),
     val parakeetNowDefault: Boolean = false,
+    val transferNotice: Boolean = false,
     /** Null until readiness is known; installation failures remain missing, never a reason to transcribe again. */
     val speakerModel: ModelStatus? = null,
 )
@@ -116,6 +117,7 @@ object Notices {
         if (facts.notificationsOff && facts.jobRunning) notices += Notice(BannerSpec(BannerKind.NOTIFICATIONS_OFF))
         if (facts.encoderMissing) notices += Notice(BannerSpec(BannerKind.NO_ENCODER, BannerArgs(m4a = facts.m4a)))
         notices += imports(facts.imports)
+        if (facts.transferNotice) notices += Notice(BannerSpec(BannerKind.TRANSFER_ENABLED))
         if (facts.parakeetNowDefault) notices += Notice(BannerSpec(BannerKind.PARAKEET_NOW_DEFAULT))
         if (facts.parakeet.firstWhistleNote != null) {
             parakeetSuggestion(facts)?.let { notices += Notice(it) }

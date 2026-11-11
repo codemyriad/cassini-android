@@ -401,6 +401,10 @@ enum class BannerKind(
         dismissible = true,
     ),
     PARAKEET_NOW_DEFAULT(OK, LIB, R.string.ui_parakeet_now_default, 0, dismissible = true),
+    TRANSFER_ENABLED(
+        INFO, LIB, R.string.ui_notice_transfer_enabled, 0,
+        actions = listOf(OPEN_SETTINGS), dismissible = true,
+    ),
     ;
 
     /** The catalogue actions, the default of [BannerSpec.actions]. */

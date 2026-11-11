@@ -11,6 +11,10 @@ sealed interface SettingsEvent {
 
     data object DismissParakeetDefault : SettingsEvent
 
+    data class Transfer(val enabled: Boolean) : SettingsEvent
+
+    data class CloudBackup(val enabled: Boolean) : SettingsEvent
+
     data object Back : SettingsEvent
 
     @Immutable

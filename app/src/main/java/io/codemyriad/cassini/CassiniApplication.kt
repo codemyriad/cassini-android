@@ -8,6 +8,7 @@ import android.util.Log
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
+import java.io.File
 import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.processing.NotificationChannels
 import io.codemyriad.cassini.whistle.WhistleProtocol
@@ -26,9 +27,17 @@ class CassiniApplication : Application() {
      * [onCreate]). Creating it starts the startup work of architecture 4.8 on IO, so that work runs once per process,
      * also when only a service starts.
      */
-    val graph: AppGraph by lazy {
-        (graphFactory ?: GraphFactory { app, paths -> AppGraph(app, AppGraph.Config(paths)) }).create(this, paths)
+    private val graphDelegate = lazy {
+        (graphFactory ?: GraphFactory { app, paths -> AppGraph(app, AppGraph.Config(paths, backupDirectory = backupDirectory)) }).create(this, paths)
     }
+
+    val graph: AppGraph get() = graphDelegate.value
+
+    /** Backup must never open Room or start inference in the backup process. */
+    fun hasStartedGraph(): Boolean = graphDelegate.isInitialized()
+
+    lateinit var backupDirectory: File
+        private set
 
     override fun onCreate() {
         super.onCreate()
@@ -38,6 +47,7 @@ class CassiniApplication : Application() {
             Os.setenv("ORT_DISABLE_TELEMETRY", "1", true)
             return // The private worker must not initialize the main graph or load sherpa's ORT.
         }
+        backupDirectory = noBackupFilesDir
         paths = AppRoots.resolve(filesDir, cacheDir, BuildConfig.DEBUG)
         if (paths.root != filesDir) Log.i(TAG, "Debug root: ${paths.root}")
         if (BuildConfig.DEBUG) {

@@ -619,4 +619,15 @@
     <string name="ui_meeting_duration_minutes">{m} min</string>
     <!-- cassini-ux library.group.unknownDate (D95); see docs/recorded-at.md. -->
     <string name="ui_day_unknown">Date unknown</string>
+
+    <!-- D97 proposed English copy; replace from the shared catalog before ready. -->
+    <string name="ui_settings_backup_heading">Transfer and backup</string>
+    <string name="ui_settings_transfer_title">Transfer to a new phone</string>
+    <string name="ui_settings_transfer_body">Let Android copy your notes, library and saved voices when you set up a new phone. Downloaded models are not copied.</string>
+    <string name="ui_settings_backup_cloud_title">Android cloud backup</string>
+    <string name="ui_settings_backup_cloud_body">Let Android back up your notes, library and saved voices to your backup account. Downloaded models are not included.</string>
+    <string name="ui_notice_transfer_enabled">Your notes and saved voices can transfer to a new phone during Android setup. You can turn this off in Settings.</string>
+    <string name="ui_settings_backup_cloud_limit">Android could not back up the whole library because it exceeds the backup limit. Save copies of your important notes.</string>
+    <string name="ui_settings_transfer_unavailable">Separate phone-transfer controls need Android 9 or newer.</string>
+    <string name="ui_settings_backup_choice_failed">Couldn’t save this choice. Try again.</string>
 </resources>

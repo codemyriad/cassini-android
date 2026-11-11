@@ -457,6 +457,10 @@ class LibraryViewModel(
                 ports.dismissNotice(kind)
                 if (kind.group == BannerGroup.DOWNLOAD) ports.downloadModels() else emit(LibraryEffect.PickAudio)
             }
+            BannerAction.OPEN_SETTINGS -> {
+                ports.dismissNotice(kind)
+                emit(LibraryEffect.OpenSettings)
+            }
             BannerAction.TURN_ON -> emit(LibraryEffect.OpenNotificationSettings)
             BannerAction.CHOOSE_ANOTHER, BannerAction.IMPORT -> {
                 ports.dismissNotice(kind)

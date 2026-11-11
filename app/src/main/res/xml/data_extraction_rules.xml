@@ -1,4 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Static ceiling only: runtime cloud consent remains off until explicitly enabled in Settings. -->
 <data-extraction-rules>
-    <cloud-backup><exclude domain="root" path="." /></cloud-backup>
-    <device-transfer><exclude domain="root" path="." /></device-transfer>
+    <cloud-backup>
+        <include domain="file" path="cassini.db" />
+        <include domain="file" path="notes/" />
+        <include domain="file" path="voices/" />
+        <include domain="file" path="backup/manifest.json" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="file" path="cassini.db" />
+        <include domain="file" path="notes/" />
+        <include domain="file" path="voices/" />
+        <include domain="file" path="backup/manifest.json" />
+    </device-transfer>
 </data-extraction-rules>

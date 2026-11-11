@@ -1,6 +1,8 @@
 package io.codemyriad.cassini.notices
 
 import android.content.Context
+import android.os.Build
+import io.codemyriad.cassini.core.backup.BackupChoices
 import android.util.Log
 import androidx.core.app.NotificationManagerCompat
 import io.codemyriad.cassini.AppGraph
@@ -106,6 +108,8 @@ class NoticeCenter(private val graph: AppGraph, context: Context, val imports: I
         facts.copy(parakeetNowDefault = announcement)
     }.combine(graph.models.status) { facts, status ->
         facts.copy(speakerModel = status[ModelPart.SPEAKERS])
+    }.combine(graph.backupChoices.choices) { facts, choices ->
+        facts.copy(transferNotice = Build.VERSION.SDK_INT >= BackupChoices.TRANSPORT_FLAGS_API && choices.showTransferNotice)
     }.stateIn(graph.appScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), NoticeFacts())
 
     init {
@@ -121,6 +125,9 @@ class NoticeCenter(private val graph: AppGraph, context: Context, val imports: I
     /** The user closed the banner of [kind], or acted on it in a way that ends it. */
     fun dismiss(kind: BannerKind) {
         when (kind) {
+            BannerKind.TRANSFER_ENABLED -> graph.appScope.launch {
+                guarded("acknowledge phone transfer") { graph.backupChoices.acknowledgeNotice() }
+            }
             BannerKind.PARAKEET_NOW_DEFAULT -> graph.appScope.launch {
                 guarded("dismiss the Parakeet default announcement") { settings.dismissParakeetDefaultNotice() }
             }

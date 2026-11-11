@@ -23,6 +23,7 @@ data class SettingsUiState(
     val speechChecking: Boolean = false,
     val parakeetSuggestion: BannerSpec? = null,
     val parakeetNowDefault: Boolean = false,
+    val backup: BackupSettingsUi? = null,
 )
 
 /**
@@ -85,3 +86,14 @@ val ModelStatusUi.canOpenDownload: Boolean
 
 val ModelStatusUi.isInstalling: Boolean
     get() = this is ModelStatusUi.Downloading || this == ModelStatusUi.Checking
+
+/** Device-local choices. Neither switch claims Android has completed a backup. */
+@Immutable
+data class BackupSettingsUi(
+    val transfer: Boolean,
+    val cloud: Boolean,
+    val transferAvailable: Boolean,
+    val quotaExceeded: Boolean,
+    val saving: Boolean = false,
+    val error: Boolean = false,
+)
