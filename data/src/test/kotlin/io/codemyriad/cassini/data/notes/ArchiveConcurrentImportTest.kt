@@ -10,6 +10,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -30,11 +31,17 @@ class ArchiveConcurrentImportTest {
     @get:Rule val folder = TemporaryFolder()
     private lateinit var h: NotesHarness
     private lateinit var importer: ImportRepository
+    private val ids = listOf("00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002")
 
     @Before fun setUp() {
         h = NotesHarness(folder)
         val source = ImportSource.of(ApplicationProvider.getApplicationContext<Context>().contentResolver)
-        importer = ImportRepository(h.db, h.paths, h.dispatchers, h.locks, h.documents, source)
+        assertNotSame("Gated readers must hold different stripes", h.locks.lockFor(ids[0]), h.locks.lockFor(ids[1]))
+        val next = AtomicInteger()
+        importer = ImportRepository(
+            h.db, h.paths, h.dispatchers, h.locks, h.documents, source,
+            newId = { ids[next.getAndIncrement()] },
+        )
     }
 
     @After fun close() { h.close() }
@@ -46,7 +53,8 @@ class ArchiveConcurrentImportTest {
         val readers = AtomicInteger()
         val release = CountDownLatch(1)
         // Both imports have already checked the digest and classified the document, but neither has committed.
-        h.reader.beforeRead = {
+        h.reader.beforeRead = { file ->
+            assertTrue("Importer must use the controlled IDs", file.parentFile.name in ids)
             if (readers.incrementAndGet() == 2) arrived.complete(Unit)
             check(release.await(20, TimeUnit.SECONDS)) { "Document readers were not released" }
         }
@@ -64,6 +72,8 @@ class ArchiveConcurrentImportTest {
             assertEquals(1, summary.imported + if (outcome is ImportOutcome.Created) 1 else 0)
             assertEquals(1, summary.duplicates + if (outcome is ImportOutcome.Existing) 1 else 0)
             val row = h.db.notes().all().single()
+            assertEquals(2, readers.get())
+            assertTrue(row.id in ids)
             assertEquals(listOf(row.id), h.paths.notes.list().orEmpty().toList())
             assertEquals("Stored words", h.db.notes().text(row.id)?.body)
         } finally {

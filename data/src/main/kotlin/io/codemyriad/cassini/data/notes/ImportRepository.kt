@@ -117,6 +117,7 @@ class ImportRepository(
     private val limits: ImportLimits = ImportLimits(),
     /** The title of a file without a usable name, read at each import; the app passes its localized string. */
     private val fallbackTitle: () -> String = { FALLBACK_TITLE },
+    private val newId: () -> String = { UUID.randomUUID().toString() },
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val notes = database.notes()
@@ -136,7 +137,7 @@ class ImportRepository(
     }
 
     private suspend fun importNew(uri: Uri, description: ImportSource.Description, size: Long?): ImportOutcome {
-        val id = UUID.randomUUID().toString()
+        val id = newId()
         val dir = paths.note(id)
         var outcome: ImportOutcome = ImportOutcome.Rejected(Failure.SAVE, "cannot create the note directory")
         try {
