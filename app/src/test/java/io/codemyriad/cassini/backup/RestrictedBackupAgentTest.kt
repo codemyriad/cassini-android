@@ -31,25 +31,27 @@ class RestrictedBackupAgentTest {
     @get:Rule val folder = TemporaryFolder()
     private val app: Application = ApplicationProvider.getApplicationContext()
 
-    @Test fun restrictedModeHonorsCloudConsentAndCanRestoreWithoutTheAppGraph() = runBlocking(Dispatchers.IO) {
+    @Test fun restrictedModeHonorsCloudConsentAndCanRestoreWithoutTheAppGraph() {
         assertEquals(Application::class.java, app.javaClass)
         val agent = Robolectric.setupBackupAgent(CassiniBackupAgent::class.java)
-        val output = ReflectionHelpers.newInstance(FullBackupDataOutput::class.java)
-        val error = assertThrows(IOException::class.java) { agent.onFullBackup(output) }
-        assertEquals("This backup transport is disabled", error.message)
-        val source = folder.newFolder()
-        val people = File(source, "voices/people.json")
-        Files.createDirectories(people.parentFile!!.toPath())
-        people.writeText(VoiceCodec.encode(emptyList()))
-        val manifest = BackupManifest.create(source)
-        val inventory = File(source, "inventory.json").also { it.writeText(manifest.json()) }
-        for ((path, file) in listOf(BackupManifest.MANIFEST to inventory, "voices/people.json" to people)) {
-            ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
-                agent.onRestoreFile(fd, file.length(), File(app.filesDir, path), BackupAgent.TYPE_FILE, 0, 1)
+        runBlocking(Dispatchers.IO) {
+            val output = ReflectionHelpers.newInstance(FullBackupDataOutput::class.java)
+            val error = assertThrows(IOException::class.java) { agent.onFullBackup(output) }
+            assertEquals("This backup transport is disabled", error.message)
+            val source = folder.newFolder()
+            val people = File(source, "voices/people.json")
+            Files.createDirectories(people.parentFile!!.toPath())
+            people.writeText(VoiceCodec.encode(emptyList()))
+            val manifest = BackupManifest.create(source)
+            val inventory = File(source, "inventory.json").also { it.writeText(manifest.json()) }
+            for ((path, file) in listOf(BackupManifest.MANIFEST to inventory, "voices/people.json" to people)) {
+                ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
+                    agent.onRestoreFile(fd, file.length(), File(app.filesDir, path), BackupAgent.TYPE_FILE, 0, 1)
+                }
             }
+            assertFalse(File(app.filesDir, "voices/people.json").exists())
+            agent.onRestoreFinished()
+            assertEquals(people.readText(), File(app.filesDir, "voices/people.json").readText())
         }
-        assertFalse(File(app.filesDir, "voices/people.json").exists())
-        agent.onRestoreFinished()
-        assertEquals(people.readText(), File(app.filesDir, "voices/people.json").readText())
     }
 }
