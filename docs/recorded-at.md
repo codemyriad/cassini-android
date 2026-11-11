@@ -15,5 +15,5 @@ invalidates old document signatures so opening a document derives its metadata a
 It does not rewrite imported documents or infer a recording start from the old cache.
 
 The Date unknown translations are copied verbatim from cassini-ux
-3216b2d (strings/strings.json, library.group.unknownDate).
+3216b2db9abd215dc7e283a02dffb9e40f336fe5 (strings/strings.json, library.group.unknownDate).
 Source SHA-256: 109a72f01e223dcfa92e69186b04d233fa479f49150b4704c9853fd0b87077bb

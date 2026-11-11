@@ -28,7 +28,12 @@ internal object NoteMarkdown {
     }
 
     fun options(res: Resources, format: FormatSettings, createdAt: Long, durationMs: Long): MarkdownOptions =
-        options(res, format, io.codemyriad.cassini.core.format.MeetingTime.utc(java.time.Instant.ofEpochMilli(createdAt)), durationMs)
+        options(
+            res,
+            format,
+            io.codemyriad.cassini.core.format.MeetingTime.utc(java.time.Instant.ofEpochMilli(createdAt)),
+            durationMs,
+        )
 
     fun options(
         res: Resources,
@@ -51,14 +56,16 @@ internal object NoteMarkdown {
             speakerList = { formatter.format(it) },
         )
         val duration = Durations.meetingDuration(res, durationMs, format).takeIf { durationMs > 0 }
-        val dateLine = recordedAt?.instant?.let { instant -> MarkdownDate.line(
-            instant.toEpochMilli(),
-            format.zone,
-            uiLocale,
-            format.locale,
-            format.is24Hour,
-            duration,
-        ) } ?: listOfNotNull(recordedAt?.label, duration).joinToString(" · ")
+        val dateLine = recordedAt?.instant?.let { instant ->
+            MarkdownDate.line(
+                instant.toEpochMilli(),
+                format.zone,
+                uiLocale,
+                format.locale,
+                format.is24Hour,
+                duration,
+            )
+        } ?: listOfNotNull(recordedAt?.label, duration).joinToString(" · ")
         return MarkdownOptions(dateLine, copy)
     }
 }

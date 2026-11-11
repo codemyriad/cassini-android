@@ -15,7 +15,7 @@ import org.junit.Test
 class NoteMappingTest {
     @Test fun subtitlePreservesALocalLabelAndDoesNotInventUnknownTime() {
         val note = documentNote().note
-        val mode = io.codemyriad.cassini.ui.note.NoteMode.Reading
+        val mode = io.codemyriad.cassini.ui.note.NoteMode.AudioOnly
         val now = io.codemyriad.cassini.library.NOW
         val zone = io.codemyriad.cassini.library.ROME
         val unknown = NoteMapping.subtitle(note.copy(recordedAt = null), mode, now, zone)!!
