@@ -57,7 +57,7 @@ These constraints are mandatory:
 The privacy rules are:
 
 - The app never writes voiceprints into documents or exports. All voiceprints and voice matches are under `voices/` (section 3.2).
-- Android can transfer or back up the catalogue, notes and saved voices according to the device-local choices in Settings. Downloaded models are excluded. See [Transfer and backup](backup.md).
+- Android can transfer the catalogue, notes and saved voices according to the device-local choice in Settings. Cloud backup is disabled by its build flag. Downloaded models are excluded. See [Transfer and backup](backup.md).
 - The app downloads no model before the user agrees.
 - The app uses the network only for model downloads. It connects only to the model host `dist.gocassini.com`: first its manifest, then the pinned files (D53.1). `DistManifest` refuses a file URL on any other host, and `ArtifactFetcher` compares each redirect host with the same allow-list (section 5.6). `PRIVACY.md` lists the host and the allow-list.
 
@@ -640,7 +640,7 @@ The purge reads its list of notes first, and Restore can operate after that. Thu
 The purge does not use WorkManager, for these reasons:
 
 - The copy promises "after 30 days".
-- The purge operates on private app storage. OS transfer and backup follow the choices in Settings.
+- The purge operates on private app storage. OS transfer follows the choice in Settings; cloud backup is disabled.
 - Each start of the app or of a service runs the purge.
 - WorkManager adds a scheduler and a database for one idempotent query.
 

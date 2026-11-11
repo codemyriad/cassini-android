@@ -5,6 +5,7 @@ import android.content.res.Configuration
 import android.icu.text.PluralRules
 import android.icu.util.ULocale
 import androidx.test.core.app.ApplicationProvider
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -81,7 +82,9 @@ class TranslationsTest {
             LANGUAGES.flatMap { language ->
                 module.read(language.dir).values.mapNotNull { entry ->
                     val english = source.getValue(entry.name).other
-                    val names = NAME.findAll(english).map { it.value }.toList()
+                    // The canonical D97 translations can name Cassini where English uses an implicit subject.
+                    val canonical = canonicalVoiceDescription(entry.name, language.tag) ?: english
+                    val names = NAME.findAll(canonical).map { it.value }.toList()
                     val kept = entry.texts.values.all { NAME.findAll(it).map { m -> m.value }.toList() == names }
                     if (kept) null else "${language.dir} ${entry.name}: ${entry.texts.values}"
                 }
@@ -164,6 +167,17 @@ class TranslationsTest {
 
         val ARGUMENT = Regex("""%(\d+\$)?[-#+ 0,(]*\d*(\.\d+)?([a-zA-Z%])""")
         val NAME = Regex("""Cassini( talk)?""")
+
+        fun canonicalVoiceDescription(name: String, tag: String): String? {
+            val id = when (name) {
+                "ui_name_remember_body" -> "android.speakers.rememberVoice.description"
+                "ui_name_remember_body_unnamed" -> "android.speakers.rememberVoice.description.unnamed"
+                else -> return null
+            }
+            val catalog = JSONObject(File("../ui/src/test/resources/transfer/strings.json").readText()).getJSONArray("entries")
+            val entry = (0 until catalog.length()).map { catalog.getJSONObject(it) }.single { it.getString("id") == id }
+            return entry.getJSONObject("l10n").getJSONObject(tag).getString("text")
+        }
 
         /** The format arguments of [text] as "1\$s"-style keys, without "%%". */
         fun arguments(text: String): Set<String> = ARGUMENT.findAll(text)

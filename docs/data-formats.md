@@ -13,7 +13,7 @@ Only the sealed `.opus` document is a complete portable Cassini artifact. It hol
 
 ## Storage layout
 
-`filesDir` is the private files directory of the app. Android transfer and backup can include the catalogue, canonical note files and committed saved voices according to the choices in Settings. Models and device-local choices are excluded. See [Transfer and backup](backup.md).
+`filesDir` is the private files directory of the app. Android transfer can include the catalogue, canonical note files and committed saved voices according to the choice in Settings. Cloud backup is disabled by its build flag. Models and device-local choices are excluded. See [Transfer and backup](backup.md).
 
 ```
 cassini.db, cassini.db-wal, cassini.db-shm   Room catalogue
@@ -150,7 +150,7 @@ If the process stops before the marker exists, the old audio stays as it was. If
 
 ## Voices
 
-`voices/` holds voiceprints and voice matches. A voiceprint is biometric data. It never goes into a shared document or export. Committed saved voices travel with enabled Android transfer and backup; temporary voiceprint updates are excluded.
+`voices/` holds voiceprints and voice matches. A voiceprint is biometric data. It never goes into a shared document or export. Committed saved voices travel with enabled Android transfer; temporary voiceprint updates are excluded.
 
 - `people.json` holds the saved people: their names, embeddings and counts.
 - `generation` holds an integer. "Forget everyone" first increases it, then deletes all other files under `voices/`.
