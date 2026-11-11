@@ -299,7 +299,7 @@ data class CassiniDocument(
                 val name = it.substringBefore('=').uppercase(Locale.ROOT)
                 isManifestComment(it) || name in setOf("DATE", "CASSINI_RECORDED_AT_UTC", "CASSINI_RECORDED_AT_LOCAL")
             } + listOfNotNull("DATE=$date", utc?.let { "CASSINI_RECORDED_AT_UTC=$it" },
-                manifest.getJSONObject("meeting").optString("recordedAtLocal").takeIf { it.isNotEmpty() }
+                (manifest.getJSONObject("meeting").opt("recordedAtLocal") as? String)?.takeIf { it.isNotEmpty() }
                     ?.let { "CASSINI_RECORDED_AT_LOCAL=$it" }) +
                 CassiniPayload.encode(MANIFEST_PREFIX, CassiniPayload.MIME, manifest.toString()).second
             try {
@@ -526,7 +526,7 @@ data class CassiniDocument(
             val start = MeetingTime.resolve(manifest, existing?.comments.orEmpty())
             val utc = start?.takeIf { it.source == MeetingTime.UTC }?.value
             if (utc != null) comments += "CASSINI_RECORDED_AT_UTC=$utc"
-            meeting.optString("recordedAtLocal").takeIf { it.isNotEmpty() }?.let {
+            (meeting.opt("recordedAtLocal") as? String)?.takeIf { it.isNotEmpty() }?.let {
                 comments += "CASSINI_RECORDED_AT_LOCAL=$it"
             }
             comments += "DATE=${utc ?: start?.takeIf { it.source == MeetingTime.DATE }?.value ?: meeting.getString("createdAtUtc")}"

@@ -19,10 +19,21 @@ data class MeetingTime(val source: String, val value: String) {
     fun day(zone: ZoneId): LocalDate? = calendarTime(zone)?.toLocalDate()
 
     /** UTC is viewed in [zone]; a floating local label keeps its written calendar fields, with no assumed zone. */
-    fun calendarTime(zone: ZoneId): LocalDateTime? = instant?.atZone(zone)?.toLocalDateTime() ?: try {
+    fun calendarTime(zone: ZoneId): LocalDateTime? = instant?.atZone(zone)?.toLocalDateTime() ?: localCalendarTime()
+
+    private fun localCalendarTime(): LocalDateTime? = try {
         LocalDateTime.parse(value)
     } catch (_: DateTimeParseException) {
-        null
+        val prefix = localPrefix.find(value)?.value?.takeIf { source == LOCAL }
+        if (prefix == null) {
+            null
+        } else {
+            try {
+                LocalDateTime.parse(prefix.replace(' ', 'T'))
+            } catch (_: DateTimeParseException) {
+                null
+            }
+        }
     }
 
     companion object {
@@ -30,6 +41,7 @@ data class MeetingTime(val source: String, val value: String) {
         const val DATE = "DATE"
         const val LOCAL = "recordedAtLocal"
         private const val MILLIS_FRACTION_WIDTH = 4 // Decimal point and three digits, as in the pinned reader.
+        private val localPrefix = Regex("""^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}""")
         private val offset = Regex(
             """^(\d{4}-\d{2}-\d{2})[Tt ](\d{2}:\d{2}:\d{2})(\.\d+)?([Zz]|[+-]\d{2}:\d{2})$""",
         )
