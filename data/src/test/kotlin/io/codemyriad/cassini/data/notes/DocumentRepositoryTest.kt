@@ -175,6 +175,14 @@ class DocumentRepositoryTest {
         assertArrayEquals(stale, dest.readBytes())
         assertEquals(OggOpus.read(stale).digest(), OggOpus.scan(dest).digest())
         assertArrayEquals(stale, h.document("stale").readBytes())
+        // A malformed final granule cannot be hashed; Save a copy still preserves the source for recovery.
+        val damaged = OggOpus.mux(stream.copy(audio = packets, finalGranule = 0), stream.tags)
+        h.document("stale").writeBytes(damaged)
+        h.notes.refreshIfStale("stale")
+        assertEquals(DocumentState.STALE_AUDIO, h.row("stale").documentState)
+        val recovery = folder.newFile("damaged-copy.opus")
+        assertTrue(h.documents.exportCopy("stale", Uri.fromFile(recovery)) is ExportOutcome.Saved)
+        assertArrayEquals(damaged, recovery.readBytes())
     }
 
     @Test fun staleReplacementAdoptAndExportCannotResurrectTheDiscardedCaptureClock() = runTest {

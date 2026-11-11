@@ -249,7 +249,10 @@ The table `notes` has these columns:
 - `title`: 1-200 characters, trimmed, never blank. This column is authoritative.
 - `title_dirty`: the document title is different, and the app must write it again.
 - `created_at`: ordering key in epoch ms: the known recording instant, else packaging/import time. Never display this fallback as a meeting time (D95).
-- `recorded_at`: nullable derived D95 value: `recordedAtUtc`, an offset-bearing DATE distinct from the packaging instant, or a literal site-local label. Null means unknown for a document. See [Recording time](recorded-at.md).
+- `recorded_at`: nullable source-tagged derived D95 value: `recordedAtUtc`, an offset-bearing DATE distinct from the packaging instant, or a literal site-local label. Null means unknown for a document. See [Recording time](recorded-at.md).
+- `capture_started_at`: independent own capture UTC clock in epoch ms.
+- `capture_audio_sha256`: compressed-audio identity bound to that clock; changed audio invalidates it.
+- `legacy_capture_candidate`: provisional v1 own-document clock, withheld until the verified file rules out packaging time.
 - `added_at`.
 - `origin`: `RECORDED | IMPORTED_AUDIO | IMPORTED_DOCUMENT | RECOVERED`.
 - `audio_file`.

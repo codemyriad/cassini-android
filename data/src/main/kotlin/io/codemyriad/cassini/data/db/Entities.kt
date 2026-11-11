@@ -74,7 +74,7 @@ data class NoteEntity(
     @ColumnInfo(name = "trashed_at") val trashedAt: Long? = null,
     @ColumnInfo(name = "trashed_job") val trashedJob: TrashedJob? = null,
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
-    /** D95 recording instant or site-local label; null means unknown for a Cassini document. */
+    /** Source-tagged D95 recording instant or site-local label; null means unknown for a Cassini document. */
     @ColumnInfo(name = "recorded_at") val recordedAt: String? = null,
     /** Authoritative own capture clock, independent of derived metadata and packaging time (D95). */
     @ColumnInfo(name = "capture_started_at") val captureStartedAt: Long? = null,
