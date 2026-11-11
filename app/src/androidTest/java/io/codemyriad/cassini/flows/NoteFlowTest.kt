@@ -172,8 +172,7 @@ class NoteFlowTest {
             // A semantics click: the sheet may still be settling, and a touch then misses the window.
             clickOnce(hasText(label, substring = true) and hasClickAction())
             if (format != null) clickOnce(hasText(format, substring = true) and hasClickAction())
-            val saved = rule.text(UiR.string.ui_actions_saved_file, "\u0000").substringBefore("\u0000")
-            rule.waitText(saved, substring = true)
+            rule.waitText(rule.text(UiR.string.ui_actions_saved_file, name))
             assertTrue("The export wrote $name before showing Saved", target.length() > 0)
         } finally {
             Background.instrumentation.removeMonitor(monitor)

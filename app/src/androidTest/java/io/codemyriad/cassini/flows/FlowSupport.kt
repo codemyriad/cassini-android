@@ -64,7 +64,7 @@ internal object Flows {
 
     val graph get() = Background.graph
 
-    /** Waits for the Room transaction that publishes the verified document and removes its job. */
+    /** Waits until Room shows the verified document and its job has been removed. */
     fun awaitSealedDocument(noteId: String, variants: Int? = null): CassiniDocument = runBlocking {
         val notes = graph.awaitCatalogue().notes
         val sealed = withTimeoutOrNull(JOB_MS) {
