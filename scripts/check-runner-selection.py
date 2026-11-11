@@ -1,9 +1,12 @@
 """Checks that the CM_RUNNER repository variable can only move jobs to the cm-hetzner runners safely.
 
-A job moves only when CM_RUNNER is exactly "hetzner", and never on a tag: tag builds restore the release signing
-key, which must stay on GitHub-hosted runners. The runner labels are a constant; the variable is never parsed, so
-any other value (unset, empty, a typo, JSON) keeps ubuntu-24.04 instead of failing the expression or queueing jobs
-for labels no runner has. Each selecting runs-on is evaluated here for those values on branch, PR and tag refs.
+A job moves only when CM_RUNNER is exactly "hetzner", the triggering event is in the trusted allow-list (`push`,
+`schedule`, `workflow_dispatch`, or a same-repo `pull_request` where `head.repo.full_name == github.repository`), and
+never on a tag: tag builds restore the release signing key, which must stay on GitHub-hosted runners, and fork pull
+requests must never execute untrusted code on self-hosted runners. The runner labels are a constant; the variable is
+never parsed, so any other value (unset, empty, a typo, JSON) keeps ubuntu-24.04 instead of failing the expression or
+queueing jobs for labels no runner has. Each selecting runs-on is evaluated here for those values across trusted,
+fork, prohibited-event, and tag contexts.
 Every other job runs on a literal GitHub-hosted image. In the jobs that can move, secrets are read only by steps
 that run on tags alone, and caches are saved only by GitHub-hosted runs: a tag build restores them while it holds
 the signing key, so nothing written on a self-hosted machine may reach it.
@@ -17,11 +20,19 @@ import json
 import re
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 WORKFLOWS = Path('.github/workflows')
 CM_HETZNER = ['self-hosted', 'cm-hetzner']
+EVENT_ALLOWLIST = (
+    r"\(github\.event_name == 'push' \|\| github\.event_name == 'schedule' \|\| "
+    r"github\.event_name == 'workflow_dispatch' \|\| "
+    r"\(github\.event_name == 'pull_request' && "
+    r"github\.event\.pull_request\.head\.repo\.full_name == github\.repository\)\)"
+)
 SELECTOR = re.compile(
-    r"^\$\{\{ vars\.CM_RUNNER == 'hetzner' && !startsWith\(github\.ref, 'refs/tags/'\) && "
+    rf"^\$\{{\{{ {EVENT_ALLOWLIST} && !startsWith\(github\.ref, 'refs/tags/'\) && "
+    r"vars\.CM_RUNNER == 'hetzner' && "
     r"fromJSON\('(?P<labels>\[\"self-hosted\",\"cm-hetzner\"\])'\) \|\| '(?P<default>ubuntu-24\.04)' \}\}$"
 )
 HOSTED_IMAGE = re.compile(r'^(?:ubuntu|macos|windows)-[0-9a-z.-]+$')
@@ -33,7 +44,46 @@ MAIN_GRADLE_CACHE = (
 # The jobs that may move. Every other job (emulator, release, play, models, record-goldens) stays GitHub-hosted.
 MOVABLE = {('android.yml', 'checks'), ('android.yml', 'core-only'), ('android.yml', 'build'), ('native.yml', 'native')}
 FALLBACK = [None, '', ' ', 'garbage{', '["self-hosted","cm-hetzner"]', '["self-hosted","cm-hetzner-typo"]',
-            'hetzner-typo', 'true']
+            'hetzner-typo', 'true', 'github']
+TRUSTED_CONTEXTS = (
+    ('push', 'refs/heads/main', None),
+    ('schedule', 'refs/heads/main', None),
+    ('workflow_dispatch', 'refs/heads/main', None),
+    ('pull_request', 'refs/pull/1/merge', 'codemyriad/cassini-android'),
+)
+PROHIBITED_EVENTS = (
+    'pull_request_target',
+    'workflow_run',
+    'issue_comment',
+    'pull_request_review',
+    'pull_request_review_comment',
+    'discussion_comment',
+    'release',
+    'merge_group',
+)
+
+
+class _CIString(str):
+    """GitHub Actions string comparison (`==` / `!=`) is case-insensitive."""
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, str) and self.casefold() == other.casefold()
+
+    def __ne__(self, other: object) -> bool:
+        return not self.__eq__(other)
+
+
+class _NullContext:
+    """GitHub Actions dereferences missing/null context properties to null instead of raising."""
+
+    def __getattr__(self, _name: str) -> _NullContext:
+        return self
+
+    def __bool__(self) -> bool:
+        return False
+
+
+_NULL = _NullContext()
 
 
 def jobs(workflow: Path):
@@ -66,27 +116,61 @@ def steps(job_text: str) -> list[str]:
     return re.split(r'\n(?=      - )', without_comments(job_text))[1:]
 
 
-def select(value: str, variable: str | None, ref: str) -> object:
-    """What GitHub picks: a model of SELECTOR (`==` ignores case; an unset variable reads as '')."""
-    match = SELECTOR.match(value)
-    if match is None:
+def select(
+    value: str,
+    variable: str | None,
+    ref: str,
+    *,
+    event_name: str = 'push',
+    head_repo: str | None = 'codemyriad/cassini-android',
+    repository: str = 'codemyriad/cassini-android',
+) -> object:
+    """Evaluate a job's runs-on expression under GitHub Actions event, ref, repo, and vars contexts."""
+    if not (value.startswith('${{') and value.endswith('}}')):
         return value
-    on = (variable or '').casefold() == 'hetzner' and not ref.startswith('refs/tags/')
-    return json.loads(match['labels']) if on else match['default']
+    expr = value.removeprefix('${{').removesuffix('}}').strip()
+    expr = expr.replace('&&', ' and ').replace('||', ' or ').replace('!startsWith(', 'not startsWith(')
+    repo_obj = _NULL if head_repo is None else SimpleNamespace(full_name=_CIString(head_repo))
+    event = SimpleNamespace(pull_request=SimpleNamespace(head=SimpleNamespace(repo=repo_obj)))
+    github = SimpleNamespace(
+        event_name=_CIString(event_name),
+        ref=_CIString(ref),
+        repository=_CIString(repository),
+        event=event if event_name in ('pull_request', 'pull_request_target') else _NULL,
+    )
+    vars_ns = SimpleNamespace(CM_RUNNER=_CIString(variable or ''))
+    env = {
+        'github': github,
+        'vars': vars_ns,
+        'fromJSON': json.loads,
+        'startsWith': lambda text, prefix: str(text).casefold().startswith(str(prefix).casefold()),
+    }
+    return eval(expr, {'__builtins__': {}}, env)
 
 
 def selection_problems(where: str, value: str) -> list[str]:
     found = []
-    for ref in ('refs/heads/main', 'refs/pull/1/merge'):
+    for event_name, ref, head_repo in TRUSTED_CONTEXTS:
         for setting in FALLBACK:
-            if select(value, setting, ref) != 'ubuntu-24.04':
-                found.append(f'{where}: CM_RUNNER={setting!r} on {ref} does not fall back to ubuntu-24.04')
+            if select(value, setting, ref, event_name=event_name, head_repo=head_repo) != 'ubuntu-24.04':
+                found.append(f'{where}: CM_RUNNER={setting!r} on {event_name} ({ref}) does not fall back')
         for setting in ('hetzner', 'Hetzner'):
-            if select(value, setting, ref) != CM_HETZNER:
-                found.append(f'{where}: CM_RUNNER={setting!r} on {ref} does not select cm-hetzner')
-    for setting in [*FALLBACK, 'hetzner']:
-        if select(value, setting, 'refs/tags/v1.2.3') != 'ubuntu-24.04':
-            found.append(f'{where}: a tag build with CM_RUNNER={setting!r} leaves GitHub-hosted runners')
+            if select(value, setting, ref, event_name=event_name, head_repo=head_repo) != CM_HETZNER:
+                found.append(f'{where}: CM_RUNNER={setting!r} on {event_name} ({ref}) does not select cm-hetzner')
+    for event_name in ('push', 'workflow_dispatch'):
+        for setting in [*FALLBACK, 'hetzner']:
+            if select(value, setting, 'refs/tags/v1.2.3', event_name=event_name) != 'ubuntu-24.04':
+                found.append(f'{where}: tag {event_name} with CM_RUNNER={setting!r} leaves GitHub-hosted runners')
+    for untrusted_head in ('fork/cassini-android', 'codemyriad/other-repo', '', None):
+        picked = select(
+            value, 'hetzner', 'refs/pull/1/merge', event_name='pull_request', head_repo=untrusted_head,
+        )
+        if picked != 'ubuntu-24.04':
+            found.append(f'{where}: fork pull_request ({untrusted_head!r}) leaves GitHub-hosted runners')
+    for prohibited_event in PROHIBITED_EVENTS:
+        picked = select(value, 'hetzner', 'refs/heads/main', event_name=prohibited_event)
+        if picked != 'ubuntu-24.04':
+            found.append(f'{where}: unallowlisted event {prohibited_event!r} leaves GitHub-hosted runners')
     return found
 
 
