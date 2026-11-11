@@ -47,7 +47,7 @@ internal fun boardArgs(kind: BannerKind): BannerArgs = BOARD_ARGS[kind] ?: Banne
 /** The English copy of every kind with [boardArgs]: title, body and action labels (features.md section 13). */
 private val ENGLISH: Map<BannerKind, Triple<String, String?, List<String>>> = mapOf(
     BannerKind.TRANSFER_ENABLED to Triple(
-        "Your notes and saved voices can transfer to a new phone during Android setup. You can turn this off in Settings.",
+        "Cassini will move your notes and saved voices to a new phone when you set it up from this one. You can change this in Settings.",
         null,
         listOf("Open settings"),
     ),
