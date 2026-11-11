@@ -56,6 +56,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Clock
@@ -128,7 +129,7 @@ class LibraryViewModel(
     }.distinctUntilChanged()
     private val environment = combine(controls, calendar) { filters, day ->
         SearchEnvironment(filters, day.first, day.second)
-    }
+    }.shareIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), replay = 1)
 
     private data class SearchEnvironment(val filters: SearchFiltersUi, val today: LocalDate, val zone: ZoneId)
 
@@ -157,7 +158,7 @@ class LibraryViewModel(
         } else {
             ports.search(text, request.filters.domain(), request.zone, request.today)
                 .map<List<SearchRow>, Pair<String, List<SearchRow>?>> { text to it }
-                .onStart { emit(text to emptyList()) }
+                .onStart { emit(text to null) }
                 .catch { error ->
                     Log.w(TAG, "Search failed", error)
                     emit(text to emptyList())

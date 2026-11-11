@@ -28,7 +28,6 @@ import io.codemyriad.cassini.data.db.WordEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.Instant
@@ -86,7 +85,6 @@ class NoteRepository(
      * Live notes matching [query] (`SearchQuery.fts`) with snippets. A query with nothing searchable yields the
      * Library, with an empty snippet and the plain title.
      */
-    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     fun search(
         query: String,
         filters: SearchFilters = SearchFilters(),
@@ -96,7 +94,7 @@ class NoteRepository(
         val match = SearchQuery.fts(query) ?: return library().map { rows ->
             rows.map { SearchRow(it, snippet = "", titleSnippet = it.title) }
         }
-        return notes.searchFlow(match).mapLatest { found ->
+        return notes.searchFlow(match).map { found ->
             withContext(dispatchers.io) {
                 val candidates = found.filter { filters.includes(it.row.createdAt, it.row.origin, today, zone) }
                 val speaker = filters.speaker
