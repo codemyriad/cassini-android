@@ -4,7 +4,6 @@ import android.os.Build
 import android.os.FileObserver
 import android.util.Log
 import io.codemyriad.cassini.background.Background.graph
-import io.codemyriad.cassini.background.Background.waitFor
 import io.codemyriad.cassini.core.format.DocumentState
 import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobState
@@ -17,6 +16,7 @@ import io.codemyriad.cassini.engine.job.JobPhase
 import io.codemyriad.cassini.processing.ProcessingService
 import io.codemyriad.cassini.processing.ProcessingState
 import io.codemyriad.cassini.test.NeedsModels
+import io.codemyriad.cassini.testing.NotificationWatch
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.mapNotNull
@@ -27,6 +27,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 
 /**
@@ -35,6 +36,8 @@ import org.junit.Test
  */
 @NeedsModels
 class ProcessingServiceTest {
+    @get:Rule val notifications = NotificationWatch()
+
     @Before
     fun setUp() = runBlocking {
         Background.grant()
@@ -109,7 +112,10 @@ class ProcessingServiceTest {
         Log.i(TAG, "Long note checkpoint at ${saved.doneMs} of ${saved.durationMs} ms")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
             // Inference runs as mediaProcessing (0x2000), as Android reports it; dataSync would time out after 6 h.
-            val service = waitFor("ProcessingService runs as mediaProcessing during inference", TYPE_WAIT_MS) {
+            val service = notifications.await(
+                "ProcessingService runs as mediaProcessing during inference",
+                TYPE_WAIT_MS,
+            ) {
                 Background.processingService().takeIf { ProcessingService.currentType() == MEDIA_PROCESSING }
             }
             Log.i(TAG, "ProcessingService during inference:\n$service")

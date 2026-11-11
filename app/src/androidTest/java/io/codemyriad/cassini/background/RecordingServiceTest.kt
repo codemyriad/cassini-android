@@ -6,7 +6,6 @@ import android.util.Log
 import androidx.core.content.ContextCompat
 import io.codemyriad.cassini.R
 import io.codemyriad.cassini.background.Background.graph
-import io.codemyriad.cassini.background.Background.waitFor
 import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.recording.AfterFinish
@@ -15,6 +14,7 @@ import io.codemyriad.cassini.recording.RecordingOutcome
 import io.codemyriad.cassini.recording.RecordingState
 import io.codemyriad.cassini.recording.inProgress
 import io.codemyriad.cassini.test.NeedsMicrophone
+import io.codemyriad.cassini.testing.NotificationWatch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
@@ -23,6 +23,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import java.io.File
 
@@ -32,6 +33,8 @@ import java.io.File
  */
 @NeedsMicrophone
 class RecordingServiceTest {
+    @get:Rule val notifications = NotificationWatch()
+
     private val watch = MainLooperWatch()
 
     @Before
@@ -66,7 +69,7 @@ class RecordingServiceTest {
 
         val finish = ContextCompat.getContextForLanguage(Background.context).getString(R.string.notif_action_finish)
         val manager = Background.context.getSystemService(NotificationManager::class.java)
-        val notification = waitFor("The recording notification is posted") {
+        val notification = notifications.await("The recording notification is posted", Background.WAIT_MS) {
             manager.activeNotifications.firstOrNull { it.id == RecordingNotifications.RECORDING_ID }?.notification
         }
         val action = notification.actions.orEmpty().firstOrNull { it.title?.toString() == finish }
