@@ -280,13 +280,15 @@ class ImportRepository(
         failed ?: Copy.Done(Sha256.hex(digest), tmp.length())
     } catch (error: FileNotFoundException) {
         currentCoroutineContext().ensureActive()
-        Copy.Failed(ImportOutcome.Rejected(Failure.OPEN, error.message))
+        Copy.Failed(ImportOutcome.Rejected(Failure.OPEN, error.message, retryable = true))
     } catch (error: SecurityException) {
         currentCoroutineContext().ensureActive()
-        Copy.Failed(ImportOutcome.Rejected(Failure.OPEN, error.message))
+        Copy.Failed(ImportOutcome.Rejected(Failure.OPEN, error.message, retryable = true))
     } catch (error: IOException) {
         currentCoroutineContext().ensureActive()
-        Copy.Failed(lowSpace(size, tmp.length()) ?: ImportOutcome.Rejected(Failure.OPEN, error.message))
+        val rejected = lowSpace(size, tmp.length())
+            ?: ImportOutcome.Rejected(Failure.OPEN, error.message, retryable = true)
+        Copy.Failed(rejected)
     }
 
     private suspend fun pump(input: InputStream, out: FileOutputStream, size: Long?, digest: MessageDigest): Copy.Failed? {
@@ -341,12 +343,14 @@ class ImportRepository(
     /** Step 5: decides what the copied file is and moves it to its name in the note directory. */
     private fun classify(tmp: File, description: ImportSource.Description): Classified {
         val result = when (AudioFiles.sniff(tmp)) {
-            AudioContainer.OGG_OPUS -> when (AudioFiles.isCassini(tmp)) {
+            AudioContainer.OGG_OPUS -> when (AudioFiles.isCassini(tmp, rethrowIo = true)) {
                 true -> Classified.Audio(NoteFiles.DOCUMENT, AudioKind.DOCUMENT, Origin.IMPORTED_DOCUMENT, 0)
-                false -> AudioFiles.opusDurationMs(tmp)?.let { plain(SOURCE_OPUS, it) } ?: rejected(Failure.OPEN)
+                false -> AudioFiles.opusDurationMs(tmp, rethrowIo = true)?.let { plain(SOURCE_OPUS, it) }
+                    ?: rejected(Failure.OPEN)
                 null -> rejected(Failure.OPEN)
             }
-            AudioContainer.WAV -> AudioFiles.wavDurationMs(tmp)?.let { plain(SOURCE_WAV, it) } ?: rejected(Failure.WAV)
+            AudioContainer.WAV ->
+                AudioFiles.wavDurationMs(tmp, rethrowIo = true)?.let { plain(SOURCE_WAV, it) } ?: rejected(Failure.WAV)
             AudioContainer.OTHER -> probe.probe(tmp)?.let { track ->
                 plain("source.${extensionOf(description.displayName, track.mime)}", track.durationMs)
             } ?: rejected(Failure.OPEN)

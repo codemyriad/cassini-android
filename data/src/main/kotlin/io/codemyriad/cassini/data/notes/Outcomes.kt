@@ -115,9 +115,15 @@ sealed interface ImportOutcome {
     /**
      * Nothing was added: LARGE (over 4 GiB), SPACE ([neededBytes] free are needed), WAV (not 16-bit PCM), OPEN
      * (unreadable, or not audio that Cassini can read), or SAVE (a storage error after the copy). [detail] is a
-     * diagnostic, never shown as is.
+     * diagnostic, never shown as is. [retryable] is true for operational storage/stream/database failures (including
+     * file-open/read/write errors during `ImportRepository.copy`) and false only when the content itself was rejected.
      */
-    data class Rejected(val failure: Failure, val detail: String? = null, val neededBytes: Long = 0) : ImportOutcome
+    data class Rejected(
+        val failure: Failure,
+        val detail: String? = null,
+        val neededBytes: Long = 0,
+        val retryable: Boolean = failure == Failure.SPACE || failure == Failure.SAVE,
+    ) : ImportOutcome
 }
 
 /**

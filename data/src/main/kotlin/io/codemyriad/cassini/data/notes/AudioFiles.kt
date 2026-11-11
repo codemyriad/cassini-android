@@ -8,6 +8,7 @@ import io.codemyriad.cassini.core.format.OggRepair
 import io.codemyriad.cassini.core.library.AudioKind
 import java.io.EOFException
 import java.io.File
+import java.io.FileInputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.RandomAccessFile
@@ -31,10 +32,14 @@ fun interface AudioProbe {
         /** The production probe. */
         val Extractor: AudioProbe = AudioProbe(::extract)
 
-        private fun extract(file: File): ProbedAudio? {
+        private fun extract(file: File): ProbedAudio? = FileInputStream(file).use { stream ->
+            extractFromDescriptor(stream.fd)
+        }
+
+        private fun extractFromDescriptor(fd: java.io.FileDescriptor): ProbedAudio? {
             val extractor = MediaExtractor()
             return try {
-                extractor.setDataSource(file.path)
+                extractor.setDataSource(fd)
                 (0 until extractor.trackCount).asSequence()
                     .map(extractor::getTrackFormat)
                     .firstOrNull { it.getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true }
@@ -87,13 +92,13 @@ internal object AudioFiles {
      * null when the headers cannot be read. Such a file is a document (`CassiniDocument.readChecked` then decides
      * whether it is OK, unverified, invalid or of a newer format); any other Ogg Opus file is plain audio.
      */
-    fun isCassini(file: File): Boolean? = try {
+    fun isCassini(file: File, rethrowIo: Boolean = false): Boolean? = try {
         val (_, tags) = file.inputStream().buffered().use(OggOpus::headers)
         CassiniDocument.readComments(tags).any {
             it.substringBefore('=', "").uppercase(Locale.ROOT) == CASSINI_FORMAT_TAG
         }
-    } catch (_: IOException) {
-        null
+    } catch (error: IOException) {
+        if (rethrowIo) throw error else null
     } catch (_: IllegalArgumentException) {
         null
     } catch (_: IndexOutOfBoundsException) {
@@ -117,10 +122,10 @@ internal object AudioFiles {
     }
 
     /** The duration of an Ogg Opus stream from one pass over its pages; 0 when unknown, null when it is not Ogg Opus. */
-    fun opusDurationMs(file: File): Long? = try {
+    fun opusDurationMs(file: File, rethrowIo: Boolean = false): Long? = try {
         OggOpus.scan(file).durationMs.coerceAtLeast(0)
-    } catch (_: IOException) {
-        null
+    } catch (error: IOException) {
+        if (rethrowIo) throw error else null
     } catch (_: IllegalArgumentException) {
         null
     } catch (_: IndexOutOfBoundsException) {
@@ -131,10 +136,10 @@ internal object AudioFiles {
      * The duration of a WAV file that the decoder accepts (`WavDecoder`: 16-bit integer PCM, 8-96 kHz, one or two
      * channels, a whole number of frames), or null for any other WAV, such as 24-bit or float samples.
      */
-    fun wavDurationMs(file: File): Long? = try {
+    fun wavDurationMs(file: File, rethrowIo: Boolean = false): Long? = try {
         RandomAccessFile(file, "r").use(WavHeader::read)?.durationMs
-    } catch (_: IOException) {
-        null
+    } catch (error: IOException) {
+        if (rethrowIo) throw error else null
     }
 
     /**

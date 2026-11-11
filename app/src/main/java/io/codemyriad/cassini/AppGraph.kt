@@ -145,6 +145,7 @@ class AppGraph(context: Context, val config: Config) {
         val recording: RecordingHooks = RecordingHooks(),
         val audioPlayer: (Context) -> AudioPlayer = ::ExoAudioPlayer,
         val importLimits: ImportLimits = ImportLimits(),
+        val importSource: ((Context) -> ImportSource)? = null,
     )
 
     /**
@@ -607,7 +608,7 @@ class Catalogue internal constructor(
         dispatchers,
         locks,
         documents,
-        ImportSource.of(context.contentResolver),
+        graph.config.importSource?.invoke(context) ?: ImportSource.of(context.contentResolver),
         limits = graph.config.importLimits,
         // Read at each import, in the app language of that moment (also below API 33).
         fallbackTitle = { context.inAppLanguage().getString(R.string.import_fallback_title) },

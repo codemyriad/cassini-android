@@ -354,4 +354,28 @@ class ImportRepositoryTest {
 
         assertPlain(id, "source.opus", OggOpus.scan(file).durationMs, "registrazione")
     }
+
+    @Test fun operationalCopyFailuresAreRetryableUnlikeContentRejections() = runTest {
+        val text = File(inputs, "notes.txt").apply { writeText("not audio") }
+        val pcm24 = File(inputs, "24bit.wav").also { writeWav(it, format = 1, bits = 24) }
+        val missing = Uri.fromFile(File(inputs, "missing.opus"))
+        val midReadErrorSource = object : ImportSource {
+            override fun describe(uri: Uri) = resolverSource.describe(uri)
+            override fun open(uri: Uri) = object : java.io.InputStream() {
+                override fun read(): Int = throw IOException("transient read error")
+            }
+        }
+
+        val badText = importer().import(Uri.fromFile(text)) as ImportOutcome.Rejected
+        val badWav = importer().import(Uri.fromFile(pcm24)) as ImportOutcome.Rejected
+        val openMissing = importer().import(missing) as ImportOutcome.Rejected
+        val readFailed = importer(midReadErrorSource).import(input(fleurs("opus"), "ok.opus")) as ImportOutcome.Rejected
+
+        assertFalse("non-audio content rejection must not be retryable", badText.retryable)
+        assertFalse("unsupported WAV content rejection must not be retryable", badWav.retryable)
+        assertEquals(Failure.OPEN, openMissing.failure)
+        assertTrue("FileNotFoundException during copy must be retryable", openMissing.retryable)
+        assertEquals(Failure.OPEN, readFailed.failure)
+        assertTrue("IOException during copy must be retryable", readFailed.retryable)
+    }
 }

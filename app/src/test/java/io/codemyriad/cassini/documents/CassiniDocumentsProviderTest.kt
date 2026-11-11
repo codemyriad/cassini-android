@@ -35,6 +35,7 @@ import io.codemyriad.cassini.data.jobs.ClaimOutcome
 import io.codemyriad.cassini.data.models.ModelFetcher
 import io.codemyriad.cassini.data.notes.ImportLimits
 import io.codemyriad.cassini.data.notes.ImportOutcome
+import io.codemyriad.cassini.data.notes.ImportSource
 import io.codemyriad.cassini.nav.DeepLinks
 import io.codemyriad.cassini.testing.NoUncaughtCoroutines
 import kotlinx.coroutines.CancellationException
@@ -73,12 +74,14 @@ import org.robolectric.annotation.Config
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
+import java.io.InputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -117,6 +120,7 @@ class CassiniDocumentsProviderTest {
     @Before
     fun setUp() {
         CassiniDocumentsProvider.limitsForTesting = null
+        CassiniDocumentsProvider.metaReadFaultForTesting = null
         PendingImports.writerClosedProbeForTesting = FifoPipeParcelFileDescriptorShadow::isWriterClosed
         FifoPipeParcelFileDescriptorShadow.resetDetached()
         observerThread = HandlerThread("test-content-observer").apply { start() }
@@ -131,6 +135,7 @@ class CassiniDocumentsProviderTest {
     @After
     fun tearDown() {
         CassiniDocumentsProvider.limitsForTesting = null
+        CassiniDocumentsProvider.metaReadFaultForTesting = null
         CassiniDocumentsProvider.graphOverrideForTesting = null
         PendingImports.writerClosedProbeForTesting = null
         FifoPipeParcelFileDescriptorShadow.resetDetached()
@@ -456,7 +461,7 @@ class CassiniDocumentsProviderTest {
 
         val grantsRoot = File(paths.root, PendingImports.GRANTS_DIR)
         val importingDir = File(grantsRoot, token).apply { mkdirs() }
-        File(importingDir, "Interrupted capture.wav").writeBytes(wavBytes)
+        File(importingDir, PendingImports.PAYLOAD_FILE).writeBytes(wavBytes)
         File(importingDir, "meta.json").writeText(
             JSONObject()
                 .put("version", 1)
@@ -847,8 +852,8 @@ class CassiniDocumentsProviderTest {
         val token = UUID.randomUUID().toString()
         val targetNoteId = UUID.randomUUID().toString()
         val grantDir = File(grantsRoot, token).apply { mkdirs() }
-        val payload = File(grantDir, "Saved note.opus").apply { writeBytes(opusBytes) }
-        seedGrantMeta(payload, "audio/ogg", targetNoteId)
+        val payload = File(grantDir, PendingImports.PAYLOAD_FILE).apply { writeBytes(opusBytes) }
+        seedGrantMeta(payload, "Saved note.opus", "audio/ogg", targetNoteId)
         val grantUri = DocumentsContract.buildDocumentUri(authority, "${PendingImports.PREFIX}$token")
 
         // 1. Insufficient disk space during startup recovery retains IMPORTING grant and surfaces Failure.SPACE.
@@ -905,9 +910,9 @@ class CassiniDocumentsProviderTest {
         val importingToken = UUID.randomUUID().toString()
         val importingDocId = "${PendingImports.PREFIX}$importingToken"
         val importingDir = File(grantsRoot, importingToken).apply { mkdirs() }
-        val wavFile = File(importingDir, "Cold start import.wav").also { writePcm16Wav(it, frames = 2_400) }
+        val wavFile = File(importingDir, PendingImports.PAYLOAD_FILE).also { writePcm16Wav(it, frames = 2_400) }
         val wavBytes = wavFile.readBytes()
-        seedGrantMeta(wavFile, "audio/wav", null)
+        seedGrantMeta(wavFile, "Cold start import.wav", "audio/wav", null)
 
         // Close graph and corrupt cassini.db so CassiniDatabaseOpener sets it aside and creates an empty database.
         currentGraph.close { shadowOf(Looper.getMainLooper()).idle() }
@@ -958,8 +963,8 @@ class CassiniDocumentsProviderTest {
         val noteDir = paths.note(targetNoteId).apply { mkdirs() }
         File(noteDir, "document.opus").writeBytes(opusBytes)
         val grantDir = File(File(paths.root, PendingImports.GRANTS_DIR), token).apply { mkdirs() }
-        val grantPayload = File(grantDir, "Customer interview.opus").apply { writeBytes(opusBytes) }
-        seedGrantMeta(grantPayload, "audio/ogg", targetNoteId)
+        val grantPayload = File(grantDir, PendingImports.PAYLOAD_FILE).apply { writeBytes(opusBytes) }
+        seedGrantMeta(grantPayload, "Customer interview.opus", "audio/ogg", targetNoteId)
         assertEquals(0, currentGraph.awaitCatalogue().database.notes().all().size)
 
         // First restart: STEP_REBUILD catalogues targetNoteId and STEP_SWEEP adopts it into the grant.
@@ -994,6 +999,82 @@ class CassiniDocumentsProviderTest {
         }
     }
 
+    /**
+     * Review #169 r4 finding 1 (blocker): saving valid audio under `meta.json` or `meta.json.tmp` must store the
+     * payload under `payload.bin` rather than colliding with grant metadata, preserving exact submitted bytes and
+     * display names both immediately after write completion and across app/provider restart.
+     */
+    @Test
+    fun reservedMetadataFilenamesPreserveExactBytesAcrossWriteAndRestart(): Unit = runBlocking {
+        val rootUri = DocumentsContract.buildDocumentUri(authority, DocumentsVault.ROOT_DOCUMENT_ID)
+        val opusBytes = buildCustomerInterviewOpusBytes()
+        val wavBytes = folder.newFile("reserved-source.wav").also { writePcm16Wav(it, frames = 2_200) }.readBytes()
+
+        val metaJsonUri = writeNewChildDocument(rootUri, "audio/ogg", "meta.json", opusBytes)
+        val metaTmpUri = writeNewChildDocument(rootUri, "audio/wav", "meta.json.tmp", wavBytes)
+        awaitNoRunningImports()
+
+        assertReservedFilenameGrant(metaJsonUri, "meta.json", opusBytes)
+        assertReservedFilenameGrant(metaTmpUri, "meta.json.tmp", wavBytes)
+        assertEquals(2, currentGraph.awaitCatalogue().database.notes().all().size)
+
+        // Full AppGraph + provider restart must read both meta.json files and preserve exact submitted payloads.
+        restartAppAndProvider(awaitReady = true)
+        assertReservedFilenameGrant(metaJsonUri, "meta.json", opusBytes)
+        assertReservedFilenameGrant(metaTmpUri, "meta.json.tmp", wavBytes)
+        assertEquals(2, currentGraph.awaitCatalogue().database.notes().all().size)
+    }
+
+    /**
+     * Review #169 r4 finding 2 (blocker): operational I/O failures in `ImportRepository.copy` (both file-open
+     * `FileNotFoundException` and mid-stream `IOException`) and in `PendingImports.readMeta` (`IOException` during
+     * startup reconciliation and URI queries) must retain persisted grants on disk and import cleanly on retry.
+     */
+    @Test
+    fun transientMetadataReadAndImportCopyIoFailuresRetainPayloadAndSucceedOnRetry(): Unit = runBlocking {
+        val opusBytes = buildCustomerInterviewOpusBytes()
+        val wavBytes = folder.newFile("transient-io.wav").also { writePcm16Wav(it, frames = 2_600) }.readBytes()
+        val faultMode = AtomicReference(CopyFaultMode.FAIL_OPEN)
+        val faultySource = buildFaultyImportSource(faultMode)
+        restartAppAndProvider(awaitReady = true, importSource = { faultySource })
+
+        // 1. Live write hits FileNotFoundException ("EMFILE") in ImportRepository.copy: payload.bin stays on disk.
+        val liveUri = submitDocumentExpectingCopyFailure(opusBytes)
+        val livePayload = grantPayloadOf(liveUri)
+        assertTrue("payload.bin must survive ImportRepository.copy open failure", livePayload.isFile)
+        assertArrayEquals(opusBytes, livePayload.readBytes())
+        assertEquals(0, currentGraph.awaitCatalogue().database.notes().all().size)
+
+        // Seed a second IMPORTING grant so startup recovery exercises both readMeta IOException and mid-copy IOException.
+        val seededUri = seedSecondImportingGrant(wavBytes)
+        val seededPayload = grantPayloadOf(seededUri)
+
+        // 2. Startup reconciliation + URI query hit IOException in readMeta: both grants and payloads remain intact.
+        CassiniDocumentsProvider.metaReadFaultForTesting = { throw IOException("Simulated EMFILE reading ${it.name}") }
+        restartAppAndProvider(awaitReady = true, importSource = { faultySource })
+        assertMetadataFaultPreservedPayloads(liveUri, livePayload to opusBytes, seededPayload to wavBytes)
+
+        // 3. Clear readMeta fault, switch ImportRepository.copy to mid-stream IOException: startup still retains both.
+        CassiniDocumentsProvider.metaReadFaultForTesting = null
+        faultMode.set(CopyFaultMode.FAIL_MID_READ)
+        restartAppAndProvider(awaitReady = true, importSource = { faultySource })
+        assertTrue("payload.bin must survive mid-stream copy IOException", livePayload.isFile)
+        assertTrue("seeded payload.bin must survive mid-stream copy IOException", seededPayload.isFile)
+        assertEquals(0, currentGraph.awaitCatalogue().database.notes().all().size)
+
+        // 4. Clear copy fault: in-process URI retry imports liveUri, and startup retry imports seededUri cleanly.
+        faultMode.set(CopyFaultMode.NONE)
+        withContext(Dispatchers.IO) {
+            assertArrayEquals(opusBytes, requireNotNull(resolver.openInputStream(liveUri)).use { it.readBytes() })
+        }
+        restartAppAndProvider(awaitReady = true, importSource = { faultySource })
+        assertEquals(2, currentGraph.awaitCatalogue().database.notes().all().size)
+        withContext(Dispatchers.IO) {
+            assertArrayEquals(opusBytes, requireNotNull(resolver.openInputStream(liveUri)).use { it.readBytes() })
+            assertArrayEquals(wavBytes, requireNotNull(resolver.openInputStream(seededUri)).use { it.readBytes() })
+        }
+    }
+
     // Helpers. --------------------------------------------------------------------------------------------------------
 
     private fun buildGraph(
@@ -1001,6 +1082,7 @@ class CassiniDocumentsProviderTest {
             CassiniDispatchers(Dispatchers.IO, Dispatchers.Default, Dispatchers.Unconfined),
         onStartupStep: (String) -> Unit = {},
         importLimits: ImportLimits = ImportLimits(),
+        importSource: ((android.content.Context) -> ImportSource)? = null,
     ): AppGraph = AppGraph(
         app,
         AppGraph.Config(
@@ -1011,6 +1093,7 @@ class CassiniDocumentsProviderTest {
             clock = nowMs::get,
             onStartupStep = onStartupStep,
             importLimits = importLimits,
+            importSource = importSource,
         ),
     )
 
@@ -1031,9 +1114,10 @@ class CassiniDocumentsProviderTest {
     private suspend fun restartAppAndProvider(
         awaitReady: Boolean,
         importLimits: ImportLimits = ImportLimits(),
+        importSource: ((android.content.Context) -> ImportSource)? = null,
     ) {
         currentGraph.close { shadowOf(Looper.getMainLooper()).idle() }
-        currentGraph = buildGraph(importLimits = importLimits)
+        currentGraph = buildGraph(importLimits = importLimits, importSource = importSource)
         CassiniDocumentsProvider.graphOverrideForTesting = ::currentGraph
         CassiniApplication.graphFactory = GraphFactory { _, _ -> currentGraph }
         recreateProvider()
@@ -1264,12 +1348,12 @@ class CassiniDocumentsProviderTest {
         file.writeBytes(buffer.array())
     }
 
-    private fun seedGrantMeta(payload: File, mimeType: String, noteId: String?) {
+    private fun seedGrantMeta(payload: File, displayName: String, mimeType: String, noteId: String?) {
         val grantDir = checkNotNull(payload.parentFile)
         val json = JSONObject()
             .put("version", 1)
             .put("token", grantDir.name)
-            .put("displayName", payload.name)
+            .put("displayName", displayName)
             .put("mimeType", mimeType)
             .put("createdAt", nowMs.get())
             .put("updatedAt", nowMs.get())
@@ -1385,8 +1469,8 @@ class CassiniDocumentsProviderTest {
         val isolatedGrantsRoot = folder.newFolder("cancel-grants")
         val cancelToken = UUID.randomUUID().toString()
         val cancelDir = File(isolatedGrantsRoot, cancelToken).apply { mkdirs() }
-        val cancelPayload = File(cancelDir, "Cancel test.opus").apply { writeBytes(opusBytes) }
-        seedGrantMeta(cancelPayload, "audio/ogg", null)
+        val cancelPayload = File(cancelDir, PendingImports.PAYLOAD_FILE).apply { writeBytes(opusBytes) }
+        seedGrantMeta(cancelPayload, "Cancel test.opus", "audio/ogg", null)
 
         val enteredStartupRecovery = CompletableDeferred<Unit>()
         val enteredUriRecovery = CompletableDeferred<Unit>()
@@ -1438,6 +1522,110 @@ class CassiniDocumentsProviderTest {
         } finally {
             scope.cancel()
         }
+    }
+
+    private suspend fun assertReservedFilenameGrant(uri: Uri, expectedDisplayName: String, expectedBytes: ByteArray) {
+        val docId = DocumentsContract.getDocumentId(uri)
+        val token = docId.removePrefix(PendingImports.PREFIX)
+        val grantDir = File(File(paths.root, PendingImports.GRANTS_DIR), token)
+        assertTrue(File(grantDir, PendingImports.PAYLOAD_FILE).isFile)
+        assertEquals("ACCEPTED", JSONObject(File(grantDir, "meta.json").readText()).getString("state"))
+        withContext(Dispatchers.IO) {
+            val queried = querySingle(docId)
+            assertEquals(docId, queried.documentId)
+            assertEquals(expectedDisplayName, queried.displayName)
+            assertEquals(expectedBytes.size.toLong(), queried.size)
+            val actual = requireNotNull(resolver.openInputStream(uri)).use { it.readBytes() }
+            assertArrayEquals("Exact bytes must be preserved for $expectedDisplayName", expectedBytes, actual)
+        }
+    }
+
+    private fun grantPayloadOf(uri: Uri): File {
+        val token = DocumentsContract.getDocumentId(uri).removePrefix(PendingImports.PREFIX)
+        return File(File(File(paths.root, PendingImports.GRANTS_DIR), token), PendingImports.PAYLOAD_FILE)
+    }
+
+    private fun buildFaultyImportSource(mode: AtomicReference<CopyFaultMode>): ImportSource {
+        val base = ImportSource.of(resolver)
+        return object : ImportSource {
+            override fun describe(uri: Uri): ImportSource.Description = base.describe(uri)
+            override fun open(uri: Uri): InputStream? = when (mode.get()) {
+                CopyFaultMode.NONE -> base.open(uri)
+                CopyFaultMode.FAIL_OPEN -> throw FileNotFoundException("Too many open files (EMFILE)")
+                CopyFaultMode.FAIL_MID_READ -> {
+                    val underlying = requireNotNull(base.open(uri))
+                    MidReadFailingInputStream(underlying)
+                }
+            }
+        }
+    }
+
+    private suspend fun submitDocumentExpectingCopyFailure(bytes: ByteArray): Uri {
+        val rootUri = DocumentsContract.buildDocumentUri(authority, DocumentsVault.ROOT_DOCUMENT_ID)
+        val uri = withContext(Dispatchers.IO) {
+            val created = createChildDocument(rootUri, "audio/ogg", "Transient copy failure.opus")
+            resolver.openOutputStream(created).use { out ->
+                requireNotNull(out).write(bytes)
+            }
+            assertNull(resolver.query(created, null, Bundle.EMPTY, null))
+            created
+        }
+        val recorded = withTimeout(EVENT_BOUND_MS) {
+            currentGraph.notices.imports.state.first { it.running.isEmpty() && it.failure != null }.failure
+        }
+        assertEquals(Failure.OPEN, recorded?.failure)
+        return uri
+    }
+
+    private fun seedSecondImportingGrant(wavBytes: ByteArray): Uri {
+        val token = UUID.randomUUID().toString()
+        val grantDir = File(File(paths.root, PendingImports.GRANTS_DIR), token).apply { mkdirs() }
+        val payload = File(grantDir, PendingImports.PAYLOAD_FILE).apply { writeBytes(wavBytes) }
+        seedGrantMeta(payload, "Seeded recovery clip.wav", "audio/wav", null)
+        return DocumentsContract.buildDocumentUri(authority, "${PendingImports.PREFIX}$token")
+    }
+
+    private suspend fun assertMetadataFaultPreservedPayloads(
+        liveUri: Uri,
+        first: Pair<File, ByteArray>,
+        second: Pair<File, ByteArray>,
+    ) {
+        withContext(Dispatchers.IO) {
+            assertNull(resolver.query(liveUri, null, Bundle.EMPTY, null))
+            assertThrows(FileNotFoundException::class.java) { resolver.openInputStream(liveUri) }
+        }
+        assertTrue("live payload.bin must survive readMeta IOException", first.first.isFile)
+        assertArrayEquals(first.second, first.first.readBytes())
+        assertTrue("seeded payload.bin must survive readMeta IOException", second.first.isFile)
+        assertArrayEquals(second.second, second.first.readBytes())
+        assertEquals(0, currentGraph.awaitCatalogue().database.notes().all().size)
+    }
+
+    private enum class CopyFaultMode {
+        NONE,
+        FAIL_OPEN,
+        FAIL_MID_READ,
+    }
+
+    private class MidReadFailingInputStream(private val delegate: InputStream) : InputStream() {
+        private var delivered = 0
+
+        override fun read(): Int {
+            if (delivered >= 32) throw IOException("Simulated mid-copy storage read error")
+            val b = delegate.read()
+            if (b >= 0) delivered++
+            return b
+        }
+
+        override fun read(b: ByteArray, off: Int, len: Int): Int {
+            if (delivered >= 32) throw IOException("Simulated mid-copy storage read error")
+            val cap = minOf(len, 32 - delivered)
+            val n = delegate.read(b, off, cap)
+            if (n > 0) delivered += n
+            return n
+        }
+
+        override fun close() = delegate.close()
     }
 
     private class ColdStartContext(

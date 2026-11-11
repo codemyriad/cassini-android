@@ -14,7 +14,6 @@ import android.system.OsConstants
 import android.system.StructPollfd
 import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.Catalogue
-import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.export.ExportNames
 import io.codemyriad.cassini.data.NoteIds
 import io.codemyriad.cassini.data.Sha256
@@ -44,7 +43,11 @@ import java.io.IOException
 import java.io.InputStream
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.NoSuchFileException
+import java.nio.file.NotDirectoryException
 import java.nio.file.StandardCopyOption
+import java.nio.file.attribute.BasicFileAttributes
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -68,6 +71,12 @@ private sealed interface GrantImportResult {
     data object PermanentRejection : GrantImportResult
 }
 
+private enum class FilePresence {
+    REGULAR_FILE,
+    ABSENT,
+    IO_ERROR,
+}
+
 /**
  * Persistent creation grants allocated through [CassiniDocumentsProvider.createDocument].
  *
@@ -78,14 +87,12 @@ private sealed interface GrantImportResult {
  * writer close and following real kernel descriptor EOF (so native clients that call `detachFd()` keep writing safely
  * until they close the detached descriptor).
  *
- * On clean EOF the submitted bytes are moved to `<uuid>/<displayName>` with a pre-allocated destination `noteId`
- * (`state = IMPORTING`) so startup recovery can finish an interrupted import idempotently even if the sender never
- * reopens its URI or the process died between installing `notes/<noteId>/document.opus` and inserting its Room row.
- * Retryable storage failures (`SPACE`, `SAVE`, or unexpected I/O/SQL errors) and cancellation leave the persisted
- * `IMPORTING` payload intact for subsequent retry, while permanent content/cap rejections delete the grant.
- * Provider-facing reads, queries, child checks, and URI-triggered recovery await [AppGraph.ready] **before** acquiring
- * [recoveryMutex], while startup-internal [reconcileStartup] runs with the open [Catalogue] directly during
- * `STEP_SWEEP` after `STEP_REBUILD` and `STEP_PURGE`.
+ * On clean EOF the submitted bytes are moved to the fixed internal filename `<uuid>/payload.bin` (keeping the caller's
+ * `displayName` solely in `meta.json`, so names such as `meta.json` or `meta.json.tmp` never collide with grant
+ * metadata) with a pre-allocated destination `noteId` (`state = IMPORTING`). Operational I/O or SQL failures (including
+ * metadata-read `IOException`s and `ImportRepository.copy` stream/open/read/write errors) and cancellation retain the
+ * persisted grant on disk for retry; only proven content rejections (`ImportOutcome.Rejected.retryable == false`),
+ * permanently purged notes, or proven `ENOENT` placeholders delete a grant directory.
  */
 @Suppress("TooManyFunctions", "LargeClass") // grant persistence, bounded pipe pump, lifecycle and startup recovery
 internal class PendingImports(private val parts: Parts) {
@@ -153,11 +160,15 @@ internal class PendingImports(private val parts: Parts) {
     /** True when [documentId] is a live unwritten, in-progress, or non-trashed accepted creation grant. */
     suspend fun isKnown(documentId: String): Boolean {
         val token = tokenOf(documentId) ?: return false
-        val entry = active[token]
-        return if (entry != null) {
-            isActiveKnown(entry)
-        } else {
-            isPersistedKnown(token)
+        return try {
+            val entry = active[token]
+            if (entry != null) isActiveKnown(entry) else isPersistedKnown(token)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: IOException) {
+            false
+        } catch (_: SQLException) {
+            false
         }
     }
 
@@ -184,15 +195,15 @@ internal class PendingImports(private val parts: Parts) {
     suspend fun inspect(documentId: String): ExposedDocument {
         val token = tokenOf(documentId) ?: throw FileNotFoundException("Unknown document: $documentId")
         val immediate = active[token]?.let(::inspectImmediateActive)
-        if (immediate != null) return immediate
-        val catalogue = awaitProviderCatalogue()
-        val entry = active[token] ?: restoreActiveFromDisk(token)
-        return if (entry != null) {
-            inspectActive(entry, documentId, catalogue)
-        } else {
-            val accepted = loadAcceptedOrRecover(token, catalogue)?.let { resolveAccessible(it, catalogue) }
-                ?: throw FileNotFoundException("Unknown document: $documentId")
-            accepted.toExposedDocument()
+        return immediate ?: runProviderLookup(documentId) {
+            val catalogue = awaitProviderCatalogue()
+            val entry = active[token] ?: restoreActiveFromDisk(token)
+            if (entry != null) {
+                inspectActive(entry, documentId, catalogue)
+            } else {
+                loadAcceptedOrRecover(token, catalogue)?.let { resolveAccessible(it, catalogue) }?.toExposedDocument()
+                    ?: throw FileNotFoundException("Unknown document: $documentId")
+            }
         }
     }
 
@@ -236,7 +247,13 @@ internal class PendingImports(private val parts: Parts) {
             throw SecurityException("Document $documentId is not writable")
         }
         val dir = prepareGrantDir(entry, readPfd, writePfd)
-        writeMeta(dir, entry.toRecord(PersistedState.WRITING, 0L, parts.clock()))
+        try {
+            writeMeta(dir, entry.toRecord(PersistedState.WRITING, 0L, parts.clock()))
+        } catch (error: IOException) {
+            abortEntry(entry, dir, readPfd)
+            runCatching { writePfd.close() }
+            throw FileNotFoundException(error.message ?: "Cannot persist grant state").apply { initCause(error) }
+        }
         signal?.setOnCancelListener {
             entry.cancelled.set(true)
             runCatching { readPfd.close() }
@@ -249,7 +266,7 @@ internal class PendingImports(private val parts: Parts) {
         val token = tokenOf(documentId)
         val entry = token?.let { active[it] ?: restoreActiveFromDisk(it) }
         if (entry != null) return entry
-        val persistedState = token?.let { readMeta(grantDir(it))?.state }
+        val persistedState = (token?.let { readMeta(grantDir(it)) } as? MetaRead.Valid)?.record?.state
         val alreadyWritten = token != null && (
             acceptedCache.containsKey(token) ||
                 persistedState == PersistedState.ACCEPTED ||
@@ -287,19 +304,28 @@ internal class PendingImports(private val parts: Parts) {
     suspend fun openForRead(documentId: String, signal: CancellationSignal?): ParcelFileDescriptor {
         signal?.throwIfCanceled()
         val token = tokenOf(documentId) ?: throw FileNotFoundException("Unknown document: $documentId")
-        val catalogue = awaitProviderCatalogue(signal)
-        val record = resolveReadableRecord(token, documentId, catalogue, signal)
+        val record = runProviderLookup(documentId) {
+            val catalogue = awaitProviderCatalogue(signal)
+            resolveReadableRecord(token, documentId, catalogue, signal)
+        }
         signal?.throwIfCanceled()
-        val file = payloadFile(record).takeIf(File::isFile)
-            ?: throw FileNotFoundException("Payload missing for $documentId")
-        return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+        return ParcelFileDescriptor.open(payloadFile(record), ParcelFileDescriptor.MODE_READ_ONLY)
+    }
+
+    private suspend fun <T> runProviderLookup(documentId: String, block: suspend () -> T): T = try {
+        block()
+    } catch (error: IOException) {
+        throw (error as? FileNotFoundException)
+            ?: FileNotFoundException(error.message ?: "Cannot access $documentId").apply { initCause(error) }
+    } catch (error: SQLException) {
+        throw FileNotFoundException(error.message ?: "Cannot access $documentId").apply { initCause(error) }
     }
 
     /**
      * Reconciles `filesDir/provider-grants/` during `STEP_SWEEP` after `STEP_REBUILD` and `STEP_PURGE`:
-     * - deletes corrupt directories, crashed `WRITING` directories, and expired `AWAITING_WRITE` placeholders;
-     * - imports any persisted `IMPORTING` payload idempotently into `ImportRepository` (keeping the staged payload on
-     *   retryable storage failures or cancellation, and deleting only permanent rejections);
+     * - deletes proven-empty corrupt/crashed directories and expired `AWAITING_WRITE` placeholders;
+     * - imports any persisted `IMPORTING` (or crashed-after-EOF `WRITING`) payload idempotently into
+     *   `ImportRepository`, retaining grants on operational I/O or SQL failures and cancellation;
      * - deletes any `ACCEPTED` grant whose associated note was permanently purged.
      */
     suspend fun reconcileStartup(catalogue: Catalogue) = withContext(parts.io()) {
@@ -308,34 +334,58 @@ internal class PendingImports(private val parts: Parts) {
         val root = parts.grantsRoot()
         if (!root.isDirectory) return@withContext
         for (dir in root.listFiles().orEmpty().sortedBy { it.name }) {
-            reconcileGrantDir(dir, cutoff, catalogue)
+            try {
+                reconcileGrantDir(dir, cutoff, catalogue)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: IOException) {
+                // Retain this grant for the next startup pass and continue reconciling sibling grants.
+            } catch (_: SQLException) {
+                // Retain this grant for the next startup pass and continue reconciling sibling grants.
+            }
         }
     }
 
     /**
      * Deletes every persisted creation grant tied to [noteId] when the note is permanently purged (`NoteFilesCleaner`).
-     * Returns true when no grant directory for [noteId] remains on disk.
+     * Returns true when no grant directory for [noteId] remains on disk and no metadata read failed with I/O error.
      */
     suspend fun deleteForNote(noteId: String): Boolean = withContext(parts.io()) {
         recoveryMutex.withLock {
-            var allDeleted = true
-            for ((token, record) in acceptedCache.entries.toList()) {
-                if (record.noteId == noteId) {
-                    evictAccepted(token)
-                    if (!deleteGrantDir(grantDir(token))) allDeleted = false
-                }
-            }
+            var allDeleted = deleteCachedGrantsForNoteLocked(noteId)
             val root = parts.grantsRoot()
             if (root.isDirectory) {
                 for (dir in root.listFiles().orEmpty()) {
-                    val token = dir.name
-                    if (NoteIds.isValid(token) && readMeta(dir)?.noteId == noteId) {
-                        evictAccepted(token)
-                        if (!deleteGrantDir(dir)) allDeleted = false
-                    }
+                    if (!reclaimDiskGrantForNoteLocked(dir, noteId)) allDeleted = false
                 }
             }
             allDeleted
+        }
+    }
+
+    private fun deleteCachedGrantsForNoteLocked(noteId: String): Boolean {
+        var allDeleted = true
+        for ((token, record) in acceptedCache.entries.toList()) {
+            if (record.noteId == noteId) {
+                evictAccepted(token)
+                if (!deleteGrantDir(grantDir(token))) allDeleted = false
+            }
+        }
+        return allDeleted
+    }
+
+    private fun reclaimDiskGrantForNoteLocked(dir: File, noteId: String): Boolean {
+        val token = dir.name
+        if (!NoteIds.isValid(token)) return true
+        return when (val meta = readMeta(dir)) {
+            is MetaRead.Valid -> if (meta.record.noteId == noteId) {
+                evictAccepted(token)
+                deleteGrantDir(dir)
+            } else {
+                true
+            }
+            MetaRead.IoFailure -> false
+            MetaRead.Missing, MetaRead.Corrupt -> true
         }
     }
 
@@ -368,16 +418,60 @@ internal class PendingImports(private val parts: Parts) {
         var acceptedToVerify: GrantRecord? = null
         recoveryMutex.withLock {
             if (!active.containsKey(token)) {
-                val meta = readMeta(dir)
-                when {
-                    meta == null || meta.state == PersistedState.WRITING -> deleteGrantDir(dir)
-                    meta.state == PersistedState.AWAITING_WRITE && meta.createdAt < cutoff -> deleteGrantDir(dir)
-                    meta.state == PersistedState.IMPORTING -> acceptedToVerify = recoverLocked(meta, dir, catalogue)
-                    meta.state == PersistedState.ACCEPTED -> acceptedToVerify = meta
-                }
+                acceptedToVerify = reconcileInactiveLocked(token, dir, cutoff, catalogue)
             }
         }
         acceptedToVerify?.let { resolveAccessible(it, catalogue) }
+    }
+
+    private suspend fun reconcileInactiveLocked(
+        token: String,
+        dir: File,
+        cutoff: Long,
+        catalogue: Catalogue,
+    ): GrantRecord? = when (val meta = readMeta(dir)) {
+        MetaRead.IoFailure -> null
+        MetaRead.Missing, MetaRead.Corrupt -> reconcileUnreadableMetaLocked(token, dir, catalogue)
+        is MetaRead.Valid -> reconcileValidMetaLocked(meta.record, dir, cutoff, catalogue)
+    }
+
+    private suspend fun reconcileUnreadableMetaLocked(token: String, dir: File, catalogue: Catalogue): GrantRecord? {
+        val payload = payloadFile(token)
+        return when (probeRegularFile(payload)) {
+            FilePresence.ABSENT -> {
+                deleteGrantDir(dir)
+                null
+            }
+            FilePresence.IO_ERROR -> null
+            FilePresence.REGULAR_FILE -> recoverSynthesizedLocked(token, dir, payload, catalogue)
+        }
+    }
+
+    private suspend fun reconcileValidMetaLocked(
+        meta: GrantRecord,
+        dir: File,
+        cutoff: Long,
+        catalogue: Catalogue,
+    ): GrantRecord? {
+        val payload = payloadFile(meta)
+        return when (meta.state) {
+            PersistedState.WRITING -> when (probeRegularFile(payload)) {
+                FilePresence.ABSENT -> {
+                    deleteGrantDir(dir)
+                    null
+                }
+                FilePresence.IO_ERROR -> null
+                FilePresence.REGULAR_FILE -> promoteFinishedWritingLocked(meta, dir, payload, catalogue)
+            }
+            PersistedState.AWAITING_WRITE -> {
+                if (meta.createdAt < cutoff && probeRegularFile(payload) == FilePresence.ABSENT) {
+                    deleteGrantDir(dir)
+                }
+                null
+            }
+            PersistedState.IMPORTING -> recoverLocked(meta, dir, catalogue)
+            PersistedState.ACCEPTED -> meta
+        }
     }
 
     private suspend fun resolveReadableRecord(
@@ -412,11 +506,14 @@ internal class PendingImports(private val parts: Parts) {
                 null
             }
             lifecycle == NoteLifecycle.TRASHED || lifecycle == NoteLifecycle.UNCATALOGUED -> null
-            !payloadFile(record).isFile -> {
-                purgeGrant(record.token)
-                null
+            else -> when (probeRegularFile(payloadFile(record))) {
+                FilePresence.REGULAR_FILE -> record
+                FilePresence.IO_ERROR -> null
+                FilePresence.ABSENT -> {
+                    purgeGrant(record.token)
+                    null
+                }
             }
-            else -> record
         }
     }
 
@@ -476,39 +573,51 @@ internal class PendingImports(private val parts: Parts) {
         readPfd: ParcelFileDescriptor,
         currentLimits: ImportLimits,
     ) {
+        val finalFile = File(dir, PAYLOAD_FILE)
+        val total = stagePipeToPayload(entry, dir, readPfd, finalFile, currentLimits) ?: return
+        val targetNoteId = UUID.randomUUID().toString()
+        try {
+            writeMeta(dir, entry.toRecord(PersistedState.IMPORTING, total, parts.clock(), noteId = targetNoteId))
+        } catch (_: IOException) {
+            // Keep committed payload.bin and prior WRITING meta.json intact; finalizeImport or recovery will adopt it.
+        }
+        entry.stage.set(Stage.Importing)
+        parts.scope().launch(parts.io()) {
+            finalizeImport(entry, dir, finalFile, total, targetNoteId)
+        }
+    }
+
+    /**
+     * Streams pipe bytes into `payload.tmp`, fsyncs, and atomically commits `payload.bin`.
+     * Returns byte count on clean commit, or cleans up `payload.tmp` via [abortEntry] and returns null on stream abort.
+     */
+    @Suppress("TooGenericExceptionCaught") // pipe thread boundary: any stream failure before commit aborts staging
+    private fun stagePipeToPayload(
+        entry: ActiveEntry,
+        dir: File,
+        readPfd: ParcelFileDescriptor,
+        finalFile: File,
+        currentLimits: ImportLimits,
+    ): Long? {
         val root = parts.grantsRoot().apply { mkdirs() }
         val tmp = File(dir, PAYLOAD_TMP)
-        val targetNoteId = UUID.randomUUID().toString()
-        var total = 0L
-        var failed = false
-        try {
+        return try {
             if (currentLimits.usableSpace(root) < currentLimits.minFreeBytes) {
                 throw IOException("Insufficient free space before staging")
             }
             // Do not wrap FileInputStream(readPfd.fileDescriptor) in .use: on failure, abortEntry must delete the
             // staging directory BEFORE closing readPfd so any writer observing EPIPE sees cleanup already complete.
             val input = FileInputStream(readPfd.fileDescriptor)
-            FileOutputStream(tmp).use { out ->
-                total = copyBounded(input, out, root, currentLimits, entry.cancelled)
-                out.fd.sync()
+            val total = FileOutputStream(tmp).use { out ->
+                copyBounded(input, out, root, currentLimits, entry.cancelled).also { out.fd.sync() }
             }
             if (entry.cancelled.get()) throw IOException("Cancelled")
             runCatching { readPfd.close() }
-            val finalFile = File(dir, entry.displayName)
             atomicMove(tmp, finalFile)
-            writeMeta(dir, entry.toRecord(PersistedState.IMPORTING, total, parts.clock(), noteId = targetNoteId))
-            entry.stage.set(Stage.Importing)
+            total
         } catch (_: Throwable) {
-            failed = true
-        }
-        if (failed) {
-            // Delete staged files BEFORE closing readPfd so any writer observing EPIPE sees cleanup already complete.
             abortEntry(entry, dir, readPfd)
-            return
-        }
-        val finalFile = File(dir, entry.displayName)
-        parts.scope().launch(parts.io()) {
-            finalizeImport(entry, dir, finalFile, total, targetNoteId)
+            null
         }
     }
 
@@ -577,7 +686,7 @@ internal class PendingImports(private val parts: Parts) {
                 commitFinalizedEntryLocked(
                     entry = entry,
                     dir = dir,
-                    payload = payload.takeIf { it.isFile },
+                    payload = payload,
                     totalBytes = totalBytes,
                     outcome = classified to lifecycle,
                 )
@@ -588,26 +697,21 @@ internal class PendingImports(private val parts: Parts) {
     private fun commitFinalizedEntryLocked(
         entry: ActiveEntry,
         dir: File,
-        payload: File?,
+        payload: File,
         totalBytes: Long,
         outcome: Pair<GrantImportResult, NoteLifecycle>,
     ) {
         val (classified, lifecycle) = outcome
         when (classified) {
-            is GrantImportResult.Accepted -> if (lifecycle != NoteLifecycle.PURGED && payload != null) {
-                payload.setWritable(false)
-                val record = entry.toRecord(PersistedState.ACCEPTED, totalBytes, parts.clock(), classified.noteId)
-                writeMeta(dir, record)
-                cacheAccepted(record)
-                active.remove(entry.token, entry)
-                entry.finish(record)
-            } else {
-                deleteGrantDir(dir)
-                active.remove(entry.token, entry)
-                entry.finish(null)
-            }
+            is GrantImportResult.Accepted -> commitAcceptedEntryLocked(
+                entry = entry,
+                dir = dir,
+                payload = payload,
+                totalBytes = totalBytes,
+                accepted = classified.noteId to lifecycle,
+            )
             GrantImportResult.RetryableFailure -> {
-                // Retain persisted IMPORTING metadata and payload so a later retry or restart imports it cleanly.
+                // Retain persisted IMPORTING metadata and payload.bin so a subsequent retry or restart imports it.
                 active.remove(entry.token, entry)
                 entry.finish(null)
             }
@@ -616,6 +720,35 @@ internal class PendingImports(private val parts: Parts) {
                 active.remove(entry.token, entry)
                 entry.finish(null)
             }
+        }
+    }
+
+    private fun commitAcceptedEntryLocked(
+        entry: ActiveEntry,
+        dir: File,
+        payload: File,
+        totalBytes: Long,
+        accepted: Pair<String, NoteLifecycle>,
+    ) {
+        val (noteId, lifecycle) = accepted
+        val presence = probeRegularFile(payload)
+        if (lifecycle != NoteLifecycle.PURGED && presence == FilePresence.REGULAR_FILE) {
+            payload.setWritable(false)
+            val record = entry.toRecord(PersistedState.ACCEPTED, totalBytes, parts.clock(), noteId)
+            try {
+                writeMeta(dir, record)
+            } catch (_: IOException) {
+                // Keep payload.bin on disk; recovery will adopt noteId and rewrite ACCEPTED metadata on next pass.
+            }
+            cacheAccepted(record)
+            active.remove(entry.token, entry)
+            entry.finish(record)
+        } else {
+            if (lifecycle == NoteLifecycle.PURGED || presence == FilePresence.ABSENT) {
+                deleteGrantDir(dir)
+            }
+            active.remove(entry.token, entry)
+            entry.finish(null)
         }
     }
 
@@ -628,7 +761,7 @@ internal class PendingImports(private val parts: Parts) {
 
     private fun restoreActiveFromDisk(token: String): ActiveEntry? {
         val dir = grantDir(token)
-        val meta = readMeta(dir) ?: return null
+        val meta = (readMeta(dir) as? MetaRead.Valid)?.record ?: return null
         return when (meta.state) {
             PersistedState.AWAITING_WRITE -> {
                 val restored = ActiveEntry(
@@ -641,8 +774,10 @@ internal class PendingImports(private val parts: Parts) {
                 active.putIfAbsent(token, restored) ?: restored.also { unwrittenOrder.addLast(token) }
             }
             PersistedState.WRITING -> {
-                // An on-disk WRITING state with no in-memory entry belongs to a dead process whose pipe is gone.
-                deleteGrantDir(dir)
+                // Only delete a dead-process WRITING directory when payload.bin is proven absent (never committed).
+                if (!active.containsKey(token) && probeRegularFile(payloadFile(token)) == FilePresence.ABSENT) {
+                    deleteGrantDir(dir)
+                }
                 null
             }
             PersistedState.IMPORTING, PersistedState.ACCEPTED -> null
@@ -651,29 +786,111 @@ internal class PendingImports(private val parts: Parts) {
 
     private suspend fun loadAcceptedOrRecover(token: String, catalogue: Catalogue): GrantRecord? =
         recoveryMutex.withLock {
-            val cached = acceptedCache[token]?.takeIf { payloadFile(it).isFile }
-            if (cached != null) return@withLock cached
-            evictAccepted(token)
-            val dir = grantDir(token)
-            val meta = readMeta(dir)
-            when {
-                meta == null -> null
-                meta.state == PersistedState.ACCEPTED && payloadFile(meta).isFile -> meta.also(::cacheAccepted)
-                meta.state == PersistedState.ACCEPTED -> {
-                    deleteGrantDir(dir)
+            val cached = acceptedCache[token]
+            if (cached != null) {
+                when (probeRegularFile(payloadFile(cached))) {
+                    FilePresence.REGULAR_FILE -> return@withLock cached
+                    FilePresence.IO_ERROR -> return@withLock null
+                    FilePresence.ABSENT -> evictAccepted(token)
+                }
+            }
+            loadFromDiskOrRecoverLocked(token, grantDir(token), catalogue)
+        }
+
+    private suspend fun loadFromDiskOrRecoverLocked(token: String, dir: File, catalogue: Catalogue): GrantRecord? {
+        val payload = payloadFile(token)
+        return when (val meta = readMeta(dir)) {
+            MetaRead.IoFailure -> null
+            MetaRead.Missing, MetaRead.Corrupt ->
+                if (probeRegularFile(payload) == FilePresence.REGULAR_FILE) {
+                    recoverSynthesizedLocked(token, dir, payload, catalogue)
+                } else {
                     null
                 }
-                meta.state == PersistedState.IMPORTING -> recoverLocked(meta, dir, catalogue)
-                else -> null
+            is MetaRead.Valid -> loadValidMetaOrRecoverLocked(meta.record, dir, payload, catalogue)
+        }
+    }
+
+    private suspend fun loadValidMetaOrRecoverLocked(
+        meta: GrantRecord,
+        dir: File,
+        payload: File,
+        catalogue: Catalogue,
+    ): GrantRecord? = when (meta.state) {
+        PersistedState.ACCEPTED -> when (probeRegularFile(payload)) {
+            FilePresence.REGULAR_FILE -> meta.also(::cacheAccepted)
+            FilePresence.IO_ERROR -> null
+            FilePresence.ABSENT -> {
+                deleteGrantDir(dir)
+                null
             }
         }
+        PersistedState.IMPORTING -> recoverLocked(meta, dir, catalogue)
+        PersistedState.WRITING ->
+            if (probeRegularFile(payload) == FilePresence.REGULAR_FILE) {
+                promoteFinishedWritingLocked(meta, dir, payload, catalogue)
+            } else {
+                null
+            }
+        PersistedState.AWAITING_WRITE -> null
+    }
+
+    private suspend fun promoteFinishedWritingLocked(
+        meta: GrantRecord,
+        dir: File,
+        payload: File,
+        catalogue: Catalogue,
+    ): GrantRecord? {
+        val size = Files.size(payload.toPath())
+        val promoted = meta.copy(
+            state = PersistedState.IMPORTING,
+            size = size,
+            updatedAt = parts.clock(),
+            noteId = meta.noteId ?: UUID.randomUUID().toString(),
+        )
+        writeMeta(dir, promoted)
+        return recoverLocked(promoted, dir, catalogue)
+    }
+
+    private suspend fun recoverSynthesizedLocked(
+        token: String,
+        dir: File,
+        payload: File,
+        catalogue: Catalogue,
+    ): GrantRecord? {
+        val now = parts.clock()
+        val synthesized = GrantRecord(
+            token = token,
+            displayName = FALLBACK_DISPLAY_NAME,
+            mimeType = DEFAULT_MIME,
+            createdAt = now,
+            updatedAt = now,
+            state = PersistedState.IMPORTING,
+            size = Files.size(payload.toPath()),
+            noteId = UUID.randomUUID().toString(),
+        )
+        writeMeta(dir, synthesized)
+        return recoverLocked(synthesized, dir, catalogue)
+    }
 
     private suspend fun recoverLocked(meta: GrantRecord, dir: File, catalogue: Catalogue): GrantRecord? {
         val file = payloadFile(meta)
-        if (!file.isFile) {
-            deleteGrantDir(dir)
-            return null
+        return when (probeRegularFile(file)) {
+            FilePresence.ABSENT -> {
+                deleteGrantDir(dir)
+                null
+            }
+            FilePresence.IO_ERROR -> null
+            FilePresence.REGULAR_FILE -> recoverExistingPayloadLocked(meta, dir, file, catalogue)
         }
+    }
+
+    private suspend fun recoverExistingPayloadLocked(
+        meta: GrantRecord,
+        dir: File,
+        file: File,
+        catalogue: Catalogue,
+    ): GrantRecord? {
         val prepared = ensureTargetNoteId(meta, dir)
         val targetNoteId = checkNotNull(prepared.noteId)
         val existingRow = catalogue.database.notes().note(targetNoteId)
@@ -714,7 +931,11 @@ internal class PendingImports(private val parts: Parts) {
         val outcome = parts.importRecoveredFile(catalogue, file, prepared.displayName, targetNoteId)
         return when (val classified = classifyImportOutcome(outcome)) {
             is GrantImportResult.Accepted ->
-                if (file.isFile) acceptGrantLocked(prepared, dir, file, classified.noteId) else null
+                if (probeRegularFile(file) == FilePresence.REGULAR_FILE) {
+                    acceptGrantLocked(prepared, dir, file, classified.noteId)
+                } else {
+                    null
+                }
             GrantImportResult.RetryableFailure -> null
             GrantImportResult.PermanentRejection -> {
                 deleteGrantDir(dir)
@@ -726,7 +947,11 @@ internal class PendingImports(private val parts: Parts) {
     private fun acceptGrantLocked(meta: GrantRecord, dir: File, file: File, noteId: String): GrantRecord {
         file.setWritable(false)
         return meta.copy(state = PersistedState.ACCEPTED, updatedAt = parts.clock(), noteId = noteId).also { done ->
-            writeMeta(dir, done)
+            try {
+                writeMeta(dir, done)
+            } catch (_: IOException) {
+                // Keep payload.bin intact; next startup/query re-runs acceptGrantLocked over the adopted noteId.
+            }
             cacheAccepted(done)
         }
     }
@@ -753,7 +978,9 @@ internal class PendingImports(private val parts: Parts) {
             val oldest = unwrittenOrder.pollFirst()
             if (oldest != null) {
                 val entry = active[oldest]
-                if (entry != null && entry.stage.get() == Stage.AwaitingWrite && active.remove(oldest, entry)) {
+                if (entry != null && entry.stage.compareAndSet(Stage.AwaitingWrite, Stage.Rejected)) {
+                    active.remove(oldest, entry)
+                    entry.completed.complete(null)
                     deleteGrantDir(grantDir(oldest))
                 }
             }
@@ -769,13 +996,11 @@ internal class PendingImports(private val parts: Parts) {
     }
 
     private fun sweepActiveAbandoned(cutoff: Long) {
-        val iterator = active.entries.iterator()
-        while (iterator.hasNext()) {
-            val current = iterator.next().value
-            val stage = current.stage.get()
-            if ((stage == Stage.AwaitingWrite || stage == Stage.Rejected) && current.createdAt < cutoff) {
-                iterator.remove()
-                deleteGrantDir(grantDir(current.token))
+        for ((token, current) in active.entries.toList()) {
+            if (current.createdAt < cutoff && current.stage.compareAndSet(Stage.AwaitingWrite, Stage.Rejected)) {
+                active.remove(token, current)
+                current.completed.complete(null)
+                deleteGrantDir(grantDir(token))
             }
         }
     }
@@ -785,15 +1010,17 @@ internal class PendingImports(private val parts: Parts) {
         if (!root.isDirectory) return
         for (dir in root.listFiles().orEmpty()) {
             val token = dir.name
-            if (NoteIds.isValid(token) && !active.containsKey(token) && isStalePlaceholderDir(dir, cutoff)) {
+            if (NoteIds.isValid(token) && !active.containsKey(token) && isStalePlaceholderDir(token, dir, cutoff)) {
                 deleteGrantDir(dir)
             }
         }
     }
 
-    private fun isStalePlaceholderDir(dir: File, cutoff: Long): Boolean {
-        val meta = readMeta(dir) ?: return false
-        return meta.state == PersistedState.AWAITING_WRITE && meta.createdAt < cutoff
+    private fun isStalePlaceholderDir(token: String, dir: File, cutoff: Long): Boolean {
+        val meta = (readMeta(dir) as? MetaRead.Valid)?.record ?: return false
+        return meta.state == PersistedState.AWAITING_WRITE &&
+            meta.createdAt < cutoff &&
+            probeRegularFile(payloadFile(token)) == FilePresence.ABSENT
     }
 
     private fun deleteGrantDir(dir: File): Boolean {
@@ -828,11 +1055,9 @@ internal class PendingImports(private val parts: Parts) {
 
     private fun grantDir(token: String): File = File(parts.grantsRoot(), token)
 
-    private fun payloadFile(record: GrantRecord): File {
-        val dir = grantDir(record.token)
-        return File(dir, record.displayName).takeIf { it.parentFile == dir }
-            ?: throw FileNotFoundException("Invalid payload path")
-    }
+    private fun payloadFile(record: GrantRecord): File = payloadFile(record.token)
+
+    private fun payloadFile(token: String): File = File(grantDir(token), PAYLOAD_FILE)
 
     private fun tokenOf(documentId: String): String? {
         if (!documentId.startsWith(PREFIX)) return null
@@ -876,21 +1101,37 @@ internal class PendingImports(private val parts: Parts) {
         atomicMove(tmp, File(dir, META_FILE))
     }
 
-    private fun readMeta(dir: File): GrantRecord? {
+    private fun readMeta(dir: File): MetaRead {
         val file = File(dir, META_FILE)
-        if (!file.isFile) return null
         return try {
-            parseGrantJson(dir.name, JSONObject(file.readText(Charsets.UTF_8)))
+            CassiniDocumentsProvider.metaReadFaultForTesting?.invoke(file)
+            val rawText = String(Files.readAllBytes(file.toPath()), Charsets.UTF_8)
+            parseGrantJson(dir.name, JSONObject(rawText))?.let(MetaRead::Valid) ?: MetaRead.Corrupt
+        } catch (_: NoSuchFileException) {
+            MetaRead.Missing
         } catch (_: IOException) {
-            null
+            MetaRead.IoFailure
+        } catch (_: SecurityException) {
+            MetaRead.IoFailure
         } catch (_: JSONException) {
-            null
+            MetaRead.Corrupt
         }
+    }
+
+    private fun probeRegularFile(file: File): FilePresence = try {
+        val attrs = Files.readAttributes(file.toPath(), BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
+        if (attrs.isRegularFile) FilePresence.REGULAR_FILE else FilePresence.ABSENT
+    } catch (_: NoSuchFileException) {
+        FilePresence.ABSENT
+    } catch (_: IOException) {
+        FilePresence.IO_ERROR
+    } catch (_: SecurityException) {
+        FilePresence.IO_ERROR
     }
 
     private fun parseGrantJson(expectedToken: String, json: JSONObject): GrantRecord? {
         val token = json.getString("token").takeIf { it == expectedToken && NoteIds.isValid(it) }
-        val displayName = json.getString("displayName").takeIf(::isSafeFileName)
+        val displayName = json.getString("displayName").takeIf(::isValidDisplayName)
         val state = PersistedState.entries.firstOrNull { it.name == json.getString("state") }
         val (noteId, noteIdValid) = parseOptionalNoteId(json, state)
         val headerValid = token != null && displayName != null && state != null
@@ -919,9 +1160,8 @@ internal class PendingImports(private val parts: Parts) {
         return noteId to (validIfPresent && presentWhenRequired)
     }
 
-    private fun isSafeFileName(name: String): Boolean =
-        name.isNotEmpty() && '/' !in name && '\\' !in name && name != "." && name != ".." &&
-            name != META_FILE && name != META_TMP && name != PAYLOAD_TMP
+    private fun isValidDisplayName(name: String): Boolean =
+        name.isNotBlank() && '/' !in name && '\\' !in name && name != "." && name != ".."
 
     private fun atomicMove(source: File, target: File) {
         try {
@@ -934,6 +1174,13 @@ internal class PendingImports(private val parts: Parts) {
         } catch (_: AtomicMoveNotSupportedException) {
             Files.move(source.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
         }
+    }
+
+    private sealed interface MetaRead {
+        data class Valid(val record: GrantRecord) : MetaRead
+        data object Missing : MetaRead
+        data object Corrupt : MetaRead
+        data object IoFailure : MetaRead
     }
 
     private enum class PersistedState {
@@ -1003,11 +1250,13 @@ internal class PendingImports(private val parts: Parts) {
     companion object {
         const val PREFIX = "pending:"
         const val GRANTS_DIR = "provider-grants"
+        internal const val PAYLOAD_FILE = "payload.bin"
         private const val META_VERSION = 1
         private const val META_FILE = "meta.json"
         private const val META_TMP = "meta.json.tmp"
         private const val PAYLOAD_TMP = "payload.tmp"
         private const val DEFAULT_MIME = "audio/ogg"
+        private const val FALLBACK_DISPLAY_NAME = "Imported audio.opus"
         private const val BUFFER_BYTES = 8_192
         private const val THREAD_TOKEN_LEN = 8
         internal const val MAX_CACHED_COMPLETED = 128
@@ -1061,7 +1310,7 @@ internal class PendingImports(private val parts: Parts) {
                         when {
                             row != null && row.trashedAt != null -> NoteLifecycle.TRASHED
                             row != null -> NoteLifecycle.LIVE
-                            hasAudioFilesOnDisk(graph.paths.note(noteId)) -> NoteLifecycle.UNCATALOGUED
+                            noteDirHasAudioOrUnreadable(graph.paths.note(noteId)) -> NoteLifecycle.UNCATALOGUED
                             else -> NoteLifecycle.PURGED
                         }
                     },
@@ -1072,18 +1321,32 @@ internal class PendingImports(private val parts: Parts) {
         private fun classifyImportOutcome(outcome: ImportOutcome?): GrantImportResult = when (outcome) {
             is ImportOutcome.Created -> GrantImportResult.Accepted(outcome.noteId)
             is ImportOutcome.Existing -> GrantImportResult.Accepted(outcome.noteId)
-            is ImportOutcome.Rejected -> when (outcome.failure) {
-                Failure.LARGE, Failure.WAV, Failure.OPEN -> GrantImportResult.PermanentRejection
-                else -> GrantImportResult.RetryableFailure
+            is ImportOutcome.Rejected -> if (outcome.retryable) {
+                GrantImportResult.RetryableFailure
+            } else {
+                GrantImportResult.PermanentRejection
             }
             null -> GrantImportResult.RetryableFailure
         }
 
-        private fun hasAudioFilesOnDisk(noteDir: File): Boolean =
-            noteDir.isDirectory && noteDir.list().orEmpty().any { name ->
-                name == DOCUMENT_FILE ||
-                    ((name.startsWith(CAPTURE_PREFIX) || name.startsWith(SOURCE_PREFIX)) && !name.endsWith(TMP_SUFFIX))
+        private fun noteDirHasAudioOrUnreadable(noteDir: File): Boolean = try {
+            Files.list(noteDir.toPath()).use { entries ->
+                entries.anyMatch { path -> isNoteAudioFileName(path.fileName?.toString().orEmpty()) }
             }
+        } catch (_: NoSuchFileException) {
+            false
+        } catch (_: NotDirectoryException) {
+            false
+        } catch (_: IOException) {
+            // Operational stat/read error on notes/<noteId>: treat as UNCATALOGUED rather than PURGED.
+            true
+        } catch (_: SecurityException) {
+            true
+        }
+
+        private fun isNoteAudioFileName(name: String): Boolean =
+            name == DOCUMENT_FILE ||
+                ((name.startsWith(CAPTURE_PREFIX) || name.startsWith(SOURCE_PREFIX)) && !name.endsWith(TMP_SUFFIX))
 
         private const val DOCUMENT_FILE = "document.opus"
         private const val CAPTURE_PREFIX = "capture."

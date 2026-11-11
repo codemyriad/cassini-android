@@ -154,6 +154,9 @@ class CassiniDocumentsProvider : DocumentsProvider() {
         internal var limitsForTesting: ImportLimits? = null
 
         @Volatile
+        internal var metaReadFaultForTesting: ((java.io.File) -> Unit)? = null
+
+        @Volatile
         internal var graphOverrideForTesting: (() -> AppGraph)? = null
 
         private val DEFAULT_ROOT_PROJECTION = arrayOf(
