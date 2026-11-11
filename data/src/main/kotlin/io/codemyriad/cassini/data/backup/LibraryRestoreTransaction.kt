@@ -191,8 +191,6 @@ class LibraryRestoreTransaction internal constructor(
         if (STAGE.matches(path.fileName.toString())) deleteStage(path.toFile())
     }
 
-
-
     companion object {
         private fun checksum(text: String): String = MessageDigest.getInstance("SHA-256")
             .digest(text.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }

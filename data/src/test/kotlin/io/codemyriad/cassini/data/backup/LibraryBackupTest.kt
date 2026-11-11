@@ -100,24 +100,24 @@ class LibraryBackupTest {
     }
 
     private suspend fun assertRestored(target: AppPaths, id: String, started: Long) {
-    val opened = offMain { CassiniDatabaseOpener(context, target).open() }
-    try {
-        val row = opened.database.notes().note(id)!!
-        assertEquals("Custom title", row.title)
-        assertEquals(started, row.createdAt)
-        assertNull(opened.database.jobs().job(id))
-        assertEquals(1, opened.database.cache().variants(id).size)
-        assertEquals("Ada", opened.database.cache().speakers(id, row.selectedVariant!!).single().label)
-        val restoredVoices = VoiceCodec.decode(target.people.readText())
-        val match = VoiceMatcher.match(
-            mapOf("new-speaker" to floatArrayOf(1f, 0f, 0f)),
-            restoredVoices,
-            "synthetic-model",
-            Thresholds(0.9f, 0.8f, 0.1f),
-        )
-        assertEquals("voice-ada", match.getValue("new-speaker").voiceId)
-    } finally {
-        opened.database.close()
+        val opened = offMain { CassiniDatabaseOpener(context, target).open() }
+        try {
+            val row = opened.database.notes().note(id)!!
+            assertEquals("Custom title", row.title)
+            assertEquals(started, row.createdAt)
+            assertNull(opened.database.jobs().job(id))
+            assertEquals(1, opened.database.cache().variants(id).size)
+            assertEquals("Ada", opened.database.cache().speakers(id, row.selectedVariant!!).single().label)
+            val restoredVoices = VoiceCodec.decode(target.people.readText())
+            val match = VoiceMatcher.match(
+                mapOf("new-speaker" to floatArrayOf(1f, 0f, 0f)),
+                restoredVoices,
+                "synthetic-model",
+                Thresholds(0.9f, 0.8f, 0.1f),
+            )
+            assertEquals("voice-ada", match.getValue("new-speaker").voiceId)
+        } finally {
+            opened.database.close()
     }
     }
 
