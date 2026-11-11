@@ -11,6 +11,7 @@ import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.Origin
 import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.data.CassiniDispatchers
+import io.codemyriad.cassini.data.NoteIds
 import io.codemyriad.cassini.data.NoteLocks
 import io.codemyriad.cassini.data.Sha256
 import io.codemyriad.cassini.data.db.CassiniDatabase
@@ -105,7 +106,7 @@ class ImportLimits(
  * disk, a failed rename, read or insert) gives SPACE or SAVE, not an exception.
  */
 // Manual DI: the repositories take their collaborators explicitly.
-@Suppress("LongParameterList")
+@Suppress("LongParameterList", "TooManyFunctions")
 class ImportRepository(
     private val database: CassiniDatabase,
     private val paths: AppPaths,
@@ -121,28 +122,92 @@ class ImportRepository(
 ) {
     private val notes = database.notes()
 
-    /** [displayName] retains a staged archive/provider file's name without using it as a filesystem path. */
-    suspend fun import(uri: Uri, displayName: String? = null): ImportOutcome = withContext(dispatchers.io) {
+    /**
+     * [displayName] retains a staged archive/provider file's name without using it as a filesystem path;
+     * [assignedId] binds a persisted provider grant to a deterministic note id across crash recovery.
+     */
+    suspend fun import(uri: Uri, displayName: String? = null, assignedId: String? = null): ImportOutcome =
+        withContext(dispatchers.io) {
+            val preExisting = assignedId?.let {
+                require(NoteIds.isValid(it)) { "Invalid noteId: $it" }
+                adoptExistingAssigned(it, uri)
+            }
+            preExisting ?: importFreshOrResumed(uri, displayName, assignedId)
+        }
+
+    private suspend fun importFreshOrResumed(uri: Uri, displayName: String?, assignedId: String?): ImportOutcome {
         val described = source.describe(uri)
         val description = described.copy(displayName = displayName ?: described.displayName)
         val size = description.size?.takeIf { it >= 0 }
         paths.notes.mkdirs()
-        when {
+        return when {
             size != null && size > limits.maxBytes -> ImportOutcome.Rejected(Failure.LARGE, "size $size")
             size != null && limits.usableSpace(paths.notes) < size + limits.minFreeBytes ->
                 ImportOutcome.Rejected(Failure.SPACE, neededBytes = size + limits.minFreeBytes)
-            else -> importNew(uri, description, size)
+            else -> importNew(uri, description, size, assignedId)
         }
     }
 
-    private suspend fun importNew(uri: Uri, description: ImportSource.Description, size: Long?): ImportOutcome {
-        val id = UUID.randomUUID().toString()
+    private suspend fun adoptExistingAssigned(id: String, uri: Uri): ImportOutcome? {
+        val row = notes.note(id) ?: return null
+        val file = if (row.sourceSha256 == null && uri.scheme == ContentResolver.SCHEME_FILE) {
+            uri.path?.let(::File)?.takeIf(File::isFile)
+        } else {
+            null
+        }
+        if (file != null) {
+            try {
+                notes.setSourceSha256IfMissing(id, Sha256.of(file))
+            } catch (_: IOException) {
+                // Best-effort digest backfill; the rebuilt row is already catalogued.
+            } catch (_: SQLException) {
+                // Best-effort digest backfill; the rebuilt row is already catalogued.
+            }
+        }
+        return ImportOutcome.Existing(id)
+    }
+
+    private enum class NoteDirState { EXISTING, READY, FAILED }
+
+    private suspend fun prepareNoteDir(id: String, dir: File, assigned: Boolean): NoteDirState {
+        if (!assigned) return if (dir.mkdirs()) NoteDirState.READY else NoteDirState.FAILED
+        return locks.withNoteLock(id, dispatchers.io) {
+            when {
+                notes.noteBlocking(id) != null -> NoteDirState.EXISTING
+                dir.exists() && !dir.deleteRecursively() -> NoteDirState.FAILED
+                dir.mkdirs() || dir.isDirectory -> NoteDirState.READY
+                else -> NoteDirState.FAILED
+            }
+        }
+    }
+
+    private suspend fun importNew(
+        uri: Uri,
+        description: ImportSource.Description,
+        size: Long?,
+        assignedId: String?,
+    ): ImportOutcome {
+        val id = assignedId ?: UUID.randomUUID().toString()
         val dir = paths.note(id)
-        var outcome: ImportOutcome = ImportOutcome.Rejected(Failure.SAVE, "cannot create the note directory")
+        return when (prepareNoteDir(id, dir, assigned = assignedId != null)) {
+            NoteDirState.EXISTING -> ImportOutcome.Existing(id)
+            NoteDirState.FAILED -> ImportOutcome.Rejected(Failure.SAVE, "cannot create the note directory")
+            NoteDirState.READY -> stageAndCleanOnFailure(uri, id, dir, description, size)
+        }
+    }
+
+    private suspend fun stageAndCleanOnFailure(
+        uri: Uri,
+        id: String,
+        dir: File,
+        description: ImportSource.Description,
+        size: Long?,
+    ): ImportOutcome {
+        var outcome: ImportOutcome = ImportOutcome.Rejected(Failure.SAVE, "cannot stage the note")
         try {
-            // Nobody knows the new id yet, so the copy runs without the note's lock: a lock stripe is shared with
+            // Nobody knows a fresh id yet, so the copy runs without the note's lock: a lock stripe is shared with
             // other notes, and a long copy must not hold up their writes.
-            if (dir.mkdirs()) outcome = stage(uri, id, description, size)
+            outcome = stage(uri, id, description, size)
         } finally {
             // NonCancellable: a cancelled import must still delete what it copied. A row means the insert committed.
             if (outcome !is ImportOutcome.Created) {

@@ -31,6 +31,7 @@ import io.codemyriad.cassini.data.models.ModelFetcher
 import io.codemyriad.cassini.data.models.ModelRepository
 import io.codemyriad.cassini.data.notes.CatalogueRepository
 import io.codemyriad.cassini.data.notes.DocumentRepository
+import io.codemyriad.cassini.data.notes.ImportLimits
 import io.codemyriad.cassini.data.notes.ImportRepository
 import io.codemyriad.cassini.data.notes.ImportSource
 import io.codemyriad.cassini.data.notes.NoteFilesCleaner
@@ -143,6 +144,7 @@ class AppGraph(context: Context, val config: Config) {
         val processing: ProcessingHooks = ProcessingHooks(),
         val recording: RecordingHooks = RecordingHooks(),
         val audioPlayer: (Context) -> AudioPlayer = ::ExoAudioPlayer,
+        val importLimits: ImportLimits = ImportLimits(),
     )
 
     /**
@@ -433,7 +435,7 @@ class AppGraph(context: Context, val config: Config) {
             catalogue.notes.purgeExpired(Instant.ofEpochMilli(now), config.zone()).also { settings.recordPurge(now) }
         }
         val sweep = bestEffort(STEP_SWEEP, failed) {
-            catalogue.documents.sweep().also { providerGrants.reconcileStartup() }
+            catalogue.documents.sweep().also { providerGrants.reconcileStartup(catalogue) }
         }
         val retitled = bestEffort(STEP_RETITLE, failed) { catalogue.documents.retitleDirty() }
         report.value = StartupReport(
@@ -606,6 +608,7 @@ class Catalogue internal constructor(
         locks,
         documents,
         ImportSource.of(context.contentResolver),
+        limits = graph.config.importLimits,
         // Read at each import, in the app language of that moment (also below API 33).
         fallbackTitle = { context.inAppLanguage().getString(R.string.import_fallback_title) },
         clock = clock,

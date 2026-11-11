@@ -40,9 +40,18 @@ class ImportTracker(
             Log.w(TAG, "Cannot describe an imported file", error)
             null
         } ?: fallbackName()
+        track(name) { run(uri) }
+    }
+
+    /**
+     * Runs [import] under the "Importing <name>…" banner and records any [ImportOutcome.Rejected] or thrown failure
+     * on [state], just like [start], while propagating [CancellationException].
+     */
+    suspend fun track(displayName: String?, import: suspend () -> ImportOutcome): ImportOutcome? {
+        val name = displayName?.takeIf { it.isNotBlank() } ?: fallbackName()
         mutable.update { it.copy(running = it.running + name, failure = null) }
         val outcome = try {
-            run(uri)
+            import()
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
@@ -57,7 +66,7 @@ class ImportTracker(
             is ImportOutcome.Created, is ImportOutcome.Existing -> null
         }
         if (failure != null) mutable.update { it.copy(failure = failure) }
-        outcome
+        return outcome
     }
 
     /**

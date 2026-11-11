@@ -30,16 +30,26 @@ import io.codemyriad.cassini.core.format.Word
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.data.CassiniDispatchers
+import io.codemyriad.cassini.data.Sha256
 import io.codemyriad.cassini.data.jobs.ClaimOutcome
 import io.codemyriad.cassini.data.models.ModelFetcher
 import io.codemyriad.cassini.data.notes.ImportLimits
 import io.codemyriad.cassini.data.notes.ImportOutcome
 import io.codemyriad.cassini.nav.DeepLinks
 import io.codemyriad.cassini.testing.NoUncaughtCoroutines
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
@@ -66,7 +76,10 @@ import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.coroutines.CoroutineContext
 
 /**
  * Tests for [CassiniDocumentsProvider] (D97):
@@ -822,16 +835,182 @@ class CassiniDocumentsProviderTest {
         assertEquals(3_999, largeProbes)
     }
 
+    /**
+     * Review #169 r3 finding 1 (blocker): temporary storage failures (`Failure.SPACE`) and coroutine cancellation
+     * during recovery must retain persisted `IMPORTING` payloads on disk, surface user-facing import errors, and
+     * rethrow `CancellationException` so a subsequent restart or retry imports the saved audio cleanly.
+     */
+    @Test
+    fun startupRecoveryRetainsPayloadOnSpaceFailureAndPropagatesCancellation(): Unit = runBlocking {
+        val opusBytes = buildCustomerInterviewOpusBytes()
+        val grantsRoot = File(paths.root, PendingImports.GRANTS_DIR).apply { mkdirs() }
+        val token = UUID.randomUUID().toString()
+        val targetNoteId = UUID.randomUUID().toString()
+        val grantDir = File(grantsRoot, token).apply { mkdirs() }
+        val payload = File(grantDir, "Saved note.opus").apply { writeBytes(opusBytes) }
+        seedGrantMeta(payload, "audio/ogg", targetNoteId)
+        val grantUri = DocumentsContract.buildDocumentUri(authority, "${PendingImports.PREFIX}$token")
+
+        // 1. Insufficient disk space during startup recovery retains IMPORTING grant and surfaces Failure.SPACE.
+        val usableBytes = AtomicLong(0L)
+        val lowSpaceLimits = ImportLimits(minFreeBytes = 100_000L, usableSpace = { usableBytes.get() })
+        restartAppAndProvider(awaitReady = true, importLimits = lowSpaceLimits)
+
+        val recordedFailure = currentGraph.notices.imports.state.value.failure
+        assertEquals(Failure.SPACE, recordedFailure?.failure)
+        assertEquals(opusBytes.size.toLong() + 100_000L, recordedFailure?.neededBytes)
+        assertEquals(0, currentGraph.awaitCatalogue().database.notes().all().size)
+        assertTrue("Persisted payload must survive Failure.SPACE", payload.isFile)
+        assertArrayEquals(opusBytes, payload.readBytes())
+        assertEquals("IMPORTING", JSONObject(File(grantDir, "meta.json").readText()).getString("state"))
+
+        // Even URI-triggered recovery while space is still exhausted must keep the persisted payload intact.
+        withContext(Dispatchers.IO) {
+            assertNull(resolver.query(grantUri, null, Bundle.EMPTY, null))
+            assertThrows(FileNotFoundException::class.java) { resolver.openInputStream(grantUri) }
+        }
+        assertTrue("Persisted payload must survive URI retry on low space", payload.isFile)
+        assertEquals("IMPORTING", JSONObject(File(grantDir, "meta.json").readText()).getString("state"))
+
+        // 2. Restoring free space and restarting imports the retained grant cleanly into targetNoteId.
+        usableBytes.set(100_000_000L)
+        restartAppAndProvider(awaitReady = true, importLimits = lowSpaceLimits)
+        val imported = currentGraph.awaitCatalogue().database.notes().all().single()
+        assertEquals(targetNoteId, imported.id)
+        assertEquals("Customer interview", imported.title)
+        assertEquals("ACCEPTED", JSONObject(File(grantDir, "meta.json").readText()).getString("state"))
+        withContext(Dispatchers.IO) {
+            assertArrayEquals(opusBytes, readDocumentBytes("${PendingImports.PREFIX}$token"))
+        }
+
+        // 3. Coroutine cancellation during both startup and URI-triggered recovery rethrows without deleting payload.
+        verifyRecoveryCancellationRetainsGrant(opusBytes)
+    }
+
+    /**
+     * Review #169 r3 finding 2 (blocker): cold-start URI queries, child checks, and reads over a recreated database
+     * must wait for `STEP_REBUILD` and startup completion before acquiring `recoveryMutex` or inspecting `notes`,
+     * rather than mistaking an un-rebuilt row for `PURGED` or racing `IMPORTING` recovery ahead of `STEP_REBUILD`.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun coldStartUriAccessWaitsForCatalogueRebuildInsteadOfDeletingGrants(): Unit = runBlocking {
+        val rootUri = DocumentsContract.buildDocumentUri(authority, DocumentsVault.ROOT_DOCUMENT_ID)
+        val opusBytes = buildCustomerInterviewOpusBytes()
+        val acceptedUri = writeNewChildDocument(rootUri, "audio/ogg", "Accepted before rebuild.opus", opusBytes)
+        val acceptedDocId = DocumentsContract.getDocumentId(acceptedUri)
+        val rebuiltNoteId = currentGraph.awaitCatalogue().database.notes().all().single().id
+
+        val grantsRoot = File(paths.root, PendingImports.GRANTS_DIR)
+        val importingToken = UUID.randomUUID().toString()
+        val importingDocId = "${PendingImports.PREFIX}$importingToken"
+        val importingDir = File(grantsRoot, importingToken).apply { mkdirs() }
+        val wavFile = File(importingDir, "Cold start import.wav").also { writePcm16Wav(it, frames = 2_400) }
+        val wavBytes = wavFile.readBytes()
+        seedGrantMeta(wavFile, "audio/wav", null)
+
+        // Close graph and corrupt cassini.db so CassiniDatabaseOpener sets it aside and creates an empty database.
+        currentGraph.close { shadowOf(Looper.getMainLooper()).idle() }
+        corruptDatabaseForSetAside()
+
+        val enteredRebuild = CompletableDeferred<Unit>()
+        val releaseRebuild = CountDownLatch(1)
+        val queued = StandardTestDispatcher()
+        val io = SwitchingDispatcher()
+        startRebuildGatedGraph(io, enteredRebuild, releaseRebuild)
+
+        val callerScope = CoroutineScope(SupervisorJob() + io)
+        try {
+            withTimeout(EVENT_BOUND_MS) { enteredRebuild.await() }
+            assertTrue("Room is already open at STEP_REBUILD", currentGraph.catalogue.isCompleted)
+            assertFalse("Startup is not yet ready at STEP_REBUILD", currentGraph.ready.isCompleted)
+            assertEquals(0, currentGraph.awaitCatalogue().database.notes().all().size)
+            assertColdStartWaitAndRecovery(
+                ColdStartContext(acceptedDocId, importingDocId, rebuiltNoteId, opusBytes, wavBytes),
+                callerScope,
+                queued,
+                io,
+                releaseRebuild,
+            )
+        } finally {
+            callerScope.cancel()
+            io.use(Dispatchers.IO)
+            queued.scheduler.runCurrent()
+            releaseRebuild.countDown()
+        }
+    }
+
+    /**
+     * Review #169 r3 finding 3 (major): if the process dies after `ImportRepository` installs
+     * `notes/<targetNoteId>/document.opus` on disk but before inserting its Room row, `STEP_REBUILD` reconstructs
+     * `<targetNoteId>` without `sourceSha256` and `STEP_SWEEP` reconciles the persisted `IMPORTING` grant onto that
+     * exact `<targetNoteId>` (backfilling `sourceSha256`) rather than creating a duplicate second note.
+     */
+    @Test
+    fun interruptedPortableDocumentImportAfterFileInstallProducesSingleNoteAcrossRestarts(): Unit = runBlocking {
+        val opusBytes = buildCustomerInterviewOpusBytes()
+        val expectedSha = Sha256.of(folder.newFile("sha-probe.opus").apply { writeBytes(opusBytes) })
+        val targetNoteId = UUID.randomUUID().toString()
+        val token = UUID.randomUUID().toString()
+        val grantDocId = "${PendingImports.PREFIX}$token"
+
+        // Simulate crash after notes/<targetNoteId>/document.opus was written, before Room row insert committed.
+        val noteDir = paths.note(targetNoteId).apply { mkdirs() }
+        File(noteDir, "document.opus").writeBytes(opusBytes)
+        val grantDir = File(File(paths.root, PendingImports.GRANTS_DIR), token).apply { mkdirs() }
+        val grantPayload = File(grantDir, "Customer interview.opus").apply { writeBytes(opusBytes) }
+        seedGrantMeta(grantPayload, "audio/ogg", targetNoteId)
+        assertEquals(0, currentGraph.awaitCatalogue().database.notes().all().size)
+
+        // First restart: STEP_REBUILD catalogues targetNoteId and STEP_SWEEP adopts it into the grant.
+        restartAppAndProvider(awaitReady = true)
+        val firstPassRow = currentGraph.awaitCatalogue().database.notes().all().single()
+        assertEquals(targetNoteId, firstPassRow.id)
+        assertEquals("Customer interview", firstPassRow.title)
+        assertEquals("sourceSha256 must be backfilled onto rebuilt note", expectedSha, firstPassRow.sourceSha256)
+        assertEquals("ACCEPTED", JSONObject(File(grantDir, "meta.json").readText()).getString("state"))
+        assertEquals(targetNoteId, JSONObject(File(grantDir, "meta.json").readText()).getString("noteId"))
+
+        // Second restart (normal) preserves backfilled sourceSha256 so re-importing identical bytes deduplicates.
+        restartAppAndProvider(awaitReady = true)
+        assertEquals(listOf(targetNoteId), currentGraph.awaitCatalogue().database.notes().all().map { it.id })
+        val dupProbe = folder.newFile("dup-check.opus").apply { writeBytes(opusBytes) }
+        val dupOutcome = currentGraph.awaitCatalogue().imports.import(Uri.fromFile(dupProbe))
+        assertEquals(ImportOutcome.Existing(targetNoteId), dupOutcome)
+
+        // Third restart with database set-aside + full STEP_REBUILD still keeps exactly 1 note.
+        currentGraph.close { shadowOf(Looper.getMainLooper()).idle() }
+        corruptDatabaseForSetAside()
+        currentGraph = buildGraph()
+        CassiniDocumentsProvider.graphOverrideForTesting = ::currentGraph
+        CassiniApplication.graphFactory = GraphFactory { _, _ -> currentGraph }
+        recreateProvider()
+        withTimeout(EVENT_BOUND_MS) { currentGraph.ready.await() }
+
+        assertEquals(listOf(targetNoteId), currentGraph.awaitCatalogue().database.notes().all().map { it.id })
+        withContext(Dispatchers.IO) {
+            assertEquals(listOf("${DocumentsVault.NOTE_PREFIX}$targetNoteId"), queryChildren().map { it.documentId })
+            assertArrayEquals(opusBytes, readDocumentBytes(grantDocId))
+        }
+    }
+
     // Helpers. --------------------------------------------------------------------------------------------------------
 
-    private fun buildGraph(): AppGraph = AppGraph(
+    private fun buildGraph(
+        dispatchers: CassiniDispatchers =
+            CassiniDispatchers(Dispatchers.IO, Dispatchers.Default, Dispatchers.Unconfined),
+        onStartupStep: (String) -> Unit = {},
+        importLimits: ImportLimits = ImportLimits(),
+    ): AppGraph = AppGraph(
         app,
         AppGraph.Config(
             paths = paths,
-            dispatchers = CassiniDispatchers(Dispatchers.IO, Dispatchers.Default, Dispatchers.Unconfined),
+            dispatchers = dispatchers,
             fetcher = ModelFetcher { _, _, _ -> fail("No model download expected") },
             network = { false },
             clock = nowMs::get,
+            onStartupStep = onStartupStep,
+            importLimits = importLimits,
         ),
     )
 
@@ -849,9 +1028,12 @@ class CassiniDocumentsProviderTest {
         Robolectric.buildContentProvider(CassiniDocumentsProvider::class.java).create(info)
     }
 
-    private suspend fun restartAppAndProvider(awaitReady: Boolean) {
+    private suspend fun restartAppAndProvider(
+        awaitReady: Boolean,
+        importLimits: ImportLimits = ImportLimits(),
+    ) {
         currentGraph.close { shadowOf(Looper.getMainLooper()).idle() }
-        currentGraph = buildGraph()
+        currentGraph = buildGraph(importLimits = importLimits)
         CassiniDocumentsProvider.graphOverrideForTesting = ::currentGraph
         CassiniApplication.graphFactory = GraphFactory { _, _ -> currentGraph }
         recreateProvider()
@@ -1080,6 +1262,209 @@ class CassiniDocumentsProviderTest {
             buffer.putShort(((i * 17) % 500).toShort())
         }
         file.writeBytes(buffer.array())
+    }
+
+    private fun seedGrantMeta(payload: File, mimeType: String, noteId: String?) {
+        val grantDir = checkNotNull(payload.parentFile)
+        val json = JSONObject()
+            .put("version", 1)
+            .put("token", grantDir.name)
+            .put("displayName", payload.name)
+            .put("mimeType", mimeType)
+            .put("createdAt", nowMs.get())
+            .put("updatedAt", nowMs.get())
+            .put("state", "IMPORTING")
+            .put("size", payload.length())
+            .apply { if (noteId != null) put("noteId", noteId) }
+            .toString()
+        File(grantDir, "meta.json").writeText(json)
+    }
+
+    private fun startRebuildGatedGraph(
+        io: SwitchingDispatcher,
+        enteredRebuild: CompletableDeferred<Unit>,
+        releaseRebuild: CountDownLatch,
+    ) {
+        currentGraph = buildGraph(
+            dispatchers = CassiniDispatchers(io = io, default = io, main = Dispatchers.Unconfined),
+            onStartupStep = { step ->
+                if (step == AppGraph.STEP_REBUILD) {
+                    enteredRebuild.complete(Unit)
+                    check(releaseRebuild.await(10, TimeUnit.SECONDS)) { "STEP_REBUILD gate was not released" }
+                }
+            },
+        )
+        CassiniDocumentsProvider.graphOverrideForTesting = ::currentGraph
+        CassiniApplication.graphFactory = GraphFactory { _, _ -> currentGraph }
+        recreateProvider()
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private suspend fun assertColdStartWaitAndRecovery(
+        ctx: ColdStartContext,
+        callerScope: CoroutineScope,
+        queued: kotlinx.coroutines.test.TestDispatcher,
+        io: SwitchingDispatcher,
+        releaseRebuild: CountDownLatch,
+    ) {
+        val grantsRoot = File(paths.root, PendingImports.GRANTS_DIR)
+        val acceptedToken = ctx.acceptedDocId.removePrefix(PendingImports.PREFIX)
+
+        io.use(queued)
+        val knownDeferred = callerScope.async { currentGraph.providerGrants.isKnown(ctx.acceptedDocId) }
+        val inspectDeferred = callerScope.async { currentGraph.providerGrants.inspect(ctx.acceptedDocId) }
+        val readAcceptedDeferred = callerScope.async {
+            currentGraph.providerGrants.openForRead(ctx.acceptedDocId, null)
+        }
+        val readImportingDeferred = callerScope.async {
+            currentGraph.providerGrants.openForRead(ctx.importingDocId, null)
+        }
+        queued.scheduler.runCurrent()
+
+        assertFalse("isKnown must wait for startup ready", knownDeferred.isCompleted)
+        assertFalse("inspect must wait for startup ready", inspectDeferred.isCompleted)
+        assertFalse("openForRead(accepted) must wait for startup ready", readAcceptedDeferred.isCompleted)
+        assertFalse("openForRead(importing) must wait for startup ready", readImportingDeferred.isCompleted)
+        assertTrue(File(grantsRoot, acceptedToken).isDirectory)
+        assertEquals(listOf(ctx.rebuiltNoteId), paths.notes.listFiles().orEmpty().map { it.name })
+
+        releaseRebuildAndVerifyColdStartSnapshot(ctx, io, queued, releaseRebuild)
+        assertTrue(withTimeout(EVENT_BOUND_MS) { knownDeferred.await() })
+        assertEquals(ctx.acceptedDocId, withTimeout(EVENT_BOUND_MS) { inspectDeferred.await() }.documentId)
+        withTimeout(EVENT_BOUND_MS) { readAcceptedDeferred.await() }.close()
+        withTimeout(EVENT_BOUND_MS) { readImportingDeferred.await() }.close()
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private suspend fun releaseRebuildAndVerifyColdStartSnapshot(
+        ctx: ColdStartContext,
+        io: SwitchingDispatcher,
+        queued: kotlinx.coroutines.test.TestDispatcher,
+        releaseRebuild: CountDownLatch,
+    ) {
+        val rootUri = DocumentsContract.buildDocumentUri(authority, DocumentsVault.ROOT_DOCUMENT_ID)
+        val acceptedUri = DocumentsContract.buildDocumentUri(authority, ctx.acceptedDocId)
+        val importingUri = DocumentsContract.buildDocumentUri(authority, ctx.importingDocId)
+        val providerScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val providerResults = providerScope.async {
+            val isChild = DocumentsContract.isChildDocument(resolver, rootUri, acceptedUri)
+            val noteMeta = querySingle("${DocumentsVault.NOTE_PREFIX}${ctx.rebuiltNoteId}")
+            val acceptedBytes = readDocumentBytes(ctx.acceptedDocId)
+            val importingBytes = readDocumentBytes(ctx.importingDocId)
+            ColdStartProviderSnapshot(isChild, noteMeta.displayName, acceptedBytes, importingBytes)
+        }
+        try {
+            val lateIo = CompletableDeferred<Unit>()
+            currentGraph.appScope.launch(io) { lateIo.complete(Unit) }
+            io.use(Dispatchers.IO)
+            queued.scheduler.runCurrent()
+            assertTrue(lateIo.isCompleted)
+            releaseRebuild.countDown()
+
+            val snapshot = withTimeout(EVENT_BOUND_MS) { providerResults.await() }
+            assertTrue(snapshot.isAcceptedChild)
+            assertEquals("Customer interview.opus", snapshot.rebuiltNoteDisplayName)
+            assertArrayEquals(ctx.opusBytes, snapshot.acceptedBytes)
+            assertArrayEquals(ctx.wavBytes, snapshot.importingBytes)
+            assertTrue(DocumentsContract.isChildDocument(resolver, rootUri, importingUri))
+            assertEquals(2, currentGraph.awaitCatalogue().database.notes().all().size)
+        } finally {
+            providerScope.cancel()
+        }
+    }
+
+    private fun corruptDatabaseForSetAside() {
+        for (suffix in listOf("-wal", "-shm", "-journal")) {
+            File(paths.database.path + suffix).delete()
+        }
+        paths.database.writeBytes("corrupt sqlite header for set-aside test".toByteArray())
+    }
+
+    private suspend fun verifyRecoveryCancellationRetainsGrant(opusBytes: ByteArray) {
+        val catalogue = currentGraph.awaitCatalogue()
+        val isolatedGrantsRoot = folder.newFolder("cancel-grants")
+        val cancelToken = UUID.randomUUID().toString()
+        val cancelDir = File(isolatedGrantsRoot, cancelToken).apply { mkdirs() }
+        val cancelPayload = File(cancelDir, "Cancel test.opus").apply { writeBytes(opusBytes) }
+        seedGrantMeta(cancelPayload, "audio/ogg", null)
+
+        val enteredStartupRecovery = CompletableDeferred<Unit>()
+        val enteredUriRecovery = CompletableDeferred<Unit>()
+        val neverFinishes = CompletableDeferred<ImportOutcome?>()
+        var callCount = 0
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        try {
+            val grants = PendingImports(
+                PendingImports.Parts(
+                    grantsRoot = { isolatedGrantsRoot },
+                    scope = { scope },
+                    io = { Dispatchers.IO },
+                    clock = nowMs::get,
+                    limits = ::ImportLimits,
+                    ready = { CompletableDeferred(Unit) },
+                    awaitCatalogue = { catalogue },
+                    importLiveFile = { _, _, _ -> neverFinishes.await() },
+                    importRecoveredFile = { _, _, _, _ ->
+                        if (callCount++ == 0) {
+                            enteredStartupRecovery.complete(Unit)
+                        } else {
+                            enteredUriRecovery.complete(Unit)
+                        }
+                        neverFinishes.await()
+                    },
+                    noteLifecycle = { _, _ -> NoteLifecycle.LIVE },
+                ),
+            )
+
+            // 1. Cancel startup reconciliation mid-import: CancellationException propagates, grant remains intact.
+            val startupJob = scope.async { grants.reconcileStartup(catalogue) }
+            withTimeout(EVENT_BOUND_MS) { enteredStartupRecovery.await() }
+            startupJob.cancel(CancellationException("cancel startup recovery"))
+            assertThrows(CancellationException::class.java) {
+                runBlocking { withTimeout(EVENT_BOUND_MS) { startupJob.await() } }
+            }
+            assertTrue("Payload must survive startup cancellation", cancelPayload.isFile)
+            assertEquals("IMPORTING", JSONObject(File(cancelDir, "meta.json").readText()).getString("state"))
+
+            // 2. Cancel URI-triggered recovery mid-import: CancellationException propagates, grant remains intact.
+            val uriJob = scope.async { grants.openForRead("${PendingImports.PREFIX}$cancelToken", null) }
+            withTimeout(EVENT_BOUND_MS) { enteredUriRecovery.await() }
+            uriJob.cancel(CancellationException("cancel URI recovery"))
+            assertThrows(CancellationException::class.java) {
+                runBlocking { withTimeout(EVENT_BOUND_MS) { uriJob.await() } }
+            }
+            assertTrue("Payload must survive URI recovery cancellation", cancelPayload.isFile)
+            assertEquals("IMPORTING", JSONObject(File(cancelDir, "meta.json").readText()).getString("state"))
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    private class ColdStartContext(
+        val acceptedDocId: String,
+        val importingDocId: String,
+        val rebuiltNoteId: String,
+        val opusBytes: ByteArray,
+        val wavBytes: ByteArray,
+    )
+
+    private class ColdStartProviderSnapshot(
+        val isAcceptedChild: Boolean,
+        val rebuiltNoteDisplayName: String,
+        val acceptedBytes: ByteArray,
+        val importingBytes: ByteArray,
+    )
+
+    private class SwitchingDispatcher : CoroutineDispatcher() {
+        private var delegate: CoroutineDispatcher = Dispatchers.IO
+
+        @Synchronized
+        fun use(next: CoroutineDispatcher) {
+            delegate = next
+        }
+
+        @Synchronized
+        override fun dispatch(context: CoroutineContext, block: Runnable) = delegate.dispatch(context, block)
     }
 
     private companion object {

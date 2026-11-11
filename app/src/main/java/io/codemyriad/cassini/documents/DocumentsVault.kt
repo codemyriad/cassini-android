@@ -3,6 +3,7 @@ package io.codemyriad.cassini.documents
 import android.content.ContentResolver
 import android.content.Context
 import android.os.CancellationSignal
+import android.os.OperationCanceledException
 import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
@@ -21,13 +22,17 @@ import io.codemyriad.cassini.data.db.NoteEntity
 import io.codemyriad.cassini.inAppLanguage
 import io.codemyriad.cassini.note.NoteExports
 import io.codemyriad.cassini.note.NoteMapping
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.suspendCancellableCoroutine
 import java.io.File
 import java.io.FileNotFoundException
 import java.util.Collections
 import java.util.Locale
 import java.util.WeakHashMap
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 /** Metadata of one document exposed by [CassiniDocumentsProvider]. */
 internal data class ExposedDocument(
@@ -85,7 +90,7 @@ internal class DocumentsVault(
         Threads.assertOffMain("CassiniDocumentsProvider.queryChildDocuments")
         val graph = graphProvider()
         return runBlocking(graph.dispatchers.io) {
-            val catalogue = graph.awaitCatalogue()
+            val catalogue = awaitReadyCatalogue(graph)
             observeChangesOnce(graph, catalogue)
             exposableDocuments(catalogue, graph.paths)
         }
@@ -174,7 +179,7 @@ internal class DocumentsVault(
 
     private suspend fun isNoteExposable(graph: AppGraph, documentId: String): Boolean {
         val noteId = noteIdOf(documentId) ?: return false
-        val catalogue = graph.awaitCatalogue()
+        val catalogue = awaitReadyCatalogue(graph)
         val row = catalogue.database.notes().note(noteId)
         val jobState = catalogue.database.jobs().job(noteId)?.state
         return row != null && isExposable(row, jobState, graph.paths)
@@ -184,7 +189,7 @@ internal class DocumentsVault(
         signal?.throwIfCanceled()
         val graph = graphProvider()
         return runBlocking(graph.dispatchers.io) {
-            val catalogue = graph.awaitCatalogue()
+            val catalogue = awaitReadyCatalogue(graph, signal)
             observeChangesOnce(graph, catalogue)
             val precheck = catalogue.database.notes().note(noteId)
             if (precheck != null && needsRetitleBeforeExport(precheck, catalogue.database.jobs().job(noteId)?.state)) {
@@ -203,10 +208,27 @@ internal class DocumentsVault(
 
     private suspend fun queryNoteDocument(graph: AppGraph, documentId: String): ExposedDocument {
         val noteId = noteIdOf(documentId) ?: throw FileNotFoundException("Unknown document: $documentId")
-        val catalogue = graph.awaitCatalogue()
+        val catalogue = awaitReadyCatalogue(graph)
         observeChangesOnce(graph, catalogue)
         return exposableDocuments(catalogue, graph.paths).firstOrNull { it.documentId == "$NOTE_PREFIX$noteId" }
             ?: throw FileNotFoundException("Note is not available: $documentId")
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private suspend fun awaitReadyCatalogue(graph: AppGraph, signal: CancellationSignal? = null): Catalogue {
+        if (signal == null) {
+            graph.ready.await()
+        } else {
+            signal.throwIfCanceled()
+            suspendCancellableCoroutine { cont ->
+                signal.setOnCancelListener { cont.cancel(OperationCanceledException()) }
+                graph.ready.invokeOnCompletion { error ->
+                    if (!cont.isActive) return@invokeOnCompletion
+                    if (error != null) cont.resumeWithException(error) else cont.resume(Unit)
+                }
+            }
+        }
+        return graph.awaitCatalogue()
     }
 
     private suspend fun exposableDocuments(catalogue: Catalogue, paths: AppPaths): List<ExposedDocument> {

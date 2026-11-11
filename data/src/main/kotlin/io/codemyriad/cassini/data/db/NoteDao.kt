@@ -95,6 +95,10 @@ abstract class NoteDao {
         return existing
     }
 
+    /** Backfills `source_sha256` when grant recovery adopts a document row that `CatalogueRepository` rebuilt first. */
+    @Query("UPDATE notes SET source_sha256 = :sha256 WHERE id = :id AND source_sha256 IS NULL")
+    abstract suspend fun setSourceSha256IfMissing(id: String, sha256: String)
+
     @Query("SELECT id FROM notes")
     abstract suspend fun ids(): List<String>
 
