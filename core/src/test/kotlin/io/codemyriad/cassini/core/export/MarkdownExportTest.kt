@@ -219,6 +219,8 @@ class MarkdownExportTest {
             text("export.markdown.transcriptHeading"),
             text("export.markdown.notesHeading"),
             text("meeting.turn.over"),
-        ) { labels -> labels.dropLast(1).joinToString(", ") + " and " + labels.last() }
+        ) { labels ->
+            if (labels.size < 2) labels.joinToString() else labels.dropLast(1).joinToString(", ") + " and " + labels.last()
+        }
     }
 }
