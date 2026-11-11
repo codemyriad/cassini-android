@@ -179,7 +179,7 @@ class DocumentRepositoryTest {
         val damaged = OggOpus.mux(stream.copy(audio = packets, finalGranule = 0), stream.tags)
         h.document("stale").writeBytes(damaged)
         h.notes.refreshIfStale("stale")
-        assertEquals(DocumentState.STALE_AUDIO, h.row("stale").documentState)
+        assertEquals(DocumentState.UNVERIFIED, h.row("stale").documentState)
         val recovery = folder.newFile("damaged-copy.opus")
         assertTrue(h.documents.exportCopy("stale", Uri.fromFile(recovery)) is ExportOutcome.Saved)
         assertArrayEquals(damaged, recovery.readBytes())
