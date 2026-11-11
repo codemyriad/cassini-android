@@ -526,7 +526,9 @@ data class CassiniDocument(
             val start = MeetingTime.resolve(manifest, existing?.comments.orEmpty())
             val utc = start?.takeIf { it.source == MeetingTime.UTC }?.value
             if (utc != null) comments += "CASSINI_RECORDED_AT_UTC=$utc"
-            meeting.optString("recordedAtLocal").takeIf { it.isNotEmpty() }?.let { comments += "CASSINI_RECORDED_AT_LOCAL=$it" }
+            meeting.optString("recordedAtLocal").takeIf { it.isNotEmpty() }?.let {
+                comments += "CASSINI_RECORDED_AT_LOCAL=$it"
+            }
             comments += "DATE=${utc ?: start?.takeIf { it.source == MeetingTime.DATE }?.value ?: meeting.getString("createdAtUtc")}"
             comments += bodyTags
             comments += CassiniPayload.encode(MANIFEST_PREFIX, CassiniPayload.MIME, manifest.toString()).second

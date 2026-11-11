@@ -384,7 +384,12 @@ internal class FakeNotePorts : NotePorts {
         markdownTime = recordedAt
         return io.codemyriad.cassini.core.export.MarkdownOptions(
             "Thursday 8 October 2026, 15:10",
-            io.codemyriad.cassini.core.export.MarkdownCopy("Speakers: {names}", "Transcript", "Notes", "(over {names})") {
+            io.codemyriad.cassini.core.export.MarkdownCopy(
+                "Speakers: {names}",
+                "Transcript",
+                "Notes",
+                "(over {names})",
+            ) {
                 it.joinToString(" and ")
             },
         )
