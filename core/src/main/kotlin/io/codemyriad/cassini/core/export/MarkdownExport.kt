@@ -18,6 +18,7 @@ data class MarkdownNote(val atMs: Long, val text: String)
 /** S-5 Markdown with the shared D84 reading projection, UTF-8/LF and one final newline. */
 object MarkdownExport {
     private const val MAX_FILENAME = 120
+    private const val MAX_FILENAME_BYTES = 230 // GNOME S-5 guard: leave room for the extension and provider suffix.
     private val whitespace = Regex("[\\s\\p{Z}]+")
     private val leadingNumber = Regex("^([0-9]+)\\.")
 
@@ -73,8 +74,21 @@ object MarkdownExport {
         val replaced = title.map {
             if (it == '/' || it == '\\' || Character.isISOControl(it)) '-' else it
         }.joinToString("").trim()
-        val codePoints = replaced.codePointCount(0, replaced.length).coerceAtMost(MAX_FILENAME)
-        val stem = replaced.substring(0, replaced.offsetByCodePoints(0, codePoints)).ifEmpty { untitled }
+        val stem = buildString {
+            var offset = 0
+            var characters = 0
+            var bytes = 0
+            while (offset < replaced.length && characters < MAX_FILENAME) {
+                val codePoint = replaced.codePointAt(offset)
+                val next = String(Character.toChars(codePoint))
+                val width = next.toByteArray(Charsets.UTF_8).size
+                if (bytes + width > MAX_FILENAME_BYTES) break
+                append(next)
+                bytes += width
+                characters++
+                offset += Character.charCount(codePoint)
+            }
+        }.ifEmpty { untitled }
         return "$stem.md"
     }
 }

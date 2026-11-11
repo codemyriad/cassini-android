@@ -129,7 +129,9 @@ class MarkdownExportTest {
         assertEquals("A-B-C.md", MarkdownExport.filename(" A/B\\C ", "Untitled meeting"))
         assertEquals("Untitled meeting.md", MarkdownExport.filename("  ", "Untitled meeting"))
         val name = MarkdownExport.filename("😀".repeat(121), "Untitled meeting").removeSuffix(".md")
-        assertEquals(120, name.codePointCount(0, name.length))
+        assertEquals(57, name.codePointCount(0, name.length))
+        assertTrue(name.toByteArray(Charsets.UTF_8).size <= 230)
+        assertEquals("a".repeat(120) + ".md", MarkdownExport.filename("a".repeat(121), "Untitled meeting"))
     }
 
     @Test fun languageAndClockLocaleAreIndependentWithoutGlobalMutation() {
