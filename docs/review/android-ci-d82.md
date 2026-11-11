@@ -57,6 +57,14 @@ These tasks overlap, so their durations must not be summed as wall time. UI unit
 
 The refreshed sample contains successful runs [43034795891](https://github.com/codemyriad/cassini-android/actions/runs/43034795891), [43030649824](https://github.com/codemyriad/cassini-android/actions/runs/43030649824), [43033470789](https://github.com/codemyriad/cassini-android/actions/runs/43033470789) and [43020103181](https://github.com/codemyriad/cassini-android/actions/runs/43020103181). The last uses attempt 2; the others use attempt 1. All four builds and API matrices used GitHub-hosted runners. One run's static/core jobs used self-hosted runners, so those observations are kept outside the hosted ranking. These runs have different source changes and cache histories; they are not a controlled before/after benchmark.
 
+### Cache write policy
+
+The build's explicit cache-read-only condition checked only the runner. On GitHub-hosted pull requests it became false, overriding the action's default branch restriction. The [pinned action definition](https://github.com/gradle/actions/blob/8da46b539cd8fe6ab27ca75128919a18d757604c/setup-gradle/action.yml) confirms that read-only restores existing entries without saving them; its default restricts writes to the default branch. [Gradle's cache documentation](https://github.com/gradle/actions/blob/main/docs/setup-gradle.md#using-the-cache-read-only) explains that a PR's merge-ref cache is reusable only by that PR.
+
+A cache inventory snapshot contained four PR-scoped Gradle entries totalling 5,778,299,237 bytes. They used the same two dependency keys across PRs 166, 169 and 170. These copies consume quota, while their merge-ref scope prevents reuse by other PRs. The diagnostic candidate restored an exact cache hit and skipped saving; the fix prevents new PR copies on cache misses. It does not delete existing caches or claim an immediate wall-time saving.
+
+The build now writes the Gradle home only on GitHub-hosted main. PRs, tags, other refs and self-hosted jobs remain read-only; other jobs remain readers. The runner-selection guard enforces both the single main writer and these exclusions. Regression cases reject the old runner-only condition, a branch-only condition, unconditional writes, a missing main writer, and a second writer in static/core jobs.
+
 | Hosted job / step | Samples | Median | Range |
 | --- | ---: | ---: | ---: |
 | build / assembly, unit/conformance tests and lint | 4 | 333 s | 152–456 s |
@@ -72,7 +80,7 @@ The refreshed sample contains successful runs [43034795891](https://github.com/c
 
 The most expensive executed unit-test tasks were UI (median 122.27 s, three executions), app (69.34 s, three) and data (66.32 s, three). Executed core main lint took a median 104.05 s (three), core test lint 71.47 s (three), and app main lint 60.93 s (three). UI main lint executed once at 88.28 s and came from cache three times at 0.040–0.740 s. The UI test task came from cache once at 4.091 s. Combining these cache hits with executions would hide the cost of the work that ran.
 
-The earlier artifact/invocation changes remain the measured waste reduction. This follow-up supplies reproducible task attribution for the remaining build time. A useful next experiment would hold the source and runner fixed while inspecting UI test and core lint cache misses; these observations alone do not justify dropping those checks or tuning worker/heap limits. All four samples' retained memory counters have zero OOM-kill increase. Their peak counters already include preparation work before Gradle, so a peak is not a JVM heap measurement.
+The earlier artifact/invocation changes remain the measured transfer reduction. This follow-up prevents unnecessary PR cache writes and supplies reproducible task attribution for the remaining build time. A useful next experiment would hold the source and runner fixed while inspecting UI test and core lint cache misses; these observations alone do not justify dropping those checks or tuning worker/heap limits. All four samples' retained memory counters have zero OOM-kill increase. Their peak counters already include preparation work before Gradle, so a peak is not a JVM heap measurement.
 
 ### Collect and reproduce
 
@@ -92,4 +100,4 @@ python3 -I scripts/profile-ci-reports.py evidence/43034795891
 
 Pass several run directories to combine observations. Reports label whether artifact metadata was checked; handcrafted inputs without it remain usable but are not marked checked. With metadata supplied, a wrong run, head, attempt, expired artifact or artifact outside the build window fails. Incomplete job pagination, duplicate runs, failed builds/tasks and missing task tables/profiles also fail.
 
-Fixture tests cover parsing, ranking, overlapping module exclusion, host/cache separation and the CLI layout, plus provenance and incomplete-input refusal. Mutations that merge cache states or runner types, include module totals, accept failed builds, duplicate a run, or accept an artifact outside its build window must fail the corresponding regression. No test, lint, ABI, API, model or coverage setting changes in this follow-up; full Android CI validates the PR.
+Fixture tests cover parsing, ranking, overlapping module exclusion, host/cache separation and the CLI layout, plus provenance and incomplete-input refusal. Mutations that merge cache states or runner types, include module totals, accept failed builds, duplicate a run, or accept an artifact outside its build window must fail the corresponding regression. Test, lint, ABI, API, model and coverage settings remain unchanged; only cache-write eligibility changes. Full Android CI validates the PR.
