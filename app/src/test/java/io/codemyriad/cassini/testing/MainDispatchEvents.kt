@@ -9,6 +9,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.InternalCoroutinesApi
 import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.android.asCoroutineDispatcher
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
@@ -31,17 +32,26 @@ class MainDispatchEvents : ExternalResource() {
 
     override fun after() = Dispatchers.resetMain()
 
-    /** Drains actual main work, then suspends for a post or Compose snapshot apply; [timeoutMs] only bounds a hung test. */
-    fun await(timeoutMs: Long, condition: () -> Boolean) = runBlocking {
+    /**
+     * Drains main work, then suspends for a post or snapshot apply. [advanceTimers] runs scheduled Android timers
+     * at their virtual deadlines for Compose predicates. [timeoutMs] only bounds a hung test.
+     */
+    fun await(timeoutMs: Long, advanceTimers: Boolean = false, condition: () -> Boolean) = runBlocking {
         val snapshots = Snapshot.registerApplyObserver { _, _ -> posted.update { it + 1 } }
         try {
             withTimeout(timeoutMs) {
                 while (true) {
+                    ensureActive()
                     val revision = posted.value
                     shadowOf(Looper.getMainLooper()).idle()
                     if (condition()) return@withTimeout
-                    // Posts and snapshot applies during the check are retained.
-                    posted.first { it != revision }
+                    val looper = shadowOf(Looper.getMainLooper())
+                    if (advanceTimers && !looper.nextScheduledTaskTime.isZero) {
+                        looper.runToNextTask()
+                    } else {
+                        // Posts and snapshot applies during the check are retained.
+                        posted.first { it != revision }
+                    }
                 }
             }
         } finally {

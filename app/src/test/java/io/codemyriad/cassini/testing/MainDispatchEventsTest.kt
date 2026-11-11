@@ -1,5 +1,6 @@
 package io.codemyriad.cassini.testing
 
+import android.os.Handler
 import android.os.Looper
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.Snapshot
@@ -87,7 +88,15 @@ class MainDispatchEventsTest {
         }
     }
 
+    @Test fun aScheduledAndroidTimerRunsAtItsVirtualDeadline() {
+        var delivered = false
+        Handler(Looper.getMainLooper()).postDelayed({ delivered = true }, TIMER_MS)
+        mainDispatches.await(TIMEOUT_MS, advanceTimers = true) { delivered }
+        assertTrue(delivered)
+    }
+
     private companion object {
         const val TIMEOUT_MS = 20_000L
+        const val TIMER_MS = 300L
     }
 }

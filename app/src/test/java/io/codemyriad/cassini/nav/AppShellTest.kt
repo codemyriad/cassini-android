@@ -275,7 +275,8 @@ class AppShellTest {
      * applications. The synchronized semantics query drains pending composition and layout work.
      */
     private fun waitUntilNodes(matcher: SemanticsMatcher, condition: (List<SemanticsNode>) -> Boolean) =
-        mainEvents.await(TIMEOUT_MS) {
+        mainEvents.await(TIMEOUT_MS, advanceTimers = true) {
+            rule.mainClock.advanceTimeByFrame()
             condition(rule.onAllNodes(matcher).fetchSemanticsNodes())
         }
 
