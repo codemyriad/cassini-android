@@ -27,10 +27,15 @@ class RecordedTimeMigrationTest {
                 "INSERT INTO notes ($columns) VALUES " +
                     "('own','Own recording',6,7,'RECORDED','capture.opus','PLAIN',8,0,0,'[]',0,'keep',10)",
             )
+            db.execSQL(
+                "INSERT INTO notes ($columns) VALUES " +
+                    "('old-own-doc','Legacy own document',12,13,'RECORDED','document.opus','DOCUMENT',3,0,0,'[]',0,'cached',14)",
+            )
         }
         helper.runMigrationsAndValidate("recorded-time-migration", 2, true, CassiniDatabase.MIGRATION_1_2).use { db ->
             db.query(
-                "SELECT title,created_at,document_signature,recorded_at,capture_started_at FROM notes ORDER BY id",
+                "SELECT title,created_at,document_signature,recorded_at,capture_started_at " +
+                    "FROM notes WHERE id IN ('doc','own') ORDER BY id",
             ).use { rows ->
                 rows.moveToFirst()
                 assertEquals("Keep title", rows.getString(0))
@@ -43,6 +48,11 @@ class RecordedTimeMigrationTest {
                 assertEquals("keep", rows.getString(2))
                 assertEquals(6L, rows.getLong(4))
                 org.junit.Assert.assertTrue(rows.isNull(3))
+            }
+            db.query("SELECT capture_started_at,created_at FROM notes WHERE id = 'old-own-doc'").use { rows ->
+                rows.moveToFirst()
+                org.junit.Assert.assertTrue("never promote an old document's seal time", rows.isNull(0))
+                assertEquals(12L, rows.getLong(1))
             }
         }
     }

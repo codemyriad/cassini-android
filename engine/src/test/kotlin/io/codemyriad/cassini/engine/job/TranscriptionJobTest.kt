@@ -585,8 +585,9 @@ class TranscriptionJobTest {
         assertEquals(before, sha256(h.audio))
         val sealed = h.sealed()
         assertEquals(1, sealed.variants.size)
-        assertFalse(sealed.manifest!!.getJSONObject("meeting").has("recordedAtLocal"))
-        assertFalse(sealed.manifest.getJSONObject("meeting").has("recordedAtUtc"))
+        val freshMeeting = checkNotNull(sealed.manifest).getJSONObject("meeting")
+        assertFalse(freshMeeting.has("recordedAtLocal"))
+        assertFalse(freshMeeting.has("recordedAtUtc"))
         assertNull(sealed.meetingTime)
         assertEquals(70, sealed.selected(null)!!.transcript!!.words.size)
         val meeting = { doc: CassiniDocument -> doc.manifest!!.getJSONObject("meeting").getString("id") }

@@ -171,6 +171,8 @@ class AppGraphTest {
             storage.withNoteLockBlocking(id) {
                 assertNull(storage.existingDocumentBlocking(id))
                 val title = storage.titleBlocking(id)
+                val start = storage.recordedAtUtcBlocking(id)
+                assertEquals(java.time.Instant.ofEpochMilli(1_000), start)
                 CassiniDocument.create(
                     audio,
                     Transcript(listOf(Word("S1", 0, 400, "hello"), Word("S2", 500, 900, "so"))),
@@ -179,10 +181,12 @@ class AppGraphTest {
                     null,
                     named.labels,
                     storage.sealTarget(id),
+                    recordedAtUtc = start,
                 )
             }.also { storage.markSealedBlocking(id, it) }
         }
         assertEquals(DocumentState.OK, sealed.documentState)
+        assertEquals(1_000L, sealed.meetingTime?.instant?.toEpochMilli())
         storage.adopt(id, Adoption(named.labels, emptyMap(), generation = 0, finalizationMs = 1_234))
 
         val row = requireNotNull(catalogue.database.notes().note(id))

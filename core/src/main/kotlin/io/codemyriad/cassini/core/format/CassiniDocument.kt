@@ -277,6 +277,7 @@ data class CassiniDocument(
             writeWithTags(audio, comments, digest, target)
             return read(target).also { verify(it, transcript) }
         }
+
         /** Fill a trusted own capture start on export, retaining identity, audio and variant bodies. */
         fun withRecordedAtUtc(source: File, existing: CassiniDocument, start: Instant, target: File): CassiniDocument {
             require(existing.documentState == DocumentState.OK && existing.manifest != null)
