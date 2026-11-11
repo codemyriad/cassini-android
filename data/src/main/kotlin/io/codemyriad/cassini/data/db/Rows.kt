@@ -16,8 +16,10 @@ import io.codemyriad.cassini.core.library.PauseReason
 internal object Sql {
     /** The readable variant shown for note `n`: explicit selection, else readable default, else first readable. */
     const val SELECTED_VARIANT =
-        "(SELECT d.variant_id FROM variants d WHERE d.note_id = n.id AND d.readable = 1 " +
-            "ORDER BY CASE WHEN d.variant_id = n.selected_variant THEN 0 ELSE 1 END, d.is_default DESC, d.ordinal LIMIT 1)"
+        "COALESCE((SELECT s.variant_id FROM variants s WHERE s.note_id = n.id " +
+            "AND s.variant_id = n.selected_variant AND s.readable = 1), " +
+            "(SELECT d.variant_id FROM variants d WHERE d.note_id = n.id AND d.readable = 1 " +
+            "ORDER BY d.is_default DESC, d.ordinal LIMIT 1))"
 
     /** The [LibraryRow] columns. */
     const val LIBRARY_COLUMNS =
