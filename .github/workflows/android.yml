@@ -22,7 +22,7 @@ concurrency:
 jobs:
   checks:
     name: Wrapper, detekt, actionlint, shellcheck, ruff, links, fonts and the verbatim diff
-    runs-on: ${{ vars.CM_RUNNER == 'hetzner' && !startsWith(github.ref, 'refs/tags/') && fromJSON('["self-hosted","cm-hetzner"]') || 'ubuntu-24.04' }}
+    runs-on: ${{ (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)) && !startsWith(github.ref, 'refs/tags/') && vars.CM_RUNNER == 'hetzner' && fromJSON('["self-hosted","cm-hetzner"]') || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -91,7 +91,7 @@ jobs:
   # The :core module needs only a JDK: no Android SDK, NDK, sherpa-onnx AAR or Opus source.
   core-only:
     name: Engine tests with a JDK alone
-    runs-on: ${{ vars.CM_RUNNER == 'hetzner' && !startsWith(github.ref, 'refs/tags/') && fromJSON('["self-hosted","cm-hetzner"]') || 'ubuntu-24.04' }}
+    runs-on: ${{ (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)) && !startsWith(github.ref, 'refs/tags/') && vars.CM_RUNNER == 'hetzner' && fromJSON('["self-hosted","cm-hetzner"]') || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -120,9 +120,9 @@ jobs:
           if-no-files-found: ignore
 
   build:
-    # CM_RUNNER=hetzner moves this job to the cm-hetzner runners, never on a tag: tag builds restore the release
-    # signing key (below) and only run GitHub-hosted. scripts/check-runner-selection.py checks every runs-on.
-    runs-on: ${{ vars.CM_RUNNER == 'hetzner' && !startsWith(github.ref, 'refs/tags/') && fromJSON('["self-hosted","cm-hetzner"]') || 'ubuntu-24.04' }}
+    # CM_RUNNER=hetzner moves trusted runs (push, schedule, workflow_dispatch, or same-repo PR) to cm-hetzner, never on
+    # a tag: tag builds restore the release signing key (below) and only run GitHub-hosted. scripts/check-runner-selection.py checks every runs-on.
+    runs-on: ${{ (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)) && !startsWith(github.ref, 'refs/tags/') && vars.CM_RUNNER == 'hetzner' && fromJSON('["self-hosted","cm-hetzner"]') || 'ubuntu-24.04' }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

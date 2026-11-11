@@ -556,14 +556,17 @@ All runs restore the caches (the native runtime, the pinned source archives, Rob
 
 ### Runners
 
-Every job runs on GitHub-hosted runners unless the repository variable `CM_RUNNER` is exactly `hetzner`. Then
-`checks`, `core-only`, `build` and `native` run on the self-hosted `cm-hetzner` runners (scale-to-zero Hetzner Cloud
-hosts, one fresh container per job; operated from codemyriad/systems, `systems/codemyriad/gha-runners/scaler/`).
-**Tag builds never move:** they restore the release signing key, so on a tag ref those jobs stay on `ubuntu-24.04`,
-like `emulator` (no KVM on the cloud hosts), `release` and `play` always do. Any other value of the variable (unset,
-empty, a typo, JSON) also keeps `ubuntu-24.04`: the runner labels are a constant in the workflow and the variable is
-never parsed. To switch: `gh variable set CM_RUNNER --body hetzner` or `gh variable delete CM_RUNNER`.
-`scripts/check-runner-selection.py` (run by `checks`) evaluates these rules for every job.
+Every job runs on GitHub-hosted runners unless the repository variable `CM_RUNNER` is exactly `hetzner` and the
+triggering event is in the trusted allow-list (`push`, `schedule`, `workflow_dispatch`, or a same-repo `pull_request`
+where `head.repo.full_name == github.repository`). Then `checks`, `core-only`, `build` and `native` run on the
+self-hosted `cm-hetzner` runners (scale-to-zero Hetzner Cloud hosts, one fresh container per job; operated from
+codemyriad/systems, `systems/codemyriad/gha-runners/scaler/`). **Tag builds and fork pull requests never move:** tag
+builds restore the release signing key, and fork pull requests run untrusted code, so both stay on `ubuntu-24.04`,
+like `emulator` (no KVM on the cloud hosts), `release`, `play`, and any unallowlisted event always do. Any other value
+of the variable (unset, empty, a typo, JSON) also keeps `ubuntu-24.04`: the runner labels are a constant in the
+workflow and the variable is never parsed. To switch: `gh variable set CM_RUNNER --body hetzner` or
+`gh variable delete CM_RUNNER`. `scripts/check-runner-selection.py` (run by `checks`) evaluates these rules for every
+job.
 
 ### android.yml
 
