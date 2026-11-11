@@ -1,6 +1,7 @@
 package io.codemyriad.cassini.baselineprofile
 
 import android.app.UiAutomation
+import android.os.Bundle
 import android.view.accessibility.AccessibilityNodeInfo
 import androidx.benchmark.macro.junit4.BaselineProfileRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -71,9 +72,10 @@ class BaselineProfileGenerator {
     }
 
     private fun playBriefly(device: UiDevice) {
-        val play = checkNotNull(device.findObject(By.desc(PLAY))) { "The note has no Play control" }
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
-        awaitPlaybackProgress(device, automation, TIMEOUT_MS, play::click)
+        awaitPlaybackProgress(device, automation, TIMEOUT_MS) {
+            checkNotNull(device.findObject(By.desc(PLAY))) { "The note has no Play control" }.click()
+        }
         device.findObject(By.desc(PAUSE))?.click()
     }
 
@@ -104,33 +106,59 @@ class BaselineProfileGenerator {
 
 /** Runs the player until two seconds of audio have advanced, or until it reaches the end of a shorter note. */
 internal fun awaitPlaybackProgress(device: UiDevice, automation: UiAutomation, timeoutMs: Long, play: () -> Unit) {
-    val start = checkNotNull(device.wait(object : Condition<UiDevice, PlaybackPosition?> {
-        override fun apply(device: UiDevice): PlaybackPosition? = playbackPosition(automation.rootInActiveWindow)
-    }, timeoutMs)) { "The player has no Position range" }
-    val from = if (start.current < start.end) start.current else 0f
-    val target = minOf(from + PROFILE_AUDIO_MS, start.end)
-    var moved = false
-    play()
-    // The slider exposes its range on demand. Position ticks do not each send an accessibility event.
-    val reached = device.wait(object : Condition<UiDevice, Boolean> {
-        override fun apply(device: UiDevice): Boolean {
-            val position = playbackPosition(automation.rootInActiveWindow) ?: return false
-            if (position.current != start.current) moved = true
-            return moved && position.current >= target
-        }
-    }, timeoutMs)
-    check(reached == true) { "Playback did not reach $target ms" }
+    awaitPlaybackProgress(
+        seekToStart = {
+            val accepted = withPositionNode(automation.rootInActiveWindow) { node ->
+                val arguments = Bundle().apply {
+                    putFloat(AccessibilityNodeInfo.ACTION_ARGUMENT_PROGRESS_VALUE, 0f)
+                }
+                node.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_PROGRESS.id, arguments)
+            }
+            check(accepted == true) { "The player did not accept seeking to zero" }
+        },
+        play = play,
+        awaitPosition = { message, matches ->
+            // Position ticks do not each send an accessibility event, so query the slider's current range.
+            checkNotNull(device.wait(object : Condition<UiDevice, PlaybackPosition?> {
+                override fun apply(device: UiDevice): PlaybackPosition? =
+                    withPositionNode(automation.rootInActiveWindow) { node ->
+                        node.rangeInfo?.let { PlaybackPosition(it.current, it.max) }
+                    }?.takeIf(matches)
+            }, timeoutMs)) { message }
+        },
+    )
 }
 
-private data class PlaybackPosition(val current: Float, val end: Float)
+internal fun awaitPlaybackProgress(
+    seekToStart: () -> Unit,
+    play: () -> Unit,
+    awaitPosition: (String, (PlaybackPosition) -> Boolean) -> PlaybackPosition,
+) {
+    var start = awaitPosition("The player has no Position range") { true }
+    if (start.current >= start.end) {
+        seekToStart()
+        start = awaitPosition("The player did not seek to zero") { it.current == 0f }
+    }
+    val target = minOf(start.current + PROFILE_AUDIO_MS, start.end)
+    var moved = false
+    play()
+    awaitPosition("Playback did not reach $target ms") { position ->
+        if (position.current != start.current) moved = true
+        moved && position.current >= target
+    }
+}
+
+internal data class PlaybackPosition(val current: Float, val end: Float)
 
 @Suppress("DEPRECATION") // AccessibilityNodeInfo.recycle is needed on API 28–32.
-private fun playbackPosition(node: AccessibilityNodeInfo?): PlaybackPosition? {
+private fun <T : Any> withPositionNode(node: AccessibilityNodeInfo?, use: (AccessibilityNodeInfo) -> T?): T? {
     node ?: return null
     return try {
-        val range = if (node.contentDescription?.toString() == "Position" && node.refresh()) node.rangeInfo else null
-        range?.let { PlaybackPosition(it.current, it.max) }
-            ?: (0 until node.childCount).firstNotNullOfOrNull { playbackPosition(node.getChild(it)) }
+        if (node.contentDescription?.toString() == "Position" && node.refresh() && node.rangeInfo != null) {
+            use(node)
+        } else {
+            (0 until node.childCount).firstNotNullOfOrNull { withPositionNode(node.getChild(it), use) }
+        }
     } finally {
         node.recycle()
     }
