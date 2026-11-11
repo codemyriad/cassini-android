@@ -168,9 +168,10 @@ class DownloadTests(unittest.TestCase):
 
     def test_gradle_info_is_keyed_by_committed_wrapper_checksum(self):
         info = DOWNLOADS.gradle_info()
-        self.assertEqual(info['checksum'], '21bd5da2de49b642904077f38c0efdc7778e92b3ed0889392dca61b97e389607')
-        self.assertTrue(info['cache_key'].endswith(info['checksum']))
-        self.assertEqual(info['archive'].name, 'gradle-9.8.2-bin.zip')
+        properties = DOWNLOADS.read_properties(DOWNLOADS.ROOT / 'gradle/wrapper/gradle-wrapper.properties')
+        self.assertEqual(info['checksum'], properties['distributionSha256Sum'])
+        self.assertEqual(info['cache_key'], f"cassini-gradle-zip-v1-{info['version']}-{info['checksum']}")
+        self.assertEqual(info['archive'].name, properties['distributionUrl'].rsplit('/', 1)[1])
 
     def distribution(self, root):
         checksum = hashlib.sha256(b'pinned distribution').hexdigest()

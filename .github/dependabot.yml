@@ -9,21 +9,6 @@ updates:
         patterns: ["androidx.*"]
       kotlin:
         patterns: ["org.jetbrains.kotlin*", "com.google.devtools.ksp"]
-    # AGP 9.5 waits for the move to built-in Kotlin: its lint fails on
-    # lifecycle 2.11.0's lint checks in :ui, and it deprecates the
-    # org.jetbrains.kotlin.android plugin (libs.versions.toml, agp note).
-    # Dependabot names AGP by its plugin ids in the version catalog.
-    ignore:
-      - dependency-name: "com.android.application"
-        versions: ["9.5.x"]
-      - dependency-name: "com.android.library"
-        versions: ["9.5.x"]
-      - dependency-name: "com.android.test"
-        versions: ["9.5.x"]
-      - dependency-name: "com.android.lint"
-        versions: ["9.5.x"]
-      - dependency-name: "com.android.tools.build:gradle"
-        versions: ["9.5.x"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
