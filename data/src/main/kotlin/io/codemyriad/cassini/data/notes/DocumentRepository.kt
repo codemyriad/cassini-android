@@ -368,7 +368,9 @@ class DocumentRepository(
                 request.format == TranscriptFormat.MARKDOWN && request.markdown == null -> ExportOutcome.NotAvailable
                 variantId == null || variants.none { it.variantId == variantId } -> ExportOutcome.NotAvailable
                 else -> {
-                    val words = cache.wordsBlocking(noteId, variantId).map { Word(it.speaker, it.startMs, it.endMs, it.text) }
+                    val words = cache.wordsBlocking(noteId, variantId).map {
+                        Word(it.speaker, it.startMs, it.endMs, it.text)
+                    }
                     val transcript = ExportTranscript(
                         row.title,
                         row.durationMs,

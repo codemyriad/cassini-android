@@ -72,7 +72,14 @@ class MarkdownExportTest {
     }
 
     @Test fun allSixD84VectorsKeepTheExpectedParagraphsHeadersAndInlineReplies() {
-        val fixtures = listOf("acknowledgment", "brief-reply", "competing", "monologue", "overlapping-turns", "seam-gap")
+        val fixtures = listOf(
+            "acknowledgment",
+            "brief-reply",
+            "competing",
+            "monologue",
+            "overlapping-turns",
+            "seam-gap",
+        )
         for (fixture in fixtures) {
             val words = Transcript.fromJson(interjection("$fixture.words.json")).words
             val expected = JSONObject(interjection("$fixture.expected.json")).getJSONArray("rows")
@@ -88,10 +95,20 @@ class MarkdownExportTest {
                     val stored = member.getString("text")
                     // These pinned fixtures contain no Markdown metacharacters; S-5 covers escaping separately.
                     assertFalse(stored.any { c -> c in "\\`*_[]<>" })
-                    if (member.getString("kind") == "interjection") "(${member.getString("speaker")}: $stored)" else stored
+                    if (member.getString("kind") == "interjection") {
+                        "(${member.getString("speaker")}: $stored)"
+                    } else {
+                        stored
+                    }
                 }
                 val seconds = row.getLong("startMs") / 1000
-                val stamp = String.format(Locale.ROOT, "%02d:%02d:%02d", seconds / 3600, seconds / 60 % 60, seconds % 60)
+                val stamp = String.format(
+                    Locale.ROOT,
+                    "%02d:%02d:%02d",
+                    seconds / 3600,
+                    seconds / 60 % 60,
+                    seconds % 60,
+                )
                 val name = if (row.getBoolean("continuation")) "" else "**${row.getString("speaker")}** · "
                 val over = row.getJSONArray("over")
                 val names = (0 until over.length()).map(over::getString)
@@ -180,7 +197,8 @@ class MarkdownExportTest {
         }
     }
 
-    private fun interjection(name: String): String = requireNotNull(javaClass.getResource("/interjections/$name")).readText()
+    private fun interjection(name: String): String =
+        requireNotNull(javaClass.getResource("/interjections/$name")).readText()
 
     private fun resource(name: String): String = requireNotNull(javaClass.getResource("/markdown/$name")).readText()
 
