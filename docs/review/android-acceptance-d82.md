@@ -4,7 +4,7 @@ The unmodified-main API 35 walk at `d17cdecf` failed four of its six test invoca
 
 ## Saved voices and Trash
 
-The Settings test matched the Saved voices title as a substring of any clickable row, then clicked the first match. In Italian, a model row's explanatory subtitle can contain that same text. The test now matches the exact localized row title and requires a unique matching node. Trash uses the same exact-title rule. Production Settings rows are unchanged.
+The Settings test used substring/first-match selection and tapped Saved voices without scrolling it into view. Italian places that row below the taller model cards, so its coordinate click did not open Saved voices. The test now matches the exact localized row title and requires a unique matching node. The Saved voices row is scrolled into view before tapping: its Italian layout places it below the model cards. Trash uses the same exact-title rule. Production Settings rows are unchanged.
 
 ## Optional model download
 
@@ -18,7 +18,7 @@ If an assertion fails while the scripted fetcher is held at a progress state, te
 
 ## Initial navigation
 
-Catalog readiness can precede the first Library frame. Setup now waits for the Library Import action before the journey can use Back navigation. This prevents a late initial frame from making the helper press Back out of the activity. The helper also waits for a positive Library indicator or a labeled Back control on a child screen before navigating. It no longer treats a 200 ms absence of Library semantics as a reason to press Back. These waits use the existing UI event observer and settled Compose semantics, so the outgoing screen's Back control cannot trigger a second click during a navigation transition.
+Catalog readiness can precede the first Library frame. Setup now waits for the Library Import action before the journey can use Back navigation. This prevents a late initial frame from making the helper press Back out of the activity. The helper also waits for a positive Library indicator or a labeled Back control on a child screen before navigating. It no longer treats a 200 ms absence of Library semantics as a reason to press Back. These waits use the existing UI event observer and settled Compose semantics, so the outgoing screen's Back control cannot trigger a second click during a navigation transition. The identified Back control uses its semantic action because Settings retains its scroll position after visiting Trash; its header can be off screen.
 
 ## Validation
 
@@ -29,7 +29,7 @@ The restored standalone download journey passes with all six screenshots. Three 
 | Control | Observed failure |
 | --- | --- |
 | Note Transcribe instead of the optional Settings download | Download consent is absent; the included model remains usable. |
-| Substring/first-match Saved voices selection | Italian opens the wrong Settings row; Anna Ricci is absent and only 11 of 13 model-walk screenshots are collected. |
+| Original Saved voices lookup without scrolling | Italian does not open Saved voices; Anna Ricci is absent and only 11 of 13 model-walk screenshots are collected. |
 | Checking-banner explanatory body on the standalone progress card | The nonexistent body fails its assertion; cleanup releases the held fetcher and reports the failure. |
 
 All three controls fail at their intended assertion without a process crash. Clean source and APKs are restored before the final full walk. The PR records the completed full-walk result and exact-head CI gate; readiness requires every invocation and all 57 screenshots. Run the walk with `scripts/acceptance-walk.sh --serial <owned API 35 emulator>` after preparing the committed public audio fixtures and installing the pinned public models. Use debug APKs with `adb install -r`; never uninstall or clear app data.

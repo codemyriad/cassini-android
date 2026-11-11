@@ -398,7 +398,7 @@ class AcceptanceWalkTest {
 
         val voices = hasText(rule.text(UiR.string.ui_settings_voices)) and hasClickAction()
         rule.waitShown(voices)
-        rule.onNode(voices).performClick()
+        rule.onNode(voices).performScrollTo().performClick()
         see(ANNA)
         see(PAOLO)
         see(rule.text(UiR.string.ui_voices_privacy))
@@ -529,7 +529,7 @@ class AcceptanceWalkTest {
                 atLibrary || nodes.any(back::matches)
             }
             if (atLibrary) return
-            rule.onNode(back).performClick()
+            rule.onNode(back).performSemanticsAction(SemanticsActions.OnClick)
         }
         rule.waitShown(library)
     }
