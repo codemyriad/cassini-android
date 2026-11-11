@@ -4,16 +4,21 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.core.net.toUri
 import io.codemyriad.cassini.MainActivity
 import io.codemyriad.cassini.R
 import io.codemyriad.cassini.background.Background
 import io.codemyriad.cassini.data.notes.ImportSummary
 import io.codemyriad.cassini.flows.Flows.awaitUi
+import io.codemyriad.cassini.flows.Flows.waitShown
 import io.codemyriad.cassini.test.CiSmoke
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -72,6 +77,27 @@ class BulkTransferDeviceTest {
         }
         awaitAllEnabled(false)
         rule.onNodeWithText(context.getString(R.string.common_cancel)).performClick()
+    }
+
+    @Test fun anImportSummaryRemainsVisibleWhenTheExportHeaderIsDisposed() {
+        val graph = Flows.graph
+        val title = runBlocking {
+            repeat(20) { index -> Background.import(Flows.meetingDocument("Scroll note $index")) }
+            graph.awaitCatalogue().notes.library().first().last().title
+        }
+        val last = hasContentDescription(title, substring = true)
+        rule.waitShown(hasScrollToNodeAction())
+        rule.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(last)
+        val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+        rule.onNodeWithText(context.getString(R.string.export_zip_all)).assertDoesNotExist()
+
+        // The pinned Import action uses this same process-scoped transfer while the lazy header is absent.
+        graph.transfers.import(listOf(Background.assetCopy("fleurs-it-short.wav").toUri()))
+        runBlocking { withTimeout(20_000) { graph.transfers.state.first { !it.running } } }
+        val summary = context.resources.getQuantityString(R.plurals.import_summary_imported, 1, 1)
+        rule.waitShown(hasText(summary))
+        rule.onNodeWithText(summary).assertIsDisplayed()
+        rule.onNodeWithText(context.getString(R.string.common_done)).performClick()
     }
 
     @Test fun multipleImportsShowTheirSummaryAndExportOriginalAudio() {

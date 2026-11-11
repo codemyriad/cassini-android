@@ -27,7 +27,6 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.codemyriad.cassini.R
 import io.codemyriad.cassini.data.notes.ArchiveFailure
 import io.codemyriad.cassini.data.notes.ImportSummary
@@ -35,34 +34,35 @@ import io.codemyriad.cassini.ui.R as UiR
 
 /** The explicit selector keeps bulk selection separate from a row's Open/long-press actions. */
 @Composable
-fun BulkTransferControls(transfers: BulkTransfers) {
-    val state by transfers.state.collectAsStateWithLifecycle()
+fun BulkTransferControls(
+    transfers: BulkTransfers,
+    state: BulkTransfers.TransferState,
+    loaded: List<BulkTransfers.Choice>?,
+    content: @Composable (enabled: Boolean, onExport: () -> Unit) -> Unit,
+) {
     var choosing by rememberSaveable { mutableStateOf(false) }
     var selected by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
     var selectionInitialized by rememberSaveable { mutableStateOf(false) }
-    val choices by transfers.available.collectAsStateWithLifecycle(initialValue = emptyList())
+    val choices = loaded.orEmpty()
     val save = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
         if (uri != null) transfers.export(selected, uri)
     }
-    LaunchedEffect(choosing, choices) {
+    LaunchedEffect(choosing, loaded) {
+        val current = loaded ?: return@LaunchedEffect
         if (choosing) {
             if (!selectionInitialized) {
-                selected = ArrayList(choices.map { it.id })
+                selected = ArrayList(current.map { it.id })
                 selectionInitialized = true
             } else {
-                val valid = choices.map { it.id }.toSet()
+                val valid = current.map { it.id }.toSet()
                 selected = selected.filter { it in valid }
             }
         }
     }
-    TextButton(
-        onClick = {
-            selectionInitialized = false
-            choosing = true
-        },
-        enabled = !state.running && choices.isNotEmpty(),
-        colors = ButtonDefaults.textButtonColors(disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant),
-    ) { Text(stringResource(R.string.export_zip_all)) }
+    content(!state.running && choices.isNotEmpty()) {
+        selectionInitialized = false
+        choosing = true
+    }
     if (choosing) {
         AlertDialog(
             onDismissRequest = { choosing = false },
@@ -90,6 +90,16 @@ fun BulkTransferControls(transfers: BulkTransfers) {
     if (state != BulkTransfers.TransferState()) {
         TransferResult(state, transfers)
     }
+}
+
+/** Only this inline trigger belongs in the Library's disposable lazy-list item. */
+@Composable
+fun BulkExportButton(enabled: Boolean, onClick: () -> Unit) {
+    TextButton(
+        onClick = onClick,
+        enabled = enabled,
+        colors = ButtonDefaults.textButtonColors(disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+    ) { Text(stringResource(R.string.export_zip_all)) }
 }
 
 @Composable

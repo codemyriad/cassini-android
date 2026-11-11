@@ -24,6 +24,8 @@ The destination opens first. One note is copied under its writer lock to a priva
 
 The live selector excludes active captures, unplayable notes and missing files. Both All actions are disabled with no exportable choices, including the initial loading state. A real picked batch goes through LibraryViewModel/LibraryPorts and clears a prior single-file import error. Cancelling the picker does neither.
 
+The Library route owns transfer-state and nullable catalogue collection, the export result launcher and all chooser/result dialogs. The lazy header contains only the inline trigger, so scrolling it out cannot dispose progress, cancellation, summaries or a pending destination callback. A null catalogue means loading: restoration retains the saved partial selection until a real catalogue emission can initialize or prune it. A loaded empty list still removes genuinely unavailable choices.
+
 Private staging is removed before completion is published, including cancellation and malformed input. The next process clears interrupted staging before a new transfer. Transfers do not promise resumption after process death. Completed normal imports remain valid if a later file fails or the person cancels.
 
 Task A ownership is preserved: DocumentRepository.kt, CassiniDocument.kt, the format pin and meeting-time semantics are unchanged. AppGraph adds only the transfer binding. Files-provider access remains a separate PR.

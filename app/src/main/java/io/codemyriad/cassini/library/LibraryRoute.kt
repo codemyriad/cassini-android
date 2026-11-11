@@ -18,6 +18,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import io.codemyriad.cassini.nav.SettingsKey
 import io.codemyriad.cassini.nav.TrashKey
+import io.codemyriad.cassini.transfer.BulkExportButton
+import io.codemyriad.cassini.transfer.BulkTransferControls
+import io.codemyriad.cassini.transfer.BulkTransfers
 import io.codemyriad.cassini.ui.library.LibraryScreen
 
 /**
@@ -31,6 +34,8 @@ fun LibraryRoute(viewModel: LibraryViewModel, navigator: LibraryNavigator, modif
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val transfers = (context.applicationContext as io.codemyriad.cassini.CassiniApplication).graph.transfers
+    val transferState by transfers.state.collectAsStateWithLifecycle()
+    val choices: List<BulkTransfers.Choice>? by transfers.available.collectAsStateWithLifecycle(initialValue = null)
     val picker = rememberLauncherForActivityResult(io.codemyriad.cassini.transfer.BulkImportContract()) { uris ->
         viewModel.onPicked(uris.map { it.toString() })
     }
@@ -56,12 +61,15 @@ fun LibraryRoute(viewModel: LibraryViewModel, navigator: LibraryNavigator, modif
         viewModel.onResume()
         onPauseOrDispose { }
     }
-    LibraryScreen(
-        state = state,
-        onEvent = viewModel::onEvent,
-        modifier = modifier,
-        tools = { io.codemyriad.cassini.transfer.BulkTransferControls(transfers) },
-    )
+    // Launchers and dialogs must outlive disposal of the lazy header while the Library is scrolled.
+    BulkTransferControls(transfers, transferState, choices) { enabled, onExport ->
+        LibraryScreen(
+            state = state,
+            onEvent = viewModel::onEvent,
+            modifier = modifier,
+            tools = { BulkExportButton(enabled, onExport) },
+        )
+    }
 }
 
 /** The app's notification settings (API 26+). */
