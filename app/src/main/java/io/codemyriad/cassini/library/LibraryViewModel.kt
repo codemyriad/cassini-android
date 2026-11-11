@@ -126,6 +126,11 @@ class LibraryViewModel(
     private val calendar = combine(ports.calendarZone, calendarRefresh) { zone, _ ->
         Instant.now(clock).atZone(zone).toLocalDate() to zone
     }.distinctUntilChanged()
+    private val environment = combine(controls, calendar) { filters, day ->
+        SearchEnvironment(filters, day.first, day.second)
+    }
+
+    private data class SearchEnvironment(val filters: SearchFiltersUi, val today: LocalDate, val zone: ZoneId)
 
     /** The catalogue cannot be read (the database did not open): the Library says so, it is not empty. */
     private val unavailable = MutableStateFlow(false)
@@ -143,8 +148,8 @@ class LibraryViewModel(
     private val searchedText = query.map { it.trim() }.distinctUntilChanged()
         .debounce { if (it.isEmpty()) 0L else SEARCH_DEBOUNCE_MS }
 
-    private val search: Flow<Pair<String, List<SearchRow>?>> = combine(searchedText, controls, calendar) { text, filters, day ->
-        SearchRequest(text, filters, day.first, day.second)
+    private val search: Flow<Pair<String, List<SearchRow>?>> = combine(searchedText, environment) { text, environment ->
+        SearchRequest(text, environment.filters, environment.today, environment.zone)
     }.flatMapLatest { request ->
         val text = request.text
         if (text.isEmpty()) {
@@ -185,7 +190,7 @@ class LibraryViewModel(
     ) { processing, rec, facts, voices -> Live(processing, rec, facts, voices) }
 
     val state: StateFlow<LibraryUiState> = combine(
-        combine(rows, search, query, unavailable, controls, ::Listing),
+        combine(rows, search, query, unavailable, environment, ::Listing),
         live,
         sheet,
         dialog,
@@ -210,7 +215,7 @@ class LibraryViewModel(
         val search: Pair<String, List<SearchRow>?>,
         val query: String,
         val unavailable: Boolean,
-        val filters: SearchFiltersUi,
+        val environment: SearchEnvironment,
     )
 
     private data class Live(
@@ -228,7 +233,7 @@ class LibraryViewModel(
         snackbar: SnackbarSpec?,
     ): LibraryUiState {
         val now = Instant.now(clock)
-        val zone = clock.zone
+        val zone = listing.environment.zone
         val recording = live.recording
         val context = RowContext(
             activeNoteId = activeNoteId(recording),
@@ -250,7 +255,7 @@ class LibraryViewModel(
         return LibraryUiState(
             loading = listing.rows == null,
             query = listing.query,
-            searchFilters = listing.filters,
+            searchFilters = listing.environment.filters,
             recording = LibraryMapping.recordingPill(recording),
             progress = LibraryMapping.progress(live.processing),
             banners = Notices.library(live.facts, facts),

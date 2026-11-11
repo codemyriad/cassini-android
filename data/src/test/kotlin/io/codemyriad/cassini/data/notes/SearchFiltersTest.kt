@@ -97,8 +97,33 @@ class SearchFiltersTest {
         assertTrue(search("hidden", SearchFilters(speaker = "Chris")).isEmpty())
     }
 
+    @Test fun switchingVariantsAndRenamingCannotReuseTheOldSpeakerMatch() = runTest {
+        val row = note("variants", createdAt = at)
+        val cached = cache(
+            row,
+            listOf("v1" to listOf(Word("S1", 0, 400, "delivery")), "v2" to listOf(Word("S2", 0, 400, "delivery"))),
+        )
+        val speakers = cached.speakers.map { it.copy(label = if (it.speakerId == "S1") "Ada" else "Ben", isPlaceholder = false) }
+        h.db.cache().replaceCache(cached.copy(speakers = speakers))
+        assertEquals(listOf("Ada"), h.notes.namedSpeakers().first())
+        assertEquals(1, search("deliv", SearchFilters(speaker = "Ada")).size)
+        val selected = cache(
+            row,
+            listOf("v1" to listOf(Word("S1", 0, 400, "delivery")), "v2" to listOf(Word("S2", 0, 400, "delivery"))),
+            selected = "v2",
+        )
+        h.db.cache().replaceCache(selected.copy(speakers = speakers))
+        assertEquals(listOf("Ben"), h.notes.namedSpeakers().first())
+        assertTrue(search("deliv", SearchFilters(speaker = "Ada")).isEmpty())
+        assertEquals(1, search("deliv", SearchFilters(speaker = "Ben")).size)
+        h.db.cache().replaceCache(selected.copy(speakers = speakers.map { it.copy(label = "Chris") }))
+        assertEquals(listOf("Chris"), h.notes.namedSpeakers().first())
+        assertTrue(search("deliv", SearchFilters(speaker = "Ben")).isEmpty())
+        assertEquals(1, search("deliv", SearchFilters(speaker = "Chris")).size)
+    }
+
     @Test fun anInlineReplyBelongsToItsSpeakerAndItsDisplayLabelIsNotIndexed() = runTest {
-        val file = java.io.File(System.getProperty("cassini.interjections"), "brief-reply.words.json")
+        val file = java.io.File(System.getProperty("cassini.interjections"), "acknowledgment.words.json")
         val items = org.json.JSONObject(file.readText()).getJSONArray("items")
         val words = (0 until items.length()).map { index ->
             val item = items.getJSONObject(index)

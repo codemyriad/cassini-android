@@ -22,6 +22,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
@@ -92,6 +93,12 @@ class LibraryBehaviourTest {
         assertEvents(
             LibraryEvent.FilterSpeaker("Ben"),
             LibraryEvent.FilterDate(io.codemyriad.cassini.ui.library.SearchDateUi.WEEK),
+        )
+        rule.onNodeWithText("Recorded by me").performScrollTo().performClick()
+        assertEvents(
+            LibraryEvent.FilterSpeaker("Ben"),
+            LibraryEvent.FilterDate(io.codemyriad.cassini.ui.library.SearchDateUi.WEEK),
+            LibraryEvent.ToggleRecordedByMe,
         )
     }
 
