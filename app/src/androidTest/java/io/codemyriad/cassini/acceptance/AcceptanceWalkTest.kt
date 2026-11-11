@@ -121,6 +121,9 @@ class AcceptanceWalkTest {
         }
         shots.deleteRecursively()
         shots.mkdirs()
+        // Activity/VM loading can outlive catalogue readiness; never press Back before the first Library frame.
+        val import = rule.text(UiR.string.ui_library_import)
+        rule.waitShown(hasText(import) or hasContentDescription(import))
     }
 
     @After fun tearDown() {
@@ -450,6 +453,8 @@ class AcceptanceWalkTest {
         )
         val start = hasText(rule.text(UiR.string.ui_models_download)) and hasClickAction()
         rule.onNode(start).performClick()
+        // Standalone consent returns to Settings; progress/error banners belong to Library.
+        library()
 
         see(rule.text(UiR.string.ui_part_downloading_speech, DOWNLOAD_PERCENT), timeoutMs = Flows.JOB_MS)
         shot("10-states-downloading")
