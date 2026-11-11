@@ -1,0 +1,25 @@
+name: Pinned Android NDK
+description: Restore or install the pinned Android NDK with bounded retries and verify it before Gradle runs.
+runs:
+  using: composite
+  steps:
+    - name: Read committed NDK pin and check SDK state
+      id: pin
+      shell: bash
+      run: python3 -I scripts/ci-ndk.py key
+    - name: Restore pinned Android NDK
+      id: restore
+      if: runner.environment == 'github-hosted' && steps.pin.outputs.installed != 'true'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.pin.outputs.path }}
+        key: ${{ steps.pin.outputs.key }}
+    - name: Install and verify pinned Android NDK
+      shell: bash
+      run: python3 -I scripts/ci-ndk.py install
+    - name: Save verified Android NDK from hosted main only
+      if: github.ref == 'refs/heads/main' && runner.environment == 'github-hosted' && steps.pin.outputs.installed != 'true' && steps.restore.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.pin.outputs.path }}
+        key: ${{ steps.pin.outputs.key }}

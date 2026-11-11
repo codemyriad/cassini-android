@@ -33,6 +33,7 @@ on:
       - 'engine/src/main/cpp/**'
       - 'engine/build.gradle.kts'
       - 'gradle/libs.versions.toml'
+      - '.github/actions/pinned-ndk/**'
       - '.github/workflows/native.yml'
   pull_request:
     paths:
@@ -57,6 +58,7 @@ on:
       - 'engine/src/main/cpp/**'
       - 'engine/build.gradle.kts'
       - 'gradle/libs.versions.toml'
+      - '.github/actions/pinned-ndk/**'
       - '.github/workflows/native.yml'
 
 permissions:
@@ -83,8 +85,10 @@ jobs:
           java-version: '17'
       - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
         with:
-          packages: 'platform-tools platforms;android-37.0 build-tools;36.0.0 ndk;28.2.13676358 cmake;3.22.1'
+          packages: 'platform-tools platforms;android-37.0 build-tools;36.0.0 cmake;3.22.1'
           log-accepted-android-sdk-licenses: false
+      - name: Restore and verify pinned Android NDK
+        uses: ./.github/actions/pinned-ndk
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
           cache-provider: basic
@@ -179,7 +183,7 @@ jobs:
       # always runs on main, weekly and by hand.
       - name: Build and test the app with the source-built AAR
         if: steps.hashes.outputs.drift == 'true' || github.event_name != 'pull_request'
-        run: ./gradlew --no-daemon :app:assembleDebug :core:test :engine:testDebugUnitTest :app:testDebugUnitTest
+        run: ./gradlew --no-daemon -Pandroid.builder.sdkDownload=false :app:assembleDebug :core:test :engine:testDebugUnitTest :app:testDebugUnitTest
       # The XML results keep the standard error of each test class: a coroutine that fails after its test ended
       # writes its stack trace there.
       - name: Upload the test reports

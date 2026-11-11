@@ -34,10 +34,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
-        with:
-          packages: 'platforms;android-37.0 build-tools;36.0.0'
-          log-accepted-android-sdk-licenses: false
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
           cache-provider: basic
@@ -50,8 +46,13 @@ jobs:
         run: python3 scripts/ci-downloads.py detekt
       - name: Prove real wrapper cache use and checksum refusal offline
         run: python3 tests/ci/wrapper-smoke.py
+      # Static analysis runs on the root project without configuring :engine or any Android subproject,
+      # and unsetting ANDROID_HOME proves detekt never touches or auto-downloads SDK/NDK packages.
       - name: detekt
-        run: ./gradlew --no-daemon --init-script scripts/ci-pinned-compiler.init.gradle detekt
+        run: >-
+          env -u ANDROID_HOME -u ANDROID_SDK_ROOT
+          ./gradlew --no-daemon --init-script scripts/ci-pinned-compiler.init.gradle
+          -PcassiniStaticChecksOnly=true -Pandroid.builder.sdkDownload=false :detekt
       - name: Download checksum-pinned actionlint
         env:
           CASSINI_GITHUB_TOKEN: ${{ github.token }}
@@ -134,8 +135,10 @@ jobs:
           java-version: '17'
       - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
         with:
-          packages: 'platform-tools platforms;android-37.0 build-tools;36.0.0 ndk;28.2.13676358 cmake;3.22.1'
+          packages: 'platform-tools platforms;android-37.0 build-tools;36.0.0 cmake;3.22.1'
           log-accepted-android-sdk-licenses: false
+      - name: Restore and verify pinned Android NDK
+        uses: ./.github/actions/pinned-ndk
       # The only job that saves the Gradle User Home (on main; pull requests only read it). Every other job of the
       # workflows has cache-read-only (D66 AND-12): they share the exact key, and core-only, which ends first, saved
       # a home without the Android dependencies or task outputs, so build could not save its own and started cold.
@@ -231,18 +234,18 @@ jobs:
           if [ "$DEVICE_TEST_TYPE" = debug ]; then
             device_tasks+=(:app:assembleDebugAndroidTest)
           fi
-          ./gradlew --no-daemon --profile \
+          ./gradlew --no-daemon --profile -Pandroid.builder.sdkDownload=false \
             ":app:assemble$BUILD_TYPE" :data:assembleDebugAndroidTest \
             ciTest :bench:compileDebugKotlin ":app:lint$BUILD_TYPE" ":data:lint$BUILD_TYPE" ":ui:lint$BUILD_TYPE" \
             "${device_tasks[@]}"
           if [ "$DEVICE_TEST_TYPE" != debug ]; then
-            ./gradlew --no-daemon --profile \
+            ./gradlew --no-daemon --profile -Pandroid.builder.sdkDownload=false \
               -PdeviceTestBuildType="$DEVICE_TEST_TYPE" \
               ":app:assemble${DEVICE_TEST_TYPE^}" ":app:assemble${DEVICE_TEST_TYPE^}AndroidTest"
           fi
           # AGP's R8 resource shrinker cannot build multi-APK outputs and an AAB in one configuration.
           if [ "$BUILD_BUNDLE" = true ]; then
-            ./gradlew --no-daemon -PcassiniBundle=true :app:bundleRelease
+            ./gradlew --no-daemon -Pandroid.builder.sdkDownload=false -PcassiniBundle=true :app:bundleRelease
           fi
       - name: Snapshot build memory counters after Gradle
         if: always()
