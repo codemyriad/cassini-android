@@ -3,6 +3,7 @@ package io.codemyriad.cassini.testing
 import android.os.Looper
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.core.os.HandlerCompat
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -13,7 +14,9 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withTimeout
@@ -32,31 +35,39 @@ class MainDispatchEvents : ExternalResource() {
 
     override fun after() = Dispatchers.resetMain()
 
-    /**
-     * Drains main work, then suspends for a post or snapshot apply. [advanceTimers] runs scheduled Android timers
-     * at their virtual deadlines for Compose predicates. [timeoutMs] only bounds a hung test.
-     */
-    fun await(timeoutMs: Long, condition: () -> Boolean) = await(timeoutMs, advanceTimers = false, condition)
+    /** Drains main work and waits for the next coroutine post or Compose snapshot application. */
+    fun await(timeoutMs: Long, condition: () -> Boolean) = await(timeoutMs, scheduler = null, condition)
 
-    fun await(timeoutMs: Long, advanceTimers: Boolean, condition: () -> Boolean) = runBlocking {
+    /** The UI caller also drives its Compose clock while the scheduler has pending virtual work. */
+    // The pinned coroutine-test scheduler exposes dispatch events internally.
+    @Suppress("INVISIBLE_MEMBER", "INVISIBLE_REFERENCE")
+    fun await(timeoutMs: Long, scheduler: TestCoroutineScheduler?, condition: () -> Boolean) = runBlocking {
         val snapshots = Snapshot.registerApplyObserver { _, _ -> posted.update { it + 1 } }
+        val scheduled = scheduler?.let {
+            launch(start = CoroutineStart.UNDISPATCHED) {
+                while (true) {
+                    scheduler.receiveDispatchEvent()
+                    posted.update { it + 1 }
+                }
+            }
+        }
         try {
             withTimeout(timeoutMs) {
                 while (true) {
                     ensureActive()
                     val revision = posted.value
-                    shadowOf(Looper.getMainLooper()).idle()
-                    if (condition()) return@withTimeout
                     val looper = shadowOf(Looper.getMainLooper())
-                    if (advanceTimers && !looper.nextScheduledTaskTime.isZero) {
-                        looper.runToNextTask()
-                    } else {
-                        // Posts and snapshot applies during the check are retained.
-                        posted.first { it != revision }
+                    looper.idle()
+                    if (condition()) return@withTimeout
+                    when {
+                        scheduler != null && !scheduler.isIdle() -> Unit
+                        scheduler != null && !looper.nextScheduledTaskTime.isZero -> looper.runToNextTask()
+                        else -> posted.first { it != revision }
                     }
                 }
             }
         } finally {
+            scheduled?.cancel()
             snapshots.dispose()
         }
     }

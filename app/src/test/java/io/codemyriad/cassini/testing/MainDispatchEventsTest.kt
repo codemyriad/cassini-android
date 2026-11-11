@@ -5,6 +5,7 @@ import android.os.Looper
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.Snapshot
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.TestCoroutineScheduler
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
@@ -91,7 +92,7 @@ class MainDispatchEventsTest {
     @Test fun aScheduledAndroidTimerRunsAtItsVirtualDeadline() {
         var delivered = false
         Handler(Looper.getMainLooper()).postDelayed({ delivered = true }, TIMER_MS)
-        mainDispatches.await(TIMEOUT_MS, advanceTimers = true) { delivered }
+        mainDispatches.await(TIMEOUT_MS, TestCoroutineScheduler()) { delivered }
         assertTrue(delivered)
     }
 
