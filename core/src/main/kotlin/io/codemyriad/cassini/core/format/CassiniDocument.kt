@@ -210,6 +210,7 @@ data class CassiniDocument(
             comments.forEach { val bytes = it.toByteArray(Charsets.UTF_8); length(bytes.size); out.write(bytes) }
             return out.toByteArray()
         }
+
         /** Adds a variant while retaining existing descriptors, bodies, extensions and unrelated tags. */
         @Suppress("LongParameterList") // Existing sealing boundary plus explicit D95 recording/packaging instants.
         fun create(
@@ -397,6 +398,7 @@ data class CassiniDocument(
         }
         private fun verify(sealed: CassiniDocument, transcript: Transcript) =
             require(sealed.state == "ok" && sealed.selected(null)?.transcript == transcript)
+
         // Preserve the reviewed verbatim encoder; D95 adds metadata without refactoring the format writer.
         @Suppress("LongParameterList", "CyclomaticComplexMethod")
         private fun seal(
@@ -448,7 +450,8 @@ data class CassiniDocument(
                 val name = it.substringBefore('=').uppercase(Locale.ROOT)
                 name == "CASSINI_FORMAT" || name == "CASSINI_PROFILE" || name == "CASSINI_PAYLOAD_SCHEMA" ||
                     isManifestTag(name) ||
-                    name in setOf("CASSINI_TRANSCRIPT_IDS", "CASSINI_TRANSCRIPT_DEFAULT", "CASSINI_DECODE_HINT", "CASSINI_SPEAKER_COUNT", "CASSINI_MEETING_ID", "CASSINI_CREATED_AT") || name in setOf("CASSINI_RECORDED_AT_UTC", "DATE") ||
+                    name in setOf("CASSINI_TRANSCRIPT_IDS", "CASSINI_TRANSCRIPT_DEFAULT", "CASSINI_DECODE_HINT", "CASSINI_SPEAKER_COUNT", "CASSINI_MEETING_ID", "CASSINI_CREATED_AT") ||
+                    name in setOf("CASSINI_RECORDED_AT_UTC", "DATE") ||
                     name in setOf("CASSINI_AUDIO_SAMPLE_RATE", "CASSINI_AUDIO_CHANNELS", "CASSINI_AUDIO_SAMPLE_COUNT", "CASSINI_AUDIO_DURATION_MS", "CASSINI_AUDIO_MATCH_POLICY", "CASSINI_AUDIO_OPUS_SHA256")
             }.toMutableList()
             comments += listOf("CASSINI_FORMAT=$FORMAT", "CASSINI_PROFILE=ogg-opus",

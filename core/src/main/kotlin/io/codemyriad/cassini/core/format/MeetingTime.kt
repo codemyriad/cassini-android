@@ -34,7 +34,7 @@ data class MeetingTime(val source: String, val value: String) {
 
         @Suppress("ReturnCount") // Ordered D95 fallback clauses, each rejecting unusable evidence.
         fun resolve(manifest: JSONObject?, comments: List<String>): MeetingTime? {
-            val meeting = manifest?.optJSONObject("meeting") ?: return null
+            val meeting = manifest?.optJSONObject("meeting") ?: JSONObject()
             val utc = (meeting.opt(UTC) as? String)?.trim()
             if (utc != null && utc.endsWith('Z') && offsetInstant(utc) != null) return MeetingTime(UTC, utc)
             val date = comments.firstOrNull { it.substringBefore('=').equals(DATE, ignoreCase = true) }

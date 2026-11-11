@@ -26,6 +26,9 @@ class MeetingTimeTest {
         assertEquals(local, equalDate?.label)
         assertNull(MeetingTime.resolve(manifest(), listOf("DATE=2026-11-11T13:09:00+01:00")))
         assertNull(MeetingTime.resolve(manifest(), emptyList()))
+        val plain = MeetingTime.resolve(null, listOf("DATE=$utc"))
+        assertEquals(MeetingTime.DATE, plain?.source)
+        assertEquals(utc, plain?.value)
     }
 
     @Test fun malformedUtcAndOffsetlessDateDoNotInventAnInstant() {

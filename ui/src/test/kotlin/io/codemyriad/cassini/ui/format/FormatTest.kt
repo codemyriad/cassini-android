@@ -40,7 +40,7 @@ class FormatTest {
     @Test fun unknownDateHasNoInventedTimeInVisibleOrSpokenCopy() {
         assertEquals("Date unknown", Dates.dayTime(res, DayLabel.Unknown, LocalTime.MIDNIGHT, f))
         assertEquals("Date unknown", Spoken.dayTime(res, DayLabel.Unknown, LocalTime.MIDNIGHT, f))
-        val local = "2026-11-11T12:00:00"
+        val local = "2026-11-11T12:34:56"
         val row = Spoken.noteRow(res, "Meeting", 0, DayLabel.Today, LocalTime.MIDNIGHT, "Ready", f, local)
         org.junit.Assert.assertTrue(row.contains(local))
         org.junit.Assert.assertFalse(row.contains("00:00"))
