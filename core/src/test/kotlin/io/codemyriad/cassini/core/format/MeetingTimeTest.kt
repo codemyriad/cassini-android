@@ -24,6 +24,22 @@ class MeetingTimeTest {
         assertEquals(label, cached.label)
     }
 
+    @Test fun nonSchemaLocalLabelsUseOnlyTheirLeadingWrittenCalendarDigits() {
+        val expected = java.time.LocalDateTime.parse("2026-11-09T10:31:48")
+        for (label in listOf("2026-11-09T10:31:48+02:00", "2026-11-09 10:31:48", "2026-11-09 10:31:48 site label")) {
+            val local = MeetingTime(MeetingTime.LOCAL, label)
+            for (zone in listOf("Pacific/Auckland", "America/Los_Angeles")) {
+                assertEquals(expected, local.calendarTime(ZoneId.of(zone)))
+                assertEquals(expected.toLocalDate(), local.day(ZoneId.of(zone)))
+                assertEquals(label, local.label)
+                assertNull(local.instant)
+            }
+        }
+        for (label in listOf("unknown", "x2026-11-09T10:31:48", "2026-02-30 10:31:48", "2026-11-09 25:31:48")) {
+            assertNull(label, MeetingTime(MeetingTime.LOCAL, label).calendarTime(ZoneId.of("UTC")))
+        }
+    }
+
     @Test fun priorityAndInstantEqualityFollowD95() {
         val utc = "2026-11-11T12:00:00Z"
         val local = "2026-11-11T13:00:00"
