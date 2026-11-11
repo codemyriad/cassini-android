@@ -19,6 +19,7 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
@@ -390,7 +391,7 @@ class AcceptanceWalkTest {
 
         val trash = hasText(rule.text(UiR.string.ui_settings_trash), substring = true) and hasClickAction()
         rule.waitShown(trash)
-        rule.onAllNodes(trash).onFirst().performClick()
+        rule.onAllNodes(trash).onFirst().performScrollTo().performClick()
         see(TEST_RECORDING)
         see(rule.text(UiR.string.ui_trash_restore))
         see(rule.text(UiR.string.ui_trash_intro))
@@ -689,7 +690,11 @@ class AcceptanceWalkTest {
     }
 }
 
-private suspend fun <T : Any> Flow<T>.await(message: String, timeoutMs: Long = Background.WAIT_MS, matches: (T) -> Boolean) {
+private suspend fun <T : Any> Flow<T>.await(
+    message: String,
+    timeoutMs: Long = Background.WAIT_MS,
+    matches: (T) -> Boolean,
+) {
     withTimeoutOrNull(timeoutMs) { first(matches) }
         ?: throw AssertionError("$message (waited ${timeoutMs / 1_000} s)")
 }
