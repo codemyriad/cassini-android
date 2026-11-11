@@ -76,5 +76,17 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/share_paths" />
         </provider>
+        <!-- Read-only Files app and picker access (D97): MANAGE_DOCUMENTS is a signature permission held only by the
+             platform document picker, which hands temporary read grants to apps the user chooses. -->
+        <provider
+            android:name=".documents.CassiniDocumentsProvider"
+            android:authorities="${applicationId}.documents"
+            android:exported="true"
+            android:grantUriPermissions="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS">
+            <intent-filter>
+                <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
+            </intent-filter>
+        </provider>
     </application>
 </manifest>
