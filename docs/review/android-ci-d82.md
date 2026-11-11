@@ -50,3 +50,37 @@ Actual task durations from that run's archived Gradle profile:
 | engine | 13.149 s | 24.514 s | unit 12.965 s; Android 0.622 s |
 
 These tasks overlap, so their durations must not be summed as wall time. UI unit tests include screenshot verification. Main and test lint analysis remain enabled, including transitive core/engine analysis. The HTML profile is in the android-checks artifact under build/reports/profile/; future runs retain the same breakdown. No slow test or lint rule was skipped to obtain the transfer reduction.
+
+## Follow-up profile sample
+
+The follow-up reads archived Gradle task profiles as well as job timestamps. It does not infer individual lint/test cost from the combined build step. `scripts/profile-ci-reports.py` produces an offline JSON report from directories containing `jobs.json` (the Actions jobs API response) and `checks/build/reports/profile/*.html` (the downloaded `android-checks` artifact). It groups steps by runner type, and tasks by runner type **and cache state**. Module totals are excluded: parallel tasks overlap, so their times do not add up to build wall time. There is no CI gate or automatic performance threshold.
+
+Sample runs: [43005678423](https://github.com/codemyriad/cassini-android/actions/runs/43005678423), [43003051270](https://github.com/codemyriad/cassini-android/actions/runs/43003051270), [43001262614](https://github.com/codemyriad/cassini-android/actions/runs/43001262614), [42998307141](https://github.com/codemyriad/cassini-android/actions/runs/42998307141). The first three builds used GitHub-hosted runners; the fourth used a self-hosted runner. All four emulator matrices used GitHub-hosted runners. These are debug PR runs on the same integrated main base, with different feature/test changes; this is a diagnostic sample, not a controlled speed comparison.
+
+Ten slowest GitHub-hosted steps in this sample:
+
+| Job / step | Samples | Median | Range |
+| --- | ---: | ---: | ---: |
+| build / build, unit/conformance tests and lint | 3 | 387 s | 258–463 s |
+| API 34 / device checks | 4 | 245.5 s | 220–252 s |
+| API 35 / device checks | 4 | 231.5 s | 227–255 s |
+| API 26 / device checks | 4 | 220.5 s | 198–230 s |
+| API 29 / device checks | 4 | 216 s | 205–252 s |
+| static / detekt | 3 | 70 s | 60–122 s |
+| build / Android setup | 3 | 31 s | 31–44 s |
+| JDK only / core tests | 3 | 19 s | 9–88 s |
+| JDK only / Gradle setup | 3 | 17 s | 3–19 s |
+| static / Gradle setup | 3 | 17 s | 1–21 s |
+
+The Gradle build totals were 257.24 s, 462.17 s and 386.54 s on the hosted runners. The self-hosted total was 75.55 s; most core/data/engine lint and test tasks came from cache, so comparing that number with a hosted cold execution would misattribute cached work to runner speed. Hosted UI unit-test executions were 132.68–161.35 s. UI main lint was 84.60–122.77 s when executed, and 0.025 s from cache in the third sample. The report preserves both states separately. No heap, worker, test, lint, ABI, model or API coverage setting changes follow from these observational numbers. Gradle daemon memory evidence remains in the separate, drmeyers-owned #167.
+
+Example collection (repeat for each selected successful run, using its numeric ID):
+
+```sh
+mkdir -p evidence/43001262614
+gh api repos/codemyriad/cassini-android/actions/runs/43001262614/jobs > evidence/43001262614/jobs.json
+gh run download 43001262614 --repo codemyriad/cassini-android --name android-checks --dir evidence/43001262614/checks
+python3 -I scripts/profile-ci-reports.py evidence/43001262614
+```
+
+The report tool has fixture tests for elapsed-time parsing, task-table selection, exclusion of overlapping module totals, cache/host separation, unknown runners, skipped steps and the CLI/download layout. Mutations merging cache states or counting module totals fail the tests. These are correctness checks on diagnostic data, with no sleeps or speed assertions.
