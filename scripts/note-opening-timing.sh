@@ -26,13 +26,22 @@ runner=$package.test/io.codemyriad.cassini.CassiniTestRunner
 test=io.codemyriad.cassini.flows.NoteOpeningTimingTest
 root=androidTest-kept-timing
 work=$(mktemp -d)
+watcher=
+started=false
 
 cleanup() {
     status_code=$?
-    adb shell am force-stop "$package" || true
-    # androidx.sqlite keeps the database lock file at cacheDir/<absolute database path>.lck.
-    adb shell "run-as $package rm -rf files/$root cache/$root cache/data/data/$package/files/$root" \
-        "cache/data/user/0/$package/files/$root" || true
+    if [ -n "$watcher" ]; then
+        exec 3<&-
+        kill "$watcher" 2>/dev/null || true
+        wait "$watcher" 2>/dev/null || true
+    fi
+    if $started; then
+        adb shell am force-stop "$package" || true
+        # androidx.sqlite keeps the database lock file at cacheDir/<absolute database path>.lck.
+        adb shell "run-as $package rm -rf files/$root cache/$root cache/data/data/$package/files/$root" \
+            "cache/data/user/0/$package/files/$root" || true
+    fi
     rm -rf "$work"
     exit "$status_code"
 }
@@ -47,10 +56,27 @@ run() {
     fi
 }
 
-while adb shell ps -A -o ARGS | grep -q '[i]nstrument'; do
+# Android removes the active instrumentation when its runner finishes. Wake on process exit and check
+# ActivityManager again. The initial timestamp also covers an exit racing the first snapshot.
+since=$(adb shell "date '+%m-%d %H:%M:%S.000'" | tr -d '\r')
+processes=$(adb shell dumpsys activity processes "$package")
+if [[ "$processes" == *'Active instrumentation:'* ]]; then
     printf 'An instrumentation run is in progress; waiting for it to end.\n'
-    sleep 30
-done
+    mkfifo "$work/process-events"
+    adb logcat -b events -T "$since" -s am_proc_died:I > "$work/process-events" &
+    watcher=$!
+    exec 3<"$work/process-events"
+    deadline=$((SECONDS + 1200))
+    while [[ "$processes" == *'Active instrumentation:'* ]]; do
+        remaining=$((deadline - SECONDS))
+        if [ "$remaining" -le 0 ] || ! IFS= read -r -t "$remaining" _event <&3; then
+            printf 'Android did not finish the active instrumentation.\n' >&2
+            exit 1
+        fi
+        processes=$(adb shell dumpsys activity processes "$package")
+    done
+fi
+started=true
 adb shell input keyevent KEYCODE_WAKEUP
 adb shell wm dismiss-keyguard
 adb shell "run-as $package rm -rf files/$root cache/$root"
