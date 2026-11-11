@@ -135,16 +135,16 @@ if [ "$(as_app id -u 2>/dev/null | grep -c '^[0-9]')" -ne 1 ]; then
     printf 'run-as %s fails: install the debug build first.\n' "$package" >&2
     exit 1
 fi
-start_updates
-deadline=$((SECONDS + 1200))
-while adb shell ps -A -o ARGS | grep -q '[i]nstrument'; do
-    log 'An instrumentation run is in progress; waiting for it to end.'
-    wait_for_update "$deadline" || { printf 'Instrumentation did not finish.\n' >&2; exit 1; }
-done
+processes=$(adb shell dumpsys activity processes "$package")
+if [[ "$processes" == *'Active instrumentation:'* ]]; then
+    printf 'Instrumentation is active. Run this probe after it finishes.\n' >&2
+    exit 1
+fi
 if [ -n "$(as_app test -e files/debug-root.txt '&&' echo present)" ]; then
     printf 'files/debug-root.txt exists already: another check runs, or an earlier one did not clean up.\n' >&2
     exit 1
 fi
+start_updates
 scratch_started=true
 
 # The debug root is read once, at process start.
