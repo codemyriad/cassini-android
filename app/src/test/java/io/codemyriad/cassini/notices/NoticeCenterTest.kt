@@ -223,6 +223,22 @@ class NoticeCenterTest {
         assertTrue(offer.actions.isEmpty())
     }
 
+    @Test fun oneVoiceShowsStandaloneSpeakerDownloadAndVerificationProgress() {
+        val status = ModelStatus.Downloading(25, 160, 640)
+        val downloading = only(Notices.job(null, oneVoice = true, speakerModel = status))
+        assertEquals(BannerKind.DL_DOWNLOADING, downloading.kind)
+        assertEquals(
+            BannerArgs(percent = 25, bytes = 160, bytes2 = 640, part = ModelPartUi.SPEAKERS),
+            downloading.args,
+        )
+        assertTrue(downloading.actions.isEmpty())
+        val verifying = only(
+            Notices.job(null, oneVoice = true, speakerModel = ModelStatus.Verifying(75)),
+        )
+        assertEquals(BannerSpec(BannerKind.DL_CHECKING, BannerArgs(percent = 75)), verifying)
+        assertTrue(Notices.job(null, oneVoice = false, speakerModel = status).isEmpty())
+    }
+
     // 13.4 Model download.
 
     @Test

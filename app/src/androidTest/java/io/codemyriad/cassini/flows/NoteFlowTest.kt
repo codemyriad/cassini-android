@@ -13,14 +13,10 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.espresso.Espresso
 import io.codemyriad.cassini.MainActivity
 import io.codemyriad.cassini.background.Background
-import io.codemyriad.cassini.core.format.CassiniDocument
-import io.codemyriad.cassini.core.format.DocumentState
-import io.codemyriad.cassini.core.library.AudioKind
+import io.codemyriad.cassini.flows.Flows.awaitSealedDocument
 import io.codemyriad.cassini.flows.Flows.import
-import io.codemyriad.cassini.flows.Flows.rows
 import io.codemyriad.cassini.flows.Flows.tapWord
 import io.codemyriad.cassini.flows.Flows.text
-import io.codemyriad.cassini.flows.Flows.waitFor
 import io.codemyriad.cassini.flows.Flows.waitGone
 import io.codemyriad.cassini.flows.Flows.waitShown
 import io.codemyriad.cassini.flows.Flows.waitText
@@ -76,30 +72,23 @@ class NoteFlowTest {
         // Transcribe from the Audio only banner; the progress card shows while the job runs.
         val transcribe = hasText(rule.text(UiR.string.ui_action_transcribe)) and hasClickAction()
         rule.waitShown(transcribe)
-        rule.waitFor("The imported audio player is prepared") {
-            graph.playback.state.value.let { it.noteId == noteId && it.durationMs > 0 && !it.failed }
-        }
-        val importedAudioEpoch = graph.playback.state.value.epoch
+        val importedAudioEpoch = awaitPreparedPlayer(noteId, afterEpoch = null)
         rule.onAllNodes(transcribe).onFirst().performClick()
         rule.waitText(rule.text(UiR.string.ui_action_stop_keep_progress), timeoutMs = Flows.JOB_MS)
-        awaitSealed(noteId, variants = 1)
+        val sealed = awaitSealedDocument(noteId, variants = 1)
 
         // Read & listen: verified, with the words; a word tap seeks there and plays.
         rule.waitText(rule.text(UiR.string.ui_trust_verified), timeoutMs = Flows.SCREEN_MS)
         rule.waitShown(hasText(WORD, substring = true), unmerged = true)
         // Words can appear before the replacement Opus player finishes preparing. A tap then has no player.
-        rule.waitFor("The sealed document player replaces the imported audio") {
-            graph.playback.state.value.let {
-                it.noteId == noteId && it.durationMs > 0 && !it.failed && it.epoch > importedAudioEpoch
-            }
-        }
-        val word = document(noteId).selected(null)!!.transcript!!.words.first { WORD in it.text }
+        awaitPreparedPlayer(noteId, afterEpoch = importedAudioEpoch)
+        val word = sealed.selected(null)!!.transcript!!.words.first { WORD in it.text }
         tapAndCheckPlayback(noteId, word.startMs)
 
         // Transcribe again: version 2, and the Versions sheet lists both.
         openActions()
         clickOnce(hasText(rule.text(UiR.string.ui_action_transcribe_again)) and hasClickAction())
-        awaitSealed(noteId, variants = 2)
+        awaitSealedDocument(noteId, variants = 2)
         val chip = rule.text(UiR.string.ui_version_chip, 2, 2)
         rule.waitText(chip, substring = true)
         rule.onNode(hasText(chip, substring = true) and hasClickAction()).performClick()
@@ -147,21 +136,18 @@ class NoteFlowTest {
         )
     }
 
-    /** Waits until the note's job is gone and its document is verified with [variants] transcripts. */
-    private fun awaitSealed(noteId: String, variants: Int) {
-        rule.waitFor("The job seals a verified document with $variants versions", Flows.JOB_MS) {
-            val row = rows().firstOrNull { it.id == noteId }
-            row != null && row.jobState == null && row.audioKind == AudioKind.DOCUMENT &&
-                row.documentState == DocumentState.OK && document(noteId).variants.size == variants
-        }
+    private fun awaitPreparedPlayer(noteId: String, afterEpoch: Long?): Long = runBlocking {
+        withTimeoutOrNull(Flows.SCREEN_MS) {
+            graph.playback.state.first {
+                it.noteId == noteId && it.durationMs > 0 && !it.failed && (afterEpoch == null || it.epoch > afterEpoch)
+            }.epoch
+        } ?: throw AssertionError("The player did not prepare $noteId after epoch $afterEpoch")
     }
 
     private suspend fun documentFile(noteId: String): File {
         val row = graph.awaitCatalogue().notes.rowBlocking(noteId)!!
         return File(graph.paths.note(noteId), row.audioFile)
     }
-
-    private fun document(noteId: String): CassiniDocument = runBlocking { CassiniDocument.read(documentFile(noteId)) }
 
     /** Opens the Note actions sheet, unless it is open. */
     private fun openActions() {
@@ -186,9 +172,8 @@ class NoteFlowTest {
             // A semantics click: the sheet may still be settling, and a touch then misses the window.
             clickOnce(hasText(label, substring = true) and hasClickAction())
             if (format != null) clickOnce(hasText(format, substring = true) and hasClickAction())
-            rule.waitFor("The export writes $name") { target.length() > 0 }
-            val saved = rule.text(UiR.string.ui_actions_saved_file, "\u0000").substringBefore("\u0000")
-            rule.waitText(saved, substring = true)
+            rule.waitText(rule.text(UiR.string.ui_actions_saved_file, name))
+            assertTrue("The export wrote $name before showing Saved", target.length() > 0)
         } finally {
             Background.instrumentation.removeMonitor(monitor)
         }

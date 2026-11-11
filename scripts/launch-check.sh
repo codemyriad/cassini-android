@@ -1,24 +1,55 @@
 #!/usr/bin/env bash
-# Install an APK over the installed app (same signing key and version, so app data stays) and check
-# that the app starts and the process is still running a few seconds later, without a crash.
+# Install a same-key APK over the app. Wait for Android's fully-drawn event after startup and check for a crash.
 #   scripts/launch-check.sh APK
 set -euo pipefail
 apk=${1:?Usage: scripts/launch-check.sh APK}
 package=io.codemyriad.cassini.talk
+component=$package/io.codemyriad.cassini.MainActivity
 adb install -r "$apk"
 adb shell am force-stop "$package"
-# Read only the log lines after this point. Some emulators (API 26) cannot clear the log ("failed to clear
-# the 'main' log"), so the clear is best effort and -T limits the read to lines after the device time below.
-since=$(adb shell "date '+%m-%d %H:%M:%S.000'" | tr -d '\r')
-adb logcat -c 2>/dev/null || printf 'Could not clear the log; reading lines after %s.\n' "$since" >&2
-start=$(adb shell am start -W -n "$package/io.codemyriad.cassini.MainActivity" | tr -d '\r')
+
+# Use the timestamp of a unique marker to exclude earlier launches, without clearing the device logs.
+marker="cassini-launch-$$-$RANDOM"
+adb shell log -p i -t CassiniLaunchCheck "$marker"
+since=$(adb logcat -d -b main -v epoch -v usec -e "^$marker$" -s CassiniLaunchCheck:I |
+    awk '$1 ~ /^[0-9]+\.[0-9]+$/ { print $1 }')
+if [ -z "$since" ]; then
+    printf 'Could not find the launch marker in logcat.\n' >&2
+    exit 1
+fi
+start=$(adb shell am start -W -n "$component" | tr -d '\r')
 printf '%s\n' "$start"
 if [[ "$start" != *'Status: ok'* ]]; then
     printf 'The app did not start.\n' >&2
     exit 1
 fi
-sleep 5
-crash=$(adb logcat -d -b crash -T "$since" | tr -d '\r' | grep -F "Process: $package" || true)
+
+if ! python3 -I - "$since" "$package" "$component" <<'PY'
+import re
+import subprocess
+import sys
+
+since, package, component = sys.argv[1:]
+fully_drawn = f"Fully drawn {component}:"
+crashed = f"Process: {package}, PID:"
+pattern = f"^({re.escape(fully_drawn)}|{re.escape(crashed)})"
+try:
+    result = subprocess.run(
+        ["adb", "logcat", "-b", "main", "-b", "system", "-b", "crash", "-v", "raw",
+         "-T", since, "-e", pattern, "-m", "1"],
+        check=True, stdout=subprocess.PIPE, text=True, timeout=45,
+    )
+except subprocess.TimeoutExpired:
+    sys.exit("Android did not report that the app was fully drawn.")
+print(result.stdout, end="")
+if not any(line.startswith(fully_drawn) for line in result.stdout.splitlines()):
+    sys.exit("The app crashed before Android reported it fully drawn.")
+PY
+then
+    adb logcat -d -b crash -T "$since" >&2 || true
+    exit 1
+fi
+crash=$(adb logcat -d -b crash -T "$since" | tr -d '\r' | grep -F "Process: $package, PID:" || true)
 if [ -n "$crash" ] || [ -z "$(adb shell pidof "$package" | tr -d '\r')" ]; then
     adb logcat -d -b crash -T "$since" >&2 || true
     printf 'The app crashed or exited after launch.\n' >&2

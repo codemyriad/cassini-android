@@ -378,7 +378,7 @@ On 10 Oct 2026, before these steps, a later open of the one-hour document took a
 
 `app/src/main/baseline-prof.txt` lists the classes and methods of the app that Android compiles ahead of time at install. Without it, the app code runs in the interpreter the first times, and a screen that is composed again from the start is slow. On a Pixel 8 (16 Oct 2026), closing a note took 69 to 98 ms with the code interpreted and about 43 ms with the code compiled.
 
-`BaselineProfileGenerator` in `:baselineprofile` collects the profile. It starts the app, scrolls the Library, opens a note with speech three times (it scrolls the transcript and plays two seconds each time), and opens Settings and Trash. It drives the `releaseTest` build, the release build without R8, so the profile has the real names. R8 rewrites the names when it builds the minified release.
+`BaselineProfileGenerator` in `:baselineprofile` collects the profile. It starts the app, scrolls the Library, opens a note with speech three times (it scrolls the transcript and plays until the position advances by two seconds or reaches the end), and opens Settings and Trash. It drives the `releaseTest` build, the release build without R8, so the profile has the real names. R8 rewrites the names when it builds the minified release.
 
 `scripts/baseline-profile.sh` builds the two APKs, installs them with direct adb instrumentation (the app data stays), runs the generator and writes `app/src/main/baseline-prof.txt`. The device needs API 33 or later, English, and at least one transcribed note with speech. The generator does not record, transcribe or change notes. Make the profile again after large changes to the screens, and commit the file.
 
@@ -407,6 +407,8 @@ The checks 2 to 6, 8 and 9 use a debug root (`files/debug-root.txt`, see [device
 | Acceptance walk | `scripts/acceptance-walk.sh` | Passed in light, dark and Italian (P12 step 1). See [Acceptance walk runs](#acceptance-walk-runs). |
 
 ### Acceptance walk runs
+
+Screenshot capture requires API 29 or later and hardware-accelerated app windows. Each visible window must commit a frame before capture.
 
 The first walk ran in light, dark and Italian (`build/acceptance/20261011-031058/`). After the corrections of the device review, the `realModels` part ran again in light (`20261011-034439`) and in dark (`20261011-034904`). The first README and store screenshots came from these two runs.
 

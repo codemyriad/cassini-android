@@ -66,7 +66,11 @@ object DebugStatus {
         try {
             graph.paths.root.mkdirs()
             temporary.writeText(json.toString(2))
-            if (!temporary.renameTo(target)) Log.w(TAG, "Cannot rename $temporary")
+            if (temporary.renameTo(target)) {
+                Log.i(TAG, "Published $name in ${graph.paths.root.name}")
+            } else {
+                Log.w(TAG, "Cannot rename $temporary")
+            }
         } catch (error: IOException) {
             Log.w(TAG, "Cannot write $target", error)
         }
