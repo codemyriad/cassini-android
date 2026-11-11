@@ -18,7 +18,7 @@ If an assertion fails while the scripted fetcher is held at a progress state, te
 
 ## Initial navigation
 
-Catalog readiness can precede the first Library frame. Setup now waits for the Library Import action before the journey can use Back navigation. This prevents a late initial frame from making the helper press Back out of the activity. The helper also waits for a positive Library indicator or a labeled Back control on a child screen before navigating. It no longer treats a 200 ms absence of Library semantics as a reason to press Back. These waits use the existing UI event observer and live semantics.
+Catalog readiness can precede the first Library frame. Setup now waits for the Library Import action before the journey can use Back navigation. This prevents a late initial frame from making the helper press Back out of the activity. The helper also waits for a positive Library indicator or a labeled Back control on a child screen before navigating. It no longer treats a 200 ms absence of Library semantics as a reason to press Back. These waits use the existing UI event observer and settled Compose semantics, so the outgoing screen's Back control cannot trigger a second click during a navigation transition.
 
 ## Validation
 

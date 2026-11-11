@@ -524,7 +524,7 @@ class AcceptanceWalkTest {
             var atLibrary = false
             // A slow Library frame must never be interpreted as permission to press Back out of the activity.
             rule.awaitUi(SEE_MS) {
-                val nodes = rule.liveNodes()
+                val nodes = rule.onAllNodes(library or back).fetchSemanticsNodes()
                 atLibrary = nodes.any(library::matches)
                 atLibrary || nodes.any(back::matches)
             }
