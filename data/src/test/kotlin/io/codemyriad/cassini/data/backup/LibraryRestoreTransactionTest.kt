@@ -126,9 +126,9 @@ class LibraryRestoreTransactionTest {
         val valid = journal.readText()
         val wrapper = JSONObject(valid).put("payload", "{}")
         journal.writeText(wrapper.toString())
-        offMain { assertThrows(
-            IllegalArgumentException::class.java
-        ) { LibraryRestoreTransaction(live, staging).recover() } }
+        offMain {
+            assertThrows(IllegalArgumentException::class.java) { LibraryRestoreTransaction(live, staging).recover() }
+        }
         assertEquals("new note", File(live, "notes/n/document.opus").readText())
         journal.writeText(valid)
         offMain { LibraryRestoreTransaction(live, staging).recover() }

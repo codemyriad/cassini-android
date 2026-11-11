@@ -141,9 +141,9 @@ data class BackupManifest(val files: List<Entry>) {
                 while (true) {
                     val size = input.read(buffer)
                     if (size < 0) break
-                    if (bytes.size().toLong() + size > MAX_MANIFEST_BYTES) throw IOException(
-                        "Oversized backup inventory"
-                    )
+                    if (bytes.size().toLong() + size > MAX_MANIFEST_BYTES) {
+                        throw IOException("Oversized backup inventory")
+                    }
                     bytes.write(buffer, 0, size)
                 }
             }

@@ -23,10 +23,13 @@ class BackupSectionTest {
     private val events = mutableListOf<SettingsEvent>()
 
     private fun show(state: BackupSettingsUi) {
-        rule.setContent { CassiniTheme { androidx.compose.foundation.layout.Column { BackupSection(
-            state,
-            events::add
-        ) } } }
+        rule.setContent {
+            CassiniTheme {
+                androidx.compose.foundation.layout.Column {
+                    BackupSection(state, events::add)
+                }
+            }
+        }
     }
 
     @Test fun switchesHaveIndependentAccessibleStateAndDoNotInventSuccessfulPersistence() {

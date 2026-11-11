@@ -191,10 +191,12 @@ class LibraryRestoreTransaction internal constructor(
         if (STAGE.matches(path.fileName.toString())) deleteStage(path.toFile())
     }
 
-    private fun checksum(text: String): String = MessageDigest.getInstance("SHA-256")
-        .digest(text.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+
 
     companion object {
+        private fun checksum(text: String): String = MessageDigest.getInstance("SHA-256")
+            .digest(text.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+
         private const val MAX_JOURNAL_BYTES = 4096
         val ROOTS = listOf("notes", "voices", "cassini.db", "cassini.db-wal", "cassini.db-shm", "cassini.db-journal")
         private val STAGE = Regex("restore-[a-f0-9-]{36}")
