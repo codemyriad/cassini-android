@@ -64,7 +64,9 @@ class NoteMarkdownTest {
     @Test fun durationCopyFollowsUiLanguageWhileDigitsFollowTheFormattingLocale() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         for (language in listOf("en", "it", "fr", "es", "pt-BR", "pt-PT")) {
-            val config = Configuration(context.resources.configuration).apply { setLocale(Locale.forLanguageTag(language)) }
+            val config = Configuration(context.resources.configuration).apply {
+                setLocale(Locale.forLanguageTag(language))
+            }
             val resources = context.createConfigurationContext(config).resources
             val format = FormatSettings(Locale.forLanguageTag("ar-EG"), true, ZoneId.of("UTC"))
             val exactHour = NoteMarkdown.options(resources, format, 0, 3_600_000).dateLine
