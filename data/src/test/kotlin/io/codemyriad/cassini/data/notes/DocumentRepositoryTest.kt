@@ -121,6 +121,7 @@ class DocumentRepositoryTest {
         assertTrue(h.documents.exportCopy("own", Uri.fromFile(exported)) is ExportOutcome.Saved)
         val written = CassiniDocument.read(exported)
         assertEquals(start, written.meetingTime?.instant)
+        assertEquals(start.toString(), written.manifest!!.getJSONObject("meeting").getString("recordedAtUtc"))
         assertEquals(
             old.manifest!!.getJSONObject("meeting").getString("id"),
             written.manifest!!.getJSONObject("meeting").getString("id"),
@@ -135,6 +136,29 @@ class DocumentRepositoryTest {
         exported.copyTo(h.document("copy"), overwrite = true)
         h.notes.refreshIfStale("copy")
         assertEquals(start, h.row("copy").recordingTime()?.instant)
+    }
+
+    @Test fun staleExportDropsTheOldLocalLabelAndKeepsTheStaleWarning() = runTest {
+        h.documentNote("stale", first)
+        val original = h.readFile("stale")
+        original.manifest!!.getJSONObject("meeting").put("recordedAtLocal", "2026-11-11T13:00:00")
+        val labelled = CassiniDocument.create(h.document("stale").readBytes(), first, "Ignored", JSONObject(), original)
+        val stream = OggOpus.read(labelled)
+        val packets = stream.audio.toMutableList()
+        packets[0] = packets[0].clone().also { it[it.lastIndex] = (it.last().toInt() xor 1).toByte() }
+        val stale = OggOpus.mux(stream.copy(audio = packets), stream.tags)
+        h.document("stale").writeBytes(stale)
+        h.notes.refreshIfStale("stale")
+        assertEquals(DocumentState.STALE_AUDIO, h.row("stale").documentState)
+        val dest = folder.newFile("stale-export.opus")
+        assertTrue(h.documents.exportCopy("stale", Uri.fromFile(dest)) is ExportOutcome.Saved)
+        val exported = CassiniDocument.read(dest)
+        assertEquals(DocumentState.STALE_AUDIO, exported.documentState)
+        assertFalse(exported.manifest!!.getJSONObject("meeting").has("recordedAtLocal"))
+        assertFalse(exported.manifest.getJSONObject("meeting").has("recordedAtUtc"))
+        assertNull(exported.meetingTime)
+        assertEquals(OggOpus.read(stale).digest(), OggOpus.scan(dest).digest())
+        assertArrayEquals(stale, h.document("stale").readBytes())
     }
 
     // Adopt.

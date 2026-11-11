@@ -86,7 +86,8 @@ class RepositoryJobStorage(
 
     override fun existingDocumentBlocking(noteId: String): CassiniDocument? = documents.readBlocking(noteId)
 
-    override fun recordedAtUtcBlocking(noteId: String): java.time.Instant? = notes.rowBlocking(noteId)?.knownCaptureStart()
+    override fun recordedAtUtcBlocking(noteId: String): java.time.Instant? =
+        notes.rowBlocking(noteId)?.knownCaptureStart()
 
     override fun titleBlocking(noteId: String): String =
         notes.titleBlocking(noteId) ?: throw FileNotFoundException("No note $noteId")

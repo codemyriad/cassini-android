@@ -96,7 +96,6 @@ class CassiniDocumentTest {
         assertFalse(next.comments.any { it.startsWith("CASSINI_RECORDED_AT_UTC=") })
     }
 
-
     @Test fun damagedOrUnknownManifestsNeverPromoteDateTagsToMeetingTime() {
         val words = Transcript(listOf(Word("spk_1", 0, 20, "Hello")), "en")
         val original = CassiniDocument.read(CassiniDocument.create(silence(), words, "Meeting", JSONObject()))

@@ -277,21 +277,42 @@ data class CassiniDocument(
             writeWithTags(audio, comments, digest, target)
             return read(target).also { verify(it, transcript) }
         }
-        /** Fill only a trusted own capture start on export; meeting identity, audio and variant bodies stay intact. */
+        /** Fill a trusted own capture start on export, retaining identity, audio and variant bodies. */
         fun withRecordedAtUtc(source: File, existing: CassiniDocument, start: Instant, target: File): CassiniDocument {
             require(existing.documentState == DocumentState.OK && existing.manifest != null)
+            require(existing.meetingTime?.source != MeetingTime.UTC)
             val manifest = JSONObject(existing.manifest.toString())
             manifest.getJSONObject("meeting").put("recordedAtUtc", start.toString())
+            return copyTimeMetadata(source, existing, manifest, target, start.toString())
+        }
+
+        /** A stale copy keeps its stale warning and words, but makes no claim about the replacement audio's start. */
+        fun withoutStaleRecordingTime(source: File, existing: CassiniDocument, target: File): CassiniDocument {
+            require(existing.documentState == DocumentState.STALE_AUDIO && existing.manifest != null)
+            val manifest = JSONObject(existing.manifest.toString())
+            manifest.getJSONObject("meeting").remove("recordedAtLocal")
+            manifest.getJSONObject("meeting").remove("recordedAtUtc")
+            return copyTimeMetadata(source, existing, manifest, target, null)
+        }
+
+        private fun copyTimeMetadata(
+            source: File,
+            existing: CassiniDocument,
+            manifest: JSONObject,
+            target: File,
+            utc: String?,
+        ): CassiniDocument {
+            val date = utc ?: manifest.getJSONObject("meeting").getString("createdAtUtc")
             val comments = existing.comments.filterNot {
                 val name = it.substringBefore('=').uppercase(Locale.ROOT)
-                isManifestComment(it) || name == "DATE" || name == "CASSINI_RECORDED_AT_UTC"
-            } + listOf("DATE=$start", "CASSINI_RECORDED_AT_UTC=$start") +
+                isManifestComment(it) || name in setOf("DATE", "CASSINI_RECORDED_AT_UTC", "CASSINI_RECORDED_AT_LOCAL")
+            } + listOfNotNull("DATE=$date", utc?.let { "CASSINI_RECORDED_AT_UTC=$it" }) +
                 CassiniPayload.encode(MANIFEST_PREFIX, CassiniPayload.MIME, manifest.toString()).second
-            val digest = manifest.getJSONObject("integrity").getString("opusAudioSha256")
             try {
-                writeWithTags(source, comments, digest, target)
+                // Check packet preservation against the actual audio, retaining the manifest's original trust claim.
+                writeWithTags(source, comments, OggOpus.scan(source).digest(), target)
                 val written = read(target)
-                require(written.state == "ok" && same(written.manifest, manifest))
+                require(written.state == existing.state && same(written.manifest, manifest))
                 require(written.variants.map { it.id to it.body } == existing.variants.map { it.id to it.body })
                 return written
             } catch (error: Throwable) {

@@ -29,7 +29,9 @@ class RecordedTimeMigrationTest {
             )
         }
         helper.runMigrationsAndValidate("recorded-time-migration", 2, true, CassiniDatabase.MIGRATION_1_2).use { db ->
-            db.query("SELECT title,created_at,document_signature,recorded_at,capture_started_at FROM notes ORDER BY id").use { rows ->
+            db.query(
+                "SELECT title,created_at,document_signature,recorded_at,capture_started_at FROM notes ORDER BY id",
+            ).use { rows ->
                 rows.moveToFirst()
                 assertEquals("Keep title", rows.getString(0))
                 assertEquals(1L, rows.getLong(1))
