@@ -1,6 +1,6 @@
 # Moving to a new phone (D97)
 
-Implementation status: draft. Device transfer is the shipping feature in this PR.
+Device transfer is enabled by the device-local choice in Settings.
 `BuildConfig.CLOUD_BACKUP_ENABLED` is fixed to `false` in every build type. There is no cloud switch
 or cloud-backup offer. The agent refuses cloud and unknown transports even if a stored preference
 contains an old opt-in. Android cloud Auto Backup has a 25 MB per-app limit; this is unsuitable for
@@ -29,7 +29,8 @@ inventory alone exceed that quota, it records the quota failure and refuses befo
 Android also measures transport framing; `onQuotaExceeded` records a later platform refusal.
 Settings shows `settings.transfer.tooLarge` after a quota failure and points to ZIP export. The
 normal explanation also recommends Export All as ZIP. No smaller subset is silently substituted.
-Downloaded models are never transferred.
+Downloaded models are never transferred. A permitted retry clears the previous size warning before
+preparation; a new quota refusal sets it again. A refused transport does not clear that warning.
 
 Android's production D2D limit can differ from the local test transport. We do not hard-code the
 cloud limit as the transfer limit. The test transport retains its 25 MiB quota even when its D2D
@@ -48,6 +49,11 @@ The agent refuses to run once graph construction starts. It never creates the gr
 service or recognizer. Full backup is not allowed in the foreground. A denied transport fails the
 operation rather than publishing a successful empty archive. Backup failure does not promise that
 every transport will retain its previous snapshot; retention belongs to Android and the provider.
+
+Before creating an inventory, preparation recovers any interrupted restore transaction. An unresolved
+or damaged journal refuses the snapshot. It then opens admitted voice files through `AtomicFile`,
+recovering committed `.bak` data on Android 9–10 even when the base is missing or truncated. Links
+and unresolved atomic recovery refuse the snapshot; `.bak` files are not copied as separate payloads.
 
 An inventory records every admitted file's path, size and SHA-256. Incoming entries stream into
 private staging; missing, changed, duplicate, linked, unexpected or oversized data is rejected before
@@ -71,11 +77,18 @@ catalogue schemas before replacing the live library.
 
 ## Validation
 
-The prior draft passed 70 focused tests and six actual fault mutations, with a clean restored suite.
-Its real API 35 arm64 matrix verified both independent choices before the cloud feature was parked.
-Those results are historical evidence, not permission to ship the cloud switch. The updated checks
-cover the OFF flag despite stored cloud consent, transfer-off refusal, successful transfer/restore,
-and a synthetic library exceeding the local D2D quota. Retain the current report in the PR before ready.
+The focused tests cover transport consent, complete inventories, quota errors and retry reset,
+atomic choices, journaled root replacement, cache repair and saved-voice preservation. API 28 and
+29 tests interrupt actual `AtomicFile` writes, then verify the inventory and restored committed
+voices. Preparation is tested immediately after each of nine interrupted restore moves, after a
+committed interruption, and with a damaged journal. Deliberately omitting voice recovery, journal
+recovery or quota reset fails the corresponding regression; restored source passes.
+
+The real API 35 arm64 local-transport matrix checks cloud refusal despite a stored opt-in, transfer
+off/on, a 26 MiB library exceeding the local D2D quota, a smaller successful retry with the warning
+cleared, and verified restores before and after that retry. Restored notes retain UTC, words and
+speaker labels; synthetic saved-voice matching works; models and unfinished jobs are excluded.
+Current commands, APK hashes and reports are retained with the PR evidence.
 
 To repeat on a task-owned disposable emulator, build the debug app and instrumentation APKs, then
 run `python3 scripts/check-backup-transport.py --help` for the SDK, APK and external output paths.
