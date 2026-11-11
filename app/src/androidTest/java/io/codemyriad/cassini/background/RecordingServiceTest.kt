@@ -56,7 +56,9 @@ class RecordingServiceTest {
         val recording = graph.recording
         watch.start()
         assertTrue("A recording starts", recording.start("Background check"))
-        val active = awaitRecording("The recording is active", START_MS) { it is RecordingState.Active } as RecordingState.Active
+        val active = awaitRecording("The recording is active", START_MS) {
+            it is RecordingState.Active
+        } as RecordingState.Active
         Background.shell("input keyevent KEYCODE_HOME")
         awaitRecording("Audio is captured", START_MS) {
             it is RecordingState.Active && it.elapsedMs >= CAPTURE_MS
@@ -71,7 +73,9 @@ class RecordingServiceTest {
         assertNotNull("The notification has a Finish action", action)
         action!!.actionIntent.send()
 
-        val ended = awaitRecording("The recording ends", FINISH_MS) { it is RecordingState.Ended } as RecordingState.Ended
+        val ended = awaitRecording("The recording ends", FINISH_MS) {
+            it is RecordingState.Ended
+        } as RecordingState.Ended
         val longest = checkNotNull(watch.stop()) { "The main-looper watch observed no complete dispatches" }
         val outcome = ended.outcome
         assertTrue("Finish saves the recording: $outcome", outcome is RecordingOutcome.Saved)
