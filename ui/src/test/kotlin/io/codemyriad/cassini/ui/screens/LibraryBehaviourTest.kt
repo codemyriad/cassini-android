@@ -45,6 +45,7 @@ import io.codemyriad.cassini.ui.note.ExportKind
 import io.codemyriad.cassini.ui.note.NoteAction
 import io.codemyriad.cassini.ui.note.NoteSheet
 import io.codemyriad.cassini.ui.theme.CassiniTheme
+import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import org.junit.Assert.assertEquals
@@ -107,12 +108,23 @@ class LibraryBehaviourTest {
 
     @Test fun aLargeSpeakerMenuComposesOnlyVisibleRowsAndKeepsAnySpeakerAccessible() {
         val names = (0 until 5000).map { "Guest ${it.toString().padStart(4, '0')}" }
-        val filters = io.codemyriad.cassini.ui.library.SearchFiltersUi(speakers = names.toImmutableList())
+        val readIndices = mutableSetOf<Int>()
+        val inventory = object : ImmutableList<String> by names.toImmutableList() {
+            override fun get(index: Int): String {
+                readIndices += index
+                return names[index]
+            }
+
+            override fun iterator(): Iterator<String> = names.indices.asSequence().map { get(it) }.iterator()
+        }
+        val filters = io.codemyriad.cassini.ui.library.SearchFiltersUi(speakers = inventory)
         show(BoardFixtures.library.copy(query = "delivery", searchFilters = filters))
         rule.onNodeWithText("Speaker").performClick()
         rule.onNodeWithText("Any speaker").assertIsEnabled().assertIsSelected()
         val composed = rule.onAllNodesWithText("Guest ", substring = true).fetchSemanticsNodes().size
         assertTrue("Only the viewport and prefetch rows should compose; got $composed", composed in 1..20)
+        // Lazy key indexing can look ahead of the viewport; it must not traverse the full inventory.
+        assertTrue("Indexed ${readIndices.size} of ${names.size} names", readIndices.size in 1..500)
         rule.onNodeWithTag("speaker-filter-menu").performScrollToIndex(names.size)
         rule.onNodeWithText("Guest 4999").performClick()
         assertEvents(LibraryEvent.FilterSpeaker("Guest 4999"))
