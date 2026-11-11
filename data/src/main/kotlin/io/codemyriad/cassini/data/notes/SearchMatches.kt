@@ -46,13 +46,13 @@ internal class SearchMatches(
                     Word(word.speaker, word.startMs, word.endMs, word.text)
                 }
             }.orEmpty()
-            if (variant != null && words.size != hit.row.wordCount) return null
-            val found = if (ids == null) {
-                matcher.note(expression, hit.row.title, words)
-            } else {
-                matcher.snippet(expression, words, ids, key.bounded)?.let { SearchExcerpt(it, hit.row.title) }
+            val complete = variant == null || words.size == hit.row.wordCount
+            val found = when {
+                !complete -> null
+                ids == null -> matcher.note(expression, hit.row.title, words)
+                else -> matcher.snippet(expression, words, ids, key.bounded)?.let { SearchExcerpt(it, hit.row.title) }
             }
-            excerpts[hit.row.id] = Cached(key, found)
+            if (complete) excerpts[hit.row.id] = Cached(key, found)
             found
         }
         return excerpt?.let { hit.copy(snippet = it.snippet, titleSnippet = it.title) }
