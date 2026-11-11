@@ -40,9 +40,14 @@ class ImportTracker(
             Log.w(TAG, "Cannot describe an imported file", error)
             null
         } ?: fallbackName()
+        track(name) { run(uri) }
+    }
+
+    /** Tracks a private Files-provider upload through the same progress and error notices as picked files. */
+    suspend fun track(name: String, import: suspend () -> ImportOutcome): ImportOutcome? {
         mutable.update { it.copy(running = it.running + name, failure = null) }
         val outcome = try {
-            run(uri)
+            import()
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
@@ -57,7 +62,7 @@ class ImportTracker(
             is ImportOutcome.Created, is ImportOutcome.Existing -> null
         }
         if (failure != null) mutable.update { it.copy(failure = failure) }
-        outcome
+        return outcome
     }
 
     /**
