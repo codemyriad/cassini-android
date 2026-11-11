@@ -30,11 +30,17 @@ class CassiniBackupAgent : BackupAgent() {
     override fun onFullBackup(data: FullBackupDataOutput) {
         requireQuiescent()
         val flags = if (Build.VERSION.SDK_INT >= BackupChoices.TRANSPORT_FLAGS_API) data.transportFlags else 0
-        if (!choices.readBlocking().permits(Build.VERSION.SDK_INT, flags)) {
+        if (!choices.readBlocking().permits(Build.VERSION.SDK_INT, flags, BuildConfig.CLOUD_BACKUP_ENABLED)) {
             // Refuse before emitting library bytes; a successful empty archive could replace earlier data.
             throw IOException("This backup transport is disabled")
         }
         val (manifest, inventory) = library.prepare()
+        // The payload alone is a lower bound; Android also measures tar framing and reports quota callbacks.
+        val bytes = manifest.files.fold(inventory.length()) { total, entry -> Math.addExact(total, entry.bytes) }
+        if (data.quota >= 0 && bytes > data.quota) {
+            onQuotaExceeded(bytes, data.quota)
+            throw IOException("Library exceeds the transfer quota")
+        }
         fullBackupFile(inventory, data)
         for (entry in manifest.files) fullBackupFile(File(filesDir, entry.path), data)
     }

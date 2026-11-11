@@ -2,6 +2,8 @@ package io.codemyriad.cassini.ui.settings
 
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -32,37 +34,45 @@ class BackupSectionTest {
         }
     }
 
-    @Test fun switchesHaveIndependentAccessibleStateAndDoNotInventSuccessfulPersistence() {
-        show(BackupSettingsUi(transfer = true, cloud = false, transferAvailable = true, quotaExceeded = false))
-        rule.onNodeWithText("Transfer to a new phone").assertIsOn().performClick()
-        rule.onNodeWithText("Android cloud backup").assertIsOff().performClick()
-        assertEquals(listOf(SettingsEvent.Transfer(false), SettingsEvent.CloudBackup(true)), events)
-        rule.onNodeWithText("Transfer to a new phone").assertIsOn()
-        rule.onNodeWithText("Android cloud backup").assertIsOff()
+    @Test fun transferHasAccessibleStateAndCloudHasNoUi() {
+        show(BackupSettingsUi(transfer = true, transferAvailable = true, quotaExceeded = false))
+        rule.onNodeWithText("Move to a new phone").assertIsOn().performClick()
+        rule.onAllNodesWithText("Android cloud backup").assertCountEquals(0)
+        assertEquals(listOf(SettingsEvent.Transfer(false)), events)
+        rule.onNodeWithText("Move to a new phone").assertIsOn()
+        rule.onAllNodesWithText("Android cloud backup").assertCountEquals(0)
+    }
+
+    @Test fun disabledTransferExplainsTheConsequenceAndOffersExport() {
+        show(BackupSettingsUi(transfer = false, transferAvailable = true, quotaExceeded = false))
+        rule.onNodeWithText("Move to a new phone").assertIsOff()
+        rule.onNodeWithText(
+            "Nothing is copied to a new phone. If this phone is lost or replaced, your notes are gone unless you exported them.",
+        ).assertExists()
+        rule.onNodeWithText("To keep a copy somewhere safe, use Export All as ZIP.").assertExists()
     }
 
     @Test fun unavailableTransferCannotBeToggledAndExplainsWhy() {
-        show(BackupSettingsUi(transfer = true, cloud = false, transferAvailable = false, quotaExceeded = false))
-        rule.onNodeWithText("Transfer to a new phone").assertIsNotEnabled().assertIsOff()
-        rule.onNodeWithText("Separate phone-transfer controls need Android 9 or newer.").assertExists()
+        show(BackupSettingsUi(transfer = true, transferAvailable = false, quotaExceeded = false))
+        rule.onNodeWithText("Move to a new phone").assertIsNotEnabled().assertIsOff()
+        rule.onNodeWithText("Choosing this needs Android 9 or newer.").assertExists()
     }
 
-    @Test fun aWriteInProgressDisablesBothSwitchesAndActualQuotaFailureIsVisible() {
+    @Test fun aWriteInProgressDisablesTransferAndActualQuotaFailureOffersZip() {
         show(
             BackupSettingsUi(
                 transfer = true,
-                cloud = true,
                 transferAvailable = true,
                 quotaExceeded = true,
                 saving = true,
                 error = true
             )
         )
-        rule.onNodeWithText("Transfer to a new phone").assertIsNotEnabled()
-        rule.onNodeWithText("Android cloud backup").assertIsNotEnabled()
+        rule.onNodeWithText("Move to a new phone").assertIsNotEnabled()
+        rule.onAllNodesWithText("Android cloud backup").assertCountEquals(0)
         rule.onNodeWithText("Couldn’t save this choice. Try again.").assertExists()
         rule.onNodeWithText(
-            "Android could not back up the whole library because it exceeds the backup limit. Save copies of your important notes.",
+            "Your library is too large to move in one transfer. Export it as a ZIP instead.",
         ).assertExists()
     }
 }

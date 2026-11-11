@@ -82,6 +82,34 @@ class CassiniBackupAgentTest {
         assertFalse(app.hasStartedGraph())
     }
 
+    @Test fun cloudBuildFlagRefusesEvenAnExistingOptIn() {
+        assertFalse(io.codemyriad.cassini.BuildConfig.CLOUD_BACKUP_ENABLED)
+        val choices = BackupChoicesStore(File(app.noBackupFilesDir, "choices.json"), Dispatchers.IO)
+        binder { runBlocking { choices.setCloud(true) } }
+        val agent = Robolectric.setupBackupAgent(CassiniBackupAgent::class.java)
+        val output = ReflectionHelpers.newInstance(FullBackupDataOutput::class.java)
+        val error = assertThrows(IOException::class.java) { binder { agent.onFullBackup(output) } }
+        assertEquals("This backup transport is disabled", error.message)
+        assertFalse(File(app.filesDir, BackupManifest.MANIFEST).exists())
+    }
+
+    @Test fun aTransferOverTheReportedQuotaFailsBeforePublishingAnyPayload() {
+        val people = File(app.filesDir, "voices/people.json").also {
+            it.parentFile!!.mkdirs()
+            it.writeText("Synthetic saved voice")
+        }
+        val output = ReflectionHelpers.newInstance(FullBackupDataOutput::class.java)
+        ReflectionHelpers.setField(output, "mTransportFlags", 2)
+        ReflectionHelpers.setField(output, "mQuota", 1L)
+        val agent = Robolectric.setupBackupAgent(CassiniBackupAgent::class.java)
+        val error = assertThrows(IOException::class.java) { binder { agent.onFullBackup(output) } }
+        assertEquals("Library exceeds the transfer quota", error.message)
+        assertEquals("Synthetic saved voice", people.readText())
+        val choices = BackupChoicesStore(File(app.noBackupFilesDir, "choices.json"), Dispatchers.IO)
+        assertTrue(binder { choices.readBlocking().quotaExceeded })
+        assertFalse(app.hasStartedGraph())
+    }
+
     @Test fun restoredLibraryDoesNotRequireOrRestoreAnOldCloudOptInAndDoesNotLoadModels() {
         val source = folder.newFolder()
         File(source, "voices").mkdirs()

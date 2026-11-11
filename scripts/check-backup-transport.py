@@ -75,7 +75,7 @@ def main():
         if 'OK (1 test)' not in output or 'INSTRUMENTATION_CODE: -1' not in output:
             raise ValueError(f'Fixture stage {stage} did not pass: {output}')
 
-    def backup(name, allowed):
+    def backup(name, allowed, quota=False):
         adb('logcat', '-c')
         output = adb('shell', 'bmgr', 'backupnow', PACKAGE)
         result = backup_result(output)
@@ -84,9 +84,13 @@ def main():
         if allowed:
             if result != 'Success':
                 raise ValueError(f'{name} did not back up: {result}')
+        elif quota:
+            if result == 'Success' or 'Library exceeds the transfer quota' not in logcat:
+                raise ValueError(f'{name} did not demonstrate the quota refusal: {result}')
+            fixture('verifyQuota')
         elif result == 'Success' or 'This backup transport is disabled' not in logcat:
             raise ValueError(f'{name} did not demonstrate the runtime consent refusal: {result}')
-        report['cases'].append({'name': name, 'allowed': allowed, 'result': result})
+        report['cases'].append({'name': name, 'allowed': allowed, 'quota': quota, 'result': result})
 
     def restore(name):
         sets = adb('shell', 'bmgr', 'list', 'sets')
@@ -160,6 +164,10 @@ def main():
             raise ValueError('ADB serial does not belong to this task')
         if adb('shell', 'getprop', 'sys.boot_completed').strip() != '1':
             raise ValueError('Guest boot property disagrees with emulator event')
+        report['api'] = int(adb('shell', 'getprop', 'ro.build.version.sdk').strip())
+        report['abi'] = adb('shell', 'getprop', 'ro.product.cpu.abi').strip()
+        if report['api'] != 35 or report['abi'] != 'arm64-v8a':
+            raise ValueError('Expected the owned API 35 arm64 image')
         adb('shell', 'cmd', 'activity', 'wait-for-broadcast-idle')
         adb('install', '-t', str(args.app))
         adb('install', '-t', str(args.test_apk))
@@ -175,10 +183,7 @@ def main():
             'is_encrypted=true,is_device_transfer=false')
         backup('cloud-default-off', False)
         fixture('choices', cloud=True, transfer=False)
-        backup('cloud-on-transfer-off', True)
-        restore('cloud')
-        # Recreate only excluded synthetic markers on the restored source before the second round.
-        fixture('markers')
+        backup('cloud-old-opt-in-refused-by-build-flag', False)
         adb('shell', 'settings', 'put', 'secure', 'backup_local_transport_parameters',
             'is_encrypted=true,is_device_transfer=true')
         fixture('choices', cloud=True, transfer=False)
@@ -186,6 +191,8 @@ def main():
         fixture('choices', cloud=False, transfer=True)
         backup('transfer-on-cloud-off', True)
         restore('transfer')
+        fixture('oversized')
+        backup('transfer-over-quota', False, quota=True)
         report['success'] = True
     finally:
         (args.output / 'report.json').write_text(json.dumps(report, indent=2) + '\n')

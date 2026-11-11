@@ -91,7 +91,6 @@ val ModelStatusUi.isInstalling: Boolean
 @Immutable
 data class BackupSettingsUi(
     val transfer: Boolean,
-    val cloud: Boolean,
     val transferAvailable: Boolean,
     val quotaExceeded: Boolean,
     val saving: Boolean = false,

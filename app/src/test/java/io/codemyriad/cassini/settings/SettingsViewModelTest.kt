@@ -393,22 +393,22 @@ class SettingsViewModelTest {
     @Test fun backupChoicesWaitForPersistenceAndShowAFailedWriteWithoutChangingTheSwitch() = runTest(dispatcher) {
         ports.backup.value = BackupChoices()
         val viewModel = viewModel()
-        assertEquals(false, viewModel.now().backup?.cloud)
+        assertEquals(true, viewModel.now().backup?.transfer)
         val gate = CompletableDeferred<Unit>()
         ports.backupWrite = gate
-        viewModel.onEvent(SettingsEvent.CloudBackup(true))
+        viewModel.onEvent(SettingsEvent.Transfer(false))
         advanceUntilIdle()
         assertEquals(true, viewModel.now().backup?.saving)
-        assertEquals(false, viewModel.now().backup?.cloud)
+        assertEquals(true, viewModel.now().backup?.transfer)
         gate.completeExceptionally(IOException("Synthetic storage full"))
         advanceUntilIdle()
         assertEquals(false, viewModel.now().backup?.saving)
         assertEquals(true, viewModel.now().backup?.error)
-        assertEquals(false, viewModel.now().backup?.cloud)
+        assertEquals(true, viewModel.now().backup?.transfer)
         ports.backupWrite = null
-        viewModel.onEvent(SettingsEvent.CloudBackup(true))
+        viewModel.onEvent(SettingsEvent.Transfer(false))
         advanceUntilIdle()
-        assertEquals(true, viewModel.now().backup?.cloud)
+        assertEquals(false, viewModel.now().backup?.transfer)
         assertEquals(false, viewModel.now().backup?.error)
     }
 
@@ -419,7 +419,6 @@ class SettingsViewModelTest {
         advanceUntilIdle()
         assertEquals(BackupChoices(transfer = false, cloud = true, noticeAcknowledged = true), ports.backup.value)
         assertEquals(false, viewModel.now().backup?.transfer)
-        assertEquals(true, viewModel.now().backup?.cloud)
     }
 
     @Test fun anOldAndroidCannotPretendToSaveAnIndependentTransferChoice() = runTest(dispatcher) {
@@ -431,9 +430,6 @@ class SettingsViewModelTest {
         advanceUntilIdle()
         assertEquals(BackupChoices(), ports.backup.value)
         assertEquals(0, ports.transferWrites)
-        viewModel.onEvent(SettingsEvent.CloudBackup(true))
-        advanceUntilIdle()
-        assertEquals(true, viewModel.now().backup?.cloud)
     }
 
     private class FakeSettingsPorts : SettingsPorts {
@@ -445,10 +441,6 @@ class SettingsViewModelTest {
             transferWrites++
             backupWrite?.await()
             backup.value = checkNotNull(backup.value).copy(transfer = enabled, noticeAcknowledged = true)
-        }
-        override suspend fun setCloudBackup(enabled: Boolean) {
-            backupWrite?.await()
-            backup.value = checkNotNull(backup.value).copy(cloud = enabled, quotaExceeded = false)
         }
 
         override fun dismissParakeetDefault() {

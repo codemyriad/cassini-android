@@ -133,7 +133,7 @@
     <string name="ui_library_settings">Configurações</string>
     <string name="ui_library_search_placeholder">Buscar títulos e o que foi dito</string>
     <string name="ui_search_clear">Limpar busca</string>
-    <string name="ui_library_privacy">Transcrito neste celular. O áudio nunca sai dele.</string>
+    <string name="ui_library_privacy">A transcrição é feita neste celular.</string>
     <string name="ui_library_recording_card">Gravando · %1$s</string>
     <string name="ui_library_recording_paused_card">Gravação pausada · %1$s</string>
     <string name="ui_library_recording_tap">Toque para voltar</string>
@@ -307,8 +307,8 @@
     <string name="ui_name_rename_saved">Renomear voz salva</string>
     <string name="ui_name_not">Não é %1$s?</string>
     <string name="ui_name_remember">Lembrar esta voz neste celular</string>
-    <string name="ui_name_remember_body">As próximas notas vão reconhecer %1$s automaticamente. A impressão de voz nunca sai do celular.</string>
-    <string name="ui_name_remember_body_unnamed">As próximas notas vão reconhecer esta pessoa automaticamente. A impressão de voz nunca sai do celular.</string>
+    <string name="ui_name_remember_body">Nas próximas notas, o Cassini vai nomear %1$s automaticamente. Esta impressão de voz vai para um novo celular se “Transferir para um novo celular” estiver ativado.</string>
+    <string name="ui_name_remember_body_unnamed">Nas próximas notas, o Cassini vai nomear esta pessoa automaticamente. Esta impressão de voz vai para um novo celular se “Transferir para um novo celular” estiver ativado.</string>
     <string name="ui_name_remember_too_little">Fala insuficiente para lembrar esta voz.</string>
     <string name="ui_name_remember_no_model">O reconhecimento de vozes salvas ainda não está instalado.</string>
     <string name="ui_name_merge_into">Mesclar com…</string>
@@ -407,7 +407,7 @@
 
     <!-- Saved voices (board 07, features.md section 10). -->
     <string name="ui_voices_title">Vozes salvas</string>
-    <string name="ui_voices_privacy">As impressões de voz ficam neste celular. Nunca são enviadas nem escritas em arquivos compartilhados — só os nomes que você escolher.</string>
+    <string name="ui_voices_privacy">As impressões de voz ficam no aplicativo e nunca são incluídas em arquivos compartilhados. Elas vão para um novo celular se “Transferir para um novo celular” estiver ativado. Só os nomes que você escolhe são compartilhados.</string>
     <string name="ui_voices_confirmed_speech">%1$s de fala confirmada</string>
     <string name="ui_voices_options">Opções de %1$s</string>
     <string name="ui_voices_forget">Esquecer…</string>
@@ -439,7 +439,7 @@
     <string name="ui_settings_model_pending">Será baixado na próxima transcrição</string>
     <string name="ui_settings_model_not_downloaded">Não baixado</string>
     <string name="ui_settings_model_failed">Falha no download — toque para tentar novamente</string>
-    <string name="ui_settings_models_footnote">A transcrição acontece neste celular. O áudio nunca sai dele.</string>
+    <string name="ui_settings_models_footnote">A transcrição é feita neste celular.</string>
     <string name="ui_settings_privacy">Privacidade</string>
     <string name="ui_settings_voices">Vozes salvas</string>
     <string name="ui_settings_voices_none">Nenhuma ainda</string>
@@ -595,4 +595,13 @@
     <string name="ui_meeting_duration_minutes">{m} min</string>
     <!-- cassini-ux library.group.unknownDate (D95); see docs/recorded-at.md. -->
     <string name="ui_day_unknown">Data desconhecida</string>
+    <string name="ui_settings_transfer_heading">Mudança para um novo celular</string>
+    <string name="ui_settings_transfer_title">Transferir para um novo celular</string>
+    <string name="ui_settings_transfer_body">Quando você configura um novo celular Android a partir deste, suas notas e vozes salvas são copiadas diretamente para ele. Nada é enviado para uma conta na nuvem. Os modelos baixados não são copiados; o novo celular os baixa novamente.</string>
+    <string name="ui_settings_transfer_body_off">Nada é copiado para um novo celular. Se este celular for perdido ou substituído, suas notas serão perdidas, a menos que você as tenha exportado.</string>
+    <string name="ui_settings_transfer_export_hint">Para guardar uma cópia em um lugar seguro, use “Exportar tudo como ZIP”.</string>
+    <string name="ui_settings_transfer_too_large">Sua biblioteca é grande demais para ser transferida de uma só vez. Exporte-a como ZIP.</string>
+    <string name="ui_settings_transfer_unavailable">Esta opção requer o Android 9 ou mais recente.</string>
+    <string name="ui_settings_transfer_choice_failed">Não foi possível salvar esta opção. Tente novamente.</string>
+    <string name="ui_notice_transfer_enabled">O Cassini vai transferir suas notas e vozes salvas para um novo celular quando você o configurar a partir deste. Você pode alterar isso nos Ajustes.</string>
 </resources>

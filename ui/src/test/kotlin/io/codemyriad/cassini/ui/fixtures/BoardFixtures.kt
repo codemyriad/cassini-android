@@ -351,7 +351,7 @@ internal object BoardFixtures {
         voices = 4,
         trash = 2,
         version = "0.1.0",
-        backup = BackupSettingsUi(transfer = true, cloud = false, transferAvailable = true, quotaExceeded = false),
+        backup = BackupSettingsUi(transfer = true, transferAvailable = true, quotaExceeded = false),
     )
 
     // Board 09: Trash, with the fixture-only "moved to trash" snackbar (ui.md section 11, item 11).

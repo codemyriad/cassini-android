@@ -43,8 +43,6 @@ interface SettingsPorts {
 
     suspend fun setTransfer(enabled: Boolean) { error("Backup choices are unavailable") }
 
-    suspend fun setCloudBackup(enabled: Boolean) { error("Backup choices are unavailable") }
-
     val speech: Flow<SpeechChoice>
 
     suspend fun chooseSpeech(model: SpeechModel)
@@ -84,8 +82,6 @@ class GraphSettingsPorts(private val graph: AppGraph) : SettingsPorts {
     override val backup: Flow<BackupChoices?> get() = graph.backupChoices.choices
 
     override suspend fun setTransfer(enabled: Boolean) = graph.backupChoices.setTransfer(enabled)
-
-    override suspend fun setCloudBackup(enabled: Boolean) = graph.backupChoices.setCloud(enabled)
 
     override val speech: Flow<SpeechChoice> get() = graph.speech.state
 

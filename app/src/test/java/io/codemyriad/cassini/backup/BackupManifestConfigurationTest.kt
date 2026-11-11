@@ -23,6 +23,7 @@ class BackupManifestConfigurationTest {
         assertEquals("true", attribute("fullBackupOnly"))
         assertEquals("false", attribute("backupInForeground"))
         assertEquals("true", attribute("killAfterRestore"))
+        assertEquals("false", attribute("restoreAnyVersion"))
         assertEquals(".backup.CassiniBackupAgent", attribute("backupAgent"))
         assertEquals("@xml/full_backup_content", attribute("fullBackupContent"))
         assertEquals("@xml/data_extraction_rules", attribute("dataExtractionRules"))
@@ -32,7 +33,9 @@ class BackupManifestConfigurationTest {
         val legacy = xml("app/src/main/res/xml/full_backup_content.xml")
         checkIncludes(legacy)
         val modern = xml("app/src/main/res/xml/data_extraction_rules.xml")
-        checkIncludes(modern.getElementsByTagName("cloud-backup").item(0) as Element)
+        val cloud = modern.getElementsByTagName("cloud-backup").item(0) as Element
+        assertEquals("true", cloud.getAttribute("disableIfNoEncryptionCapabilities"))
+        checkIncludes(cloud)
         checkIncludes(modern.getElementsByTagName("device-transfer").item(0) as Element)
     }
 

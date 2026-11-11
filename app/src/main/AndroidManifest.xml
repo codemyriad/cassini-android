@@ -21,6 +21,7 @@
         android:localeConfig="@xml/locales_config" android:dataExtractionRules="@xml/data_extraction_rules"
         android:largeHeap="true" android:allowBackup="true" android:fullBackupOnly="true"
         android:backupAgent=".backup.CassiniBackupAgent" android:backupInForeground="false" android:killAfterRestore="true"
+        android:restoreAnyVersion="false"
         android:fullBackupContent="@xml/full_backup_content" android:supportsRtl="true"
         android:usesCleartextTraffic="false" android:enableOnBackInvokedCallback="true" tools:targetApi="33">
         <!-- The only activity (docs/architecture.md section 6). singleTop: a notification or a viewed file reaches the

@@ -133,7 +133,7 @@
     <string name="ui_library_settings">Definições</string>
     <string name="ui_library_search_placeholder">Pesquisar títulos e o que foi dito</string>
     <string name="ui_search_clear">Limpar pesquisa</string>
-    <string name="ui_library_privacy">Transcrito neste telemóvel. O áudio nunca sai dele.</string>
+    <string name="ui_library_privacy">A transcrição é feita neste telemóvel.</string>
     <string name="ui_library_recording_card">A gravar · %1$s</string>
     <string name="ui_library_recording_paused_card">Gravação em pausa · %1$s</string>
     <string name="ui_library_recording_tap">Toque para voltar</string>
@@ -307,8 +307,8 @@
     <string name="ui_name_rename_saved">Mudar o nome da voz guardada</string>
     <string name="ui_name_not">Não é %1$s?</string>
     <string name="ui_name_remember">Memorizar esta voz neste telemóvel</string>
-    <string name="ui_name_remember_body">As próximas notas vão reconhecer %1$s automaticamente. A impressão vocal nunca sai do telemóvel.</string>
-    <string name="ui_name_remember_body_unnamed">As próximas notas vão reconhecer esta pessoa automaticamente. A impressão vocal nunca sai do telemóvel.</string>
+    <string name="ui_name_remember_body">Nas próximas notas, o Cassini reconhece %1$s automaticamente. Esta impressão vocal passa para um telemóvel novo se «Passar para um telemóvel novo» estiver ativado.</string>
+    <string name="ui_name_remember_body_unnamed">Nas próximas notas, o Cassini reconhece esta pessoa automaticamente. Esta impressão vocal passa para um telemóvel novo se «Passar para um telemóvel novo» estiver ativado.</string>
     <string name="ui_name_remember_too_little">Fala insuficiente para memorizar esta voz.</string>
     <string name="ui_name_remember_no_model">O reconhecimento de vozes guardadas ainda não está instalado.</string>
     <string name="ui_name_merge_into">Juntar a…</string>
@@ -407,7 +407,7 @@
 
     <!-- Saved voices (board 07, features.md section 10). -->
     <string name="ui_voices_title">Vozes guardadas</string>
-    <string name="ui_voices_privacy">As impressões vocais ficam neste telemóvel. Nunca são carregadas nem escritas em ficheiros partilhados — só os nomes que escolher.</string>
+    <string name="ui_voices_privacy">As impressões vocais ficam na aplicação e nunca são incluídas nos ficheiros partilhados. Passam para um telemóvel novo se «Passar para um telemóvel novo» estiver ativado. Só os nomes que escolher são partilhados.</string>
     <string name="ui_voices_confirmed_speech">%1$s de fala confirmada</string>
     <string name="ui_voices_options">Opções para %1$s</string>
     <string name="ui_voices_forget">Esquecer…</string>
@@ -439,7 +439,7 @@
     <string name="ui_settings_model_pending">Será transferido na próxima transcrição</string>
     <string name="ui_settings_model_not_downloaded">Não transferido</string>
     <string name="ui_settings_model_failed">Falha na transferência — toque para tentar novamente</string>
-    <string name="ui_settings_models_footnote">A transcrição acontece neste telemóvel. O áudio nunca sai dele.</string>
+    <string name="ui_settings_models_footnote">A transcrição é feita neste telemóvel.</string>
     <string name="ui_settings_privacy">Privacidade</string>
     <string name="ui_settings_voices">Vozes guardadas</string>
     <string name="ui_settings_voices_none">Ainda nenhuma</string>
@@ -595,4 +595,13 @@
     <string name="ui_meeting_duration_minutes">{m} min</string>
     <!-- cassini-ux library.group.unknownDate (D95); see docs/recorded-at.md. -->
     <string name="ui_day_unknown">Data desconhecida</string>
+    <string name="ui_settings_transfer_heading">Mudança para um telemóvel novo</string>
+    <string name="ui_settings_transfer_title">Passar para um telemóvel novo</string>
+    <string name="ui_settings_transfer_body">Ao configurar um telemóvel Android novo a partir deste, as suas notas e vozes guardadas são copiadas diretamente para ele. Nada é enviado para uma conta na nuvem. Os modelos transferidos não são copiados; o telemóvel novo volta a transferi-los.</string>
+    <string name="ui_settings_transfer_body_off">Nada é copiado para um telemóvel novo. Se este telemóvel for perdido ou substituído, as suas notas perdem-se, a menos que as tenha exportado.</string>
+    <string name="ui_settings_transfer_export_hint">Para guardar uma cópia num local seguro, utilize «Exportar tudo como ZIP».</string>
+    <string name="ui_settings_transfer_too_large">A sua biblioteca é demasiado grande para ser passada de uma só vez. Exporte-a como ZIP.</string>
+    <string name="ui_settings_transfer_unavailable">Esta opção requer o Android 9 ou mais recente.</string>
+    <string name="ui_settings_transfer_choice_failed">Não foi possível guardar esta opção. Tente novamente.</string>
+    <string name="ui_notice_transfer_enabled">O Cassini passa as suas notas e vozes guardadas para um telemóvel novo quando este for configurado a partir deste telemóvel. Pode alterar isto nas definições.</string>
 </resources>

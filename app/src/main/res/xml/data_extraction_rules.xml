@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Static ceiling only: runtime cloud consent remains off until explicitly enabled in Settings. -->
+<!-- Static ceiling only: the OFF build flag refuses cloud transport even with a persisted opt-in. -->
 <data-extraction-rules>
-    <cloud-backup>
+    <cloud-backup disableIfNoEncryptionCapabilities="true">
         <include domain="file" path="cassini.db" />
         <include domain="file" path="notes/" />
         <include domain="file" path="voices/" />

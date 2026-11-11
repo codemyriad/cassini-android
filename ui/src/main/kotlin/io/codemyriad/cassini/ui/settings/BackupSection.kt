@@ -24,24 +24,19 @@ import io.codemyriad.cassini.ui.theme.CassiniTheme
 /** Entire-row switch semantics, one node per choice; failed persistence never optimistically changes it. */
 @Composable
 internal fun BackupSection(state: BackupSettingsUi, onEvent: (SettingsEvent) -> Unit) {
-    SectionHeader(stringResource(R.string.ui_settings_backup_heading))
+    SectionHeader(stringResource(R.string.ui_settings_transfer_heading))
     GroupCard(Modifier.padding(horizontal = 16.dp)) {
         BackupSwitch(
             stringResource(R.string.ui_settings_transfer_title),
-            stringResource(R.string.ui_settings_transfer_body),
+            stringResource(if (state.transfer) R.string.ui_settings_transfer_body else R.string.ui_settings_transfer_body_off),
             state.transferAvailable && state.transfer,
             !state.saving && state.transferAvailable,
         ) { onEvent(SettingsEvent.Transfer(it)) }
-        BackupSwitch(
-            stringResource(R.string.ui_settings_backup_cloud_title),
-            stringResource(R.string.ui_settings_backup_cloud_body),
-            state.cloud,
-            !state.saving,
-        ) { onEvent(SettingsEvent.CloudBackup(it)) }
     }
+    HelperText(stringResource(R.string.ui_settings_transfer_export_hint))
     if (!state.transferAvailable) HelperText(stringResource(R.string.ui_settings_transfer_unavailable))
-    if (state.quotaExceeded) HelperText(stringResource(R.string.ui_settings_backup_cloud_limit))
-    if (state.error) HelperText(stringResource(R.string.ui_settings_backup_choice_failed))
+    if (state.quotaExceeded) HelperText(stringResource(R.string.ui_settings_transfer_too_large))
+    if (state.error) HelperText(stringResource(R.string.ui_settings_transfer_choice_failed))
 }
 
 @Composable

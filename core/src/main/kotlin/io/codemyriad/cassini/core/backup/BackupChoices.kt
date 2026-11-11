@@ -8,8 +8,8 @@ data class BackupChoices(
     val quotaExceeded: Boolean = false,
 ) {
     /** Unknown transports require cloud consent. Android exposes transport flags from API 28 onward. */
-    fun permits(api: Int, transportFlags: Int): Boolean =
-        if (api >= TRANSPORT_FLAGS_API && transportFlags and TRANSFER_FLAGS != 0) transfer else cloud
+    fun permits(api: Int, transportFlags: Int, cloudEnabled: Boolean = false): Boolean =
+        if (api >= TRANSPORT_FLAGS_API && transportFlags and TRANSFER_FLAGS != 0) transfer else cloudEnabled && cloud
 
     val showTransferNotice: Boolean get() = transfer && !noticeAcknowledged
 

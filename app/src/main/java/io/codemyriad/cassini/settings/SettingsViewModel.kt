@@ -67,7 +67,6 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
         choices?.let {
             BackupSettingsUi(
                 transfer = it.transfer,
-                cloud = it.cloud,
                 transferAvailable = ports.transferAvailable,
                 quotaExceeded = it.quotaExceeded,
                 saving = saving,
@@ -127,7 +126,6 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
             SettingsEvent.DismissParakeet -> ports.dismissParakeetSuggestion()
             SettingsEvent.DismissParakeetDefault -> ports.dismissParakeetDefault()
             is SettingsEvent.Transfer -> saveBackup(transfer = event.enabled)
-            is SettingsEvent.CloudBackup -> saveBackup(cloud = event.enabled)
             SettingsEvent.Back -> emit(SettingsEffect.Close)
             is SettingsEvent.Language -> choose(event.language)
             is SettingsEvent.ChooseSpeech -> chooseSpeech(event.model)
@@ -148,14 +146,13 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
         ports.refreshNotices()
     }
 
-    private fun saveBackup(transfer: Boolean? = null, cloud: Boolean? = null) {
-        if (backupSaving.value || (transfer != null && !ports.transferAvailable)) return
+    private fun saveBackup(transfer: Boolean) {
+        if (backupSaving.value || !ports.transferAvailable) return
         backupSaving.value = true
         backupError.value = false
         viewModelScope.launch {
             try {
-                if (transfer != null) ports.setTransfer(transfer)
-                if (cloud != null) ports.setCloudBackup(cloud)
+                ports.setTransfer(transfer)
             } catch (error: CancellationException) {
                 throw error
             } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
