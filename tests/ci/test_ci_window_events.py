@@ -23,7 +23,10 @@ class WindowWaitTest(unittest.TestCase):
     def test_suppressed_removal_notification_fails_despite_the_dialog_changing(self):
         self.check_transition("hidden", notify=False)
 
-    def check_transition(self, target, *, notify):
+    def test_process_exit_with_no_dialog_wakes_preflight(self):
+        self.check_transition("hidden", notify=True, event="[0,123,fixture]")
+
+    def check_transition(self, target, *, notify, event="WINDOW"):
         source = SCRIPT.read_text()
         function = source[source.index("wait_for() ("):source.index("error_dialog() {")]
         with tempfile.TemporaryDirectory() as temporary:
@@ -40,6 +43,7 @@ class WindowWaitTest(unittest.TestCase):
 import os
 from pathlib import Path
 import sys
+import signal
 
 root = Path(os.environ["WINDOW_TEST_ROOT"])
 args = sys.argv[1:]
@@ -54,9 +58,13 @@ elif args[0] == "shell" and "app_process" in args[1]:
     (root / "state").write_text(os.environ["WINDOW_TARGET"])
     (root / "changed").touch()
     if os.environ["WINDOW_NOTIFY"] == "yes":
-        print("WINDOW", flush=True)
+        print(os.environ["WINDOW_EVENT"], flush=True)
     sys.stdin.read(1)
     print("STOPPED", flush=True)
+elif args[0] == "logcat":
+    signal.pause()
+elif args[0] == "shell" and args[1].startswith("date "):
+    print("11-11 01:00:00.000")
 elif args[0] == "shell" and args[1] in ("rm", "kill"):
     pass
 else:
@@ -85,6 +93,7 @@ wait_for 1 'Dialog did not reach the expected state' predicate
                 WINDOW_TEST_ROOT=str(root),
                 WINDOW_TARGET=target,
                 WINDOW_NOTIFY="yes" if notify else "no",
+                WINDOW_EVENT=event,
             )
             process = subprocess.Popen(
                 ["bash", "-c", command],

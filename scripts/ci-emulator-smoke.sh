@@ -68,15 +68,20 @@ finish() {
 trap finish EXIT
 # Subscribe before the retained-state check. Dialog appearance and removal both publish window events.
 wait_for() (
-    local seconds=$1 message=$2 work watcher='' remote remote_pid='' line remaining
+    local seconds=$1 message=$2 work watcher='' process_watcher='' remote remote_pid='' line remaining since
     shift 2
+    since=$(adb shell "date '+%m-%d %H:%M:%S.000'" | tr -d '\r')
     work=$(mktemp -d)
     remote=/data/local/tmp/cassini-window-events-$$-$RANDOM.apk
     mkfifo "$work/events" "$work/control"
     exec 3<>"$work/events"
     exec 4<>"$work/control"
-    # shellcheck disable=SC2329 # Invoked by this subshell's EXIT trap.
+    # shellcheck disable=SC2317,SC2329 # Invoked by this subshell's EXIT trap.
     cleanup_window_observer() {
+        if [ -n "$process_watcher" ]; then
+            kill "$process_watcher" 2>/dev/null || true
+            wait "$process_watcher" 2>/dev/null || true
+        fi
         if [ -n "$watcher" ]; then
             printf 'stop\n' >&4
             local cleanup_end=$((SECONDS + 5)) stopped=false
@@ -100,6 +105,9 @@ wait_for() (
     adb shell "CLASSPATH=$remote app_process / io.codemyriad.cassini.preflight.WindowEvents" \
         < "$work/control" > "$work/events" 2> "$work/error.txt" &
     watcher=$!
+    adb logcat -b events -T "$since" -v raw -s am_anr:I am_proc_died:I am_kill:I \
+        > "$work/events" 2> "$work/process-error.txt" &
+    process_watcher=$!
     local end=$((SECONDS + seconds))
     while :; do
         remaining=$((end - SECONDS))
@@ -123,7 +131,7 @@ wait_for() (
         remaining=$((end - SECONDS))
         if [ "$remaining" -le 0 ] || ! IFS= read -r -t "$remaining" line <&3; then break; fi
         line=${line%$'\r'}
-        if [ "$line" = WINDOW ] && "$@"; then return 0; fi
+        if { [ "$line" = WINDOW ] || [[ "$line" == \[* ]]; } && "$@"; then return 0; fi
     done
     printf '%s (no matching window change within %s s)\n' "$message" "$seconds" >&2
     return 1
