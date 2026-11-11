@@ -107,6 +107,9 @@ dependencies {
     // pane before the navigation in :app takes it. A change to ui.md section 1 ("only for previews"); see
     // docs/ui-fidelity.md, "Changes to the screen contracts".
     implementation(libs.activity.compose)
+    // Activity brings an older runtime into this module. Its lint uses APIs removed in AGP 9.5.
+    // Keep the bundled lifecycle checks compatible with the app's pinned Lifecycle version.
+    constraints { implementation(libs.lifecycle.runtime) }
     // UiState classes expose ImmutableList (docs/design/ui.md, section 2), so :app ViewModels need the type.
     api(libs.kotlinx.collections.immutable)
     // Android Studio previews. It also adds the exported PreviewActivity to the debug APK of :app.
