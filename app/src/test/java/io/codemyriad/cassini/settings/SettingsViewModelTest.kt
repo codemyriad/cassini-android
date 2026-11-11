@@ -1,6 +1,9 @@
 package io.codemyriad.cassini.settings
 
 import androidx.core.os.LocaleListCompat
+import io.codemyriad.cassini.core.backup.BackupChoices
+import java.io.IOException
+import kotlinx.coroutines.CompletableDeferred
 import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.core.models.ModelPlan
@@ -387,7 +390,67 @@ class SettingsViewModelTest {
         assertEquals(1, ports.noticeRefreshes)
     }
 
+    @Test fun backupChoicesWaitForPersistenceAndShowAFailedWriteWithoutChangingTheSwitch() = runTest(dispatcher) {
+        ports.backup.value = BackupChoices()
+        val viewModel = viewModel()
+        assertEquals(false, viewModel.now().backup?.cloud)
+        val gate = CompletableDeferred<Unit>()
+        ports.backupWrite = gate
+        viewModel.onEvent(SettingsEvent.CloudBackup(true))
+        advanceUntilIdle()
+        assertEquals(true, viewModel.now().backup?.saving)
+        assertEquals(false, viewModel.now().backup?.cloud)
+        gate.completeExceptionally(IOException("Synthetic storage full"))
+        advanceUntilIdle()
+        assertEquals(false, viewModel.now().backup?.saving)
+        assertEquals(true, viewModel.now().backup?.error)
+        assertEquals(false, viewModel.now().backup?.cloud)
+        ports.backupWrite = null
+        viewModel.onEvent(SettingsEvent.CloudBackup(true))
+        advanceUntilIdle()
+        assertEquals(true, viewModel.now().backup?.cloud)
+        assertEquals(false, viewModel.now().backup?.error)
+    }
+
+    @Test fun turningOffTransferAcknowledgesTheNoticeWithoutChangingCloudConsent() = runTest(dispatcher) {
+        ports.backup.value = BackupChoices(cloud = true)
+        val viewModel = viewModel()
+        viewModel.onEvent(SettingsEvent.Transfer(false))
+        advanceUntilIdle()
+        assertEquals(BackupChoices(transfer = false, cloud = true, noticeAcknowledged = true), ports.backup.value)
+        assertEquals(false, viewModel.now().backup?.transfer)
+        assertEquals(true, viewModel.now().backup?.cloud)
+    }
+
+    @Test fun anOldAndroidCannotPretendToSaveAnIndependentTransferChoice() = runTest(dispatcher) {
+        ports.backup.value = BackupChoices()
+        ports.transferAvailable = false
+        val viewModel = viewModel()
+        assertEquals(false, viewModel.now().backup?.transferAvailable)
+        viewModel.onEvent(SettingsEvent.Transfer(false))
+        advanceUntilIdle()
+        assertEquals(BackupChoices(), ports.backup.value)
+        assertEquals(0, ports.transferWrites)
+        viewModel.onEvent(SettingsEvent.CloudBackup(true))
+        advanceUntilIdle()
+        assertEquals(true, viewModel.now().backup?.cloud)
+    }
+
     private class FakeSettingsPorts : SettingsPorts {
+        override val backup = MutableStateFlow<BackupChoices?>(null)
+        override var transferAvailable = true
+        var backupWrite: CompletableDeferred<Unit>? = null
+        var transferWrites = 0
+        override suspend fun setTransfer(enabled: Boolean) {
+            transferWrites++
+            backupWrite?.await()
+            backup.value = checkNotNull(backup.value).copy(transfer = enabled, noticeAcknowledged = true)
+        }
+        override suspend fun setCloudBackup(enabled: Boolean) {
+            backupWrite?.await()
+            backup.value = checkNotNull(backup.value).copy(cloud = enabled, quotaExceeded = false)
+        }
+
         override fun dismissParakeetDefault() {
             notices.value = notices.value.copy(parakeetNowDefault = false)
         }
