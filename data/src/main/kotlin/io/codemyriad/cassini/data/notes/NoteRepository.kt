@@ -27,6 +27,8 @@ import io.codemyriad.cassini.data.db.VariantEntity
 import io.codemyriad.cassini.data.db.WordEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -94,27 +96,19 @@ class NoteRepository(
         val match = SearchQuery.fts(query) ?: return library().map { rows ->
             rows.map { SearchRow(it, snippet = "", titleSnippet = it.title) }
         }
-        return notes.searchFlow(match).map { found ->
-            withContext(dispatchers.io) {
-                val candidates = found.filter { filters.includes(it.row.createdAt, it.row.origin, today, zone) }
-                val speaker = filters.speaker
-                if (speaker == null) return@withContext candidates
-                SpeakerSearch().use { matcher ->
-                    candidates.mapNotNull { hit ->
-                        val variant = hit.row.selectedVariant ?: return@mapNotNull null
-                        val ids = hit.speakers.filter {
-                            it.variantId == variant && !it.isPlaceholder && it.label.equals(speaker, ignoreCase = true)
-                        }.mapTo(HashSet()) { it.speakerId }
-                        if (ids.isEmpty()) return@mapNotNull null
-                        val words = cache.searchWords(hit.row.id, variant, hit.documentSignature).map {
-                            Word(it.speaker, it.startMs, it.endMs, it.text)
-                        }
-                        matcher.snippet(match, words, ids, hit.row.wordEndsBoundedByAudio == true)?.let {
-                            hit.copy(snippet = it, titleSnippet = hit.row.title)
+        return flow {
+            val matches = SearchMatches(cache::searchWords)
+            emitAll(
+                notes.searchFlow(match).map { found ->
+                    withContext(dispatchers.io) {
+                        val candidates = found.filter { filters.includes(it.row.createdAt, it.row.origin, today, zone) }
+                        matches.retain(candidates.mapTo(HashSet()) { it.row.id })
+                        SpeakerSearch().use { matcher ->
+                            candidates.mapNotNull { matches.match(it, filters.speaker, match, matcher) }
                         }
                     }
-                }
-            }
+                },
+            )
         }
     }
 

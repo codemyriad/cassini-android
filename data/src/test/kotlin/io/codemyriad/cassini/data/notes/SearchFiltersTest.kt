@@ -137,7 +137,15 @@ class SearchFiltersTest {
         val labels = words.map { it.speaker }.distinct().associateWith {
             if (it == chipWord.speaker) "Reply Person" else "Host Person"
         }
-        insert("chip", words, labels = labels)
+        val cached = cache(note("chip", createdAt = at), listOf("v1" to words))
+        h.db.cache().replaceCache(
+            cached.copy(
+                speakers = cached.speakers.map { it.copy(label = labels.getValue(it.speakerId), isPlaceholder = false) },
+                // Existing caches contain rendered chips. They remain useful candidates, but never grant a hit.
+                body = io.codemyriad.cassini.core.export.ReadingText.body(words, labels::getValue, true),
+            ),
+        )
+        assertTrue(search("Reply Person").isEmpty())
         val found = search(chipWord.text, SearchFilters(speaker = "Reply Person")).single()
         assertTrue(found.snippet.contains(SearchQuery.MATCH_START))
         assertTrue(search("Reply Person", SearchFilters(speaker = "Reply Person")).isEmpty())

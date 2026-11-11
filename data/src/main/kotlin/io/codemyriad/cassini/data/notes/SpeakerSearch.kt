@@ -14,6 +14,7 @@ import java.io.Closeable
 internal class SpeakerSearch : Closeable {
     private val database = SQLiteDatabase.create(null).apply {
         execSQL("CREATE VIRTUAL TABLE runs USING fts4(body, tokenize=unicode61 \"remove_diacritics=1\")")
+        execSQL("CREATE VIRTUAL TABLE note USING fts4(title, body, tokenize=unicode61 \"remove_diacritics=1\")")
     }
 
     suspend fun snippet(match: String, words: List<Word>, speakers: Set<String>, bounded: Boolean): String? {
@@ -39,6 +40,21 @@ internal class SpeakerSearch : Closeable {
             "SELECT snippet(runs, char(2), char(3), '…', 0, 15) FROM runs WHERE runs MATCH ? ORDER BY rowid LIMIT 1",
             arrayOf(match),
         ).use { if (it.moveToFirst()) it.getString(0) else null }
+    }
+
+    /** The broad, persistent index may contain old display labels. Validate only title and spoken words. */
+    fun note(match: String, title: String, words: List<Word>): SearchExcerpt? {
+        database.execSQL("DELETE FROM note")
+        database.compileStatement("INSERT INTO note(title, body) VALUES (?, ?)").use { insert ->
+            insert.bindString(1, title)
+            insert.bindString(2, words.joinToString(" ") { it.text })
+            insert.executeInsert()
+        }
+        return database.rawQuery(
+            "SELECT snippet(note, char(2), char(3), '…', 1, 15), " +
+                "snippet(note, char(2), char(3), '…', 0, 64) FROM note WHERE note MATCH ?",
+            arrayOf(match),
+        ).use { if (it.moveToFirst()) SearchExcerpt(it.getString(0), it.getString(1)) else null }
     }
 
     override fun close() = database.close()
