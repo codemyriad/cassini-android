@@ -450,9 +450,23 @@ data class CassiniDocument(
                 val name = it.substringBefore('=').uppercase(Locale.ROOT)
                 name == "CASSINI_FORMAT" || name == "CASSINI_PROFILE" || name == "CASSINI_PAYLOAD_SCHEMA" ||
                     isManifestTag(name) ||
-                    name in setOf("CASSINI_TRANSCRIPT_IDS", "CASSINI_TRANSCRIPT_DEFAULT", "CASSINI_DECODE_HINT", "CASSINI_SPEAKER_COUNT", "CASSINI_MEETING_ID", "CASSINI_CREATED_AT") ||
+                    name in setOf(
+                        "CASSINI_TRANSCRIPT_IDS",
+                        "CASSINI_TRANSCRIPT_DEFAULT",
+                        "CASSINI_DECODE_HINT",
+                        "CASSINI_SPEAKER_COUNT",
+                        "CASSINI_MEETING_ID",
+                        "CASSINI_CREATED_AT",
+                    ) ||
                     name in setOf("CASSINI_RECORDED_AT_UTC", "DATE") ||
-                    name in setOf("CASSINI_AUDIO_SAMPLE_RATE", "CASSINI_AUDIO_CHANNELS", "CASSINI_AUDIO_SAMPLE_COUNT", "CASSINI_AUDIO_DURATION_MS", "CASSINI_AUDIO_MATCH_POLICY", "CASSINI_AUDIO_OPUS_SHA256")
+                    name in setOf(
+                        "CASSINI_AUDIO_SAMPLE_RATE",
+                        "CASSINI_AUDIO_CHANNELS",
+                        "CASSINI_AUDIO_SAMPLE_COUNT",
+                        "CASSINI_AUDIO_DURATION_MS",
+                        "CASSINI_AUDIO_MATCH_POLICY",
+                        "CASSINI_AUDIO_OPUS_SHA256",
+                    )
             }.toMutableList()
             comments += listOf("CASSINI_FORMAT=$FORMAT", "CASSINI_PROFILE=ogg-opus",
                 "CASSINI_PAYLOAD_SCHEMA=https://format.gocassini.com/schema/cassini-portable-meeting-manifest-v1.schema.json",
