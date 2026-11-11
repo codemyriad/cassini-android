@@ -68,8 +68,8 @@ finish() {
 trap finish EXIT
 # Subscribe before the retained-state check. Dialog appearance and removal both publish window events.
 wait_for() (
-    local seconds=$1 message=$2 work watcher='' process_watcher='' remote remote_pid='' line remaining since
-    shift 2
+    local seconds=$1 message=$2 notifications=$3 work watcher='' process_watcher='' remote remote_pid='' line remaining since
+    shift 3
     since=$(adb shell "date '+%m-%d %H:%M:%S.000'" | tr -d '\r')
     work=$(mktemp -d)
     remote=/data/local/tmp/cassini-window-events-$$-$RANDOM.apk
@@ -131,7 +131,12 @@ wait_for() (
         remaining=$((end - SECONDS))
         if [ "$remaining" -le 0 ] || ! IFS= read -r -t "$remaining" line <&3; then break; fi
         line=${line%$'\r'}
-        if { [ "$line" = WINDOW ] || [[ "$line" == \[* ]]; } && "$@"; then return 0; fi
+        if {
+            [ "$line" = WINDOW ] ||
+                { [ "$notifications" = state ] && [[ "$line" == \[* ]]; }
+        } && "$@"; then
+            return 0
+        fi
     done
     printf '%s (no matching window change within %s s)\n' "$message" "$seconds" >&2
     return 1
@@ -165,12 +170,12 @@ fi
 # ANR raised), and its dialog can open after the first look: in run 41188862768 the window list had no dialog at
 # 09:44:07.0 and the dialog opened at 09:44:07.05, after the trace dumps. So each ANR in progress ends first.
 for _ in 1 2 3 4 5; do
-    wait_for 60 'An app is still in an ANR: it got neither an error dialog nor stopped' anr_settled
+    wait_for 60 'An app is still in an ANR: it got neither an error dialog nor stopped' state anr_settled
     dialog=$(error_dialog)
     [ -n "$dialog" ] || break
     printf 'Closing a system error dialog before the tests: %s\n' "$dialog"
     adb shell am force-stop "${dialog##* }"
-    wait_for 10 "The system error dialog did not close: $dialog" dialog_closed "$dialog"
+    wait_for 10 "The system error dialog did not close: $dialog" window dialog_closed "$dialog"
 done
 if [ -n "$(error_dialog)" ] || not_responding; then
     printf 'A system error dialog is still open (%s), or an app is still in an ANR\n' "$(error_dialog)" >&2

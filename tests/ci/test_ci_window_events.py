@@ -59,6 +59,10 @@ elif args[0] == "shell" and "app_process" in args[1]:
     (root / "changed").touch()
     if os.environ["WINDOW_NOTIFY"] == "yes":
         print(os.environ["WINDOW_EVENT"], flush=True)
+    else:
+        # A lifecycle notification cannot stand in for the missing dialog-window event.
+        print("[0,123,fixture-lifecycle]", flush=True)
+        print("READ_TIMEOUT", flush=True)
     sys.stdin.read(1)
     print("STOPPED", flush=True)
 elif args[0] == "logcat":
@@ -75,6 +79,11 @@ else:
             command = r"""
 set -euo pipefail
 source "$WINDOW_TEST_ROOT/wait.sh"
+# The fake producer marks expiry after changing state. Readiness still has an outer hang guard.
+read() {
+    builtin read "$@" || return
+    [ "$line" != READ_TIMEOUT ]
+}
 predicate() {
     printf 'checked\n' >> "$WINDOW_TEST_ROOT/checks"
     if [ -e "$WINDOW_TEST_ROOT/ready" ] && [ ! -e "$WINDOW_TEST_ROOT/triggered" ]; then
@@ -84,7 +93,7 @@ predicate() {
     fi
     [ "$(cat "$WINDOW_TEST_ROOT/state")" = "$WINDOW_TARGET" ]
 }
-wait_for 1 'Dialog did not reach the expected state' predicate
+wait_for 30 'Dialog did not reach the expected state' "$WINDOW_NOTIFICATIONS" predicate
 """
             environment = dict(os.environ)
             environment.update(
@@ -94,6 +103,7 @@ wait_for 1 'Dialog did not reach the expected state' predicate
                 WINDOW_TARGET=target,
                 WINDOW_NOTIFY="yes" if notify else "no",
                 WINDOW_EVENT=event,
+                WINDOW_NOTIFICATIONS="window" if event == "WINDOW" else "state",
             )
             process = subprocess.Popen(
                 ["bash", "-c", command],
@@ -104,7 +114,7 @@ wait_for 1 'Dialog did not reach the expected state' predicate
                 start_new_session=True,
             )
             try:
-                stdout, stderr = process.communicate(timeout=8)
+                stdout, stderr = process.communicate(timeout=30)
             finally:
                 try:
                     os.killpg(process.pid, signal.SIGKILL)

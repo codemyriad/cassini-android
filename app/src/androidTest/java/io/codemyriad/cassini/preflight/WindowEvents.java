@@ -3,6 +3,7 @@ package io.codemyriad.cassini.preflight;
 import android.accessibilityservice.AccessibilityServiceInfo;
 import android.app.UiAutomation;
 import android.os.HandlerThread;
+import android.os.Looper;
 import android.os.Process;
 import android.view.accessibility.AccessibilityEvent;
 
@@ -10,7 +11,9 @@ import android.view.accessibility.AccessibilityEvent;
 public final class WindowEvents {
     private WindowEvents() {}
 
+    @SuppressWarnings("deprecation") // A shell process must initialize the framework's main looper itself.
     public static void main(String[] arguments) throws Exception {
+        Looper.prepareMainLooper();
         System.out.println("START " + Process.myPid());
         System.out.flush();
         HandlerThread events = new HandlerThread("cassini-window-events");
