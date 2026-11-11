@@ -13,14 +13,17 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasImeAction
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNode
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -99,7 +102,8 @@ class LibraryBehaviourTest {
         rule.onNodeWithText("Ben").assertIsSelected().performClick()
         assertEvents(LibraryEvent.FilterSpeaker("Ben"))
         rule.onNodeWithText("Any date").performClick()
-        rule.onNodeWithText("Past 7 days").performClick()
+        rule.onNode(hasText("Any date") and hasAnyAncestor(isPopup())).assertIsSelected()
+        rule.onNodeWithText("Past 7 days").assertIsNotSelected().performClick()
         assertEvents(
             LibraryEvent.FilterSpeaker("Ben"),
             LibraryEvent.FilterDate(io.codemyriad.cassini.ui.library.SearchDateUi.WEEK),

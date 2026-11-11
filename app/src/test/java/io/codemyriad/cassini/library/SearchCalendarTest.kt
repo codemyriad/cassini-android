@@ -16,6 +16,19 @@ import java.util.TimeZone
 
 @RunWith(RobolectricTestRunner::class)
 class SearchCalendarTest {
+    @Test fun theInjectedZoneIsUsedForTheRetainedValueAndEveryBroadcast() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        var zone = ZoneId.of("Pacific/Kiritimati")
+        searchCalendar(context) { zone }.test {
+            assertEquals(zone, awaitItem())
+            zone = ZoneId.of("America/Havana")
+            context.sendBroadcast(Intent(Intent.ACTION_TIMEZONE_CHANGED))
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(zone, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
     @Test fun retainedZoneThenClockAndCalendarBroadcastsRefreshWithoutPolling() = runTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val original = TimeZone.getDefault()

@@ -57,10 +57,14 @@ internal fun SearchFiltersBar(filters: SearchFiltersUi, onEvent: (LibraryEvent) 
             SearchChip(dateLabel(filters.date), filters.date != SearchDateUi.ANY, onClick = { dateMenu = true })
             CassiniMenu(dateMenu, onDismissRequest = { dateMenu = false }) {
                 for (date in SearchDateUi.entries) {
-                    CassiniMenuItem(dateLabel(date), onClick = {
-                        dateMenu = false
-                        onEvent(LibraryEvent.FilterDate(date))
-                    })
+                    CassiniMenuItem(
+                        dateLabel(date),
+                        modifier = Modifier.semantics { selected = date == filters.date },
+                        onClick = {
+                            dateMenu = false
+                            onEvent(LibraryEvent.FilterDate(date))
+                        },
+                    )
                 }
             }
         }

@@ -11,10 +11,10 @@ import kotlinx.coroutines.flow.callbackFlow
 import java.time.ZoneId
 
 /** Register before the retained read, so midnight or a clock/zone change cannot fall between them. */
-internal fun searchCalendar(context: Context): Flow<ZoneId> = callbackFlow {
+internal fun searchCalendar(context: Context, zone: () -> ZoneId = ZoneId::systemDefault): Flow<ZoneId> = callbackFlow {
     val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            trySend(ZoneId.systemDefault())
+            trySend(zone())
         }
     }
     val filter = IntentFilter().apply {
@@ -23,6 +23,6 @@ internal fun searchCalendar(context: Context): Flow<ZoneId> = callbackFlow {
         addAction(Intent.ACTION_TIMEZONE_CHANGED)
     }
     ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
-    trySend(ZoneId.systemDefault())
+    trySend(zone())
     awaitClose { context.unregisterReceiver(receiver) }
 }

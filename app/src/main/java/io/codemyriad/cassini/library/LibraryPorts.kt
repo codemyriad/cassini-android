@@ -100,7 +100,7 @@ class GraphLibraryPorts(private val graph: AppGraph, context: Context) : Library
 
     override fun namedSpeakers(): Flow<List<String>> = flow { emitAll(graph.awaitCatalogue().notes.namedSpeakers()) }
 
-    override val calendarZone: Flow<ZoneId> = searchCalendar(app)
+    override val calendarZone: Flow<ZoneId> = searchCalendar(app, graph.config.zone)
 
     override fun details(id: String): Flow<NoteDetails?> = flow { emitAll(graph.awaitCatalogue().notes.note(id)) }
 

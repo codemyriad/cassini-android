@@ -59,6 +59,60 @@ class SearchFiltersTest {
     private suspend fun search(query: String, filters: SearchFilters = SearchFilters()) =
         h.notes.search(query, filters, zone, today).first()
 
+    @Test fun punctuationOnlyQueriesStillApplyDateAndOriginAndNeverInventSpeakerMatches() = runTest {
+        val words = listOf(Word("S1", 0, 400, "delivery"))
+        insert("old", words, createdAt = at - 1)
+        insert("own", words, createdAt = at + 1)
+        insert("received", words, createdAt = at + 2, origin = Origin.IMPORTED_DOCUMENT)
+        insert("unknown", words, recordedAt = null)
+        for (query in listOf("?", "...", "---")) {
+            assertEquals(4, search(query).size)
+            assertEquals(listOf("own"), search(query, SearchFilters(date = SearchDate.TODAY, recordedByMe = true)).map { it.row.id })
+            assertEquals(setOf("own", "received"), search(query, SearchFilters(date = SearchDate.TODAY)).mapTo(HashSet()) { it.row.id })
+            assertTrue(search(query, SearchFilters(speaker = "Ada")).isEmpty())
+        }
+    }
+
+    @Test fun anUnreadableOnlyVariantCannotHideATitleHitOrAdvertiseSpeakers() = runTest {
+        val cached = cache(note("unsupported", "Unique heading", at), listOf("v1" to listOf(Word("S1", 0, 400, "hidden"))))
+        h.db.cache().replaceCache(
+            cached.copy(
+                note = cached.note.copy(selectedVariant = null),
+                variants = cached.variants.map { it.copy(readable = false, wordCount = 42) },
+                words = emptyList(),
+                speakers = emptyList(),
+                body = "",
+            ),
+        )
+        val found = search("Unique").single()
+        assertEquals("unsupported", found.row.id)
+        assertEquals("Unique heading", SearchQuery.highlights(found.titleSnippet).text)
+        assertTrue(h.notes.namedSpeakers().first().isEmpty())
+        assertTrue(search("hidden").isEmpty())
+    }
+
+    @Test fun anUnreadableDefaultFallsBackToTheReadableVariantUsedByTheNoteAndFts() = runTest {
+        val cached = cache(
+            note("fallback", "Meeting", at),
+            listOf("v1" to listOf(Word("S1", 0, 400, "hidden")), "v2" to listOf(Word("S2", 0, 400, "delivery"))),
+            selected = "v2",
+        )
+        for (selection in listOf(null, "v1", "v2")) {
+            h.db.cache().replaceCache(
+                cached.copy(
+                    note = cached.note.copy(selectedVariant = selection),
+                    variants = cached.variants.map { if (it.variantId == "v1") it.copy(readable = false, wordCount = 42) else it },
+                    words = cached.words.filter { it.variantId == "v2" },
+                    speakers = cached.speakers.filter { it.variantId == "v2" }.map { it.copy(label = "Ben", isPlaceholder = false) },
+                ),
+            )
+            assertEquals(listOf("Ben"), h.notes.namedSpeakers().first())
+            val found = search("deliv", SearchFilters(speaker = "Ben")).single()
+            assertEquals("v2", found.row.selectedVariant)
+            assertEquals("delivery", SearchQuery.highlights(found.snippet).text)
+        }
+    }
+
     @Test fun aNamedSpeakerMustActuallySayTheMatchingWords() = runTest {
         insert("a", listOf(Word("S1", 0, 400, "Nothing"), Word("S2", 1000, 1400, "café")), title = "Café review")
         assertTrue(search("cafe", SearchFilters(speaker = "Ada")).isEmpty())

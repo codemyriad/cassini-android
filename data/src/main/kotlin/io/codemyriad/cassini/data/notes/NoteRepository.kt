@@ -85,7 +85,7 @@ class NoteRepository(
 
     /**
      * Live notes matching [query] (`SearchQuery.fts`) with snippets. A query with nothing searchable yields the
-     * Library, with an empty snippet and the plain title.
+     * Library narrowed by date/origin, with an empty snippet and the plain title. A speaker requires a text match.
      */
     fun search(
         query: String,
@@ -94,7 +94,12 @@ class NoteRepository(
         today: LocalDate = Instant.ofEpochMilli(clock()).atZone(zone).toLocalDate(),
     ): Flow<List<SearchRow>> {
         val match = SearchQuery.fts(query) ?: return library().map { rows ->
-            rows.map { SearchRow(it, snippet = "", titleSnippet = it.title) }
+            withContext(dispatchers.io) {
+                // No attributed text can match a speaker without a searchable token.
+                if (filters.speaker != null) emptyList() else rows.filter {
+                    filters.includes(it.recordingTime()?.day(zone), it.origin, today)
+                }.map { SearchRow(it, snippet = "", titleSnippet = it.title) }
+            }
         }
         return flow {
             val matches = SearchMatches(cache::searchWords)
