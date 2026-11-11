@@ -1,0 +1,20 @@
+{
+  "repository": "https://github.com/codemyriad/cassini-ux",
+  "commit": "b86b7b0ecfa0984e313380578863f2f75fd652f1",
+  "directory": "vectors/interjections",
+  "files": {
+    "README.md": "0aaaf19c4b7f6a60f9bd6db875450a9276b09c110e53d38313f0cbd7e0b8cfb9",
+    "acknowledgment.expected.json": "5628015653116378dce0ef2b03b829d488d8522d24eda70b8447987d646222fa",
+    "acknowledgment.words.json": "fc8bb5d7569059ccbb4476a6f13eeb9a2b712bf1465e62f65d036e03c7f0c42b",
+    "brief-reply.expected.json": "c2a74f2855add21bc5d97712c77e1b810651f5e40a1a6b96bc9b55afb423a158",
+    "brief-reply.words.json": "c3be37021dcc9aaa5620e28f66db5a96b0553ad3ff2d1c115bb55d5017cbab83",
+    "competing.expected.json": "04e1869ef4a7bbc8b9e5e19029eac041077cb46556ddffdad0a7e0f43a7179db",
+    "competing.words.json": "0b53909c0b1c822ec370ca71debac4655a68a7bab8a26016ef4ee9b4372438a3",
+    "monologue.expected.json": "2873a69e938f2cf2de768c5ad871bcfbd0294511521e22da0fec5497fd80f23e",
+    "monologue.words.json": "eb9dfedc10c69990b22ec13a5817f3d9ef56ef7af5b8dfe7d40f847534e32974",
+    "overlapping-turns.expected.json": "70b1137c85ba585f770586a2bad0527e88fa4d7400c119ecfd0d28831006fd82",
+    "overlapping-turns.words.json": "e3fcb790418e23e8921805afc01bd73fb5bc041da88ed7a005d9c09cc2d3ea1d",
+    "seam-gap.expected.json": "268a34f00784e2382976279badd9ed3bde8456f4a2add07ddf73b3560c93d348",
+    "seam-gap.words.json": "2f18b19d31f2fc8887b91e87e04e7fba50af111e596de432c60c222c3420c5b1"
+  }
+}

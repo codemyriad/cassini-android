@@ -71,6 +71,37 @@ class MarkdownExportTest {
         assertFalse(actual.contains("**Ben**"))
     }
 
+    @Test fun allSixD84VectorsKeepTheExpectedParagraphsHeadersAndInlineReplies() {
+        val fixtures = listOf("acknowledgment", "brief-reply", "competing", "monologue", "overlapping-turns", "seam-gap")
+        for (fixture in fixtures) {
+            val words = Transcript.fromJson(interjection("$fixture.words.json")).words
+            val expected = JSONObject(interjection("$fixture.expected.json")).getJSONArray("rows")
+            val labels = words.associate { it.speaker to it.speaker }
+            val markdown = MarkdownExport.write(ExportTranscript(fixture, 0, words, labels), "", copy("en"))
+            val blocks = markdown.substringAfter("## Transcript\n\n").trimEnd().split("\n\n")
+            assertEquals(fixture, expected.length(), blocks.size)
+            for (index in 0 until expected.length()) {
+                val row = expected.getJSONObject(index)
+                val members = row.getJSONArray("members")
+                val text = (0 until members.length()).joinToString(" ") {
+                    val member = members.getJSONObject(it)
+                    val stored = member.getString("text")
+                    // These pinned fixtures contain no Markdown metacharacters; S-5 covers escaping separately.
+                    assertFalse(stored.any { c -> c in "\\`*_[]<>" })
+                    if (member.getString("kind") == "interjection") "(${member.getString("speaker")}: $stored)" else stored
+                }
+                val seconds = row.getLong("startMs") / 1000
+                val stamp = String.format(Locale.ROOT, "%02d:%02d:%02d", seconds / 3600, seconds / 60 % 60, seconds % 60)
+                val name = if (row.getBoolean("continuation")) "" else "**${row.getString("speaker")}** · "
+                val over = row.getJSONArray("over")
+                val names = (0 until over.length()).map(over::getString)
+                val joined = if (names.size < 2) names.joinToString() else names.dropLast(1).joinToString(", ") + " and " + names.last()
+                val suffix = if (names.isEmpty()) "" else " (over $joined)"
+                assertEquals("$fixture row$index", "$name$stamp$suffix\n$text", blocks[index])
+            }
+        }
+    }
+
     @Test fun escapingAndUnicodeSafeNamesFollowS5() {
         assertEquals("\\# heading", MarkdownExport.escape(" #   heading "))
         assertEquals("123\\. item", MarkdownExport.escape("123. item"))
@@ -148,6 +179,8 @@ class MarkdownExportTest {
             assertEquals(name, files.getJSONObject(name).getString("sha256"), digest)
         }
     }
+
+    private fun interjection(name: String): String = requireNotNull(javaClass.getResource("/interjections/$name")).readText()
 
     private fun resource(name: String): String = requireNotNull(javaClass.getResource("/markdown/$name")).readText()
 
