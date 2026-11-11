@@ -15,7 +15,9 @@ import io.codemyriad.cassini.recording.RecordingOutcome
 import io.codemyriad.cassini.recording.RecordingState
 import io.codemyriad.cassini.recording.inProgress
 import io.codemyriad.cassini.test.NeedsMicrophone
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -44,7 +46,7 @@ class RecordingServiceTest {
         watch.stop()
         val recording = graph.recording
         if (recording.state.value.inProgress) recording.finish()
-        waitFor("The recording ends", FINISH_MS) { recording.state.value.takeUnless { it.inProgress } }
+        awaitRecording("The recording ends", FINISH_MS) { !it.inProgress }
         recording.dismissEnded()
         Background.reset()
     }
@@ -54,10 +56,10 @@ class RecordingServiceTest {
         val recording = graph.recording
         watch.start()
         assertTrue("A recording starts", recording.start("Background check"))
-        val active = waitFor("The recording is active", START_MS) { recording.state.value as? RecordingState.Active }
+        val active = awaitRecording("The recording is active", START_MS) { it is RecordingState.Active } as RecordingState.Active
         Background.shell("input keyevent KEYCODE_HOME")
-        waitFor("Audio is captured", START_MS) {
-            (recording.state.value as? RecordingState.Active)?.takeIf { it.elapsedMs >= CAPTURE_MS }
+        awaitRecording("Audio is captured", START_MS) {
+            it is RecordingState.Active && it.elapsedMs >= CAPTURE_MS
         }
 
         val finish = ContextCompat.getContextForLanguage(Background.context).getString(R.string.notif_action_finish)
@@ -69,7 +71,7 @@ class RecordingServiceTest {
         assertNotNull("The notification has a Finish action", action)
         action!!.actionIntent.send()
 
-        val ended = waitFor("The recording ends", FINISH_MS) { recording.state.value as? RecordingState.Ended }
+        val ended = awaitRecording("The recording ends", FINISH_MS) { it is RecordingState.Ended } as RecordingState.Ended
         val longest = checkNotNull(watch.stop()) { "The main-looper watch observed no complete dispatches" }
         val outcome = ended.outcome
         assertTrue("Finish saves the recording: $outcome", outcome is RecordingOutcome.Saved)
@@ -92,6 +94,13 @@ class RecordingServiceTest {
         Log.i(TAG, "Most CPU in one main-thread dispatch: $sample")
         assertTrue("A main-thread dispatch exceeded $MAX_MAIN_CPU_MS ms CPU: $sample", longest.cpuMs <= MAX_MAIN_CPU_MS)
     }
+
+    private suspend fun awaitRecording(
+        message: String,
+        timeoutMs: Long,
+        matches: (RecordingState) -> Boolean,
+    ): RecordingState = withTimeoutOrNull(timeoutMs) { graph.recording.state.first(matches) }
+        ?: throw AssertionError("$message (waited ${timeoutMs / 1_000} s)")
 
     private companion object {
         const val TAG = "RecordingServiceTest"
