@@ -121,15 +121,17 @@ class LibraryViewModel(
     private val listingCache = LibraryListing()
     private val filters = MutableStateFlow(SearchFiltersUi())
     private val calendarRefresh = MutableStateFlow(0L)
-    private val controls = combine(filters, ports.namedSpeakers().catch { emit(emptyList()) }) { filters, names ->
+    private val controls = combine(filters, ports.namedSpeakers().distinctUntilChanged().catch { emit(emptyList()) }) { filters, names ->
         filters.copy(speakers = names.toImmutableList())
     }
     private val calendar = combine(ports.calendarZone, calendarRefresh) { zone, _ ->
         Instant.now(clock).atZone(zone).toLocalDate() to zone
     }.distinctUntilChanged()
+        .flowOn(compute)
+        .shareIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), replay = 1)
     private val environment = combine(controls, calendar) { filters, day ->
         SearchEnvironment(filters, day.first, day.second)
-    }.shareIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), replay = 1)
+    }.flowOn(compute).shareIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), replay = 1)
 
     private data class SearchEnvironment(val filters: SearchFiltersUi, val today: LocalDate, val zone: ZoneId)
 
@@ -149,14 +151,16 @@ class LibraryViewModel(
     private val searchedText = query.map { it.trim() }.distinctUntilChanged()
         .debounce { if (it.isEmpty()) 0L else SEARCH_DEBOUNCE_MS }
 
-    private val search: Flow<Pair<String, List<SearchRow>?>> = combine(searchedText, environment) { text, environment ->
-        SearchRequest(text, environment.filters, environment.today, environment.zone)
-    }.flatMapLatest { request ->
+    // Menu inventory is display state, never a search/cache lifetime input.
+    private val domainFilters = filters.map { it.domain() }.distinctUntilChanged()
+    private val search: Flow<Pair<String, List<SearchRow>?>> = combine(searchedText, domainFilters, calendar) { text, filters, day ->
+        SearchRequest(text, filters, day.first, day.second)
+    }.distinctUntilChanged().flatMapLatest { request ->
         val text = request.text
         if (text.isEmpty()) {
             flowOf(text to null)
         } else {
-            ports.search(text, request.filters.domain(), request.zone, request.today)
+            ports.search(text, request.filters, request.zone, request.today)
                 .map<List<SearchRow>, Pair<String, List<SearchRow>?>> { text to it }
                 .onStart { emit(text to null) }
                 .catch { error ->
@@ -166,7 +170,7 @@ class LibraryViewModel(
         }
     }
 
-    private data class SearchRequest(val text: String, val filters: SearchFiltersUi, val today: LocalDate, val zone: ZoneId)
+    private data class SearchRequest(val text: String, val filters: SearchFilters, val today: LocalDate, val zone: ZoneId)
 
     private fun SearchFiltersUi.domain(): SearchFilters = SearchFilters(
         speaker,

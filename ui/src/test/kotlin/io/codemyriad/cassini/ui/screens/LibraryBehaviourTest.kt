@@ -10,6 +10,8 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
@@ -44,6 +46,7 @@ import io.codemyriad.cassini.ui.note.NoteAction
 import io.codemyriad.cassini.ui.note.NoteSheet
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -100,6 +103,23 @@ class LibraryBehaviourTest {
             LibraryEvent.FilterDate(io.codemyriad.cassini.ui.library.SearchDateUi.WEEK),
             LibraryEvent.ToggleRecordedByMe,
         )
+    }
+
+    @Test fun aLargeSpeakerMenuComposesOnlyVisibleRowsAndKeepsAnySpeakerAccessible() {
+        val names = (0 until 5000).map { "Guest ${it.toString().padStart(4, '0')}" }
+        val filters = io.codemyriad.cassini.ui.library.SearchFiltersUi(speakers = names.toImmutableList())
+        show(BoardFixtures.library.copy(query = "delivery", searchFilters = filters))
+        rule.onNodeWithText("Speaker").performClick()
+        rule.onNodeWithText("Any speaker").assertIsEnabled().assertIsSelected()
+        val composed = rule.onAllNodesWithText("Guest ", substring = true).fetchSemanticsNodes().size
+        assertTrue("Only the viewport and prefetch rows should compose; got $composed", composed in 1..20)
+        rule.onNodeWithTag("speaker-filter-menu").performScrollToIndex(names.size)
+        rule.onNodeWithText("Guest 4999").performClick()
+        assertEvents(LibraryEvent.FilterSpeaker("Guest 4999"))
+        rule.onNodeWithText("Speaker").performClick()
+        rule.onNodeWithTag("speaker-filter-menu").performScrollToIndex(0)
+        rule.onNodeWithText("Any speaker").assertIsEnabled().performClick()
+        assertEvents(LibraryEvent.FilterSpeaker("Guest 4999"), LibraryEvent.FilterSpeaker(null))
     }
 
     @Test fun filterControlsDisappearWithAnEmptyQuery() {
