@@ -86,6 +86,21 @@ class DocumentRepositoryTest {
         assertEquals(start, imported.recordingTime()?.instant?.toEpochMilli())
     }
 
+    @Test fun persistedOffsetBearingLocalLabelIsNeverConvertedIntoAnInstant() = runTest {
+        h.documentNote("label", first)
+        val document = h.readFile("label")
+        val label = "2026-11-09T10:31:48+02:00"
+        document.manifest!!.getJSONObject("meeting").put("recordedAtLocal", label)
+        h.document("label").writeBytes(
+            CassiniDocument.create(h.document("label").readBytes(), first, "Ignored", JSONObject(), document),
+        )
+        h.notes.refreshIfStale("label")
+        h.restart()
+        val time = h.notes.library().first().single().recordingTime()!!
+        assertEquals(label, time.label)
+        assertNull(time.instant)
+    }
+
     @Test fun packagingOnlyImportHasNoDisplayedRecordingTime() = runTest {
         h.documentNote("unknown", first)
         h.notes.refreshIfStale("unknown")
