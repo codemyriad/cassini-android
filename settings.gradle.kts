@@ -25,6 +25,7 @@ val staticChecksOnly = providers.gradleProperty("cassiniStaticChecksOnly")
     .getOrElse(false)
 if (!staticChecksOnly) {
     include(":core")
+    include(":app-logic")
     include(":data")
     include(":engine")
     include(":ui")

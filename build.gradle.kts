@@ -19,6 +19,9 @@ detekt {
     baseline = file("config/detekt/baseline.xml")
     source.setFrom(
         files(
+            "app-logic/src/main/kotlin",
+            "app-logic/src/test/kotlin",
+            "app-logic/build.gradle.kts",
             "app/src/main/java",
             "app/src/debug/java",
             "app/src/test/java",
@@ -58,7 +61,7 @@ dependencies {
 val ciTest = tasks.register("ciTest") {
     group = "verification"
     description = "Runs the JVM, Robolectric and screenshot tests of every module."
-    dependsOn(":core:test")
+    dependsOn(":core:test", ":app-logic:test")
 }
 subprojects {
     val module = this

@@ -33,6 +33,7 @@ import io.codemyriad.cassini.data.models.ModelFetcher
 import io.codemyriad.cassini.data.models.ModelRepository
 import io.codemyriad.cassini.data.notes.CatalogueRepository
 import io.codemyriad.cassini.data.notes.DocumentRepository
+import io.codemyriad.cassini.data.notes.ImportOutcome
 import io.codemyriad.cassini.data.notes.ImportRepository
 import io.codemyriad.cassini.data.notes.ImportSource
 import io.codemyriad.cassini.data.notes.NoteRepository
@@ -52,6 +53,7 @@ import io.codemyriad.cassini.models.ParakeetRecommendation
 import io.codemyriad.cassini.models.SpeechSelection
 import io.codemyriad.cassini.nav.ViewedImports
 import io.codemyriad.cassini.note.RecentWords
+import io.codemyriad.cassini.notices.ImportFailure
 import io.codemyriad.cassini.notices.ImportTracker
 import io.codemyriad.cassini.notices.NoticeCenter
 import io.codemyriad.cassini.notices.TrashUndo
@@ -281,6 +283,13 @@ class AppGraph(context: Context, val config: Config) {
                 ready.await()
                 awaitCatalogue().imports.import(uri.toUri())
             },
+            rejected = { outcome ->
+                when (outcome) {
+                    is ImportOutcome.Rejected -> ImportFailure(outcome.failure, outcome.neededBytes)
+                    is ImportOutcome.Created, is ImportOutcome.Existing -> null
+                }
+            },
+            report = { message, error -> Log.w("CassiniImport", message, error) },
             clock = config.clock,
             fallbackName = { app.inAppLanguage().getString(R.string.import_fallback_title) },
         )

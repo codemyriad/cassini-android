@@ -36,6 +36,7 @@ These files stay out of commits: `local.properties`, model weights, AAR download
 | Module | Content | Build needs |
 |---|---|---|
 | `:core` | Plain Kotlin on the JVM, package `io.codemyriad.cassini.core`. The portable format, the audio arithmetic, the recognition windows and the speaker rules. The model pins and downloads, the checkpoint codec, the library rules and the export writers. | JDK 17 and the submodule |
+| `:app-logic` | Plain Kotlin/JVM app policies: service type, Unicode search, leaf state and import tracking. Android adapters stay in app. | JDK 17 and the submodule |
 | `:engine` | Android library, package `io.codemyriad.cassini.engine`. The sherpa-onnx wrappers, the MediaCodec decoder, the microphone capture, the Opus encoder with its JNI library `libcassini_opus.so`, and `TranscriptionJob` behind its ports. | The Android SDK, the NDK, CMake and `scripts/setup.sh` |
 | `:data` | Android library, package `io.codemyriad.cassini.data`. The Room catalogue, the DataStore settings and the file repositories. | The Android SDK |
 | `:ui` | Android library, package `io.codemyriad.cassini.ui`. The Compose design system, the stateless screens and the Roborazzi screenshot tests. | The Android SDK |
@@ -85,7 +86,7 @@ On macOS the lock is held by `/usr/bin/lockf -k`, elsewhere by `flock -o`. Neith
 
 ## Test tiers
 
-The root task `ciTest` runs `:core:test`. For each Android module, it runs `verifyRoborazziDebug` if the module has the Roborazzi plugin, else `testDebugUnitTest`. CI runs this command:
+The root task `ciTest` runs `:core:test` and `:app-logic:test`. For each Android module, it runs `verifyRoborazziDebug` if the module has the Roborazzi plugin, else `testDebugUnitTest`. CI runs this command:
 
 ```sh
 ./gradlew detekt ciTest :app:lintDebug :data:lintDebug :ui:lintDebug
@@ -93,7 +94,7 @@ The root task `ciTest` runs `:core:test`. For each Android module, it runs `veri
 
 | Tier | Command | Content |
 |---|---|---|
-| JVM | `:core:test`, `:engine:testDebugUnitTest`, `:app:testDebugUnitTest` | The engine tests, the codec goldens, the pure rules, `TranscriptionJob` with fakes, the coordinators and the ViewModels |
+| JVM | `:core:test`, `:app-logic:test`, `:engine:testDebugUnitTest`, `:app:testDebugUnitTest` | The engine tests, the codec goldens, the pure rules, `TranscriptionJob` with fakes, the coordinators and the ViewModels |
 | Robolectric | `:data:testDebugUnitTest` and the Robolectric tests of the other modules | The repositories and DAOs, the full-text search, the purge order, the catalogue rebuild, the font and license assets |
 | Screenshots | `:ui:verifyRoborazziDebug` | Each board compared with its golden, in light, dark, Italian, French and 1.5x font scale |
 | Device | `scripts/device-smoke.sh` | Instrumentation tests on an emulator or a phone (see [Device scripts](#device-scripts)) |
@@ -594,7 +595,7 @@ job.
 | Job | What it does |
 |---|---|
 | `checks` | The Gradle wrapper validation, detekt, actionlint, shellcheck on `scripts/*.sh` and `tools/*.sh`, ruff on `scripts` and `tools`, `scripts/check-links.sh`, `scripts/fetch-fonts.sh --check`, `scripts/check-resource-collisions.py`, `scripts/check-runner-selection.py` and `scripts/check-verbatim.sh`. On a tag, it also makes sure that `CHANGELOG.md` has a section for the tag. |
-| `core-only` | `./gradlew --configure-on-demand :core:test` with only a JDK and the submodules. It does not run `setup.sh` and it hides the Android SDK of the runner. |
+| `core-only` | `./gradlew --configure-on-demand :core:test :app-logic:test` with only a JDK and the submodules. It does not run `setup.sh` and it hides the Android SDK of the runner. |
 | `build` | `setup.sh --prebuilt-only`, then `ciTest` (with `:ui:verifyRoborazziDebug`), the lint of `:app`, `:data` and `:ui`, the APK, the device test APKs of `:app` and `:data`, and `scripts/package-apk.py`. On a tag, it builds `release` (the APK and the bundle) and `releaseTest` and collects the native sources. |
 | `emulator` | After `build`, `checks` and `core-only` pass: the device checks on API 26 and 35 for pull requests; API 26, 29, 34 and 35 for main, tags, nightly and manual runs (x86_64 Google APIs images), with `scripts/ci-emulator-smoke.sh`. Add the `full-ci` label to a PR to run all four immediately and on subsequent pushes while the label remains. Other label additions start no heavy jobs and do not cancel a useful run. Removing the label restores the two-API matrix on the next push. A push that already fails a cheap check starts no emulators; the push that fixes it runs them. If the emulator or adb fails before the tests start, the job does all the checks one more time on a new emulator. If a test fails, the job fails and does not try again. |
 | `release` | On a tag only, after `checks`, `core-only`, `build` and `emulator` pass. It publishes the GitHub release with the files of `dist/` and the notes of the tag from `CHANGELOG.md` ([`release.md`](release.md)). |

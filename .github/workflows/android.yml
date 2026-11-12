@@ -117,7 +117,7 @@ jobs:
   # The :core module needs only a JDK: no Android SDK, NDK, sherpa-onnx AAR or Opus source.
   core-only:
     if: ${{ (github.event.action != 'labeled' || github.event.label.name == 'full-ci') }}
-    name: Engine tests with a JDK alone
+    name: Engine and app logic tests with a JDK alone
     runs-on: ${{ (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)) && !startsWith(github.ref, 'refs/tags/') && vars.CM_RUNNER == 'hetzner' && fromJSON('["self-hosted","cm-hetzner"]') || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
@@ -137,13 +137,15 @@ jobs:
       - name: Restore and verify pinned Gradle distribution
         uses: ./.github/actions/pinned-gradle
       - name: Run the :core tests
-        run: env -u ANDROID_HOME -u ANDROID_SDK_ROOT ./gradlew --no-daemon --configure-on-demand :core:test
+        run: env -u ANDROID_HOME -u ANDROID_SDK_ROOT ./gradlew --no-daemon --configure-on-demand :core:test :app-logic:test
       - name: Upload the :core test reports
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: core-tests
-          path: core/build/reports/tests/
+          path: |
+            core/build/reports/tests/
+            app-logic/build/reports/tests/
           if-no-files-found: ignore
 
   build:
@@ -372,6 +374,8 @@ jobs:
             app/build/reports/tests/testDebugUnitTest/
             app/build/test-results/testDebugUnitTest/
             app/build/reports/lint-results-*.html
+            app-logic/build/reports/tests/
+            app-logic/build/test-results/test/
             core/build/reports/tests/
             core/build/test-results/test/
             engine/build/reports/tests/testDebugUnitTest/

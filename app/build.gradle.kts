@@ -180,6 +180,7 @@ dependencies {
     // The design system and the stateless screens (docs/design/ui.md).
     implementation(project(":ui"))
     implementation(project(":core"))
+    implementation(project(":app-logic"))
     // The native wrappers, libcassini_opus, sherpa-onnx and the zstd-jni AAR (engine/build.gradle.kts).
     implementation(project(":engine"))
     // The Room catalogue, DataStore settings and file repositories that AppGraph wires (architecture 2.3 and 2.5).
