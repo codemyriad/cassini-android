@@ -71,6 +71,42 @@ class MarkdownExportTest {
         assertFalse(actual.contains("**Ben**"))
     }
 
+    @Test fun unassignedLabelsAreUsedInInventoryHeadersOverlapAndInlineReplies() {
+        val covered = mutableSetOf<String>()
+        for (fixture in listOf("acknowledgment", "competing", "overlapping-turns")) {
+            val original = Transcript.fromJson(interjection("$fixture.words.json")).words
+            for (speaker in original.map { it.speaker }.distinct()) {
+                val words = original.map { if (it.speaker == speaker) it.copy(speaker = "unassigned") else it }
+                for (label in listOf("Voce sconosciuta", "Mira")) {
+                    assertUnassignedLabels(words, label, covered)
+                }
+            }
+        }
+        assertEquals(setOf("header", "overlap", "inline"), covered)
+    }
+
+    private fun assertUnassignedLabels(words: List<io.codemyriad.cassini.core.format.Word>, label: String, covered: MutableSet<String>) {
+        val labels = words.associate { it.speaker to if (it.speaker == "unassigned") label else it.speaker }
+        val markdown = MarkdownExport.write(ExportTranscript("Meeting", 0, words, labels), "", copy("en"))
+        assertTrue(markdown.substringBefore("## Transcript").contains(label))
+        for (row in ReadingTurns.of(words).rows) {
+            if (row.speaker == "unassigned" && !row.continuation) {
+                covered += "header"
+                assertTrue(markdown, "**$label**" in markdown)
+            }
+            if ("unassigned" in row.over) {
+                covered += "overlap"
+                val names = copy("en").speakerList(row.over.map { labels.getValue(it) }.distinct())
+                assertTrue(markdown, copy("en").overLine.replace("{names}", names) in markdown)
+            }
+            if (row.members.any { it.interjectionSpeaker == "unassigned" }) {
+                covered += "inline"
+                assertTrue(markdown, "($label:" in markdown)
+            }
+        }
+        assertFalse(markdown, "unassigned" in markdown)
+    }
+
     @Test fun allSixD84VectorsKeepTheExpectedParagraphsHeadersAndInlineReplies() {
         val fixtures = listOf(
             "acknowledgment",

@@ -663,7 +663,7 @@ class DocumentRepository(
 
     /** D13: notes live only in their owner's namespace; exporting never rewrites private data. */
     private fun markdownNotes(noteId: String): List<MarkdownNote> {
-        val notes = readBlocking(noteId)?.manifest?.optJSONObject("x")?.optJSONObject("gocassini.com")
+        val notes = CassiniDocument.readMetadata(documentFile(noteId)).manifest?.optJSONObject("x")?.optJSONObject("gocassini.com")
             ?.optJSONArray("notes") ?: return emptyList()
         return (0 until notes.length()).mapNotNull { index ->
             val note = notes.optJSONObject(index)

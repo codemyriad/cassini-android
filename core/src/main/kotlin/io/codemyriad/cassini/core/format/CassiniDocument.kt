@@ -79,7 +79,12 @@ data class CassiniDocument(
             return read(file, verify)
         }
 
-        private fun read(verify: Boolean = true, open: () -> InputStream): CassiniDocument {
+        /** Validates the envelope and manifest without decoding transcript bodies or reading audio packets. */
+        fun readMetadata(file: File): CassiniDocument = read(verify = false, metadataOnly = true) {
+            file.inputStream().buffered()
+        }
+
+        private fun read(verify: Boolean = true, metadataOnly: Boolean = false, open: () -> InputStream): CassiniDocument {
             // Audio corruption must not conceal an otherwise intact manifest/transcript.
             val (head, tagPacket) = try { open().use(OggOpus::headers) } catch (_: Exception) { return CassiniDocument("plain-audio") }
             val comments = try { readComments(tagPacket) } catch (_: Exception) { return CassiniDocument("invalid-cassini-metadata") }
@@ -115,6 +120,7 @@ data class CassiniDocument(
                 fields.forEach { (field, suffix) ->
                     if (tags[prefix + suffix] != ref.get(field).toString()) warnings += "tag-manifest-disagreement: $prefix$suffix"
                 }
+                if (metadataOnly) return@map Variant(id, descriptor, null, null)
                 try {
                     require(ref.keys().asSequence().toSet() == refKeys && descriptor.getString("format") == "cassini.words.v1")
                     require(ref.getString("mime") == CassiniPayload.WORD_MIME)

@@ -138,6 +138,39 @@ class CassiniDocumentTest {
         assertNull(CassiniDocument("plain-audio", comments = listOf("DATE=2026-11-11T12:00:00Z")).meetingTime)
     }
 
+    @Test fun metadataProfileKeepsOpaqueVariantsUndecodedAndDoesNotReadAudio() {
+        val words = Transcript(listOf(Word("unassigned", 0, 20, "Hello")), "en")
+        val first = CassiniDocument.create(silence(), words, "Meeting", JSONObject())
+        val both = CassiniDocument.create(first, words, "Meeting", JSONObject(), CassiniDocument.read(first))
+        val document = CassiniDocument.read(both)
+        val comments = document.comments.map {
+            if (it.substringBefore('=').matches(Regex("CASSINI_TX_.*_PAYLOAD_[0-9]+"))) {
+                it.substringBefore('=') + "=opaque!"
+            } else {
+                it
+            }
+        }
+        val opaque = OggOpus.mux(OggOpus.read(both), CassiniDocument.tagsPacket(comments))
+        assertTrue(CassiniDocument.read(opaque).variants.all { it.error != null })
+        val audioPage = (0..opaque.size - 4).last { opaque.copyOfRange(it, it + 4).contentEquals("OggS".toByteArray()) }
+        val file = java.nio.file.Files.createTempFile("metadata-", ".opus").toFile()
+        try {
+            val headersOnly = opaque.copyOf(audioPage)
+            file.writeBytes(headersOnly)
+            val metadata = CassiniDocument.readMetadata(file)
+            assertEquals("unverified", metadata.state)
+            assertEquals(2, metadata.variants.size)
+            assertEquals(document.manifest.toString(), metadata.manifest.toString())
+            assertTrue(metadata.variants.all { it.body == null && it.transcript == null && it.error == null })
+            assertArrayEquals(headersOnly, file.readBytes())
+            val missing = comments.filterNot { it.startsWith("CASSINI_PAYLOAD_000=") }
+            file.writeBytes(OggOpus.mux(OggOpus.read(both), CassiniDocument.tagsPacket(missing)))
+            assertEquals("invalid-cassini-metadata", CassiniDocument.readMetadata(file).state)
+        } finally {
+            file.delete()
+        }
+    }
+
     private fun silence(): ByteArray {
         val head = "OpusHead".toByteArray() + byteArrayOf(1, 1, 0, 0, -128, -69, 0, 0, 0, 0, 0)
         return OggOpus.mux(OggOpus.Stream(head, CassiniDocument.tagsPacket(listOf("X_CUSTOM=keep=me")),

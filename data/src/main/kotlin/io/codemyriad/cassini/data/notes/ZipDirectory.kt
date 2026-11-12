@@ -122,7 +122,7 @@ internal class ZipDirectory(
         )
         cursor += length
         val sizes = sizes(header, extra.first)
-        val data = local(sizes.third, rawName, header.u16(10), flags)
+        val data = local(sizes.third, rawName, name, header.u16(10), flags)
         archiveCheck(range(data, sizes.second, centralStart))
         val base = name.replace('\\', '/').trimEnd('/').substringAfterLast('/')
         val display = if (base.length <= 210) {
@@ -143,13 +143,20 @@ internal class ZipDirectory(
         )
     }
 
-    private fun local(offset: Long, centralName: ByteArray, method: Int, centralFlags: Int): Long {
+    private fun local(
+        offset: Long,
+        centralName: ByteArray,
+        centralPath: String,
+        method: Int,
+        centralFlags: Int,
+    ): Long {
         archiveCheck(range(offset, 30, centralStart))
         file.seek(offset)
         val header = bytes(30)
-        archiveCheck(header.u32(0) == 0x04034b50L && header.u16(8) == method)
+        archiveCheck(header.u32(0) == 0x04034b50L)
         val flags = header.u16(6)
         archiveCheck(flags and 0x2041 == 0, ArchiveFailure.ENCRYPTED)
+        archiveCheck(range(offset, 30L + header.u16(26) + header.u16(28), centralStart))
         val name = bytes(header.u16(26))
         val extra = extras(bytes(header.u16(28)), name)
         archiveCheck(NoteArchives.safeName(decode(name, flags)), ArchiveFailure.UNSAFE_PATHS)
@@ -157,7 +164,11 @@ internal class ZipDirectory(
             extra.second == null || NoteArchives.safeName(checkNotNull(extra.second)),
             ArchiveFailure.UNSAFE_PATHS,
         )
+        archiveCheck(header.u16(8) == method)
         archiveCheck(name.contentEquals(centralName) && (flags and 0x800) == (centralFlags and 0x800))
+        // Optional Unicode fields may be present on one side only, but cannot contradict the central path.
+        archiveCheck((extra.second ?: decode(name, flags)) == centralPath)
+        archiveCheck(pathKind(decode(name, flags)) == pathKind(centralPath))
         return offset + 30 + header.u16(26) + header.u16(28)
     }
 
@@ -184,25 +195,52 @@ internal class ZipDirectory(
         var at = 0
         var zip64: ByteArray? = null
         var unicode: String? = null
-        while (at < extra.size) {
-            archiveCheck(at + 4 <= extra.size)
+        var damaged = false
+        val seen = HashSet<Int>()
+        val nameCrc = CRC32().apply { update(rawName) }.value
+        while (at + 2 <= extra.size) {
             val id = extra.u16(at)
-            val length = extra.u16(at + 2)
-            archiveCheck(at + 4 + length <= extra.size)
+            val length = if (at + 4 <= extra.size) extra.u16(at + 2) else -1
+            // Security refusals take priority over malformed/duplicate extra fields, in one forward scan.
             archiveCheck(id != 0x9901, ArchiveFailure.ENCRYPTED)
-            if (id == 1) zip64 = extra.copyOfRange(at + 4, at + 4 + length)
-            if (id == 0x7075 && length >= 5 && extra[at + 4] == 1.toByte()) {
-                val crc = CRC32().apply { update(rawName) }.value
-                if (extra.u32(at + 5) == crc) unicode = decode(extra.copyOfRange(at + 9, at + 4 + length), 0x800)
+            if (length < 0 || at + 4 + length > extra.size) {
+                damaged = true
+                break
+            }
+            if (!seen.add(id)) damaged = true
+            if (id == 1 && zip64 == null) zip64 = extra.copyOfRange(at + 4, at + 4 + length)
+            val path = if (id == 0x7075) {
+                runCatching { unicodePath(extra, at, length, nameCrc) }.getOrElse {
+                    damaged = true
+                    null
+                }
+            } else {
+                null
+            }
+            if (path != null) {
+                archiveCheck(NoteArchives.safeName(path), ArchiveFailure.UNSAFE_PATHS)
+                unicode = path
             }
             at += 4 + length
         }
+        archiveCheck(!damaged && at == extra.size)
         return zip64 to unicode
     }
 
-    private fun decode(name: ByteArray, flags: Int): String =
-        (if (flags and 0x800 != 0) Charsets.UTF_8 else Charset.forName("CP437")).newDecoder()
-            .decode(java.nio.ByteBuffer.wrap(name)).toString()
+    private fun unicodePath(extra: ByteArray, at: Int, length: Int, nameCrc: Long): String? {
+        if (length < 5 || extra[at + 4] != 1.toByte()) return null
+        return if (extra.u32(at + 5) == nameCrc) decode(extra.copyOfRange(at + 9, at + 4 + length), 0x800) else null
+    }
+
+    private fun decode(name: ByteArray, flags: Int): String {
+        val input = java.nio.ByteBuffer.wrap(name)
+        val utf8 = Charsets.UTF_8.newDecoder()
+        if (flags and 0x800 != 0) return utf8.decode(input).toString()
+        // macOS ditto/Finder writes UTF-8 without bit 11; legacy bytes still fall back to CP437.
+        return runCatching { utf8.decode(input).toString() }.getOrElse {
+            Charset.forName("CP437").newDecoder().decode(java.nio.ByteBuffer.wrap(name)).toString()
+        }
+    }
 
     private fun bytes(count: Int): ByteArray = ByteArray(count).also(file::readFully)
 
@@ -222,3 +260,9 @@ internal fun archiveCheck(valid: Boolean, reason: ArchiveFailure = ArchiveFailur
 }
 internal fun overRatio(expanded: Long, compressed: Long, ratio: Int): Boolean =
     expanded > 0 && (compressed <= 0 || (expanded - 1) / ratio >= compressed)
+
+private fun pathKind(path: String): Pair<Boolean, Boolean> {
+    val normalized = path.replace('\\', '/')
+    return normalized.endsWith('/') to
+        (normalized.startsWith("__MACOSX/") && normalized.substringAfterLast('/').startsWith("._"))
+}

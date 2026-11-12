@@ -71,4 +71,43 @@ class NoteExportsTest {
         val expected = mapOf("a" to "Giulia", "b" to "Speaker 2", "c" to "Speaker 3")
         assertEquals(expected, NoteExports.labels(unlabelled, english))
     }
+
+    @Test fun unassignedStoredAndRenamedLabelsWinForEveryFormatAndSelectedVersion() {
+        val base = documentNote(variants = 2)
+        val words = listOf(Word("unassigned", 0, 1000, "First"), Word("a", 200, 400, "Yes"))
+        val copy = io.codemyriad.cassini.core.export.MarkdownCopy(
+            "Speakers: {names}",
+            "Transcript",
+            "Notes",
+            "(over {names})",
+        ) {
+            it.joinToString(" and ")
+        }
+        for (label in listOf("Voce sconosciuta", "Mira")) {
+            for (version in listOf("v1", "v2")) {
+                val expected = if (version == "v1") "Voce precedente" else label
+                val details = base.copy(
+                    note = base.note.copy(selectedVariant = version),
+                    speakers = listOf(
+                        SpeakerEntity(NOTE, "v1", "unassigned", 0, "Voce precedente", isPlaceholder = true),
+                        SpeakerEntity(NOTE, "v2", "unassigned", 0, label, isPlaceholder = false),
+                        SpeakerEntity(NOTE, version, "a", 1, "Ada", isPlaceholder = false),
+                    ),
+                )
+                val labels = NoteExports.labels(details, english)
+                assertEquals(expected, labels["unassigned"])
+                val transcript = ExportTranscript("Meeting", 1000, words, labels)
+                val texts = listOf(
+                    io.codemyriad.cassini.core.export.MarkdownExport.write(transcript, "", copy),
+                    TextExport.write(transcript, "", ""),
+                    SrtWriter.write(transcript),
+                    VttWriter.write(transcript),
+                )
+                for (text in texts) {
+                    assertTrue(text, expected in text)
+                    assertFalse(text, "Speaker 1" in text || "unassigned" in text)
+                }
+            }
+        }
+    }
 }
