@@ -1,5 +1,7 @@
 package io.codemyriad.cassini.core.speakers
 
+import io.codemyriad.cassini.core.format.MAX_SAFE_INTEGER
+import io.codemyriad.cassini.core.format.optionalInteger
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
@@ -8,20 +10,43 @@ import java.util.UUID
  * A person the user named, as the running mean of their confirmed voiceprints.
  * Private app data; enabled OS transfer and backup can include it.
  */
-data class Voice(val id: String, val name: String, val model: String, val mean: FloatArray,
-                 val count: Int, val seconds: Double, val createdAt: Long, val updatedAt: Long) {
+data class Voice(
+    val id: String,
+    val name: String,
+    val model: String,
+    val mean: FloatArray,
+    val count: Int,
+    val seconds: Double,
+    val createdAt: Long,
+    val updatedAt: Long,
+    val colourIndex: Int? = null,
+) {
     fun json(): JSONObject = JSONObject().put("id", id).put("name", name).put("model", model).put("dim", mean.size)
-        .put("mean", floats(mean)).put("count", count).put("seconds", seconds).put("createdAt", createdAt).put("updatedAt", updatedAt)
+        .put("mean", floats(mean)).put("count", count).put("seconds", seconds)
+        .put("createdAt", createdAt).put("updatedAt", updatedAt)
+        .apply { colourIndex?.let { put("colourIndex", it) } }
 
     companion object {
         fun fromJson(json: JSONObject): Voice {
             val mean = floats(json.getJSONArray("mean"))
             require(mean.size == json.getInt("dim") && json.getInt("count") > 0)
-            return Voice(json.getString("id"), json.getString("name"), json.getString("model"), mean,
-                json.getInt("count"), json.getDouble("seconds"), json.getLong("createdAt"), json.getLong("updatedAt"))
+            val slot = json.optionalInteger("colourIndex", Int.MAX_VALUE.toLong())?.toInt()
+            return Voice(
+                json.getString("id"),
+                json.getString("name"),
+                json.getString("model"),
+                mean,
+                json.getInt("count"),
+                json.getDouble("seconds"),
+                json.getLong("createdAt"),
+                json.getLong("updatedAt"),
+                slot,
+            )
         }
     }
 }
+
+data class SavedVoiceBook(val voices: List<Voice>, val nextColourIndex: Long)
 
 fun floats(values: FloatArray) = JSONArray().apply { values.forEach { put(it.toDouble()) } }
 fun floats(array: JSONArray) = FloatArray(array.length()) { array.getDouble(it).toFloat() }
@@ -34,32 +59,78 @@ fun floats(array: JSONArray) = FloatArray(array.length()) { array.getDouble(it).
 object VoiceCodec {
     const val VERSION = 1
     const val MAX_COUNT_WEIGHT = 20
+    private const val COLOUR_COUNT = 6
 
     /** The file's `version` is [found]; this codec reads and writes [VERSION] only. */
     class UnsupportedVersion(val found: Int) : IllegalArgumentException("voices.json version $found")
 
-    fun decode(text: String): List<Voice> {
+    fun decode(text: String): List<Voice> = decodeBook(text).voices
+
+    fun decodeBook(text: String): SavedVoiceBook {
         val json = JSONObject(text)
         val version = json.getInt("version")
         if (version != VERSION) throw UnsupportedVersion(version)
         val voices = json.getJSONArray("voices")
-        return (0 until voices.length()).map { Voice.fromJson(voices.getJSONObject(it)) }
+        val decoded = (0 until voices.length()).map { Voice.fromJson(voices.getJSONObject(it)) }
+        // Older stores already have a save clock. Assign before any rename, deletion or display sorting.
+        var next = maxOf(json.optionalInteger("nextColourIndex") ?: 0, nextColourIndex(decoded))
+        val missing = decoded.filter { it.colourIndex == null }.sortedBy { it.createdAt }.associate {
+            val slot = colourSlot(next)
+            next = advanceColourIndex(next)
+            it.id to slot
+        }
+        val assigned = decoded.map {
+            if (it.colourIndex == null) it.copy(colourIndex = missing.getValue(it.id)) else it
+        }
+        return SavedVoiceBook(assigned, maxOf(next, nextColourIndex(assigned)))
     }
 
-    fun encode(voices: List<Voice>): String =
-        JSONObject().put("version", VERSION).put("voices", JSONArray(voices.map { it.json() })).toString()
+    fun nextColourIndex(voices: List<Voice>): Long =
+        (voices.mapNotNull { it.colourIndex }.maxOrNull()?.toLong() ?: -1) + 1
+
+    fun advanceColourIndex(index: Long, isNew: Boolean = true): Long =
+        if (isNew) minOf(MAX_SAFE_INTEGER, index + 1) else index
+
+    // Voice slots have a bounded Int representation; preserve the six-colour cycle for an extreme counter.
+    private fun colourSlot(index: Long): Int =
+        if (index <= Int.MAX_VALUE) index.toInt() else (index % COLOUR_COUNT).toInt()
+
+    fun encode(voices: List<Voice>, nextColourIndex: Long = nextColourIndex(voices)): String =
+        JSONObject().put("version", VERSION).put("voices", JSONArray(voices.map { it.json() }))
+            .put("nextColourIndex", maxOf(nextColourIndex, nextColourIndex(voices))).toString()
 
     /** [voices] with a confirmed print added to [voiceId], or a new person when it is null or unknown; and that voice. */
-    fun enrol(voices: List<Voice>, voiceId: String?, name: String, model: String, embedding: FloatArray, seconds: Double,
-              now: Long): Pair<List<Voice>, Voice> {
+    @Suppress("LongParameterList") // Existing enrolment inputs plus the persisted save-order counter.
+    fun enrol(
+        voices: List<Voice>,
+        voiceId: String?,
+        name: String,
+        model: String,
+        embedding: FloatArray,
+        seconds: Double,
+        now: Long,
+        nextColourIndex: Long = nextColourIndex(voices),
+    ): Pair<List<Voice>, Voice> {
         val result = voices.toMutableList()
         val index = result.indexOfFirst { it.id == voiceId }
         val previous = result.getOrNull(index)?.takeIf { it.model == model && it.mean.size == embedding.size }
-        val voice = if (previous == null) Voice(result.getOrNull(index)?.id ?: "voice_${UUID.randomUUID()}", name, model,
-            requireNotNull(Voiceprints.normalised(embedding)), 1, seconds, result.getOrNull(index)?.createdAt ?: now, now)
-        else previous.copy(name = name, mean = requireNotNull(Voiceprints.normalised(FloatArray(embedding.size) {
-            previous.mean[it] * minOf(previous.count, MAX_COUNT_WEIGHT) + embedding[it] })),
-            count = previous.count + 1, seconds = previous.seconds + seconds, updatedAt = now)
+        val voice = if (previous == null) {
+            Voice(
+                result.getOrNull(index)?.id ?: "voice_${UUID.randomUUID()}", name, model,
+                requireNotNull(Voiceprints.normalised(embedding)), 1, seconds, result.getOrNull(index)?.createdAt ?: now, now,
+                result.getOrNull(index)?.colourIndex ?: colourSlot(maxOf(nextColourIndex, nextColourIndex(result))),
+            )
+        } else {
+            previous.copy(
+                name = name,
+                mean = requireNotNull(Voiceprints.normalised(FloatArray(embedding.size) {
+                    previous.mean[it] * minOf(previous.count, MAX_COUNT_WEIGHT) + embedding[it]
+                })),
+                count = previous.count + 1,
+                seconds = previous.seconds + seconds,
+                updatedAt = now,
+            )
+        }
         if (index >= 0) result[index] = voice else result.add(voice)
         return result to voice
     }

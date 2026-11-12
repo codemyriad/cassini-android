@@ -3,6 +3,7 @@ package io.codemyriad.cassini.data.voices
 import android.util.AtomicFile
 import android.util.Log
 import io.codemyriad.cassini.core.speakers.NoteVoiceCodec
+import io.codemyriad.cassini.core.speakers.SavedVoiceBook
 import io.codemyriad.cassini.core.speakers.SpeakerPrint
 import io.codemyriad.cassini.core.speakers.Voice
 import io.codemyriad.cassini.core.speakers.VoiceCodec
@@ -64,15 +65,16 @@ internal data class PendingPrints(
 // One reader and one writer per file kind, plus the shared AtomicFile helpers.
 @Suppress("TooManyFunctions")
 internal class VoiceFiles(private val clock: () -> Long) {
-    fun readPeople(file: File): FileRead<List<Voice>> = read(file) { text ->
+    fun readPeople(file: File): FileRead<SavedVoiceBook> = read(file) { text ->
         try {
-            VoiceCodec.decode(text)
+            VoiceCodec.decodeBook(text)
         } catch (error: VoiceCodec.UnsupportedVersion) {
             throw if (error.found > VoiceCodec.VERSION) NewerFile() else error
         }
     }
 
-    fun writePeople(file: File, voices: List<Voice>) = writeText(file, VoiceCodec.encode(voices))
+    fun writePeople(file: File, voices: List<Voice>, nextColourIndex: Long) =
+        writeText(file, VoiceCodec.encode(voices, nextColourIndex))
 
     fun readNote(file: File): FileRead<NotePrints> = read(file) { text ->
         decodeNote(text).let { NotePrints(it.first, it.second) }

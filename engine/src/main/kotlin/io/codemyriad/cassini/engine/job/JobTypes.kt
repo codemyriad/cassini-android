@@ -139,6 +139,7 @@ data class DraftState(
     val suggestions: List<VoiceSuggestion>,
     val tentativeFromMs: Long,
     val namingOpen: Boolean,
+    val colourIndices: Map<String, Int> = emptyMap(),
 ) {
     companion object {
         val EMPTY = DraftState(emptyList(), emptyMap(), emptySet(), emptyList(), 0, namingOpen = true)

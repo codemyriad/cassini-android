@@ -149,6 +149,7 @@ data class SpeakerEntity(
     /** The "Play a sample" window; null when no turn reaches 1 s. */
     @ColumnInfo(name = "sample_start_ms") val sampleStartMs: Long? = null,
     @ColumnInfo(name = "sample_end_ms") val sampleEndMs: Long? = null,
+    @ColumnInfo(name = "colour_index", defaultValue = "0") val colourIndex: Long = ordinal.toLong(),
 )
 
 /**

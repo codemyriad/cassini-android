@@ -70,7 +70,7 @@ class VoiceRepository(
     /** `people.json` as last read or written; null until the first use. */
     private val book = MutableStateFlow<Book?>(null)
 
-    private data class Book(val voices: List<Voice>, val problem: VoiceProblem?) {
+    private data class Book(val voices: List<Voice>, val problem: VoiceProblem?, val nextColourIndex: Long = 0) {
         /** Every problem makes the people read-only; only "Forget everyone" clears a damaged list. */
         val readOnly: Boolean get() = problem != null
     }
@@ -349,14 +349,15 @@ class VoiceRepository(
     private fun readPeopleLocked(): Book = when (val read = files.readPeople(paths.people)) {
         // A set-aside copy without a new list: the list was damaged, and only "Forget everyone" starts it again.
         FileRead.Missing -> Book(emptyList(), if (setAside(paths.people)) VoiceProblem.DAMAGED else null)
-        is FileRead.Loaded -> Book(read.value, null)
+        is FileRead.Loaded -> Book(read.value.voices, null, read.value.nextColourIndex)
         is FileRead.Kept -> Book(emptyList(), read.problem)
         is FileRead.Damaged -> Book(emptyList(), VoiceProblem.DAMAGED)
     }
 
-    private fun savePeopleLocked(voices: List<Voice>) {
-        files.writePeople(paths.people, voices)
-        book.value = Book(voices, null)
+    private fun savePeopleLocked(voices: List<Voice>, nextColourIndex: Long = peopleLocked().nextColourIndex) {
+        val next = maxOf(nextColourIndex, VoiceCodec.nextColourIndex(voices))
+        files.writePeople(paths.people, voices, next)
+        book.value = Book(voices, null, next)
     }
 
     private fun forgetEveryoneLocked(): Long? {
@@ -447,13 +448,18 @@ class VoiceRepository(
         val previous = existing?.takeIf { it.model == pending.model }?.prints.orEmpty()
         val kept = previous.filterKeys { key -> variants.none { key.startsWith(it) } }
         val enrolment = enrolChoices(people, cleaned, previous, pending.confirmations)
-        if (enrolment.enrolled.isNotEmpty()) savePeopleLocked(enrolment.voices)
+        if (enrolment.enrolled.isNotEmpty()) savePeopleLocked(enrolment.voices, enrolment.nextColourIndex)
         val merged = kept + cleaned + enrolment.prints
         if (merged.isNotEmpty() || existing != null) writeNoteLocked(noteId, pending.model, merged)
         return PendingOutcome.Merged(cleaned.size, dropped, enrolment.enrolled)
     }
 
-    private class Enrolment(val voices: List<Voice>, val enrolled: List<String>, val prints: Map<String, SpeakerPrint>)
+    private class Enrolment(
+        val voices: List<Voice>,
+        val enrolled: List<String>,
+        val prints: Map<String, SpeakerPrint>,
+        val nextColourIndex: Long,
+    )
 
     /**
      * Enrols the draft's Remember [choices] for the pending [prints] whose voice still exists, or that make a new
@@ -468,8 +474,9 @@ class VoiceRepository(
         previous: Map<String, SpeakerPrint>,
         choices: Map<String, Confirmation>,
     ): Enrolment {
-        if (people.readOnly) return Enrolment(people.voices, emptyList(), emptyMap())
+        if (people.readOnly) return Enrolment(people.voices, emptyList(), emptyMap(), people.nextColourIndex)
         var voices = people.voices
+        var nextColourIndex = people.nextColourIndex
         val enrolled = mutableListOf<String>()
         val confirmed = LinkedHashMap<String, SpeakerPrint>()
         for ((speaker, choice) in choices) {
@@ -485,15 +492,16 @@ class VoiceRepository(
                     null
                 }
                 !exists && !choice.isNew -> null
-                else -> enrolOne(voices, choice.voiceId, choice.name, print)
+                else -> enrolOne(voices, choice.voiceId, choice.name, print, nextColourIndex)
             }
             if (result != null && key != null && print != null) {
                 voices = result.first
+                nextColourIndex = VoiceCodec.advanceColourIndex(nextColourIndex, !exists)
                 enrolled += result.second.voiceId
                 confirmed[key] = print.copy(match = result.second)
             }
         }
-        return Enrolment(voices, enrolled, confirmed)
+        return Enrolment(voices, enrolled, confirmed, nextColourIndex)
     }
 
     /**
@@ -505,13 +513,23 @@ class VoiceRepository(
         voiceId: String,
         name: String,
         print: SpeakerPrint,
+        nextColourIndex: Long,
     ): Pair<List<Voice>, Match>? {
         val unit = Voiceprints.normalised(print.embedding)
         if (unit == null || name.isEmpty()) return null
         val previous = voices.firstOrNull { it.id == voiceId }
         val score = previous?.takeIf { it.mean.size == unit.size }?.let { Voiceprints.cosine(unit, it.mean) } ?: 1f
         val (enrolled, voice) =
-            VoiceCodec.enrol(voices, previous?.id, name, MODEL, print.embedding, print.seconds, clock())
+            VoiceCodec.enrol(
+                voices,
+                previous?.id,
+                name,
+                MODEL,
+                print.embedding,
+                print.seconds,
+                clock(),
+                nextColourIndex,
+            )
         // VoiceCodec names a new person at random; keep the id that was reserved for them.
         val next = if (previous != null) {
             enrolled
@@ -526,14 +544,19 @@ class VoiceRepository(
         val read = (files.readNote(notesFile(noteId)) as? FileRead.Loaded)?.value?.takeUnless { people.readOnly }
         val print = read?.prints?.get(key)
         val target = voiceId?.takeIf { id -> people.voices.any { it.id == id } } ?: newVoiceId()
-        val result = if (read != null && print != null) enrolOne(people.voices, target, name, print) else null
+        val result = if (read != null && print != null) {
+            enrolOne(people.voices, target, name, print, people.nextColourIndex)
+        } else {
+            null
+        }
         if (result != null && read != null && print != null) {
             // The match first: when the people.json write fails after it, the match is put back, so the note never
             // shows a CONFIRMED match that people.json does not count ("Not this person" would then take back a print
             // that was never added). A retry enrols the print once.
             writeNoteLocked(noteId, read.model, read.prints + (key to print.copy(match = result.second)))
             try {
-                savePeopleLocked(result.first)
+                val next = VoiceCodec.advanceColourIndex(people.nextColourIndex, people.voices.none { it.id == target })
+                savePeopleLocked(result.first, next)
             } catch (error: IOException) {
                 writeNoteLocked(noteId, read.model, read.prints)
                 throw error

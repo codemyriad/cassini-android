@@ -654,6 +654,13 @@ class TranscriptionJob(
                     target,
                     extensions,
                     recordedAtUtc = start,
+                    colourIndices = speakerSlotsForRun(
+                        existing,
+                        decoded.transcript.words,
+                        draft.names,
+                        matched.matches,
+                        voices.noteVoicesBlocking(noteId),
+                    ),
                 )
             }
             env.syncFile(target) { sync(target) }
