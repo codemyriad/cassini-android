@@ -346,7 +346,6 @@ private fun DraftTurn(turn: TurnUi, first: Boolean, onEvent: (NoteEvent) -> Unit
             onWordTap = {},
             modifier = Modifier.padding(top = if (suggestion != null) 6.dp else 0.dp),
             mode = TurnMode.Draft,
-            placeholder = turn.name is SpeakerNameUi.Placeholder,
             unsettledFrom = turn.unsettledFrom,
         )
     }

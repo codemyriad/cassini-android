@@ -27,6 +27,7 @@ class DarkScreenshotTest : BoardTest() {
     @Test fun sevenSpeakers() {
         board("dark", "11-seven-speakers", dark = true) { NoteScreen(BoardFixtures.sevenSpeakers, onEvent = {}) }
         rule.onNodeWithText("Speaker 7", useUnmergedTree = true).assertIsDisplayed()
+        assertSevenSpeakerWordsInk(dark = true)
     }
 
     @Test fun nameSpeaker() = dark("04-name-a-speaker")

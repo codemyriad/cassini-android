@@ -69,7 +69,7 @@ class ContentScreenshotTest : BoardTest() {
             TurnHeader("Paolo Ferri", SpeakerTone.Two, 701_000, auto = true, onClick = {})
             TurnParagraph(TranscriptFixtures.paolo, activeIndex = TranscriptFixtures.PAOLO_ACTIVE, onWordTap = {})
             TurnHeader("Speaker 3", SpeakerTone.Unnamed, 740_000, auto = false, onClick = null)
-            TurnParagraph(TranscriptFixtures.speaker3, activeIndex = null, onWordTap = {}, placeholder = true)
+            TurnParagraph(TranscriptFixtures.speaker3, activeIndex = null, onWordTap = {})
         }
         Label("Active word that wraps (160 dp column); search matches, the current one in 600")
         Pane {

@@ -425,7 +425,6 @@ private fun Turn(
                 .then(if (onParagraphPlaced != null) Modifier.onGloballyPositioned(onParagraphPlaced) else Modifier)
                 .padding(top = if (suggestion != null) 6.dp else ParagraphGap),
             mode = TurnMode.Read,
-            placeholder = turn.name is SpeakerNameUi.Placeholder,
             matches = matches,
             onPlayFromStart = { onEvent(NoteEvent.PlayTurn(turn.id)) },
             onActiveLine = onActiveLine,

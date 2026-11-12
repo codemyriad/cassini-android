@@ -70,7 +70,7 @@ internal val LocalTurnParagraphProbe = staticCompositionLocalOf<(() -> Unit)?> {
 /**
  * One turn's paragraph: a single `Text` built from [words] (joined by spaces, see [turnText]).
  *
- * [TurnMode.Read] (`transcript`, ink, or text3 for a [placeholder] speaker): a tap calls [onWordTap] with the index of
+ * [TurnMode.Read] (`transcript`, ink for every speaker): a tap calls [onWordTap] with the index of
  * the word under it; a tap on a space reaches the nearer word on the same line. The pressed word gets the accentTint
  * background. [activeIndex] is the word being played: its glyphs turn onAccentFill and a rounded accentFill
  * rectangle (radius 4, 3 dp wider on each side, the height of the font's content area as on board 03) is drawn
@@ -105,7 +105,6 @@ fun TurnParagraph(
     onWordTap: (Int) -> Unit,
     modifier: Modifier = Modifier,
     mode: TurnMode = TurnMode.Read,
-    placeholder: Boolean = false,
     unsettledFrom: Int? = null,
     matches: TurnMatches = TurnMatches.None,
     onPlayFromStart: (() -> Unit)? = null,
@@ -115,7 +114,7 @@ fun TurnParagraph(
     if (probe != null) SideEffect { probe() }
     val c = CassiniTheme.colors
     val style = if (mode == TurnMode.Read) CassiniTheme.type.transcript else CassiniTheme.type.draft
-    val color = if (mode == TurnMode.Draft || placeholder) c.text3 else c.ink
+    val color = if (mode == TurnMode.Draft) c.text3 else c.ink
     val tap by rememberUpdatedState(onWordTap)
     val starts = remember(words) { wordStarts(words) }
     val text = remember(words, mode, unsettledFrom, matches, c) {
