@@ -351,7 +351,7 @@ data class CassiniDocument(
         private fun fixSpeakerSlots(speakers: JSONArray, originalSlots: Map<String, Int>) {
             for (i in 0 until speakers.length()) {
                 val speaker = speakers.getJSONObject(i)
-                if (!speaker.has("colourIndex")) {
+                if (speaker.optInt("colourIndex", -1) < 0) {
                     val index = originalSlots[speaker.getString("id")] ?: i
                     speaker.put("colourIndex", index)
                 }
@@ -535,7 +535,7 @@ data class CassiniDocument(
             val known = (0 until speakers.length()).map { speakers.getJSONObject(it).getString("id") }.toSet()
             var nextColour = (0 until speakers.length()).maxOfOrNull {
                 speakers.getJSONObject(it).getInt("colourIndex")
-            }?.plus(1) ?: 0
+            }?.takeIf { it < Int.MAX_VALUE }?.plus(1) ?: speakers.length()
             transcript.words.map { it.speaker }.distinct().filterNot { it in known }.forEach {
                 val slot = if (existing == null) colourIndices[it] ?: nextColour++ else nextColour++
                 require(slot >= 0) { "Invalid speaker colour index" }
