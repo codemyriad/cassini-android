@@ -111,9 +111,6 @@ class CassiniColors(
     val raised: Color get() = brand?.getValue("raised") ?: surface
 }
 
-private fun canvasValue(dark: Boolean, role: String): Color =
-    (if (dark) BrandTokenValues.dark else BrandTokenValues.light).getValue(role)
-
 // W1 preview activates Alex’s decided palette; values come only from the pinned source.
 
 // Source: codemyriad/cassini-ux@e244ad6a830e4ef77d87fb452143f7100c767139, brand/tokens.json.

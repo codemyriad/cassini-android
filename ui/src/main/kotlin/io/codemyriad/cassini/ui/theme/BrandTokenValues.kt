@@ -113,6 +113,9 @@ internal object BrandTokenValues {
     val iconMask: Color = light.getValue("ink")
 }
 
+internal fun canvasValue(dark: Boolean, role: String): Color =
+    (if (dark) BrandTokenValues.dark else BrandTokenValues.light).getValue(role)
+
 val CassiniRecordingColors: RecordingColors = RecordingColors(
     bg = BrandTokenValues.dark.getValue("ground"),
     text = BrandTokenValues.dark.getValue("ink"),

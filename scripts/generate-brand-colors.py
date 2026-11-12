@@ -56,6 +56,8 @@ def generated(root):
         lines.append('    )')
     lines.append('    val iconMask: Color = light.getValue("ink")')
     lines.append('}')
+    lines += ['', 'internal fun canvasValue(dark: Boolean, role: String): Color =',
+              '    (if (dark) BrandTokenValues.dark else BrandTokenValues.light).getValue(role)']
     lines += ['', 'val CassiniRecordingColors: RecordingColors = RecordingColors(']
     for name, role in RECORDING_ROLES.items():
         value = f'BrandTokenValues.dark.getValue("{role}")'
