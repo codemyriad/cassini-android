@@ -141,14 +141,14 @@ class PlaybackSessionTest {
     }
 
     private fun dispatchMediaKey(key: String) {
-        // HOME can finish the activity before InputDispatcher finishes switching windows (API 26). Window input
-        // may then drop ACTION_DOWN. Dispatch through the system media service, as a headset does, instead.
-        // API 28–29's media shell tool supplies an empty controller package and crashes Media3. Keep the
-        // existing input path on newer Android; the observed app-switch injection failure is on API 26.
-        val command = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
-            "media dispatch $key"
-        } else {
-            "input keyevent KEYCODE_MEDIA_${key.uppercase(java.util.Locale.ROOT)}"
+        // HOME can finish the activity before InputDispatcher has a focused launcher window. Window input
+        // can then drop ACTION_DOWN and even ANR the launcher (observed on API 26 and 35). Deliver the
+        // headset command through the media service, independent of window focus. API 28–32's legacy
+        // media shell supplies an empty controller package that Media3 rejects; retain input only there.
+        val command = when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> "cmd media_session dispatch $key"
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.P -> "media dispatch $key"
+            else -> "input keyevent KEYCODE_MEDIA_${key.uppercase(java.util.Locale.ROOT)}"
         }
         val output = Background.shell(command)
         assertTrue("System media dispatch failed: $output", output.isBlank())
