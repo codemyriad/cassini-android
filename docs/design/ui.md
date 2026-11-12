@@ -77,13 +77,13 @@ val PlexMono = FontFamily(Font(R.font.ui_ibm_plex_mono_regular, W400), Font(R.fo
 | `line3` | #9AA2AC | #5A626C | Dashed "Words may still change" tag, dot of the plain banner |
 | `accent` | #2346C8 | #8FA6FF | Progress fill, slider, focused border, dots, checkbox |
 | `accentFill` / `onAccentFill` | #2346C8 / #FFFFFF | #2346C8 / #FFFFFF | Primary buttons, active word |
-| `accentInk` | #1A3596 | #B9C7FF | Text on the accent tint, blue text buttons, blue avatar initials |
+| `accentInk` | #1A3596 | #B9C7FF | Text on the accent tint, blue text buttons |
 | `accentTint` | #E8EDFC | #1C2647 | Info chip and banner |
 | `accentTrack` | #C9D4F6 | #2B3A70 | Track of the Library banner |
 | `teal` / `tealInk` / `tealTint` | #0F766E / #0B5A54 / #E3F2EF | #4FC7B8 / #8EDDD2 / #12302D | Ok tone, privacy shield |
-| `amber` / `amberInk` / `amberTint` / `amberWash` | #B45309 / #8A3B07 / #FCEFE3 / #FCF6EE | #F0A35E / #F7C291 / #3A2614 / #2C2118 | Warn tone, unnamed speakers |
+| `amber` / `amberInk` / `amberTint` / `amberWash` | #B45309 / #8A3B07 / #FCEFE3 / #FCF6EE | #F0A35E / #F7C291 / #3A2614 / #2C2118 | Warn tone |
 | `red` / `redInk` / `redTint` / `redLine` | #C2410C / #A3330B / #FBE7E1 / #E3B9A6 | #C2410C / #FFB08F / #3D1E14 / #6B3A2A | Record, error, destructive |
-| `violet` / `violetTint` | #5B2BB5 / #EFEAFB | #C1A8FF / #2A2045 | Tint of the 3rd named speaker, 4th avatar tint |
+| `violet` / `violetTint` | #5B2BB5 / #EFEAFB | #C1A8FF / #2A2045 | Legacy violet family |
 | `inkFill` / `onInkFill` | #14171A / #FFFFFF | #ECEEF1 / #0F1214 | Ink pills, play/pause, selected segment |
 | `snackbarBg` / `snackbarText` / `snackbarAction` | #14171A / #F2F3F5 / #9DB4FF | #ECEEF1 / #14171A / #2346C8 | Snackbar |
 | `scrim` | #1F2A39 at 50 % | #000000 at 60 % | Sheets and dialogs (over `bg`, it gives the #8A9098 of the boards) |
@@ -102,12 +102,19 @@ val PlexMono = FontFamily(Font(R.font.ui_ibm_plex_mono_regular, W400), Font(R.fo
 
 On the Recording screen, the banners keep their light tones.
 
-`SpeakerTone { Blue, Teal, Violet, Amber }` gives (dot, label/ink, tint):
+`SpeakerTone { Blue, Teal, Violet, Amber }` reads the separate `speakerBlue`, `speakerTeal`,
+`speakerViolet` and `speakerAmber` fields. Each has dot, label/ink and tint values:
 
-- Blue: accent, accentInk, accentTint.
-- Teal: teal, tealInk, tealTint.
-- Violet: violet, violet, violetTint.
-- Amber: amber, amberInk, amberTint.
+| Speaker role | Light: dot / ink / tint | Dark: dot / ink / tint |
+|---|---|---|
+| Blue | #2346C8 / #1A3596 / #E8EDFC | #8FA6FF / #B9C7FF / #1C2647 |
+| Teal | #0F766E / #0B5A54 / #E3F2EF | #4FC7B8 / #8EDDD2 / #12302D |
+| Violet | #5B2BB5 / #5B2BB5 / #EFEAFB | #C1A8FF / #C1A8FF / #2A2045 |
+| Amber | #B45309 / #8A3B07 / #FCEFE3 | #F0A35E / #F7C291 / #3A2614 |
+
+The unnamed-speaker question uses `speakerQuestionWash` (#FCF6EE light, #2C2118 dark) and
+`speakerAmber.ink` for its pulsing border. These roles freeze the existing speaker and avatar hues
+while L-14 and L-17 remain open. Changes to accent and status colours do not change them.
 
 features.md section 0 gives the rule that selects a tone. The avatars use the same three values: the tint as the fill and the ink color for the initial.
 

@@ -38,10 +38,10 @@ enum class SpeakerTone { Blue, Teal, Violet, Amber }
 data class SpeakerColors(val dot: Color, val ink: Color, val tint: Color)
 
 fun CassiniColors.speaker(tone: SpeakerTone): SpeakerColors = when (tone) {
-    SpeakerTone.Blue -> SpeakerColors(dot = accent, ink = accentInk, tint = accentTint)
-    SpeakerTone.Teal -> SpeakerColors(dot = teal, ink = tealInk, tint = tealTint)
-    SpeakerTone.Violet -> SpeakerColors(dot = violet, ink = violet, tint = violetTint)
-    SpeakerTone.Amber -> SpeakerColors(dot = amber, ink = amberInk, tint = amberTint)
+    SpeakerTone.Blue -> speakerBlue
+    SpeakerTone.Teal -> speakerTeal
+    SpeakerTone.Violet -> speakerViolet
+    SpeakerTone.Amber -> speakerAmber
 }
 
 /** The colours of this speaker tone in the current theme. */

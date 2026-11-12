@@ -45,7 +45,7 @@ class CassiniColors(
     val accentFill: Color,
     /** Text and icons on [accentFill]. */
     val onAccentFill: Color,
-    /** Text on [accentTint], blue text buttons, blue avatar initials. */
+    /** Text on [accentTint], blue text buttons. */
     val accentInk: Color,
     /** Info chip and banner background. */
     val accentTint: Color,
@@ -55,11 +55,18 @@ class CassiniColors(
     val teal: Color,
     val tealInk: Color,
     val tealTint: Color,
-    /** Warn tone and unnamed speakers. */
+    /** Warn tone. */
     val amber: Color,
     val amberInk: Color,
     val amberTint: Color,
     val amberWash: Color,
+    /** Speaker and saved-voice avatar colours, independent of accent and status roles (L-14/L-17 hues stay open). */
+    val speakerBlue: SpeakerColors,
+    val speakerTeal: SpeakerColors,
+    val speakerViolet: SpeakerColors,
+    val speakerAmber: SpeakerColors,
+    /** Unnamed-speaker question fill; its border uses [speakerAmber] ink. */
+    val speakerQuestionWash: Color,
     /** Record, error and destructive actions. */
     val red: Color,
     val redInk: Color,
@@ -67,7 +74,7 @@ class CassiniColors(
     val redLine: Color,
     /** Text and icons on [red] (the Record button). */
     val onRed: Color,
-    /** The third named-speaker tint and the fourth avatar tint. */
+    /** Legacy violet palette family; speaker/avatar colours have separate fields. */
     val violet: Color,
     val violetTint: Color,
     /** Ink pills, play/pause and the selected segment. */
@@ -109,6 +116,11 @@ val LightColors: CassiniColors = CassiniColors(
     amberInk = Color(0xFF8A3B07),
     amberTint = Color(0xFFFCEFE3),
     amberWash = Color(0xFFFCF6EE),
+    speakerBlue = SpeakerColors(Color(0xFF2346C8), Color(0xFF1A3596), Color(0xFFE8EDFC)),
+    speakerTeal = SpeakerColors(Color(0xFF0F766E), Color(0xFF0B5A54), Color(0xFFE3F2EF)),
+    speakerViolet = SpeakerColors(Color(0xFF5B2BB5), Color(0xFF5B2BB5), Color(0xFFEFEAFB)),
+    speakerAmber = SpeakerColors(Color(0xFFB45309), Color(0xFF8A3B07), Color(0xFFFCEFE3)),
+    speakerQuestionWash = Color(0xFFFCF6EE),
     red = Color(0xFFC2410C),
     redInk = Color(0xFFA3330B),
     redTint = Color(0xFFFBE7E1),
@@ -152,6 +164,11 @@ val DarkColors: CassiniColors = CassiniColors(
     amberInk = Color(0xFFF7C291),
     amberTint = Color(0xFF3A2614),
     amberWash = Color(0xFF2C2118),
+    speakerBlue = SpeakerColors(Color(0xFF8FA6FF), Color(0xFFB9C7FF), Color(0xFF1C2647)),
+    speakerTeal = SpeakerColors(Color(0xFF4FC7B8), Color(0xFF8EDDD2), Color(0xFF12302D)),
+    speakerViolet = SpeakerColors(Color(0xFFC1A8FF), Color(0xFFC1A8FF), Color(0xFF2A2045)),
+    speakerAmber = SpeakerColors(Color(0xFFF0A35E), Color(0xFFF7C291), Color(0xFF3A2614)),
+    speakerQuestionWash = Color(0xFF2C2118),
     red = Color(0xFFC2410C),
     redInk = Color(0xFFFFB08F),
     redTint = Color(0xFF3D1E14),
