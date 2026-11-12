@@ -34,13 +34,16 @@ permissions:
 
 # The weekly model and native runtime checks are in models.yml and native.yml (docs/development.md).
 concurrency:
-  # A newer push to a pull request cancels its older run. Pushes to main and tags never cancel or replace each
+  # A newer push to a pull request cancels its older push run. Pushes to main and tags never cancel or replace each
   # other (D66 AND-7): each commit has its own group, because GitHub keeps one pending run per group and drops the
   # other even without cancel-in-progress (run 41335351975, main's tip f94c3a3c, was dropped 2 s after it was made).
-  # Manual runs use main's ref too; their own group keeps a push from cancelling them. Unrelated label events
-  # skip the heavy jobs and get a separate group, so they cannot cancel a useful PR run.
-  group: android-${{ inputs.daily_test && 'test-release-' || '' }}${{ github.event_name }}-${{ github.ref }}${{ github.event_name == 'push' && format('-{0}', github.sha) || '' }}${{ github.event.action == 'labeled' && github.event.label.name != 'full-ci' && format('-label-{0}', github.run_id) || '' }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # Manual runs use main's ref too; their own group keeps a push from cancelling them. All label events get their own
+  # non-cancelling group so synchronize/opened + labeled on the same head never leave CANCELLED checks (UNSTABLE).
+  group: android-${{ inputs.daily_test && 'test-release-' || '' }}${{ github.event_name }}-${{ github.ref }}${{ github.event_name == 'push' && format('-{0}', github.sha) || '' }}${{ github.event.action == 'labeled' && format('-label-{0}', github.run_id) || '' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.event.action != 'labeled' }}
+
+env:
+  CASSINI_PERF_GATE: ${{ ((!inputs.daily_test && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')) || contains(github.event.pull_request.labels.*.name, 'full-ci')) && '1' || '' }}
 
 jobs:
   checks:
@@ -136,6 +139,8 @@ jobs:
       # --configure-on-demand keeps Gradle from configuring the Android modules (docs/development.md).
       - name: Restore and verify pinned Gradle distribution
         uses: ./.github/actions/pinned-gradle
+      - name: Prove CASSINI_PERF_GATE invalidates Test task caching
+        run: python3 tests/ci/perf-gate-cache-smoke.py
       - name: Run the :core tests
         run: env -u ANDROID_HOME -u ANDROID_SDK_ROOT ./gradlew --no-daemon --configure-on-demand :core:test :app-logic:test
       - name: Upload the :core test reports

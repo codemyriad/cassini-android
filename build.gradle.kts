@@ -64,8 +64,14 @@ val ciTest = tasks.register("ciTest") {
     description = "Runs the JVM, Robolectric and screenshot tests of every module."
     dependsOn(":core:test", ":app-logic:test")
 }
+val perfGate = providers.environmentVariable("CASSINI_PERF_GATE").orElse("")
 subprojects {
     val module = this
+    val perfGateValue = perfGate
+    tasks.withType<Test>().configureEach {
+        inputs.property("CASSINI_PERF_GATE", perfGateValue)
+        environment("CASSINI_PERF_GATE", perfGateValue.get())
+    }
     listOf("com.android.application", "com.android.library").forEach { androidPlugin ->
         pluginManager.withPlugin(androidPlugin) {
             ciTest.configure {
