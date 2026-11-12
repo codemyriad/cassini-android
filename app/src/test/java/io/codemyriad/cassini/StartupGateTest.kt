@@ -105,7 +105,10 @@ class StartupGateTest {
         val graph = graph { if (it == AppGraph.STEP_DATABASE) throw failure }
         try {
             val result = runCatching { withTimeout(GUARD_MS) { graph.awaitCatalogue() } }
-            assertSame(failure, result.exceptionOrNull())
+            val error = result.exceptionOrNull()
+            assertTrue(error is IOException)
+            // Coroutine stack-trace recovery may copy the exception and retain the original as its cause.
+            assertSame(failure, generateSequence(error) { it.cause }.last())
             assertSame(graph.ready, graph.catalogue)
             assertEquals(setOf(AppGraph.STEP_DATABASE), graph.startupReport.value!!.failed.keys)
         } finally {
