@@ -163,24 +163,60 @@ class RecordingController(private val parts: Parts) {
         work { scheduleTitle() }
     }
 
-    fun pause() = work {
-        val mic = capture ?: return@work
+    fun pause() = controlCapture { mic ->
         if (!mic.paused) mic.togglePause()
         update { it.copy(pause = RecordingPause.USER, elapsedMs = mic.elapsedMs) }
     }
 
-    fun resume() = work {
-        val mic = capture ?: return@work
+    fun resume() = controlCapture { mic ->
         if (mic.paused) mic.togglePause()
         update { it.copy(pause = null) }
         silence?.resumed()
     }
 
-    /**
-     * Finish: stops and saves, asynchronously ([state] goes Finishing, then Ended). [title] is the field's final value;
-     * null keeps the current one (the notification's Finish). A blank title becomes the default.
-     */
-    fun finish(title: String? = null) = work { operations.withLock { end(Stop.USER, title) } }
+    /** Checks both before posting and on the recorder thread; stale actions cannot reach another capture. */
+    private fun controlCapture(action: (MicrophoneCapture) -> Unit) {
+        val noteId = (mutableState.value as? RecordingState.Active)?.noteId ?: return
+        work {
+            if ((mutableState.value as? RecordingState.Active)?.noteId == noteId) capture?.let(action)
+        }
+    }
+
+    /** Finish acknowledges Saving before dispatch; the recorder still stops and saves off the main thread. */
+    fun finish(title: String? = null) {
+        if (mutableState.value is RecordingState.Starting) {
+            work { operations.withLock { end(Stop.USER, title) } }
+            return
+        }
+        val saving = acknowledgeStop(title, user = true) ?: return
+        work { operations.withLock { end(Stop.USER, null, saving.noteId) } }
+    }
+
+    /** Publishes the same saving transition for automatic stops, without changing their queued outcome. */
+    private fun automaticStop(stop: Stop, noteId: String) {
+        val starting = mutableState.value is RecordingState.Starting
+        if (acknowledgeStop(null, noteId) != null || starting) {
+            work { operations.withLock { end(stop, null, noteId) } }
+        }
+    }
+
+    private fun acknowledgeStop(title: String?, expectedNoteId: String? = null, user: Boolean = false): RecordingState.Finishing? {
+        while (true) {
+            val current = mutableState.value
+            val saving = when (current) {
+                is RecordingState.Active -> RecordingState.Finishing(
+                    current.noteId, title ?: current.title, current.elapsedMs, titleFinal = user,
+                )
+                is RecordingState.Finishing -> when {
+                    !user -> current
+                    current.titleFinal -> null
+                    else -> current.copy(title = title ?: current.title, titleFinal = true)
+                }
+                else -> null
+            }?.takeIf { expectedNoteId == null || it.noteId == expectedNoteId } ?: return null
+            if (mutableState.compareAndSet(current, saving)) return saving
+        }
+    }
 
     /** The UI has handled [RecordingState.Ended]. */
     fun dismissEnded() {
@@ -222,12 +258,14 @@ class RecordingController(private val parts: Parts) {
             active.value = id
             enterForeground()
             val mic = parts.capture.start(File(notes.directory(id), "capture.${format.extension}")) {
-                work { operations.withLock { end(Stop.MICROPHONE, null) } }
+                automaticStop(Stop.MICROPHONE, id)
             }
             capture = mic
             parts.platform.acquireWakeLock()
             sinceWakeLockMs = 0L
-            silence = parts.platform.watchSilence(mic) { silenced -> work { onSilence(silenced) } }
+            silence = parts.platform.watchSilence(mic) { silenced ->
+                work { if (capture === mic) onSilence(silenced) }
+            }
             val typed = (mutableState.value as? RecordingState.Starting)?.title ?: title
             val usable = parts.platform.usableBytes(notes.directory(id))
             mutableState.value = RecordingState.Active(
@@ -242,7 +280,7 @@ class RecordingController(private val parts: Parts) {
                 warning = null,
             )
             if (typed != title) scheduleTitle()
-            policy = parts.scope.launch(parts.dispatcher) { policyLoop() }
+            policy = parts.scope.launch(parts.dispatcher) { policyLoop(id) }
         } catch (error: CancellationException) {
             // The application scope ends (tests only): recovery repairs the row at the next start.
             capture?.release()
@@ -284,12 +322,12 @@ class RecordingController(private val parts: Parts) {
 
     // While recording. ----------------------------------------------------------------------------------------------
 
-    private suspend fun policyLoop() {
+    private suspend fun policyLoop(noteId: String) {
         while (true) {
             delay(timing.tickMs)
             val stop = tick() ?: continue
             // A new coroutine: end() cancels this loop.
-            work { operations.withLock { end(stop, null) } }
+            automaticStop(stop, noteId)
             return
         }
     }
@@ -353,9 +391,11 @@ class RecordingController(private val parts: Parts) {
         silenceCheck?.cancel()
         silenceCheck = null
         val mic = capture
+        if (mutableState.value !is RecordingState.Active) return
         if (!silenced || mic == null || mic.paused) return
         silenceCheck = parts.scope.launch(parts.dispatcher) {
             delay(timing.silenceConfirmMs)
+            if (mutableState.value !is RecordingState.Active) return@launch
             if (capture !== mic || mic.paused) return@launch
             mic.togglePause()
             update { it.copy(pause = RecordingPause.OTHER_APP, elapsedMs = mic.elapsedMs) }
@@ -374,19 +414,13 @@ class RecordingController(private val parts: Parts) {
 
     // End. --------------------------------------------------------------------------------------------------------
 
-    private suspend fun end(stop: Stop, title: String?) {
-        val current = mutableState.value as? RecordingState.Active ?: return
+    private suspend fun end(stop: Stop, title: String?, expectedNoteId: String? = null) {
         val mic = capture ?: return
-        policy?.cancel()
-        policy = null
-        titleWrite?.cancelAndJoin()
-        titleWrite = null
-        silence?.close()
-        silence = null
-        silenceCheck?.cancel()
-        silenceCheck = null
-        val typed = title ?: current.title
-        mutableState.value = RecordingState.Finishing(current.noteId, typed, mic.elapsedMs)
+        val current = claimStop(mic, title, expectedNoteId) ?: return
+        val typed = current.title
+        // Claim both the capture and the title before any suspension. Other controls cannot touch the stopping mic.
+        capture = null
+        var stopEntered = false
         var kept: String? = current.noteId
         var outcome = when (stop) {
             Stop.SPACE -> RecordingOutcome.StoppedForSpace
@@ -395,7 +429,16 @@ class RecordingController(private val parts: Parts) {
             Stop.USER -> RecordingOutcome.Saved(AfterFinish.AUDIO_ONLY)
         }
         try {
+            policy?.cancel()
+            policy = null
+            titleWrite?.cancelAndJoin()
+            titleWrite = null
+            silence?.close()
+            silence = null
+            silenceCheck?.cancel()
+            silenceCheck = null
             val notes = parts.notes()
+            stopEntered = true
             val file = stopCapture(mic)
             if (file == null) {
                 guarded("discard an empty recording") { notes.discard(current.noteId) }
@@ -409,11 +452,26 @@ class RecordingController(private val parts: Parts) {
                 if (outcome is RecordingOutcome.Saved) outcome = outcome.copy(next = next(current.noteId, mic.elapsedMs))
             }
         } finally {
-            capture = null
+            // If title cancellation failed before stop(), this owner must still release the capture it claimed.
+            if (!stopEntered) guarded("release the recording") { mic.release() }
             parts.platform.releaseWakeLock()
             active.value = null
             service.value = Service.IDLE
             mutableState.value = RecordingState.Ended(kept, outcome)
+        }
+    }
+
+    private fun claimStop(mic: MicrophoneCapture, title: String?, expectedNoteId: String?): RecordingState.Finishing? {
+        while (true) {
+            val state = mutableState.value
+            val current = when (state) {
+                is RecordingState.Active -> RecordingState.Finishing(state.noteId, state.title, state.elapsedMs)
+                is RecordingState.Finishing -> state
+                else -> null
+            }?.takeIf { expectedNoteId == null || it.noteId == expectedNoteId } ?: return null
+            val typed = if (current.titleFinal) current.title else title ?: current.title
+            val claimed = current.copy(title = typed, elapsedMs = mic.elapsedMs, titleFinal = true)
+            if (mutableState.compareAndSet(state, claimed)) return claimed
         }
     }
 
