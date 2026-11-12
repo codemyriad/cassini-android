@@ -11,6 +11,34 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class SpeakerSlotCarryTest {
+    @Test fun staleLiveSuggestionsAndAutomaticMatchesCannotMaskFinalAcceptedIdentity() {
+        val words = listOf(Word("old_a", 0, 1, "a"), Word("old_b", 1, 2, "b"))
+        val document = CassiniDocument.read(
+            CassiniDocument.create(FIXTURE_OPUS.readBytes(), Transcript(words), "Meeting", JSONObject()),
+        )
+        val previous = mapOf("old_a" to SpeakerPrint(axis(1), 30.0, Match("saved", 1f, Match.State.CONFIRMED)))
+        for (state in listOf(Match.State.SUGGESTED, Match.State.AUTO)) {
+            val names = CheckpointNames(emptyMap(), emptyMap(), live = mapOf("fresh" to Match("other", 1f, state)))
+            val slots = speakerSlotsForRun(
+                document,
+                listOf(Word("fresh", 0, 1, "new")),
+                names,
+                mapOf("fresh" to Match("saved", 1f, Match.State.AUTO)),
+                previous,
+            )
+            assertEquals(0L, slots["fresh"])
+        }
+        val confirmed = CheckpointNames(emptyMap(), emptyMap()).confirm("fresh", "saved", "Anna", 0, 1f)
+        val slots = speakerSlotsForRun(
+            document,
+            listOf(Word("fresh", 0, 1, "new")),
+            confirmed,
+            emptyMap(),
+            previous,
+        )
+        assertEquals(0L, slots["fresh"])
+    }
+
     @Test fun onlyAnUnambiguousAcceptedVoiceMatchCarriesIdentity() {
         val words = listOf(Word("old_a", 0, 1, "a"), Word("old_b", 1, 2, "b"))
         val document = CassiniDocument.read(

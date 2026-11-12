@@ -42,7 +42,8 @@ private fun carriedSlots(
         }.toMap()
     return ordered.mapNotNull { id ->
         val target = SpeakerMerges.resolve(id, names.merges)
-        val match = (names.live[target] ?: matches[target])?.takeIf { it.carriesIdentity() }
+        val match = names.live[target]?.takeIf { it.state == Match.State.CONFIRMED }
+            ?: matches[target]?.takeIf { it.carriesIdentity() }
         val slot = match?.voiceId?.let { voice ->
             if (voice.startsWith(CheckpointNames.NOTE_VOICE_PREFIX)) {
                 oldSlots[voice.removePrefix(CheckpointNames.NOTE_VOICE_PREFIX)]
