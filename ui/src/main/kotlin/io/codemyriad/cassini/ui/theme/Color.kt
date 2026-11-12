@@ -1,5 +1,4 @@
-// This file is the palette: every hex value of docs/design/ui.md section 4.1 lives here. Its name is the one
-// docs/design/ui.md section 1 gives.
+// Authored Android role aliases. Values live only in generated BrandTokenValues.kt.
 @file:Suppress("MagicNumber", "MatchingDeclarationName")
 
 package io.codemyriad.cassini.ui.theme
@@ -110,102 +109,6 @@ class CassiniColors(
 
 private fun canvasValue(dark: Boolean, role: String): Color =
     (if (dark) BrandTokenValues.dark else BrandTokenValues.light).getValue(role)
-
-/** The light set (the boards). */
-internal val LegacyLightColors: CassiniColors = CassiniColors(
-    isDark = false,
-    ink = Color(0xFF14171A),
-    bg = Color(0xFFF5F6F7),
-    surface = Color(0xFFFFFFFF),
-    surfaceWash = Color(0xFFF5F6F7),
-    boardBg = Color(0xFFECEEF0),
-    text2 = Color(0xFF4A525B),
-    text3 = Color(0xFF3A4250),
-    text4 = Color(0xFF687180),
-    line = Color(0xFFE2E5E9),
-    line2 = Color(0xFFC9CED5),
-    line3 = Color(0xFF9AA2AC),
-    accent = Color(0xFF2346C8),
-    accentFill = Color(0xFF2346C8),
-    onAccentFill = Color(0xFFFFFFFF),
-    accentInk = Color(0xFF1A3596),
-    accentTint = Color(0xFFE8EDFC),
-    accentTrack = Color(0xFFC9D4F6),
-    teal = Color(0xFF0F766E),
-    tealInk = Color(0xFF0B5A54),
-    tealTint = Color(0xFFE3F2EF),
-    amber = Color(0xFFB45309),
-    amberInk = Color(0xFF8A3B07),
-    amberTint = Color(0xFFFCEFE3),
-    amberWash = Color(0xFFFCF6EE),
-    speakerBlue = SpeakerColors(Color(0xFF2346C8), Color(0xFF1A3596), Color(0xFFE8EDFC)),
-    speakerTeal = SpeakerColors(Color(0xFF0F766E), Color(0xFF0B5A54), Color(0xFFE3F2EF)),
-    speakerViolet = SpeakerColors(Color(0xFF5B2BB5), Color(0xFF5B2BB5), Color(0xFFEFEAFB)),
-    speakerAmber = SpeakerColors(Color(0xFFB45309), Color(0xFF8A3B07), Color(0xFFFCEFE3)),
-    speakerQuestionWash = Color(0xFFFCF6EE),
-    red = Color(0xFFC2410C),
-    redInk = Color(0xFFA3330B),
-    redTint = Color(0xFFFBE7E1),
-    redLine = Color(0xFFE3B9A6),
-    onRed = Color(0xFFFFFFFF),
-    violet = Color(0xFF5B2BB5),
-    violetTint = Color(0xFFEFEAFB),
-    inkFill = Color(0xFF14171A),
-    onInkFill = Color(0xFFFFFFFF),
-    snackbarBg = Color(0xFF14171A),
-    snackbarText = Color(0xFFF2F3F5),
-    snackbarAction = Color(0xFF9DB4FF),
-    scrim = Color(0xFF1F2A39).copy(alpha = 0.5f),
-    link = Color(0xFF2346C8),
-)
-
-/** The dark set (no board: it follows docs/design/ui.md and waits for the owner's review). */
-internal val LegacyDarkColors: CassiniColors = CassiniColors(
-    isDark = true,
-    ink = Color(0xFFECEEF1),
-    bg = Color(0xFF0F1214),
-    surface = Color(0xFF181C20),
-    surfaceWash = Color(0xFF1F2429),
-    boardBg = Color(0xFF1F2429),
-    text2 = Color(0xFFA9B0B9),
-    text3 = Color(0xFFC3C9D0),
-    text4 = Color(0xFF8C95A0),
-    line = Color(0xFF2A3036),
-    line2 = Color(0xFF3A4048),
-    line3 = Color(0xFF5A626C),
-    accent = Color(0xFF8FA6FF),
-    accentFill = Color(0xFF2346C8),
-    onAccentFill = Color(0xFFFFFFFF),
-    accentInk = Color(0xFFB9C7FF),
-    accentTint = Color(0xFF1C2647),
-    accentTrack = Color(0xFF2B3A70),
-    teal = Color(0xFF4FC7B8),
-    tealInk = Color(0xFF8EDDD2),
-    tealTint = Color(0xFF12302D),
-    amber = Color(0xFFF0A35E),
-    amberInk = Color(0xFFF7C291),
-    amberTint = Color(0xFF3A2614),
-    amberWash = Color(0xFF2C2118),
-    speakerBlue = SpeakerColors(Color(0xFF8FA6FF), Color(0xFFB9C7FF), Color(0xFF1C2647)),
-    speakerTeal = SpeakerColors(Color(0xFF4FC7B8), Color(0xFF8EDDD2), Color(0xFF12302D)),
-    speakerViolet = SpeakerColors(Color(0xFFC1A8FF), Color(0xFFC1A8FF), Color(0xFF2A2045)),
-    speakerAmber = SpeakerColors(Color(0xFFF0A35E), Color(0xFFF7C291), Color(0xFF3A2614)),
-    speakerQuestionWash = Color(0xFF2C2118),
-    red = Color(0xFFC2410C),
-    redInk = Color(0xFFFFB08F),
-    redTint = Color(0xFF3D1E14),
-    redLine = Color(0xFF6B3A2A),
-    onRed = Color(0xFFFFFFFF),
-    violet = Color(0xFFC1A8FF),
-    violetTint = Color(0xFF2A2045),
-    inkFill = Color(0xFFECEEF1),
-    onInkFill = Color(0xFF0F1214),
-    snackbarBg = Color(0xFFECEEF1),
-    snackbarText = Color(0xFF14171A),
-    snackbarAction = Color(0xFF2346C8),
-    scrim = Color(0xFF000000).copy(alpha = 0.6f),
-    link = Color(0xFF8FA6FF),
-)
 
 // W1.1 is plumbing only: the canvas mapping is checked but the active palette stays pixel-identical.
 val LightColors: CassiniColors = LegacyLightColors

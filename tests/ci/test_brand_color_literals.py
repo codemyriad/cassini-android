@@ -12,7 +12,8 @@ SPEC.loader.exec_module(GUARD)
 
 class BrandColorLiteralTest(unittest.TestCase):
     def test_every_supported_literal_form_fails_in_production(self):
-        forms = ['Color(0xFFFF0000)', 'Color(1f, 0f, 0f)', 'Color(red = 1f, green = 0f, blue = 0f)',
+        forms = ['Color(0xFFFF0000)', 'Color(color = 0xFFFF0000)', 'Color.RED', 'rgb(255, 0, 0)',
+                 'Color(1f, 0f, 0f)', 'Color(red = 1f, green = 0f, blue = 0f)',
                  'Color.Red', 'android.graphics.Color.rgb(255, 0, 0)', 'Color.parseColor("red")',
                  '<color name="oops">#F00</color>', '@android:color/white',
                  'val url = "https://example.com"; val ink = Color.Red']
@@ -47,3 +48,12 @@ class BrandColorLiteralTest(unittest.TestCase):
             failures = GUARD.violations(root)
             self.assertEqual(1, len(failures))
             self.assertIn('Color.kt:2:', failures[0])
+
+    def test_release_and_debug_sources_cannot_hide_colours(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for source_set in ('release', 'debug'):
+                source = root / f'app/src/{source_set}/Oops.kt'
+                source.parent.mkdir(parents=True)
+                source.write_text('val ink = Color.White')
+            self.assertEqual(2, len(GUARD.violations(root)))

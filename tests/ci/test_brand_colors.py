@@ -21,9 +21,17 @@ class BrandColorsTest(unittest.TestCase):
             target = self.root / BRAND.VENDOR / name
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes((ROOT / BRAND.VENDOR / name).read_bytes())
-        output = self.root / BRAND.OUTPUT
-        output.parent.mkdir(parents=True)
-        output.write_text(BRAND.generated(self.root))
+        for name in ('temporary-old-palette.json', 'temporary-old-palette.sha256'):
+            target = self.root / 'scripts/brand' / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes((ROOT / 'scripts/brand' / name).read_bytes())
+        self.regenerate()
+
+    def regenerate(self):
+        for name, content in BRAND.generated_files(self.root):
+            output = self.root / name
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(content)
 
     def check(self):
         with patch.object(BRAND, 'ROOT', self.root), patch('sys.argv', ['generate-brand-colors.py', '--check']):
@@ -61,3 +69,36 @@ class BrandColorsTest(unittest.TestCase):
         commit, _ = BRAND.tokens(self.root)
         self.assertEqual(pin['files']['brand/tokens.json']['commit'], commit)
         self.assertNotEqual(pin['commit'], commit)
+
+    def test_manual_window_xml_edit_fails_in_each_mode(self):
+        for qualifier in ('values', 'values-night'):
+            with self.subTest(qualifier=qualifier):
+                self.regenerate()
+                path = self.root / f'ui/src/main/res/{qualifier}/colors.xml'
+                path.write_text(path.read_text().replace('#', '#00', 1))
+                with self.assertRaisesRegex(SystemExit, 'Stale generated'):
+                    self.check()
+
+    def test_temporary_snapshot_is_checksum_frozen(self):
+        path = self.root / BRAND.TEMPORARY
+        path.write_bytes(path.read_bytes() + b'\n')
+        with self.assertRaisesRegex(ValueError, 'frozen SHA-256'):
+            self.check()
+
+    def test_removing_snapshot_and_checksum_switches_to_canonical_only(self):
+        path = self.root / BRAND.TEMPORARY
+        path.unlink()
+        path.with_suffix('.sha256').unlink()
+        self.regenerate()
+        self.check()
+        source = (self.root / BRAND.OUTPUT).read_text()
+        self.assertNotIn('LegacyLightColors', source)
+        self.assertNotIn('LegacyDarkColors', source)
+        self.assertNotIn('TEMPORARY', source)
+        self.assertIn('bg = BrandTokenValues.dark.getValue("ground")', source)
+        _, roles = BRAND.tokens(self.root)
+        for mode, qualifier in [('light', 'values'), ('dark', 'values-night')]:
+            xml = (self.root / f'ui/src/main/res/{qualifier}/colors.xml').read_text()
+            self.assertIn(roles['ground'][mode], xml)
+            self.assertIn(roles['ink'][mode], xml)
+            self.assertNotIn('TEMPORARY', xml)

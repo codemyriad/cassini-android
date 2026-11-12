@@ -4,12 +4,17 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-GENERATED = {'ui/src/main/kotlin/io/codemyriad/cassini/ui/theme/BrandTokenValues.kt'}
+GENERATED = {
+    'ui/src/main/kotlin/io/codemyriad/cassini/ui/theme/BrandTokenValues.kt',
+    'ui/src/main/res/values/colors.xml',
+    'ui/src/main/res/values-night/colors.xml',
+}
 PATTERN = re.compile(
-    r'\bColor\s*\(\s*(?:0[xX][0-9a-fA-F]+|\d+(?:\.\d+)?[fF]?\s*,|(?:red|green|blue)\s*=)'
-    r'|\bColor\.(?:Black|White|Red|Green|Blue|Yellow|Cyan|Magenta|Gray|LightGray|DarkGray)\b'
+    r'\bColor\s*\(\s*(?:(?:color\s*=\s*)?0[xX][0-9a-fA-F]+|\d+(?:\.\d+)?[fF]?\s*,|(?:red|green|blue)\s*=)'
+    r'|\bColor\.(?:Black|White|Red|Green|Blue|Yellow|Cyan|Magenta|Gray|LightGray|DarkGray|BLACK|WHITE|RED|GREEN|BLUE|YELLOW|CYAN|MAGENTA|GRAY|LTGRAY|DKGRAY)\b'
     r'|\b(?:Color|android\.graphics\.Color)\.(?:rgb|argb|parseColor)\s*\('
     r'|#[0-9a-fA-F]{3,8}(?![0-9a-fA-F])'
+    r'|\b(?:rgb|rgba|hsl|hsla)\s*\(\s*\d'
     r'|@android:color/(?:black|white|holo_\w+|darker_gray)\b'
 )
 COMMENTS = re.compile(r'"(?:\\.|[^"\\])*"|/\*.*?\*/|<!--.*?-->|//[^\n]*', re.DOTALL)
@@ -17,10 +22,13 @@ COMMENTS = re.compile(r'"(?:\\.|[^"\\])*"|/\*.*?\*/|<!--.*?-->|//[^\n]*', re.DOT
 
 def violations(root):
     failures = []
+    sources = []
     for module in root.iterdir():
-        source = module / 'src/main'
-        if not source.is_dir():
-            continue
+        source_root = module / 'src'
+        if source_root.is_dir():
+            sources.extend(path for path in source_root.iterdir()
+                           if path.is_dir() and not path.name.startswith(('test', 'androidTest')))
+    for source in sources:
         for path in sorted(source.rglob('*')):
             relative = path.relative_to(root).as_posix()
             if path.suffix not in {'.kt', '.java', '.xml', '.css'} or relative in GENERATED:
