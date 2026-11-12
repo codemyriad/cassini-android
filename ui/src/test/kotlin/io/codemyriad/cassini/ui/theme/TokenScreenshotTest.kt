@@ -39,12 +39,21 @@ class TokenScreenshotTest : BoardTest() {
     @Config(qualifiers = "+night")
     fun tokensDark() = board("components", "tokens-dark", dark = true) { TokenStrip() }
 
-    /** The strip lists every colour token and every text style: a new token must be added here too. */
+    /** Base colours are swatches; speaker roles have chips/screens and fixed-value checks in SpeakerPaletteTest. */
     @Test fun stripCoversEveryToken() {
-        val colorGetters = CassiniColors::class.java.declaredMethods.count {
+        fun tokenName(getter: String) =
+            getter.removePrefix("get").substringBefore('-').replaceFirstChar { it.lowercaseChar() }
+        val colorGetters = CassiniColors::class.java.declaredMethods.filter {
             it.name.startsWith("get") && it.returnType == Long::class.javaPrimitiveType
-        }
-        assertEquals(colorGetters, palette(LightColors).size)
+        }.map { tokenName(it.name) }.toSet()
+        // The question wash is covered by Name a speaker/Meeting goldens and SpeakerPaletteTest. Adding a
+        // swatch would change the token strip during W1.0a, which must preserve every existing golden.
+        val coveredColors = palette(LightColors).map { it.first }.toSet() + "speakerQuestionWash"
+        assertEquals(colorGetters, coveredColors)
+        val speakerGetters = CassiniColors::class.java.declaredMethods.filter {
+            it.name.startsWith("get") && it.returnType == SpeakerColors::class.java
+        }.map { tokenName(it.name) }.toSet()
+        assertEquals(SpeakerTone.entries.map { "speaker${it.name}" }.toSet(), speakerGetters)
         val typeGetters = CassiniType::class.java.declaredMethods.count { it.returnType == TextStyle::class.java }
         assertEquals(typeGetters, typeScale(CassiniTypography).size)
         val recordingGetters = RecordingColors::class.java.declaredMethods.count {
