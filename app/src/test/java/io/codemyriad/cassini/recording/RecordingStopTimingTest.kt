@@ -130,6 +130,25 @@ class RecordingStopTimingTest {
         }
     }
 
+    @Test fun anEarlierStartupRequestCannotOverwriteAnAlreadyAcceptedFinalTitle() = runTest {
+        val h = StopHarness(this, folder.newFolder(), CaptureFormat.OPUS)
+        try {
+            assertTrue(h.controller.start("Initial title"))
+            h.dispatcher.passJob = h.dispatcher.lastJob
+            h.dispatcher.holding = true
+            h.controller.finish("Earlier startup title")
+            runCurrent()
+            assertTrue(h.controller.state.value is RecordingState.Active)
+            h.controller.finish("Final title")
+            h.dispatcher.releaseAll()
+            runCurrent()
+            h.assertEnded(RecordingOutcome.Saved(AfterFinish.TRANSCRIBE), handoffs = 1)
+        } finally {
+            h.dispatcher.releaseAll()
+            runCurrent()
+        }
+    }
+
     @Test fun pauseAndSilenceCannotTouchACaptureWhileStopIsSuspended() = runTest {
         val h = harness()
         val release = CompletableDeferred<Unit>()

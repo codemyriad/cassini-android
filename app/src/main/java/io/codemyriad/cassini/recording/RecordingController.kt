@@ -469,7 +469,8 @@ class RecordingController(private val parts: Parts) {
                 is RecordingState.Finishing -> state
                 else -> null
             }?.takeIf { expectedNoteId == null || it.noteId == expectedNoteId } ?: return null
-            val claimed = current.copy(title = title ?: current.title, elapsedMs = mic.elapsedMs, titleFinal = true)
+            val typed = if (current.titleFinal) current.title else title ?: current.title
+            val claimed = current.copy(title = typed, elapsedMs = mic.elapsedMs, titleFinal = true)
             if (mutableState.compareAndSet(state, claimed)) return claimed
         }
     }
