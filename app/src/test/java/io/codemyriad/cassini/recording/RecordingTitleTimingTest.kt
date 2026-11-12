@@ -59,7 +59,7 @@ class RecordingTitleTimingTest {
         controller.finish("Final title")
         assertEquals(
             "Saving is synchronous even while the recorder dispatcher has not run",
-            RecordingState.Finishing(active.noteId, "Final title", active.elapsedMs),
+            RecordingState.Finishing(active.noteId, "Final title", active.elapsedMs, titleFinal = true),
             controller.state.value,
         )
         controller.finish("Duplicate tap")
