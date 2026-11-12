@@ -119,8 +119,11 @@ Each upload needs a `versionCode` that is more than the `versionCode` of each ea
 
 `daily-test-release.yml` runs at 09:00, 14:00 and 20:00 **Europe/Berlin**, including daylight-saving changes,
 and offers `workflow_dispatch` on main. GitHub added [IANA schedule timezones](https://github.blog/changelog/2026-03-19-github-actions-late-march-2026-updates/).
-It skips with an Actions notice and summary when main has moved, its latest Android CI is not green, or its
-commit has already reached the internal track. A manual test-tag upload counts too.
+It admits the current `main` commit at slot start, waits up to 45 minutes if that commit's latest Android CI run is
+still in progress, and skips with an Actions notice and summary when `main` moved before planning, its latest Android
+CI finishes non-green (or exceeds the 45-minute wait), or its commit has already reached the internal track. Once a
+`main` commit is admitted at slot start, advancing `main` while waiting for its CI or collecting notes does not discard
+that admitted commit. A manual test-tag upload counts too.
 
 The job reserves the next `beta.N` and a higher `versionCode` in the repository's
 `android-play-internal-test` deployment ledger. Failed reservations consume their number. A bare stable source version or an existing stable tag advances

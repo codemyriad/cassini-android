@@ -18,10 +18,12 @@ SOURCE = 'android {\n    versionCode = 18\n    versionName = "0.4.2-beta.3"\n}\n
 
 
 class API:
-    def __init__(self, main=SHA, green=True, baseline=OLD, baseline_code=18, records=(), states=None, jobs=()):
+    def __init__(self, main=SHA, green=True, baseline=OLD, baseline_code=18, records=(), states=None, jobs=(),
+                 ci_states=None):
         self.main, self.is_green, self.baseline = main, green, baseline
         self.baseline_code = baseline_code
         self.records, self.states, self.jobs = list(records), states or {}, list(jobs)
+        self.ci_states = list(ci_states) if ci_states is not None else None
         self.posts = []
         self.main_reads = 0
 
@@ -41,8 +43,14 @@ class API:
             return iter(self.records)
         return iter(self.states.get(path, []))
 
+    def ci_state(self, sha):
+        if self.ci_states:
+            state = self.ci_states.pop(0) if len(self.ci_states) > 1 else self.ci_states[0]
+            return state
+        return 'green' if self.is_green else 'red'
+
     def green(self, sha):
-        return self.is_green
+        return self.ci_state(sha) == 'green'
 
     def manual_baseline(self):
         return (self.baseline, self.baseline_code) if self.baseline else None
@@ -123,18 +131,90 @@ class DailyReleaseTests(unittest.TestCase):
         self.assertFalse(DAILY.uploaded([upload_job('skipped')]))
         self.assertFalse(DAILY.uploaded([upload_job('failure')]))
 
-    def test_ci_or_main_changing_during_notes_collection_skips_before_reservation(self):
-        for move in (True, False):
-            api = API()
-            def change(*_, move=move, api=api):
-                if move:
-                    api.main = OLD
-                else:
-                    api.is_green = False
-                return '- New change'
-            with self.subTest(move=move), patch.object(DAILY, 'notes', side_effect=change):
-                self.assertFalse(DAILY.plan(api, SHA, SOURCE, 42)['build'])
-                self.assertEqual([], api.posts)
+    def test_ci_turning_red_during_notes_skips_while_advancing_main_keeps_admitted_sha(self):
+        api_red = API()
+        def turn_red(*_):
+            api_red.is_green = False
+            return '- New change'
+        with patch.object(DAILY, 'notes', side_effect=turn_red):
+            self.assertFalse(DAILY.plan(api_red, SHA, SOURCE, 42)['build'])
+            self.assertEqual([], api_red.posts)
+
+        api_moved = API()
+        def move_main(*_):
+            api_moved.main = 'd' * 40
+            return '- New change'
+        with patch.object(DAILY, 'notes', side_effect=move_main):
+            value = DAILY.plan(api_moved, SHA, SOURCE, 42)
+            self.assertTrue(value['build'])
+            self.assertEqual(SHA, value['sha'])
+            self.assertEqual(1, len(api_moved.posts))
+
+    def test_slot_waits_bounded_for_in_progress_main_ci_and_never_publishes_red_or_timed_out_ci(self):
+        now = [0.0]
+        sleeps = []
+        def clock():
+            return now[0]
+        def fake_sleep(seconds):
+            sleeps.append(seconds)
+            now[0] += seconds
+
+        # 1. In-progress CI finishing green within the bound reserves and plans the admitted SHA,
+        #    even if commits/main advances while waiting.
+        api_ok = API(ci_states=['pending', 'pending', 'green', 'green'])
+        def sleep_and_advance(seconds):
+            fake_sleep(seconds)
+            api_ok.main = 'e' * 40
+        with patch.object(DAILY, 'notes', return_value='- Fix (#1)'):
+            planned = DAILY.plan(api_ok, SHA, SOURCE, 42, clock=clock, sleep=sleep_and_advance)
+        self.assertTrue(planned['build'])
+        self.assertEqual(SHA, planned['sha'])
+        self.assertEqual([30, 30], sleeps)
+
+        # 2. In-progress CI finishing red stops immediately and never reserves a build.
+        now[0] = 0.0
+        sleeps.clear()
+        api_fail = API(ci_states=['pending', 'red'])
+        self.assertFalse(DAILY.plan(api_fail, SHA, SOURCE, 42, clock=clock, sleep=fake_sleep)['build'])
+        self.assertEqual([30], sleeps)
+        self.assertEqual([], api_fail.posts)
+
+        # 3. Already-completed red CI fails closed immediately without sleeping.
+        now[0] = 0.0
+        sleeps.clear()
+        api_red_now = API(ci_states=['red'])
+        self.assertFalse(DAILY.plan(api_red_now, SHA, SOURCE, 42, clock=clock, sleep=fake_sleep)['build'])
+        self.assertEqual([], sleeps)
+        self.assertEqual([], api_red_now.posts)
+
+        # 4. Still-pending CI at the 45-minute bound clamps the final sleep and skips cleanly.
+        now[0] = 0.0
+        sleeps.clear()
+        api_timeout = API(ci_states=['pending'])
+        deadline = 45.0
+        self.assertFalse(DAILY.wait_for_green(api_timeout, SHA, deadline=deadline, clock=clock, sleep=fake_sleep))
+        self.assertEqual([30, 15.0], sleeps)
+        self.assertEqual(45.0, now[0])
+
+        now[0] = 0.0
+        sleeps.clear()
+        self.assertFalse(DAILY.plan(api_timeout, SHA, SOURCE, 42, clock=clock, sleep=fake_sleep)['build'])
+        self.assertEqual(DAILY.CI_WAIT_SECONDS, sum(sleeps))
+        self.assertEqual([], api_timeout.posts)
+
+    def test_github_ci_state_classifies_queued_and_in_progress_trusted_runs_as_pending(self):
+        api = object.__new__(DAILY.GitHub)
+        api.repo = 'codemyriad/cassini-android'
+        for event in ('push', 'workflow_dispatch', 'schedule'):
+            for status in ('queued', 'in_progress', 'waiting'):
+                api.request = Mock(return_value={'workflow_runs': [
+                    workflow_run(event=event, status=status, conclusion=None),
+                    workflow_run(conclusion='success'),
+                ]})
+                self.assertEqual('pending', api.ci_state(SHA))
+                self.assertFalse(api.green(SHA))
+        workflow = (ROOT / '.github/workflows/daily-test-release.yml').read_text()
+        self.assertIn('timeout-minutes: 55', workflow)
 
     def test_expanded_github_body_is_checked_before_reserving_a_build(self):
         api = API()
