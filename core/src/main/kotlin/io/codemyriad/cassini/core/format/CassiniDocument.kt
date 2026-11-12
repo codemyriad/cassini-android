@@ -537,7 +537,8 @@ data class CassiniDocument(
                 speakers.getJSONObject(it).getInt("colourIndex")
             }?.takeIf { it < Int.MAX_VALUE }?.plus(1) ?: speakers.length()
             transcript.words.map { it.speaker }.distinct().filterNot { it in known }.forEach {
-                val slot = if (existing == null) colourIndices[it] ?: nextColour++ else nextColour++
+                val slot = if (existing == null) colourIndices[it] ?: nextColour else nextColour
+                nextColour = if (nextColour == Int.MAX_VALUE) 0 else nextColour + 1
                 require(slot >= 0) { "Invalid speaker colour index" }
                 speakers.put(JSONObject().put("id", it).put("label", speakerLabels[it] ?: it).put("colourIndex", slot))
             }

@@ -66,10 +66,17 @@ object VoiceCodec {
         val voices = json.getJSONArray("voices")
         val decoded = (0 until voices.length()).map { Voice.fromJson(voices.getJSONObject(it)) }
         // Older stores already have a save clock. Assign before any rename, deletion or display sorting.
-        var next = decoded.mapNotNull { it.colourIndex }.maxOrNull()?.plus(1) ?: 0
-        val missing = decoded.filter { it.colourIndex == null }.sortedBy { it.createdAt }.associate { it.id to next++ }
+        var next = nextColourIndex(decoded)
+        val missing = decoded.filter { it.colourIndex == null }.sortedBy { it.createdAt }.associate {
+            val slot = next
+            next = if (next == Int.MAX_VALUE) 0 else next + 1
+            it.id to slot
+        }
         return decoded.map { if (it.colourIndex == null) it.copy(colourIndex = missing.getValue(it.id)) else it }
     }
+
+    private fun nextColourIndex(voices: List<Voice>): Int =
+        voices.mapNotNull { it.colourIndex }.maxOrNull()?.let { if (it == Int.MAX_VALUE) 0 else it + 1 } ?: 0
 
     fun encode(voices: List<Voice>): String =
         JSONObject().put("version", VERSION).put("voices", JSONArray(voices.map { it.json() })).toString()
@@ -84,7 +91,7 @@ object VoiceCodec {
             Voice(
                 result.getOrNull(index)?.id ?: "voice_${UUID.randomUUID()}", name, model,
                 requireNotNull(Voiceprints.normalised(embedding)), 1, seconds, result.getOrNull(index)?.createdAt ?: now, now,
-                result.getOrNull(index)?.colourIndex ?: ((result.mapNotNull { it.colourIndex }.maxOrNull() ?: -1) + 1),
+                result.getOrNull(index)?.colourIndex ?: nextColourIndex(result),
             )
         } else {
             previous.copy(

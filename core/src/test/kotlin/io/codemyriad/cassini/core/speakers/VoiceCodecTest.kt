@@ -68,4 +68,17 @@ class VoiceCodecTest {
         assertEquals(listOf("z", "a"), decoded.map { it.id })
         assertEquals(listOf(0, 1), decoded.map { it.colourIndex })
     }
+
+    @Test fun maximumOptionalSlotsDoNotOverflowLegacyAssignmentOrEnrolment() {
+        for (slot in listOf(Int.MAX_VALUE - 1, Int.MAX_VALUE)) {
+            val stored = Voice("stored", "Stored", "m", axis(0), 1, 1.0, 0, 0, slot)
+            val first = Voice("first", "First", "m", axis(1), 1, 1.0, 1, 1)
+            val second = Voice("second", "Second", "m", axis(2), 1, 1.0, 2, 2)
+            val decoded = VoiceCodec.decode(VoiceCodec.encode(listOf(stored, first, second)))
+            assertEquals(slot, decoded.first().colourIndex)
+            assertTrue(decoded.all { it.colourIndex!! >= 0 })
+            val (_, enrolled) = VoiceCodec.enrol(listOf(stored), null, "New", "m", axis(1), 1.0, 3)
+            assertTrue(enrolled.colourIndex!! >= 0)
+        }
+    }
 }
