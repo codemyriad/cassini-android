@@ -109,7 +109,7 @@ internal fun question(ui: NameSheetUi): Question? {
 }
 
 /**
- * The question card: amberWash, radius 14, padding 12/14 (bottom 8: the buttons' 48 dp layout holds 4 dp below
+ * The question card: speakerQuestionWash, radius 14, padding 12/14 (bottom 8: the buttons' 48 dp layout holds 4 dp below
  * their 40 dp visual), `body14` ink with the first sentence bold, then the answers 4 dp below (8 on the board,
  * less the same slack): `InkButton` medium and `SecondaryButton` medium plain "Someone else". The card is focusable,
  * so a blocked Save can move focus to it; [pulses] counts the blocked presses, and each one says "Answer the
@@ -144,8 +144,8 @@ internal fun QuestionCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(c.amberWash)
-            .pulseBorder(c.amberInk, shape) { pulse.value }
+            .background(c.speakerQuestionWash)
+            .pulseBorder(c.speakerAmber.ink, shape) { pulse.value }
             .semantics {
                 liveRegion = LiveRegionMode.Polite
                 if (announced) stateDescription = answerFirst
