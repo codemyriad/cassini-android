@@ -89,15 +89,7 @@ class CassiniColors(
     val link: Color,
     /** Canonical decided/placeholder roles; null until the W1 look preview activates them. */
     internal val brand: Map<String, Color>? = null,
-) {
-    val highlight: Color get() = brand?.getValue("highlight") ?: accentTint
-    val highlightInk: Color get() = brand?.getValue("highlight-ink") ?: ink
-    val record: Color get() = brand?.getValue("record") ?: red
-    val onRecord: Color get() = brand?.getValue("on-record") ?: onRed
-    val error: Color get() = brand?.getValue("error") ?: redInk
-    val neutralInk: Color get() = brand?.getValue("neutral-ink") ?: ink
-    val neutralTint: Color get() = brand?.getValue("neutral-tint") ?: surface
-}
+)
 
 /** The light set (the boards). */
 internal val LegacyLightColors: CassiniColors = CassiniColors(
