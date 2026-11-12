@@ -13,6 +13,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -23,6 +24,7 @@ import io.codemyriad.cassini.ui.format.DayLabel
 import io.codemyriad.cassini.ui.format.FIXED_ZONE
 import io.codemyriad.cassini.ui.format.ProvideFixedFormat
 import io.codemyriad.cassini.ui.theme.CassiniTheme
+import kotlinx.collections.immutable.persistentListOf
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -34,9 +36,8 @@ import org.robolectric.annotation.GraphicsMode
 import java.util.Locale
 
 /**
- * The fixes for font scale 2.0 from the P12 device review (docs/ui-fidelity.md): the Library row suffix goes to the
- * next line and is not cut ("· No speech" showed as "· No"), and the "10" of the skip buttons keeps its size. Native
- * graphics give the text its real width.
+ * Font-scale-2 checks from P12 (docs/ui-fidelity.md), applied to the W2 row: badge and names remain visible,
+ * no-speech information remains accessible, and skip digits retain their size. Native graphics measure real text.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -60,16 +61,17 @@ class LargeFontScaleTest {
         CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale), content = content)
     }
 
-    @Test fun theRowSuffixIsNotCutAtFontScale2() {
+    @Test fun theRowBadgeAndSpeakerNameAreNotCutAtFontScale2() {
         val silent = ComponentFixtures.otherRows.first { it.first.id == "silent" }.first
+        val paused = ComponentFixtures.board.copy(speakerLabels = persistentListOf(RowSpeakerUi("Giulia", 1)))
         setThemed(fontScale = 2f) {
             Column(Modifier.width(390.dp).testTag(LIST)) {
-                NoteRow(ComponentFixtures.board, DayLabel.Yesterday, onAction = {})
+                NoteRow(paused, DayLabel.Yesterday, onAction = {})
                 NoteRow(silent, DayLabel.Yesterday, onAction = {})
             }
         }
         val list = rule.onNode(hasTestTag(LIST)).getUnclippedBoundsInRoot()
-        for (suffix in listOf("· Resume", "· No speech")) {
+        for (suffix in listOf("Interrupted", "Giulia")) {
             val node = rule.onNode(hasText(suffix), useUnmergedTree = true)
             // The first line holds the whole suffix, and the row gives it the width that line needs (px).
             val layout = node.textLayout()
@@ -81,6 +83,7 @@ class LargeFontScaleTest {
             val bounds = node.getUnclippedBoundsInRoot()
             assertTrue("\"$suffix\" ends at ${bounds.right}, past the row (${list.right})", bounds.right <= list.right)
         }
+        rule.onNode(hasContentDescription("no speech", substring = true)).assertExists()
     }
 
     @Test fun theSkipDigitsKeepTheirSizeAtFontScale2() {
