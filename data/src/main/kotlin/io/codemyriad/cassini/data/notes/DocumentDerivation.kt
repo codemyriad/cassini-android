@@ -117,6 +117,7 @@ internal object DocumentDerivation {
                 variantId = variantId,
                 speakerId = stat.speakerId,
                 ordinal = stat.ordinal,
+                colourIndex = document.speakerColourIndex(stat.speakerId) ?: stat.ordinal,
                 label = label,
                 isPlaceholder = placeholder,
                 placeholderNumber = if (placeholder) placeholderNumber(label) ?: (stat.ordinal + 1) else null,

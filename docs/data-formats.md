@@ -75,17 +75,19 @@ A note with a valid checkpoint comes back paused.
 
 ## Room catalogue
 
-The database is `io.codemyriad.cassini.data.db.CassiniDatabase`, version 1. The schemas are in `data/schemas/`. Room stores the enums as `TEXT` with stable names, never as ordinals.
+The database is `io.codemyriad.cassini.data.db.CassiniDatabase`, version 3. The schemas are in `data/schemas/`. Room stores the enums as `TEXT` with stable names, never as ordinals.
 
 | Table | Key | Content |
 |---|---|---|
 | `notes` | `id` | Title, `title_dirty`, dates, origin, audio file and kind, duration, SHA-256 of an import, document state and signature, meeting ID, selected version, position, preview, trust acknowledgement, trash time and the job state at trash time |
 | `variants` | `note_id`, `variant_id` | One row for each transcript version: order, default, language (`und` for a Parakeet run, `""` in older files), kind (`TRANSCRIBED` or `MERGED`), word count, speaker count, inference time, errors |
-| `speakers` | `note_id`, `variant_id`, `speaker_id` | Label, placeholder flag and number, speaking time, word and turn counts, the sample window |
+| `speakers` | `note_id`, `variant_id`, `speaker_id` | Label, placeholder flag and number, file-derived colour index, speaking time, word and turn counts, the sample window |
 | `note_text` | `rowid` | The title and the words of the selected version, for search |
 | `note_fts` | | An FTS4 table over `note_text` with `tokenizer = unicode61` and `remove_diacritics=1` |
 | `jobs` | `note_id` | The queue: order, kind, state, pause reason, failure, progress, attempts |
 | `note_voice_links` | `note_id`, `variant_id`, `speaker_id` | A copy of the matches in `voices/notes/<id>.json`: voice ID, state, score, seconds. No embeddings. |
+
+Schema 2 added recording-time metadata. Schema 3 adds the derived `speakers.colour_index` column. Its explicit migration preserves notes and jobs, invalidating document signatures so startup re-derives the speaker cache from files. Variant-specific display ordinals remain separate from stored colour indices.
 
 The tables `variants`, `speakers`, `note_text`, `jobs` and `note_voice_links` cascade from `notes`. Each later schema version needs a written `Migration` and a `MigrationTestHelper` test. The code does not use `fallbackToDestructiveMigration`. If the database does not open, the app renames it `cassini.db.corrupt-<epoch>` and makes the catalogue again.
 
@@ -152,7 +154,7 @@ If the process stops before the marker exists, the old audio stays as it was. If
 
 `voices/` holds voiceprints and voice matches. A voiceprint is biometric data. It never goes into a shared document or export. Committed saved voices travel with enabled Android transfer; temporary voiceprint updates are excluded.
 
-- `people.json` holds the saved people: their names, embeddings and counts.
+- `people.json` holds the saved people: their names, embeddings, counts and optional save-order `colourIndex`. New people get a stored slot; existing slots survive edits and sorting. Older files initialise missing slots from `createdAt`, with file order breaking equal-clock ties, and persist those slots at the next explicit write.
 - `generation` holds an integer. "Forget everyone" first increases it, then deletes all other files under `voices/`.
 - `notes/<id>.json` holds the voiceprints and matches of a sealed note. Its keys are `<variantId>/<speakerId>`.
 - `pending/<id>.json` holds the final voiceprints and matches of a sealed job before adopt. It has the same codec and the generation of the time when the job sealed.
@@ -169,6 +171,8 @@ A Cassini document is an Ogg Opus file at 48 kHz. Any audio player plays it. The
 
 - Plain tags, for example `TITLE`, `CASSINI_SPEAKER_COUNT` and `CASSINI_MEETING_ID`.
 - A JSON manifest (`application/vnd.cassini.portable-meeting+json`) and the transcript bodies (`application/vnd.cassini.transcript-words+json`, format `cassini.words.v1`). They are compressed and split across numbered tags.
+
+Speaker records can carry the optional `colourIndex` hint (L-41): a zero-based slot in original first-speech order, including speakers not named yet. New seals store it, draft merges keep the target's original slot, and later naming, merging or transcript variants retain valid stored slots. Missing legacy slots come from the first readable variant, with manifest order as a fallback when no body can be read. Reads and imports never rewrite a file; a later explicit document edit persists missing slots. Malformed hints are nonfatal. This metadata is independent of the renderer's palette and assignment policy.
 
 Each transcription adds a transcript version (a variant). The document keeps the earlier versions. "Save a copy" copies the document byte for byte, together with the versions, extensions and attachments that Android does not use.
 

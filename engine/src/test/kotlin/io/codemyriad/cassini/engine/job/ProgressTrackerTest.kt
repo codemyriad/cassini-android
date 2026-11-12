@@ -464,6 +464,7 @@ class ProgressTrackerTest {
         t.send(JobEvent.WindowDone(28_000, 70_000, words))
         tick()
         val draft = t.draft
+        assertEquals(mapOf("a" to 0, "d" to 1, "c" to 2, "e" to 3, "b" to 4), t.draft.colourIndices)
         assertEquals(listOf("a", "b", "c", "e", "b"), draft.words.map { it.speaker })
         assertEquals(mapOf("a" to "Speaker 1", "b" to "Bruno", "c" to "Carla", "e" to "Speaker 4"), draft.labels)
         assertEquals(setOf("b"), draft.automatic)

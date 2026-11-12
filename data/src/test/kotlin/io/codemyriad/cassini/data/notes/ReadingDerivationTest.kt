@@ -51,6 +51,17 @@ class ReadingDerivationTest {
         }
     }
 
+    @Test fun storedColourSlotsAreCachedWithoutChangingLabelsOrOrdinals() {
+        val doc = document(fixture("acknowledgment"))
+        doc.manifest!!.getJSONArray("speakers").getJSONObject(0).put("colourIndex", 5)
+        val cache = DocumentDerivation.derive(row, doc, "signature", 1)
+        val ada = cache.speakers.single { it.speakerId == "ada" }
+        assertEquals(5, ada.colourIndex)
+        assertEquals(0, ada.ordinal)
+        assertEquals("Ada", ada.label)
+        assertFalse(ada.isPlaceholder)
+    }
+
     private fun document(words: List<Word>, bounded: Boolean = false): CassiniDocument {
         val speakers = JSONArray()
             .put(JSONObject().put("id", "ada").put("label", "Ada"))
