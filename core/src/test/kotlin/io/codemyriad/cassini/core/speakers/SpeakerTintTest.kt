@@ -4,6 +4,13 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class SpeakerTintTest {
+    @Test fun widePortableSlotsReduceWithoutIntTruncation() {
+        assertEquals(SpeakerTint.FIVE, SpeakerTint.named(4294967296L))
+        assertEquals(SpeakerTint.TWO, SpeakerTint.named(9007199254740991L))
+        val tones = SpeakerTint.assign(listOf("wide"), mapOf("wide" to 4294967296L)) { false }
+        assertEquals(SpeakerTint.FIVE, tones["wide"])
+    }
+
     @Test fun namedSpeakersCycleThroughSixSlotsInFirstTurnOrder() {
         val order = listOf("a", "b", "c", "d", "e", "f", "g")
         val tints = SpeakerTint.assign(order) { false }
@@ -62,7 +69,7 @@ class SpeakerTintTest {
     }
 
     @Test fun namingAndReorderingRevealStoredSlotsWithoutReassigningOtherSpeakers() {
-        val slots = mapOf("a" to 0, "b" to 1, "c" to 2, "g" to 6)
+        val slots = mapOf("a" to 0L, "b" to 1L, "c" to 2L, "g" to 6L)
         val before = SpeakerTint.assign(listOf("a", "b", "c", "g"), slots) { it == "b" }
         val after = SpeakerTint.assign(listOf("g", "c", "b", "a"), slots) { false }
         assertEquals(SpeakerTint.UNNAMED, before["b"])

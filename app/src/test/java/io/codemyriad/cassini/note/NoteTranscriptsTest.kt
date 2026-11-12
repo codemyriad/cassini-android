@@ -37,6 +37,12 @@ class NoteTranscriptsTest {
     private val paolo = Voice("paolo", "Paolo Ferri", "m", FloatArray(1), 1, 10.0, 0, 0)
     private val luca = Voice("luca", "Luca", "m", FloatArray(1), 1, 10.0, 0, 0)
 
+    @Test fun sealedTonesKeepWideCachedSlotsUntilPaletteReduction() {
+        val cached = speakers.map { if (it.speakerId == "a") it.copy(colourIndex = 4294967296L) else it }
+        val shown = NoteTranscripts.sealed(words, cached, emptyMap(), emptyList())
+        assertEquals(SpeakerTone.Five, shown.speakerMetadata.getValue("a").tone)
+    }
+
     @Test
     fun sealedTurnsFollowTheSpeakersWithTintsAndPlaceholders() {
         val transcript = NoteTranscripts.sealed(words, speakers, emptyMap(), emptyList())

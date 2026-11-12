@@ -290,6 +290,15 @@ class CheckpointRepositoryTest {
         assertEquals(CheckpointStatus.SealedAwaitingAdopt, repo.status(id))
     }
 
+    @Test fun pausedDraftSlotsUseEarliestSpeechBeforeMerging() = runTest {
+        val words = listOf(Word("S1", 2000, 2100, "late"), Word("S2", 1000, 1100, "early"))
+        save(h.checkpoint(id, words = words))
+        repo.draftNames(id).mutate { it.merge("S2", "S1") }
+        val draft = requireNotNull(repo.loadDraft(id))
+        assertEquals(mapOf("S2" to 0, "S1" to 1), draft.colourIndices)
+        assertEquals(listOf(2000L, 1000L), draft.words.map { it.startMs })
+    }
+
     @Test fun draftAppliesMergesAndLabels() = runTest {
         save(h.checkpoint(id, words = draftWords("S1", "S2", "S3", "S2")))
         repo.draftNames(id).mutate { names ->

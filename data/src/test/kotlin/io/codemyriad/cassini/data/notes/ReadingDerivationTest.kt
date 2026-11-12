@@ -51,13 +51,24 @@ class ReadingDerivationTest {
         }
     }
 
+    @Test fun storedColourSlotsAreCachedWithoutChangingLabelsOrOrdinals() {
+        val doc = document(fixture("acknowledgment"))
+        doc.manifest!!.getJSONArray("speakers").getJSONObject(0).put("colourIndex", 5)
+        val cache = DocumentDerivation.derive(row, doc, "signature", 1)
+        val ada = cache.speakers.single { it.speakerId == "ada" }
+        assertEquals(5L, ada.colourIndex)
+        assertEquals(0, ada.ordinal)
+        assertEquals("Ada", ada.label)
+        assertFalse(ada.isPlaceholder)
+    }
+
     @Test fun storedSlotsAndExplicitUnnamedProvenanceReachTheCache() {
         val doc = document(fixture("acknowledgment"))
         val speakers = doc.manifest!!.getJSONArray("speakers")
         speakers.getJSONObject(0).put("colourIndex", 5).put("provenance", "unnamed")
         val cache = DocumentDerivation.derive(row, doc, "signature", 1)
         val ada = cache.speakers.single { it.speakerId == "ada" }
-        assertEquals(5, ada.colourIndex)
+        assertEquals(5L, ada.colourIndex)
         assertTrue(ada.isPlaceholder)
     }
 

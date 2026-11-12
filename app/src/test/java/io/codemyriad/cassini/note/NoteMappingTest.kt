@@ -1,18 +1,34 @@
 package io.codemyriad.cassini.note
 
 import io.codemyriad.cassini.core.asr.ProgressAnchor
+import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.engine.job.BatteryLine
+import io.codemyriad.cassini.engine.job.JobPhase
 import io.codemyriad.cassini.engine.job.ProgressHeadline
 import io.codemyriad.cassini.engine.job.RunningProgress
 import io.codemyriad.cassini.engine.job.Step
 import io.codemyriad.cassini.engine.job.TimeLeft
+import io.codemyriad.cassini.processing.NoteJobState
 import io.codemyriad.cassini.ui.components.TrackAnchor
+import io.codemyriad.cassini.ui.note.NoteMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
 /** The Document info texts and the progress card that NoteMapping derives (features.md sections 3.1 and 6). */
 class NoteMappingTest {
+    @Test fun stoppingMakesOnlyTheExistingStopControlBusy() {
+        val row = job(JobState.RUNNING)
+        val details = documentNote().copy(job = row)
+        val phase = NoteJobState(row, ahead = 0, phase = JobPhase.Stopping)
+        val card = requireNotNull(NoteMapping.card(JobPhase.Stopping))
+        val mode = NoteMapping.mode(details, phase, card) as NoteMode.Processing
+        assertEquals(card, mode.card)
+        assertEquals(true, mode.stopBusy)
+        val restarted = NoteMapping.mode(details, phase.copy(phase = JobPhase.Starting), card) as NoteMode.Processing
+        assertEquals(false, restarted.stopBusy)
+    }
+
     @Test fun subtitlePreservesALocalLabelAndDoesNotInventUnknownTime() {
         val note = documentNote().note
         val mode = io.codemyriad.cassini.ui.note.NoteMode.AudioOnly
