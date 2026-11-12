@@ -4,7 +4,7 @@ Cassini keeps two texts. PR titles form the complete developer changelog, shown 
 GitHub release. The notes above it and Play’s “What’s new” describe what someone using the app will notice.
 
 For each user-visible change, follow the [fragment rules](../release-notes.d/README.md). Do not add a fragment for
-CI, refactoring, evidence collection or tests. Never generate user copy from PR titles. To preview pending notes:
+CI, refactoring, evidence collection or tests. Never generate user copy from PR titles. To review all fragments locally:
 
 ```sh
 python3 -c 'import sys; sys.path.insert(0, "scripts"); import release_notes as n; from pathlib import Path; print(n.render(n.fragments(Path("."))))'
