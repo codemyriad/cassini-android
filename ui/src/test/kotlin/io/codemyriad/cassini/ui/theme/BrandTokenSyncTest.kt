@@ -24,12 +24,12 @@ class BrandTokenSyncTest {
         assertEquals(40, upstream.getString("commit").length)
         val sheet = JSONObject(bytes.toString(Charsets.UTF_8))
         assertEquals("cassini-ux/brand-tokens@1", sheet.getString("schema"))
-        val tokens = sheet.getJSONObject("tokens")
         val accepted = checkedActiveRoles(sheet)
         for ((mode, values) in listOf("light" to BrandTokenValues.light, "dark" to BrandTokenValues.dark)) {
             assertEquals("No proposed/pending roles may be read", accepted, values.keys)
             for (name in accepted) {
-                val expected = tokens.getJSONObject(name).getString(mode)
+                val token = sheet.getJSONObject("tokens").optJSONObject(name) ?: sheet.getJSONObject("derived").getJSONObject(name)
+                val expected = token.getString(mode)
                 val color = values.getValue(name)
                 val channels = listOf(color.red, color.green, color.blue) + if (expected.length == 9) listOf(color.alpha) else emptyList()
                 val actual = "#" + channels.joinToString("") { "%02X".format((it * 255).roundToInt()) }
@@ -40,7 +40,7 @@ class BrandTokenSyncTest {
 
     // Keep these explicit: promoting or adding a role must require an Android wiring decision.
     private val deferredCanvasRoles = setOf("raised", "highlight", "highlight-ink", "neutral-ink", "neutral-tint")
-    private val unusedCanvasRoles = setOf("line-soft", "record-ink", "record-tint", "shadow")
+    private val unusedCanvasRoles = setOf("line-soft", "record-ink", "record-tint", "shadow", "card-rest")
 
     private fun checkedActiveRoles(sheet: JSONObject): Set<String> {
         val active = buildSet {
@@ -66,13 +66,16 @@ class BrandTokenSyncTest {
 
     @Test fun addedAndPromotedTokensCannotSilentlyBypassAndroidCoverage() {
         val original = resource("tokens.json").toString(Charsets.UTF_8)
-        val promotions = (0..3).flatMap { listOf("tokens" to "speaker-$it", "tokens" to "avatar-$it") } +
-            listOf("derived" to "card-rest", "tokens" to "new-brand-role")
+        val promotions = (7..10).flatMap { listOf("tokens" to "speaker-$it", "tokens" to "avatar-$it") } +
+            listOf("derived" to "future-derived-role", "tokens" to "new-brand-role")
         for ((section, name) in promotions) {
             for (status in listOf("decided", "placeholder")) {
                 val sheet = JSONObject(original)
                 val roles = sheet.getJSONObject(section)
-                roles.put(name, (roles.optJSONObject(name) ?: JSONObject()).put("status", status))
+                val role = JSONObject().put("status", if (section == "derived") "pending" else "proposed")
+                roles.put(name, role)
+                checkedActiveRoles(sheet)
+                role.put("status", status)
                 val failure = assertThrows(AssertionError::class.java) { checkedActiveRoles(sheet) }
                 assertTrue("$section/$name/$status", failure.message.orEmpty().contains("Every active brand token"))
             }

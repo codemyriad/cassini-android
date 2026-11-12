@@ -48,7 +48,27 @@ class TokenScreenshotTest : BoardTest() {
         }.map { tokenName(it.name) }.toSet()
         // The question wash is covered by Name a speaker/Meeting goldens and SpeakerPaletteTest. Adding a
         // swatch would change the token strip during W1.0a, which must preserve every existing golden.
-        val coveredColors = palette(LightColors).map { it.first }.toSet() + "speakerQuestionWash"
+        // These sixteen new fields are byte-checked in BrandTokenSyncTest but remain invisible until PR B.
+        // Keep this list explicit: any further getter still fails coverage instead of silently disappearing.
+        val stagedColors = setOf(
+            "errorFill",
+            "successFill",
+            "speaker0",
+            "speaker1",
+            "speaker2",
+            "speaker3",
+            "speaker4",
+            "speaker5",
+            "speaker6",
+            "avatar0",
+            "avatar1",
+            "avatar2",
+            "avatar3",
+            "avatar4",
+            "avatar5",
+            "avatar6",
+        )
+        val coveredColors = palette(LightColors).map { it.first }.toSet() + "speakerQuestionWash" + stagedColors
         assertEquals(colorGetters, coveredColors)
         val speakerGetters = CassiniColors::class.java.declaredMethods.filter {
             it.name.startsWith("get") && it.returnType == SpeakerColors::class.java

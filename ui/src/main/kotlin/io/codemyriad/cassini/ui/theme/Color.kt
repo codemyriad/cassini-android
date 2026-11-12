@@ -89,7 +89,27 @@ class CassiniColors(
     val link: Color,
     /** Canonical decided/placeholder roles; null until the W1 look preview activates them. */
     internal val brand: Map<String, Color>? = null,
+    // Canonical roles staged for the look preview; no current component or swatch reads them in plumbing.
+    val errorFill: Color = canvasValue(isDark, "error-fill"),
+    val successFill: Color = canvasValue(isDark, "success-fill"),
+    val speaker0: Color = canvasValue(isDark, "speaker-0"),
+    val speaker1: Color = canvasValue(isDark, "speaker-1"),
+    val speaker2: Color = canvasValue(isDark, "speaker-2"),
+    val speaker3: Color = canvasValue(isDark, "speaker-3"),
+    val speaker4: Color = canvasValue(isDark, "speaker-4"),
+    val speaker5: Color = canvasValue(isDark, "speaker-5"),
+    val speaker6: Color = canvasValue(isDark, "speaker-6"),
+    val avatar0: Color = canvasValue(isDark, "avatar-0"),
+    val avatar1: Color = canvasValue(isDark, "avatar-1"),
+    val avatar2: Color = canvasValue(isDark, "avatar-2"),
+    val avatar3: Color = canvasValue(isDark, "avatar-3"),
+    val avatar4: Color = canvasValue(isDark, "avatar-4"),
+    val avatar5: Color = canvasValue(isDark, "avatar-5"),
+    val avatar6: Color = canvasValue(isDark, "avatar-6"),
 )
+
+private fun canvasValue(dark: Boolean, role: String): Color =
+    (if (dark) BrandTokenValues.dark else BrandTokenValues.light).getValue(role)
 
 /** The light set (the boards). */
 internal val LegacyLightColors: CassiniColors = CassiniColors(
@@ -191,9 +211,25 @@ internal val LegacyDarkColors: CassiniColors = CassiniColors(
 val LightColors: CassiniColors = LegacyLightColors
 val DarkColors: CassiniColors = LegacyDarkColors
 
-// Source: codemyriad/cassini-ux@e4ae2217312370250a39ad83e047a186048e0a9e, brand/tokens.json.
+// Source: codemyriad/cassini-ux@e244ad6a830e4ef77d87fb452143f7100c767139, brand/tokens.json.
 // Android-only secondary roles alias published tokens; L-14/L-17 speaker hues remain frozen below.
 internal val CanvasRoleTokens = mapOf(
+    "errorFill" to "error-fill",
+    "successFill" to "success-fill",
+    "speaker0" to "speaker-0",
+    "speaker1" to "speaker-1",
+    "speaker2" to "speaker-2",
+    "speaker3" to "speaker-3",
+    "speaker4" to "speaker-4",
+    "speaker5" to "speaker-5",
+    "speaker6" to "speaker-6",
+    "avatar0" to "avatar-0",
+    "avatar1" to "avatar-1",
+    "avatar2" to "avatar-2",
+    "avatar3" to "avatar-3",
+    "avatar4" to "avatar-4",
+    "avatar5" to "avatar-5",
+    "avatar6" to "avatar-6",
     "ink" to "ink",
     "bg" to "ground",
     "surface" to "surface",
