@@ -29,6 +29,14 @@ import java.util.concurrent.atomic.AtomicReference
 class ProgressTrackerTest {
     // Phases ----------------------------------------------------------------------------------------------------
 
+    @Test fun draftSlotsUseEarliestSpeechBeforeMergesWithoutReorderingWords() {
+        val words = listOf(Word("a", 2000, 2100, "late"), Word("b", 1000, 1100, "early"))
+        val names = CheckpointNames(emptyMap(), mapOf("b" to "a"))
+        val draft = DraftView.build(words, DraftSources({ names }, { emptyMap() }, { "Speaker $it" }), false, 0)
+        assertEquals(mapOf("b" to 0, "a" to 1), draft.colourIndices)
+        assertEquals(listOf(2000L, 1000L), draft.words.map { it.startMs })
+    }
+
     @Test fun phaseFollowsTheJobBeforeTranscribing() = runTest {
         val t = Tracked(this)
         assertEquals(JobPhase.Starting, t.phase)

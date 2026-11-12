@@ -1,5 +1,6 @@
 package io.codemyriad.cassini.engine.job
 
+import io.codemyriad.cassini.core.format.speakersByFirstSpeech
 import io.codemyriad.cassini.core.asr.BatteryProjection
 import io.codemyriad.cassini.core.asr.ProgressAnchor
 import io.codemyriad.cassini.core.asr.ProgressPace
@@ -362,7 +363,7 @@ internal object DraftView {
         }
         return DraftState(
             words = merged,
-            colourIndices = words.map { it.speaker }.distinct().withIndex().associate { it.value to it.index },
+            colourIndices = words.speakersByFirstSpeech().withIndex().associate { it.value to it.index },
             labels = labels,
             automatic = automatic,
             suggestions = if (namingOpen) suggestions(merged, placeholders, names, sources) else emptyList(),

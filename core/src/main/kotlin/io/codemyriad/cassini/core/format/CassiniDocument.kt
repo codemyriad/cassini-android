@@ -61,7 +61,7 @@ data class CassiniDocument(
     }
 
     private val originalColourIndices: Map<String, Int> by lazy {
-        variants.firstOrNull { it.transcript != null }?.transcript?.words?.map { it.speaker }?.distinct()
+        variants.firstOrNull { it.transcript != null }?.transcript?.words?.speakersByFirstSpeech()
             ?.withIndex()?.associate { it.value to it.index }.orEmpty()
     }
 
@@ -536,7 +536,7 @@ data class CassiniDocument(
             var nextColour = (0 until speakers.length()).maxOfOrNull {
                 speakers.getJSONObject(it).getInt("colourIndex")
             }?.takeIf { it < Int.MAX_VALUE }?.plus(1) ?: speakers.length()
-            transcript.words.map { it.speaker }.distinct().filterNot { it in known }.forEach {
+            transcript.words.speakersByFirstSpeech().filterNot { it in known }.forEach {
                 val slot = if (existing == null) colourIndices[it] ?: nextColour else nextColour
                 nextColour = if (nextColour == Int.MAX_VALUE) 0 else nextColour + 1
                 require(slot >= 0) { "Invalid speaker colour index" }

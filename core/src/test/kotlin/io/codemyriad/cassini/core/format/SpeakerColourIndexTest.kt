@@ -15,6 +15,23 @@ class SpeakerColourIndexTest {
         return OggOpus.mux(OggOpus.Stream(head, tags, listOf(byteArrayOf(-8, -1, -2)), 960, true), tags)
     }
 
+    @Test fun overlappingTurnOrderUsesEarliestSpeechWithoutReorderingWords() {
+        val words = listOf(Word("a", 2000, 2100, "late"), Word("b", 1000, 1100, "early"),
+            Word("c", 1000, 1100, "tie"), Word("a", 500, 600, "earliest"))
+        assertEquals(listOf("a", "b", "c"), words.speakersByFirstSpeech())
+        val transcript = Transcript(words.take(3))
+        val document = CassiniDocument.read(CassiniDocument.create(audio(), transcript, "Overlap", JSONObject()))
+        assertEquals(listOf("b", "c", "a"), transcript.words.speakersByFirstSpeech())
+        assertEquals(0, document.speakerColourIndex("b"))
+        assertEquals(1, document.speakerColourIndex("c"))
+        assertEquals(2, document.speakerColourIndex("a"))
+        assertEquals(transcript, document.selected(null)!!.transcript)
+        val speakers = document.manifest!!.getJSONArray("speakers")
+        repeat(speakers.length()) { speakers.getJSONObject(it).remove("colourIndex") }
+        assertEquals(0, document.speakerColourIndex("b"))
+        assertEquals(2, document.speakerColourIndex("a"))
+    }
+
     @Test fun slotsAreStoredBeforeNamingAndSurviveMergesAndRediarization() {
         val raw = Transcript((0..6).map { Word("s$it", it.toLong(), it + 1L, "word") })
         val source = folder.newFile("source.opus").apply {

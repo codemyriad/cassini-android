@@ -1,5 +1,6 @@
 package io.codemyriad.cassini.engine.job
 
+import io.codemyriad.cassini.core.format.speakersByFirstSpeech
 import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.ProcessingPaused
 import io.codemyriad.cassini.core.UserFacingException
@@ -654,7 +655,7 @@ class TranscriptionJob(
                     target,
                     extensions,
                     recordedAtUtc = start,
-                    colourIndices = decoded.transcript.words.map { it.speaker }.distinct().withIndex()
+                    colourIndices = decoded.transcript.words.speakersByFirstSpeech().withIndex()
                         .associate { it.value to it.index },
                 )
             }

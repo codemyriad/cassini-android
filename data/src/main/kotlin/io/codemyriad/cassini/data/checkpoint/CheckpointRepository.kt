@@ -1,5 +1,6 @@
 package io.codemyriad.cassini.data.checkpoint
 
+import io.codemyriad.cassini.core.format.speakersByFirstSpeech
 import androidx.annotation.WorkerThread
 import io.codemyriad.cassini.core.audio.Limits
 import io.codemyriad.cassini.core.checkpoint.CheckpointState
@@ -214,7 +215,7 @@ class CheckpointRepository(
                 .firstOrNull { !DefaultLabels.isDefault(id, it) }
                 ?.let { id to it }
         }.toMap()
-        val slots = state.recognition.chunks.words.map { it.speaker }.distinct().withIndex().associate { it.value to it.index }
+        val slots = state.recognition.chunks.words.speakersByFirstSpeech().withIndex().associate { it.value to it.index }
         return DraftTranscript(words, labels, names, state.doneMs, state.durationMs, slots)
     }
 
