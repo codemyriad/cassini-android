@@ -564,7 +564,7 @@ The workflows in `.github/workflows/` check builds, committed screenshot changes
 
 | Workflow | Triggers |
 |---|---|
-| `android.yml` | Each push to `main`, each pull request, each tag `v*` and a manual start (`workflow_dispatch`) |
+| `android.yml` | Each push to `main`, each pull request, each tag `v*`, nightly at 02:30 UTC and a manual start (`workflow_dispatch`) |
 | `models.yml` | Each Monday and a manual start |
 | `pr-shots.yml` | Each pull request; read-only committed-golden comparison, no render or emulator |
 | `record-goldens.yml` | A manual start only, for a branch ([Screenshot tests](#screenshot-tests)) |
@@ -595,7 +595,7 @@ job.
 | `checks` | The Gradle wrapper validation, detekt, actionlint, shellcheck on `scripts/*.sh` and `tools/*.sh`, ruff on `scripts` and `tools`, `scripts/check-links.sh`, `scripts/fetch-fonts.sh --check`, `scripts/check-resource-collisions.py`, `scripts/check-runner-selection.py` and `scripts/check-verbatim.sh`. On a tag, it also makes sure that `CHANGELOG.md` has a section for the tag. |
 | `core-only` | `./gradlew --configure-on-demand :core:test` with only a JDK and the submodules. It does not run `setup.sh` and it hides the Android SDK of the runner. |
 | `build` | `setup.sh --prebuilt-only`, then `ciTest` (with `:ui:verifyRoborazziDebug`), the lint of `:app`, `:data` and `:ui`, the APK, the device test APKs of `:app` and `:data`, and `scripts/package-apk.py`. On a tag, it builds `release` (the APK and the bundle) and `releaseTest` and collects the native sources. |
-| `emulator` | After `build`, `checks` and `core-only` pass: the device checks on API 26, 29, 34 and 35 (x86_64 Google APIs images), with `scripts/ci-emulator-smoke.sh`. A push that already fails a cheap check starts no emulators; the push that fixes it runs them. If the emulator or adb fails before the tests start, the job does all the checks one more time on a new emulator. If a test fails, the job fails and does not try again. |
+| `emulator` | After `build`, `checks` and `core-only` pass: the device checks on API 26 and 35 for pull requests; API 26, 29, 34 and 35 for main, tags, nightly and manual runs (x86_64 Google APIs images), with `scripts/ci-emulator-smoke.sh`. Add the `full-ci` label to a PR to run all four immediately and on subsequent pushes while the label remains. Other label additions start no heavy jobs and do not cancel a useful run. Removing the label restores the two-API matrix on the next push. A push that already fails a cheap check starts no emulators; the push that fixes it runs them. If the emulator or adb fails before the tests start, the job does all the checks one more time on a new emulator. If a test fails, the job fails and does not try again. |
 | `release` | On a tag only, after `checks`, `core-only`, `build` and `emulator` pass. It publishes the GitHub release with the files of `dist/` and the notes of the tag from `CHANGELOG.md` ([`release.md`](release.md)). |
 | `play` | On a tag only, after `release`. If the secret `PLAY_SERVICE_ACCOUNT_JSON` is set, it uploads the bundle to the internal testing track of Google Play ([`release.md`](release.md#google-play)). Else it only shows a notice. |
 

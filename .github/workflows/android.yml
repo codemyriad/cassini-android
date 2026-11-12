@@ -5,6 +5,9 @@ on:
     branches: [main]
     tags: ['v*']
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
+  schedule:
+    - cron: '30 2 * * *' # Nightly UTC; all four APIs, even when main has not changed.
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -34,12 +37,14 @@ concurrency:
   # A newer push to a pull request cancels its older run. Pushes to main and tags never cancel or replace each
   # other (D66 AND-7): each commit has its own group, because GitHub keeps one pending run per group and drops the
   # other even without cancel-in-progress (run 41335351975, main's tip f94c3a3c, was dropped 2 s after it was made).
-  # Manual runs use main's ref too; their own group keeps a push from cancelling them.
-  group: android-${{ inputs.daily_test && 'test-release-' || '' }}${{ github.event_name }}-${{ github.ref }}${{ github.event_name == 'push' && format('-{0}', github.sha) || '' }}
+  # Manual runs use main's ref too; their own group keeps a push from cancelling them. Unrelated label events
+  # skip the heavy jobs and get a separate group, so they cannot cancel a useful PR run.
+  group: android-${{ inputs.daily_test && 'test-release-' || '' }}${{ github.event_name }}-${{ github.ref }}${{ github.event_name == 'push' && format('-{0}', github.sha) || '' }}${{ github.event.action == 'labeled' && github.event.label.name != 'full-ci' && format('-label-{0}', github.run_id) || '' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   checks:
+    if: ${{ (github.event.action != 'labeled' || github.event.label.name == 'full-ci') }}
     name: Wrapper, detekt, actionlint, shellcheck, ruff, links, fonts and the verbatim diff
     runs-on: ${{ (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)) && !startsWith(github.ref, 'refs/tags/') && vars.CM_RUNNER == 'hetzner' && fromJSON('["self-hosted","cm-hetzner"]') || 'ubuntu-24.04' }}
     timeout-minutes: 15
@@ -111,6 +116,7 @@ jobs:
 
   # The :core module needs only a JDK: no Android SDK, NDK, sherpa-onnx AAR or Opus source.
   core-only:
+    if: ${{ (github.event.action != 'labeled' || github.event.label.name == 'full-ci') }}
     name: Engine tests with a JDK alone
     runs-on: ${{ (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)) && !startsWith(github.ref, 'refs/tags/') && vars.CM_RUNNER == 'hetzner' && fromJSON('["self-hosted","cm-hetzner"]') || 'ubuntu-24.04' }}
     timeout-minutes: 15
@@ -141,7 +147,7 @@ jobs:
           if-no-files-found: ignore
 
   build:
-    if: ${{ !inputs.daily_test || (inputs.daily_test && github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')) }}
+    if: ${{ (github.event.action != 'labeled' || github.event.label.name == 'full-ci') && (!inputs.daily_test || (inputs.daily_test && github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'))) }}
     # CM_RUNNER=hetzner moves trusted runs (push, schedule, workflow_dispatch, or same-repo PR) to cm-hetzner, never on
     # a tag: tag builds restore the release signing key (below) and only run GitHub-hosted. scripts/check-runner-selection.py checks every runs-on.
     runs-on: ${{ inputs.daily_test != true && (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)) && !startsWith(github.ref, 'refs/tags/') && vars.CM_RUNNER == 'hetzner' && fromJSON('["self-hosted","cm-hetzner"]') || 'ubuntu-24.04' }}
@@ -390,7 +396,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        api: [26, 29, 34, 35]
+        # PR edges by default; full-ci label additions also trigger a complete run.
+        api: ${{ fromJSON((github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-ci')) && '[26,29,34,35]' || '[26,35]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
