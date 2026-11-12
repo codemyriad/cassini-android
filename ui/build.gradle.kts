@@ -126,3 +126,6 @@ dependencies {
     // FontAssetsTest parses third_party/fonts/fonts.json on the plain JVM, where android.jar has only stubs.
     testImplementation(libs.org.json)
 }
+
+// Tests read the exact vendor bytes, not a separately copied resource.
+android.sourceSets.getByName("test").resources.srcDir(rootProject.file("third_party/cassini-ux"))

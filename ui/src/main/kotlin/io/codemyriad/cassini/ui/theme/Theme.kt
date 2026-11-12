@@ -64,7 +64,7 @@ object CassiniTheme {
         get() = CassiniSpacing
 }
 
-private val White = Color(0xFFFFFFFF)
+private val White = BrandTokenValues.light.getValue("on-record")
 
 /**
  * The Material roles of docs/design/ui.md section 4.2, the same mapping for both sets. In light, the on-colours of

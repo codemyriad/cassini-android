@@ -9,7 +9,7 @@
     <path
         android:pathData="M8.5,14a5.5,5.5 0,1 0,11 0a5.5,5.5 0,1 0,-11 0z"
         android:strokeWidth="2"
-        android:strokeColor="@android:color/white" />
+        android:strokeColor="@color/ui_brand_on_record" />
     <group
         android:pivotX="14"
         android:pivotY="14"
@@ -17,6 +17,6 @@
         <path
             android:pathData="M2,14a12,4.2 0,1 0,24 0a12,4.2 0,1 0,-24 0z"
             android:strokeWidth="2"
-            android:strokeColor="@android:color/white" />
+            android:strokeColor="@color/ui_brand_on_record" />
     </group>
 </vector>

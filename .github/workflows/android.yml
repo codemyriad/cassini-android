@@ -99,6 +99,10 @@ jobs:
         run: pipx run --spec ruff==0.14.0 ruff check --config config/ruff.toml scripts tools
       - name: CI download failure tests
         run: python3 -m unittest discover -s tests/ci -p 'test_*.py' -v
+      - name: Pinned brand colours match their generator
+        run: |
+          python3 -I scripts/generate-brand-colors.py --check
+          python3 -I scripts/check-brand-color-literals.py
       - name: Relative links in the Markdown files
         run: scripts/check-links.sh
       - name: Bundled fonts match their pins

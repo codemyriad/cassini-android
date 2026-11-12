@@ -33,18 +33,4 @@ class RecordingColors(
     val finish: Color,
 )
 
-val CassiniRecordingColors: RecordingColors = RecordingColors(
-    bg = Color(0xFF14171A),
-    text = Color(0xFFF2F3F5),
-    text2 = Color(0xFFA9B0B9),
-    line = Color(0xFF3A4048),
-    barIdle = Color(0xFF4A525B),
-    barFresh = Color(0xFFFF8A55),
-    dot = Color(0xFFFF6A2B),
-    status = Color(0xFFFF9A6B),
-    pauseFill = Color(0xFFF2F3F5),
-    onPause = Color(0xFF14171A),
-    finish = Color(0xFFC2410C),
-)
-
 val LocalRecordingColors = staticCompositionLocalOf { CassiniRecordingColors }

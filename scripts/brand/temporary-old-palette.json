@@ -1,0 +1,162 @@
+{
+  "schema": "cassini-android/temporary-w1-palette@1",
+  "temporary": true,
+  "removeIn": "#196",
+  "decision": "Coordinator 2026-11-12: preserve #195 pixels; delete snapshot in #196.",
+  "sourceRepository": "https://github.com/codemyriad/cassini-android",
+  "sourceCommit": "968dfbc01f03e910bd3e59689ddfcfe64bf30c4e",
+  "light": {
+    "ink": "#14171A",
+    "bg": "#F5F6F7",
+    "surface": "#FFFFFF",
+    "surfaceWash": "#F5F6F7",
+    "boardBg": "#ECEEF0",
+    "text2": "#4A525B",
+    "text3": "#3A4250",
+    "text4": "#687180",
+    "line": "#E2E5E9",
+    "line2": "#C9CED5",
+    "line3": "#9AA2AC",
+    "accent": "#2346C8",
+    "accentFill": "#2346C8",
+    "onAccentFill": "#FFFFFF",
+    "accentInk": "#1A3596",
+    "accentTint": "#E8EDFC",
+    "accentTrack": "#C9D4F6",
+    "teal": "#0F766E",
+    "tealInk": "#0B5A54",
+    "tealTint": "#E3F2EF",
+    "amber": "#B45309",
+    "amberInk": "#8A3B07",
+    "amberTint": "#FCEFE3",
+    "amberWash": "#FCF6EE",
+    "speakerBlue": [
+      "#2346C8",
+      "#1A3596",
+      "#E8EDFC"
+    ],
+    "speakerTeal": [
+      "#0F766E",
+      "#0B5A54",
+      "#E3F2EF"
+    ],
+    "speakerViolet": [
+      "#5B2BB5",
+      "#5B2BB5",
+      "#EFEAFB"
+    ],
+    "speakerAmber": [
+      "#B45309",
+      "#8A3B07",
+      "#FCEFE3"
+    ],
+    "speakerQuestionWash": "#FCF6EE",
+    "red": "#C2410C",
+    "redInk": "#A3330B",
+    "redTint": "#FBE7E1",
+    "redLine": "#E3B9A6",
+    "onRed": "#FFFFFF",
+    "violet": "#5B2BB5",
+    "violetTint": "#EFEAFB",
+    "inkFill": "#14171A",
+    "onInkFill": "#FFFFFF",
+    "snackbarBg": "#14171A",
+    "snackbarText": "#F2F3F5",
+    "snackbarAction": "#9DB4FF",
+    "scrim": {
+      "hex": "#1F2A39",
+      "alpha": 0.5
+    },
+    "link": "#2346C8"
+  },
+  "dark": {
+    "ink": "#ECEEF1",
+    "bg": "#0F1214",
+    "surface": "#181C20",
+    "surfaceWash": "#1F2429",
+    "boardBg": "#1F2429",
+    "text2": "#A9B0B9",
+    "text3": "#C3C9D0",
+    "text4": "#8C95A0",
+    "line": "#2A3036",
+    "line2": "#3A4048",
+    "line3": "#5A626C",
+    "accent": "#8FA6FF",
+    "accentFill": "#2346C8",
+    "onAccentFill": "#FFFFFF",
+    "accentInk": "#B9C7FF",
+    "accentTint": "#1C2647",
+    "accentTrack": "#2B3A70",
+    "teal": "#4FC7B8",
+    "tealInk": "#8EDDD2",
+    "tealTint": "#12302D",
+    "amber": "#F0A35E",
+    "amberInk": "#F7C291",
+    "amberTint": "#3A2614",
+    "amberWash": "#2C2118",
+    "speakerBlue": [
+      "#8FA6FF",
+      "#B9C7FF",
+      "#1C2647"
+    ],
+    "speakerTeal": [
+      "#4FC7B8",
+      "#8EDDD2",
+      "#12302D"
+    ],
+    "speakerViolet": [
+      "#C1A8FF",
+      "#C1A8FF",
+      "#2A2045"
+    ],
+    "speakerAmber": [
+      "#F0A35E",
+      "#F7C291",
+      "#3A2614"
+    ],
+    "speakerQuestionWash": "#2C2118",
+    "red": "#C2410C",
+    "redInk": "#FFB08F",
+    "redTint": "#3D1E14",
+    "redLine": "#6B3A2A",
+    "onRed": "#FFFFFF",
+    "violet": "#C1A8FF",
+    "violetTint": "#2A2045",
+    "inkFill": "#ECEEF1",
+    "onInkFill": "#0F1214",
+    "snackbarBg": "#ECEEF1",
+    "snackbarText": "#14171A",
+    "snackbarAction": "#2346C8",
+    "scrim": {
+      "hex": "#000000",
+      "alpha": 0.6
+    },
+    "link": "#8FA6FF"
+  },
+  "recording": {
+    "bg": "#14171A",
+    "text": "#F2F3F5",
+    "text2": "#A9B0B9",
+    "line": "#3A4048",
+    "barIdle": "#4A525B",
+    "barFresh": "#FF8A55",
+    "dot": "#FF6A2B",
+    "status": "#FF9A6B",
+    "pauseFill": "#F2F3F5",
+    "onPause": "#14171A",
+    "finish": "#C2410C"
+  },
+  "xml": {
+    "light": {
+      "ui_window_bg": "#F5F6F7",
+      "ui_logo_ink": "#14171A",
+      "ui_launcher_background": "#F5F6F7",
+      "ui_launcher_ink": "#14171A"
+    },
+    "dark": {
+      "ui_window_bg": "#0F1214",
+      "ui_logo_ink": "#ECEEF1"
+    }
+  },
+  "iconMask": "#000000"
+}
