@@ -106,6 +106,21 @@ All the JVM tests of a module run in one JVM, and the Robolectric tests share st
 
 ### Screenshot tests
 
+Every PR also runs `pr-shots.yml`: it compares committed goldens at the merge base and PR head,
+without rendering or an emulator. The `pr-shots` artifact (14 days) has `changes.json` and a ready
+Markdown block; its summary lists changed screens in both available modes. Images link to full commit
+SHAs. The job has read-only repository permissions and publishes nothing; only the coordinator runs
+`publish`. Original render-runner versions are unrecorded for committed images and stay `unknown`.
+
+`ui/src/test/screenshots/shots.json` explicitly maps each golden to its screen, scheme and locale.
+Legacy light-only entries name ANDROID-SCR-03; dark coverage follows separately. Contract tests reject
+missing pairs, scheme/path mismatches and backgrounds that disagree with the declared rendered scheme.
+Recording's current always-dark appearance is explicit, including in light configurations.
+
+The script is vendored unchanged from cassini-ux commit `5ca44de` with a source header and hash test.
+For its tests, create a Python 3.10+ venv with Pillow 11.3.0, then run its interpreter with
+`-I scripts/pr-shots.py --self-test` and `-m unittest discover -s tests/pr_shots -v`.
+
 The `:ui` tests draw the screens with Robolectric. They compare each picture with a committed PNG file (a golden) in `ui/src/test/screenshots/`. We record and compare the goldens on Linux x86_64 only, because font rendering on other systems can change the pixels.
 
 If you change a screen on purpose, do these steps on Linux x86_64:
@@ -541,12 +556,13 @@ The command does not search `CHANGELOG.md`, `docs/notes/` and this file, because
 
 ## Continuous integration
 
-Three workflows in `.github/workflows/` do the CI checks, and a fourth records the screenshot goldens when started by hand. All actions have a pin to a full commit SHA. Dependabot (`.github/dependabot.yml`) updates the Gradle dependencies, the actions and the submodule each week. The action updates of a week come as one pull request.
+The workflows in `.github/workflows/` check builds, committed screenshot changes and models, and record screenshot goldens when started by hand. All actions have a pin to a full commit SHA. Dependabot (`.github/dependabot.yml`) updates the Gradle dependencies, the actions and the submodule each week. The action updates of a week come as one pull request.
 
 | Workflow | Triggers |
 |---|---|
 | `android.yml` | Each push to `main`, each pull request, each tag `v*` and a manual start (`workflow_dispatch`) |
 | `models.yml` | Each Monday and a manual start |
+| `pr-shots.yml` | Each pull request; read-only committed-golden comparison, no render or emulator |
 | `record-goldens.yml` | A manual start only, for a branch ([Screenshot tests](#screenshot-tests)) |
 | `native.yml` | Each Monday, a manual start, and a push to `main` or a pull request that changes a script of the native build (`setup.sh` and the scripts, pins and patch it uses), `engine/src/main/cpp/`, `engine/build.gradle.kts`, `gradle/libs.versions.toml` or the workflow |
 

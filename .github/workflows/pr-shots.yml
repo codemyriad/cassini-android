@@ -1,0 +1,47 @@
+name: PR screenshots
+on:
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: pr-shots-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  compare:
+    name: Compare committed UI screenshots
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Isolated image-tool environment
+        run: |
+          python3 -m venv .venv-pr-shots
+          .venv-pr-shots/bin/python -m pip install Pillow==11.3.0
+      - name: Screenshot contract tests
+        run: |
+          env -u GITHUB_STEP_SUMMARY .venv-pr-shots/bin/python -I scripts/pr-shots.py --self-test
+          env -u GITHUB_STEP_SUMMARY .venv-pr-shots/bin/python -m unittest discover -s tests/pr_shots -v
+      - name: Compare merge-base and PR-head goldens
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_REPO: ${{ github.repository }}
+        run: |
+          base=$(git merge-base "$PR_BASE" "$PR_HEAD")
+          .venv-pr-shots/bin/python -I scripts/pr-shots.py diff \
+            --layout android --repo "$PR_REPO" --pr "$PR_NUMBER" \
+            --git "$base" "$PR_HEAD" --out pr-shots \
+            --base-run committed --head-run "$GITHUB_RUN_ID" \
+            --base-runner committed-goldens --head-runner committed-goldens \
+            --base-image unknown --head-image unknown
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pr-shots
+          path: pr-shots/
+          retention-days: 14
+          if-no-files-found: error
