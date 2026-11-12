@@ -218,8 +218,9 @@ class AndroidPublication(unittest.TestCase):
             if row["screen"] == "model-download" and row["lang"] == "en" and row["device"] == "phone":
                 row.update(status="added", before_git_path=None)
         ordered = list(dict.fromkeys(shots.screen_id(r) for r in shots.sorted_rows(self.data["rows"])))
-        self.assertLess(ordered.index(("model-download", "en", "phone")),
-                        ordered.index(("transcribing", "en", "phone")))
+        for secondary in ("transcribing", "settings"):
+            self.assertLess(ordered.index(("model-download", "en", "phone")),
+                            ordered.index((secondary, "en", "phone")))
 
     def test_long_multibyte_prose_compacts_even_when_block_alone_fits(self):
         selected = list(dict.fromkeys(shots.screen_id(r) for r in shots.sorted_rows(self.data["rows"])))[:20]
