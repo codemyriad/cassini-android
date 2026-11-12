@@ -40,7 +40,9 @@ class BrandTokenSyncTest {
 
     @Test fun everyAndroidColorFieldHasAnAliasOrAnExplicitFrozenException() {
         val frozen = setOf("speakerQuestionWash", "violet", "violetTint")
-        val colorFields = CassiniColors::class.java.declaredFields.filter { it.type == Color::class.java || it.type == Long::class.javaPrimitiveType }
+        val colorFields = CassiniColors::class.java.declaredFields.filter {
+            it.type == Color::class.java || it.type == Long::class.javaPrimitiveType
+        }
         // Compose Color is an inline value class: its backing fields are packed Longs on the JVM.
         assertEquals(CanvasRoleTokens.keys + frozen, colorFields.map { it.name }.toSet())
         for (dark in listOf(false, true)) {

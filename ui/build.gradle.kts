@@ -28,7 +28,8 @@ class RepoRootArgument(
 
 /** Build-time data import: app code owns the aliases; no canvas hex is repeated in authored Kotlin. */
 abstract class GenerateBrandTokens : DefaultTask() {
-    @get:InputFile @get:PathSensitive(PathSensitivity.RELATIVE)
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val tokenFile: RegularFileProperty
 
     @get:OutputDirectory
