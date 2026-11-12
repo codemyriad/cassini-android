@@ -713,7 +713,7 @@
     <ID>CyclomaticComplexMethod:AudioDecoder.kt$AudioDecoder$private fun decodeCompressed(file: File, onSamples: (FloatArray, Int) -&gt; Unit, onProgress: (Long, Long?) -&gt; Unit, retainPcm: Boolean, startSample: Long): PcmAudio</ID>
     <ID>CyclomaticComplexMethod:AudioDecoder.kt$AudioDecoder$private fun decodeInternal(uri: Uri, retainPcm: Boolean, onSamples: (FloatArray, Int) -&gt; Unit, onProgress: (Long, Long?) -&gt; Unit, startSample: Long = 0): PcmAudio</ID>
     <ID>CyclomaticComplexMethod:BatteryProjection.kt$BatteryProjection$fun sample(now: Reading, remainingMs: Long?): Estimate</ID>
-    <ID>CyclomaticComplexMethod:CassiniDocument.kt$CassiniDocument.Companion$private fun read(verify: Boolean = true, open: () -&gt; InputStream): CassiniDocument</ID>
+    <ID>CyclomaticComplexMethod:CassiniDocument.kt$CassiniDocument.Companion$private fun read(verify: Boolean = true, metadataOnly: Boolean = false, open: () -&gt; InputStream): CassiniDocument</ID>
     <ID>CyclomaticComplexMethod:CassiniDocument.kt$CassiniDocument.Companion$private fun seal( stream: OggOpus.Info, transcript: Transcript, title: String, processing: JSONObject, existing: CassiniDocument?, speakerLabels: Map&lt;String, String&gt;, extensions: JSONObject? = null, ): Pair&lt;List&lt;String&gt;, String&gt;</ID>
     <ID>CyclomaticComplexMethod:ChunkingComparisonTest.kt$ChunkingComparisonTest$@Test fun cuttingModesAgainstTheWholeRecording()</ID>
     <ID>CyclomaticComplexMethod:DeviceSmokeTest.kt$DeviceSmokeTest$@NeedsModels @Test fun nativeParakeetProducesTimedItalianWords()</ID>
@@ -748,7 +748,7 @@
     <ID>Indentation:VoiceCodec.kt$Voice$ </ID>
     <ID>Indentation:VoiceCodec.kt$VoiceCodec$ </ID>
     <ID>LongMethod:AudioDecoder.kt$AudioDecoder$private fun decodeCompressed(file: File, onSamples: (FloatArray, Int) -&gt; Unit, onProgress: (Long, Long?) -&gt; Unit, retainPcm: Boolean, startSample: Long): PcmAudio</ID>
-    <ID>LongMethod:CassiniDocument.kt$CassiniDocument.Companion$private fun read(verify: Boolean = true, open: () -&gt; InputStream): CassiniDocument</ID>
+    <ID>LongMethod:CassiniDocument.kt$CassiniDocument.Companion$private fun read(verify: Boolean = true, metadataOnly: Boolean = false, open: () -&gt; InputStream): CassiniDocument</ID>
     <ID>LongMethod:VoiceprintCalibrationTest.kt$VoiceprintCalibrationTest$@Test fun meetingVoicesAcrossRecordings()</ID>
     <ID>LongMethod:WavDecoder.kt$WavDecoder$fun decodeWav(file: RandomAccessFile, onSamples: (FloatArray, Int) -&gt; Unit = { _, _ -&gt; }, retainPcm: Boolean = true, startSample: Long = 0, onProgress: (Long, Long?) -&gt; Unit = { _, _ -&gt; }): PcmAudio</ID>
     <ID>LongParameterList:CassiniDocument.kt$CassiniDocument.Companion$( audio: File, transcript: Transcript, title: String, processing: JSONObject, existing: CassiniDocument?, speakerLabels: Map&lt;String, String&gt;, target: File, extensions: JSONObject? = null, )</ID>
@@ -1319,7 +1319,7 @@
     <ID>PropertyWrapping:WordGateTest.kt$WordGateTest$val words = listOf(timed("max", Long.MAX_VALUE, Long.MAX_VALUE), timed("min", Long.MIN_VALUE, Long.MIN_VALUE), timed("reversed", 800, 700))</ID>
     <ID>ReturnCount:BatteryReader.kt$BatteryReader$fun read(context: Context, elapsedMs: Long): BatteryProjection.Reading?</ID>
     <ID>ReturnCount:CassiniDocument.kt$CassiniDocument$fun speakerLabel(id: String): String?</ID>
-    <ID>ReturnCount:CassiniDocument.kt$CassiniDocument.Companion$private fun read(verify: Boolean = true, open: () -&gt; InputStream): CassiniDocument</ID>
+    <ID>ReturnCount:CassiniDocument.kt$CassiniDocument.Companion$private fun read(verify: Boolean = true, metadataOnly: Boolean = false, open: () -&gt; InputStream): CassiniDocument</ID>
     <ID>ReturnCount:OggRepair.kt$OggRepair$fun repair(file: File): Result?</ID>
     <ID>ReturnCount:SeamMerge.kt$SeamMerge$fun &lt;T&gt; merge(items: List&lt;T&gt;, more: List&lt;T&gt;, firstWindow: Boolean, windowStartMs: Long, overlapMs: Long, midpointOnDisagreement: Boolean = false, word: (T) -&gt; Word): List&lt;T&gt;</ID>
     <ID>ReturnCount:SeamMerge.kt$SeamMerge$fun &lt;T&gt; splice(items: List&lt;T&gt;, more: List&lt;T&gt;, overlapStartMs: Long, overlapMs: Long, word: (T) -&gt; Word): List&lt;T&gt;</ID>

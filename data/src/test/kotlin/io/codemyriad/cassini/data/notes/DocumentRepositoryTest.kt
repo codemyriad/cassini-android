@@ -587,6 +587,10 @@ class DocumentRepositoryTest {
             h.document("a"),
             extensions = privateData,
         )
+        makeSourceBodiesOpaque("a")
+        val rowBefore = h.row("a")
+        val readsBefore = h.reader.reads.get()
+        h.reader.beforeRead = { error("Markdown must not use the full document reader") }
         val original = h.document("a").readBytes()
         val copy = MarkdownCopy("Speakers: {names}", "Transcript", "Notes", "(over {names})") {
             it.joinToString(" and ")
@@ -606,6 +610,8 @@ class DocumentRepositoryTest {
         assertFalse(exported.contains("not exported"))
         assertArrayEquals("export never mutates private metadata or audio", original, h.document("a").readBytes())
         assertFalse(h.paths.exports.exists())
+        assertEquals(readsBefore, h.reader.reads.get())
+        assertEquals(rowBefore, h.row("a"))
         assertEquals(
             ExportOutcome.NotAvailable,
             h.documents.exportTranscript("a", request.copy(markdown = null), Uri.fromFile(dest)),
@@ -693,5 +699,21 @@ class DocumentRepositoryTest {
         assertTrue(orphanAudio.isFile)
         assertFalse(h.paths.exports.exists())
         assertEquals(3, report.deleted.size)
+    }
+
+    private suspend fun makeSourceBodiesOpaque(id: String) {
+        assertTrue(h.documents.refreshIfStale(id) is RefreshOutcome.Refreshed)
+        val document = h.readFile(id)
+        val opaque = document.comments.map {
+            if (it.substringBefore('=').matches(Regex("CASSINI_TX_.*_PAYLOAD_[0-9]+"))) {
+                it.substringBefore('=') + "=opaque!"
+            } else {
+                it
+            }
+        }
+        val source = OggOpus.read(h.document(id).readBytes())
+        h.document(id).writeBytes(OggOpus.mux(source, CassiniDocument.tagsPacket(opaque)))
+        // Simulate already stored words with source bodies unavailable; its current signature is known.
+        h.db.notes().update(h.row(id).copy(documentSignature = DocumentSignature.of(h.document(id))))
     }
 }
