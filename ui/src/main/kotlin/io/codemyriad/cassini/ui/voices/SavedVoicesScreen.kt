@@ -52,7 +52,7 @@ import io.codemyriad.cassini.ui.theme.Tone
 import io.codemyriad.cassini.ui.theme.sans
 
 /** Saved-voice avatars cycle blue, teal, amber, violet by list position (features.md section 0). */
-private val AvatarTones = listOf(SpeakerTone.Blue, SpeakerTone.Teal, SpeakerTone.Amber, SpeakerTone.Violet)
+private val AvatarTones = SpeakerTone.entries.filter { it != SpeakerTone.Unnamed }
 
 private val UnreadableBanner = BannerSpec(BannerKind.VOICES_UNREADABLE, announce = true)
 

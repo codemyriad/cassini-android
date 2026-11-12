@@ -863,12 +863,12 @@ class NoteViewModelTest {
         send(vm, NoteEvent.SpeakerTap("ben"))
         val sheet = (vm.now().sheet as NoteSheet.NameSpeaker).ui
         assertEquals(SpeakerNameUi.Named("Ben"), sheet.label)
-        assertEquals(SpeakerTone.Teal, sheet.tone)
+        assertEquals(SpeakerTone.Two, sheet.tone)
         send(vm, NoteEvent.NameSheet(NameSheetEvent.Cancel))
         send(vm, NoteEvent.SpeakerTap("ada"), NoteEvent.NameSheet(NameSheetEvent.MergeInto))
         val targets = (vm.now().sheet as NoteSheet.Merge).ui.targets
         assertEquals(listOf("ben"), targets.map { it.speakerId })
-        assertEquals(SpeakerTone.Teal, targets.single().tone)
+        assertEquals(SpeakerTone.Two, targets.single().tone)
     }
 
     @Test fun anInlineOnlySealedSpeakerKeepsTheAssignedToneInNamingAndMergeTargets() = runTest(dispatcher) {
@@ -884,10 +884,10 @@ class NoteViewModelTest {
         val vm = viewModel()
         assertEquals(listOf("ada"), vm.now().turns.map { it.speakerId })
         send(vm, NoteEvent.SpeakerTap("ben"))
-        assertEquals(SpeakerTone.Teal, (vm.now().sheet as NoteSheet.NameSpeaker).ui.tone)
+        assertEquals(SpeakerTone.Two, (vm.now().sheet as NoteSheet.NameSpeaker).ui.tone)
         send(vm, NoteEvent.NameSheet(NameSheetEvent.Cancel))
         send(vm, NoteEvent.SpeakerTap("ada"), NoteEvent.NameSheet(NameSheetEvent.MergeInto))
-        assertEquals(SpeakerTone.Teal, (vm.now().sheet as NoteSheet.Merge).ui.targets.single().tone)
+        assertEquals(SpeakerTone.Two, (vm.now().sheet as NoteSheet.Merge).ui.targets.single().tone)
     }
 
     private fun interjectionWords(): List<Word> = Transcript.fromJson(

@@ -277,11 +277,11 @@ class ComponentScreenshotTest : BoardTest() {
         }
         Label("Avatar (blue, teal, amber, violet; 32 dp)")
         Wrap {
-            Avatar("G", SpeakerTone.Blue)
-            Avatar("P", SpeakerTone.Teal)
-            Avatar("3", SpeakerTone.Amber)
-            Avatar("L", SpeakerTone.Violet)
-            Avatar("A", SpeakerTone.Blue, size = 32.dp)
+            Avatar("G", SpeakerTone.One)
+            Avatar("P", SpeakerTone.Two)
+            Avatar("3", SpeakerTone.Unnamed)
+            Avatar("L", SpeakerTone.Three)
+            Avatar("A", SpeakerTone.One, size = 32.dp)
         }
         Label("LinearTrack thin and thick: 0, 62 %, 100 %")
         Padded {

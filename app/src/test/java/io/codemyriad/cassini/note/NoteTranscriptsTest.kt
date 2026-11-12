@@ -46,7 +46,7 @@ class NoteTranscriptsTest {
         assertEquals(SpeakerNameUi.Named("Giulia"), turns[0].name)
         assertEquals(SpeakerNameUi.Placeholder(2, "Speaker 2"), turns[1].name)
         // Placeholders are amber and take no slot: Giulia blue, Paolo teal.
-        val tones = listOf(SpeakerTone.Blue, SpeakerTone.Amber, SpeakerTone.Teal, SpeakerTone.Blue)
+        val tones = listOf(SpeakerTone.One, SpeakerTone.Unnamed, SpeakerTone.Two, SpeakerTone.One)
         assertEquals(tones, turns.map { it.tone })
         assertEquals("Hello everyone.", turnText(turns[0].words))
         assertEquals(500L, turns[0].words[1].startMs)
@@ -130,7 +130,7 @@ class NoteTranscriptsTest {
         assertEquals(SpeakerNameUi.Placeholder(2, "Voce 2"), turns[1].name)
         val spanish = SpeakerNameUi.Placeholder(7, "Hablante 7")
         assertEquals("the number comes from the stored label", spanish, turns[2].name)
-        assertEquals("a stored placeholder stays amber", SpeakerTone.Amber, turns[1].tone)
+        assertEquals("a stored placeholder stays amber", SpeakerTone.Unnamed, turns[1].tone)
 
         val draft = NoteTranscripts.draft(words, mapOf("a" to "Voce 1"), emptySet(), emptyMap(), null).turns
         assertEquals(SpeakerNameUi.Placeholder(1, "Voce 1"), draft[0].name)

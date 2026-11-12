@@ -1,4 +1,6 @@
 {"shots": [
+  {"screen": "seven-speakers", "label": "Seven speakers (six named, one unnamed)", "scheme": "light", "lang": "en", "device": "phone", "path": "light/11-seven-speakers.png"},
+  {"screen": "seven-speakers", "label": "Seven speakers (six named, one unnamed)", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/11-seven-speakers.png"},
   {"screen": "components-banners", "label": "Components banners", "scheme": "dark", "lang": "en", "device": "phone", "path": "components/banners-dark.png"},
   {"screen": "components-banners-it-1", "label": "Components banners it 1", "scheme": "light", "lang": "en", "device": "phone", "path": "components/banners-it-1.png", "single_scheme_reason": "Legacy light-only coverage (ANDROID-SCR-03)"},
   {"screen": "components-banners-it-2", "label": "Components banners it 2", "scheme": "light", "lang": "en", "device": "phone", "path": "components/banners-it-2.png", "single_scheme_reason": "Legacy light-only coverage (ANDROID-SCR-03)"},

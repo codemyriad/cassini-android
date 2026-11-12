@@ -39,12 +39,14 @@ meta stays 13 sp. Other row titles keep their existing sizes. Explicit transcrip
 
 ## 4. Tokens
 
-The W1 preview reads `ui/src/main/resources/brand/tokens.json`, pinned to cassini-ux `e4ae221`.
-`Color.kt` owns all Android aliases; `brand/ANDROID-MAPPING.md` documents them. Decided and placeholder
-roles generate Kotlin and launch-window resources from that JSON. The preview uses Linen / Saturn-night,
-Cassini teal, a separate placeholder Record red and teal highlights. Speaker/avatar hues and the forced-dark
-Recording palette stay frozen while their decisions are open. The vendored JSON and executable sync/contrast tests are the preview's value authority.
-
+The W1 preview reads `third_party/cassini-ux/brand/tokens.json`, pinned to cassini-ux `e244ad6`.
+`Color.kt` owns Android aliases; `third_party/cassini-ux/brand/ANDROID-MAPPING.md` documents them.
+`scripts/generate-brand-colors.py` emits checked-in Kotlin and window/launcher XML. CI checks the
+source digest, generated outputs and absence of authored colour literals in production sources.
+The temporary #195 compatibility snapshot is deleted here. All values come from the canonical file,
+including the forced-dark Recording screen. The preview uses Linen / Saturn-night, teal, the decided
+Record/error red, six speaker pairs plus unnamed stone and teal highlights. The preview remains draft
+for visual approval; speaker colourIndex semantics are not changed.
 
 ### 4.1 Canvas values (W1 preview)
 
@@ -58,7 +60,7 @@ Recording palette stay frozen while their decisions are open. The vendored JSON 
 | line-soft | #E6E3DB | #1A1F27 |
 | ink | #1A1611 | #E5E5D9 |
 | ink-2 | #5B544A | #AFAEA4 |
-| ink-3 | #726B61 | #88877C |
+| ink-3 | #6E675D | #88877C |
 | accent | #007999 | #83CDDF |
 | accent-strong | #006380 | #83CDDF |
 | on-accent | #FFFFFF | #070B11 |
@@ -68,46 +70,60 @@ Recording palette stay frozen while their decisions are open. The vendored JSON 
 | record-ink | #C01C28 | #FF7B7F |
 | record-tint | #FBE4E6 | #3A1A1D |
 | on-record | #FFFFFF | #FFFFFF |
-| error | #C12B0B | #FF6F4C |
+| error-fill | #C01C28 | #C01C28 |
+| success-fill | #197640 | #197640 |
+| error | #C01C28 | #FF7B7F |
 | error-tint | #FFE8E2 | #3F1A12 |
 | success | #197640 | #49BA71 |
-| success-tint | #E0F5E5 | #0E2B18 |
+| success-tint | #E3EEDD | #0E2B18 |
 | warn-ink | #774A00 | #FCB700 |
 | warn-tint | #FFECC9 | #342305 |
 | neutral-ink | #5B544A | #AFAEA4 |
 | neutral-tint | #EBE9E2 | #1A1F27 |
 | highlight | #BDDCE4 | #3E5F6A |
 | highlight-ink | #1A1611 | #E5E5D9 |
+| speaker-1 | #B93508 | #F2744E |
+| speaker-2 | #89593B | #C49A78 |
+| speaker-3 | #925E00 | #F2B21B |
+| speaker-4 | #006BAA | #4FA9EC |
+| speaker-5 | #277717 | #7CCB5E |
+| speaker-6 | #984493 | #D27FCD |
+| speaker-0 | #6C6560 | #C3BCB7 |
+| avatar-1 | #FEDED5 | #4D261D |
+| avatar-2 | #FAE0D1 | #403630 |
+| avatar-3 | #FEEAC7 | #4E3D14 |
+| avatar-4 | #D2EAFE | #1D3A53 |
+| avatar-5 | #D1F1CB | #2A4528 |
+| avatar-6 | #FADBF7 | #432C49 |
+| avatar-0 | #EAE5E1 | #3F4043 |
 | inverse | #10151C | #E5E5D9 |
 | on-inverse | #E5E5D9 | #070B11 |
 | inverse-accent | #83CDDF | #006380 |
 | scrim | #070B1173 | #00000099 |
 | shadow | #0F05001F | #00000066 |
+| card-rest | #FAFAF7 | #10151C |
 
-Record roles remain placeholders pending L-07. Speaker/avatar hues and the Recording palette retain their
-previous values; they do not read proposed tokens. Android aliases are in `Color.kt` and its adjacent mapping note.
+Alex decided the Record red and six-plus-stone speaker palette on 12 November (L-07/L-14).
+Named speakers cycle through six roles in first-turn order; unnamed speakers use stone. Speaker names,
+avatar initials and chips use their own speaker/avatar pair, never the accent or a status role.
+The existing named-only assignment helper stays; file colourIndex mapping is not approved.
+The forced-dark Recording palette uses canonical dark roles without changing its layout:
+`bg/onPause` → ground; `text/pauseFill` → ink; `text2` → ink-2; `line` → line;
+`barIdle` → ink-3; `barFresh/dot/status` → record-ink; `finish` → record.
+This follows the coordinator's decision to remove the temporary old palette in #196.
+
 
 ### 4.2 Material mapping
 
 `CassiniTheme(darkTheme = isSystemInDarkTheme())` gives the locals and a `MaterialTheme`:
 
-```kotlin
-lightColorScheme(
-  primary = accentFill, onPrimary = onAccentFill, primaryContainer = accentTint, onPrimaryContainer = accentInk,
-  inversePrimary = Color(0xFF9DB4FF),
-  secondary = teal, onSecondary = White, secondaryContainer = tealTint, onSecondaryContainer = tealInk,
-  tertiary = amber, onTertiary = White, tertiaryContainer = amberTint, onTertiaryContainer = amberInk,
-  error = redInk, onError = White, errorContainer = redTint, onErrorContainer = redInk,
-  background = bg, onBackground = ink, surface = surface, onSurface = ink,
-  surfaceVariant = bg, onSurfaceVariant = text2, surfaceTint = Color.Transparent,
-  surfaceBright = surface, surfaceDim = boardBg,
-  surfaceContainerLowest = surface, surfaceContainerLow = surface, surfaceContainer = surface,
-  surfaceContainerHigh = surface, surfaceContainerHighest = surface,
-  inverseSurface = ink, inverseOnSurface = Color(0xFFF2F3F5),
-  outline = line2, outlineVariant = line, scrim = Color(0xFF1F2A39),
-)
-// dark: the same mapping from the dark column; inverseSurface #ECEEF1, inverseOnSurface #14171A.
-```
+The complete mapping is in `theme/Theme.kt`. Primary uses accentFill/onAccentFill; containers use
+accentTint/accentInk; inverse roles use the three inverse tokens. Error text uses error, and its wash
+uses error-tint. Outlines use line and line-soft. Native status-color foregrounds choose bg in dark
+and onAccentFill in light. Custom filled destructive buttons instead use errorFill/onRecord in both
+modes; a filled success action uses successFill/onRecord. No white text sits on the light dark-mode
+error/success text colors. Both window modes read the generated ground/ink resources.
+
 
 There is no dynamic color. The ripples follow the content color. The XML `Theme.Cassini` in `:app` sets `android:windowBackground` to `@color/ui_window_bg` (bg, with a `values-night` value). Thus the first frame at a cold start has the correct color.
 
@@ -264,18 +280,22 @@ The values in this section are in dp, unless the text gives a different unit.
 
 - `overline` text2. Padding: horizontal 20, bottom 6, top 14 (first header) or 16. It is a heading.
 
-### `NoteRow`
+### `NoteRow` (W2 preview)
 
-- List padding: horizontal 12, with 2 dp between the rows.
-- Radius 14. surface when highlighted, else transparent. Padding 12/10, gap 4.
-- Title: `rowTitle` (at most 2 lines), then 8 dp, then the duration in `monoTime` text2 (with the line height of sans16).
-- Preview: `snippet` text3, 2 lines. `Highlighted` gives the ellipses at the start and at the end. The highlights are W600 ink on accentTint.
-- Meta row with gap 8: the time in `caption`, the `StatusChip` and the suffix (`caption` text2). "· Resume" and "· Try again" are inline text buttons with extended hit areas (section 5).
-- `mergeDescendants`, with the description "Weekly product sync, 48 minutes 13 seconds, today 10:02, transcribing". Custom actions. `combinedClickable(onLongClick)`.
+- List padding 16, gap 12; surface cards with a 1 dp line, radius 14, padding 12/16 and gap 4.
+- Single-line title at 17/600, with the tabular duration at 13. Metadata has a 22 dp minimum, gap 8:
+  time, at most one badge, then speaker names with ellipsis. Large fonts can increase the metadata height.
+- Stored speaker labels remain verbatim; missing labels use localized Speaker N. Search results retain
+  their highlighted excerpt; rows at rest omit it.
+- The whole row opens the note and supports long press. Resume/Try again, Rename and Move to trash remain
+  TalkBack actions. Spoken status preserves the pause position, failure reason, queue state and speaker count.
 
-### `StatusChip(text, tone, dot?)`
+### `StatusChip(text, kind)` (W2 preview)
 
-- Padding 8/2, radius 10, `chip`. Outline: 1 dp line2, ink. It is not interactive.
+- Pill, minimum height 22, padding 0/8, gap 4, 12/600 with tabular figures. Every kind has its glyph.
+- Recording: record ink/tint and dot; work: neutral ink/tint and spinner mark; problems: warning ink/tint
+  and alert; Received: outline only and tray arrow. Ready rows have no badge. Badges are not interactive.
+- Shared labels, explicit catalog gaps and preview boundaries: [W2 Library preview](w2-library-preview.md).
 
 ### Tags
 
@@ -445,7 +465,7 @@ All buttons are pills, with no elevation, a clipped ripple and `Role.Button`. A 
 
 ### `Avatar(text, tone: SpeakerTone, size = 40)`
 
-- A circle in the tint of the tone. The initial is in the ink color of the tone (accentInk, tealInk, amberInk, violet), in the `avatar` style (16 sp W700), as on boards 04 and 07.
+- A circle in avatar-n. The initial uses speaker-n (six named pairs plus stone), in the `avatar` style (16 sp W700), as on boards 04 and 07.
 
 ### `Banner(spec: BannerSpec, onAction, onDismiss?)`
 
@@ -513,7 +533,7 @@ These are the contracts of the screens:
 ### Library (00)
 
 - A `Box(bg)` with a `LazyColumn` and the bottom bar. The snackbar is above the bar.
-- The `LazyColumn` has, in this sequence: the header, the search (padding: horizontal 16, top 4), the privacy line, the recording card, the progress card (top margin 14), the banners and the day sections. The list has a top padding of 6.
+- The `LazyColumn` has, in this sequence: the header, the search (padding: horizontal 16, top 4), the recording card, the banners and the day sections. Transcription is shown in its own row, with no Library progress card or privacy line. The list has a top padding of 6.
 - In search mode, the flat list of results replaces the sections.
 
 ### Recording (01)
@@ -734,18 +754,17 @@ The tasks are `:ui:recordRoborazziDebug` (update), `:ui:verifyRoborazziDebug` (C
 | text3 on bg | 6.78 | 8.84 |
 | text3 on accentTint | 5.95 | 6.88 |
 | text3 on boardBg | 6.20 | 8.56 |
-| text4 on bg | 4.78 | 5.45 |
-| text4 on surface | 5.26 | 5.06 |
+| text4 on bg | 5.07 | 5.45 |
+| text4 on surface | 5.58 | 5.06 |
 | accentInk on accentTint | 5.40 | 8.59 |
-| tealInk on tealTint | 4.95 | 6.20 |
+| tealInk on tealTint | 4.73 | 6.20 |
 | tealInk on surface | 5.67 | 7.46 |
 | amberInk on amberTint | 6.55 | 8.58 |
 | amberInk on amberWash | 6.55 | 8.58 |
 | amberInk on surface | 7.60 | 10.39 |
-| redInk on redTint | 4.95 | 5.58 |
-| redInk on surface | 5.80 | 6.66 |
-| redInk on bg | 5.27 | 7.16 |
-| violet on violetTint | 7.26 | 7.41 |
+| redInk on redTint | 5.20 | 6.13 |
+| redInk on surface | 6.11 | 7.32 |
+| redInk on bg | 5.55 | 7.88 |
 | onAccentFill on accentFill | 6.78 | 11.05 |
 | accent on surface | 5.01 | 10.26 |
 | white on red (Record) | 6.11 | 6.11 |
@@ -758,11 +777,12 @@ The tasks are `:ui:recordRoborazziDebug` (update), `:ui:verifyRoborazziDebug` (C
 | accent on line | 3.44 | 8.20 |
 | teal dot on surface | 5.67 | 7.46 |
 | amber dot on surface | 7.60 | 10.39 |
-| error dot on surface | 5.80 | 6.66 |
+| error dot on surface | 6.11 | 7.32 |
 
-The unchanged forced-dark Recording palette keeps its previous checked contrast ratios. The shared token
-file documents one known exception for Alex: ink-3 on sunken in light is 4.37:1, below text AA. This exception
-is reported, not corrected by inventing a new colour. Highlight ink on highlight meets text AA in both modes.
+The canonical forced-dark Recording pairs are text/background 15.53:1, secondary/background 8.84:1,
+and recording text, dot and fresh bars/background 7.88:1. The text AA minimum remains 4.5:1. The approved
+source has no contrast exceptions: ink-3 on sunken in light now passes at 4.64:1 (L-36). Highlight ink,
+all seven speaker/avatar pairs, and white on errorFill/successFill meet text AA in both modes.
 
 These items can have less than 3:1, because text or icons identify the control (WCAG 1.4.11): the line2 outlines (1.58), the rec.line circle and barIdle (decorative), the line3 dashed tag and plain dot, and the inactive track of the slider (the thumb and the active track show the state). The checkbox that is not checked uses text2 (7.93).
 

@@ -262,7 +262,7 @@ class SheetAndDraftDeviceTest {
             id = "t$index",
             speakerId = "s${index % 2}",
             name = if (index % 2 == 0) SpeakerNameUi.Named("Giulia") else SpeakerNameUi.Placeholder(2),
-            tone = if (index % 2 == 0) SpeakerTone.Blue else SpeakerTone.Amber,
+            tone = if (index % 2 == 0) SpeakerTone.One else SpeakerTone.Unnamed,
             startMs = index * MINUTE,
             words = words(text, index * MINUTE),
         )
@@ -304,7 +304,7 @@ class SheetAndDraftDeviceTest {
                 NameSheetUi(
                     speakerId = "s1",
                     label = SpeakerNameUi.Placeholder(1),
-                    tone = SpeakerTone.Amber,
+                    tone = SpeakerTone.Unnamed,
                     speakingMs = 26_000,
                     canSample = true,
                     name = "Anna",

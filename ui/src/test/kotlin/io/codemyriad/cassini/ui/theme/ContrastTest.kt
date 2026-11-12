@@ -35,18 +35,18 @@ class ContrastTest {
         text("text3 on bg", 6.78, 8.84, { it.text3 }, { it.bg }),
         text("text3 on accentTint", 5.95, 6.88, { it.text3 }, { it.accentTint }),
         text("text3 on boardBg", 6.20, 8.56, { it.text3 }, { it.boardBg }),
-        text("text4 on bg", 4.78, 5.45, { it.text4 }, { it.bg }),
-        text("text4 on surface", 5.26, 5.06, { it.text4 }, { it.surface }),
+        text("text4 on sunken", 4.64, 5.28, { it.text4 }, { it.boardBg }),
+        text("text4 on bg", 5.07, 5.45, { it.text4 }, { it.bg }),
+        text("text4 on surface", 5.58, 5.06, { it.text4 }, { it.surface }),
         text("accentInk on accentTint", 5.40, 8.59, { it.accentInk }, { it.accentTint }),
-        text("tealInk on tealTint", 4.95, 6.20, { it.tealInk }, { it.tealTint }),
+        text("tealInk on tealTint", 4.73, 6.20, { it.tealInk }, { it.tealTint }),
         text("tealInk on surface", 5.67, 7.46, { it.tealInk }, { it.surface }),
         text("amberInk on amberTint", 6.55, 8.58, { it.amberInk }, { it.amberTint }),
         text("amberInk on amberWash", 6.55, 8.58, { it.amberInk }, { it.amberWash }),
         text("amberInk on surface", 7.60, 10.39, { it.amberInk }, { it.surface }),
-        text("redInk on redTint", 4.95, 5.58, { it.redInk }, { it.redTint }),
-        text("redInk on surface", 5.80, 6.66, { it.redInk }, { it.surface }),
-        text("redInk on bg", 5.27, 7.16, { it.redInk }, { it.bg }),
-        text("violet on violetTint", 7.26, 7.41, { it.violet }, { it.violetTint }),
+        text("redInk on redTint", 5.20, 6.13, { it.redInk }, { it.redTint }),
+        text("redInk on surface", 6.11, 7.32, { it.redInk }, { it.surface }),
+        text("redInk on bg", 5.55, 7.88, { it.redInk }, { it.bg }),
         text("onAccentFill on accentFill", 6.78, 11.05, { it.onAccentFill }, { it.accentFill }),
         text("accent on surface", 5.01, 10.26, { it.accent }, { it.surface }),
         text("white on red (Record)", 6.11, 6.11, white, { it.red }),
@@ -59,7 +59,7 @@ class ContrastTest {
         nonText("accent on line", 3.44, 8.20, { it.accent }, { it.line }),
         nonText("teal dot on surface", 5.67, 7.46, { it.teal }, { it.surface }),
         nonText("amber dot on surface", 7.60, 10.39, { it.amber }, { it.surface }),
-        nonText("error dot on surface", 5.80, 6.66, { it.error }, { it.surface }),
+        nonText("error dot on surface", 6.11, 7.32, { it.error }, { it.surface }),
     )
 
     @Test fun lightPairsMeetTheirMinimumAndTheTable() = check(LightColors) { it.light }
@@ -69,11 +69,11 @@ class ContrastTest {
     @Test fun recordingPairs() {
         val rec = CassiniRecordingColors
         listOf(
-            Triple("rec.text", rec.text, 16.20),
-            Triple("rec.text2", rec.text2, 8.22),
-            Triple("rec.status", rec.status, 8.64),
-            Triple("rec.dot", rec.dot, 6.30),
-            Triple("rec.barFresh", rec.barFresh, 7.73),
+            Triple("rec.text", rec.text, 15.53),
+            Triple("rec.text2", rec.text2, 8.84),
+            Triple("rec.status", rec.status, 7.88),
+            Triple("rec.dot", rec.dot, 7.88),
+            Triple("rec.barFresh", rec.barFresh, 7.88),
         ).forEach { (label, fg, documented) ->
             val ratio = contrast(fg, rec.bg)
             assertTrue("$label on rec.bg is $ratio", ratio >= TEXT)
@@ -86,8 +86,15 @@ class ContrastTest {
     @Test fun highlightAndInkMeetTextContrast() {
         for (colors in listOf(LightColors, DarkColors)) {
             assertTrue(contrast(colors.highlightInk, colors.highlight) >= TEXT)
+            assertTrue(contrast(colors.onRecord, colors.errorFill) >= TEXT)
+            assertTrue(contrast(colors.onRecord, colors.successFill) >= TEXT)
             assertTrue(contrast(colors.recordInk, colors.recordTint) >= TEXT)
             assertTrue(contrast(colors.neutralInk, colors.neutralTint) >= TEXT)
+            for (tone in SpeakerTone.entries) {
+                val speaker = colors.speaker(tone)
+                assertTrue("$tone on avatar", contrast(speaker.ink, speaker.tint) >= TEXT)
+                assertTrue("$tone on ground", contrast(speaker.ink, colors.bg) >= TEXT)
+            }
         }
     }
 

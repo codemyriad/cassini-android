@@ -73,10 +73,13 @@ class WordIndex(private val starts: LongArray, private val turnIds: Array<String
 object NoteTranscripts {
     /** The colour of each speaker ([SpeakerTint] to the theme's tone). */
     fun tone(tint: SpeakerTint): SpeakerTone = when (tint) {
-        SpeakerTint.BLUE -> SpeakerTone.Blue
-        SpeakerTint.TEAL -> SpeakerTone.Teal
-        SpeakerTint.VIOLET -> SpeakerTone.Violet
-        SpeakerTint.AMBER -> SpeakerTone.Amber
+        SpeakerTint.ONE -> SpeakerTone.One
+        SpeakerTint.TWO -> SpeakerTone.Two
+        SpeakerTint.THREE -> SpeakerTone.Three
+        SpeakerTint.FOUR -> SpeakerTone.Four
+        SpeakerTint.FIVE -> SpeakerTone.Five
+        SpeakerTint.SIX -> SpeakerTone.Six
+        SpeakerTint.UNNAMED -> SpeakerTone.Unnamed
     }
 
     /**

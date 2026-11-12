@@ -35,7 +35,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import io.codemyriad.cassini.ui.theme.CassiniColors
 import io.codemyriad.cassini.ui.theme.CassiniIcon
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import io.codemyriad.cassini.ui.theme.Glyph
@@ -330,8 +329,7 @@ fun DestructiveOutlineButton(
 }
 
 /**
- * The destructive dialog confirm: 48 dp, padding 22, redInk fill. The label is white in light; in dark redInk is a
- * light colour, so the label is [CassiniColors.bg], as the Material `onError` mapping.
+ * The destructive dialog confirm: 48 dp, padding 22, errorFill with onRecord (white) in both modes.
  */
 @Composable
 fun DestructiveButton(
@@ -348,16 +346,14 @@ fun DestructiveButton(
         modifier = modifier,
         visual = 48.dp,
         padding = 22.dp,
-        fill = c.redInk,
+        fill = c.errorFill,
         border = null,
         textStyle = CassiniTheme.type.button,
-        textColor = c.onDestructive(),
+        textColor = c.onRecord,
         enabled = enabled,
         busy = busy,
     )
 }
-
-private fun CassiniColors.onDestructive(): Color = if (isDark) bg else onRed
 
 @Preview
 @Composable

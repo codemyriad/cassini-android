@@ -1,20 +1,12 @@
 package io.codemyriad.cassini.core.speakers
 
-/**
- * The colour of a speaker's label and avatar (features.md section 0). A placeholder speaker is always [AMBER] ("not
- * named yet"). Named speakers cycle [BLUE], [TEAL], [VIOLET] in order of their first turn; placeholder speakers do not
- * take a slot. The `:ui` theme maps each value to its tone.
- */
+/** Six named slots in first-speaking order; an unnamed speaker is stone and takes no named slot. */
 enum class SpeakerTint {
-    BLUE,
-    TEAL,
-    VIOLET,
-    AMBER,
-    ;
+    ONE, TWO, THREE, FOUR, FIVE, SIX, UNNAMED;
 
     companion object {
         /** The cycle of named speakers. */
-        val NAMED = listOf(BLUE, TEAL, VIOLET)
+        val NAMED = listOf(ONE, TWO, THREE, FOUR, FIVE, SIX)
 
         /** The tint of the named speaker at [namedIndex] (from 0) among the named speakers only. */
         fun named(namedIndex: Int): SpeakerTint = NAMED[Math.floorMod(namedIndex, NAMED.size)]
@@ -26,7 +18,7 @@ enum class SpeakerTint {
         fun assign(order: List<String>, isPlaceholder: (String) -> Boolean): Map<String, SpeakerTint> {
             val result = LinkedHashMap<String, SpeakerTint>()
             var named = 0
-            for (id in order.distinct()) result[id] = if (isPlaceholder(id)) AMBER else named(named++)
+            for (id in order.distinct()) result[id] = if (isPlaceholder(id)) UNNAMED else named(named++)
             return result
         }
 

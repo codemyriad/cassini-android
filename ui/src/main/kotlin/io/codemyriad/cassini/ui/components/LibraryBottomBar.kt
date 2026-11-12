@@ -59,6 +59,9 @@ fun RecordFab(onClick: () -> Unit, modifier: Modifier = Modifier, recordingElaps
     val c = CassiniTheme.colors
     val shape = CassiniTheme.shapes.pill
     val label = recordLabel(recordingElapsedMs)
+    val live = recordingElapsedMs != null
+    val background = if (live) c.recordTint else c.record
+    val foreground = if (live) c.recordInk else c.onRecord
     val description = stringResource(
         if (recordingElapsedMs == null) R.string.ui_library_record_description else R.string.ui_library_return_to_recording,
     )
@@ -75,10 +78,10 @@ fun RecordFab(onClick: () -> Unit, modifier: Modifier = Modifier, recordingElaps
                 ),
             )
             .clip(shape)
-            .background(c.record)
+            .background(background)
             .clickable(
                 interactionSource = null,
-                indication = ripple(color = c.onRecord),
+                indication = ripple(color = foreground),
                 role = Role.Button,
                 onClick = onClick,
             )
@@ -91,7 +94,7 @@ fun RecordFab(onClick: () -> Unit, modifier: Modifier = Modifier, recordingElaps
         Text(
             text = label,
             style = CassiniTheme.type.fab,
-            color = c.onRecord,
+            color = foreground,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )

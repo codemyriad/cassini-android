@@ -1,5 +1,4 @@
-// This file is the palette: every hex value of docs/design/ui.md section 4.1 lives here. Its name is the one
-// docs/design/ui.md section 1 gives.
+// Authored Android role aliases. Values live only in generated BrandTokenValues.kt.
 @file:Suppress("MagicNumber", "MatchingDeclarationName")
 
 package io.codemyriad.cassini.ui.theme
@@ -60,12 +59,7 @@ class CassiniColors(
     val amberInk: Color,
     val amberTint: Color,
     val amberWash: Color,
-    /** Speaker and saved-voice avatar colours, independent of accent and status roles (L-14/L-17 hues stay open). */
-    val speakerBlue: SpeakerColors,
-    val speakerTeal: SpeakerColors,
-    val speakerViolet: SpeakerColors,
-    val speakerAmber: SpeakerColors,
-    /** Unnamed-speaker question fill; its border uses [speakerAmber] ink. */
+    /** Unnamed-speaker question fill; its border uses the unnamed speaker ink. */
     val speakerQuestionWash: Color,
     /** Record, error and destructive actions. */
     val red: Color,
@@ -74,9 +68,6 @@ class CassiniColors(
     val redLine: Color,
     /** Text and icons on [red] (the Record button). */
     val onRed: Color,
-    /** Legacy violet palette family; speaker/avatar colours have separate fields. */
-    val violet: Color,
-    val violetTint: Color,
     /** Ink pills, play/pause and the selected segment. */
     val inkFill: Color,
     val onInkFill: Color,
@@ -89,12 +80,30 @@ class CassiniColors(
     val link: Color,
     /** Canonical decided/placeholder roles; null until the W1 look preview activates them. */
     internal val brand: Map<String, Color>? = null,
+    // Alex’s decided roles; speakers never read accent or status families.
+    val errorFill: Color = canvasValue(isDark, "error-fill"),
+    val successFill: Color = canvasValue(isDark, "success-fill"),
+    val speaker0: Color = canvasValue(isDark, "speaker-0"),
+    val speaker1: Color = canvasValue(isDark, "speaker-1"),
+    val speaker2: Color = canvasValue(isDark, "speaker-2"),
+    val speaker3: Color = canvasValue(isDark, "speaker-3"),
+    val speaker4: Color = canvasValue(isDark, "speaker-4"),
+    val speaker5: Color = canvasValue(isDark, "speaker-5"),
+    val speaker6: Color = canvasValue(isDark, "speaker-6"),
+    val avatar0: Color = canvasValue(isDark, "avatar-0"),
+    val avatar1: Color = canvasValue(isDark, "avatar-1"),
+    val avatar2: Color = canvasValue(isDark, "avatar-2"),
+    val avatar3: Color = canvasValue(isDark, "avatar-3"),
+    val avatar4: Color = canvasValue(isDark, "avatar-4"),
+    val avatar5: Color = canvasValue(isDark, "avatar-5"),
+    val avatar6: Color = canvasValue(isDark, "avatar-6"),
 ) {
     val highlight: Color get() = brand?.getValue("highlight") ?: accentTint
     val highlightInk: Color get() = brand?.getValue("highlight-ink") ?: ink
     val record: Color get() = brand?.getValue("record") ?: red
     val recordInk: Color get() = brand?.getValue("record-ink") ?: redInk
     val recordTint: Color get() = brand?.getValue("record-tint") ?: redTint
+    val lineSoft: Color get() = brand?.getValue("line-soft") ?: line
     val onRecord: Color get() = brand?.getValue("on-record") ?: onRed
     val error: Color get() = brand?.getValue("error") ?: redInk
     val neutralInk: Color get() = brand?.getValue("neutral-ink") ?: ink
@@ -102,106 +111,28 @@ class CassiniColors(
     val raised: Color get() = brand?.getValue("raised") ?: surface
 }
 
-/** The light set (the boards). */
-internal val LegacyLightColors: CassiniColors = CassiniColors(
-    isDark = false,
-    ink = Color(0xFF14171A),
-    bg = Color(0xFFF5F6F7),
-    surface = Color(0xFFFFFFFF),
-    surfaceWash = Color(0xFFF5F6F7),
-    boardBg = Color(0xFFECEEF0),
-    text2 = Color(0xFF4A525B),
-    text3 = Color(0xFF3A4250),
-    text4 = Color(0xFF687180),
-    line = Color(0xFFE2E5E9),
-    line2 = Color(0xFFC9CED5),
-    line3 = Color(0xFF9AA2AC),
-    accent = Color(0xFF2346C8),
-    accentFill = Color(0xFF2346C8),
-    onAccentFill = Color(0xFFFFFFFF),
-    accentInk = Color(0xFF1A3596),
-    accentTint = Color(0xFFE8EDFC),
-    accentTrack = Color(0xFFC9D4F6),
-    teal = Color(0xFF0F766E),
-    tealInk = Color(0xFF0B5A54),
-    tealTint = Color(0xFFE3F2EF),
-    amber = Color(0xFFB45309),
-    amberInk = Color(0xFF8A3B07),
-    amberTint = Color(0xFFFCEFE3),
-    amberWash = Color(0xFFFCF6EE),
-    speakerBlue = SpeakerColors(Color(0xFF2346C8), Color(0xFF1A3596), Color(0xFFE8EDFC)),
-    speakerTeal = SpeakerColors(Color(0xFF0F766E), Color(0xFF0B5A54), Color(0xFFE3F2EF)),
-    speakerViolet = SpeakerColors(Color(0xFF5B2BB5), Color(0xFF5B2BB5), Color(0xFFEFEAFB)),
-    speakerAmber = SpeakerColors(Color(0xFFB45309), Color(0xFF8A3B07), Color(0xFFFCEFE3)),
-    speakerQuestionWash = Color(0xFFFCF6EE),
-    red = Color(0xFFC2410C),
-    redInk = Color(0xFFA3330B),
-    redTint = Color(0xFFFBE7E1),
-    redLine = Color(0xFFE3B9A6),
-    onRed = Color(0xFFFFFFFF),
-    violet = Color(0xFF5B2BB5),
-    violetTint = Color(0xFFEFEAFB),
-    inkFill = Color(0xFF14171A),
-    onInkFill = Color(0xFFFFFFFF),
-    snackbarBg = Color(0xFF14171A),
-    snackbarText = Color(0xFFF2F3F5),
-    snackbarAction = Color(0xFF9DB4FF),
-    scrim = Color(0xFF1F2A39).copy(alpha = 0.5f),
-    link = Color(0xFF2346C8),
-)
+// W1 preview activates Alex’s decided palette; values come only from the pinned source.
 
-/** The dark set (no board: it follows docs/design/ui.md and waits for the owner's review). */
-internal val LegacyDarkColors: CassiniColors = CassiniColors(
-    isDark = true,
-    ink = Color(0xFFECEEF1),
-    bg = Color(0xFF0F1214),
-    surface = Color(0xFF181C20),
-    surfaceWash = Color(0xFF1F2429),
-    boardBg = Color(0xFF1F2429),
-    text2 = Color(0xFFA9B0B9),
-    text3 = Color(0xFFC3C9D0),
-    text4 = Color(0xFF8C95A0),
-    line = Color(0xFF2A3036),
-    line2 = Color(0xFF3A4048),
-    line3 = Color(0xFF5A626C),
-    accent = Color(0xFF8FA6FF),
-    accentFill = Color(0xFF2346C8),
-    onAccentFill = Color(0xFFFFFFFF),
-    accentInk = Color(0xFFB9C7FF),
-    accentTint = Color(0xFF1C2647),
-    accentTrack = Color(0xFF2B3A70),
-    teal = Color(0xFF4FC7B8),
-    tealInk = Color(0xFF8EDDD2),
-    tealTint = Color(0xFF12302D),
-    amber = Color(0xFFF0A35E),
-    amberInk = Color(0xFFF7C291),
-    amberTint = Color(0xFF3A2614),
-    amberWash = Color(0xFF2C2118),
-    speakerBlue = SpeakerColors(Color(0xFF8FA6FF), Color(0xFFB9C7FF), Color(0xFF1C2647)),
-    speakerTeal = SpeakerColors(Color(0xFF4FC7B8), Color(0xFF8EDDD2), Color(0xFF12302D)),
-    speakerViolet = SpeakerColors(Color(0xFFC1A8FF), Color(0xFFC1A8FF), Color(0xFF2A2045)),
-    speakerAmber = SpeakerColors(Color(0xFFF0A35E), Color(0xFFF7C291), Color(0xFF3A2614)),
-    speakerQuestionWash = Color(0xFF2C2118),
-    red = Color(0xFFC2410C),
-    redInk = Color(0xFFFFB08F),
-    redTint = Color(0xFF3D1E14),
-    redLine = Color(0xFF6B3A2A),
-    onRed = Color(0xFFFFFFFF),
-    violet = Color(0xFFC1A8FF),
-    violetTint = Color(0xFF2A2045),
-    inkFill = Color(0xFFECEEF1),
-    onInkFill = Color(0xFF0F1214),
-    snackbarBg = Color(0xFFECEEF1),
-    snackbarText = Color(0xFF14171A),
-    snackbarAction = Color(0xFF2346C8),
-    scrim = Color(0xFF000000).copy(alpha = 0.6f),
-    link = Color(0xFF8FA6FF),
-)
-
-// W1 look preview: activate the pinned canvas mapping; legacy values remain only for open roles.
-// Source: codemyriad/cassini-ux@e4ae2217312370250a39ad83e047a186048e0a9e, brand/tokens.json.
-// Android-only secondary roles alias published tokens; L-14/L-17 speaker hues remain frozen below.
+// Source: codemyriad/cassini-ux@e244ad6a830e4ef77d87fb452143f7100c767139, brand/tokens.json.
+// Android-only secondary roles alias published tokens; speaker/avatar pairs have their own roles.
 internal val CanvasRoleTokens = mapOf(
+    "speakerQuestionWash" to "avatar-0",
+    "errorFill" to "error-fill",
+    "successFill" to "success-fill",
+    "speaker0" to "speaker-0",
+    "speaker1" to "speaker-1",
+    "speaker2" to "speaker-2",
+    "speaker3" to "speaker-3",
+    "speaker4" to "speaker-4",
+    "speaker5" to "speaker-5",
+    "speaker6" to "speaker-6",
+    "avatar0" to "avatar-0",
+    "avatar1" to "avatar-1",
+    "avatar2" to "avatar-2",
+    "avatar3" to "avatar-3",
+    "avatar4" to "avatar-4",
+    "avatar5" to "avatar-5",
+    "avatar6" to "avatar-6",
     "ink" to "ink",
     "bg" to "ground",
     "surface" to "surface",
@@ -242,7 +173,6 @@ internal val CanvasRoleTokens = mapOf(
 
 internal fun canvasColors(dark: Boolean): CassiniColors {
     val values = if (dark) BrandTokenValues.dark else BrandTokenValues.light
-    val legacy = if (dark) LegacyDarkColors else LegacyLightColors
     fun role(name: String): Color = values.getValue(CanvasRoleTokens.getValue(name))
     return CassiniColors(
         isDark = dark,
@@ -282,19 +212,13 @@ internal fun canvasColors(dark: Boolean): CassiniColors {
         snackbarAction = role("snackbarAction"),
         scrim = role("scrim"),
         link = role("link"),
-        speakerBlue = legacy.speakerBlue,
-        speakerTeal = legacy.speakerTeal,
-        speakerViolet = legacy.speakerViolet,
-        speakerAmber = legacy.speakerAmber,
-        speakerQuestionWash = legacy.speakerQuestionWash,
-        violet = legacy.violet,
-        violetTint = legacy.violetTint,
+        speakerQuestionWash = role("speakerQuestionWash"),
         brand = values,
     )
 }
 
+/** Provided by `CassiniTheme`; the default is the light set so a bare preview still renders. */
 val LightColors: CassiniColors = canvasColors(dark = false)
 val DarkColors: CassiniColors = canvasColors(dark = true)
 
-/** Provided by `CassiniTheme`; the default is the light set so a bare preview still renders. */
 val LocalCassiniColors = staticCompositionLocalOf { LightColors }

@@ -1499,7 +1499,7 @@ class NoteViewModel(
         const val SKIP_MS = 10_000L
         private const val STOP_TIMEOUT_MS = 5_000L
         private const val TAG = "CassiniNote"
-        private val AMBER = SpeakerTone.Amber
+        private val AMBER = SpeakerTone.Unnamed
 
         private const val KEY_SEARCH = "search"
         private const val KEY_EXPORT = "export"
