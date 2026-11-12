@@ -12,16 +12,20 @@ import kotlin.math.roundToInt
 
 /** The vendored token file is the value source; Color.kt is the only Android alias table. */
 class BrandTokenSyncTest {
-    private fun resource(name: String): ByteArray =
-        requireNotNull(javaClass.getResourceAsStream("/brand/$name")).use { it.readBytes() }
+    private fun resource(name: String): ByteArray {
+        val path = if (name == "tokens.json") "/brand/$name" else "/$name"
+        return requireNotNull(javaClass.getResourceAsStream(path)).use { it.readBytes() }
+    }
 
     @Test fun vendorDigestAndEveryDecidedOrPlaceholderValueMatchInBothModes() {
         val bytes = resource("tokens.json")
         val upstream = JSONObject(resource("UPSTREAM.json").toString(Charsets.UTF_8))
         val hash = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
-        assertEquals(upstream.getJSONObject("files").getJSONObject("tokens.json").getString("sha256"), hash)
+        assertEquals(upstream.getJSONObject("files").getJSONObject("brand/tokens.json").getString("sha256"), hash)
         assertEquals("https://github.com/codemyriad/cassini-ux", upstream.getString("repository"))
-        assertEquals(40, upstream.getString("commit").length)
+        val pin = upstream.getJSONObject("files").getJSONObject("brand/tokens.json")
+        assertEquals("brand/tokens.json", pin.getString("source"))
+        assertEquals(40, pin.getString("commit").length)
         val sheet = JSONObject(bytes.toString(Charsets.UTF_8))
         assertEquals("cassini-ux/brand-tokens@1", sheet.getString("schema"))
         val accepted = checkedActiveRoles(sheet)
