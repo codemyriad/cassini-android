@@ -49,7 +49,9 @@ class StartupGateTest {
             try {
                 withTimeout(GUARD_MS) { entered.await() }
                 assertSame(graph.ready, graph.catalogue)
-                val access = async(start = CoroutineStart.UNDISPATCHED) { graph.awaitCatalogue() }
+                val access = async(Dispatchers.Unconfined, start = CoroutineStart.UNDISPATCHED) {
+                    graph.awaitCatalogue().also { assertNotNull(graph.startupReport.value) }
+                }
                 assertFalse("Catalogue escaped at $step", access.isCompleted)
                 assertFalse(graph.ready.isCompleted)
                 release.countDown()

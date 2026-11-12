@@ -183,7 +183,7 @@ internal class DocumentsVault(
         } else {
             signal.throwIfCanceled()
             try {
-                suspendCancellableCoroutine { cont ->
+                suspendCancellableCoroutine<Unit> { cont ->
                     signal.setOnCancelListener { cont.cancel() }
                     val handle = graph.ready.invokeOnCompletion { error ->
                         if (cont.isActive) {
