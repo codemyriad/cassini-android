@@ -11,7 +11,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
@@ -28,7 +27,6 @@ import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getFirstLinkBounds
-import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.isHeading
@@ -141,21 +139,23 @@ class ComponentSemanticsTest {
         rule.onNodeWithText("Giulia").assertExists()
     }
 
-    @Test fun rowSuffixKeepsItsLayoutAndTakesTapsWithin48dp() {
+    @Test fun pausedRowKeepsAFullTouchTargetAndItsResumeAccessibilityAction() {
         val actions = mutableListOf<NoteRowAction>()
         setThemed {
             Column(Modifier.width(390.dp)) {
                 NoteRow(ComponentFixtures.board, DayLabel.Yesterday, onAction = { actions += it })
             }
         }
-        val suffix = rule.onNodeWithContentDescription("Resume transcribing Board review prep")
-        suffix.assertExtendedTouchAtLeast48(rule.density)
-        // The text keeps its board size: the 48 dp comes from extended hit testing, not from layout.
-        val bounds = suffix.getUnclippedBoundsInRoot()
-        val height = bounds.bottom - bounds.top
-        assertTrue("suffix grew to $height", height < 24.dp)
-        suffix.performTouchInput { click(Offset(centerX, centerY - 14.dp.toPx())) }
-        rule.runOnIdle { assertEquals(listOf(NoteRowAction.RESUME), actions) }
+        val row = rule.onNode(
+            hasContentDescription("Board review prep, 34 minutes 12 seconds, yesterday 11:00, paused at 12:40"),
+        )
+        row.assertExtendedTouchAtLeast48(rule.density)
+        row.performTouchInput { click() }
+        rule.runOnIdle { assertEquals(listOf(NoteRowAction.OPEN), actions) }
+        actions.clear()
+        val resume = row.fetchSemanticsNode().config[SemanticsActions.CustomActions].single { it.label == "Resume" }
+        rule.runOnIdle { resume.action() }
+        assertEquals(listOf(NoteRowAction.RESUME), actions)
     }
 
     @Test fun rowIsOneDescribedNodeWithClickLongClickAndCustomActions() {

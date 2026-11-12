@@ -8,6 +8,7 @@ import io.codemyriad.cassini.core.library.NoteFacts
 import io.codemyriad.cassini.core.library.NoteStatus
 import io.codemyriad.cassini.core.library.SearchQuery
 import io.codemyriad.cassini.core.models.ModelPart
+import io.codemyriad.cassini.core.speakers.DefaultLabels
 import io.codemyriad.cassini.data.db.LibraryRow
 import io.codemyriad.cassini.data.db.NoteDetails
 import io.codemyriad.cassini.data.db.SearchRow
@@ -22,6 +23,7 @@ import io.codemyriad.cassini.recording.RecordingState
 import io.codemyriad.cassini.ui.components.Highlighted
 import io.codemyriad.cassini.ui.components.NoteRowUi
 import io.codemyriad.cassini.ui.components.NoteStatusUi
+import io.codemyriad.cassini.ui.components.RowSpeakerUi
 import io.codemyriad.cassini.ui.format.DayLabel
 import io.codemyriad.cassini.ui.format.TimeLeftUi
 import io.codemyriad.cassini.ui.library.DaySection
@@ -45,6 +47,7 @@ data class RowContext(
     val activeNoteId: String? = null,
     val recordingElapsedMs: Long = 0,
     val runningNoteId: String? = null,
+    val transcriptionMinutes: Long? = null,
 )
 
 /**
@@ -53,6 +56,8 @@ data class RowContext(
  */
 @Suppress("TooManyFunctions") // one mapping per UiState part of the Library
 object LibraryMapping {
+    private const val MINUTE_MS = 60_000L
+
     /** The status chip of [row] (`NoteStatus.of`, first match wins) with its semantic values. */
     fun status(row: LibraryRow, context: RowContext): NoteStatusUi {
         val facts = NoteFacts(
@@ -97,7 +102,21 @@ object LibraryMapping {
             status = status(row, context),
             preview = if (hit != null) hit.snippet else storedPreview(row.preview),
             highlighted = row.id == context.runningNoteId || row.jobState == JobState.RUNNING,
+            transcriptionMinutes = context.transcriptionMinutes.takeIf { row.id == context.runningNoteId },
+            speakerLabels = row.rowSpeakers.filter { it.variantId == row.selectedVariant }.sortedBy { it.ordinal }
+                .map {
+                    RowSpeakerUi(
+                        label = DefaultLabels.stored(it.speakerId, it.label),
+                        number = it.placeholderNumber ?: (it.ordinal + 1),
+                    )
+                }.toImmutableList(),
         )
+    }
+
+    /** Quantize ETA before the listing cache, so second-level progress does not remap every row. */
+    fun badgeMinutes(eta: TimeLeftUi?): Long? {
+        val highMs = (eta as? TimeLeftUi.Range)?.highMs?.takeIf { it > 0 } ?: return null
+        return highMs / MINUTE_MS + if (highMs % MINUTE_MS == 0L) 0 else 1
     }
 
     /** Day sections ordered by resolved recording date/time, with packaging order only for unknown starts. */

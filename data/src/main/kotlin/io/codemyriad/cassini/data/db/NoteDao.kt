@@ -14,7 +14,8 @@ import kotlinx.coroutines.flow.Flow
 @Suppress("TooManyFunctions")
 @Dao
 abstract class NoteDao {
-    /** Live notes, newest first, with their job and selected variant. */
+    /** Live notes, newest first, with their job, selected variant and speaker labels in one snapshot. */
+    @Transaction
     @Query(
         "SELECT ${Sql.LIBRARY_COLUMNS} FROM notes n ${Sql.LIBRARY_JOINS} " +
             "WHERE n.trashed_at IS NULL ORDER BY n.created_at DESC",

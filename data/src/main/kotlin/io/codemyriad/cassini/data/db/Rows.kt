@@ -63,6 +63,17 @@ data class LibraryRow(
     @ColumnInfo(name = "recorded_at") val recordedAt: String? = null,
     @ColumnInfo(name = "capture_started_at") val captureStartedAt: Long? = null,
     @ColumnInfo(name = "word_ends_bounded_by_audio") val wordEndsBoundedByAudio: Boolean? = null,
+    @Relation(parentColumn = "id", entityColumn = "note_id", entity = SpeakerEntity::class)
+    val rowSpeakers: List<LibrarySpeakerLabel> = emptyList(),
+)
+
+/** Only label facts needed by the Library; the selected variant is chosen by LibraryRow.selectedVariant. */
+data class LibrarySpeakerLabel(
+    @ColumnInfo(name = "variant_id") val variantId: String,
+    val ordinal: Int,
+    val label: String,
+    @ColumnInfo(name = "speaker_id") val speakerId: String,
+    @ColumnInfo(name = "placeholder_number") val placeholderNumber: Int? = null,
 )
 
 /**

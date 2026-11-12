@@ -253,6 +253,8 @@ class TokenScreenshotTest : BoardTest() {
             "highlight" to c.highlight,
             "highlightInk" to c.highlightInk,
             "record" to c.record,
+            "recordInk" to c.recordInk,
+            "recordTint" to c.recordTint,
             "onRecord" to c.onRecord,
             "error" to c.error,
             "neutralInk" to c.neutralInk,

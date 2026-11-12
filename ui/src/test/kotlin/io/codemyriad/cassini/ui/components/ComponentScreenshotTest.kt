@@ -177,13 +177,13 @@ class ComponentScreenshotTest : BoardTest() {
     private fun ChipsAndTags() {
         Label("StatusChip")
         Wrap {
-            StatusChip("Recording", Tone.Error, dot = true)
-            StatusChip("Transcribing", Tone.Info)
-            StatusChip("Queued", Tone.Outline)
-            StatusChip("Paused at 12:40", Tone.Warn)
-            StatusChip("Couldn’t transcribe", Tone.Error)
-            StatusChip("Transcribed", Tone.Ok)
-            StatusChip("Audio only", Tone.Outline)
+            StatusChip("Recording 12:48", StatusBadgeKind.Recording)
+            StatusChip("Importing…", StatusBadgeKind.Importing)
+            StatusChip("Saving…", StatusBadgeKind.Saving)
+            StatusChip("Transcribing · 4 min", StatusBadgeKind.Transcribing)
+            StatusChip("Needs attention", StatusBadgeKind.Attention)
+            StatusChip("Interrupted", StatusBadgeKind.Interrupted)
+            StatusChip("Received", StatusBadgeKind.Received)
         }
         Label("Tags: Likely, dashed, auto; FormatBadge on rec.bg")
         Wrap {

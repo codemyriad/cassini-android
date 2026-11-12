@@ -7,10 +7,16 @@ import io.codemyriad.cassini.core.library.PauseReason
 import io.codemyriad.cassini.core.library.TrashPolicy
 import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.core.speakers.Match
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -178,6 +184,34 @@ class CatalogueDaoTest {
         assertEquals(5, first.wordCount)
         assertEquals(2, first.speakerCount)
         assertEquals("first version of the text", first.preview)
+    }
+
+    @Test fun libraryLabelProjectionIsScopedToTheNoteAndObservesSpeakerOnlyRenames() = runTest {
+        val first = cache(note("a"), listOf("v1" to words("hello"), "v2" to words("again")))
+        val firstSpeakers = first.speakers.map { it.copy(label = "Ada", isPlaceholder = false) }
+        db.cache().replaceCache(first.copy(speakers = firstSpeakers))
+        val other = cache(note("b"), listOf("v1" to words("hello")))
+        val otherSpeakers = other.speakers.map { it.copy(label = "Ben", isPlaceholder = false) }
+        db.cache().replaceCache(other.copy(speakers = otherSpeakers))
+        val snapshots = Channel<List<LibraryRow>>(Channel.UNLIMITED)
+        val watcher = backgroundScope.launch { db.notes().libraryFlow().collect { snapshots.send(it) } }
+        val initial = snapshots.receive().associateBy { it.id }
+        assertEquals(listOf("Ada", "Ada"), initial.getValue("a").rowSpeakers.map { it.label })
+        assertEquals(listOf("Ben"), initial.getValue("b").rowSpeakers.map { it.label })
+        withContext(Dispatchers.IO) {
+            db.runInTransaction {
+                db.openHelper.writableDatabase.execSQL(
+                    "UPDATE speakers SET label = ? WHERE note_id = ? AND variant_id = ?",
+                    arrayOf("Mira, Jr.", "a", "v1"),
+                )
+            }
+        }
+        val renamed = snapshots.receiveAsFlow().first { rows ->
+            rows.single { it.id == "a" }.rowSpeakers.any { it.variantId == "v1" && it.label == "Mira, Jr." }
+        }.associateBy { it.id }
+        assertEquals(listOf("Ben"), renamed.getValue("b").rowSpeakers.map { it.label })
+        watcher.cancelAndJoin()
+        snapshots.close()
     }
 
     @Test fun noteFlowCarriesVariantsSpeakersAndJob() = runTest {

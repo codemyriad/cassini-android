@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Canvas L-26 preview copy; missing shared catalog forms are listed in the draft PR. -->
+<resources>
+    <string name="ui_preview_badge_importing" translatable="false">Importing…</string>
+    <string name="ui_preview_badge_transcribing_eta" translatable="false">Transcribing · %1$s min</string>
+    <string name="ui_preview_badge_interrupted" translatable="false">Interrupted</string>
+</resources>

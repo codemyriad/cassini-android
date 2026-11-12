@@ -38,8 +38,16 @@ class BrandTokenSyncTest {
     }
 
     // Keep these explicit: promoting or adding a role must require an Android wiring decision.
-    private val additionalCanvasRoles = setOf("raised", "highlight", "highlight-ink", "neutral-ink", "neutral-tint")
-    private val unusedCanvasRoles = setOf("line-soft", "record-ink", "record-tint", "shadow")
+    private val additionalCanvasRoles = setOf(
+        "raised",
+        "highlight",
+        "highlight-ink",
+        "neutral-ink",
+        "neutral-tint",
+        "record-ink",
+        "record-tint",
+    )
+    private val unusedCanvasRoles = setOf("line-soft", "shadow")
 
     private fun checkedActiveRoles(sheet: JSONObject): Set<String> {
         val active = buildSet {
@@ -120,6 +128,8 @@ class BrandTokenSyncTest {
                 "highlight-ink" to colors.highlightInk,
                 "neutral-ink" to colors.neutralInk,
                 "neutral-tint" to colors.neutralTint,
+                "record-ink" to colors.recordInk,
+                "record-tint" to colors.recordTint,
             )
             assertEquals(additionalCanvasRoles, additional.keys)
             for ((role, value) in additional) assertEquals(role, requireNotNull(colors.brand).getValue(role), value)

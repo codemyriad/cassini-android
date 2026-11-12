@@ -6,6 +6,7 @@ import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.core.models.ModelPart
+import io.codemyriad.cassini.data.db.LibrarySpeakerLabel
 import io.codemyriad.cassini.data.db.SearchRow
 import io.codemyriad.cassini.data.db.SpeakerEntity
 import io.codemyriad.cassini.data.db.VariantEntity
@@ -168,6 +169,27 @@ class LibraryMappingTest {
         assertEquals(1_447_000L, recRow.durationMs)
         assertFalse(recRow.highlighted)
         assertTrue(LibraryMapping.row(running, live, ROME).highlighted)
+    }
+
+    @Test fun rowsUseSelectedVariantNamesAndOnlyTheRunningNotesMinuteEstimate() {
+        val source = libraryRow("run", words = 4).copy(
+            rowSpeakers = listOf(
+                LibrarySpeakerLabel("v2", 0, "Do not show another version", "s1"),
+                LibrarySpeakerLabel("v1", 1, "Voce 9", "9", 9),
+                LibrarySpeakerLabel("v1", 2, "12", "12", 12),
+                LibrarySpeakerLabel("v1", 0, "Ada, Jr.", "s1"),
+            ),
+        )
+        val live = RowContext(runningNoteId = "run", transcriptionMinutes = 4)
+        val row = LibraryMapping.row(source, live, ROME)
+        assertEquals(listOf("Ada, Jr.", "Voce 9", null), row.speakerLabels.map { it.label })
+        assertEquals(listOf(1, 9, 12), row.speakerLabels.map { it.number })
+        assertEquals(4L, row.transcriptionMinutes)
+        assertNull(LibraryMapping.row(source.copy(id = "waiting"), live, ROME).transcriptionMinutes)
+        assertEquals(4L, LibraryMapping.badgeMinutes(TimeLeftUi.Range(180_000, 240_000)))
+        assertEquals(5L, LibraryMapping.badgeMinutes(TimeLeftUi.Range(180_000, 240_001)))
+        assertEquals(1L, LibraryMapping.badgeMinutes(TimeLeftUi.Range(0, 1)))
+        assertNull(LibraryMapping.badgeMinutes(TimeLeftUi.Calculating))
     }
 
     @Test

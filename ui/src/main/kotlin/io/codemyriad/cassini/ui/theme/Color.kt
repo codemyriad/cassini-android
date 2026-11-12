@@ -93,6 +93,8 @@ class CassiniColors(
     val highlight: Color get() = brand?.getValue("highlight") ?: accentTint
     val highlightInk: Color get() = brand?.getValue("highlight-ink") ?: ink
     val record: Color get() = brand?.getValue("record") ?: red
+    val recordInk: Color get() = brand?.getValue("record-ink") ?: redInk
+    val recordTint: Color get() = brand?.getValue("record-tint") ?: redTint
     val onRecord: Color get() = brand?.getValue("on-record") ?: onRed
     val error: Color get() = brand?.getValue("error") ?: redInk
     val neutralInk: Color get() = brand?.getValue("neutral-ink") ?: ink

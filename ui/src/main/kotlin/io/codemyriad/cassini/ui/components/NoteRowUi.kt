@@ -68,7 +68,13 @@ data class NoteRowUi(
     val preview: Highlighted? = null,
     val highlighted: Boolean = false,
     val recordedLabel: String? = null,
+    val transcriptionMinutes: Long? = null,
+    val speakerLabels: ImmutableList<RowSpeakerUi> = persistentListOf(),
 )
+
+/** Null labels use the current locale's Speaker N; stored/renamed labels remain verbatim. */
+@Immutable
+data class RowSpeakerUi(val label: String?, val number: Int)
 
 /** What a Library row asks for: open, the long press, the inline suffixes and the TalkBack custom actions. */
 enum class NoteRowAction { OPEN, LONG_PRESS, RESUME, TRY_AGAIN, RENAME, TRASH }

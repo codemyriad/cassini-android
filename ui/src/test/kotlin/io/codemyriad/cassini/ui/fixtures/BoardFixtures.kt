@@ -8,6 +8,7 @@ import io.codemyriad.cassini.ui.components.Highlighted
 import io.codemyriad.cassini.ui.components.NoteRowUi
 import io.codemyriad.cassini.ui.components.NoteStatusUi
 import io.codemyriad.cassini.ui.components.ProcessingCardUi
+import io.codemyriad.cassini.ui.components.RowSpeakerUi
 import io.codemyriad.cassini.ui.components.SnackbarKind
 import io.codemyriad.cassini.ui.components.SnackbarSpec
 import io.codemyriad.cassini.ui.components.SpeakerNameUi
@@ -94,6 +95,8 @@ internal object BoardFixtures {
         time = LocalTime.of(10, 2),
         status = NoteStatusUi.Transcribing,
         highlighted = true,
+        transcriptionMinutes = 4,
+        speakerLabels = persistentListOf(RowSpeakerUi("Giulia", 1)),
     )
     val interview = NoteRowUi(
         id = "interview",
@@ -119,6 +122,11 @@ internal object BoardFixtures {
         time = LocalTime.of(15, 10),
         status = NoteStatusUi.Transcribed(speakers = 3, words = 4_812),
         preview = supplierPreview,
+        speakerLabels = persistentListOf(
+            RowSpeakerUi("Giulia", 1),
+            RowSpeakerUi("Paolo Ferri", 2),
+            RowSpeakerUi(null, 3),
+        ),
     )
     val boardReview = NoteRowUi(
         id = "board-review",

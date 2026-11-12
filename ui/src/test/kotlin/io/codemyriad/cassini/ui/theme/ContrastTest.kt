@@ -86,6 +86,8 @@ class ContrastTest {
     @Test fun highlightAndInkMeetTextContrast() {
         for (colors in listOf(LightColors, DarkColors)) {
             assertTrue(contrast(colors.highlightInk, colors.highlight) >= TEXT)
+            assertTrue(contrast(colors.recordInk, colors.recordTint) >= TEXT)
+            assertTrue(contrast(colors.neutralInk, colors.neutralTint) >= TEXT)
         }
     }
 

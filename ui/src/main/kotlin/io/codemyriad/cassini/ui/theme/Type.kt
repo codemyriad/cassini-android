@@ -134,7 +134,7 @@ class CassiniType {
     val caption: TextStyle = sans(13)
 
     /** Status chips. */
-    val chip: TextStyle = sans(13, 500)
+    val chip: TextStyle = mono(12, 600)
 
     /** Uppercase. Library day headers; the States column headings (in text3). */
     val overline: TextStyle = sans(13, 600, ls = 0.06f)

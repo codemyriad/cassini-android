@@ -48,14 +48,10 @@ import io.codemyriad.cassini.ui.components.NoteRow
 import io.codemyriad.cassini.ui.components.NoteRowAction
 import io.codemyriad.cassini.ui.components.NoteRowUi
 import io.codemyriad.cassini.ui.components.PillSearchField
-import io.codemyriad.cassini.ui.components.PrivacyLine
-import io.codemyriad.cassini.ui.components.ProgressBannerCard
 import io.codemyriad.cassini.ui.components.RecordingBannerCard
 import io.codemyriad.cassini.ui.components.screenContentWidth
-import io.codemyriad.cassini.ui.format.Counts
 import io.codemyriad.cassini.ui.format.Dates
 import io.codemyriad.cassini.ui.format.DayLabel
-import io.codemyriad.cassini.ui.format.Progress
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 
 /**
@@ -147,7 +143,7 @@ fun LibraryScreen(
     state.dialog?.let { LibraryDialogWindow(it, onEvent) }
 }
 
-/** The search field and the privacy line under it. IME Search hides the keyboard; the results follow the query. */
+/** The search field. IME Search hides the keyboard; the results follow the query. */
 @Composable
 private fun SearchBlock(query: String, filters: SearchFiltersUi, onEvent: (LibraryEvent) -> Unit) {
     val keyboard = LocalSoftwareKeyboardController.current
@@ -160,7 +156,6 @@ private fun SearchBlock(query: String, filters: SearchFiltersUi, onEvent: (Libra
             onClear = { onEvent(LibraryEvent.ClearQuery) },
         )
         if (query.isNotBlank()) SearchFiltersBar(filters, onEvent)
-        PrivacyLine(stringResource(R.string.ui_library_privacy))
     }
 }
 
@@ -187,10 +182,6 @@ private fun LazyListScope.activity(state: LibraryUiState, onEvent: (LibraryEvent
             )
         }
     }
-    state.progress?.let { progress ->
-        val modifier = top()
-        item(key = "progress", contentType = "progress") { ProgressCard(progress, onEvent, modifier) }
-    }
     state.banners.forEachIndexed { index, spec ->
         val modifier = top()
         // Ids are unique in a list (BannerSpec); the index only keeps a duplicate from crashing the list.
@@ -203,39 +194,6 @@ private fun LazyListScope.activity(state: LibraryUiState, onEvent: (LibraryEvent
             )
         }
     }
-}
-
-/** The transcription banner with its title and line 2 (features.md section 1, item 4). */
-@Composable
-private fun ProgressCard(progress: ProgressBannerUi, onEvent: (LibraryEvent) -> Unit, modifier: Modifier) {
-    val title = when {
-        progress.title == null -> stringResource(R.string.ui_progress_downloading_models)
-        progress.line is ProgressLine.Downloading || progress.line is ProgressLine.Checking ->
-            stringResource(R.string.ui_progress_getting_ready, progress.title)
-        else -> stringResource(R.string.ui_progress_transcribing, progress.title)
-    }
-    val line = when (val l = progress.line) {
-        is ProgressLine.TimeLeft -> Progress.timeLeftLine(l.timeLeft)
-        ProgressLine.Waiting -> stringResource(R.string.ui_headline_waiting)
-        is ProgressLine.Downloading -> l.part.downloading(l.percent)
-        is ProgressLine.Checking -> stringResource(R.string.ui_banner_dl_checking_title, l.percent)
-    }
-    val text = if (progress.queued > 0) {
-        stringResource(R.string.ui_join_dot, line, Counts.plural(R.plurals.ui_count_more_in_queue, progress.queued))
-    } else {
-        line
-    }
-    ProgressBannerCard(
-        title = title,
-        percent = progress.percent,
-        progress = progress.progress,
-        line = text,
-        onClick = { onEvent(LibraryEvent.OpenProgress) },
-        modifier = modifier,
-        onClickLabel = stringResource(
-            if (progress.noteId == null) R.string.ui_action_open_settings else R.string.ui_action_open_note,
-        ),
-    )
 }
 
 /** The day sections: an overline header per day (top 14 for the first, else 16) and rows 2 dp apart. */
@@ -261,7 +219,7 @@ private fun LazyListScope.rows(rows: List<NoteRowUi>, day: DayLabel?, onEvent: (
             row = row,
             day = row.day ?: day ?: DayLabel.Today,
             onAction = { onEvent(row.event(it)) },
-            modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = if (index == 0) 0.dp else 2.dp),
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = if (index == 0) 0.dp else 12.dp),
         )
     }
 }

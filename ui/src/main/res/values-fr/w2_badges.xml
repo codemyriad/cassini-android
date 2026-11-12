@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated from cassini-ux 4d577376f6360ed352fa75307f4dc47890ed9858; do not edit. -->
+<resources>
+    <string name="ui_badge_recording">Enregistrement %1$s</string>
+    <string name="ui_badge_saving">Sauvegarde…</string>
+    <string name="ui_badge_transcribing">Transcription en cours…</string>
+    <string name="ui_badge_attention">À vérifier</string>
+    <string name="ui_badge_received">Reçue</string>
+    <string name="ui_badge_transcribing_spoken_eta">Transcription, environ %1$s minutes</string>
+</resources>
