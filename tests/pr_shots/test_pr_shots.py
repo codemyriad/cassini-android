@@ -57,10 +57,10 @@ def validate_manifest(rows, expected_files=None):
 class ScreenshotContract(unittest.TestCase):
     def test_vendor_is_exact_pinned_source_apart_from_header(self):
         lines = SCRIPT.read_bytes().splitlines(keepends=True)
-        self.assertIn(b"cassini-ux@d46d36d65cf5fb7674f89b5f7f511f1a6ad2949b:", lines[1])
+        self.assertIn(b"cassini-ux@afe3ba905880e7052dbcef425d204266153a2ae0:", lines[1])
         canonical = lines[0] + b"".join(lines[2:])
         self.assertEqual(
-            "63cc9e25f2583895b1f0d1a5befa2611e4271bf2cfa3b06b8c09bf95561afa65", hashlib.sha256(canonical).hexdigest()
+            "5d22dbac2cdf0439d6a8a6be9885f27140bf088a0e17574ed3b55667711550da", hashlib.sha256(canonical).hexdigest()
         )
 
     def test_manifest_pairs_and_rendered_scheme(self):
