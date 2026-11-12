@@ -1,5 +1,4 @@
-// This file is the palette: every hex value of docs/design/ui.md section 4.1 lives here. Its name is the one
-// docs/design/ui.md section 1 gives.
+// Authored Android role aliases. Values live only in generated BrandTokenValues.kt.
 @file:Suppress("MagicNumber", "MatchingDeclarationName")
 
 package io.codemyriad.cassini.ui.theme

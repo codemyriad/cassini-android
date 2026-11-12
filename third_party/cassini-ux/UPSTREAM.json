@@ -5,6 +5,11 @@
     "strings.json": {
       "source": "strings/strings.json",
       "sha256": "7b059577a6e4a5d692ccb5c745916bc790e9e0fe7c77c5572fb64fda80f0f7b3"
+    },
+    "brand/tokens.json": {
+      "source": "brand/tokens.json",
+      "sha256": "f534ccd38e2aa9d05fe9e4bb3dd352c588eead915fff21293ebb1d6945cdefb0",
+      "commit": "e244ad6a830e4ef77d87fb452143f7100c767139"
     }
   }
 }

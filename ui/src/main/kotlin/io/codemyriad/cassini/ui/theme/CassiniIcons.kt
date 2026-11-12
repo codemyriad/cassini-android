@@ -139,11 +139,11 @@ object CassiniIcons {
 
     private fun ImageVector.Builder.addPart(nodes: List<PathNode>, glyph: Glyph, stroke: Float) {
         if (glyph.filled) {
-            addPath(nodes, fill = SolidColor(Color.Black))
+            addPath(nodes, fill = SolidColor(BrandTokenValues.iconMask))
         } else {
             addPath(
                 nodes,
-                stroke = SolidColor(Color.Black),
+                stroke = SolidColor(BrandTokenValues.iconMask),
                 strokeLineWidth = stroke,
                 strokeLineCap = StrokeCap.Round,
                 strokeLineJoin = StrokeJoin.Round,

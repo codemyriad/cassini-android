@@ -23,3 +23,6 @@ fill pairs and the corrected ink-3/sunken pair pass text AA. No contrast excepti
 
 The Recording screen's forced-dark palette remains unchanged while L-08 is open. Launcher artwork
 remains unchanged. The generator/literal enforcement is being completed in the included plumbing work.
+
+The temporary #195 old-palette snapshot and compatibility generator path are deleted. Recording now
+uses canonical dark ground/ink/ink-2/ink-3/line/record-ink and Record fill roles.

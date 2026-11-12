@@ -39,12 +39,14 @@ meta stays 13 sp. Other row titles keep their existing sizes. Explicit transcrip
 
 ## 4. Tokens
 
-The W1 preview reads `ui/src/main/resources/brand/tokens.json`, pinned to cassini-ux `e4ae221`.
-`Color.kt` owns all Android aliases; `brand/ANDROID-MAPPING.md` documents them. Decided and placeholder
-roles generate Kotlin and launch-window resources from that JSON. The preview uses Linen / Saturn-night,
-Cassini teal, a separate placeholder Record red and teal highlights. Speaker/avatar hues and the forced-dark
-Recording palette stay frozen while their decisions are open. The vendored JSON and executable sync/contrast tests are the preview's value authority.
-
+The W1 preview reads `third_party/cassini-ux/brand/tokens.json`, pinned to cassini-ux `e244ad6`.
+`Color.kt` owns Android aliases; `third_party/cassini-ux/brand/ANDROID-MAPPING.md` documents them.
+`scripts/generate-brand-colors.py` emits checked-in Kotlin and window/launcher XML. CI checks the
+source digest, generated outputs and absence of authored colour literals in production sources.
+The temporary #195 compatibility snapshot is deleted here. All values come from the canonical file,
+including the forced-dark Recording screen. The preview uses Linen / Saturn-night, teal, the decided
+Record/error red, six speaker pairs plus unnamed stone and teal highlights. The preview remains draft
+for visual approval; speaker colourIndex semantics are not changed.
 
 ### 4.1 Canvas values (W1 preview)
 
@@ -105,7 +107,10 @@ Alex decided the Record red and six-plus-stone speaker palette on 12 November (L
 Named speakers cycle through six roles in first-turn order; unnamed speakers use stone. Speaker names,
 avatar initials and chips use their own speaker/avatar pair, never the accent or a status role.
 The existing named-only assignment helper stays; file colourIndex mapping is not approved.
-The forced-dark Recording palette stays on its existing values while L-08 is open.
+The forced-dark Recording palette uses canonical dark roles without changing its layout:
+`bg/onPause` → ground; `text/pauseFill` → ink; `text2` → ink-2; `line` → line;
+`barIdle` → ink-3; `barFresh/dot/status` → record-ink; `finish` → record.
+This follows the coordinator's decision to remove the temporary old palette in #196.
 
 
 ### 4.2 Material mapping
@@ -770,7 +775,8 @@ The tasks are `:ui:recordRoborazziDebug` (update), `:ui:verifyRoborazziDebug` (C
 | amber dot on surface | 7.60 | 10.39 |
 | error dot on surface | 6.11 | 7.32 |
 
-The unchanged forced-dark Recording palette keeps its previous checked contrast ratios. The approved
+The canonical forced-dark Recording pairs are text/background 15.53:1, secondary/background 8.84:1,
+and recording text, dot and fresh bars/background 7.88:1. The text AA minimum remains 4.5:1. The approved
 source has no contrast exceptions: ink-3 on sunken in light now passes at 4.64:1 (L-36). Highlight ink,
 all seven speaker/avatar pairs, and white on errorFill/successFill meet text AA in both modes.
 

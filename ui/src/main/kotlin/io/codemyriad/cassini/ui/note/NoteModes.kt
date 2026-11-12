@@ -46,7 +46,6 @@ import io.codemyriad.cassini.ui.components.DashedTag
 import io.codemyriad.cassini.ui.components.ProcessingCard
 import io.codemyriad.cassini.ui.components.ProcessingCardUi
 import io.codemyriad.cassini.ui.components.QueuedCard
-import io.codemyriad.cassini.ui.components.SpeakerNameUi
 import io.codemyriad.cassini.ui.components.SuggestionCard
 import io.codemyriad.cassini.ui.components.TurnHeader
 import io.codemyriad.cassini.ui.components.TurnMode

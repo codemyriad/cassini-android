@@ -46,7 +46,6 @@ import io.codemyriad.cassini.ui.components.BannerCard
 import io.codemyriad.cassini.ui.components.IconButton44
 import io.codemyriad.cassini.ui.components.LargeChip
 import io.codemyriad.cassini.ui.components.PillSearchField
-import io.codemyriad.cassini.ui.components.SpeakerNameUi
 import io.codemyriad.cassini.ui.components.SuggestionCard
 import io.codemyriad.cassini.ui.components.TurnHeader
 import io.codemyriad.cassini.ui.components.TurnMatches

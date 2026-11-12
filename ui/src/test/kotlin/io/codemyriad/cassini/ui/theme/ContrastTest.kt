@@ -69,11 +69,11 @@ class ContrastTest {
     @Test fun recordingPairs() {
         val rec = CassiniRecordingColors
         listOf(
-            Triple("rec.text", rec.text, 16.20),
-            Triple("rec.text2", rec.text2, 8.22),
-            Triple("rec.status", rec.status, 8.64),
-            Triple("rec.dot", rec.dot, 6.30),
-            Triple("rec.barFresh", rec.barFresh, 7.73),
+            Triple("rec.text", rec.text, 15.53),
+            Triple("rec.text2", rec.text2, 8.84),
+            Triple("rec.status", rec.status, 7.88),
+            Triple("rec.dot", rec.dot, 7.88),
+            Triple("rec.barFresh", rec.barFresh, 7.88),
         ).forEach { (label, fg, documented) ->
             val ratio = contrast(fg, rec.bg)
             assertTrue("$label on rec.bg is $ratio", ratio >= TEXT)
