@@ -389,7 +389,13 @@ class RecordingController(private val parts: Parts) {
     // End. --------------------------------------------------------------------------------------------------------
 
     private suspend fun end(stop: Stop, title: String?, requested: RecordingState.Active? = null) {
-        val current = requested ?: (mutableState.value as? RecordingState.Active) ?: return
+        val state = mutableState.value
+        // An automatic stop may have finished before this request acquired the lock; leave any newer capture alone.
+        val current = when (state) {
+            is RecordingState.Active -> state.takeIf { requested == null }
+            is RecordingState.Finishing -> requested?.takeIf { state.noteId == it.noteId }
+            else -> null
+        } ?: return
         val mic = capture ?: return
         policy?.cancel()
         policy = null
