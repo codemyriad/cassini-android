@@ -302,8 +302,8 @@
     <string name="ui_name_rename_saved">Rinomina la voce salvata</string>
     <string name="ui_name_not">Non è %1$s?</string>
     <string name="ui_name_remember">Ricorda questa voce su questo telefono</string>
-    <string name="ui_name_remember_body">Le prossime note riconosceranno %1$s automaticamente. Questa impronta vocale passa a un nuovo telefono se “Trasferisci su un nuovo telefono” è attivo.</string>
-    <string name="ui_name_remember_body_unnamed">Le prossime note riconosceranno questa persona automaticamente. Questa impronta vocale passa a un nuovo telefono se “Trasferisci su un nuovo telefono” è attivo.</string>
+    <string name="ui_name_remember_body">Le prossime note riconosceranno %1$s automaticamente.</string>
+    <string name="ui_name_remember_body_unnamed">Le prossime note riconosceranno questa persona automaticamente.</string>
     <string name="ui_name_remember_too_little">Troppo poco parlato per ricordare questa voce.</string>
     <string name="ui_name_remember_no_model">Il riconoscimento delle voci salvate non è ancora installato.</string>
     <string name="ui_name_merge_into">Unisci a…</string>
@@ -399,7 +399,7 @@
 
     <!-- Voci salvate. -->
     <string name="ui_voices_title">Voci salvate</string>
-    <string name="ui_voices_privacy">Le impronte vocali restano nell’app e non vengono mai scritte nei file condivisi. Passano a un nuovo telefono se “Trasferisci su un nuovo telefono” è attivo. Vengono condivisi solo i nomi che scegli.</string>
+    <string name="ui_voices_privacy">Le impronte vocali restano nell’app e non vengono mai scritte nei file condivisi. Vengono condivisi solo i nomi che scegli.</string>
     <string name="ui_voices_confirmed_speech">%1$s di parlato confermato</string>
     <string name="ui_voices_options">Opzioni per %1$s</string>
     <string name="ui_voices_forget">Dimentica…</string>
@@ -594,7 +594,6 @@
     <string name="ui_settings_transfer_too_large">Le tue note e le voci salvate sono troppo grandi per essere trasferite in una sola volta. Esporta le note come ZIP.</string>
     <string name="ui_settings_transfer_unavailable">Per questa scelta serve Android 9 o successivo.</string>
     <string name="ui_settings_transfer_choice_failed">Impossibile salvare questa scelta. Riprova.</string>
-    <string name="ui_notice_transfer_enabled">Cassini trasferirà le tue note e le voci salvate su un nuovo telefono quando lo configuri a partire da questo. Puoi cambiare questa scelta nelle impostazioni.</string>
     <string name="ui_search_filter_any_date">Qualsiasi data</string>
     <string name="ui_search_filter_recorded_by_me">Registrate da me</string>
     <string name="ui_search_filter_speaker">Voce: {name}</string>

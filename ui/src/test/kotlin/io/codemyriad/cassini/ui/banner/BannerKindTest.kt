@@ -46,11 +46,6 @@ internal fun boardArgs(kind: BannerKind): BannerArgs = BOARD_ARGS[kind] ?: Banne
 
 /** The English copy of every kind with [boardArgs]: title, body and action labels (features.md section 13). */
 private val ENGLISH: Map<BannerKind, Triple<String, String?, List<String>>> = mapOf(
-    BannerKind.TRANSFER_ENABLED to Triple(
-        "Cassini will move your notes and saved voices to a new phone when you set it up from this one. You can change this in Settings.",
-        null,
-        listOf("Open settings"),
-    ),
     BannerKind.PARAKEET_NOW_DEFAULT to Triple("New meetings now use Parakeet Ultra.", null, listOf()),
     BannerKind.PARAKEET_RECOMMENDED to Triple(
         "Get better transcripts with Parakeet Ultra",
@@ -319,7 +314,6 @@ class BannerKindTest {
                 BannerKind.DL_MODEL_UNAVAILABLE,
                 BannerKind.PARAKEET_RECOMMENDED,
                 BannerKind.PARAKEET_NOW_DEFAULT,
-                BannerKind.TRANSFER_ENABLED,
             ),
             dismissible,
         )
@@ -329,7 +323,7 @@ class BannerKindTest {
                 BannerGroup.RECORDING to 8,
                 BannerGroup.TRANSCRIPTION to 10,
                 BannerGroup.DOWNLOAD to 9,
-                BannerGroup.LIBRARY to 14,
+                BannerGroup.LIBRARY to 13,
             ),
             BannerKind.entries.groupingBy { it.group }.eachCount(),
         )
