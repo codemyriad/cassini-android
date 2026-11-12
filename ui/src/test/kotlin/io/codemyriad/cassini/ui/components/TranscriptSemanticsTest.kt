@@ -438,8 +438,8 @@ class TranscriptSemanticsTest {
         }
         active = 1
         rule.waitForIdle()
-        assertTrue("active chip glyphs use onAccentFill", contains(1, colors.onAccentFill))
-        assertTrue("active chip uses accentFill", contains(1, colors.accentFill))
+        assertTrue("active chip glyphs use highlightInk", contains(1, colors.highlightInk))
+        assertTrue("active chip uses highlight", contains(1, colors.highlight))
         assertEquals("playback keeps the text layout", layout.layoutInput.text, node.textLayout().layoutInput.text)
         rule.mainClock.autoAdvance = false
         node.performTouchInput { down(layout.getBoundingBox(starts[2]).center) }

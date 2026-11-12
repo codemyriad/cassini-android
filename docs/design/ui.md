@@ -113,7 +113,9 @@ There is no dynamic color. The ripples follow the content color. The XML `Theme.
 
 ### 4.3 Typography (`CassiniType`, from `LocalCassiniType`)
 
-The CSS "normal" line height comes from the hhea metrics: 1.22 em for Instrument Sans and 1.30 em for Plex Mono. Each style sets `lineHeight` explicitly, with `LineHeightStyle(Alignment.Center, Trim.None)`. The letter spacing is in em. The helpers are `sans(size, weight = 400, lh = 1.22, ls = 0)` and `mono(size, weight = 400, lh = 1.30, ls = 0)`.
+Normal lines use the Android system font's metrics; explicit paragraph leading is retained without the old
+browser half-pixel grid. Both sans and time helpers use the system family. The time helpers add tabular figures;
+they do not select a monospace font. Letter spacing remains in em and text scales in sp.
 
 | Name | Style | Used by |
 |---|---|---|

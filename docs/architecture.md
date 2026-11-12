@@ -982,7 +982,7 @@ The other rules of the build are:
 
 CI has three workflows in `.github/workflows/`. `docs/development.md` ("Continuous integration") gives the details.
 
-- `android.yml`, job `checks`: the wrapper validation, detekt, actionlint, shellcheck, ruff, the Markdown link check, `fetch-fonts.sh --check`, the resource collision check, the verbatim diff, and on tags the CHANGELOG section.
+- `android.yml`, job `checks`: the wrapper validation, detekt, actionlint, shellcheck, ruff, the Markdown link check, the resource collision check, the verbatim diff, and on tags the CHANGELOG section.
 - `android.yml`, job `core-only`: `:core:test` without `setup.sh`.
 - `android.yml`, job `build`: the prebuilt AAR, `ciTest`, lint, the debug APK, and the device test APKs of `:app` and `:data`. On tags, also `release` and `releaseTest`. If the job fails, it uploads the Roborazzi diffs.
 - `android.yml`, job `emulator`: API 26, 29, 34 and 35, with `scripts/ci-emulator-smoke.sh`. It runs `@CiSmoke`, makes sure that the platform Opus encoder is as expected for each API level, and runs `NoteFtsDeviceTest` on API 26. If the emulator or adb fails before the tests start, the job tries one more time.
