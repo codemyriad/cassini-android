@@ -1,5 +1,6 @@
 package io.codemyriad.cassini.core.speakers
 
+import io.codemyriad.cassini.core.format.optionalInteger
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
@@ -28,7 +29,7 @@ data class Voice(
         fun fromJson(json: JSONObject): Voice {
             val mean = floats(json.getJSONArray("mean"))
             require(mean.size == json.getInt("dim") && json.getInt("count") > 0)
-            val slot = json.optInt("colourIndex", -1).takeIf { it >= 0 }
+            val slot = json.optionalInteger("colourIndex", Int.MAX_VALUE.toLong())?.toInt()
             return Voice(
                 json.getString("id"),
                 json.getString("name"),

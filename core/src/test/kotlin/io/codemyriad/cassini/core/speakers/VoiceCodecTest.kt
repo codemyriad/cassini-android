@@ -10,6 +10,16 @@ import org.junit.Test
 class VoiceCodecTest {
     private fun axis(i: Int) = FloatArray(3).also { it[i] = 1f }
 
+    @Test fun voiceSlotParsingRejectsCoercionAndOverflow() {
+        val json = Voice("v", "Anna", "m", axis(0), 1, 1.0, 0, 0).json()
+        for (hint in listOf("1.5", "2", 1.5, 1e30, true, -1L, 3000000000L, 4294967296L)) {
+            json.put("colourIndex", hint)
+            assertNull("Invalid optional slot $hint", Voice.fromJson(json).colourIndex)
+        }
+        json.put("colourIndex", Int.MAX_VALUE)
+        assertEquals(Int.MAX_VALUE, Voice.fromJson(json).colourIndex)
+    }
+
     @Test fun voicesRoundTripThroughVersionOne() {
         val (voices, anna) = VoiceCodec.enrol(emptyList(), null, "Anna", "m", floatArrayOf(3f, 4f, 0f), 12.5, 100)
         val text = VoiceCodec.encode(voices)

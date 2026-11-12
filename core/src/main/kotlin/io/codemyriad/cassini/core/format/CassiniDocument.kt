@@ -66,11 +66,11 @@ data class CassiniDocument(
     }
 
     /** Old files use the first readable variant, never the currently selected variant's order. */
-    fun speakerColourIndex(id: String): Int? {
+    fun speakerColourIndex(id: String): Long? {
         val speakers = manifest?.optJSONArray("speakers") ?: return null
         return (0 until speakers.length()).firstOrNull { speakers.getJSONObject(it).optString("id") == id }?.let { i ->
-            val original = originalColourIndices[id] ?: i
-            speakers.getJSONObject(i).optInt("colourIndex", original).takeIf { it >= 0 } ?: original
+            val original = (originalColourIndices[id] ?: i).toLong()
+            speakers.getJSONObject(i).optionalInteger("colourIndex") ?: original
         }
     }
 
@@ -256,7 +256,7 @@ data class CassiniDocument(
             speakerLabels: Map<String, String> = emptyMap(),
             recordedAtUtc: Instant? = null,
             createdAtUtc: Instant = Instant.now(),
-            colourIndices: Map<String, Int> = emptyMap(),
+            colourIndices: Map<String, Long> = emptyMap(),
         ): ByteArray {
             val (comments, digest) = seal(
                 OggOpus.scan(ByteArrayInputStream(audioBytes)),
@@ -291,7 +291,7 @@ data class CassiniDocument(
             extensions: JSONObject? = null,
             recordedAtUtc: Instant? = null,
             createdAtUtc: Instant = Instant.now(),
-            colourIndices: Map<String, Int> = emptyMap(),
+            colourIndices: Map<String, Long> = emptyMap(),
         ): CassiniDocument {
             val stream = OggOpus.scan(audio)
             val (comments, digest) = seal(
@@ -351,7 +351,7 @@ data class CassiniDocument(
         private fun fixSpeakerSlots(speakers: JSONArray, originalSlots: Map<String, Int>) {
             for (i in 0 until speakers.length()) {
                 val speaker = speakers.getJSONObject(i)
-                if (speaker.optInt("colourIndex", -1) < 0) {
+                if (speaker.optionalInteger("colourIndex") == null) {
                     val index = originalSlots[speaker.getString("id")] ?: i
                     speaker.put("colourIndex", index)
                 }
@@ -505,7 +505,7 @@ data class CassiniDocument(
             extensions: JSONObject? = null,
             recordedAtUtc: Instant? = null,
             createdAtUtc: Instant = Instant.now(),
-            colourIndices: Map<String, Int> = emptyMap(),
+            colourIndices: Map<String, Long> = emptyMap(),
         ): Pair<List<String>, String> {
             val digest = stream.digest()
             require(existing == null || existing.state == "ok") // Never rebind stale transcripts to different audio.
@@ -533,13 +533,15 @@ data class CassiniDocument(
             val speakers = manifest.getJSONArray("speakers")
             fixSpeakerSlots(speakers, existing?.originalColourIndices.orEmpty())
             val known = (0 until speakers.length()).map { speakers.getJSONObject(it).getString("id") }.toSet()
-            var nextColour = (0 until speakers.length()).maxOfOrNull {
-                speakers.getJSONObject(it).getInt("colourIndex")
-            }?.takeIf { it < Int.MAX_VALUE }?.plus(1) ?: speakers.length()
+            val storedSlots = (0 until speakers.length()).map { speakers.getJSONObject(it).optionalInteger("colourIndex")!! }
+            val usedSlots = (storedSlots + colourIndices.values).toMutableSet()
+            var nextColour = storedSlots.maxOrNull()?.let { if (it == MAX_SAFE_INTEGER) 0 else it + 1 } ?: 0L
             transcript.words.speakersByFirstSpeech().filterNot { it in known }.forEach {
-                val slot = if (existing == null) colourIndices[it] ?: nextColour else nextColour
-                nextColour = if (nextColour == Int.MAX_VALUE) 0 else nextColour + 1
-                require(slot >= 0) { "Invalid speaker colour index" }
+                while (nextColour in usedSlots) nextColour = if (nextColour == MAX_SAFE_INTEGER) 0 else nextColour + 1
+                val slot = colourIndices[it] ?: nextColour
+                require(slot in 0..MAX_SAFE_INTEGER) { "Invalid speaker colour index" }
+                usedSlots += slot
+                nextColour = maxOf(nextColour, if (slot == MAX_SAFE_INTEGER) 0 else slot + 1)
                 speakers.put(JSONObject().put("id", it).put("label", speakerLabels[it] ?: it).put("colourIndex", slot))
             }
             val provenance = manifest.optJSONObject("provenance") ?: JSONObject().also { manifest.put("provenance", it) }
