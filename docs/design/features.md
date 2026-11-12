@@ -33,48 +33,47 @@ The Library has these parts, from the top to the bottom:
 
 1. Header: the logo, "Notes", the Trash button (a11y "Trash") and the Settings button (a11y "Settings").
 2. Search field [CHANGED]: the placeholder "Search titles and what was said", the IME action Search, and a clear button when the field is not empty.
-3. Privacy line [NEW]: a shield and "Transcribed on this phone. Audio never leaves it." The app always shows it.
-4. Activity area: the recording card, the transcription banner and the notices. "Activity area" gives the details.
-5. List of notes. "List of notes" gives the details.
-6. Bottom bar: "Import audio" and the Record button. "Import audio" opens the system picker (`ACTION_OPEN_DOCUMENT`, MIME `audio/*` and `application/ogg`). While the app records, the Record button shows "Recording · 24:07" with the live dot, and it opens Recording again. Only one capture can exist at a time.
-7. Snackbar: "“<title>” moved to trash" with Undo (section 8). The Library shows it after Move to trash on the Note screen or in the actions sheet.
+3. Activity area: the recording card and notices. Transcription appears in the note's own row; there is no separate transcription progress card or Library privacy line.
+4. List of notes. "List of notes" gives the details.
+5. Bottom bar: "Import audio" and the Record button. Import opens the system document picker for supported audio, Cassini documents and ZIP archives. While the app records, the Record button returns to Recording. Only one capture can exist at a time.
+6. Snackbar: "“<title>” moved to trash" with Undo (section 8). The Library shows it after Move to trash on the Note screen or in the actions sheet.
 
 ### Activity area
 
 The activity area shows these items, in this sequence:
 
-- Recording card [NEW]: the app shows it while `RecordingController.state` is `Active`. It is a dark card with "Recording · <title>" and the elapsed time, or with "Recording paused · <title>". The caption is "Tap to return". A tap opens Recording.
-- Transcription banner [NEW]: the app shows it while a job is RUNNING or a standalone download runs. The data comes from `ProcessingCoordinator.state` and `ModelInstallOwner`. The banner has the title "Transcribing <title>" and the percent, a 4 dp bar, and line 2 "About 6–9 min left · 1 more in queue".
-- The other forms of line 2 are "Calculating time left…", "Finishing the previous note…" (`WaitingForPrevious`), "Downloading speech recognition — 46%" and "Checking files — 80%". During a download, the title is "Getting ready to transcribe <title>", or "Downloading models" for a standalone download. At 0, the banner does not show the queue suffix. A tap opens the running note, or Settings for a standalone download.
-- Notices from `NoticeCenter` (section 13): queue held, recording recovered, record now transcribe later, notifications off, no Opus encoder, import errors, and "Importing <name>…".
+- Recording card: the app shows it while `RecordingController.state` is `Active`. It shows the title and elapsed time, or the paused state. A tap returns to Recording.
+- Notices from `NoticeCenter` (section 13), including queue held, recording recovered, record now transcribe later, notifications off and no Opus encoder. Import progress, cancellation and results belong to the Library route's transfer controls.
 
 ### List of notes
 
 The [W2 look preview](w2-library-preview.md) uses compact row badges and speaker metadata.
-The state facts and recovery actions below remain the behavioral contract.
+The presentation below does not change persisted note/job states or recovery actions.
 
 - Day groups: by the local day of `created_at`, the newest first, with overline headers.
-- Row: the title (up to 2 lines) and the duration, an optional preview (up to 2 lines), and a meta line with the time, the status chip and the suffix.
-- Preview without a query (`PreviewText` in `:core`, stored in `notes.preview`): if the saved playback position is after the first word, the preview is about 160 characters of the selected variant. It starts at the word that plays at that position. It has a "…" at the start, and a "…" at the end when the text is cut. Board 00 shows "…so the delivery slips to Thursday, but the price stays as agreed in the March order…".
-- Else the preview is the start of the transcript (`note_text.body`): the first 160 characters, cut at a word, with a "…" at the end when the text is cut. The app calculates the preview again when the playback pauses, when the user leaves the Note screen, and when the selected variant changes. A note without a transcript has no preview.
-- Preview during a search: the FTS snippet, with the matches in weight 600 on the accent tint (not only by color). A match in the title only highlights the title and shows no snippet.
-- The row of the RUNNING note is on `surface`. The other rows are transparent.
-- A tap opens the Note screen (with the query during a search). A long press, and the TalkBack custom actions (Rename, Move to trash, and Resume when the note is paused), open the Note actions sheet.
+- Row: a card with a 14 dp radius, a 1 dp border and 12 dp vertical / 16 dp horizontal padding. Its first line has a one-line, ellipsized title (17 sp, weight 600) and duration (13 sp).
+- The metadata line shows time, an optional compact badge and speaker names from the selected variant. Long names ellipsize visually; accessibility retains the full names. A finished note has no status badge.
+- Resting rows have no transcript excerpt. `PreviewText` and the stored preview remain available to other consumers; they are not displayed in the resting Library row.
+- During a search, the FTS snippet highlights matches in weight 600 on the accent tint (not only by color). A title-only match highlights the title and shows no snippet.
+- All rows use the card surface, including the running note. Transcription is represented in that note's row rather than in a separate progress card.
+- A tap opens the Note screen (with the query during a search). Long press opens the Note actions sheet. TalkBack custom actions retain Rename, Move to trash and the applicable recovery action. There are no inline Resume / Try again suffix buttons.
 
-### Status chip (`NoteStatus.of` in `:core`, the first match applies)
+### Compact row badges
 
-| Status | Condition | Chip (tone) | Suffix |
-|---|---|---|---|
-| RECORDING | `LIVE_CAPTURE`, and it is the active capture | "Recording" (error tone, dot) | – |
-| TRANSCRIBING | Job RUNNING (also during the download and the preparation) | "Transcribing" (info) | – |
-| QUEUED | Job QUEUED | "Queued" (outline) | – |
-| PAUSED | Job PAUSED | "Paused at 12:40" (warn, from `done_ms`) | The text button "· Resume". It looks as on the board. Its touch area extends to 48 dp, and the layout does not move (ui.md section 5). The a11y text is "Resume transcribing <title>". |
-| FAILED | Job FAILED | "Couldn't transcribe" (error) | "· Try again" (the same touch rule) |
-| UNPLAYABLE | `audio_kind = UNPLAYABLE` | "Can't play" (error) | – |
-| UNREADABLE | Document `UNREADABLE` or `INVALID_METADATA` | "Can't read transcript" (error) | – |
-| NEWER_FORMAT | `UNKNOWN_FORMAT` | "Newer format" (outline) | – |
-| TRANSCRIBED | Document `OK`, `UNVERIFIED` or `STALE_AUDIO` | "Transcribed" (ok) | "· 3 speakers" with 2 or more speakers. "· No speech" at 0 words. |
-| AUDIO_ONLY | All other notes (PLAIN, NEEDS_CONSENT) | "Audio only" (outline) | – |
+`NoteStatus.of` in `:core` still selects the underlying state. The W2 phone projection is:
+
+| Underlying state | Row badge | Tone / glyph |
+|---|---|---|
+| RECORDING | Recording and elapsed time | Red / dot |
+| TRANSCRIBING | Transcribing, with compact minute estimate when available | Neutral / spinner |
+| QUEUED | Transcribing without an estimate | Neutral / spinner |
+| PAUSED | Interrupted | Amber / alert |
+| FAILED, UNPLAYABLE, UNREADABLE, NEWER_FORMAT | Needs attention | Amber / alert |
+| TRANSCRIBED, AUDIO_ONLY | None | – |
+
+Badges are pills, at least 22 dp high, with 12 sp text at weight 600 and a glyph on every badge. Copy comes from the shared catalog. Importing, Saving and outline-only Received are also covered in the component gallery; they do not create new visible Library states. Received remains unmapped pending the shared receiving-flow decision. Phone state mapping remains provisional as recorded in the shared badge contract.
+
+Accessibility preserves the more specific underlying state: queued, paused position, failure/trust reason, speaker count and no-speech information. Existing detailed spoken transcription estimates remain unchanged while the cross-app progress presentation decision is on hold. Recovery still opens the Note screen or actions sheet; a failed note with a final length limit is not offered a futile retry.
 
 ### Search [CHANGED: FTS4 with highlights]
 
@@ -156,7 +155,7 @@ The draft transcript [KEPT, CHANGED visuals] has these parts and rules:
 - The words are not interactive. A tap on a speaker label opens the Name a speaker sheet in draft mode.
 - From step 6 (attribute), naming is closed. The cards and the rename show "Saving — you can rename when it's done".
 
-Length [CHANGED: 0.1.0 accepted 2 hours]: a transcription has two real limits (architecture.md section 3.7). The audio can be at most 36 hours. The words must fit in the transcript of one document: about 110,000 words, or 11 hours of continuous speech. If the audio is longer, the job fails before the download and the model load. If the words do not fit, the job fails at the window where they stop to fit, and not at the end. Both failures show TX_FAILED with the text of `Failure.LONG`: "This recording is too long to transcribe: one transcript holds up to 36 hours of audio and about 11 hours of speech. You can still play it, and save the audio file with Save a copy." This failure is final, because each new try fails at the same point. The banner has no Try again and no Start over, and the user can dismiss it. The dismissal removes the job and its saved progress. In the Library, "· Try again" on such a note opens the note. A plain note longer than 36 h shows PLAIN_AUDIO with this text in place of "No transcript yet." and without Transcribe.
+Length [CHANGED: 0.1.0 accepted 2 hours]: a transcription has two real limits (architecture.md section 3.7). The audio can be at most 36 hours. The words must fit in the transcript of one document: about 110,000 words, or 11 hours of continuous speech. If the audio is longer, the job fails before the download and the model load. If the words do not fit, the job fails at the window where they stop to fit, and not at the end. Both failures show TX_FAILED with the text of `Failure.LONG`: "This recording is too long to transcribe: one transcript holds up to 36 hours of audio and about 11 hours of speech. You can still play it, and save the audio file with Save a copy." This failure is final, because each new try fails at the same point. The banner has no Try again and no Start over, and the user can dismiss it. The dismissal removes the job and its saved progress. In the Library, tapping such a note opens the note; its actions do not offer a futile retry. A plain note longer than 36 h shows PLAIN_AUDIO with this text in place of "No transcript yet." and without Transcribe.
 
 The inline suggestion card [NEW] shows for each speaker with a `live` SUGGESTED match that is not rejected and whose label is a placeholder. It is at the most recent turn of that speaker. It has a header (the speaker label and the time, as a 48 dp button that opens the Name sheet, as each speaker label does), then "Is this **Luca**?" [Yes, Luca] [Not Luca]. These rules apply:
 
