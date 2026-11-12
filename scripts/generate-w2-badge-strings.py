@@ -16,6 +16,15 @@ LABELS = {'recording': 'states.badge.recording', 'saving': 'states.badge.saving'
           'received': 'states.badge.received', 'transcribing_spoken_eta': 'states.badge.transcribing'}
 
 
+def android_text(text, expected, argument, catalog_id, locale, *, literal_count=False):
+    actual = set(re.findall(r'\{([^{}]+)\}', text))
+    if not actual <= expected or (not literal_count and actual != expected):
+        raise ValueError(f'Missing shared placeholder: {catalog_id}/{locale}')
+    if argument:
+        text = text.replace('{' + argument + '}', '%1$s')
+    return escape(text).replace("'", "\\'").replace('"', '\\"')
+
+
 def generated(root):
     raw = (root / VENDOR / 'strings.json').read_bytes()
     pin = json.loads((root / VENDOR / 'UPSTREAM.json').read_text())
@@ -33,13 +42,20 @@ def generated(root):
             expected = {argument} if argument else set()
             if set(entry.get('placeholders', {})) != expected:
                 raise ValueError(f'Unexpected shared placeholders: {catalog_id}')
-            text = entry['en'] if locale == 'en' else entry['l10n'][locale]['text']
-            if set(re.findall(r'\{([^{}]+)\}', text)) != expected:
-                raise ValueError(f'Missing shared placeholder: {catalog_id}/{locale}')
-            if argument:
-                text = text.replace('{' + argument + '}', '%1$s')
-            text = escape(text).replace("'", "\\'").replace('"', '\\"')
-            lines.append(f'    <string name="ui_badge_{name}">{text}</string>')
+            if 'plural' in entry:
+                forms = entry['plural'] if locale == 'en' else entry['l10n'][locale]['plural']
+                if 'other' not in forms:
+                    raise ValueError(f'Missing shared other form: {catalog_id}/{locale}')
+                lines.append(f'    <plurals name="ui_badge_{name}">')
+                for quantity, text in forms.items():
+                    value = android_text(
+                        text, expected, argument, catalog_id, locale, literal_count=quantity != 'other')
+                    lines.append(f'        <item quantity="{quantity}">{value}</item>')
+                lines.append('    </plurals>')
+            else:
+                text = entry['en'] if locale == 'en' else entry['l10n'][locale]['text']
+                value = android_text(text, expected, argument, catalog_id, locale)
+                lines.append(f'    <string name="ui_badge_{name}">{value}</string>')
         lines.append('</resources>')
         yield root / 'ui/src/main/res' / qualifier / 'w2_badges.xml', '\n'.join(lines) + '\n'
 

@@ -1,10 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generated from cassini-ux 4d577376f6360ed352fa75307f4dc47890ed9858; do not edit. -->
+<!-- Generated from cassini-ux 26a37501ec33adf02d1917353078d41298d834e1; do not edit. -->
 <resources>
     <string name="ui_badge_recording">Gravando %1$s</string>
     <string name="ui_badge_saving">Salvando…</string>
     <string name="ui_badge_transcribing">Transcrevendo…</string>
     <string name="ui_badge_attention">Requer atenção</string>
     <string name="ui_badge_received">Recebida</string>
-    <string name="ui_badge_transcribing_spoken_eta">Transcrevendo, faltam cerca de %1$s minutos</string>
+    <plurals name="ui_badge_transcribing_spoken_eta">
+        <item quantity="one">Transcrevendo, falta cerca de %1$s minuto</item>
+        <item quantity="many">Transcrevendo, faltam cerca de %1$s minutos</item>
+        <item quantity="other">Transcrevendo, faltam cerca de %1$s minutos</item>
+    </plurals>
 </resources>

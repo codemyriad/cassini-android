@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
@@ -201,7 +202,11 @@ private fun rowSpokenStatus(status: NoteStatusUi, minutes: Long?): String = when
     NoteStatusUi.Transcribing -> if (minutes == null) {
         stringResource(R.string.ui_status_transcribing)
     } else {
-        stringResource(R.string.ui_badge_transcribing_spoken_eta, Counts.number(minutes))
+        pluralStringResource(
+            R.plurals.ui_badge_transcribing_spoken_eta,
+            minutes.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+            Counts.number(minutes),
+        )
     }
     NoteStatusUi.Queued -> stringResource(R.string.ui_status_queued)
     is NoteStatusUi.Paused -> stringResource(R.string.ui_status_paused_at, Durations.clock(status.atMs))

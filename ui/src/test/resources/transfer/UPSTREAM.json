@@ -1,6 +1,6 @@
 {
   "repository": "https://github.com/codemyriad/cassini-ux",
-  "commit": "24821b2510a012b1c95de90ea79b55390e98f35b",
+  "commit": "26a37501ec33adf02d1917353078d41298d834e1",
   "files": {
     "strings.json": {
       "source": "strings/strings.json",

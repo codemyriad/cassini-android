@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.text.TextLayoutResult
@@ -42,6 +43,29 @@ class StatusBadgeTest {
         assertEquals("tnum", CassiniTypography.chip.fontFeatureSettings)
         assertEquals(600, CassiniTypography.chip.fontWeight!!.weight)
         assertEquals(12f, CassiniTypography.chip.fontSize.value)
+    }
+
+    @Test fun spokenEtaUsesTheSharedSingularAndPluralForms() {
+        var minutes by mutableStateOf(1L)
+        rule.setContent {
+            CassiniTheme {
+                NoteRow(
+                    NoteRowUi(
+                        id = "running",
+                        title = "Meeting",
+                        durationMs = 48_000,
+                        time = LocalTime.of(10, 2),
+                        status = NoteStatusUi.Transcribing,
+                        transcriptionMinutes = minutes,
+                    ),
+                    DayLabel.Today,
+                    onAction = {},
+                )
+            }
+        }
+        rule.onNodeWithContentDescription("transcribing, about 1 minute left", substring = true).assertExists()
+        rule.runOnIdle { minutes = 4 }
+        rule.onNodeWithContentDescription("transcribing, about 4 minutes left", substring = true).assertExists()
     }
 
     @Test fun longSpeakerMetadataEllipsizesOnTheBadgeLine() {

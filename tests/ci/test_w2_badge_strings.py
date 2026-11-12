@@ -35,10 +35,15 @@ class BadgeStringsTest(unittest.TestCase):
         self.assertEqual(6, len(outputs))
         for path, text in outputs:
             with self.subTest(locale=path.parent.name):
-                labels = {item.attrib['name']: item.text for item in ET.fromstring(text)}
+                resources = {item.attrib['name']: item for item in ET.fromstring(text)}
+                labels = {name: item.text for name, item in resources.items()}
                 self.assertEqual({'ui_badge_' + key for key in BADGES.LABELS}, labels.keys())
                 self.assertEqual(1, labels['ui_badge_recording'].count('%1$s'))
-                self.assertEqual(1, labels['ui_badge_transcribing_spoken_eta'].count('%1$s'))
+                forms = {item.attrib['quantity']: item.text for item in resources['ui_badge_transcribing_spoken_eta']}
+                self.assertEqual(1, forms['other'].count('%1$s'))
+                self.assertIn('one', forms)
+                if path.parent.name == 'values':
+                    self.assertEqual('Transcribing, about 1 minute left', forms['one'])
                 self.assertNotIn('{liveBadge}', text)
 
     def test_missing_locale_file_fails(self):

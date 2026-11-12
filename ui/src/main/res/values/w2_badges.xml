@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generated from cassini-ux 4d577376f6360ed352fa75307f4dc47890ed9858; do not edit. -->
+<!-- Generated from cassini-ux 26a37501ec33adf02d1917353078d41298d834e1; do not edit. -->
 <resources>
     <string name="ui_badge_recording">Recording %1$s</string>
     <string name="ui_badge_saving">Saving…</string>
     <string name="ui_badge_transcribing">Transcribing…</string>
     <string name="ui_badge_attention">Needs attention</string>
     <string name="ui_badge_received">Received</string>
-    <string name="ui_badge_transcribing_spoken_eta">Transcribing, about %1$s minutes left</string>
+    <plurals name="ui_badge_transcribing_spoken_eta">
+        <item quantity="one">Transcribing, about 1 minute left</item>
+        <item quantity="other">Transcribing, about %1$s minutes left</item>
+    </plurals>
 </resources>

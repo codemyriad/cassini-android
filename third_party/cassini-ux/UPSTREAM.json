@@ -1,10 +1,10 @@
 {
   "repository": "https://github.com/codemyriad/cassini-ux",
-  "commit": "4d577376f6360ed352fa75307f4dc47890ed9858",
+  "commit": "26a37501ec33adf02d1917353078d41298d834e1",
   "files": {
     "strings.json": {
       "source": "strings/strings.json",
-      "sha256": "7b059577a6e4a5d692ccb5c745916bc790e9e0fe7c77c5572fb64fda80f0f7b3"
+      "sha256": "89f9747fe0b397f44fb949f34d7616d2f1757f44f799900d3307726393d5ee38"
     },
     "brand/tokens.json": {
       "source": "brand/tokens.json",
