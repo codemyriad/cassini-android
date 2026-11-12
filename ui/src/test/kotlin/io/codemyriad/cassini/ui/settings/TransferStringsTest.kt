@@ -11,7 +11,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.util.Locale
 
-/** The pinned D97 catalog is the authority, including the quoted transfer-switch name in voiceprint copy. */
+/** The pinned D97 catalog is the authority, including the trimmed recognition and Saved voices privacy copy. */
 @RunWith(RobolectricTestRunner::class)
 class TransferStringsTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
@@ -54,7 +54,6 @@ class TransferStringsTest {
             "settings.transfer.tooLarge" to R.string.ui_settings_transfer_too_large,
             "settings.transfer.unavailable" to R.string.ui_settings_transfer_unavailable,
             "settings.transfer.choice.failed" to R.string.ui_settings_transfer_choice_failed,
-            "notice.transfer.enabled" to R.string.ui_notice_transfer_enabled,
             "android.privacy.processing" to R.string.ui_library_privacy,
             "android.speakers.rememberVoice.description" to R.string.ui_name_remember_body,
             "android.speakers.rememberVoice.description.unnamed" to R.string.ui_name_remember_body_unnamed,

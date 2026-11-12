@@ -39,7 +39,7 @@
       "role": "switch",
       "boards": [],
       "milestone": "D97",
-      "note": "Coordinator (D97). Switch label; on by default. What moves is the notes and saved voices, not the person. Other strings quote this label (android.speakers.rememberVoice.description*, android.savedVoices.privacy): keep them identical.",
+      "note": "Coordinator (D97). Switch label; on by default. What moves is the notes and saved voices, not the person.",
       "status": "draft",
       "l10n": {
         "it": {
@@ -234,35 +234,6 @@
       }
     },
     {
-      "id": "notice.transfer.enabled",
-      "en": "Cassini will move your notes and saved voices to a new phone when you set it up from this one. You can change this in Settings.",
-      "platforms": [
-        "android"
-      ],
-      "role": "banner",
-      "boards": [],
-      "milestone": "D97",
-      "note": "Coordinator (D97). Gentle one-time notice that device-to-device transfer is on; dismissible, never a blocking dialog. 'Settings' is the app's own settings screen.",
-      "status": "draft",
-      "l10n": {
-        "it": {
-          "text": "Cassini trasferirà le tue note e le voci salvate su un nuovo telefono quando lo configuri a partire da questo. Puoi cambiare questa scelta nelle impostazioni."
-        },
-        "fr": {
-          "text": "Cassini transférera vos notes et vos voix mémorisées vers un nouveau téléphone lorsque vous le configurerez à partir de celui-ci. Vous pouvez modifier ce choix dans les réglages."
-        },
-        "es": {
-          "text": "Cassini transferirá tus notas y voces guardadas a un teléfono nuevo cuando lo configures a partir de este. Puedes cambiarlo en Ajustes."
-        },
-        "pt-BR": {
-          "text": "O Cassini vai transferir suas notas e vozes salvas para um novo celular quando você o configurar a partir deste. Você pode alterar isso nos Ajustes."
-        },
-        "pt-PT": {
-          "text": "O Cassini passa as suas notas e vozes guardadas para um telemóvel novo quando este for configurado a partir deste telemóvel. Pode alterar isto nas definições."
-        }
-      }
-    },
-    {
       "id": "android.privacy.processing",
       "en": "Transcription runs on this phone.",
       "platforms": [
@@ -293,91 +264,91 @@
     },
     {
       "id": "android.speakers.rememberVoice.description",
-      "en": "Future notes will name {name} automatically. This voiceprint moves to a new phone if Move to a new phone is on.",
+      "en": "Future notes will name {name} automatically.",
       "platforms": [
         "android"
       ],
       "role": "description",
       "boards": [],
       "milestone": "D97",
-      "note": "Coordinator (D97). Under the 'Remember this voice' choice when the speaker has a name. The switch label settings.transfer.title is quoted here: the quoted text must match it exactly in every language.",
+      "note": "Silvio (2026-11-12): remove routine phone-transfer notices; keep the Settings opt-out and privacy policy. Existing recognition/privacy wording retained.",
       "placeholders": {
         "name": "the speaker's name as the person typed it"
       },
       "status": "draft",
       "l10n": {
         "it": {
-          "text": "Le prossime note riconosceranno {name} automaticamente. Questa impronta vocale passa a un nuovo telefono se “Trasferisci su un nuovo telefono” è attivo."
+          "text": "Le prossime note riconosceranno {name} automaticamente."
         },
         "fr": {
-          "text": "Cassini nommera {name} automatiquement dans les prochaines notes. Cette empreinte vocale est transférée vers un nouveau téléphone si « Transférer vers un nouveau téléphone » est activé."
+          "text": "Cassini nommera {name} automatiquement dans les prochaines notes."
         },
         "es": {
-          "text": "En las próximas notas, Cassini reconocerá a {name} automáticamente. Esta huella de voz pasa a un teléfono nuevo si “Transferir a un teléfono nuevo” está activado."
+          "text": "En las próximas notas, Cassini reconocerá a {name} automáticamente."
         },
         "pt-BR": {
-          "text": "Nas próximas notas, o Cassini vai nomear {name} automaticamente. Esta impressão de voz vai para um novo celular se “Transferir para um novo celular” estiver ativado."
+          "text": "Nas próximas notas, o Cassini vai nomear {name} automaticamente."
         },
         "pt-PT": {
-          "text": "Nas próximas notas, o Cassini reconhece {name} automaticamente. Esta impressão vocal passa para um telemóvel novo se «Passar para um telemóvel novo» estiver ativado."
+          "text": "Nas próximas notas, o Cassini reconhece {name} automaticamente."
         }
       }
     },
     {
       "id": "android.speakers.rememberVoice.description.unnamed",
-      "en": "Future notes will name this person automatically. This voiceprint moves to a new phone if Move to a new phone is on.",
+      "en": "Future notes will name this person automatically.",
       "platforms": [
         "android"
       ],
       "role": "description",
       "boards": [],
       "milestone": "D97",
-      "note": "Coordinator (D97). Under the 'Remember this voice' choice when the speaker has no name yet. The switch label settings.transfer.title is quoted here: the quoted text must match it exactly in every language.",
+      "note": "Silvio (2026-11-12): remove routine phone-transfer notices; keep the Settings opt-out and privacy policy. Existing recognition/privacy wording retained.",
       "status": "draft",
       "l10n": {
         "it": {
-          "text": "Le prossime note riconosceranno questa persona automaticamente. Questa impronta vocale passa a un nuovo telefono se “Trasferisci su un nuovo telefono” è attivo."
+          "text": "Le prossime note riconosceranno questa persona automaticamente."
         },
         "fr": {
-          "text": "Cassini nommera cette personne automatiquement dans les prochaines notes. Cette empreinte vocale est transférée vers un nouveau téléphone si « Transférer vers un nouveau téléphone » est activé."
+          "text": "Cassini nommera cette personne automatiquement dans les prochaines notes."
         },
         "es": {
-          "text": "En las próximas notas, Cassini reconocerá a esta persona automáticamente. Esta huella de voz pasa a un teléfono nuevo si “Transferir a un teléfono nuevo” está activado."
+          "text": "En las próximas notas, Cassini reconocerá a esta persona automáticamente."
         },
         "pt-BR": {
-          "text": "Nas próximas notas, o Cassini vai nomear esta pessoa automaticamente. Esta impressão de voz vai para um novo celular se “Transferir para um novo celular” estiver ativado."
+          "text": "Nas próximas notas, o Cassini vai nomear esta pessoa automaticamente."
         },
         "pt-PT": {
-          "text": "Nas próximas notas, o Cassini reconhece esta pessoa automaticamente. Esta impressão vocal passa para um telemóvel novo se «Passar para um telemóvel novo» estiver ativado."
+          "text": "Nas próximas notas, o Cassini reconhece esta pessoa automaticamente."
         }
       }
     },
     {
       "id": "android.savedVoices.privacy",
-      "en": "Voiceprints are kept in the app and are never written into shared files. They move to a new phone if Move to a new phone is on. Only the names you choose are shared.",
+      "en": "Voiceprints are kept in the app and are never written into shared files. Only the names you choose are shared.",
       "platforms": [
         "android"
       ],
       "role": "description",
       "boards": [],
       "milestone": "D97",
-      "note": "Coordinator (D97). Footnote of the Saved voices screen. The switch label settings.transfer.title is quoted here: the quoted text must match it exactly in every language.",
+      "note": "Silvio (2026-11-12): remove routine phone-transfer notices; keep the Settings opt-out and privacy policy. Existing recognition/privacy wording retained.",
       "status": "draft",
       "l10n": {
         "it": {
-          "text": "Le impronte vocali restano nell’app e non vengono mai scritte nei file condivisi. Passano a un nuovo telefono se “Trasferisci su un nuovo telefono” è attivo. Vengono condivisi solo i nomi che scegli."
+          "text": "Le impronte vocali restano nell’app e non vengono mai scritte nei file condivisi. Vengono condivisi solo i nomi che scegli."
         },
         "fr": {
-          "text": "Les empreintes vocales sont conservées dans l’application et ne sont jamais écrites dans les fichiers partagés. Elles sont transférées vers un nouveau téléphone si « Transférer vers un nouveau téléphone » est activé. Seuls les noms que vous choisissez sont partagés."
+          "text": "Les empreintes vocales sont conservées dans l’application et ne sont jamais écrites dans les fichiers partagés. Seuls les noms que vous choisissez sont partagés."
         },
         "es": {
-          "text": "Las huellas de voz se guardan en la aplicación y nunca se incluyen en los archivos compartidos. Pasan a un teléfono nuevo si “Transferir a un teléfono nuevo” está activado. Solo se comparten los nombres que eliges."
+          "text": "Las huellas de voz se guardan en la aplicación y nunca se incluyen en los archivos compartidos. Solo se comparten los nombres que eliges."
         },
         "pt-BR": {
-          "text": "As impressões de voz ficam no aplicativo e nunca são incluídas em arquivos compartilhados. Elas vão para um novo celular se “Transferir para um novo celular” estiver ativado. Só os nomes que você escolhe são compartilhados."
+          "text": "As impressões de voz ficam no aplicativo e nunca são incluídas em arquivos compartilhados. Só os nomes que você escolhe são compartilhados."
         },
         "pt-PT": {
-          "text": "As impressões vocais ficam na aplicação e nunca são incluídas nos ficheiros partilhados. Passam para um telemóvel novo se «Passar para um telemóvel novo» estiver ativado. Só os nomes que escolher são partilhados."
+          "text": "As impressões vocais ficam na aplicação e nunca são incluídas nos ficheiros partilhados. Só os nomes que escolher são partilhados."
         }
       }
     }

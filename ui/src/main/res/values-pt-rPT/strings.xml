@@ -307,8 +307,8 @@
     <string name="ui_name_rename_saved">Mudar o nome da voz guardada</string>
     <string name="ui_name_not">Não é %1$s?</string>
     <string name="ui_name_remember">Memorizar esta voz neste telemóvel</string>
-    <string name="ui_name_remember_body">Nas próximas notas, o Cassini reconhece %1$s automaticamente. Esta impressão vocal passa para um telemóvel novo se «Passar para um telemóvel novo» estiver ativado.</string>
-    <string name="ui_name_remember_body_unnamed">Nas próximas notas, o Cassini reconhece esta pessoa automaticamente. Esta impressão vocal passa para um telemóvel novo se «Passar para um telemóvel novo» estiver ativado.</string>
+    <string name="ui_name_remember_body">Nas próximas notas, o Cassini reconhece %1$s automaticamente.</string>
+    <string name="ui_name_remember_body_unnamed">Nas próximas notas, o Cassini reconhece esta pessoa automaticamente.</string>
     <string name="ui_name_remember_too_little">Fala insuficiente para memorizar esta voz.</string>
     <string name="ui_name_remember_no_model">O reconhecimento de vozes guardadas ainda não está instalado.</string>
     <string name="ui_name_merge_into">Juntar a…</string>
@@ -407,7 +407,7 @@
 
     <!-- Saved voices (board 07, features.md section 10). -->
     <string name="ui_voices_title">Vozes guardadas</string>
-    <string name="ui_voices_privacy">As impressões vocais ficam na aplicação e nunca são incluídas nos ficheiros partilhados. Passam para um telemóvel novo se «Passar para um telemóvel novo» estiver ativado. Só os nomes que escolher são partilhados.</string>
+    <string name="ui_voices_privacy">As impressões vocais ficam na aplicação e nunca são incluídas nos ficheiros partilhados. Só os nomes que escolher são partilhados.</string>
     <string name="ui_voices_confirmed_speech">%1$s de fala confirmada</string>
     <string name="ui_voices_options">Opções para %1$s</string>
     <string name="ui_voices_forget">Esquecer…</string>
@@ -603,7 +603,6 @@
     <string name="ui_settings_transfer_too_large">As suas notas e vozes guardadas são demasiado grandes para serem passadas de uma só vez. Exporte as suas notas como ZIP.</string>
     <string name="ui_settings_transfer_unavailable">Esta opção requer o Android 9 ou mais recente.</string>
     <string name="ui_settings_transfer_choice_failed">Não foi possível guardar esta opção. Tente novamente.</string>
-    <string name="ui_notice_transfer_enabled">O Cassini passa as suas notas e vozes guardadas para um telemóvel novo quando este for configurado a partir deste telemóvel. Pode alterar isto nas definições.</string>
     <string name="ui_search_filter_any_date">Qualquer data</string>
     <string name="ui_search_filter_recorded_by_me">Gravadas por mim</string>
     <string name="ui_search_filter_speaker">Orador: {name}</string>

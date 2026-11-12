@@ -334,8 +334,8 @@
     <string name="ui_name_rename_saved">Rename saved voice</string>
     <string name="ui_name_not">Not %1$s?</string>
     <string name="ui_name_remember">Remember this voice on this phone</string>
-    <string name="ui_name_remember_body">Future notes will name %1$s automatically. This voiceprint moves to a new phone if Move to a new phone is on.</string>
-    <string name="ui_name_remember_body_unnamed">Future notes will name this person automatically. This voiceprint moves to a new phone if Move to a new phone is on.</string>
+    <string name="ui_name_remember_body">Future notes will name %1$s automatically.</string>
+    <string name="ui_name_remember_body_unnamed">Future notes will name this person automatically.</string>
     <string name="ui_name_remember_too_little">Too little speech to remember this voice.</string>
     <string name="ui_name_remember_no_model">Recognising saved voices isn’t installed yet.</string>
     <string name="ui_name_merge_into">Merge into…</string>
@@ -433,7 +433,7 @@
 
     <!-- Saved voices (board 07, features.md section 10). -->
     <string name="ui_voices_title">Saved voices</string>
-    <string name="ui_voices_privacy">Voiceprints are kept in the app and are never written into shared files. They move to a new phone if Move to a new phone is on. Only the names you choose are shared.</string>
+    <string name="ui_voices_privacy">Voiceprints are kept in the app and are never written into shared files. Only the names you choose are shared.</string>
     <string name="ui_voices_confirmed_speech">%1$s confirmed speech</string>
     <string name="ui_voices_options">Options for %1$s</string>
     <string name="ui_voices_forget">Forget…</string>
@@ -622,7 +622,6 @@
 
     <string name="ui_settings_transfer_title">Move to a new phone</string>
     <string name="ui_settings_transfer_body">When you set up a new Android phone from this one, your notes and saved voices are copied directly to it. Nothing is sent to a cloud account. Downloaded models are not copied; the new phone downloads them again.</string>
-    <string name="ui_notice_transfer_enabled">Cassini will move your notes and saved voices to a new phone when you set it up from this one. You can change this in Settings.</string>
     <string name="ui_settings_transfer_unavailable">Choosing this needs Android 9 or newer.</string>
     <string name="ui_settings_transfer_heading">Moving to a new phone</string>
     <string name="ui_settings_transfer_body_off">Nothing is copied to a new phone. If this phone is lost or replaced, your notes are gone unless you exported them.</string>
