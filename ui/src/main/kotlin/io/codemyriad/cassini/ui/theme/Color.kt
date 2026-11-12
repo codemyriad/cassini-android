@@ -87,10 +87,20 @@ class CassiniColors(
     val scrim: Color,
     /** Inline links (underlined). */
     val link: Color,
-)
+    /** Canonical decided/placeholder roles; null until the W1 look preview activates them. */
+    internal val brand: Map<String, Color>? = null,
+) {
+    val highlight: Color get() = brand?.getValue("highlight") ?: accentTint
+    val highlightInk: Color get() = brand?.getValue("highlight-ink") ?: ink
+    val record: Color get() = brand?.getValue("record") ?: red
+    val onRecord: Color get() = brand?.getValue("on-record") ?: onRed
+    val error: Color get() = brand?.getValue("error") ?: redInk
+    val neutralInk: Color get() = brand?.getValue("neutral-ink") ?: ink
+    val neutralTint: Color get() = brand?.getValue("neutral-tint") ?: surface
+}
 
 /** The light set (the boards). */
-val LightColors: CassiniColors = CassiniColors(
+internal val LegacyLightColors: CassiniColors = CassiniColors(
     isDark = false,
     ink = Color(0xFF14171A),
     bg = Color(0xFFF5F6F7),
@@ -138,7 +148,7 @@ val LightColors: CassiniColors = CassiniColors(
 )
 
 /** The dark set (no board: it follows docs/design/ui.md and waits for the owner's review). */
-val DarkColors: CassiniColors = CassiniColors(
+internal val LegacyDarkColors: CassiniColors = CassiniColors(
     isDark = true,
     ink = Color(0xFFECEEF1),
     bg = Color(0xFF0F1214),
@@ -184,6 +194,104 @@ val DarkColors: CassiniColors = CassiniColors(
     scrim = Color(0xFF000000).copy(alpha = 0.6f),
     link = Color(0xFF8FA6FF),
 )
+
+// W1.1 is plumbing only: the canvas mapping is checked but the active palette stays pixel-identical.
+val LightColors: CassiniColors = LegacyLightColors
+val DarkColors: CassiniColors = LegacyDarkColors
+
+// Source: codemyriad/cassini-ux@e4ae2217312370250a39ad83e047a186048e0a9e, brand/tokens.json.
+// Android-only secondary roles alias published tokens; L-14/L-17 speaker hues remain frozen below.
+internal val CanvasRoleTokens = mapOf(
+    "ink" to "ink",
+    "bg" to "ground",
+    "surface" to "surface",
+    "surfaceWash" to "sunken",
+    "boardBg" to "sunken",
+    "text2" to "ink-2",
+    "text3" to "ink-2",
+    "text4" to "ink-3",
+    "line" to "line",
+    "line2" to "line",
+    "line3" to "ink-3",
+    "accent" to "accent",
+    "accentFill" to "accent-strong",
+    "onAccentFill" to "on-accent",
+    "accentInk" to "accent-ink",
+    "accentTint" to "accent-tint",
+    "accentTrack" to "accent-tint",
+    "teal" to "success",
+    "tealInk" to "success",
+    "tealTint" to "success-tint",
+    "amber" to "warn-ink",
+    "amberInk" to "warn-ink",
+    "amberTint" to "warn-tint",
+    "amberWash" to "warn-tint",
+    "red" to "record",
+    "redInk" to "error",
+    "redTint" to "error-tint",
+    "redLine" to "error",
+    "onRed" to "on-record",
+    "inkFill" to "ink",
+    "onInkFill" to "ground",
+    "snackbarBg" to "inverse",
+    "snackbarText" to "on-inverse",
+    "snackbarAction" to "inverse-accent",
+    "scrim" to "scrim",
+    "link" to "accent",
+)
+
+internal fun canvasColors(dark: Boolean): CassiniColors {
+    val values = if (dark) BrandTokenValues.dark else BrandTokenValues.light
+    val legacy = if (dark) LegacyDarkColors else LegacyLightColors
+    fun role(name: String): Color = values.getValue(CanvasRoleTokens.getValue(name))
+    return CassiniColors(
+        isDark = dark,
+        ink = role("ink"),
+        bg = role("bg"),
+        surface = role("surface"),
+        surfaceWash = role("surfaceWash"),
+        boardBg = role("boardBg"),
+        text2 = role("text2"),
+        text3 = role("text3"),
+        text4 = role("text4"),
+        line = role("line"),
+        line2 = role("line2"),
+        line3 = role("line3"),
+        accent = role("accent"),
+        accentFill = role("accentFill"),
+        onAccentFill = role("onAccentFill"),
+        accentInk = role("accentInk"),
+        accentTint = role("accentTint"),
+        accentTrack = role("accentTrack"),
+        teal = role("teal"),
+        tealInk = role("tealInk"),
+        tealTint = role("tealTint"),
+        amber = role("amber"),
+        amberInk = role("amberInk"),
+        amberTint = role("amberTint"),
+        amberWash = role("amberWash"),
+        red = role("red"),
+        redInk = role("redInk"),
+        redTint = role("redTint"),
+        redLine = role("redLine"),
+        onRed = role("onRed"),
+        inkFill = role("inkFill"),
+        onInkFill = role("onInkFill"),
+        snackbarBg = role("snackbarBg"),
+        snackbarText = role("snackbarText"),
+        snackbarAction = role("snackbarAction"),
+        scrim = role("scrim"),
+        link = role("link"),
+        speakerBlue = legacy.speakerBlue,
+        speakerTeal = legacy.speakerTeal,
+        speakerViolet = legacy.speakerViolet,
+        speakerAmber = legacy.speakerAmber,
+        speakerQuestionWash = legacy.speakerQuestionWash,
+        violet = legacy.violet,
+        violetTint = legacy.violetTint,
+        brand = values,
+    )
+}
 
 /** Provided by `CassiniTheme`; the default is the light set so a bare preview still renders. */
 val LocalCassiniColors = staticCompositionLocalOf { LightColors }

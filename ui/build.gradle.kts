@@ -1,3 +1,4 @@
+import groovy.json.JsonSlurper
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 // The Compose design system and the stateless screens (docs/design/ui.md). Depends only on Compose,
@@ -23,6 +24,48 @@ class RepoRootArgument(
     @get:InputFiles @get:PathSensitive(PathSensitivity.RELATIVE) val webFonts: FileCollection,
 ) : CommandLineArgumentProvider {
     override fun asArguments(): Iterable<String> = listOf("-Dcassini.repoRoot=${root.absolutePath}")
+}
+
+/** Build-time data import: app code owns the aliases; no canvas hex is repeated in authored Kotlin. */
+abstract class GenerateBrandTokens : DefaultTask() {
+    @get:InputFile @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val tokenFile: RegularFileProperty
+
+    @get:OutputDirectory
+    abstract val output: DirectoryProperty
+
+    @TaskAction fun generate() {
+        val document = JsonSlurper().parse(tokenFile.get().asFile) as Map<*, *>
+        val tokens = document["tokens"] as Map<*, *>
+        val source = buildString {
+            appendLine("// Generated from brand/tokens.json; do not edit.")
+            appendLine("@file:Suppress(\"MagicNumber\")")
+            appendLine("package io.codemyriad.cassini.ui.theme")
+            appendLine("import androidx.compose.ui.graphics.Color")
+            appendLine("internal object BrandTokenValues {")
+            for (mode in listOf("light", "dark")) {
+                appendLine("    val $mode: Map<String, Color> = mapOf(")
+                for ((name, value) in tokens) {
+                    val role = value as Map<*, *>
+                    if (role["status"] !in setOf("decided", "placeholder")) continue
+                    val hex = (role[mode] as String).removePrefix("#")
+                    require(hex.matches(Regex("[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?")))
+                    val argb = if (hex.length == 8) hex.takeLast(2) + hex.take(6) else "FF$hex"
+                    appendLine("        \"$name\" to Color(0x$argb),")
+                }
+                appendLine("    )")
+            }
+            appendLine("}")
+        }
+        val target = output.file("io/codemyriad/cassini/ui/theme/BrandTokenValues.kt").get().asFile
+        target.parentFile.mkdirs()
+        target.writeText(source)
+    }
+}
+
+val generateBrandTokens = tasks.register<GenerateBrandTokens>("generateBrandTokens") {
+    tokenFile.set(layout.projectDirectory.file("src/main/resources/brand/tokens.json"))
+    output.set(layout.buildDirectory.dir("generated/brand-tokens/kotlin"))
 }
 
 val webFontPatterns = PatternSet().apply {
@@ -125,4 +168,11 @@ dependencies {
     testImplementation(libs.roborazzi.junit.rule)
     // FontAssetsTest parses third_party/fonts/fonts.json on the plain JVM, where android.jar has only stubs.
     testImplementation(libs.org.json)
+}
+
+// Both APK compilation and JVM screenshot tests consume the same generated token values.
+tasks.named("preBuild") { dependsOn(generateBrandTokens) }
+
+androidComponents.onVariants { variant ->
+    variant.sources.java?.addGeneratedSourceDirectory(generateBrandTokens, GenerateBrandTokens::output)
 }
