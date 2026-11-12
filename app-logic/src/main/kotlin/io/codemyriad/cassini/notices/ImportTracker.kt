@@ -1,8 +1,6 @@
 package io.codemyriad.cassini.notices
 
-import android.util.Log
 import io.codemyriad.cassini.core.Failure
-import io.codemyriad.cassini.data.notes.ImportOutcome
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -19,10 +17,13 @@ import kotlinx.coroutines.flow.update
  *
  * A new import clears the last failure ("shown until dismissed or the next import"); a failed one sets it.
  */
-class ImportTracker(
+@Suppress("LongParameterList") // Platform adapters, result classification and deterministic clock inputs.
+class ImportTracker<T : Any>(
     private val scope: CoroutineScope,
     private val describe: suspend (String) -> String?,
-    private val run: suspend (String) -> ImportOutcome,
+    private val run: suspend (String) -> T,
+    private val rejected: (T) -> ImportFailure?,
+    private val report: (String, Exception) -> Unit,
     private val clock: () -> Long = System::currentTimeMillis,
     private val fallbackName: () -> String = { "" },
 ) {
@@ -31,13 +32,13 @@ class ImportTracker(
     val state: StateFlow<ImportState> = mutable.asStateFlow()
 
     /** Imports [uri]. The result is null when the import threw; that is shown as "Can't open this file". */
-    fun start(uri: String): Deferred<ImportOutcome?> = scope.async {
+    fun start(uri: String): Deferred<T?> = scope.async {
         val name = try {
             describe(uri)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-            Log.w(TAG, "Cannot describe an imported file", error)
+            report("Cannot describe an imported file", error)
             null
         } ?: fallbackName()
         mutable.update { it.copy(running = it.running + name, failure = null) }
@@ -46,15 +47,15 @@ class ImportTracker(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-            Log.w(TAG, "Import failed", error)
+            report("Import failed", error)
             null
         } finally {
             mutable.update { it.copy(running = it.running - name) }
         }
-        val failure = when (outcome) {
-            is ImportOutcome.Rejected -> ImportFailure(outcome.failure, outcome.neededBytes, clock())
-            null -> ImportFailure(Failure.OPEN, at = clock())
-            is ImportOutcome.Created, is ImportOutcome.Existing -> null
+        val failure = if (outcome == null) {
+            ImportFailure(Failure.OPEN, at = clock())
+        } else {
+            rejected(outcome)?.copy(at = clock())
         }
         if (failure != null) mutable.update { it.copy(failure = failure) }
         outcome
@@ -71,9 +72,5 @@ class ImportTracker(
     /** The user closed the import error banner. */
     fun dismissFailure() {
         mutable.update { it.copy(failure = null) }
-    }
-
-    private companion object {
-        const val TAG = "CassiniImport"
     }
 }

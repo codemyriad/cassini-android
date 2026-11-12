@@ -689,17 +689,6 @@ class ProcessingCoordinatorTest {
         assertEquals(listOf(consentless), notices.ready.toList())
     }
 
-    @Test fun theForegroundNeedFollowsThePhaseAndTheApiLevel() {
-        val running = { phase: JobPhase -> ProcessingState(running = RunningJob("n", "t", phase)) }
-        val transcribing = running(JobPhase.Transcribing(PROGRESS, io.codemyriad.cassini.engine.job.DraftState.EMPTY))
-        assertEquals(ForegroundNeed.NONE, ProcessingState.foregroundNeed(ProcessingState(), 35))
-        assertEquals(ForegroundNeed.DATA_SYNC, ProcessingState.foregroundNeed(running(JobPhase.Downloading(null)), 35))
-        assertEquals(ForegroundNeed.DATA_SYNC, ProcessingState.foregroundNeed(running(JobPhase.Starting), 35))
-        assertEquals(ForegroundNeed.MEDIA_PROCESSING, ProcessingState.foregroundNeed(transcribing, 35))
-        assertEquals(ForegroundNeed.DATA_SYNC, ProcessingState.foregroundNeed(transcribing, 34))
-        assertEquals(ForegroundNeed.DATA_SYNC, ProcessingState.foregroundNeed(ProcessingState(downloading = true), 35))
-    }
-
     // Draft names. -------------------------------------------------------------------------------------------------
 
     @Test fun aDraftConfirmRacingTheJobsLiveUpdatesLosesNeither() = runBlocking {

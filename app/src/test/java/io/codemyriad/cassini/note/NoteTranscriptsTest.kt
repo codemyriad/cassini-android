@@ -149,38 +149,6 @@ class NoteTranscriptsTest {
         assertEquals("not in speakers[]: numbered by first word", SpeakerNameUi.Placeholder(3), turns[2].name)
     }
 
-    @Test
-    fun searchIgnoresCaseAndAccents() {
-        val turns = NoteTranscripts.sealed(
-            listOf(
-                Word("a", 0, 1, "Café"),
-                Word("a", 1, 2, "DELIVERY"),
-                Word("b", 2, 3, "cafe"),
-                Word("b", 3, 4, "delivery"),
-            ),
-            emptyList(),
-            emptyMap(),
-            emptyList(),
-        ).turns
-        val cafe = TranscriptSearch.matches(turns, "cafe")
-        assertEquals(2, cafe.size)
-        assertEquals("w0", cafe[0].turnId)
-        assertEquals(0..3, cafe[0].range)
-        assertEquals(0..3, cafe[1].range)
-        assertEquals(listOf(5..12, 5..12), TranscriptSearch.matches(turns, "Delivery").map { it.range })
-        assertTrue(TranscriptSearch.matches(turns, "  ").isEmpty())
-        assertTrue(TranscriptSearch.matches(turns, "tomorrow").isEmpty())
-    }
-
-    @Test
-    fun aDecomposedAccentKeepsTheRangeOnTheSourceText() {
-        val text = "Café aperto"
-        val atoms = text.split(' ').mapIndexed { index, word -> Word("a", index.toLong(), index + 1L, word) }
-        val turns = NoteTranscripts.sealed(atoms, emptyList(), emptyMap(), emptyList()).turns
-        val match = TranscriptSearch.matches(turns, "café").single()
-        assertEquals("the combining mark belongs to the match", 0..4, match.range)
-    }
-
     @Test fun acknowledgmentKeepsChipWordsSeekableAndSearchable() {
         val vector = fixture("acknowledgment")
         val transcript = NoteTranscripts.sealed(vector, vectorSpeakers, emptyMap(), emptyList())

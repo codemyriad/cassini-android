@@ -11,6 +11,7 @@ import io.codemyriad.cassini.core.models.ModelPlan
 import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.data.db.LibraryRow
 import io.codemyriad.cassini.data.models.ModelStatus
+import io.codemyriad.cassini.data.notes.ImportOutcome
 import io.codemyriad.cassini.data.voices.VoiceProblem
 import io.codemyriad.cassini.engine.job.DownloadError
 import io.codemyriad.cassini.engine.job.InstallOutcome
@@ -39,7 +40,7 @@ import kotlinx.coroutines.launch
  * The notices the user closes are remembered where features.md says: RECOVERED in `notices.recoveredAck`, NO_ENCODER
  * in `notices.opusNativeAck`, an import error and a download failure until the next import or download.
  */
-class NoticeCenter(private val graph: AppGraph, context: Context, val imports: ImportTracker) {
+class NoticeCenter(private val graph: AppGraph, context: Context, val imports: ImportTracker<ImportOutcome>) {
     private val app = context.applicationContext
     private val settings = graph.settings
     private val notificationsOff = MutableStateFlow(!notificationsEnabled())

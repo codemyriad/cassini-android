@@ -63,12 +63,14 @@ The privacy rules are:
 
 ## 2. Modules
 
-The build has six Gradle modules:
+The build modules are:
 
 ```
 :core    Pure Kotlin/JVM. The verbatim engine plus pure app rules (statuses, search,
          trash arithmetic, exports, speaker stats, model plan). No android.*, no sherpa,
          no coroutines. org.json is compileOnly.
+:app-logic Pure Kotlin/JVM app policies and leaf state; depends on core and coroutines.
+         Android/UI/repository adapters stay in app.
 :data    Android library. Room catalogue, DataStore settings, file repositories.
 :engine  Android library. Native wrappers (sherpa-onnx, libcassini_opus), MediaCodec
          decoder, microphone capture, TranscriptionJob, ModelInstaller, ProgressTracker.
@@ -84,6 +86,7 @@ The dependencies go in this direction:
 
 ```
 app -> ui
+app -> app-logic -> core
 app -> data -> core
 app -> engine -> core
 bench -(instruments)-> app

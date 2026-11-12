@@ -110,7 +110,7 @@ The `ciTest` task runs the tests of these tiers:
 
 | Tier | Gradle task | What it needs |
 |---|---|---|
-| JVM | `:core:test` | JDK 17 and the submodule |
+| JVM | `:core:test`, `:app-logic:test` | JDK 17 and the submodule |
 | Android unit and Robolectric (SDK 35) | `:engine:testDebugUnitTest`, `:data:testDebugUnitTest`, `:app:testDebugUnitTest` | The Android SDK and `scripts/setup.sh` |
 | Screenshots (Roborazzi) | `:ui:verifyRoborazziDebug` | Linux x86_64 |
 

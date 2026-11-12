@@ -5,13 +5,6 @@ import io.codemyriad.cassini.data.db.JobEntity
 import io.codemyriad.cassini.data.settings.QueueHold
 import io.codemyriad.cassini.engine.job.JobPhase
 
-/**
- * What the foreground service must be while the coordinator works (architecture 5.7). [NONE]: nothing to do, the
- * service may stop. [DATA_SYNC]: downloads, the start of a job, and inference on API 29-34. [MEDIA_PROCESSING]:
- * inference on API 35+. Below API 29 the service type is ignored (`ServiceCompat` starts it untyped).
- */
-enum class ForegroundNeed { NONE, DATA_SYNC, MEDIA_PROCESSING }
-
 /** The job that runs now: [noteId] with its [title] and what its tracker shows ([phase]). */
 data class RunningJob(val noteId: String, val title: String, val phase: JobPhase)
 
@@ -50,17 +43,16 @@ data class ProcessingState(
 
     companion object {
         /** API 35: the first level with the `mediaProcessing` service type (and its 6 h per 24 h budget). */
-        const val MEDIA_PROCESSING_API = 35
+        const val MEDIA_PROCESSING_API = ForegroundPolicy.MEDIA_PROCESSING_API
 
         /** The service type that [state] needs on a device with [sdkInt]. */
         fun foregroundNeed(state: ProcessingState, sdkInt: Int): ForegroundNeed {
             val phase = state.running?.phase
-            return when {
-                phase is JobPhase.Transcribing || phase == JobPhase.Stopping ->
-                    if (sdkInt >= MEDIA_PROCESSING_API) ForegroundNeed.MEDIA_PROCESSING else ForegroundNeed.DATA_SYNC
-                phase != null || state.draining || state.downloading -> ForegroundNeed.DATA_SYNC
-                else -> ForegroundNeed.NONE
-            }
+            return ForegroundPolicy.need(
+                sdkInt,
+                processing = phase is JobPhase.Transcribing || phase == JobPhase.Stopping,
+                working = phase != null || state.draining || state.downloading,
+            )
         }
     }
 }
