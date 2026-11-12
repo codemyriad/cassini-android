@@ -788,11 +788,11 @@ and recording text, dot and fresh bars/background 7.61:1. The text AA minimum re
 source has no contrast exceptions: ink-3 on sunken in light now passes at 4.78:1 (L-36). Highlight ink,
 all seven speaker/avatar pairs, and white on errorFill/successFill meet text AA in both modes.
 
-These items can have less than 3:1, because text or icons identify the control (WCAG 1.4.11): the line2 outlines (1.58), the rec.line circle and barIdle (decorative), the line3 dashed tag and plain dot, and the inactive track of the slider (the thumb and the active track show the state). The checkbox that is not checked uses text2 (7.93).
+These items can have less than 3:1, because text or icons identify the control (WCAG 1.4.11): the line2 outlines, the rec.line circle and barIdle (decorative), the line3 dashed tag and plain dot, and the inactive track of the slider (the thumb and the active track show the state). The checkbox that is not checked uses the AA-checked text2 role.
 
 Accepted deviations from the boards. The reviewer examines each one, and the tolerance does not hide them:
 
-1. `text4` #687180 in place of #6B7480.
+1. Unsettled draft words and placeholders use the canonical ink-3 role.
 2. A 48 dp layout for each control. In the draft transcript, this adds about 6 dp for each turn.
 3. The app draws the background of the active word and does not pad the word. Thus the highlight does not change the line breaks.
 4. Sub-pixel differences of the text advance (a snippet line can wrap one word earlier).

@@ -102,4 +102,18 @@ class SpeakerColourIndexTest {
         repeat(words.size) { assertEquals(it, doc.speakerColourIndex("s$it")) }
         assertEquals(words.size, reads)
     }
+
+    @Test fun optionalMalformedAndMaximumColourHintsCannotPreventAnotherTranscript() {
+        val transcript = Transcript(listOf(Word("a", 0, 1, "one"), Word("b", 1, 2, "two")))
+        val bytes = CassiniDocument.create(audio(), transcript, "Meeting", JSONObject())
+        for (hint in listOf("unknown", Int.MAX_VALUE)) {
+            val existing = CassiniDocument.read(bytes)
+            existing.manifest!!.getJSONArray("speakers").getJSONObject(0).put("colourIndex", hint)
+            val next = Transcript(transcript.words + Word("c", 2, 3, "three"))
+            val written = CassiniDocument.read(CassiniDocument.create(bytes, next, "Meeting", JSONObject(), existing))
+            assertEquals("ok", written.state)
+            org.junit.Assert.assertTrue(written.speakerColourIndex("c")!! >= 0)
+            assertEquals(1, written.speakerColourIndex("b"))
+        }
+    }
 }
