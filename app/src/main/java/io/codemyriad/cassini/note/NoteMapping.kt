@@ -73,7 +73,10 @@ object NoteMapping {
         return when {
             note.audioKind == AudioKind.UNPLAYABLE -> NoteMode.Unplayable
             row?.state == JobState.QUEUED -> NoteMode.Queued(job?.ahead ?: 0, overDocument = document)
-            row?.state == JobState.RUNNING -> NoteMode.Processing(card ?: STARTING_CARD)
+            row?.state == JobState.RUNNING -> NoteMode.Processing(
+                card ?: STARTING_CARD,
+                stopBusy = job?.phase == JobPhase.Stopping,
+            )
             row?.state == JobState.PAUSED -> NoteMode.Paused(row.doneMs, row.totalMs, hasCheckpoint = row.doneMs > 0)
             row?.state == JobState.FAILED -> NoteMode.Failed(overDocument = document)
             document -> NoteMode.Reading
