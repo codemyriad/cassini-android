@@ -1,6 +1,6 @@
 package io.codemyriad.cassini.core.speakers
 
-/** Six named slots in first-speaking order; an unnamed speaker is stone and takes no named slot. */
+/** Six slots fixed at first speech; unnamed speakers hide their slot behind stone. */
 enum class SpeakerTint {
     ONE, TWO, THREE, FOUR, FIVE, SIX, UNNAMED;
 
@@ -8,17 +8,22 @@ enum class SpeakerTint {
         /** The cycle of named speakers. */
         val NAMED = listOf(ONE, TWO, THREE, FOUR, FIVE, SIX)
 
-        /** The tint of the named speaker at [namedIndex] (from 0) among the named speakers only. */
+        /** The tint of the named speaker at [namedIndex] (from 0) in the meeting (including speakers not named yet). */
         fun named(namedIndex: Int): SpeakerTint = NAMED[Math.floorMod(namedIndex, NAMED.size)]
 
         /**
          * The tint of each speaker in [order] (speaker ids in order of their first turn in the shown variant, as
          * `SpeakerStats` ordinals give them). [isPlaceholder] tells a speaker without a name.
          */
-        fun assign(order: List<String>, isPlaceholder: (String) -> Boolean): Map<String, SpeakerTint> {
+        fun assign(
+            order: List<String>,
+            colourIndices: Map<String, Int> = emptyMap(),
+            isPlaceholder: (String) -> Boolean,
+        ): Map<String, SpeakerTint> {
             val result = LinkedHashMap<String, SpeakerTint>()
-            var named = 0
-            for (id in order.distinct()) result[id] = if (isPlaceholder(id)) UNNAMED else named(named++)
+            for ((index, id) in order.distinct().withIndex()) {
+                result[id] = if (isPlaceholder(id)) UNNAMED else named(colourIndices[id] ?: index)
+            }
             return result
         }
 

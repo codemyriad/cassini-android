@@ -34,7 +34,7 @@ fun StatusChip(text: String, kind: StatusBadgeKind, modifier: Modifier = Modifie
         StatusBadgeTone.Red -> c.recordTint
         StatusBadgeTone.Amber -> c.amberTint
         StatusBadgeTone.Outline -> Color.Transparent
-        StatusBadgeTone.Neutral -> c.neutralTint
+        StatusBadgeTone.Neutral -> c.ink.copy(alpha = 0.1f)
     }
     val foreground = when (kind.tone) {
         StatusBadgeTone.Red -> c.recordInk

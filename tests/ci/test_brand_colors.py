@@ -56,6 +56,8 @@ class BrandColorsTest(unittest.TestCase):
     def test_both_modes_include_every_accepted_token_and_derived_role(self):
         _, roles = BRAND.tokens(self.root)
         self.assertIn('card-rest', roles)
+        self.assertEqual(54, len(roles))  # 53 authored tokens plus derived card-rest.
+        self.assertTrue(all(role['status'] == 'decided' for role in roles.values()))
         source = BRAND.generated(self.root)
         for role in roles:
             self.assertEqual(2, source.count(f'"{role}" to Color('))

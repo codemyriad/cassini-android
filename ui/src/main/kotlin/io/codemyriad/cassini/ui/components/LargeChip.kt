@@ -67,7 +67,7 @@ fun LargeChip(
             modifier = Modifier
                 .heightIn(min = 32.dp)
                 .clip(CassiniTheme.shapes.card)
-                .background(colors.bg)
+                .background(if (tone == Tone.Plain) CassiniTheme.colors.ink.copy(alpha = 0.1f) else colors.bg)
                 .then(if (onClick != null) Modifier.indication(interaction, ripple(color = colors.fg)) else Modifier)
                 .padding(horizontal = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -114,7 +114,7 @@ private fun OutlineChip(text: String, onClick: () -> Unit, modifier: Modifier, g
             modifier = Modifier
                 .heightIn(min = 32.dp)
                 .clip(shape)
-                .background(c.surface)
+                .background(c.ink.copy(alpha = 0.1f))
                 .border(1.dp, c.line2, shape)
                 .indication(interaction, ripple(color = c.ink))
                 .padding(start = if (leading) 10.dp else 12.dp, end = if (leading) 12.dp else 10.dp),

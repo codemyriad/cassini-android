@@ -100,4 +100,5 @@ data class DraftTranscript(
     val names: CheckpointNames,
     val doneMs: Long,
     val durationMs: Long,
+    val colourIndices: Map<String, Int> = emptyMap(),
 )

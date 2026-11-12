@@ -1,6 +1,7 @@
 package io.codemyriad.cassini.ui.voices
 
 import androidx.compose.runtime.Immutable
+import io.codemyriad.cassini.ui.theme.SpeakerTone
 import kotlinx.collections.immutable.ImmutableList
 
 /**
@@ -18,7 +19,7 @@ data class SavedVoicesUiState(
 
 /**
  * One saved voice: "14 notes · 22 min confirmed speech" from [notes] and [confirmedSeconds]; [stale] adds "Name them
- * again in a note to keep recognising them". The avatar tint follows the list position.
+ * again in a note to keep recognising them". The avatar tint follows its stored save-order slot.
  */
 @Immutable
 data class PersonUi(
@@ -27,6 +28,7 @@ data class PersonUi(
     val notes: Int,
     val confirmedSeconds: Long,
     val stale: Boolean = false,
+    val tone: SpeakerTone = SpeakerTone.One,
 )
 
 /** A Saved voices dialog. */

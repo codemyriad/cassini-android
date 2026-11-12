@@ -654,6 +654,8 @@ class TranscriptionJob(
                     target,
                     extensions,
                     recordedAtUtc = start,
+                    colourIndices = decoded.transcript.words.map { it.speaker }.distinct().withIndex()
+                        .associate { it.value to it.index },
                 )
             }
             env.syncFile(target) { sync(target) }

@@ -362,9 +362,16 @@ internal object BoardFixtures {
     val savedVoices = SavedVoicesUiState(
         people = persistentListOf(
             PersonUi(id = "giulia", name = "Giulia", notes = 14, confirmedSeconds = 22 * 60),
-            PersonUi(id = "paolo", name = "Paolo Ferri", notes = 6, confirmedSeconds = 9 * 60),
-            PersonUi(id = "anna", name = "Anna Ricci", notes = 3, confirmedSeconds = 4 * 60),
-            PersonUi(id = "luca", name = "Luca", notes = 2, confirmedSeconds = 60, stale = true),
+            PersonUi(tone = SpeakerTone.Two, id = "paolo", name = "Paolo Ferri", notes = 6, confirmedSeconds = 9 * 60),
+            PersonUi(tone = SpeakerTone.Three, id = "anna", name = "Anna Ricci", notes = 3, confirmedSeconds = 4 * 60),
+            PersonUi(
+                tone = SpeakerTone.Four,
+                id = "luca",
+                name = "Luca",
+                notes = 2,
+                confirmedSeconds = 60,
+                stale = true,
+            ),
         ),
     )
 

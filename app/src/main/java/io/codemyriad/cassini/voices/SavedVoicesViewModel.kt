@@ -4,8 +4,10 @@ import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.codemyriad.cassini.core.speakers.SpeakerTint
 import io.codemyriad.cassini.data.voices.SavedVoices
 import io.codemyriad.cassini.data.voices.VoiceEdit
+import io.codemyriad.cassini.note.NoteTranscripts
 import io.codemyriad.cassini.ui.voices.PersonUi
 import io.codemyriad.cassini.ui.voices.SavedVoicesDialog
 import io.codemyriad.cassini.ui.voices.SavedVoicesEvent
@@ -102,7 +104,14 @@ class SavedVoicesViewModel(
     private fun build(voices: SavedVoices?, menu: String?, dialog: String?): SavedVoicesUiState? {
         if (voices == null) return null
         val people = voices.voices.map { voice ->
-            PersonUi(voice.id, voice.name, voice.notes, voice.confirmedSeconds.toLong(), voice.stale)
+            PersonUi(
+                voice.id,
+                voice.name,
+                voice.notes,
+                voice.confirmedSeconds.toLong(),
+                voice.stale,
+                NoteTranscripts.tone(SpeakerTint.named(voice.voice.colourIndex ?: 0)),
+            )
         }
         val readOnly = voices.readOnly
         return SavedVoicesUiState(

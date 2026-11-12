@@ -45,12 +45,23 @@ class NoteTranscriptsTest {
         assertEquals(listOf("a", "b", "c", "a"), turns.map { it.speakerId })
         assertEquals(SpeakerNameUi.Named("Giulia"), turns[0].name)
         assertEquals(SpeakerNameUi.Placeholder(2, "Speaker 2"), turns[1].name)
-        // Placeholders are amber and take no slot: Giulia blue, Paolo teal.
-        val tones = listOf(SpeakerTone.One, SpeakerTone.Unnamed, SpeakerTone.Two, SpeakerTone.One)
+        // Unnamed hides slot 2; Paolo retains slot 3 before and after naming that speaker.
+        val tones = listOf(SpeakerTone.One, SpeakerTone.Unnamed, SpeakerTone.Three, SpeakerTone.One)
         assertEquals(tones, turns.map { it.tone })
         assertEquals("Hello everyone.", turnText(turns[0].words))
         assertEquals(500L, turns[0].words[1].startMs)
         assertEquals(listOf("a", "b", "c"), transcript.speakers)
+    }
+
+    @Test fun namingOrMergingDoesNotReassignOtherSpeakersStoredSlots() {
+        val named = speakers.map { if (it.speakerId == "b") it.copy(label = "Ben", isPlaceholder = false) else it }
+        val renamed = NoteTranscripts.sealed(words, named, emptyMap(), emptyList())
+        assertEquals(SpeakerTone.Two, renamed.speakerMetadata.getValue("b").tone)
+        assertEquals(SpeakerTone.Three, renamed.speakerMetadata.getValue("c").tone)
+        val merged = words.map { if (it.speaker == "a") it.copy(speaker = "b") else it }
+        val shown = NoteTranscripts.sealed(merged, named.reversed(), emptyMap(), emptyList())
+        assertEquals(SpeakerTone.Two, shown.speakerMetadata.getValue("b").tone)
+        assertEquals(SpeakerTone.Three, shown.speakerMetadata.getValue("c").tone)
     }
 
     @Test

@@ -6,7 +6,8 @@ import androidx.room.TypeConverters
 
 /**
  * The Room catalogue (docs/architecture.md, section 3.3), opened by absolute path at `AppPaths.database` through
- * [CassiniDatabaseOpener]. Version 2 adds the derived D95 recording time. Its explicit migration preserves authoritative
+ * [CassiniDatabaseOpener]. Version 2 adds the derived D95 recording time; version 3 adds the file-derived
+ * speaker colour slot. Its explicit migration preserves authoritative
  * rows and jobs, invalidating legacy document signatures for off-main startup re-derivation, with a MigrationTestHelper test.
  * Destructive fallback migrations are forbidden: a database that cannot be opened is set aside and the catalogue
  * is rebuilt from the files.
@@ -28,7 +29,15 @@ import androidx.room.TypeConverters
 @TypeConverters(Converters::class)
 abstract class CassiniDatabase : RoomDatabase() {
     companion object {
-        const val VERSION = 2
+        const val VERSION = 3
+
+        /** Colour is a file fact; refresh derived rows without touching authoritative notes or jobs. */
+        val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, VERSION) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE speakers ADD COLUMN colour_index INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("UPDATE notes SET document_signature = NULL WHERE audio_kind = 'DOCUMENT'")
+            }
+        }
 
         /** Preserve authoritative rows/jobs; old document-time caches must be derived again from the file. */
         val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {

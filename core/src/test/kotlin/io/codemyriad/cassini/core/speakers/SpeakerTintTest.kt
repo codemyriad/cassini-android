@@ -21,7 +21,7 @@ class SpeakerTintTest {
         )
     }
 
-    @Test fun placeholdersAreStoneAndTakeNoNamedSlot() {
+    @Test fun placeholdersHideTheirFirstSpeechSlotUntilNamed() {
         val labels = mapOf(
             "s1" to "Giulia",
             "s2" to "Speaker 2",
@@ -34,9 +34,9 @@ class SpeakerTintTest {
             mapOf(
                 "s1" to SpeakerTint.ONE,
                 "s2" to SpeakerTint.UNNAMED,
-                "s3" to SpeakerTint.TWO,
+                "s3" to SpeakerTint.THREE,
                 "s4" to SpeakerTint.UNNAMED,
-                "s5" to SpeakerTint.THREE,
+                "s5" to SpeakerTint.FIVE,
             ),
             tints,
         )
@@ -45,7 +45,7 @@ class SpeakerTintTest {
     @Test fun aSpeakerWithoutALabelIsAPlaceholder() {
         val tints = SpeakerTint.assign(listOf("s1", "s2"), mapOf("s2" to "Luca"))
         assertEquals(SpeakerTint.UNNAMED, tints["s1"])
-        assertEquals(SpeakerTint.ONE, tints["s2"])
+        assertEquals(SpeakerTint.TWO, tints["s2"])
     }
 
     @Test fun theOrderIsTheGivenFirstTurnOrder() {
@@ -59,5 +59,15 @@ class SpeakerTintTest {
         assertEquals(SpeakerTint.THREE, SpeakerTint.named(2))
         assertEquals(SpeakerTint.SIX, SpeakerTint.named(5))
         assertEquals(SpeakerTint.ONE, SpeakerTint.named(6))
+    }
+
+    @Test fun namingAndReorderingRevealStoredSlotsWithoutReassigningOtherSpeakers() {
+        val slots = mapOf("a" to 0, "b" to 1, "c" to 2, "g" to 6)
+        val before = SpeakerTint.assign(listOf("a", "b", "c", "g"), slots) { it == "b" }
+        val after = SpeakerTint.assign(listOf("g", "c", "b", "a"), slots) { false }
+        assertEquals(SpeakerTint.UNNAMED, before["b"])
+        assertEquals(SpeakerTint.TWO, after["b"])
+        for (id in listOf("a", "c", "g")) assertEquals(before[id], after[id])
+        assertEquals(SpeakerTint.ONE, after["g"])
     }
 }

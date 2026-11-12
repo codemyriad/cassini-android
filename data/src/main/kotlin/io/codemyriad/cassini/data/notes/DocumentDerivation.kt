@@ -111,12 +111,13 @@ internal object DocumentDerivation {
     private fun speakerRows(noteId: String, document: CassiniDocument, variantId: String, words: List<Word>): List<SpeakerEntity> =
         SpeakerStats.of(words, wordEndsBoundedByAudio(document)).values.map { stat ->
             val label = document.speakerLabel(stat.speakerId) ?: stat.speakerId
-            val placeholder = DefaultLabels.isDefault(stat.speakerId, label)
+            val placeholder = document.speakerProvenance(stat.speakerId) == "unnamed" || DefaultLabels.isDefault(stat.speakerId, label)
             SpeakerEntity(
                 noteId = noteId,
                 variantId = variantId,
                 speakerId = stat.speakerId,
                 ordinal = stat.ordinal,
+                colourIndex = document.speakerColourIndex(stat.speakerId) ?: stat.ordinal,
                 label = label,
                 isPlaceholder = placeholder,
                 placeholderNumber = if (placeholder) placeholderNumber(label) ?: (stat.ordinal + 1) else null,
