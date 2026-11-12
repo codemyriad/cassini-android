@@ -283,6 +283,31 @@ class DailyReleaseTests(unittest.TestCase):
         ]})
         self.assertFalse(api.green(SHA))  # Never fall back to an older green trusted run.
 
+    def test_latest_nightly_blocks_or_clears_an_older_push_for_the_same_main_sha(self):
+        api = object.__new__(DAILY.GitHub)
+        api.repo = 'codemyriad/cassini-android'
+        for status, conclusion, expected in [('completed', 'success', True), ('completed', 'failure', False),
+                                             ('in_progress', None, False), ('completed', 'cancelled', False)]:
+            with self.subTest(status=status, conclusion=conclusion):
+                api.request = Mock(return_value={'workflow_runs': [
+                    workflow_run(event='schedule', status=status, conclusion=conclusion),
+                    workflow_run(conclusion='failure' if expected else 'success'),
+                ]})
+                self.assertEqual(expected, api.green(SHA))
+                self.assertIn('branch=main&head_sha=' + SHA, api.request.call_args.args[0])
+
+    def test_scheduled_runs_require_same_repository_sha_and_main_branch(self):
+        api = object.__new__(DAILY.GitHub)
+        api.repo = 'codemyriad/cassini-android'
+        for trusted_green in (True, False):
+            for changed in ({'repo': 'attacker/cassini-android'}, {'sha': OLD}, {'branch': 'feature'}):
+                with self.subTest(trusted_green=trusted_green, changed=changed):
+                    api.request = Mock(return_value={'workflow_runs': [
+                        workflow_run(event='schedule', conclusion='failure' if trusted_green else 'success', **changed),
+                        workflow_run(conclusion='success' if trusted_green else 'failure'),
+                    ]})
+                    self.assertEqual(trusted_green, api.green(SHA))
+
     def test_foreign_push_at_the_same_sha_cannot_hide_red_main(self):
         api = object.__new__(DAILY.GitHub)
         api.repo = 'codemyriad/cassini-android'
@@ -314,6 +339,7 @@ class DailyReleaseTests(unittest.TestCase):
                 self.assertIn('event=push', path)
                 return {'workflow_runs': [
                     workflow_run(branch=tag, event='pull_request', identifier=1),
+                    workflow_run(branch=tag, event='schedule', identifier=4),
                     workflow_run(branch=tag, repo='attacker/cassini-android', identifier=2),
                     workflow_run(branch=tag, identifier=3),
                 ]}

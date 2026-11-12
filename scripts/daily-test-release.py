@@ -56,7 +56,7 @@ class GitHub:
             path += f'&event={event}'
         for run in self.pages(path, 'workflow_runs'):
             repository = (run.get('head_repository') or {}).get('full_name')
-            allowed = {event} if event else {'push', 'workflow_dispatch'}
+            allowed = {event} if event else {'push', 'workflow_dispatch', 'schedule'}
             if (repository == self.repo and run.get('event') in allowed and
                     run.get('head_sha') == sha and run.get('head_branch') == branch):
                 yield run
