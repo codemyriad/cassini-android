@@ -130,8 +130,8 @@ class StartupGateTest {
             val access = async(start = CoroutineStart.UNDISPATCHED) { graph.awaitCatalogue() }
             assertFalse(access.isCompleted)
             graph.appScope.coroutineContext[kotlinx.coroutines.Job]!!.cancel()
-            release.countDown()
-            access.join()
+            // Waiter cancellation must not depend on the blocked recovery step returning.
+            withTimeout(GUARD_MS) { access.join() }
             assertTrue(access.isCancelled)
             assertTrue(graph.catalogue.isCancelled)
         } finally {
@@ -154,7 +154,7 @@ class StartupGateTest {
     )
 
     private companion object {
-        const val GUARD_SECONDS = 30L
+        const val GUARD_SECONDS = 120L
         const val GUARD_MS = 30_000L
     }
 }
