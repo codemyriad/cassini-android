@@ -136,6 +136,12 @@ class DailyReleaseTests(unittest.TestCase):
                 self.assertFalse(DAILY.plan(api, SHA, SOURCE, 42)['build'])
                 self.assertEqual([], api.posts)
 
+    def test_expanded_github_body_is_checked_before_reserving_a_build(self):
+        api = API()
+        with patch.object(DAILY, 'notes', return_value='<' * 20_000), self.assertRaises(ValueError):
+            DAILY.plan(api, SHA, SOURCE, 42)
+        self.assertEqual([], api.posts)
+
     def test_plan_separates_user_copy_from_developer_titles(self):
         with patch.object(DAILY, 'notes', return_value='- Refactor CI for D95 (#123)'):
             value = DAILY.plan(API(), SHA, SOURCE, 42)

@@ -96,8 +96,11 @@ def store_notes(text: str) -> str:
 
 
 def release_body(user: str, developer: str) -> str:
-    return (store_notes(user) + '\n\n<details>\n<summary>Developer changelog</summary>\n\n' +
+    body = (store_notes(user) + '\n\n<details>\n<summary>Developer changelog</summary>\n\n' +
             html.escape(developer, quote=False).strip() + '\n\n</details>\n')
+    if len(body.encode('utf-8')) > 60_000:
+        raise ValueError('Complete GitHub notes exceed the release plan limit')
+    return body
 
 
 def curated(root: Path, version: str) -> str:

@@ -193,6 +193,7 @@ def plan(api: GitHub, sha: str, text: str, run_id: int) -> dict:
     name, code = next_version(source_name, code_floor, reservations, released)
     developer = notes(api, baseline, sha)
     body = user_notes(baseline)
+    release_notes.release_body(body, developer)  # Validate both destinations before reserving a build.
     if api.request('commits/main')['sha'] != sha or not api.green(sha):
         return {'build': False, 'reason': 'main or its CI changed while planning'}
     payload = {'schema': 1, 'version_name': name, 'version_code': code, 'run_id': run_id}
