@@ -84,6 +84,15 @@ class StatusBadgeVectorTest {
         }
     }
 
+    @Test fun invalidNegativeEtaDoesNotPromiseLessThanAMinute() {
+        rule.setContent {
+            CassiniTheme {
+                StatusChip(statusBadgeText(StatusBadgeKind.Transcribing, minutes = -1), StatusBadgeKind.Transcribing)
+            }
+        }
+        rule.onNodeWithText("Transcribing…").assertExists()
+    }
+
     private data class Sample(val kind: StatusBadgeKind, val liveMs: Long, val minutes: Long?)
 
     private fun kind(name: String): StatusBadgeKind = when (name) {
