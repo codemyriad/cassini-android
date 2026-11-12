@@ -20,9 +20,14 @@ shots = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(shots)
 
 
-def validate_manifest(rows):
+def validate_manifest(rows, expected_files=None):
     paths = {r["path"] for r in rows}
-    assert len(paths) == len(rows) and paths == {p.relative_to(GOLDENS).as_posix() for p in GOLDENS.rglob("*.png")}
+    expected_files = (
+        expected_files
+        if expected_files is not None
+        else {p.relative_to(GOLDENS).as_posix() for p in GOLDENS.rglob("*.png")}
+    )
+    assert len(paths) == len(rows) and paths == expected_files
     groups = {}
     for row in rows:
         path = row["path"]
@@ -67,6 +72,9 @@ class ScreenshotContract(unittest.TestCase):
                 validate_manifest(rows)
         with self.assertRaises(AssertionError):
             validate_manifest([r for r in rows if r["path"] != "dark/00-library.png"])
+        remaining = [r for r in rows if r["path"] != "dark/00-library.png"]
+        with self.assertRaises(AssertionError):
+            validate_manifest(remaining, {r["path"] for r in remaining})
         altered = [dict(r) for r in rows]
         next(r for r in altered if r["path"] == "dark/00-library.png")["scheme"] = "light"
         with self.assertRaises(AssertionError):
@@ -104,6 +112,7 @@ class ScreenshotContract(unittest.TestCase):
                         folder,
                     ],
                     cwd=root,
+                    timeout=30,
                     check=True,
                     capture_output=True,
                 )
