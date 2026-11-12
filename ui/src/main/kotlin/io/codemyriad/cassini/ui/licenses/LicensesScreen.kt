@@ -126,17 +126,15 @@ private fun LicenseTextPane(open: LicenseText, onEvent: (LicensesEvent) -> Unit,
 private fun paragraphs(text: String): List<String> =
     text.split(Regex("\n\\s*\n")).map(String::trim).filter(String::isNotEmpty)
 
-/** The licence texts (GPLv3, the font licences) are set in mono; the notices and the privacy text in body type. */
+/** The licence texts (GPLv3) are set in the system text face; the notices and the privacy text in body type. */
 private fun LicenseEntry.isLicenceText(): Boolean =
-    this == LicenseEntry.CASSINI || this == LicenseEntry.INSTRUMENT_SANS || this == LicenseEntry.PLEX_MONO
+    this == LicenseEntry.CASSINI
 
 @Composable
 private fun LicenseEntry.title(): String = when (this) {
     LicenseEntry.CASSINI -> stringResource(R.string.ui_brand)
     LicenseEntry.THIRD_PARTY -> stringResource(R.string.ui_licenses_third_party)
     LicenseEntry.NATIVE -> stringResource(R.string.ui_licenses_native)
-    LicenseEntry.INSTRUMENT_SANS -> stringResource(R.string.ui_font_instrument_sans)
-    LicenseEntry.PLEX_MONO -> stringResource(R.string.ui_font_plex_mono)
     LicenseEntry.MODELS -> stringResource(R.string.ui_licenses_models)
     LicenseEntry.MODEL_SOURCES -> stringResource(R.string.ui_licenses_sources)
     LicenseEntry.PRIVACY -> stringResource(R.string.ui_licenses_privacy)
@@ -148,7 +146,6 @@ private fun LicenseEntry.subtitle(): String = when (this) {
     LicenseEntry.CASSINI -> stringResource(R.string.ui_licence_gpl)
     LicenseEntry.THIRD_PARTY -> stringResource(R.string.ui_licenses_third_party_body)
     LicenseEntry.NATIVE -> stringResource(R.string.ui_licenses_native_body)
-    LicenseEntry.INSTRUMENT_SANS, LicenseEntry.PLEX_MONO -> stringResource(R.string.ui_licence_ofl)
     LicenseEntry.MODELS -> stringResource(R.string.ui_licenses_models_body)
     LicenseEntry.MODEL_SOURCES -> stringResource(R.string.ui_licenses_sources_body)
     LicenseEntry.PRIVACY -> stringResource(R.string.ui_licenses_privacy_body)

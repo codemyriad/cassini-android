@@ -69,16 +69,16 @@ fun RecordFab(onClick: () -> Unit, modifier: Modifier = Modifier, recordingElaps
                 shape,
                 Shadow(
                     radius = RecordShadow.radius,
-                    color = c.red,
+                    color = c.record,
                     offset = DpOffset(0.dp, RecordShadow.offsetY),
                     alpha = RecordShadow.ALPHA,
                 ),
             )
             .clip(shape)
-            .background(c.red)
+            .background(c.record)
             .clickable(
                 interactionSource = null,
-                indication = ripple(color = c.onRed),
+                indication = ripple(color = c.onRecord),
                 role = Role.Button,
                 onClick = onClick,
             )
@@ -91,7 +91,7 @@ fun RecordFab(onClick: () -> Unit, modifier: Modifier = Modifier, recordingElaps
         Text(
             text = label,
             style = CassiniTheme.type.fab,
-            color = c.onRed,
+            color = c.onRecord,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
@@ -115,7 +115,7 @@ private fun FabDot(live: Boolean) {
         Modifier
             .size(18.dp)
             .clip(CircleShape)
-            .background(c.onRed),
+            .background(c.onRecord),
         contentAlignment = Alignment.Center,
     ) {
         if (live) {
@@ -123,7 +123,7 @@ private fun FabDot(live: Boolean) {
                 Modifier
                     .size(8.dp)
                     .clip(CircleShape)
-                    .background(c.red),
+                    .background(c.record),
             )
         }
     }

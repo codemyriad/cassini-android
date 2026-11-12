@@ -98,8 +98,6 @@ class LicensesViewModelTest {
             assertTrue("native: $name", name in native)
         }
         assertFalse("the diarizer licence is a model notice", "OpenMDW" in native)
-        assertTrue("Instrument Sans", "SIL OPEN FONT LICENSE" in texts.text(LicenseEntry.INSTRUMENT_SANS).uppercase())
-        assertTrue("Plex Mono", "SIL OPEN FONT LICENSE" in texts.text(LicenseEntry.PLEX_MONO).uppercase())
         val models = texts.text(LicenseEntry.MODELS)
         assertTrue(models.startsWith("Downloaded models and local test fixtures\n"))
         assertTrue("nemotron-3-diarization/OpenMDW-1.1.txt" in models)

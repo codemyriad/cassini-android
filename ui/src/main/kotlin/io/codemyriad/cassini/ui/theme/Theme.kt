@@ -64,8 +64,6 @@ object CassiniTheme {
         get() = CassiniSpacing
 }
 
-private val White = Color(0xFFFFFFFF)
-
 /**
  * The Material roles of docs/design/ui.md section 4.2, the same mapping for both sets. In light, the on-colours of
  * teal, amber and redInk are white as written there. In dark those fills are light colours, so their on-colour is
@@ -73,7 +71,7 @@ private val White = Color(0xFFFFFFFF)
  * the values of ui.md (#9DB4FF, #14171A on #F2F3F5 in light; #ECEEF1 and #14171A in dark).
  */
 internal fun CassiniColors.toColorScheme(): ColorScheme {
-    val onStrong = if (isDark) bg else White
+    val onStrong = if (isDark) bg else onAccentFill
     val base = if (isDark) darkColorScheme() else lightColorScheme()
     return base.copy(
         primary = accentFill,

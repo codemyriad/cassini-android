@@ -77,7 +77,7 @@ fun NoteRow(row: NoteRowUi, day: DayLabel, onAction: (NoteRowAction) -> Unit, mo
         row.preview?.text,
     ).joinToString(", ")
     val actions = customActions(row, onAction)
-    val match = SpanStyle(fontWeight = FontWeight.W600, color = c.ink, background = c.accentTint)
+    val match = SpanStyle(fontWeight = FontWeight.W600, color = c.highlightInk, background = c.highlight)
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -103,13 +103,13 @@ fun NoteRow(row: NoteRowUi, day: DayLabel, onAction: (NoteRowAction) -> Unit, mo
             EllipsisText(
                 text = Highlighted(row.title, row.titleRanges).toAnnotatedString(match),
                 modifier = Modifier.weight(1f),
-                style = t.rowTitle,
+                style = t.meetingTitle,
                 color = c.ink,
                 maxLines = 2,
             )
             Text(
                 text = Durations.clock(row.durationMs),
-                style = t.monoTime.copy(lineHeight = t.rowTitle.lineHeight),
+                style = t.monoTime.copy(lineHeight = t.meetingTitle.lineHeight),
                 color = c.text2,
             )
         }

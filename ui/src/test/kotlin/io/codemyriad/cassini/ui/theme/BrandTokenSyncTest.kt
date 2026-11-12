@@ -3,7 +3,6 @@ package io.codemyriad.cassini.ui.theme
 import androidx.compose.ui.graphics.Color
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertSame
 import org.junit.Test
 import java.security.MessageDigest
 import kotlin.math.roundToInt
@@ -61,8 +60,8 @@ class BrandTokenSyncTest {
         }
     }
 
-    @Test fun plumbingLeavesTheActivePaletteUnchanged() {
-        assertSame(LegacyLightColors, LightColors)
-        assertSame(LegacyDarkColors, DarkColors)
+    @Test fun previewUsesTheCheckedCanvasPalette() {
+        assertEquals(BrandTokenValues.light, LightColors.brand)
+        assertEquals(BrandTokenValues.dark, DarkColors.brand)
     }
 }

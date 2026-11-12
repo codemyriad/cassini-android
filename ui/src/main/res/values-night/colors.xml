@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- The dark bg token (docs/design/ui.md section 4.1). -->
-    <color name="ui_window_bg">#0F1214</color>
+    <color name="ui_window_bg">@color/ui_brand_ground</color>
     <!-- The dark ink token. -->
-    <color name="ui_logo_ink" tools:ignore="UnusedResources">#ECEEF1</color>
+    <color name="ui_logo_ink" tools:ignore="UnusedResources">@color/ui_brand_ink</color>
 </resources>

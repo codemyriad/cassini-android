@@ -37,8 +37,6 @@
     <string name="ui_models_int8_size" translatable="false">INT8 · %1$s</string>
     <string name="ui_licence_gpl" translatable="false">GNU General Public License v3</string>
     <string name="ui_licence_ofl" translatable="false">SIL Open Font License 1.1</string>
-    <string name="ui_font_instrument_sans" translatable="false">Instrument Sans</string>
-    <string name="ui_font_plex_mono" translatable="false">IBM Plex Mono</string>
 
     <!-- Units (D50: French writes Mo and Go, and French and Spanish put a space before %). -->
     <string name="ui_percent">%1$d%%</string>

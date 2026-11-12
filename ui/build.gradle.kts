@@ -11,9 +11,6 @@ plugins {
     alias(libs.plugins.roborazzi)
 }
 
-// FontAssetsTest reads the font manifest in third_party/fonts and scans every module's src for web fonts.
-val fontManifestDir = rootProject.layout.projectDirectory.dir("third_party/fonts")
-
 /**
  * Passes the repository root to FontAssetsTest. The root's absolute path is not an input, so the task stays
  * relocatable and shares cache entries between checkouts. The web fonts the test looks for are an input: adding one
@@ -34,6 +31,9 @@ abstract class GenerateBrandTokens : DefaultTask() {
 
     @get:OutputDirectory
     abstract val output: DirectoryProperty
+
+    @get:OutputDirectory
+    abstract val resources: DirectoryProperty
 
     @TaskAction fun generate() {
         val document = JsonSlurper().parse(tokenFile.get().asFile) as Map<*, *>
@@ -61,12 +61,23 @@ abstract class GenerateBrandTokens : DefaultTask() {
         val target = output.file("io/codemyriad/cassini/ui/theme/BrandTokenValues.kt").get().asFile
         target.parentFile.mkdirs()
         target.writeText(source)
+        for (mode in listOf("light", "dark")) {
+            val qualifier = if (mode == "dark") "values-night" else "values"
+            val colors = listOf("ground", "ink").joinToString("\n") { name ->
+                val value = checkNotNull((tokens[name] as Map<*, *>)[mode])
+                "    <color name=\"ui_brand_${name}\">$value</color>"
+            }
+            val xml = resources.file("$qualifier/brand.xml").get().asFile
+            xml.parentFile.mkdirs()
+            xml.writeText("<resources>\n$colors\n</resources>\n")
+        }
     }
 }
 
 val generateBrandTokens = tasks.register<GenerateBrandTokens>("generateBrandTokens") {
     tokenFile.set(layout.projectDirectory.file("src/main/resources/brand/tokens.json"))
     output.set(layout.buildDirectory.dir("generated/brand-tokens/kotlin"))
+    resources.set(layout.buildDirectory.dir("generated/brand-tokens/res"))
 }
 
 val webFontPatterns = PatternSet().apply {
@@ -110,9 +121,6 @@ android {
                     .withPropertyName("screenshotGoldens")
                     .withPathSensitivity(PathSensitivity.RELATIVE)
                 it.jvmArgumentProviders.add(RepoRootArgument(rootDir, webFonts))
-                it.inputs.dir(fontManifestDir)
-                    .withPropertyName("fontManifest")
-                    .withPathSensitivity(PathSensitivity.RELATIVE)
                 it.inputs.dir(designMarkupDir)
                     .withPropertyName("designMarkup")
                     .withPathSensitivity(PathSensitivity.RELATIVE)
@@ -167,7 +175,7 @@ dependencies {
     testImplementation(libs.roborazzi)
     testImplementation(libs.roborazzi.compose)
     testImplementation(libs.roborazzi.junit.rule)
-    // FontAssetsTest parses third_party/fonts/fonts.json on the plain JVM, where android.jar has only stubs.
+    // The token-sync test parses the pinned JSON on the plain JVM, where android.jar has only stubs.
     testImplementation(libs.org.json)
 }
 
@@ -176,4 +184,5 @@ tasks.named("preBuild") { dependsOn(generateBrandTokens) }
 
 androidComponents.onVariants { variant ->
     variant.sources.java?.addGeneratedSourceDirectory(generateBrandTokens, GenerateBrandTokens::output)
+    variant.sources.res?.addGeneratedSourceDirectory(generateBrandTokens, GenerateBrandTokens::resources)
 }

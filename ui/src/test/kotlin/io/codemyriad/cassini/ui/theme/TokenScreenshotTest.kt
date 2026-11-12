@@ -250,6 +250,15 @@ class TokenScreenshotTest : BoardTest() {
             "snackbarAction" to c.snackbarAction,
             "scrim" to c.scrim,
             "link" to c.link,
+            "highlight" to c.highlight,
+            "highlightInk" to c.highlightInk,
+            "record" to c.record,
+            "onRecord" to c.onRecord,
+            "error" to c.error,
+            "neutralInk" to c.neutralInk,
+            "neutralTint" to c.neutralTint,
+            "raised" to c.raised,
+
         )
 
         fun recordingPalette(r: RecordingColors): List<Pair<String, Color>> = listOf(
@@ -279,6 +288,7 @@ class TokenScreenshotTest : BoardTest() {
             "field" to t.field,
             "fab" to t.fab,
             "rowTitle" to t.rowTitle,
+            "meetingTitle" to t.meetingTitle,
             "body16" to t.body16,
             "heroBody" to t.heroBody,
             "draft" to t.draft,

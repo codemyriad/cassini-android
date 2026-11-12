@@ -89,7 +89,16 @@ class CassiniColors(
     val link: Color,
     /** Canonical decided/placeholder roles; null until the W1 look preview activates them. */
     internal val brand: Map<String, Color>? = null,
-)
+) {
+    val highlight: Color get() = brand?.getValue("highlight") ?: accentTint
+    val highlightInk: Color get() = brand?.getValue("highlight-ink") ?: ink
+    val record: Color get() = brand?.getValue("record") ?: red
+    val onRecord: Color get() = brand?.getValue("on-record") ?: onRed
+    val error: Color get() = brand?.getValue("error") ?: redInk
+    val neutralInk: Color get() = brand?.getValue("neutral-ink") ?: ink
+    val neutralTint: Color get() = brand?.getValue("neutral-tint") ?: surface
+    val raised: Color get() = brand?.getValue("raised") ?: surface
+}
 
 /** The light set (the boards). */
 internal val LegacyLightColors: CassiniColors = CassiniColors(
@@ -187,10 +196,7 @@ internal val LegacyDarkColors: CassiniColors = CassiniColors(
     link = Color(0xFF8FA6FF),
 )
 
-// W1.1 is plumbing only: the canvas mapping is checked but the active palette stays pixel-identical.
-val LightColors: CassiniColors = LegacyLightColors
-val DarkColors: CassiniColors = LegacyDarkColors
-
+// W1 look preview: activate the pinned canvas mapping; legacy values remain only for open roles.
 // Source: codemyriad/cassini-ux@e4ae2217312370250a39ad83e047a186048e0a9e, brand/tokens.json.
 // Android-only secondary roles alias published tokens; L-14/L-17 speaker hues remain frozen below.
 internal val CanvasRoleTokens = mapOf(
@@ -284,6 +290,9 @@ internal fun canvasColors(dark: Boolean): CassiniColors {
         brand = values,
     )
 }
+
+val LightColors: CassiniColors = canvasColors(dark = false)
+val DarkColors: CassiniColors = canvasColors(dark = true)
 
 /** Provided by `CassiniTheme`; the default is the light set so a bare preview still renders. */
 val LocalCassiniColors = staticCompositionLocalOf { LightColors }

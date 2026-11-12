@@ -30,8 +30,6 @@ class LicenseTexts(private val read: (String) -> String, private val list: (Stri
         LicenseEntry.CASSINI -> read("$ROOT/Cassini-GPL-3.0.txt")
         LicenseEntry.THIRD_PARTY -> join(listOf(read(NOTICES)) + otherDirectories().flatMap(::files))
         LicenseEntry.NATIVE -> native()
-        LicenseEntry.INSTRUMENT_SANS -> read("$ROOT/fonts/InstrumentSans-OFL.txt")
-        LicenseEntry.PLEX_MONO -> read("$ROOT/fonts/IBMPlexMono-OFL.txt")
         LicenseEntry.MODELS -> join(listOf(section(read(NOTICES), MODELS_HEADING)) + MODEL_DIRECTORIES.flatMap(::files))
         LicenseEntry.MODEL_SOURCES -> join(listOf(section(read(PRIVACY), NETWORK_HEADING)) + downloads())
         LicenseEntry.PRIVACY -> read(PRIVACY)

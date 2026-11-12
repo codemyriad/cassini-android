@@ -1,5 +1,5 @@
-W1.1 plumbing keeps LegacyLightColors/LegacyDarkColors active. No rendered value changes.
-Color.kt owns CanvasRoleTokens and canvasColors; the separate W1 look-preview PR activates them.
+The W1 draft look preview activates canvasColors in both modes.
+Color.kt owns CanvasRoleTokens and canvasColors; the look-preview PR remains draft for visual approval.
 Values come from tokens.json through the Android build's GenerateBrandTokens task, not copied hex constants.
 The sync test checks the vendored SHA and every decided/placeholder role in light and dark.
 
