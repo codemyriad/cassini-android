@@ -189,7 +189,7 @@ All sizes are in sp, and they change with the system font size. Fixed heights be
 - More radii in dp: 14 (rows, inputs, inner groups of sheets, suggestion card, snackbar, confirm box, menus), 16 (banners, settings groups, trash cards, Library banner, 32 dp chips), 18 (Saved voices list), 20 (progress card), 28 (top corners of sheets, dialogs).
 - M3 `Shapes(extraSmall 4, small 8, medium 14, large 16, extraLarge 28)`.
 - Spacing: `gutter` 16 dp (cards and fields from the edge), `textGutter` 20 dp (section headers, transcript, intros), `listInset` 12 + `rowPad` 10 (Library rows) and `topBarPad` 8. Section 6 gives the other values for each component.
-- Flat design with 1 dp `line` borders. The only shadow is on the Record button: `dropShadow(pill, Shadow(radius 18 dp, color red, alpha 0.28, offset 0/6 dp))`. Sheets, dialogs, menus and the snackbar have no shadow.
+- Flat design with 1 dp `line` borders. The only shadow is on the Record button: `dropShadow(pill, Shadow(radius 18 dp, color red, alpha 0.30, offset 0/6 dp))`. Sheets, dialogs, menus and the snackbar have no shadow.
 
 ### 4.5 Icons
 
@@ -336,12 +336,12 @@ All buttons are pills, with no elevation, a clipped ripple and `Role.Button`. A 
 
 ### `LibraryBottomBar`
 
-- At the bottom. Padding: horizontal 16, top 40, bottom 24 + the navigation-bar inset.
+- At the bottom. Padding: horizontal 16, top 28, bottom 24 + the navigation-bar inset.
 - `verticalGradient(0 → bg@0, 0.4 → bg)`.
-- Import at the left and **`RecordFab`** at the right.
-- `RecordFab`: height 64, radius 32, padding 22/26, red, gap 10, an 18 dp white circle, "Record" in `fab` white, and the drop shadow. The description is "Record a new note".
+- Import at the left (40 dp visual, 48 dp touch target) and **`RecordFab`** at the right.
+- `RecordFab`: minimum height 56, fully rounded, padding 24, red, gap 10, a 12 dp white circle, "Record" in `fab` white, and the drop shadow. The description is "Record a new note".
 - The recording variant of `RecordFab`: "Recording · 24:07" with the live dot. The description is "Return to recording".
-- The list gets `contentPadding(bottom = 128 dp + navigation bars)`.
+- The list gets `contentPadding(bottom = measured bar height)`, at least 108 dp + navigation bars.
 
 ### `SegmentedControl`
 
@@ -889,3 +889,5 @@ The table gives the key Italian copy. The implementer writes the other strings i
 | Dismiss | Chiudi |
 | Forget everyone… | Dimentica tutti… |
 | About | Informazioni |
+
+W3.10 bottom-bar preview metrics, state boundaries and accessibility adaptations are in [w3-bottom-bar-preview.md](w3-bottom-bar-preview.md).

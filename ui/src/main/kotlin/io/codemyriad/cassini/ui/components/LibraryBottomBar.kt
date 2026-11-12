@@ -6,6 +6,9 @@ package io.codemyriad.cassini.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -20,14 +23,20 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
-import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.dropShadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -49,8 +58,8 @@ import io.codemyriad.cassini.ui.theme.Glyph
 import io.codemyriad.cassini.ui.theme.RecordShadow
 
 /**
- * The Record button (board 00): 64 dp high, radius 32, padding 22/26, red with the red drop shadow, gap 10, an
- * 18 dp white circle and "Record" (`fab`, white); described "Record a new note". While a recording runs
+ * The canvas Record button: 56 dp high, pill shape, padding 24, red with the red drop shadow, gap 10, a
+ * 12 dp white circle and "Record" (`fab`, white); described "Record a new note". While a recording runs
  * ([recordingElapsedMs] set) it reads "Recording · 24:07" with a live dot inside the circle and is described
  * "Return to recording".
  */
@@ -60,14 +69,27 @@ fun RecordFab(onClick: () -> Unit, modifier: Modifier = Modifier, recordingElaps
     val shape = CassiniTheme.shapes.pill
     val label = recordLabel(recordingElapsedMs)
     val live = recordingElapsedMs != null
-    val background = if (live) c.recordTint else c.record
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val focused by interaction.collectIsFocusedAsState()
+    val rest = if (live) c.recordTint else c.record
+    val background = if (pressed) {
+        // The canvas's 16% black overlay, derived from the current token without a second authored colour.
+        rest.copy(
+            red = rest.red * PRESSED_FACTOR,
+            green = rest.green * PRESSED_FACTOR,
+            blue = rest.blue * PRESSED_FACTOR,
+        )
+    } else {
+        rest
+    }
     val foreground = if (live) c.recordInk else c.onRecord
     val description = stringResource(
         if (recordingElapsedMs == null) R.string.ui_library_record_description else R.string.ui_library_return_to_recording,
     )
     Row(
         modifier = modifier
-            .heightIn(min = 64.dp)
+            .heightIn(min = LibraryActionBarMetrics.recordHeight)
             .dropShadow(
                 shape,
                 Shadow(
@@ -77,16 +99,17 @@ fun RecordFab(onClick: () -> Unit, modifier: Modifier = Modifier, recordingElaps
                     alpha = RecordShadow.ALPHA,
                 ),
             )
+            .recordFocusRing(focused, c.accent)
             .clip(shape)
             .background(background)
             .clickable(
-                interactionSource = null,
-                indication = ripple(color = foreground),
+                interactionSource = interaction,
+                indication = null,
                 role = Role.Button,
                 onClick = onClick,
             )
             .clearAndSetSemantics { contentDescription = description }
-            .padding(start = 22.dp, end = 26.dp),
+            .padding(horizontal = RecordHorizontalPadding),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -101,6 +124,19 @@ fun RecordFab(onClick: () -> Unit, modifier: Modifier = Modifier, recordingElaps
     }
 }
 
+private fun Modifier.recordFocusRing(focused: Boolean, color: Color): Modifier = drawBehind {
+    if (focused) {
+        val outset = FocusOutset.toPx()
+        drawRoundRect(
+            color,
+            topLeft = Offset(-outset, -outset),
+            size = Size(size.width + outset * 2, size.height + outset * 2),
+            cornerRadius = CornerRadius(size.height / 2 + outset),
+            style = Stroke(FocusStroke.toPx()),
+        )
+    }
+}
+
 /** "Record", or "Recording · 24:07" while a recording runs. */
 @Composable
 private fun recordLabel(recordingElapsedMs: Long?): String =
@@ -110,13 +146,13 @@ private fun recordLabel(recordingElapsedMs: Long?): String =
         stringResource(R.string.ui_library_recording_fab, Durations.clock(recordingElapsedMs))
     }
 
-/** The Record button's 18 dp white circle; while a recording runs ([live]) it holds an 8 dp red dot. */
+/** The Record button's 12 dp white circle; while a recording runs ([live]) it holds an 8 dp red dot. */
 @Composable
 private fun FabDot(live: Boolean) {
     val c = CassiniTheme.colors
     Box(
         Modifier
-            .size(18.dp)
+            .size(RecordDotSize)
             .clip(CircleShape)
             .background(c.onRecord),
         contentAlignment = Alignment.Center,
@@ -151,8 +187,8 @@ private fun ImportIconButton(description: String, onClick: () -> Unit) {
 
 /**
  * The Library bottom bar: Import (left) and [RecordFab] (right) over a gradient from transparent bg to bg at 40 %;
- * padding 16 horizontal, top 40, bottom 24 plus the navigation bar inset. The list gives itself a bottom content
- * padding of 128 dp plus the navigation bars.
+ * padding 16 horizontal, top 28, bottom 24 plus the navigation bar inset. The list gives itself a bottom content
+ * padding of at least 108 dp plus the navigation bars.
  *
  * When "Import audio" and the Record button do not both fit at their full width (while a recording runs, no board,
  * "Recording · 24:07" never fits at 390 dp; at large font scales "Record" does not either), Import becomes a 52 dp
@@ -176,7 +212,12 @@ fun LibraryBottomBar(
             .fillMaxWidth()
             .background(Brush.verticalGradient(0f to bg.copy(alpha = 0f), 0.4f to bg))
             .navigationBarsPadding()
-            .padding(start = 16.dp, end = 16.dp, top = 40.dp, bottom = 24.dp),
+            .padding(
+                start = 16.dp,
+                end = 16.dp,
+                top = LibraryActionBarMetrics.topPadding,
+                bottom = LibraryActionBarMetrics.bottomPadding,
+            ),
     ) {
         val density = LocalDensity.current
         val recording = recordingElapsedMs != null
@@ -184,7 +225,7 @@ fun LibraryBottomBar(
             if (recording) {
                 false
             } else {
-                val importText = measurer.measure(importLabel, t.button, maxLines = 1).size.width
+                val importText = measurer.measure(importLabel, t.label14, maxLines = 1).size.width
                 val recordText = measurer.measure(recordLabel, t.fab, maxLines = 1).size.width
                 with(density) { (importText + recordText).toDp() } + ImportChrome + BarGap + RecordChrome <= maxWidth
             }
@@ -198,7 +239,7 @@ fun LibraryBottomBar(
                 SecondaryButton(
                     text = importLabel,
                     onClick = onImport,
-                    size = SecondaryButtonSize.Large,
+                    size = SecondaryButtonSize.Medium,
                     glyph = Glyph.Import,
                 )
             } else {
@@ -214,11 +255,11 @@ fun LibraryBottomBar(
     }
 }
 
-/** "Import audio" without its label: padding 20 + 20, the 20 dp icon and the 8 dp gap. */
-private val ImportChrome = 68.dp
+/** "Import audio" without its label: padding 16 + 16, the 20 dp icon and the 8 dp gap. */
+private val ImportChrome = 60.dp
 
-/** The Record button without its label: padding 22 + 26, the 18 dp circle and the 10 dp gap. */
-private val RecordChrome = 76.dp
+/** The Record button without its label: padding 24 + 24, the 12 dp circle and the 10 dp gap. */
+private val RecordChrome = 70.dp
 
 /** The least space between Import and Record. */
 private val BarGap = 8.dp
@@ -233,3 +274,17 @@ internal fun LibraryBottomBarPreview() {
         }
     }
 }
+
+/** Canvas W3.10 metrics; the Library and snackbar use the same measured/fallback geometry. */
+internal object LibraryActionBarMetrics {
+    val recordHeight = 56.dp
+    val topPadding = 28.dp
+    val bottomPadding = 24.dp
+    val minimumHeight = topPadding + recordHeight + bottomPadding
+}
+
+private val RecordDotSize = 12.dp
+private val RecordHorizontalPadding = 24.dp
+private val FocusStroke = 2.dp
+private val FocusOutset = 3.dp // 2 dp gap plus half the stroke.
+private const val PRESSED_FACTOR = 0.84f

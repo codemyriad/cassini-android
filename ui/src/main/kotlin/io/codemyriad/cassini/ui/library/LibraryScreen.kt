@@ -42,6 +42,7 @@ import io.codemyriad.cassini.ui.R
 import io.codemyriad.cassini.ui.components.Banner
 import io.codemyriad.cassini.ui.components.CassiniSnackbarHost
 import io.codemyriad.cassini.ui.components.DayHeader
+import io.codemyriad.cassini.ui.components.LibraryActionBarMetrics
 import io.codemyriad.cassini.ui.components.LibraryBottomBar
 import io.codemyriad.cassini.ui.components.LibraryTopBar
 import io.codemyriad.cassini.ui.components.NoteRow
@@ -59,10 +60,10 @@ import io.codemyriad.cassini.ui.theme.CassiniTheme
  * measured. The bar grows when the Record label wraps (large font scales, a recording), and the list then uses the
  * measured height.
  */
-private val BottomBarHeight = 128.dp
+private val BottomBarHeight = LibraryActionBarMetrics.minimumHeight
 
 /** The bar's top padding: the snackbar sits 24 dp above the Record button, so the bar's height less this. */
-private val BarTopPadding = 40.dp
+private val BarTopPadding = LibraryActionBarMetrics.topPadding
 
 /**
  * The Library (board 00, features.md section 1; ui.md section 8). A `Box` on bg holds one `LazyColumn`: the header,

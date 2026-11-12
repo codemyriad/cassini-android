@@ -247,5 +247,7 @@
   {"screen": "variants-voices-under-a-minute", "label": "Variants voices under a minute", "scheme": "light", "lang": "en", "device": "phone", "path": "variants/voices-under-a-minute.png", "single_scheme_reason": "Legacy light-only coverage (ANDROID-SCR-03)"},
   {"screen": "wide-library", "label": "Wide library", "scheme": "light", "lang": "en", "device": "phone", "path": "wide/00-library.png", "single_scheme_reason": "Legacy light-only coverage (ANDROID-SCR-03)"},
   {"screen": "wide-recording", "label": "Wide recording", "scheme": "light", "lang": "en", "device": "phone", "path": "wide/01-recording.png", "single_scheme_reason": "Legacy light-only coverage (ANDROID-SCR-03)", "rendered_scheme": "dark"},
-  {"screen": "wide-read-and-listen", "label": "Wide read and listen", "scheme": "light", "lang": "en", "device": "phone", "path": "wide/03-read-and-listen.png", "single_scheme_reason": "Legacy light-only coverage (ANDROID-SCR-03)"}
+  {"screen": "wide-read-and-listen", "label": "Wide read and listen", "scheme": "light", "lang": "en", "device": "phone", "path": "wide/03-read-and-listen.png", "single_scheme_reason": "Legacy light-only coverage (ANDROID-SCR-03)"},
+  {"screen": "record-pressed", "label": "Record pressed", "scheme": "light", "lang": "en", "device": "phone", "path": "components/record-pressed-light.png"},
+  {"screen": "record-pressed", "label": "Record pressed", "scheme": "dark", "lang": "en", "device": "phone", "path": "components/record-pressed-dark.png"}
 ]}
