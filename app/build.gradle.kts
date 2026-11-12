@@ -208,6 +208,7 @@ dependencies {
     // The JVM unit tests decompress with the zstd-jni jar, which carries the desktop natives.
     testImplementation(libs.zstd.jni)
     testImplementation(libs.org.json)
+    testImplementation(testFixtures(project(":app-logic")))
     testImplementation(libs.bundles.testing.robolectric)
     testImplementation(platform(libs.compose.bom))
     testImplementation(libs.compose.ui.test.junit4)

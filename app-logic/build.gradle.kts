@@ -1,5 +1,6 @@
 plugins {
     `java-library`
+    `java-test-fixtures`
     alias(libs.plugins.kotlin.jvm)
 }
 
@@ -9,4 +10,5 @@ dependencies {
     api(project(":core"))
     api(libs.coroutines.core)
     testImplementation(libs.bundles.testing.jvm)
+    testFixturesImplementation(libs.junit)
 }

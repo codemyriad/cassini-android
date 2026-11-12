@@ -21,6 +21,7 @@ detekt {
         files(
             "app-logic/src/main/kotlin",
             "app-logic/src/test/kotlin",
+            "app-logic/src/testFixtures/kotlin",
             "app-logic/build.gradle.kts",
             "app/src/main/java",
             "app/src/debug/java",

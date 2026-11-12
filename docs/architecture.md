@@ -69,11 +69,11 @@ The build modules are:
 :core    Pure Kotlin/JVM. The verbatim engine plus pure app rules (statuses, search,
          trash arithmetic, exports, speaker stats, model plan). No android.*, no sherpa,
          no coroutines. org.json is compileOnly.
-:app-logic Pure Kotlin/JVM app policies and leaf state; depends on core and coroutines.
+:app-logic Pure Kotlin/JVM app policies, leaf state and model-install ownership/sequencing; depends on core and coroutines.
          Android/UI/repository adapters stay in app.
 :data    Android library. Room catalogue, DataStore settings, file repositories.
 :engine  Android library. Native wrappers (sherpa-onnx, libcassini_opus), MediaCodec
-         decoder, microphone capture, TranscriptionJob, ModelInstaller, ProgressTracker.
+         decoder, microphone capture, TranscriptionJob, ProgressTracker.
 :ui      Android library. Compose design system and stateless screens rendered from
          UiState. Depends only on Compose and kotlinx-collections-immutable.
 :app     Android application. AppGraph, ViewModels and routes, navigation, services,
@@ -87,6 +87,7 @@ The dependencies go in this direction:
 ```
 app -> ui
 app -> app-logic -> core
+data, engine -> app-logic
 app -> data -> core
 app -> engine -> core
 bench -(instruments)-> app
@@ -125,7 +126,7 @@ The P1 move kept the bodies of the files, except for the listed edits. `scripts/
 | `capture` | `MicrophoneCapture` (an interface with a suspend `stop()`), `OpusCapture` (the platform MediaCodec Opus encoder, API 29+), `AacCapture` and `CaptureFactory`. The `MediaCodecList` probe of `CaptureFactory` operates one time, not on the main thread. |
 | `asr` | `ParakeetDecoder` (implements `WordDecoder`), `SileroDetector` (implements `SpeechFeed.Stream`), `IncrementalRecognizer`. `SileroDetector` passes each window through `SileroInputFilter` (D26.1, `silero-input-hpf-butter2-100hz-v1`): WebRTC APM's 2nd-order Butterworth 100 Hz high-pass, exact binary64 coefficients, Direct Form I, applied only to the samples Silero sees. The recognizer, the diarizer, the voiceprint windows and the stored audio are never filtered. `IncrementalRecognizer` carries the filter state from window to window of a track (`TrackSileroInput`): each 28 s window starts from the state recorded where it begins, inside the 2 s overlap. The first window and the first one after a resume start from zero, which D26.1 shows never makes a segment. `OpusCapture`'s meter is the AC peak, max |x − mean|, so a microphone that carries only DC reads as silent; `AacCapture` (API 26–28) reports `MediaRecorder.getMaxAmplitude`, which has no PCM to take the mean of. |
 | `speakers` | `SortformerStream`, `VoiceprintExtractor`. |
-| `job` | `InferenceDispatcher` (one thread) and `NativeBudget` (the `Mutex` for model loads). From P5, also these items: the seams of section 2, `TranscriptionJob`, `ModelInstaller`, `ProgressTracker`, the ports (`JobStorage`, `JobVoices`, `ModelAccess`, `ModelStore`, `BatterySource`), `JobEngines` (the factories of the seams), `JobEnvironment` (dispatchers, clock, logger, placeholder label), `DraftSources` and the job state types (section 5). A JVM test makes sure that `ModelCatalog.VOICEPRINT_DIM` is the print length that the voiceprint adapter accepts. The adapter refuses a print of a different length. No test operates the real CAM++ model. |
+| `job` | `InferenceDispatcher` (one thread) and `NativeBudget` (the `Mutex` for model loads). From P5, also these items: the seams of section 2, `TranscriptionJob`, `ProgressTracker`, the ports (`JobStorage`, `JobVoices`, `ModelAccess`, `BatterySource`), `JobEngines` (the factories of the seams), `JobEnvironment` (dispatchers, clock, logger, placeholder label), `DraftSources` and the job state types (section 5). A JVM test makes sure that `ModelCatalog.VOICEPRINT_DIM` is the print length that the voiceprint adapter accepts. The adapter refuses a print of a different length. No test operates the real CAM++ model. |
 
 The sherpa-onnx AAR is the Maven coordinate `org.cassini.native:sherpa-onnx-nemotron:1.13.7-0c2ee3f3` in the repository `native/m2/`, which git ignores (section 8).
 
@@ -1088,3 +1089,13 @@ F-Droid: the app has no proprietary SDKs. `docs/release.md` gives the open probl
 - A diarizer failure after the first window keeps the earlier speakers and the diarization record, as 0.1.0 did. The plan says "Failure.SPEAKERS degrades to speakersSeparated = false" (section 5.4).
 - The model installer examines the free space for each part, not one time for the whole plan (section 5.6).
 - features.md section 13 has no banner for a database that does not open (section 4.8, step 1). The app adds LIB_UNAVAILABLE (an error, not on the board): "Your notes can't be opened" — "Your files are kept. Free some storage, then open Cassini again." The Library shows it in place of LIB_EMPTY.
+
+### JVM model-install ownership
+
+`ModelInstallOwner` and the existing interruptible `ModelInstaller` sequence live in `:app-logic`.
+The owner has one effects port, `ModelInstallBackend`; `RepositoryModelInstallBackend` in `:app`
+connects it to persisted consent, model files, status refresh and Android connectivity. Dispatcher and
+application scope ownership remain in `AppGraph`. The download/status value types retain their package
+names for existing callers; `:data` and `:engine` expose them through their JVM dependency. No persisted
+error names or model paths change. Owner concurrency tests run with JUnit alone; persisted-consent and
+repository exception integration checks remain in `ModelInstallQueueTest` under Robolectric.
