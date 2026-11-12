@@ -1,6 +1,5 @@
 package io.codemyriad.cassini.engine.job
 
-import io.codemyriad.cassini.core.format.speakersByFirstSpeech
 import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.ProcessingPaused
 import io.codemyriad.cassini.core.UserFacingException
@@ -655,8 +654,8 @@ class TranscriptionJob(
                     target,
                     extensions,
                     recordedAtUtc = start,
-                    colourIndices = decoded.transcript.words.speakersByFirstSpeech().withIndex()
-                        .associate { it.value to it.index.toLong() },
+                    colourIndices = speakerSlotsForRun(existing, decoded.transcript.words, draft.names, matched.matches,
+                        voices.noteVoicesBlocking(noteId)),
                 )
             }
             env.syncFile(target) { sync(target) }

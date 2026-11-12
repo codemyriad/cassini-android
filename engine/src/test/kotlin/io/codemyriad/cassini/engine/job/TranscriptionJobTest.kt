@@ -558,6 +558,52 @@ class TranscriptionJobTest {
         assertTrue(h.storage.jobNames.none { sp1 in it.automatic || sp1 in it.live })
     }
 
+    @Test fun freshRunIdsKeepNoteLocalAndSavedVoiceSlots() = runBlocking {
+        for (saved in listOf(false, true)) {
+            val oldPrefix = "diar_${java.util.UUID.randomUUID()}_"
+            val oldId = oldPrefix + "2"
+            val prefix = "diar_${java.util.UUID.randomUUID()}_"
+            val h = Harness(runPrefix = prefix)
+            val target = temp.newFile()
+            val old = CassiniDocument.create(FIXTURE_OPUS, Transcript(listOf(Word(oldPrefix + "1", 0, 500, "first"), Word(oldId, 1000, 1500, "hello"))),
+                "Meeting", JSONObject().put("x-speakerDiarization", JSONObject()), null, mapOf(oldId to "Anna"), target)
+            target.copyTo(h.audio, overwrite = true)
+            h.storage.existing = old
+            val match = if (saved) Match("saved-anna", 1f, Match.State.CONFIRMED) else null
+            h.voices.noteVoices = mapOf(oldId to SpeakerPrint(axis(1), 30.0, match))
+            if (saved) h.voices.people = listOf(voice("saved-anna", "Anna", axis(1)))
+            assertEquals(JobOutcome.Done, h.run().first)
+            assertEquals("Anna", h.sealed().speakerLabel(prefix + "1"))
+            assertEquals(1L, h.sealed().speakerColourIndex(prefix + "1"))
+            assertEquals(2L, h.sealed().speakerColourIndex(prefix + "2"))
+        }
+    }
+
+    @Test fun firstSeparationAndRerunMergesUseOriginalRunOffsetsWithFreshIds() = runBlocking {
+        for (separated in listOf(false, true)) {
+            val oldId = "diar_${java.util.UUID.randomUUID()}_1"
+            val prefix = "diar_${java.util.UUID.randomUUID()}_"
+            val h = Harness(runPrefix = prefix)
+            val target = temp.newFile()
+            val processing = JSONObject().apply { if (separated) put("x-speakerDiarization", JSONObject()) }
+            val old = CassiniDocument.create(FIXTURE_OPUS, Transcript(listOf(Word(oldId, 0, 500, "hello"))),
+                "Meeting", processing, null, emptyMap(), target)
+            target.copyTo(h.audio, overwrite = true)
+            h.storage.existing = old
+            if (separated) h.script.beforeDecode = { start ->
+                if (start == 52000L) h.storage.names.updateAndGet { it.merge(prefix + "1", prefix + "2") }
+            }
+            assertEquals(JobOutcome.Done, h.run().first)
+            if (separated) {
+                assertEquals(2L, h.sealed().speakerColourIndex(prefix + "2"))
+                assertEquals(3L, h.sealed().speakerColourIndex(prefix + "3"))
+            } else {
+                assertEquals(0L, h.sealed().speakerColourIndex(prefix + "1"))
+                assertEquals(1L, h.sealed().speakerColourIndex(prefix + "2"))
+            }
+        }
+    }
+
     @Test fun productionSealWritesTheIndependentCaptureClock() = runBlocking {
         val h = Harness()
         val start = java.time.Instant.parse("2026-11-11T12:00:00Z")
@@ -946,6 +992,7 @@ class TranscriptionJobTest {
         private val speechModel: SpeechModel = SpeechModel.PARAKEET,
         private val maxDurationMs: Long = Limits.MAX_TRANSCRIBE_MS,
         private val maxBodyBytes: Long = WordBodyBudget.MAX_BYTES,
+        private val runPrefix: String = "diar_test_",
     ) {
         val noteDir: File = temp.newFolder("notes-$source-${System.nanoTime()}", "note-1")
         val audio = File(noteDir, source)
@@ -988,7 +1035,7 @@ class TranscriptionJobTest {
                 inference = inference,
                 io = Dispatchers.IO,
                 nanoTime = { clock.addAndGet(1_000_000L) },
-                speakerPrefix = { "diar_test_" },
+                speakerPrefix = { runPrefix },
                 warn = { _, _ -> },
                 syncFile = { file, sync ->
                     sync()

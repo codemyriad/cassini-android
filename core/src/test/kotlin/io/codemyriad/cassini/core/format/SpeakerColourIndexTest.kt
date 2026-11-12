@@ -15,6 +15,19 @@ class SpeakerColourIndexTest {
         return OggOpus.mux(OggOpus.Stream(head, tags, listOf(byteArrayOf(-8, -1, -2)), 960, true), tags)
     }
 
+    @Test fun partialPreferredSlotsDoNotCollideAndApplyOnTranscriptAddition() {
+        val transcript = Transcript(listOf(Word("b", 0, 1, "one"), Word("x", 1, 2, "two")))
+        val bytes = CassiniDocument.create(audio(), transcript, "Meeting", JSONObject(), colourIndices = mapOf("b" to 1L))
+        val first = CassiniDocument.read(bytes)
+        assertEquals(1L, first.speakerColourIndex("b"))
+        assertEquals(2L, first.speakerColourIndex("x"))
+        val rerun = Transcript(listOf(Word("new_b", 0, 1, "one"), Word("new_x", 1, 2, "two")))
+        val next = CassiniDocument.read(CassiniDocument.create(bytes, rerun, "Meeting", JSONObject(), first,
+            colourIndices = mapOf("new_b" to 1L)))
+        assertEquals(1L, next.speakerColourIndex("new_b"))
+        assertEquals(3L, next.speakerColourIndex("new_x"))
+    }
+
     @Test fun optionalMalformedSlotsAreRepairedOnBothExplicitWriters() {
         val transcript = Transcript(listOf(Word("a", 0, 1, "one")))
         val source = folder.newFile("malformed.opus").apply {
