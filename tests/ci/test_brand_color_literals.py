@@ -14,7 +14,7 @@ class BrandColorLiteralTest(unittest.TestCase):
     def test_every_supported_literal_form_fails_in_production(self):
         forms = ['Color(0xFFFF0000)', 'Color(color = 0xFFFF0000)', 'Color.RED', 'rgb(255, 0, 0)',
                  'Color(1f, 0f, 0f)', 'Color(red = 1f, green = 0f, blue = 0f)', 'Color(4294901760L)',
-                 'colorResource(android.R.color.white)',
+                 'colorResource(android.R.color.white)', 'colorResource(android.R.color.background_dark)',
                  'Color.Red', 'android.graphics.Color.rgb(255, 0, 0)', 'Color.parseColor("red")',
                  '<color name="oops">#F00</color>', '@android:color/white',
                  'val url = "https://example.com"; val ink = Color.Red']
@@ -33,7 +33,8 @@ class BrandColorLiteralTest(unittest.TestCase):
             for name, text in [
                 (next(iter(GUARD.GENERATED)), 'Color(0xFFFF0000)'),
                 ('app/src/test/Fixture.kt', 'Color.Red'),
-                ('app/src/main/Roles.kt', '// Old #FF0000\nval ink = colors.ink\n/* Color.White */'),
+                ('app/src/main/Roles.kt', '// Old #FF0000\nval ink = colors.ink\n/* Color.White */\n'
+                 'val clear = android.R.color.transparent'),
             ]:
                 path = root / name
                 path.parent.mkdir(parents=True, exist_ok=True)

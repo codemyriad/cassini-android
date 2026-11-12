@@ -107,9 +107,6 @@ class CassiniColors(
     val avatar6: Color = canvasValue(isDark, "avatar-6"),
 )
 
-private fun canvasValue(dark: Boolean, role: String): Color =
-    (if (dark) BrandTokenValues.dark else BrandTokenValues.light).getValue(role)
-
 // W1.1 is plumbing only: the canvas mapping is checked but the active palette stays pixel-identical.
 val LightColors: CassiniColors = LegacyLightColors
 val DarkColors: CassiniColors = LegacyDarkColors

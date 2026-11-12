@@ -75,7 +75,7 @@ class BrandColorsTest(unittest.TestCase):
             with self.subTest(qualifier=qualifier):
                 self.regenerate()
                 path = self.root / f'ui/src/main/res/{qualifier}/colors.xml'
-                path.write_text(path.read_text().replace('#', '#00', 1))
+                path.write_text(path.read_text().replace('>#', '>#00', 1))
                 with self.assertRaisesRegex(SystemExit, 'Stale generated'):
                     self.check()
 

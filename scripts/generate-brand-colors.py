@@ -88,6 +88,9 @@ def generated(root):
     mask = color(snapshot['iconMask']) if snapshot else 'light.getValue("ink")'
     lines.append(f'    val iconMask: Color = {mask}')
     lines.append('}')
+    # Constructor defaults must not initialize ColorKt while these legacy values are still being assigned.
+    lines += ['', 'internal fun canvasValue(dark: Boolean, role: String): Color =',
+              '    (if (dark) BrandTokenValues.dark else BrandTokenValues.light).getValue(role)']
     if snapshot:
         lines += ['', '// TEMPORARY: coordinator-approved no-pixel-change bridge for #195. Delete in #196.',
                   '// Generated from scripts/brand/temporary-old-palette.json; never edit these values here.']

@@ -113,6 +113,9 @@ internal object BrandTokenValues {
     val iconMask: Color = Color(0xFF000000)
 }
 
+internal fun canvasValue(dark: Boolean, role: String): Color =
+    (if (dark) BrandTokenValues.dark else BrandTokenValues.light).getValue(role)
+
 // TEMPORARY: coordinator-approved no-pixel-change bridge for #195. Delete in #196.
 // Generated from scripts/brand/temporary-old-palette.json; never edit these values here.
 
