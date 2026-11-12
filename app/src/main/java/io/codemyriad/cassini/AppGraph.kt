@@ -343,24 +343,25 @@ class AppGraph(context: Context, val config: Config) {
     private val runningJobCanceller = AtomicReference(RunningJobCanceller { })
     private val activeRecording = AtomicReference<() -> String?> { null }
 
-    private val opened = CompletableDeferred<Catalogue>()
-    private val startup = CompletableDeferred<Unit>()
+    private val startup = CompletableDeferred<Catalogue>(appScope.coroutineContext.job)
     private val report = MutableStateFlow<StartupReport?>(null)
 
     @Volatile private var openedCatalogue: Catalogue? = null
 
-    /** The repositories over Room; completes once the database is open (startup step 1). */
-    val catalogue: Deferred<Catalogue> get() = opened
+    /** The repositories become available only after startup recovery finishes. */
+    val catalogue: Deferred<Catalogue> get() = startup
 
     /** Completes after the startup work of architecture 4.8. */
-    val ready: Deferred<Unit> get() = startup
+    val ready: Deferred<Catalogue> get() = startup
 
     /** What the startup work did (the recovered recordings for their banner, the failures); null until it ends. */
     val startupReport: StateFlow<StartupReport?> = report.asStateFlow()
 
     init {
         bindActiveRecording { if (recordingHolder.isInitialized()) recording.activeNoteId.value else null }
-        appScope.launch(dispatchers.io) { runStartup() }
+        appScope.launch(dispatchers.io) { runStartup() }.invokeOnCompletion { error ->
+            if (error != null) startup.completeExceptionally(error)
+        }
         // ON_START (architecture 5.3): the first time the app is visible the coordinator exists, so a waiting queue
         // starts also when no screen reads `processing` first.
         appScope.launch {
@@ -384,8 +385,8 @@ class AppGraph(context: Context, val config: Config) {
     /** A [Clock] over [Config.clock] and [Config.zone], read at each call (the ViewModels' day labels). */
     fun clock(): Clock = ConfigClock(config.clock, config.zone)
 
-    /** The catalogue, waiting until the database is open. */
-    suspend fun awaitCatalogue(): Catalogue = opened.await()
+    /** The catalogue, waiting until all startup recovery steps have finished. */
+    suspend fun awaitCatalogue(): Catalogue = startup.await()
 
     /**
      * Stops the graph's work, waits until it has ended, then closes the database. For tests; the app's graph lives as
@@ -430,12 +431,10 @@ class AppGraph(context: Context, val config: Config) {
         } catch (error: Exception) {
             Log.e(TAG, "Cannot open the catalogue; the next start tries again", error)
             report.value = StartupReport(failed = mapOf(STEP_DATABASE to error.toString()))
-            opened.completeExceptionally(error)
             startup.completeExceptionally(error)
             return
         }
         openedCatalogue = catalogue
-        opened.complete(catalogue)
         val failed = LinkedHashMap<String, String>()
         restoreRejection?.let { failed[STEP_RESTORE] = it }
         val active = activeRecording.get()
@@ -461,7 +460,7 @@ class AppGraph(context: Context, val config: Config) {
             retitled = retitled.orEmpty(),
             failed = failed,
         )
-        startup.complete(Unit)
+        startup.complete(catalogue)
     }
 
     /** Runs one startup step; a failure is logged and recorded, and the next step still runs. */
