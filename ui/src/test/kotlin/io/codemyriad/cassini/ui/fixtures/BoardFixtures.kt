@@ -187,7 +187,7 @@ internal object BoardFixtures {
         id = "d1",
         speakerId = "s1",
         name = SpeakerNameUi.Named("Giulia"),
-        tone = SpeakerTone.Blue,
+        tone = SpeakerTone.One,
         startMs = clock(28, 31),
         words = timedWords(
             "So for the October release we keep the import flow as it is, and we move the onboarding changes to " +
@@ -201,7 +201,7 @@ internal object BoardFixtures {
         id = "d2",
         speakerId = "s2",
         name = SpeakerNameUi.Placeholder(2),
-        tone = SpeakerTone.Amber,
+        tone = SpeakerTone.Unnamed,
         startMs = clock(29, 2),
         words = timedWords(
             "All right, but we must notify support by Friday, otherwise they'll get the tickets " +
@@ -226,7 +226,7 @@ internal object BoardFixtures {
         id = "t1",
         speakerId = "s1",
         name = SpeakerNameUi.Named("Giulia"),
-        tone = SpeakerTone.Blue,
+        tone = SpeakerTone.One,
         startMs = clock(11, 32),
         words = timedWords(
             "Ok, then let's confirm the quantities first. We said four hundred units for the first batch, right?",
@@ -239,7 +239,7 @@ internal object BoardFixtures {
         id = "t2",
         speakerId = "s2",
         name = SpeakerNameUi.Named("Paolo Ferri"),
-        tone = SpeakerTone.Teal,
+        tone = SpeakerTone.Two,
         startMs = clock(11, 41),
         auto = true,
         words = timedWords(
@@ -255,7 +255,7 @@ internal object BoardFixtures {
         id = "t3",
         speakerId = "s3",
         name = SpeakerNameUi.Placeholder(3),
-        tone = SpeakerTone.Amber,
+        tone = SpeakerTone.Unnamed,
         startMs = clock(12, 20),
         words = timedWords(
             "Can you send that in writing? I need it for the purchase order before Friday.",
@@ -277,12 +277,35 @@ internal object BoardFixtures {
         playback = PlaybackUi(positionMs = clock(11, 44), durationMs = clock(23, 50), playing = true),
     )
 
+    /** L-14: all six named pairs plus the unnamed stone pair, in one real meeting screen. */
+    val sevenSpeakers = readAndListen.copy(
+        title = "Seven speakers",
+        chips = NoteChipsUi(trust = TrustUi.VERIFIED, speakers = 7),
+        turns = SpeakerTone.entries.mapIndexed { index, tone ->
+            val start = index * 5_000L
+            TurnUi(
+                id = "seven-$index",
+                speakerId = "speaker-$index",
+                name = if (tone == SpeakerTone.Unnamed) {
+                    SpeakerNameUi.Placeholder(7)
+                } else {
+                    SpeakerNameUi.Named(listOf("Ada", "Ben", "Chloe", "Dario", "Eva", "Faye")[index])
+                },
+                tone = tone,
+                startMs = start,
+                words = timedWords("Ready.", start),
+            )
+        }.toImmutableList(),
+        activeWord = null,
+        playback = PlaybackUi(positionMs = 0, durationMs = 35_000, playing = false),
+    )
+
     // Board 04: Name a speaker (Speaker 3 of board 03, "Anna" typed, the same-person question open).
 
     val nameSpeaker = NameSheetUi(
         speakerId = readSpeaker3.speakerId,
         label = SpeakerNameUi.Placeholder(3),
-        tone = SpeakerTone.Amber,
+        tone = SpeakerTone.Unnamed,
         speakingMs = clock(3, 12),
         canSample = true,
         name = "Anna",

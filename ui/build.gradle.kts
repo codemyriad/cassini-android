@@ -37,7 +37,7 @@ abstract class GenerateBrandTokens : DefaultTask() {
 
     @TaskAction fun generate() {
         val document = JsonSlurper().parse(tokenFile.get().asFile) as Map<*, *>
-        val tokens = document["tokens"] as Map<*, *>
+        val tokens = (document["tokens"] as Map<*, *>) + (document["derived"] as? Map<*, *> ?: emptyMap<Any, Any>())
         val source = buildString {
             appendLine("// Generated from brand/tokens.json; do not edit.")
             appendLine("@file:Suppress(\"MagicNumber\")")

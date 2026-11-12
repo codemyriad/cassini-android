@@ -1,6 +1,10 @@
 package io.codemyriad.cassini.ui.screens
 
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onNodeWithText
 import io.codemyriad.cassini.ui.BoardTest
+import io.codemyriad.cassini.ui.fixtures.BoardFixtures
+import io.codemyriad.cassini.ui.note.NoteScreen
 import org.junit.Test
 import org.robolectric.annotation.Config
 
@@ -19,6 +23,11 @@ class DarkScreenshotTest : BoardTest() {
     @Test fun transcribing() = dark("02-transcribing")
 
     @Test fun readAndListen() = dark("03-read-and-listen")
+
+    @Test fun sevenSpeakers() {
+        board("dark", "11-seven-speakers", dark = true) { NoteScreen(BoardFixtures.sevenSpeakers, onEvent = {}) }
+        rule.onNodeWithText("Speaker 7", useUnmergedTree = true).assertIsDisplayed()
+    }
 
     @Test fun nameSpeaker() = dark("04-name-a-speaker")
 
