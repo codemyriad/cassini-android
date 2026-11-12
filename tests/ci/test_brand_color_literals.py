@@ -13,7 +13,8 @@ SPEC.loader.exec_module(GUARD)
 class BrandColorLiteralTest(unittest.TestCase):
     def test_every_supported_literal_form_fails_in_production(self):
         forms = ['Color(0xFFFF0000)', 'Color(color = 0xFFFF0000)', 'Color.RED', 'rgb(255, 0, 0)',
-                 'Color(1f, 0f, 0f)', 'Color(red = 1f, green = 0f, blue = 0f)',
+                 'Color(1f, 0f, 0f)', 'Color(red = 1f, green = 0f, blue = 0f)', 'Color(4294901760L)',
+                 'colorResource(android.R.color.white)',
                  'Color.Red', 'android.graphics.Color.rgb(255, 0, 0)', 'Color.parseColor("red")',
                  '<color name="oops">#F00</color>', '@android:color/white',
                  'val url = "https://example.com"; val ink = Color.Red']
