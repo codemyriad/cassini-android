@@ -106,6 +106,10 @@ All the JVM tests of a module run in one JVM, and the Robolectric tests share st
 
 ### Screenshot tests
 
+Dark coverage includes 20 core and error variants in `variants-dark/`, the six Italian boards in `it-dark/`,
+and all ten French boards in `fr-dark/`. Their light counterparts keep the same screen and locale identities
+in `shots.json`. The remaining light-only cases declare that limitation in the manifest.
+
 Every PR also runs `pr-shots.yml`: it compares committed goldens at the merge base and PR head,
 without rendering or an emulator. The `pr-shots` artifact (14 days) has `changes.json` and a ready
 Markdown block; its summary lists changed screens in both available modes. Images link to full commit
