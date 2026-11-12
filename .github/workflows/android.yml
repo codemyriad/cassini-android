@@ -113,7 +113,9 @@ jobs:
       # job does not run. The build job does not wait for this job; the emulator jobs do (D66 AND-11).
       - name: CHANGELOG.md has a section for the tag
         if: startsWith(github.ref, 'refs/tags/')
-        run: python3 -I scripts/changelog-section.py "$GITHUB_REF_NAME" > /dev/null
+        run: |
+          python3 -I scripts/changelog-section.py "$GITHUB_REF_NAME" > /dev/null
+          python3 -I scripts/release_notes.py "$GITHUB_REF_NAME" --check
       - name: Kept engine code has only its reviewed differences from 0.1.0
         run: scripts/check-verbatim.sh
 
@@ -317,6 +319,13 @@ jobs:
           name: roborazzi-diffs
           path: '**/build/outputs/roborazzi'
           if-no-files-found: ignore
+      - name: Write user notes for a tagged Play build
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          code=$(python3 -c 'import re; from pathlib import Path; print(re.search(r"versionCode = (\d+)", Path("app/build.gradle.kts").read_text())[1])')
+          python3 -I scripts/release_notes.py "$TAG" --play-code "$code"
       - name: Prepare installable APK
         env:
           TAG: ${{ inputs.daily_test && format('v{0}', fromJSON(inputs.daily_plan).version_name) || github.ref_name }}
@@ -495,7 +504,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
         run: |
-          python3 -I scripts/changelog-section.py "$TAG" \
+          python3 -I scripts/release_notes.py "$TAG" \
             --link-base "https://github.com/$GH_REPO/blob/$TAG" > "$RUNNER_TEMP/release-notes.md"
       - name: Publish GitHub release
         env:

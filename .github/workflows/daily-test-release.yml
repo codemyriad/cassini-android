@@ -33,7 +33,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.sha }}
-      - name: Check main, collect merged PR titles and reserve the next test number
+      - name: Check main, collect user fragments and reserve the next test number
         id: plan
         env:
           GH_TOKEN: ${{ github.token }}
@@ -64,8 +64,47 @@ jobs:
       CASSINI_RELEASE_KEY_ALIAS: ${{ secrets.CASSINI_RELEASE_KEY_ALIAS }}
       PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
 
-  outcome:
+  github-notes:
     needs: [plan, publish]
+    if: always() && !cancelled() && needs.plan.outputs.build == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: internal-test-release-plan
+          path: .tools/daily-test-release
+      - name: Prepare notes only for an actual Play upload
+        id: notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DAILY_TEST_PLAN: ${{ needs.plan.outputs.plan }}
+        run: python3 -I scripts/daily-test-release.py body
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: steps.notes.outputs.publish == 'true'
+        with:
+          name: cassini-android
+          path: dist
+      - name: Publish user notes with a folded developer changelog
+        if: steps.notes.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BUILD_CODE: ${{ fromJSON(needs.plan.outputs.plan).version_code }}
+          BUILD_NAME: ${{ fromJSON(needs.plan.outputs.plan).version_name }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          gh release create "android-internal-$BUILD_CODE" dist/* --target "$SOURCE_SHA" --prerelease \
+            --title "$BUILD_NAME ($BUILD_CODE)" --notes-file test-release-notes.md
+
+  outcome:
+    needs: [plan, publish, github-notes]
     if: always() && (needs.plan.outputs.build == 'true' || needs.plan.result == 'failure')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -88,6 +127,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           DAILY_TEST_PLAN: ${{ needs.plan.outputs.plan }}
-          PUBLISH_RESULT: ${{ needs.publish.result }}
+          PUBLISH_RESULT: ${{ needs.publish.result == 'success' && needs.github-notes.result == 'success' && 'success' || 'failure' }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: python3 -I scripts/daily-test-release.py finish
