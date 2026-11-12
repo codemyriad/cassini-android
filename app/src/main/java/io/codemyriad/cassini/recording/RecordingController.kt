@@ -180,7 +180,21 @@ class RecordingController(private val parts: Parts) {
      * Finish: stops and saves, asynchronously ([state] goes Finishing, then Ended). [title] is the field's final value;
      * null keeps the current one (the notification's Finish). A blank title becomes the default.
      */
-    fun finish(title: String? = null) = work { operations.withLock { end(Stop.USER, title) } }
+    fun finish(title: String? = null) {
+        while (true) {
+            val current = mutableState.value
+            if (current !is RecordingState.Active) {
+                // A Finish posted during startup still runs after begin, as before.
+                if (current is RecordingState.Starting) work { operations.withLock { end(Stop.USER, title) } }
+                return
+            }
+            val saving = RecordingState.Finishing(current.noteId, title ?: current.title, current.elapsedMs)
+            if (!mutableState.compareAndSet(current, saving)) continue
+            // Publish before dispatch: a busy recorder or title write must not delay the button's acknowledgement.
+            work { operations.withLock { end(Stop.USER, title, current) } }
+            return
+        }
+    }
 
     /** The UI has handled [RecordingState.Ended]. */
     fun dismissEnded() {
@@ -374,8 +388,8 @@ class RecordingController(private val parts: Parts) {
 
     // End. --------------------------------------------------------------------------------------------------------
 
-    private suspend fun end(stop: Stop, title: String?) {
-        val current = mutableState.value as? RecordingState.Active ?: return
+    private suspend fun end(stop: Stop, title: String?, requested: RecordingState.Active? = null) {
+        val current = requested ?: (mutableState.value as? RecordingState.Active) ?: return
         val mic = capture ?: return
         policy?.cancel()
         policy = null
