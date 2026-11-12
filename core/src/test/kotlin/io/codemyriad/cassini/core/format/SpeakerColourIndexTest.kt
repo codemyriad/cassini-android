@@ -82,4 +82,24 @@ class SpeakerColourIndexTest {
         assertEquals(1, renamed.manifest!!.getJSONArray("speakers").getJSONObject(0).getInt("colourIndex"))
         org.junit.Assert.assertArrayEquals(bytes, source.readBytes())
     }
+
+    @Test fun legacyColourLookupsScanTheTranscriptOnlyOnce() {
+        var reads = 0
+        val words = object : AbstractList<Word>() {
+            override val size: Int = 50
+            override fun get(index: Int): Word {
+                reads++
+                return Word("s$index", index.toLong(), index + 1L, "word")
+            }
+        }
+        val speakers = org.json.JSONArray()
+        repeat(words.size) { speakers.put(JSONObject().put("id", "s$it").put("label", "s$it")) }
+        val doc = CassiniDocument(
+            "ok",
+            JSONObject().put("speakers", speakers),
+            listOf(CassiniDocument.Variant("words", JSONObject(), null, Transcript(words))),
+        )
+        repeat(words.size) { assertEquals(it, doc.speakerColourIndex("s$it")) }
+        assertEquals(words.size, reads)
+    }
 }
