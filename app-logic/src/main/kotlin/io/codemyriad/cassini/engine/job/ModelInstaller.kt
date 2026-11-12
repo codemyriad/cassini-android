@@ -70,7 +70,7 @@ sealed interface InstallOutcome {
 }
 
 /**
- * Installs model parts in [ModelPart] order (architecture section 5.6). `ModelInstallOwner` in `:app` is its only
+ * Installs model parts in [ModelPart] order (architecture section 5.6). `ModelInstallOwner` in `:app-logic` is its only
  * caller; jobs and the standalone download share it.
  *
  * - SPEECH is required: Parakeet must install. Its speech detector (VAD) is best effort, also when Parakeet is

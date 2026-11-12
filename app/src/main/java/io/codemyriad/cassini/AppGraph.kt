@@ -11,6 +11,7 @@ import io.codemyriad.cassini.adapters.NetworkCheck
 import io.codemyriad.cassini.adapters.RepositoryJobStorage
 import io.codemyriad.cassini.adapters.RepositoryJobVoices
 import io.codemyriad.cassini.adapters.RepositoryModelAccess
+import io.codemyriad.cassini.adapters.RepositoryModelInstallBackend
 import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.UserFacingException
 import io.codemyriad.cassini.core.models.ModelCheck
@@ -200,7 +201,11 @@ class AppGraph(context: Context, val config: Config) {
         speech.included,
         dispatchers.io,
     )
-    val installOwner = ModelInstallOwner(models, paths.modelRoot, network, appScope, dispatchers.io)
+    val installOwner = ModelInstallOwner(
+        RepositoryModelInstallBackend(models, paths.modelRoot, network, dispatchers.io),
+        appScope,
+        dispatchers.io,
+    )
     val modelAccess: ModelAccess = RepositoryModelAccess(models, paths.modelRoot, installOwner, network)
 
     /**

@@ -1,19 +1,15 @@
 package io.codemyriad.cassini.processing
 
-import io.codemyriad.cassini.adapters.RepositoryModelAccess
 import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.models.ModelCatalog
 import io.codemyriad.cassini.core.models.ModelDescriptor
 import io.codemyriad.cassini.core.models.ModelPart
-import io.codemyriad.cassini.data.AppPaths
-import io.codemyriad.cassini.data.CassiniDispatchers
-import io.codemyriad.cassini.data.models.ModelFetcher
-import io.codemyriad.cassini.data.models.ModelRepository
 import io.codemyriad.cassini.data.models.ModelStatus
-import io.codemyriad.cassini.data.settings.SettingsRepository
 import io.codemyriad.cassini.engine.job.DownloadError
 import io.codemyriad.cassini.engine.job.DownloadProgress
 import io.codemyriad.cassini.engine.job.InstallOutcome
+import io.codemyriad.cassini.engine.job.ModelInstaller
+import io.codemyriad.cassini.engine.job.ModelStore
 import io.codemyriad.cassini.testing.NoUncaughtCoroutines
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -24,31 +20,22 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import java.io.File
-import java.io.IOException
-import java.io.InterruptedIOException
 import java.io.RandomAccessFile
-import java.net.ConnectException
-import java.net.NoRouteToHostException
-import java.net.SocketTimeoutException
-import java.net.UnknownHostException
 import java.util.Collections
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -62,7 +49,6 @@ import kotlin.coroutines.CoroutineContext
  * other parts waits for it, and every artifact is fetched once. The fetcher is a fake that writes sparse files of the
  * pinned sizes, so nothing is downloaded and almost no disk is used.
  */
-@RunWith(RobolectricTestRunner::class)
 class ModelInstallOwnerTest {
     @get:Rule(order = Int.MIN_VALUE)
     val uncaught = NoUncaughtCoroutines()
@@ -78,20 +64,17 @@ class ModelInstallOwnerTest {
 
     /** The fetch ignores an interrupt, as a socket read blocked until its timeout does. */
     private val stubborn = AtomicBoolean(false)
-    private val interruptAsIo = AtomicBoolean(false)
-    private var fetchFailure: IOException? = null
     private val inFlight = AtomicInteger()
     private val mostInFlight = AtomicInteger()
-    private lateinit var paths: AppPaths
-    private lateinit var models: ModelRepository
+    private lateinit var modelRoot: File
+    private lateinit var models: FakeModels
     private lateinit var owner: ModelInstallOwner
 
     /** Blocks the fetch of Parakeet until [release], after it wrote a `.part` file; records every fetch. */
-    private val fetcher = ModelFetcher { model, directory, progress ->
+    private val fetcher: (ModelDescriptor, File, (Long, Boolean) -> Unit) -> Unit = { model, directory, progress ->
         fetched += key(model)
         mostInFlight.accumulateAndGet(inFlight.incrementAndGet(), ::maxOf)
         try {
-            fetchFailure?.let { throw it }
             if (model == ModelCatalog.PARAKEET) {
                 File(directory, "encoder.int8.onnx.part").writeBytes(ByteArray(PART_BYTES))
                 started.countDown()
@@ -116,20 +99,15 @@ class ModelInstallOwnerTest {
                 interrupted.set(true)
                 interruptSeen.countDown()
                 if (stubborn.get()) continue
-                if (!interruptAsIo.get()) throw error
-                Thread.currentThread().interrupt()
-                throw InterruptedIOException("interrupted").apply { initCause(error) }
+                throw error
             }
         }
     }
 
     @Before fun setUp() = runBlocking {
-        paths = AppPaths(folder.newFolder("root"), folder.newFolder("cache"), modelRoot = folder.newFolder("models"))
-        val dispatchers = CassiniDispatchers(Dispatchers.IO, Dispatchers.Default, Dispatchers.Unconfined)
-        val settings = SettingsRepository.create(paths, CoroutineScope(scope.coroutineContext + Dispatchers.IO))
-        models = ModelRepository(paths, settings, dispatchers, fetcher)
-        models.recordConsent()
-        owner = ModelInstallOwner(models, paths.modelRoot, { true }, scope, Dispatchers.IO)
+        modelRoot = folder.newFolder("models")
+        models = FakeModels()
+        owner = newOwner()
     }
 
     /** Waits until the work of [scope] has ended, before TemporaryFolder deletes its files. */
@@ -142,100 +120,9 @@ class ModelInstallOwnerTest {
 
     private val everyModel = ModelPart.entries.flatMap { it.models }.map(::key).sorted()
 
-    @Test fun transportFailuresThroughTheRepositoryStayNoConnectionOnValidatedWifi() = runBlocking {
-        val failures = listOf(
-            SocketTimeoutException("Read timed out"),
-            UnknownHostException("model host"),
-            ConnectException("Connection refused"),
-            NoRouteToHostException("No route"),
-        )
-        for (failure in failures) {
-            fetchFailure = failure
-            withTimeout(WAIT_MS) { owner.startDownload(setOf(ModelPart.SPEECH)).join() }
-            assertEquals(
-                failure.javaClass.simpleName,
-                DownloadError.NO_CONNECTION,
-                (owner.lastOutcome.value as InstallOutcome.Failed).error,
-            )
-            assertEquals(
-                ModelStatus.Failed(Failure.DOWNLOAD, DownloadError.NO_CONNECTION.name),
-                models.status.value[ModelPart.SPEECH],
-            )
-        }
-    }
-
-    @Test fun anInterruptedSocketCancelThroughTheRepositoryLeavesNoFailureBanner() = runBlocking {
-        interruptAsIo.set(true)
-        val download = owner.startDownload(setOf(ModelPart.SPEECH))
-        assertTrue(started.await(WAIT_S, TimeUnit.SECONDS))
-        owner.cancel()
-        withTimeout(WAIT_MS) { download.join() }
-        assertEquals(InstallState.Idle, owner.state.value)
-        assertNull(owner.lastOutcome.value)
-        assertEquals(ModelStatus.Missing(consented = true), models.status.value[ModelPart.SPEECH])
-        assertTrue(File(ModelCatalog.PARAKEET.directory(paths.modelRoot), "encoder.int8.onnx.part").isFile)
-    }
-
-    @Test fun optionalRetryKeepsItsOriginalPlanWithOrWithoutEarlierSpeechConsent() = runBlocking {
-        for (speechConsent in listOf(false, true)) {
-            val root = folder.newFolder("optional-$speechConsent")
-            val separate = AppPaths(root, File(root, "cache").apply { mkdirs() })
-            val settingsScope = CoroutineScope(scope.coroutineContext + Dispatchers.IO)
-            val settings = SettingsRepository.create(separate, settingsScope)
-            val failedOnce = AtomicBoolean(false)
-            val requested = Collections.synchronizedList(mutableListOf<ModelDescriptor>())
-            val fetch = ModelFetcher { model, directory, _ ->
-                requested += model
-                if (model == ModelCatalog.DIARIZATION && !failedOnce.getAndSet(true)) {
-                    throw java.io.IOException("Lab optional download failed")
-                }
-                model.artifacts.forEach { artifact ->
-                    RandomAccessFile(File(directory, artifact.name), "rw").use { it.setLength(artifact.size) }
-                }
-            }
-            val repository = ModelRepository(separate, settings, CassiniDispatchers(), fetch)
-            repository.recordConsent(includeSpeech = speechConsent)
-            val installer = ModelInstallOwner(repository, root, { true }, scope, Dispatchers.IO)
-            val optional = setOf(ModelPart.SPEAKERS, ModelPart.VOICES)
-            withTimeout(WAIT_MS) { installer.startDownload(optional).join() }
-            assertTrue((installer.lastOutcome.value as InstallOutcome.Installed).failed.containsKey(ModelPart.SPEAKERS))
-            withTimeout(WAIT_MS) { installer.startDownload().join() }
-            assertEquals(InstallOutcome.Installed(), installer.lastOutcome.value)
-            assertEquals(listOf(ModelCatalog.DIARIZATION, ModelCatalog.DIARIZATION, ModelCatalog.VOICEPRINT), requested)
-            assertTrue(repository.ready(ModelPart.SPEAKERS) && repository.ready(ModelPart.VOICES))
-            assertTrue(!repository.ready(ModelPart.SPEECH))
-        }
-    }
-
-    @Test fun parakeetOnlyPermissionCannotFetchOptionalPartsOrScheduleThemForTheNextJob() = runBlocking {
-        val separate = AppPaths(folder.newFolder("speech-root"), folder.newFolder("speech-cache"))
-        val settingsScope = CoroutineScope(scope.coroutineContext + Dispatchers.IO)
-        val settings = SettingsRepository.create(separate, settingsScope)
-        val repository = ModelRepository(separate, settings, CassiniDispatchers(), fetcher)
-        repository.recordConsent(includeOptional = false)
-        val installer = ModelInstallOwner(repository, separate.modelRoot, { true }, scope, Dispatchers.IO)
-        val access = RepositoryModelAccess(repository, separate.modelRoot, installer) { true }
-        assertEquals(listOf(ModelPart.SPEECH), withContext(Dispatchers.IO) { access.plan().parts })
-        val mixed = withTimeout(WAIT_MS) { installer.install(setOf(ModelPart.SPEECH, ModelPart.SPEAKERS)) }
-        assertTrue(mixed is InstallOutcome.NeedsConsent)
-        assertTrue(fetched.isEmpty())
-        release.countDown()
-        val speech = withTimeout(WAIT_MS) { installer.install(setOf(ModelPart.SPEECH)) }
-        assertEquals(InstallOutcome.Installed(), speech)
-        val expected = listOf(key(ModelCatalog.PARAKEET), key(ModelCatalog.VAD)).sorted()
-        assertEquals(expected, fetched.sorted())
-        assertTrue(withContext(Dispatchers.IO) { access.plan().isEmpty })
-        assertTrue(installer.install(setOf(ModelPart.SPEAKERS)) is InstallOutcome.NeedsConsent)
-        withTimeout(WAIT_MS) { installer.startDownload().join() }
-        assertEquals("A speech-only retry cannot add optional models", expected, fetched.sorted())
-        repository.recordConsent(includeSpeech = false)
-        val authorized = withContext(Dispatchers.IO) { access.plan().parts }
-        assertEquals(listOf(ModelPart.SPEAKERS, ModelPart.VOICES), authorized)
-    }
-
     @Test fun offlineStandaloneOptionalSkipsStayRetryableWhileJobSkipsRemainBestEffort() = runBlocking {
         val online = AtomicBoolean(false)
-        val installer = ModelInstallOwner(models, paths.modelRoot, { online.get() }, scope, Dispatchers.IO)
+        val installer = newOwner(online = { online.get() })
         val optional = setOf(ModelPart.SPEAKERS, ModelPart.VOICES)
         assertEquals(InstallOutcome.Installed(skipped = optional), installer.install(optional))
         optional.forEach { assertEquals(ModelStatus.Missing(true), models.status.value[it]) }
@@ -301,7 +188,7 @@ class ModelInstallOwnerTest {
         withTimeout(WAIT_MS) { download.join() }
         withTimeout(WAIT_MS) { owner.state.first { it == InstallState.Idle } }
         assertTrue(interrupted.get())
-        assertTrue(File(ModelCatalog.PARAKEET.directory(paths.modelRoot), "encoder.int8.onnx.part").isFile)
+        assertTrue(File(ModelCatalog.PARAKEET.directory(modelRoot), "encoder.int8.onnx.part").isFile)
         assertEquals(ModelStatus.Missing(consented = true), models.status.value[ModelPart.SPEECH])
     }
 
@@ -366,7 +253,7 @@ class ModelInstallOwnerTest {
         val io = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
         io.executor.execute { gate.await(WAIT_S, TimeUnit.SECONDS) }
         try {
-            val gated = ModelInstallOwner(models, paths.modelRoot, { true }, scope, io)
+            val gated = newOwner(io = io)
             val download = gated.startDownload(setOf(ModelPart.SPEECH))
             withTimeout(WAIT_MS) { gated.state.first { it is InstallState.Installing } }
             gated.cancel()
@@ -396,8 +283,74 @@ class ModelInstallOwnerTest {
     private fun ownerWithObservableDispatch(): ObservedIo {
         val io = ObservedIo()
         val attaching = CoroutineScope(scope.coroutineContext + Dispatchers.Unconfined)
-        owner = ModelInstallOwner(models, paths.modelRoot, { true }, attaching, io)
+        owner = newOwner(io = io, attaching = attaching)
         return io
+    }
+
+    private fun newOwner(
+        io: CoroutineDispatcher = Dispatchers.IO,
+        attaching: CoroutineScope = scope,
+        online: () -> Boolean = { true },
+    ) = ModelInstallOwner(models.backend(io, online), attaching, io)
+
+    /** Only effects are faked: the owner and ModelInstaller run their production sequencing and interruption. */
+    private inner class FakeModels : ModelInstallBackend {
+        override val status = MutableStateFlow<Map<ModelPart, ModelStatus>>(
+            ModelPart.entries.associateWith { ModelStatus.Missing(true) },
+        )
+        private val progress = mutableMapOf<ModelPart, ModelStatus>()
+        override suspend fun consented(part: ModelPart): Boolean = true
+        override fun hasValidatedNetwork(): Boolean = true
+
+        @Synchronized override fun publishProgress(part: ModelPart, progress: ModelStatus) {
+            this.progress[part] = progress
+            snapshot()
+        }
+
+        @Synchronized override fun clearProgress(part: ModelPart) {
+            progress.remove(part)
+            snapshot()
+        }
+        override suspend fun refresh() = snapshot()
+
+        @Synchronized private fun snapshot() {
+            status.value = ModelPart.entries.associateWith { part ->
+                if (part.primary.ready(modelRoot)) ModelStatus.Ready else progress[part] ?: ModelStatus.Missing(true)
+            }
+        }
+        override suspend fun install(parts: Set<ModelPart>, onProgress: (DownloadProgress) -> Unit): InstallOutcome =
+            installWith(parts, onProgress, Dispatchers.IO) { true }
+
+        fun backend(io: CoroutineDispatcher, online: () -> Boolean): ModelInstallBackend =
+            object : ModelInstallBackend by this {
+                override fun hasValidatedNetwork(): Boolean = online()
+                override suspend fun install(
+                    parts: Set<ModelPart>,
+                    onProgress: (DownloadProgress) -> Unit,
+                ): InstallOutcome =
+                    installWith(parts, onProgress, io, online)
+            }
+
+        private suspend fun installWith(
+            parts: Set<ModelPart>,
+            onProgress: (DownloadProgress) -> Unit,
+            io: CoroutineDispatcher,
+            online: () -> Boolean,
+        ): InstallOutcome {
+            val store = object : ModelStore {
+                override fun consented(): Boolean = true
+                override fun hasValidatedNetwork(): Boolean = online()
+                override fun ready(model: ModelDescriptor): Boolean = model.ready(modelRoot)
+                override fun usableBytes(): Long = Long.MAX_VALUE
+                override fun installBlocking(model: ModelDescriptor, progress: (Long, Boolean) -> Unit) {
+                    if (ready(model)) return
+                    val directory = model.directory(modelRoot).apply { mkdirs() }
+                    fetcher(model, directory, progress)
+                    File(directory, model.markerFile).writeText(model.markerValue)
+                }
+            }
+            return ModelInstaller(store, io).install(parts, onProgress)
+        }
     }
 
     /** Count an attempted dispatch even if its worker has not got CPU time yet. */

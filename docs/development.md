@@ -36,7 +36,7 @@ These files stay out of commits: `local.properties`, model weights, AAR download
 | Module | Content | Build needs |
 |---|---|---|
 | `:core` | Plain Kotlin on the JVM, package `io.codemyriad.cassini.core`. The portable format, the audio arithmetic, the recognition windows and the speaker rules. The model pins and downloads, the checkpoint codec, the library rules and the export writers. | JDK 17 and the submodule |
-| `:app-logic` | Plain Kotlin/JVM app policies: service type, Unicode search, leaf state and import tracking. Android adapters stay in app. | JDK 17 and the submodule |
+| `:app-logic` | Plain Kotlin/JVM app policies: service type, Unicode search, leaf state, import tracking and model-install ownership/sequencing. Android adapters stay in app. | JDK 17 and the submodule |
 | `:engine` | Android library, package `io.codemyriad.cassini.engine`. The sherpa-onnx wrappers, the MediaCodec decoder, the microphone capture, the Opus encoder with its JNI library `libcassini_opus.so`, and `TranscriptionJob` behind its ports. | The Android SDK, the NDK, CMake and `scripts/setup.sh` |
 | `:data` | Android library, package `io.codemyriad.cassini.data`. The Room catalogue, the DataStore settings and the file repositories. | The Android SDK |
 | `:ui` | Android library, package `io.codemyriad.cassini.ui`. The Compose design system, the stateless screens and the Roborazzi screenshot tests. | The Android SDK |

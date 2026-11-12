@@ -1,7 +1,10 @@
 package io.codemyriad.cassini.processing
 
 import io.codemyriad.cassini.adapters.RepositoryModelAccess
+import io.codemyriad.cassini.adapters.RepositoryModelInstallBackend
+import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.models.ModelCatalog
+import io.codemyriad.cassini.core.models.ModelDescriptor
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.data.CassiniDispatchers
@@ -37,6 +40,11 @@ import java.io.File
 import java.io.IOException
 import java.io.InterruptedIOException
 import java.io.RandomAccessFile
+import java.net.ConnectException
+import java.net.NoRouteToHostException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+import java.util.Collections
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -58,6 +66,10 @@ class ModelInstallQueueTest {
     private val releaseVoices = CountDownLatch(1)
     private val failSpeakers = AtomicBoolean(false)
     private val interrupted = AtomicBoolean(false)
+    private val speechStarted = CountDownLatch(1)
+    private val releaseSpeech = CountDownLatch(1)
+    private var blockSpeech = false
+    private var fetchFailure: IOException? = null
     private lateinit var paths: AppPaths
     private lateinit var settings: SettingsRepository
     private lateinit var models: ModelRepository
@@ -65,6 +77,13 @@ class ModelInstallQueueTest {
 
     private val fetcher = ModelFetcher { model, directory, progress ->
         fetched += model.id
+        fetchFailure?.let { throw it }
+        if (model == ModelCatalog.PARAKEET && blockSpeech) {
+            File(directory, "encoder.int8.onnx.part").writeBytes(ByteArray(1024))
+            speechStarted.countDown()
+            waitForRelease(releaseSpeech)
+            File(directory, "encoder.int8.onnx.part").delete()
+        }
         progress(model.downloadBytes / 2, false)
         if (model == ModelCatalog.DIARIZATION) {
             speakersStarted.countDown()
@@ -90,6 +109,7 @@ class ModelInstallQueueTest {
     @After fun tearDown() = runBlocking {
         releaseSpeakers.countDown()
         releaseVoices.countDown()
+        releaseSpeech.countDown()
         withTimeout(WAIT_MS) { scope.coroutineContext.job.cancelAndJoin() }
     }
 
@@ -167,8 +187,106 @@ class ModelInstallQueueTest {
         assertEquals(InstallOutcome.Installed(), owner.lastOutcome.value)
     }
 
-    private fun newOwner(repository: ModelRepository) =
-        ModelInstallOwner(repository, paths.modelRoot, { true }, scope, Dispatchers.IO)
+    @Test fun transportFailuresThroughTheRepositoryStayNoConnectionOnValidatedWifi() = runBlocking {
+        models.recordConsent()
+        val failures = listOf(
+            SocketTimeoutException("Read timed out"),
+            UnknownHostException("model host"),
+            ConnectException("Connection refused"),
+            NoRouteToHostException("No route"),
+        )
+        for (failure in failures) {
+            fetchFailure = failure
+            withTimeout(WAIT_MS) { owner.startDownload(setOf(ModelPart.SPEECH)).join() }
+            assertEquals(
+                failure.javaClass.simpleName,
+                DownloadError.NO_CONNECTION,
+                (owner.lastOutcome.value as InstallOutcome.Failed).error,
+            )
+            assertEquals(
+                ModelStatus.Failed(Failure.DOWNLOAD, DownloadError.NO_CONNECTION.name),
+                models.status.value[ModelPart.SPEECH],
+            )
+        }
+    }
+
+    @Test fun anInterruptedSocketCancelThroughTheRepositoryLeavesNoFailureBanner() = runBlocking {
+        models.recordConsent()
+        blockSpeech = true
+        val download = owner.startDownload(setOf(ModelPart.SPEECH))
+        assertTrue(speechStarted.await(WAIT_S, TimeUnit.SECONDS))
+        owner.cancel()
+        withTimeout(WAIT_MS) { download.join() }
+        assertEquals(InstallState.Idle, owner.state.value)
+        assertNull(owner.lastOutcome.value)
+        assertEquals(ModelStatus.Missing(consented = true), models.status.value[ModelPart.SPEECH])
+        assertTrue(File(ModelCatalog.PARAKEET.directory(paths.modelRoot), "encoder.int8.onnx.part").isFile)
+    }
+
+    @Test fun optionalRetryKeepsItsOriginalPlanWithOrWithoutEarlierSpeechConsent() = runBlocking {
+        for (speechConsent in listOf(false, true)) {
+            val root = folder.newFolder("optional-$speechConsent")
+            val separate = AppPaths(root, File(root, "cache").apply { mkdirs() })
+            val settingsScope = CoroutineScope(scope.coroutineContext + Dispatchers.IO)
+            val settings = SettingsRepository.create(separate, settingsScope)
+            val failedOnce = AtomicBoolean(false)
+            val requested = Collections.synchronizedList(mutableListOf<ModelDescriptor>())
+            val fetch = ModelFetcher { model, directory, _ ->
+                requested += model
+                if (model == ModelCatalog.DIARIZATION && !failedOnce.getAndSet(true)) {
+                    throw java.io.IOException("Lab optional download failed")
+                }
+                model.artifacts.forEach { artifact ->
+                    RandomAccessFile(File(directory, artifact.name), "rw").use { it.setLength(artifact.size) }
+                }
+            }
+            val repository = ModelRepository(separate, settings, CassiniDispatchers(), fetch)
+            repository.recordConsent(includeSpeech = speechConsent)
+            val installer = newOwner(repository, root)
+            val optional = setOf(ModelPart.SPEAKERS, ModelPart.VOICES)
+            withTimeout(WAIT_MS) { installer.startDownload(optional).join() }
+            assertTrue((installer.lastOutcome.value as InstallOutcome.Installed).failed.containsKey(ModelPart.SPEAKERS))
+            withTimeout(WAIT_MS) { installer.startDownload().join() }
+            assertEquals(InstallOutcome.Installed(), installer.lastOutcome.value)
+            assertEquals(listOf(ModelCatalog.DIARIZATION, ModelCatalog.DIARIZATION, ModelCatalog.VOICEPRINT), requested)
+            assertTrue(repository.ready(ModelPart.SPEAKERS) && repository.ready(ModelPart.VOICES))
+            assertTrue(!repository.ready(ModelPart.SPEECH))
+        }
+    }
+
+    @Test fun parakeetOnlyPermissionCannotFetchOptionalPartsOrScheduleThemForTheNextJob() = runBlocking {
+        val separate = AppPaths(folder.newFolder("speech-root"), folder.newFolder("speech-cache"))
+        val settingsScope = CoroutineScope(scope.coroutineContext + Dispatchers.IO)
+        val settings = SettingsRepository.create(separate, settingsScope)
+        val repository = ModelRepository(separate, settings, CassiniDispatchers(), fetcher)
+        repository.recordConsent(includeOptional = false)
+        val installer = newOwner(repository, separate.modelRoot)
+        val access = RepositoryModelAccess(repository, separate.modelRoot, installer) { true }
+        assertEquals(listOf(ModelPart.SPEECH), withContext(Dispatchers.IO) { access.plan().parts })
+        val mixed = withTimeout(WAIT_MS) { installer.install(setOf(ModelPart.SPEECH, ModelPart.SPEAKERS)) }
+        assertTrue(mixed is InstallOutcome.NeedsConsent)
+        assertTrue(fetched.isEmpty())
+        releaseSpeakers.countDown()
+        releaseVoices.countDown()
+        val speech = withTimeout(WAIT_MS) { installer.install(setOf(ModelPart.SPEECH)) }
+        assertEquals(InstallOutcome.Installed(), speech)
+        val expected = listOf(ModelCatalog.PARAKEET.id, ModelCatalog.VAD.id).sorted()
+        assertEquals(expected, fetched.sorted())
+        assertTrue(withContext(Dispatchers.IO) { access.plan().isEmpty })
+        assertTrue(installer.install(setOf(ModelPart.SPEAKERS)) is InstallOutcome.NeedsConsent)
+        withTimeout(WAIT_MS) { installer.startDownload().join() }
+        assertEquals("A speech-only retry cannot add optional models", expected, fetched.sorted())
+        repository.recordConsent(includeSpeech = false)
+        val authorized = withContext(Dispatchers.IO) { access.plan().parts }
+        assertEquals(listOf(ModelPart.SPEAKERS, ModelPart.VOICES), authorized)
+    }
+
+    private fun newOwner(repository: ModelRepository, root: File = paths.modelRoot) =
+        ModelInstallOwner(
+            RepositoryModelInstallBackend(repository, root, { true }, Dispatchers.IO),
+            scope,
+            Dispatchers.IO,
+        )
 
     private fun waitForRelease(gate: CountDownLatch) {
         try {

@@ -1,15 +1,11 @@
 package io.codemyriad.cassini.processing
 
-import io.codemyriad.cassini.adapters.NetworkCheck
-import io.codemyriad.cassini.adapters.RepositoryModelStore
 import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.models.ModelPart
-import io.codemyriad.cassini.data.models.ModelRepository
 import io.codemyriad.cassini.data.models.ModelStatus
 import io.codemyriad.cassini.engine.job.DownloadError
 import io.codemyriad.cassini.engine.job.DownloadProgress
 import io.codemyriad.cassini.engine.job.InstallOutcome
-import io.codemyriad.cassini.engine.job.ModelInstaller
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -28,7 +24,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CopyOnWriteArraySet
 
@@ -49,7 +44,7 @@ sealed interface InstallState {
 }
 
 /**
- * The only caller of [ModelInstaller] (architecture 5.1 and 5.6). Jobs and the standalone download share it:
+ * The shared owner of model installs (architecture 5.1 and 5.6). Jobs and the standalone download share it:
  *
  * - At most one install runs at a time.
  * - A request for the same part set while one runs joins it: it waits on the same [Deferred] and gets its progress and
@@ -65,9 +60,7 @@ sealed interface InstallState {
  */
 @Suppress("TooManyFunctions") // the install API of architecture 5.6, plus the stop by Android of 5.7
 class ModelInstallOwner(
-    private val models: ModelRepository,
-    private val modelRoot: File,
-    private val network: NetworkCheck,
+    private val models: ModelInstallBackend,
     private val scope: CoroutineScope,
     private val io: CoroutineDispatcher,
 ) {
@@ -331,9 +324,7 @@ class ModelInstallOwner(
             shared.parts.filterNot { it in requestedCounts }.forEach(models::clearProgress)
         }
         try {
-            val consented = shared.parts.all { models.consented(it) }
-            val store = RepositoryModelStore(models, modelRoot, network, consented)
-            val outcome = ModelInstaller(store, io).install(shared.parts) { progress ->
+            val outcome = models.install(shared.parts) { progress ->
                 shared.progress = progress
                 models.publishProgress(progress.part, statusOf(progress))
                 publishState(shared)
@@ -401,17 +392,17 @@ class ModelInstallOwner(
     private fun failures(outcome: InstallOutcome, standalone: Boolean): Map<ModelPart, DownloadError> = when (outcome) {
         is InstallOutcome.Failed -> mapOf(outcome.part to outcome.error)
         is InstallOutcome.Installed -> {
-            val error = if (network.validated()) DownloadError.INSTALL else DownloadError.NO_CONNECTION
+            val error = if (models.hasValidatedNetwork()) DownloadError.INSTALL else DownloadError.NO_CONNECTION
             val skipped = if (standalone) outcome.skipped.associateWith { error } else emptyMap()
             skipped + outcome.failed
         }
         is InstallOutcome.NeedsConsent -> emptyMap()
     }
 
-    internal companion object {
+    companion object {
         private const val PERCENT = 100L
 
-        fun statusOf(progress: DownloadProgress): ModelStatus = if (progress.verifying) {
+        internal fun statusOf(progress: DownloadProgress): ModelStatus = if (progress.verifying) {
             ModelStatus.Verifying(progress.percent)
         } else {
             val total = progress.totalBytes.coerceAtLeast(0)

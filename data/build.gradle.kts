@@ -74,6 +74,7 @@ room {
 
 dependencies {
     api(project(":core"))
+    api(project(":app-logic"))
     implementation(libs.bundles.room)
     implementation(libs.annotation)
     ksp(libs.room.compiler)

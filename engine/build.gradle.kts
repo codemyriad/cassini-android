@@ -57,6 +57,7 @@ kotlin {
 
 dependencies {
     api(project(":core"))
+    api(project(":app-logic"))
     // The wrappers expose sherpa-onnx types (configs, results) and suspend functions to :app.
     api(libs.sherpa.onnx.nemotron)
     api(libs.coroutines.core)
