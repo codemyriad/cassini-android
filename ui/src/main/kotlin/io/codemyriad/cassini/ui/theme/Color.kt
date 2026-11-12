@@ -30,7 +30,7 @@ class CassiniColors(
     val text2: Color,
     /** Card bodies, placeholder-speaker paragraphs, the settled draft and the States column headings. */
     val text3: Color,
-    /** Unsettled draft words and placeholders. Light is #687180, not the board's #6B7480 (fails AA). */
+    /** Unsettled draft words and placeholders, using the canonical ink-3 role. */
     val text4: Color,
     /** Hairlines and card borders. */
     val line: Color,
@@ -74,7 +74,7 @@ class CassiniColors(
     val snackbarBg: Color,
     val snackbarText: Color,
     val snackbarAction: Color,
-    /** Behind sheets and dialogs, with its alpha. Over [bg] it gives the boards' #8A9098 in light. */
+    /** Behind sheets and dialogs, with the canonical alpha. */
     val scrim: Color,
     /** Inline links (underlined). */
     val link: Color,
@@ -113,7 +113,7 @@ class CassiniColors(
 
 // W1 preview activates Alex’s decided palette; values come only from the pinned source.
 
-// Source: codemyriad/cassini-ux@e244ad6a830e4ef77d87fb452143f7100c767139, brand/tokens.json.
+// Source: codemyriad/cassini-ux@b4dec4160a04a5e9995ce0a74d0215aa24a3da9c, brand/tokens.json.
 // Android-only secondary roles alias published tokens; speaker/avatar pairs have their own roles.
 internal val CanvasRoleTokens = mapOf(
     "speakerQuestionWash" to "avatar-0",

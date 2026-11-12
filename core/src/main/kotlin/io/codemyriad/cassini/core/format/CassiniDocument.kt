@@ -52,6 +52,26 @@ data class CassiniDocument(
         for (i in 0 until speakers.length()) speakers.getJSONObject(i).let { if (it.optString("id") == id) return it.optString("label") }
         return null
     }
+
+    /** An explicit unnamed provenance overrides any display label in an imported file. */
+    fun speakerProvenance(id: String): String? {
+        val speakers = manifest?.optJSONArray("speakers") ?: return null
+        return (0 until speakers.length()).map { speakers.getJSONObject(it) }
+            .firstOrNull { it.optString("id") == id }?.optString("provenance")?.ifEmpty { null }
+    }
+
+    private fun firstSpeechOrder(): List<String> = variants.firstOrNull { it.transcript != null }
+        ?.transcript?.words?.map { it.speaker }?.distinct().orEmpty()
+
+    /** Old files use the first readable variant, never the currently selected variant's order. */
+    fun speakerColourIndex(id: String): Int? {
+        val speakers = manifest?.optJSONArray("speakers") ?: return null
+        return (0 until speakers.length()).firstOrNull { speakers.getJSONObject(it).optString("id") == id }?.let { i ->
+            val original = firstSpeechOrder().indexOf(id).takeIf { it >= 0 } ?: i
+            speakers.getJSONObject(i).optInt("colourIndex", original).takeIf { it >= 0 } ?: original
+        }
+    }
+
     companion object {
         const val FORMAT = "org.cassini.portable-meeting/1"
         private const val MANIFEST_PREFIX = "CASSINI_PAYLOAD_"
@@ -234,6 +254,7 @@ data class CassiniDocument(
             speakerLabels: Map<String, String> = emptyMap(),
             recordedAtUtc: Instant? = null,
             createdAtUtc: Instant = Instant.now(),
+            colourIndices: Map<String, Int> = emptyMap(),
         ): ByteArray {
             val (comments, digest) = seal(
                 OggOpus.scan(ByteArrayInputStream(audioBytes)),
@@ -244,6 +265,7 @@ data class CassiniDocument(
                 speakerLabels,
                 recordedAtUtc = recordedAtUtc,
                 createdAtUtc = createdAtUtc,
+                colourIndices = colourIndices,
             )
             val out = ByteArrayOutputStream()
             require(OggOpus.rewrite(ByteArrayInputStream(audioBytes), tagsPacket(comments), out).digest() == digest)
@@ -267,6 +289,7 @@ data class CassiniDocument(
             extensions: JSONObject? = null,
             recordedAtUtc: Instant? = null,
             createdAtUtc: Instant = Instant.now(),
+            colourIndices: Map<String, Int> = emptyMap(),
         ): CassiniDocument {
             val stream = OggOpus.scan(audio)
             val (comments, digest) = seal(
@@ -279,6 +302,7 @@ data class CassiniDocument(
                 extensions,
                 recordedAtUtc,
                 createdAtUtc,
+                colourIndices,
             )
             writeWithTags(audio, comments, digest, target)
             return read(target).also { verify(it, transcript) }
@@ -321,19 +345,37 @@ data class CassiniDocument(
             }
         }
 
+        /** Assign once, before any label or transcript-order edit; never overwrite a stored slot. */
+        private fun fixSpeakerSlots(speakers: JSONArray, originalOrder: List<String>) {
+            for (i in 0 until speakers.length()) {
+                val speaker = speakers.getJSONObject(i)
+                if (!speaker.has("colourIndex")) {
+                    val index = originalOrder.indexOf(speaker.getString("id")).takeIf { it >= 0 } ?: i
+                    speaker.put("colourIndex", index)
+                }
+            }
+        }
+
         /** Copies [source]'s audio packet for packet behind [comments]; the audio must still hash to [digest]. */
         private fun writeWithTags(source: File, comments: List<String>, digest: String, target: File) =
             require(OggOpus.rewrite(source, tagsPacket(comments), target).digest() == digest)
+
         /**
-         * Renames speakers only: bodies, variants, unknown members and unrelated tags stay as they are, and the
-         * manifest tags are re-encoded. The written file must read back identical apart from those labels.
+         * Renames speakers, fixing any legacy missing colour slots before the edit and clearing an explicit
+         * unnamed marker on the renamed speaker. Bodies, variants and unrelated metadata/tags are retained.
          */
         fun relabel(source: File, existing: CassiniDocument, labels: Map<String, String>, target: File): CassiniDocument {
             require(existing.state == "ok" && existing.manifest != null)
             val manifest = JSONObject(existing.manifest.toString())
             val speakers = manifest.getJSONArray("speakers")
+            fixSpeakerSlots(speakers, existing.firstSpeechOrder())
             val byId = (0 until speakers.length()).associate { speakers.getJSONObject(it).let { s -> s.getString("id") to s } }
-            labels.forEach { (id, label) -> require(label.isNotBlank()) { "Blank label" }; (byId[id] ?: throw IllegalArgumentException("Unknown speaker $id")).put("label", label.trim()) }
+            labels.forEach { (id, label) ->
+                require(label.isNotBlank()) { "Blank label" }
+                val speaker = byId[id] ?: throw IllegalArgumentException("Unknown speaker $id")
+                speaker.put("label", label.trim())
+                if (speaker.optString("provenance") == "unnamed") speaker.remove("provenance")
+            }
             val digest = manifest.getJSONObject("integrity").getString("opusAudioSha256")
             val comments = existing.comments.filterNot { isManifestTag(it.substringBefore('=').uppercase(Locale.ROOT)) } +
                 CassiniPayload.encode(MANIFEST_PREFIX, CassiniPayload.MIME, manifest.toString()).second
@@ -461,6 +503,7 @@ data class CassiniDocument(
             extensions: JSONObject? = null,
             recordedAtUtc: Instant? = null,
             createdAtUtc: Instant = Instant.now(),
+            colourIndices: Map<String, Int> = emptyMap(),
         ): Pair<List<String>, String> {
             val digest = stream.digest()
             require(existing == null || existing.state == "ok") // Never rebind stale transcripts to different audio.
@@ -486,8 +529,16 @@ data class CassiniDocument(
             descriptors.put(JSONObject().put("id", id).put("format", "cassini.words.v1").put("default", true)
                 .put("language", transcript.language).put("wordCount", transcript.words.size).put("createdAtUtc", now).put("payloadRef", ref))
             val speakers = manifest.getJSONArray("speakers")
+            fixSpeakerSlots(speakers, existing?.firstSpeechOrder().orEmpty())
             val known = (0 until speakers.length()).map { speakers.getJSONObject(it).getString("id") }.toSet()
-            transcript.words.map { it.speaker }.distinct().filterNot { it in known }.forEach { speakers.put(JSONObject().put("id", it).put("label", speakerLabels[it] ?: it)) }
+            var nextColour = (0 until speakers.length()).maxOfOrNull {
+                speakers.getJSONObject(it).getInt("colourIndex")
+            }?.plus(1) ?: 0
+            transcript.words.map { it.speaker }.distinct().filterNot { it in known }.forEach {
+                val slot = if (existing == null) colourIndices[it] ?: nextColour++ else nextColour++
+                require(slot >= 0) { "Invalid speaker colour index" }
+                speakers.put(JSONObject().put("id", it).put("label", speakerLabels[it] ?: it).put("colourIndex", slot))
+            }
             val provenance = manifest.optJSONObject("provenance") ?: JSONObject().also { manifest.put("provenance", it) }
             val speech = provenance.optJSONObject("speechToText") ?: JSONObject().also { provenance.put("speechToText", it) }
             speech.put(id, processing)

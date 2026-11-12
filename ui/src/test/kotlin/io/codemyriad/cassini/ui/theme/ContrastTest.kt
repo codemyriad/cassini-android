@@ -1,6 +1,7 @@
 package io.codemyriad.cassini.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -27,39 +28,39 @@ class ContrastTest {
 
     @Suppress("LongMethod") // One line per row of the table.
     private fun pairs(): List<Pair> = listOf(
-        text("ink on bg", 16.34, 15.53, { it.ink }, { it.bg }),
-        text("ink on surface", 18.00, 14.43, { it.ink }, { it.surface }),
-        text("text2 on bg", 6.78, 8.84, { it.text2 }, { it.bg }),
-        text("text2 on surface", 7.47, 8.21, { it.text2 }, { it.surface }),
-        text("text2 on boardBg", 6.20, 8.56, { it.text2 }, { it.boardBg }),
-        text("text3 on bg", 6.78, 8.84, { it.text3 }, { it.bg }),
-        text("text3 on accentTint", 5.95, 6.88, { it.text3 }, { it.accentTint }),
-        text("text3 on boardBg", 6.20, 8.56, { it.text3 }, { it.boardBg }),
-        text("text4 on sunken", 4.64, 5.28, { it.text4 }, { it.boardBg }),
-        text("text4 on bg", 5.07, 5.45, { it.text4 }, { it.bg }),
-        text("text4 on surface", 5.58, 5.06, { it.text4 }, { it.surface }),
-        text("accentInk on accentTint", 5.40, 8.59, { it.accentInk }, { it.accentTint }),
+        text("ink on bg", 15.81, 15.70, { it.ink }, { it.bg }),
+        text("ink on surface", 17.24, 14.35, { it.ink }, { it.surface }),
+        text("text2 on bg", 6.25, 8.78, { it.text2 }, { it.bg }),
+        text("text2 on surface", 6.81, 8.03, { it.text2 }, { it.surface }),
+        text("text2 on boardBg", 5.82, 8.50, { it.text2 }, { it.boardBg }),
+        text("text3 on bg", 6.25, 8.78, { it.text3 }, { it.bg }),
+        text("text3 on accentTint", 5.71, 7.06, { it.text3 }, { it.accentTint }),
+        text("text3 on boardBg", 5.82, 8.50, { it.text3 }, { it.boardBg }),
+        text("text4 on sunken", 4.78, 5.76, { it.text4 }, { it.boardBg }),
+        text("text4 on bg", 5.13, 5.95, { it.text4 }, { it.bg }),
+        text("text4 on surface", 5.60, 5.44, { it.text4 }, { it.surface }),
+        text("accentInk on accentTint", 10.98, 8.59, { it.accentInk }, { it.accentTint }),
         text("tealInk on tealTint", 4.73, 6.20, { it.tealInk }, { it.tealTint }),
-        text("tealInk on surface", 5.67, 7.46, { it.tealInk }, { it.surface }),
+        text("tealInk on surface", 5.67, 7.09, { it.tealInk }, { it.surface }),
         text("amberInk on amberTint", 6.55, 8.58, { it.amberInk }, { it.amberTint }),
         text("amberInk on amberWash", 6.55, 8.58, { it.amberInk }, { it.amberWash }),
-        text("amberInk on surface", 7.60, 10.39, { it.amberInk }, { it.surface }),
-        text("redInk on redTint", 5.20, 6.13, { it.redInk }, { it.redTint }),
-        text("redInk on surface", 6.11, 7.32, { it.redInk }, { it.surface }),
-        text("redInk on bg", 5.55, 7.88, { it.redInk }, { it.bg }),
-        text("onAccentFill on accentFill", 6.78, 11.05, { it.onAccentFill }, { it.accentFill }),
-        text("accent on surface", 5.01, 10.26, { it.accent }, { it.surface }),
+        text("amberInk on surface", 7.60, 9.89, { it.amberInk }, { it.surface }),
+        text("redInk on redTint", 5.04, 6.24, { it.redInk }, { it.redTint }),
+        text("redInk on surface", 6.11, 6.96, { it.redInk }, { it.surface }),
+        text("redInk on bg", 5.60, 7.61, { it.redInk }, { it.bg }),
+        text("onAccentFill on accentFill", 13.09, 11.05, { it.onAccentFill }, { it.accentFill }),
+        text("accent on surface", 13.09, 9.76, { it.accent }, { it.surface }),
         text("white on red (Record)", 6.11, 6.11, white, { it.red }),
         text("onRed on red (Record)", 6.11, 6.11, { it.onRed }, { it.red }),
-        text("onInkFill on inkFill", 16.34, 15.53, { it.onInkFill }, { it.inkFill }),
-        text("snackbar action on snackbar", 10.26, 5.34, { it.snackbarAction }, { it.snackbarBg }),
-        text("snackbar text on snackbar", 14.43, 15.53, { it.snackbarText }, { it.snackbarBg }),
-        text("link on surface", 5.01, 10.26, { it.link }, { it.surface }),
-        nonText("accent on accentTrack", 3.99, 8.59, { it.accent }, { it.accentTrack }),
-        nonText("accent on line", 3.44, 8.20, { it.accent }, { it.line }),
-        nonText("teal dot on surface", 5.67, 7.46, { it.teal }, { it.surface }),
-        nonText("amber dot on surface", 7.60, 10.39, { it.amber }, { it.surface }),
-        nonText("error dot on surface", 6.11, 7.32, { it.error }, { it.surface }),
+        text("onInkFill on inkFill", 15.81, 15.70, { it.onInkFill }, { it.inkFill }),
+        text("snackbar action on snackbar", 9.76, 10.78, { it.snackbarAction }, { it.snackbarBg }),
+        text("snackbar text on snackbar", 14.35, 15.70, { it.snackbarText }, { it.snackbarBg }),
+        text("link on surface", 13.09, 9.76, { it.link }, { it.surface }),
+        nonText("accent on accentTrack", 10.98, 8.59, { it.accent }, { it.accentTrack }),
+        nonText("accent on line", 9.73, 7.12, { it.accent }, { it.line }),
+        nonText("teal dot on surface", 5.67, 7.09, { it.teal }, { it.surface }),
+        nonText("amber dot on surface", 7.60, 9.89, { it.amber }, { it.surface }),
+        nonText("error dot on surface", 6.11, 6.96, { it.error }, { it.surface }),
     )
 
     @Test fun lightPairsMeetTheirMinimumAndTheTable() = check(LightColors) { it.light }
@@ -69,11 +70,11 @@ class ContrastTest {
     @Test fun recordingPairs() {
         val rec = CassiniRecordingColors
         listOf(
-            Triple("rec.text", rec.text, 15.53),
-            Triple("rec.text2", rec.text2, 8.84),
-            Triple("rec.status", rec.status, 7.88),
-            Triple("rec.dot", rec.dot, 7.88),
-            Triple("rec.barFresh", rec.barFresh, 7.88),
+            Triple("rec.text", rec.text, 15.70),
+            Triple("rec.text2", rec.text2, 8.78),
+            Triple("rec.status", rec.status, 7.61),
+            Triple("rec.dot", rec.dot, 7.61),
+            Triple("rec.barFresh", rec.barFresh, 7.61),
         ).forEach { (label, fg, documented) ->
             val ratio = contrast(fg, rec.bg)
             assertTrue("$label on rec.bg is $ratio", ratio >= TEXT)
@@ -94,6 +95,16 @@ class ContrastTest {
                 val speaker = colors.speaker(tone)
                 assertTrue("$tone on avatar", contrast(speaker.ink, speaker.tint) >= TEXT)
                 assertTrue("$tone on ground", contrast(speaker.ink, colors.bg) >= TEXT)
+            }
+        }
+    }
+
+    @Test fun neutralInkOverlayKeepsTextAAOnBothPhoneBackdrops() {
+        for (colors in listOf(LightColors, DarkColors)) {
+            for (backdrop in listOf(colors.bg, colors.surface)) {
+                val fill = colors.ink.copy(alpha = 0.1f).compositeOver(backdrop)
+                assertTrue(contrast(colors.ink, fill) >= TEXT)
+                assertTrue(contrast(colors.neutralInk, fill) >= TEXT)
             }
         }
     }

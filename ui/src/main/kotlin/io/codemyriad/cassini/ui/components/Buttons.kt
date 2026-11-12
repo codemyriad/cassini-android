@@ -244,7 +244,7 @@ fun SecondaryButton(
         modifier = modifier,
         visual = size.visual,
         padding = padding,
-        fill = if (size == SecondaryButtonSize.Regular) Color.Transparent else c.surface,
+        fill = c.ink.copy(alpha = 0.1f),
         border = c.line2,
         textStyle = style,
         textColor = c.ink,

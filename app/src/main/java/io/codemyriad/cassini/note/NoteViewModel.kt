@@ -1416,6 +1416,7 @@ class NoteViewModel(
             suggestions,
             state.tentativeFromMs,
             ports::placeholderLabel,
+            colourIndices = state.colourIndices,
         )
         DraftShown(
             transcript,
@@ -1444,6 +1445,7 @@ class NoteViewModel(
                 suggestions,
                 null,
                 ports::placeholderLabel,
+                colourIndices = draft.colourIndices,
             )
             DraftShown(
                 transcript,

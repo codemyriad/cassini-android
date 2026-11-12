@@ -39,33 +39,37 @@ meta stays 13 sp. Other row titles keep their existing sizes. Explicit transcrip
 
 ## 4. Tokens
 
-The W1 preview reads `third_party/cassini-ux/brand/tokens.json`, pinned to cassini-ux `e244ad6`.
+The W1 preview reads `third_party/cassini-ux/brand/tokens.json`, pinned to cassini-ux `b4dec41`.
 `Color.kt` owns Android aliases; `third_party/cassini-ux/brand/ANDROID-MAPPING.md` documents them.
 `scripts/generate-brand-colors.py` emits checked-in Kotlin and window/launcher XML. CI checks the
 source digest, generated outputs and absence of authored colour literals in production sources.
 The temporary #195 compatibility snapshot is deleted here. All values come from the canonical file,
-including the forced-dark Recording screen. The preview uses Linen / Saturn-night, teal, the decided
-Record/error red, six speaker pairs plus unnamed stone and teal highlights. The preview remains draft
-for visual approval; speaker colourIndex semantics are not changed.
+including the forced-dark Recording screen. The preview uses the decided cool-grey base, navy light accent, six speaker pairs plus unnamed
+stone, and the approved highlights. It remains draft for visual approval. Speaker colourIndex is
+fixed at first speech and stored in the meeting file (L-41).
 
 ### 4.1 Canvas values (W1 preview)
 
 | Role | Light | Dark |
 |---|---|---|
-| ground | #F5F4EF | #070B11 |
-| surface | #FFFFFF | #10151C |
-| sunken | #ECEAE3 | #0B1016 |
-| raised | #FFFFFF | #181E26 |
-| line | #D9D6CD | #232932 |
-| line-soft | #E6E3DB | #1A1F27 |
-| ink | #1A1611 | #E5E5D9 |
-| ink-2 | #5B544A | #AFAEA4 |
-| ink-3 | #6E675D | #88877C |
-| accent | #007999 | #83CDDF |
-| accent-strong | #006380 | #83CDDF |
+| ground | #F4F5F7 | #0D1015 |
+| surface | #FFFFFF | #171A20 |
+| sunken | #ECEDF0 | #111419 |
+| raised | #FFFFFF | #21252C |
+| sidebar | #EBECEF | #1C1F25 |
+| sidebar-mac | #EBECEF | #1C1F25 |
+| field | #FFFFFF | #25292F |
+| field-line | #DCDEE3 | #30353D |
+| line | #DCDEE3 | #2E333B |
+| line-soft | #E6E8EC | #23272E |
+| ink | #191B1F | #E8E9EC |
+| ink-2 | #575B63 | #ADB0B7 |
+| ink-3 | #64686F | #8C9098 |
+| accent | #093351 | #83CDDF |
+| accent-strong | #093351 | #83CDDF |
 | on-accent | #FFFFFF | #070B11 |
-| accent-ink | #006380 | #83CDDF |
-| accent-tint | #C9EBF8 | #072930 |
+| accent-ink | #093351 | #83CDDF |
+| accent-tint | #DEEDFB | #072930 |
 | record | #C01C28 | #C01C28 |
 | record-ink | #C01C28 | #FF7B7F |
 | record-tint | #FBE4E6 | #3A1A1D |
@@ -73,40 +77,40 @@ for visual approval; speaker colourIndex semantics are not changed.
 | error-fill | #C01C28 | #C01C28 |
 | success-fill | #197640 | #197640 |
 | error | #C01C28 | #FF7B7F |
-| error-tint | #FFE8E2 | #3F1A12 |
+| error-tint | #FBE4E6 | #3A1A1D |
 | success | #197640 | #49BA71 |
 | success-tint | #E3EEDD | #0E2B18 |
 | warn-ink | #774A00 | #FCB700 |
 | warn-tint | #FFECC9 | #342305 |
-| neutral-ink | #5B544A | #AFAEA4 |
-| neutral-tint | #EBE9E2 | #1A1F27 |
-| highlight | #BDDCE4 | #3E5F6A |
-| highlight-ink | #1A1611 | #E5E5D9 |
-| speaker-1 | #B93508 | #F2744E |
-| speaker-2 | #89593B | #C49A78 |
-| speaker-3 | #925E00 | #F2B21B |
-| speaker-4 | #006BAA | #4FA9EC |
-| speaker-5 | #277717 | #7CCB5E |
-| speaker-6 | #984493 | #D27FCD |
-| speaker-0 | #6C6560 | #C3BCB7 |
-| avatar-1 | #FEDED5 | #4D261D |
-| avatar-2 | #FAE0D1 | #403630 |
-| avatar-3 | #FEEAC7 | #4E3D14 |
-| avatar-4 | #D2EAFE | #1D3A53 |
-| avatar-5 | #D1F1CB | #2A4528 |
-| avatar-6 | #FADBF7 | #432C49 |
-| avatar-0 | #EAE5E1 | #3F4043 |
-| inverse | #10151C | #E5E5D9 |
-| on-inverse | #E5E5D9 | #070B11 |
-| inverse-accent | #83CDDF | #006380 |
+| neutral-ink | #575B63 | #ADB0B7 |
+| neutral-tint | #E9EBEE | #23272E |
+| highlight | #BDDCE4 | #24708A |
+| highlight-ink | #191B1F | #E8E9EC |
+| speaker-1 | #2C61C7 | #679CFF |
+| speaker-2 | #AF3679 | #E96CAD |
+| speaker-3 | #007378 | #09B4BB |
+| speaker-4 | #AD3F00 | #EB7C33 |
+| speaker-5 | #7B4CBC | #B082F7 |
+| speaker-6 | #486A86 | #7FA3C2 |
+| speaker-0 | #62666E | #B0B4BC |
+| avatar-1 | #D9E7FF | #1F304F |
+| avatar-2 | #FEDBEA | #472335 |
+| avatar-3 | #C4F0F2 | #00383B |
+| avatar-4 | #FED8C9 | #482612 |
+| avatar-5 | #EAE0FF | #35294A |
+| avatar-6 | #D4E9FD | #12334C |
+| avatar-0 | #E6E8EC | #30353D |
+| inverse | #171A20 | #E8E9EC |
+| on-inverse | #E8E9EC | #0D1015 |
+| inverse-accent | #83CDDF | #093351 |
 | scrim | #070B1173 | #00000099 |
-| shadow | #0F05001F | #00000066 |
-| card-rest | #FAFAF7 | #10151C |
+| shadow | #0F141E1F | #00000066 |
+| card-rest | #FAFAFB | #171A20 |
 
 Alex decided the Record red and six-plus-stone speaker palette on 12 November (L-07/L-14).
-Named speakers cycle through six roles in first-turn order; unnamed speakers use stone. Speaker names,
+All speakers receive a fixed first-speech slot; unnamed speakers hide it behind stone. Speaker names,
 avatar initials and chips use their own speaker/avatar pair, never the accent or a status role.
-The existing named-only assignment helper stays; file colourIndex mapping is not approved.
+Naming reveals the stored slot without changing other speakers; merges and new variants preserve it.
 The forced-dark Recording palette uses canonical dark roles without changing its layout:
 `bg/onPause` → ground; `text/pauseFill` → ink; `text2` → ink-2; `line` → line;
 `barIdle` → ink-3; `barFresh/dot/status` → record-ink; `finish` → record.
@@ -746,42 +750,42 @@ The tasks are `:ui:recordRoborazziDebug` (update), `:ui:verifyRoborazziDebug` (C
 
 | Pair | Light | Dark |
 |---|---:|---:|
-| ink on bg | 16.34 | 15.53 |
-| ink on surface | 18.00 | 14.43 |
-| text2 on bg | 6.78 | 8.84 |
-| text2 on surface | 7.47 | 8.21 |
-| text2 on boardBg | 6.20 | 8.56 |
-| text3 on bg | 6.78 | 8.84 |
-| text3 on accentTint | 5.95 | 6.88 |
-| text3 on boardBg | 6.20 | 8.56 |
-| text4 on bg | 5.07 | 5.45 |
-| text4 on surface | 5.58 | 5.06 |
-| accentInk on accentTint | 5.40 | 8.59 |
+| ink on bg | 15.81 | 15.70 |
+| ink on surface | 17.24 | 14.35 |
+| text2 on bg | 6.25 | 8.78 |
+| text2 on surface | 6.81 | 8.03 |
+| text2 on boardBg | 5.82 | 8.50 |
+| text3 on bg | 6.25 | 8.78 |
+| text3 on accentTint | 5.71 | 7.06 |
+| text3 on boardBg | 5.82 | 8.50 |
+| text4 on bg | 5.13 | 5.95 |
+| text4 on surface | 5.60 | 5.44 |
+| accentInk on accentTint | 10.98 | 8.59 |
 | tealInk on tealTint | 4.73 | 6.20 |
-| tealInk on surface | 5.67 | 7.46 |
+| tealInk on surface | 5.67 | 7.09 |
 | amberInk on amberTint | 6.55 | 8.58 |
 | amberInk on amberWash | 6.55 | 8.58 |
-| amberInk on surface | 7.60 | 10.39 |
-| redInk on redTint | 5.20 | 6.13 |
-| redInk on surface | 6.11 | 7.32 |
-| redInk on bg | 5.55 | 7.88 |
-| onAccentFill on accentFill | 6.78 | 11.05 |
-| accent on surface | 5.01 | 10.26 |
+| amberInk on surface | 7.60 | 9.89 |
+| redInk on redTint | 5.04 | 6.24 |
+| redInk on surface | 6.11 | 6.96 |
+| redInk on bg | 5.60 | 7.61 |
+| onAccentFill on accentFill | 13.09 | 11.05 |
+| accent on surface | 13.09 | 9.76 |
 | white on red (Record) | 6.11 | 6.11 |
 | onRed on red (Record) | 6.11 | 6.11 |
-| onInkFill on inkFill | 16.34 | 15.53 |
-| snackbar action on snackbar | 10.26 | 5.34 |
-| snackbar text on snackbar | 14.43 | 15.53 |
-| link on surface | 5.01 | 10.26 |
-| accent on accentTrack | 3.99 | 8.59 |
-| accent on line | 3.44 | 8.20 |
-| teal dot on surface | 5.67 | 7.46 |
-| amber dot on surface | 7.60 | 10.39 |
-| error dot on surface | 6.11 | 7.32 |
+| onInkFill on inkFill | 15.81 | 15.70 |
+| snackbar action on snackbar | 9.76 | 10.78 |
+| snackbar text on snackbar | 14.35 | 15.70 |
+| link on surface | 13.09 | 9.76 |
+| accent on accentTrack | 10.98 | 8.59 |
+| accent on line | 9.73 | 7.12 |
+| teal dot on surface | 5.67 | 7.09 |
+| amber dot on surface | 7.60 | 9.89 |
+| error dot on surface | 6.11 | 6.96 |
 
-The canonical forced-dark Recording pairs are text/background 15.53:1, secondary/background 8.84:1,
-and recording text, dot and fresh bars/background 7.88:1. The text AA minimum remains 4.5:1. The approved
-source has no contrast exceptions: ink-3 on sunken in light now passes at 4.64:1 (L-36). Highlight ink,
+The canonical forced-dark Recording pairs are text/background 15.70:1, secondary/background 8.78:1,
+and recording text, dot and fresh bars/background 7.61:1. The text AA minimum remains 4.5:1. The approved
+source has no contrast exceptions: ink-3 on sunken in light now passes at 4.78:1 (L-36). Highlight ink,
 all seven speaker/avatar pairs, and white on errorFill/successFill meet text AA in both modes.
 
 These items can have less than 3:1, because text or icons identify the control (WCAG 1.4.11): the line2 outlines (1.58), the rec.line circle and barIdle (decorative), the line3 dashed tag and plain dot, and the inactive track of the slider (the thumb and the active track show the state). The checkbox that is not checked uses text2 (7.93).
