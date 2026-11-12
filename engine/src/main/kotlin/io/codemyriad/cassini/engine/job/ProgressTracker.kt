@@ -1,6 +1,5 @@
 package io.codemyriad.cassini.engine.job
 
-import io.codemyriad.cassini.core.format.speakersByFirstSpeech
 import io.codemyriad.cassini.core.asr.BatteryProjection
 import io.codemyriad.cassini.core.asr.ProgressAnchor
 import io.codemyriad.cassini.core.asr.ProgressPace
@@ -9,6 +8,7 @@ import io.codemyriad.cassini.core.asr.TranscriptionProgress.Stage
 import io.codemyriad.cassini.core.checkpoint.CheckpointNames
 import io.codemyriad.cassini.core.format.SpeakerMerges
 import io.codemyriad.cassini.core.format.Word
+import io.codemyriad.cassini.core.format.speakersByFirstSpeech
 import io.codemyriad.cassini.core.speakers.Match
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers

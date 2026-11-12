@@ -565,8 +565,16 @@ class TranscriptionJobTest {
             val prefix = "diar_${java.util.UUID.randomUUID()}_"
             val h = Harness(runPrefix = prefix)
             val target = temp.newFile()
-            val old = CassiniDocument.create(FIXTURE_OPUS, Transcript(listOf(Word(oldPrefix + "1", 0, 500, "first"), Word(oldId, 1000, 1500, "hello"))),
-                "Meeting", JSONObject().put("x-speakerDiarization", JSONObject()), null, mapOf(oldId to "Anna"), target)
+            val words = listOf(Word(oldPrefix + "1", 0, 500, "first"), Word(oldId, 1000, 1500, "hello"))
+            val old = CassiniDocument.create(
+                FIXTURE_OPUS,
+                Transcript(words),
+                "Meeting",
+                JSONObject().put("x-speakerDiarization", JSONObject()),
+                null,
+                mapOf(oldId to "Anna"),
+                target,
+            )
             target.copyTo(h.audio, overwrite = true)
             h.storage.existing = old
             val match = if (saved) Match("saved-anna", 1f, Match.State.CONFIRMED) else null
@@ -586,12 +594,21 @@ class TranscriptionJobTest {
             val h = Harness(runPrefix = prefix)
             val target = temp.newFile()
             val processing = JSONObject().apply { if (separated) put("x-speakerDiarization", JSONObject()) }
-            val old = CassiniDocument.create(FIXTURE_OPUS, Transcript(listOf(Word(oldId, 0, 500, "hello"))),
-                "Meeting", processing, null, emptyMap(), target)
+            val old = CassiniDocument.create(
+                FIXTURE_OPUS,
+                Transcript(listOf(Word(oldId, 0, 500, "hello"))),
+                "Meeting",
+                processing,
+                null,
+                emptyMap(),
+                target,
+            )
             target.copyTo(h.audio, overwrite = true)
             h.storage.existing = old
-            if (separated) h.script.beforeDecode = { start ->
-                if (start == 52000L) h.storage.names.updateAndGet { it.merge(prefix + "1", prefix + "2") }
+            if (separated) {
+                h.script.beforeDecode = { start ->
+                    if (start == 52000L) h.storage.names.updateAndGet { it.merge(prefix + "1", prefix + "2") }
+                }
             }
             assertEquals(JobOutcome.Done, h.run().first)
             if (separated) {

@@ -1,11 +1,11 @@
 package io.codemyriad.cassini.data.checkpoint
 
-import io.codemyriad.cassini.core.format.speakersByFirstSpeech
 import androidx.annotation.WorkerThread
 import io.codemyriad.cassini.core.audio.Limits
 import io.codemyriad.cassini.core.checkpoint.CheckpointState
 import io.codemyriad.cassini.core.format.SpeakerMerges
 import io.codemyriad.cassini.core.format.Transcript
+import io.codemyriad.cassini.core.format.speakersByFirstSpeech
 import io.codemyriad.cassini.core.models.ModelCatalog
 import io.codemyriad.cassini.core.models.SpeechModel
 import io.codemyriad.cassini.core.speakers.DefaultLabels

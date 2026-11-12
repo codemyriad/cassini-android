@@ -533,7 +533,9 @@ data class CassiniDocument(
             val speakers = manifest.getJSONArray("speakers")
             fixSpeakerSlots(speakers, existing?.originalColourIndices.orEmpty())
             val known = (0 until speakers.length()).map { speakers.getJSONObject(it).getString("id") }.toSet()
-            val storedSlots = (0 until speakers.length()).map { speakers.getJSONObject(it).optionalInteger("colourIndex")!! }
+            val storedSlots = (0 until speakers.length()).map {
+                speakers.getJSONObject(it).optionalInteger("colourIndex")!!
+            }
             val usedSlots = (storedSlots + colourIndices.values).toMutableSet()
             var nextColour = storedSlots.maxOrNull()?.let { if (it == MAX_SAFE_INTEGER) 0 else it + 1 } ?: 0L
             transcript.words.speakersByFirstSpeech().filterNot { it in known }.forEach {

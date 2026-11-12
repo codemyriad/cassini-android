@@ -10,6 +10,38 @@ import org.junit.Test
 class VoiceCodecTest {
     private fun axis(i: Int) = FloatArray(3).also { it[i] = 1f }
 
+    @Test fun counterUsesStrictMetadataAndCoversExistingAndLegacySlots() {
+        val stored = Voice("stored", "Stored", "m", axis(0), 1, 1.0, 0, 0, 4)
+        val legacy = Voice("legacy", "Legacy", "m", axis(1), 1, 1.0, 1, 1)
+        for ((hint, expected) in listOf(2 to 5, 8 to 8, "100" to 5)) {
+            val json = JSONObject(VoiceCodec.encode(listOf(stored, legacy))).put("nextColourIndex", hint)
+            val book = VoiceCodec.decodeBook(json.toString())
+            assertEquals(4, book.voices[0].colourIndex)
+            assertEquals(expected, book.voices[1].colourIndex)
+            assertEquals(expected + 1L, book.nextColourIndex)
+        }
+    }
+
+    @Test fun deletingLatestVoiceKeepsMonotonicSaveOrderAcrossReload() {
+        val (annaOnly, _) = VoiceCodec.enrol(emptyList(), null, "Anna", "m", axis(0), 1.0, 0)
+        val (both, bruno) = VoiceCodec.enrol(annaOnly, null, "Bruno", "m", axis(1), 1.0, 1)
+        val book = VoiceCodec.decodeBook(VoiceCodec.encode(both))
+        val remaining = VoiceCodec.encode(book.voices.filter { it.id != bruno.id }, book.nextColourIndex)
+        val reloaded = VoiceCodec.decodeBook(remaining)
+        val (_, chris) = VoiceCodec.enrol(
+            reloaded.voices,
+            null,
+            "Chris",
+            "m",
+            axis(2),
+            1.0,
+            2,
+            reloaded.nextColourIndex,
+        )
+        assertEquals(2, chris.colourIndex)
+        assertEquals(2L, reloaded.nextColourIndex)
+    }
+
     @Test fun voiceSlotParsingRejectsCoercionAndOverflow() {
         val json = Voice("v", "Anna", "m", axis(0), 1, 1.0, 0, 0).json()
         for (hint in listOf("1.5", "2", 1.5, 1e30, true, -1L, 3000000000L, 4294967296L)) {

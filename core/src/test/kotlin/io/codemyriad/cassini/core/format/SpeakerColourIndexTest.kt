@@ -17,13 +17,26 @@ class SpeakerColourIndexTest {
 
     @Test fun partialPreferredSlotsDoNotCollideAndApplyOnTranscriptAddition() {
         val transcript = Transcript(listOf(Word("b", 0, 1, "one"), Word("x", 1, 2, "two")))
-        val bytes = CassiniDocument.create(audio(), transcript, "Meeting", JSONObject(), colourIndices = mapOf("b" to 1L))
+        val bytes = CassiniDocument.create(
+            audio(),
+            transcript,
+            "Meeting",
+            JSONObject(),
+            colourIndices = mapOf("b" to 1L),
+        )
         val first = CassiniDocument.read(bytes)
         assertEquals(1L, first.speakerColourIndex("b"))
         assertEquals(2L, first.speakerColourIndex("x"))
         val rerun = Transcript(listOf(Word("new_b", 0, 1, "one"), Word("new_x", 1, 2, "two")))
-        val next = CassiniDocument.read(CassiniDocument.create(bytes, rerun, "Meeting", JSONObject(), first,
-            colourIndices = mapOf("new_b" to 1L)))
+        val added = CassiniDocument.create(
+            bytes,
+            rerun,
+            "Meeting",
+            JSONObject(),
+            first,
+            colourIndices = mapOf("new_b" to 1L),
+        )
+        val next = CassiniDocument.read(added)
         assertEquals(1L, next.speakerColourIndex("new_b"))
         assertEquals(3L, next.speakerColourIndex("new_x"))
     }
@@ -39,7 +52,8 @@ class SpeakerColourIndexTest {
             assertEquals(0L, existing.speakerColourIndex("a")?.toLong())
             val target = folder.newFile()
             val renamed = CassiniDocument.relabel(source, existing, mapOf("a" to "Anna"), target)
-            val extended = CassiniDocument.read(CassiniDocument.create(source.readBytes(), transcript, "Meeting", JSONObject(), existing))
+            val added = CassiniDocument.create(source.readBytes(), transcript, "Meeting", JSONObject(), existing)
+            val extended = CassiniDocument.read(added)
             for (document in listOf(renamed, extended)) {
                 val value = document.manifest!!.getJSONArray("speakers").getJSONObject(0).get("colourIndex")
                 org.junit.Assert.assertTrue(value is Number)
@@ -59,7 +73,8 @@ class SpeakerColourIndexTest {
             assertEquals(slot, existing.speakerColourIndex("a")?.toLong())
             val renamed = CassiniDocument.relabel(source, existing, mapOf("a" to "Anna"), folder.newFile())
             val next = Transcript(transcript.words + Word("b", 1, 2, "two"))
-            val extended = CassiniDocument.read(CassiniDocument.create(source.readBytes(), next, "Meeting", JSONObject(), existing))
+            val added = CassiniDocument.create(source.readBytes(), next, "Meeting", JSONObject(), existing)
+            val extended = CassiniDocument.read(added)
             for (document in listOf(renamed, extended)) {
                 assertEquals(slot, document.speakerColourIndex("a")?.toLong())
                 assertEquals(slot, document.manifest!!.getJSONArray("speakers").getJSONObject(0).getLong("colourIndex"))
@@ -68,8 +83,12 @@ class SpeakerColourIndexTest {
     }
 
     @Test fun overlappingTurnOrderUsesEarliestSpeechWithoutReorderingWords() {
-        val words = listOf(Word("a", 2000, 2100, "late"), Word("b", 1000, 1100, "early"),
-            Word("c", 1000, 1100, "tie"), Word("a", 500, 600, "earliest"))
+        val words = listOf(
+            Word("a", 2000, 2100, "late"),
+            Word("b", 1000, 1100, "early"),
+            Word("c", 1000, 1100, "tie"),
+            Word("a", 500, 600, "earliest"),
+        )
         assertEquals(listOf("a", "b", "c"), words.speakersByFirstSpeech())
         val transcript = Transcript(words.take(3))
         val document = CassiniDocument.read(CassiniDocument.create(audio(), transcript, "Overlap", JSONObject()))
