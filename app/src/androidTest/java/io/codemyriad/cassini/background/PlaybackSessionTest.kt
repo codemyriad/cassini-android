@@ -4,6 +4,7 @@ import android.app.Notification
 import android.app.NotificationManager
 import android.content.ComponentName
 import android.content.Intent
+import android.os.Build
 import androidx.lifecycle.Lifecycle
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
@@ -118,12 +119,12 @@ class PlaybackSessionTest {
         }
 
         // Resuming from the background, as the lock screen or a headset does: the system delivers the play.
-        Background.shell("input keyevent KEYCODE_MEDIA_PLAY")
+        dispatchMediaKey("play")
         awaitPlayback("The media key resumes the note in the background") { it.playing }
         connected.awaitEvent(Player.EVENT_IS_PLAYING_CHANGED, "The session shows it playing") { isPlaying }
 
         // A headset's pause button: the media key goes to the playing session.
-        Background.shell("input keyevent KEYCODE_MEDIA_PAUSE")
+        dispatchMediaKey("pause")
         awaitPlayback("The media key pauses the player") { !it.playing }
 
         // Leaving the note ends the session even though this controller is still bound: Media3 removes the
@@ -137,6 +138,14 @@ class PlaybackSessionTest {
             Unit.takeIf { media.isEmpty() }
         }
         Unit
+    }
+
+    private fun dispatchMediaKey(key: String) {
+        // HOME can finish the activity before InputDispatcher finishes switching windows (API 26). Window input
+        // may then drop ACTION_DOWN. Dispatch through the system media service, as a headset does, instead.
+        val command = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) "media" else "cmd media_session"
+        val output = Background.shell("$command dispatch $key")
+        assertTrue("System media dispatch failed: $output", output.isBlank())
     }
 
     private fun connect(disconnected: CompletableDeferred<Unit>): MediaController {
