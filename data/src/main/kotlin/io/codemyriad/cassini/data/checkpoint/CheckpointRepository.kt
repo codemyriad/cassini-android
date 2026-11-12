@@ -214,7 +214,8 @@ class CheckpointRepository(
                 .firstOrNull { !DefaultLabels.isDefault(id, it) }
                 ?.let { id to it }
         }.toMap()
-        return DraftTranscript(words, labels, names, state.doneMs, state.durationMs)
+        val slots = state.recognition.chunks.words.map { it.speaker }.distinct().withIndex().associate { it.value to it.index }
+        return DraftTranscript(words, labels, names, state.doneMs, state.durationMs, slots)
     }
 
     private fun work(noteId: String): File {

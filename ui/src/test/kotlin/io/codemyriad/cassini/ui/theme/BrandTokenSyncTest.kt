@@ -28,6 +28,8 @@ class BrandTokenSyncTest {
         val sheet = JSONObject(bytes.toString(Charsets.UTF_8))
         assertEquals("cassini-ux/brand-tokens@1", sheet.getString("schema"))
         val accepted = checkedActiveRoles(sheet)
+        assertEquals(53, sheet.getJSONObject("tokens").length())
+        assertEquals(54, accepted.size) // Includes derived card-rest.
         for ((mode, values) in listOf("light" to BrandTokenValues.light, "dark" to BrandTokenValues.dark)) {
             assertEquals("No proposed/pending roles may be read", accepted, values.keys)
             for (name in accepted) {
@@ -52,7 +54,7 @@ class BrandTokenSyncTest {
         "record-tint",
         "line-soft",
     )
-    private val unusedCanvasRoles = setOf("shadow", "card-rest")
+    private val unusedCanvasRoles = setOf("shadow", "card-rest", "sidebar", "sidebar-mac", "field", "field-line")
 
     private fun checkedActiveRoles(sheet: JSONObject): Set<String> {
         val active = buildSet {

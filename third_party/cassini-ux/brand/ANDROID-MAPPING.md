@@ -1,28 +1,33 @@
 # Android canvas mapping
 
-This preview reads cassini-ux e244ad6a830e4ef77d87fb452143f7100c767139. Generated values come
-from the byte-identical pinned tokens.json. Color.kt owns Android aliases; the sync test checks every
-approved token/derived role, every packed color field and the additional named getters in both modes.
-No source role is deferred to a later preview. Native shadow geometry stays; shadow is unused as an
-explicit paint role. The desktop card-rest role is imported but unused by W1 Android rows.
+This preview reads byte-identical cassini-ux b4dec4160a04a5e9995ce0a74d0215aa24a3da9c,
+version 2026-11-12.3, SHA-256 9d3d10d88db5d86d18a1cd099df36ca1c00234344fa383d28283992b734c6358.
+All 53 authored colours and derived card-rest are decided. The sync test checks every role and
+packed colour alias in both modes. No speaker or avatar rendering is frozen.
 
-Android secondary aliases: surfaceWash/boardBg → sunken; text3 → ink-2; line2 → line;
+Android imports but does not use these desktop roles: `sidebar`, `sidebar-mac`, `field`, `field-line`.
+`shadow` is not an explicit paint role (native shadow geometry is retained); W1 rows do not use `card-rest`.
+These exemptions are named individually in the sync test.
+
+Secondary aliases: surfaceWash/boardBg → sunken; text3 → ink-2; line2 → line;
 line3 → ink-3; accentTrack → accent-tint; amberWash → warn-tint; redLine → error;
-inkFill/onInkFill → ink/ground. The Material outlineVariant reads line-soft.
+inkFill/onInkFill → ink/ground. Material outlineVariant reads line-soft.
+Neutral pills and secondary controls use ink at 10% over their actual backdrop (L-46/L-54).
 
-SpeakerTone maps One through Six to speaker-1..6/avatar-1..6, and Unnamed to speaker-0/avatar-0.
-Old speaker palettes are removed. Named speakers retain the existing first-turn, named-only ordering
-helper, now with six slots; unnamed speakers take no named slot. Saved-voice avatars cycle the six
-named pairs in list order. File colourIndex is not used or changed: that proposed mapping is not approved.
-Names/initials use the speaker ink; transcript words keep ink. Question washes use avatar-0.
+L-41 / HARMONY 10.11: colourIndex is fixed at first speech, including unnamed speakers,
+and stored in the meeting's speaker record. Unnamed shows speaker-0/avatar-0; naming reveals
+speaker-((colourIndex mod 6)+1) and the corresponding avatar, without shifting other speakers.
+Draft metadata keeps the original pre-merge speaking order. Existing indices survive merges,
+new transcript variants and re-diarization. Old files without an index use first speech in their first readable variant (manifest order if no body can be read);
+the next explicit document edit persists that index. Merely importing or viewing never rewrites a file.
+The Room cache carries this file fact separately from variant-specific display ordinals.
 
-Filled destructive actions read errorFill/onRecord (white) in both modes. The live Record control uses
-recordTint/recordInk; Record at rest uses record/onRecord. Filled success uses successFill/onRecord;
-Android currently has success badges but no filled success action. All seven speaker/avatar pairs,
-fill pairs and the corrected ink-3/sunken pair pass text AA. No contrast exceptions remain.
+L-41 / HARMONY 10.12: saved voices store their save-order slot in people.json; display sort,
+rename, deleting another voice and reload retain it. Older voice files derive their initial
+slots from createdAt (file order breaks ties) before edits, then persist them on the next write.
+Names/initials use speaker ink; transcript words keep ink. Question washes use avatar-0.
 
-The Recording screen's forced-dark palette remains unchanged while L-08 is open. Launcher artwork
-remains unchanged. The generator/literal enforcement is being completed in the included plumbing work.
-
-The temporary #195 old-palette snapshot and compatibility generator path are deleted. Recording now
-uses canonical dark ground/ink/ink-2/ink-3/line/record-ink and Record fill roles.
+Destructive actions use error-fill/on-record; successful filled actions use success-fill/on-record.
+Record uses record/on-record at rest and record-tint/record-ink while live. Recording's forced-dark
+palette uses canonical dark roles. All text contrast thresholds remain 4.5:1, without exceptions.
+The old #195 palette snapshot is deleted. The preview stays draft pending visual approval.

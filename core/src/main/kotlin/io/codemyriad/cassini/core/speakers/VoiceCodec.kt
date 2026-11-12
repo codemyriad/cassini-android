@@ -8,17 +8,38 @@ import java.util.UUID
  * A person the user named, as the running mean of their confirmed voiceprints.
  * Private app data; enabled OS transfer and backup can include it.
  */
-data class Voice(val id: String, val name: String, val model: String, val mean: FloatArray,
-                 val count: Int, val seconds: Double, val createdAt: Long, val updatedAt: Long) {
+data class Voice(
+    val id: String,
+    val name: String,
+    val model: String,
+    val mean: FloatArray,
+    val count: Int,
+    val seconds: Double,
+    val createdAt: Long,
+    val updatedAt: Long,
+    val colourIndex: Int? = null,
+) {
     fun json(): JSONObject = JSONObject().put("id", id).put("name", name).put("model", model).put("dim", mean.size)
-        .put("mean", floats(mean)).put("count", count).put("seconds", seconds).put("createdAt", createdAt).put("updatedAt", updatedAt)
+        .put("mean", floats(mean)).put("count", count).put("seconds", seconds)
+        .put("createdAt", createdAt).put("updatedAt", updatedAt)
+        .apply { colourIndex?.let { put("colourIndex", it) } }
 
     companion object {
         fun fromJson(json: JSONObject): Voice {
             val mean = floats(json.getJSONArray("mean"))
             require(mean.size == json.getInt("dim") && json.getInt("count") > 0)
-            return Voice(json.getString("id"), json.getString("name"), json.getString("model"), mean,
-                json.getInt("count"), json.getDouble("seconds"), json.getLong("createdAt"), json.getLong("updatedAt"))
+            val slot = json.optInt("colourIndex", -1).takeIf { it >= 0 }
+            return Voice(
+                json.getString("id"),
+                json.getString("name"),
+                json.getString("model"),
+                mean,
+                json.getInt("count"),
+                json.getDouble("seconds"),
+                json.getLong("createdAt"),
+                json.getLong("updatedAt"),
+                slot,
+            )
         }
     }
 }
@@ -43,7 +64,11 @@ object VoiceCodec {
         val version = json.getInt("version")
         if (version != VERSION) throw UnsupportedVersion(version)
         val voices = json.getJSONArray("voices")
-        return (0 until voices.length()).map { Voice.fromJson(voices.getJSONObject(it)) }
+        val decoded = (0 until voices.length()).map { Voice.fromJson(voices.getJSONObject(it)) }
+        // Older stores already have a save clock. Assign before any rename, deletion or display sorting.
+        var next = decoded.mapNotNull { it.colourIndex }.maxOrNull()?.plus(1) ?: 0
+        val missing = decoded.filter { it.colourIndex == null }.sortedBy { it.createdAt }.associate { it.id to next++ }
+        return decoded.map { if (it.colourIndex == null) it.copy(colourIndex = missing.getValue(it.id)) else it }
     }
 
     fun encode(voices: List<Voice>): String =
@@ -55,11 +80,23 @@ object VoiceCodec {
         val result = voices.toMutableList()
         val index = result.indexOfFirst { it.id == voiceId }
         val previous = result.getOrNull(index)?.takeIf { it.model == model && it.mean.size == embedding.size }
-        val voice = if (previous == null) Voice(result.getOrNull(index)?.id ?: "voice_${UUID.randomUUID()}", name, model,
-            requireNotNull(Voiceprints.normalised(embedding)), 1, seconds, result.getOrNull(index)?.createdAt ?: now, now)
-        else previous.copy(name = name, mean = requireNotNull(Voiceprints.normalised(FloatArray(embedding.size) {
-            previous.mean[it] * minOf(previous.count, MAX_COUNT_WEIGHT) + embedding[it] })),
-            count = previous.count + 1, seconds = previous.seconds + seconds, updatedAt = now)
+        val voice = if (previous == null) {
+            Voice(
+                result.getOrNull(index)?.id ?: "voice_${UUID.randomUUID()}", name, model,
+                requireNotNull(Voiceprints.normalised(embedding)), 1, seconds, result.getOrNull(index)?.createdAt ?: now, now,
+                result.getOrNull(index)?.colourIndex ?: ((result.mapNotNull { it.colourIndex }.maxOrNull() ?: -1) + 1),
+            )
+        } else {
+            previous.copy(
+                name = name,
+                mean = requireNotNull(Voiceprints.normalised(FloatArray(embedding.size) {
+                    previous.mean[it] * minOf(previous.count, MAX_COUNT_WEIGHT) + embedding[it]
+                })),
+                count = previous.count + 1,
+                seconds = previous.seconds + seconds,
+                updatedAt = now,
+            )
+        }
         if (index >= 0) result[index] = voice else result.add(voice)
         return result to voice
     }

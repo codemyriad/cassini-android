@@ -40,7 +40,7 @@ fun StatusChip(text: String, tone: Tone, modifier: Modifier = Modifier, dot: Boo
     Row(
         modifier = modifier
             .clip(shape)
-            .background(colors.bg)
+            .background(if (tone == Tone.Plain) CassiniTheme.colors.ink.copy(alpha = 0.1f) else colors.bg)
             .then(if (outlined && border != null) Modifier.border(1.dp, border, shape) else Modifier)
             .padding(
                 start = if (outlined) 9.dp else 8.dp,
