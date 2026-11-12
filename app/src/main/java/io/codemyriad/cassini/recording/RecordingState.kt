@@ -88,8 +88,16 @@ sealed interface RecordingState {
         val warning: RecordingWarning?,
     ) : RecordingState
 
-    /** The capture stops and the note is saved; the hand-off to processing may still run. */
-    data class Finishing(val noteId: String, val title: String, val elapsedMs: Long) : RecordingState
+    /**
+     * The capture stops and the note is saved; the hand-off may still run. [titleFinal] closes title admission
+     * after Finish accepted it or the recorder claimed an automatic stop. This is process state, never stored.
+     */
+    data class Finishing(
+        val noteId: String,
+        val title: String,
+        val elapsedMs: Long,
+        val titleFinal: Boolean = false,
+    ) : RecordingState
 
     /** The recording ended. [noteId] is null when no note was kept (it could not start, or nothing was captured). */
     data class Ended(val noteId: String?, val outcome: RecordingOutcome) : RecordingState
