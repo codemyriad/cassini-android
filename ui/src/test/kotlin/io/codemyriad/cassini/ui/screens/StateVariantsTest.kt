@@ -8,27 +8,13 @@ import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.DpRect
-import io.codemyriad.cassini.ui.BoardTest
-import io.codemyriad.cassini.ui.components.DialogBoardFrame
 import io.codemyriad.cassini.ui.components.MenuBoardFrame
 import io.codemyriad.cassini.ui.components.SheetBoardFrame
 import io.codemyriad.cassini.ui.fixtures.VariantFixtures
 import io.codemyriad.cassini.ui.library.LibraryScreen
 import io.codemyriad.cassini.ui.licenses.LicensesScreen
-import io.codemyriad.cassini.ui.models.ModelDownloadScreen
-import io.codemyriad.cassini.ui.note.MergeConfirmContent
 import io.codemyriad.cassini.ui.note.MergeSheetContent
-import io.codemyriad.cassini.ui.note.NameSpeakerSheetContent
-import io.codemyriad.cassini.ui.note.NoteActionsSheetContent
-import io.codemyriad.cassini.ui.note.NoteScreen
-import io.codemyriad.cassini.ui.recording.RecordingScreen
-import io.codemyriad.cassini.ui.settings.LanguageChoice
-import io.codemyriad.cassini.ui.settings.LanguageSheetContent
-import io.codemyriad.cassini.ui.settings.SettingsScreen
-import io.codemyriad.cassini.ui.trash.TrashDialogContent
-import io.codemyriad.cassini.ui.trash.TrashScreen
 import io.codemyriad.cassini.ui.voices.SavedVoiceMenuItems
-import io.codemyriad.cassini.ui.voices.SavedVoicesDialogContent
 import io.codemyriad.cassini.ui.voices.SavedVoicesScreen
 import org.junit.Test
 
@@ -37,70 +23,7 @@ import org.junit.Test
  * only (`variants/<name>.png`, ui.md section 10.2). Sheets render inline in `SheetBoardFrame` and dialogs in
  * `DialogBoardFrame`, over the plain scrim as boards 04 and 06 show them.
  */
-class StateVariantsTest : BoardTest() {
-    private fun library(name: String) = board("variants", name) {
-        LibraryScreen(VariantFixtures.library.getValue(name), onEvent = {})
-    }
-
-    private fun recording(name: String) = board("variants", name) {
-        RecordingScreen(VariantFixtures.recording.getValue(name), onEvent = {})
-    }
-
-    private fun note(name: String) = board("variants", name) {
-        NoteScreen(VariantFixtures.transcribing.getValue(name), onEvent = {})
-    }
-
-    private fun read(name: String) = board("variants", name) {
-        NoteScreen(VariantFixtures.read.getValue(name), onEvent = {})
-    }
-
-    private fun readOverlay(name: String) = board("variants", name) {
-        NoteOverlayFrame(VariantFixtures.read.getValue(name))
-    }
-
-    private fun noteSheet(name: String) = board("variants", name) {
-        NoteOverlayFrame(VariantFixtures.noteSheets.getValue(name))
-    }
-
-    private fun nameSheet(name: String) = board("variants", name) {
-        SheetBoardFrame { NameSpeakerSheetContent(VariantFixtures.nameSheet.getValue(name), onEvent = {}) }
-    }
-
-    private fun actions(name: String) = board("variants", name) {
-        SheetBoardFrame { NoteActionsSheetContent(VariantFixtures.noteActions.getValue(name), onAction = {}) }
-    }
-
-    private fun mergeConfirm(name: String) = board("variants", name) {
-        val merge = VariantFixtures.merges.getValue(name)
-        DialogBoardFrame { MergeConfirmContent(merge, requireNotNull(merge.confirm), onEvent = {}) }
-    }
-
-    private fun models(name: String) = board("variants", name) {
-        ModelDownloadScreen(VariantFixtures.modelDownload.getValue(name), onEvent = {})
-    }
-
-    private fun settings(name: String) = board("variants", name) {
-        SettingsScreen(VariantFixtures.settings.getValue(name), onEvent = {})
-    }
-
-    private fun voices(name: String) = board("variants", name) {
-        SavedVoicesScreen(VariantFixtures.savedVoices.getValue(name), onEvent = {})
-    }
-
-    private fun trash(name: String) = board("variants", name) {
-        TrashScreen(VariantFixtures.trash.getValue(name), onEvent = {})
-    }
-
-    private fun trashDialog(name: String) = board("variants", name) {
-        val dialog = requireNotNull(VariantFixtures.trash.getValue(name).dialog)
-        DialogBoardFrame { TrashDialogContent(dialog, onEvent = {}) }
-    }
-
-    private fun voicesDialog(name: String) = board("variants", name) {
-        val dialog = requireNotNull(VariantFixtures.savedVoices.getValue(name).dialog)
-        DialogBoardFrame { SavedVoicesDialogContent(dialog, onEvent = {}) }
-    }
-
+class StateVariantsTest : VariantBoardTest() {
     // Library (features.md section 1).
 
     @Test fun libraryLoading() = library("library-loading")
@@ -327,9 +250,7 @@ class StateVariantsTest : BoardTest() {
 
     @Test fun settingsItalianNone() = settings("settings-italian-none")
 
-    @Test fun settingsLanguageSheet() = board("variants", "settings-language-sheet") {
-        SheetBoardFrame { LanguageSheetContent(LanguageChoice.ITALIAN, onPick = {}) }
-    }
+    @Test fun settingsLanguageSheet() = languageSheet()
 
     // Saved voices (features.md section 10).
 
