@@ -32,8 +32,8 @@ enum class StatusBadgeKind(
 internal fun statusBadgeText(kind: StatusBadgeKind, liveMs: Long = 0, minutes: Long? = null): String = when (kind) {
     StatusBadgeKind.Recording -> stringResource(kind.label, Durations.clock(liveMs))
     StatusBadgeKind.Transcribing -> when {
-        minutes == null -> stringResource(kind.label)
-        minutes <= 0 -> stringResource(R.string.ui_badge_transcribing_under_minute)
+        minutes == null || minutes < 0 -> stringResource(kind.label)
+        minutes == 0L -> stringResource(R.string.ui_badge_transcribing_under_minute)
         else -> pluralStringResource(
             R.plurals.ui_badge_transcribing_eta,
             minutes.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
