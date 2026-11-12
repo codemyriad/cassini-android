@@ -119,7 +119,9 @@ class ReleaseNotesTests(unittest.TestCase):
             self.write(root, 'second', 'fixed', 'Your note names stay intact.')
             self.assertEqual([('fixed', 'Your note names stay intact.')], NOTES.fragments(root, baseline))
             # Failed releases keep the last successful baseline: the same pending change remains visible.
-            self.assertEqual(NOTES.fragments(root, baseline), NOTES.fragments(root, baseline))
+            git('add', '.')
+            git('commit', '-qm', 'Failed build does not publish')
+            self.assertEqual([('fixed', 'Your note names stay intact.')], NOTES.fragments(root, baseline))
             self.write(root, 'first', 'new', 'You can export more notes together.')
             self.assertEqual(2, len(NOTES.fragments(root, baseline)))
             git('add', '.')
