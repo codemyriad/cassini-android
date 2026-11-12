@@ -1,11 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generated from cassini-ux 26a37501ec33adf02d1917353078d41298d834e1; do not edit. -->
+<!-- Generated from cassini-ux 793209cb3425bece7143178458fddd94b691e12d; do not edit. -->
 <resources>
     <string name="ui_badge_recording">Gravando %1$s</string>
     <string name="ui_badge_saving">Salvando…</string>
     <string name="ui_badge_transcribing">Transcrevendo…</string>
     <string name="ui_badge_attention">Requer atenção</string>
     <string name="ui_badge_received">Recebida</string>
+    <string name="ui_badge_importing">Importando…</string>
+    <string name="ui_badge_interrupted">Interrompida</string>
+    <plurals name="ui_badge_transcribing_eta">
+        <item quantity="one">Transcrevendo · %1$s min</item>
+        <item quantity="many">Transcrevendo · %1$s min</item>
+        <item quantity="other">Transcrevendo · %1$s min</item>
+    </plurals>
+    <string name="ui_badge_transcribing_under_minute">Transcrevendo, falta menos de um minuto</string>
+    <!-- Existing detailed spoken ETA retained from 26a37501ec33adf02d1917353078d41298d834e1. -->
     <plurals name="ui_badge_transcribing_spoken_eta">
         <item quantity="one">Transcrevendo, falta cerca de %1$s minuto</item>
         <item quantity="many">Transcrevendo, faltam cerca de %1$s minutos</item>

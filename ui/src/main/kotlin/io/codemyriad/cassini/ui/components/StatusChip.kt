@@ -29,19 +29,17 @@ import io.codemyriad.cassini.ui.theme.CassiniTheme
 @Composable
 fun StatusChip(text: String, kind: StatusBadgeKind, modifier: Modifier = Modifier) {
     val c = CassiniTheme.colors
-    val recording = kind == StatusBadgeKind.Recording
-    val warning = kind == StatusBadgeKind.Attention || kind == StatusBadgeKind.Interrupted
-    val received = kind == StatusBadgeKind.Received
-    val background = when {
-        recording -> c.recordTint
-        warning -> c.amberTint
-        received -> Color.Transparent
-        else -> c.neutralTint
+    val received = kind.tone == StatusBadgeTone.Outline
+    val background = when (kind.tone) {
+        StatusBadgeTone.Red -> c.recordTint
+        StatusBadgeTone.Amber -> c.amberTint
+        StatusBadgeTone.Outline -> Color.Transparent
+        StatusBadgeTone.Neutral -> c.neutralTint
     }
-    val foreground = when {
-        recording -> c.recordInk
-        warning -> c.amberInk
-        else -> c.neutralInk
+    val foreground = when (kind.tone) {
+        StatusBadgeTone.Red -> c.recordInk
+        StatusBadgeTone.Amber -> c.amberInk
+        StatusBadgeTone.Neutral, StatusBadgeTone.Outline -> c.text2
     }
     Row(
         modifier = modifier
@@ -60,16 +58,16 @@ fun StatusChip(text: String, kind: StatusBadgeKind, modifier: Modifier = Modifie
 /** Static spinner arc as drawn by the canvas, so screenshots never depend on an animation frame. */
 @Composable
 private fun BadgeGlyph(kind: StatusBadgeKind, color: Color) {
-    val size = when (kind) {
-        StatusBadgeKind.Recording -> 6.dp
-        StatusBadgeKind.Importing, StatusBadgeKind.Saving, StatusBadgeKind.Transcribing -> 10.dp
+    val size = when (kind.glyph) {
+        StatusBadgeGlyph.Dot -> 6.dp
+        StatusBadgeGlyph.Spinner -> 10.dp
         else -> 11.dp
     }
     Canvas(Modifier.size(size).testTag("badge-glyph-$kind")) {
-        val unit = this.size.width / if (kind == StatusBadgeKind.Received) 24f else 16f
-        when (kind) {
-            StatusBadgeKind.Recording -> drawCircle(color)
-            StatusBadgeKind.Importing, StatusBadgeKind.Saving, StatusBadgeKind.Transcribing -> {
+        val unit = this.size.width / if (kind.glyph == StatusBadgeGlyph.Incoming) 24f else 16f
+        when (kind.glyph) {
+            StatusBadgeGlyph.Dot -> drawCircle(color)
+            StatusBadgeGlyph.Spinner -> {
                 val stroke = Stroke(2.4f * unit, cap = StrokeCap.Round)
                 drawCircle(color.copy(alpha = 0.3f), 6f * unit, Offset(8f * unit, 8f * unit), style = stroke)
                 drawArc(
@@ -82,7 +80,7 @@ private fun BadgeGlyph(kind: StatusBadgeKind, color: Color) {
                     style = stroke,
                 )
             }
-            StatusBadgeKind.Attention, StatusBadgeKind.Interrupted -> {
+            StatusBadgeGlyph.Alert -> {
                 drawCircle(color, 6.5f * unit, Offset(8f * unit, 8f * unit), style = Stroke(1.8f * unit))
                 drawLine(
                     color,
@@ -93,7 +91,7 @@ private fun BadgeGlyph(kind: StatusBadgeKind, color: Color) {
                 )
                 drawCircle(color, 0.95f * unit, Offset(8f * unit, 11f * unit))
             }
-            StatusBadgeKind.Received -> {
+            StatusBadgeGlyph.Incoming -> {
                 val arrow = Path().apply {
                     moveTo(12f * unit, 4f * unit)
                     lineTo(12f * unit, 14f * unit)

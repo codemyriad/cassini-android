@@ -177,13 +177,9 @@ class ComponentScreenshotTest : BoardTest() {
     private fun ChipsAndTags() {
         Label("StatusChip")
         Wrap {
-            StatusChip("Recording 12:48", StatusBadgeKind.Recording)
-            StatusChip("Importing…", StatusBadgeKind.Importing)
-            StatusChip("Saving…", StatusBadgeKind.Saving)
-            StatusChip("Transcribing · 4 min", StatusBadgeKind.Transcribing)
-            StatusChip("Needs attention", StatusBadgeKind.Attention)
-            StatusChip("Interrupted", StatusBadgeKind.Interrupted)
-            StatusChip("Received", StatusBadgeKind.Received)
+            for (kind in StatusBadgeKind.entries) {
+                StatusChip(statusBadgeText(kind, liveMs = 768_000, minutes = 4), kind)
+            }
         }
         Label("Tags: Likely, dashed, auto; FormatBadge on rec.bg")
         Wrap {

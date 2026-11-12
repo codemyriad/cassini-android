@@ -1,11 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generated from cassini-ux 26a37501ec33adf02d1917353078d41298d834e1; do not edit. -->
+<!-- Generated from cassini-ux 793209cb3425bece7143178458fddd94b691e12d; do not edit. -->
 <resources>
     <string name="ui_badge_recording">Recording %1$s</string>
     <string name="ui_badge_saving">Saving…</string>
     <string name="ui_badge_transcribing">Transcribing…</string>
     <string name="ui_badge_attention">Needs attention</string>
     <string name="ui_badge_received">Received</string>
+    <string name="ui_badge_importing">Importing…</string>
+    <string name="ui_badge_interrupted">Interrupted</string>
+    <plurals name="ui_badge_transcribing_eta">
+        <item quantity="one">Transcribing · 1 min</item>
+        <item quantity="other">Transcribing · %1$s min</item>
+    </plurals>
+    <string name="ui_badge_transcribing_under_minute">Transcribing, less than a minute left</string>
+    <!-- Existing detailed spoken ETA retained from 26a37501ec33adf02d1917353078d41298d834e1. -->
     <plurals name="ui_badge_transcribing_spoken_eta">
         <item quantity="one">Transcribing, about 1 minute left</item>
         <item quantity="other">Transcribing, about %1$s minutes left</item>

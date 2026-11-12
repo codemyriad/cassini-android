@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the existing shared L-26 labels; missing short forms remain explicit canvas preview copy."""
+"""Generate shared L-26 labels and retain existing detail copy during the progress UI hold."""
 import argparse
 import hashlib
 import json
@@ -13,7 +13,10 @@ LOCALES = {'en': 'values', 'it': 'values-it', 'fr': 'values-fr', 'es': 'values-e
            'pt-BR': 'values-pt-rBR', 'pt-PT': 'values-pt-rPT'}
 LABELS = {'recording': 'states.badge.recording', 'saving': 'states.badge.saving',
           'transcribing': 'states.badge.transcribing.noEta', 'attention': 'states.badge.needsAttention',
-          'received': 'states.badge.received', 'transcribing_spoken_eta': 'states.badge.transcribing'}
+          'received': 'states.badge.received', 'importing': 'states.badge.importing',
+          'interrupted': 'states.badge.interrupted', 'transcribing_eta': 'states.badge.transcribing',
+          'transcribing_under_minute': 'states.badge.transcribing.underMinute',
+          'transcribing_spoken_eta': 'states.badge.transcribing'}
 
 
 def android_text(text, expected, argument, catalog_id, locale, *, literal_count=False):
@@ -32,13 +35,20 @@ def generated(root):
     if hashlib.sha256(raw).hexdigest() != record['sha256']:
         raise ValueError('Shared strings differ from their pinned SHA-256')
     entries = {entry['id']: entry for entry in json.loads(raw)['entries']}
+    retained_raw = (root / VENDOR / 'retained-detail-strings.json').read_bytes()
+    retained_pin = pin['files']['retained-detail-strings.json']
+    if hashlib.sha256(retained_raw).hexdigest() != retained_pin['sha256']:
+        raise ValueError('Retained detail strings differ from their pinned SHA-256')
+    retained = json.loads(retained_raw)['entries'][0]
     commit = record.get('commit', pin['commit'])
     for locale, qualifier in LOCALES.items():
         lines = ['<?xml version="1.0" encoding="utf-8"?>',
                  f'<!-- Generated from cassini-ux {commit}; do not edit. -->', '<resources>']
         for name, catalog_id in LABELS.items():
-            entry = entries[catalog_id]
-            argument = {'recording': 'liveBadge', 'transcribing_spoken_eta': 'n'}.get(name)
+            entry = retained if name == 'transcribing_spoken_eta' else entries[catalog_id]
+            if name == 'transcribing_spoken_eta':
+                lines.append(f"    <!-- Existing detailed spoken ETA retained from {retained_pin['commit']}. -->")
+            argument = {'recording': 'liveBadge', 'transcribing_eta': 'n', 'transcribing_spoken_eta': 'n'}.get(name)
             expected = {argument} if argument else set()
             if set(entry.get('placeholders', {})) != expected:
                 raise ValueError(f'Unexpected shared placeholders: {catalog_id}')

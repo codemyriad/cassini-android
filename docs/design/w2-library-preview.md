@@ -25,24 +25,29 @@ It stays draft until Silvio and Alex approve the pictures.
   labels retain detailed TalkBack status, including pause position, failure
   reason, queue state, speaker count, no-speech state and the ETA when known.
 
-## Shared words
+## Shared words and fixtures
 
-Five visible labels come from the checksum-pinned shared catalog in all six
-languages: recording, saving, transcribing without an ETA, needs-attention and
-received. The full spoken ETA also uses its existing shared entry.
+All seven labels use the checksum-pinned shared catalog at merged cassini-ux
+`793209cb3425bece7143178458fddd94b691e12d` (PR 11). This replaces the three
+English-only preview strings. The state vectors v3, format vectors v5 and five
+changed Library expectations use the same pin. The canonical contract verifier
+checks both the meeting and transient import-entry arrays, ETA forms, all five
+translation languages and 41 Library rows. Android renders the shared badge
+presentations in light and dark with tests of text, glyph and actual text colour.
+These are presentation tests; they do not invent a shared persisted lifecycle
+or new applicability for Android-only states.
+
 `scripts/generate-w2-badge-strings.py --check` runs in CI. It refuses catalog
 byte drift, missing locale output, edited translations and placeholder drift.
+The fixture-family test also checks all vendored hashes and refuses half-pins.
 
-The coordinator allowed canvas text where a short catalog form is missing:
-
-| Canvas preview text | Existing form that cannot supply it |
-|---|---|
-| Importing… | import.progress requires done and total |
-| Interrupted | states.badge.interrupted includes a position |
-| Transcribing · {n} min | states.badge.transcribing is the longer spoken phrase |
-
-These three preview-only strings are English and nontranslatable until the
-coordinator adds their shared forms. They are listed in the PR body.
+The dogfood progress/remaining-time UI is on hold for a shared decision. Existing
+detailed spoken ETA stays byte-for-byte in the generated resources, using the
+one retained catalog entry from the prior merged pin `26a37501`. Its separate
+source SHA, selection and receipt are in UPSTREAM.json. It is detail copy, not
+a badge label. The visible progress display and its placement are not extended
+by this contract adoption. The current detailed interrupted position also stays
+available to TalkBack and the existing detail controls.
 
 ## Boundaries
 

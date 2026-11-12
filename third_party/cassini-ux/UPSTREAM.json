@@ -1,15 +1,65 @@
 {
   "repository": "https://github.com/codemyriad/cassini-ux",
-  "commit": "26a37501ec33adf02d1917353078d41298d834e1",
+  "commit": "793209cb3425bece7143178458fddd94b691e12d",
   "files": {
     "strings.json": {
       "source": "strings/strings.json",
-      "sha256": "89f9747fe0b397f44fb949f34d7616d2f1757f44f799900d3307726393d5ee38"
+      "sha256": "7ec404fad17f96a29ec1ee03612736710db2dba0fb964bbc6153a3ed00b97699"
     },
     "brand/tokens.json": {
       "source": "brand/tokens.json",
       "sha256": "f534ccd38e2aa9d05fe9e4bb3dd352c588eead915fff21293ebb1d6945cdefb0",
       "commit": "e244ad6a830e4ef77d87fb452143f7100c767139"
+    },
+    "retained-detail-strings.json": {
+      "source": "strings/strings.json",
+      "commit": "26a37501ec33adf02d1917353078d41298d834e1",
+      "source_sha256": "89f9747fe0b397f44fb949f34d7616d2f1757f44f799900d3307726393d5ee38",
+      "selection": [
+        "states.badge.transcribing"
+      ],
+      "sha256": "2ef145d91d4524c8dee77648feccf44d89cde251f016994503d6802ddc21131c",
+      "purpose": "Preserve existing detailed spoken ETA during the cross-app progress UI hold; not badge copy."
+    },
+    "contract/STATUS-BADGES.md": {
+      "source": "contract/STATUS-BADGES.md",
+      "sha256": "eecbb0bddf22571055a87816a19631c2f1bf4f1320d146714ec7d4d1723755ab"
+    },
+    "contract/LIBRARY-RULES.md": {
+      "source": "contract/LIBRARY-RULES.md",
+      "sha256": "a558724842725d345767fcb19f2802a86c6f18c566127f7e1fd57a51265c02f2"
+    },
+    "vectors/states/states-vectors.json": {
+      "source": "vectors/states/states-vectors.json",
+      "sha256": "2857b5af75191714b04b9974aebe7903b41e9dd96857c6b79c969bac0ae2ce67"
+    },
+    "vectors/format/format-vectors.json": {
+      "source": "vectors/format/format-vectors.json",
+      "sha256": "561e2acb1f44473904d87280447ea98e45f8185ae399a47084bec50f82595960"
+    },
+    "vectors/library-vectors/expected/main.json": {
+      "source": "vectors/library-vectors/expected/main.json",
+      "sha256": "7f5020acf49c66f710f028c150a15718d47da36ab71988733042edbfe40c8a2d"
+    },
+    "vectors/library-vectors/expected/r3-transcript-precedence.json": {
+      "source": "vectors/library-vectors/expected/r3-transcript-precedence.json",
+      "sha256": "59fe2214aa8492ff1d72558b3b08f7cd8cc3fada713b9f727c740fbb8aebd2f4"
+    },
+    "vectors/library-vectors/expected/r4-capture-history.json": {
+      "source": "vectors/library-vectors/expected/r4-capture-history.json",
+      "sha256": "5c093dbeb6e74099381580b18a4bdd7c7169a3c39720f30cdd1a325b55f89f66"
+    },
+    "vectors/library-vectors/expected/t8-low-audio-silent.json": {
+      "source": "vectors/library-vectors/expected/t8-low-audio-silent.json",
+      "sha256": "8c18748f8d778a2209870e9484262eb7116ecdce780d48fb5201106092628419"
+    },
+    "vectors/library-vectors/expected/t8-others-never-captured.json": {
+      "source": "vectors/library-vectors/expected/t8-others-never-captured.json",
+      "sha256": "8c18748f8d778a2209870e9484262eb7116ecdce780d48fb5201106092628419"
+    },
+    "vectors/states/verify.py": {
+      "source": "vectors/states/verify.py",
+      "sha256": "7ef123c5635b2a02f5e64aa148c93ed5f0103ca38909c1b7f491210007bf974c"
     }
   }
 }

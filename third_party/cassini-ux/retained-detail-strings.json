@@ -1,0 +1,71 @@
+{
+  "entries": [
+    {
+      "id": "states.badge.transcribing",
+      "en": "Transcribing, about {n} minutes left",
+      "platforms": [
+        "gnome",
+        "mac"
+      ],
+      "role": "badge",
+      "boards": [
+        "Main",
+        "Library-mac",
+        "States",
+        "States-mac"
+      ],
+      "milestone": "UX2",
+      "placeholders": {
+        "n": "etaMinutes (integer, only while transcript is queued or running); format-vectors eta"
+      },
+      "plural": {
+        "one": "Transcribing, about 1 minute left",
+        "other": "Transcribing, about {n} minutes left"
+      },
+      "note": "HARMONY 3 row 3. Accent tint. Kept as one sentence for translators; the ETA part follows the HARMONY 6 plural. 'Transcribing' is the allowed badge exception. n = 0 uses states.badge.transcribing.underMinute. Live from UX13. n = 0 uses states.badge.transcribing.underMinute.",
+      "status": "drawn",
+      "l10n": {
+        "it": {
+          "text": "In trascrizione, circa {n} minuti",
+          "plural": {
+            "one": "In trascrizione, circa 1 minuto",
+            "many": "In trascrizione, circa {n} minuti",
+            "other": "In trascrizione, circa {n} minuti"
+          }
+        },
+        "fr": {
+          "text": "Transcription, environ {n} minutes",
+          "plural": {
+            "one": "Transcription, environ {n} minute",
+            "many": "Transcription, environ {n} minutes",
+            "other": "Transcription, environ {n} minutes"
+          }
+        },
+        "es": {
+          "text": "Transcribiendo, quedan unos {n} minutos",
+          "plural": {
+            "one": "Transcribiendo, queda alrededor de 1 minuto",
+            "many": "Transcribiendo, quedan unos {n} minutos",
+            "other": "Transcribiendo, quedan unos {n} minutos"
+          }
+        },
+        "pt-BR": {
+          "text": "Transcrevendo, faltam cerca de {n} minutos",
+          "plural": {
+            "one": "Transcrevendo, falta cerca de {n} minuto",
+            "many": "Transcrevendo, faltam cerca de {n} minutos",
+            "other": "Transcrevendo, faltam cerca de {n} minutos"
+          }
+        },
+        "pt-PT": {
+          "text": "A transcrever, faltam cerca de {n} minutos",
+          "plural": {
+            "one": "A transcrever, falta cerca de {n} minuto",
+            "many": "A transcrever, faltam cerca de {n} minutos",
+            "other": "A transcrever, faltam cerca de {n} minutos"
+          }
+        }
+      }
+    }
+  ]
+}

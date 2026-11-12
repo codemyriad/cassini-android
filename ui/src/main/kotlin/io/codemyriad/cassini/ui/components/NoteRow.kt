@@ -172,11 +172,11 @@ internal data class RowStatus(val text: String, val kind: StatusBadgeKind? = nul
 @Composable
 internal fun rowStatus(status: NoteStatusUi, durationMs: Long, minutes: Long?): RowStatus = when (status) {
     NoteStatusUi.Recording -> RowStatus(
-        stringResource(R.string.ui_badge_recording, Durations.clock(durationMs)),
+        statusBadgeText(StatusBadgeKind.Recording, liveMs = durationMs),
         StatusBadgeKind.Recording,
     )
     NoteStatusUi.Transcribing, NoteStatusUi.Queued -> RowStatus(
-        transcribingLabel(minutes),
+        statusBadgeText(StatusBadgeKind.Transcribing, minutes = minutes),
         StatusBadgeKind.Transcribing,
     )
     is NoteStatusUi.Paused -> RowStatus(
@@ -187,12 +187,6 @@ internal fun rowStatus(status: NoteStatusUi, durationMs: Long, minutes: Long?): 
         RowStatus(stringResource(R.string.ui_badge_attention), StatusBadgeKind.Attention)
     is NoteStatusUi.Transcribed -> RowStatus(stringResource(R.string.ui_status_transcribed))
     NoteStatusUi.AudioOnly -> RowStatus(stringResource(R.string.ui_status_audio_only))
-}
-
-@Composable
-private fun transcribingLabel(minutes: Long?): String {
-    if (minutes == null) return stringResource(R.string.ui_badge_transcribing)
-    return stringResource(R.string.ui_preview_badge_transcribing_eta, Counts.number(minutes))
 }
 
 /** Compact visual badges must not erase the saved position, failure reason or queued state from TalkBack. */

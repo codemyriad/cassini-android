@@ -9087,11 +9087,48 @@
    }
   },
   {
-   "id": "states.badge.interrupted",
-   "en": "Interrupted at {position}",
+   "id": "states.badge.importing",
+   "en": "Importing…",
    "platforms": [
     "gnome",
-    "mac"
+    "mac",
+    "ios",
+    "android"
+   ],
+   "role": "badge",
+   "boards": [
+    "States",
+    "States-mac"
+   ],
+   "milestone": "W0.4 (L-25, L-26)",
+   "note": "L-25/L-26: active transient import-entry badge, neutral tint and spinner. Does not add a persisted meeting lifecycle or define priority against a recording. Current model has no importing lifecycle; cross-domain placement remains PROVISIONAL pending Alex.",
+   "status": "drawn",
+   "l10n": {
+    "it": {
+     "text": "Importazione…"
+    },
+    "fr": {
+     "text": "Importation…"
+    },
+    "es": {
+     "text": "Importando…"
+    },
+    "pt-BR": {
+     "text": "Importando…"
+    },
+    "pt-PT": {
+     "text": "A importar…"
+    }
+   }
+  },
+  {
+   "id": "states.badge.interrupted",
+   "en": "Interrupted",
+   "platforms": [
+    "gnome",
+    "mac",
+    "ios",
+    "android"
    ],
    "role": "badge",
    "boards": [
@@ -9100,27 +9137,24 @@
     "States",
     "States-mac"
    ],
-   "milestone": "UX2",
-   "placeholders": {
-    "position": "format.position of interruptedAtMs, HH:MM:SS (e.g. 00:41:12)"
-   },
-   "note": "HARMONY 3 row 5. Amber tint (amber text on amberTint). This is history, not an error.",
+   "milestone": "W0.4 (L-26)",
+   "note": "L-26: amber/alert badge, no position. History, not an error. Position-bearing current copy is meeting.interruptedAt, for the meeting/detail surface.",
    "status": "drawn",
    "l10n": {
     "it": {
-     "text": "Interrotta a {position}"
+     "text": "Interrotta"
     },
     "fr": {
-     "text": "Interrompue à {position}"
+     "text": "Interrompue"
     },
     "es": {
-     "text": "Interrumpida en {position}"
+     "text": "Interrumpida"
     },
     "pt-BR": {
-     "text": "Interrompida em {position}"
+     "text": "Interrompida"
     },
     "pt-PT": {
-     "text": "Interrompida aos {position}"
+     "text": "Interrompida"
     }
    }
   },
@@ -9129,15 +9163,17 @@
    "en": "Needs attention",
    "platforms": [
     "gnome",
-    "mac"
+    "mac",
+    "ios",
+    "android"
    ],
    "role": "badge",
    "boards": [
     "States",
     "States-mac"
    ],
-   "milestone": "UX2",
-   "note": "HARMONY 3 row 4: only when error != null and error.action != null. Amber tint.",
+   "milestone": "W0.4 (L-26)",
+   "note": "L-26: amber tone and alert glyph, only actionable errors. Current code identifier needsAttention is retained; the canvas calls the visual kind attention.",
    "status": "drawn",
    "l10n": {
     "it": {
@@ -9162,7 +9198,9 @@
    "en": "Received",
    "platforms": [
     "gnome",
-    "mac"
+    "mac",
+    "ios",
+    "android"
    ],
    "role": "badge",
    "boards": [
@@ -9173,8 +9211,8 @@
     "States",
     "States-mac"
    ],
-   "milestone": "UX2",
-   "note": "HARMONY 3 row 6 (origin = received). Grey chip (chip background, dim text). On a selected row: pill with an rgba(255,255,255,0.22) fill and selFg text on both platforms. The same word ends format.previewSubtitle.received and must stay identical. Live from UX4.",
+   "milestone": "W0.4 (L-26)",
+   "note": "L-26: transparent fill, line-token outline, ink-2 text, incoming glyph. Same word as format.previewSubtitle.received. Phone eligibility remains PROVISIONAL pending Alex/L-10; current per-app applicability is unchanged.",
    "status": "drawn",
    "l10n": {
     "it": {
@@ -9199,7 +9237,9 @@
    "en": "Recording {liveBadge}",
    "platforms": [
     "gnome",
-    "mac"
+    "mac",
+    "ios",
+    "android"
    ],
    "role": "badge",
    "boards": [
@@ -9208,11 +9248,11 @@
     "States",
     "States-mac"
    ],
-   "milestone": "UX2",
+   "milestone": "W0.4 (L-26)",
    "placeholders": {
     "liveBadge": "HARMONY 6 badge/header-pill live timer (format-vectors liveBadge): 12:48, 1:02:48 from one hour on"
    },
-   "note": "HARMONY 3 row 1 (lifecycle = recording). Red tint with a decorative 7 px red dot before the text. Live from UX5.",
+   "note": "L-26: red tone, record-tint/record-ink, dot glyph; timer unchanged. Exact glyph dimensions PROVISIONAL pending Alex; current canvas dot6.",
    "status": "drawn",
    "l10n": {
     "it": {
@@ -9237,15 +9277,17 @@
    "en": "Saving…",
    "platforms": [
     "gnome",
-    "mac"
+    "mac",
+    "ios",
+    "android"
    ],
    "role": "badge",
    "boards": [
     "States",
     "States-mac"
    ],
-   "milestone": "UX2",
-   "note": "HARMONY 3 row 2 (lifecycle = saving). Grey chip. U+2026. Live from UX5.",
+   "milestone": "W0.4 (L-26)",
+   "note": "L-26: neutral tint and spinner, typographic ellipsis.",
    "status": "drawn",
    "l10n": {
     "it": {
@@ -9267,10 +9309,12 @@
   },
   {
    "id": "states.badge.transcribing",
-   "en": "Transcribing, about {n} minutes left",
+   "en": "Transcribing · {n} min",
    "platforms": [
     "gnome",
-    "mac"
+    "mac",
+    "ios",
+    "android"
    ],
    "role": "badge",
    "boards": [
@@ -9279,55 +9323,55 @@
     "States",
     "States-mac"
    ],
-   "milestone": "UX2",
+   "milestone": "W0.4 (L-26)",
    "placeholders": {
     "n": "etaMinutes (integer, only while transcript is queued or running); format-vectors eta"
    },
    "plural": {
-    "one": "Transcribing, about 1 minute left",
-    "other": "Transcribing, about {n} minutes left"
+    "one": "Transcribing · 1 min",
+    "other": "Transcribing · {n} min"
    },
-   "note": "HARMONY 3 row 3. Accent tint. Kept as one sentence for translators; the ETA part follows the HARMONY 6 plural. 'Transcribing' is the allowed badge exception. n = 0 uses states.badge.transcribing.underMinute. Live from UX13. n = 0 uses states.badge.transcribing.underMinute.",
+   "note": "L-26: positive integer ETA only, compact middle-dot label. Neutral tint, spinner. n=0 uses underMinute and absent/invalid ETA uses noEta; those current wordings remain PROVISIONAL pending Alex. Do not derive a sentence by concatenation.",
    "status": "drawn",
    "l10n": {
     "it": {
-     "text": "In trascrizione, circa {n} minuti",
+     "text": "In trascrizione · {n} min",
      "plural": {
-      "one": "In trascrizione, circa 1 minuto",
-      "many": "In trascrizione, circa {n} minuti",
-      "other": "In trascrizione, circa {n} minuti"
+      "one": "In trascrizione · 1 min",
+      "many": "In trascrizione · {n} min",
+      "other": "In trascrizione · {n} min"
      }
     },
     "fr": {
-     "text": "Transcription, environ {n} minutes",
+     "text": "Transcription · {n} min",
      "plural": {
-      "one": "Transcription, environ {n} minute",
-      "many": "Transcription, environ {n} minutes",
-      "other": "Transcription, environ {n} minutes"
+      "one": "Transcription · {n} min",
+      "many": "Transcription · {n} min",
+      "other": "Transcription · {n} min"
      }
     },
     "es": {
-     "text": "Transcribiendo, quedan unos {n} minutos",
+     "text": "Transcribiendo · {n} min",
      "plural": {
-      "one": "Transcribiendo, queda alrededor de 1 minuto",
-      "many": "Transcribiendo, quedan unos {n} minutos",
-      "other": "Transcribiendo, quedan unos {n} minutos"
+      "one": "Transcribiendo · 1 min",
+      "many": "Transcribiendo · {n} min",
+      "other": "Transcribiendo · {n} min"
      }
     },
     "pt-BR": {
-     "text": "Transcrevendo, faltam cerca de {n} minutos",
+     "text": "Transcrevendo · {n} min",
      "plural": {
-      "one": "Transcrevendo, falta cerca de {n} minuto",
-      "many": "Transcrevendo, faltam cerca de {n} minutos",
-      "other": "Transcrevendo, faltam cerca de {n} minutos"
+      "one": "Transcrevendo · {n} min",
+      "many": "Transcrevendo · {n} min",
+      "other": "Transcrevendo · {n} min"
      }
     },
     "pt-PT": {
-     "text": "A transcrever, faltam cerca de {n} minutos",
+     "text": "A transcrever · {n} min",
      "plural": {
-      "one": "A transcrever, falta cerca de {n} minuto",
-      "many": "A transcrever, faltam cerca de {n} minutos",
-      "other": "A transcrever, faltam cerca de {n} minutos"
+      "one": "A transcrever · {n} min",
+      "many": "A transcrever · {n} min",
+      "other": "A transcrever · {n} min"
      }
     }
    }
@@ -9337,13 +9381,15 @@
    "en": "Transcribing…",
    "platforms": [
     "gnome",
-    "mac"
+    "mac",
+    "ios",
+    "android"
    ],
    "role": "badge",
    "boards": [],
    "milestone": "UX2",
    "status": "harmony",
-   "note": "D6 R3: queued/running with no valid etaMinutes. Same tint as states.badge.transcribing.",
+   "note": "PROVISIONAL, pending Alex (W0.4/L-26): current wording retained verbatim; the canvas gives no replacement for this ETA variant. Neutral tint, spinner.",
    "l10n": {
     "it": {
      "text": "In trascrizione…"
@@ -9367,12 +9413,14 @@
    "en": "Transcribing, less than a minute left",
    "platforms": [
     "gnome",
-    "mac"
+    "mac",
+    "ios",
+    "android"
    ],
    "role": "badge",
    "boards": [],
    "milestone": "UX2",
-   "note": "Not drawn. Required by format-vectors.json eta {minutes:0}; HARMONY 6 lists it.",
+   "note": "PROVISIONAL, pending Alex (W0.4/L-26): current wording retained verbatim; the canvas gives no replacement for this ETA variant. Neutral tint, spinner.",
    "status": "vectors",
    "l10n": {
     "it": {
@@ -22276,6 +22324,41 @@
     },
     "pt-PT": {
      "text": "O Parakeet Ultra não pôde ser executado neste dispositivo para esta gravação, por isso foi o Whistle a transcrevê-la."
+    }
+   }
+  },
+  {
+   "id": "meeting.interruptedAt",
+   "en": "Interrupted at {position}",
+   "platforms": [
+    "gnome",
+    "mac",
+    "ios",
+    "android"
+   ],
+   "role": "status",
+   "boards": [],
+   "milestone": "W0.4 (L-26)",
+   "placeholders": {
+    "position": "format.position of interruptedAtMs, HH:MM:SS (e.g. 00:41:12)"
+   },
+   "note": "Current position-bearing copy preserved outside the badge (L-26). Exact placement PROVISIONAL, pending Alex; keep each app’s current meeting/detail placement.",
+   "status": "harmony",
+   "l10n": {
+    "it": {
+     "text": "Interrotta a {position}"
+    },
+    "fr": {
+     "text": "Interrompue à {position}"
+    },
+    "es": {
+     "text": "Interrumpida en {position}"
+    },
+    "pt-BR": {
+     "text": "Interrompida em {position}"
+    },
+    "pt-PT": {
+     "text": "Interrompida aos {position}"
     }
    }
   }

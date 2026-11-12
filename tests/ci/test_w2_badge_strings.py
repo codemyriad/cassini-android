@@ -17,7 +17,7 @@ class BadgeStringsTest(unittest.TestCase):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         self.root = Path(temp.name)
-        for name in ('strings.json', 'UPSTREAM.json'):
+        for name in ('strings.json', 'UPSTREAM.json', 'retained-detail-strings.json'):
             target = self.root / BADGES.VENDOR / name
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes((ROOT / BADGES.VENDOR / name).read_bytes())
@@ -42,8 +42,13 @@ class BadgeStringsTest(unittest.TestCase):
                 forms = {item.attrib['quantity']: item.text for item in resources['ui_badge_transcribing_spoken_eta']}
                 self.assertEqual(1, forms['other'].count('%1$s'))
                 self.assertIn('one', forms)
+                compact = {item.attrib['quantity']: item.text for item in resources['ui_badge_transcribing_eta']}
+                self.assertEqual(1, compact['other'].count('%1$s'))
                 if path.parent.name == 'values':
                     self.assertEqual('Transcribing, about 1 minute left', forms['one'])
+                    self.assertEqual('Transcribing · 1 min', compact['one'])
+                    self.assertEqual('Importing…', labels['ui_badge_importing'])
+                    self.assertEqual('Interrupted', labels['ui_badge_interrupted'])
                 self.assertNotIn('{liveBadge}', text)
 
     def test_missing_locale_file_fails(self):
