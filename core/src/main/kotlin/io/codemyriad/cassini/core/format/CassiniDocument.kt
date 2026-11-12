@@ -60,14 +60,16 @@ data class CassiniDocument(
             .firstOrNull { it.optString("id") == id }?.optString("provenance")?.ifEmpty { null }
     }
 
-    private fun firstSpeechOrder(): List<String> = variants.firstOrNull { it.transcript != null }
-        ?.transcript?.words?.map { it.speaker }?.distinct().orEmpty()
+    private val originalColourIndices: Map<String, Int> by lazy {
+        variants.firstOrNull { it.transcript != null }?.transcript?.words?.map { it.speaker }?.distinct()
+            ?.withIndex()?.associate { it.value to it.index }.orEmpty()
+    }
 
     /** Old files use the first readable variant, never the currently selected variant's order. */
     fun speakerColourIndex(id: String): Int? {
         val speakers = manifest?.optJSONArray("speakers") ?: return null
         return (0 until speakers.length()).firstOrNull { speakers.getJSONObject(it).optString("id") == id }?.let { i ->
-            val original = firstSpeechOrder().indexOf(id).takeIf { it >= 0 } ?: i
+            val original = originalColourIndices[id] ?: i
             speakers.getJSONObject(i).optInt("colourIndex", original).takeIf { it >= 0 } ?: original
         }
     }
@@ -346,11 +348,11 @@ data class CassiniDocument(
         }
 
         /** Assign once, before any label or transcript-order edit; never overwrite a stored slot. */
-        private fun fixSpeakerSlots(speakers: JSONArray, originalOrder: List<String>) {
+        private fun fixSpeakerSlots(speakers: JSONArray, originalSlots: Map<String, Int>) {
             for (i in 0 until speakers.length()) {
                 val speaker = speakers.getJSONObject(i)
                 if (!speaker.has("colourIndex")) {
-                    val index = originalOrder.indexOf(speaker.getString("id")).takeIf { it >= 0 } ?: i
+                    val index = originalSlots[speaker.getString("id")] ?: i
                     speaker.put("colourIndex", index)
                 }
             }
@@ -368,7 +370,7 @@ data class CassiniDocument(
             require(existing.state == "ok" && existing.manifest != null)
             val manifest = JSONObject(existing.manifest.toString())
             val speakers = manifest.getJSONArray("speakers")
-            fixSpeakerSlots(speakers, existing.firstSpeechOrder())
+            fixSpeakerSlots(speakers, existing.originalColourIndices)
             val byId = (0 until speakers.length()).associate { speakers.getJSONObject(it).let { s -> s.getString("id") to s } }
             labels.forEach { (id, label) ->
                 require(label.isNotBlank()) { "Blank label" }
@@ -529,7 +531,7 @@ data class CassiniDocument(
             descriptors.put(JSONObject().put("id", id).put("format", "cassini.words.v1").put("default", true)
                 .put("language", transcript.language).put("wordCount", transcript.words.size).put("createdAtUtc", now).put("payloadRef", ref))
             val speakers = manifest.getJSONArray("speakers")
-            fixSpeakerSlots(speakers, existing?.firstSpeechOrder().orEmpty())
+            fixSpeakerSlots(speakers, existing?.originalColourIndices.orEmpty())
             val known = (0 until speakers.length()).map { speakers.getJSONObject(it).getString("id") }.toSet()
             var nextColour = (0 until speakers.length()).maxOfOrNull {
                 speakers.getJSONObject(it).getInt("colourIndex")
