@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Vendored from codemyriad/cassini-ux@d46d36d65cf5fb7674f89b5f7f511f1a6ad2949b:tools/pr-shots/pr-shots.py
+# Vendored from codemyriad/cassini-ux@afe3ba905880e7052dbcef425d204266153a2ae0:tools/pr-shots/pr-shots.py
 """W0.8 screenshot comparisons. Diff is read-only; only the coordinator publishes."""
 
 import argparse
@@ -24,6 +24,7 @@ START, END = "<!-- cassini-shots:start -->", "<!-- cassini-shots:end -->"
 KEY = re.compile(r"[a-z0-9][a-z0-9.-]{0,159}")
 SHA = re.compile(r"[0-9a-f]{40}")
 REPO = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9_.-]+")
+MAX_BLOCK_CHARACTERS = 40_000  # Leave room for the authored PR description below GitHub's body limit.
 MAX_PUBLICATION_PNGS = 1000  # GNOME: 76 pairs x 2 schemes x 3 images = 456; allow >2x headroom.
 Image.MAX_IMAGE_PIXELS = 12_000_000
 
@@ -257,6 +258,13 @@ def sorted_rows(rows):
 
 
 def block(data, images=True, summary=False, summary_run=None):
+    rendered = render_block(data, images, summary, summary_run)
+    if len(rendered) > MAX_BLOCK_CHARACTERS:
+        return render_block(data, images, summary, summary_run, omit_details=True)
+    return rendered
+
+
+def render_block(data, images, summary, summary_run, omit_details=False):
     validate_metadata(data)
     images = images and not summary
     rows = data["rows"]
@@ -294,6 +302,8 @@ def block(data, images=True, summary=False, summary_run=None):
         inline_screens = set(list(dict.fromkeys(screen_id(r) for r in selected))[:12])
         inline_rows = sum(screen_id(r) in inline_screens for r in selected)
         for index, row in enumerate(selected):
+            if omit_details and index >= inline_rows:
+                continue
             if index == inline_rows:
                 lines += ["", f"<details><summary>{len(changed) - 12} more screens</summary>", ""]
             links = {}
@@ -327,7 +337,16 @@ def block(data, images=True, summary=False, summary_run=None):
             else:
                 lines.append(f"- {label}: {links['before']} · {links['after']} · {pct}")
         if len(changed) > 12:
-            lines += ["", "</details>"]
+            if omit_details:
+                lines += [
+                    "",
+                    (
+                        f"Showing the first 12 of {len(changed)} changed screens. "
+                        f"The remaining {len(changed) - 12} screens are in the full images linked below."
+                    ),
+                ]
+            else:
+                lines += ["", "</details>"]
     if changed:
         if summary and not data.get("git_images"):
             run = str(summary_run or "")
