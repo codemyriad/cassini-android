@@ -10,6 +10,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 # -I omits the script directory; import only this checkout's trusted helper.
@@ -20,6 +21,8 @@ from play_changelog import format_play_notes  # noqa: E402
 ENVIRONMENT = 'android-play-internal-test'
 VERSION = re.compile(r'(\d+\.\d+\.\d+)(?:-beta\.(\d+))?')
 SHA = re.compile(r'[0-9a-f]{40}')
+CI_WAIT_SECONDS = 45 * 60
+CI_POLL_SECONDS = 30
 
 
 def command(*args: str) -> str:
@@ -62,9 +65,16 @@ class GitHub:
                     run.get('head_sha') == sha and run.get('head_branch') == branch):
                 yield run
 
-    def green(self, sha: str) -> bool:
+    def ci_state(self, sha: str) -> str:
         run = next(self.runs('main', sha), None)
-        return bool(run and run['status'] == 'completed' and run['conclusion'] == 'success')
+        if not run:
+            return 'red'
+        if run['status'] != 'completed':
+            return 'pending'
+        return 'green' if run['conclusion'] == 'success' else 'red'
+
+    def green(self, sha: str) -> bool:
+        return self.ci_state(sha) == 'green'
 
     def manual_baseline(self) -> tuple[str, int] | None:
         for release in self.pages('releases'):
@@ -155,12 +165,29 @@ def user_notes(baseline: str | None) -> str:
     return release_notes.render(release_notes.fragments(Path(__file__).resolve().parents[1], baseline))
 
 
-def plan(api: GitHub, sha: str, text: str, run_id: int) -> dict:
+def wait_for_green(api: GitHub, sha: str, *, deadline: float | None = None,
+                   clock=time.monotonic, sleep=time.sleep) -> bool:
+    end = (clock() + CI_WAIT_SECONDS) if deadline is None else deadline
+    while True:
+        state = api.ci_state(sha) if hasattr(api, 'ci_state') else ('green' if api.green(sha) else 'red')
+        if state == 'green':
+            return True
+        if state != 'pending':
+            return False
+        remaining = end - clock()
+        if remaining <= 0:
+            return False
+        sleep(min(CI_POLL_SECONDS, remaining))
+
+
+def plan(api: GitHub, sha: str, text: str, run_id: int, *,
+         clock=time.monotonic, sleep=time.sleep) -> dict:
     if not SHA.fullmatch(sha):
         raise ValueError('Invalid main commit')
     if api.request('commits/main')['sha'] != sha:
         return {'build': False, 'reason': 'main moved before planning'}
-    if not api.green(sha):
+    deadline = clock() + CI_WAIT_SECONDS
+    if not wait_for_green(api, sha, deadline=deadline, clock=clock, sleep=sleep):
         return {'build': False, 'reason': 'latest main CI is not green'}
     source_name, code_floor = source_version(text)
     reservations, baseline = [], None
@@ -194,8 +221,8 @@ def plan(api: GitHub, sha: str, text: str, run_id: int) -> dict:
     developer = notes(api, baseline, sha)
     body = user_notes(baseline)
     release_notes.release_body(body, developer)  # Validate both destinations before reserving a build.
-    if api.request('commits/main')['sha'] != sha or not api.green(sha):
-        return {'build': False, 'reason': 'main or its CI changed while planning'}
+    if not wait_for_green(api, sha, deadline=deadline, clock=clock, sleep=sleep):
+        return {'build': False, 'reason': 'main CI changed while planning'}
     payload = {'schema': 1, 'version_name': name, 'version_code': code, 'run_id': run_id}
     deployment = api.request('deployments', {'ref': sha, 'environment': ENVIRONMENT, 'auto_merge': False,
                                            'required_contexts': [], 'transient_environment': True,
