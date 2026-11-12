@@ -138,7 +138,6 @@
     <string name="ui_library_recording_paused_card">Gravação em pausa · %1$s</string>
     <string name="ui_library_recording_tap">Toque para voltar</string>
     <string name="ui_progress_transcribing">A transcrever %1$s</string>
-    <string name="ui_progress_getting_ready">A preparar a transcrição de %1$s</string>
     <string name="ui_progress_downloading_models">A transferir modelos</string>
     <string name="ui_library_import">Importar áudio</string>
     <string name="ui_library_record">Gravar</string>
@@ -158,8 +157,6 @@
     <string name="ui_status_newer_format">Formato mais recente</string>
     <string name="ui_status_transcribed">Transcrita</string>
     <string name="ui_status_audio_only">Só áudio</string>
-    <string name="ui_status_suffix_resume">· Retomar</string>
-    <string name="ui_status_suffix_try_again">· Tentar novamente</string>
     <string name="ui_status_suffix_no_speech">· Sem fala</string>
     <!-- The Note screen of a document with no words (docs/ui-fidelity.md, device follow-up 5). -->
     <string name="ui_note_no_words_title">Sem fala</string>
@@ -169,8 +166,6 @@
         <item quantity="many">· %1$s oradores</item>
         <item quantity="other">· %1$s oradores</item>
     </plurals>
-    <string name="ui_row_resume_description">Retomar a transcrição de %1$s</string>
-    <string name="ui_row_try_again_description">Tentar transcrever %1$s novamente</string>
 
     <!-- Recording (board 01, features.md section 2). -->
     <string name="ui_recording_minimise">Minimizar para a biblioteca (a gravação continua)</string>

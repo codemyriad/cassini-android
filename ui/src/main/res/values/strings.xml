@@ -162,7 +162,6 @@
     <string name="ui_library_recording_paused_card">Recording paused · %1$s</string>
     <string name="ui_library_recording_tap">Tap to return</string>
     <string name="ui_progress_transcribing">Transcribing %1$s</string>
-    <string name="ui_progress_getting_ready">Getting ready to transcribe %1$s</string>
     <string name="ui_progress_downloading_models">Downloading models</string>
     <string name="ui_library_import">Import audio</string>
     <string name="ui_library_record">Record</string>
@@ -182,8 +181,6 @@
     <string name="ui_status_newer_format">Newer format</string>
     <string name="ui_status_transcribed">Transcribed</string>
     <string name="ui_status_audio_only">Audio only</string>
-    <string name="ui_status_suffix_resume">· Resume</string>
-    <string name="ui_status_suffix_try_again">· Try again</string>
     <string name="ui_status_suffix_no_speech">· No speech</string>
     <!-- The Note screen of a document with no words (docs/ui-fidelity.md, device follow-up 5). -->
     <string name="ui_note_no_words_title">No speech</string>
@@ -192,8 +189,6 @@
         <item quantity="one">· %1$s speaker</item>
         <item quantity="other">· %1$s speakers</item>
     </plurals>
-    <string name="ui_row_resume_description">Resume transcribing %1$s</string>
-    <string name="ui_row_try_again_description">Try transcribing %1$s again</string>
 
     <!-- Recording (board 01, features.md section 2). -->
     <string name="ui_recording_minimise">Minimise to library (recording continues)</string>
