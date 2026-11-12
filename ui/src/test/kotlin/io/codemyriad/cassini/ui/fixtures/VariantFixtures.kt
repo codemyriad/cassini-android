@@ -772,9 +772,8 @@ internal object VariantFixtures {
         "licenses-text" to LicensesUiState(
             entries = LicenseEntry.entries.toImmutableList(),
             open = LicenseText(
-                LicenseEntry.INSTRUMENT_SANS,
-                "Copyright 2022 The Instrument Sans Project Authors (https://github.com/Instrument/instrument-sans)\n\n" +
-                    "This Font Software is licensed under the SIL Open Font License, Version 1.1.",
+                LicenseEntry.CASSINI,
+                "GNU GENERAL PUBLIC LICENSE\n\nVersion 3, 29 June 2007",
             ),
         ),
     )

@@ -14,7 +14,7 @@ If the three documents do not agree, `features.md` has priority for the behavior
 The owner made two decisions on 2026-10-09 that give the shape of this version:
 
 1. Greenfield. Cassini Android has no installations at this time. We build nothing whose only purpose is to read or keep the app data of 0.0.x or 0.1.0. Thus there is no migrator, no legacy reader, no frozen `library.json` or `session.json`, no tombstone and no upgrade check. The on-disk layout is new. Two things stay external contracts: the portable `.opus` document format (with its conformance vectors) and the privacy rules.
-2. New visual design. The UI follows the boards in `design/reference/` (11 boards at 390 x 844 dp, PNG renders and the source markup). The fonts are Instrument Sans and IBM Plex Mono.
+2. New visual design. The UI follows the boards in `design/reference/` (11 boards at 390 x 844 dp, PNG renders and the source markup). The fonts are the Android system sans.
 
 The work came in phases. Each phase operated in one git worktree. Phases that operated at the same time used separate worktrees and changed different files. All phases are done.
 
@@ -970,7 +970,6 @@ The other rules of the build are:
 - The version catalog is `gradle/libs.versions.toml`. Bundles contain only artifacts with an explicit version. Each module declares the artifacts that the BOM manages (`compose-ui-test-junit4`, `compose-ui-test-junit4-accessibility`) next to `platform(libs.compose.bom)`. `kotlinx-collections-immutable` is 0.5.2. The app does not use `material-icons-extended`, because the icons come from the SVG paths of the design.
 - Screenshot tests: Roborazzi 1.77.0 with the native graphics of Robolectric, in `:ui` (ui.md section 10). The P2 scaffold test shows that it operates in an AGP 9 library module with `android.newDsl=false`. The earlier spike operated only in an application module.
 - Accessibility checks: `androidx.compose.ui:ui-test-junit4-accessibility` (the BOM manages it, and it includes the Accessibility Test Framework). P2 found that `enableAccessibilityChecks()` does not operate under Robolectric 4.17/SDK 35. Thus the checks are in device tests on an emulator: `flows/ScreenAccessibilityTest` and `flows/AppAccessibilityTest` (features.md section 14, `docs/development.md`).
-- Fonts: the unmodified static TTFs of Instrument Sans and IBM Plex Mono. `third_party/fonts/fonts.json` pins them, and `scripts/fetch-fonts.sh` gets them (ui.md section 3).
 - JVM tests: `src/test/resources/robolectric.properties` pins Robolectric 4.17 to SDK 35 in each module that uses it. One test in each such module asserts `Build.VERSION.SDK_INT == 35`. SDK 36 and later need a JDK 21 runtime. The tests use `--add-opens` jvmArgs and `isIncludeAndroidResources = true`.
 - `ciTest` (a root task) runs `:core:test`. For each Android module, it runs `verifyRoborazziDebug` if the module has the Roborazzi plugin, else `testDebugUnitTest`. CI and the green check of each phase run it.
 - Release: R8 (`isMinifyEnabled`, `isShrinkResources`, `proguard-android-optimize.txt`). The keep rules keep the members of `com.k2fsa.sherpa.onnx.** { *; }`, `com.github.luben.zstd.** { *; }`, `io.codemyriad.cassini.NativeOpus { *; }`, the classes with `native` methods, and kotlinx-serialization for the navigation keys. `scripts/package-apk.py` copies the R8 mapping into `dist/`.
@@ -983,7 +982,7 @@ The other rules of the build are:
 
 CI has three workflows in `.github/workflows/`. `docs/development.md` ("Continuous integration") gives the details.
 
-- `android.yml`, job `checks`: the wrapper validation, detekt, actionlint, shellcheck, ruff, the Markdown link check, `fetch-fonts.sh --check`, the resource collision check, the verbatim diff, and on tags the CHANGELOG section.
+- `android.yml`, job `checks`: the wrapper validation, detekt, actionlint, shellcheck, ruff, the Markdown link check, the resource collision check, the verbatim diff, and on tags the CHANGELOG section.
 - `android.yml`, job `core-only`: `:core:test` without `setup.sh`.
 - `android.yml`, job `build`: the prebuilt AAR, `ciTest`, lint, the debug APK, and the device test APKs of `:app` and `:data`. On tags, also `release` and `releaseTest`. If the job fails, it uploads the Roborazzi diffs.
 - `android.yml`, job `emulator`: API 26, 29, 34 and 35, with `scripts/ci-emulator-smoke.sh`. It runs `@CiSmoke`, makes sure that the platform Opus encoder is as expected for each API level, and runs `NoteFtsDeviceTest` on API 26. If the emulator or adb fails before the tests start, the job tries one more time.

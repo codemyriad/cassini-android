@@ -42,7 +42,6 @@ import io.codemyriad.cassini.ui.format.LocalFormat
 import io.codemyriad.cassini.ui.theme.CassiniIcon
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import io.codemyriad.cassini.ui.theme.Glyph
-import io.codemyriad.cassini.ui.theme.PlexMono
 
 /**
  * The three kinds of sheet row (board 06): [Featured] is the highlighted "Cassini document" row, [Plain] an ordinary
@@ -181,7 +180,13 @@ private fun withExtension(
         // A zero-width space lets the line break before ".opus": Unicode line breaking never breaks before a full
         // stop, even after a space, and would move the last word of the text with it (board 06 breaks there).
         if (text != null) append(" \u200B")
-        withStyle(SpanStyle(fontFamily = PlexMono, fontSize = size.sp, color = color)) { append(extension) }
+        val extensionStyle = SpanStyle(
+            fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
+            fontFeatureSettings = "tnum",
+            fontSize = size.sp,
+            color = color,
+        )
+        withStyle(extensionStyle) { append(extension) }
     }
 }
 

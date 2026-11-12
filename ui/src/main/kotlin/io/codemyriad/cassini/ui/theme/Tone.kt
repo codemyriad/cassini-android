@@ -20,8 +20,8 @@ fun CassiniColors.tone(tone: Tone): ToneColors = when (tone) {
     Tone.Ok -> ToneColors(bg = tealTint, fg = tealInk, dot = teal)
     Tone.Info -> ToneColors(bg = accentTint, fg = accentInk, dot = accent)
     Tone.Warn -> ToneColors(bg = amberTint, fg = amberInk, dot = amber)
-    Tone.Error -> ToneColors(bg = redTint, fg = redInk, dot = red)
-    Tone.Plain -> ToneColors(bg = surface, fg = ink, dot = line3, border = line)
+    Tone.Error -> ToneColors(bg = redTint, fg = redInk, dot = error)
+    Tone.Plain -> ToneColors(bg = neutralTint, fg = neutralInk, dot = neutralInk, border = line)
     Tone.Outline -> ToneColors(bg = Color.Transparent, fg = ink, dot = Color.Unspecified, border = line2)
 }
 

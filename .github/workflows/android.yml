@@ -101,8 +101,6 @@ jobs:
         run: python3 -m unittest discover -s tests/ci -p 'test_*.py' -v
       - name: Relative links in the Markdown files
         run: scripts/check-links.sh
-      - name: Bundled fonts match their pins
-        run: scripts/fetch-fonts.sh --check
       - name: No resource name is in both :app and :ui
         run: python3 -I scripts/check-resource-collisions.py
       - name: native.yml runs on every change to the native build's scripts

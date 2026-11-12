@@ -14,7 +14,6 @@ library/ recording/ note/ models/ settings/ voices/ trash/ licenses/
 res/         values/strings.xml, values-{it,fr,es,pt-rBR,pt-rPT}/strings.xml, values/colors.xml + values-night/colors.xml (ui_window_bg),
              font/ui_*.ttf, drawable/ui_ic_logo.xml, drawable/ui_ic_stat_logo.xml,
              drawable/ui_ic_launcher_{foreground,background,monochrome}.xml, mipmap-anydpi/ui_ic_launcher.xml (+ _round)
-assets/licenses/fonts/InstrumentSans-OFL.txt, IBMPlexMono-OFL.txt
 src/test/    fixtures (BoardFixtures.kt, VariantFixtures.kt), BoardTest base, frames, screenshot tests, ContrastTest, FormatTest, FontAssetsTest
 src/test/screenshots/{light,dark,it,fontscale,variants,components,states}/*.png   committed goldens
 ```
@@ -32,91 +31,61 @@ src/test/screenshots/{light,dark,it,fontscale,variants,components,states}/*.png 
 - Each `UiState` class is `@Immutable` and uses `ImmutableList`.
 - The ViewModel classifies the formats that depend on "now" (Today, Yesterday, "23 days left") with an injected `Clock`. It gives them as semantic values (`DayLabel.Today`, `daysLeft = 23`).
 
-## 3. Fonts
+## 3. Type (W1 draft preview)
 
-| `res/font` file | Upstream | Path | SHA-256 |
-|---|---|---|---|
-| `ui_instrument_sans_regular.ttf` | github.com/Instrument/instrument-sans @ `7fa22308a3d0c94ee2b3cd537a1196b65db34a3e` | `fonts/ttf/InstrumentSans-Regular.ttf` | `69fd3f7c467c70c1f73b232812407f688f3d87dd7a801ea7281aa97d29cf53d5` |
-| `ui_instrument_sans_medium.ttf` | same | `fonts/ttf/InstrumentSans-Medium.ttf` | `56ba599d12b7cf2fff4eebf46d29253231b6f49bc5b6ce7733dfbf3d7940bfae` |
-| `ui_instrument_sans_semibold.ttf` | same | `fonts/ttf/InstrumentSans-SemiBold.ttf` | `7151cf505f897e17b4e9b956293b5a60046ec39da3923a8feba29ce86fd14e12` |
-| `ui_instrument_sans_bold.ttf` | same | `fonts/ttf/InstrumentSans-Bold.ttf` | `735badeb8b2046cee6f5e1226412ab6c29db04accbca413af03d70e991dce10d` |
-| `ui_ibm_plex_mono_regular.ttf` | github.com/IBM/plex tag `@ibm/plex-mono@2.5.0` | `packages/plex-mono/fonts/complete/ttf/IBMPlexMono-Regular.ttf` | `7c6fbddca4b700be918f5f6183d9bd4464fa427fe435f0b480d77fe2bb8c5a43` |
-| `ui_ibm_plex_mono_medium.ttf` | same | `…/IBMPlexMono-Medium.ttf` | `98fbd727aae340b236955879dabed4d991aac9e8e90b3b2a67ce4a59221cc97c` |
-
-The file names are only resource names. The font files are the same as upstream, byte for byte. The license texts are the `OFL.txt` of Instrument Sans and `packages/plex-mono/LICENSE.txt`, verbatim. These rules apply:
-
-- Ship the unmodified static TTFs. Never commit the `.woff2` files of the design. They are web subsets of Google Fonts, a subset is a Modified Version under the OFL, and "Plex" is a Reserved Font Name. Do not make subsets, and do not rename the fonts inside the files.
-- `third_party/fonts/fonts.json` is the source of truth. It has one entry for each file: `{file, family, weight, repo, ref, path, sha256, license}`. The license copies are `third_party/fonts/instrument-sans/OFL.txt` and `third_party/fonts/ibm-plex-mono/LICENSE.txt`.
-- `scripts/fetch-fonts.sh` downloads the files of the manifest, makes sure that the SHA-256 is correct, and copies the files into `ui/src/main/res/font`. With `--check`, it only makes sure that the files agree with the manifest. The script passes ShellCheck.
-- `ui/src/main/assets/licenses/fonts/*.txt` are the same as the copies in `third_party`, byte for byte. `THIRD_PARTY_NOTICES.md` has a "Fonts" section: the families, the copyright lines, the SIL Open Font License 1.1, the upstream URLs and refs, and "unmodified".
-- `FontAssetsTest` (`:ui`, plain JVM) makes sure of these items: each TTF is in the manifest with the correct hash, and each manifest entry has a TTF. The license copies are equal. No `*.woff` or `*.woff2` file is under `*/src`.
-- Plex Mono ships the weights 400 and 500. The "Processed" stat asks for 600. Compose makes 600 from 500 with the default `FontSynthesis.All`, as the browser did. Do not bundle a SemiBold.
-
-```kotlin
-val InstrumentSans = FontFamily(Font(R.font.ui_instrument_sans_regular, W400), Font(R.font.ui_instrument_sans_medium, W500),
-    Font(R.font.ui_instrument_sans_semibold, W600), Font(R.font.ui_instrument_sans_bold, W700))
-val PlexMono = FontFamily(Font(R.font.ui_ibm_plex_mono_regular, W400), Font(R.font.ui_ibm_plex_mono_medium, W500))
-```
+Android uses its system sans (Roboto), with native normal line metrics and tabular figures for times,
+durations and counters. There are no bundled fonts or font-licence rows. Meeting-card titles are 17 sp / 600;
+meta stays 13 sp. Other row titles keep their existing sizes. Explicit transcript paragraph leading remains.
 
 ## 4. Tokens
 
-### 4.1 Colors (`CassiniColors`, from `LocalCassiniColors`)
+The W1 preview reads `ui/src/main/resources/brand/tokens.json`, pinned to cassini-ux `e4ae221`.
+`Color.kt` owns all Android aliases; `brand/ANDROID-MAPPING.md` documents them. Decided and placeholder
+roles generate Kotlin and launch-window resources from that JSON. The preview uses Linen / Saturn-night,
+Cassini teal, a separate placeholder Record red and teal highlights. Speaker/avatar hues and the forced-dark
+Recording palette stay frozen while their decisions are open. The vendored JSON and executable sync/contrast tests are the preview's value authority.
 
-| Token | Light | Dark | Use |
-|---|---|---|---|
-| `ink` | #14171A | #ECEEF1 | Primary text |
-| `bg` | #F5F6F7 | #0F1214 | Screen background (also `ui_window_bg`) |
-| `surface` | #FFFFFF | #181C20 | Cards, sheets, transcript pane, player |
-| `surfaceWash` | #F5F6F7 | #1F2429 | Highlighted sheet rows ("Cassini document", "Likely") |
-| `boardBg` | #ECEEF0 | #1F2429 | Background of the States board, inactive track of the slider |
-| `text2` | #4A525B | #A9B0B9 | Meta, captions, icons, section headers |
-| `text3` | #3A4250 | #C3C9D0 | Card bodies, paragraphs of placeholder speakers, settled draft, column headings of the States board |
-| `text4` | **#687180** (board #6B7480) | #8C95A0 | Unsettled draft words, placeholders |
-| `line` | #E2E5E9 | #2A3036 | Hairlines, card borders |
-| `line2` | #C9CED5 | #3A4048 | Outline buttons and chips, drag handle |
-| `line3` | #9AA2AC | #5A626C | Dashed "Words may still change" tag, dot of the plain banner |
-| `accent` | #2346C8 | #8FA6FF | Progress fill, slider, focused border, dots, checkbox |
-| `accentFill` / `onAccentFill` | #2346C8 / #FFFFFF | #2346C8 / #FFFFFF | Primary buttons, active word |
-| `accentInk` | #1A3596 | #B9C7FF | Text on the accent tint, blue text buttons |
-| `accentTint` | #E8EDFC | #1C2647 | Info chip and banner |
-| `accentTrack` | #C9D4F6 | #2B3A70 | Track of the Library banner |
-| `teal` / `tealInk` / `tealTint` | #0F766E / #0B5A54 / #E3F2EF | #4FC7B8 / #8EDDD2 / #12302D | Ok tone, privacy shield |
-| `amber` / `amberInk` / `amberTint` / `amberWash` | #B45309 / #8A3B07 / #FCEFE3 / #FCF6EE | #F0A35E / #F7C291 / #3A2614 / #2C2118 | Warn tone |
-| `red` / `redInk` / `redTint` / `redLine` | #C2410C / #A3330B / #FBE7E1 / #E3B9A6 | #C2410C / #FFB08F / #3D1E14 / #6B3A2A | Record, error, destructive |
-| `violet` / `violetTint` | #5B2BB5 / #EFEAFB | #C1A8FF / #2A2045 | Legacy violet family |
-| `inkFill` / `onInkFill` | #14171A / #FFFFFF | #ECEEF1 / #0F1214 | Ink pills, play/pause, selected segment |
-| `snackbarBg` / `snackbarText` / `snackbarAction` | #14171A / #F2F3F5 / #9DB4FF | #ECEEF1 / #14171A / #2346C8 | Snackbar |
-| `scrim` | #1F2A39 at 50 % | #000000 at 60 % | Sheets and dialogs (over `bg`, it gives the #8A9098 of the boards) |
-| `link` | #2346C8, underlined | #8FA6FF | Inline links |
 
-`RecordingColors` is one set, because the Recording screen is dark in the two themes: `bg` #14171A, `text` #F2F3F5, `text2` #A9B0B9, `line` #3A4048, `barIdle` #4A525B, `barFresh` #FF8A55, `dot` #FF6A2B, `status` #FF9A6B, `pauseFill` #F2F3F5, `onPause` #14171A and `finish` #C2410C.
+### 4.1 Canvas values (W1 preview)
 
-`Tone { Ok, Info, Warn, Error, Plain, Outline }` gives `ToneColors(bg, fg, dot, border?)`:
-
-- Ok: tealTint, tealInk, teal.
-- Info: accentTint, accentInk, accent.
-- Warn: amberTint, amberInk, amber.
-- Error: redTint, redInk, red.
-- Plain: surface, ink, line3, with the border line.
-- Outline: transparent, ink, no dot, with the border line2.
-
-On the Recording screen, the banners keep their light tones.
-
-`SpeakerTone { Blue, Teal, Violet, Amber }` reads the separate `speakerBlue`, `speakerTeal`,
-`speakerViolet` and `speakerAmber` fields. Each has dot, label/ink and tint values:
-
-| Speaker role | Light: dot / ink / tint | Dark: dot / ink / tint |
+| Role | Light | Dark |
 |---|---|---|
-| Blue | #2346C8 / #1A3596 / #E8EDFC | #8FA6FF / #B9C7FF / #1C2647 |
-| Teal | #0F766E / #0B5A54 / #E3F2EF | #4FC7B8 / #8EDDD2 / #12302D |
-| Violet | #5B2BB5 / #5B2BB5 / #EFEAFB | #C1A8FF / #C1A8FF / #2A2045 |
-| Amber | #B45309 / #8A3B07 / #FCEFE3 | #F0A35E / #F7C291 / #3A2614 |
+| ground | #F5F4EF | #070B11 |
+| surface | #FFFFFF | #10151C |
+| sunken | #ECEAE3 | #0B1016 |
+| raised | #FFFFFF | #181E26 |
+| line | #D9D6CD | #232932 |
+| line-soft | #E6E3DB | #1A1F27 |
+| ink | #1A1611 | #E5E5D9 |
+| ink-2 | #5B544A | #AFAEA4 |
+| ink-3 | #726B61 | #88877C |
+| accent | #007999 | #83CDDF |
+| accent-strong | #006380 | #83CDDF |
+| on-accent | #FFFFFF | #070B11 |
+| accent-ink | #006380 | #83CDDF |
+| accent-tint | #C9EBF8 | #072930 |
+| record | #C01C28 | #C01C28 |
+| record-ink | #C01C28 | #FF7B7F |
+| record-tint | #FBE4E6 | #3A1A1D |
+| on-record | #FFFFFF | #FFFFFF |
+| error | #C12B0B | #FF6F4C |
+| error-tint | #FFE8E2 | #3F1A12 |
+| success | #197640 | #49BA71 |
+| success-tint | #E0F5E5 | #0E2B18 |
+| warn-ink | #774A00 | #FCB700 |
+| warn-tint | #FFECC9 | #342305 |
+| neutral-ink | #5B544A | #AFAEA4 |
+| neutral-tint | #EBE9E2 | #1A1F27 |
+| highlight | #BDDCE4 | #3E5F6A |
+| highlight-ink | #1A1611 | #E5E5D9 |
+| inverse | #10151C | #E5E5D9 |
+| on-inverse | #E5E5D9 | #070B11 |
+| inverse-accent | #83CDDF | #006380 |
+| scrim | #070B1173 | #00000099 |
+| shadow | #0F05001F | #00000066 |
 
-The unnamed-speaker question uses `speakerQuestionWash` (#FCF6EE light, #2C2118 dark) and
-`speakerAmber.ink` for its pulsing border. These roles freeze the existing speaker and avatar hues
-while L-14 and L-17 remain open. Changes to accent and status colours do not change them.
-
-features.md section 0 gives the rule that selects a tone. The avatars use the same three values: the tint as the fill and the ink color for the initial.
+Record roles remain placeholders pending L-07. Speaker/avatar hues and the Recording palette retain their
+previous values; they do not read proposed tokens. Android aliases are in `Color.kt` and its adjacent mapping note.
 
 ### 4.2 Material mapping
 
@@ -144,7 +113,9 @@ There is no dynamic color. The ripples follow the content color. The XML `Theme.
 
 ### 4.3 Typography (`CassiniType`, from `LocalCassiniType`)
 
-The CSS "normal" line height comes from the hhea metrics: 1.22 em for Instrument Sans and 1.30 em for Plex Mono. Each style sets `lineHeight` explicitly, with `LineHeightStyle(Alignment.Center, Trim.None)`. The letter spacing is in em. The helpers are `sans(size, weight = 400, lh = 1.22, ls = 0)` and `mono(size, weight = 400, lh = 1.30, ls = 0)`.
+Normal lines use the Android system font's metrics; explicit paragraph leading is retained without the old
+browser half-pixel grid. Both sans and time helpers use the system family. The time helpers add tabular figures;
+they do not select a monospace font. Letter spacing remains in em and text scales in sp.
 
 | Name | Style | Used by |
 |---|---|---|
@@ -753,25 +724,45 @@ The tasks are `:ui:recordRoborazziDebug` (update), `:ui:verifyRoborazziDebug` (C
 
 `ContrastTest` enforces the contrast (WCAG 2.x) for the two themes: 4.5 or more for text, and 3.0 or more for large text and for non-text items.
 
-| Pair | Ratio |
-|---|---|
-| ink on bg / surface | 16.63 / 17.99 |
-| text2 on bg / surface / boardBg | 7.33 / 7.93 / 6.82 |
-| text3 on bg / accentTint / boardBg | 9.35 / 8.65 / (calculated, ≥ 4.5) |
-| text4 #687180 on bg / surface | 4.55 / 4.93 (the #6B7480 of the board is 4.38 and fails AA) |
-| accentInk on accentTint | 9.00 |
-| tealInk on tealTint / surface | 6.99 / 8.06 |
-| amberInk on amberTint / amberWash / surface | 6.86 / 7.22 / 7.75 |
-| redInk on redTint / surface / bg | 5.80 / 6.92 / 6.39 |
-| violet on violetTint | 7.26 |
-| white on accentFill, accent on surface | 7.55 |
-| white on red (Record) | 5.18 |
-| onInkFill on inkFill | 17.99 |
-| rec.text / text2 / status / dot / barFresh on rec.bg | 16.20 / 8.22 / 8.64 / 6.30 / 7.73 |
-| snackbar action on snackbar | 8.92 |
-| accent on accentTrack / line (non-text) | 5.12 / 5.97 |
-| teal / amber / red dots on surface (non-text) | 5.47 / 5.02 / 5.18 |
-| Dark: ink on bg 16.18, text2 on surface 7.83, text4 on bg 6.20, accentInk on accentTint 8.94, tealInk on tealTint 9.03, amberInk on amberTint 8.91, redInk on redTint 8.51, violet on violetTint 7.41, accent on surface 7.40 | AA |
+| Pair | Light | Dark |
+|---|---:|---:|
+| ink on bg | 16.34 | 15.53 |
+| ink on surface | 18.00 | 14.43 |
+| text2 on bg | 6.78 | 8.84 |
+| text2 on surface | 7.47 | 8.21 |
+| text2 on boardBg | 6.20 | 8.56 |
+| text3 on bg | 6.78 | 8.84 |
+| text3 on accentTint | 5.95 | 6.88 |
+| text3 on boardBg | 6.20 | 8.56 |
+| text4 on bg | 4.78 | 5.45 |
+| text4 on surface | 5.26 | 5.06 |
+| accentInk on accentTint | 5.40 | 8.59 |
+| tealInk on tealTint | 4.95 | 6.20 |
+| tealInk on surface | 5.67 | 7.46 |
+| amberInk on amberTint | 6.55 | 8.58 |
+| amberInk on amberWash | 6.55 | 8.58 |
+| amberInk on surface | 7.60 | 10.39 |
+| redInk on redTint | 4.95 | 5.58 |
+| redInk on surface | 5.80 | 6.66 |
+| redInk on bg | 5.27 | 7.16 |
+| violet on violetTint | 7.26 | 7.41 |
+| onAccentFill on accentFill | 6.78 | 11.05 |
+| accent on surface | 5.01 | 10.26 |
+| white on red (Record) | 6.11 | 6.11 |
+| onRed on red (Record) | 6.11 | 6.11 |
+| onInkFill on inkFill | 16.34 | 15.53 |
+| snackbar action on snackbar | 10.26 | 5.34 |
+| snackbar text on snackbar | 14.43 | 15.53 |
+| link on surface | 5.01 | 10.26 |
+| accent on accentTrack | 3.99 | 8.59 |
+| accent on line | 3.44 | 8.20 |
+| teal dot on surface | 5.67 | 7.46 |
+| amber dot on surface | 7.60 | 10.39 |
+| error dot on surface | 5.80 | 6.66 |
+
+The unchanged forced-dark Recording palette keeps its previous checked contrast ratios. The shared token
+file documents one known exception for Alex: ink-3 on sunken in light is 4.37:1, below text AA. This exception
+is reported, not corrected by inventing a new colour. Highlight ink on highlight meets text AA in both modes.
 
 These items can have less than 3:1, because text or icons identify the control (WCAG 1.4.11): the line2 outlines (1.58), the rec.line circle and barIdle (decorative), the line3 dashed tag and plain dot, and the inactive track of the slider (the thumb and the active track show the state). The checkbox that is not checked uses text2 (7.93).
 

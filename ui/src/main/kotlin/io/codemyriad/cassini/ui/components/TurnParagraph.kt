@@ -175,7 +175,7 @@ private class Highlights {
     private val pressedRects = WordRects()
 
     /**
-     * Draws the paragraph with the pressed word on accentTint and the [active] word on accentFill in onAccentFill.
+     * Draws the paragraph with the pressed word on accentTint and the [active] word on highlight in highlightInk.
      * [height] is the height of the word rectangles.
      */
     fun ContentDrawScope.draw(active: IntRange?, height: Float, c: CassiniColors) {
@@ -187,9 +187,9 @@ private class Highlights {
         for ((path, tint) in chips) drawPath(path, tint)
         pressed?.let { drawWord(pressedRects.of(this, result, it, height), c.accentTint) }
         val rects = if (active != null) activeRects.of(this, result, active, height) else emptyList()
-        drawWord(rects, c.accentFill)
+        drawWord(rects, c.highlight)
         drawContent()
-        drawActiveGlyphs(glyphLayout ?: result, rects, c.accentFill, c.onAccentFill)
+        drawActiveGlyphs(glyphLayout ?: result, rects, c.highlight, c.highlightInk)
     }
 
     /** Draws [rects] in [color] with 4 dp corners. */
@@ -365,7 +365,12 @@ private fun paragraph(
         val start = range.first.coerceIn(0, length)
         val end = (range.last + 1).coerceIn(start, length)
         val current = index == matches.current
-        addStyle(SpanStyle(background = c.amberTint, fontWeight = if (current) FontWeight.W600 else null), start, end)
+        val hitStyle = SpanStyle(
+            color = c.highlightInk,
+            background = c.highlight,
+            fontWeight = if (current) FontWeight.W600 else null,
+        )
+        addStyle(hitStyle, start, end)
     }
 }
 

@@ -53,7 +53,7 @@ fun CassiniMenu(
         modifier = modifier,
         offset = offset,
         shape = CassiniTheme.shapes.row,
-        containerColor = c.surface,
+        containerColor = c.raised,
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
         border = BorderStroke(1.dp, c.line),
@@ -69,7 +69,7 @@ fun CassiniMenuContent(modifier: Modifier = Modifier, content: @Composable Colum
     Column(
         modifier = modifier
             .clip(shape)
-            .background(c.surface)
+            .background(c.raised)
             .border(1.dp, c.line, shape)
             .padding(vertical = MenuVerticalPadding)
             .width(IntrinsicSize.Max),

@@ -326,13 +326,13 @@ class SettingsBehaviourTest {
     @Test fun licenceRowsOpenAndBackClosesTheText() {
         val events = mutableListOf<LicensesEvent>()
         setThemed { LicensesScreen(VariantFixtures.licenses.getValue("licenses"), onEvent = { events += it }) }
-        rule.onNodeWithText("IBM Plex Mono").performClick()
+        rule.onNodeWithText("Cassini talk").performClick()
         rule.onNodeWithText("Source code on GitHub").performScrollTo().performClick()
         rule.onNodeWithContentDescription("Back to settings").performClick()
         rule.runOnIdle {
             assertEquals(
                 listOf(
-                    LicensesEvent.Open(LicenseEntry.PLEX_MONO),
+                    LicensesEvent.Open(LicenseEntry.CASSINI),
                     LicensesEvent.Open(LicenseEntry.SOURCE_CODE),
                     LicensesEvent.Back,
                 ),
@@ -344,7 +344,7 @@ class SettingsBehaviourTest {
     @Test fun backInTheLicenceTextClosesIt() {
         val events = mutableListOf<LicensesEvent>()
         setThemed { LicensesScreen(VariantFixtures.licenses.getValue("licenses-text"), onEvent = { events += it }) }
-        rule.onNodeWithText("Instrument Sans").assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
+        rule.onNodeWithText("Cassini talk").assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
         rule.runOnIdle { back.onBackPressed() }
         rule.onNodeWithContentDescription("Back").performClick()
         rule.runOnIdle { assertEquals(listOf(LicensesEvent.CloseText, LicensesEvent.CloseText), events) }
