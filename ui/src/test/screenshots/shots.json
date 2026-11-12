@@ -1,4 +1,6 @@
 {"shots": [
+  {"screen": "components-record-focused", "label": "Record with keyboard focus", "scheme": "light", "lang": "en", "device": "phone", "path": "components/record-focused-light.png"},
+  {"screen": "components-record-focused", "label": "Record with keyboard focus", "scheme": "dark", "lang": "en", "device": "phone", "path": "components/record-focused-dark.png"},
   {"screen": "seven-speakers", "label": "Seven speakers (six named, one unnamed)", "scheme": "light", "lang": "en", "device": "phone", "path": "light/11-seven-speakers.png"},
   {"screen": "seven-speakers", "label": "Seven speakers (six named, one unnamed)", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/11-seven-speakers.png"},
   {"screen": "components-banners", "label": "Components banners", "scheme": "dark", "lang": "en", "device": "phone", "path": "components/banners-dark.png"},

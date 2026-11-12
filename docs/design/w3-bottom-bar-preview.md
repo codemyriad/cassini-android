@@ -21,8 +21,11 @@ and label remain; no new Starting, Saving or Unavailable behaviour is inferred
 from the open canvas states.
 
 Screenshot proof includes the Library in both modes, existing localized and
-large-font boards, and a new pressed Record pair using an actual held pointer.
-The new pressed capture is added coverage; earlier sources do not have it.
+large-font boards, a pressed Record pair using an actual held pointer, and a
+keyboard-focused pair. Native pixel tests check the accent ring outside the
+pill in both themes and require zero recording starts on focus. Suppressing
+the ring makes both focused-state tests fail.
+The new pressed and focused captures are added coverage; earlier sources do not have it.
 Existing rest-state Library captures provide the before/after comparison.
 
 W3.7–W3.9 need the approved W0.2 Saturn asset source. They are separate from

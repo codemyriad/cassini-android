@@ -1,16 +1,25 @@
 package io.codemyriad.cassini.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.input.InputMode
+import androidx.compose.ui.input.InputModeManager
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.Density
@@ -24,6 +33,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import kotlin.math.roundToInt
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -49,6 +59,46 @@ class LibraryActionBarTest {
         assertEquals(restPixel.blue * 0.84f, pressed.blue, 0.005f)
         button.performTouchInput { up() }
         rule.runOnIdle { assertEquals(1, clicks) }
+    }
+
+    @Test fun keyboardFocusDrawsAnOutsideRingWithoutStartingRecording() = focusedRecord(dark = false)
+
+    @Test
+    @Config(qualifiers = "+night")
+    fun keyboardFocusDrawsAnOutsideRingInDarkMode() = focusedRecord(dark = true)
+
+    private fun focusedRecord(dark: Boolean) {
+        val focus = FocusRequester()
+        lateinit var inputMode: InputModeManager
+        var accent = Color.Unspecified
+        var density = 0f
+        var clicks = 0
+        rule.setContent {
+            CassiniTheme(darkTheme = dark) {
+                inputMode = LocalInputModeManager.current
+                accent = CassiniTheme.colors.accent
+                density = LocalDensity.current.density
+                Box(Modifier.background(CassiniTheme.colors.bg).padding(24.dp)) {
+                    RecordFab(onClick = { clicks++ }, modifier = Modifier.focusRequester(focus))
+                }
+            }
+        }
+        rule.runOnIdle {
+            assertTrue(inputMode.requestInputMode(InputMode.Keyboard))
+            focus.requestFocus()
+        }
+        rule.waitForIdle()
+        val bounds = rule.onNodeWithContentDescription("Record a new note").getBoundsInRoot()
+        val image = rule.onRoot().captureToImage().toPixelMap()
+        // The stroke is centred 3 dp outside the pill: 2 dp clear gap, then a 2 dp accent ring.
+        val ring = image[
+            ((bounds.left.value + bounds.right.value) / 2 * density).roundToInt(),
+            ((bounds.top.value - 3) * density).roundToInt(),
+        ]
+        assertEquals(accent.red, ring.red, 0.005f)
+        assertEquals(accent.green, ring.green, 0.005f)
+        assertEquals(accent.blue, ring.blue, 0.005f)
+        rule.runOnIdle { assertEquals("focus must not start recording", 0, clicks) }
     }
 
     @Test fun bottomBarKeepsBothActionsWithTouchTargetsAtLargeFontScale() {
