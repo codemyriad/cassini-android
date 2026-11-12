@@ -7,6 +7,7 @@ import android.database.sqlite.SQLiteFullException
 import androidx.test.core.app.ApplicationProvider
 import io.codemyriad.cassini.core.backup.BackupManifest
 import io.codemyriad.cassini.data.AppPaths
+import io.codemyriad.cassini.data.db.CassiniDatabase
 import io.codemyriad.cassini.data.db.offMain
 import io.codemyriad.cassini.data.notes.NotesHarness
 import kotlinx.coroutines.test.runTest
@@ -33,7 +34,7 @@ class CorruptCatalogueRestoreTest {
     @Test fun aValidCataloguePassesTheIntegrityCheck() = runTest {
         val source = NotesHarness(folder)
         source.close()
-        offMain { assertEquals(2, RestoredCatalogueValidation.version(source.paths.database)) }
+        offMain { assertEquals(CassiniDatabase.VERSION, RestoredCatalogueValidation.version(source.paths.database)) }
     }
 
     @Test fun aFailingQuickCheckIsCorruptionEvenWhenSqliteOpensAndItsVersionIsSupported() = offMain {
