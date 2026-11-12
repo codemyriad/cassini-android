@@ -112,8 +112,9 @@ in `shots.json`. The remaining light-only cases declare that limitation in the m
 
 Every PR also runs `pr-shots.yml`: it compares committed goldens at the merge base and PR head,
 without rendering or an emulator. The `pr-shots` artifact (14 days) has `changes.json` and a ready
-Markdown block; its summary lists changed screens in both available modes. Images link to full commit
-SHAs. The job has read-only repository permissions and publishes nothing; only the coordinator runs
+Markdown block; its summary lists changed screens in both available modes. Both blocks put the first
+12 changed screen identities, with all available modes, in a table; the rest are collapsed. Images link
+to full commit SHAs. The job has read-only repository permissions and publishes nothing; only the coordinator runs
 `publish`. Original render-runner versions are unrecorded for committed images and stay `unknown`.
 
 `ui/src/test/screenshots/shots.json` explicitly maps each golden to its screen, scheme and locale.
@@ -121,7 +122,7 @@ Legacy light-only entries name ANDROID-SCR-03; dark coverage follows separately.
 missing pairs, scheme/path mismatches and backgrounds that disagree with the declared rendered scheme.
 Recording's current always-dark appearance is explicit, including in light configurations.
 
-The script is vendored unchanged from cassini-ux commit `5ca44de` with a source header and hash test.
+The script is vendored unchanged from cassini-ux commit `d46d36d` with a source header and hash test.
 For its tests, create a Python 3.10+ venv with Pillow 11.3.0, then run its interpreter with
 `-I scripts/pr-shots.py --self-test` and `-m unittest discover -s tests/pr_shots -v`.
 
