@@ -604,7 +604,9 @@ A voice file whose `version` is newer than the codec stays in place, read-only, 
 
 ### 4.8 Startup work
 
-`CassiniApplication` does these steps on IO, in the application scope. It does them one time for each process, also when only a service starts the process. Then it completes `AppGraph.ready`.
+`CassiniApplication` does these steps on IO, in the application scope. It does them one time for each process, also when only a service starts the process. Then it completes the single library gate shared by `AppGraph.ready`, `catalogue` and `awaitCatalogue()`.
+The startup task keeps the catalogue private until then. Library reads and writes wait for this gate; database-open alone does not grant access.
+A database-open failure fails the gate. Other steps keep their best-effort reporting in `startupReport`, which is published before access is granted.
 
 1. Open Room. If this fails, rename the file and rebuild the catalogue (section 4.9). Also rebuild the catalogue when a note directory with audio (`document.opus`, `capture.*` or `source.*`) has no row. Thus the next start finishes a rebuild that a crash or an error stopped. Some errors do not show a damaged file: a full disk, an I/O error, a lock error, a permission error or a read-only database. For these errors, the opener throws the error, and the file stays (section 3.3). Then show an error and do not rebuild.
 2. Run `RecoveryRepository.recover(RecordingController.activeNoteId)`.

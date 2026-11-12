@@ -285,12 +285,14 @@ class ProcessingCoordinator internal constructor(private val graph: AppGraph, pr
      * the note was running.
      */
     suspend fun cancel(noteId: String, discard: Boolean): Boolean {
-        val catalogue = graph.awaitCatalogue()
+        // Startup purge may stop an old RUNNING row before the catalogue is published.
+        // A non-discard stop only needs the in-memory active job, never the repositories.
+        val catalogue = if (discard) graph.awaitCatalogue() else null
         val current = queueLock.withLock {
             // The flag is set under the lock: the outcome is written under it too, so it always sees the flag.
             active?.takeIf { it.noteId == noteId }?.also { it.cancel.set(if (discard) Cancel.DISCARD else Cancel.KEEP) }
                 ?: run {
-                    if (discard) discardWork(catalogue, noteId)
+                    if (discard) discardWork(checkNotNull(catalogue), noteId)
                     null
                 }
         } ?: return false

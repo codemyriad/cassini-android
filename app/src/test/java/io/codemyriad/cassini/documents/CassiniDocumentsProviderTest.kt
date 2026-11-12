@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ProviderInfo
 import android.database.ContentObserver
+import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
 import android.os.Bundle
 import android.os.CancellationSignal
@@ -350,9 +351,18 @@ class CassiniDocumentsProviderTest {
         val callerScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         try {
             withTimeout(EVENT_BOUND_MS) { enteredRebuild.await() }
-            assertTrue("Room is already open at STEP_REBUILD", currentGraph.catalogue.isCompleted)
+            assertFalse("Catalogue stays private at STEP_REBUILD", currentGraph.catalogue.isCompleted)
             assertFalse("Startup is not yet ready at STEP_REBUILD", currentGraph.ready.isCompleted)
-            assertEquals(0, currentGraph.awaitCatalogue().database.notes().all().size)
+            // Inspect the test database directly: application callers must not obtain it before recovery.
+            val beforeRebuild = withContext(Dispatchers.IO) {
+                SQLiteDatabase.openDatabase(paths.database.path, null, SQLiteDatabase.OPEN_READONLY).use { database ->
+                    database.rawQuery("SELECT COUNT(*) FROM notes", null).use { cursor ->
+                        assertTrue(cursor.moveToFirst())
+                        cursor.getInt(0)
+                    }
+                }
+            }
+            assertEquals(0, beforeRebuild)
 
             // 1. CancellationSignal unblocks openDocument immediately while STEP_REBUILD is still paused.
             verifyColdStartCancellationUnblocks(rebuiltDocId, callerScope)
