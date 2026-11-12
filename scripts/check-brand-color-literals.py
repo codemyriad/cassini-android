@@ -16,6 +16,8 @@ PATTERN = re.compile(
     r'|#[0-9a-fA-F]{3,8}(?![0-9a-fA-F])'
     r'|\b(?:rgb|rgba|hsl|hsla)\s*\(\s*\d'
     r'|@android:color/(?:black|white|holo_\w+|darker_gray)\b'
+    r'|\bandroid\.R\.color\.(?:black|white|holo_\w+|darker_gray)\b'
+    r'|\bColor\s*\(\s*(?:color\s*=\s*)?\d+[lL]?\s*\)'
 )
 COMMENTS = re.compile(r'"(?:\\.|[^"\\])*"|/\*.*?\*/|<!--.*?-->|//[^\n]*', re.DOTALL)
 
