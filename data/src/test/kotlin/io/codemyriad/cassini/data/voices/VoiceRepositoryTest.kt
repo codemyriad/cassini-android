@@ -431,6 +431,53 @@ class VoiceRepositoryTest {
         assertEquals(2, links(sealedId).size)
     }
 
+    @Test fun pendingChoicesAdvanceThePersistedCounterForEveryNewPerson() = runTest {
+        val peopleFile = h.paths.people.apply { parentFile!!.mkdirs() }
+        peopleFile.writeText(VoiceCodec.encode(listOf(luca.copy(colourIndex = 0)), 9))
+        checkpoints.names.mutate(draftId) {
+            it.rename("S1", "Bea").remember("S1", "", 0).rename("S2", "Chris").remember("S2", "", 0)
+        }
+        offMain { voices.savePendingBlocking(draftId, mapOf("new/S1" to print(21), "new/S2" to print(22)), 0) }
+        assertEquals(2, (voices.adoptPending(draftId) as PendingOutcome.Merged).enrolled.size)
+        val saved = people().voices.associate { it.name to it.voice.colourIndex }
+        assertEquals(9, saved["Bea"])
+        assertEquals(10, saved["Chris"])
+        voices = newRepository()
+        writeSealed(sealedId, mapOf("v1/S3" to print(23)))
+        assertEquals(11, voices.enrol(sealedId, "v1", "S3", null, "Dee")!!.colourIndex)
+    }
+
+    @Test fun deletingTheHighestSavedSlotNeverReusesItAcrossReloads() = runTest {
+        for (forget in listOf(true, false)) {
+            voices.forgetEveryone()
+            writeSealed(
+                sealedId,
+                mapOf("v1/S1" to print(10), "v1/S2" to print(11), "v1/S3" to print(12), "v1/S4" to print(13)),
+            )
+            assertEquals(0, voices.enrol(sealedId, "v1", "S1", null, "Anna")!!.colourIndex)
+            val bruno = voices.enrol(sealedId, "v1", "S2", null, "Bruno")!!
+            assertEquals(1, bruno.colourIndex)
+            if (forget) {
+                assertEquals(VoiceEdit.Done, voices.forget(bruno.id))
+            } else {
+                assertEquals(UnenrolOutcome.Forgotten, voices.unenrol(sealedId, "v1", "S2"))
+            }
+            voices = newRepository()
+            val chris = voices.enrol(sealedId, "v1", "S3", null, "Chris")!!
+            assertEquals(2, chris.colourIndex)
+            voices.forget(chris.id)
+            voices = newRepository()
+            assertEquals(3, voices.enrol(sealedId, "v1", "S4", null, "Dee")!!.colourIndex)
+            people().voices.forEach { voices.forget(it.id) }
+            voices = newRepository()
+            assertEquals(4, voices.enrol(sealedId, "v1", "S1", null, "Still monotonic")!!.colourIndex)
+        }
+        voices.forgetEveryone()
+        voices = newRepository()
+        writeSealed(sealedId, mapOf("v1/S1" to print(10)))
+        assertEquals(0, voices.enrol(sealedId, "v1", "S1", null, "Reset")!!.colourIndex)
+    }
+
     @Test fun sealedNoteEditsKeepFileAndLinksTogether() = runTest {
         writePeople(luca)
         writeSealed(sealedId, mapOf("v1/S1" to print(10), "v1/S2" to print(11)))
