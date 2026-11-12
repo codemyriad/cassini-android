@@ -138,7 +138,9 @@ No automatic source commit, Git tag, GitHub release, production track, tester or
 
 The outcome records whether the actual upload succeeded, even if a later job post-step failed. Closed failures
 never require expired workflow logs; only unacknowledged attempts are reconciled, and an expired HTTP 404 is not success.
-CI eligibility accepts only same-repository push/dispatch runs; PR/fork runs at the same SHA are ignored.
+CI eligibility accepts only same-repository push, dispatch and scheduled runs for the exact SHA on main.
+The latest matching run decides: a red nightly blocks release, and a green nightly can clear an older
+failed push. PR/fork runs at the same SHA are ignored.
 Full-history and outcome checkouts pin the scheduled SHA. A lost deployment acknowledgement is reconciled against the
 actual upload step before deciding whether main is unchanged. Failure emits
 `[Android] daily test release failed: <cause>` as an Actions error and job summary, the coordinator's selected
