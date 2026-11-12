@@ -68,9 +68,9 @@ sealed interface NoteMode {
     @Immutable
     data class Queued(val ahead: Int, val overDocument: Boolean) : NoteMode
 
-    /** A running job: the progress card and the draft. No player. */
+    /** A running job: the progress card and draft. [stopBusy] prevents repeat Stop while checkpointing ends. */
     @Immutable
-    data class Processing(val card: ProcessingCardUi) : NoteMode
+    data class Processing(val card: ProcessingCardUi, val stopBusy: Boolean = false) : NoteMode
 
     /** A paused job at [doneMs] of [totalMs]: the pause banner, the read-only draft and the player. */
     @Immutable

@@ -372,6 +372,10 @@ class NoteViewModelTest {
         assertNull("Transcribing has no player", running.playback)
         assertNull(running.chips)
         assertEquals("leavePlayer", ports.calls.last())
+        assertFalse(mode.stopBusy)
+        ports.setJob(job(JobState.RUNNING), phase = JobPhase.Stopping)
+        advanceUntilIdle()
+        assertTrue((viewModel.now().mode as NoteMode.Processing).stopBusy)
 
         ports.draft = DraftTranscript(listOf(Word("s1", 0, 400, "Fermato")), emptyMap(), ports.names.value, 400, 4_000)
         ports.setJob(job(JobState.PAUSED, doneMs = 400))
