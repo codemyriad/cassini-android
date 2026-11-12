@@ -159,7 +159,8 @@ object NoteTranscripts {
                 SpeakerNameUi.Named(label)
             }
         }
-        val tints = SpeakerTint.assign(order, colourIndices) { id -> names[id] is SpeakerNameUi.Placeholder }
+        val slots = colourIndices.mapValues { it.value.toLong() }
+        val tints = SpeakerTint.assign(order, slots) { id -> names[id] is SpeakerNameUi.Placeholder }
         val transcript = build(words, placeholderLabel, false) { speaker, _ ->
             TurnTemplate(names.getValue(speaker), tone(tints.getValue(speaker)))
         }

@@ -8,6 +8,7 @@ import io.codemyriad.cassini.core.asr.TranscriptionProgress.Stage
 import io.codemyriad.cassini.core.checkpoint.CheckpointNames
 import io.codemyriad.cassini.core.format.SpeakerMerges
 import io.codemyriad.cassini.core.format.Word
+import io.codemyriad.cassini.core.format.speakersByFirstSpeech
 import io.codemyriad.cassini.core.speakers.Match
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -362,7 +363,7 @@ internal object DraftView {
         }
         return DraftState(
             words = merged,
-            colourIndices = words.map { it.speaker }.distinct().withIndex().associate { it.value to it.index },
+            colourIndices = words.speakersByFirstSpeech().withIndex().associate { it.value to it.index },
             labels = labels,
             automatic = automatic,
             suggestions = if (namingOpen) suggestions(merged, placeholders, names, sources) else emptyList(),

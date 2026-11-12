@@ -9,7 +9,10 @@ enum class SpeakerTint {
         val NAMED = listOf(ONE, TWO, THREE, FOUR, FIVE, SIX)
 
         /** The tint of the named speaker at [namedIndex] (from 0) in the meeting (including speakers not named yet). */
-        fun named(namedIndex: Int): SpeakerTint = NAMED[Math.floorMod(namedIndex, NAMED.size)]
+        fun named(namedIndex: Int): SpeakerTint = named(namedIndex.toLong())
+
+        /** Reduce a portable safe-integer slot before narrowing it to a palette index. */
+        fun named(namedIndex: Long): SpeakerTint = NAMED[Math.floorMod(namedIndex, NAMED.size.toLong()).toInt()]
 
         /**
          * The tint of each speaker in [order] (speaker ids in order of their first turn in the shown variant, as
@@ -17,12 +20,12 @@ enum class SpeakerTint {
          */
         fun assign(
             order: List<String>,
-            colourIndices: Map<String, Int> = emptyMap(),
+            colourIndices: Map<String, Long> = emptyMap(),
             isPlaceholder: (String) -> Boolean,
         ): Map<String, SpeakerTint> {
             val result = LinkedHashMap<String, SpeakerTint>()
             for ((index, id) in order.distinct().withIndex()) {
-                result[id] = if (isPlaceholder(id)) UNNAMED else named(colourIndices[id] ?: index)
+                result[id] = if (isPlaceholder(id)) UNNAMED else named(colourIndices[id] ?: index.toLong())
             }
             return result
         }

@@ -212,6 +212,7 @@ private fun ColumnScope.DraftList(
             ProcessingCard(
                 state = card,
                 onStop = { onEvent(NoteEvent.Stop) },
+                stopBusy = (state.mode as? NoteMode.Processing)?.stopBusy == true,
                 modifier = Modifier
                     .onSizeChanged { cardPx = it.height }
                     .then(TopItemPadding),
