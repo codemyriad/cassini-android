@@ -14,6 +14,7 @@ from pathlib import Path
 
 # -I omits the script directory; import only this checkout's trusted helper.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import release_notes  # noqa: E402
 from play_changelog import format_play_notes  # noqa: E402
 
 ENVIRONMENT = 'android-play-internal-test'
@@ -150,6 +151,10 @@ def run_uploaded(api: GitHub, run_id: int) -> bool:
         return False
 
 
+def user_notes(baseline: str | None) -> str:
+    return release_notes.render(release_notes.fragments(Path(__file__).resolve().parents[1], baseline))
+
+
 def plan(api: GitHub, sha: str, text: str, run_id: int) -> dict:
     if not SHA.fullmatch(sha):
         raise ValueError('Invalid main commit')
@@ -186,7 +191,9 @@ def plan(api: GitHub, sha: str, text: str, run_id: int) -> dict:
     base = VERSION.fullmatch(source_name)[1]
     released = bool(command('git', 'tag', '--list', f'v{base}'))
     name, code = next_version(source_name, code_floor, reservations, released)
-    body = notes(api, baseline, sha)
+    developer = notes(api, baseline, sha)
+    body = user_notes(baseline)
+    release_notes.release_body(body, developer)  # Validate both destinations before reserving a build.
     if api.request('commits/main')['sha'] != sha or not api.green(sha):
         return {'build': False, 'reason': 'main or its CI changed while planning'}
     payload = {'schema': 1, 'version_name': name, 'version_code': code, 'run_id': run_id}
@@ -194,13 +201,14 @@ def plan(api: GitHub, sha: str, text: str, run_id: int) -> dict:
                                            'required_contexts': [], 'transient_environment': True,
                                            'production_environment': False, 'payload': payload})
     return {'build': True, 'sha': sha, 'deployment_id': deployment['id'], **payload,
-            'stable_released': released, 'notes': body}
+            'stable_released': released, 'notes': body, 'developer_notes': developer}
 
 
 def plan_metadata(value: dict) -> dict:
-    metadata = {key: item for key, item in value.items() if key != 'notes'}
-    if 'notes' in value:
-        metadata['notes_sha256'] = hashlib.sha256(value['notes'].encode('utf-8')).hexdigest()
+    metadata = {key: item for key, item in value.items() if key not in {'notes', 'developer_notes'}}
+    for key in ('notes', 'developer_notes'):
+        if key in value:
+            metadata[key + '_sha256'] = hashlib.sha256(value[key].encode('utf-8')).hexdigest()
     return metadata
 
 
@@ -223,15 +231,17 @@ def apply(value: dict, sha: str, root: Path):
             not old_code < value['version_code'] <= 2_100_000_000 or
             VERSION.fullmatch(value['version_name'])[1] != beta_base(old_name, value.get('stable_released', False))):
         raise ValueError('Invalid test version')
+    body = release_notes.store_notes(value['notes'])
+    developer = value.get('developer_notes', '')
+    if not isinstance(developer, str) or len(developer.encode('utf-8')) > 60_000:
+        raise ValueError('Invalid developer changelog')
     text = re.sub(r'(?m)^(\s*versionCode = )\d+$', lambda m: m[1] + str(value['version_code']), file.read_text())
     text = re.sub(r'(?m)^(\s*versionName = )"[^"]+"$', lambda m: m[1] + json.dumps(value['version_name']), text)
     file.write_text(text)
     directory = root / 'metadata/en-US/changelogs'
     directory.mkdir(parents=True, exist_ok=True)
-    body = value['notes']
-    # Complete titles remain verbatim; only Play's bounded plain-text copy is sanitized.
     (directory / f'{value["version_code"]}.txt').write_text(format_play_notes(body))
-    (root / 'test-release-notes.md').write_text(body + '\n')
+    (root / 'test-release-notes.md').write_text(release_notes.release_body(body, developer))
 
 
 def finish(api: GitHub, value: dict, _workflow_success: bool, url: str) -> bool:
@@ -251,7 +261,7 @@ def report(message: str, failed: bool = False):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('mode', choices=['plan', 'apply', 'finish'])
+    parser.add_argument('mode', choices=['plan', 'apply', 'body', 'finish'])
     args = parser.parse_args()
     trusted = os.environ['GITHUB_REF'] == 'refs/heads/main' and \
         os.environ['GITHUB_EVENT_NAME'] in {'schedule', 'workflow_dispatch'}
@@ -268,8 +278,19 @@ def main():
                f'skipped: {value["reason"]}')
     else:
         value = json.loads(os.environ['DAILY_TEST_PLAN'])
-        if args.mode == 'apply':
-            apply(load_plan(value, Path('.')), sha, Path('.'))
+        if args.mode in {'apply', 'body'}:
+            full = load_plan(value, Path('.'))
+            if args.mode == 'apply':
+                apply(full, sha, Path('.'))
+            else:
+                if full['sha'] != sha or not SHA.fullmatch(sha):
+                    raise ValueError('Release notes are not bound to this main commit')
+                delivered = run_uploaded(GitHub(), full['run_id'])
+                with Path(os.environ['GITHUB_OUTPUT']).open('a') as output:
+                    output.write(f'publish={str(delivered).lower()}\n')
+                if delivered:
+                    Path('test-release-notes.md').write_text(
+                        release_notes.release_body(full['notes'], full.get('developer_notes', '')))
         else:
             workflow_success = os.environ['PUBLISH_RESULT'] == 'success'
             success = finish(GitHub(), value, workflow_success, os.environ['RUN_URL'])

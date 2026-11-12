@@ -77,6 +77,9 @@ class DailyReleaseTests(unittest.TestCase):
         git_patch = patch.object(DAILY, 'command', side_effect=git)
         self.git = git_patch.start()
         self.addCleanup(git_patch.stop)
+        user_patch = patch.object(DAILY, 'user_notes', return_value='Notes are easier to export.')
+        user_patch.start()
+        self.addCleanup(user_patch.stop)
 
     def test_red_pending_or_moved_main_never_reserves_or_publishes(self):
         for api in (API(green=False), API(main=OLD)):
@@ -133,6 +136,29 @@ class DailyReleaseTests(unittest.TestCase):
                 self.assertFalse(DAILY.plan(api, SHA, SOURCE, 42)['build'])
                 self.assertEqual([], api.posts)
 
+    def test_expanded_github_body_is_checked_before_reserving_a_build(self):
+        api = API()
+        with patch.object(DAILY, 'notes', return_value='<' * 20_000), self.assertRaises(ValueError):
+            DAILY.plan(api, SHA, SOURCE, 42)
+        self.assertEqual([], api.posts)
+
+    def test_plan_separates_user_copy_from_developer_titles(self):
+        with patch.object(DAILY, 'notes', return_value='- Refactor CI for D95 (#123)'):
+            value = DAILY.plan(API(), SHA, SOURCE, 42)
+        self.assertEqual('Notes are easier to export.', value['notes'])
+        self.assertEqual('- Refactor CI for D95 (#123)', value['developer_notes'])
+
+    def test_fragment_baseline_advances_only_after_successful_play_publication(self):
+        manual = 'c' * 40
+        for state, expected in (('failure', manual), ('success', OLD)):
+            api = API(baseline=manual, records=[reservation()],
+                      states={'deployments/19/statuses': [{'state': state}]})
+            with self.subTest(state=state), patch.object(DAILY, 'notes', return_value='Developer text'), \
+                    patch.object(DAILY, 'user_notes', return_value='Your notes keep their names.') as user, \
+                    patch.object(DAILY.subprocess, 'run', return_value=Mock(returncode=1)):
+                self.assertTrue(DAILY.plan(api, SHA, SOURCE, 42)['build'])
+                user.assert_called_once_with(expected)
+
     def test_version_changes_reset_beta_but_never_reset_android_version_code(self):
         self.assertEqual(('0.5.1-beta.1', 43), DAILY.next_version('0.5.0', 20, [
             {'version_name': '0.4.2-beta.27', 'version_code': 42},
@@ -152,14 +178,18 @@ class DailyReleaseTests(unittest.TestCase):
             (root / 'app').mkdir()
             build = root / 'app/build.gradle.kts'
             build.write_text(SOURCE)
-            notes = '- ' + 'A' * 600 + ' (#7)'
-            value = {'build': True, 'sha': SHA, 'version_name': '0.4.2-beta.4', 'version_code': 19, 'notes': notes}
+            notes = 'Notes are easier to export.'
+            developer = '- ' + 'A' * 600 + ' (#7)'
+            value = {'build': True, 'sha': SHA, 'version_name': '0.4.2-beta.4', 'version_code': 19,
+                     'notes': notes, 'developer_notes': developer}
             DAILY.apply(value, SHA, root)
             self.assertEqual(('0.4.2-beta.4', 19), DAILY.source_version(build.read_text()))
-            self.assertEqual(500, len((root / 'metadata/en-US/changelogs/19.txt').read_text()))
-            self.assertEqual(notes + '\n', (root / 'test-release-notes.md').read_text())
+            self.assertEqual(notes, (root / 'metadata/en-US/changelogs/19.txt').read_text())
+            self.assertEqual(DAILY.release_notes.release_body(notes, developer),
+                             (root / 'test-release-notes.md').read_text())
             for change in ({'sha': OLD}, {'version_code': 18}, {'version_code': True},
-                           {'version_name': '0.5.0-beta.1'}, {'notes': None}):
+                           {'version_name': '0.5.0-beta.1'}, {'notes': None},
+                           {'notes': 'Fix CI (#123)'}, {'notes': '😀' * 251}):
                 build.write_text(SOURCE)
                 with self.subTest(change=change), self.assertRaises(ValueError):
                     DAILY.apply({**value, **change}, SHA, root)
@@ -248,7 +278,7 @@ class DailyReleaseTests(unittest.TestCase):
 
     def test_daily_full_history_and_outcome_checkouts_pin_the_reserved_sha(self):
         workflow = (ROOT / '.github/workflows/daily-test-release.yml').read_text()
-        self.assertEqual(2, workflow.count('ref: ${{ github.sha }}'))
+        self.assertEqual(3, workflow.count('ref: ${{ github.sha }}'))
         android = (ROOT / '.github/workflows/android.yml').read_text().split('  core-only:', 1)[0]
         self.assertIn('ref: ${{ github.sha }}', android)
 
@@ -388,11 +418,12 @@ class DailyReleaseTests(unittest.TestCase):
             file = root / 'app/build.gradle.kts'
             file.write_text(SOURCE.replace('0.4.2-beta.3', '0.4.2'))
             value = {'build': True, 'sha': SHA, 'version_name': '0.4.3-beta.1',
-                     'version_code': 19, 'notes': '<Generic>'}
+                     'version_code': 19, 'notes': 'Your notes are easier to find.'}
             DAILY.apply(value, SHA, root)
             self.assertEqual(('0.4.3-beta.1', 19), DAILY.source_version(file.read_text()))
-            self.assertEqual('[Generic]', (root / 'metadata/en-US/changelogs/19.txt').read_text())
-            self.assertEqual('<Generic>\n', (root / 'test-release-notes.md').read_text())
+            self.assertEqual(value['notes'], (root / 'metadata/en-US/changelogs/19.txt').read_text())
+            self.assertEqual(DAILY.release_notes.release_body(value['notes'], ''),
+                             (root / 'test-release-notes.md').read_text())
 
     def test_a_stable_tag_on_a_beta_source_reserves_the_next_patch(self):
         api = API()
