@@ -5,6 +5,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertContentDescriptionContains
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -12,6 +14,7 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.fixtures.BoardFixtures
@@ -66,9 +69,36 @@ class TranscribingStatusTest {
             }
         }
         rule.onNodeWithTag("transcribing-details")
-            .assertContentDescriptionContains("Calculating time left", substring = true)
+            .assertContentDescriptionContains("calculating time left", substring = true)
         rule.runOnIdle { progress = progress.copy(timeLeft = TimeLeftUi.Range(240_000, 240_000)) }
         rule.onNodeWithTag("transcribing-details").assertContentDescriptionContains("4", substring = true)
+    }
+
+    @Test
+    @Config(qualifiers = "fr-rFR-w390dp-h844dp-xhdpi")
+    fun frenchRangeKeepsTheCompactStatusOnOneLine() = compactLine(Locale.FRENCH, "Transcription")
+
+    @Test
+    @Config(qualifiers = "it-rIT-w390dp-h844dp-xhdpi")
+    fun italianRangeKeepsTheCompactStatusOnOneLine() = compactLine(Locale.ITALIAN, "In trascrizione")
+
+    private fun compactLine(locale: Locale, heading: String) {
+        rule.setContent {
+            CassiniTheme {
+                ProvideFixedFormat(locale = locale) { TranscribingStatus(card, false, {}, {}) }
+            }
+        }
+        val nodes = rule.onAllNodes(
+            SemanticsMatcher.keyIsDefined(SemanticsActions.GetTextLayoutResult),
+            useUnmergedTree = true,
+        ).fetchSemanticsNodes()
+        val layouts = nodes.flatMap { node ->
+            val results = mutableListOf<TextLayoutResult>()
+            node.config[SemanticsActions.GetTextLayoutResult].action!!.invoke(results)
+            results
+        }
+        val status = layouts.single { it.layoutInput.text.text.startsWith(heading) }
+        assertEquals(status.layoutInput.text.text, 1, status.lineCount)
     }
 
     @Test fun largeTextWrapsWithoutCoveringEitherNativeTouchTarget() {

@@ -45,6 +45,7 @@ LABELS = {
     'row_try_again': ('common.tryAgain', None),
     'search_meetings': ('format.searchCount.meetings', 'n'),
     'tx_heading': ('transcribing.heading', None),
+    'tx_eta_minutes': ('transcribing.eta.minutes', 'n'),
     'tx_details': ('transcribing.details.a11y', None),
     'tx_stop': ('common.stop', None),
     'tx_stop_keep': ('transcribing.stopAndKeepProgress', None),

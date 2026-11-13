@@ -112,7 +112,8 @@ class ProgressTracker(
                     JobEvent.Stopping -> {
                         stopping = true
                         ticker?.cancel()
-                        state.value = JobPhase.Stopping
+                        val phase = state.value
+                        state.value = if (phase is JobPhase.Stopping) phase else JobPhase.Stopping(phase as? JobPhase.Transcribing)
                     }
                     is JobEvent.Ended -> {
                         outcome = event.outcome

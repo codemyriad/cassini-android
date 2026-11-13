@@ -46,6 +46,11 @@
         <item quantity="other">%1$s reuniones</item>
     </plurals>
     <string name="ui_tx_heading">Transcribiendo</string>
+    <plurals name="ui_tx_eta_minutes">
+        <item quantity="one">queda %1$s min</item>
+        <item quantity="many">quedan unos %1$s min</item>
+        <item quantity="other">quedan unos %1$s min</item>
+    </plurals>
     <string name="ui_tx_details">Detalles de la transcripción</string>
     <string name="ui_tx_stop">Detener</string>
     <string name="ui_tx_stop_keep">Detener y conservar el progreso</string>

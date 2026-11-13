@@ -75,7 +75,7 @@ object NoteMapping {
             row?.state == JobState.QUEUED -> NoteMode.Queued(job?.ahead ?: 0, overDocument = document)
             row?.state == JobState.RUNNING -> NoteMode.Processing(
                 card ?: STARTING_CARD,
-                stopBusy = job?.phase == JobPhase.Stopping,
+                stopBusy = job?.phase is JobPhase.Stopping,
             )
             row?.state == JobState.PAUSED -> NoteMode.Paused(row.doneMs, row.totalMs, hasCheckpoint = row.doneMs > 0)
             row?.state == JobState.FAILED -> NoteMode.Failed(overDocument = document)
@@ -86,7 +86,8 @@ object NoteMapping {
 
     /** Whether the mode shows the draft (the job's words), not the sealed transcript. */
     fun showsDraft(mode: NoteMode): Boolean =
-        mode is NoteMode.Processing || mode is NoteMode.Paused || (mode is NoteMode.Failed && !mode.overDocument)
+        mode is NoteMode.Processing || mode is NoteMode.Paused || (mode is NoteMode.Failed && !mode.overDocument) ||
+            (mode is NoteMode.Queued && !mode.overDocument)
 
     /** Whether the mode has a player (all but Transcribing and Unplayable). */
     fun hasPlayer(mode: NoteMode): Boolean =
@@ -197,7 +198,7 @@ object NoteMapping {
         null -> null
         JobPhase.Starting -> STARTING_CARD
         JobPhase.WaitingForPrevious -> STARTING_CARD.copy(headline = ProgressHeadline.WAITING_FOR_PREVIOUS)
-        JobPhase.Stopping -> STARTING_CARD
+        is JobPhase.Stopping -> phase.last?.let { card(it.progress) } ?: STARTING_CARD
         is JobPhase.Downloading -> STARTING_CARD.copy(download = phase.progress?.let(::download))
         is JobPhase.Transcribing -> card(phase.progress)
     }

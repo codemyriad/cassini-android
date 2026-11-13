@@ -58,17 +58,22 @@ class ProgressTrackerTest {
         val t = Tracked(this)
         t.send(started(totalMs = 70_000))
         advanceTimeBy(1_500)
+        t.send(JobEvent.WindowDone(10_000, 70_000, words(0, 10)))
+        val last = t.phase as JobPhase.Transcribing
         t.send(JobEvent.Stopping)
-        assertEquals(JobPhase.Stopping, t.phase)
+        assertEquals(last, (t.phase as JobPhase.Stopping).last)
+        t.send(JobEvent.Stopping)
+        assertEquals(last, (t.phase as JobPhase.Stopping).last)
         val reads = t.battery.reads.size
         t.send(JobEvent.WindowDone(28_000, 70_000, words(0, 28)))
         t.send(JobEvent.StageChanged(Stage.SAVING))
         advanceTimeBy(30_000)
-        assertEquals(JobPhase.Stopping, t.phase)
+        assertTrue(t.phase is JobPhase.Stopping)
+        assertEquals(last, (t.phase as JobPhase.Stopping).last)
         assertEquals(reads, t.battery.reads.size)
         t.send(JobEvent.Ended(JobOutcome.Paused(PauseReason.USER)))
         t.close()
-        assertEquals(JobPhase.Stopping, t.phase)
+        assertTrue(t.phase is JobPhase.Stopping)
         assertEquals(JobOutcome.Paused(PauseReason.USER), t.outcome.await())
     }
 
@@ -77,7 +82,7 @@ class ProgressTrackerTest {
         t.send(JobEvent.Stopping)
         t.send(started())
         advanceTimeBy(5_000)
-        assertEquals(JobPhase.Stopping, t.phase)
+        assertTrue(t.phase is JobPhase.Stopping)
         assertTrue(t.battery.reads.isEmpty())
         t.close()
     }

@@ -379,7 +379,7 @@ class NoteViewModelTest {
         assertNull(running.chips)
         assertEquals("leavePlayer", ports.calls.last())
         assertFalse(mode.stopBusy)
-        ports.setJob(job(JobState.RUNNING), phase = JobPhase.Stopping)
+        ports.setJob(job(JobState.RUNNING), phase = JobPhase.Stopping())
         advanceUntilIdle()
         assertTrue((viewModel.now().mode as NoteMode.Processing).stopBusy)
 
@@ -689,6 +689,38 @@ class NoteViewModelTest {
         val viewModel = viewModel(start = NoteStart.DOCUMENT_INFO)
         assertTrue(viewModel.now().sheet is NoteSheet.Info)
         assertTrue("documentFacts" in ports.calls)
+    }
+
+    @Test
+    fun stopAndResumeKeepTheLastProgressAndCheckpointDraftThroughPreludePhases() = runTest(dispatcher) {
+        ports.details.value = documentNote(audioKind = AudioKind.PLAIN)
+        val words = listOf(Word("s1", 0, 400, "Before"), Word("s2", 500, 900, "draft"))
+        val draft = DraftState(words, emptyMap(), emptySet(), emptyList(), Long.MAX_VALUE, true)
+        val running = JobPhase.Transcribing(progress(), draft)
+        ports.setJob(job(JobState.RUNNING), phase = running)
+        val vm = viewModel()
+        val original = (vm.now().mode as NoteMode.Processing).card
+        fun assertDraft() = assertEquals(words.map { it.text }, vm.now().turns.flatMap { it.words }.map { it.text })
+        assertDraft()
+        send(vm, NoteEvent.Stop)
+        ports.setJob(job(JobState.RUNNING), phase = JobPhase.Stopping(running))
+        advanceUntilIdle()
+        assertTrue((vm.now().mode as NoteMode.Processing).stopBusy)
+        assertEquals(original, (vm.now().mode as NoteMode.Processing).card)
+        assertDraft()
+        ports.draft = DraftTranscript(words, emptyMap(), ports.names.value, 900, 4_000)
+        ports.setJob(job(JobState.PAUSED, doneMs = 900))
+        advanceUntilIdle()
+        assertDraft()
+        ports.setJob(job(JobState.QUEUED, doneMs = 900))
+        advanceUntilIdle()
+        assertTrue(vm.now().mode is NoteMode.Queued)
+        assertDraft()
+        for (phase in listOf(JobPhase.Starting, JobPhase.Downloading(null), JobPhase.WaitingForPrevious, running)) {
+            ports.setJob(job(JobState.RUNNING, doneMs = 900), phase = phase)
+            advanceUntilIdle()
+            assertDraft()
+        }
     }
 
     // Trash. ----------------------------------------------------------------------------------------------------

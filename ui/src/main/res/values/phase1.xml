@@ -43,6 +43,10 @@
         <item quantity="other">%1$s meetings</item>
     </plurals>
     <string name="ui_tx_heading">Transcribing</string>
+    <plurals name="ui_tx_eta_minutes">
+        <item quantity="one">about %1$s min left</item>
+        <item quantity="other">about %1$s min left</item>
+    </plurals>
     <string name="ui_tx_details">Transcribing details</string>
     <string name="ui_tx_stop">Stop</string>
     <string name="ui_tx_stop_keep">Stop and keep progress</string>

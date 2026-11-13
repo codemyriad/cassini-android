@@ -47,6 +47,7 @@ import io.codemyriad.cassini.ui.format.BatteryUi
 import io.codemyriad.cassini.ui.format.Counts
 import io.codemyriad.cassini.ui.format.Durations
 import io.codemyriad.cassini.ui.format.Progress
+import io.codemyriad.cassini.ui.format.ProgressHeadline
 import io.codemyriad.cassini.ui.format.StageState
 import io.codemyriad.cassini.ui.format.StageUi
 import io.codemyriad.cassini.ui.format.TimeLeftUi
@@ -102,6 +103,9 @@ internal fun TranscribingDetailsContent(
             moving = true,
             anchor = progress.anchor,
         )
+        if (progress.headline == ProgressHeadline.WAITING_FOR_PREVIOUS) {
+            Text(Progress.headline(progress.headline), style = CassiniTheme.type.caption, color = c.text2)
+        }
         ProcessingStages(progress)
         HorizontalDivider(color = c.lineSoft)
         StatGrid(detailStats(progress))
@@ -141,9 +145,10 @@ private fun ProcessingStages(progress: ProcessingCardUi) {
     )
     val states = stageStates(progress.stage, progress.skippedMatching)
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        StageUi.entries.forEachIndexed { index, stage ->
+        StageUi.entries.forEachIndexed { index, _ ->
             val state = states[index]
-            val spoken = Progress.stageDescription(stage)
+            val label = stringResource(labels[index])
+            val spoken = stringResource(R.string.ui_stage_description, index + 1, labels.size, label)
             val status = Progress.stageState(state)
             Row(
                 Modifier.fillMaxWidth().clearAndSetSemantics {
@@ -155,7 +160,7 @@ private fun ProcessingStages(progress: ProcessingCardUi) {
             ) {
                 StageGlyph(state)
                 Text(
-                    stringResource(labels[index]),
+                    label,
                     style = if (state == StageState.IN_PROGRESS) CassiniTheme.type.label14 else CassiniTheme.type.body14,
                     color = if (state == StageState.DONE || state == StageState.IN_PROGRESS) c.ink else c.text4,
                     textDecoration = if (state == StageState.SKIPPED) TextDecoration.LineThrough else null,

@@ -141,7 +141,7 @@ class ProcessingNotifications(context: Context) : ProcessingNotices {
     private fun phaseText(res: Context, phase: JobPhase): String = when (phase) {
         JobPhase.Starting -> res.getString(R.string.notif_processing_starting)
         JobPhase.WaitingForPrevious -> res.getString(R.string.notif_processing_waiting)
-        JobPhase.Stopping -> res.getString(R.string.notif_processing_stopping)
+        is JobPhase.Stopping -> res.getString(R.string.notif_processing_stopping)
         is JobPhase.Downloading -> res.getString(R.string.notif_processing_starting)
         is JobPhase.Transcribing -> progressText(res, phase.progress)
     }

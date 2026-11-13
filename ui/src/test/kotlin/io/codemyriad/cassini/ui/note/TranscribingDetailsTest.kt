@@ -61,7 +61,7 @@ class TranscribingDetailsTest {
         rule.onNodeWithText("62%").assertIsDisplayed()
         rule.onNodeWithText("29:52 of 48:13").assertIsDisplayed()
         rule.onNodeWithText("4,812").assertIsDisplayed()
-        rule.onNodeWithContentDescription("Step 3 of 5: Words and voices")
+        rule.onNodeWithContentDescription("Step 3 of 5: Words")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "in progress"))
         rule.runOnIdle {
             progress = progress.copy(stage = StageUi.SAVING, percent = 98, words = 5_000, battery = BatteryUi.Hidden)
@@ -71,6 +71,22 @@ class TranscribingDetailsTest {
         rule.onNodeWithText("Battery at finish").assertDoesNotExist()
         rule.onNodeWithContentDescription("Step 5 of 5: Saving")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "in progress"))
+    }
+
+    @Test
+    @Config(qualifiers = "+pt-rPT")
+    fun spokenPortugueseStagesUseTheVisibleCatalogLabels() {
+        rule.setContent {
+            CassiniTheme {
+                ProvideFixedFormat(locale = Locale.forLanguageTag("pt-PT")) {
+                    TranscribingDetailsContent(card, false, false, {}, {})
+                }
+            }
+        }
+        rule.onNodeWithContentDescription("Etapa 3 de 5: Palavras").assertExists()
+        rule.onNodeWithContentDescription("Etapa 4 de 5: Oradores e reconhecimento").assertExists()
+        rule.onNodeWithContentDescription("Etapa 5 de 5: Gravação").assertExists()
+        rule.onNodeWithContentDescription("Etapa 5 de 5: Armazenamento").assertDoesNotExist()
     }
 
     @Test fun downloadCancelMemoryNotificationAndBusyStopRemainReachableAtLargeText() {

@@ -215,13 +215,13 @@ object LibraryMapping {
     fun progress(state: ProcessingState): ProgressBannerUi? {
         val running = state.running ?: return standaloneDownload(state)
         return when (val phase = running.phase) {
-            JobPhase.Starting, JobPhase.Stopping -> ProgressBannerUi(
+            JobPhase.Starting, is JobPhase.Stopping -> ProgressBannerUi(
                 noteId = running.noteId,
                 title = running.title,
                 percent = null,
                 progress = null,
                 line = ProgressLine.TimeLeft(
-                    if (phase == JobPhase.Stopping) TimeLeftUi.Finishing else TimeLeftUi.Calculating,
+                    if (phase is JobPhase.Stopping) TimeLeftUi.Finishing else TimeLeftUi.Calculating,
                 ),
                 queued = state.waiting,
             )

@@ -110,8 +110,8 @@ class ModeBehaviourTest {
         val states = listOf(
             "Step 1 of 5: Reading" to "done",
             "Step 2 of 5: Preparing" to "done",
-            "Step 3 of 5: Words and voices" to "in progress",
-            "Step 4 of 5: Matching" to "not started",
+            "Step 3 of 5: Words" to "in progress",
+            "Step 4 of 5: Speakers & matching" to "not started",
             "Step 5 of 5: Saving" to "not started",
         )
         states.forEach { (step, state) ->

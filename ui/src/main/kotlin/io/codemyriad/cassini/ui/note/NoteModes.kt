@@ -17,9 +17,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,7 +40,6 @@ import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.R
 import io.codemyriad.cassini.ui.banner.BannerSpec
 import io.codemyriad.cassini.ui.components.Banner
-import io.codemyriad.cassini.ui.components.ProcessingCardUi
 import io.codemyriad.cassini.ui.components.QueuedCard
 import io.codemyriad.cassini.ui.components.SuggestionCard
 import io.codemyriad.cassini.ui.components.TurnHeader
@@ -88,17 +90,19 @@ internal fun ColumnScope.NoteModeBody(
     state: NoteUiState,
     listState: LazyListState,
     draftListState: LazyListState,
+    draftFollow: MutableState<Boolean>,
     onEvent: (NoteEvent) -> Unit,
 ) {
     val navigationBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val bottom = if (state.playback == null) navigationBar else 0.dp
     val mode = state.mode
-    val draft = mode is NoteMode.Processing || mode is NoteMode.Paused || (mode is NoteMode.Failed && !mode.overDocument)
+    val draft = mode is NoteMode.Processing || mode is NoteMode.Paused || (mode is NoteMode.Failed && !mode.overDocument) ||
+        (mode is NoteMode.Queued && !mode.overDocument && state.turns.isNotEmpty())
     if (draft) {
         DraftList(
             state,
-            card = (mode as? NoteMode.Processing)?.card,
             listState = draftListState,
+            follow = draftFollow,
             bottom = bottom,
             onEvent = onEvent,
         )
@@ -171,12 +175,13 @@ private fun ColumnScope.DocumentBelow(
 @Composable
 private fun ColumnScope.DraftList(
     state: NoteUiState,
-    card: ProcessingCardUi?,
     listState: LazyListState,
+    follow: MutableState<Boolean>,
     bottom: Dp,
     onEvent: (NoteEvent) -> Unit,
 ) {
-    var stick by remember { mutableStateOf(true) }
+    val card = (state.mode as? NoteMode.Processing)?.card
+    var stick by follow
     LaunchedEffect(listState) {
         snapshotFlow { listState.isScrollInProgress }
             .drop(1)
@@ -199,7 +204,14 @@ private fun ColumnScope.DraftList(
     LaunchedEffect(card != null) {
         if (card == null) detailsOpen = false
     }
+    val scrolled by remember {
+        derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0 }
+    }
     Column(Modifier.weight(1f).fillMaxWidth()) {
+        val queued = state.mode as? NoteMode.Queued
+        if (queued != null) {
+            QueuedCard(queued.ahead, onRemove = { onEvent(NoteEvent.RemoveFromQueue) }, modifier = TopItemPadding)
+        }
         if (card != null) {
             TranscribingStatus(
                 progress = card,
@@ -208,6 +220,7 @@ private fun ColumnScope.DraftList(
                 onStop = { onEvent(NoteEvent.Stop) },
             )
         }
+        if (card != null && scrolled) HorizontalDivider(color = CassiniTheme.colors.line)
         DraftItems(state, listState, bottom, onEvent)
     }
     if (detailsOpen && card != null) {

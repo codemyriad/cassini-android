@@ -46,6 +46,11 @@
         <item quantity="other">%1$s riunioni</item>
     </plurals>
     <string name="ui_tx_heading">In trascrizione</string>
+    <plurals name="ui_tx_eta_minutes">
+        <item quantity="one">circa %1$s min rimanente</item>
+        <item quantity="many">circa %1$s min rimanenti</item>
+        <item quantity="other">circa %1$s min rimanenti</item>
+    </plurals>
     <string name="ui_tx_details">Dettagli della trascrizione</string>
     <string name="ui_tx_stop">Ferma</string>
     <string name="ui_tx_stop_keep">Ferma e conserva i progressi</string>

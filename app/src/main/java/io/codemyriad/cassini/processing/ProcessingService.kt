@@ -199,7 +199,7 @@ class ProcessingService : LifecycleService() {
                 when (val phase = state.running?.phase) {
                     is JobPhase.Transcribing -> phase.progress.doneMs
                     JobPhase.WaitingForPrevious -> WAKE_HOLD
-                    JobPhase.Stopping -> WAKE_KEEP
+                    is JobPhase.Stopping -> WAKE_KEEP
                     else -> null
                 }
             }

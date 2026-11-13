@@ -1,5 +1,7 @@
 package io.codemyriad.cassini.ui.screens
 
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import io.codemyriad.cassini.ui.BoardTest
 import io.codemyriad.cassini.ui.components.DialogBoardFrame
 import io.codemyriad.cassini.ui.components.SheetBoardFrame
@@ -34,6 +36,16 @@ abstract class VariantBoardTest : BoardTest() {
 
     protected fun note(name: String) = board(variantDirectory, name, dark = variantDark) {
         NoteScreen(VariantFixtures.transcribing.getValue(name), onEvent = {})
+    }
+
+    protected fun transcribingDetails(name: String) {
+        show(variantDark) { NoteScreen(VariantFixtures.transcribing.getValue(name), onEvent = {}) }
+        rule.mainClock.autoAdvance = true
+        rule.onNodeWithTag("transcribing-details").performClick()
+        rule.waitForIdle()
+        rule.mainClock.autoAdvance = false
+        rule.mainClock.advanceTimeBy(1_000)
+        capture(variantDirectory, name, window = true)
     }
 
     protected fun read(name: String) = board(variantDirectory, name, dark = variantDark) {

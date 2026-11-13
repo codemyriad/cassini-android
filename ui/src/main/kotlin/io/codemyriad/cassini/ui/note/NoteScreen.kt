@@ -25,7 +25,9 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -65,8 +67,10 @@ fun NoteScreen(
     BackHandler(enabled = search != null) { onEvent(NoteEvent.CloseSearch) }
     val listState = rememberLazyListState()
     val draftListState = rememberLazyListState()
+    val draftFollow = rememberSaveable(state.noteId) { mutableStateOf(true) }
     val draftMode = state.mode is NoteMode.Processing || state.mode is NoteMode.Paused ||
-        (state.mode is NoteMode.Failed && !state.mode.overDocument)
+        (state.mode is NoteMode.Failed && !state.mode.overDocument) ||
+        (state.mode is NoteMode.Queued && !state.mode.overDocument)
     val draftScrolled by remember {
         derivedStateOf { draftListState.firstVisibleItemIndex > 0 || draftListState.firstVisibleItemScrollOffset > 0 }
     }
@@ -92,7 +96,7 @@ fun NoteScreen(
             Column(Modifier.fillMaxSize()) {
                 when (state.mode) {
                     NoteMode.Reading -> ReadAndListenBody(state, listState, onEvent)
-                    else -> NoteModeBody(state, listState, draftListState, onEvent)
+                    else -> NoteModeBody(state, listState, draftListState, draftFollow, onEvent)
                 }
             }
             NoteFloating(state, onEvent)
@@ -124,7 +128,7 @@ private fun NoteHeader(state: NoteUiState, scrolled: Boolean, draftScrolled: Boo
         state.mode == NoteMode.Reading -> MeetingTopBar(state, scrolled, onEvent)
         else -> {
             NoteTopBar(state, onEvent, compact = draftScrolled)
-            if (draftScrolled) HorizontalDivider(color = CassiniTheme.colors.line)
+            if (draftScrolled && state.mode !is NoteMode.Processing) HorizontalDivider(color = CassiniTheme.colors.line)
         }
     }
 }

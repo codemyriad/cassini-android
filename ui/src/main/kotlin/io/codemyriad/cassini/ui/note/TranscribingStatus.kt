@@ -5,11 +5,13 @@ package io.codemyriad.cassini.ui.note
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -17,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -36,7 +39,7 @@ import io.codemyriad.cassini.ui.R
 import io.codemyriad.cassini.ui.components.LinearTrack
 import io.codemyriad.cassini.ui.components.ProcessingCardUi
 import io.codemyriad.cassini.ui.format.Counts
-import io.codemyriad.cassini.ui.format.Progress
+import io.codemyriad.cassini.ui.format.LocalFormat
 import io.codemyriad.cassini.ui.theme.CassiniIcon
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import io.codemyriad.cassini.ui.theme.Glyph
@@ -73,7 +76,7 @@ internal fun TranscribingStatus(
 private fun StatusDetails(progress: ProcessingCardUi, onDetails: () -> Unit, modifier: Modifier) {
     val c = CassiniTheme.colors
     val heading = stringResource(R.string.ui_tx_heading)
-    val eta = Progress.timeLeftLine(progress.timeLeft)
+    val eta = transcribingEta(LocalResources.current, LocalFormat.current.locale, progress.timeLeft)
     val label = stringResource(R.string.ui_join_dot, heading, eta)
     val details = stringResource(R.string.ui_tx_details)
     val percentage = Counts.percent(progress.percent / 5 * 5)
@@ -109,8 +112,9 @@ private fun StatusStop(stopBusy: Boolean, onStop: () -> Unit) {
     val stop = stringResource(R.string.ui_tx_stop_keep)
     TextButton(
         onClick = onStop,
+        contentPadding = PaddingValues(0.dp),
         enabled = !stopBusy,
-        modifier = Modifier.heightIn(min = 48.dp).semantics { contentDescription = stop }
+        modifier = Modifier.heightIn(min = 48.dp).widthIn(min = 48.dp).semantics { contentDescription = stop }
             .testTag("transcribing-stop"),
     ) {
         androidx.compose.foundation.layout.Box(contentAlignment = Alignment.Center) {
