@@ -176,7 +176,6 @@
     <string name="ui_recording_hint_space">Espace pour encore environ %1$s.</string>
     <string name="ui_recording_pause">Mettre l’enregistrement en pause</string>
     <string name="ui_recording_resume">Reprendre l’enregistrement</string>
-    <string name="ui_recording_finish">Terminer</string>
 
     <!-- Note screen header and modes (features.md section 3). -->
     <string name="ui_note_search">Rechercher dans la transcription</string>

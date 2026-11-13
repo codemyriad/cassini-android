@@ -10,7 +10,6 @@ import androidx.compose.ui.test.performClick
 import androidx.core.content.ContextCompat
 import androidx.test.espresso.Espresso
 import io.codemyriad.cassini.MainActivity
-import io.codemyriad.cassini.R
 import io.codemyriad.cassini.background.Background
 import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobState
@@ -79,7 +78,7 @@ class RecordingFlowTest {
         rule.waitText(rule.text(UiR.string.ui_library_recording_tap))
         assertTrue("Back minimises; the capture goes on", recording.state.value is RecordingState.Active)
 
-        val finish = ContextCompat.getContextForLanguage(rule.activity).getString(R.string.notif_action_finish)
+        val finish = ContextCompat.getContextForLanguage(rule.activity).getString(UiR.string.ui_recording_finish)
         val manager = rule.activity.getSystemService(NotificationManager::class.java)
         val action = runBlocking {
             notifications.await("The recording notification has a Finish action", Flows.SCREEN_MS) {

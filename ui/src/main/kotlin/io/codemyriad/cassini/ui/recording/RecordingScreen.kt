@@ -6,19 +6,24 @@ package io.codemyriad.cassini.ui.recording
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -30,10 +35,13 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.codemyriad.cassini.ui.R
 import io.codemyriad.cassini.ui.banner.BannerAction
 import io.codemyriad.cassini.ui.components.Banner
@@ -57,9 +65,9 @@ import io.codemyriad.cassini.ui.theme.LightColors
  * The Recording screen (board 01, features.md section 2; ui.md section 8). It is dark in both app themes: every
  * colour comes from `CassiniTheme.recording`, and the banner keeps its light tones.
  *
- * A Column with padding 16/16/28 inside the safe drawing insets: the 48 dp header (Minimise, the status and the
- * format badge, spaced as the board), the title block 28 dp below, the banner slot 8 dp below that, the centre
- * (timer, waveform and caption, 28 dp apart and centred in the free height) and the controls.
+ * The editable title follows the status/format header inside the scrolling middle viewport. Title, banners,
+ * timer, waveform and space hint scroll together so the pinned header and capture controls remain visible. Stop is the centre action,
+ * All meetings is on the left and labelled Pause/Resume is on the right (L-48/L-49).
  *
  * The header chevron sends [RecordingEvent.Minimise]: the recording continues. System back is not handled here: the
  * navigation in :app pops `RecordingKey` with the predictive pop of ui.md section 9, and that pop minimises too.
@@ -68,7 +76,7 @@ import io.codemyriad.cassini.ui.theme.LightColors
  *
  * The status shows only while the capture runs or is paused. Before the capture starts and while it is saved, the
  * caption tells why ("Cassini needs the microphone to record.", "Starting the microphone…", "Saving the
- * recording…") and Pause and Finish are disabled.
+ * recording…") and Pause and Stop are disabled.
  */
 @Composable
 fun RecordingScreen(
@@ -83,9 +91,40 @@ fun RecordingScreen(
             .background(rec.bg)
             .windowInsetsPadding(WindowInsets.safeDrawing)
             .screenContentWidth()
-            .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 28.dp),
+            .padding(start = 16.dp, top = 6.dp, end = 16.dp, bottom = 34.dp),
     ) {
         RecordingHeader(state, onEvent)
+        RecordingMiddle(state, onEvent, Modifier.weight(1f).fillMaxWidth())
+        val capturing = state.phase == RecordingPhase.Recording || state.phase == RecordingPhase.Paused
+        RecordingControls(
+            paused = state.phase == RecordingPhase.Paused,
+            onLibrary = { onEvent(RecordingEvent.OpenLibrary) },
+            onPauseResume = { onEvent(RecordingEvent.PauseResume) },
+            onFinish = { onEvent(RecordingEvent.Finish) },
+            captureEnabled = capturing,
+        )
+    }
+}
+
+/** Title, alerts and meter share the bounded space between the pinned header and controls. */
+@Composable
+private fun RecordingMiddle(state: RecordingUiState, onEvent: (RecordingEvent) -> Unit, modifier: Modifier) {
+    BoxWithConstraints(modifier) {
+        val viewportHeight = maxHeight
+        Column(
+            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).heightIn(min = viewportHeight),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            RecordingTitleAndBanner(state, onEvent)
+            RecordingMeter(state)
+            Spacer(Modifier.height(0.dp))
+        }
+    }
+}
+
+@Composable
+private fun RecordingTitleAndBanner(state: RecordingUiState, onEvent: (RecordingEvent) -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
         TitleField(state.title, onTitle = { onEvent(RecordingEvent.Title(it)) })
         state.banner?.let { spec ->
             Banner(
@@ -103,30 +142,26 @@ fun RecordingScreen(
                 colors = LightColors,
             )
         }
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(28.dp, Alignment.CenterVertically),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            RecordingTimer(state.elapsedMs)
-            Waveform(state.levels, running = state.phase == RecordingPhase.Recording)
-            Text(
-                text = caption(state),
-                modifier = Modifier.widthIn(max = 300.dp),
-                style = CassiniTheme.type.body14,
-                color = rec.text2,
-                textAlign = TextAlign.Center,
-            )
-        }
-        val capturing = state.phase == RecordingPhase.Recording || state.phase == RecordingPhase.Paused
-        RecordingControls(
-            paused = state.phase == RecordingPhase.Paused,
-            onLibrary = { onEvent(RecordingEvent.OpenLibrary) },
-            onPauseResume = { onEvent(RecordingEvent.PauseResume) },
-            onFinish = { onEvent(RecordingEvent.Finish) },
-            captureEnabled = capturing,
+    }
+}
+
+/** Symmetric padding supplies a scrolling gap without moving the centred meter on tall windows. */
+@Composable
+private fun RecordingMeter(state: RecordingUiState) {
+    val rec = CassiniTheme.recording
+    Column(
+        Modifier.fillMaxWidth().padding(vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        RecordingTimer(state.elapsedMs)
+        Waveform(state.levels, running = state.phase == RecordingPhase.Recording)
+        Text(
+            text = caption(state),
+            modifier = Modifier.widthIn(max = 280.dp),
+            style = CassiniTheme.type.body14,
+            color = rec.text2,
+            textAlign = TextAlign.Center,
         )
     }
 }
@@ -166,17 +201,13 @@ private fun RecordingHeader(state: RecordingUiState, onEvent: (RecordingEvent) -
     }
 }
 
-/**
- * The title block, 28 dp below the header: the label "Title" (13 sp rec.text2, 3 dp lower, see below), 4 dp, then the field row with a
- * 1 dp rec.line bottom border and 6 dp below the text: the title in `screenTitle` rec.text (4 dp above and below,
- * as the board's input), the caret in rec.status, and the decorative Pencil 18/1.8 in rec.text2, 8 dp after it.
- * The label is inside the field's decoration, so TalkBack reads it with the field.
- */
+/** The native editable title and pencil; its spoken label remains after removing the redundant visible label. */
 @Composable
 private fun TitleField(title: String, onTitle: (String) -> Unit) {
     val rec = CassiniTheme.recording
     val t = CassiniTheme.type
     val focus = LocalFocusManager.current
+    val description = stringResource(R.string.ui_title_label)
     // The field shows its own copy of the title and sends each change; a late state keeps the typed text.
     val text = rememberSyncedText(title)
     BasicTextField(
@@ -184,8 +215,9 @@ private fun TitleField(title: String, onTitle: (String) -> Unit) {
         onValueChange = { text.edit(it, TITLE_MAX_LENGTH, onTitle) },
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 28.dp),
-        textStyle = t.screenTitle.copy(color = rec.text),
+            .padding(start = 4.dp, top = 18.dp, end = 4.dp)
+            .semantics { contentDescription = description },
+        textStyle = t.screenTitle.copy(fontSize = 20.sp, color = rec.text),
         keyboardOptions = KeyboardOptions(
             capitalization = KeyboardCapitalization.Sentences,
             imeAction = ImeAction.Done,
@@ -195,17 +227,10 @@ private fun TitleField(title: String, onTitle: (String) -> Unit) {
         cursorBrush = SolidColor(rec.status),
         decorationBox = { inner ->
             Column {
-                // The board's label is inline in a 16 px line box: its glyphs sit 3 dp lower than a 13 sp line.
-                Text(
-                    text = stringResource(R.string.ui_title_label),
-                    modifier = Modifier.padding(top = 3.dp),
-                    style = t.caption,
-                    color = rec.text2,
-                )
                 Row(
                     modifier = Modifier
-                        .padding(top = 4.dp)
                         .fillMaxWidth()
+                        .heightIn(min = 48.dp)
                         .drawBehind {
                             val line = 1.dp.toPx()
                             drawRect(rec.line, Offset(0f, size.height - line), Size(size.width, line))

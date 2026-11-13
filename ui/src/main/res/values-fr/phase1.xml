@@ -27,6 +27,9 @@
     <string name="ui_recording_library">Toutes les réunions</string>
     <string name="ui_recording_minimise">Retour à toutes les réunions</string>
     <string name="ui_note_search_placeholder">Rechercher</string>
+    <string name="ui_recording_finish">Arrêter</string>
+    <string name="ui_recording_pause_label">Pause</string>
+    <string name="ui_recording_resume_label">Reprendre</string>
     <string name="ui_library_search_placeholder">Rechercher</string>
     <string name="ui_library_search_description">Rechercher dans toutes les réunions</string>
     <plurals name="ui_row_speaker_count">

@@ -174,7 +174,6 @@
     <string name="ui_recording_hint_space">Spazio per circa %1$s ancora.</string>
     <string name="ui_recording_pause">Metti in pausa la registrazione</string>
     <string name="ui_recording_resume">Riprendi la registrazione</string>
-    <string name="ui_recording_finish">Termina</string>
 
     <!-- Schermata della nota. -->
     <string name="ui_note_search">Cerca nella trascrizione</string>

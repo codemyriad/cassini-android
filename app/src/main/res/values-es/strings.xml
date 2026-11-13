@@ -99,7 +99,6 @@
     <string name="notif_rec_storage_low">Almacenamiento casi lleno — quedan unos %1$d min</string>
     <string name="notif_rec_file_low">Archivo de grabación casi lleno — quedan unos %1$d min</string>
     <string name="notif_action_pause">Pausar</string>
-    <string name="notif_action_finish">Terminar</string>
     <string name="notif_rec_stopped_title">Grabación detenida</string>
     <string name="notif_rec_stopped_text">Quedan menos de 200 MB libres. Lo grabado hasta ahora está guardado.</string>
     <string name="notif_rec_file_full_text">Cassini termina las grabaciones M4A al llegar a 1 GB, unas 74 horas. Lo grabado hasta ahora está guardado. Empieza una grabación nueva para continuar.</string>

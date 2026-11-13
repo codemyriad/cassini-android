@@ -64,7 +64,7 @@ class ModeBehaviourTest {
         rule.onNodeWithContentDescription("Back to all meetings").performClick()
         rule.onNodeWithText("All meetings").performClick()
         rule.onNodeWithContentDescription("Pause recording").performClick()
-        rule.onNodeWithText("Finish").performClick()
+        rule.onNodeWithText("Stop").performClick()
         rule.runOnIdle {
             assertEquals(
                 listOf(

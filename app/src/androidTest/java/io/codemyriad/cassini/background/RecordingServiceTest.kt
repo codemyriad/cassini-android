@@ -4,7 +4,6 @@ import android.Manifest
 import android.app.NotificationManager
 import android.util.Log
 import androidx.core.content.ContextCompat
-import io.codemyriad.cassini.R
 import io.codemyriad.cassini.background.Background.graph
 import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobState
@@ -26,6 +25,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import java.io.File
+import io.codemyriad.cassini.ui.R as UiR
 
 /**
  * The new `RecordingService` with the real microphone (docs/architecture.md section 5.8): start, Home, Finish from
@@ -67,7 +67,7 @@ class RecordingServiceTest {
             it is RecordingState.Active && it.elapsedMs >= CAPTURE_MS
         }
 
-        val finish = ContextCompat.getContextForLanguage(Background.context).getString(R.string.notif_action_finish)
+        val finish = ContextCompat.getContextForLanguage(Background.context).getString(UiR.string.ui_recording_finish)
         val manager = Background.context.getSystemService(NotificationManager::class.java)
         val notification = notifications.await("The recording notification is posted", Background.WAIT_MS) {
             manager.activeNotifications.firstOrNull { it.id == RecordingNotifications.RECORDING_ID }?.notification

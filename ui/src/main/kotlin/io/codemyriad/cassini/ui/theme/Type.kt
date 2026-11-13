@@ -50,7 +50,7 @@ private fun style(family: FontFamily, size: Int, weight: Int, lineHeight: TextUn
 @Immutable
 class CassiniType {
     /** Recording timer, tabular figures. */
-    val timer: TextStyle = mono(72, ls = -0.02f).copy(fontFeatureSettings = "tnum")
+    val timer: TextStyle = mono(56, weight = 500, ls = -0.02f).copy(fontFeatureSettings = "tnum")
 
     /** Progress card percentage number. */
     val percent: TextStyle = sans(40, 600, lh = 1.0f, ls = -0.02f)
