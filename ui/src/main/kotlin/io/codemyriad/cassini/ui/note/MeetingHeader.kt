@@ -66,8 +66,10 @@ internal fun MeetingHeader(state: NoteUiState, onEvent: (NoteEvent) -> Unit) {
             }
         }
         // Existing trust/version controls stay available and scroll with the rest of the metadata.
-        state.chips?.let { NoteChipsRow(it, onEvent) }
-        HorizontalDivider(color = c.line)
+        state.chips?.let {
+            NoteChipsRow(it, onEvent, showSpeakerCount = state.mode != NoteMode.Reading || speakers.isEmpty())
+        }
+        HorizontalDivider(color = c.line, modifier = Modifier.testTag("meeting-header-divider"))
     }
 }
 

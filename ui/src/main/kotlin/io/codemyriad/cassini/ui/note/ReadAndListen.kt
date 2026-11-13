@@ -80,7 +80,7 @@ private const val FOLLOW_RESUME_MS = 4_000L
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun NoteChipsRow(chips: NoteChipsUi, onEvent: (NoteEvent) -> Unit) {
+internal fun NoteChipsRow(chips: NoteChipsUi, onEvent: (NoteEvent) -> Unit, showSpeakerCount: Boolean = true) {
     val c = CassiniTheme.colors
     FlowRow(
         modifier = Modifier
@@ -106,7 +106,7 @@ internal fun NoteChipsRow(chips: NoteChipsUi, onEvent: (NoteEvent) -> Unit) {
                 onClick = { onEvent(NoteEvent.OpenVersions) },
             )
         }
-        if (chips.speakers > 0) {
+        if (showSpeakerCount && chips.speakers > 0) {
             Box(Modifier.heightIn(min = 32.dp), contentAlignment = Alignment.Center) {
                 Text(
                     text = Counts.plural(R.plurals.ui_count_speakers, chips.speakers),
@@ -214,7 +214,7 @@ internal fun TranscriptPane(
                 active.height = it.size.height
             },
         state = listState,
-        contentPadding = PaddingValues(top = 0.5.dp, bottom = 16.dp),
+        contentPadding = PaddingValues(top = if (header == null) 0.5.dp else 0.dp, bottom = 16.dp),
     ) {
         if (header != null) item(key = Int.MIN_VALUE) { header() }
         if (noWords && turns.isEmpty()) {

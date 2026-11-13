@@ -8,6 +8,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -15,6 +17,7 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
@@ -22,6 +25,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.unit.dp
@@ -31,6 +35,7 @@ import io.codemyriad.cassini.ui.components.WordRef
 import io.codemyriad.cassini.ui.fixtures.BoardFixtures
 import io.codemyriad.cassini.ui.format.ProvideFixedFormat
 import io.codemyriad.cassini.ui.screens.assertSevenSpeakerWordsInk
+import io.codemyriad.cassini.ui.theme.CassiniColors
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
@@ -43,6 +48,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.util.Locale
+import kotlin.math.roundToInt
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -152,6 +158,53 @@ class Phase1MeetingTest {
         rule.runOnIdle { state = base }
         rule.onNode(button).assertIsDisplayed()
         rule.onNodeWithContentDescription("Close search").assertDoesNotExist()
+    }
+
+    @Test fun inlineSpeakersReplaceOnlyTheReadingCountAndKeepTrustAndVersionActions() {
+        var state by mutableStateOf(BoardFixtures.readAndListen.copy(activeWord = null, playback = null))
+        val events = mutableListOf<NoteEvent>()
+        rule.setContent {
+            CassiniTheme {
+                ProvideFixedFormat(locale = Locale.ENGLISH) {
+                    NoteScreen(state, onEvent = { events += it })
+                }
+            }
+        }
+        rule.onAllNodesWithText("3 speakers").assertCountEquals(0)
+        rule.onNode(hasText("Verified")).performClick()
+        rule.onNode(hasText("Version 2 of 2", substring = true)).performClick()
+        rule.runOnIdle { assertEquals(listOf(NoteEvent.TrustChip, NoteEvent.OpenVersions), events) }
+        rule.runOnIdle { state = state.copy(mode = NoteMode.Queued(ahead = 0, overDocument = true)) }
+        rule.onAllNodesWithText("3 speakers").assertCountEquals(1)
+    }
+
+    @Test fun restingBarAndHeaderAreContinuousGroundInLightMode() = continuousGround(dark = false)
+
+    @Test fun restingBarAndHeaderAreContinuousGroundInDarkMode() = continuousGround(dark = true)
+
+    private fun continuousGround(dark: Boolean) {
+        lateinit var colors: CassiniColors
+        var density = 0f
+        rule.setContent {
+            CassiniTheme(darkTheme = dark) {
+                colors = CassiniTheme.colors
+                density = LocalDensity.current.density
+                ProvideFixedFormat(locale = Locale.ENGLISH) {
+                    NoteScreen(BoardFixtures.readAndListen.copy(activeWord = null, playback = null), onEvent = {})
+                }
+            }
+        }
+        val bar = rule.onNodeWithTag("meeting-app-bar").getBoundsInRoot()
+        val header = rule.onNodeWithTag("meeting-header").getBoundsInRoot()
+        assertEquals("No exposed transcript surface between ground blocks", bar.bottom, header.top)
+        rule.onNodeWithTag("meeting-scrolled-edge").assertDoesNotExist()
+        val divider = rule.onNodeWithTag("meeting-header-divider").getBoundsInRoot()
+        assertEquals(1.dp, divider.bottom - divider.top)
+        val pixels = rule.onRoot().captureToImage().toPixelMap()
+        for (y in ((bar.bottom.value - 2) * density).roundToInt()..((header.top.value + 4) * density).roundToInt()) {
+            assertEquals("Continuous ground at y=$y, dark=$dark", colors.bg, pixels[(2 * density).roundToInt(), y])
+        }
+        assertEquals(colors.line, pixels[(2 * density).roundToInt(), (divider.top.value * density).roundToInt()])
     }
 
     @Test fun searchJumpsPastTheHeaderToTheActualMatchedTurn() = jump(searching = true)
