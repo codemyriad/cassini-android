@@ -100,7 +100,6 @@
     <string name="notif_rec_storage_low">Armazenamento quase cheio — restam cerca de %1$d min</string>
     <string name="notif_rec_file_low">Arquivo de gravação quase cheio — restam cerca de %1$d min</string>
     <string name="notif_action_pause">Pausar</string>
-    <string name="notif_action_finish">Finalizar</string>
     <string name="notif_rec_stopped_title">Gravação interrompida</string>
     <string name="notif_rec_stopped_text">Menos de 200 MB livres. A gravação até agora está salva.</string>
     <string name="notif_rec_file_full_text">O Cassini encerra gravações M4A ao atingir 1 GB, cerca de 74 horas. A gravação até agora está salva. Inicie uma nova gravação para continuar.</string>

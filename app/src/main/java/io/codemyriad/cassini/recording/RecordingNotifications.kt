@@ -91,7 +91,7 @@ class RecordingNotifications(context: Context) {
                     action(RecordingService.ACTION_RESUME),
                 )
             }
-            builder.addAction(0, res.getString(R.string.notif_action_finish), action(RecordingService.ACTION_FINISH))
+            builder.addAction(0, res.getString(UiR.string.ui_recording_finish), action(RecordingService.ACTION_FINISH))
         }
         return builder.build()
     }
