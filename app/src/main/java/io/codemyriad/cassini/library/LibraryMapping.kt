@@ -29,6 +29,7 @@ import io.codemyriad.cassini.ui.library.ProgressBannerUi
 import io.codemyriad.cassini.ui.library.ProgressLine
 import io.codemyriad.cassini.ui.library.RecordingPillUi
 import io.codemyriad.cassini.ui.note.DocumentKindUi
+import io.codemyriad.cassini.ui.note.NoteAction
 import io.codemyriad.cassini.ui.note.NoteActionsUi
 import io.codemyriad.cassini.ui.note.TranscribeRowUi
 import kotlinx.collections.immutable.ImmutableList
@@ -284,12 +285,14 @@ object LibraryMapping {
      * version only through note voiceprints, so "Speaker names carry over." needs [voiceModelReady] and a named
      * speaker.
      */
+    @Suppress("LongParameterList") // One parameter per live input of the Note actions sheet.
     fun actions(
         details: NoteDetails,
         activeNoteId: String?,
         now: Instant,
         zone: ZoneId,
         voiceModelReady: Boolean,
+        stopBusy: Boolean = false,
     ): NoteActionsUi {
         val note = details.note
         val selected = details.variants.firstOrNull { it.variantId == note.selectedVariant }
@@ -314,6 +317,7 @@ object LibraryMapping {
             },
             textExportEnabled = document && readable && selected?.readable == true,
             transcribeRow = transcribeRow(details, namesCarry),
+            busyRow = NoteAction.STOP.takeIf { stopBusy && details.job?.state == JobState.RUNNING },
             recording = note.audioKind == AudioKind.LIVE_CAPTURE && note.id == activeNoteId,
         )
     }

@@ -101,7 +101,7 @@ class ProcessingNotifications(context: Context) : ProcessingNotices {
             .setProgress(PERCENT, content.percent ?: 0, content.percent == null)
         if (state.running != null || state.queue.isNotEmpty()) {
             val stop = serviceIntent(ProcessingService.ACTION_STOP_ALL)
-            builder.addAction(0, res.getString(R.string.notif_action_stop), stop)
+            builder.addAction(0, res.getString(UiR.string.ui_tx_stop), stop)
         }
         builder.addAction(0, res.getString(R.string.notif_action_open), openIntent(state.running?.noteId))
         if (content.cancel) {

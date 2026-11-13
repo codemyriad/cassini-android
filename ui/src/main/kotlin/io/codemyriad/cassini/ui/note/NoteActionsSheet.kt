@@ -74,7 +74,7 @@ fun NoteActionsSheetContent(ui: NoteActionsUi, onAction: (NoteAction) -> Unit, m
         SaveACopy(ui, document, onAction)
         SheetDivider()
         SheetActionRow(stringResource(R.string.ui_action_rename), Glyph.Pencil, { onAction(NoteAction.RENAME) })
-        TranscribeRows(ui.transcribeRow, onAction)
+        TranscribeRows(ui.transcribeRow, stopBusy = ui.busyRow == NoteAction.STOP, onAction = onAction)
         if (document) {
             SheetActionRow(
                 label = stringResource(R.string.ui_actions_document_info),
@@ -183,7 +183,7 @@ private fun rowShare(label: String, onClick: () -> Unit): RowShare =
  * Start over (paused).
  */
 @Composable
-private fun TranscribeRows(row: TranscribeRowUi, onAction: (NoteAction) -> Unit) {
+private fun TranscribeRows(row: TranscribeRowUi, stopBusy: Boolean, onAction: (NoteAction) -> Unit) {
     when (row) {
         TranscribeRowUi.Transcribe -> SheetActionRow(
             label = stringResource(R.string.ui_action_transcribe),
@@ -211,9 +211,10 @@ private fun TranscribeRows(row: TranscribeRowUi, onAction: (NoteAction) -> Unit)
             enabled = false,
         )
         TranscribeRowUi.Stop -> SheetActionRow(
-            label = stringResource(R.string.ui_action_stop_keep_progress),
+            label = stringResource(R.string.ui_tx_stop_keep),
             glyph = Glyph.Pause,
             onClick = { onAction(NoteAction.STOP) },
+            busy = stopBusy,
         )
         TranscribeRowUi.RemoveFromQueue -> SheetActionRow(
             label = stringResource(R.string.ui_action_remove_from_queue),

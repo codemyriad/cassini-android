@@ -126,7 +126,7 @@ fun ProcessingCard(
         // The block button is 44 dp drawn in a 48 dp layout: 2 dp less on each side keeps the board's 12 dp gaps.
         Spacer(Modifier.height(10.dp))
         SecondaryButton(
-            text = stringResource(R.string.ui_action_stop_keep_progress),
+            text = stringResource(R.string.ui_tx_stop_keep),
             onClick = onStop,
             size = SecondaryButtonSize.Block,
             busy = stopBusy,

@@ -11,6 +11,7 @@ import io.codemyriad.cassini.core.library.SearchFilters
 import io.codemyriad.cassini.data.db.LibraryRow
 import io.codemyriad.cassini.data.db.NoteDetails
 import io.codemyriad.cassini.data.db.SearchRow
+import io.codemyriad.cassini.engine.job.JobPhase
 import io.codemyriad.cassini.nav.ModelDownloadKey
 import io.codemyriad.cassini.nav.NoteKey
 import io.codemyriad.cassini.nav.NoteStart
@@ -278,7 +279,10 @@ class LibraryViewModel(
             results = mapped.results,
             snackbar = snackbar,
             sheet = details?.let {
-                LibrarySheet.Actions(LibraryMapping.actions(it, context.activeNoteId, now, zone, live.voiceModelReady))
+                val stopBusy = live.processing.notes[it.note.id]?.phase is JobPhase.Stopping
+                LibrarySheet.Actions(
+                    LibraryMapping.actions(it, context.activeNoteId, now, zone, live.voiceModelReady, stopBusy),
+                )
             },
             dialog = dialog,
         )
@@ -433,7 +437,7 @@ class LibraryViewModel(
             }
             NoteAction.STOP -> {
                 closeSheet()
-                ports.stop(id)
+                if (ports.processing.first().notes[id]?.phase !is JobPhase.Stopping) ports.stop(id)
             }
             NoteAction.REMOVE_FROM_QUEUE -> {
                 closeSheet()

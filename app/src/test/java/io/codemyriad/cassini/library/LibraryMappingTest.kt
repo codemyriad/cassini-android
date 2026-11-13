@@ -33,6 +33,7 @@ import io.codemyriad.cassini.ui.library.ProgressBannerUi
 import io.codemyriad.cassini.ui.library.ProgressLine
 import io.codemyriad.cassini.ui.library.RecordingPillUi
 import io.codemyriad.cassini.ui.note.DocumentKindUi
+import io.codemyriad.cassini.ui.note.NoteAction
 import io.codemyriad.cassini.ui.note.TranscribeRowUi
 import kotlinx.collections.immutable.persistentListOf
 import org.junit.Assert.assertEquals
@@ -383,6 +384,9 @@ class LibraryMappingTest {
             val job = plain.copy(job = jobOf("p", state))
             val ui = LibraryMapping.actions(job, null, NOW, ROME, voiceModelReady = true)
             assertEquals(state.name, row, ui.transcribeRow)
+            assertNull(state.name, ui.busyRow)
+            val stopping = LibraryMapping.actions(job, null, NOW, ROME, voiceModelReady = true, stopBusy = true)
+            assertEquals(state.name, NoteAction.STOP.takeIf { state == JobState.RUNNING }, stopping.busyRow)
         }
 
         val unreadable = details(docRow("u", DocumentState.UNREADABLE))

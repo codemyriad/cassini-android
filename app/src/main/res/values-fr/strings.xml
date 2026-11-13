@@ -63,7 +63,6 @@
     <string name="notif_time_minutes_range">%1$d–%2$d min</string>
     <string name="notif_time_hours">%1$d h</string>
     <string name="notif_time_hours_minutes">%1$d h %2$d min</string>
-    <string name="notif_action_stop">Arrêter</string>
     <string name="notif_action_open">Ouvrir</string>
     <string name="notif_action_cancel">Annuler</string>
     <string name="notif_action_resume">Reprendre</string>

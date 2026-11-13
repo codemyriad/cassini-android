@@ -63,6 +63,11 @@
     <string name="ui_tx_audio_done">Audio traité</string>
     <string name="ui_tx_audio_done_value">%1$s sur %2$s</string>
     <string name="ui_tx_time_left">Temps restant</string>
+    <plurals name="ui_tx_time_left_value">
+        <item quantity="one">Environ %1$s min</item>
+        <item quantity="many">Environ %1$s min</item>
+        <item quantity="other">Environ %1$s min</item>
+    </plurals>
     <string name="ui_tx_words_so_far">Mots jusqu’ici</string>
     <string name="ui_tx_battery_finish">Batterie à la fin</string>
     <string name="ui_tx_suggestion_question">Est-ce %1$s ?</string>

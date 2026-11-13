@@ -110,12 +110,15 @@ private fun StatusDetails(progress: ProcessingCardUi, onDetails: () -> Unit, mod
 private fun StatusStop(stopBusy: Boolean, onStop: () -> Unit) {
     val c = CassiniTheme.colors
     val stop = stringResource(R.string.ui_tx_stop_keep)
+    val saving = stringResource(R.string.ui_badge_saving)
     TextButton(
         onClick = onStop,
         contentPadding = PaddingValues(0.dp),
         enabled = !stopBusy,
-        modifier = Modifier.heightIn(min = 48.dp).widthIn(min = 48.dp).semantics { contentDescription = stop }
-            .testTag("transcribing-stop"),
+        modifier = Modifier.heightIn(min = 48.dp).widthIn(min = 48.dp).semantics {
+            contentDescription = stop
+            if (stopBusy) stateDescription = saving
+        }.testTag("transcribing-stop"),
     ) {
         androidx.compose.foundation.layout.Box(contentAlignment = Alignment.Center) {
             Text(

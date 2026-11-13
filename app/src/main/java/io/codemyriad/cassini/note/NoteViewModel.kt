@@ -438,7 +438,7 @@ class NoteViewModel(
             search = ui.search?.let { query ->
                 TranscriptSearchUi(query, matches, ui.current.coerceIn(0, (matches.size - 1).coerceAtLeast(0)))
             },
-            sheet = sheet(details, live, ui, now),
+            sheet = sheet(details, mode, live, ui, now),
             dialog = ui.dialog,
             notificationsOff = live.facts.notificationsOff,
             snackbar = ui.snackbar,
@@ -541,13 +541,14 @@ class NoteViewModel(
         return BannerSpec(kind)
     }
 
-    private fun sheet(details: NoteDetails, live: Live, ui: Local, now: Instant): NoteSheet? =
+    private fun sheet(details: NoteDetails, mode: NoteMode, live: Live, ui: Local, now: Instant): NoteSheet? =
         when (ui.sheet) {
             null -> null
             SheetKind.ACTIONS -> {
                 val active = activeNoteId(live.recording)
-                val actions = LibraryMapping.actions(details, active, now, clock.zone, live.voiceModelReady)
-                NoteSheet.Actions(actions.copy(busyRow = ui.busyRow))
+                val stopBusy = (mode as? NoteMode.Processing)?.stopBusy == true
+                val actions = LibraryMapping.actions(details, active, now, clock.zone, live.voiceModelReady, stopBusy)
+                NoteSheet.Actions(if (ui.busyRow != null) actions.copy(busyRow = ui.busyRow) else actions)
             }
             SheetKind.VERSIONS -> NoteSheet.Versions(NoteMapping.versions(details, now, clock.zone))
             SheetKind.SUBTITLES -> NoteSheet.SubtitleFormat
@@ -594,7 +595,7 @@ class NoteViewModel(
         when (event) {
             NoteEvent.Back -> emit(NoteEffect.Close)
             NoteEvent.More -> openSheet(SheetKind.ACTIONS)
-            NoteEvent.Stop -> ports.stop(noteId)
+            NoteEvent.Stop -> if (core.value?.job?.phase !is JobPhase.Stopping) ports.stop(noteId)
             NoteEvent.RemoveFromQueue -> launch { ports.dequeue(noteId) }
             is NoteEvent.WordTap -> wordTap(event.word)
             is NoteEvent.PlayTurn -> launch { playTurn(event.turnId) }
@@ -891,7 +892,7 @@ class NoteViewModel(
             }
             NoteAction.STOP -> {
                 closeSheet()
-                ports.stop(noteId)
+                if (core.value?.job?.phase !is JobPhase.Stopping) ports.stop(noteId)
             }
             NoteAction.REMOVE_FROM_QUEUE -> {
                 closeSheet()
