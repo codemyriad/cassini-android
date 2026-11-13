@@ -6,8 +6,10 @@ package io.codemyriad.cassini.ui.recording
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -63,8 +65,8 @@ import io.codemyriad.cassini.ui.theme.LightColors
  * The Recording screen (board 01, features.md section 2; ui.md section 8). It is dark in both app themes: every
  * colour comes from `CassiniTheme.recording`, and the banner keeps its light tones.
  *
- * The editable title follows the status/format header. Timer, waveform and space hint share the remaining area;
- * that area scrolls in a short window so the capture controls remain visible. Stop is the centre action,
+ * The editable title follows the status/format header inside the scrolling middle viewport. Title, banners,
+ * timer, waveform and space hint scroll together so the pinned header and capture controls remain visible. Stop is the centre action,
  * All meetings is on the left and labelled Pause/Resume is on the right (L-48/L-49).
  *
  * The header chevron sends [RecordingEvent.Minimise]: the recording continues. System back is not handled here: the
@@ -92,6 +94,37 @@ fun RecordingScreen(
             .padding(start = 16.dp, top = 6.dp, end = 16.dp, bottom = 34.dp),
     ) {
         RecordingHeader(state, onEvent)
+        RecordingMiddle(state, onEvent, Modifier.weight(1f).fillMaxWidth())
+        val capturing = state.phase == RecordingPhase.Recording || state.phase == RecordingPhase.Paused
+        RecordingControls(
+            paused = state.phase == RecordingPhase.Paused,
+            onLibrary = { onEvent(RecordingEvent.OpenLibrary) },
+            onPauseResume = { onEvent(RecordingEvent.PauseResume) },
+            onFinish = { onEvent(RecordingEvent.Finish) },
+            captureEnabled = capturing,
+        )
+    }
+}
+
+/** Title, alerts and meter share the bounded space between the pinned header and controls. */
+@Composable
+private fun RecordingMiddle(state: RecordingUiState, onEvent: (RecordingEvent) -> Unit, modifier: Modifier) {
+    BoxWithConstraints(modifier) {
+        val viewportHeight = maxHeight
+        Column(
+            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).heightIn(min = viewportHeight),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            RecordingTitleAndBanner(state, onEvent)
+            RecordingMeter(state)
+            Spacer(Modifier.height(0.dp))
+        }
+    }
+}
+
+@Composable
+private fun RecordingTitleAndBanner(state: RecordingUiState, onEvent: (RecordingEvent) -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
         TitleField(state.title, onTitle = { onEvent(RecordingEvent.Title(it)) })
         state.banner?.let { spec ->
             Banner(
@@ -109,31 +142,26 @@ fun RecordingScreen(
                 colors = LightColors,
             )
         }
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterVertically),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            RecordingTimer(state.elapsedMs)
-            Waveform(state.levels, running = state.phase == RecordingPhase.Recording)
-            Text(
-                text = caption(state),
-                modifier = Modifier.widthIn(max = 280.dp),
-                style = CassiniTheme.type.body14,
-                color = rec.text2,
-                textAlign = TextAlign.Center,
-            )
-        }
-        val capturing = state.phase == RecordingPhase.Recording || state.phase == RecordingPhase.Paused
-        RecordingControls(
-            paused = state.phase == RecordingPhase.Paused,
-            onLibrary = { onEvent(RecordingEvent.OpenLibrary) },
-            onPauseResume = { onEvent(RecordingEvent.PauseResume) },
-            onFinish = { onEvent(RecordingEvent.Finish) },
-            captureEnabled = capturing,
+    }
+}
+
+/** Symmetric padding supplies a scrolling gap without moving the centred meter on tall windows. */
+@Composable
+private fun RecordingMeter(state: RecordingUiState) {
+    val rec = CassiniTheme.recording
+    Column(
+        Modifier.fillMaxWidth().padding(vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        RecordingTimer(state.elapsedMs)
+        Waveform(state.levels, running = state.phase == RecordingPhase.Recording)
+        Text(
+            text = caption(state),
+            modifier = Modifier.widthIn(max = 280.dp),
+            style = CassiniTheme.type.body14,
+            color = rec.text2,
+            textAlign = TextAlign.Center,
         )
     }
 }
