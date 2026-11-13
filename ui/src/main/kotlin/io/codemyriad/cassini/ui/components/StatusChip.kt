@@ -55,7 +55,9 @@ fun StatusChip(text: String, kind: StatusBadgeKind, modifier: Modifier = Modifie
         verticalAlignment = Alignment.CenterVertically,
     ) {
         BadgeGlyph(kind, if (kind == StatusBadgeKind.Transcribing) c.accent else foreground)
-        Text(text, style = CassiniTheme.type.chip, color = foreground, maxLines = 1)
+        // Keep the exact catalog label at larger font sizes or on narrow phones. The 22dp metric is a minimum;
+        // a multi-line label grows the pill instead of clipping the sub-minute or localized status.
+        Text(text, style = CassiniTheme.type.chip, color = foreground)
     }
 }
 

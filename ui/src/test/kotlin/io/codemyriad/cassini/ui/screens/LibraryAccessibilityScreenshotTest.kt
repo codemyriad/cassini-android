@@ -7,6 +7,7 @@ import io.codemyriad.cassini.ui.format.DayLabel
 import io.codemyriad.cassini.ui.library.DaySection
 import io.codemyriad.cassini.ui.library.LibraryScreen
 import kotlinx.collections.immutable.persistentListOf
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.robolectric.annotation.Config
 
@@ -34,5 +35,10 @@ class LibraryAccessibilityScreenshotTest : BoardTest() {
                 onEvent = {},
             )
         }
+        val clippedStatuses = cutTexts().filter {
+            it.startsWith("Transcribing") || it.startsWith("Paused at") ||
+                it.startsWith("Couldn’t transcribe") || it.startsWith("Resume") || it.startsWith("Try again")
+        }
+        assertTrue("Status and recovery copy must fit: $clippedStatuses", clippedStatuses.isEmpty())
     }
 }

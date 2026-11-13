@@ -2,6 +2,7 @@ package io.codemyriad.cassini.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -9,10 +10,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import io.codemyriad.cassini.ui.theme.CassiniTypography
 import io.codemyriad.cassini.ui.theme.DarkColors
@@ -65,6 +70,53 @@ class Phase1BadgeTest {
                 (0 until pixels.height).any { y -> pixels[x, y].toArgb() == colors.accent.toArgb() }
             }
             assertTrue("Transcribing spinner must contain opaque accent pixels ($value)", hasAccent)
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS", fontScale = 1.5f)
+    fun largeEnglishLabelsFit() = largeLabelsFit()
+
+    @Test
+    @Config(qualifiers = "it-rIT", fontScale = 1.5f)
+    fun largeItalianLabelsFit() = largeLabelsFit()
+
+    @Test
+    @Config(qualifiers = "fr-rFR", fontScale = 1.5f)
+    fun largeFrenchLabelsFit() = largeLabelsFit()
+
+    @Test
+    @Config(qualifiers = "es-rES", fontScale = 1.5f)
+    fun largeSpanishLabelsFit() = largeLabelsFit()
+
+    @Test
+    @Config(qualifiers = "pt-rBR", fontScale = 1.5f)
+    fun largeBrazilianPortugueseLabelsFit() = largeLabelsFit()
+
+    @Test
+    @Config(qualifiers = "pt-rPT", fontScale = 1.5f)
+    fun largeEuropeanPortugueseLabelsFit() = largeLabelsFit()
+
+    private fun largeLabelsFit() {
+        var kind by mutableStateOf(StatusBadgeKind.Transcribing)
+        var label = ""
+        rule.setContent {
+            CassiniTheme {
+                label = statusBadgeText(kind, minutes = 0, positionMs = 60_000)
+                Box(Modifier.width(144.dp)) { StatusChip(label, kind) }
+            }
+        }
+        for (value in listOf(StatusBadgeKind.Transcribing, StatusBadgeKind.Paused, StatusBadgeKind.Unreadable)) {
+            rule.runOnIdle { kind = value }
+            rule.waitForIdle()
+            val layouts = mutableListOf<TextLayoutResult>()
+            rule.onNodeWithText(label).fetchSemanticsNode().config[SemanticsActions.GetTextLayoutResult]
+                .action!!.invoke(layouts)
+            val layout = layouts.single()
+            assertTrue("Full catalog label must fit: $label", !layout.multiParagraph.didExceedMaxLines)
+            for (line in 0 until layout.lineCount) {
+                assertTrue(label, layout.getLineRight(line) - layout.getLineLeft(line) <= layout.size.width + 1)
+            }
         }
     }
 }

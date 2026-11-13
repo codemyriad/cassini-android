@@ -6,6 +6,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
@@ -70,14 +71,17 @@ private fun RecoveryAction(status: RowStatus, title: String, onAction: (NoteRowA
         if (action == NoteRowAction.RESUME) R.string.ui_row_resume_description else R.string.ui_row_try_again_description,
         title,
     )
-    Text(
-        text,
-        Modifier.clickable(role = Role.Button, onClick = { onAction(action) })
+    Box(
+        Modifier.touchTarget().clickable(role = Role.Button, onClick = { onAction(action) })
             .semantics { contentDescription = description },
-        style = CassiniTheme.type.caption.copy(fontWeight = FontWeight.W600),
-        color = CassiniTheme.colors.ink,
-        maxLines = 1,
-    )
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Text(
+            text,
+            style = CassiniTheme.type.caption.copy(fontWeight = FontWeight.W600),
+            color = CassiniTheme.colors.ink,
+        )
+    }
 }
 
 /** A finished row keeps its spoken state even though the visual status chip is gone (L-52). */
