@@ -5,6 +5,7 @@ package io.codemyriad.cassini.ui.library
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -75,6 +76,7 @@ private val BarTopPadding = LibraryActionBarMetrics.topPadding
 
 /**
  * Phase 1 Library: a native pinned search bar with a hidden All meetings heading, then a scrolling list.
+ * Entry focus stays on the screen until the user enters Search (Navigation3 otherwise focuses the field).
  * Search filters scroll with results; snippets belong only to search. Recording and import notices remain,
  * while transcription is represented by its own row. The process-owned transfer dialogs stay in LibraryRoute.
  * Import/Record and the snackbar float above the measured list bottom inset. Empty search also handles Back.
@@ -106,7 +108,7 @@ fun LibraryScreen(
     // The keyboard covers the bottom bar: the results end above whichever is taller (ui.md section 9).
     val listBottom = max(bar, WindowInsets.ime.asPaddingValues().calculateBottomPadding())
     Box(
-        modifier
+        modifier.focusable()
             .fillMaxSize()
             .background(CassiniTheme.colors.bg)
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
