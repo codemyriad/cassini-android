@@ -17,6 +17,9 @@
     "version": "2.0.21",
     "pom": {
       "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-compiler-embeddable/2.0.21/kotlin-compiler-embeddable-2.0.21.pom",
+      "mirrors": [
+        "https://maven-central.storage-download.googleapis.com/maven2/org/jetbrains/kotlin/kotlin-compiler-embeddable/2.0.21/kotlin-compiler-embeddable-2.0.21.pom"
+      ],
       "size": 2666,
       "sha256": "bd4656a46ec418252e5bc5e1c20eb2029fb2a8e0e3cc94eeddfac7e87c8cd5b6"
     }
