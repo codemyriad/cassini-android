@@ -97,7 +97,6 @@
     <string name="notif_rec_other_app">In pausa — un\'altra app sta usando l\'audio</string>
     <string name="notif_rec_storage_low">Spazio quasi esaurito — circa %1$d min rimasti</string>
     <string name="notif_rec_file_low">File della registrazione quasi pieno — circa %1$d min rimasti</string>
-    <string name="notif_action_pause">Pausa</string>
     <string name="notif_rec_stopped_title">Registrazione interrotta</string>
     <string name="notif_rec_stopped_text">Meno di 200 MB liberi. La registrazione fin qui è salvata.</string>
     <string name="notif_rec_file_full_text">Cassini chiude le registrazioni M4A a 1 GB, circa 74 ore. La registrazione fin qui è salvata. Avvia una nuova registrazione per continuare.</string>

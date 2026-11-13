@@ -54,7 +54,7 @@ class RecordingNotifications(context: Context) {
 
     /**
      * The ongoing notification: "Recording" with a chronometer that starts [elapsedMs] ago, or "Recording paused"
-     * with "Paused at 24:07"; Pause or Resume, and Finish; the content opens the Recording screen.
+     * with "Paused at 24:07"; Pause or Resume, and Stop; the content opens the Recording screen.
      */
     fun ongoing(state: RecordingState, elapsedMs: Long): Notification {
         val res = localized()
@@ -83,11 +83,15 @@ class RecordingNotifications(context: Context) {
         content.pausedAtMs?.let { builder.setSubText(res.getString(R.string.notif_rec_paused_at, clock(it))) }
         if (state is RecordingState.Active) {
             if (state.pause == null) {
-                builder.addAction(0, res.getString(R.string.notif_action_pause), action(RecordingService.ACTION_PAUSE))
+                builder.addAction(
+                    0,
+                    res.getString(UiR.string.ui_recording_pause_label),
+                    action(RecordingService.ACTION_PAUSE),
+                )
             } else {
                 builder.addAction(
                     0,
-                    res.getString(R.string.notif_action_resume),
+                    res.getString(UiR.string.ui_recording_resume_label),
                     action(RecordingService.ACTION_RESUME),
                 )
             }

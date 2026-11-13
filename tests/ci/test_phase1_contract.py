@@ -87,6 +87,39 @@ class Phase1ContractTest(unittest.TestCase):
                 self.assertIsNotNone(actual)
                 self.assertEqual(text, actual.text)
 
+    def test_recording_controls_and_notification_actions_use_the_catalog_in_every_locale(self):
+        entries = {
+            entry['id']: entry
+            for entry in json.loads((self.root / PIN.VENDOR / 'strings.json').read_text())['entries']
+        }
+        expected_resources = {
+            'ui_recording_finish': 'common.stop',
+            'ui_recording_pause_label': 'player.pause',
+            'ui_recording_resume_label': 'phone.row.resume',
+            'ui_recording_library': 'library.allMeetings',
+            'ui_recording_minimise': 'library.backToAllMeetings',
+        }
+        outputs = dict(STRINGS.generated(self.root))
+        for locale, directory in STRINGS.LOCALES.items():
+            with self.subTest(locale=locale):
+                root = ET.fromstring(next(v for path, v in outputs.items() if path.parent.name == directory))
+                ui_handwritten = (ROOT / 'ui/src/main/res' / directory / 'strings.xml').read_text()
+                app_handwritten = (ROOT / 'app/src/main/res' / directory / 'strings.xml').read_text()
+                for resource_name, catalog_id in expected_resources.items():
+                    actual = root.find(f"string[@name='{resource_name}']")
+                    entry = entries[catalog_id]
+                    text = entry['en'] if locale == 'en' else entry['l10n'][locale]['text']
+                    self.assertIsNotNone(actual, f'{resource_name} must be generated in {locale}')
+                    self.assertEqual(text, actual.text)
+                    self.assertNotIn(f'name="{resource_name}"', ui_handwritten)
+                for retired in ('notif_action_finish', 'notif_action_pause'):
+                    self.assertNotIn(f'name="{retired}"', app_handwritten)
+        notifications = (
+            ROOT / 'app/src/main/java/io/codemyriad/cassini/recording/RecordingNotifications.kt'
+        ).read_text()
+        for shared_action in ('ui_recording_pause_label', 'ui_recording_resume_label', 'ui_recording_finish'):
+            self.assertIn(f'UiR.string.{shared_action}', notifications)
+
     def test_compact_eta_is_a_catalog_plural_in_every_locale(self):
         catalog = json.loads((self.root / PIN.VENDOR / 'strings.json').read_text())
         entry = next(e for e in catalog['entries'] if e['id'] == 'transcribing.eta.minutes')

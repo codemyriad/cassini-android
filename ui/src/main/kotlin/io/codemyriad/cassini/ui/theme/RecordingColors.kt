@@ -29,7 +29,7 @@ class RecordingColors(
     /** The Pause button and the glyph on it. */
     val pauseFill: Color,
     val onPause: Color,
-    /** The Finish button. */
+    /** The Stop button. */
     val finish: Color,
 )
 
