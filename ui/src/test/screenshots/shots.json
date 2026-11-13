@@ -263,5 +263,9 @@
   {"screen": "recording-short-large-banner", "label": "Recording banner · short window · 2x text", "scheme": "light", "lang": "en", "device": "phone", "path": "adaptive/recording-short-large-banner.png", "rendered_scheme": "dark"},
   {"screen": "recording-short-large-feedback", "label": "Recording feedback · short window · 2x text", "scheme": "light", "lang": "en", "device": "phone", "path": "adaptive/recording-short-large-feedback.png", "rendered_scheme": "dark"},
   {"screen": "recording-short-large-banner", "label": "Recording banner · short window · 2x text", "scheme": "dark", "lang": "en", "device": "phone", "path": "adaptive-dark/recording-short-large-banner.png", "rendered_scheme": "dark"},
-  {"screen": "recording-short-large-feedback", "label": "Recording feedback · short window · 2x text", "scheme": "dark", "lang": "en", "device": "phone", "path": "adaptive-dark/recording-short-large-feedback.png", "rendered_scheme": "dark"}
+  {"screen": "recording-short-large-feedback", "label": "Recording feedback · short window · 2x text", "scheme": "dark", "lang": "en", "device": "phone", "path": "adaptive-dark/recording-short-large-feedback.png", "rendered_scheme": "dark"},
+  {"screen": "transcribing-scrolled", "label": "Transcribing scrolled", "scheme": "light", "lang": "en", "device": "phone", "path": "light/16-transcribing-scrolled.png"},
+  {"screen": "transcribing-scrolled", "label": "Transcribing scrolled", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/16-transcribing-scrolled.png"},
+  {"screen": "transcribing-details", "label": "Transcribing details", "scheme": "light", "lang": "en", "device": "phone", "path": "light/17-transcribing-details.png"},
+  {"screen": "transcribing-details", "label": "Transcribing details", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/17-transcribing-details.png"}
 ]}
