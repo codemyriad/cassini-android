@@ -35,7 +35,6 @@
     <string name="ui_action_continue">Continua</string>
     <string name="ui_action_remove_from_queue">Togli dalla coda</string>
     <string name="ui_action_stop_keep_progress">Ferma e conserva i progressi</string>
-    <string name="ui_back_to_library">Torna alla libreria</string>
     <string name="ui_back_to_settings">Torna alle impostazioni</string>
     <string name="ui_back">Indietro</string>
     <string name="ui_title_label">Titolo</string>
@@ -127,18 +126,12 @@
     </plurals>
 
     <!-- Libreria. -->
-    <string name="ui_library_title">Note</string>
     <string name="ui_library_trash">Cestino</string>
     <string name="ui_library_settings">Impostazioni</string>
-    <string name="ui_library_search_placeholder">Cerca nei titoli e in ciò che è stato detto</string>
     <string name="ui_search_clear">Cancella la ricerca</string>
-    <string name="ui_library_privacy">La trascrizione avviene su questo telefono.</string>
     <string name="ui_library_recording_card">Registrazione · %1$s</string>
     <string name="ui_library_recording_paused_card">Registrazione in pausa · %1$s</string>
     <string name="ui_library_recording_tap">Tocca per tornare</string>
-    <string name="ui_progress_transcribing">Trascrizione di %1$s</string>
-    <string name="ui_progress_getting_ready">Preparazione per trascrivere %1$s</string>
-    <string name="ui_progress_downloading_models">Download dei modelli</string>
     <string name="ui_library_import">Importa audio</string>
     <string name="ui_library_record">Registra</string>
     <string name="ui_library_record_description">Registra una nuova nota</string>
@@ -171,7 +164,6 @@
     <string name="ui_row_try_again_description">Riprova a trascrivere %1$s</string>
 
     <!-- Registrazione. -->
-    <string name="ui_recording_minimise">Riduci nella libreria (la registrazione continua)</string>
     <string name="ui_recording_status_recording">Registrazione in corso</string>
     <string name="ui_recording_status_paused">In pausa</string>
     <string name="ui_recording_status_label">Stato della registrazione</string>
@@ -181,7 +173,6 @@
     <string name="ui_recording_waveform">Livello del microfono, ultimi 7 secondi</string>
     <string name="ui_recording_hint">Continua a registrare a schermo spento o in un’altra app.</string>
     <string name="ui_recording_hint_space">Spazio per circa %1$s ancora.</string>
-    <string name="ui_recording_library">Libreria</string>
     <string name="ui_recording_pause">Metti in pausa la registrazione</string>
     <string name="ui_recording_resume">Riprendi la registrazione</string>
     <string name="ui_recording_finish">Termina</string>

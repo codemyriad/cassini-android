@@ -157,11 +157,11 @@ class AcceptanceWalkTest {
         language?.let(::useLanguage)
         val notes = seed()
 
-        // 00 Library: the progress banner and the queued row.
+        // 00 All meetings: ongoing work stays in its row, without a separate progress/privacy card.
         library()
-        see(rule.text(UiR.string.ui_progress_transcribing, WEEKLY))
+        see(WEEKLY)
         see(rule.text(UiR.string.ui_badge_queued))
-        see(rule.text(UiR.string.ui_library_privacy))
+        see(rule.text(UiR.string.ui_all_meetings))
         shot("00-library")
 
         recording()
@@ -460,7 +460,7 @@ class AcceptanceWalkTest {
         shot("10-states-downloading")
         ScriptedModels.release()
         see(rule.text(UiR.string.ui_banner_dl_checking_title, CHECK_PERCENT), timeoutMs = Flows.JOB_MS)
-        see(rule.text(UiR.string.ui_progress_downloading_models))
+        rule.waitShown(hasContentDescription(rule.text(UiR.string.ui_library_record_description)))
         shot("10-states-checking")
         ScriptedModels.release()
 

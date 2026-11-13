@@ -61,8 +61,8 @@ class ModeBehaviourTest {
         val events = mutableListOf<RecordingEvent>()
         setThemed { RecordingScreen(BoardFixtures.recording, onEvent = { events += it }) }
         rule.runOnIdle { assertEquals(false, back.hasEnabledCallbacks()) }
-        rule.onNodeWithContentDescription("Minimise to library (recording continues)").performClick()
-        rule.onNodeWithText("Library").performClick()
+        rule.onNodeWithContentDescription("Back to all meetings").performClick()
+        rule.onNodeWithText("All meetings").performClick()
         rule.onNodeWithContentDescription("Pause recording").performClick()
         rule.onNodeWithText("Finish").performClick()
         rule.runOnIdle {

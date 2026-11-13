@@ -47,6 +47,28 @@ import java.time.LocalTime
 class LibraryMappingTest {
     private val context = RowContext()
 
+    @Test fun listRowsDropTheStoredQuoteWhileSearchKeepsItsMatchedSnippet() {
+        val stored = docRow("quote", DocumentState.OK).copy(preview = "A stored transcript quote")
+        assertNull(LibraryMapping.row(stored, context, java.time.ZoneOffset.UTC).preview)
+        val hit = LibraryMapping.Hit(day = DayLabel.Today, snippet = Highlighted("A matching snippet"))
+        assertEquals(hit.snippet, LibraryMapping.row(stored, context, java.time.ZoneOffset.UTC, hit).preview)
+    }
+
+    @Test fun rowEtaBelongsOnlyToTheRunningMeetingAndChangesAtMinuteBoundaries() {
+        val running = RowContext(runningNoteId = "running", transcriptionMinutes = 4)
+        val activeRow = docRow("running", DocumentState.OK)
+        val otherRow = docRow("other", DocumentState.OK)
+        val zone = java.time.ZoneOffset.UTC
+        assertEquals(4L, LibraryMapping.row(activeRow, running, zone).transcriptionMinutes)
+        assertNull(LibraryMapping.row(otherRow, running, zone).transcriptionMinutes)
+        assertNull(LibraryMapping.badgeMinutes(TimeLeftUi.Calculating))
+        assertNull(LibraryMapping.badgeMinutes(TimeLeftUi.Finishing))
+        assertEquals(0L, LibraryMapping.badgeMinutes(TimeLeftUi.Range(1, 59_999)))
+        assertEquals(1L, LibraryMapping.badgeMinutes(TimeLeftUi.Range(1, 60_000)))
+        assertEquals(2L, LibraryMapping.badgeMinutes(TimeLeftUi.Range(1, 60_001)))
+        assertEquals(2L, LibraryMapping.badgeMinutes(TimeLeftUi.Range(1, 119_999)))
+    }
+
     @Test fun mixedUtcAndFloatingLabelsSortByRecordingTimeInLibraryAndSearch() {
         val zone = java.time.ZoneId.of("UTC")
         val now = java.time.Instant.parse("2026-11-12T12:00:00Z")

@@ -20,4 +20,21 @@
     <string name="ui_badge_unplayable">Can’t play</string>
     <string name="ui_badge_unreadable">Can’t read transcript</string>
     <string name="ui_badge_newer">Newer format</string>
+    <string name="ui_all_meetings">All meetings</string>
+    <string name="ui_back_to_library">Back to all meetings</string>
+    <string name="ui_recording_library">All meetings</string>
+    <string name="ui_recording_minimise">Back to all meetings</string>
+    <string name="ui_library_search_placeholder">Search</string>
+    <string name="ui_library_search_description">Search every meeting</string>
+    <plurals name="ui_row_speaker_count">
+        <item quantity="one">%1$s speaker</item>
+        <item quantity="other">%1$s speakers</item>
+    </plurals>
+    <string name="ui_row_no_speech">No speech</string>
+    <string name="ui_row_resume">Resume</string>
+    <string name="ui_row_try_again">Try again</string>
+    <plurals name="ui_search_meetings">
+        <item quantity="one">%1$s meeting</item>
+        <item quantity="other">%1$s meetings</item>
+    </plurals>
 </resources>

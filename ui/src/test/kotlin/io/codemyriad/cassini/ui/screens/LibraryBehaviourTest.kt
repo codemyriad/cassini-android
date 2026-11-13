@@ -191,8 +191,12 @@ class LibraryBehaviourTest {
         show(BoardFixtures.library)
         rule.onNodeWithContentDescription("Record a new note").performClick()
         rule.onNodeWithText("Import audio").performClick()
-        rule.onNodeWithText("Transcribing Weekly product sync", useUnmergedTree = true).performClick()
-        assertEvents(LibraryEvent.Record, LibraryEvent.Import, LibraryEvent.OpenProgress)
+        rule.onNode(hasContentDescription("Weekly product sync,", substring = true)).performClick()
+        assertEvents(
+            LibraryEvent.Record,
+            LibraryEvent.Import,
+            LibraryEvent.OpenNote(BoardFixtures.library.sections.first().rows.first().id),
+        )
     }
 
     @Test fun duringARecordingTheCardAndTheButtonReturnToIt() {
@@ -303,8 +307,8 @@ class LibraryBehaviourTest {
 
     /** The index of the last list item: header, search, activity items, the list top spacer, headers and rows. */
     private fun lastIndex(state: LibraryUiState): Int {
-        val activity = listOfNotNull(state.recording, state.progress).size + state.banners.size
+        val activity = listOfNotNull(state.recording).size + state.banners.size
         val rows = state.sections.sumOf { it.rows.size + 1 }
-        return 2 + activity + 1 + rows - 1
+        return activity + 1 + rows - 1
     }
 }

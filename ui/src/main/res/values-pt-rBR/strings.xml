@@ -35,7 +35,6 @@
     <string name="ui_action_continue">Continuar</string>
     <string name="ui_action_remove_from_queue">Remover da fila</string>
     <string name="ui_action_stop_keep_progress">Parar e manter o progresso</string>
-    <string name="ui_back_to_library">Voltar à biblioteca</string>
     <string name="ui_back_to_settings">Voltar às configurações</string>
     <string name="ui_back">Voltar</string>
     <string name="ui_title_label">Título</string>
@@ -128,18 +127,12 @@
     </plurals>
 
     <!-- Library (board 00, features.md section 1). -->
-    <string name="ui_library_title">Notas</string>
     <string name="ui_library_trash">Lixeira</string>
     <string name="ui_library_settings">Configurações</string>
-    <string name="ui_library_search_placeholder">Buscar títulos e o que foi dito</string>
     <string name="ui_search_clear">Limpar busca</string>
-    <string name="ui_library_privacy">A transcrição é feita neste celular.</string>
     <string name="ui_library_recording_card">Gravando · %1$s</string>
     <string name="ui_library_recording_paused_card">Gravação pausada · %1$s</string>
     <string name="ui_library_recording_tap">Toque para voltar</string>
-    <string name="ui_progress_transcribing">Transcrevendo %1$s</string>
-    <string name="ui_progress_getting_ready">Preparando para transcrever %1$s</string>
-    <string name="ui_progress_downloading_models">Baixando modelos</string>
     <string name="ui_library_import">Importar áudio</string>
     <string name="ui_library_record">Gravar</string>
     <string name="ui_library_record_description">Gravar uma nova nota</string>
@@ -173,7 +166,6 @@
     <string name="ui_row_try_again_description">Tentar transcrever %1$s de novo</string>
 
     <!-- Recording (board 01, features.md section 2). -->
-    <string name="ui_recording_minimise">Minimizar para a biblioteca (a gravação continua)</string>
     <string name="ui_recording_status_recording">Gravando</string>
     <string name="ui_recording_status_paused">Em pausa</string>
     <string name="ui_recording_status_label">Status da gravação</string>
@@ -183,7 +175,6 @@
     <string name="ui_recording_waveform">Nível do microfone, últimos 7 segundos</string>
     <string name="ui_recording_hint">Continua gravando com a tela desligada ou em outro app.</string>
     <string name="ui_recording_hint_space">Espaço para cerca de mais %1$s.</string>
-    <string name="ui_recording_library">Biblioteca</string>
     <string name="ui_recording_pause">Pausar gravação</string>
     <string name="ui_recording_resume">Retomar gravação</string>
     <string name="ui_recording_finish">Finalizar</string>

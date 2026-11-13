@@ -37,10 +37,6 @@ class TransferStringsTest {
                 val actual = resources.getString(IDS.getValue(id), "Ada")
                 assertEquals("$tag $id", wanted, actual)
             }
-            assertEquals(
-                resources.getString(R.string.ui_library_privacy),
-                resources.getString(R.string.ui_settings_models_footnote),
-            )
         }
     }
 
@@ -54,7 +50,7 @@ class TransferStringsTest {
             "settings.transfer.tooLarge" to R.string.ui_settings_transfer_too_large,
             "settings.transfer.unavailable" to R.string.ui_settings_transfer_unavailable,
             "settings.transfer.choice.failed" to R.string.ui_settings_transfer_choice_failed,
-            "android.privacy.processing" to R.string.ui_library_privacy,
+            "android.privacy.processing" to R.string.ui_settings_models_footnote,
             "android.speakers.rememberVoice.description" to R.string.ui_name_remember_body,
             "android.speakers.rememberVoice.description.unnamed" to R.string.ui_name_remember_body_unnamed,
             "android.savedVoices.privacy" to R.string.ui_voices_privacy,

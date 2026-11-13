@@ -45,6 +45,7 @@ data class RowContext(
     val activeNoteId: String? = null,
     val recordingElapsedMs: Long = 0,
     val runningNoteId: String? = null,
+    val transcriptionMinutes: Long? = null,
 )
 
 /**
@@ -53,6 +54,14 @@ data class RowContext(
  */
 @Suppress("TooManyFunctions") // one mapping per UiState part of the Library
 object LibraryMapping {
+    private const val MINUTE_MS = 60_000L
+
+    /** Quantize before the listing cache; progress ticks must not remap every Library row. */
+    fun badgeMinutes(eta: TimeLeftUi?): Long? {
+        val high = (eta as? TimeLeftUi.Range)?.highMs?.takeIf { it > 0 } ?: return null
+        return if (high < MINUTE_MS) 0 else high / MINUTE_MS + if (high % MINUTE_MS == 0L) 0 else 1
+    }
+
     /** The status chip of [row] (`NoteStatus.of`, first match wins) with its semantic values. */
     fun status(row: LibraryRow, context: RowContext): NoteStatusUi {
         val facts = NoteFacts(
@@ -95,8 +104,9 @@ object LibraryMapping {
             recordedLabel = row.recordingTime()?.label,
             day = hit?.day,
             status = status(row, context),
-            preview = if (hit != null) hit.snippet else storedPreview(row.preview),
+            preview = hit?.snippet,
             highlighted = row.id == context.runningNoteId || row.jobState == JobState.RUNNING,
+            transcriptionMinutes = context.transcriptionMinutes.takeIf { row.id == context.runningNoteId },
         )
     }
 

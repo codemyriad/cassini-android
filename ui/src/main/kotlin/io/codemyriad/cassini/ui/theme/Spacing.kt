@@ -36,5 +36,5 @@ object CassiniSpacing {
 object RecordShadow {
     val radius: Dp = 18.dp
     val offsetY: Dp = 6.dp
-    const val ALPHA: Float = 0.28f
+    const val ALPHA: Float = 0.30f
 }
