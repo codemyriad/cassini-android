@@ -49,6 +49,7 @@ data class NamingInput(
     val mergeTargets: List<MergeTargetUi> = emptyList(),
     val sealedVersions: MergeVersionsUi? = null,
     val canSample: Boolean = true,
+    val quote: String = "",
 ) {
     /** The stored name, or null for a placeholder speaker. */
     val namedLabel: String? get() = (label as? SpeakerNameUi.Named)?.text
@@ -63,7 +64,7 @@ data class NamingInput(
         print contentEquals other.print && printSeconds == other.printSeconds &&
         willHavePrint == other.willHavePrint && match == other.match && voices == other.voices &&
         voicesReadOnly == other.voicesReadOnly && voiceModelReady == other.voiceModelReady &&
-        mergeTargets == other.mergeTargets && sealedVersions == other.sealedVersions && canSample == other.canSample
+        mergeTargets == other.mergeTargets && sealedVersions == other.sealedVersions && canSample == other.canSample && quote == other.quote
 
     override fun hashCode(): Int = speakerId.hashCode() * HASH + label.hashCode()
 
@@ -263,6 +264,7 @@ object SpeakerNaming {
         return NameSheetUi(
             speakerId = input.speakerId,
             label = input.label,
+            quote = input.quote,
             tone = input.tone,
             speakingMs = input.speakingMs,
             canSample = input.sample != null && input.canSample,

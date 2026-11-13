@@ -280,26 +280,14 @@
     <string name="ui_name_speaks_for">Fala por %1$s nesta nota</string>
     <string name="ui_name_play_sample">Reproduzir uma amostra desta voz</string>
     <string name="ui_name_stop_sample">Parar a amostra</string>
-    <string name="ui_name_voices_ranked">Vozes salvas, mais parecidas primeiro</string>
-    <string name="ui_name_voices">Vozes salvas</string>
-    <string name="ui_name_likely">Provável</string>
     <string name="ui_name_show_all">Mostrar todas</string>
-    <string name="ui_name_same_person_saved">“%1$s” já é uma voz salva.</string>
-    <string name="ui_name_same_person_question">É a mesma pessoa?</string>
-    <string name="ui_name_same_person">Mesma pessoa</string>
-    <string name="ui_name_someone_else">Outra pessoa</string>
     <string name="ui_name_answer_first">Responda primeiro à pergunta acima</string>
     <string name="ui_name_rename_saved_saved_as">Esta voz está salva como “%1$s”.</string>
     <string name="ui_name_rename_saved_question">Renomear também a voz salva?</string>
     <string name="ui_name_rename_saved">Renomear voz salva</string>
     <string name="ui_name_not">Não é %1$s?</string>
-    <string name="ui_name_remember">Lembrar esta voz neste celular</string>
     <string name="ui_name_remember_body">Nas próximas notas, o Cassini vai nomear %1$s automaticamente.</string>
     <string name="ui_name_remember_body_unnamed">Nas próximas notas, o Cassini vai nomear esta pessoa automaticamente.</string>
-    <string name="ui_name_remember_too_little">Fala insuficiente para lembrar esta voz.</string>
-    <string name="ui_name_remember_no_model">O reconhecimento de vozes salvas ainda não está instalado.</string>
-    <string name="ui_name_merge_into">Mesclar com…</string>
-    <string name="ui_name_save">Salvar nome</string>
 
     <!-- Merge sheet and confirmation (features.md section 4, ui.md section 8). -->
     <string name="ui_merge_sheet_title">Mesclar %1$s com…</string>

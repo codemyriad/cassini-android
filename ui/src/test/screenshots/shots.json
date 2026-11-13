@@ -271,5 +271,9 @@
   {"screen": "variants-transcribing-checking", "label": "Variants transcribing checking", "scheme": "dark", "lang": "en", "device": "phone", "path": "variants-dark/transcribing-checking.png"},
   {"screen": "variants-transcribing-downloading", "label": "Variants transcribing downloading", "scheme": "dark", "lang": "en", "device": "phone", "path": "variants-dark/transcribing-downloading.png"},
   {"screen": "variants-transcribing-notifications-off", "label": "Variants transcribing notifications off", "scheme": "dark", "lang": "en", "device": "phone", "path": "variants-dark/transcribing-notifications-off.png"},
-  {"screen": "variants-transcribing-waiting", "label": "Variants transcribing waiting", "scheme": "dark", "lang": "en", "device": "phone", "path": "variants-dark/transcribing-waiting.png"}
+  {"screen": "variants-transcribing-waiting", "label": "Variants transcribing waiting", "scheme": "dark", "lang": "en", "device": "phone", "path": "variants-dark/transcribing-waiting.png"},
+  {"screen": "18-name-native", "label": "Name a speaker native sheet", "scheme": "light", "lang": "en", "device": "phone", "path": "light/18-name-native.png"},
+  {"screen": "18-name-native", "label": "Name a speaker native sheet", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/18-name-native.png"},
+  {"screen": "19-name-native-large", "label": "Name a speaker native sheet at 200 percent", "scheme": "light", "lang": "en", "device": "phone", "path": "light/19-name-native-large.png"},
+  {"screen": "19-name-native-large", "label": "Name a speaker native sheet at 200 percent", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/19-name-native-large.png"}
 ]}

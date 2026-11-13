@@ -304,26 +304,14 @@
     <string name="ui_name_speaks_for">Speaks for %1$s in this note</string>
     <string name="ui_name_play_sample">Play a sample of this voice</string>
     <string name="ui_name_stop_sample">Stop the sample</string>
-    <string name="ui_name_voices_ranked">Saved voices, closest first</string>
-    <string name="ui_name_voices">Saved voices</string>
-    <string name="ui_name_likely">Likely</string>
     <string name="ui_name_show_all">Show all</string>
-    <string name="ui_name_same_person_saved">“%1$s” is already a saved voice.</string>
-    <string name="ui_name_same_person_question">Is this the same person?</string>
-    <string name="ui_name_same_person">Same person</string>
-    <string name="ui_name_someone_else">Someone else</string>
     <string name="ui_name_answer_first">Answer the question above first</string>
     <string name="ui_name_rename_saved_saved_as">This voice is saved as “%1$s”.</string>
     <string name="ui_name_rename_saved_question">Also rename the saved voice?</string>
     <string name="ui_name_rename_saved">Rename saved voice</string>
     <string name="ui_name_not">Not %1$s?</string>
-    <string name="ui_name_remember">Remember this voice on this phone</string>
     <string name="ui_name_remember_body">Future notes will name %1$s automatically.</string>
     <string name="ui_name_remember_body_unnamed">Future notes will name this person automatically.</string>
-    <string name="ui_name_remember_too_little">Too little speech to remember this voice.</string>
-    <string name="ui_name_remember_no_model">Recognising saved voices isn’t installed yet.</string>
-    <string name="ui_name_merge_into">Merge into…</string>
-    <string name="ui_name_save">Save name</string>
 
     <!-- Merge sheet and confirmation (features.md section 4, ui.md section 8). -->
     <string name="ui_merge_sheet_title">Merge %1$s into…</string>

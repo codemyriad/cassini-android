@@ -275,26 +275,14 @@
     <string name="ui_name_speaks_for">Parla per %1$s in questa nota</string>
     <string name="ui_name_play_sample">Riproduci un campione di questa voce</string>
     <string name="ui_name_stop_sample">Ferma il campione</string>
-    <string name="ui_name_voices_ranked">Voci salvate, dalla più simile</string>
-    <string name="ui_name_voices">Voci salvate</string>
-    <string name="ui_name_likely">Probabile</string>
     <string name="ui_name_show_all">Mostra tutte</string>
-    <string name="ui_name_same_person_saved">“%1$s” è già una voce salvata.</string>
-    <string name="ui_name_same_person_question">È la stessa persona?</string>
-    <string name="ui_name_same_person">Stessa persona</string>
-    <string name="ui_name_someone_else">Un’altra persona</string>
     <string name="ui_name_answer_first">Prima rispondi alla domanda qui sopra</string>
     <string name="ui_name_rename_saved_saved_as">Questa voce è salvata come “%1$s”.</string>
     <string name="ui_name_rename_saved_question">Rinominare anche la voce salvata?</string>
     <string name="ui_name_rename_saved">Rinomina la voce salvata</string>
     <string name="ui_name_not">Non è %1$s?</string>
-    <string name="ui_name_remember">Ricorda questa voce su questo telefono</string>
     <string name="ui_name_remember_body">Le prossime note riconosceranno %1$s automaticamente.</string>
     <string name="ui_name_remember_body_unnamed">Le prossime note riconosceranno questa persona automaticamente.</string>
-    <string name="ui_name_remember_too_little">Troppo poco parlato per ricordare questa voce.</string>
-    <string name="ui_name_remember_no_model">Il riconoscimento delle voci salvate non è ancora installato.</string>
-    <string name="ui_name_merge_into">Unisci a…</string>
-    <string name="ui_name_save">Salva il nome</string>
 
     <string name="ui_merge_sheet_title">Unisci %1$s a…</string>
     <string name="ui_merge_confirm_title">Unire %1$s a %2$s?</string>

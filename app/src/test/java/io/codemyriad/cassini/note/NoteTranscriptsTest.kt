@@ -37,6 +37,27 @@ class NoteTranscriptsTest {
     private val paolo = Voice("paolo", "Paolo Ferri", "m", FloatArray(1), 1, 10.0, 0, 0)
     private val luca = Voice("luca", "Luca", "m", FloatArray(1), 1, 10.0, 0, 0)
 
+    @Test fun namingQuotesUseOnlyTheSelectedSpeakersFirstSpeechInBothTranscriptForms() {
+        val sealed = NoteTranscripts.sealed(words, speakers, emptyMap(), emptyList())
+        val draft = NoteTranscripts.draft(words, emptyMap(), emptySet(), emptyMap(), null)
+        for (shown in listOf(sealed, draft)) {
+            assertEquals("Hello everyone.", shown.namingQuote("a"))
+            assertEquals("Morning", shown.namingQuote("b"))
+            assertEquals("Here", shown.namingQuote("c"))
+            assertEquals("", shown.namingQuote("missing"))
+        }
+    }
+
+    @Test fun namingQuotesBoundLongSpeechAndNeverSplitASurrogatePair() {
+        val many = (0..40).map { Word("a", it * 500L, it * 500L + 400, "word") }
+        val shown = NoteTranscripts.draft(many, emptyMap(), emptySet(), emptyMap(), null)
+        assertEquals(List(40) { "word" }.joinToString(" ") + "…", shown.namingQuote("a"))
+        val long = listOf(Word("a", 0, 400, "x".repeat(239) + "😀more"))
+        val bounded = NoteTranscripts.draft(long, emptyMap(), emptySet(), emptyMap(), null).namingQuote("a")
+        assertEquals("x".repeat(239) + "…", bounded)
+        assertEquals("", NoteTranscript.EMPTY.namingQuote("a"))
+    }
+
     @Test fun sealedTonesKeepWideCachedSlotsUntilPaletteReduction() {
         val cached = speakers.map { if (it.speakerId == "a") it.copy(colourIndex = 4294967296L) else it }
         val shown = NoteTranscripts.sealed(words, cached, emptyMap(), emptyList())
