@@ -303,11 +303,11 @@ private fun RowDivider() {
 /** "Future notes will name Anna automatically. …", or why Remember is disabled. */
 @Composable
 private fun rememberSubtitle(ui: NameSheetUi): String {
-    if (!ui.rememberEnabled && ui.rememberReason != null) {
-        return when (ui.rememberReason) {
+    val reason = ui.rememberReason
+    if (!ui.rememberEnabled && reason != null) {
+        return when (reason) {
             RememberReason.NO_MODEL -> stringResource(R.string.ui_sp_remember_models)
             RememberReason.TOO_LITTLE_SPEECH -> stringResource(R.string.ui_sp_remember_too_short)
-            null -> error("Remember reason checked above")
         }
     }
     val name = ui.name.trim()
