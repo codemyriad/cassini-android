@@ -251,6 +251,7 @@ class NoteTranscriptsTest {
         val draft = NoteTranscripts.draft(vector, mapOf("ada" to "Ada", "ben" to "Ben"), setOf("ben"), emptyMap(), null)
         for (shown in listOf(sealed, draft)) {
             assertTrue("Ben occurs only in an inline chip", shown.turns.none { it.speakerId == "ben" })
+            assertEquals("Sounds good.", shown.namingQuote("ben"))
             assertTrue(shown.speakerMetadata.getValue("ben").auto)
             val header = shown.meetingSpeakers.single { it.id == "ben" }
             assertTrue(header.auto)

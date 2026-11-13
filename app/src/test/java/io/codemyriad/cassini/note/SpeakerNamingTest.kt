@@ -59,6 +59,16 @@ class SpeakerNamingTest {
 
     private fun NamingState.effects(event: NamingEvent): List<NamingEffect> = SpeakerNaming.reduce(this, event).effects
 
+    @Test fun aChangedQuoteIsPublishedWithoutChangingNamingRules() {
+        val first = input().copy(quote = "First speech.")
+        val next = first.copy(quote = "Updated speech.")
+        assertFalse(first == next)
+        val ui = SpeakerNaming.ui(SpeakerNaming.open(next))
+        assertEquals("Updated speech.", ui.quote)
+        assertEquals("", ui.name)
+        assertEquals(SaveState.DISABLED, ui.save)
+    }
+
     @Test
     fun aPlaceholderOpensEmptyWithRememberOnAndNothingToSave() {
         val state = SpeakerNaming.open(input())
