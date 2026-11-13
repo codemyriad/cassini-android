@@ -13,12 +13,14 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
@@ -105,6 +107,8 @@ class Phase1RecordingTest {
         show()
         assertControlTargets()
         rule.onNodeWithContentDescription("Title").assertIsDisplayed()
+        rule.onNode(hasText("Keeps recording", substring = true)).performScrollTo().assertIsDisplayed()
+        assertControlTargets()
     }
 
     @Test fun largeTextKeepsSeparateControlTargets() {
