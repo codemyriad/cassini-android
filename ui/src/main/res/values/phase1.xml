@@ -59,6 +59,10 @@
     <string name="ui_tx_audio_done">Audio done</string>
     <string name="ui_tx_audio_done_value">%1$s of %2$s</string>
     <string name="ui_tx_time_left">Time left</string>
+    <plurals name="ui_tx_time_left_value">
+        <item quantity="one">About %1$s min</item>
+        <item quantity="other">About %1$s min</item>
+    </plurals>
     <string name="ui_tx_words_so_far">Words so far</string>
     <string name="ui_tx_battery_finish">Battery at finish</string>
     <string name="ui_tx_suggestion_question">Is this %1$s?</string>

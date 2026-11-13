@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -46,6 +47,7 @@ import io.codemyriad.cassini.ui.components.stageStates
 import io.codemyriad.cassini.ui.format.BatteryUi
 import io.codemyriad.cassini.ui.format.Counts
 import io.codemyriad.cassini.ui.format.Durations
+import io.codemyriad.cassini.ui.format.LocalFormat
 import io.codemyriad.cassini.ui.format.Progress
 import io.codemyriad.cassini.ui.format.ProgressHeadline
 import io.codemyriad.cassini.ui.format.StageState
@@ -114,10 +116,14 @@ internal fun TranscribingDetailsContent(
             Text(stringResource(R.string.ui_progress_low_memory), style = CassiniTheme.type.caption, color = c.amberInk)
         }
         val stop = stringResource(R.string.ui_tx_stop_keep)
+        val saving = stringResource(R.string.ui_badge_saving)
         SecondaryButton(
             stop,
             onClick = onStop,
-            modifier = Modifier.testTag("transcribing-details-stop").semantics { contentDescription = stop },
+            modifier = Modifier.testTag("transcribing-details-stop").semantics {
+                contentDescription = stop
+                if (stopBusy) stateDescription = saving
+            },
             size = SecondaryButtonSize.Block,
             busy = stopBusy,
         )
@@ -189,7 +195,7 @@ private fun StageGlyph(state: StageState) {
 private fun detailStats(progress: ProcessingCardUi) = listOfNotNull(
     StatItem(
         stringResource(R.string.ui_tx_time_left),
-        Progress.timeLeft(progress.timeLeft),
+        transcribingDetailTimeLeft(LocalResources.current, LocalFormat.current.locale, progress.timeLeft),
         pending = progress.timeLeft == TimeLeftUi.Calculating,
     ),
     StatItem(

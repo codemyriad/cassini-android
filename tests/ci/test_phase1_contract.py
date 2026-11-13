@@ -120,6 +120,47 @@ class Phase1ContractTest(unittest.TestCase):
         for shared_action in ('ui_recording_pause_label', 'ui_recording_resume_label', 'ui_recording_finish'):
             self.assertIn(f'UiR.string.{shared_action}', notifications)
 
+    def test_transcribing_stop_controls_use_catalog_strings_in_every_locale(self):
+        catalog = json.loads((self.root / PIN.VENDOR / 'strings.json').read_text())
+        stop = next(e for e in catalog['entries'] if e['id'] == 'common.stop')
+        keep = next(e for e in catalog['entries'] if e['id'] == 'transcribing.stopAndKeepProgress')
+        outputs = dict(STRINGS.generated(self.root))
+        for locale, directory in STRINGS.LOCALES.items():
+            with self.subTest(locale=locale):
+                output = next(value for path, value in outputs.items() if path.parent.name == directory)
+                xml = ET.fromstring(output)
+                stop_el = xml.find("string[@name='ui_tx_stop']")
+                keep_el = xml.find("string[@name='ui_tx_stop_keep']")
+                self.assertIsNotNone(stop_el)
+                self.assertIsNotNone(keep_el)
+                expected_stop = stop['en'] if locale == 'en' else stop['l10n'][locale]['text']
+                expected_keep = keep['en'] if locale == 'en' else keep['l10n'][locale]['text']
+                self.assertEqual(expected_stop, stop_el.text)
+                self.assertEqual(expected_keep, keep_el.text)
+                ui_strings = (ROOT / 'ui/src/main/res' / directory / 'strings.xml').read_text()
+                app_strings = (ROOT / 'app/src/main/res' / directory / 'strings.xml').read_text()
+                self.assertNotIn('name="ui_action_stop_keep_progress"', ui_strings)
+                self.assertNotIn('name="notif_action_stop"', app_strings)
+        processing_notifications = (
+            ROOT / 'app/src/main/java/io/codemyriad/cassini/processing/ProcessingNotifications.kt'
+        ).read_text()
+        self.assertIn('UiR.string.ui_tx_stop', processing_notifications)
+
+    def test_detail_time_left_value_is_a_catalog_plural_in_every_locale(self):
+        catalog = json.loads((self.root / PIN.VENDOR / 'strings.json').read_text())
+        entry = next(e for e in catalog['entries'] if e['id'] == 'transcribing.stat.timeLeftValue')
+        for locale, directory in STRINGS.LOCALES.items():
+            with self.subTest(locale=locale):
+                output = next(text for path, text in STRINGS.generated(self.root) if path.parent.name == directory)
+                plural = ET.fromstring(output).find("plurals[@name='ui_tx_time_left_value']")
+                self.assertIsNotNone(plural)
+                actual = {item.attrib['quantity']: item.text for item in plural}
+                forms = entry['plural'] if locale == 'en' else entry['l10n'][locale]['plural']
+                self.assertEqual(set(forms), set(actual))
+                for quantity, text in forms.items():
+                    expected = text.replace('{n}', '%1$s').replace('1 min', '%1$s min')
+                    self.assertEqual(expected, actual[quantity])
+
     def test_compact_eta_is_a_catalog_plural_in_every_locale(self):
         catalog = json.loads((self.root / PIN.VENDOR / 'strings.json').read_text())
         entry = next(e for e in catalog['entries'] if e['id'] == 'transcribing.eta.minutes')

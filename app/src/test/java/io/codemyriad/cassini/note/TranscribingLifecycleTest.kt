@@ -5,14 +5,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
@@ -34,6 +38,8 @@ import io.codemyriad.cassini.engine.job.Step
 import io.codemyriad.cassini.engine.job.TimeLeft
 import io.codemyriad.cassini.library.CLOCK
 import io.codemyriad.cassini.nav.NoteKey
+import io.codemyriad.cassini.ui.note.NoteAction
+import io.codemyriad.cassini.ui.note.NoteEvent
 import io.codemyriad.cassini.ui.note.NoteScreen
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import kotlinx.coroutines.Dispatchers
@@ -123,8 +129,21 @@ class TranscribingLifecycleTest {
         rule.onNodeWithText("00:40 of 01:20").assertIsDisplayed()
         rule.onNodeWithText("40").assertIsDisplayed()
         rule.onNodeWithTag("transcribing-details-stop").assertIsNotEnabled()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Saving…"))
         rule.onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.Dismiss))
             .performSemanticsAction(SemanticsActions.Dismiss) { it() }
+        rule.onNodeWithContentDescription("More actions").performClick()
+        rule.onNode(
+            hasText("Stop and keep progress").and(hasClickAction())
+                .and(SemanticsMatcher.keyNotDefined(SemanticsProperties.TestTag)),
+        ).performScrollTo()
+            .assertIsNotEnabled()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Saving…"))
+        rule.runOnIdle {
+            vm.onEvent(NoteEvent.Stop)
+            vm.onEvent(NoteEvent.SheetAction(NoteAction.STOP))
+            assertEquals("checkpointing must not send another stop", 1, ports.calls.count { it == "stop" })
+        }
         assertAnchor()
         rule.runOnIdle {
             ports.draft = DraftTranscript(words, emptyMap(), ports.names.value, 40_000, 80_000)

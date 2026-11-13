@@ -254,6 +254,52 @@ class NoteTranscriptsTest {
         assertEquals(4000L, transcript.turns.single().words.single().endMs)
     }
 
+    // Timeout only guards against hangs; scaling uses calling-thread CPU time (D87 #1, D88).
+    @Test(timeout = 300_000L)
+    fun elevenHourDraftBuildsLinearlyInThreadCpuTime() {
+        // Android's compile boot classpath lacks java.management; the test runs on the host JDK.
+        val type = Class.forName("java.lang.management.ThreadMXBean")
+        val clock = Class.forName("java.lang.management.ManagementFactory").getMethod("getThreadMXBean").invoke(null)
+        assertEquals(true, type.getMethod("isCurrentThreadCpuTimeSupported").invoke(clock))
+        val setEnabled = type.getMethod("setThreadCpuTimeEnabled", Boolean::class.javaPrimitiveType)
+        val wasEnabled = type.getMethod("isThreadCpuTimeEnabled").invoke(clock) as Boolean
+        if (!wasEnabled) setEnabled.invoke(clock, true)
+        val readCpu = type.getMethod("getCurrentThreadCpuTime")
+        fun cpuNs(): Long = readCpu.invoke(clock) as Long
+        try {
+            val fullWords = (0 until 100_000).map { i ->
+                val start = i * 396L
+                Word("s${(i / 25) % 4}", start, start + 320L, if (i % 18 == 17) "end." else "w$i")
+            }
+            val halfWords = fullWords.subList(0, 50_000)
+            val labels = mapOf("s0" to "Ada", "s2" to "Cy")
+            NoteTranscripts.draft(halfWords, labels, setOf("s2"), emptyMap(), halfWords.last().startMs)
+            val halfCpu = ArrayList<Long>()
+            val fullCpu = ArrayList<Long>()
+            var turns = 0
+            repeat(3) { round ->
+                val order = if (round % 2 == 0) listOf(halfWords, fullWords) else listOf(fullWords, halfWords)
+                for (input in order) {
+                    val began = cpuNs()
+                    val draft = NoteTranscripts.draft(input, labels, setOf("s2"), emptyMap(), input.last().startMs)
+                    val cpu = cpuNs() - began
+                    if (input === fullWords) {
+                        fullCpu += cpu
+                        turns = draft.turns.size
+                    } else {
+                        halfCpu += cpu
+                    }
+                }
+            }
+            val small = halfCpu.sorted()[1]
+            val large = fullCpu.sorted()[1]
+            assertTrue("11-hour draft must produce turns", turns > 500)
+            assertTrue("Draft CPU ns: N=$small, 2N=$large", large <= small * 3 + 100_000_000L)
+        } finally {
+            if (!wasEnabled) setEnabled.invoke(clock, false)
+        }
+    }
+
     @Test fun everyViewerVectorKeepsTheSameSealedAndDraftRowMapping() {
         val labels = mapOf("ada" to "Ada", "ben" to "Ben", "cy" to "Cy")
         val speakers = vectorSpeakers + speaker("cy", 2, "Cy", false)

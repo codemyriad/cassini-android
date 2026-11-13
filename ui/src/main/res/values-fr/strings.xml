@@ -34,7 +34,6 @@
     <string name="ui_action_import">Importer</string>
     <string name="ui_action_continue">Continuer</string>
     <string name="ui_action_remove_from_queue">Retirer de la file</string>
-    <string name="ui_action_stop_keep_progress">Arrêter et garder la progression</string>
     <string name="ui_back_to_settings">Retour aux paramètres</string>
     <string name="ui_back">Retour</string>
     <string name="ui_title_label">Titre</string>
