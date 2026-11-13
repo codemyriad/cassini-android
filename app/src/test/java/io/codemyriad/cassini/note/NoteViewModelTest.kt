@@ -35,6 +35,7 @@ import io.codemyriad.cassini.ui.banner.BannerKind
 import io.codemyriad.cassini.ui.components.SnackbarKind
 import io.codemyriad.cassini.ui.components.SpeakerNameUi
 import io.codemyriad.cassini.ui.components.WordRef
+import io.codemyriad.cassini.ui.format.DayLabel
 import io.codemyriad.cassini.ui.format.ProgressHeadline
 import io.codemyriad.cassini.ui.note.ExportKind
 import io.codemyriad.cassini.ui.note.MergeEvent
@@ -44,6 +45,7 @@ import io.codemyriad.cassini.ui.note.NoteDialog
 import io.codemyriad.cassini.ui.note.NoteEvent
 import io.codemyriad.cassini.ui.note.NoteMode
 import io.codemyriad.cassini.ui.note.NoteSheet
+import io.codemyriad.cassini.ui.note.NoteSubtitleUi
 import io.codemyriad.cassini.ui.note.NoteUiState
 import io.codemyriad.cassini.ui.note.PlaybackAnchor
 import io.codemyriad.cassini.ui.note.ReadOnlyReason
@@ -218,7 +220,11 @@ class NoteViewModelTest {
         val state = viewModel.now()
         assertEquals(NoteMode.Reading, state.mode)
         assertEquals("Weekly sync", state.title)
-        assertNull("Read & listen has no subtitle", state.subtitle)
+        assertEquals(
+            "The scrolling header uses cached recording metadata",
+            NoteSubtitleUi(DayLabel.Today, java.time.LocalTime.of(9, 0), 4_000),
+            state.subtitle,
+        )
         assertEquals(TrustUi.VERIFIED, state.chips?.trust)
         assertEquals(3, state.chips?.speakers)
         assertNull("one variant: no version chip", state.chips?.version)
