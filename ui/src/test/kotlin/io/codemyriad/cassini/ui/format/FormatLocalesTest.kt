@@ -70,24 +70,26 @@ class FormatLocalesTest {
         }
     }
 
-    @Test fun sharedSpeakerCountsKeepTheNumberAcrossAndroidPluralCategories() {
-        val expected = mapOf(
-            "en" to listOf("1 speaker", "2 speakers"),
-            "it" to listOf("1 voce", "2 voci"),
-            "fr" to listOf("1 intervenant", "2 intervenants"),
-            "es" to listOf("1 hablante", "2 hablantes"),
-            "pt-BR" to listOf("1 locutor", "2 locutores"),
-            "pt-PT" to listOf("1 orador", "2 oradores"),
+    @Test fun sharedBadgeCountsKeepTheNumberAcrossAndroidPluralCategories() {
+        val prefixes = mapOf(
+            "en" to "Transcribing",
+            "it" to "In trascrizione",
+            "fr" to "Transcription",
+            "es" to "Transcribiendo",
+            "pt-BR" to "Transcrevendo",
+            "pt-PT" to "A transcrever",
         )
-        for ((tag, labels) in expected) {
-            val actual = (1..2).map { Counts.plural(resources(tag), R.plurals.ui_row_speaker_count, it, format(tag)) }
-            assertEquals(tag, labels, actual)
+        for ((tag, prefix) in prefixes) {
+            for (count in 1..2) {
+                val actual = Counts.plural(resources(tag), R.plurals.ui_badge_transcribing_eta, count, format(tag))
+                assertEquals(tag, "$prefix · $count min", actual)
+            }
         }
         // CLDR versions differ on zero's category; either must retain the actual count.
-        val zero = Counts.plural(resources("pt-PT"), R.plurals.ui_row_speaker_count, 0, format("pt-PT"))
-        assertTrue(zero, zero.startsWith("0 "))
-        val singular = resources("pt-PT").getQuantityString(R.plurals.ui_row_speaker_count, 1, "0")
-        assertEquals("0 orador", singular)
+        val zero = Counts.plural(resources("pt-PT"), R.plurals.ui_badge_transcribing_eta, 0, format("pt-PT"))
+        assertTrue(zero, zero.contains("0 min"))
+        val singular = resources("en").getQuantityString(R.plurals.ui_badge_transcribing_eta, 1, "0")
+        assertEquals("Transcribing · 0 min", singular)
     }
 
     private companion object {

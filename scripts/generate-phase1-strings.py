@@ -28,11 +28,6 @@ LABELS = {
     'badge_unplayable': ('states.phone.cantPlay', None),
     'badge_unreadable': ('states.phone.cantReadTranscript', None),
     'badge_newer': ('states.phone.newerFormat', None),
-    'all_meetings': ('library.allMeetings', None),
-    'row_speaker_count': ('phone.row.speakerCount', 'n'),
-    'row_no_speech': ('phone.row.noSpeech', None),
-    'row_transcribed_a11y': ('phone.row.transcribed.a11y', None),
-    'row_resume': ('phone.row.resume', None),
 }
 
 

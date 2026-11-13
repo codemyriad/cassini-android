@@ -75,7 +75,7 @@ class Phase1ContractTest(unittest.TestCase):
     def test_missing_other_plural_fails_after_an_intentional_pin_update(self):
         path = self.root / PIN.VENDOR / 'strings.json'
         catalog = json.loads(path.read_text())
-        entry = next(e for e in catalog['entries'] if e['id'] == 'phone.row.speakerCount')
+        entry = next(e for e in catalog['entries'] if e['id'] == 'states.badge.transcribing')
         entry['plural'].pop('other')
         path.write_text(json.dumps(catalog))
         self.pin['files']['strings.json']['sha256'] = hashlib.sha256(path.read_bytes()).hexdigest()

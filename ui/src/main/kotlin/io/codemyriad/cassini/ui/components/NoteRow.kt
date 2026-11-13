@@ -211,20 +211,27 @@ internal fun rowStatus(status: NoteStatusUi, liveMs: Long = 0): RowStatus = when
     is NoteStatusUi.Paused -> RowStatus(
         text = stringResource(R.string.ui_badge_paused, Durations.clock(status.atMs)),
         kind = StatusBadgeKind.Paused,
+        spoken = stringResource(R.string.ui_status_paused_at, Durations.clock(status.atMs)),
         suffix = stringResource(R.string.ui_status_suffix_resume),
         suffixAction = NoteRowAction.RESUME,
     )
     NoteStatusUi.Failed -> RowStatus(
         text = stringResource(R.string.ui_badge_failed),
         kind = StatusBadgeKind.Failed,
+        spoken = stringResource(R.string.ui_status_failed),
         suffix = stringResource(R.string.ui_status_suffix_try_again),
         suffixAction = NoteRowAction.TRY_AGAIN,
     )
     NoteStatusUi.Unplayable -> RowStatus(stringResource(StatusBadgeKind.Unplayable.label), StatusBadgeKind.Unplayable)
-    NoteStatusUi.Unreadable -> RowStatus(stringResource(StatusBadgeKind.Unreadable.label), StatusBadgeKind.Unreadable)
+    NoteStatusUi.Unreadable -> RowStatus(
+        stringResource(StatusBadgeKind.Unreadable.label),
+        StatusBadgeKind.Unreadable,
+        spoken = stringResource(R.string.ui_status_unreadable),
+    )
     NoteStatusUi.NewerFormat -> RowStatus(
         stringResource(StatusBadgeKind.NewerFormat.label),
         StatusBadgeKind.NewerFormat,
+        spoken = stringResource(R.string.ui_status_newer_format),
     )
     is NoteStatusUi.Transcribed -> RowStatus(
         text = stringResource(R.string.ui_status_transcribed),

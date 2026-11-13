@@ -21,13 +21,4 @@
     <string name="ui_badge_unplayable">Lecture impossible</string>
     <string name="ui_badge_unreadable">Transcription illisible</string>
     <string name="ui_badge_newer">Format plus récent</string>
-    <string name="ui_all_meetings">Toutes les réunions</string>
-    <plurals name="ui_row_speaker_count">
-        <item quantity="one">%1$s intervenant</item>
-        <item quantity="many">%1$s intervenants</item>
-        <item quantity="other">%1$s intervenants</item>
-    </plurals>
-    <string name="ui_row_no_speech">Aucune parole</string>
-    <string name="ui_row_transcribed_a11y">transcrite</string>
-    <string name="ui_row_resume">Reprendre</string>
 </resources>
