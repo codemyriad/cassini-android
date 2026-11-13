@@ -13,6 +13,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.hasContentDescription
@@ -255,17 +256,20 @@ class AppShellTest {
         importDocument()
         rule.onNodeWithText(TITLE).performClick()
         waitFor(FIND_BUTTON)
-        // The label is drawn first inside its turn, then as its own button node.
         waitFor(SPEAKER_2)
-
-        val speaker = rule.onNode(SPEAKER_2)
-        speaker.assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
-        val label = speaker.fetchSemanticsNode().config.getOrNull(SemanticsActions.OnClick)?.label
-        assertEquals("Name this speaker", label)
-        val description = speaker.fetchSemanticsNode().config[SemanticsProperties.ContentDescription].single()
-        assertTrue("the label says when the turn starts: $description", description.startsWith("Speaker 2, at "))
-        rule.onNode(hasContentDescription("Ada", substring = true))
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+        // Both the inline metadata control and the turn control expose the same full spoken action.
+        for (name in listOf("Speaker 2", "Ada")) {
+            val speakers = rule.onAllNodes(hasContentDescription(name, substring = true))
+            speakers.assertCountEquals(2)
+            for (index in 0 until 2) {
+                val speaker = speakers[index]
+                speaker.assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+                val config = speaker.fetchSemanticsNode().config
+                assertEquals("Name this speaker", config.getOrNull(SemanticsActions.OnClick)?.label)
+                val description = config[SemanticsProperties.ContentDescription].single()
+                assertTrue("the label says when speech starts: $description", description.startsWith("$name, at "))
+            }
+        }
 
         // The words are not links: the paragraph maps a tap position to a word, with no child node per word.
         val paragraph = rule.onNode(hasText(SECOND_TURN), useUnmergedTree = true).fetchSemanticsNode()
