@@ -46,7 +46,9 @@
         <item quantity="other">%1$s reuniones</item>
     </plurals>
     <string name="ui_tx_heading">Transcribiendo</string>
+    <string name="ui_sp_dialog_a11y">Poner nombre a un hablante</string>
     <string name="ui_sp_name">Nombre</string>
+    <string name="ui_sp_play_sample">Reproducir una muestra de esta voz</string>
     <string name="ui_sp_quote">“%1$s”</string>
     <string name="ui_sp_talk_time">Habla durante %1$s en esta reunión</string>
     <string name="ui_sp_duplicate_notice">%1$s ya es una voz guardada.</string>

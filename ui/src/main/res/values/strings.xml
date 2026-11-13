@@ -301,8 +301,6 @@
     <string name="ui_versions_unreadable">Can’t be read</string>
 
     <!-- Name a speaker (board 04, features.md section 4). -->
-    <string name="ui_name_speaks_for">Speaks for %1$s in this note</string>
-    <string name="ui_name_play_sample">Play a sample of this voice</string>
     <string name="ui_name_stop_sample">Stop the sample</string>
     <string name="ui_name_show_all">Show all</string>
     <string name="ui_name_answer_first">Answer the question above first</string>

@@ -25,6 +25,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -35,6 +36,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
@@ -42,6 +44,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogWindowProvider
 import io.codemyriad.cassini.ui.R
 import io.codemyriad.cassini.ui.components.Avatar
 import io.codemyriad.cassini.ui.components.CassiniSheet
@@ -71,7 +74,21 @@ import io.codemyriad.cassini.ui.theme.SpeakerTone
  */
 @Composable
 fun NameSpeakerSheet(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit, onDismiss: () -> Unit) {
-    CassiniSheet(onDismissRequest = onDismiss) { NameSpeakerSheetContent(ui, onEvent) }
+    val dialogTitle = stringResource(R.string.ui_sp_dialog_a11y)
+    CassiniSheet(onDismissRequest = onDismiss) {
+        val view = LocalView.current
+        SideEffect {
+            generateSequence(view.parent) { it.parent }
+                .filterIsInstance<DialogWindowProvider>()
+                .firstOrNull()
+                ?.window
+                ?.let { window ->
+                    window.setTitle(dialogTitle)
+                    window.attributes = window.attributes.apply { title = dialogTitle }
+                }
+        }
+        NameSpeakerSheetContent(ui, onEvent)
+    }
 }
 
 /**
@@ -173,7 +190,7 @@ private fun SheetHeader(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit) {
                 color = c.ink,
             )
             Text(
-                text = stringResource(R.string.ui_sp_talk_time, Durations.compact(ui.speakingMs)),
+                text = Durations.speaksFor(ui.speakingMs),
                 style = CassiniTheme.type.caption,
                 color = c.text2,
             )
@@ -193,7 +210,7 @@ private fun SheetHeader(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit) {
 @Composable
 private fun PlaySampleButton(sampling: Boolean, enabled: Boolean, onClick: () -> Unit) {
     val c = CassiniTheme.colors
-    val description = stringResource(if (sampling) R.string.ui_name_stop_sample else R.string.ui_name_play_sample)
+    val description = stringResource(if (sampling) R.string.ui_name_stop_sample else R.string.ui_sp_play_sample)
     Box(
         modifier = Modifier
             .overhang(2.dp)

@@ -201,6 +201,8 @@ The title is "Versions". The sheet has one row for each variant, in the sequence
 
 ## 4. Name a speaker sheet (board 04) [CHANGED: one sheet replaces 3-4 chained dialogs]
 
+Phase 1 speaker-sheet presentation, quote excerpt, grouped saved voices, native Remember switch and shared catalog strings follow [WP6: Name a speaker](phase1-wp6.md) (`L-14`, `L-41`, `L-46`), retaining the reducer, enrolment, merge and storage contracts below.
+
 The sheet has two modes: SEALED (document OK, no job row) and DRAFT (job RUNNING or PAUSED, naming open). The pure reducer `SpeakerNaming` controls it: events go in, and the state of the sheet and the effects come out.
 
 1. Header: an avatar in the speaker tint (the placeholder number, or the first grapheme of the label). The title is the display label. "Speaks for 3 min 12 s in this note" (`speaking_ms`. For a draft, the app calculates it from the draft words, with the merges applied). Play sample (a11y "Play a sample of this voice") calls `playRange(sample_start_ms, sample_end_ms)`. It is disabled without a sample window.

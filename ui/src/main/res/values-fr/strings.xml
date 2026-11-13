@@ -277,8 +277,6 @@
     <string name="ui_versions_unreadable">Illisible</string>
 
     <!-- Name a speaker (board 04, features.md section 4). -->
-    <string name="ui_name_speaks_for">Parle pendant %1$s dans cette note</string>
-    <string name="ui_name_play_sample">Lire un extrait de cette voix</string>
     <string name="ui_name_stop_sample">Arrêter l’extrait</string>
     <string name="ui_name_show_all">Tout afficher</string>
     <string name="ui_name_answer_first">Répondez d’abord à la question ci-dessus</string>

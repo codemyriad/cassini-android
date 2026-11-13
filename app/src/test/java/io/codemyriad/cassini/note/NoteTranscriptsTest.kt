@@ -55,6 +55,21 @@ class NoteTranscriptsTest {
         val long = listOf(Word("a", 0, 400, "x".repeat(239) + "😀more"))
         val bounded = NoteTranscripts.draft(long, emptyMap(), emptySet(), emptyMap(), null).namingQuote("a")
         assertEquals("x".repeat(239) + "…", bounded)
+        val boundary = listOf(
+            Word("a", 0, 200, "x".repeat(238)),
+            Word("a", 200, 400, "  "),
+            Word("a", 400, 600, "😀more"),
+        )
+        val noTrailingSpace = NoteTranscripts.draft(boundary, emptyMap(), emptySet(), emptyMap(), null).namingQuote("a")
+        assertEquals("x".repeat(238) + "…", noTrailingSpace)
+        val large = buildList(100_000) {
+            repeat(99_990) { index -> add(Word("early", index * 10L, index * 10L + 5, "alpha")) }
+            repeat(10) { index -> add(Word("late", (99_990 + index) * 10L, (99_990 + index) * 10L + 5, "omega$index")) }
+        }
+        val largeShown = NoteTranscripts.draft(large, emptyMap(), emptySet(), emptyMap(), null)
+        assertEquals(List(40) { "alpha" }.joinToString(" ") + "…", largeShown.namingQuote("early"))
+        assertEquals((0 until 10).joinToString(" ") { "omega$it" }, largeShown.namingQuote("late"))
+        assertEquals("", largeShown.namingQuote("absent"))
         assertEquals("", NoteTranscript.EMPTY.namingQuote("a"))
     }
 

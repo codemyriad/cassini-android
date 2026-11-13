@@ -277,8 +277,6 @@
     <string name="ui_versions_unreadable">No se puede leer</string>
 
     <!-- Name a speaker. -->
-    <string name="ui_name_speaks_for">Habla durante %1$s en esta nota</string>
-    <string name="ui_name_play_sample">Reproducir una muestra de esta voz</string>
     <string name="ui_name_stop_sample">Detener la muestra</string>
     <string name="ui_name_show_all">Mostrar todas</string>
     <string name="ui_name_answer_first">Primero responde la pregunta de arriba</string>

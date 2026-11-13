@@ -43,7 +43,9 @@
         <item quantity="other">%1$s meetings</item>
     </plurals>
     <string name="ui_tx_heading">Transcribing</string>
+    <string name="ui_sp_dialog_a11y">Name a speaker</string>
     <string name="ui_sp_name">Name</string>
+    <string name="ui_sp_play_sample">Play a sample of this voice</string>
     <string name="ui_sp_quote">“%1$s”</string>
     <string name="ui_sp_talk_time">Speaks for %1$s in this meeting</string>
     <string name="ui_sp_duplicate_notice">%1$s is already a saved voice.</string>

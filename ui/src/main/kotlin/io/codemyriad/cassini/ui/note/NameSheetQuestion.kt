@@ -73,13 +73,16 @@ private fun Modifier.pulseBorder(color: Color, shape: Shape, alpha: () -> Float)
     }
 }
 
-/** An open question of the sheet: the bold [saved] sentence, the question, and its two answers. */
+/** Sentinel used to locate the `{name}` placeholder span in localized duplicate notices. */
+private const val PLACEHOLDER_SENTINEL = "\u0000"
+
+/** An open question of the sheet: the [saved] sentence, optional [ask], and its two answers. */
 internal data class Question(
     val saved: String,
     val ask: String,
     val yes: String,
     val yesEvent: NameSheetEvent,
-    val name: String? = null,
+    val boldRange: IntRange? = null,
 )
 
 /** The same-person question (features.md section 4, item 4) or the rename-saved question (item 5), else null. */
@@ -88,13 +91,17 @@ internal fun question(ui: NameSheetUi): Question? {
     val same = ui.samePerson
     val rename = ui.renameSaved
     return when {
-        same != null -> Question(
-            saved = stringResource(R.string.ui_sp_duplicate_notice, same),
-            ask = "",
-            yes = stringResource(R.string.ui_sp_same_person),
-            yesEvent = NameSheetEvent.SamePerson,
-            name = same,
-        )
+        same != null -> {
+            val start = stringResource(R.string.ui_sp_duplicate_notice, PLACEHOLDER_SENTINEL)
+                .indexOf(PLACEHOLDER_SENTINEL)
+            Question(
+                saved = stringResource(R.string.ui_sp_duplicate_notice, same),
+                ask = "",
+                yes = stringResource(R.string.ui_sp_same_person),
+                yesEvent = NameSheetEvent.SamePerson,
+                boldRange = if (start >= 0 && same.isNotEmpty()) start until (start + same.length) else null,
+            )
+        }
         rename != null -> Question(
             saved = stringResource(R.string.ui_name_rename_saved_saved_as, rename),
             ask = stringResource(R.string.ui_name_rename_saved_question),
@@ -171,9 +178,9 @@ internal fun QuestionCard(
 
 private fun questionText(question: Question): AnnotatedString = buildAnnotatedString {
     append(question.saved)
-    val name = question.name
-    val start = name?.let { question.saved.indexOf(it) } ?: -1
-    if (name != null && start >= 0) addStyle(SpanStyle(fontWeight = FontWeight.SemiBold), start, start + name.length)
+    question.boldRange?.let { range ->
+        addStyle(SpanStyle(fontWeight = FontWeight.SemiBold), range.first, range.last + 1)
+    }
     if (question.ask.isNotEmpty()) {
         append(' ')
         append(question.ask)

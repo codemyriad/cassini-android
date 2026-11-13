@@ -62,6 +62,63 @@ class Phase1ContractTest(unittest.TestCase):
                     self.assertIn(r'\n', text)
                     self.assertNotIn('\n', text)
 
+    def test_speaker_naming_uses_the_catalog_in_every_locale(self):
+        entries = {
+            entry['id']: entry
+            for entry in json.loads((self.root / PIN.VENDOR / 'strings.json').read_text())['entries']
+        }
+        expected_resources = {
+            'ui_sp_dialog_a11y': ('speakers.dialog.a11y', None),
+            'ui_sp_name': ('speakers.nameLabel', None),
+            'ui_sp_play_sample': ('speakers.playSample', None),
+            'ui_sp_quote': ('common.quote', 'quote'),
+            'ui_sp_talk_time': ('speakers.talkTime', 'talkTime'),
+            'ui_sp_duplicate_notice': ('speakers.duplicate.notice', 'name'),
+            'ui_sp_same_person': ('speakers.duplicate.samePerson', None),
+            'ui_sp_someone_else': ('speakers.duplicate.someoneElse', None),
+            'ui_sp_voices_ranked': ('speakers.savedVoices.heading', None),
+            'ui_sp_voices': ('common.savedVoices', None),
+            'ui_sp_likely': ('speakers.savedVoices.likely', None),
+            'ui_sp_remember_title': ('speakers.rememberVoice.title', None),
+            'ui_sp_remember_body': ('speakers.rememberVoice.cardBody.phone', 'name'),
+            'ui_sp_remember_unnamed': ('speakers.rememberVoice.cardBody.phone.unnamed', None),
+            'ui_sp_remember_too_short': ('speakers.rememberVoice.tooShort', None),
+            'ui_sp_remember_models': ('speakers.rememberVoice.modelsNeeded', None),
+            'ui_sp_merge': ('speakers.mergeInto', None),
+            'ui_sp_save': ('speakers.saveName', None),
+        }
+        retired_handwritten = (
+            'ui_name_speaks_for',
+            'ui_name_play_sample',
+            'ui_name_voices_ranked',
+            'ui_name_voices',
+            'ui_name_likely',
+            'ui_name_same_person_saved',
+            'ui_name_same_person_question',
+            'ui_name_same_person',
+            'ui_name_someone_else',
+            'ui_name_remember',
+            'ui_name_remember_too_little',
+            'ui_name_remember_no_model',
+            'ui_name_merge_into',
+            'ui_name_save',
+        )
+        outputs = dict(STRINGS.generated(self.root))
+        for locale, directory in STRINGS.LOCALES.items():
+            with self.subTest(locale=locale):
+                root = ET.fromstring(next(v for path, v in outputs.items() if path.parent.name == directory))
+                ui_handwritten = (ROOT / 'ui/src/main/res' / directory / 'strings.xml').read_text()
+                for resource_name, (catalog_id, argument) in expected_resources.items():
+                    actual = root.find(f"string[@name='{resource_name}']")
+                    entry = entries[catalog_id]
+                    raw = entry['en'] if locale == 'en' else entry['l10n'][locale]['text']
+                    expected = ET.fromstring(f'<s>{STRINGS.android_text(raw, argument)}</s>').text
+                    self.assertIsNotNone(actual, f'{resource_name} must be generated in {locale}')
+                    self.assertEqual(expected, actual.text)
+                    self.assertNotIn(f'name="{resource_name}"', ui_handwritten)
+                for retired in retired_handwritten:
+                    self.assertNotIn(f'name="{retired}"', ui_handwritten)
+
     def test_every_vendored_input_is_byte_pinned(self):
         for name in self.pin['files']:
             with self.subTest(name=name):
