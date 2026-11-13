@@ -1,7 +1,19 @@
-# Shared UI catalog
+# Shared Phase 1 contract
 
-`strings.json` is the complete catalog from [cassini-ux](https://github.com/codemyriad/cassini-ux), pinned by commit and SHA-256 in `UPSTREAM.json`. The catalog is the source of truth for D96 copy. It is a build input, not an app asset.
+The catalog, tokens, Saturn navigation mark, contracts and vectors come from
+cassini-ux commit `5e0c34e0f1bb390298dabdf4eedc494e933fd329`. `UPSTREAM.json`
+records source paths and SHA-256 values. `scripts/check-ux-pin.py` verifies every
+input, requires the Phase 1 inputs and rejects per-file commit drift.
 
-Run `python3 scripts/generate-d96-strings.py` from the repository root after updating the pin. This generates the D96 and common action resources for all six app locales in `app/src/main/res/values*/d96.xml`. Do not edit those resources by hand. CI runs the generator with `--check`.
+`strings/strings.json` preserves the upstream directory layout for its vector
+verifier. The identical `strings.json` is the existing Android generator input;
+both copies are checked against the same source and digest.
 
-The older Markdown vectors keep their own reference pin under `core/src/test/resources/markdown`; its strings selection now records this same catalog commit independently of the vector files.
+Run `python3 -I scripts/generate-phase1-strings.py` for the badge and phone
+catalog resources, and `scripts/generate-d96-strings.py` for import/export copy.
+Run `scripts/generate-brand-colors.py` for Kotlin and XML colour values. CI checks
+all generated output and the state vectors. These are build/test inputs, not
+runtime catalog assets. The mark is the canonical source for native rendering.
+
+The older Markdown, search and interjection conformance fixtures retain their
+independent reference pins; this UI catalog update does not change those formats.

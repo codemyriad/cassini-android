@@ -64,12 +64,12 @@ class ContentScreenshotTest : BoardTest() {
     private fun TranscriptStrip() = Strip {
         Label("Read: TurnHeader + TurnParagraph (named; auto, active “so”; placeholder, not renamable)")
         Pane {
-            TurnHeader("Giulia", SpeakerTone.Blue, 692_000, auto = false, onClick = {})
+            TurnHeader("Giulia", SpeakerTone.One, 692_000, auto = false, onClick = {})
             TurnParagraph(TranscriptFixtures.giulia, activeIndex = null, onWordTap = {})
-            TurnHeader("Paolo Ferri", SpeakerTone.Teal, 701_000, auto = true, onClick = {})
+            TurnHeader("Paolo Ferri", SpeakerTone.Two, 701_000, auto = true, onClick = {})
             TurnParagraph(TranscriptFixtures.paolo, activeIndex = TranscriptFixtures.PAOLO_ACTIVE, onWordTap = {})
-            TurnHeader("Speaker 3", SpeakerTone.Amber, 740_000, auto = false, onClick = null)
-            TurnParagraph(TranscriptFixtures.speaker3, activeIndex = null, onWordTap = {}, placeholder = true)
+            TurnHeader("Speaker 3", SpeakerTone.Unnamed, 740_000, auto = false, onClick = null)
+            TurnParagraph(TranscriptFixtures.speaker3, activeIndex = null, onWordTap = {})
         }
         Label("Active word that wraps (160 dp column); search matches, the current one in 600")
         Pane {
@@ -101,10 +101,18 @@ class ContentScreenshotTest : BoardTest() {
                 .background(CassiniTheme.colors.bg)
                 .padding(horizontal = 20.dp),
         ) {
-            TurnHeader("Giulia", SpeakerTone.Blue, 1_711_000, auto = false, onClick = {})
+            TurnHeader("Giulia", SpeakerTone.One, 1_711_000, auto = false, onClick = {})
             TurnParagraph(TranscriptFixtures.draftGiulia, null, {}, mode = TurnMode.Draft)
             Box(Modifier.padding(top = 14.dp)) {
-                SuggestionCard("Speaker 2", SpeakerTone.Amber, 1_742_000, "Luca", onYes = {}, onNo = {}, onSpeaker = {})
+                SuggestionCard(
+                    "Speaker 2",
+                    SpeakerTone.Unnamed,
+                    1_742_000,
+                    "Luca",
+                    onYes = {},
+                    onNo = {},
+                    onSpeaker = {},
+                )
             }
             TurnParagraph(
                 words = TranscriptFixtures.draftAfterCard,

@@ -403,7 +403,7 @@ internal object VariantFixtures {
         id = "t1",
         speakerId = "s1",
         name = SpeakerNameUi.Placeholder(1),
-        tone = SpeakerTone.Amber,
+        tone = SpeakerTone.Unnamed,
         startMs = b.readGiulia.startMs,
         words = (b.readGiulia.words + b.readPaolo.words + b.readSpeaker3.words).toImmutableList(),
     )
@@ -471,7 +471,7 @@ internal object VariantFixtures {
     val nameSheet: Map<String, NameSheetUi> = mapOf(
         "name-rename-saved" to b.nameSpeaker.copy(
             label = SpeakerNameUi.Named("Anna Ricci"),
-            tone = SpeakerTone.Blue,
+            tone = SpeakerTone.One,
             name = "Anna Rossi",
             samePerson = null,
             renameSaved = "Anna Ricci",
@@ -480,7 +480,7 @@ internal object VariantFixtures {
         "name-not-auto" to b.nameSpeaker.copy(
             speakerId = b.readPaolo.speakerId,
             label = SpeakerNameUi.Named("Paolo Ferri"),
-            tone = SpeakerTone.Teal,
+            tone = SpeakerTone.Two,
             speakingMs = clock(6, 40),
             name = "Paolo Ferri",
             voices = persistentListOf(VoiceOptionUi(id = "paolo", name = "Paolo Ferri", likely = true)),
@@ -547,9 +547,9 @@ internal object VariantFixtures {
     // Merge sheet and confirmation (no board; features.md section 4, item 8).
 
     private val mergeTargets = persistentListOf(
-        MergeTargetUi("s1", SpeakerNameUi.Named("Giulia"), SpeakerTone.Blue, clock(9, 41)),
-        MergeTargetUi("s2", SpeakerNameUi.Named("Paolo Ferri"), SpeakerTone.Teal, clock(6, 40)),
-        MergeTargetUi("s4", SpeakerNameUi.Placeholder(4), SpeakerTone.Amber, clock(0, 48)),
+        MergeTargetUi("s1", SpeakerNameUi.Named("Giulia"), SpeakerTone.One, clock(9, 41)),
+        MergeTargetUi("s2", SpeakerNameUi.Named("Paolo Ferri"), SpeakerTone.Two, clock(6, 40)),
+        MergeTargetUi("s4", SpeakerNameUi.Placeholder(4), SpeakerTone.Unnamed, clock(0, 48)),
     )
     private val merge = MergeUi(
         sourceId = b.readSpeaker3.speakerId,
@@ -772,9 +772,8 @@ internal object VariantFixtures {
         "licenses-text" to LicensesUiState(
             entries = LicenseEntry.entries.toImmutableList(),
             open = LicenseText(
-                LicenseEntry.INSTRUMENT_SANS,
-                "Copyright 2022 The Instrument Sans Project Authors (https://github.com/Instrument/instrument-sans)\n\n" +
-                    "This Font Software is licensed under the SIL Open Font License, Version 1.1.",
+                LicenseEntry.CASSINI,
+                "GNU GENERAL PUBLIC LICENSE\n\nVersion 3, 29 June 2007",
             ),
         ),
     )

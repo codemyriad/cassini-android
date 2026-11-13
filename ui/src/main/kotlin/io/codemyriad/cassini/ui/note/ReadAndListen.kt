@@ -46,7 +46,6 @@ import io.codemyriad.cassini.ui.components.BannerCard
 import io.codemyriad.cassini.ui.components.IconButton44
 import io.codemyriad.cassini.ui.components.LargeChip
 import io.codemyriad.cassini.ui.components.PillSearchField
-import io.codemyriad.cassini.ui.components.SpeakerNameUi
 import io.codemyriad.cassini.ui.components.SuggestionCard
 import io.codemyriad.cassini.ui.components.TurnHeader
 import io.codemyriad.cassini.ui.components.TurnMatches
@@ -425,7 +424,6 @@ private fun Turn(
                 .then(if (onParagraphPlaced != null) Modifier.onGloballyPositioned(onParagraphPlaced) else Modifier)
                 .padding(top = if (suggestion != null) 6.dp else ParagraphGap),
             mode = TurnMode.Read,
-            placeholder = turn.name is SpeakerNameUi.Placeholder,
             matches = matches,
             onPlayFromStart = { onEvent(NoteEvent.PlayTurn(turn.id)) },
             onActiveLine = onActiveLine,

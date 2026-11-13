@@ -1,6 +1,10 @@
 package io.codemyriad.cassini.ui.screens
 
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onNodeWithText
 import io.codemyriad.cassini.ui.BoardTest
+import io.codemyriad.cassini.ui.fixtures.BoardFixtures
+import io.codemyriad.cassini.ui.note.NoteScreen
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -21,6 +25,12 @@ class BoardScreenshotTest : BoardTest() {
     @Test fun transcribing() = light("02-transcribing")
 
     @Test fun readAndListen() = light("03-read-and-listen")
+
+    @Test fun sevenSpeakers() {
+        board("light", "11-seven-speakers") { NoteScreen(BoardFixtures.sevenSpeakers, onEvent = {}) }
+        rule.onNodeWithText("Speaker 7", useUnmergedTree = true).assertIsDisplayed()
+        assertSevenSpeakerWordsInk(dark = false)
+    }
 
     @Test fun nameSpeaker() = light("04-name-a-speaker")
 

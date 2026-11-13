@@ -6,6 +6,7 @@ import io.codemyriad.cassini.data.voices.SavedVoice
 import io.codemyriad.cassini.data.voices.SavedVoices
 import io.codemyriad.cassini.data.voices.VoiceEdit
 import io.codemyriad.cassini.data.voices.VoiceProblem
+import io.codemyriad.cassini.ui.theme.SpeakerTone
 import io.codemyriad.cassini.ui.voices.PersonUi
 import io.codemyriad.cassini.ui.voices.SavedVoicesDialog
 import io.codemyriad.cassini.ui.voices.SavedVoicesEvent
@@ -64,6 +65,17 @@ class SavedVoicesViewModelTest {
         )
         assertEquals(false, state.readOnly)
         assertNull(state.dialog)
+    }
+
+    @Test fun avatarSlotsComeFromSavedOrderEvenWhenRepositorySortChanges() = runTest(dispatcher) {
+        val first = saved("g", "Giulia", 14, 1_320.0).let { it.copy(voice = it.voice.copy(colourIndex = 4)) }
+        val second = saved("l", "Luca", 2, 30.0).let { it.copy(voice = it.voice.copy(colourIndex = 1)) }
+        ports.people.value = SavedVoices(listOf(first, second), problem = null)
+        val vm = viewModel()
+        assertEquals(listOf(SpeakerTone.Five, SpeakerTone.Two), vm.state.value!!.people.map { it.tone })
+        ports.people.value = SavedVoices(listOf(second, first), problem = null)
+        advanceUntilIdle()
+        assertEquals(listOf(SpeakerTone.Two, SpeakerTone.Five), vm.state.value!!.people.map { it.tone })
     }
 
     @Test

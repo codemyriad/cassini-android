@@ -126,7 +126,7 @@ class PlaybackClockTest {
         id = id,
         speakerId = "S1",
         name = SpeakerNameUi.Placeholder(1),
-        tone = SpeakerTone.Blue,
+        tone = SpeakerTone.One,
         startMs = starts.firstOrNull() ?: 0,
         words = starts.map { WordUi("w", it) }.toImmutableList(),
     )

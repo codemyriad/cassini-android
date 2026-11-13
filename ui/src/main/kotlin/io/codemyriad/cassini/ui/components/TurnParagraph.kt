@@ -70,7 +70,7 @@ internal val LocalTurnParagraphProbe = staticCompositionLocalOf<(() -> Unit)?> {
 /**
  * One turn's paragraph: a single `Text` built from [words] (joined by spaces, see [turnText]).
  *
- * [TurnMode.Read] (`transcript`, ink, or text3 for a [placeholder] speaker): a tap calls [onWordTap] with the index of
+ * [TurnMode.Read] (`transcript`, ink for every speaker): a tap calls [onWordTap] with the index of
  * the word under it; a tap on a space reaches the nearer word on the same line. The pressed word gets the accentTint
  * background. [activeIndex] is the word being played: its glyphs turn onAccentFill and a rounded accentFill
  * rectangle (radius 4, 3 dp wider on each side, the height of the font's content area as on board 03) is drawn
@@ -105,7 +105,6 @@ fun TurnParagraph(
     onWordTap: (Int) -> Unit,
     modifier: Modifier = Modifier,
     mode: TurnMode = TurnMode.Read,
-    placeholder: Boolean = false,
     unsettledFrom: Int? = null,
     matches: TurnMatches = TurnMatches.None,
     onPlayFromStart: (() -> Unit)? = null,
@@ -115,7 +114,7 @@ fun TurnParagraph(
     if (probe != null) SideEffect { probe() }
     val c = CassiniTheme.colors
     val style = if (mode == TurnMode.Read) CassiniTheme.type.transcript else CassiniTheme.type.draft
-    val color = if (mode == TurnMode.Draft || placeholder) c.text3 else c.ink
+    val color = if (mode == TurnMode.Draft) c.text3 else c.ink
     val tap by rememberUpdatedState(onWordTap)
     val starts = remember(words) { wordStarts(words) }
     val text = remember(words, mode, unsettledFrom, matches, c) {
@@ -175,7 +174,7 @@ private class Highlights {
     private val pressedRects = WordRects()
 
     /**
-     * Draws the paragraph with the pressed word on accentTint and the [active] word on accentFill in onAccentFill.
+     * Draws the paragraph with the pressed word on accentTint and the [active] word on highlight in highlightInk.
      * [height] is the height of the word rectangles.
      */
     fun ContentDrawScope.draw(active: IntRange?, height: Float, c: CassiniColors) {
@@ -187,9 +186,9 @@ private class Highlights {
         for ((path, tint) in chips) drawPath(path, tint)
         pressed?.let { drawWord(pressedRects.of(this, result, it, height), c.accentTint) }
         val rects = if (active != null) activeRects.of(this, result, active, height) else emptyList()
-        drawWord(rects, c.accentFill)
+        drawWord(rects, c.highlight)
         drawContent()
-        drawActiveGlyphs(glyphLayout ?: result, rects, c.accentFill, c.onAccentFill)
+        drawActiveGlyphs(glyphLayout ?: result, rects, c.highlight, c.highlightInk)
     }
 
     /** Draws [rects] in [color] with 4 dp corners. */
@@ -365,7 +364,12 @@ private fun paragraph(
         val start = range.first.coerceIn(0, length)
         val end = (range.last + 1).coerceIn(start, length)
         val current = index == matches.current
-        addStyle(SpanStyle(background = c.amberTint, fontWeight = if (current) FontWeight.W600 else null), start, end)
+        val hitStyle = SpanStyle(
+            color = c.highlightInk,
+            background = c.highlight,
+            fontWeight = if (current) FontWeight.W600 else null,
+        )
+        addStyle(hitStyle, start, end)
     }
 }
 

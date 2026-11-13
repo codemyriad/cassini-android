@@ -49,11 +49,11 @@ class LicenseAssetsTest {
 
     @Test fun nativeDependenciesMatchTheBuildManifest() = same("scripts/native-dependencies.json", "native-dependencies.json")
 
-    @Test fun noticesNameTheBundledFontsAndTheirLicence() {
+    @Test fun noticesDescribeTheSystemFontWithoutClaimingBundledFonts() {
         val notices = File(root, "THIRD_PARTY_NOTICES.md").readText()
-        for (name in listOf("Instrument Sans", "IBM Plex Mono", "SIL Open Font License")) {
-            assertTrue("THIRD_PARTY_NOTICES.md does not name $name", name in notices)
-        }
+        assertTrue("Android system font" in notices)
+        assertTrue("No font files are bundled" in notices)
+        assertTrue("Instrument Sans" !in notices && "IBM Plex Mono" !in notices)
     }
 
     @Test fun dataStoreProtobufLicenceShipsWithTheNotices() {

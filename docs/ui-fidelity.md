@@ -60,7 +60,7 @@ Each phone golden is 780 x 1688 px, the same size as its board. Most of the pixe
 anti-aliasing and text that is a fraction of a pixel wider or narrower than on the board (accepted deviation 4).
 
 For each board, the reviewer read the design PNG, the golden and the 50/50 blend with the Read tool. The colors
-are the tokens of ui.md section 4.1. The type is Instrument Sans and IBM Plex Mono in the sizes and weights of
+are the tokens of ui.md section 4.1. The type is the Android system sans in the sizes and weights of
 ui.md section 4.3. The icons are the icons of ui.md section 4.5. The copy is the board copy, word for word, except
 where a deviation in this report says otherwise.
 

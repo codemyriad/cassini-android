@@ -10,9 +10,6 @@ plugins {
     alias(libs.plugins.roborazzi)
 }
 
-// FontAssetsTest reads the font manifest in third_party/fonts and scans every module's src for web fonts.
-val fontManifestDir = rootProject.layout.projectDirectory.dir("third_party/fonts")
-
 /**
  * Passes the repository root to FontAssetsTest. The root's absolute path is not an input, so the task stays
  * relocatable and shares cache entries between checkouts. The web fonts the test looks for are an input: adding one
@@ -66,9 +63,6 @@ android {
                     .withPropertyName("screenshotGoldens")
                     .withPathSensitivity(PathSensitivity.RELATIVE)
                 it.jvmArgumentProviders.add(RepoRootArgument(rootDir, webFonts))
-                it.inputs.dir(fontManifestDir)
-                    .withPropertyName("fontManifest")
-                    .withPathSensitivity(PathSensitivity.RELATIVE)
                 it.inputs.dir(designMarkupDir)
                     .withPropertyName("designMarkup")
                     .withPathSensitivity(PathSensitivity.RELATIVE)
@@ -123,7 +117,7 @@ dependencies {
     testImplementation(libs.roborazzi)
     testImplementation(libs.roborazzi.compose)
     testImplementation(libs.roborazzi.junit.rule)
-    // FontAssetsTest parses third_party/fonts/fonts.json on the plain JVM, where android.jar has only stubs.
+    // The token-sync test parses the pinned JSON on the plain JVM, where android.jar has only stubs.
     testImplementation(libs.org.json)
 }
 

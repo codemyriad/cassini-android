@@ -160,7 +160,7 @@ class AcceptanceWalkTest {
         // 00 Library: the progress banner and the queued row.
         library()
         see(rule.text(UiR.string.ui_progress_transcribing, WEEKLY))
-        see(rule.text(UiR.string.ui_status_queued))
+        see(rule.text(UiR.string.ui_badge_queued))
         see(rule.text(UiR.string.ui_library_privacy))
         shot("00-library")
 

@@ -3,6 +3,7 @@
 
 package io.codemyriad.cassini.ui.components
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -44,7 +45,6 @@ import io.codemyriad.cassini.ui.format.Durations
 import io.codemyriad.cassini.ui.format.LocalFormat
 import io.codemyriad.cassini.ui.format.Spoken
 import io.codemyriad.cassini.ui.theme.CassiniTheme
-import io.codemyriad.cassini.ui.theme.Tone
 import kotlinx.collections.immutable.persistentListOf
 import java.time.LocalTime
 
@@ -66,18 +66,25 @@ import java.time.LocalTime
 fun NoteRow(row: NoteRowUi, day: DayLabel, onAction: (NoteRowAction) -> Unit, modifier: Modifier = Modifier) {
     val c = CassiniTheme.colors
     val t = CassiniTheme.type
-    val status = rowStatus(row.status)
+    val status = rowStatus(row.status, row.durationMs)
     val (boundsModifier, layerModifier) = noteRowBoundsModifiers(row.id)
     // The explicit description replaces the merged texts for TalkBack, so it also carries what they add: a suffix
     // that is not a button ("3 speakers", "No speech") and the preview, which tells why a search result matched.
     val locale = LocalFormat.current.locale
     val description = listOfNotNull(
-        Spoken.noteRow(row.title, row.durationMs, row.day ?: day, row.time, status.text, row.recordedLabel),
+        Spoken.noteRow(
+            row.title,
+            row.durationMs,
+            row.day ?: day,
+            row.time,
+            status.spokenText,
+            row.recordedLabel,
+        ),
         status.suffix?.takeIf { status.suffixAction == null }?.trimStart('·', ' ', '\u00A0')?.lowercase(locale),
         row.preview?.text,
     ).joinToString(", ")
     val actions = customActions(row, onAction)
-    val match = SpanStyle(fontWeight = FontWeight.W600, color = c.ink, background = c.accentTint)
+    val match = SpanStyle(fontWeight = FontWeight.W600, color = c.highlightInk, background = c.highlight)
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -103,13 +110,13 @@ fun NoteRow(row: NoteRowUi, day: DayLabel, onAction: (NoteRowAction) -> Unit, mo
             EllipsisText(
                 text = Highlighted(row.title, row.titleRanges).toAnnotatedString(match),
                 modifier = Modifier.weight(1f),
-                style = t.rowTitle,
+                style = t.meetingTitle,
                 color = c.ink,
                 maxLines = 2,
             )
             Text(
                 text = Durations.clock(row.durationMs),
-                style = t.monoTime.copy(lineHeight = t.rowTitle.lineHeight),
+                style = t.monoTime.copy(lineHeight = t.meetingTitle.lineHeight),
                 color = c.text2,
             )
         }
@@ -137,7 +144,7 @@ fun NoteRow(row: NoteRowUi, day: DayLabel, onAction: (NoteRowAction) -> Unit, mo
                 style = t.caption,
                 color = c.text2,
             )
-            StatusChip(status.text, status.tone, dot = status.dot)
+            StatusChip(status.text, status.kind)
             val suffix = status.suffix
             if (suffix != null) {
                 val action = status.suffixAction
@@ -181,43 +188,59 @@ private fun noteRowBoundsModifiers(noteId: String): Pair<Modifier, Modifier> {
 /** The chip and suffix of a status (features.md section 1, the status table). */
 internal data class RowStatus(
     val text: String,
-    val tone: Tone,
-    val dot: Boolean = false,
+    val kind: StatusBadgeKind,
+    val spoken: String? = null,
     val suffix: String? = null,
     val suffixAction: NoteRowAction? = null,
-)
+) {
+    val spokenText: String get() = spoken ?: text
+}
 
 @Composable
-internal fun rowStatus(status: NoteStatusUi): RowStatus = when (status) {
-    NoteStatusUi.Recording -> RowStatus(stringResource(R.string.ui_status_recording), Tone.Error, dot = true)
-    NoteStatusUi.Transcribing -> RowStatus(stringResource(R.string.ui_status_transcribing), Tone.Info)
-    NoteStatusUi.Queued -> RowStatus(stringResource(R.string.ui_status_queued), Tone.Outline)
+internal fun rowStatus(status: NoteStatusUi, liveMs: Long = 0): RowStatus = when (status) {
+    NoteStatusUi.Recording -> RowStatus(
+        statusBadgeText(StatusBadgeKind.Recording, liveMs = liveMs),
+        StatusBadgeKind.Recording,
+        spoken = stringResource(R.string.ui_status_recording),
+    )
+    NoteStatusUi.Transcribing -> badgeRowStatus(StatusBadgeKind.Transcribing, R.string.ui_status_transcribing)
+    NoteStatusUi.Queued -> badgeRowStatus(StatusBadgeKind.Queued, R.string.ui_status_queued)
     is NoteStatusUi.Paused -> RowStatus(
-        text = stringResource(R.string.ui_status_paused_at, Durations.clock(status.atMs)),
-        tone = Tone.Warn,
+        text = stringResource(R.string.ui_badge_paused, Durations.clock(status.atMs)),
+        kind = StatusBadgeKind.Paused,
+        spoken = stringResource(R.string.ui_status_paused_at, Durations.clock(status.atMs)),
         suffix = stringResource(R.string.ui_status_suffix_resume),
         suffixAction = NoteRowAction.RESUME,
     )
     NoteStatusUi.Failed -> RowStatus(
-        text = stringResource(R.string.ui_status_failed),
-        tone = Tone.Error,
+        text = stringResource(R.string.ui_badge_failed),
+        kind = StatusBadgeKind.Failed,
+        spoken = stringResource(R.string.ui_status_failed),
         suffix = stringResource(R.string.ui_status_suffix_try_again),
         suffixAction = NoteRowAction.TRY_AGAIN,
     )
-    NoteStatusUi.Unplayable -> RowStatus(stringResource(R.string.ui_status_unplayable), Tone.Error)
-    NoteStatusUi.Unreadable -> RowStatus(stringResource(R.string.ui_status_unreadable), Tone.Error)
-    NoteStatusUi.NewerFormat -> RowStatus(stringResource(R.string.ui_status_newer_format), Tone.Outline)
+    NoteStatusUi.Unplayable -> badgeRowStatus(StatusBadgeKind.Unplayable, R.string.ui_status_unplayable)
+    NoteStatusUi.Unreadable -> badgeRowStatus(StatusBadgeKind.Unreadable, R.string.ui_status_unreadable)
+    NoteStatusUi.NewerFormat -> badgeRowStatus(StatusBadgeKind.NewerFormat, R.string.ui_status_newer_format)
     is NoteStatusUi.Transcribed -> RowStatus(
         text = stringResource(R.string.ui_status_transcribed),
-        tone = Tone.Ok,
+        kind = StatusBadgeKind.Transcribed,
         suffix = when {
             status.words == 0 -> stringResource(R.string.ui_status_suffix_no_speech)
             status.speakers >= 2 -> Counts.plural(R.plurals.ui_status_suffix_speakers, status.speakers)
             else -> null
         },
     )
-    NoteStatusUi.AudioOnly -> RowStatus(stringResource(R.string.ui_status_audio_only), Tone.Outline)
+    NoteStatusUi.AudioOnly -> badgeRowStatus(StatusBadgeKind.AudioOnly, R.string.ui_status_audio_only)
 }
+
+/** A compact badge and its independent, established spoken label. */
+@Composable
+private fun badgeRowStatus(kind: StatusBadgeKind, @StringRes spoken: Int): RowStatus = RowStatus(
+    text = stringResource(kind.label),
+    kind = kind,
+    spoken = stringResource(spoken),
+)
 
 /**
  * Rename always; Move to trash except on the note being recorded (features.md section 6, as the actions sheet);

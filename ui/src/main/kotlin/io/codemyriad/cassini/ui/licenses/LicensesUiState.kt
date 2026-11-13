@@ -24,8 +24,6 @@ enum class LicenseEntry {
     CASSINI,
     THIRD_PARTY,
     NATIVE,
-    INSTRUMENT_SANS,
-    PLEX_MONO,
     MODELS,
     MODEL_SOURCES,
     PRIVACY,

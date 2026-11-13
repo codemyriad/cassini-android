@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated from cassini-ux 5e0c34e0f1bb390298dabdf4eedc494e933fd329; do not edit. -->
+<resources>
+    <string name="ui_badge_recording">A gravar %1$s</string>
+    <string name="ui_badge_importing">A importar…</string>
+    <string name="ui_badge_saving">A guardar…</string>
+    <string name="ui_badge_transcribing">A transcrever…</string>
+    <plurals name="ui_badge_transcribing_eta">
+        <item quantity="one">A transcrever · %1$s min</item>
+        <item quantity="many">A transcrever · %1$s min</item>
+        <item quantity="other">A transcrever · %1$s min</item>
+    </plurals>
+    <string name="ui_badge_transcribing_under_minute">A transcrever, falta menos de um minuto</string>
+    <string name="ui_badge_attention">Requer atenção</string>
+    <string name="ui_badge_interrupted">Interrompida</string>
+    <string name="ui_badge_received">Recebida</string>
+    <string name="ui_badge_queued">Em fila</string>
+    <string name="ui_badge_paused">Em pausa aos %1$s</string>
+    <string name="ui_badge_failed">Falha na transcrição</string>
+    <string name="ui_badge_audio_only">Apenas áudio</string>
+    <string name="ui_badge_unplayable">Não é possível reproduzir</string>
+    <string name="ui_badge_unreadable">Transcrição ilegível</string>
+    <string name="ui_badge_newer">Formato mais recente</string>
+</resources>

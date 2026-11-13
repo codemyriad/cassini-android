@@ -49,10 +49,10 @@ fun Avatar(text: String, tone: SpeakerTone, modifier: Modifier = Modifier, size:
 internal fun AvatarPreview() {
     CassiniTheme {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Avatar("G", SpeakerTone.Blue)
-            Avatar("P", SpeakerTone.Teal)
-            Avatar("A", SpeakerTone.Amber)
-            Avatar("L", SpeakerTone.Violet)
+            Avatar("G", SpeakerTone.One)
+            Avatar("P", SpeakerTone.Two)
+            Avatar("A", SpeakerTone.Unnamed)
+            Avatar("L", SpeakerTone.Three)
         }
     }
 }

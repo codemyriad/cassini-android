@@ -59,6 +59,9 @@ fun RecordFab(onClick: () -> Unit, modifier: Modifier = Modifier, recordingElaps
     val c = CassiniTheme.colors
     val shape = CassiniTheme.shapes.pill
     val label = recordLabel(recordingElapsedMs)
+    val live = recordingElapsedMs != null
+    val background = if (live) c.recordTint else c.record
+    val foreground = if (live) c.recordInk else c.onRecord
     val description = stringResource(
         if (recordingElapsedMs == null) R.string.ui_library_record_description else R.string.ui_library_return_to_recording,
     )
@@ -69,16 +72,16 @@ fun RecordFab(onClick: () -> Unit, modifier: Modifier = Modifier, recordingElaps
                 shape,
                 Shadow(
                     radius = RecordShadow.radius,
-                    color = c.red,
+                    color = c.record,
                     offset = DpOffset(0.dp, RecordShadow.offsetY),
                     alpha = RecordShadow.ALPHA,
                 ),
             )
             .clip(shape)
-            .background(c.red)
+            .background(background)
             .clickable(
                 interactionSource = null,
-                indication = ripple(color = c.onRed),
+                indication = ripple(color = foreground),
                 role = Role.Button,
                 onClick = onClick,
             )
@@ -91,7 +94,7 @@ fun RecordFab(onClick: () -> Unit, modifier: Modifier = Modifier, recordingElaps
         Text(
             text = label,
             style = CassiniTheme.type.fab,
-            color = c.onRed,
+            color = foreground,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
@@ -115,7 +118,7 @@ private fun FabDot(live: Boolean) {
         Modifier
             .size(18.dp)
             .clip(CircleShape)
-            .background(c.onRed),
+            .background(c.onRecord),
         contentAlignment = Alignment.Center,
     ) {
         if (live) {
@@ -123,7 +126,7 @@ private fun FabDot(live: Boolean) {
                 Modifier
                     .size(8.dp)
                     .clip(CircleShape)
-                    .background(c.red),
+                    .background(c.record),
             )
         }
     }

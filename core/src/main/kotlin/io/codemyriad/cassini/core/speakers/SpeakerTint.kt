@@ -1,32 +1,32 @@
 package io.codemyriad.cassini.core.speakers
 
-/**
- * The colour of a speaker's label and avatar (features.md section 0). A placeholder speaker is always [AMBER] ("not
- * named yet"). Named speakers cycle [BLUE], [TEAL], [VIOLET] in order of their first turn; placeholder speakers do not
- * take a slot. The `:ui` theme maps each value to its tone.
- */
+/** Six slots fixed at first speech; unnamed speakers hide their slot behind stone. */
 enum class SpeakerTint {
-    BLUE,
-    TEAL,
-    VIOLET,
-    AMBER,
-    ;
+    ONE, TWO, THREE, FOUR, FIVE, SIX, UNNAMED;
 
     companion object {
         /** The cycle of named speakers. */
-        val NAMED = listOf(BLUE, TEAL, VIOLET)
+        val NAMED = listOf(ONE, TWO, THREE, FOUR, FIVE, SIX)
 
-        /** The tint of the named speaker at [namedIndex] (from 0) among the named speakers only. */
-        fun named(namedIndex: Int): SpeakerTint = NAMED[Math.floorMod(namedIndex, NAMED.size)]
+        /** The tint of the named speaker at [namedIndex] (from 0) in the meeting (including speakers not named yet). */
+        fun named(namedIndex: Int): SpeakerTint = named(namedIndex.toLong())
+
+        /** Reduce a portable safe-integer slot before narrowing it to a palette index. */
+        fun named(namedIndex: Long): SpeakerTint = NAMED[Math.floorMod(namedIndex, NAMED.size.toLong()).toInt()]
 
         /**
          * The tint of each speaker in [order] (speaker ids in order of their first turn in the shown variant, as
          * `SpeakerStats` ordinals give them). [isPlaceholder] tells a speaker without a name.
          */
-        fun assign(order: List<String>, isPlaceholder: (String) -> Boolean): Map<String, SpeakerTint> {
+        fun assign(
+            order: List<String>,
+            colourIndices: Map<String, Long> = emptyMap(),
+            isPlaceholder: (String) -> Boolean,
+        ): Map<String, SpeakerTint> {
             val result = LinkedHashMap<String, SpeakerTint>()
-            var named = 0
-            for (id in order.distinct()) result[id] = if (isPlaceholder(id)) AMBER else named(named++)
+            for ((index, id) in order.distinct().withIndex()) {
+                result[id] = if (isPlaceholder(id)) UNNAMED else named(colourIndices[id] ?: index.toLong())
+            }
             return result
         }
 

@@ -166,9 +166,9 @@ internal fun TurnHeaderPreview() {
                 .width(350.dp)
                 .background(CassiniTheme.colors.surface),
         ) {
-            TurnHeader("Giulia", SpeakerTone.Blue, 692_000, auto = false, onClick = {})
-            TurnHeader("Paolo Ferri", SpeakerTone.Teal, 701_000, auto = true, onClick = {})
-            TurnHeader("Speaker 3", SpeakerTone.Amber, 740_000, auto = false, onClick = null)
+            TurnHeader("Giulia", SpeakerTone.One, 692_000, auto = false, onClick = {})
+            TurnHeader("Paolo Ferri", SpeakerTone.Two, 701_000, auto = true, onClick = {})
+            TurnHeader("Speaker 3", SpeakerTone.Unnamed, 740_000, auto = false, onClick = null)
         }
     }
 }

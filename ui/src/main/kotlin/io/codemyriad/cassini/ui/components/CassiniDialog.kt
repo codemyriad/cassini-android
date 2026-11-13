@@ -114,7 +114,7 @@ fun CassiniDialogContent(
                 .widthIn(max = DialogMaxWidth)
                 .fillMaxWidth()
                 .clip(CassiniTheme.shapes.dialog)
-                .background(c.surface)
+                .background(c.raised)
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {

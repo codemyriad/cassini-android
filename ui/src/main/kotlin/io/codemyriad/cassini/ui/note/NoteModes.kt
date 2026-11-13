@@ -46,7 +46,6 @@ import io.codemyriad.cassini.ui.components.DashedTag
 import io.codemyriad.cassini.ui.components.ProcessingCard
 import io.codemyriad.cassini.ui.components.ProcessingCardUi
 import io.codemyriad.cassini.ui.components.QueuedCard
-import io.codemyriad.cassini.ui.components.SpeakerNameUi
 import io.codemyriad.cassini.ui.components.SuggestionCard
 import io.codemyriad.cassini.ui.components.TurnHeader
 import io.codemyriad.cassini.ui.components.TurnMode
@@ -347,7 +346,6 @@ private fun DraftTurn(turn: TurnUi, first: Boolean, onEvent: (NoteEvent) -> Unit
             onWordTap = {},
             modifier = Modifier.padding(top = if (suggestion != null) 6.dp else 0.dp),
             mode = TurnMode.Draft,
-            placeholder = turn.name is SpeakerNameUi.Placeholder,
             unsettledFrom = turn.unsettledFrom,
         )
     }

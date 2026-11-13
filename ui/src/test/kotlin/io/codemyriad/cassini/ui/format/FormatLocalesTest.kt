@@ -4,7 +4,9 @@ import android.content.Context
 import android.content.res.Configuration
 import android.content.res.Resources
 import androidx.test.core.app.ApplicationProvider
+import io.codemyriad.cassini.ui.R
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -66,6 +68,28 @@ class FormatLocalesTest {
             val f = format(tag)
             assertEquals(tag, sizes, listOf(Sizes.megabytes(res, ModelBytes.SPEECH, f), Sizes.storage(res, GIB_1_4, f)))
         }
+    }
+
+    @Test fun sharedBadgeCountsKeepTheNumberAcrossAndroidPluralCategories() {
+        val prefixes = mapOf(
+            "en" to "Transcribing",
+            "it" to "In trascrizione",
+            "fr" to "Transcription",
+            "es" to "Transcribiendo",
+            "pt-BR" to "Transcrevendo",
+            "pt-PT" to "A transcrever",
+        )
+        for ((tag, prefix) in prefixes) {
+            for (count in 1..2) {
+                val actual = Counts.plural(resources(tag), R.plurals.ui_badge_transcribing_eta, count, format(tag))
+                assertEquals(tag, "$prefix · $count min", actual)
+            }
+        }
+        // CLDR versions differ on zero's category; either must retain the actual count.
+        val zero = Counts.plural(resources("pt-PT"), R.plurals.ui_badge_transcribing_eta, 0, format("pt-PT"))
+        assertTrue(zero, zero.contains("0 min"))
+        val singular = resources("en").getQuantityString(R.plurals.ui_badge_transcribing_eta, 1, "0")
+        assertEquals("Transcribing · 0 min", singular)
     }
 
     private companion object {
