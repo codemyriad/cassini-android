@@ -25,6 +25,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
@@ -113,7 +114,9 @@ class Phase1MeetingTest {
         }.toImmutableList()
         val events = mutableListOf<NoteEvent>()
         show(base.copy(meetingSpeakers = speakers, playback = null), onEvent = { events += it })
-        rule.onNodeWithTag("meeting-speaker-${unnamed.speakerId}").assert(hasText("Voce originale")).performClick()
+        rule.onNodeWithTag("meeting-speaker-${unnamed.speakerId}")
+            .assert(hasContentDescription("Voce originale", substring = true)).performClick()
+        rule.onNodeWithText("Voce originale", useUnmergedTree = true).assertIsDisplayed()
         rule.runOnIdle { assertEquals(listOf(NoteEvent.SpeakerTap(unnamed.speakerId)), events) }
     }
 

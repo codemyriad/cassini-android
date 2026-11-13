@@ -3,14 +3,12 @@
 package io.codemyriad.cassini.ui.note
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -24,15 +22,19 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.codemyriad.cassini.ui.R
 import io.codemyriad.cassini.ui.components.AutoBadge
 import io.codemyriad.cassini.ui.components.SpeakerNameUi
 import io.codemyriad.cassini.ui.components.display
+import io.codemyriad.cassini.ui.components.touchTarget
+import io.codemyriad.cassini.ui.components.turnHeaderSemantics
 import io.codemyriad.cassini.ui.format.Dates
 import io.codemyriad.cassini.ui.format.Durations
+import io.codemyriad.cassini.ui.format.Spoken
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import io.codemyriad.cassini.ui.theme.colors
 
@@ -42,7 +44,9 @@ internal fun MeetingHeader(state: NoteUiState, onEvent: (NoteEvent) -> Unit) {
     val c = CassiniTheme.colors
     val speakers = remember(state.meetingSpeakers, state.turns) {
         state.meetingSpeakers.ifEmpty {
-            state.turns.distinctBy { it.speakerId }.map { MeetingSpeakerUi(it.speakerId, it.name, it.tone, it.auto) }
+            state.turns.distinctBy { it.speakerId }.map {
+                MeetingSpeakerUi(it.speakerId, it.name, it.tone, it.auto, it.startMs)
+            }
         }
     }
     Column(Modifier.fillMaxWidth().background(c.bg).testTag("meeting-header")) {
@@ -77,28 +81,41 @@ internal fun MeetingHeader(state: NoteUiState, onEvent: (NoteEvent) -> Unit) {
 private fun InlineSpeaker(speaker: MeetingSpeakerUi, onClick: () -> Unit) {
     val c = CassiniTheme.colors
     val unnamed = speaker.name is SpeakerNameUi.Placeholder
-    Row(
-        Modifier.heightIn(min = 48.dp).testTag("meeting-speaker-${speaker.id}")
-            .clickable(role = Role.Button, onClick = onClick),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    Box(
+        Modifier.touchTarget().testTag("meeting-speaker-${speaker.id}")
+            .turnHeaderSemantics(
+                description = Spoken.turn(speaker.name.display(), speaker.startMs, speaker.auto),
+                clickLabel = stringResource(R.string.ui_turn_name_action),
+                onClick = onClick,
+            ),
+        contentAlignment = Alignment.CenterStart,
     ) {
-        Box(Modifier.size(7.dp).background(speaker.tone.colors.ink, CircleShape))
-        Text(
-            speaker.name.display(),
-            style = CassiniTheme.type.body14Plain.copy(fontSize = 15.sp),
-            color = c.ink,
-            modifier = Modifier.drawBehind {
-                if (unnamed) {
-                    drawLine(
-                        c.text2.copy(alpha = 0.55f),
-                        Offset(0f, size.height),
-                        Offset(size.width, size.height),
-                        1.dp.toPx(),
-                    )
-                }
-            },
-        )
-        if (speaker.auto) AutoBadge(stringResource(R.string.ui_turn_auto))
+        Row(
+            Modifier.clearAndSetSemantics {},
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.size(7.dp).background(speaker.tone.colors.ink, CircleShape))
+            Text(
+                speaker.name.display(),
+                style = CassiniTheme.type.body14Plain.copy(fontSize = 15.sp),
+                color = c.ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false).drawBehind {
+                    if (unnamed) {
+                        drawLine(
+                            c.text2.copy(alpha = 0.55f),
+                            Offset(0f, size.height),
+                            Offset(size.width, size.height),
+                            1.dp.toPx(),
+                        )
+                    }
+                },
+            )
+            if (speaker.auto) {
+                AutoBadge(stringResource(R.string.ui_turn_auto), Modifier.testTag("meeting-auto-${speaker.id}"))
+            }
+        }
     }
 }

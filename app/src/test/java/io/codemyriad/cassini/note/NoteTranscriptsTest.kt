@@ -222,6 +222,21 @@ class NoteTranscriptsTest {
         assertEquals(WordRef(row.id, 8), draft.activeWord(3400))
     }
 
+    @Test fun automaticOverlapOnlySpeakersKeepTheirHeaderMetadataInSealedAndDraftViews() {
+        val vector = fixture("acknowledgment")
+        val ben = Voice("ben-voice", "Ben", "m", FloatArray(1), 1, 10.0, 0, 0)
+        val prints = mapOf("ben" to SpeakerPrint(FloatArray(1), 5.0, Match(ben.id, 0.8f, Match.State.AUTO)))
+        val sealed = NoteTranscripts.sealed(vector, vectorSpeakers, prints, listOf(ben))
+        val draft = NoteTranscripts.draft(vector, mapOf("ada" to "Ada", "ben" to "Ben"), setOf("ben"), emptyMap(), null)
+        for (shown in listOf(sealed, draft)) {
+            assertTrue("Ben occurs only in an inline chip", shown.turns.none { it.speakerId == "ben" })
+            assertTrue(shown.speakerMetadata.getValue("ben").auto)
+            val header = shown.meetingSpeakers.single { it.id == "ben" }
+            assertTrue(header.auto)
+            assertEquals(vector.filter { it.speaker == "ben" }.minOf { it.startMs }, header.startMs)
+        }
+    }
+
     @Test fun canonicalOrderMayDifferFromPlaybackOrder() {
         val transcript = NoteTranscripts.sealed(
             listOf(Word("a", 1000, 1100, "later"), Word("b", 0, 100, "earlier")),

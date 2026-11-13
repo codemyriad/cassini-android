@@ -24,7 +24,7 @@ import kotlinx.collections.immutable.toImmutableList
 import java.util.Arrays
 
 /** Naming metadata for every speaker, including speakers shown only inside a chip. */
-data class TranscriptSpeaker(val name: SpeakerNameUi, val tone: SpeakerTone)
+data class TranscriptSpeaker(val name: SpeakerNameUi, val tone: SpeakerTone, val auto: Boolean = false)
 
 /**
  * The transcript the Note screen shows: its [turns] (one LazyColumn item each) and an [index] from audio time to
@@ -52,11 +52,20 @@ class NoteTranscript(
     }.distinct()
 
     /** Built once with the transcript, including speakers occurring only in an inline overlap. */
-    val meetingSpeakers: ImmutableList<MeetingSpeakerUi> = speakers.mapNotNull { id ->
-        speakerMetadata[id]?.let { metadata ->
-            MeetingSpeakerUi(id, metadata.name, metadata.tone, turns.firstOrNull { it.speakerId == id }?.auto ?: false)
+    val meetingSpeakers: ImmutableList<MeetingSpeakerUi> = run {
+        val firstStarts = HashMap<String, Long>()
+        turns.forEach { turn ->
+            turn.words.forEach { word ->
+                val id = word.speakerId.ifEmpty { turn.speakerId }
+                firstStarts[id] = minOf(firstStarts[id] ?: Long.MAX_VALUE, word.startMs)
+            }
         }
-    }.toImmutableList()
+        speakers.mapNotNull { id ->
+            speakerMetadata[id]?.let { metadata ->
+                MeetingSpeakerUi(id, metadata.name, metadata.tone, metadata.auto, firstStarts.getValue(id))
+            }
+        }.toImmutableList()
+    }
 
     companion object {
         val EMPTY = NoteTranscript(persistentListOf(), WordIndex(LongArray(0), emptyArray(), IntArray(0)))
@@ -205,7 +214,8 @@ object NoteTranscripts {
                 inlineSuggestions = inline.toImmutableList(),
             )
         }
-        return NoteTranscript(turns.toImmutableList(), transcript.index, transcript.speakerMetadata)
+        val metadata = transcript.speakerMetadata.mapValues { (id, speaker) -> speaker.copy(auto = id in automatic) }
+        return NoteTranscript(turns.toImmutableList(), transcript.index, metadata)
     }
 
     // Building. ---------------------------------------------------------------------------------------------------
@@ -286,7 +296,7 @@ object NoteTranscripts {
         val turnIds = chronological.map { checkNotNull(refs[it]).turnId }.toTypedArray()
         val inTurn = chronological.map { checkNotNull(refs[it]).index }.toIntArray()
         val metadata = words.map { it.speaker }.distinct().associateWith { id ->
-            made(id).let { TranscriptSpeaker(it.name, it.tone) }
+            made(id).let { TranscriptSpeaker(it.name, it.tone, it.auto) }
         }
         return NoteTranscript(turns.toImmutableList(), WordIndex(starts, turnIds, inTurn), metadata)
     }

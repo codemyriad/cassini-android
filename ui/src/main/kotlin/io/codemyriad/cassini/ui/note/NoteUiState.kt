@@ -193,4 +193,10 @@ sealed interface NoteDialog {
 
 /** Existing transcript metadata in first-speech order; no separate speaker identity or colour allocation. */
 @Immutable
-data class MeetingSpeakerUi(val id: String, val name: SpeakerNameUi, val tone: SpeakerTone, val auto: Boolean = false)
+data class MeetingSpeakerUi(
+    val id: String,
+    val name: SpeakerNameUi,
+    val tone: SpeakerTone,
+    val auto: Boolean = false,
+    val startMs: Long = 0,
+)
