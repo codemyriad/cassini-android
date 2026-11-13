@@ -17,6 +17,7 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
@@ -260,8 +261,8 @@ class Phase1LibraryTest {
             rule.runOnIdle { row = row.copy(status = status) }
             val target = rule.onNodeWithText(label)
             val bounds = target.getBoundsInRoot()
-            assertTrue("$label width", bounds.width.value >= 48f)
-            assertTrue("$label height", bounds.height.value >= 48f)
+            assertTrue("$label width", (bounds.right - bounds.left).value >= 48f)
+            assertTrue("$label height", (bounds.bottom - bounds.top).value >= 48f)
             // Tap below the text, inside the explicit target, rather than the default semantic centre.
             target.performTouchInput { click(Offset(width / 2f, height - 1f)) }
         }
