@@ -66,6 +66,12 @@ class Phase1ContractTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             STRINGS.android_text('Paused', 'position')
 
+    def test_android_singular_category_keeps_the_numeric_argument(self):
+        self.assertEqual('%1$s orador', STRINGS.android_text('1 orador', 'n', literal=True))
+        self.assertEqual('%1$s intervenant', STRINGS.android_text('{n} intervenant', 'n', literal=True))
+        with self.assertRaisesRegex(ValueError, 'carry its count'):
+            STRINGS.android_text('orador', 'n', literal=True)
+
     def test_missing_other_plural_fails_after_an_intentional_pin_update(self):
         path = self.root / PIN.VENDOR / 'strings.json'
         catalog = json.loads(path.read_text())

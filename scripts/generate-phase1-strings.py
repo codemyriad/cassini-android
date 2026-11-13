@@ -37,6 +37,12 @@ LABELS = {
 
 
 def android_text(text, argument, *, literal=False):
+    # Android may select `one` for zero (Portuguese), so keep the count dynamic
+    # even when the shared catalog spells its singular example with a literal 1.
+    if literal and argument == 'n' and '{n}' not in text:
+        text, count = re.subn(r'(?<!\w)1(?!\w)', '{n}', text)
+        if count != 1:
+            raise ValueError('Shared count plural must carry its count')
     expected = {argument} if argument else set()
     actual = set(re.findall(r'\{([^{}]+)\}', text))
     if (literal and not actual <= expected) or (not literal and actual != expected):

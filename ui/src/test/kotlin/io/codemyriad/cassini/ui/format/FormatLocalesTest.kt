@@ -4,7 +4,9 @@ import android.content.Context
 import android.content.res.Configuration
 import android.content.res.Resources
 import androidx.test.core.app.ApplicationProvider
+import io.codemyriad.cassini.ui.R
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -66,6 +68,26 @@ class FormatLocalesTest {
             val f = format(tag)
             assertEquals(tag, sizes, listOf(Sizes.megabytes(res, ModelBytes.SPEECH, f), Sizes.storage(res, GIB_1_4, f)))
         }
+    }
+
+    @Test fun sharedSpeakerCountsKeepTheNumberAcrossAndroidPluralCategories() {
+        val expected = mapOf(
+            "en" to listOf("1 speaker", "2 speakers"),
+            "it" to listOf("1 voce", "2 voci"),
+            "fr" to listOf("1 intervenant", "2 intervenants"),
+            "es" to listOf("1 hablante", "2 hablantes"),
+            "pt-BR" to listOf("1 locutor", "2 locutores"),
+            "pt-PT" to listOf("1 orador", "2 oradores"),
+        )
+        for ((tag, labels) in expected) {
+            val actual = (1..2).map { Counts.plural(resources(tag), R.plurals.ui_row_speaker_count, it, format(tag)) }
+            assertEquals(tag, labels, actual)
+        }
+        // CLDR versions differ on zero's category; either must retain the actual count.
+        val zero = Counts.plural(resources("pt-PT"), R.plurals.ui_row_speaker_count, 0, format("pt-PT"))
+        assertTrue(zero, zero.startsWith("0 "))
+        val singular = resources("pt-PT").getQuantityString(R.plurals.ui_row_speaker_count, 1, "0")
+        assertEquals("0 orador", singular)
     }
 
     private companion object {

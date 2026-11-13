@@ -6,7 +6,7 @@
     <string name="ui_badge_saving">Salvataggio…</string>
     <string name="ui_badge_transcribing">In trascrizione…</string>
     <plurals name="ui_badge_transcribing_eta">
-        <item quantity="one">In trascrizione · 1 min</item>
+        <item quantity="one">In trascrizione · %1$s min</item>
         <item quantity="many">In trascrizione · %1$s min</item>
         <item quantity="other">In trascrizione · %1$s min</item>
     </plurals>
@@ -23,7 +23,7 @@
     <string name="ui_badge_newer">Formato più recente</string>
     <string name="ui_all_meetings">Tutte le riunioni</string>
     <plurals name="ui_row_speaker_count">
-        <item quantity="one">1 voce</item>
+        <item quantity="one">%1$s voce</item>
         <item quantity="many">%1$s voci</item>
         <item quantity="other">%1$s voci</item>
     </plurals>
