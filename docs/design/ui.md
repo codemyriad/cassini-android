@@ -458,6 +458,8 @@ All buttons are pills, with no elevation, a clipped ripple and `Role.Button`. A 
 
 ### Recording components
 
+Phase 1 Recording component layout and shared catalog labels follow [WP4: Android recording](phase1-wp4.md) (`L-08`, `L-48`, `L-49`).
+
 - **`RecordingTimer`**: `timer` rec.text, at the center. A spoken contentDescription. It is not a live region.
 - **`RecordingStatus`**: a 10 dp dot (paused: a hollow 10 dp ring with a 1.5 dp rec.text2 stroke) and a 14/600 text ("Recording" in rec.status, "Paused" in rec.text2). A polite live region.
 - **`RecordingControls`**: 3 equal columns, with the Library, Pause/Resume and Finish controls.
@@ -539,6 +541,8 @@ These are the contracts of the screens:
 - In search mode, the flat list of results replaces the sections.
 
 ### Recording (01)
+
+Phase 1 screen layout and bounded middle scroll follow [WP4: Android recording](phase1-wp4.md) (`L-08`, `L-48`, `L-49`).
 
 - A `Column(rec.bg)` with padding 16/16/28 and the safe drawing insets.
 - Header row 48: collapse (44/48), the status at the center, and the format badge.

@@ -100,6 +100,8 @@ The activity area shows these items, in this sequence:
 
 ## 2. Recording (board 01)
 
+Phase 1 Recording presentation and shared catalog controls follow [WP4: Android recording](phase1-wp4.md) (`L-08`, `L-48`, `L-49`), retaining the capture, handoff and action contracts below.
+
 The dark surface is the same in the two app themes.
 
 - Header: a chevron down (a11y "Minimise to library (recording continues)") opens the Library. At the center: "Recording" with the orange dot, or "Paused" with a hollow ring. The word gives the state, and the ring is decorative. The format chip shows "Opus 48 kHz" / "M4A 48 kHz" from the capture.
@@ -323,7 +325,7 @@ If a cue has more than 42 characters, the writer breaks the line. It uses the sp
 
 | Notification | Channel | Content | Actions |
 |---|---|---|---|
-| Recording (ongoing, id 1) | recording | "Recording" / "Recording paused". The text is the title or the active warning. A chronometer during the recording, and "Paused at 24:07" during a pause. | Pause/Resume and Finish. The content opens Recording. |
+| Recording (ongoing, id 1) | recording | "Recording" / "Recording paused". The text is the title or the active warning. A chronometer during the recording, and "Paused at 24:07" during a pause. | Pause/Resume and Stop (shared catalog labels; `ACTION_FINISH` retained). The content opens Recording. |
 | Processing (ongoing, id 2, ≤ 1 Hz) | processing | "Transcribing “<title>”" and "62% · 6–9 min left" or "Calculating time left…". Also "Starting…" and "Finishing the previous note…". For a download: "Downloading speech recognition — 46%" / "296 of 640 MB". "Checking files — 80%". "Matching voices…" and "Saving…". The sub-text is "1 more in queue". | Stop (stop all and hold) and Open. Cancel during a download. |
 | Transcribed | results | "Transcribed: <title>" / "3 speakers · 48:13" | The content opens the note. |
 | Couldn't transcribe | results | "Couldn't transcribe <title>" / the failure text | The content opens the note. |

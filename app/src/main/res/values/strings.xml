@@ -95,7 +95,6 @@
     <string name="notif_rec_other_app">Paused — another app is using audio</string>
     <string name="notif_rec_storage_low">Storage almost full — about %1$d min left</string>
     <string name="notif_rec_file_low">Recording file almost full — about %1$d min left</string>
-    <string name="notif_action_pause">Pause</string>
     <string name="notif_rec_stopped_title">Recording stopped</string>
     <string name="notif_rec_stopped_text">Less than 200 MB free. The recording so far is saved.</string>
     <string name="notif_rec_file_full_text">Cassini ends M4A recordings at 1 GB, about 74 hours. The recording so far is saved. Start a new recording to continue.</string>

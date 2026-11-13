@@ -99,7 +99,6 @@
     <string name="notif_rec_other_app">Em pausa — outra aplicação está a usar o áudio</string>
     <string name="notif_rec_storage_low">Armazenamento quase cheio — restam cerca de %1$d min</string>
     <string name="notif_rec_file_low">Ficheiro de gravação quase cheio — restam cerca de %1$d min</string>
-    <string name="notif_action_pause">Pausa</string>
     <string name="notif_rec_stopped_title">Gravação interrompida</string>
     <string name="notif_rec_stopped_text">Menos de 200 MB livres. A gravação até agora está guardada.</string>
     <string name="notif_rec_file_full_text">O Cassini termina as gravações M4A ao atingir 1 GB, cerca de 74 horas. A gravação até agora está guardada. Inicie uma nova gravação para continuar.</string>

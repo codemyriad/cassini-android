@@ -99,7 +99,6 @@
     <string name="notif_rec_other_app">En pause — une autre application utilise l’audio</string>
     <string name="notif_rec_storage_low">Stockage presque plein — il reste environ %1$d min</string>
     <string name="notif_rec_file_low">Fichier d’enregistrement presque plein — il reste environ %1$d min</string>
-    <string name="notif_action_pause">Pause</string>
     <string name="notif_rec_stopped_title">Enregistrement arrêté</string>
     <string name="notif_rec_stopped_text">Moins de 200 Mo libres. L’enregistrement effectué jusqu’ici est sauvegardé.</string>
     <string name="notif_rec_file_full_text">Cassini arrête les enregistrements M4A à 1 Go, soit environ 74 heures. L’enregistrement effectué jusqu’ici est sauvegardé. Lancez un nouvel enregistrement pour continuer.</string>
