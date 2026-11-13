@@ -168,15 +168,15 @@ class AppShellTest {
             }
         }
         assertTrue("the recording starts: $started", started is RecordingState.Active)
-        rule.onNodeWithText("Finish").assertExists()
+        rule.onNodeWithText("Stop").assertExists()
 
         Espresso.pressBack()
-        rule.onNodeWithText("Finish").assertDoesNotExist()
+        rule.onNodeWithText("Stop").assertDoesNotExist()
         rule.onNodeWithText("Tap to return").assertExists()
         assertTrue("the recording continues", app.graph.recording.state.value is RecordingState.Active)
 
         rule.onNodeWithText("Tap to return").performClick()
-        rule.onNodeWithText("Finish").assertExists()
+        rule.onNodeWithText("Stop").assertExists()
     }
 
     @Test fun anEmptySearchDoesNotSurviveAMeetingRoundTrip() {
@@ -238,7 +238,7 @@ class AppShellTest {
 
         shadowOf(app as Application).grantPermissions(Manifest.permission.RECORD_AUDIO)
         rule.onNodeWithText("Record").performClick()
-        rule.onNodeWithText("Finish").assertExists()
+        rule.onNodeWithText("Stop").assertExists()
         assertEquals("Recording is dark in both themes", false, darkIcons())
         Espresso.pressBack()
         rule.onNodeWithText("Tap to return").assertExists()

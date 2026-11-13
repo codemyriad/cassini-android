@@ -75,6 +75,18 @@ class Phase1ContractTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'one commit'):
             PIN.check(self.root)
 
+    def test_recording_stop_uses_the_shared_stop_in_every_locale(self):
+        catalog = json.loads((self.root / PIN.VENDOR / 'strings.json').read_text())
+        stop = next(e for e in catalog['entries'] if e['id'] == 'common.stop')
+        outputs = dict(STRINGS.generated(self.root))
+        for locale, directory in STRINGS.LOCALES.items():
+            with self.subTest(locale=locale):
+                output = next(value for path, value in outputs.items() if path.parent.name == directory)
+                actual = ET.fromstring(output).find("string[@name='ui_recording_finish']")
+                text = stop['en'] if locale == 'en' else stop['l10n'][locale]['text']
+                self.assertIsNotNone(actual)
+                self.assertEqual(text, actual.text)
+
     def test_unexpected_or_missing_placeholder_fails(self):
         with self.assertRaises(ValueError):
             STRINGS.android_text('Paused at {invented}', 'position')

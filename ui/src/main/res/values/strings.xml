@@ -199,7 +199,6 @@
     <string name="ui_recording_hint_space">Space for about %1$s more.</string>
     <string name="ui_recording_pause">Pause recording</string>
     <string name="ui_recording_resume">Resume recording</string>
-    <string name="ui_recording_finish">Finish</string>
 
     <!-- Note screen header and modes (features.md section 3). -->
     <string name="ui_note_search">Search in transcript</string>
