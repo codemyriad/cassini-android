@@ -27,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.R
@@ -62,6 +63,7 @@ fun NoteScreen(
     val search = state.search
     BackHandler(enabled = search != null) { onEvent(NoteEvent.CloseSearch) }
     val listState = rememberLazyListState()
+    MeetingFindPosition(search != null, state.mode == NoteMode.Reading, listState, state.turns.firstOrNull()?.id)
     val scrolled by remember {
         derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0 }
     }
@@ -193,13 +195,10 @@ internal fun ColumnScope.ReadAndListenBody(
     listState: LazyListState,
     onEvent: (NoteEvent) -> Unit,
 ) {
-    state.banners.forEach { spec ->
-        Banner(
-            spec = spec,
-            onAction = { onEvent(NoteEvent.BannerAction(spec.id, it)) },
-            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 10.dp),
-            onDismiss = { onEvent(NoteEvent.DismissBanner(spec.id)) },
-        )
+    val scrollingHeader = state.mode == NoteMode.Reading && state.search == null
+    if (!scrollingHeader) {
+        if (state.mode != NoteMode.Reading) state.chips?.let { NoteChipsRow(it, onEvent) }
+        MeetingBanners(state, onEvent)
     }
     TranscriptPane(
         turns = state.turns,
@@ -212,6 +211,21 @@ internal fun ColumnScope.ReadAndListenBody(
         onEvent = onEvent,
         modifier = Modifier.weight(1f),
         noWords = state.noWords,
-        header = if (state.search == null) ({ MeetingHeader(state, onEvent) }) else null,
+        header = if (scrollingHeader) ({ MeetingHeader(state, onEvent) }) else null,
     )
+}
+
+/** Reading banners travel with their controls; other document modes keep them above the transcript. */
+@Composable
+internal fun MeetingBanners(state: NoteUiState, onEvent: (NoteEvent) -> Unit) {
+    state.banners.forEach { spec ->
+        Banner(
+            spec = spec,
+            onAction = { onEvent(NoteEvent.BannerAction(spec.id, it)) },
+            modifier = Modifier
+                .padding(start = 16.dp, end = 16.dp, bottom = 10.dp)
+                .testTag("meeting-banner-${spec.id}"),
+            onDismiss = { onEvent(NoteEvent.DismissBanner(spec.id)) },
+        )
+    }
 }

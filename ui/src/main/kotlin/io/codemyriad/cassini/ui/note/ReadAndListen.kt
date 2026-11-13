@@ -310,7 +310,9 @@ private fun SearchScroll(
         val index = turnIndex + headerItems
         val headerVisible = listState.firstVisibleItemIndex < headerItems
         val targetVisible = listState.layoutInfo.visibleItemsInfo.any { it.index == index }
-        if (turnIndex >= 0 && (headerVisible || !targetVisible)) {
+        val targetClipped = listState.firstVisibleItemIndex == index && listState.firstVisibleItemScrollOffset > 0
+        val needsScroll = headerVisible || !targetVisible || targetClipped
+        if (turnIndex >= 0 && needsScroll) {
             listState.animateScrollToItem(index)
         }
     }

@@ -73,6 +73,7 @@ internal fun MeetingHeader(state: NoteUiState, onEvent: (NoteEvent) -> Unit) {
         state.chips?.let {
             NoteChipsRow(it, onEvent, showSpeakerCount = state.mode != NoteMode.Reading || speakers.isEmpty())
         }
+        MeetingBanners(state, onEvent)
         HorizontalDivider(color = c.line, modifier = Modifier.testTag("meeting-header-divider"))
     }
 }
