@@ -9,11 +9,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -108,6 +110,28 @@ class Phase1MeetingTest {
     @Test fun everySpeakerParagraphKeepsNeutralInkAfterMetadataScrolls() {
         show(BoardFixtures.sevenSpeakers)
         rule.assertSevenSpeakerWordsInk(dark = false)
+    }
+
+    @Test fun queuedAndFailedDocumentsDoNotRepeatTheExistingBarDate() {
+        var state by mutableStateOf(BoardFixtures.readAndListen.copy(mode = NoteMode.Failed(overDocument = true)))
+        rule.setContent {
+            CassiniTheme {
+                ProvideFixedFormat(locale = Locale.ENGLISH) { NoteScreen(state, onEvent = {}) }
+            }
+        }
+        rule.onNodeWithTag("meeting-date").assertDoesNotExist()
+        rule.onAllNodesWithText("Yesterday, 15:10 · 23:50").assertCountEquals(1)
+        rule.runOnIdle { state = state.copy(mode = NoteMode.Queued(ahead = 0, overDocument = true)) }
+        rule.onNodeWithTag("meeting-date").assertDoesNotExist()
+        rule.onAllNodesWithText("Yesterday, 15:10 · 23:50").assertCountEquals(1)
+    }
+
+    @Test fun findUsesTheWholeTranscriptViewportWithoutTheMeetingMetadata() {
+        val base = BoardFixtures.readAndListen
+        val match = TranscriptMatch(base.turns[1].id, 0..3)
+        show(base.copy(playback = null, search = TranscriptSearchUi("Yes", persistentListOf(match), 0)))
+        rule.onNodeWithTag("meeting-header").assertDoesNotExist()
+        rule.onNodeWithContentDescription("Close search").assertIsDisplayed()
     }
 
     @Test fun searchJumpsPastTheHeaderToTheActualMatchedTurn() = jump(searching = true)

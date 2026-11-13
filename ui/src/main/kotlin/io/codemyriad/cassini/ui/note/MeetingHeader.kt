@@ -46,21 +46,23 @@ internal fun MeetingHeader(state: NoteUiState, onEvent: (NoteEvent) -> Unit) {
         }
     }
     Column(Modifier.fillMaxWidth().background(c.bg).testTag("meeting-header")) {
-        Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
-            state.subtitle?.let {
-                Text(
-                    stringResource(
-                        R.string.ui_join_dot,
-                        it.recordedLabel ?: Dates.dayTime(it.day, it.time),
-                        Durations.clock(it.durationMs),
-                    ),
-                    style = CassiniTheme.type.monoTime,
-                    color = c.text2,
-                    modifier = Modifier.testTag("meeting-date"),
-                )
-            }
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                speakers.forEach { speaker -> InlineSpeaker(speaker) { onEvent(NoteEvent.SpeakerTap(speaker.id)) } }
+        if (state.mode == NoteMode.Reading) {
+            Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+                state.subtitle?.let {
+                    Text(
+                        stringResource(
+                            R.string.ui_join_dot,
+                            it.recordedLabel ?: Dates.dayTime(it.day, it.time),
+                            Durations.clock(it.durationMs),
+                        ),
+                        style = CassiniTheme.type.monoTime,
+                        color = c.text2,
+                        modifier = Modifier.testTag("meeting-date"),
+                    )
+                }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    speakers.forEach { speaker -> InlineSpeaker(speaker) { onEvent(NoteEvent.SpeakerTap(speaker.id)) } }
+                }
             }
         }
         // Existing trust/version controls stay available and scroll with the rest of the metadata.

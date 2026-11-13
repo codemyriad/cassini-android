@@ -212,6 +212,6 @@ internal fun ColumnScope.ReadAndListenBody(
         onEvent = onEvent,
         modifier = Modifier.weight(1f),
         noWords = state.noWords,
-        header = { MeetingHeader(state, onEvent) },
+        header = if (state.search == null) ({ MeetingHeader(state, onEvent) }) else null,
     )
 }
