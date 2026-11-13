@@ -98,6 +98,7 @@ class LibraryFlowTest {
         // Search finds a word of what was said in another note, and not the clip.
         runBlocking { import(meetingDocument(MEETING_TITLE)) }
         rule.waitShown(hasContentDescription(MEETING_TITLE, substring = true))
+        rule.waitForWindowFocus()
         rule.onNode(hasSetTextAction()).performClick()
         rule.onNode(hasSetTextAction()).performTextInput("star")
         rule.waitGone(row)
@@ -138,6 +139,7 @@ class LibraryFlowTest {
             val noteId = runBlocking { import(meetingDocument(MEETING_TITLE)) }
             val row = hasContentDescription(MEETING_TITLE, substring = true)
             rule.waitShown(row)
+            rule.waitForWindowFocus()
             rule.onNode(hasSetTextAction()).performClick()
             rule.onNode(hasSetTextAction()).performTextInput("star")
             rule.waitForKeyboard("The search keyboard did not open") { Flows.keyboardShown() }
@@ -158,6 +160,13 @@ class LibraryFlowTest {
             Background.shell(
                 if (unset) "settings delete secure $SHOW_IME" else "settings put secure $SHOW_IME $showIme",
             )
+        }
+    }
+
+    /** Soft-input requests on a clicked field are ignored until WindowManager gives the Activity window focus. */
+    private fun AppRule.waitForWindowFocus() {
+        waitForKeyboard("The Library window got no input focus") {
+            runOnUiThread { activity.hasWindowFocus() }
         }
     }
 
