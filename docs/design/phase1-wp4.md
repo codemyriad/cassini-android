@@ -1,6 +1,6 @@
 # Phase 1 WP4: Android recording
 
-L-08 keeps recording on the canonical night ground in both app themes. L-48 removes the visible Title caption while retaining the editable field's spoken label, pencil, title-length limit and delayed-state acknowledgement. The format chip, waveform, space hint and permission/error states stay available.
+L-08 keeps recording on the canonical night ground in both app themes. L-48 removes the visible Title caption while retaining the editable field's spoken label, pencil, title-length limit and delayed-state acknowledgement. The editable title keeps a 48dp minimum touch target after removing its visible caption. The format chip, waveform, space hint and permission/error states stay available.
 
 L-49 places Stop in the centre, All meetings on the left and labelled Pause/Resume on the right. Section 4.D of the overnight dispatch specifies a 56sp system-font tabular timer and a 48dp red Stop pill. Native Material controls grow for larger text; side controls have 52dp outline targets. The meter area scrolls in a short window so it cannot cover the fixed capture controls.
 

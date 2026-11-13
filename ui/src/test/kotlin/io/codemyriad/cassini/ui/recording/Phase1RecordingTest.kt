@@ -12,6 +12,7 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -92,7 +93,10 @@ class Phase1RecordingTest {
         val events = mutableListOf<RecordingEvent>()
         show(onEvent = { events += it })
         rule.onNodeWithText("Title").assertDoesNotExist()
-        rule.onNodeWithContentDescription("Title").assert(hasSetTextAction()).performTextReplacement("Renamed meeting")
+        val title = rule.onNodeWithContentDescription("Title").assert(hasSetTextAction())
+        val bounds = title.getUnclippedBoundsInRoot()
+        assertTrue("The editable title is a 48dp touch target", bounds.bottom - bounds.top >= 48.dp)
+        title.performTextReplacement("Renamed meeting")
         rule.runOnIdle { assertEquals(listOf(RecordingEvent.Title("Renamed meeting")), events) }
         rule.onNodeWithText("Opus 48 kHz").assertIsDisplayed()
     }
