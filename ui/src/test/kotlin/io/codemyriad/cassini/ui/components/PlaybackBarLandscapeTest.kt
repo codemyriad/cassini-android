@@ -110,6 +110,19 @@ class PlaybackBarLandscapeTest {
 
     @Test
     @Config(qualifiers = "w390dp-h844dp-xhdpi")
+    fun speedLeadsTransportInPortraitWithoutMovingTheCentredPlayButton() {
+        setBar(390.dp, fontScale = 1f, durationMs = HALF_HOUR, speed = 1.25f)
+        assertTwoRows()
+        val speed = rule.onNodeWithContentDescription("Playback speed, 1.25×")
+            .assertTouchAtLeast48(density).getUnclippedBoundsInRoot()
+        val back = rule.onNodeWithContentDescription("Back 10 seconds").getUnclippedBoundsInRoot()
+        val play = rule.onNodeWithContentDescription("Play").getUnclippedBoundsInRoot()
+        assertTrue(speed.right <= back.left)
+        assertEquals((bar().left + bar().right) / 2, (play.left + play.right) / 2)
+    }
+
+    @Test
+    @Config(qualifiers = "w390dp-h844dp-xhdpi")
     fun largeSpeedUsesItsOwnLeadingRowInsteadOfCoveringTransport() {
         setBar(390.dp, fontScale = 2f, durationMs = HALF_HOUR, speed = 1.25f)
         assertTwoRows()

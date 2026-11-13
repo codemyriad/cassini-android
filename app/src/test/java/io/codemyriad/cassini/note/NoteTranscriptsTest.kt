@@ -218,6 +218,7 @@ class NoteTranscriptsTest {
         assertFalse(row.words[7].unsettled)
         assertTrue(row.words[8].unsettled)
         assertEquals("ben", row.inlineSuggestions.single().speakerId)
+        assertTrue("overlap-only speaker remains in the meeting header", draft.meetingSpeakers.any { it.id == "ben" })
         assertEquals(WordRef(row.id, 8), draft.activeWord(3400))
     }
 

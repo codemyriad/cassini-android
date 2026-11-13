@@ -8,15 +8,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.unit.dp
+import io.codemyriad.cassini.ui.components.SpeakerNameUi
 import io.codemyriad.cassini.ui.components.TranscriptFixtures
 import io.codemyriad.cassini.ui.components.WordRef
 import io.codemyriad.cassini.ui.fixtures.BoardFixtures
@@ -82,6 +85,23 @@ class Phase1MeetingTest {
                 events,
             )
         }
+    }
+
+    @Test fun aStoredUnnamedLabelWinsInTheHeaderAndKeepsItsNamingTarget() {
+        val base = BoardFixtures.readAndListen
+        val unnamed = base.turns.last()
+        val speakers = base.turns.map {
+            MeetingSpeakerUi(
+                it.speakerId,
+                if (it == unnamed) SpeakerNameUi.Placeholder(3, "Voce originale") else it.name,
+                it.tone,
+                it.auto,
+            )
+        }.toImmutableList()
+        val events = mutableListOf<NoteEvent>()
+        show(base.copy(meetingSpeakers = speakers, playback = null), onEvent = { events += it })
+        rule.onNodeWithTag("meeting-speaker-${unnamed.speakerId}").assert(hasText("Voce originale")).performClick()
+        rule.runOnIdle { assertEquals(listOf(NoteEvent.SpeakerTap(unnamed.speakerId)), events) }
     }
 
     @Test fun searchJumpsPastTheHeaderToTheActualMatchedTurn() = jump(searching = true)
