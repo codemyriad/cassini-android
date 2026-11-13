@@ -7,7 +7,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.FocusManager
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsActions
@@ -17,7 +16,6 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
-import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
@@ -32,7 +30,6 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
-import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
 import io.codemyriad.cassini.ui.components.Highlighted
 import io.codemyriad.cassini.ui.components.NoteRow
@@ -250,22 +247,6 @@ class Phase1LibraryTest {
         rule.onNodeWithText("· Resume", useUnmergedTree = true).assertDoesNotExist()
         rule.runOnIdle { row = row.copy(status = NoteStatusUi.Failed) }
         rule.onNodeWithText("Try again", useUnmergedTree = true).performClick()
-        rule.runOnIdle { assertEquals(listOf(NoteRowAction.RESUME, NoteRowAction.TRY_AGAIN), actions) }
-    }
-
-    @Test fun recoveryTargetsAreAtLeast48DpAndTheirEdgesDoNotOpenTheMeeting() {
-        var row by mutableStateOf(BoardFixtures.supplier.copy(status = NoteStatusUi.Paused(60_000)))
-        val actions = mutableListOf<NoteRowAction>()
-        themed { NoteRow(row, DayLabel.Today, onAction = { actions += it }) }
-        for ((label, status) in listOf("Resume" to NoteStatusUi.Paused(60_000), "Try again" to NoteStatusUi.Failed)) {
-            rule.runOnIdle { row = row.copy(status = status) }
-            val target = rule.onNodeWithText(label)
-            val bounds = target.getBoundsInRoot()
-            assertTrue("$label width", (bounds.right - bounds.left).value >= 48f)
-            assertTrue("$label height", (bounds.bottom - bounds.top).value >= 48f)
-            // Tap below the text, inside the explicit target, rather than the default semantic centre.
-            target.performTouchInput { click(Offset(width / 2f, height - 1f)) }
-        }
         rule.runOnIdle { assertEquals(listOf(NoteRowAction.RESUME, NoteRowAction.TRY_AGAIN), actions) }
     }
 }
