@@ -33,6 +33,7 @@ LABELS = {
     'back_to_library': ('library.backToAllMeetings', None),
     'recording_library': ('library.allMeetings', None),
     'recording_minimise': ('library.backToAllMeetings', None),
+    'note_search_placeholder': ('common.search', None),
     'library_search_placeholder': ('common.search', None),
     'library_search_description': ('search.field.a11y', None),
     'row_speaker_count': ('phone.row.speakerCount', 'n'),

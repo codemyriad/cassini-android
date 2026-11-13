@@ -92,9 +92,8 @@ object NoteMapping {
     fun hasPlayer(mode: NoteMode): Boolean =
         mode !is NoteMode.Processing && mode != NoteMode.Unplayable && mode != NoteMode.Loading
 
-    /** "Today, 10:02 · 48:13"; null in Reading mode (board 03). */
-    fun subtitle(note: NoteEntity, mode: NoteMode, now: Instant, zone: ZoneId): NoteSubtitleUi? {
-        if (mode == NoteMode.Reading) return null
+    /** Recording metadata for the native bar or the scrolling finished-meeting header. */
+    fun subtitle(note: NoteEntity, now: Instant, zone: ZoneId): NoteSubtitleUi {
         val recording = note.recordingTime()
         val time = recording?.instant?.atZone(zone)?.toLocalTime() ?: java.time.LocalTime.MIDNIGHT
         return NoteSubtitleUi(

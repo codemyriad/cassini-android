@@ -154,7 +154,7 @@ class NoteFlowTest {
     private fun openActions() {
         val section = hasText(rule.text(UiR.string.ui_actions_save_copy), ignoreCase = true)
         if (rule.onAllNodes(section).fetchSemanticsNodes().isEmpty()) {
-            rule.onNode(hasContentDescription(rule.text(UiR.string.ui_note_share_more))).performClick()
+            rule.onNode(hasContentDescription(rule.text(UiR.string.ui_note_more_actions))).performClick()
         }
         rule.waitShown(section)
     }

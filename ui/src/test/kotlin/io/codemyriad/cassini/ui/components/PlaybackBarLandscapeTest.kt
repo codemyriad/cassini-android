@@ -10,6 +10,7 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -43,8 +44,9 @@ class PlaybackBarLandscapeTest {
     private lateinit var density: Density
     private var timeWidth = 0
     private var timeHeight = 0
+    private var speedClicks = 0
 
-    private fun setBar(width: Dp, fontScale: Float, durationMs: Long) {
+    private fun setBar(width: Dp, fontScale: Float, durationMs: Long, speed: Float? = null) {
         rule.setContent {
             CassiniTheme(darkTheme = false) {
                 ProvideFixedFormat(locale = Locale.ENGLISH, is24Hour = true, zone = FIXED_ZONE) {
@@ -64,6 +66,7 @@ class PlaybackBarLandscapeTest {
                                 onSkipBack = {},
                                 onSkipForward = {},
                                 onPlayPause = {},
+                                speed = speed?.let { SpeedControl(it) { speedClicks++ } },
                             )
                         }
                     }
@@ -92,6 +95,42 @@ class PlaybackBarLandscapeTest {
     fun anUprightSplitScreenHasTwoRows() {
         setBar(390.dp, fontScale = 1f, durationMs = HOUR_AND_A_HALF)
         assertTwoRows()
+    }
+
+    @Test fun speedLeadsTransportInLandscapeWithoutOverlappingItsTargets() {
+        setBar(560.dp, fontScale = 1f, durationMs = HALF_HOUR, speed = 1.25f)
+        assertOneRow()
+        val speed = rule.onNodeWithContentDescription("Playback speed, 1.25×")
+        val bounds = speed.assertTouchAtLeast48(density).getUnclippedBoundsInRoot()
+        val back = rule.onNodeWithContentDescription("Back 10 seconds").getUnclippedBoundsInRoot()
+        assertTrue(bounds.right <= back.left)
+        speed.performClick()
+        rule.runOnIdle { assertEquals(1, speedClicks) }
+    }
+
+    @Test
+    @Config(qualifiers = "w390dp-h844dp-xhdpi")
+    fun speedLeadsTransportInPortraitWithoutMovingTheCentredPlayButton() {
+        setBar(390.dp, fontScale = 1f, durationMs = HALF_HOUR, speed = 1.25f)
+        assertTwoRows()
+        val speed = rule.onNodeWithContentDescription("Playback speed, 1.25×")
+            .assertTouchAtLeast48(density).getUnclippedBoundsInRoot()
+        val back = rule.onNodeWithContentDescription("Back 10 seconds").getUnclippedBoundsInRoot()
+        val play = rule.onNodeWithContentDescription("Play").getUnclippedBoundsInRoot()
+        assertTrue(speed.right <= back.left)
+        assertEquals((bar().left + bar().right) / 2, (play.left + play.right) / 2)
+    }
+
+    @Test
+    @Config(qualifiers = "w390dp-h844dp-xhdpi")
+    fun largeSpeedUsesItsOwnLeadingRowInsteadOfCoveringTransport() {
+        setBar(390.dp, fontScale = 2f, durationMs = HALF_HOUR, speed = 1.25f)
+        assertTwoRows()
+        val speed = rule.onNodeWithContentDescription("Playback speed, 1.25×")
+            .assertTouchAtLeast48(density).getUnclippedBoundsInRoot()
+        val back = rule.onNodeWithContentDescription("Back 10 seconds").getUnclippedBoundsInRoot()
+        assertTrue("speed must fit in the bar", speed.inside(bar()))
+        assertTrue("speed must stay above transport when it cannot fit beside it", speed.bottom <= back.top)
     }
 
     private fun assertOneRow() {

@@ -426,12 +426,13 @@ class NoteViewModel(
         return NoteUiState(
             noteId = noteId,
             title = note.title,
-            subtitle = NoteMapping.subtitle(note, mode, now, clock.zone),
+            subtitle = NoteMapping.subtitle(note, now, clock.zone),
             mode = mode,
             readOnlyReason = NoteMapping.readOnly(details, mode, core.namingOpen),
             chips = if (draft) null else NoteMapping.chips(details),
             banners = banners(details, core, live.facts, ui, freeBytes),
             turns = transcript.turns,
+            meetingSpeakers = transcript.meetingSpeakers,
             activeWord = active,
             playback = playback,
             search = ui.search?.let { query ->

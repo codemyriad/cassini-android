@@ -2,7 +2,10 @@ package io.codemyriad.cassini.ui.screens
 
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -65,7 +68,10 @@ class ReadingSuggestionHeaderTest {
         }
         rule.onAllNodes(hasContentDescription("(over Ada)", substring = true)).assertCountEquals(1)
         rule.onAllNodes(hasContentDescription("Probably crosstalk", substring = true)).assertCountEquals(1)
-        rule.onAllNodesWithText("Speaker 2", useUnmergedTree = true).assertCountEquals(0)
+        val inTurn = hasAnyAncestor(hasTestTag("transcript-turn-${turn.id}"))
+        rule.onAllNodes(hasText("Speaker 2") and inTurn, useUnmergedTree = true).assertCountEquals(0)
+        rule.onAllNodesWithText("Speaker 2", useUnmergedTree = true)
+            .assertCountEquals(if (mode == NoteMode.Reading) 1 else 0)
         rule.onNodeWithText("(over Ada)", useUnmergedTree = true).assertIsDisplayed()
         rule.onNodeWithText("Yes, Benjamin").performClick()
         rule.runOnIdle { assertEquals(listOf(NoteEvent.AcceptSuggestion("ben", "voice")), events) }

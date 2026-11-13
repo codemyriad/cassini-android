@@ -57,6 +57,9 @@ class NoteTranscriptsTest {
         assertEquals("Hello everyone.", turnText(turns[0].words))
         assertEquals(500L, turns[0].words[1].startMs)
         assertEquals(listOf("a", "b", "c"), transcript.speakers)
+        assertEquals(transcript.speakers, transcript.meetingSpeakers.map { it.id })
+        assertEquals(SpeakerNameUi.Placeholder(2, "Speaker 2"), transcript.meetingSpeakers[1].name)
+        assertEquals(SpeakerTone.Unnamed, transcript.meetingSpeakers[1].tone)
     }
 
     @Test fun namingOrMergingDoesNotReassignOtherSpeakersStoredSlots() {
@@ -215,7 +218,23 @@ class NoteTranscriptsTest {
         assertFalse(row.words[7].unsettled)
         assertTrue(row.words[8].unsettled)
         assertEquals("ben", row.inlineSuggestions.single().speakerId)
+        assertTrue("overlap-only speaker remains in the meeting header", draft.meetingSpeakers.any { it.id == "ben" })
         assertEquals(WordRef(row.id, 8), draft.activeWord(3400))
+    }
+
+    @Test fun automaticOverlapOnlySpeakersKeepTheirHeaderMetadataInSealedAndDraftViews() {
+        val vector = fixture("acknowledgment")
+        val ben = Voice("ben-voice", "Ben", "m", FloatArray(1), 1, 10.0, 0, 0)
+        val prints = mapOf("ben" to SpeakerPrint(FloatArray(1), 5.0, Match(ben.id, 0.8f, Match.State.AUTO)))
+        val sealed = NoteTranscripts.sealed(vector, vectorSpeakers, prints, listOf(ben))
+        val draft = NoteTranscripts.draft(vector, mapOf("ada" to "Ada", "ben" to "Ben"), setOf("ben"), emptyMap(), null)
+        for (shown in listOf(sealed, draft)) {
+            assertTrue("Ben occurs only in an inline chip", shown.turns.none { it.speakerId == "ben" })
+            assertTrue(shown.speakerMetadata.getValue("ben").auto)
+            val header = shown.meetingSpeakers.single { it.id == "ben" }
+            assertTrue(header.auto)
+            assertEquals(vector.filter { it.speaker == "ben" }.minOf { it.startMs }, header.startMs)
+        }
     }
 
     @Test fun canonicalOrderMayDifferFromPlaybackOrder() {

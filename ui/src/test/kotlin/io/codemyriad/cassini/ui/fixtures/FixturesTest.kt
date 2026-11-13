@@ -8,7 +8,6 @@ import io.codemyriad.cassini.ui.note.NoteUiState
 import io.codemyriad.cassini.ui.note.SaveState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -25,7 +24,9 @@ class FixturesTest {
     @Test
     fun readAndListenPlaysQuindiAtTheBoardPosition() {
         val state = b.readAndListen
-        assertNull("board 03 has no subtitle", state.subtitle)
+        val metadata = requireNotNull(state.subtitle)
+        assertEquals(b.supplier.time, metadata.time)
+        assertEquals(b.supplier.durationMs, metadata.durationMs)
         val active = requireNotNull(state.activeWord)
         val word = state.turns.single { it.id == active.turnId }.words[active.index]
         assertEquals("so", word.text)
