@@ -64,7 +64,7 @@ class FormatTest {
         assertEquals(nb("3 min"), Durations.compact(res, 3 * MIN))
         assertEquals(nb("1 h 12 min"), Durations.compact(res, H + 12 * MIN + 5 * S))
         assertEquals(nb("1 h"), Durations.compact(res, H + 30 * S))
-        assertEquals("Speaks for ${nb("3 min 12 s")} in this note", Durations.speaksFor(res, 3 * MIN + 12 * S))
+        assertEquals("Speaks for ${nb("3 min 12 s")} in this meeting", Durations.speaksFor(res, 3 * MIN + 12 * S))
         assertEquals("${nb("22 min")} confirmed speech", Durations.confirmedSpeech(res, 22 * MIN + 59 * S))
         assertEquals("${nb("under 1 min")} confirmed speech", Durations.confirmedSpeech(res, 59 * S))
         assertEquals("${nb("1 h 5 min")} confirmed speech", Durations.confirmedSpeech(res, 65 * MIN))
@@ -243,7 +243,7 @@ class FormatItalianTest {
     @Test fun durations() {
         assertEquals("02:41", Durations.clock(161 * S))
         assertEquals(nb("3 min 12 s"), Durations.compact(res, 3 * MIN + 12 * S))
-        assertEquals("Parla per ${nb("3 min 12 s")} in questa nota", Durations.speaksFor(res, 3 * MIN + 12 * S))
+        assertEquals("Parla per ${nb("3 min 12 s")} in questa riunione", Durations.speaksFor(res, 3 * MIN + 12 * S))
         assertEquals("${nb("meno di 1 min")} di parlato confermato", Durations.confirmedSpeech(res, 30 * S))
         assertEquals("${nb("1 h 5 min")} di parlato confermato", Durations.confirmedSpeech(res, 65 * MIN))
         assertEquals("48 minuti e 13 secondi", Spoken.duration(res, 48 * MIN + 13 * S, f))

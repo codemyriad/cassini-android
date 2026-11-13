@@ -9,7 +9,7 @@ import kotlinx.collections.immutable.ImmutableList
  * The Name a speaker sheet (board 04, features.md section 4; ui.md section 7), as the `SpeakerNaming` reducer
  * produces it.
  *
- * - Header: [label] in [tone], "Speaks for <[speakingMs]> in this note", Play sample enabled by [canSample];
+ * - Header: [label] in ink, speaking time [speakingMs], Play sample enabled by [canSample];
  *   [sampling] while the sample plays.
  * - [name] is the field's text. [nameFieldFocused] gives the field the focused look without a caret (fixtures,
  *   board 04); the screen otherwise follows real focus.
@@ -18,7 +18,8 @@ import kotlinx.collections.immutable.ImmutableList
  *   (sorted by name). An empty list hides the card.
  * - [samePerson] is the saved name of the "Is this the same person?" question, [renameSaved] the saved name of the
  *   "Also rename the saved voice?" question, [notName] the voice name of the "Not <name>?" button; null hides each.
- * - [remember] is the checkbox; [rememberEnabled] false disables it with [rememberReason].
+ * - [quote] is the selected speaker’s bounded speech excerpt.
+ * - [remember] is the native switch; [rememberEnabled] false disables it with [rememberReason].
  * - [canMerge] shows "Merge into…"; [save] is the Save name state; [draft] is true while the job runs.
  *
  * [name] is the text of a field. The field keeps its own copy and sends each change as [NameSheetEvent.NameChanged]; it
@@ -47,11 +48,17 @@ data class NameSheetUi(
     val save: SaveState,
     val nameFieldFocused: Boolean = false,
     val draft: Boolean = false,
+    val quote: String = "",
 )
 
-/** A saved voice in the Name sheet list; [likely] adds the "Likely" tag and the surfaceWash row. */
+/** A saved voice in the Name sheet list; [likely] adds a neutral tag; [tone] comes from its stored colour slot. */
 @Immutable
-data class VoiceOptionUi(val id: String, val name: String, val likely: Boolean = false)
+data class VoiceOptionUi(
+    val id: String,
+    val name: String,
+    val likely: Boolean = false,
+    val tone: SpeakerTone = SpeakerTone.One,
+)
 
 /** Why Remember is disabled (features.md section 4, item 7). */
 enum class RememberReason {

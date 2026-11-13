@@ -46,6 +46,24 @@
         <item quantity="other">%1$s réunions</item>
     </plurals>
     <string name="ui_tx_heading">Transcription</string>
+    <string name="ui_sp_dialog_a11y">Nommer un intervenant</string>
+    <string name="ui_sp_name">Nom</string>
+    <string name="ui_sp_play_sample">Lire un extrait de cette voix</string>
+    <string name="ui_sp_quote">« %1$s »</string>
+    <string name="ui_sp_talk_time">Parle pendant %1$s dans cette réunion</string>
+    <string name="ui_sp_duplicate_notice">%1$s fait déjà partie des voix mémorisées.</string>
+    <string name="ui_sp_same_person">Même personne</string>
+    <string name="ui_sp_someone_else">Quelqu’un d’autre</string>
+    <string name="ui_sp_voices_ranked">Voix mémorisées, les plus proches d’abord</string>
+    <string name="ui_sp_voices">Voix mémorisées</string>
+    <string name="ui_sp_likely">Probable</string>
+    <string name="ui_sp_remember_title">Mémoriser cette voix</string>
+    <string name="ui_sp_remember_body">Cassini nommera %1$s automatiquement la prochaine fois.\nL’empreinte vocale reste sur ce téléphone.</string>
+    <string name="ui_sp_remember_unnamed">Cassini nommera cette personne automatiquement la prochaine fois.\nL’empreinte vocale reste sur ce téléphone.</string>
+    <string name="ui_sp_remember_too_short">Cassini a besoin d’au moins 4 secondes de cette voix pour la mémoriser.</string>
+    <string name="ui_sp_remember_models">Pour mémoriser des voix, téléchargez et activez « Distinguer les intervenants » et « Reconnaître les voix mémorisées » dans les réglages.</string>
+    <string name="ui_sp_merge">Fusionner avec…</string>
+    <string name="ui_sp_save">Enregistrer le nom</string>
     <plurals name="ui_tx_eta_minutes">
         <item quantity="one">environ %1$s min restante</item>
         <item quantity="many">environ %1$s min restantes</item>

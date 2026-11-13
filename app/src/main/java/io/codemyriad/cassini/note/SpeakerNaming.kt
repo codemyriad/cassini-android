@@ -4,6 +4,7 @@ import io.codemyriad.cassini.core.models.ModelCatalog
 import io.codemyriad.cassini.core.speakers.Match
 import io.codemyriad.cassini.core.speakers.NameMatch
 import io.codemyriad.cassini.core.speakers.SampleWindow
+import io.codemyriad.cassini.core.speakers.SpeakerTint
 import io.codemyriad.cassini.core.speakers.Voice
 import io.codemyriad.cassini.core.speakers.VoiceStaleness
 import io.codemyriad.cassini.core.speakers.Voiceprints
@@ -48,6 +49,7 @@ data class NamingInput(
     val mergeTargets: List<MergeTargetUi> = emptyList(),
     val sealedVersions: MergeVersionsUi? = null,
     val canSample: Boolean = true,
+    val quote: String = "",
 ) {
     /** The stored name, or null for a placeholder speaker. */
     val namedLabel: String? get() = (label as? SpeakerNameUi.Named)?.text
@@ -62,7 +64,7 @@ data class NamingInput(
         print contentEquals other.print && printSeconds == other.printSeconds &&
         willHavePrint == other.willHavePrint && match == other.match && voices == other.voices &&
         voicesReadOnly == other.voicesReadOnly && voiceModelReady == other.voiceModelReady &&
-        mergeTargets == other.mergeTargets && sealedVersions == other.sealedVersions && canSample == other.canSample
+        mergeTargets == other.mergeTargets && sealedVersions == other.sealedVersions && canSample == other.canSample && quote == other.quote
 
     override fun hashCode(): Int = speakerId.hashCode() * HASH + label.hashCode()
 
@@ -262,12 +264,20 @@ object SpeakerNaming {
         return NameSheetUi(
             speakerId = input.speakerId,
             label = input.label,
+            quote = input.quote,
             tone = input.tone,
             speakingMs = input.speakingMs,
             canSample = input.sample != null && input.canSample,
             sampling = sampling,
             name = state.name,
-            voices = shown.map { VoiceOptionUi(it.voice.id, it.voice.name, it.likely) }.toImmutableList(),
+            voices = shown.map {
+                VoiceOptionUi(
+                    it.voice.id,
+                    it.voice.name,
+                    it.likely,
+                    NoteTranscripts.tone(SpeakerTint.named(it.voice.colourIndex ?: 0)),
+                )
+            }.toImmutableList(),
             showAll = !state.showAll && ranked.size > VISIBLE_VOICES,
             ranked = input.print != null,
             samePerson = samePerson(state)?.name,

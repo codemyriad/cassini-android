@@ -276,29 +276,15 @@
     <string name="ui_versions_unreadable">Illisible</string>
 
     <!-- Name a speaker (board 04, features.md section 4). -->
-    <string name="ui_name_speaks_for">Parle pendant %1$s dans cette note</string>
-    <string name="ui_name_play_sample">Lire un extrait de cette voix</string>
     <string name="ui_name_stop_sample">Arrêter l’extrait</string>
-    <string name="ui_name_voices_ranked">Voix mémorisées, les plus proches d’abord</string>
-    <string name="ui_name_voices">Voix mémorisées</string>
-    <string name="ui_name_likely">Probable</string>
     <string name="ui_name_show_all">Tout afficher</string>
-    <string name="ui_name_same_person_saved">«\u202F%1$s\u202F» est déjà une voix mémorisée.</string>
-    <string name="ui_name_same_person_question">Est-ce la même personne\u202F?</string>
-    <string name="ui_name_same_person">Même personne</string>
-    <string name="ui_name_someone_else">Quelqu’un d’autre</string>
     <string name="ui_name_answer_first">Répondez d’abord à la question ci-dessus</string>
     <string name="ui_name_rename_saved_saved_as">Cette voix est mémorisée sous le nom «\u202F%1$s\u202F».</string>
     <string name="ui_name_rename_saved_question">Renommer aussi la voix mémorisée\u202F?</string>
     <string name="ui_name_rename_saved">Renommer la voix mémorisée</string>
     <string name="ui_name_not">Pas %1$s\u202F?</string>
-    <string name="ui_name_remember">Mémoriser cette voix sur ce téléphone</string>
     <string name="ui_name_remember_body">Cassini nommera %1$s automatiquement dans les prochaines notes.</string>
     <string name="ui_name_remember_body_unnamed">Cassini nommera cette personne automatiquement dans les prochaines notes.</string>
-    <string name="ui_name_remember_too_little">Pas assez de parole pour mémoriser cette voix.</string>
-    <string name="ui_name_remember_no_model">La reconnaissance des voix mémorisées n’est pas encore installée.</string>
-    <string name="ui_name_merge_into">Fusionner avec…</string>
-    <string name="ui_name_save">Enregistrer le nom</string>
 
     <!-- Merge sheet and confirmation (features.md section 4, ui.md section 8). -->
     <string name="ui_merge_sheet_title">Fusionner %1$s avec…</string>

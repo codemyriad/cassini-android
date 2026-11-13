@@ -2,21 +2,27 @@ package io.codemyriad.cassini.ui.screens
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.fixtures.BoardFixtures
 import io.codemyriad.cassini.ui.fixtures.VariantFixtures
 import io.codemyriad.cassini.ui.format.FIXED_ZONE
@@ -103,14 +109,43 @@ class SheetBehaviourTest {
         rule.runOnIdle { assertEquals(listOf(NameSheetEvent.SaveBlocked, NameSheetEvent.SaveBlocked), events) }
     }
 
+    @Test fun rememberHasOneNativeSwitchTargetAndKeepsTheTwoLinePrivacyCopy() {
+        val events = mutableListOf<NameSheetEvent>()
+        setThemed { NameSpeakerSheetContent(BoardFixtures.nameSpeaker, onEvent = { events += it }) }
+        val switch = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch)
+        rule.onAllNodes(switch).assertCountEquals(1)
+        rule.onNode(switch).assertIsOn().assertIsEnabled().performClick()
+        rule.onNodeWithText(
+            "Anna is named automatically next time.\nThe voiceprint stays on this phone.",
+            substring = true,
+        )
+            .assertExists()
+        rule.runOnIdle { assertEquals(listOf(NameSheetEvent.RememberChanged(false)), events) }
+    }
+
+    @Test fun disabledRememberDoesNotSendAToggleAndQuoteComesFromTheSelectedSpeaker() {
+        val events = mutableListOf<NameSheetEvent>()
+        val ui = BoardFixtures.nameSpeaker.copy(rememberEnabled = false, rememberReason = null)
+        setThemed { NameSpeakerSheetContent(ui, onEvent = { events += it }) }
+        rule.onNodeWithTag("remember-voice").assertIsNotEnabled().performClick()
+        rule.onNodeWithText("“${ui.quote}”").assertExists()
+        rule.onNodeWithText(
+            "Anna is named automatically next time.\nThe voiceprint stays on this phone.",
+            substring = true,
+        )
+            .assertExists()
+        rule.runOnIdle { assertEquals(emptyList<NameSheetEvent>(), events) }
+    }
+
     @Test fun theNameSheetControlsSendTheirEvents() {
         val events = mutableListOf<NameSheetEvent>()
         setThemed { NameSpeakerSheetContent(BoardFixtures.nameSpeaker, onEvent = { events += it }) }
         rule.onNodeWithContentDescription("Play a sample of this voice").performClick()
         rule.onNodeWithText("Annalisa B.").performClick()
-        rule.onNodeWithText("Same person").performClick()
+        rule.onNodeWithTag("name-primary-pill", useUnmergedTree = true).assertHeightIsAtLeast(32.dp)
+        rule.onNodeWithText("Same person").assertHeightIsAtLeast(48.dp).performClick()
         rule.onNodeWithText("Someone else").performClick()
-        rule.onNodeWithText("Remember this voice on this phone", substring = true).performClick()
+        rule.onNodeWithText("Remember this voice", substring = true).performClick()
         rule.onNodeWithText("Merge into…").performClick()
         rule.onNodeWithText("Cancel").performClick()
         rule.runOnIdle {

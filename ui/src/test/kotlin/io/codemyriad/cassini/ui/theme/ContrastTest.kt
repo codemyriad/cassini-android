@@ -106,6 +106,14 @@ class ContrastTest {
                 assertTrue(contrast(colors.ink, fill) >= TEXT)
                 assertTrue(contrast(colors.neutralInk, fill) >= TEXT)
             }
+            assertTrue(contrast(colors.ink, colors.field) >= TEXT)
+            assertTrue(contrast(colors.text2, colors.field) >= TEXT)
+            assertTrue(contrast(colors.accentInk, colors.field) >= TEXT)
+            assertTrue(contrast(colors.ink, colors.surfaceWash) >= TEXT)
+            val likelyFill = colors.ink.copy(alpha = 0.12f).compositeOver(colors.field)
+            assertTrue(contrast(colors.ink, likelyFill) >= TEXT)
+            val secondaryNoticeFill = colors.ink.copy(alpha = 0.10f).compositeOver(colors.surfaceWash)
+            assertTrue(contrast(colors.ink, secondaryNoticeFill) >= TEXT)
         }
     }
 

@@ -94,8 +94,8 @@ object Durations {
             hoursMinutes(res, minutes.coerceAtLeast(RECORDING_MINUTE_STEP))
         }
 
-    /** "Speaks for 3 min 12 s in this note" (Name a speaker header). */
-    fun speaksFor(res: Resources, ms: Long): String = res.getString(R.string.ui_name_speaks_for, compact(res, ms))
+    /** "Speaks for 3 min 12 s in this meeting" (Name a speaker header). */
+    fun speaksFor(res: Resources, ms: Long): String = res.getString(R.string.ui_sp_talk_time, compact(res, ms))
 
     /** "22 min confirmed speech", "under 1 min confirmed speech" (Saved voices rows). */
     fun confirmedSpeech(res: Resources, ms: Long): String =

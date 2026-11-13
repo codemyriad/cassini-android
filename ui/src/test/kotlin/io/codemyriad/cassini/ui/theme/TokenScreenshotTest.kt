@@ -235,6 +235,7 @@ class TokenScreenshotTest : BoardTest() {
             "bg" to c.bg,
             "surface" to c.surface,
             "surfaceWash" to c.surfaceWash,
+            "field" to c.field,
             "boardBg" to c.boardBg,
             "text2" to c.text2,
             "text3" to c.text3,

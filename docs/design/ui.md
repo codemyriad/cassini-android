@@ -576,6 +576,8 @@ Phase 1 screen layout and bounded middle scroll follow [WP4: Android recording](
 
 ### Name a speaker (04)
 
+Phase 1 sheet layout, ink heading, speaker quote, inline duplicate notice, grouped saved-voice surfaces and native Remember switch follow [WP6: Name a speaker](phase1-wp6.md) (`L-14`, `L-41`, `L-46`).
+
 - Sheet padding: top 10, horizontal 20, bottom 24. Gap 16.
 - Header row: the avatar 40, the title in `sheetTitle`, the caption, and the play-sample button (a 44/48 circle with 1 dp line2).
 - The name field (`showFocus` in the board fixture).

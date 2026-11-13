@@ -46,6 +46,24 @@
         <item quantity="other">%1$s reuniões</item>
     </plurals>
     <string name="ui_tx_heading">A transcrever</string>
+    <string name="ui_sp_dialog_a11y">Dar nome a um orador</string>
+    <string name="ui_sp_name">Nome</string>
+    <string name="ui_sp_play_sample">Reproduzir uma amostra desta voz</string>
+    <string name="ui_sp_quote">«%1$s»</string>
+    <string name="ui_sp_talk_time">Fala durante %1$s nesta reunião</string>
+    <string name="ui_sp_duplicate_notice">%1$s já é uma voz guardada.</string>
+    <string name="ui_sp_same_person">Mesma pessoa</string>
+    <string name="ui_sp_someone_else">Outra pessoa</string>
+    <string name="ui_sp_voices_ranked">Vozes guardadas, as mais parecidas primeiro</string>
+    <string name="ui_sp_voices">Vozes guardadas</string>
+    <string name="ui_sp_likely">Provável</string>
+    <string name="ui_sp_remember_title">Memorizar esta voz</string>
+    <string name="ui_sp_remember_body">O Cassini dará o nome %1$s automaticamente da próxima vez.\nA impressão vocal fica neste telemóvel.</string>
+    <string name="ui_sp_remember_unnamed">O Cassini dará nome a esta pessoa automaticamente da próxima vez.\nA impressão vocal fica neste telemóvel.</string>
+    <string name="ui_sp_remember_too_short">O Cassini precisa de, pelo menos, 4 segundos desta voz para a memorizar.</string>
+    <string name="ui_sp_remember_models">Para memorizar vozes, transfira e ative Distinguir oradores e Reconhecer vozes guardadas nas definições.</string>
+    <string name="ui_sp_merge">Juntar a…</string>
+    <string name="ui_sp_save">Guardar nome</string>
     <plurals name="ui_tx_eta_minutes">
         <item quantity="one">cerca de %1$s min restante</item>
         <item quantity="many">cerca de %1$s min restantes</item>

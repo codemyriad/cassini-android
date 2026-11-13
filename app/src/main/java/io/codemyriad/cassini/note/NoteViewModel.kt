@@ -1185,6 +1185,7 @@ class NoteViewModel(
         return NamingInput(
             speakerId = speakerId,
             label = NoteTranscripts.name(speaker),
+            quote = withContext(compute) { transcript.namingQuote(speakerId) },
             tone = tones[speakerId] ?: AMBER,
             speakingMs = speaker.speakingMs,
             sample = sample,
@@ -1213,6 +1214,7 @@ class NoteViewModel(
         return NamingInput(
             speakerId = speakerId,
             label = speaker.name,
+            quote = withContext(compute) { draft.transcript.namingQuote(speakerId) },
             tone = speaker.tone,
             speakingMs = stats[speakerId]?.speakingMs ?: 0,
             sample = stats[speakerId]?.sample,
