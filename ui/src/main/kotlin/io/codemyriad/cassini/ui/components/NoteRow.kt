@@ -3,6 +3,7 @@
 
 package io.codemyriad.cassini.ui.components
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -202,12 +203,8 @@ internal fun rowStatus(status: NoteStatusUi, liveMs: Long = 0): RowStatus = when
         StatusBadgeKind.Recording,
         spoken = stringResource(R.string.ui_status_recording),
     )
-    NoteStatusUi.Transcribing -> RowStatus(
-        stringResource(StatusBadgeKind.Transcribing.label),
-        StatusBadgeKind.Transcribing,
-        spoken = stringResource(R.string.ui_status_transcribing),
-    )
-    NoteStatusUi.Queued -> RowStatus(stringResource(StatusBadgeKind.Queued.label), StatusBadgeKind.Queued)
+    NoteStatusUi.Transcribing -> badgeRowStatus(StatusBadgeKind.Transcribing, R.string.ui_status_transcribing)
+    NoteStatusUi.Queued -> badgeRowStatus(StatusBadgeKind.Queued, R.string.ui_status_queued)
     is NoteStatusUi.Paused -> RowStatus(
         text = stringResource(R.string.ui_badge_paused, Durations.clock(status.atMs)),
         kind = StatusBadgeKind.Paused,
@@ -222,17 +219,9 @@ internal fun rowStatus(status: NoteStatusUi, liveMs: Long = 0): RowStatus = when
         suffix = stringResource(R.string.ui_status_suffix_try_again),
         suffixAction = NoteRowAction.TRY_AGAIN,
     )
-    NoteStatusUi.Unplayable -> RowStatus(stringResource(StatusBadgeKind.Unplayable.label), StatusBadgeKind.Unplayable)
-    NoteStatusUi.Unreadable -> RowStatus(
-        stringResource(StatusBadgeKind.Unreadable.label),
-        StatusBadgeKind.Unreadable,
-        spoken = stringResource(R.string.ui_status_unreadable),
-    )
-    NoteStatusUi.NewerFormat -> RowStatus(
-        stringResource(StatusBadgeKind.NewerFormat.label),
-        StatusBadgeKind.NewerFormat,
-        spoken = stringResource(R.string.ui_status_newer_format),
-    )
+    NoteStatusUi.Unplayable -> badgeRowStatus(StatusBadgeKind.Unplayable, R.string.ui_status_unplayable)
+    NoteStatusUi.Unreadable -> badgeRowStatus(StatusBadgeKind.Unreadable, R.string.ui_status_unreadable)
+    NoteStatusUi.NewerFormat -> badgeRowStatus(StatusBadgeKind.NewerFormat, R.string.ui_status_newer_format)
     is NoteStatusUi.Transcribed -> RowStatus(
         text = stringResource(R.string.ui_status_transcribed),
         kind = StatusBadgeKind.Transcribed,
@@ -242,8 +231,16 @@ internal fun rowStatus(status: NoteStatusUi, liveMs: Long = 0): RowStatus = when
             else -> null
         },
     )
-    NoteStatusUi.AudioOnly -> RowStatus(stringResource(StatusBadgeKind.AudioOnly.label), StatusBadgeKind.AudioOnly)
+    NoteStatusUi.AudioOnly -> badgeRowStatus(StatusBadgeKind.AudioOnly, R.string.ui_status_audio_only)
 }
+
+/** A compact badge and its independent, established spoken label. */
+@Composable
+private fun badgeRowStatus(kind: StatusBadgeKind, @StringRes spoken: Int): RowStatus = RowStatus(
+    text = stringResource(kind.label),
+    kind = kind,
+    spoken = stringResource(spoken),
+)
 
 /**
  * Rename always; Move to trash except on the note being recorded (features.md section 6, as the actions sheet);
