@@ -71,7 +71,14 @@ fun NoteRow(row: NoteRowUi, day: DayLabel, onAction: (NoteRowAction) -> Unit, mo
     // that is not a button ("3 speakers", "No speech") and the preview, which tells why a search result matched.
     val locale = LocalFormat.current.locale
     val description = listOfNotNull(
-        Spoken.noteRow(row.title, row.durationMs, row.day ?: day, row.time, status.text, row.recordedLabel),
+        Spoken.noteRow(
+            row.title,
+            row.durationMs,
+            row.day ?: day,
+            row.time,
+            status.spokenText,
+            row.recordedLabel,
+        ),
         status.suffix?.takeIf { status.suffixAction == null }?.trimStart('·', ' ', '\u00A0')?.lowercase(locale),
         row.preview?.text,
     ).joinToString(", ")
@@ -181,19 +188,24 @@ private fun noteRowBoundsModifiers(noteId: String): Pair<Modifier, Modifier> {
 internal data class RowStatus(
     val text: String,
     val kind: StatusBadgeKind,
+    val spoken: String? = null,
     val suffix: String? = null,
     val suffixAction: NoteRowAction? = null,
-)
+) {
+    val spokenText: String get() = spoken ?: text
+}
 
 @Composable
 internal fun rowStatus(status: NoteStatusUi, liveMs: Long = 0): RowStatus = when (status) {
     NoteStatusUi.Recording -> RowStatus(
         statusBadgeText(StatusBadgeKind.Recording, liveMs = liveMs),
         StatusBadgeKind.Recording,
+        spoken = stringResource(R.string.ui_status_recording),
     )
     NoteStatusUi.Transcribing -> RowStatus(
         stringResource(StatusBadgeKind.Transcribing.label),
         StatusBadgeKind.Transcribing,
+        spoken = stringResource(R.string.ui_status_transcribing),
     )
     NoteStatusUi.Queued -> RowStatus(stringResource(StatusBadgeKind.Queued.label), StatusBadgeKind.Queued)
     is NoteStatusUi.Paused -> RowStatus(
