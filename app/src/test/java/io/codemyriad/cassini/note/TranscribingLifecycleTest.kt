@@ -78,8 +78,11 @@ class TranscribingLifecycleTest {
         )
         val draftState = DraftState(words, emptyMap(), emptySet(), emptyList(), Long.MAX_VALUE, true)
         val live = JobPhase.Transcribing(progress, draftState)
-        ports.details.value = documentNote(audioKind = AudioKind.PLAIN)
-        ports.setJob(job(JobState.RUNNING), phase = live)
+        ports.details.value = documentNote(audioKind = AudioKind.PLAIN).let {
+            it.copy(note = it.note.copy(durationMs = 80_000))
+        }
+        fun row(state: JobState, doneMs: Long = 0) = job(state, doneMs = doneMs).copy(totalMs = 80_000)
+        ports.setJob(row(JobState.RUNNING), phase = live)
         val factory = object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 @Suppress("UNCHECKED_CAST")
@@ -115,7 +118,7 @@ class TranscribingLifecycleTest {
         rule.onNodeWithTag("transcribing-details").performClick()
         rule.onNodeWithText("62%").assertIsDisplayed()
         rule.onNodeWithTag("transcribing-details-stop").performClick()
-        rule.runOnIdle { ports.setJob(job(JobState.RUNNING), phase = JobPhase.Stopping(live)) }
+        rule.runOnIdle { ports.setJob(row(JobState.RUNNING), phase = JobPhase.Stopping(live)) }
         rule.onNodeWithText("62%").assertIsDisplayed()
         rule.onNodeWithText("00:40 of 01:20").assertIsDisplayed()
         rule.onNodeWithText("40").assertIsDisplayed()
@@ -125,19 +128,19 @@ class TranscribingLifecycleTest {
         assertAnchor()
         rule.runOnIdle {
             ports.draft = DraftTranscript(words, emptyMap(), ports.names.value, 40_000, 80_000)
-            ports.setJob(job(JobState.PAUSED, doneMs = 40_000))
+            ports.setJob(row(JobState.PAUSED, doneMs = 40_000))
         }
         assertAnchor()
-        rule.runOnIdle { ports.setJob(job(JobState.QUEUED, doneMs = 40_000)) }
+        rule.runOnIdle { ports.setJob(row(JobState.QUEUED, doneMs = 40_000)) }
         assertAnchor()
         for (phase in listOf(JobPhase.Starting, JobPhase.Downloading(null), JobPhase.WaitingForPrevious, live)) {
-            rule.runOnIdle { ports.setJob(job(JobState.RUNNING, doneMs = 40_000), phase = phase) }
+            rule.runOnIdle { ports.setJob(row(JobState.RUNNING, doneMs = 40_000), phase = phase) }
             assertAnchor()
             rule.onNodeWithTag("transcribing-details-content").assertDoesNotExist()
         }
         rule.runOnIdle {
             val appended = live.draft.copy(words = words + Word("extra", 80_000, 81_000, "Newest."))
-            ports.setJob(job(JobState.RUNNING), phase = live.copy(draft = appended))
+            ports.setJob(row(JobState.RUNNING), phase = live.copy(draft = appended))
         }
         assertAnchor()
     }
