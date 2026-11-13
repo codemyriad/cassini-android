@@ -385,7 +385,7 @@ class NoteViewModel(
         val details: NoteDetails? get() = loaded?.details
         val card get() = NoteMapping.card(job?.phase)
         val mode: NoteMode get() = details?.let { NoteMapping.mode(it, job, card) } ?: NoteMode.Loading
-        val namingOpen: Boolean get() = draft?.namingOpen ?: true
+        val namingOpen: Boolean get() = job?.phase !is JobPhase.Stopping && (draft?.namingOpen ?: true)
 
         /** A transcript (sealed or draft) has loaded. */
         val shownLoaded: Boolean get() = sealed != null || draft != null
