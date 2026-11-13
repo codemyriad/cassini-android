@@ -45,4 +45,18 @@
         <item quantity="many">%1$s reuniões</item>
         <item quantity="other">%1$s reuniões</item>
     </plurals>
+    <string name="ui_tx_heading">Transcrevendo</string>
+    <string name="ui_tx_details">Detalhes da transcrição</string>
+    <string name="ui_tx_stop">Parar</string>
+    <string name="ui_tx_stop_keep">Parar e manter o progresso</string>
+    <string name="ui_tx_transcript">Transcrição até agora</string>
+    <string name="ui_tx_reading">Leitura</string>
+    <string name="ui_tx_preparing">Preparação</string>
+    <string name="ui_tx_words">Palavras</string>
+    <string name="ui_tx_matching">Locutores e reconhecimento</string>
+    <string name="ui_tx_saving">Salvamento</string>
+    <string name="ui_tx_audio_done">Áudio processado</string>
+    <string name="ui_tx_audio_done_value">%1$s de %2$s</string>
+    <string name="ui_tx_suggestion_yes">Sim</string>
+    <string name="ui_tx_suggestion_no">Não</string>
 </resources>

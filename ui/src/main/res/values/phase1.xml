@@ -42,4 +42,18 @@
         <item quantity="one">%1$s meeting</item>
         <item quantity="other">%1$s meetings</item>
     </plurals>
+    <string name="ui_tx_heading">Transcribing</string>
+    <string name="ui_tx_details">Transcribing details</string>
+    <string name="ui_tx_stop">Stop</string>
+    <string name="ui_tx_stop_keep">Stop and keep progress</string>
+    <string name="ui_tx_transcript">Transcript so far</string>
+    <string name="ui_tx_reading">Reading</string>
+    <string name="ui_tx_preparing">Preparing</string>
+    <string name="ui_tx_words">Words</string>
+    <string name="ui_tx_matching">Speakers &amp; matching</string>
+    <string name="ui_tx_saving">Saving</string>
+    <string name="ui_tx_audio_done">Audio done</string>
+    <string name="ui_tx_audio_done_value">%1$s of %2$s</string>
+    <string name="ui_tx_suggestion_yes">Yes</string>
+    <string name="ui_tx_suggestion_no">No</string>
 </resources>

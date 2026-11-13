@@ -44,6 +44,20 @@ LABELS = {
     'row_resume': ('phone.row.resume', None),
     'row_try_again': ('common.tryAgain', None),
     'search_meetings': ('format.searchCount.meetings', 'n'),
+    'tx_heading': ('transcribing.heading', None),
+    'tx_details': ('transcribing.details.a11y', None),
+    'tx_stop': ('common.stop', None),
+    'tx_stop_keep': ('transcribing.stopAndKeepProgress', None),
+    'tx_transcript': ('transcribing.transcriptSoFar', None),
+    'tx_reading': ('transcribing.step.reading', None),
+    'tx_preparing': ('transcribing.step.preparing', None),
+    'tx_words': ('transcribing.step.words', None),
+    'tx_matching': ('transcribing.step.speakers', None),
+    'tx_saving': ('transcribing.step.saving', None),
+    'tx_audio_done': ('transcribing.stat.audioDone', None),
+    'tx_audio_done_value': ('transcribing.stat.audioDoneValue', ('done', 'total')),
+    'tx_suggestion_yes': ('transcribing.speakerSuggestion.yes', None),
+    'tx_suggestion_no': ('transcribing.speakerSuggestion.no', None),
 }
 
 
@@ -54,12 +68,13 @@ def android_text(text, argument, *, literal=False):
         text, count = re.subn(r'(?<!\w)1(?!\w)', '{n}', text)
         if count != 1:
             raise ValueError('Shared count plural must carry its count')
-    expected = {argument} if argument else set()
+    arguments = (argument,) if isinstance(argument, str) else (argument or ())
+    expected = set(arguments)
     actual = set(re.findall(r'\{([^{}]+)\}', text))
     if (literal and not actual <= expected) or (not literal and actual != expected):
         raise ValueError('Shared string placeholders changed')
-    if argument:
-        text = text.replace('{' + argument + '}', '%1$s')
+    for index, name in enumerate(arguments, start=1):
+        text = text.replace('{' + name + '}', f'%{index}$s')
     return escape(text).replace("'", "\\'").replace('"', '\\"')
 
 
@@ -74,7 +89,8 @@ def generated(root):
                  f"<!-- Generated from cassini-ux {pin['commit']}; do not edit. -->", '<resources>']
         for name, (identifier, argument) in LABELS.items():
             entry = entries[identifier]
-            if set(entry.get('placeholders', {})) != ({argument} if argument else set()):
+            arguments = (argument,) if isinstance(argument, str) else (argument or ())
+            if set(entry.get('placeholders', {})) != set(arguments):
                 raise ValueError(f'Shared placeholder declaration changed: {identifier}')
             if 'plural' in entry:
                 forms = entry['plural'] if locale == 'en' else entry['l10n'][locale]['plural']

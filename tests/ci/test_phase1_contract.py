@@ -93,6 +93,13 @@ class Phase1ContractTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             STRINGS.android_text('Paused', 'position')
 
+    def test_audio_progress_arguments_keep_their_identity_when_translation_reorders_them(self):
+        self.assertEqual('Total %2$s, done %1$s',
+                         STRINGS.android_text('Total {total}, done {done}', ('done', 'total')))
+        for text in ['{done}', '{done} of {unknown}', '{done} of {total} {extra}']:
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                STRINGS.android_text(text, ('done', 'total'))
+
     def test_android_singular_category_keeps_the_numeric_argument(self):
         self.assertEqual('%1$s orador', STRINGS.android_text('1 orador', 'n', literal=True))
         self.assertEqual('%1$s intervenant', STRINGS.android_text('{n} intervenant', 'n', literal=True))
