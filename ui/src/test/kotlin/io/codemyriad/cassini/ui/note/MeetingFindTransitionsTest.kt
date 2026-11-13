@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollToIndex
@@ -50,11 +51,23 @@ class MeetingFindTransitionsTest {
         show()
         rule.onNodeWithTag("transcript-list").performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, 40f) }
         rule.onNodeWithTag("meeting-scrolled-edge").assertIsDisplayed()
-        search(match = true)
+        search()
         val pane = rule.onNodeWithTag("transcript-list").getBoundsInRoot()
-        val first = rule.onNodeWithTag("transcript-turn-turn-0").getBoundsInRoot()
+        val first = rule.onNodeWithTag("transcript-turn-turn-0").getUnclippedBoundsInRoot()
         assertTrue("The first match starts below Find", first.top >= pane.top)
         closeAtFirstTurn()
+    }
+
+    @Test fun aNewFirstMatchClearsAClippedTurnWhileFindIsAlreadyOpen() {
+        show()
+        search()
+        rule.onNodeWithTag("transcript-list").performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, 40f) }
+        rule.runOnIdle {
+            state = state.copy(search = TranscriptSearchUi("paragraph0", persistentListOf(TranscriptMatch(turns[0].id, 0..9)), 0))
+        }
+        val pane = rule.onNodeWithTag("transcript-list").getBoundsInRoot()
+        val first = rule.onNodeWithTag("transcript-turn-turn-0").getUnclippedBoundsInRoot()
+        assertTrue("The first match is no longer clipped", first.top >= pane.top)
     }
 
     @Test fun closingADeepResultKeepsItsLocation() {

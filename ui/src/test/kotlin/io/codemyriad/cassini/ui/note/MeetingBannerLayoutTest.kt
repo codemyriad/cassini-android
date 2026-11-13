@@ -79,6 +79,15 @@ class MeetingBannerLayoutTest {
         assertSingleBoundary()
     }
 
+    @Test fun failedDocumentControlsStayPinnedAboveOneBoundary() {
+        state = state.copy(mode = NoteMode.Failed(overDocument = true))
+        show()
+        val version = rule.onNode(hasText("Version 2 of 2", substring = true)).getBoundsInRoot()
+        rule.onNodeWithTag("transcript-list").performScrollToIndex(12)
+        assertEquals(version, rule.onNode(hasText("Version 2 of 2", substring = true)).getBoundsInRoot())
+        assertSingleBoundary()
+    }
+
     @Test fun findHasOneBoundaryImmediatelyBelowItsHeader() {
         state = state.copy(banners = persistentListOf(), search = TranscriptSearchUi("missing", persistentListOf(), 0))
         show()
