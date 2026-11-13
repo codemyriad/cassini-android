@@ -427,8 +427,10 @@ class AppShellTest {
         rule.onNode(hasSetTextAction()).performTextInput(QUERY)
         waitFor(hasText(TITLE))
         rule.onNodeWithText(TITLE).performClick()
-        // A result opens its note with the query in the note's own search.
-        waitFor(hasContentDescription("Close search"))
+        // A result opens its note with the query in the note's own search, beyond the retained Library bar.
+        val field = hasContentDescription("Search in transcript") and hasSetTextAction()
+        waitFor(field)
+        rule.onNode(field).assert(hasText(QUERY))
         rule.waitForIdle()
 
         // The Library's own back handler (it clears the query) is off while the note covers it: back closes the
