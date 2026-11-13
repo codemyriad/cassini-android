@@ -247,5 +247,13 @@
   {"screen": "variants-voices-under-a-minute", "label": "Variants voices under a minute", "scheme": "light", "lang": "en", "device": "phone", "path": "variants/voices-under-a-minute.png", "single_scheme_reason": "Legacy light-only coverage (ANDROID-SCR-03)"},
   {"screen": "wide-library", "label": "Wide library", "scheme": "light", "lang": "en", "device": "phone", "path": "wide/00-library.png", "single_scheme_reason": "Legacy light-only coverage (ANDROID-SCR-03)"},
   {"screen": "wide-recording", "label": "Wide recording", "scheme": "light", "lang": "en", "device": "phone", "path": "wide/01-recording.png", "single_scheme_reason": "Legacy light-only coverage (ANDROID-SCR-03)", "rendered_scheme": "dark"},
-  {"screen": "wide-read-and-listen", "label": "Wide read and listen", "scheme": "light", "lang": "en", "device": "phone", "path": "wide/03-read-and-listen.png", "single_scheme_reason": "Legacy light-only coverage (ANDROID-SCR-03)"}
+  {"screen": "wide-read-and-listen", "label": "Wide read and listen", "scheme": "light", "lang": "en", "device": "phone", "path": "wide/03-read-and-listen.png", "single_scheme_reason": "Legacy light-only coverage (ANDROID-SCR-03)"},
+  {"screen": "components-record-focused", "label": "Record Focused", "scheme": "dark", "lang": "en", "device": "phone", "path": "components/record-focused-dark.png"},
+  {"screen": "components-record-focused", "label": "Record Focused", "scheme": "light", "lang": "en", "device": "phone", "path": "components/record-focused-light.png"},
+  {"screen": "components-record-pressed", "label": "Record Pressed", "scheme": "dark", "lang": "en", "device": "phone", "path": "components/record-pressed-dark.png"},
+  {"screen": "components-record-pressed", "label": "Record Pressed", "scheme": "light", "lang": "en", "device": "phone", "path": "components/record-pressed-light.png"},
+  {"screen": "12-library-scrolled", "label": "12 Library Scrolled", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/12-library-scrolled.png"},
+  {"screen": "13-search-scrolled", "label": "13 Search Scrolled", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/13-search-scrolled.png"},
+  {"screen": "12-library-scrolled", "label": "12 Library Scrolled", "scheme": "light", "lang": "en", "device": "phone", "path": "light/12-library-scrolled.png"},
+  {"screen": "13-search-scrolled", "label": "13 Search Scrolled", "scheme": "light", "lang": "en", "device": "phone", "path": "light/13-search-scrolled.png"}
 ]}
