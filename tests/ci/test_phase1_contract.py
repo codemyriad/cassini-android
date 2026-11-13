@@ -53,6 +53,15 @@ class Phase1ContractTest(unittest.TestCase):
                 handwritten = (ROOT / 'ui/src/main/res' / directory / 'strings.xml').read_text()
                 self.assertNotIn('name="ui_library_import"', handwritten)
 
+    def test_remember_privacy_newlines_survive_android_resource_parsing(self):
+        for path, output in STRINGS.generated(self.root):
+            with self.subTest(locale=path.parent.name):
+                resources = ET.fromstring(output)
+                for alias in ('ui_sp_remember_body', 'ui_sp_remember_unnamed'):
+                    text = resources.find(f"string[@name='{alias}']").text
+                    self.assertIn(r'\n', text)
+                    self.assertNotIn('\n', text)
+
     def test_every_vendored_input_is_byte_pinned(self):
         for name in self.pin['files']:
             with self.subTest(name=name):

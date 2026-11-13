@@ -45,6 +45,22 @@ LABELS = {
     'row_try_again': ('common.tryAgain', None),
     'search_meetings': ('format.searchCount.meetings', 'n'),
     'tx_heading': ('transcribing.heading', None),
+    'sp_name': ('speakers.nameLabel', None),
+    'sp_quote': ('common.quote', 'quote'),
+    'sp_talk_time': ('speakers.talkTime', 'talkTime'),
+    'sp_duplicate_notice': ('speakers.duplicate.notice', 'name'),
+    'sp_same_person': ('speakers.duplicate.samePerson', None),
+    'sp_someone_else': ('speakers.duplicate.someoneElse', None),
+    'sp_voices_ranked': ('speakers.savedVoices.heading', None),
+    'sp_voices': ('common.savedVoices', None),
+    'sp_likely': ('speakers.savedVoices.likely', None),
+    'sp_remember_title': ('speakers.rememberVoice.title', None),
+    'sp_remember_body': ('speakers.rememberVoice.cardBody.phone', 'name'),
+    'sp_remember_unnamed': ('speakers.rememberVoice.cardBody.phone.unnamed', None),
+    'sp_remember_too_short': ('speakers.rememberVoice.tooShort', None),
+    'sp_remember_models': ('speakers.rememberVoice.modelsNeeded', None),
+    'sp_merge': ('speakers.mergeInto', None),
+    'sp_save': ('speakers.saveName', None),
     'tx_eta_minutes': ('transcribing.eta.minutes', 'n'),
     'tx_details': ('transcribing.details.a11y', None),
     'tx_stop': ('common.stop', None),
@@ -80,7 +96,7 @@ def android_text(text, argument, *, literal=False):
         raise ValueError('Shared string placeholders changed')
     for index, name in enumerate(arguments, start=1):
         text = text.replace('{' + name + '}', f'%{index}$s')
-    return escape(text).replace("'", "\\'").replace('"', '\\"')
+    return escape(text).replace('\n', r'\n').replace("'", "\\'").replace('"', '\\"')
 
 
 def generated(root):

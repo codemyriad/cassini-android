@@ -280,26 +280,14 @@
     <string name="ui_name_speaks_for">Fala durante %1$s nesta nota</string>
     <string name="ui_name_play_sample">Reproduzir uma amostra desta voz</string>
     <string name="ui_name_stop_sample">Parar a amostra</string>
-    <string name="ui_name_voices_ranked">Vozes guardadas, mais parecidas primeiro</string>
-    <string name="ui_name_voices">Vozes guardadas</string>
-    <string name="ui_name_likely">Provável</string>
     <string name="ui_name_show_all">Mostrar todas</string>
-    <string name="ui_name_same_person_saved">«%1$s» já é uma voz guardada.</string>
-    <string name="ui_name_same_person_question">É a mesma pessoa?</string>
-    <string name="ui_name_same_person">Mesma pessoa</string>
-    <string name="ui_name_someone_else">Outra pessoa</string>
     <string name="ui_name_answer_first">Responda primeiro à pergunta acima</string>
     <string name="ui_name_rename_saved_saved_as">Esta voz está guardada como «%1$s».</string>
     <string name="ui_name_rename_saved_question">Mudar também o nome da voz guardada?</string>
     <string name="ui_name_rename_saved">Mudar o nome da voz guardada</string>
     <string name="ui_name_not">Não é %1$s?</string>
-    <string name="ui_name_remember">Memorizar esta voz neste telemóvel</string>
     <string name="ui_name_remember_body">Nas próximas notas, o Cassini reconhece %1$s automaticamente.</string>
     <string name="ui_name_remember_body_unnamed">Nas próximas notas, o Cassini reconhece esta pessoa automaticamente.</string>
-    <string name="ui_name_remember_too_little">Fala insuficiente para memorizar esta voz.</string>
-    <string name="ui_name_remember_no_model">O reconhecimento de vozes guardadas ainda não está instalado.</string>
-    <string name="ui_name_merge_into">Juntar a…</string>
-    <string name="ui_name_save">Guardar nome</string>
 
     <!-- Merge sheet and confirmation (features.md section 4, ui.md section 8). -->
     <string name="ui_merge_sheet_title">Juntar %1$s a…</string>

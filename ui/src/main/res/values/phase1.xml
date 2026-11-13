@@ -43,6 +43,22 @@
         <item quantity="other">%1$s meetings</item>
     </plurals>
     <string name="ui_tx_heading">Transcribing</string>
+    <string name="ui_sp_name">Name</string>
+    <string name="ui_sp_quote">“%1$s”</string>
+    <string name="ui_sp_talk_time">Speaks for %1$s in this meeting</string>
+    <string name="ui_sp_duplicate_notice">%1$s is already a saved voice.</string>
+    <string name="ui_sp_same_person">Same person</string>
+    <string name="ui_sp_someone_else">Someone else</string>
+    <string name="ui_sp_voices_ranked">Saved voices, closest first</string>
+    <string name="ui_sp_voices">Saved voices</string>
+    <string name="ui_sp_likely">Likely</string>
+    <string name="ui_sp_remember_title">Remember this voice</string>
+    <string name="ui_sp_remember_body">%1$s is named automatically next time.\nThe voiceprint stays on this phone.</string>
+    <string name="ui_sp_remember_unnamed">This person is named automatically next time.\nThe voiceprint stays on this phone.</string>
+    <string name="ui_sp_remember_too_short">Cassini needs at least 4 seconds of this voice to remember it.</string>
+    <string name="ui_sp_remember_models">To remember voices, download and turn on Tell speakers apart and Recognise saved voices in Settings.</string>
+    <string name="ui_sp_merge">Merge into…</string>
+    <string name="ui_sp_save">Save name</string>
     <plurals name="ui_tx_eta_minutes">
         <item quantity="one">about %1$s min left</item>
         <item quantity="other">about %1$s min left</item>

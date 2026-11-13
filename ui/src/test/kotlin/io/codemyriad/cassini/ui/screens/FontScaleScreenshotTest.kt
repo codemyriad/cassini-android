@@ -37,7 +37,7 @@ class FontScaleScreenshotTest : BoardTest() {
     @Test fun nameSpeaker() = large("04-name-a-speaker")
 
     // The footer (Cancel, Save name) stays below the scrolling part; Remember is the last part that scrolls.
-    @Test fun nameSpeakerEnd() = largeEnd("04-name-a-speaker", "Remember this voice on this phone")
+    @Test fun nameSpeakerEnd() = largeEnd("04-name-a-speaker", "Remember this voice")
 
     @Test fun settings() = large("08-settings")
 

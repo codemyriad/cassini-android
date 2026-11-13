@@ -59,6 +59,16 @@ class SpeakerNamingTest {
 
     private fun NamingState.effects(event: NamingEvent): List<NamingEffect> = SpeakerNaming.reduce(this, event).effects
 
+    @Test fun aChangedQuoteIsPublishedWithoutChangingNamingRules() {
+        val first = input().copy(quote = "First speech.")
+        val next = first.copy(quote = "Updated speech.")
+        assertFalse(first == next)
+        val ui = SpeakerNaming.ui(SpeakerNaming.open(next))
+        assertEquals("Updated speech.", ui.quote)
+        assertEquals("", ui.name)
+        assertEquals(SaveState.DISABLED, ui.save)
+    }
+
     @Test
     fun aPlaceholderOpensEmptyWithRememberOnAndNothingToSave() {
         val state = SpeakerNaming.open(input())
@@ -157,6 +167,17 @@ class SpeakerNamingTest {
         assertEquals("luca", picked.boundVoiceId)
         val edited = picked.on(NamingEvent.NameChanged("Luca B."))
         assertNull(edited.boundVoiceId)
+    }
+
+    @Test
+    fun savedVoiceColoursKeepTheirStoredSlotWhenTheListIsReordered() {
+        val voices = listOf(anna.copy(colourIndex = 4), luca.copy(colourIndex = 1), elodie.copy(colourIndex = 8))
+        fun tones(input: NamingInput): Map<String, SpeakerTone> {
+            return SpeakerNaming.ui(SpeakerNaming.open(input)).voices.associate { it.id to it.tone }
+        }
+        val expected = mapOf("anna" to SpeakerTone.Five, "luca" to SpeakerTone.Two, "elodie" to SpeakerTone.Three)
+        assertEquals(expected, tones(input(voices = voices)))
+        assertEquals(expected, tones(input(voices = voices.reversed(), print = null)))
     }
 
     @Test

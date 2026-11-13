@@ -25,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.semantics
@@ -57,6 +58,7 @@ fun CassiniTextField(
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     maxLength: Int = Int.MAX_VALUE,
+    containerColor: Color = CassiniTheme.colors.surface,
 ) {
     val c = CassiniTheme.colors
     val t = CassiniTheme.type
@@ -92,7 +94,7 @@ fun CassiniTextField(
                         .fillMaxWidth()
                         .height(52.dp)
                         .clip(shape)
-                        .background(c.surface)
+                        .background(containerColor)
                         .border(width, color, shape)
                         .padding(horizontal = 16.dp),
                     contentAlignment = Alignment.CenterStart,

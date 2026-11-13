@@ -103,7 +103,7 @@ class SheetAndDraftDeviceTest {
         assertTrue("The sheet top ${sheet.sheet.top} is above the status bar", sheet.sheet.top >= sheet.statusBar)
         val labels = listOf(
             io.codemyriad.cassini.ui.R.string.ui_action_cancel,
-            io.codemyriad.cassini.ui.R.string.ui_name_save,
+            io.codemyriad.cassini.ui.R.string.ui_sp_save,
         )
         for (label in labels.map(rule.activity::getString)) {
             val node = rule.onNode(hasText(label) and hasClickAction()).fetchSemanticsNode()

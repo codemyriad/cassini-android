@@ -103,6 +103,7 @@ class CassiniColors(
     val record: Color get() = brand?.getValue("record") ?: red
     val recordInk: Color get() = brand?.getValue("record-ink") ?: redInk
     val recordTint: Color get() = brand?.getValue("record-tint") ?: redTint
+    val field: Color get() = brand?.getValue("field") ?: surface
     val lineSoft: Color get() = brand?.getValue("line-soft") ?: line
     val onRecord: Color get() = brand?.getValue("on-record") ?: onRed
     val error: Color get() = brand?.getValue("error") ?: redInk

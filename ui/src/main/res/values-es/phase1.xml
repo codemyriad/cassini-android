@@ -46,6 +46,22 @@
         <item quantity="other">%1$s reuniones</item>
     </plurals>
     <string name="ui_tx_heading">Transcribiendo</string>
+    <string name="ui_sp_name">Nombre</string>
+    <string name="ui_sp_quote">“%1$s”</string>
+    <string name="ui_sp_talk_time">Habla durante %1$s en esta reunión</string>
+    <string name="ui_sp_duplicate_notice">%1$s ya es una voz guardada.</string>
+    <string name="ui_sp_same_person">Misma persona</string>
+    <string name="ui_sp_someone_else">Otra persona</string>
+    <string name="ui_sp_voices_ranked">Voces guardadas, la más parecida primero</string>
+    <string name="ui_sp_voices">Voces guardadas</string>
+    <string name="ui_sp_likely">Probable</string>
+    <string name="ui_sp_remember_title">Recordar esta voz</string>
+    <string name="ui_sp_remember_body">Cassini pondrá el nombre %1$s automáticamente la próxima vez.\nLa huella de voz se queda en este teléfono.</string>
+    <string name="ui_sp_remember_unnamed">Cassini pondrá nombre a esta persona automáticamente la próxima vez.\nLa huella de voz se queda en este teléfono.</string>
+    <string name="ui_sp_remember_too_short">Cassini necesita al menos 4 segundos de esta voz para recordarla.</string>
+    <string name="ui_sp_remember_models">Para recordar voces, descarga y activa Distinguir hablantes y Reconocer voces guardadas en Ajustes.</string>
+    <string name="ui_sp_merge">Fusionar con…</string>
+    <string name="ui_sp_save">Guardar nombre</string>
     <plurals name="ui_tx_eta_minutes">
         <item quantity="one">queda %1$s min</item>
         <item quantity="many">quedan unos %1$s min</item>
