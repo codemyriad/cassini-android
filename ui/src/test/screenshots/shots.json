@@ -260,8 +260,8 @@
   {"screen": "meeting-find", "label": "Meeting Find", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/15-meeting-find.png"},
   {"screen": "meeting-scrolled", "label": "Meeting scrolled", "scheme": "light", "lang": "en", "device": "phone", "path": "light/14-meeting-scrolled.png"},
   {"screen": "meeting-find", "label": "Meeting Find", "scheme": "light", "lang": "en", "device": "phone", "path": "light/15-meeting-find.png"},
-  {"screen": "recording-short-large-banner", "label": "Recording banner · short window · 2x text", "scheme": "light", "lang": "en", "device": "phone", "path": "adaptive/recording-short-large-banner.png"},
-  {"screen": "recording-short-large-feedback", "label": "Recording feedback · short window · 2x text", "scheme": "light", "lang": "en", "device": "phone", "path": "adaptive/recording-short-large-feedback.png"},
-  {"screen": "recording-short-large-banner", "label": "Recording banner · short window · 2x text", "scheme": "dark", "lang": "en", "device": "phone", "path": "adaptive-dark/recording-short-large-banner.png"},
-  {"screen": "recording-short-large-feedback", "label": "Recording feedback · short window · 2x text", "scheme": "dark", "lang": "en", "device": "phone", "path": "adaptive-dark/recording-short-large-feedback.png"}
+  {"screen": "recording-short-large-banner", "label": "Recording banner · short window · 2x text", "scheme": "light", "lang": "en", "device": "phone", "path": "adaptive/recording-short-large-banner.png", "rendered_scheme": "dark"},
+  {"screen": "recording-short-large-feedback", "label": "Recording feedback · short window · 2x text", "scheme": "light", "lang": "en", "device": "phone", "path": "adaptive/recording-short-large-feedback.png", "rendered_scheme": "dark"},
+  {"screen": "recording-short-large-banner", "label": "Recording banner · short window · 2x text", "scheme": "dark", "lang": "en", "device": "phone", "path": "adaptive-dark/recording-short-large-banner.png", "rendered_scheme": "dark"},
+  {"screen": "recording-short-large-feedback", "label": "Recording feedback · short window · 2x text", "scheme": "dark", "lang": "en", "device": "phone", "path": "adaptive-dark/recording-short-large-feedback.png", "rendered_scheme": "dark"}
 ]}

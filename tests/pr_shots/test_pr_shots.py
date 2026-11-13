@@ -40,7 +40,7 @@ def validate_manifest(rows, expected_files=None):
         assert row["scheme"] == ("dark" if dark else "light"), path
         groups.setdefault(shots.screen_id(row), []).append(row)
         fixed = path in {f"{d}/01-recording.png" for d in ("light", "dark", "fr", "wide")} or path.startswith(
-            "variants/recording-"
+            ("variants/recording-", "adaptive/recording-", "adaptive-dark/recording-")
         )
         rendered = "dark" if fixed else row["scheme"]
         assert row.get("rendered_scheme", row["scheme"]) == rendered, path
