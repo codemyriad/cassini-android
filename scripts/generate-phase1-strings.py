@@ -28,6 +28,7 @@ LABELS = {
     'badge_unplayable': ('states.phone.cantPlay', None),
     'badge_unreadable': ('states.phone.cantReadTranscript', None),
     'badge_newer': ('states.phone.newerFormat', None),
+    'library_import': ('import.button.mobile', None),
     'all_meetings': ('library.allMeetings', None),
     'back_to_library': ('library.backToAllMeetings', None),
     'recording_library': ('library.allMeetings', None),

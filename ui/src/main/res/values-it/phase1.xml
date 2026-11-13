@@ -21,6 +21,7 @@
     <string name="ui_badge_unplayable">Impossibile riprodurre</string>
     <string name="ui_badge_unreadable">Trascrizione illeggibile</string>
     <string name="ui_badge_newer">Formato più recente</string>
+    <string name="ui_library_import">Importa audio</string>
     <string name="ui_all_meetings">Tutte le riunioni</string>
     <string name="ui_back_to_library">Torna a tutte le riunioni</string>
     <string name="ui_recording_library">Tutte le riunioni</string>

@@ -157,7 +157,6 @@
     <string name="ui_library_recording_card">Recording · %1$s</string>
     <string name="ui_library_recording_paused_card">Recording paused · %1$s</string>
     <string name="ui_library_recording_tap">Tap to return</string>
-    <string name="ui_library_import">Import audio</string>
     <string name="ui_library_record">Record</string>
     <string name="ui_library_record_description">Record a new note</string>
     <string name="ui_library_recording_fab">Recording · %1$s</string>
@@ -624,4 +623,6 @@
     <string name="ui_search_filter_date_today">Today</string>
     <string name="ui_search_filter_date_week">Past 7 days</string>
     <string name="ui_search_filter_date_month">Past 30 days</string>
+    <string name="ui_progress_downloading_models">Downloading models</string>
+    <string name="ui_progress_getting_ready">Getting ready to transcribe %1$s</string>
 </resources>

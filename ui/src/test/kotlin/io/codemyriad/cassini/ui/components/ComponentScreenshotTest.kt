@@ -75,8 +75,14 @@ class ComponentScreenshotTest : BoardTest() {
     private fun TopBars() {
         Label("LibrarySearchBar")
         io.codemyriad.cassini.ui.library.LibrarySearchBar(
-            query = "", active = false, onActive = {}, onQuery = {}, onClear = {}, onClose = {},
-            onSearch = {}, onTrash = {}, onSettings = {},
+            query = "",
+            hasResults = false,
+            onQuery = {},
+            onClear = {},
+            onClose = {},
+            onSearch = {},
+            onTrash = {},
+            onSettings = {},
         )
         Label("CassiniTopBar: Screen, Note with subtitle, Read, Trash with Empty")
         CassiniTopBar(title = "Settings", onBack = {}, backLabel = "Back to library")

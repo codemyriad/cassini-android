@@ -12,6 +12,7 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -21,6 +22,7 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
@@ -506,12 +508,12 @@ class AcceptanceWalkTest {
 
     /**
      * Goes back until the Library shows, and scrolls it to the top. Its bottom bar (Import audio) is always on screen;
-     * the header scrolls with the list.
+     * the search header stays pinned above the list.
      */
     private fun library() {
         toLibrary()
         val settings = hasContentDescription(rule.text(UiR.string.ui_library_settings))
-        rule.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(settings)
+        rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToIndex(0)
         rule.waitShown(settings)
     }
 

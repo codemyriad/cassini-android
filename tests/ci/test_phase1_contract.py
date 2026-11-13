@@ -4,6 +4,7 @@ import importlib.util
 import json
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -37,6 +38,20 @@ class Phase1ContractTest(unittest.TestCase):
         self.assertEqual(6, len(outputs))
         for path, content in outputs:
             self.assertEqual((ROOT / path.relative_to(self.root)).read_text(), content)
+
+    def test_mobile_import_label_is_generated_from_the_catalog_in_every_locale(self):
+        catalog = json.loads((self.root / PIN.VENDOR / 'strings.json').read_text())
+        entry = next(e for e in catalog['entries'] if e['id'] == 'import.button.mobile')
+        outputs = dict(STRINGS.generated(self.root))
+        for locale, directory in STRINGS.LOCALES.items():
+            with self.subTest(locale=locale):
+                output = next(value for path, value in outputs.items() if path.parent.name == directory)
+                actual = ET.fromstring(output).find("string[@name='ui_library_import']")
+                self.assertIsNotNone(actual, 'mobile Import must be a generated catalog resource')
+                expected = entry['en'] if locale == 'en' else entry['l10n'][locale]['text']
+                self.assertEqual(expected, actual.text)
+                handwritten = (ROOT / 'ui/src/main/res' / directory / 'strings.xml').read_text()
+                self.assertNotIn('name="ui_library_import"', handwritten)
 
     def test_every_vendored_input_is_byte_pinned(self):
         for name in self.pin['files']:

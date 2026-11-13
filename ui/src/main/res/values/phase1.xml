@@ -20,6 +20,7 @@
     <string name="ui_badge_unplayable">Can’t play</string>
     <string name="ui_badge_unreadable">Can’t read transcript</string>
     <string name="ui_badge_newer">Newer format</string>
+    <string name="ui_library_import">Import audio</string>
     <string name="ui_all_meetings">All meetings</string>
     <string name="ui_back_to_library">Back to all meetings</string>
     <string name="ui_recording_library">All meetings</string>

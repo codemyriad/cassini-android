@@ -178,6 +178,19 @@ class AppShellTest {
         rule.onNodeWithText("Finish").assertExists()
     }
 
+    @Test fun anEmptySearchDoesNotSurviveAMeetingRoundTrip() {
+        importDocument()
+        rule.onNode(hasSetTextAction()).performClick()
+        rule.onNodeWithContentDescription("Close search").assertExists()
+        rule.onNodeWithText(TITLE).performClick()
+        waitFor(hasContentDescription("Search in transcript"))
+        Espresso.pressBack()
+        waitFor(hasContentDescription("Settings"))
+        rule.onNode(hasSetTextAction()).assertIsNotFocused()
+        rule.onNodeWithContentDescription("Trash").assertIsDisplayed()
+        rule.onNodeWithContentDescription("Close search").assertDoesNotExist()
+    }
+
     @Test fun theAppUsesPredictiveBackAndTheLibraryLeavesBackToTheSystem() {
         // Robolectric does not set the ApplicationInfo flag, so the merged manifest it runs with is read instead.
         val attribute = "enableOnBackInvokedCallback"

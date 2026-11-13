@@ -2,6 +2,7 @@
 
 package io.codemyriad.cassini.ui.library
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
@@ -19,8 +20,15 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberSearchBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -42,8 +50,7 @@ import io.codemyriad.cassini.ui.theme.Glyph
 @Suppress("LongParameterList", "LongMethod") // Native input slot and its fixed leading/trailing controls.
 internal fun LibrarySearchBar(
     query: String,
-    active: Boolean,
-    onActive: () -> Unit,
+    hasResults: Boolean,
     onQuery: (String) -> Unit,
     onClear: () -> Unit,
     onClose: () -> Unit,
@@ -53,6 +60,17 @@ internal fun LibrarySearchBar(
 ) {
     val c = CassiniTheme.colors
     val text = rememberSyncedText(query)
+    var focused by remember { mutableStateOf(false) }
+    val active = focused || text.value.text.isNotEmpty() || query.isNotEmpty() || hasResults
+    val focus = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    val close = {
+        text.set("")
+        focus.clearFocus()
+        keyboard?.hide()
+        onClose()
+    }
+    BackHandler(enabled = active, onBack = close)
     val description = stringResource(R.string.ui_library_search_description)
     val colors = SearchBarDefaults.colors(containerColor = c.neutralTint)
     CompositionLocalProvider(LocalTextStyle provides CassiniTheme.type.body16) {
@@ -71,8 +89,9 @@ internal fun LibrarySearchBar(
                     },
                     onSearch = { onSearch() },
                     expanded = active,
-                    onExpandedChange = { if (it) onActive() },
-                    modifier = Modifier.semantics { contentDescription = description },
+                    onExpandedChange = {}, // Actual input focus owns empty-search activation, including navigation focus loss.
+                    modifier = Modifier.onFocusChanged { focused = it.isFocused }
+                        .semantics { contentDescription = description },
                     placeholder = {
                         Text(
                             stringResource(R.string.ui_library_search_placeholder),
@@ -84,10 +103,7 @@ internal fun LibrarySearchBar(
                         Crossfade(active, label = "Library search leading icon") { searching ->
                             Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
                                 if (searching) {
-                                    SearchIcon(Glyph.Back, stringResource(R.string.ui_search_close)) {
-                                        text.set("")
-                                        onClose()
-                                    }
+                                    SearchIcon(Glyph.Back, stringResource(R.string.ui_search_close), close)
                                 } else {
                                     Image(
                                         painterResource(R.drawable.ui_saturn_nav),

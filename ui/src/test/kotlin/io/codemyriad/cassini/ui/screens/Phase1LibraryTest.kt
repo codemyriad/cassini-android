@@ -6,6 +6,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.FocusManager
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -24,6 +27,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.text.TextLayoutResult
@@ -33,10 +37,13 @@ import io.codemyriad.cassini.ui.components.NoteRowAction
 import io.codemyriad.cassini.ui.components.NoteStatusUi
 import io.codemyriad.cassini.ui.fixtures.BoardFixtures
 import io.codemyriad.cassini.ui.format.DayLabel
+import io.codemyriad.cassini.ui.format.ModelPartUi
 import io.codemyriad.cassini.ui.format.ProvideFixedFormat
 import io.codemyriad.cassini.ui.library.DaySection
 import io.codemyriad.cassini.ui.library.LibraryEvent
 import io.codemyriad.cassini.ui.library.LibraryScreen
+import io.codemyriad.cassini.ui.library.ProgressBannerUi
+import io.codemyriad.cassini.ui.library.ProgressLine
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
@@ -80,8 +87,74 @@ class Phase1LibraryTest {
         assertEquals(bar, rule.onNodeWithTag("library-search-bar").getBoundsInRoot())
         rule.onNodeWithContentDescription("Trash").assertIsDisplayed()
         rule.onNodeWithTag("saturn-nav", useUnmergedTree = true).assertIsDisplayed()
+        // Acceptance returns to index zero; the pinned Settings action is not a lazy item.
+        rule.onNodeWithTag("library-list").performScrollToIndex(0)
+        rule.onNode(hasContentDescription(rows.first().title, substring = true)).assertIsDisplayed()
+        rule.onNodeWithContentDescription("Settings").assertIsDisplayed()
         rule.onAllNodesWithText("Transcription runs on this phone.").assertCountEquals(0)
         rule.onAllNodesWithText("Transcribing Weekly product sync").assertCountEquals(0)
+    }
+
+    @Test fun standaloneDownloadAndVerificationStayVisibleSpokenAndOpenable() {
+        val download = ProgressBannerUi(null, null, null, 0.46f, ProgressLine.Downloading(ModelPartUi.SPEECH, 46))
+        var state by mutableStateOf(BoardFixtures.library.copy(progress = download))
+        val events = mutableListOf<LibraryEvent>()
+        themed { LibraryScreen(state, onEvent = { events += it }) }
+        fun card(line: String) = rule.onNode(hasContentDescription(line, substring = true))
+        card("Downloading speech recognition — 46%")
+            .assertIsDisplayed()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+            .performClick()
+        rule.runOnIdle {
+            assertEquals(listOf(LibraryEvent.OpenProgress), events)
+            // The stage changes without moving the percentage: verification must still be announced.
+            state = state.copy(progress = download.copy(line = ProgressLine.Checking(46)))
+        }
+        card("Checking files — 46%").assertIsDisplayed()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+        rule.runOnIdle { state = state.copy(progress = download.copy(line = ProgressLine.Checking(80))) }
+        card("Checking files — 80%").assertIsDisplayed()
+        rule.runOnIdle { state = state.copy(progress = BoardFixtures.libraryProgress) }
+        card("Downloading models").assertDoesNotExist()
+        rule.onAllNodesWithText("Transcribing Weekly product sync").assertCountEquals(0)
+    }
+
+    @Test fun emptySearchEndsOnFocusLossAndRestoresNavigationActions() {
+        lateinit var focus: FocusManager
+        themed {
+            focus = LocalFocusManager.current
+            LibraryScreen(BoardFixtures.library, onEvent = {})
+        }
+        rule.onNode(hasSetTextAction()).performClick()
+        rule.onNodeWithContentDescription("Close search").assertIsDisplayed()
+        rule.runOnIdle { focus.clearFocus() }
+        rule.onNodeWithContentDescription("Trash").assertIsDisplayed()
+        rule.onNodeWithContentDescription("Settings").assertIsDisplayed()
+        rule.onNodeWithContentDescription("Close search").assertDoesNotExist()
+    }
+
+    @Test fun systemBackClearsUnacknowledgedTextExactlyLikeTheCloseButton() {
+        var state by mutableStateOf(BoardFixtures.library)
+        lateinit var back: OnBackPressedDispatcher
+        val events = mutableListOf<LibraryEvent>()
+        themed {
+            back = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
+            // Deliberately withhold all ViewModel query acknowledgements until after Back.
+            LibraryScreen(state, onEvent = { events += it })
+        }
+        val field = rule.onNode(hasSetTextAction())
+        field.performClick().performTextInput("budget")
+        rule.runOnIdle { back.onBackPressed() }
+        field.assert(hasText(""))
+        rule.onNodeWithContentDescription("Settings").assertIsDisplayed()
+        rule.runOnIdle {
+            assertEquals(LibraryEvent.ClearQuery, events.last())
+            state = state.copy(query = "budget")
+        }
+        field.assert(hasText(""))
+        rule.runOnIdle { state = state.copy(query = "") }
+        field.assert(hasText(""))
+        rule.onNodeWithContentDescription("Settings").assertIsDisplayed()
     }
 
     @Test fun emptySearchBackAndClearPreserveTheBarBoundsAndFocus() {
