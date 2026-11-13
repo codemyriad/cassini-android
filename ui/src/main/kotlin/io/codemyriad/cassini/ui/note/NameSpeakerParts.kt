@@ -5,6 +5,7 @@ package io.codemyriad.cassini.ui.note
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -57,14 +58,19 @@ internal fun NameNoticeButton(label: String, primary: Boolean, onClick: () -> Un
         modifier = Modifier.heightIn(min = 48.dp).widthIn(min = 48.dp),
         contentPadding = PaddingValues(0.dp),
     ) {
-        Text(
-            label,
-            Modifier.clip(CassiniTheme.shapes.pill)
+        Box(
+            Modifier.heightIn(min = 32.dp).clip(CassiniTheme.shapes.pill)
                 .background(if (primary) c.accentFill else c.ink.copy(alpha = 0.10f))
+                .testTag(if (primary) "name-primary-pill" else "name-secondary-pill")
                 .padding(horizontal = 14.dp, vertical = 6.dp),
-            style = CassiniTheme.type.label14,
-            color = if (primary) c.onAccentFill else c.ink,
-        )
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                label,
+                style = CassiniTheme.type.label14,
+                color = if (primary) c.onAccentFill else c.ink,
+            )
+        }
     }
 }
 

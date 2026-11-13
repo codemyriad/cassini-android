@@ -7,6 +7,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
@@ -21,6 +22,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.fixtures.BoardFixtures
 import io.codemyriad.cassini.ui.fixtures.VariantFixtures
 import io.codemyriad.cassini.ui.format.FIXED_ZONE
@@ -140,7 +142,8 @@ class SheetBehaviourTest {
         setThemed { NameSpeakerSheetContent(BoardFixtures.nameSpeaker, onEvent = { events += it }) }
         rule.onNodeWithContentDescription("Play a sample of this voice").performClick()
         rule.onNodeWithText("Annalisa B.").performClick()
-        rule.onNodeWithText("Same person").performClick()
+        rule.onNodeWithTag("name-primary-pill", useUnmergedTree = true).assertHeightIsAtLeast(32.dp)
+        rule.onNodeWithText("Same person").assertHeightIsAtLeast(48.dp).performClick()
         rule.onNodeWithText("Someone else").performClick()
         rule.onNodeWithText("Remember this voice", substring = true).performClick()
         rule.onNodeWithText("Merge into…").performClick()
