@@ -255,5 +255,9 @@
   {"screen": "12-library-scrolled", "label": "12 Library Scrolled", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/12-library-scrolled.png"},
   {"screen": "13-search-scrolled", "label": "13 Search Scrolled", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/13-search-scrolled.png"},
   {"screen": "12-library-scrolled", "label": "12 Library Scrolled", "scheme": "light", "lang": "en", "device": "phone", "path": "light/12-library-scrolled.png"},
-  {"screen": "13-search-scrolled", "label": "13 Search Scrolled", "scheme": "light", "lang": "en", "device": "phone", "path": "light/13-search-scrolled.png"}
+  {"screen": "13-search-scrolled", "label": "13 Search Scrolled", "scheme": "light", "lang": "en", "device": "phone", "path": "light/13-search-scrolled.png"},
+  {"screen": "meeting-scrolled", "label": "Meeting scrolled", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/14-meeting-scrolled.png"},
+  {"screen": "meeting-find", "label": "Meeting Find", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/15-meeting-find.png"},
+  {"screen": "meeting-scrolled", "label": "Meeting scrolled", "scheme": "light", "lang": "en", "device": "phone", "path": "light/14-meeting-scrolled.png"},
+  {"screen": "meeting-find", "label": "Meeting Find", "scheme": "light", "lang": "en", "device": "phone", "path": "light/15-meeting-find.png"}
 ]}
