@@ -230,8 +230,6 @@
     <string name="ui_progress_low_memory">Ce téléphone manque de mémoire. Fermez d’autres applications si la transcription s’arrête.</string>
 
     <!-- Draft transcript and suggestions (board 02). -->
-    <string name="ui_draft_title">Brouillon de transcription</string>
-    <string name="ui_draft_tag">Les mots peuvent encore changer</string>
     <string name="ui_suggestion_question">Est-ce %1$s\u202F?</string>
     <string name="ui_suggestion_yes">Oui, %1$s</string>
     <string name="ui_suggestion_no">Pas %1$s</string>

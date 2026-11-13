@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -85,13 +84,24 @@ private val TopItemPadding = Modifier.padding(start = 16.dp, top = 8.dp, end = 1
  * uses the screen's [listState], as Reading does, so Remove from queue keeps the position too.
  */
 @Composable
-internal fun ColumnScope.NoteModeBody(state: NoteUiState, listState: LazyListState, onEvent: (NoteEvent) -> Unit) {
+internal fun ColumnScope.NoteModeBody(
+    state: NoteUiState,
+    listState: LazyListState,
+    draftListState: LazyListState,
+    onEvent: (NoteEvent) -> Unit,
+) {
     val navigationBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val bottom = if (state.playback == null) navigationBar else 0.dp
     val mode = state.mode
     val draft = mode is NoteMode.Processing || mode is NoteMode.Paused || (mode is NoteMode.Failed && !mode.overDocument)
     if (draft) {
-        DraftList(state, card = (mode as? NoteMode.Processing)?.card, bottom = bottom, onEvent = onEvent)
+        DraftList(
+            state,
+            card = (mode as? NoteMode.Processing)?.card,
+            listState = draftListState,
+            bottom = bottom,
+            onEvent = onEvent,
+        )
     } else {
         OtherModeBody(state, listState, onEvent)
     }
@@ -162,10 +172,10 @@ private fun ColumnScope.DocumentBelow(
 private fun ColumnScope.DraftList(
     state: NoteUiState,
     card: ProcessingCardUi?,
+    listState: LazyListState,
     bottom: Dp,
     onEvent: (NoteEvent) -> Unit,
 ) {
-    val listState = rememberLazyListState()
     var stick by remember { mutableStateOf(true) }
     LaunchedEffect(listState) {
         snapshotFlow { listState.isScrollInProgress }

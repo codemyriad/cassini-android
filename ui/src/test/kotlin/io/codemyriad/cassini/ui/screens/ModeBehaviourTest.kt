@@ -7,13 +7,15 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
-import androidx.compose.ui.test.assertContentDescriptionEquals
+import androidx.compose.ui.test.assertContentDescriptionContains
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import io.codemyriad.cassini.ui.fixtures.BoardFixtures
 import io.codemyriad.cassini.ui.format.FIXED_ZONE
 import io.codemyriad.cassini.ui.format.ProvideFixedFormat
@@ -81,8 +83,8 @@ class ModeBehaviourTest {
     @Test fun yesAndNotAnswerTheSuggestion() {
         val events = mutableListOf<NoteEvent>()
         setThemed { NoteScreen(BoardFixtures.transcribing, onEvent = { events += it }) }
-        rule.onNodeWithText("Yes, Luca").performClick()
-        rule.onNodeWithText("Not Luca").performClick()
+        rule.onNodeWithContentDescription("Yes, Luca").performClick()
+        rule.onNodeWithContentDescription("Not Luca").performClick()
         rule.runOnIdle {
             assertEquals(
                 listOf(NoteEvent.AcceptSuggestion("s2", "luca"), NoteEvent.RejectSuggestion("s2", "luca")),
@@ -99,10 +101,12 @@ class ModeBehaviourTest {
         rule.runOnIdle { assertEquals(listOf(NoteEvent.SpeakerTap("s2"), NoteEvent.SpeakerTap("s1")), events) }
     }
 
-    @Test fun theProgressCardIsAPoliteLiveRegionWithStepStates() {
+    @Test fun theStatusIsAPoliteLiveRegionWithStepStatesInDetails() {
         setThemed { NoteScreen(BoardFixtures.transcribing, onEvent = {}) }
         rule.onNode(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
-            .assertContentDescriptionEquals("Finding words and speakers, 60%")
+            .assertContentDescriptionContains("Transcribing", substring = true)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "60%"))
+        rule.onNodeWithTag("transcribing-details").performClick()
         val states = listOf(
             "Step 1 of 5: Reading" to "done",
             "Step 2 of 5: Preparing" to "done",
@@ -111,7 +115,7 @@ class ModeBehaviourTest {
             "Step 5 of 5: Saving" to "not started",
         )
         states.forEach { (step, state) ->
-            rule.onNodeWithContentDescription(step)
+            rule.onNodeWithContentDescription(step).performScrollTo()
                 .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, state))
         }
     }
@@ -119,7 +123,8 @@ class ModeBehaviourTest {
     @Test fun stopKeepsProgress() {
         val events = mutableListOf<NoteEvent>()
         setThemed { NoteScreen(BoardFixtures.transcribing, onEvent = { events += it }) }
-        rule.onNodeWithText("Stop and keep progress").performClick()
+        rule.onNodeWithTag("transcribing-details").performClick()
+        rule.onNodeWithText("Stop and keep progress").performScrollTo().performClick()
         rule.runOnIdle { assertEquals(listOf<NoteEvent>(NoteEvent.Stop), events) }
     }
 }

@@ -89,7 +89,7 @@ class SpeakerNamingFlowTest {
         val transcribe = hasText(rule.text(UiR.string.ui_action_transcribe)) and hasClickAction()
         rule.waitShown(transcribe)
         rule.onAllNodes(transcribe).onFirst().performClick()
-        val yes = hasText(rule.text(UiR.string.ui_suggestion_yes, NAME)) and hasClickAction()
+        val yes = hasContentDescription(rule.text(UiR.string.ui_suggestion_yes, NAME)) and hasClickAction()
         rule.waitShown(yes, timeoutMs = Flows.JOB_MS)
         val state = runBlocking { catalogue.jobs.job(secondId) }?.state
         Log.i(TAG, "Draft suggestion shown; job $state")

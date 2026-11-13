@@ -283,16 +283,16 @@ class AcceptanceWalkTest {
 
     /**
      * 02 Transcribing: the running note with its draft. Auto-follow keeps the end of the draft in view, so when the
-     * draft is taller than the list (Italian: the card is taller), the header is above the list and not composed.
+     * draft is taller than the list, the transcript heading has scrolled away and is not composed.
      * The walk scrolls the list back to the header, as a reader does, which pauses auto-follow.
      */
     private fun transcribing() {
         openRow(WEEKLY)
-        see(rule.text(UiR.string.ui_action_stop_keep_progress))
-        val header = hasText(rule.text(UiR.string.ui_draft_title))
+        see(rule.text(UiR.string.ui_tx_stop_keep))
+        val header = hasText(rule.text(UiR.string.ui_tx_transcript))
         val toHeader = { rule.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(header) }
         rule.waitForUi("Not shown: the draft header", SEE_MS) { runCatching { toHeader() }.isSuccess }
-        see(rule.text(UiR.string.ui_draft_title))
+        see(rule.text(UiR.string.ui_tx_transcript))
         shot("02-transcribing")
         library()
     }

@@ -76,7 +76,7 @@ internal val LocalTurnParagraphProbe = staticCompositionLocalOf<(() -> Unit)?> {
  * rectangle (radius 4, 3 dp wider on each side, the height of the font's content area as on board 03) is drawn
  * behind them from the text layout, one rectangle per line when the word wraps, so the text never reflows.
  *
- * [TurnMode.Draft] (`draft`, text3; words from [unsettledFrom] on in text4): plain text, taps do nothing.
+ * [TurnMode.Draft] (`draft`, ink; unsettled words use text3): plain text, taps do nothing.
  *
  * The paragraph that holds the active word has [ActiveWordStart] in its semantics: that word's start (ms), for tests.
  * It is not given to accessibility services.
@@ -114,7 +114,7 @@ fun TurnParagraph(
     if (probe != null) SideEffect { probe() }
     val c = CassiniTheme.colors
     val style = if (mode == TurnMode.Read) CassiniTheme.type.transcript else CassiniTheme.type.draft
-    val color = if (mode == TurnMode.Draft) c.text3 else c.ink
+    val color = c.ink
     val tap by rememberUpdatedState(onWordTap)
     val starts = remember(words) { wordStarts(words) }
     val text = remember(words, mode, unsettledFrom, matches, c) {
@@ -358,7 +358,7 @@ private fun paragraph(
             if (word.prefix.isNotEmpty()) addStyle(SpanStyle(fontWeight = FontWeight.SemiBold), first, starts[index])
         }
         val unsettled = word.unsettled || (!explicitUnsettled && unsettledFrom != null && index >= unsettledFrom)
-        if (mode != TurnMode.Read && unsettled) addStyle(SpanStyle(color = c.text4), starts[index], end)
+        if (mode != TurnMode.Read && unsettled) addStyle(SpanStyle(color = c.text3), starts[index], end)
     }
     matches.ranges.forEachIndexed { index, range ->
         val start = range.first.coerceIn(0, length)

@@ -86,8 +86,11 @@ class TranscribingPresentationTest {
         val turns = List(40) { turn.copy(id = "turn-$it", startMs = it * 1_000L) }.toImmutableList()
         state = state.copy(turns = turns)
         show()
+        rule.onNodeWithText("48:13", substring = true).assertIsDisplayed()
         val draft = rule.onNodeWithTag("transcribing-draft")
         draft.performScrollToIndex(10)
+        rule.onNodeWithText("48:13", substring = true).assertDoesNotExist()
+        rule.onNodeWithTag("transcribing-status").assertIsDisplayed()
         draft.performTouchInput { swipeUp() }
         fun position() = draft.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
         val heldAway = position()
