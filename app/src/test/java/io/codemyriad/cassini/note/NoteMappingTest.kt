@@ -31,12 +31,11 @@ class NoteMappingTest {
 
     @Test fun subtitlePreservesALocalLabelAndDoesNotInventUnknownTime() {
         val note = documentNote().note
-        val mode = io.codemyriad.cassini.ui.note.NoteMode.AudioOnly
         val now = io.codemyriad.cassini.library.NOW
         val zone = io.codemyriad.cassini.library.ROME
-        val unknown = NoteMapping.subtitle(note.copy(recordedAt = null), mode, now, zone)!!
+        val unknown = NoteMapping.subtitle(note.copy(recordedAt = null), now, zone)
         assertEquals(io.codemyriad.cassini.ui.format.DayLabel.Unknown, unknown.day)
-        val local = NoteMapping.subtitle(note.copy(recordedAt = "2026-10-07T23:59:00"), mode, now, zone)!!
+        val local = NoteMapping.subtitle(note.copy(recordedAt = "2026-10-07T23:59:00"), now, zone)
         assertEquals("2026-10-07T23:59:00", local.recordedLabel)
     }
 

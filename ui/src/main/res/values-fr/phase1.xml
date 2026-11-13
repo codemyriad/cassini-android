@@ -26,6 +26,7 @@
     <string name="ui_back_to_library">Retour à toutes les réunions</string>
     <string name="ui_recording_library">Toutes les réunions</string>
     <string name="ui_recording_minimise">Retour à toutes les réunions</string>
+    <string name="ui_note_search_placeholder">Rechercher</string>
     <string name="ui_library_search_placeholder">Rechercher</string>
     <string name="ui_library_search_description">Rechercher dans toutes les réunions</string>
     <plurals name="ui_row_speaker_count">

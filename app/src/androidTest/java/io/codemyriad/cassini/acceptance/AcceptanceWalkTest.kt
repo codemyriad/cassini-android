@@ -341,7 +341,7 @@ class AcceptanceWalkTest {
         Log.i(TAG, "Read & listen shot at $captured")
         rule.runOnUiThread { graph.playback.pause() }
 
-        rule.onNode(hasContentDescription(rule.text(UiR.string.ui_note_share_more))).performClick()
+        rule.onNode(hasContentDescription(rule.text(UiR.string.ui_note_more_actions))).performClick()
         see(rule.text(UiR.string.ui_actions_save_copy), ignoreCase = true)
         see(rule.text(UiR.string.ui_actions_document))
         see(rule.text(UiR.string.ui_actions_document_info))

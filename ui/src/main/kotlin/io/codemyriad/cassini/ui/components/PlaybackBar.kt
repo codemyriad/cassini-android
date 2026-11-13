@@ -4,6 +4,7 @@
 package io.codemyriad.cassini.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,6 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
@@ -45,11 +47,13 @@ import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.codemyriad.cassini.ui.R
 import io.codemyriad.cassini.ui.format.Durations
 import io.codemyriad.cassini.ui.format.format
@@ -84,32 +88,34 @@ fun PlaybackBar(
     speed: SpeedControl? = null,
 ) {
     val windowHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() }
-    val fixedWidth = compactFixedWidth(durationMs, speed != null)
-    BoxWithConstraints(modifier.fillMaxWidth()) {
-        if (windowHeight < COMPACT_HEIGHT && maxWidth - fixedWidth >= COMPACT_MIN_SLIDER) {
-            CompactPlaybackBar(
-                positionMs,
-                durationMs,
-                playing,
-                onSeek,
-                onSkipBack,
-                onSkipForward,
-                onPlayPause,
-                onSeekFinished,
-                speed,
-            )
-        } else {
-            TwoRowPlaybackBar(
-                positionMs,
-                durationMs,
-                playing,
-                onSeek,
-                onSkipBack,
-                onSkipForward,
-                onPlayPause,
-                onSeekFinished,
-                speed,
-            )
+    val fixedWidth = compactFixedWidth(durationMs, speed)
+    Surface(modifier = modifier, color = CassiniTheme.colors.surface) {
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            if (windowHeight < COMPACT_HEIGHT && maxWidth - fixedWidth >= COMPACT_MIN_SLIDER) {
+                CompactPlaybackBar(
+                    positionMs,
+                    durationMs,
+                    playing,
+                    onSeek,
+                    onSkipBack,
+                    onSkipForward,
+                    onPlayPause,
+                    onSeekFinished,
+                    speed,
+                )
+            } else {
+                TwoRowPlaybackBar(
+                    positionMs,
+                    durationMs,
+                    playing,
+                    onSeek,
+                    onSkipBack,
+                    onSkipForward,
+                    onPlayPause,
+                    onSeekFinished,
+                    speed,
+                )
+            }
         }
     }
 }
@@ -170,17 +176,37 @@ private fun TwoRowPlaybackBar(
             )
         }
         Spacer(Modifier.height(6.dp))
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(28.dp, Alignment.CenterHorizontally),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                SkipButton(forward = false, onClick = onSkipBack)
-                PlayPauseButton(playing = playing, onClick = onPlayPause)
-                SkipButton(forward = true, onClick = onSkipForward)
+        PlaybackControls(playing, speed, onSkipBack, onSkipForward, onPlayPause)
+    }
+}
+
+/** Keep transport centred; move speed to its own row when larger text cannot fit beside it. */
+@Composable
+private fun PlaybackControls(
+    playing: Boolean,
+    speed: SpeedControl?,
+    onBack: () -> Unit,
+    onForward: () -> Unit,
+    onPlayPause: () -> Unit,
+) {
+    val speedWidth = speed?.let { speedControlWidth(it) } ?: 0.dp
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val side = (maxWidth - SkipSize * 2 - PlayPauseSize - 56.dp) / 2
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            if (speed != null && speedWidth > side) {
+                Box(Modifier.fillMaxWidth()) { SpeedButton(speed) }
             }
-            // At the end, so the three controls stay centred as on board 03.
-            if (speed != null) SpeedButton(speed, Modifier.align(Alignment.CenterEnd))
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(28.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    SkipButton(forward = false, onClick = onBack)
+                    PlayPauseButton(playing = playing, onClick = onPlayPause)
+                    SkipButton(forward = true, onClick = onForward)
+                }
+                if (speed != null && speedWidth <= side) SpeedButton(speed, Modifier.align(Alignment.CenterStart))
+            }
         }
     }
 }
@@ -213,7 +239,7 @@ internal const val COMPACT_LENGTH_TAG = "player-length"
  * never shorter than the position, so the layout does not change while the note plays.
  */
 @Composable
-private fun compactFixedWidth(durationMs: Long, speed: Boolean): Dp {
+private fun compactFixedWidth(durationMs: Long, speed: SpeedControl?): Dp {
     val density = LocalDensity.current
     val direction = LocalLayoutDirection.current
     val insets = WindowInsets.navigationBars
@@ -223,7 +249,7 @@ private fun compactFixedWidth(durationMs: Long, speed: Boolean): Dp {
     val time = remember(durationMs, style, density) {
         measurer.measure(Durations.clock(durationMs), style, maxLines = 1, softWrap = false).size.width
     }
-    val speedWidth = if (speed) CompactGap + SkipSize else 0.dp
+    val speedWidth = if (speed != null) CompactGap + speedControlWidth(speed) else 0.dp
     return with(density) { (2 * time + sides).toDp() } + CompactPadding * 2 + CompactGap * 5 + SkipSize * 2 +
         PlayPauseSize + speedWidth
 }
@@ -262,10 +288,10 @@ private fun CompactPlaybackBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(CompactGap),
     ) {
+        if (speed != null) SpeedButton(speed)
         SkipButton(forward = false, onClick = onSkipBack)
         PlayPauseButton(playing = playing, onClick = onPlayPause)
         SkipButton(forward = true, onClick = onSkipForward)
-        if (speed != null) SpeedButton(speed)
         Text(
             text = Durations.clock(positionMs),
             style = CassiniTheme.type.monoSmall,
@@ -330,19 +356,33 @@ fun SpeedButton(speed: SpeedControl, modifier: Modifier = Modifier) {
         modifier = modifier
             .heightIn(min = SkipSize)
             .widthIn(min = SkipSize)
-            .clip(CassiniTheme.shapes.row)
             .clickable(role = Role.Button, onClick = speed.onClick)
-            .clearAndSetSemantics { contentDescription = description }
-            .padding(horizontal = 8.dp),
+            .clearAndSetSemantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) {
-        Text(text = rate, style = CassiniTheme.type.label14, color = c.ink, maxLines = 1, softWrap = false)
+        Box(
+            Modifier.heightIn(min = 32.dp).border(1.dp, c.line, CassiniTheme.shapes.pill)
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = rate,
+                style = CassiniTheme.type.label14.copy(
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    fontFeatureSettings = "tnum",
+                ),
+                color = c.ink,
+                maxLines = 1,
+                softWrap = false,
+            )
+        }
     }
 }
 
 /** 1, 1.25, 0.75 in the formatting locale ("1,25" in Italian), without trailing zeros. */
 @Composable
-private fun speedNumber(speed: Float): String {
+internal fun speedNumber(speed: Float): String {
     val locale = format().locale
     return remember(speed, locale) {
         NumberFormat.getNumberInstance(locale).apply {

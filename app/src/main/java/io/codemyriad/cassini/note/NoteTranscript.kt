@@ -16,6 +16,7 @@ import io.codemyriad.cassini.ui.components.SuggestionUi
 import io.codemyriad.cassini.ui.components.TurnUi
 import io.codemyriad.cassini.ui.components.WordRef
 import io.codemyriad.cassini.ui.components.WordUi
+import io.codemyriad.cassini.ui.note.MeetingSpeakerUi
 import io.codemyriad.cassini.ui.theme.SpeakerTone
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
@@ -49,6 +50,13 @@ class NoteTranscript(
     val speakers: List<String> get() = turns.flatMap { turn ->
         turn.words.map { it.speakerId.ifEmpty { turn.speakerId } }
     }.distinct()
+
+    /** Built once with the transcript, including speakers occurring only in an inline overlap. */
+    val meetingSpeakers: ImmutableList<MeetingSpeakerUi> = speakers.mapNotNull { id ->
+        speakerMetadata[id]?.let { metadata ->
+            MeetingSpeakerUi(id, metadata.name, metadata.tone, turns.firstOrNull { it.speakerId == id }?.auto ?: false)
+        }
+    }.toImmutableList()
 
     companion object {
         val EMPTY = NoteTranscript(persistentListOf(), WordIndex(LongArray(0), emptyArray(), IntArray(0)))

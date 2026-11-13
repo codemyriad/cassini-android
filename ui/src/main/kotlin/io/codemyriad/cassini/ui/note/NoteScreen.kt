@@ -22,6 +22,9 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -59,6 +62,9 @@ fun NoteScreen(
     val search = state.search
     BackHandler(enabled = search != null) { onEvent(NoteEvent.CloseSearch) }
     val listState = rememberLazyListState()
+    val scrolled by remember {
+        derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0 }
+    }
     Column(
         modifier
             .fillMaxSize()
@@ -70,6 +76,8 @@ fun NoteScreen(
     ) {
         if (search != null) {
             TranscriptSearchHeader(search, onEvent)
+        } else if (state.mode == NoteMode.Reading) {
+            MeetingTopBar(state, scrolled, onEvent)
         } else {
             NoteTopBar(state, onEvent)
         }
@@ -185,7 +193,6 @@ internal fun ColumnScope.ReadAndListenBody(
     listState: LazyListState,
     onEvent: (NoteEvent) -> Unit,
 ) {
-    state.chips?.let { NoteChipsRow(it, onEvent) }
     state.banners.forEach { spec ->
         Banner(
             spec = spec,
@@ -205,5 +212,6 @@ internal fun ColumnScope.ReadAndListenBody(
         onEvent = onEvent,
         modifier = Modifier.weight(1f),
         noWords = state.noWords,
+        header = { MeetingHeader(state, onEvent) },
     )
 }

@@ -4,9 +4,11 @@ import androidx.compose.runtime.Immutable
 import io.codemyriad.cassini.ui.banner.BannerSpec
 import io.codemyriad.cassini.ui.components.ProcessingCardUi
 import io.codemyriad.cassini.ui.components.SnackbarSpec
+import io.codemyriad.cassini.ui.components.SpeakerNameUi
 import io.codemyriad.cassini.ui.components.TurnUi
 import io.codemyriad.cassini.ui.components.WordRef
 import io.codemyriad.cassini.ui.format.DayLabel
+import io.codemyriad.cassini.ui.theme.SpeakerTone
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import java.time.LocalTime
@@ -14,7 +16,7 @@ import java.time.LocalTime
 /**
  * The Note screen (boards 02 and 03, features.md section 3; ui.md section 7). One destination with modes.
  *
- * - [subtitle] is "Today, 10:02 · 48:13"; null in Reading mode (board 03 has none).
+ * - [subtitle] is "Today, 10:02 · 48:13"; shown in the scrolling meeting header in Reading mode.
  * - [readOnlyReason] is set while the sealed transcript cannot be renamed, merged or switched (and, for SAVING,
  *   while the draft cannot be named). The screen does not draw it and does not block anything for it: the speaker
  *   headers, the suggestion card buttons and the version chip stay active and send their events. The ViewModel
@@ -38,6 +40,7 @@ data class NoteUiState(
     val chips: NoteChipsUi? = null,
     val banners: ImmutableList<BannerSpec> = persistentListOf(),
     val turns: ImmutableList<TurnUi> = persistentListOf(),
+    val meetingSpeakers: ImmutableList<MeetingSpeakerUi> = persistentListOf(),
     val activeWord: WordRef? = null,
     val playback: PlaybackUi? = null,
     val search: TranscriptSearchUi? = null,
@@ -187,3 +190,7 @@ sealed interface NoteDialog {
     @Immutable
     data class ReadOnly(val reason: ReadOnlyReason) : NoteDialog
 }
+
+/** Existing transcript metadata in first-speech order; no separate speaker identity or colour allocation. */
+@Immutable
+data class MeetingSpeakerUi(val id: String, val name: SpeakerNameUi, val tone: SpeakerTone, val auto: Boolean = false)

@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -30,22 +29,18 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.R
 import io.codemyriad.cassini.ui.components.BannerCard
-import io.codemyriad.cassini.ui.components.IconButton44
 import io.codemyriad.cassini.ui.components.LargeChip
-import io.codemyriad.cassini.ui.components.PillSearchField
 import io.codemyriad.cassini.ui.components.SuggestionCard
 import io.codemyriad.cassini.ui.components.TurnHeader
 import io.codemyriad.cassini.ui.components.TurnMatches
@@ -57,7 +52,6 @@ import io.codemyriad.cassini.ui.components.WordRef
 import io.codemyriad.cassini.ui.components.display
 import io.codemyriad.cassini.ui.format.Counts
 import io.codemyriad.cassini.ui.theme.CassiniTheme
-import io.codemyriad.cassini.ui.theme.Glyph
 import io.codemyriad.cassini.ui.theme.Tone
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
@@ -150,61 +144,6 @@ internal fun Modifier.trimVertical(top: Dp, bottom: Dp): Modifier = layout { mea
  * the compact search field "Search in transcript", the counter "2 of 7" (or "No matches"), then Previous and Next
  * match. Opening with an empty query focuses the field.
  */
-@Composable
-internal fun TranscriptSearchHeader(search: TranscriptSearchUi, onEvent: (NoteEvent) -> Unit) {
-    val c = CassiniTheme.colors
-    val keyboard = LocalSoftwareKeyboardController.current
-    val focus = remember { FocusRequester() }
-    val openedEmpty = remember { search.query.isEmpty() }
-    if (openedEmpty) LaunchedEffect(Unit) { focus.requestFocus() }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 6.dp, end = 6.dp, top = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconButton44(Glyph.Back, stringResource(R.string.ui_search_close), { onEvent(NoteEvent.CloseSearch) })
-        PillSearchField(
-            query = search.query,
-            onQueryChange = { onEvent(NoteEvent.SearchQuery(it)) },
-            placeholder = stringResource(R.string.ui_note_search),
-            modifier = Modifier
-                .weight(1f)
-                .focusRequester(focus),
-            onSearch = { keyboard?.hide() },
-            onClear = { onEvent(NoteEvent.SearchQuery("")) },
-            compact = true,
-        )
-        if (search.query.isNotBlank()) {
-            val t = CassiniTheme.type
-            Text(
-                text = if (search.total > 0) {
-                    stringResource(R.string.ui_search_counter, search.current + 1, search.total)
-                } else {
-                    stringResource(R.string.ui_search_no_matches)
-                },
-                modifier = Modifier.padding(start = 8.dp, end = 2.dp),
-                style = if (search.total > 0) t.monoTime else t.caption,
-                color = c.text2,
-                maxLines = 1,
-            )
-        }
-        val any = search.total > 0
-        IconButton44(
-            glyph = Glyph.ChevronUp,
-            contentDescription = stringResource(R.string.ui_search_previous),
-            onClick = { onEvent(NoteEvent.PreviousMatch) },
-            enabled = any,
-        )
-        IconButton44(
-            glyph = Glyph.ChevronDown,
-            contentDescription = stringResource(R.string.ui_search_next),
-            onClick = { onEvent(NoteEvent.NextMatch) },
-            enabled = any,
-        )
-    }
-}
-
 /**
  * Where the active line is: the list's and the active paragraph's coordinates, the line's top in the paragraph and
  * the list's height (px).
@@ -253,6 +192,7 @@ internal fun TranscriptPane(
     modifier: Modifier = Modifier,
     noWords: Boolean = false,
     anchor: PlaybackAnchor? = null,
+    header: (@Composable () -> Unit)? = null,
 ) {
     val c = CassiniTheme.colors
     val playingWord = frameWord(turns, anchor, activeWord)
@@ -260,31 +200,38 @@ internal fun TranscriptPane(
     val active = remember { ActiveLine() }
     val onLine = remember { { top: Float -> active.top = top } }
     val onPlaced = remember { { coordinates: LayoutCoordinates -> active.paragraph = coordinates } }
-    FollowEffects(turns, playingWord, following, followPaused, listState, active, onEvent)
-    SearchScroll(turns, search, listState)
+    val headerItems = if (header == null) 0 else 1
+    FollowEffects(turns, playingWord, following, followPaused, listState, active, onEvent, headerItems)
+    SearchScroll(turns, search, listState, headerItems)
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
+            .testTag("transcript-list")
             .background(c.surface)
-            .drawBehind { drawRect(c.line, Offset.Zero, Size(size.width, 1.dp.toPx())) }
+            .drawBehind { if (header == null) drawRect(c.line, Offset.Zero, Size(size.width, 1.dp.toPx())) }
             .onGloballyPositioned {
                 active.list = it
                 active.height = it.size.height
             },
         state = listState,
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 0.5.dp, bottom = 16.dp),
+        contentPadding = PaddingValues(top = 0.5.dp, bottom = 16.dp),
     ) {
-        if (noWords && turns.isEmpty()) item(key = "no-words") { NoWordsCard() }
+        if (header != null) item(key = Int.MIN_VALUE) { header() }
+        if (noWords && turns.isEmpty()) {
+            item(key = "no-words") { Box(Modifier.padding(horizontal = 20.dp)) { NoWordsCard() } }
+        }
         items(turns, key = { it.id }) { turn ->
             val activeIndex = playingWord?.takeIf { it.turnId == turn.id }?.index
-            Turn(
-                turn = turn,
-                activeIndex = activeIndex,
-                matches = matches[turn.id] ?: TurnMatches.None,
-                onEvent = onEvent,
-                onActiveLine = if (activeIndex != null) onLine else null,
-                onParagraphPlaced = if (activeIndex != null) onPlaced else null,
-            )
+            Box(Modifier.padding(horizontal = 20.dp)) {
+                Turn(
+                    turn = turn,
+                    activeIndex = activeIndex,
+                    matches = matches[turn.id] ?: TurnMatches.None,
+                    onEvent = onEvent,
+                    onActiveLine = if (activeIndex != null) onLine else null,
+                    onParagraphPlaced = if (activeIndex != null) onPlaced else null,
+                )
+            }
         }
     }
 }
@@ -317,6 +264,7 @@ private fun FollowEffects(
     listState: LazyListState,
     active: ActiveLine,
     onEvent: (NoteEvent) -> Unit,
+    headerItems: Int,
 ) {
     val event by rememberUpdatedState(onEvent)
     val follows by rememberUpdatedState(following)
@@ -335,9 +283,10 @@ private fun FollowEffects(
         }
     }
     if (following && activeWord != null) {
-        LaunchedEffect(activeWord) {
-            val index = turns.indexOfFirst { it.id == activeWord.turnId }
-            if (index < 0) return@LaunchedEffect
+        LaunchedEffect(activeWord, headerItems) {
+            val turnIndex = turns.indexOfFirst { it.id == activeWord.turnId }
+            if (turnIndex < 0) return@LaunchedEffect
+            val index = turnIndex + headerItems
             if (listState.layoutInfo.visibleItemsInfo.none { it.index == index }) listState.scrollToItem(index)
             withFrameNanos {}
             val y = active.y() ?: return@LaunchedEffect
@@ -349,11 +298,19 @@ private fun FollowEffects(
 
 /** Scrolls the turn of the current search match into view when it is off screen. */
 @Composable
-private fun SearchScroll(turns: ImmutableList<TurnUi>, search: TranscriptSearchUi?, listState: LazyListState) {
+private fun SearchScroll(
+    turns: ImmutableList<TurnUi>,
+    search: TranscriptSearchUi?,
+    listState: LazyListState,
+    headerItems: Int,
+) {
     val current = search?.matches?.getOrNull(search.current) ?: return
-    LaunchedEffect(current) {
-        val index = turns.indexOfFirst { it.id == current.turnId }
-        if (index >= 0 && listState.layoutInfo.visibleItemsInfo.none { it.index == index }) {
+    LaunchedEffect(current, headerItems) {
+        val turnIndex = turns.indexOfFirst { it.id == current.turnId }
+        val index = turnIndex + headerItems
+        val headerVisible = listState.firstVisibleItemIndex < headerItems
+        val targetVisible = listState.layoutInfo.visibleItemsInfo.any { it.index == index }
+        if (turnIndex >= 0 && (headerVisible || !targetVisible)) {
             listState.animateScrollToItem(index)
         }
     }

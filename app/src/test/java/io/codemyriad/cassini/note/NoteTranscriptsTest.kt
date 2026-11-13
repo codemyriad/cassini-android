@@ -57,6 +57,9 @@ class NoteTranscriptsTest {
         assertEquals("Hello everyone.", turnText(turns[0].words))
         assertEquals(500L, turns[0].words[1].startMs)
         assertEquals(listOf("a", "b", "c"), transcript.speakers)
+        assertEquals(transcript.speakers, transcript.meetingSpeakers.map { it.id })
+        assertEquals(SpeakerNameUi.Placeholder(2, "Speaker 2"), transcript.meetingSpeakers[1].name)
+        assertEquals(SpeakerTone.Unnamed, transcript.meetingSpeakers[1].tone)
     }
 
     @Test fun namingOrMergingDoesNotReassignOtherSpeakersStoredSlots() {

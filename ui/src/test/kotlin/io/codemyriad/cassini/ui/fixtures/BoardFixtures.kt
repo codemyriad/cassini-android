@@ -267,6 +267,7 @@ internal object BoardFixtures {
     val readAndListen = NoteUiState(
         noteId = supplier.id,
         title = "Call with supplier",
+        subtitle = NoteSubtitleUi(DayLabel.Yesterday, LocalTime.of(15, 10), clock(23, 50)),
         mode = NoteMode.Reading,
         chips = NoteChipsUi(
             trust = TrustUi.VERIFIED,
