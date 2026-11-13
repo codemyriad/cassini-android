@@ -73,7 +73,8 @@ class ReadingSuggestionHeaderTest {
         rule.onAllNodesWithText("Speaker 2", useUnmergedTree = true)
             .assertCountEquals(if (mode == NoteMode.Reading) 1 else 0)
         rule.onNodeWithText("(over Ada)", useUnmergedTree = true).assertIsDisplayed()
-        rule.onNodeWithText("Yes, Benjamin").performClick()
+        val answer = if (mode == NoteMode.Reading) hasText("Yes, Benjamin") else hasContentDescription("Yes, Benjamin")
+        rule.onNode(answer).performClick()
         rule.runOnIdle { assertEquals(listOf(NoteEvent.AcceptSuggestion("ben", "voice")), events) }
     }
 }
