@@ -8,16 +8,24 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -59,7 +67,24 @@ fun SuggestionCard(
     continuation: Boolean = false,
     over: String = "",
     crosstalk: Boolean = false,
+    compact: Boolean = false,
 ) {
+    if (compact) {
+        Column(modifier) {
+            TurnHeader(
+                speaker,
+                tone,
+                timeMs,
+                auto = false,
+                onClick = onSpeaker,
+                continuation = continuation,
+                over = over,
+                crosstalk = crosstalk,
+            )
+            CompactSuggestionQuestion(name, onYes, onNo)
+        }
+        return
+    }
     val c = CassiniTheme.colors
     val shape = CassiniTheme.shapes.row
     Box(
@@ -103,6 +128,55 @@ fun SuggestionCard(
                 SecondaryButton(stringResource(R.string.ui_suggestion_no, name), onClick = onNo, padding = 16.dp)
             }
         }
+    }
+}
+
+/** The live draft keeps the question compact, with full spoken names on both 48dp actions. */
+@Composable
+private fun CompactSuggestionQuestion(name: String, onYes: () -> Unit, onNo: () -> Unit) {
+    val c = CassiniTheme.colors
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+            .background(c.neutralTint).padding(start = 14.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            question(stringResource(R.string.ui_suggestion_question), name),
+            Modifier.weight(1f).padding(vertical = 6.dp),
+            style = QuestionStyle,
+            color = c.ink,
+        )
+        CompactSuggestionAction(
+            stringResource(R.string.ui_tx_suggestion_no),
+            stringResource(R.string.ui_suggestion_no, name),
+            false,
+            onNo,
+        )
+        CompactSuggestionAction(
+            stringResource(R.string.ui_tx_suggestion_yes),
+            stringResource(R.string.ui_suggestion_yes, name),
+            true,
+            onYes,
+        )
+    }
+}
+
+@Composable
+private fun CompactSuggestionAction(label: String, spoken: String, accent: Boolean, onClick: () -> Unit) {
+    val c = CassiniTheme.colors
+    TextButton(
+        onClick = onClick,
+        modifier = Modifier.heightIn(min = 48.dp).semantics { contentDescription = spoken },
+        contentPadding = PaddingValues(4.dp),
+    ) {
+        Text(
+            label,
+            Modifier.clearAndSetSemantics {}.clip(RoundedCornerShape(13.dp))
+                .then(if (accent) Modifier.background(c.accent) else Modifier)
+                .padding(horizontal = 11.dp, vertical = 3.dp),
+            style = CassiniTheme.type.label14,
+            color = if (accent) c.onAccentFill else c.text2,
+        )
     }
 }
 

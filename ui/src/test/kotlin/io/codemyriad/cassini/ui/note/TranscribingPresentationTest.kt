@@ -8,7 +8,9 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -17,6 +19,7 @@ import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.fixtures.BoardFixtures
 import io.codemyriad.cassini.ui.format.ProvideFixedFormat
 import io.codemyriad.cassini.ui.theme.CassiniTheme
@@ -101,6 +104,27 @@ class TranscribingPresentationTest {
         assertEquals(heldAway, position(), 0.1f)
         rule.runOnIdle { state = state.copy(turns = (turns + turn.copy(id = "appended")).toImmutableList()) }
         assertEquals(heldAway, position(), 0.1f)
+    }
+
+    @Test fun compactAnswersKeepFullSpokenNamesAndSeparateNativeTargets() {
+        show()
+        val yes = rule.onNodeWithContentDescription("Yes, Luca").performScrollTo()
+        val no = rule.onNodeWithContentDescription("Not Luca")
+        val yesBounds = yes.getUnclippedBoundsInRoot()
+        val noBounds = no.getUnclippedBoundsInRoot()
+        for (bounds in listOf(yesBounds, noBounds)) {
+            assertTrue(bounds.right - bounds.left >= 48.dp)
+            assertTrue(bounds.bottom - bounds.top >= 48.dp)
+        }
+        assertTrue(noBounds.right <= yesBounds.left)
+        yes.performClick()
+        no.performClick()
+        rule.runOnIdle {
+            assertEquals(
+                listOf(NoteEvent.AcceptSuggestion("s2", "luca"), NoteEvent.RejectSuggestion("s2", "luca")),
+                events,
+            )
+        }
     }
 
     @Test fun stopUsesTheExistingEventAndBothSurfacesReflectCheckpointing() {

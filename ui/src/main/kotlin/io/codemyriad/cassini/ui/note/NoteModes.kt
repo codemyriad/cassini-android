@@ -271,6 +271,7 @@ private fun DraftTurn(turn: TurnUi, first: Boolean, onEvent: (NoteEvent) -> Unit
         val suggestion = turn.suggestion
         if (suggestion != null) {
             SuggestionCard(
+                compact = true,
                 speaker = name,
                 tone = turn.tone,
                 timeMs = turn.startMs,
@@ -298,6 +299,7 @@ private fun DraftTurn(turn: TurnUi, first: Boolean, onEvent: (NoteEvent) -> Unit
         }
         turn.inlineSuggestions.forEach { inline ->
             SuggestionCard(
+                compact = true,
                 speaker = inline.name,
                 tone = inline.tone,
                 timeMs = inline.startMs,
