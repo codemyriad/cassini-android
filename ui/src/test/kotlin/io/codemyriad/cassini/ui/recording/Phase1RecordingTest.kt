@@ -14,6 +14,7 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -131,6 +132,13 @@ class Phase1RecordingTest {
         assertTrue(stop.right <= pause.left)
         val window = rule.onRoot().getBoundsInRoot()
         assertEquals((window.left.value + window.right.value) / 2, (stop.left.value + stop.right.value) / 2, 1f)
+        for (index in 0..1) {
+            val circle = rule.onAllNodesWithTag(
+                "recording-side-circle",
+                useUnmergedTree = true,
+            )[index].getBoundsInRoot()
+            assertEquals((circle.top.value + circle.bottom.value) / 2, (stop.top.value + stop.bottom.value) / 2, 1f)
+        }
         for (bounds in listOf(library, stop, pause)) {
             assertTrue(bounds.right - bounds.left >= 48.dp)
             assertTrue(bounds.bottom - bounds.top >= 48.dp)

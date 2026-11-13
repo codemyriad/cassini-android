@@ -28,6 +28,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -53,11 +55,12 @@ fun RecordingControls(
 ) {
     val rec = CassiniTheme.recording
     val onRed = CassiniTheme.colors.onRed
+    val sideAxis = with(LocalDensity.current) { 26.dp.roundToPx() }
     Row(
         modifier.fillMaxWidth().padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+        Box(Modifier.weight(1f).alignBy { sideAxis }, contentAlignment = Alignment.Center) {
             RecordingSideControl(stringResource(R.string.ui_recording_library), onClick = onLibrary) {
                 CassiniIcon(Glyph.List, 22.dp, 1.8f, rec.text, null)
             }
@@ -65,7 +68,7 @@ fun RecordingControls(
         Button(
             onClick = onFinish,
             enabled = captureEnabled,
-            modifier = Modifier.heightIn(min = 48.dp),
+            modifier = Modifier.heightIn(min = 48.dp).alignBy { it.measuredHeight / 2 },
             shape = CircleShape,
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
             colors = ButtonDefaults.buttonColors(
@@ -82,7 +85,7 @@ fun RecordingControls(
                 Text(stringResource(R.string.ui_recording_finish), style = CassiniTheme.type.label14)
             }
         }
-        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+        Box(Modifier.weight(1f).alignBy { sideAxis }, contentAlignment = Alignment.Center) {
             val label = stringResource(
                 if (paused) R.string.ui_recording_resume_label else R.string.ui_recording_pause_label,
             )
@@ -117,7 +120,7 @@ private fun RecordingSideControl(
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Box(
-            Modifier.size(52.dp).clip(CircleShape).border(1.dp, rec.line, CircleShape)
+            Modifier.size(52.dp).testTag("recording-side-circle").clip(CircleShape).border(1.dp, rec.line, CircleShape)
                 .indication(interaction, ripple(color = rec.text)),
             contentAlignment = Alignment.Center,
         ) { glyph() }
