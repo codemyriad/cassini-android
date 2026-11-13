@@ -92,7 +92,7 @@ class StateVariantsTest : VariantBoardTest() {
 
     @Test fun transcribingQueuedNext() = note("transcribing-queued-next")
 
-    @Test fun transcribingNotificationsOff() = note("transcribing-notifications-off")
+    @Test fun transcribingNotificationsOff() = transcribingDetails("transcribing-notifications-off")
 
     @Test fun transcribingPaused() = note("transcribing-paused")
 
@@ -100,13 +100,13 @@ class StateVariantsTest : VariantBoardTest() {
 
     @Test fun transcribingQueueHeld() = note("transcribing-queue-held")
 
-    @Test fun transcribingDownloading() = note("transcribing-downloading")
+    @Test fun transcribingDownloading() = transcribingDetails("transcribing-downloading")
 
-    @Test fun transcribingChecking() = note("transcribing-checking")
+    @Test fun transcribingChecking() = transcribingDetails("transcribing-checking")
 
-    @Test fun transcribingWaiting() = note("transcribing-waiting")
+    @Test fun transcribingWaiting() = transcribingDetails("transcribing-waiting")
 
-    @Test fun transcribingStartingLowMemory() = note("transcribing-starting-low-memory")
+    @Test fun transcribingStartingLowMemory() = transcribingDetails("transcribing-starting-low-memory")
 
     @Test fun transcribingSaving() = note("transcribing-saving")
 

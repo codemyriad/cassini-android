@@ -75,7 +75,7 @@ class NoteFlowTest {
         rule.waitShown(transcribe)
         val importedAudioEpoch = awaitPreparedPlayer(noteId, afterEpoch = null)
         rule.onAllNodes(transcribe).onFirst().performClick()
-        rule.waitText(rule.text(UiR.string.ui_action_stop_keep_progress), timeoutMs = Flows.JOB_MS)
+        rule.waitShown(hasContentDescription(rule.text(UiR.string.ui_tx_stop_keep)), timeoutMs = Flows.JOB_MS)
         val sealed = awaitSealedDocument(noteId, variants = 1)
 
         // Read & listen: verified, with the words; a word tap seeks there and plays.

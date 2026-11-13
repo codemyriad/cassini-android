@@ -16,6 +16,7 @@ import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -118,7 +119,7 @@ class SheetAndDraftDeviceTest {
         }
     }
 
-    @Test fun newDraftTextKeepsTheProgressCardInView() {
+    @Test fun newDraftTextKeepsTheStatusAndStopInView() {
         var state by mutableStateOf(processing(turns(TURNS)))
         rule.setContent { CassiniTheme(darkTheme = false) { NoteScreen(state, onEvent = {}) } }
         rule.waitForIdle()
@@ -126,7 +127,7 @@ class SheetAndDraftDeviceTest {
         rule.runOnIdle { state = processing((turns(TURNS) + newest).toPersistentList()) }
         rule.waitForIdle()
         rule.onNode(hasText(turnText(newest.words))).assertIsDisplayed()
-        rule.onNode(hasText(rule.activity.getString(io.codemyriad.cassini.ui.R.string.ui_action_stop_keep_progress)))
+        rule.onNode(hasContentDescription(rule.activity.getString(io.codemyriad.cassini.ui.R.string.ui_tx_stop_keep)))
             .assertIsDisplayed()
         shot("transcribing-new-text")
     }

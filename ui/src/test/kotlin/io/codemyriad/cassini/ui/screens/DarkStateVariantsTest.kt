@@ -39,7 +39,15 @@ class DarkStateVariantsTest : VariantBoardTest() {
 
     @Test fun transcribingCheckpointMismatch() = note("transcribing-checkpoint-mismatch")
 
-    @Test fun transcribingStartingLowMemory() = note("transcribing-starting-low-memory")
+    @Test fun transcribingStartingLowMemory() = transcribingDetails("transcribing-starting-low-memory")
+
+    @Test fun transcribingDownloading() = transcribingDetails("transcribing-downloading")
+
+    @Test fun transcribingChecking() = transcribingDetails("transcribing-checking")
+
+    @Test fun transcribingWaiting() = transcribingDetails("transcribing-waiting")
+
+    @Test fun transcribingNotificationsOff() = transcribingDetails("transcribing-notifications-off")
 
     @Test fun readFailedOverDocument() = read("read-failed-over-document")
 

@@ -385,7 +385,7 @@ class NoteViewModel(
         val details: NoteDetails? get() = loaded?.details
         val card get() = NoteMapping.card(job?.phase)
         val mode: NoteMode get() = details?.let { NoteMapping.mode(it, job, card) } ?: NoteMode.Loading
-        val namingOpen: Boolean get() = draft?.namingOpen ?: true
+        val namingOpen: Boolean get() = job?.phase !is JobPhase.Stopping && (draft?.namingOpen ?: true)
 
         /** A transcript (sealed or draft) has loaded. */
         val shownLoaded: Boolean get() = sealed != null || draft != null
@@ -1396,17 +1396,25 @@ class NoteViewModel(
 
     private fun draftSource(job: NoteJobState?): DraftSource = when (job?.state) {
         JobState.RUNNING -> DraftSource.Running
-        JobState.PAUSED, JobState.FAILED -> DraftSource.Saved(job.job.updatedAt)
+        JobState.PAUSED, JobState.FAILED, JobState.QUEUED -> DraftSource.Saved(job.job.updatedAt)
         else -> DraftSource.None
     }
 
-    private fun runningDraft(): Flow<DraftShown?> = combine(
-        // The tracker ticks every second; only a new draft rebuilds the turns.
-        job.map { (it?.phase as? JobPhase.Transcribing)?.draft }.distinctUntilChanged(),
+    private fun runningDraft(): Flow<DraftShown?> = job.map { job ->
+        when (val phase = job?.phase) {
+            is JobPhase.Transcribing -> phase.draft
+            is JobPhase.Stopping -> phase.last?.draft
+            else -> null
+        }
+    }.distinctUntilChanged().flatMapLatest { draft ->
+        // Resume can load models or wait before the tracker restores its first publication.
+        if (draft == null) savedDraft() else liveDraft(draft)
+    }
+
+    private fun liveDraft(state: DraftState): Flow<DraftShown?> = combine(
         people,
         ports.draftNames(noteId).catch { emit(CheckpointNames(emptyMap(), emptyMap())) },
-    ) { draft, people, names ->
-        val state = draft ?: DraftState.EMPTY
+    ) { people, names ->
         val voiceNames = people.voices.associate { it.id to it.name }
         val suggestions = state.suggestions.filter { it.voiceId in voiceNames }
             .associate { it.speakerId to SuggestionUi(it.voiceId, it.name) }

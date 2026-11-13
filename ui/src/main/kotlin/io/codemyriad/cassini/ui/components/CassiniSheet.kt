@@ -28,6 +28,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.theme.CassiniTheme
@@ -53,6 +54,7 @@ import kotlinx.coroutines.launch
 fun CassiniSheet(
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
+    containerColor: Color = CassiniTheme.colors.surface,
     content: @Composable ColumnScope.(SheetHider) -> Unit,
 ) {
     val c = CassiniTheme.colors
@@ -70,7 +72,7 @@ fun CassiniSheet(
         modifier = modifier.windowInsetsPadding(SheetTopInsets),
         sheetState = state,
         shape = CassiniTheme.shapes.sheet,
-        containerColor = c.surface,
+        containerColor = containerColor,
         contentColor = c.ink,
         tonalElevation = 0.dp,
         scrimColor = c.scrim,

@@ -50,7 +50,7 @@ data class ProcessingState(
             val phase = state.running?.phase
             return ForegroundPolicy.need(
                 sdkInt,
-                processing = phase is JobPhase.Transcribing || phase == JobPhase.Stopping,
+                processing = phase is JobPhase.Transcribing || phase is JobPhase.Stopping,
                 working = phase != null || state.draining || state.downloading,
             )
         }

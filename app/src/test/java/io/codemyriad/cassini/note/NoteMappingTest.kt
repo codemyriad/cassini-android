@@ -20,8 +20,8 @@ class NoteMappingTest {
     @Test fun stoppingMakesOnlyTheExistingStopControlBusy() {
         val row = job(JobState.RUNNING)
         val details = documentNote().copy(job = row)
-        val phase = NoteJobState(row, ahead = 0, phase = JobPhase.Stopping)
-        val card = requireNotNull(NoteMapping.card(JobPhase.Stopping))
+        val phase = NoteJobState(row, ahead = 0, phase = JobPhase.Stopping())
+        val card = requireNotNull(NoteMapping.card(JobPhase.Stopping()))
         val mode = NoteMapping.mode(details, phase, card) as NoteMode.Processing
         assertEquals(card, mode.card)
         assertEquals(true, mode.stopBusy)

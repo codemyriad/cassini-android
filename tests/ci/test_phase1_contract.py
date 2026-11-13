@@ -87,11 +87,32 @@ class Phase1ContractTest(unittest.TestCase):
                 self.assertIsNotNone(actual)
                 self.assertEqual(text, actual.text)
 
+    def test_compact_eta_is_a_catalog_plural_in_every_locale(self):
+        catalog = json.loads((self.root / PIN.VENDOR / 'strings.json').read_text())
+        entry = next(e for e in catalog['entries'] if e['id'] == 'transcribing.eta.minutes')
+        for locale, directory in STRINGS.LOCALES.items():
+            output = next(text for path, text in STRINGS.generated(self.root) if path.parent.name == directory)
+            plural = ET.fromstring(output).find("plurals[@name='ui_tx_eta_minutes']")
+            self.assertIsNotNone(plural)
+            actual = {item.attrib['quantity']: item.text for item in plural}
+            forms = entry['plural'] if locale == 'en' else entry['l10n'][locale]['plural']
+            self.assertEqual(set(forms), set(actual))
+            for quantity, text in forms.items():
+                expected = text.replace('{n}', '%1$s').replace('1 min', '%1$s min')
+                self.assertEqual(expected, actual[quantity])
+
     def test_unexpected_or_missing_placeholder_fails(self):
         with self.assertRaises(ValueError):
             STRINGS.android_text('Paused at {invented}', 'position')
         with self.assertRaises(ValueError):
             STRINGS.android_text('Paused', 'position')
+
+    def test_audio_progress_arguments_keep_their_identity_when_translation_reorders_them(self):
+        self.assertEqual('Total %2$s, done %1$s',
+                         STRINGS.android_text('Total {total}, done {done}', ('done', 'total')))
+        for text in ['{done}', '{done} of {unknown}', '{done} of {total} {extra}']:
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                STRINGS.android_text(text, ('done', 'total'))
 
     def test_android_singular_category_keeps_the_numeric_argument(self):
         self.assertEqual('%1$s orador', STRINGS.android_text('1 orador', 'n', literal=True))

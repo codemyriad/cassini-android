@@ -45,4 +45,27 @@
         <item quantity="many">%1$s riunioni</item>
         <item quantity="other">%1$s riunioni</item>
     </plurals>
+    <string name="ui_tx_heading">In trascrizione</string>
+    <plurals name="ui_tx_eta_minutes">
+        <item quantity="one">circa %1$s min rimanente</item>
+        <item quantity="many">circa %1$s min rimanenti</item>
+        <item quantity="other">circa %1$s min rimanenti</item>
+    </plurals>
+    <string name="ui_tx_details">Dettagli della trascrizione</string>
+    <string name="ui_tx_stop">Ferma</string>
+    <string name="ui_tx_stop_keep">Ferma e conserva i progressi</string>
+    <string name="ui_tx_transcript">Trascrizione fin qui</string>
+    <string name="ui_tx_reading">Lettura</string>
+    <string name="ui_tx_preparing">Preparazione</string>
+    <string name="ui_tx_words">Parole</string>
+    <string name="ui_tx_matching">Voci e riconoscimento</string>
+    <string name="ui_tx_saving">Salvataggio</string>
+    <string name="ui_tx_audio_done">Audio elaborato</string>
+    <string name="ui_tx_audio_done_value">%1$s su %2$s</string>
+    <string name="ui_tx_time_left">Tempo rimanente</string>
+    <string name="ui_tx_words_so_far">Parole fin qui</string>
+    <string name="ui_tx_battery_finish">Batteria a fine trascrizione</string>
+    <string name="ui_tx_suggestion_question">È %1$s?</string>
+    <string name="ui_tx_suggestion_yes">Sì</string>
+    <string name="ui_tx_suggestion_no">No</string>
 </resources>

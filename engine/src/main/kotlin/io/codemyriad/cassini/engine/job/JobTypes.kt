@@ -28,8 +28,9 @@ sealed interface JobPhase {
     /**
      * Stop was asked. During the decode the job saves a checkpoint at its next sample block, if at least one window
      * is done; after the decode the final checkpoint stays and the job ends at its next check.
+     * [last] keeps the visible publication while that checkpoint is saved; it is never persisted.
      */
-    data object Stopping : JobPhase
+    data class Stopping(val last: Transcribing? = null) : JobPhase
 }
 
 /** The stepper of the progress card, in order. [ordinal] is the step index (0 to 4). */

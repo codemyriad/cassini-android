@@ -230,8 +230,6 @@
     <string name="ui_progress_low_memory">Este telemóvel tem pouca memória. Feche outras apps se a transcrição parar.</string>
 
     <!-- Draft transcript and suggestions (board 02). -->
-    <string name="ui_draft_title">Rascunho da transcrição</string>
-    <string name="ui_draft_tag">As palavras ainda podem mudar</string>
     <string name="ui_suggestion_question">É %1$s?</string>
     <string name="ui_suggestion_yes">Sim, %1$s</string>
     <string name="ui_suggestion_no">Não é %1$s</string>

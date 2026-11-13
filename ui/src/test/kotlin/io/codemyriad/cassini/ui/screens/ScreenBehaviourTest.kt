@@ -121,21 +121,21 @@ class ScreenBehaviourTest {
     }
 
     /**
-     * New draft text scrolls only the draft below the progress card (docs/ui-fidelity.md, device follow-up 3): the
-     * card stays in view, and the newest turn comes into view.
+     * New draft text scrolls only the draft below the compact status (docs/ui-fidelity.md, device follow-up 3): the
+     * status stays in view, and the newest turn comes into view.
      */
-    @Test fun newDraftTextKeepsTheProgressCardInView() = assertNewDraftTextKeepsTheCardInView()
+    @Test fun newDraftTextKeepsTheStatusInView() = assertNewDraftTextKeepsTheStatusInView()
 
-    /** The same on a 16:9 phone (the pixel_2 profile of the CI emulators), where the card is over half the space. */
+    /** The same on a 16:9 phone (the pixel_2 profile of the CI emulators), where the pinned status must leave space for the draft. */
     @Config(qualifiers = "w411dp-h731dp-xxhdpi")
     @Test
-    fun newDraftTextKeepsTheProgressCardInViewOnA16By9Phone() = assertNewDraftTextKeepsTheCardInView()
+    fun newDraftTextKeepsTheStatusInViewOnA16By9Phone() = assertNewDraftTextKeepsTheStatusInView()
 
     @Config(qualifiers = "w360dp-h640dp-xhdpi")
     @Test
-    fun newDraftTextKeepsTheProgressCardInViewOnASmallPhone() = assertNewDraftTextKeepsTheCardInView()
+    fun newDraftTextKeepsTheStatusInViewOnASmallPhone() = assertNewDraftTextKeepsTheStatusInView()
 
-    private fun assertNewDraftTextKeepsTheCardInView() {
+    private fun assertNewDraftTextKeepsTheStatusInView() {
         val base = BoardFixtures.transcribing
         val many = (1..12).flatMap { n -> base.turns.map { it.copy(id = "${it.id}-$n") } }
         var state by mutableStateOf(base.copy(turns = many.toPersistentList()))
@@ -143,7 +143,7 @@ class ScreenBehaviourTest {
         val newest = BoardFixtures.draftGiulia.copy(id = "newest", words = timedWords("Latest new sentence.", 0))
         rule.runOnIdle { state = state.copy(turns = (many + newest).toPersistentList()) }
         rule.onNodeWithText(turnText(newest.words)).assertIsDisplayed()
-        rule.onNodeWithText("Stop and keep progress").assertIsDisplayed()
+        rule.onNodeWithContentDescription("Stop and keep progress").assertIsDisplayed()
     }
 
     /** A document with no words shows the empty state on the Note screen (docs/ui-fidelity.md, follow-up 5). */

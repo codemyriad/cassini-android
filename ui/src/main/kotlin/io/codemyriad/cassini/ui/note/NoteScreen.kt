@@ -21,10 +21,13 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -63,6 +66,14 @@ fun NoteScreen(
     val search = state.search
     BackHandler(enabled = search != null) { onEvent(NoteEvent.CloseSearch) }
     val listState = rememberLazyListState()
+    val draftListState = rememberLazyListState()
+    val draftFollow = rememberSaveable(state.noteId) { mutableStateOf(true) }
+    val draftMode = state.mode is NoteMode.Processing || state.mode is NoteMode.Paused ||
+        (state.mode is NoteMode.Failed && !state.mode.overDocument) ||
+        (state.mode is NoteMode.Queued && !state.mode.overDocument)
+    val draftScrolled by remember {
+        derivedStateOf { draftListState.firstVisibleItemIndex > 0 || draftListState.firstVisibleItemScrollOffset > 0 }
+    }
     MeetingFindPosition(search != null, state.mode == NoteMode.Reading, listState, state.turns.firstOrNull()?.id)
     val scrolled by remember {
         derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0 }
@@ -76,13 +87,7 @@ fun NoteScreen(
             .then(if (search != null) Modifier.imePadding() else Modifier)
             .screenContentWidth(),
     ) {
-        if (search != null) {
-            TranscriptSearchHeader(search, onEvent)
-        } else if (state.mode == NoteMode.Reading) {
-            MeetingTopBar(state, scrolled, onEvent)
-        } else {
-            NoteTopBar(state, onEvent)
-        }
+        NoteHeader(state, scrolled, draftMode && draftScrolled, onEvent)
         Box(
             Modifier
                 .weight(1f)
@@ -91,7 +96,7 @@ fun NoteScreen(
             Column(Modifier.fillMaxSize()) {
                 when (state.mode) {
                     NoteMode.Reading -> ReadAndListenBody(state, listState, onEvent)
-                    else -> NoteModeBody(state, listState, onEvent)
+                    else -> NoteModeBody(state, listState, draftListState, draftFollow, onEvent)
                 }
             }
             NoteFloating(state, onEvent)
@@ -112,6 +117,20 @@ fun NoteScreen(
         }
     }
     NoteOverlays(state, onEvent)
+}
+
+/** Native header actions stay fixed; scrolling a draft removes its date and retains the divider. */
+@Composable
+private fun NoteHeader(state: NoteUiState, scrolled: Boolean, draftScrolled: Boolean, onEvent: (NoteEvent) -> Unit) {
+    val search = state.search
+    when {
+        search != null -> TranscriptSearchHeader(search, onEvent)
+        state.mode == NoteMode.Reading -> MeetingTopBar(state, scrolled, onEvent)
+        else -> {
+            NoteTopBar(state, onEvent, compact = draftScrolled)
+            if (draftScrolled && state.mode !is NoteMode.Processing) HorizontalDivider(color = CassiniTheme.colors.line)
+        }
+    }
 }
 
 /**
@@ -152,9 +171,9 @@ private val SnackbarOverChip = 40.dp
  * more"). Every other mode (board 02): the subtitle "Today, 10:02 · 48:13" and More ("More actions").
  */
 @Composable
-private fun NoteTopBar(state: NoteUiState, onEvent: (NoteEvent) -> Unit) {
+private fun NoteTopBar(state: NoteUiState, onEvent: (NoteEvent) -> Unit, compact: Boolean) {
     val reading = state.mode == NoteMode.Reading
-    val subtitle = state.subtitle?.let {
+    val subtitle = state.subtitle?.takeUnless { compact }?.let {
         stringResource(
             R.string.ui_join_dot,
             it.recordedLabel ?: Dates.dayTime(it.day, it.time),
