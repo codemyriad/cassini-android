@@ -18,7 +18,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.lang.management.ManagementFactory
 
 /** Turns, tints, badges, suggestion cards and the active word (features.md sections 3.1 and 3.3). */
 class NoteTranscriptsTest {
@@ -258,10 +257,15 @@ class NoteTranscriptsTest {
     // Timeout only guards against hangs; scaling uses calling-thread CPU time (D87 #1, D88).
     @Test(timeout = 300_000L)
     fun elevenHourDraftBuildsLinearlyInThreadCpuTime() {
-        val clock = ManagementFactory.getThreadMXBean()
-        assertTrue("JDK 17 must provide calling-thread CPU time", clock.isCurrentThreadCpuTimeSupported)
-        val wasEnabled = clock.isThreadCpuTimeEnabled
-        if (!wasEnabled) clock.isThreadCpuTimeEnabled = true
+        // Android's compile boot classpath lacks java.management; the test runs on the host JDK.
+        val type = Class.forName("java.lang.management.ThreadMXBean")
+        val clock = Class.forName("java.lang.management.ManagementFactory").getMethod("getThreadMXBean").invoke(null)
+        assertEquals(true, type.getMethod("isCurrentThreadCpuTimeSupported").invoke(clock))
+        val setEnabled = type.getMethod("setThreadCpuTimeEnabled", Boolean::class.javaPrimitiveType)
+        val wasEnabled = type.getMethod("isThreadCpuTimeEnabled").invoke(clock) as Boolean
+        if (!wasEnabled) setEnabled.invoke(clock, true)
+        val readCpu = type.getMethod("getCurrentThreadCpuTime")
+        fun cpuNs(): Long = readCpu.invoke(clock) as Long
         try {
             val fullWords = (0 until 100_000).map { i ->
                 val start = i * 396L
@@ -269,16 +273,16 @@ class NoteTranscriptsTest {
             }
             val halfWords = fullWords.subList(0, 50_000)
             val labels = mapOf("s0" to "Ada", "s2" to "Cy")
-            NoteTranscripts.draft(fullWords.subList(0, 10_000), labels, setOf("s2"), emptyMap(), 3_000_000L)
+            NoteTranscripts.draft(halfWords, labels, setOf("s2"), emptyMap(), halfWords.last().startMs)
             val halfCpu = ArrayList<Long>()
             val fullCpu = ArrayList<Long>()
             var turns = 0
             repeat(3) { round ->
                 val order = if (round % 2 == 0) listOf(halfWords, fullWords) else listOf(fullWords, halfWords)
                 for (input in order) {
-                    val began = clock.currentThreadCpuTime
+                    val began = cpuNs()
                     val draft = NoteTranscripts.draft(input, labels, setOf("s2"), emptyMap(), input.last().startMs)
-                    val cpu = clock.currentThreadCpuTime - began
+                    val cpu = cpuNs() - began
                     if (input === fullWords) {
                         fullCpu += cpu
                         turns = draft.turns.size
@@ -290,12 +294,9 @@ class NoteTranscriptsTest {
             val small = halfCpu.sorted()[1]
             val large = fullCpu.sorted()[1]
             assertTrue("11-hour draft must produce turns", turns > 500)
-            if (small > 0) {
-                val growth = large.toDouble() / small
-                assertTrue("Draft CPU work grows $growth times for twice the words", growth < 3.5)
-            }
+            assertTrue("Draft CPU ns: N=$small, 2N=$large", large <= small * 3 + 100_000_000L)
         } finally {
-            if (!wasEnabled) clock.isThreadCpuTimeEnabled = false
+            if (!wasEnabled) setEnabled.invoke(clock, false)
         }
     }
 
