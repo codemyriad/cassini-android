@@ -62,7 +62,7 @@ internal fun TranscribingStatus(
         LinearTrack(
             progress = progress.percent / 100f,
             modifier = Modifier.padding(bottom = 12.dp),
-            trackColor = c.ink.copy(alpha = 0.10f),
+            trackColor = c.neutralTint,
             moving = true,
             anchor = progress.anchor,
         )
@@ -96,9 +96,9 @@ private fun StatusDetails(progress: ProcessingCardUi, onDetails: () -> Unit, mod
         CircularProgressIndicator(Modifier.size(16.dp), color = c.accent, strokeWidth = 2.dp)
         val text = buildAnnotatedString {
             append(label)
-            addStyle(SpanStyle(fontWeight = FontWeight.SemiBold), 0, heading.length)
+            addStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = c.ink), 0, heading.length)
         }
-        Text(text, Modifier.weight(1f), style = CassiniTheme.type.body14, color = c.ink)
+        Text(text, Modifier.weight(1f), style = CassiniTheme.type.body14, color = c.text2)
         CassiniIcon(Glyph.ChevronRight, 14.dp, 1.8f, c.text2, null)
     }
 }
@@ -118,7 +118,7 @@ private fun StatusStop(stopBusy: Boolean, onStop: () -> Unit) {
                 stringResource(R.string.ui_tx_stop),
                 Modifier.alpha(if (stopBusy) 0f else 1f),
                 style = CassiniTheme.type.label14,
-                color = c.accent,
+                color = c.accentInk,
             )
             if (stopBusy) CircularProgressIndicator(Modifier.size(16.dp), color = c.accent, strokeWidth = 2.dp)
         }

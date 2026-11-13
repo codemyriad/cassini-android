@@ -141,9 +141,9 @@ private fun CompactSuggestionQuestion(name: String, onYes: () -> Unit, onNo: () 
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            question(stringResource(R.string.ui_suggestion_question), name),
+            question(stringResource(R.string.ui_tx_suggestion_question), name, FontWeight.SemiBold),
             Modifier.weight(1f).padding(vertical = 6.dp),
-            style = QuestionStyle,
+            style = sans(15, lh = 1.4f),
             color = c.ink,
         )
         CompactSuggestionAction(
@@ -181,13 +181,17 @@ private fun CompactSuggestionAction(label: String, spoken: String, accent: Boole
 }
 
 /** [format] ("Is this %1$s?") with [name] in bold. */
-private fun question(format: String, name: String): AnnotatedString = buildAnnotatedString {
+private fun question(
+    format: String,
+    name: String,
+    weight: FontWeight = FontWeight.W700,
+): AnnotatedString = buildAnnotatedString {
     val at = format.indexOf(NAME_PLACEHOLDER)
     if (at < 0) {
         append(format)
     } else {
         append(format.substring(0, at))
-        withStyle(SpanStyle(fontWeight = FontWeight.W700)) { append(name) }
+        withStyle(SpanStyle(fontWeight = weight)) { append(name) }
         append(format.substring(at + NAME_PLACEHOLDER.length))
     }
 }

@@ -28,6 +28,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.R
@@ -94,17 +95,15 @@ internal fun TranscribingDetailsContent(
             )
             Text(Counts.percent(progress.percent), style = CassiniTheme.type.monoTime, color = c.text2)
         }
-        LinearTrack(progress.percent / 100f, height = TrackHeight.Thick, moving = true, anchor = progress.anchor)
-        Text(Progress.headline(progress.headline), style = CassiniTheme.type.caption, color = c.text2)
-        if (progress.rangeStartMs != 0L || progress.rangeEndMs != 0L) {
-            Text(
-                Durations.clockRange(progress.rangeStartMs, progress.rangeEndMs),
-                style = CassiniTheme.type.monoTime,
-                color = c.text2,
-            )
-        }
+        LinearTrack(
+            progress.percent / 100f,
+            height = TrackHeight.Thick,
+            trackColor = c.neutralTint,
+            moving = true,
+            anchor = progress.anchor,
+        )
         ProcessingStages(progress)
-        HorizontalDivider(color = c.line)
+        HorizontalDivider(color = c.lineSoft)
         StatGrid(detailStats(progress))
         progress.download?.let { Banner(it.banner(), onAction = onDownloadAction) }
         if (progress.lowMemory) {
@@ -122,8 +121,10 @@ internal fun TranscribingDetailsContent(
             stringResource(
                 if (notificationsOff) R.string.ui_progress_footnote_no_notifications else R.string.ui_progress_footnote,
             ),
+            modifier = Modifier.fillMaxWidth(),
             style = CassiniTheme.type.caption12,
             color = c.text2,
+            textAlign = TextAlign.Center,
         )
     }
 }
@@ -156,7 +157,7 @@ private fun ProcessingStages(progress: ProcessingCardUi) {
                 Text(
                     stringResource(labels[index]),
                     style = if (state == StageState.IN_PROGRESS) CassiniTheme.type.label14 else CassiniTheme.type.body14,
-                    color = if (state == StageState.DONE || state == StageState.IN_PROGRESS) c.ink else c.text3,
+                    color = if (state == StageState.DONE || state == StageState.IN_PROGRESS) c.ink else c.text4,
                     textDecoration = if (state == StageState.SKIPPED) TextDecoration.LineThrough else null,
                 )
             }
@@ -182,7 +183,7 @@ private fun StageGlyph(state: StageState) {
 @Composable
 private fun detailStats(progress: ProcessingCardUi) = listOfNotNull(
     StatItem(
-        stringResource(R.string.ui_stat_time_left),
+        stringResource(R.string.ui_tx_time_left),
         Progress.timeLeft(progress.timeLeft),
         pending = progress.timeLeft == TimeLeftUi.Calculating,
     ),
@@ -195,8 +196,8 @@ private fun detailStats(progress: ProcessingCardUi) = listOfNotNull(
         ),
         mono = true,
     ),
-    StatItem(stringResource(R.string.ui_stat_words), Counts.number(progress.words.toLong())),
+    StatItem(stringResource(R.string.ui_tx_words_so_far), Counts.number(progress.words.toLong())),
     Progress.battery(progress.battery)?.let {
-        StatItem(stringResource(R.string.ui_stat_battery), it, pending = progress.battery is BatteryUi.Measuring)
+        StatItem(stringResource(R.string.ui_tx_battery_finish), it, pending = progress.battery is BatteryUi.Measuring)
     },
 ).toImmutableList()

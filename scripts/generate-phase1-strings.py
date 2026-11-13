@@ -56,6 +56,10 @@ LABELS = {
     'tx_saving': ('transcribing.step.saving', None),
     'tx_audio_done': ('transcribing.stat.audioDone', None),
     'tx_audio_done_value': ('transcribing.stat.audioDoneValue', ('done', 'total')),
+    'tx_time_left': ('transcribing.stat.timeLeft', None),
+    'tx_words_so_far': ('transcribing.stat.wordsSoFar', None),
+    'tx_battery_finish': ('transcribing.stat.batteryAtFinish', None),
+    'tx_suggestion_question': ('transcribing.speakerSuggestion', 'name'),
     'tx_suggestion_yes': ('transcribing.speakerSuggestion.yes', None),
     'tx_suggestion_no': ('transcribing.speakerSuggestion.no', None),
 }

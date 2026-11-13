@@ -38,7 +38,7 @@ class TranscribingDraftInkTest {
         rule.setContent {
             CassiniTheme {
                 ink = CassiniTheme.colors.ink
-                lighter = CassiniTheme.colors.text3
+                lighter = CassiniTheme.colors.text4
                 // Explicit unsettled flags take precedence over this legacy boundary.
                 TurnParagraph(words, null, {}, Modifier.testTag("draft-ink"), TurnMode.Draft, unsettledFrom = boundary)
             }

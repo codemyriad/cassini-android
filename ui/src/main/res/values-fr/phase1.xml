@@ -57,6 +57,10 @@
     <string name="ui_tx_saving">Sauvegarde</string>
     <string name="ui_tx_audio_done">Audio traité</string>
     <string name="ui_tx_audio_done_value">%1$s sur %2$s</string>
+    <string name="ui_tx_time_left">Temps restant</string>
+    <string name="ui_tx_words_so_far">Mots jusqu’ici</string>
+    <string name="ui_tx_battery_finish">Batterie à la fin</string>
+    <string name="ui_tx_suggestion_question">Est-ce %1$s ?</string>
     <string name="ui_tx_suggestion_yes">Oui</string>
     <string name="ui_tx_suggestion_no">Non</string>
 </resources>
