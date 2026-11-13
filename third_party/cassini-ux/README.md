@@ -1,6 +1,6 @@
 # Shared Phase 1 contract
 
-The catalog, tokens, Saturn navigation mark, contracts and vectors come from
+The catalog, tokens, Saturn marks (nav, mid), contracts and vectors come from
 cassini-ux commit `5e0c34e0f1bb390298dabdf4eedc494e933fd329`. `UPSTREAM.json`
 records source paths and SHA-256 values. `scripts/check-ux-pin.py` verifies every
 input, requires the Phase 1 inputs and rejects per-file commit drift.

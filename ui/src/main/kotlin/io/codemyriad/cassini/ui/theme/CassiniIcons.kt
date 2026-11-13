@@ -15,7 +15,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.PathBuilder
 import androidx.compose.ui.graphics.vector.PathNode
 import androidx.compose.ui.graphics.vector.addPathNodes
-import androidx.compose.ui.graphics.vector.group
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -32,9 +31,6 @@ internal sealed interface GlyphPart {
 
     /** A `<rect>` with rounded corners. */
     data class Rect(val x: Float, val y: Float, val width: Float, val height: Float, val rx: Float) : GlyphPart
-
-    /** An `<ellipse>` rotated by [rotate] degrees about its centre, drawn as two arcs in a rotated group. */
-    data class Ellipse(val cx: Float, val cy: Float, val rx: Float, val ry: Float, val rotate: Float) : GlyphPart
 }
 
 private fun paths(vararg d: String): List<GlyphPart> = d.map { GlyphPart.Path(it) }
@@ -50,8 +46,6 @@ private fun dots(r: Float): List<GlyphPart> = listOf(5f, 12f, 19f).map { circle(
  * glyphs ignore it. Draw one with [CassiniIcon]; the board sizes and strokes are in the ui.md table.
  */
 enum class Glyph(internal val parts: List<GlyphPart>, val filled: Boolean = false, val viewport: Float = 24f) {
-    /** 28/1.6 ink (Library header); 56/1.3 accent (Model download). */
-    Logo(listOf(circle(14f, 14f, 5.5f), GlyphPart.Ellipse(14f, 14f, 12f, 4.2f, rotate = -20f)), viewport = 28f),
     Trash(paths("M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13")),
     Settings(
         listOf(circle(12f, 12f, 3f)) + paths(
@@ -125,15 +119,7 @@ object CassiniIcons {
     private fun build(glyph: Glyph, stroke: Float): ImageVector {
         val size = glyph.viewport.dp
         return ImageVector.Builder(glyph.name, size, size, glyph.viewport, glyph.viewport).apply {
-            glyph.parts.forEach { part ->
-                if (part is GlyphPart.Ellipse && part.rotate != 0f) {
-                    group(rotate = part.rotate, pivotX = part.cx, pivotY = part.cy) {
-                        addPart(part.nodes(), glyph, stroke)
-                    }
-                } else {
-                    addPart(part.nodes(), glyph, stroke)
-                }
-            }
+            glyph.parts.forEach { part -> addPart(part.nodes(), glyph, stroke) }
         }.build()
     }
 
@@ -152,11 +138,10 @@ object CassiniIcons {
     }
 }
 
-/** The path of one part; circles and ellipses are two arcs, rects four lines and four corner arcs. */
+/** The path of one part; circles are two arcs, rects four lines and four corner arcs. */
 internal fun GlyphPart.nodes(): List<PathNode> = when (this) {
     is GlyphPart.Path -> addPathNodes(d)
     is GlyphPart.Circle -> ellipseNodes(cx, cy, r, r)
-    is GlyphPart.Ellipse -> ellipseNodes(cx, cy, rx, ry)
     is GlyphPart.Rect -> PathBuilder().apply {
         moveTo(x + rx, y)
         horizontalLineToRelative(width - 2 * rx)

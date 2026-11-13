@@ -13,7 +13,8 @@ def check(root):
     pin = json.loads((root / VENDOR / 'UPSTREAM.json').read_text())
     if not re.fullmatch(r'[0-9a-f]{40}', pin['commit']):
         raise ValueError('Invalid UX commit')
-    required = {"brand/tokens.json", "brand/mark/saturn-nav.svg", "strings.json",
+    required = {"brand/tokens.json", "brand/mark/saturn-nav.svg", "brand/mark/saturn-mid.svg",
+                "strings.json",
                 "vectors/states/states-vectors.json", "contract/STATUS-BADGES.md", "contract/HARMONY.md"}
     if not required <= pin["files"].keys():
         raise ValueError("Required Phase 1 pin missing")
