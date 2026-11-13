@@ -106,7 +106,13 @@ class TranscribingPresentationTest {
         assertEquals(heldAway, position(), 0.1f)
     }
 
-    @Test fun compactAnswersKeepFullSpokenNamesAndSeparateNativeTargets() {
+    @Test fun compactAnswersKeepFullSpokenNamesAndSeparateNativeTargets() = compactAnswers()
+
+    @Test
+    @Config(fontScale = 2f)
+    fun compactAnswersRemainReachableAtLargeText() = compactAnswers()
+
+    private fun compactAnswers() {
         show()
         val yes = rule.onNodeWithContentDescription("Yes, Luca").performScrollTo()
         val no = rule.onNodeWithContentDescription("Not Luca")
