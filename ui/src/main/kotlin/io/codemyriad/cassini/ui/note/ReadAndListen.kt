@@ -222,7 +222,7 @@ internal fun TranscriptPane(
         }
         items(turns, key = { it.id }) { turn ->
             val activeIndex = playingWord?.takeIf { it.turnId == turn.id }?.index
-            Box(Modifier.padding(horizontal = 20.dp)) {
+            Box(Modifier.padding(horizontal = 20.dp).testTag("transcript-turn-${turn.id}")) {
                 Turn(
                     turn = turn,
                     activeIndex = activeIndex,

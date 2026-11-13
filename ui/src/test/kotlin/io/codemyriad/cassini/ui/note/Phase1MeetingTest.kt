@@ -24,6 +24,7 @@ import io.codemyriad.cassini.ui.components.TranscriptFixtures
 import io.codemyriad.cassini.ui.components.WordRef
 import io.codemyriad.cassini.ui.fixtures.BoardFixtures
 import io.codemyriad.cassini.ui.format.ProvideFixedFormat
+import io.codemyriad.cassini.ui.screens.assertSevenSpeakerWordsInk
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
@@ -102,6 +103,11 @@ class Phase1MeetingTest {
         show(base.copy(meetingSpeakers = speakers, playback = null), onEvent = { events += it })
         rule.onNodeWithTag("meeting-speaker-${unnamed.speakerId}").assert(hasText("Voce originale")).performClick()
         rule.runOnIdle { assertEquals(listOf(NoteEvent.SpeakerTap(unnamed.speakerId)), events) }
+    }
+
+    @Test fun everySpeakerParagraphKeepsNeutralInkAfterMetadataScrolls() {
+        show(BoardFixtures.sevenSpeakers)
+        rule.assertSevenSpeakerWordsInk(dark = false)
     }
 
     @Test fun searchJumpsPastTheHeaderToTheActualMatchedTurn() = jump(searching = true)
