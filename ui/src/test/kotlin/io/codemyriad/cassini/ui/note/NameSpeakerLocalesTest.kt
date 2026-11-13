@@ -128,7 +128,9 @@ class NameSpeakerLocalesTest {
         assertEquals(expectedStart, span.start)
         assertEquals(expectedStart + same.length, span.end)
         rule.onNodeWithText(resources.getString(R.string.ui_sp_same_person)).assertHeightIsAtLeast(48.dp).performClick()
-        rule.onNodeWithText(resources.getString(R.string.ui_sp_someone_else)).assertHeightIsAtLeast(48.dp).performClick()
+        rule.onNodeWithText(
+            resources.getString(R.string.ui_sp_someone_else),
+        ).assertHeightIsAtLeast(48.dp).performClick()
     }
 
     private fun assertVoicesRememberAndFooter(
@@ -155,7 +157,13 @@ class NameSpeakerLocalesTest {
 
         val base = BoardFixtures.nameSpeaker
         update(
-            base.copy(name = "", ranked = false, samePerson = "a", rememberEnabled = false, rememberReason = RememberReason.NO_MODEL),
+            base.copy(
+                name = "",
+                ranked = false,
+                samePerson = "a",
+                rememberEnabled = false,
+                rememberReason = RememberReason.NO_MODEL,
+            ),
         )
         rule.waitForIdle()
         assertEquals("Texts that do not fit ($tag, variants)", emptyList<String>(), cutTexts())
