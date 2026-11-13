@@ -160,6 +160,17 @@ class SpeakerNamingTest {
     }
 
     @Test
+    fun savedVoiceColoursKeepTheirStoredSlotWhenTheListIsReordered() {
+        val voices = listOf(anna.copy(colourIndex = 4), luca.copy(colourIndex = 1), elodie.copy(colourIndex = 8))
+        fun tones(input: NamingInput): Map<String, SpeakerTone> {
+            return SpeakerNaming.ui(SpeakerNaming.open(input)).voices.associate { it.id to it.tone }
+        }
+        val expected = mapOf("anna" to SpeakerTone.Five, "luca" to SpeakerTone.Two, "elodie" to SpeakerTone.Three)
+        assertEquals(expected, tones(input(voices = voices)))
+        assertEquals(expected, tones(input(voices = voices.reversed(), print = null)))
+    }
+
+    @Test
     fun showAllListsEveryVoiceAfterTheFirstThree() {
         val many = listOf(anna, luca, elodie, voice("m", "Marco", axis = 3), voice("g", "Giulia", axis = 4))
         val state = SpeakerNaming.open(input(voices = many))

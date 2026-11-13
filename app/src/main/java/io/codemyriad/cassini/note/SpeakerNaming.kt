@@ -4,6 +4,7 @@ import io.codemyriad.cassini.core.models.ModelCatalog
 import io.codemyriad.cassini.core.speakers.Match
 import io.codemyriad.cassini.core.speakers.NameMatch
 import io.codemyriad.cassini.core.speakers.SampleWindow
+import io.codemyriad.cassini.core.speakers.SpeakerTint
 import io.codemyriad.cassini.core.speakers.Voice
 import io.codemyriad.cassini.core.speakers.VoiceStaleness
 import io.codemyriad.cassini.core.speakers.Voiceprints
@@ -267,7 +268,14 @@ object SpeakerNaming {
             canSample = input.sample != null && input.canSample,
             sampling = sampling,
             name = state.name,
-            voices = shown.map { VoiceOptionUi(it.voice.id, it.voice.name, it.likely) }.toImmutableList(),
+            voices = shown.map {
+                VoiceOptionUi(
+                    it.voice.id,
+                    it.voice.name,
+                    it.likely,
+                    NoteTranscripts.tone(SpeakerTint.named(it.voice.colourIndex ?: 0)),
+                )
+            }.toImmutableList(),
             showAll = !state.showAll && ranked.size > VISIBLE_VOICES,
             ranked = input.print != null,
             samePerson = samePerson(state)?.name,

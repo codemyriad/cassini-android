@@ -49,9 +49,14 @@ data class NameSheetUi(
     val draft: Boolean = false,
 )
 
-/** A saved voice in the Name sheet list; [likely] adds the "Likely" tag and the surfaceWash row. */
+/** A saved voice in the Name sheet list; [likely] adds a neutral tag; [tone] comes from its stored colour slot. */
 @Immutable
-data class VoiceOptionUi(val id: String, val name: String, val likely: Boolean = false)
+data class VoiceOptionUi(
+    val id: String,
+    val name: String,
+    val likely: Boolean = false,
+    val tone: SpeakerTone = SpeakerTone.One,
+)
 
 /** Why Remember is disabled (features.md section 4, item 7). */
 enum class RememberReason {

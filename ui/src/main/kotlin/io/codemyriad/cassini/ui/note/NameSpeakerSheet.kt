@@ -53,7 +53,6 @@ import io.codemyriad.cassini.ui.components.NAME_MAX_LENGTH
 import io.codemyriad.cassini.ui.components.PrimaryButton
 import io.codemyriad.cassini.ui.components.SecondaryButton
 import io.codemyriad.cassini.ui.components.SecondaryButtonSize
-import io.codemyriad.cassini.ui.components.SpeakerNameUi
 import io.codemyriad.cassini.ui.components.TextButton
 import io.codemyriad.cassini.ui.components.display
 import io.codemyriad.cassini.ui.components.firstGrapheme
@@ -64,6 +63,7 @@ import io.codemyriad.cassini.ui.format.LocalFormat
 import io.codemyriad.cassini.ui.theme.CassiniIcon
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import io.codemyriad.cassini.ui.theme.Glyph
+import io.codemyriad.cassini.ui.theme.SpeakerTone
 
 /**
  * The Name a speaker sheet (board 04; features.md section 4) in its [CassiniSheet] window. Every control sends a
@@ -131,6 +131,7 @@ fun NameSpeakerSheetContent(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit, 
                 modifier = Modifier.padding(top = 3.dp),
                 keyboardActions = KeyboardActions(onDone = { save() }),
                 maxLength = NAME_MAX_LENGTH,
+                containerColor = CassiniTheme.colors.field,
             )
             if (ui.voices.isNotEmpty()) VoicesCard(ui, onEvent)
             ui.notName?.let { name ->
@@ -164,13 +165,12 @@ fun NameSpeakerSheetContent(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit, 
     }
 }
 
-/** Avatar 40, title `sheetTitle`, "Speaks for 3 min 12 s in this note", and the 44 dp Play sample button. */
+/** The speaker in ink and speaking time precede the field; sampling keeps its existing action. */
 @Composable
 private fun SheetHeader(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit) {
     val c = CassiniTheme.colors
     val label = ui.label.display()
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Avatar(text = avatarText(ui.label, label), tone = ui.tone)
         Column(Modifier.weight(1f)) {
             Text(
                 text = label,
@@ -186,13 +186,6 @@ private fun SheetHeader(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit) {
             onClick = { onEvent(NameSheetEvent.PlaySample) },
         )
     }
-}
-
-/** The avatar's text: the placeholder number, or the first character (grapheme) of the name. */
-@Composable
-private fun avatarText(name: SpeakerNameUi, label: String): String {
-    if (name is SpeakerNameUi.Placeholder) return name.number.toString()
-    return firstGrapheme(label, LocalFormat.current.locale)
 }
 
 /**
@@ -226,7 +219,7 @@ private fun PlaySampleButton(sampling: Boolean, enabled: Boolean, onClick: () ->
 
 /**
  * "Saved voices, closest first" (or "Saved voices" without a voiceprint) and the list card: 1 dp line border,
- * radius 14; rows at least 52 dp, padding 14, gap 10, `body16`; the Likely row on surfaceWash with its tag; 1 dp
+ * radius 14; rows at least 56 dp, padding 14, gap 10, `body16`; the neutral Likely tag does not highlight its row; 1 dp
  * line dividers; then "Show all" in accentInk when more voices exist.
  */
 @Composable
@@ -246,7 +239,8 @@ private fun VoicesCard(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit) {
             Modifier
                 .fillMaxWidth()
                 .clip(shape)
-                .border(1.dp, c.line, shape),
+                .background(c.field)
+                .border(1.dp, c.lineSoft, shape),
         ) {
             ui.voices.forEachIndexed { i, voice ->
                 if (i > 0) RowDivider()
@@ -254,6 +248,7 @@ private fun VoicesCard(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit) {
                     text = voice.name,
                     onClick = { onEvent(NameSheetEvent.PickVoice(voice.id)) },
                     likely = voice.likely,
+                    tone = voice.tone,
                 )
             }
             if (ui.showAll) {
@@ -269,18 +264,24 @@ private fun VoicesCard(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit) {
 }
 
 @Composable
-private fun VoiceRow(text: String, onClick: () -> Unit, likely: Boolean = false, accent: Boolean = false) {
+private fun VoiceRow(
+    text: String,
+    onClick: () -> Unit,
+    likely: Boolean = false,
+    accent: Boolean = false,
+    tone: SpeakerTone? = null,
+) {
     val c = CassiniTheme.colors
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 52.dp)
-            .then(if (likely) Modifier.background(c.surfaceWash) else Modifier)
+            .heightIn(min = 56.dp)
             .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = 14.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (tone != null) Avatar(firstGrapheme(text, LocalFormat.current.locale), tone, size = 32.dp)
         Text(
             text = text,
             modifier = Modifier.weight(1f),
@@ -297,7 +298,7 @@ private fun RowDivider() {
         Modifier
             .fillMaxWidth()
             .height(1.dp)
-            .background(CassiniTheme.colors.line),
+            .background(CassiniTheme.colors.lineSoft),
     )
 }
 
