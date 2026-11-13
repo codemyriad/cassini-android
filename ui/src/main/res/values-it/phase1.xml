@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated from cassini-ux 5e0c34e0f1bb390298dabdf4eedc494e933fd329; do not edit. -->
+<resources>
+    <string name="ui_badge_recording">Registrazione %1$s</string>
+    <string name="ui_badge_importing">Importazione…</string>
+    <string name="ui_badge_saving">Salvataggio…</string>
+    <string name="ui_badge_transcribing">In trascrizione…</string>
+    <plurals name="ui_badge_transcribing_eta">
+        <item quantity="one">In trascrizione · 1 min</item>
+        <item quantity="many">In trascrizione · %1$s min</item>
+        <item quantity="other">In trascrizione · %1$s min</item>
+    </plurals>
+    <string name="ui_badge_transcribing_under_minute">In trascrizione, meno di un minuto</string>
+    <string name="ui_badge_attention">Richiede attenzione</string>
+    <string name="ui_badge_interrupted">Interrotta</string>
+    <string name="ui_badge_received">Ricevuta</string>
+    <string name="ui_badge_queued">In coda</string>
+    <string name="ui_badge_paused">In pausa a %1$s</string>
+    <string name="ui_badge_failed">Trascrizione non riuscita</string>
+    <string name="ui_badge_audio_only">Solo audio</string>
+    <string name="ui_badge_unplayable">Impossibile riprodurre</string>
+    <string name="ui_badge_unreadable">Trascrizione illeggibile</string>
+    <string name="ui_badge_newer">Formato più recente</string>
+    <string name="ui_all_meetings">Tutte le riunioni</string>
+    <plurals name="ui_row_speaker_count">
+        <item quantity="one">1 voce</item>
+        <item quantity="many">%1$s voci</item>
+        <item quantity="other">%1$s voci</item>
+    </plurals>
+    <string name="ui_row_no_speech">Nessun parlato</string>
+    <string name="ui_row_transcribed_a11y">trascritta</string>
+    <string name="ui_row_resume">Riprendi</string>
+</resources>

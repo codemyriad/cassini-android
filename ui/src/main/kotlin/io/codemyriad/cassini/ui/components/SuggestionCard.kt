@@ -128,7 +128,7 @@ internal fun SuggestionCardPreview() {
                 .background(CassiniTheme.colors.bg)
                 .padding(20.dp),
         ) {
-            SuggestionCard("Speaker 2", SpeakerTone.Amber, 1_742_000, "Luca", onYes = {}, onNo = {}, onSpeaker = {})
+            SuggestionCard("Speaker 2", SpeakerTone.Unnamed, 1_742_000, "Luca", onYes = {}, onNo = {}, onSpeaker = {})
         }
     }
 }

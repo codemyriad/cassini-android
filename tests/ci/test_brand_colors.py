@@ -21,10 +21,6 @@ class BrandColorsTest(unittest.TestCase):
             target = self.root / BRAND.VENDOR / name
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes((ROOT / BRAND.VENDOR / name).read_bytes())
-        for name in ('temporary-old-palette.json', 'temporary-old-palette.sha256'):
-            target = self.root / 'scripts/brand' / name
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes((ROOT / 'scripts/brand' / name).read_bytes())
         self.regenerate()
 
     def regenerate(self):
@@ -60,15 +56,24 @@ class BrandColorsTest(unittest.TestCase):
     def test_both_modes_include_every_accepted_token_and_derived_role(self):
         _, roles = BRAND.tokens(self.root)
         self.assertIn('card-rest', roles)
+        self.assertEqual(54, len(roles))  # 53 authored tokens plus derived card-rest.
+        self.assertTrue(all(role['status'] == 'decided' for role in roles.values()))
         source = BRAND.generated(self.root)
         for role in roles:
             self.assertEqual(2, source.count(f'"{role}" to Color('))
 
-    def test_brand_has_its_own_commit_without_repinning_the_strings(self):
+    def test_brand_and_catalog_share_the_approved_commit(self):
         pin = json.loads((self.root / BRAND.VENDOR / 'UPSTREAM.json').read_text())
         commit, _ = BRAND.tokens(self.root)
-        self.assertEqual(pin['files']['brand/tokens.json']['commit'], commit)
-        self.assertNotEqual(pin['commit'], commit)
+        self.assertEqual(pin['commit'], commit)
+
+    def test_detached_brand_commit_is_rejected(self):
+        path = self.root / BRAND.VENDOR / 'UPSTREAM.json'
+        pin = json.loads(path.read_text())
+        pin['files']['brand/tokens.json']['commit'] = '0' * 40
+        path.write_text(json.dumps(pin))
+        with self.assertRaisesRegex(ValueError, 'one UX commit'):
+            BRAND.tokens(self.root)
 
     def test_manual_window_xml_edit_fails_in_each_mode(self):
         for qualifier in ('values', 'values-night'):
@@ -79,18 +84,9 @@ class BrandColorsTest(unittest.TestCase):
                 with self.assertRaisesRegex(SystemExit, 'Stale generated'):
                     self.check()
 
-    def test_temporary_snapshot_is_checksum_frozen(self):
-        path = self.root / BRAND.TEMPORARY
-        path.write_bytes(path.read_bytes() + b'\n')
-        with self.assertRaisesRegex(ValueError, 'frozen SHA-256'):
-            self.check()
-
-    def test_removing_snapshot_and_checksum_switches_to_canonical_only(self):
-        path = self.root / BRAND.TEMPORARY
-        path.unlink()
-        path.with_suffix('.sha256').unlink()
-        self.regenerate()
-        self.check()
+    def test_temporary_palette_is_removed_from_the_look_preview(self):
+        self.assertFalse((ROOT / 'scripts/brand/temporary-old-palette.json').exists())
+        self.assertFalse((ROOT / 'scripts/brand/temporary-old-palette.sha256').exists())
         source = (self.root / BRAND.OUTPUT).read_text()
         self.assertNotIn('LegacyLightColors', source)
         self.assertNotIn('LegacyDarkColors', source)

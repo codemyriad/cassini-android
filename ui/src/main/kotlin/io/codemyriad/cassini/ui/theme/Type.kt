@@ -9,65 +9,35 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineHeightStyle
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import kotlin.math.ceil
-import kotlin.math.floor
 
-/** CSS "normal" line height of Instrument Sans (hhea metrics), in em. */
+/** The existing transcript highlight box ratio; ordinary text uses native system font metrics. */
 const val SANS_NORMAL_LINE_HEIGHT = 1.22f
+const val MONO_NORMAL_LINE_HEIGHT = SANS_NORMAL_LINE_HEIGHT
 
-/** CSS "normal" line height of IBM Plex Mono (hhea metrics), in em. */
-const val MONO_NORMAL_LINE_HEIGHT = 1.30f
-
-/** Centred in the line box, never trimmed: the browser's half-leading model the boards were drawn with. */
 private val CssLineHeight = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None)
 
-/** The hhea ascender and descender of Instrument Sans and IBM Plex Mono, in em (line gap 0 in both). */
-private const val SANS_ASCENT = 0.970f
-private const val SANS_DESCENT = 0.250f
-private const val MONO_ASCENT = 1.025f
-private const val MONO_DESCENT = 0.275f
-
-/** The boards' pixels per CSS px: they were rendered at 2x, as the xhdpi screenshots. */
-private const val BOARD_SCALE = 2f
-
-/**
- * An Instrument Sans style of [size] sp. [lh] is the line height as a multiple of the size; it becomes an explicit
- * sp value, so `mono(13).copy(lineHeight = sans(16).lineHeight)` gives a mono run the line box of a 16 sp row.
- * [ls] is the letter spacing in em.
- *
- * Line heights are snapped to the boards' half-sp grid (whole pixels at 2x), because Android rounds every line up to
- * a whole pixel while the browser does not: unsnapped, a 16 sp line came out at 40 px instead of the board's 39 and a
- * list drifted by about 1 dp per row. The "normal" line height (the default [lh]) is the browser's: its ascent and
- * descent each rounded to whole pixels at 2x, with an exact half rounded down, as measured on the boards (a 13 px
- * chip line is 31 px, a 16 px title 39 px). So 13 sp is 15.5, 14 sp is 17 and 16 sp is 19.5. An explicit [lh] is
- * rounded to the nearest half sp (17 x 1.6 = 27.2 becomes 27).
- */
+/** System sans; preserve explicit paragraph leading and allow native metrics for normal text. */
 fun sans(size: Int, weight: Int = 400, lh: Float = SANS_NORMAL_LINE_HEIGHT, ls: Float = 0f): TextStyle =
-    style(InstrumentSans, size, weight, lineHeight(size, lh, SANS_NORMAL_LINE_HEIGHT, SANS_ASCENT, SANS_DESCENT), ls)
+    style(
+        FontFamily.Default,
+        size,
+        weight,
+        if (lh == SANS_NORMAL_LINE_HEIGHT) TextUnit.Unspecified else (size * lh).sp,
+        ls,
+    )
 
-/** An IBM Plex Mono style; as [sans]. Weight 600 is synthesised from the bundled 500. */
+/** Time/size styles use the same system face, with tabular figures instead of a bundled monospace font. */
 fun mono(size: Int, weight: Int = 400, lh: Float = MONO_NORMAL_LINE_HEIGHT, ls: Float = 0f): TextStyle =
-    style(PlexMono, size, weight, lineHeight(size, lh, MONO_NORMAL_LINE_HEIGHT, MONO_ASCENT, MONO_DESCENT), ls)
+    sans(size, weight, lh, ls).copy(fontFeatureSettings = "tnum")
 
-/** The line height in sp: the browser's "normal" for [normal], else [lh] x [size] on the half-sp grid. */
-@Suppress("LongParameterList") // The size, the multiple and the font's metrics.
-private fun lineHeight(size: Int, lh: Float, normal: Float, ascent: Float, descent: Float): Float {
-    val px = size * BOARD_SCALE
-    val scaled = if (lh == normal) {
-        ceil(ascent * px - 0.5f) + ceil(descent * px - 0.5f)
-    } else {
-        floor(lh * px + 0.5f)
-    }
-    return scaled / BOARD_SCALE
-}
-
-private fun style(family: FontFamily, size: Int, weight: Int, lineHeight: Float, ls: Float) = TextStyle(
+private fun style(family: FontFamily, size: Int, weight: Int, lineHeight: TextUnit, ls: Float) = TextStyle(
     fontFamily = family,
     fontWeight = FontWeight(weight),
     fontSize = size.sp,
-    lineHeight = lineHeight.sp,
+    lineHeight = lineHeight,
     letterSpacing = ls.em,
     lineHeightStyle = CssLineHeight,
 )
@@ -112,7 +82,10 @@ class CassiniType {
     /** Record. */
     val fab: TextStyle = sans(17, 600)
 
-    /** Library rows, trash cards, voices. */
+    /** Meeting cards only (L-13); other row titles keep their existing size. */
+    val meetingTitle: TextStyle = sans(17, 600)
+
+    /** Trash cards, voices and other rows. */
     val rowTitle: TextStyle = sans(16, 600)
 
     /** Search, sheet rows. */
@@ -161,7 +134,7 @@ class CassiniType {
     val caption: TextStyle = sans(13)
 
     /** Status chips. */
-    val chip: TextStyle = sans(13, 500)
+    val chip: TextStyle = mono(12, 600)
 
     /** Uppercase. Library day headers; the States column headings (in text3). */
     val overline: TextStyle = sans(13, 600, ls = 0.06f)
@@ -202,7 +175,7 @@ class CassiniType {
     /** Player times, format chip. */
     val monoSmall: TextStyle = mono(12)
 
-    /** "Processed" (600 synthesised from Plex Mono 500). */
+    /** "Processed", in native tabular type. */
     val monoValue: TextStyle = mono(15, 600)
 
     /** Model sizes. */

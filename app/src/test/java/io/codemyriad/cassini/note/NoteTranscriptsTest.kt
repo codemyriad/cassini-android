@@ -37,6 +37,12 @@ class NoteTranscriptsTest {
     private val paolo = Voice("paolo", "Paolo Ferri", "m", FloatArray(1), 1, 10.0, 0, 0)
     private val luca = Voice("luca", "Luca", "m", FloatArray(1), 1, 10.0, 0, 0)
 
+    @Test fun sealedTonesKeepWideCachedSlotsUntilPaletteReduction() {
+        val cached = speakers.map { if (it.speakerId == "a") it.copy(colourIndex = 4294967296L) else it }
+        val shown = NoteTranscripts.sealed(words, cached, emptyMap(), emptyList())
+        assertEquals(SpeakerTone.Five, shown.speakerMetadata.getValue("a").tone)
+    }
+
     @Test
     fun sealedTurnsFollowTheSpeakersWithTintsAndPlaceholders() {
         val transcript = NoteTranscripts.sealed(words, speakers, emptyMap(), emptyList())
@@ -45,12 +51,23 @@ class NoteTranscriptsTest {
         assertEquals(listOf("a", "b", "c", "a"), turns.map { it.speakerId })
         assertEquals(SpeakerNameUi.Named("Giulia"), turns[0].name)
         assertEquals(SpeakerNameUi.Placeholder(2, "Speaker 2"), turns[1].name)
-        // Placeholders are amber and take no slot: Giulia blue, Paolo teal.
-        val tones = listOf(SpeakerTone.Blue, SpeakerTone.Amber, SpeakerTone.Teal, SpeakerTone.Blue)
+        // Unnamed hides slot 2; Paolo retains slot 3 before and after naming that speaker.
+        val tones = listOf(SpeakerTone.One, SpeakerTone.Unnamed, SpeakerTone.Three, SpeakerTone.One)
         assertEquals(tones, turns.map { it.tone })
         assertEquals("Hello everyone.", turnText(turns[0].words))
         assertEquals(500L, turns[0].words[1].startMs)
         assertEquals(listOf("a", "b", "c"), transcript.speakers)
+    }
+
+    @Test fun namingOrMergingDoesNotReassignOtherSpeakersStoredSlots() {
+        val named = speakers.map { if (it.speakerId == "b") it.copy(label = "Ben", isPlaceholder = false) else it }
+        val renamed = NoteTranscripts.sealed(words, named, emptyMap(), emptyList())
+        assertEquals(SpeakerTone.Two, renamed.speakerMetadata.getValue("b").tone)
+        assertEquals(SpeakerTone.Three, renamed.speakerMetadata.getValue("c").tone)
+        val merged = words.map { if (it.speaker == "a") it.copy(speaker = "b") else it }
+        val shown = NoteTranscripts.sealed(merged, named.reversed(), emptyMap(), emptyList())
+        assertEquals(SpeakerTone.Two, shown.speakerMetadata.getValue("b").tone)
+        assertEquals(SpeakerTone.Three, shown.speakerMetadata.getValue("c").tone)
     }
 
     @Test
@@ -130,7 +147,7 @@ class NoteTranscriptsTest {
         assertEquals(SpeakerNameUi.Placeholder(2, "Voce 2"), turns[1].name)
         val spanish = SpeakerNameUi.Placeholder(7, "Hablante 7")
         assertEquals("the number comes from the stored label", spanish, turns[2].name)
-        assertEquals("a stored placeholder stays amber", SpeakerTone.Amber, turns[1].tone)
+        assertEquals("a stored placeholder stays amber", SpeakerTone.Unnamed, turns[1].tone)
 
         val draft = NoteTranscripts.draft(words, mapOf("a" to "Voce 1"), emptySet(), emptyMap(), null).turns
         assertEquals(SpeakerNameUi.Placeholder(1, "Voce 1"), draft[0].name)

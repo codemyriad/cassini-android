@@ -27296,10 +27296,6 @@ HSPLio/codemyriad/cassini/ui/theme/ColorKt;->getLightColors()Lio/codemyriad/cass
 HSPLio/codemyriad/cassini/ui/theme/ColorKt;->getLocalCassiniColors()Landroidx/compose/runtime/ProvidableCompositionLocal;
 Lio/codemyriad/cassini/ui/theme/ColorKt$$ExternalSyntheticLambda0;
 HSPLio/codemyriad/cassini/ui/theme/ColorKt$$ExternalSyntheticLambda0;-><init>()V
-Lio/codemyriad/cassini/ui/theme/FontsKt;
-HSPLio/codemyriad/cassini/ui/theme/FontsKt;-><clinit>()V
-HSPLio/codemyriad/cassini/ui/theme/FontsKt;->getInstrumentSans()Landroidx/compose/ui/text/font/FontFamily;
-HSPLio/codemyriad/cassini/ui/theme/FontsKt;->getPlexMono()Landroidx/compose/ui/text/font/FontFamily;
 Lio/codemyriad/cassini/ui/theme/Glyph;
 HSPLio/codemyriad/cassini/ui/theme/Glyph;->$values()[Lio/codemyriad/cassini/ui/theme/Glyph;
 HSPLio/codemyriad/cassini/ui/theme/Glyph;-><clinit>()V

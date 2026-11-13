@@ -73,10 +73,13 @@ class WordIndex(private val starts: LongArray, private val turnIds: Array<String
 object NoteTranscripts {
     /** The colour of each speaker ([SpeakerTint] to the theme's tone). */
     fun tone(tint: SpeakerTint): SpeakerTone = when (tint) {
-        SpeakerTint.BLUE -> SpeakerTone.Blue
-        SpeakerTint.TEAL -> SpeakerTone.Teal
-        SpeakerTint.VIOLET -> SpeakerTone.Violet
-        SpeakerTint.AMBER -> SpeakerTone.Amber
+        SpeakerTint.ONE -> SpeakerTone.One
+        SpeakerTint.TWO -> SpeakerTone.Two
+        SpeakerTint.THREE -> SpeakerTone.Three
+        SpeakerTint.FOUR -> SpeakerTone.Four
+        SpeakerTint.FIVE -> SpeakerTone.Five
+        SpeakerTint.SIX -> SpeakerTone.Six
+        SpeakerTint.UNNAMED -> SpeakerTone.Unnamed
     }
 
     /**
@@ -112,7 +115,9 @@ object NoteTranscripts {
         val byId = speakers.associateBy { it.speakerId }
         val order = words.map { it.speaker }.distinct()
         val names = order.associateWith { id -> byId[id]?.let(::name) ?: SpeakerNameUi.Placeholder(order.indexOf(id) + 1) }
-        val tints = SpeakerTint.assign(order) { id -> names[id] is SpeakerNameUi.Placeholder }
+        val tints = SpeakerTint.assign(order, byId.mapValues { it.value.colourIndex }) { id ->
+            names[id] is SpeakerNameUi.Placeholder
+        }
         val voiceNames = voices.associate { it.id to it.name }
         val suggested = HashSet<String>()
         return build(words, placeholderLabel, endsBoundedByAudio) { speaker, first ->
@@ -143,6 +148,7 @@ object NoteTranscripts {
         suggestions: Map<String, SuggestionUi>,
         tentativeFromMs: Long?,
         placeholderLabel: (Int) -> String = { "Speaker $it" },
+        colourIndices: Map<String, Int> = emptyMap(),
     ): NoteTranscript {
         val order = words.map { it.speaker }.distinct()
         val names = order.withIndex().associate { (index, id) ->
@@ -153,7 +159,8 @@ object NoteTranscripts {
                 SpeakerNameUi.Named(label)
             }
         }
-        val tints = SpeakerTint.assign(order) { id -> names[id] is SpeakerNameUi.Placeholder }
+        val slots = colourIndices.mapValues { it.value.toLong() }
+        val tints = SpeakerTint.assign(order, slots) { id -> names[id] is SpeakerNameUi.Placeholder }
         val transcript = build(words, placeholderLabel, false) { speaker, _ ->
             TurnTemplate(names.getValue(speaker), tone(tints.getValue(speaker)))
         }

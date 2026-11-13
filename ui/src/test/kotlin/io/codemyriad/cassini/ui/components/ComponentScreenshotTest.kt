@@ -177,13 +177,9 @@ class ComponentScreenshotTest : BoardTest() {
     private fun ChipsAndTags() {
         Label("StatusChip")
         Wrap {
-            StatusChip("Recording", Tone.Error, dot = true)
-            StatusChip("Transcribing", Tone.Info)
-            StatusChip("Queued", Tone.Outline)
-            StatusChip("Paused at 12:40", Tone.Warn)
-            StatusChip("Couldn’t transcribe", Tone.Error)
-            StatusChip("Transcribed", Tone.Ok)
-            StatusChip("Audio only", Tone.Outline)
+            for (kind in StatusBadgeKind.entries) {
+                StatusChip(statusBadgeText(kind, liveMs = 768_000, minutes = 4, positionMs = 1_792_000), kind)
+            }
         }
         Label("Tags: Likely, dashed, auto; FormatBadge on rec.bg")
         Wrap {
@@ -277,11 +273,11 @@ class ComponentScreenshotTest : BoardTest() {
         }
         Label("Avatar (blue, teal, amber, violet; 32 dp)")
         Wrap {
-            Avatar("G", SpeakerTone.Blue)
-            Avatar("P", SpeakerTone.Teal)
-            Avatar("3", SpeakerTone.Amber)
-            Avatar("L", SpeakerTone.Violet)
-            Avatar("A", SpeakerTone.Blue, size = 32.dp)
+            Avatar("G", SpeakerTone.One)
+            Avatar("P", SpeakerTone.Two)
+            Avatar("3", SpeakerTone.Unnamed)
+            Avatar("L", SpeakerTone.Three)
+            Avatar("A", SpeakerTone.One, size = 32.dp)
         }
         Label("LinearTrack thin and thick: 0, 62 %, 100 %")
         Padded {

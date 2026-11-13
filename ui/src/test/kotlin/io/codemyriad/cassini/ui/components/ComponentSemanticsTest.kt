@@ -133,7 +133,7 @@ class ComponentSemanticsTest {
     @Test fun theAvatarIsHiddenSoTheRowReadsOnlyTheName() {
         setThemed {
             Row {
-                Avatar("G", SpeakerTone.Blue)
+                Avatar("G", SpeakerTone.One)
                 Text("Giulia")
             }
         }

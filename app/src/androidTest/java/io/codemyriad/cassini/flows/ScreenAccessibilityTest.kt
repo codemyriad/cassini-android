@@ -130,7 +130,7 @@ class ScreenAccessibilityTest {
             id = "t1",
             speakerId = "s1",
             name = SpeakerNameUi.Named("Giulia"),
-            tone = SpeakerTone.Blue,
+            tone = SpeakerTone.One,
             startMs = 11 * MINUTE,
             words = words("Ok, then let's confirm the quantities first.", 11 * MINUTE),
         )
@@ -138,7 +138,7 @@ class ScreenAccessibilityTest {
             id = "t2",
             speakerId = "s2",
             name = SpeakerNameUi.Named("Paolo Ferri"),
-            tone = SpeakerTone.Teal,
+            tone = SpeakerTone.Two,
             startMs = 11 * MINUTE + 41 * SECOND,
             auto = true,
             words = words("Yes, four hundred. The problem is the second delivery.", 11 * MINUTE + 41 * SECOND),
@@ -147,7 +147,7 @@ class ScreenAccessibilityTest {
             id = "t3",
             speakerId = "s3",
             name = SpeakerNameUi.Placeholder(3),
-            tone = SpeakerTone.Amber,
+            tone = SpeakerTone.Unnamed,
             startMs = 12 * MINUTE + 20 * SECOND,
             words = words("Can you send that in writing?", 12 * MINUTE + 20 * SECOND),
         )

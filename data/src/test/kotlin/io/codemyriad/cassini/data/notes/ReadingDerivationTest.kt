@@ -62,6 +62,16 @@ class ReadingDerivationTest {
         assertFalse(ada.isPlaceholder)
     }
 
+    @Test fun storedSlotsAndExplicitUnnamedProvenanceReachTheCache() {
+        val doc = document(fixture("acknowledgment"))
+        val speakers = doc.manifest!!.getJSONArray("speakers")
+        speakers.getJSONObject(0).put("colourIndex", 5).put("provenance", "unnamed")
+        val cache = DocumentDerivation.derive(row, doc, "signature", 1)
+        val ada = cache.speakers.single { it.speakerId == "ada" }
+        assertEquals(5L, ada.colourIndex)
+        assertTrue(ada.isPlaceholder)
+    }
+
     private fun document(words: List<Word>, bounded: Boolean = false): CassiniDocument {
         val speakers = JSONArray()
             .put(JSONObject().put("id", "ada").put("label", "Ada"))

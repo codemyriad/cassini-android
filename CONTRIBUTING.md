@@ -97,7 +97,6 @@ Then run the checks that are not in Gradle. Run them from the repository root:
 shellcheck -x scripts/*.sh tools/*.sh
 ruff check --config config/ruff.toml scripts tools
 scripts/check-links.sh
-scripts/fetch-fonts.sh --check
 python3 -I scripts/check-resource-collisions.py
 scripts/check-verbatim.sh
 ```

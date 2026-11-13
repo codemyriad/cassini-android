@@ -48,32 +48,12 @@ class TokenScreenshotTest : BoardTest() {
         }.map { tokenName(it.name) }.toSet()
         // The question wash is covered by Name a speaker/Meeting goldens and SpeakerPaletteTest. Adding a
         // swatch would change the token strip during W1.0a, which must preserve every existing golden.
-        // These sixteen new fields are byte-checked in BrandTokenSyncTest but remain invisible until PR B.
-        // Keep this list explicit: any further getter still fails coverage instead of silently disappearing.
-        val stagedColors = setOf(
-            "errorFill",
-            "successFill",
-            "speaker0",
-            "speaker1",
-            "speaker2",
-            "speaker3",
-            "speaker4",
-            "speaker5",
-            "speaker6",
-            "avatar0",
-            "avatar1",
-            "avatar2",
-            "avatar3",
-            "avatar4",
-            "avatar5",
-            "avatar6",
-        )
-        val coveredColors = palette(LightColors).map { it.first }.toSet() + "speakerQuestionWash" + stagedColors
+        val coveredColors = palette(LightColors).map { it.first }.toSet() + "speakerQuestionWash"
         assertEquals(colorGetters, coveredColors)
         val speakerGetters = CassiniColors::class.java.declaredMethods.filter {
             it.name.startsWith("get") && it.returnType == SpeakerColors::class.java
         }.map { tokenName(it.name) }.toSet()
-        assertEquals(SpeakerTone.entries.map { "speaker${it.name}" }.toSet(), speakerGetters)
+        assertEquals(emptySet<String>(), speakerGetters)
         val typeGetters = CassiniType::class.java.declaredMethods.count { it.returnType == TextStyle::class.java }
         assertEquals(typeGetters, typeScale(CassiniTypography).size)
         val recordingGetters = RecordingColors::class.java.declaredMethods.count {
@@ -231,7 +211,26 @@ class TokenScreenshotTest : BoardTest() {
         const val OPAQUE = 255
         const val PERCENT = 100
 
-        fun palette(c: CassiniColors): List<Pair<String, Color>> = listOf(
+        private fun speakerAndFillPalette(c: CassiniColors): List<Pair<String, Color>> = listOf(
+            "errorFill" to c.errorFill,
+            "successFill" to c.successFill,
+            "speaker0" to c.speaker0,
+            "speaker1" to c.speaker1,
+            "speaker2" to c.speaker2,
+            "speaker3" to c.speaker3,
+            "speaker4" to c.speaker4,
+            "speaker5" to c.speaker5,
+            "speaker6" to c.speaker6,
+            "avatar0" to c.avatar0,
+            "avatar1" to c.avatar1,
+            "avatar2" to c.avatar2,
+            "avatar3" to c.avatar3,
+            "avatar4" to c.avatar4,
+            "avatar5" to c.avatar5,
+            "avatar6" to c.avatar6,
+        )
+
+        fun palette(c: CassiniColors): List<Pair<String, Color>> = speakerAndFillPalette(c) + listOf(
             "ink" to c.ink,
             "bg" to c.bg,
             "surface" to c.surface,
@@ -261,8 +260,6 @@ class TokenScreenshotTest : BoardTest() {
             "redTint" to c.redTint,
             "redLine" to c.redLine,
             "onRed" to c.onRed,
-            "violet" to c.violet,
-            "violetTint" to c.violetTint,
             "inkFill" to c.inkFill,
             "onInkFill" to c.onInkFill,
             "snackbarBg" to c.snackbarBg,
@@ -270,6 +267,18 @@ class TokenScreenshotTest : BoardTest() {
             "snackbarAction" to c.snackbarAction,
             "scrim" to c.scrim,
             "link" to c.link,
+            "highlight" to c.highlight,
+            "highlightInk" to c.highlightInk,
+            "record" to c.record,
+            "recordInk" to c.recordInk,
+            "recordTint" to c.recordTint,
+            "lineSoft" to c.lineSoft,
+            "onRecord" to c.onRecord,
+            "error" to c.error,
+            "neutralInk" to c.neutralInk,
+            "neutralTint" to c.neutralTint,
+            "raised" to c.raised,
+
         )
 
         fun recordingPalette(r: RecordingColors): List<Pair<String, Color>> = listOf(
@@ -299,6 +308,7 @@ class TokenScreenshotTest : BoardTest() {
             "field" to t.field,
             "fab" to t.fab,
             "rowTitle" to t.rowTitle,
+            "meetingTitle" to t.meetingTitle,
             "body16" to t.body16,
             "heroBody" to t.heroBody,
             "draft" to t.draft,

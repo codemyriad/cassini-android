@@ -261,8 +261,8 @@ class TranscriptSemanticsTest {
         var clicks = 0
         setThemed {
             Column(Modifier.width(350.dp)) {
-                TurnHeader("Paolo Ferri", SpeakerTone.Teal, 701_000, auto = true, onClick = { clicks++ })
-                TurnHeader("Speaker 3", SpeakerTone.Amber, 740_000, auto = false, onClick = null)
+                TurnHeader("Paolo Ferri", SpeakerTone.Two, 701_000, auto = true, onClick = { clicks++ })
+                TurnHeader("Speaker 3", SpeakerTone.Unnamed, 740_000, auto = false, onClick = null)
             }
         }
         val paolo = rule.onNode(hasContentDescription("Paolo Ferri, named automatically, at 11 minutes 41 seconds"))
@@ -282,7 +282,7 @@ class TranscriptSemanticsTest {
             Box(Modifier.width(350.dp)) {
                 SuggestionCard(
                     speaker = "Speaker 2",
-                    tone = SpeakerTone.Amber,
+                    tone = SpeakerTone.Unnamed,
                     timeMs = 1_742_000,
                     name = "Luca",
                     onYes = { events += "yes" },
@@ -428,7 +428,7 @@ class TranscriptSemanticsTest {
         val starts = wordStarts(words)
         val gap = layout.getBoundingBox(starts[1] + words[1].text.length).center
         val image = node.captureToImage().toPixelMap()
-        assertEquals(colors.speaker(SpeakerTone.Teal).tint, image[gap.x.toInt(), gap.y.toInt()])
+        assertEquals(colors.speaker(SpeakerTone.Two).tint, image[gap.x.toInt(), gap.y.toInt()])
         fun contains(index: Int, color: Color): Boolean {
             val pixels = node.captureToImage().toPixelMap()
             val box = layout.getPathForRange(starts[index], starts[index] + words[index].text.length).getBounds()
@@ -438,8 +438,8 @@ class TranscriptSemanticsTest {
         }
         active = 1
         rule.waitForIdle()
-        assertTrue("active chip glyphs use onAccentFill", contains(1, colors.onAccentFill))
-        assertTrue("active chip uses accentFill", contains(1, colors.accentFill))
+        assertTrue("active chip glyphs use highlightInk", contains(1, colors.highlightInk))
+        assertTrue("active chip uses highlight", contains(1, colors.highlight))
         assertEquals("playback keeps the text layout", layout.layoutInput.text, node.textLayout().layoutInput.text)
         rule.mainClock.autoAdvance = false
         node.performTouchInput { down(layout.getBoundingBox(starts[2]).center) }
@@ -460,11 +460,11 @@ class TranscriptSemanticsTest {
             "row",
             "ada",
             SpeakerNameUi.Named("Ada"),
-            SpeakerTone.Blue,
+            SpeakerTone.One,
             0,
             words = chipWords(),
             inlineSuggestions = persistentListOf(
-                InlineSuggestionUi("ben", "Speaker 2", SpeakerTone.Teal, 1000, SuggestionUi("v", "Ben")),
+                InlineSuggestionUi("ben", "Speaker 2", SpeakerTone.Two, 1000, SuggestionUi("v", "Ben")),
             ),
         )
         setThemed {
@@ -484,8 +484,8 @@ class TranscriptSemanticsTest {
 
     private fun chipWords() = persistentListOf(
         WordUi("Opening", 0),
-        WordUi("Sounds", 1000, prefix = "(Ben: ", interjectionTone = SpeakerTone.Teal),
-        WordUi("good.", 1500, suffix = ")", interjectionTone = SpeakerTone.Teal),
+        WordUi("Sounds", 1000, prefix = "(Ben: ", interjectionTone = SpeakerTone.Two),
+        WordUi("good.", 1500, suffix = ")", interjectionTone = SpeakerTone.Two),
         WordUi("Next.", 2000),
     )
 

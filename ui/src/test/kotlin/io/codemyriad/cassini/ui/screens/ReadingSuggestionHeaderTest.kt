@@ -45,7 +45,7 @@ class ReadingSuggestionHeaderTest {
             id = "turn",
             speakerId = "ben",
             name = SpeakerNameUi.Placeholder(2, "Speaker 2"),
-            tone = SpeakerTone.Teal,
+            tone = SpeakerTone.Two,
             startMs = 0,
             words = persistentListOf(WordUi("Agreed.", 0)),
             suggestion = SuggestionUi("voice", "Benjamin"),

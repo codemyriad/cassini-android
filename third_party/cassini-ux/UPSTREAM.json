@@ -1,15 +1,66 @@
 {
   "repository": "https://github.com/codemyriad/cassini-ux",
-  "commit": "4d577376f6360ed352fa75307f4dc47890ed9858",
+  "commit": "5e0c34e0f1bb390298dabdf4eedc494e933fd329",
   "files": {
     "strings.json": {
       "source": "strings/strings.json",
-      "sha256": "7b059577a6e4a5d692ccb5c745916bc790e9e0fe7c77c5572fb64fda80f0f7b3"
+      "sha256": "4bbe42b47bbf2e6e61ed15b1c54cabf4096e92aca63b9ed84d428070baa52acf"
     },
     "brand/tokens.json": {
       "source": "brand/tokens.json",
-      "sha256": "f534ccd38e2aa9d05fe9e4bb3dd352c588eead915fff21293ebb1d6945cdefb0",
-      "commit": "e244ad6a830e4ef77d87fb452143f7100c767139"
+      "sha256": "9d3d10d88db5d86d18a1cd099df36ca1c00234344fa383d28283992b734c6358"
+    },
+    "contract/STATUS-BADGES.md": {
+      "source": "contract/STATUS-BADGES.md",
+      "sha256": "1a10d0fbe8f5fe7b95847aaede72a1be862083b6c0bdb99494ba187f83d5454f"
+    },
+    "contract/LIBRARY-RULES.md": {
+      "source": "contract/LIBRARY-RULES.md",
+      "sha256": "415d866eb4a098400c76a3975969d9764bb70eed905726fbdcf7e90e42f85ce8"
+    },
+    "vectors/states/states-vectors.json": {
+      "source": "vectors/states/states-vectors.json",
+      "sha256": "2857b5af75191714b04b9974aebe7903b41e9dd96857c6b79c969bac0ae2ce67"
+    },
+    "vectors/format/format-vectors.json": {
+      "source": "vectors/format/format-vectors.json",
+      "sha256": "561e2acb1f44473904d87280447ea98e45f8185ae399a47084bec50f82595960"
+    },
+    "vectors/library-vectors/expected/main.json": {
+      "source": "vectors/library-vectors/expected/main.json",
+      "sha256": "7f5020acf49c66f710f028c150a15718d47da36ab71988733042edbfe40c8a2d"
+    },
+    "vectors/library-vectors/expected/r3-transcript-precedence.json": {
+      "source": "vectors/library-vectors/expected/r3-transcript-precedence.json",
+      "sha256": "59fe2214aa8492ff1d72558b3b08f7cd8cc3fada713b9f727c740fbb8aebd2f4"
+    },
+    "vectors/library-vectors/expected/r4-capture-history.json": {
+      "source": "vectors/library-vectors/expected/r4-capture-history.json",
+      "sha256": "5c093dbeb6e74099381580b18a4bdd7c7169a3c39720f30cdd1a325b55f89f66"
+    },
+    "vectors/library-vectors/expected/t8-low-audio-silent.json": {
+      "source": "vectors/library-vectors/expected/t8-low-audio-silent.json",
+      "sha256": "8c18748f8d778a2209870e9484262eb7116ecdce780d48fb5201106092628419"
+    },
+    "vectors/library-vectors/expected/t8-others-never-captured.json": {
+      "source": "vectors/library-vectors/expected/t8-others-never-captured.json",
+      "sha256": "8c18748f8d778a2209870e9484262eb7116ecdce780d48fb5201106092628419"
+    },
+    "vectors/states/verify.py": {
+      "source": "vectors/states/verify.py",
+      "sha256": "7ef123c5635b2a02f5e64aa148c93ed5f0103ca38909c1b7f491210007bf974c"
+    },
+    "brand/mark/saturn-nav.svg": {
+      "source": "brand/mark/saturn-nav.svg",
+      "sha256": "38b639fe49123ee236239a523183815505c33b826b135f63b65d691df7caf61e"
+    },
+    "contract/HARMONY.md": {
+      "source": "contract/HARMONY.md",
+      "sha256": "8ddb3ac96ee39163afc9a0fb247b4568481ff861976ebc26f313f734b7c8ced7"
+    },
+    "strings/strings.json": {
+      "source": "strings/strings.json",
+      "sha256": "4bbe42b47bbf2e6e61ed15b1c54cabf4096e92aca63b9ed84d428070baa52acf"
     }
   }
 }

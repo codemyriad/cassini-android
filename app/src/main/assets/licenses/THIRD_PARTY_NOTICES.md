@@ -58,16 +58,9 @@ The APK contains these libraries from Maven Central and the Google Maven reposit
 
 DataStore Preferences also contains `datastore-preferences-external-protobuf` 1.2.1, a copy of [Protocol Buffers](https://github.com/protocolbuffers/protobuf) for Java with its package names changed by the AndroidX authors. Its license is BSD-3-Clause: Copyright 2008 Google Inc. All rights reserved. The full text of this license is in `assets/licenses/protobuf/LICENSE` in the APK.
 
-## Fonts
+## Typography
 
-The APK contains two font families. Their authors publish them under the SIL Open Font License, Version 1.1. The font files are unmodified copies of the upstream static TTF files. Cassini gives the files different resource names, but it does not change the fonts in the files.
-
-| Family | Weights | Upstream | Copyright |
-| --- | --- | --- | --- |
-| Instrument Sans | 400, 500, 600, 700 | [github.com/Instrument/instrument-sans](https://github.com/Instrument/instrument-sans/tree/7fa22308a3d0c94ee2b3cd537a1196b65db34a3e) at commit `7fa22308a3d0c94ee2b3cd537a1196b65db34a3e`, `fonts/ttf/` | Copyright 2022 The Instrument Sans Project Authors (https://github.com/Instrument/instrument-sans) |
-| IBM Plex Mono | 400, 500 | [github.com/IBM/plex](https://github.com/IBM/plex/tree/%40ibm/plex-mono%402.5.0) at tag `@ibm/plex-mono@2.5.0`, `packages/plex-mono/fonts/complete/ttf/` | Copyright © 2017 IBM Corp. with Reserved Font Name "Plex" |
-
-`third_party/fonts/fonts.json` gives the path and the SHA-256 of each font file. The full license texts are in `assets/licenses/fonts/` in the APK.
+Cassini uses the Android system font. No font files are bundled in the APK.
 
 ## Downloaded models and local test fixtures
 

@@ -145,7 +145,7 @@ internal fun QuestionCard(
             .fillMaxWidth()
             .clip(shape)
             .background(c.speakerQuestionWash)
-            .pulseBorder(c.speakerAmber.ink, shape) { pulse.value }
+            .pulseBorder(c.speaker0, shape) { pulse.value }
             .semantics {
                 liveRegion = LiveRegionMode.Polite
                 if (announced) stateDescription = answerFirst

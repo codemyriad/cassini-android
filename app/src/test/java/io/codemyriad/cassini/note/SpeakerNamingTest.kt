@@ -25,7 +25,7 @@ class SpeakerNamingTest {
     /** A print close to [anna] (cosine 1 against her, 0 against the others). */
     private val annaPrint = FloatArray(ModelCatalog.VOICEPRINT_DIM).also { it[0] = 1f }
 
-    private val paolo = listOf(MergeTargetUi("s1", SpeakerNameUi.Named("Paolo"), SpeakerTone.Blue, 9_000))
+    private val paolo = listOf(MergeTargetUi("s1", SpeakerNameUi.Named("Paolo"), SpeakerTone.One, 9_000))
 
     @Suppress("LongParameterList") // one default per test variation
     private fun input(
@@ -40,7 +40,7 @@ class SpeakerNamingTest {
     ) = NamingInput(
         speakerId = "s3",
         label = label,
-        tone = SpeakerTone.Amber,
+        tone = SpeakerTone.Unnamed,
         speakingMs = 192_000,
         sample = SampleWindow(10_000, 20_000),
         draft = draft,
