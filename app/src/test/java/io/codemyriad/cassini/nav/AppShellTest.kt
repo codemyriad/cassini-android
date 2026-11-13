@@ -131,7 +131,7 @@ class AppShellTest {
     @Test fun backClosesTheSheetThenTheSearchThenLeavesTheNote() {
         importDocument()
         rule.onNodeWithText(TITLE).performClick()
-        waitFor(hasContentDescription("Search in transcript"))
+        waitFor(FIND_BUTTON)
         // The Note state is built off the main thread, so each step waits for the state that the one before makes.
         rule.onNodeWithContentDescription("Search in transcript").performClick()
         waitFor(hasSetTextAction())
@@ -146,10 +146,10 @@ class AppShellTest {
 
         Espresso.pressBack()
         waitGone(hasContentDescription("Close search"))
-        waitFor(hasContentDescription("Search in transcript"))
+        waitFor(FIND_BUTTON)
 
         Espresso.pressBack()
-        waitGone(hasContentDescription("Search in transcript"))
+        waitGone(FIND_BUTTON)
         rule.onNodeWithContentDescription("Settings").assertExists()
         rule.onNodeWithText(TITLE).assertExists()
     }
@@ -183,7 +183,7 @@ class AppShellTest {
         rule.onNode(hasSetTextAction()).performClick()
         rule.onNodeWithContentDescription("Close search").assertExists()
         rule.onNodeWithText(TITLE).performClick()
-        waitFor(hasContentDescription("Search in transcript"))
+        waitFor(FIND_BUTTON)
         Espresso.pressBack()
         waitFor(hasContentDescription("Settings"))
         rule.onNode(hasSetTextAction()).assertIsNotFocused()
@@ -254,7 +254,7 @@ class AppShellTest {
     @Test fun transcriptWordsAreNotLinksAndSpeakerLabelsAreSpokenButtons() {
         importDocument()
         rule.onNodeWithText(TITLE).performClick()
-        waitFor(hasContentDescription("Search in transcript"))
+        waitFor(FIND_BUTTON)
         // The label is drawn first inside its turn, then as its own button node.
         waitFor(SPEAKER_2)
 
@@ -291,11 +291,16 @@ class AppShellTest {
      * Waits until the nodes of [matcher] meet [condition], waking on main coroutine posts and Compose snapshot
      * applications. The synchronized semantics query drains pending composition and layout work.
      */
-    private fun waitUntilNodes(matcher: SemanticsMatcher, condition: (List<SemanticsNode>) -> Boolean) =
-        mainEvents.await(TIMEOUT_MS, rule.mainClock.scheduler) {
-            rule.mainClock.advanceTimeByFrame()
-            condition(rule.onAllNodes(matcher).fetchSemanticsNodes())
+    private fun waitUntilNodes(matcher: SemanticsMatcher, condition: (List<SemanticsNode>) -> Boolean) {
+        try {
+            mainEvents.await(TIMEOUT_MS, rule.mainClock.scheduler) {
+                rule.mainClock.advanceTimeByFrame()
+                condition(rule.onAllNodes(matcher).fetchSemanticsNodes())
+            }
+        } catch (timeout: kotlinx.coroutines.TimeoutCancellationException) {
+            throw AssertionError("Timed out checking nodes matching $matcher", timeout)
         }
+    }
 
     private fun darkIcons(): Boolean {
         rule.waitForIdle()
@@ -308,7 +313,7 @@ class AppShellTest {
         app.graph.viewedImports.start(uri)
         // A rotation or a language change while the file imports: the new activity opens the note.
         rule.activityRule.scenario.recreate()
-        waitFor(hasContentDescription("Search in transcript"))
+        waitFor(FIND_BUTTON)
         runBlocking {
             withTimeout(TIMEOUT_MS) { app.graph.viewedImports.ready.first { it.isEmpty() } }
         }
@@ -317,7 +322,7 @@ class AppShellTest {
     @Test fun aConfigurationChangeKeepsTheNotePlayer() {
         importDocument()
         rule.onNodeWithText(TITLE).performClick()
-        waitFor(hasContentDescription("Search in transcript"))
+        waitFor(FIND_BUTTON)
         val playback = app.graph.playback
         // The player opens after the first turns draw. Main dispatches deliver the Note ViewModel's work.
         rule.waitForIdle()
@@ -331,7 +336,7 @@ class AppShellTest {
 
         try {
             rule.activityRule.scenario.recreate()
-            waitFor(hasContentDescription("Search in transcript"))
+            waitFor(FIND_BUTTON)
             rule.waitForIdle()
             assertEquals(noteId, playback.state.value.noteId)
             assertTrue("the player was not left: $seen", seen.all { it == noteId })
@@ -352,7 +357,7 @@ class AppShellTest {
         rule.onNodeWithContentDescription("Settings").assertExists()
 
         rule.mainClock.autoAdvance = true
-        waitFor(hasContentDescription("Search in transcript"))
+        waitFor(FIND_BUTTON)
         rule.onNodeWithContentDescription("Settings").assertDoesNotExist()
 
         rule.mainClock.autoAdvance = false
@@ -364,7 +369,7 @@ class AppShellTest {
         rule.onNodeWithContentDescription("Search in transcript").assertExists()
 
         rule.mainClock.autoAdvance = true
-        waitGone(hasContentDescription("Search in transcript"))
+        waitGone(FIND_BUTTON)
         rule.onNodeWithContentDescription("Settings").assertExists()
         rule.onNodeWithText(TITLE).assertExists()
     }
@@ -375,13 +380,13 @@ class AppShellTest {
         val settings = libraryNodeId()
 
         rule.onNodeWithText(TITLE).performClick()
-        waitFor(hasContentDescription("Search in transcript"))
+        waitFor(FIND_BUTTON)
         // Under a settled note the Library is composed but not placed: no node of it is reachable.
         rule.onNodeWithContentDescription("Settings").assertDoesNotExist()
         rule.onNodeWithContentDescription("Record a new note").assertDoesNotExist()
 
         Espresso.pressBack()
-        waitGone(hasContentDescription("Search in transcript"))
+        waitGone(FIND_BUTTON)
         rule.waitForIdle()
         // The same layout node: the Library moved between scenes, it was not disposed and composed again.
         assertEquals(settings, libraryNodeId())
@@ -392,7 +397,7 @@ class AppShellTest {
         rule.waitForIdle()
         val settings = libraryNodeId()
         rule.onNodeWithText(TITLE).performClick()
-        waitFor(hasContentDescription("Search in transcript"))
+        waitFor(FIND_BUTTON)
         val dispatcher = rule.activity.onBackPressedDispatcher
 
         rule.runOnIdle {
@@ -412,7 +417,7 @@ class AppShellTest {
             dispatcher.dispatchOnBackProgressed(backEvent(HALF))
             dispatcher.onBackPressed()
         }
-        waitGone(hasContentDescription("Search in transcript"))
+        waitGone(FIND_BUTTON)
         rule.waitForIdle()
         assertEquals(settings, libraryNodeId())
     }
@@ -429,9 +434,9 @@ class AppShellTest {
         // The Library's own back handler (it clears the query) is off while the note covers it: back closes the
         // note's search, then the note.
         Espresso.pressBack()
-        waitFor(hasContentDescription("Search in transcript"))
+        waitFor(FIND_BUTTON)
         Espresso.pressBack()
-        waitGone(hasContentDescription("Search in transcript"))
+        waitGone(FIND_BUTTON)
         rule.onNode(hasSetTextAction()).assert(hasText(QUERY))
     }
 
@@ -475,6 +480,10 @@ class AppShellTest {
     private companion object {
         /** The label of the second speaker as its own node (merged tree). */
         val SPEAKER_2 = hasContentDescription("Speaker 2", substring = true)
+
+        // The Find text field has the same spoken label; only the button acknowledges that Find has closed.
+        val FIND_BUTTON = hasContentDescription("Search in transcript") and
+            SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button)
         const val ANDROID_NS = "http://schemas.android.com/apk/res/android"
         const val TITLE = "Meeting"
         const val QUERY = "Meet"

@@ -8,11 +8,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -132,6 +136,22 @@ class Phase1MeetingTest {
         show(base.copy(playback = null, search = TranscriptSearchUi("Yes", persistentListOf(match), 0)))
         rule.onNodeWithTag("meeting-header").assertDoesNotExist()
         rule.onNodeWithContentDescription("Close search").assertIsDisplayed()
+    }
+
+    @Test fun theFindFieldCannotAcknowledgeThatBackHasClosedFind() {
+        val base = BoardFixtures.readAndListen.copy(playback = null)
+        var state by mutableStateOf(base.copy(search = TranscriptSearchUi("Yes", persistentListOf(), 0)))
+        rule.setContent {
+            CassiniTheme { ProvideFixedFormat(locale = Locale.ENGLISH) { NoteScreen(state, onEvent = {}) } }
+        }
+        val label = hasContentDescription("Search in transcript")
+        val button = label and SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button)
+        // While a Back acknowledgement is pending, the field is still present with this same accessible label.
+        rule.onNode(label).assertIsDisplayed()
+        rule.onNode(button).assertDoesNotExist()
+        rule.runOnIdle { state = base }
+        rule.onNode(button).assertIsDisplayed()
+        rule.onNodeWithContentDescription("Close search").assertDoesNotExist()
     }
 
     @Test fun searchJumpsPastTheHeaderToTheActualMatchedTurn() = jump(searching = true)
