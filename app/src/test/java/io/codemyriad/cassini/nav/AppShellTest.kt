@@ -261,14 +261,18 @@ class AppShellTest {
         for (name in listOf("Speaker 2", "Ada")) {
             val speakers = rule.onAllNodes(hasContentDescription(name, substring = true))
             speakers.assertCountEquals(2)
+            val descriptions = mutableSetOf<String>()
             for (index in 0 until 2) {
                 val speaker = speakers[index]
                 speaker.assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
                 val config = speaker.fetchSemanticsNode().config
                 assertEquals("Name this speaker", config.getOrNull(SemanticsActions.OnClick)?.label)
                 val description = config[SemanticsProperties.ContentDescription].single()
-                assertTrue("the label says when speech starts: $description", description.startsWith("$name, at "))
+                descriptions += description
+                assertTrue("the label says when speech starts: $description", description.contains("$name, at "))
             }
+            val turnDescription = descriptions.single { it.startsWith("$name, at ") }
+            assertEquals(setOf(turnDescription, "Name this speaker · $turnDescription"), descriptions)
         }
 
         // The words are not links: the paragraph maps a tap position to a word, with no child node per word.

@@ -85,7 +85,11 @@ private fun InlineSpeaker(speaker: MeetingSpeakerUi, onClick: () -> Unit) {
     Box(
         Modifier.touchTarget().testTag("meeting-speaker-${speaker.id}")
             .turnHeaderSemantics(
-                description = Spoken.turn(speaker.name.display(), speaker.startMs, speaker.auto),
+                description = stringResource(
+                    R.string.ui_join_dot,
+                    stringResource(R.string.ui_turn_name_action),
+                    Spoken.turn(speaker.name.display(), speaker.startMs, speaker.auto),
+                ),
                 clickLabel = stringResource(R.string.ui_turn_name_action),
                 onClick = onClick,
             ),

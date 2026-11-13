@@ -4,6 +4,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasContentDescription
@@ -13,8 +14,10 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.components.SpeakerNameUi
+import io.codemyriad.cassini.ui.components.display
 import io.codemyriad.cassini.ui.fixtures.BoardFixtures
 import io.codemyriad.cassini.ui.format.ProvideFixedFormat
+import io.codemyriad.cassini.ui.format.Spoken
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import io.codemyriad.cassini.ui.theme.SpeakerTone
 import kotlinx.collections.immutable.persistentListOf
@@ -37,6 +40,25 @@ class MeetingSpeakerControlsTest {
     @Test fun shortAndAutomaticLongNamesKeepTheirTouchTargetsAndSpokenActions() = controls(1f)
 
     @Test fun largerTextKeepsTheAutomaticBadgeVisibleBesideALongName() = controls(2f)
+
+    @Test fun overviewNamingAndTranscriptTurnsHaveDistinctFullSpokenDescriptions() {
+        val base = BoardFixtures.readAndListen.copy(activeWord = null, playback = null)
+        val descriptions = mutableMapOf<String, String>()
+        rule.setContent {
+            CassiniTheme {
+                ProvideFixedFormat(locale = Locale.ENGLISH) {
+                    base.turns.forEach { descriptions[it.speakerId] = Spoken.turn(it.name.display(), it.startMs, it.auto) }
+                    NoteScreen(base, onEvent = {})
+                }
+            }
+        }
+        rule.runOnIdle { assertEquals(base.turns.size, descriptions.size) }
+        for ((id, spoken) in descriptions) {
+            rule.onAllNodes(hasContentDescription(spoken)).assertCountEquals(1)
+            rule.onNodeWithTag("meeting-speaker-$id")
+                .assert(hasContentDescription("Name this speaker · $spoken"))
+        }
+    }
 
     private fun controls(scale: Float) {
         val events = mutableListOf<NoteEvent>()
