@@ -175,7 +175,7 @@ class SettingsBehaviourTest {
         rule.onNodeWithText("Saved voices").performScrollTo().performClick()
         rule.onNodeWithText("Trash").performScrollTo().performClick()
         rule.onNodeWithText("Free software under GPLv3", substring = true).performScrollTo().performFirstLinkClick()
-        rule.onNodeWithContentDescription("Back to library").performScrollTo().performClick()
+        rule.onNodeWithContentDescription("Back to all meetings").performScrollTo().performClick()
         rule.runOnIdle {
             assertEquals(
                 listOf(
@@ -297,7 +297,7 @@ class SettingsBehaviourTest {
         rule.onAllNodesWithText("Delete now")[0].performClick()
         rule.onNodeWithText("Empty").performClick()
         rule.onNodeWithText("Undo").performClick()
-        rule.onNodeWithContentDescription("Back to library").performClick()
+        rule.onNodeWithContentDescription("Back to all meetings").performClick()
         // The duration is read in words.
         rule.onNodeWithContentDescription("18 seconds", substring = true).assertExists()
         rule.runOnIdle {

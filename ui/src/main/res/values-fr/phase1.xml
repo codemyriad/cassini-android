@@ -21,4 +21,24 @@
     <string name="ui_badge_unplayable">Lecture impossible</string>
     <string name="ui_badge_unreadable">Transcription illisible</string>
     <string name="ui_badge_newer">Format plus récent</string>
+    <string name="ui_library_import">Importer un audio</string>
+    <string name="ui_all_meetings">Toutes les réunions</string>
+    <string name="ui_back_to_library">Retour à toutes les réunions</string>
+    <string name="ui_recording_library">Toutes les réunions</string>
+    <string name="ui_recording_minimise">Retour à toutes les réunions</string>
+    <string name="ui_library_search_placeholder">Rechercher</string>
+    <string name="ui_library_search_description">Rechercher dans toutes les réunions</string>
+    <plurals name="ui_row_speaker_count">
+        <item quantity="one">%1$s intervenant</item>
+        <item quantity="many">%1$s intervenants</item>
+        <item quantity="other">%1$s intervenants</item>
+    </plurals>
+    <string name="ui_row_no_speech">Aucune parole</string>
+    <string name="ui_row_resume">Reprendre</string>
+    <string name="ui_row_try_again">Réessayer</string>
+    <plurals name="ui_search_meetings">
+        <item quantity="one">%1$s réunion</item>
+        <item quantity="many">%1$s réunions</item>
+        <item quantity="other">%1$s réunions</item>
+    </plurals>
 </resources>

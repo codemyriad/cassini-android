@@ -6,21 +6,18 @@ package io.codemyriad.cassini.ui.components
 import androidx.annotation.StringRes
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.boundsInRoot
@@ -31,6 +28,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -39,7 +37,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.R
 import io.codemyriad.cassini.ui.format.Counts
-import io.codemyriad.cassini.ui.format.Dates
 import io.codemyriad.cassini.ui.format.DayLabel
 import io.codemyriad.cassini.ui.format.Durations
 import io.codemyriad.cassini.ui.format.LocalFormat
@@ -49,16 +46,9 @@ import kotlinx.collections.immutable.persistentListOf
 import java.time.LocalTime
 
 /**
- * A Library row (board 00): radius 14, surface when [NoteRowUi.highlighted] else transparent, padding 12/10, gap 4.
- * The title (`rowTitle`, up to 2 lines) and the duration (`monoTime`, text2, on the title's line height); the
- * preview (`snippet`, text3, up to 2 lines) with its ellipses and highlights; the meta line (gap 8): the time (or
- * [day] and time in search results), the [StatusChip] and the suffix.
- *
- * "· Resume" and "· Try again" are inline text buttons: they keep the board's text layout, and Compose's extended
- * hit testing gives them a 48 dp touch area (ui.md section 5). The row is one merged node described as
- * "Weekly product sync, 48 minutes 13 seconds, today 10:02, transcribing", followed by a suffix that is not a
- * button ("3 speakers") and the preview text; it opens on click, reports a long press, and offers Rename, Move to
- * trash and Resume / Try again as TalkBack custom actions.
+ * L-51..53 phone row: two-line title and duration, then time, an unfinished status or finished count/no-speech
+ * pill, and recovery actions. Search results alone keep their highlighted snippet. The row retains explicit
+ * localized spoken status and custom actions independently of its compact visual label.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -66,7 +56,8 @@ import java.time.LocalTime
 fun NoteRow(row: NoteRowUi, day: DayLabel, onAction: (NoteRowAction) -> Unit, modifier: Modifier = Modifier) {
     val c = CassiniTheme.colors
     val t = CassiniTheme.type
-    val status = rowStatus(row.status, row.durationMs)
+    val status = rowStatus(row.status, row.durationMs, row.transcriptionMinutes)
+    val preview = row.preview?.takeIf { row.day != null }
     val (boundsModifier, layerModifier) = noteRowBoundsModifiers(row.id)
     // The explicit description replaces the merged texts for TalkBack, so it also carries what they add: a suffix
     // that is not a button ("3 speakers", "No speech") and the preview, which tells why a search result matched.
@@ -80,8 +71,11 @@ fun NoteRow(row: NoteRowUi, day: DayLabel, onAction: (NoteRowAction) -> Unit, mo
             status.spokenText,
             row.recordedLabel,
         ),
-        status.suffix?.takeIf { status.suffixAction == null }?.trimStart('·', ' ', '\u00A0')?.lowercase(locale),
-        row.preview?.text,
+        spokenSuffix(row.status, status)
+            ?.takeIf { status.suffixAction == null }
+            ?.trimStart('·', ' ', '\u00A0')
+            ?.lowercase(locale),
+        preview?.text,
     ).joinToString(", ")
     val actions = customActions(row, onAction)
     val match = SpanStyle(fontWeight = FontWeight.W600, color = c.highlightInk, background = c.highlight)
@@ -90,7 +84,8 @@ fun NoteRow(row: NoteRowUi, day: DayLabel, onAction: (NoteRowAction) -> Unit, mo
             .fillMaxWidth()
             .then(boundsModifier)
             .clip(CassiniTheme.shapes.row)
-            .background(if (row.highlighted) c.surface else Color.Transparent)
+            .background(c.surface)
+            .border(1.dp, c.line, CassiniTheme.shapes.row)
             .combinedClickable(
                 onClickLabel = stringResource(R.string.ui_action_open_note),
                 role = Role.Button,
@@ -101,9 +96,12 @@ fun NoteRow(row: NoteRowUi, day: DayLabel, onAction: (NoteRowAction) -> Unit, mo
             .semantics(mergeDescendants = true) {
                 contentDescription = description
                 customActions = actions
+                if (row.status == NoteStatusUi.Transcribing && row.transcriptionMinutes != null) {
+                    stateDescription = status.text
+                }
             }
             .then(layerModifier)
-            .padding(horizontal = 10.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -120,7 +118,6 @@ fun NoteRow(row: NoteRowUi, day: DayLabel, onAction: (NoteRowAction) -> Unit, mo
                 color = c.text2,
             )
         }
-        val preview = row.preview
         if (preview != null) {
             EllipsisText(
                 text = preview.toAnnotatedString(match),
@@ -129,45 +126,7 @@ fun NoteRow(row: NoteRowUi, day: DayLabel, onAction: (NoteRowAction) -> Unit, mo
                 maxLines = 2,
             )
         }
-        // A flow row: at a large font scale the suffix ("· No speech", "· Resume") goes to the next line, not out of
-        // the row.
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            itemVerticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = row.recordedLabel ?: if (day == DayLabel.Unknown) {
-                    Dates.dayLabel(day)
-                } else {
-                    row.day?.let { Dates.dayTime(it, row.time) } ?: Dates.time(row.time)
-                },
-                style = t.caption,
-                color = c.text2,
-            )
-            StatusChip(status.text, status.kind)
-            val suffix = status.suffix
-            if (suffix != null) {
-                val action = status.suffixAction
-                val suffixDescription = when (action) {
-                    NoteRowAction.RESUME -> stringResource(R.string.ui_row_resume_description, row.title)
-                    NoteRowAction.TRY_AGAIN -> stringResource(R.string.ui_row_try_again_description, row.title)
-                    else -> null
-                }
-                Text(
-                    text = suffix,
-                    modifier = if (action != null && suffixDescription != null) {
-                        Modifier
-                            .clickable(role = Role.Button, onClick = { onAction(action) })
-                            .semantics { contentDescription = suffixDescription }
-                    } else {
-                        Modifier
-                    },
-                    style = t.caption,
-                    color = c.text2,
-                    maxLines = 1,
-                )
-            }
-        }
+        RowMeta(row, day, status, onAction)
     }
 }
 
@@ -188,7 +147,7 @@ private fun noteRowBoundsModifiers(noteId: String): Pair<Modifier, Modifier> {
 /** The chip and suffix of a status (features.md section 1, the status table). */
 internal data class RowStatus(
     val text: String,
-    val kind: StatusBadgeKind,
+    val kind: StatusBadgeKind?,
     val spoken: String? = null,
     val suffix: String? = null,
     val suffixAction: NoteRowAction? = null,
@@ -197,13 +156,17 @@ internal data class RowStatus(
 }
 
 @Composable
-internal fun rowStatus(status: NoteStatusUi, liveMs: Long = 0): RowStatus = when (status) {
+internal fun rowStatus(status: NoteStatusUi, liveMs: Long = 0, minutes: Long? = null): RowStatus = when (status) {
     NoteStatusUi.Recording -> RowStatus(
         statusBadgeText(StatusBadgeKind.Recording, liveMs = liveMs),
         StatusBadgeKind.Recording,
         spoken = stringResource(R.string.ui_status_recording),
     )
-    NoteStatusUi.Transcribing -> badgeRowStatus(StatusBadgeKind.Transcribing, R.string.ui_status_transcribing)
+    NoteStatusUi.Transcribing -> RowStatus(
+        statusBadgeText(StatusBadgeKind.Transcribing, minutes = minutes),
+        StatusBadgeKind.Transcribing,
+        spoken = stringResource(R.string.ui_status_transcribing),
+    )
     NoteStatusUi.Queued -> badgeRowStatus(StatusBadgeKind.Queued, R.string.ui_status_queued)
     is NoteStatusUi.Paused -> RowStatus(
         text = stringResource(R.string.ui_badge_paused, Durations.clock(status.atMs)),
@@ -224,7 +187,7 @@ internal fun rowStatus(status: NoteStatusUi, liveMs: Long = 0): RowStatus = when
     NoteStatusUi.NewerFormat -> badgeRowStatus(StatusBadgeKind.NewerFormat, R.string.ui_status_newer_format)
     is NoteStatusUi.Transcribed -> RowStatus(
         text = stringResource(R.string.ui_status_transcribed),
-        kind = StatusBadgeKind.Transcribed,
+        kind = null,
         suffix = when {
             status.words == 0 -> stringResource(R.string.ui_status_suffix_no_speech)
             status.speakers >= 2 -> Counts.plural(R.plurals.ui_status_suffix_speakers, status.speakers)

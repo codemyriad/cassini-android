@@ -93,6 +93,7 @@ internal object BoardFixtures {
         durationMs = clock(48, 13),
         time = LocalTime.of(10, 2),
         status = NoteStatusUi.Transcribing,
+        transcriptionMinutes = 9,
         highlighted = true,
     )
     val interview = NoteRowUi(

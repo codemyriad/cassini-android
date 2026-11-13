@@ -109,7 +109,7 @@ class ScreenBehaviourTest {
         rule.runOnIdle { assertEquals(listOf<NoteEvent>(NoteEvent.CloseSearch), events) }
         // With the search closed the screen no longer takes system back: the navigation in :app pops the screen.
         rule.runOnIdle { assertEquals(false, back.hasEnabledCallbacks()) }
-        rule.onNodeWithContentDescription("Back to library").performClick()
+        rule.onNodeWithContentDescription("Back to all meetings").performClick()
         rule.runOnIdle { assertEquals(listOf(NoteEvent.CloseSearch, NoteEvent.Back), events) }
     }
 

@@ -24,6 +24,7 @@ internal object ComponentFixtures {
         durationMs = 2_893_000,
         time = LocalTime.of(10, 2),
         status = NoteStatusUi.Transcribing,
+        transcriptionMinutes = 4,
         highlighted = true,
     )
     val interview = NoteRowUi(
@@ -113,6 +114,13 @@ internal object ComponentFixtures {
             time = LocalTime.of(16, 20),
             status = NoteStatusUi.NewerFormat,
         ) to DayLabel.Date(LocalDate.of(2025, 12, 1), withYear = true),
+        NoteRowUi(
+            id = "solo",
+            title = "Project notes",
+            durationMs = 180_000,
+            time = LocalTime.of(14, 10),
+            status = NoteStatusUi.Transcribed(speakers = 1, words = 80),
+        ) to DayLabel.Today,
         NoteRowUi(
             id = "result",
             title = "Call with supplier",

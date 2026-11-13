@@ -1,6 +1,7 @@
 package io.codemyriad.cassini.ui.components
 
 import android.content.Context
+import android.content.res.Resources
 import androidx.annotation.StringRes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -99,15 +100,31 @@ class RowStatusLocalesTest {
         }
         for (case in cases) {
             rule.runOnIdle { status = case.status }
-            val visual = resources.getString(case.visual, *listOfNotNull(case.visualArgument).toTypedArray())
-            val spoken = resources.getString(case.spoken, *listOfNotNull(case.spokenArgument).toTypedArray())
-            // Same exact, unmerged text match as the acceptance walk's visible badge selector.
-            rule.onNodeWithText(visual, useUnmergedTree = true).assertIsDisplayed()
-            // Same case-insensitive status match as the Library @CiSmoke device flow.
-            val row = rule.onNode(hasContentDescription(spoken, substring = true, ignoreCase = true))
-            val description = row.fetchSemanticsNode().config[SemanticsProperties.ContentDescription].single()
-            assertTrue("$tag/${case.status}: $description", description.endsWith(", ${spoken.lowercase(locale)}"))
+            assertCase(case, locale, resources)
         }
+    }
+
+    private fun assertCase(case: Case, locale: Locale, resources: Resources) {
+        val visual = resources.getString(case.visual, *listOfNotNull(case.visualArgument).toTypedArray())
+        val spoken = resources.getString(case.spoken, *listOfNotNull(case.spokenArgument).toTypedArray())
+        // Same exact, unmerged text match as the acceptance walk's visible badge selector.
+        if (case.status is NoteStatusUi.Transcribed) {
+            // L-52 replaces the finished chip with a count, while TalkBack still hears transcribed.
+            rule.onNodeWithText(visual, useUnmergedTree = true).assertDoesNotExist()
+            val count = resources.getQuantityString(R.plurals.ui_row_speaker_count, 1, "1")
+            rule.onNodeWithText(count, useUnmergedTree = true).assertIsDisplayed()
+        } else {
+            rule.onNodeWithText(visual, useUnmergedTree = true).assertIsDisplayed()
+        }
+        // Same case-insensitive status match as the Library @CiSmoke device flow.
+        val row = rule.onNode(hasContentDescription(spoken, substring = true, ignoreCase = true))
+        val description = row.fetchSemanticsNode().config[SemanticsProperties.ContentDescription].single()
+        val suffix = if (case.status is NoteStatusUi.Transcribed) {
+            ", " + resources.getQuantityString(R.plurals.ui_row_speaker_count, 1, "1").lowercase(locale)
+        } else {
+            ""
+        }
+        assertTrue("$locale/${case.status}: $description", description.endsWith(", ${spoken.lowercase(locale)}$suffix"))
     }
 
     private data class Case(

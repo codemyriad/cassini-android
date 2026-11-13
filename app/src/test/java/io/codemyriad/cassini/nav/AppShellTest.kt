@@ -13,6 +13,8 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -176,6 +178,19 @@ class AppShellTest {
         rule.onNodeWithText("Finish").assertExists()
     }
 
+    @Test fun anEmptySearchDoesNotSurviveAMeetingRoundTrip() {
+        importDocument()
+        rule.onNode(hasSetTextAction()).performClick()
+        rule.onNodeWithContentDescription("Close search").assertExists()
+        rule.onNodeWithText(TITLE).performClick()
+        waitFor(hasContentDescription("Search in transcript"))
+        Espresso.pressBack()
+        waitFor(hasContentDescription("Settings"))
+        rule.onNode(hasSetTextAction()).assertIsNotFocused()
+        rule.onNodeWithContentDescription("Trash").assertIsDisplayed()
+        rule.onNodeWithContentDescription("Close search").assertDoesNotExist()
+    }
+
     @Test fun theAppUsesPredictiveBackAndTheLibraryLeavesBackToTheSystem() {
         // Robolectric does not set the ApplicationInfo flag, so the merged manifest it runs with is read instead.
         val attribute = "enableOnBackInvokedCallback"
@@ -183,8 +198,10 @@ class AppShellTest {
         val dispatcher = rule.activity.onBackPressedDispatcher
         // The root takes no back, so the system animates back to home.
         rule.runOnIdle { assertFalse(dispatcher.hasEnabledCallbacks()) }
-
-        rule.onNodeWithContentDescription("Settings").performClick()
+        // Navigation3 entering the Library must not focus Search or hide its two navigation actions.
+        rule.onNode(hasSetTextAction()).assertIsNotFocused()
+        rule.onNodeWithContentDescription("Trash").assertIsDisplayed()
+        rule.onNodeWithContentDescription("Settings").assertIsDisplayed().performClick()
         rule.onNode(hasText("App language", ignoreCase = true)).assertExists()
         rule.runOnIdle { assertTrue("NavDisplay takes back above the root", dispatcher.hasEnabledCallbacks()) }
         Espresso.pressBack()

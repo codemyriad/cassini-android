@@ -28,6 +28,18 @@ LABELS = {
     'badge_unplayable': ('states.phone.cantPlay', None),
     'badge_unreadable': ('states.phone.cantReadTranscript', None),
     'badge_newer': ('states.phone.newerFormat', None),
+    'library_import': ('import.button.mobile', None),
+    'all_meetings': ('library.allMeetings', None),
+    'back_to_library': ('library.backToAllMeetings', None),
+    'recording_library': ('library.allMeetings', None),
+    'recording_minimise': ('library.backToAllMeetings', None),
+    'library_search_placeholder': ('common.search', None),
+    'library_search_description': ('search.field.a11y', None),
+    'row_speaker_count': ('phone.row.speakerCount', 'n'),
+    'row_no_speech': ('phone.row.noSpeech', None),
+    'row_resume': ('phone.row.resume', None),
+    'row_try_again': ('common.tryAgain', None),
+    'search_meetings': ('format.searchCount.meetings', 'n'),
 }
 
 

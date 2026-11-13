@@ -32,7 +32,6 @@ enum class StatusBadgeKind(
     Unplayable(R.string.ui_badge_unplayable, StatusBadgeTone.Error, StatusBadgeGlyph.Alert),
     Unreadable(R.string.ui_badge_unreadable, StatusBadgeTone.Error, StatusBadgeGlyph.Alert),
     NewerFormat(R.string.ui_badge_newer, StatusBadgeTone.Outline, StatusBadgeGlyph.Alert),
-    Transcribed(R.string.ui_status_transcribed, StatusBadgeTone.Neutral, StatusBadgeGlyph.Check),
 }
 
 /** Shared badge text only; detailed progress copy remains outside the badge. */

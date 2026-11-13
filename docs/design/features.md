@@ -1,5 +1,7 @@
 # Cassini Android 0.2: features and behavior
 
+Phase 1 Library presentation follows [WP2: Android Library and search](phase1-wp2.md). The descriptions below retain the existing workflow and action contracts.
+
 Status: this document is a binding contract for the implementers of `:data`, `:engine`, `:app` and `:ui`. `docs/architecture.md` gives the storage, the services and the threads. `docs/design/ui.md` gives the visuals, the components and the screen contracts. This document tells what each screen does, where each value comes from, and how to examine it. If the copy is different from a design board, the difference is intentional, and ui.md section 11 lists it.
 
 The tags have these meanings:

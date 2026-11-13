@@ -3,8 +3,8 @@
 
 package io.codemyriad.cassini.ui.library
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
@@ -24,6 +25,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -34,7 +36,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.max
@@ -42,20 +48,16 @@ import io.codemyriad.cassini.ui.R
 import io.codemyriad.cassini.ui.components.Banner
 import io.codemyriad.cassini.ui.components.CassiniSnackbarHost
 import io.codemyriad.cassini.ui.components.DayHeader
+import io.codemyriad.cassini.ui.components.LibraryActionBarMetrics
 import io.codemyriad.cassini.ui.components.LibraryBottomBar
-import io.codemyriad.cassini.ui.components.LibraryTopBar
 import io.codemyriad.cassini.ui.components.NoteRow
 import io.codemyriad.cassini.ui.components.NoteRowAction
 import io.codemyriad.cassini.ui.components.NoteRowUi
-import io.codemyriad.cassini.ui.components.PillSearchField
-import io.codemyriad.cassini.ui.components.PrivacyLine
-import io.codemyriad.cassini.ui.components.ProgressBannerCard
 import io.codemyriad.cassini.ui.components.RecordingBannerCard
 import io.codemyriad.cassini.ui.components.screenContentWidth
 import io.codemyriad.cassini.ui.format.Counts
 import io.codemyriad.cassini.ui.format.Dates
 import io.codemyriad.cassini.ui.format.DayLabel
-import io.codemyriad.cassini.ui.format.Progress
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 
 /**
@@ -63,24 +65,17 @@ import io.codemyriad.cassini.ui.theme.CassiniTheme
  * measured. The bar grows when the Record label wraps (large font scales, a recording), and the list then uses the
  * measured height.
  */
-private val BottomBarHeight = 128.dp
+private val BottomBarHeight = LibraryActionBarMetrics.minimumHeight
 
 /** The bar's top padding: the snackbar sits 24 dp above the Record button, so the bar's height less this. */
-private val BarTopPadding = 40.dp
+private val BarTopPadding = LibraryActionBarMetrics.topPadding
 
 /**
- * The Library (board 00, features.md section 1; ui.md section 8). A `Box` on bg holds one `LazyColumn`: the header,
- * the search field (padding 16 horizontal, top 4) with the privacy line, the activity area (recording card, progress
- * card, banners), then either the day sections (list padding top 6) or, while searching, the flat results. The
- * bottom bar with Import and Record lies over the list, the snackbar 24 dp above Record; the list's bottom padding
- * and the snackbar follow the bar's measured height. The sheets and the dialogs open in their own windows from
- * [LibraryUiState.sheet] and [LibraryUiState.dialog].
- *
- * While a search is open (a query or results), system back clears it ([LibraryEvent.ClearQuery]) before it leaves
- * the app (architecture.md section 6).
- *
- * While [LibraryUiState.loading] the list shows nothing below the privacy line, so the empty banner does not flash
- * before the first rows arrive. The empty and no-match states arrive as banners (LIB_EMPTY, LIB_NO_MATCH).
+ * Phase 1 Library: a native pinned search bar with a hidden All meetings heading, then a scrolling list.
+ * Entry focus stays on the screen until the user enters Search (Navigation3 otherwise focuses the field).
+ * Search filters scroll with results; snippets belong only to search. Recording and import notices remain,
+ * while transcription is represented by its own row. The process-owned transfer dialogs stay in LibraryRoute.
+ * Import/Record and the snackbar float above the measured list bottom inset. Empty search also handles Back.
  */
 @Composable
 fun LibraryScreen(
@@ -89,7 +84,6 @@ fun LibraryScreen(
     modifier: Modifier = Modifier,
     tools: (@Composable () -> Unit)? = null,
 ) {
-    BackHandler(enabled = state.query.isNotEmpty() || state.results != null) { onEvent(LibraryEvent.ClearQuery) }
     val density = LocalDensity.current
     var barPx by remember { mutableIntStateOf(0) }
     val bar: Dp = max(
@@ -99,41 +93,33 @@ fun LibraryScreen(
     // The keyboard covers the bottom bar: the results end above whichever is taller (ui.md section 9).
     val listBottom = max(bar, WindowInsets.ime.asPaddingValues().calculateBottomPadding())
     Box(
-        modifier
+        modifier.focusable()
             .fillMaxSize()
             .background(CassiniTheme.colors.bg)
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
             .screenContentWidth(),
     ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            state = rememberLazyListState(),
-            contentPadding = PaddingValues(bottom = listBottom),
-        ) {
-            item(key = "header", contentType = "header") {
-                LibraryTopBar(
-                    onTrash = { onEvent(LibraryEvent.OpenTrash) },
-                    onSettings = { onEvent(LibraryEvent.OpenSettings) },
-                )
-            }
-            if (tools != null) item(key = "transfers", contentType = "transfers") { tools() }
-            item(key = "search", contentType = "search") { SearchBlock(state.query, state.searchFilters, onEvent) }
-            activity(state, onEvent)
-            if (!state.loading) {
-                val results = state.results
-                if (results != null) results(results, onEvent) else sections(state.sections, onEvent)
+        Column(Modifier.fillMaxSize()) {
+            LibraryPinnedHeader(state, onEvent)
+            LazyColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth().testTag("library-list"),
+                state = rememberLazyListState(),
+                contentPadding = PaddingValues(bottom = listBottom),
+            ) {
+                if (tools != null) item(key = "transfers", contentType = "transfers") { tools() }
+                if (state.query.isNotBlank()) {
+                    item(key = "filters", contentType = "filters") {
+                        Column(Modifier.padding(horizontal = 16.dp)) { SearchFiltersBar(state.searchFilters, onEvent) }
+                    }
+                }
+                activity(state, onEvent)
+                if (!state.loading) {
+                    val results = state.results
+                    if (results != null) results(results, onEvent) else sections(state.sections, onEvent)
+                }
             }
         }
-        LibraryBottomBar(
-            onImport = { onEvent(LibraryEvent.Import) },
-            onRecord = {
-                onEvent(if (state.recording != null) LibraryEvent.ReturnToRecording else LibraryEvent.Record)
-            },
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .onSizeChanged { barPx = it.height },
-            recordingElapsedMs = state.recording?.elapsedMs,
-        )
+        LibraryActions(state, onEvent) { barPx = it }
         CassiniSnackbarHost(
             spec = state.snackbar,
             onTimeout = { onEvent(LibraryEvent.SnackbarTimeout) },
@@ -147,26 +133,9 @@ fun LibraryScreen(
     state.dialog?.let { LibraryDialogWindow(it, onEvent) }
 }
 
-/** The search field and the privacy line under it. IME Search hides the keyboard; the results follow the query. */
-@Composable
-private fun SearchBlock(query: String, filters: SearchFiltersUi, onEvent: (LibraryEvent) -> Unit) {
-    val keyboard = LocalSoftwareKeyboardController.current
-    Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp)) {
-        PillSearchField(
-            query = query,
-            onQueryChange = { onEvent(LibraryEvent.Query(it)) },
-            placeholder = stringResource(R.string.ui_library_search_placeholder),
-            onSearch = { keyboard?.hide() },
-            onClear = { onEvent(LibraryEvent.ClearQuery) },
-        )
-        if (query.isNotBlank()) SearchFiltersBar(filters, onEvent)
-        PrivacyLine(stringResource(R.string.ui_library_privacy))
-    }
-}
-
 /**
- * The activity area (features.md section 1, item 4): the recording card, the progress card and the banners, in this
- * order. The first item sits 14 dp below the privacy line, the next ones 8 dp below the one before.
+ * Existing recording feedback and import/problem banners; no separate transcription progress or privacy card.
+ * The first item sits 14dp below the search/filter region, the next ones 8dp below the one before.
  */
 private fun LazyListScope.activity(state: LibraryUiState, onEvent: (LibraryEvent) -> Unit) {
     var first = true
@@ -187,9 +156,9 @@ private fun LazyListScope.activity(state: LibraryUiState, onEvent: (LibraryEvent
             )
         }
     }
-    state.progress?.let { progress ->
+    state.progress?.takeIf { it.line is ProgressLine.Downloading || it.line is ProgressLine.Checking }?.let { progress ->
         val modifier = top()
-        item(key = "progress", contentType = "progress") { ProgressCard(progress, onEvent, modifier) }
+        item(key = "download-progress", contentType = "progress") { LibraryDownloadCard(progress, onEvent, modifier) }
     }
     state.banners.forEachIndexed { index, spec ->
         val modifier = top()
@@ -205,39 +174,6 @@ private fun LazyListScope.activity(state: LibraryUiState, onEvent: (LibraryEvent
     }
 }
 
-/** The transcription banner with its title and line 2 (features.md section 1, item 4). */
-@Composable
-private fun ProgressCard(progress: ProgressBannerUi, onEvent: (LibraryEvent) -> Unit, modifier: Modifier) {
-    val title = when {
-        progress.title == null -> stringResource(R.string.ui_progress_downloading_models)
-        progress.line is ProgressLine.Downloading || progress.line is ProgressLine.Checking ->
-            stringResource(R.string.ui_progress_getting_ready, progress.title)
-        else -> stringResource(R.string.ui_progress_transcribing, progress.title)
-    }
-    val line = when (val l = progress.line) {
-        is ProgressLine.TimeLeft -> Progress.timeLeftLine(l.timeLeft)
-        ProgressLine.Waiting -> stringResource(R.string.ui_headline_waiting)
-        is ProgressLine.Downloading -> l.part.downloading(l.percent)
-        is ProgressLine.Checking -> stringResource(R.string.ui_banner_dl_checking_title, l.percent)
-    }
-    val text = if (progress.queued > 0) {
-        stringResource(R.string.ui_join_dot, line, Counts.plural(R.plurals.ui_count_more_in_queue, progress.queued))
-    } else {
-        line
-    }
-    ProgressBannerCard(
-        title = title,
-        percent = progress.percent,
-        progress = progress.progress,
-        line = text,
-        onClick = { onEvent(LibraryEvent.OpenProgress) },
-        modifier = modifier,
-        onClickLabel = stringResource(
-            if (progress.noteId == null) R.string.ui_action_open_settings else R.string.ui_action_open_note,
-        ),
-    )
-}
-
 /** The day sections: an overline header per day (top 14 for the first, else 16) and rows 2 dp apart. */
 private fun LazyListScope.sections(sections: List<DaySection>, onEvent: (LibraryEvent) -> Unit) {
     item(key = "list-top", contentType = "list-top") { Spacer(Modifier.height(6.dp)) }
@@ -251,7 +187,14 @@ private fun LazyListScope.sections(sections: List<DaySection>, onEvent: (Library
 
 /** The flat search results, newest first, each with its own day in the meta line. */
 private fun LazyListScope.results(results: List<NoteRowUi>, onEvent: (LibraryEvent) -> Unit) {
-    item(key = "list-top", contentType = "list-top") { Spacer(Modifier.height(6.dp)) }
+    item(key = "results-count", contentType = "results-count") {
+        Text(
+            Counts.plural(R.plurals.ui_search_meetings, results.size),
+            Modifier.padding(horizontal = 20.dp, vertical = 8.dp).semantics { heading() },
+            style = CassiniTheme.type.caption,
+            color = CassiniTheme.colors.text2,
+        )
+    }
     rows(results, day = null, onEvent)
 }
 
@@ -261,7 +204,7 @@ private fun LazyListScope.rows(rows: List<NoteRowUi>, day: DayLabel?, onEvent: (
             row = row,
             day = row.day ?: day ?: DayLabel.Today,
             onAction = { onEvent(row.event(it)) },
-            modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = if (index == 0) 0.dp else 2.dp),
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = if (index == 0) 0.dp else 12.dp),
         )
     }
 }
@@ -273,4 +216,51 @@ private fun NoteRowUi.event(action: NoteRowAction): LibraryEvent = when (action)
     NoteRowAction.TRY_AGAIN -> LibraryEvent.TryAgain(id)
     NoteRowAction.RENAME -> LibraryEvent.Rename(id)
     NoteRowAction.TRASH -> LibraryEvent.Trash(id)
+}
+
+@Composable
+private fun LibraryPinnedHeader(
+    state: LibraryUiState,
+    onEvent: (LibraryEvent) -> Unit,
+) {
+    val keyboard = LocalSoftwareKeyboardController.current
+    val heading = stringResource(R.string.ui_all_meetings)
+    Column(
+        Modifier.fillMaxWidth()
+            .background(CassiniTheme.colors.bg)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .semantics {
+                heading()
+                contentDescription = heading
+            },
+    ) {
+        LibrarySearchBar(
+            query = state.query,
+            hasResults = state.results != null,
+            onQuery = { onEvent(LibraryEvent.Query(it)) },
+            onClear = { onEvent(LibraryEvent.ClearQuery) },
+            onClose = { onEvent(LibraryEvent.ClearQuery) },
+            onSearch = { keyboard?.hide() },
+            onTrash = { onEvent(LibraryEvent.OpenTrash) },
+            onSettings = { onEvent(LibraryEvent.OpenSettings) },
+        )
+    }
+}
+
+@Composable
+private fun androidx.compose.foundation.layout.BoxScope.LibraryActions(
+    state: LibraryUiState,
+    onEvent: (LibraryEvent) -> Unit,
+    onHeight: (Int) -> Unit,
+) {
+    LibraryBottomBar(
+        onImport = { onEvent(LibraryEvent.Import) },
+        onRecord = {
+            onEvent(if (state.recording != null) LibraryEvent.ReturnToRecording else LibraryEvent.Record)
+        },
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .onSizeChanged { onHeight(it.height) },
+        recordingElapsedMs = state.recording?.elapsedMs,
+    )
 }

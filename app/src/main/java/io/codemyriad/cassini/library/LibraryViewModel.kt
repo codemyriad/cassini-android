@@ -29,6 +29,7 @@ import io.codemyriad.cassini.ui.library.LibraryDialog
 import io.codemyriad.cassini.ui.library.LibraryEvent
 import io.codemyriad.cassini.ui.library.LibrarySheet
 import io.codemyriad.cassini.ui.library.LibraryUiState
+import io.codemyriad.cassini.ui.library.ProgressLine
 import io.codemyriad.cassini.ui.library.SearchDateUi
 import io.codemyriad.cassini.ui.library.SearchFiltersUi
 import io.codemyriad.cassini.ui.note.ExportKind
@@ -247,10 +248,12 @@ class LibraryViewModel(
         val now = Instant.now(clock)
         val zone = listing.environment.zone
         val recording = live.recording
+        val progress = LibraryMapping.progress(live.processing)
         val context = RowContext(
             activeNoteId = activeNoteId(recording),
             recordingElapsedMs = (recording as? RecordingState.Active)?.elapsedMs ?: 0,
             runningNoteId = live.processing.running?.noteId,
+            transcriptionMinutes = LibraryMapping.badgeMinutes((progress?.line as? ProgressLine.TimeLeft)?.timeLeft),
         )
         val rows = listing.rows.orEmpty()
         val (searched, found) = listing.search
@@ -269,7 +272,7 @@ class LibraryViewModel(
             query = listing.query,
             searchFilters = listing.environment.filters,
             recording = LibraryMapping.recordingPill(recording),
-            progress = LibraryMapping.progress(live.processing),
+            progress = progress,
             banners = Notices.library(live.facts, facts),
             sections = mapped.sections,
             results = mapped.results,

@@ -69,7 +69,7 @@ class LargeFontScaleTest {
             }
         }
         val list = rule.onNode(hasTestTag(LIST)).getUnclippedBoundsInRoot()
-        for (suffix in listOf("· Resume", "· No speech")) {
+        for (suffix in listOf("Resume", "No speech")) {
             val node = rule.onNode(hasText(suffix), useUnmergedTree = true)
             // The first line holds the whole suffix, and the row gives it the width that line needs (px).
             val layout = node.textLayout()

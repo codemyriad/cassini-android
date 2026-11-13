@@ -210,7 +210,7 @@ class ControlsSemanticsTest {
         timer.assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.LiveRegion))
         rule.onNodeWithContentDescription("Microphone level, last 7 seconds")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Image))
-        rule.onNodeWithText("Library").assertHasClickAction().assertTouchAtLeast48()
+        rule.onNodeWithText("All meetings").assertHasClickAction().assertTouchAtLeast48()
         rule.onNodeWithText("Finish").assertHasClickAction().assertTouchAtLeast48()
         rule.onNodeWithContentDescription("Pause recording").assertTouchAtLeast48().performClick()
         rule.runOnIdle {

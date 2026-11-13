@@ -1,0 +1,63 @@
+{
+  "source_sha256": "38b639fe49123ee236239a523183815505c33b826b135f63b65d691df7caf61e",
+  "upstream": "5e0c34e0f1bb390298dabdf4eedc494e933fd329",
+  "images": [
+    {
+      "density": "mdpi",
+      "width": 37,
+      "height": 24,
+      "sha256": "30b9a47b79fa90dad6290ccd104b895b01681e86398c3f7685008b00c5c2dbbf",
+      "alpha": [
+        0,
+        255
+      ],
+      "path": "ui/src/main/res/drawable-mdpi/ui_saturn_nav.png"
+    },
+    {
+      "density": "hdpi",
+      "width": 56,
+      "height": 36,
+      "sha256": "1cf57ccb6fc2323313c6ff4b5a5488bfeeced59caa447566d85d08144b97dc96",
+      "alpha": [
+        0,
+        255
+      ],
+      "path": "ui/src/main/res/drawable-hdpi/ui_saturn_nav.png"
+    },
+    {
+      "density": "xhdpi",
+      "width": 74,
+      "height": 48,
+      "sha256": "180f465ffc14b95b68d8feb53f6a31fb81f37bd5d2a2c006fcbe8fc5a44aa75f",
+      "alpha": [
+        0,
+        255
+      ],
+      "path": "ui/src/main/res/drawable-xhdpi/ui_saturn_nav.png"
+    },
+    {
+      "density": "xxhdpi",
+      "width": 111,
+      "height": 72,
+      "sha256": "eac847eaebf11e33b8b42d1ec17101c03b5c106151941307f358e95d162fe47d",
+      "alpha": [
+        0,
+        255
+      ],
+      "path": "ui/src/main/res/drawable-xxhdpi/ui_saturn_nav.png"
+    },
+    {
+      "density": "xxxhdpi",
+      "width": 148,
+      "height": 96,
+      "sha256": "0f0b3e67ada322af87aa884952ce76fc2e9da8fad74de61e7cf90b05bd0261a8",
+      "alpha": [
+        0,
+        255
+      ],
+      "path": "ui/src/main/res/drawable-xxxhdpi/ui_saturn_nav.png"
+    }
+  ],
+  "visual_inspection": "All five density exports inspected at original resolution; approved canonical SVG gradients and transparency retained.",
+  "renderer": "macOS WebKit WKWebView transparent 184x120 viewport; see scripts/render-nav-mark.swift"
+}

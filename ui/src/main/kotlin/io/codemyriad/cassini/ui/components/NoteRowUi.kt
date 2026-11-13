@@ -67,6 +67,7 @@ data class NoteRowUi(
     val status: NoteStatusUi,
     val preview: Highlighted? = null,
     val highlighted: Boolean = false,
+    val transcriptionMinutes: Long? = null,
     val recordedLabel: String? = null,
 )
 

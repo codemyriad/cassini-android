@@ -16,14 +16,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import io.codemyriad.cassini.ui.R
-import io.codemyriad.cassini.ui.theme.CassiniIcon
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import io.codemyriad.cassini.ui.theme.Glyph
 
@@ -78,43 +75,11 @@ fun CassiniTopBar(
     }
 }
 
-/**
- * The Library header: logo 28/1.6 + 10 dp + "Notes" (`libraryTitle`, a heading), Trash and Settings at the end.
- * Board padding 20/16/8 with 44 dp buttons, compensated to 18/14/6; the logo keeps its 16 dp inset.
- */
-@Composable
-fun LibraryTopBar(onTrash: () -> Unit, onSettings: () -> Unit, modifier: Modifier = Modifier) {
-    val c = CassiniTheme.colors
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(start = 14.dp, end = 14.dp, top = 18.dp, bottom = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Spacer(Modifier.width(2.dp))
-        CassiniIcon(Glyph.Logo, 28.dp, 1.6f, c.ink, null)
-        Spacer(Modifier.width(10.dp))
-        Text(
-            text = stringResource(R.string.ui_library_title),
-            modifier = Modifier
-                .weight(1f)
-                .semantics { heading() },
-            style = CassiniTheme.type.libraryTitle,
-            color = c.ink,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        IconButton44(Glyph.Trash, stringResource(R.string.ui_library_trash), onTrash, stroke = 1.7f)
-        IconButton44(Glyph.Settings, stringResource(R.string.ui_library_settings), onSettings, stroke = 1.7f)
-    }
-}
-
 @Preview
 @Composable
 internal fun CassiniTopBarPreview() {
     CassiniTheme {
         Column(Modifier.background(CassiniTheme.colors.bg)) {
-            LibraryTopBar(onTrash = {}, onSettings = {})
             CassiniTopBar(title = "Settings", onBack = {}, backLabel = "Back to library")
             CassiniTopBar(
                 title = "Weekly product sync",
