@@ -41,6 +41,13 @@ class DownloadTests(unittest.TestCase):
             DOWNLOADS.network(operation, wait=wait)
         operation.assert_called_once()
 
+    def test_urlerror_socket_reset_recovers_within_cap(self):
+        reset = DOWNLOADS.urllib.error.URLError(ConnectionResetError('reset by peer'))
+        operation = Mock(side_effect=[reset, b'good'])
+        wait = Mock()
+        self.assertEqual(DOWNLOADS.network(operation, wait=wait), b'good')
+        wait.assert_called_once_with(15)
+
     def test_persistent_api_failure_stops_at_cap_and_stays_failed(self):
         error = DOWNLOADS.urllib.error.HTTPError('https://api.github.com', 504, 'gateway', {}, None)
         operation = Mock(side_effect=error)
@@ -155,6 +162,40 @@ class DownloadTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     DOWNLOADS.pinned_file(pin, target)
             self.assertFalse(target.exists())
+
+    def test_pinned_file_falls_back_to_mirror_on_edge_404_and_still_verifies_hash(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            body = b'<project/>'
+            digest = hashlib.sha256(body).hexdigest()
+            pin = dict(
+                url='https://repo.maven.apache.org/maven2/compiler.pom',
+                mirrors=['https://maven-central.storage-download.googleapis.com/maven2/compiler.pom'],
+                size=len(body),
+                sha256=digest,
+            )
+            edge_404 = DOWNLOADS.urllib.error.HTTPError(pin['url'], 404, 'Not Found', {}, None)
+            wait = Mock()
+            with patch.object(DOWNLOADS.urllib.request, 'urlopen', side_effect=[edge_404, io.BytesIO(body)]) as fetch:
+                DOWNLOADS.pinned_file(pin, root / 'compiler.pom', wait=wait)
+            self.assertEqual((root / 'compiler.pom').read_bytes(), body)
+            self.assertEqual([call.args[0] for call in fetch.call_args_list], [pin['url'], pin['mirrors'][0]])
+            wait.assert_not_called()
+
+            # Tampered mirror bytes are still refused before publication.
+            tampered = root / 'tampered.pom'
+            with patch.object(DOWNLOADS.urllib.request, 'urlopen', side_effect=[edge_404, io.BytesIO(b'tampered!!')]):
+                with self.assertRaises(ValueError):
+                    DOWNLOADS.pinned_file(pin, tampered, wait=wait)
+            self.assertFalse(tampered.exists())
+
+            # When all mirrors fail, the final error surfaces.
+            missing = root / 'missing.pom'
+            mirror_404 = DOWNLOADS.urllib.error.HTTPError(pin['mirrors'][0], 404, 'Not Found', {}, None)
+            with patch.object(DOWNLOADS.urllib.request, 'urlopen', side_effect=[edge_404, mirror_404]):
+                with self.assertRaises(DOWNLOADS.urllib.error.HTTPError):
+                    DOWNLOADS.pinned_file(pin, missing, wait=wait)
+            self.assertFalse(missing.exists())
 
     def test_pinned_source_reuses_verified_file_without_network(self):
         with tempfile.TemporaryDirectory() as tmp:

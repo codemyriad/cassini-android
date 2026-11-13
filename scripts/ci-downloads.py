@@ -22,7 +22,7 @@ def network(operation, *, wait=time.sleep):
         except urllib.error.HTTPError as error:
             if error.code not in {429, 500, 502, 503, 504} or attempt == ATTEMPTS:
                 raise
-        except (TimeoutError, ConnectionError):
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
             if attempt == ATTEMPTS:
                 raise
         delay = 15 * 2 ** (attempt - 1)
@@ -190,17 +190,25 @@ def input_pin(name):
     return json.loads((ROOT / 'scripts/ci-download-pins.json').read_text())[name]
 
 
-def pinned_file(pin, target):
+def pinned_file(pin, target, *, wait=time.sleep):
     if target.exists():
         if sha(target) != pin['sha256']:
             raise ValueError('Cached pinned input SHA-256 mismatch')
         return
+    urls = [pin['url'], *pin.get('mirrors', ())]
+    body = None
+    for index, url in enumerate(urls):
+        def fetch(current=url):
+            with urllib.request.urlopen(current, timeout=60) as response:
+                return response.read(pin.get('size', 512 * 1024 * 1024) + 1)
 
-    def fetch():
-        with urllib.request.urlopen(pin['url'], timeout=60) as response:
-            return response.read(pin.get('size', 512 * 1024 * 1024) + 1)
-
-    body = network(fetch)
+        try:
+            body = network(fetch, wait=wait)
+            break
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as error:
+            if index == len(urls) - 1:
+                raise
+            print(f'D66 pinned download fallback from {url} ({error}) to {urls[index + 1]}', flush=True)
     if ((pin.get('size') is not None and len(body) != pin['size'])
             or len(body) > 512 * 1024 * 1024 or hashlib.sha256(body).hexdigest() != pin['sha256']):
         raise ValueError('Pinned input size/SHA-256 mismatch')
