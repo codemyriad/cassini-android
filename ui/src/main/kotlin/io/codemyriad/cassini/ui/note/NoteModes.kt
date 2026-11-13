@@ -4,10 +4,8 @@
 package io.codemyriad.cassini.ui.note
 
 import androidx.compose.foundation.gestures.scrollBy
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -24,16 +22,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -42,8 +38,6 @@ import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.R
 import io.codemyriad.cassini.ui.banner.BannerSpec
 import io.codemyriad.cassini.ui.components.Banner
-import io.codemyriad.cassini.ui.components.DashedTag
-import io.codemyriad.cassini.ui.components.ProcessingCard
 import io.codemyriad.cassini.ui.components.ProcessingCardUi
 import io.codemyriad.cassini.ui.components.QueuedCard
 import io.codemyriad.cassini.ui.components.SuggestionCard
@@ -68,12 +62,6 @@ private val FirstHeaderLift = 15.5.dp
 /** Board 02: 14 dp between the draft's turns (the article's gap). */
 private val DraftTurnGap = 14.dp
 
-/**
- * The card stays fixed above the draft while at least this much space stays for the draft below it: about six
- * draft lines. A share of the space is not used, because on a 16:9 phone (731 dp) the card is more than half of it.
- */
-private val MinDraftSpace = 160.dp
-
 /** The large step that scrolls the draft to its end; the list stops at the end. */
 private const val TO_END_PX = 1_000_000f
 
@@ -86,7 +74,7 @@ private val TopItemPadding = Modifier.padding(start = 16.dp, top = 8.dp, end = 1
  *
  * - Audio only and Unplayable: the banners.
  * - Queued: the Queued card and the banners; over a document, the Read & listen content follows.
- * - Processing: the progress card, the banners and the draft (board 02).
+ * - Processing: the compact status, optional details sheet, banners and live draft (WP5).
  * - Paused: the pause banner and the read-only draft.
  * - Failed: the failure banner and the draft so far; over a document, the Read & listen content follows.
  *
@@ -166,14 +154,9 @@ private fun ColumnScope.DocumentBelow(
 }
 
 /**
- * The draft list (board 02). The progress [card] (margin 8/16; null in Paused and Failed) stays fixed above a
- * LazyColumn with the banners, the "Draft transcript" header and one item per turn, keyed by its id, as on the
- * board. When the card leaves less than [MinDraftSpace] for the draft (a very short screen, a large font scale), it
- * is the first item of the list instead, so the card and the draft scroll together and the draft keeps some space.
- *
- * Auto-follow (features.md section 3.1): new text scrolls the end of the draft into view. Only the list scrolls, so
- * a fixed card stays in view. A scroll that ends above the end pauses it, and a scroll back to the end resumes it.
- * Opening the screen does not scroll.
+ * One draft list survives Processing, Paused and Failed. The compact status remains above the list;
+ * the details sheet uses current state and is never owned by a lazy item. New text follows only while
+ * the user is at the end; opening details or stopping/resuming does not move the draft.
  */
 @Composable
 private fun ColumnScope.DraftList(
@@ -202,43 +185,39 @@ private fun ColumnScope.DraftList(
                 }
             }
     }
-    // The heights of the space and of the card with its margin. Before the first measurement the card is fixed.
-    var areaPx by remember { mutableIntStateOf(0) }
-    var cardPx by remember { mutableIntStateOf(0) }
-    val minDraftPx = with(LocalDensity.current) { MinDraftSpace.roundToPx() }
-    val pinned = areaPx == 0 || areaPx - cardPx >= minDraftPx
-    val cardItem: @Composable () -> Unit = {
+    var detailsOpen by rememberSaveable(state.noteId) { mutableStateOf(false) }
+    LaunchedEffect(card != null) {
+        if (card == null) detailsOpen = false
+    }
+    Column(Modifier.weight(1f).fillMaxWidth()) {
         if (card != null) {
-            ProcessingCard(
-                state = card,
-                onStop = { onEvent(NoteEvent.Stop) },
+            TranscribingStatus(
+                progress = card,
                 stopBusy = (state.mode as? NoteMode.Processing)?.stopBusy == true,
-                modifier = Modifier
-                    .onSizeChanged { cardPx = it.height }
-                    .then(TopItemPadding),
-                notificationsOff = state.notificationsOff,
-                onDownloadAction = { action ->
-                    card.download?.let { onEvent(NoteEvent.BannerAction(it.banner().id, action)) }
-                },
+                onDetails = { detailsOpen = true },
+                onStop = { onEvent(NoteEvent.Stop) },
             )
         }
+        DraftItems(state, listState, bottom, onEvent)
     }
-    Column(
-        Modifier
-            .weight(1f)
-            .fillMaxWidth()
-            .onSizeChanged { areaPx = it.height },
-    ) {
-        if (pinned) cardItem()
-        DraftItems(state, cardItem.takeUnless { pinned || card == null }, listState, bottom, onEvent)
+    if (detailsOpen && card != null) {
+        TranscribingDetails(
+            progress = card,
+            stopBusy = (state.mode as? NoteMode.Processing)?.stopBusy == true,
+            notificationsOff = state.notificationsOff,
+            onStop = { onEvent(NoteEvent.Stop) },
+            onDownloadAction = { action ->
+                card.download?.let { onEvent(NoteEvent.BannerAction(it.banner().id, action)) }
+            },
+            onDismiss = { detailsOpen = false },
+        )
     }
 }
 
-/** The scrolling part of [DraftList]: the [card] when it is not fixed, the banners, the header and the turns. */
+/** The scrolling banners, transcript heading and keyed turns below the compact status. */
 @Composable
 private fun ColumnScope.DraftItems(
     state: NoteUiState,
-    card: (@Composable () -> Unit)?,
     listState: LazyListState,
     bottom: Dp,
     onEvent: (NoteEvent) -> Unit,
@@ -247,11 +226,11 @@ private fun ColumnScope.DraftItems(
     LazyColumn(
         modifier = Modifier
             .weight(1f)
-            .fillMaxWidth(),
+            .fillMaxWidth()
+            .testTag("transcribing-draft"),
         state = listState,
         contentPadding = PaddingValues(bottom = 16.dp + bottom),
     ) {
-        if (card != null) item(key = "card", contentType = "card") { card() }
         // Ids are unique in a list (BannerSpec); the index only keeps a duplicate from crashing the list.
         state.banners.forEachIndexed { index, spec ->
             item(key = "banner-$index-${spec.id}", contentType = "banner") { NoteBanner(spec, onEvent, TopItemPadding) }
@@ -265,34 +244,22 @@ private fun ColumnScope.DraftItems(
     }
 }
 
-/**
- * The draft header (board 02): padding 16/20/6, "Draft transcript" (`button`, a heading) and the dashed tag
- * "Words may still change" at the end. When both do not fit on one line (Italian, large fonts) the tag goes to a
- * second line, 4 dp below.
- */
+/** The transcript-so-far heading scrolls with the text; unsettled words carry their own lighter ink. */
 @Composable
 private fun DraftHeader() {
-    FlowRow(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 20.dp, top = 16.dp, end = 20.dp, bottom = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-        itemVerticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = stringResource(R.string.ui_draft_title),
-            modifier = Modifier.semantics { heading() },
-            style = CassiniTheme.type.button,
-            color = CassiniTheme.colors.ink,
-        )
-        DashedTag(stringResource(R.string.ui_draft_tag))
-    }
+    Text(
+        text = stringResource(R.string.ui_tx_transcript),
+        modifier = Modifier.fillMaxWidth()
+            .padding(start = 20.dp, top = 16.dp, end = 20.dp, bottom = 6.dp)
+            .semantics { heading() },
+        style = CassiniTheme.type.button,
+        color = CassiniTheme.colors.ink,
+    )
 }
 
 /**
  * One draft turn (board 02), 20 dp from the sides: the speaker header (a 48 dp button when renaming is allowed) or
- * the suggestion card, then the paragraph in `draft` text3 with the unsettled words in text4. The words are not
+ * the suggestion card, then the paragraph with the unsettled words in lighter ink. The words are not
  * links. Turns are 14 dp apart; the 48 dp header adds about 7 dp per turn (ui.md section 11, accepted deviation
  * 2), except the first, which reaches up over the header row's padding ([FirstHeaderLift]).
  */
