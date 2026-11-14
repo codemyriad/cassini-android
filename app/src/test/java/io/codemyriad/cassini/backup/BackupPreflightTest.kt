@@ -13,6 +13,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -30,6 +31,9 @@ import java.util.concurrent.CopyOnWriteArrayList
 @RunWith(RobolectricTestRunner::class)
 @Config(shadows = [BackupPreflightTest.EmissionShadow::class])
 class BackupPreflightTest {
+    // A @Config shadow's @Resetter is not run between tests, so every test starts from an empty emission list.
+    @Before fun clearEmissions() = EmissionShadow.files.clear()
+
     @Test fun quotaDoesNotShortCircuitMeasurementAndTheInventoryIsEmittedLast() = runBlocking {
         val app: CassiniApplication = ApplicationProvider.getApplicationContext()
         val agent = Robolectric.setupBackupAgent(CassiniBackupAgent::class.java)
