@@ -33,7 +33,7 @@ class CassiniBackupAgent : BackupAgent() {
     override fun onFullBackup(data: FullBackupDataOutput) {
         requireQuiescent()
         val api = Build.VERSION.SDK_INT
-        val flags = if (api >= BackupChoices.TRANSPORT_FLAGS_API) data.transportFlags else 0
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) data.transportFlags else 0
         val current = choices.readBlocking()
         if (!current.permits(api, flags, BuildConfig.CLOUD_BACKUP_ENABLED)) {
             // Never emit library bytes. Binder exceptions do not guarantee transport failure.
