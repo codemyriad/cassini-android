@@ -69,7 +69,7 @@ class LibraryFlowTest {
     @After fun tearDown() = runBlocking { Background.reset() }
 
     @Test fun importSearchActionsTrashAndUndo() {
-        rule.waitText(rule.text(UiR.string.ui_banner_lib_empty_title))
+        rule.waitText(rule.text(UiR.string.ui_hero_title))
 
         // ACTION_VIEW: the note opens over the Library.
         val clip = Background.assetCopy("fleurs-it-short.wav")

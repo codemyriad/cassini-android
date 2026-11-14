@@ -105,6 +105,9 @@ internal class FakeLibraryPorts : LibraryPorts {
     override val recording: MutableStateFlow<RecordingState> = MutableStateFlow(RecordingState.Idle)
     override val notices = MutableStateFlow(NoticeFacts())
     override val voiceModelReady = MutableStateFlow(true)
+
+    /** The shipped default: cloud backup off in every build (docs/backup.md), transfer on. */
+    override val backupReach = MutableStateFlow(BackupReach(cloud = false, transfer = true))
     var transcribeOutcome: TranscribeOutcome = TranscribeOutcome.Queued(changed = true)
     val actions = mutableListOf<String>()
     val searches = mutableListOf<String>()

@@ -158,8 +158,8 @@ class AppShellTest {
     @Test fun backOnRecordingMinimisesItAndTheLibraryShowsTheCard() {
         shadowOf(app as Application).grantPermissions(Manifest.permission.RECORD_AUDIO)
         // The Library state is built off the main thread: wait for the loaded Library.
-        waitFor(hasText("Record"))
-        rule.onNodeWithText("Record").performClick()
+        waitFor(hasContentDescription(RECORD))
+        rule.onNodeWithContentDescription(RECORD).performClick()
         // Mount RecordingRoute and run its onEnter before blocking the test thread for the controller event.
         rule.waitForIdle()
         val started = runBlocking {
@@ -237,7 +237,7 @@ class AppShellTest {
         Espresso.pressBack()
 
         shadowOf(app as Application).grantPermissions(Manifest.permission.RECORD_AUDIO)
-        rule.onNodeWithText("Record").performClick()
+        rule.onNodeWithContentDescription(RECORD).performClick()
         rule.onNodeWithText("Stop").assertExists()
         assertEquals("Recording is dark in both themes", false, darkIcons())
         Espresso.pressBack()
@@ -500,6 +500,9 @@ class AppShellTest {
         const val HALF = 0.5f
         const val SECOND_TURN = "so start now"
         const val TIMEOUT_MS = 10_000L
+
+        // The bottom bar Record button (its label is merged into this description); the empty Library has no banner Record.
+        const val RECORD = "Record a new note"
         const val PLAYER_DURATION_MS = 60_000L
         const val STATUS_PX = 60
         const val NAVIGATION_PX = 96
