@@ -32,8 +32,11 @@ abstract class CassiniDatabase : RoomDatabase() {
     companion object {
         const val VERSION = 4
 
+        /** Schema 3: the file-derived speaker colour slot. */
+        private const val SPEAKER_COLOUR_VERSION = 3
+
         /** Stars are new per-device state: an empty table, every existing row untouched. */
-        val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, VERSION) {
+        val MIGRATION_3_4 = object : androidx.room.migration.Migration(SPEAKER_COLOUR_VERSION, VERSION) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL(
                     "CREATE TABLE IF NOT EXISTS `note_stars` (`note_id` TEXT NOT NULL, `starred_at` INTEGER NOT NULL, " +
@@ -44,7 +47,7 @@ abstract class CassiniDatabase : RoomDatabase() {
         }
 
         /** Colour is a file fact; refresh derived rows without touching authoritative notes or jobs. */
-        val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
+        val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, SPEAKER_COLOUR_VERSION) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE speakers ADD COLUMN colour_index INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("UPDATE notes SET document_signature = NULL WHERE audio_kind = 'DOCUMENT'")
