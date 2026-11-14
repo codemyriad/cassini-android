@@ -201,7 +201,8 @@ class ImportRepositoryTest {
         val opus = created(importer().import(input(fleurs("opus"), "b.opus"), checkType = true))
         val m4a = created(importer().import(input(fleurs("m4a"), "d.m4a"), checkType = true))
         val mp3 = created(importer(typed(fleurs("mp3"), "e.mp3", "audio/mpeg")).import(provided, checkType = true))
-        assertEquals(4, setOf(wav, opus, m4a, mp3).size)
+        val flac = created(importer().import(input(fleurs("flac"), "f.flac"), checkType = true))
+        assertEquals(5, setOf(wav, opus, m4a, mp3, flac).size)
         // The same Ogg Opus bytes as .ogg pass the stream check and find the note they already are.
         assertEquals(ImportOutcome.Existing(opus), importer().import(input(fleurs("opus"), "c.ogg"), checkType = true))
     }
@@ -211,6 +212,7 @@ class ImportRepositoryTest {
             rejectedOpen(importer().import(input(fleurs("wav"), name), checkType = true))
         }
         rejectedOpen(importer(typed(fleurs("wav"), "a.wav", "video/x-wav")).import(provided, checkType = true))
+        // Native FLAC is accepted only as .flac: an Ogg named .ogg under a FLAC MIME type is not.
         rejectedOpen(importer(typed(fleurs("opus"), "a.ogg", "audio/flac")).import(provided, checkType = true))
         // Without an extension the MIME type decides; Opus/Ogg then still needs the stream check.
         rejectedOpen(importer(typed(fleurs("mp3"), "", "audio/ogg")).import(provided, checkType = true))
@@ -237,6 +239,108 @@ class ImportRepositoryTest {
         assertEquals(emptyList<String>(), noteDirs())
         assertEquals(0, h.db.notes().noteCount())
         created(importer(typed(fleurs("opus"), "voice.ogg", "application/ogg")).import(provided, checkType = true))
+    }
+
+    @Test fun aNativeFlacBecomesSourceFlacAfterTheHeaderCheck() = runTest {
+        val id = created(importer().import(input(fleurs("flac"), "Studio take.flac"), checkType = true))
+
+        val row = assertPlain(id, "source.flac", FLEURS_WAV_MS, "Studio take")
+        assertEquals(sha256(fleurs("flac")), row.sourceSha256)
+        assertEquals(sha256(fleurs("flac")), sha256(File(h.dir(id), "source.flac")))
+        assertEquals(1, probe.calls.get())
+        // A provider's FLAC under either MIME type, and an extensionless share: same bytes, the note they already are.
+        for (mime in listOf("audio/flac", "audio/x-flac")) {
+            val outcome = importer(typed(fleurs("flac"), "take.flac", mime)).import(provided, checkType = true)
+            assertEquals(mime, ImportOutcome.Existing(id), outcome)
+        }
+        val shared = importer(typed(fleurs("flac"), "Voice memo", "audio/flac")).import(provided, checkType = true)
+        assertEquals(ImportOutcome.Existing(id), shared)
+    }
+
+    @Test fun anExtensionlessFlacShareGetsTheFlacExtension() = runTest {
+        val id = created(importer(typed(fleurs("flac"), "", "audio/x-flac")).import(provided, checkType = true))
+        assertEquals("source.flac", h.row(id).audioFile)
+    }
+
+    @Test fun checkedFlacMustBeANativeStream() = runTest {
+        val flac = fleurs("flac").readBytes()
+        val bad = mapOf(
+            "truncated.flac" to flac.copyOf(ImportTypes.FLAC_MIN_PROBE_BYTES - 1),
+            "magic only.flac" to "fLaC".toByteArray(),
+            "zero rate.flac" to flac.copyOf().also { bytes ->
+                bytes[18] = 0
+                bytes[19] = 0
+                bytes[20] = (bytes[20].toInt() and 0x0f).toByte()
+            },
+            "padding first.flac" to flac.copyOf().also { it[4] = 1 },
+            "short info.flac" to flac.copyOf().also { it[7] = 33 },
+            "ogg flac.flac" to oggFlac(flac),
+            "id3.flac" to "ID3".toByteArray() + byteArrayOf(4, 0, 0, 0, 0, 0, 0) + flac,
+            "opus.flac" to fleurs("opus").readBytes(),
+            "mp3.flac" to fleurs("mp3").readBytes(),
+        )
+        for ((name, bytes) in bad) {
+            val file = File(inputs, name).apply { writeBytes(bytes) }
+            val outcome = importer().import(Uri.fromFile(file), checkType = true)
+            val open = outcome is ImportOutcome.Rejected && outcome.failure == Failure.OPEN
+            assertTrue("$name: expected OPEN, got $outcome", open)
+        }
+        assertEquals("nothing reached the probe", 0, probe.calls.get())
+        assertEquals(emptyList<String>(), noteDirs())
+        assertEquals(0, h.db.notes().noteCount())
+    }
+
+    @Test fun oggFlacMimeTypesAreRejectedBeforeTheStreamIsOpened() = runTest {
+        for (mime in listOf("audio/x-flac+ogg", "audio/x-oggflac", "audio/ogg", "application/ogg")) {
+            var opened = false
+            val source = object : ImportSource {
+                override fun describe(uri: Uri) = ImportSource.Description("take.flac", 1L, mime)
+
+                override fun open(uri: Uri) = fleurs("flac").inputStream().also { opened = true }
+            }
+            rejectedOpen(importer(source).import(provided, checkType = true))
+            assertFalse(mime, opened)
+        }
+        // Ogg FLAC MIME types are refused whatever the name says.
+        val oggFlac = typed(fleurs("opus"), "voice.ogg", "audio/x-flac+ogg")
+        rejectedOpen(importer(oggFlac).import(provided, checkType = true))
+        rejectedOpen(importer(typed(fleurs("flac"), "", "audio/x-oggflac")).import(provided, checkType = true))
+        assertEquals(emptyList<String>(), noteDirs())
+    }
+
+    @Test fun aLargeFakeFlacIsRejectedFromItsHeadWithoutACopy() = runTest {
+        // OPEN (not LARGE, not SPACE) after reading only the 42 probe bytes.
+        for (limits in listOf(ImportLimits(), ImportLimits(usableSpace = { 0L }))) {
+            val stream = CountingStream(oggFlac(fleurs("flac").readBytes()), Limits.MAX_IMPORT_BYTES + 1)
+            val source = object : ImportSource {
+                override fun describe(uri: Uri) = ImportSource.Description("take.flac", stream.length, "audio/flac")
+
+                override fun open(uri: Uri) = stream
+            }
+            rejectedOpen(importer(source, limits).import(provided, checkType = true))
+            assertTrue("read ${stream.consumed} bytes", stream.consumed <= ImportTypes.FLAC_MIN_PROBE_BYTES)
+            assertEquals(emptyList<String>(), noteDirs())
+        }
+    }
+
+    @Test fun aValidFlacStillMeetsTheSizeAndSpaceLimits() = runTest {
+        val big = typed(fleurs("flac"), "take.flac", "audio/flac")
+        val large = object : ImportSource by big {
+            override fun describe(uri: Uri) = big.describe(uri).copy(size = Limits.MAX_IMPORT_BYTES + 1)
+        }
+        val outcome = importer(large).import(provided, checkType = true)
+        val tooLarge = outcome is ImportOutcome.Rejected && outcome.failure == Failure.LARGE
+        assertTrue("expected LARGE, got $outcome", tooLarge)
+        val full = importer(big, ImportLimits(usableSpace = { 0L })).import(provided, checkType = true)
+        assertTrue("expected SPACE, got $full", full is ImportOutcome.Rejected && full.failure == Failure.SPACE)
+        assertEquals(emptyList<String>(), noteDirs())
+    }
+
+    /** [flac]'s native stream mapped into Ogg (RFC 9639 appendix): an OggS BOS page of 0x7F "FLAC" and the header. */
+    private fun oggFlac(flac: ByteArray): ByteArray {
+        val packet = byteArrayOf(0x7f) + "FLAC".toByteArray() + byteArrayOf(1, 0, 0, 1) + flac.copyOf(42)
+        val header = "OggS".toByteArray() + byteArrayOf(0, 2) + ByteArray(20) + byteArrayOf(1, packet.size.toByte())
+        return header + packet
     }
 
     @Test fun anExtensionlessOpusShareIsImportedAfterTheStreamCheck() = runTest {

@@ -35,12 +35,15 @@ metadata = {
     "source": BASE, "revision": REVISION, "filename": FILENAME,
     "reference": row[2], "license": "CC-BY-4.0", "attribution": "Google FLEURS contributors (https://huggingface.co/datasets/google/fleurs)",
     "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
-    "modifications": "Extracted from dev.tar.gz and converted with ffmpeg to 16 kHz mono PCM16 WAV, AAC (M4A), MP3 and "
-    "Opus for decoder checks. Nothing was cut or edited.",
+    "modifications": "Extracted from dev.tar.gz and converted with ffmpeg to 16 kHz mono PCM16 WAV, AAC (M4A), MP3, "
+    "Opus and FLAC for decoder checks. Nothing was cut or edited.",
 }
 for suffix, options in {
     "wav": ["-c:a", "pcm_s16le"], "m4a": ["-c:a", "aac", "-b:a", "96k"],
     "mp3": ["-c:a", "libmp3lame", "-b:a", "96k"], "opus": ["-c:a", "libopus", "-b:a", "48k"],
+    "flac": [
+        "-c:a", "flac", "-compression_level", "8", "-fflags", "+bitexact", "-flags", "+bitexact", "-map_metadata", "-1",
+    ],
 }.items():
     command = ["ffmpeg", "-v", "error", "-y"]
     acceleration = ["-hwaccel", "vaapi", "-hwaccel_device", "/dev/dri/renderD128", "-hwaccel_output_format", "vaapi"]

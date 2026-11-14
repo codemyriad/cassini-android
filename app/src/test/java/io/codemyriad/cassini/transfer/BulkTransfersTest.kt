@@ -92,7 +92,7 @@ class BulkTransfersTest {
         val flac = folder.newFile("take.flac").apply { writeBytes(wav.readBytes()) }
         graph.transfers.import(listOf(flac.toUri(), wav.toUri()))
         assertEquals(1, finished().summary?.imported)
-        // The undecided type is refused by the import-types check and keeps "Needs attention"; the WAV's card went.
+        // A WAV renamed .flac fails the FLAC header check (D102) and keeps "Needs attention"; the WAV's card went.
         assertEquals(listOf("take.flac" to Failure.OPEN), cards().map { it.name to it.failure })
         // The same WAV again is a duplicate: it clears the earlier failed cards and leaves none of its own.
         graph.transfers.import(listOf(wav.toUri()))

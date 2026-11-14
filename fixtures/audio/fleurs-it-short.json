@@ -6,8 +6,9 @@
   "license": "CC-BY-4.0",
   "attribution": "Google FLEURS contributors (https://huggingface.co/datasets/google/fleurs)",
   "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
-  "modifications": "Extracted from dev.tar.gz and converted with ffmpeg to 16 kHz mono PCM16 WAV, AAC (M4A), MP3 and Opus for decoder checks. Nothing was cut or edited.",
+  "modifications": "Extracted from dev.tar.gz and converted with ffmpeg to 16 kHz mono PCM16 WAV, AAC (M4A), MP3, Opus and FLAC for decoder checks. Nothing was cut or edited.",
   "files": {
+    "fleurs-it-short.flac": "d224a20dd1b5d67cfc72f56585060fbfe1273491816e6e307065e556888cbe67",
     "fleurs-it-short.m4a": "0e100282bfd51f048dd186d0bf87e2acda8b34f3e554aa1ed2bb2e57d79855d6",
     "fleurs-it-short.mp3": "490c3dcf33d8e654b416aaef6f68dfbd6af0d4e5e73ec3edebfb066a306d7805",
     "fleurs-it-short.opus": "2151f3e50c6cd936b9bf7d4b769492be9bcc6e56b8f27d05e805d8bf9a8b65f9",

@@ -118,8 +118,10 @@ class ImportLimits(
  *    Cassini) it rejects OPEN a file that is not a decided type of the shared import-types contract
  *    ([ImportTypes.verdict], L-25), and OPEN an Opus/Ogg or compatibility-MIME input whose first
  *    [ImportTypes.MIN_PROBE_BYTES] are not an Ogg Opus stream ([ImportTypes.contentValidated]: Ogg video, Vorbis or
- *    FLAC-in-Ogg). That head is read from the opened stream before anything is written, so a large Ogg video is
- *    neither copied nor reported as too large or as needing space;
+ *    FLAC-in-Ogg), and OPEN a native FLAC input whose first [ImportTypes.FLAC_MIN_PROBE_BYTES] fail the contract's
+ *    `headerValidation` ([ImportTypes.headerValidated]: truncated, Ogg FLAC renamed to `.flac`, ID3v2-prefixed, a
+ *    zero sample rate). That head is read from the opened stream before anything is written, so a large Ogg video
+ *    is neither copied nor reported as too large or as needing space;
  * 2. rejects LARGE above 4 GiB (`Limits.MAX_IMPORT_BYTES`), and requires the size plus `Limits.MIN_FREE_BYTES` free,
  *    else SPACE with the bytes needed;
  * 3. copies the bytes (the probed head first) into `notes/<newId>/source.tmp` in one pass while it hashes them
@@ -127,7 +129,8 @@ class ImportLimits(
  * 4. returns [ImportOutcome.Existing] when a live note has the same hash (a trashed one does not count);
  * 5. classifies the file: Ogg Opus with Cassini metadata becomes `document.opus` (IMPORTED_DOCUMENT, verified now so
  *    the first open is cheap), other Ogg Opus `source.opus`, a 16-bit PCM WAV `source.wav` (any other WAV is
- *    rejected as WAV), and anything else `source.<ext>` when [probe] finds an audio track (else OPEN);
+ *    rejected as WAV), and anything else (MP3, M4A, native FLAC) `source.<ext>` when [probe] finds an audio track
+ *    (else OPEN). Like MP3, M4A and WAV, a FLAC source is decoded into the Opus portable meeting later (D102);
  * 6. inserts the row with the duration and a title: the document's `meeting.title`, else the display name without
  *    its extension (a content Uri without a display name gets the fallback title). A plain Ogg Opus file's own TITLE
  *    tag is not used; the adopt of the first seal writes the note title into it.
@@ -178,14 +181,18 @@ class ImportRepository(
                 ImportTypes.Verdict.ACCEPT
             }
             paths.notes.mkdirs()
-            val validate = verdict == ImportTypes.Verdict.VALIDATE
+            val check = when (verdict) {
+                ImportTypes.Verdict.VALIDATE -> HeadCheck.OGG_OPUS
+                ImportTypes.Verdict.VALIDATE_HEADER -> HeadCheck.FLAC
+                else -> null
+            }
             when {
                 verdict == ImportTypes.Verdict.REJECT ->
                     ImportOutcome.Rejected(Failure.OPEN, "not an import type: ${description.mimeType}")
-                // An input that needs the stream check is checked first (in the copy): an Ogg video is OPEN, not LARGE.
-                !validate && size != null ->
-                    limits.refusal(size, paths.notes) ?: importNew(uri, description, size, validate)
-                else -> importNew(uri, description, size, validate)
+                // An input that needs a head check is checked first (in the copy): an Ogg video is OPEN, not LARGE.
+                check == null && size != null ->
+                    limits.refusal(size, paths.notes) ?: importNew(uri, description, size, check)
+                else -> importNew(uri, description, size, check)
             }
         }
 
@@ -193,7 +200,7 @@ class ImportRepository(
         uri: Uri,
         description: ImportSource.Description,
         size: Long?,
-        validate: Boolean,
+        check: HeadCheck?,
     ): ImportOutcome {
         val id = newId()
         val dir = paths.note(id)
@@ -201,7 +208,7 @@ class ImportRepository(
         try {
             // Nobody knows the new id yet, so the copy runs without the note's lock: a lock stripe is shared with
             // other notes, and a long copy must not hold up their writes.
-            if (dir.mkdirs()) outcome = stage(uri, id, description, size, validate)
+            if (dir.mkdirs()) outcome = stage(uri, id, description, size, check)
         } finally {
             // NonCancellable: a cancelled import must still delete what it copied. A row means the insert committed.
             if (outcome !is ImportOutcome.Created) {
@@ -215,16 +222,16 @@ class ImportRepository(
         return outcome
     }
 
-    /** Steps 3 to 6 for the new note [id], whose directory exists; [validate] runs the stream check of step 1. */
+    /** Steps 3 to 6 for the new note [id], whose directory exists; [check] is the head check of step 1. */
     private suspend fun stage(
         uri: Uri,
         id: String,
         description: ImportSource.Description,
         size: Long?,
-        validate: Boolean,
+        check: HeadCheck?,
     ): ImportOutcome {
         val tmp = File(paths.note(id), SOURCE_TMP)
-        return when (val copied = copy(uri, tmp, size, validate)) {
+        return when (val copied = copy(uri, tmp, size, check)) {
             is Copy.Failed -> copied.outcome
             is Copy.Done -> try {
                 notes.liveWithSource(copied.sha256)?.let { ImportOutcome.Existing(it) }
@@ -273,21 +280,21 @@ class ImportRepository(
     }
 
     /**
-     * Step 3: copies the bytes into [tmp] with their SHA-256, enforcing the size cap and the free space. With
-     * [validate] it first reads the head from the stream and runs the stream check and step 2 on it, before [tmp] is
-     * even created: a rejected input costs at most [ImportTypes.MIN_PROBE_BYTES] read and nothing written. The head
-     * is then written first, so the stream is read once (a pipe-backed provider cannot be reopened).
+     * Step 3: copies the bytes into [tmp] with their SHA-256, enforcing the size cap and the free space. With a
+     * [check] it first reads the head from the stream and runs the check and step 2 on it, before [tmp] is even
+     * created: a rejected input costs at most the check's probe bytes read and nothing written. The head is then
+     * written first, so the stream is read once (a pipe-backed provider cannot be reopened).
      */
-    private suspend fun copy(uri: Uri, tmp: File, size: Long?, validate: Boolean): Copy = try {
+    private suspend fun copy(uri: Uri, tmp: File, size: Long?, check: HeadCheck?): Copy = try {
         val input = source.open(uri) ?: throw FileNotFoundException("no stream")
         val digest = MessageDigest.getInstance("SHA-256")
         val failed = input.useCancellable {
-            val probed = if (validate) oggOpusHead(input) else ByteArray(0)
+            val probed = if (check != null) check.head(input) else ByteArray(0)
             currentCoroutineContext().ensureActive()
             if (probed == null) {
-                return@useCancellable Copy.Failed(ImportOutcome.Rejected(Failure.OPEN, "not an Ogg Opus stream"))
+                return@useCancellable Copy.Failed(ImportOutcome.Rejected(Failure.OPEN, check?.failure))
             }
-            val refused = size?.takeIf { validate }?.let { limits.refusal(it, paths.notes) }
+            val refused = size?.takeIf { check != null }?.let { limits.refusal(it, paths.notes) }
             refused?.let(Copy::Failed) ?: tmp.outputStream().use { out -> pump(input, out, size, digest, probed) }
         }
         failed ?: Copy.Done(Sha256.hex(digest), tmp.length())
@@ -443,12 +450,27 @@ private fun typeName(displayName: String?, uri: Uri): String? =
         ?: uri.lastPathSegment?.takeIf { ImportTypes.extensionOf(it) != null }
         ?: displayName
 
-/** [head] of [input] when it passes [ImportTypes.contentValidated], else null. */
-private fun oggOpusHead(input: InputStream): ByteArray? = head(input).takeIf { ImportTypes.contentValidated(it) }
+/** The check step 1 runs on the head of an input before it is copied. */
+private enum class HeadCheck(val probeBytes: Int, val failure: String) {
+    /** The Ogg Opus stream check of opus-ogg (`contentValidation`). */
+    OGG_OPUS(ImportTypes.MIN_PROBE_BYTES, "not an Ogg Opus stream") {
+        override fun passes(head: ByteArray) = ImportTypes.contentValidated(head)
+    },
 
-/** The first [ImportTypes.MIN_PROBE_BYTES] of [input], or all of it when it is shorter; nothing more is read. */
-private fun head(input: InputStream): ByteArray {
-    val head = ByteArray(ImportTypes.MIN_PROBE_BYTES)
+    /** The native FLAC header check of flac (`headerValidation`, D102). */
+    FLAC(ImportTypes.FLAC_MIN_PROBE_BYTES, "not a native FLAC stream") {
+        override fun passes(head: ByteArray) = ImportTypes.headerValidated(head)
+    };
+
+    abstract fun passes(head: ByteArray): Boolean
+
+    /** The first [probeBytes] of [input] when they pass, else null. */
+    fun head(input: InputStream): ByteArray? = readHead(input, probeBytes).takeIf(::passes)
+}
+
+/** The first [bytes] of [input], or all of it when it is shorter; nothing more is read. */
+private fun readHead(input: InputStream, bytes: Int): ByteArray {
+    val head = ByteArray(bytes)
     var n = 0
     while (n < head.size) {
         val read = input.read(head, n, head.size - n)

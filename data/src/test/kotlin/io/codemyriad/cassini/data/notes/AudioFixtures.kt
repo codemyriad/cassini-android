@@ -8,7 +8,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.atomic.AtomicInteger
 
-/** The FLEURS clip in fixtures/audio in [extension] (wav, m4a, mp3, opus). */
+/** The FLEURS clip in fixtures/audio in [extension] (wav, m4a, mp3, opus, flac). */
 fun fleurs(extension: String): File =
     File(checkNotNull(System.getProperty("cassini.fixtures")), "audio/fleurs-it-short.$extension")
 
@@ -18,7 +18,7 @@ const val FLEURS_WAV_MS = 15_840L
 /**
  * Stands in for `MediaExtractor`, which Robolectric cannot run on real files. Like the extractor it needs a whole
  * container: an MP4 opens only when its `moov` box is present (a capture cut short has none), an MP3 when it starts
- * with an ID3 tag or a frame sync. Everything else has no audio track.
+ * with an ID3 tag or a frame sync, a native FLAC when it starts with `fLaC`. Everything else has no audio track.
  */
 class FakeProbe(private val durationMs: Long = FLEURS_WAV_MS) : AudioProbe {
     val calls = AtomicInteger()
@@ -34,6 +34,7 @@ class FakeProbe(private val durationMs: Long = FLEURS_WAV_MS) : AudioProbe {
         return when {
             bytes.size > 8 && text.substring(4, 8) == "ftyp" ->
                 if ("moov" in text) ProbedAudio("audio/mp4a-latm", durationMs) else null
+            text.startsWith("fLaC") -> ProbedAudio("audio/flac", durationMs)
             text.startsWith("ID3") || (bytes.size > 1 && bytes[0] == 0xFF.toByte() && bytes[1].toInt() and 0xE0 == 0xE0) ->
                 ProbedAudio("audio/mpeg", durationMs)
             else -> null

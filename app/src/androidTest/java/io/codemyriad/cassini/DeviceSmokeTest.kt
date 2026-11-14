@@ -64,7 +64,8 @@ class DeviceSmokeTest {
     @CiSmoke
     @Test fun importsCompressedAudioOnTheSameClock() {
         val reference = audioDecoder(context).decode(Uri.fromFile(fixture()))
-        for (name in listOf("fleurs-it-short.m4a", "fleurs-it-short.mp3", "fleurs-it-short.opus")) {
+        val names = listOf("fleurs-it-short.m4a", "fleurs-it-short.mp3", "fleurs-it-short.opus", "fleurs-it-short.flac")
+        for (name in names) {
             val file = fixture(name)
             try {
                 val audio = audioDecoder(context).decode(Uri.fromFile(file))
@@ -72,6 +73,8 @@ class DeviceSmokeTest {
                 fun onset(pcm: PcmAudio) = pcm.samples.indexOfFirst { kotlin.math.abs(it) > .1f } * 1000L / pcm.sampleRate
                 assertTrue("$name speech onset shifted", kotlin.math.abs(onset(audio) - onset(reference)) <= 100)
                 if (name.endsWith(".mp3")) assertMp3OnTheWavClock(reference, audio)
+                // Native FLAC (D102) is lossless: the same 16 kHz samples as the WAV it was encoded from.
+                if (name.endsWith(".flac")) assertArrayEquals(reference.samples, audio.samples, 1e-4f)
             } finally { file.delete() }
         }
     }
@@ -279,7 +282,8 @@ class DeviceSmokeTest {
 
     @CiSmoke
     @Test fun opusEncodingRunsInTheDecodePassAndTrimsLookahead() {
-        for (name in listOf("fleurs-it-short.m4a", "fleurs-it-short.wav")) {
+        // A native FLAC import becomes an Opus portable meeting in the same pass as M4A and WAV (D102).
+        for (name in listOf("fleurs-it-short.m4a", "fleurs-it-short.wav", "fleurs-it-short.flac")) {
             val file = fixture(name)
             val opus = File(context.cacheDir, "same-pass.opus")
             try {

@@ -13,9 +13,9 @@ import org.robolectric.RobolectricTestRunner
 
 /**
  * "Open with" (the parity review, gap 6): the activity takes ACTION_VIEW for every decided type of the shared
- * import-types contract (L-25, [ImportTypes]), so another app can hand over an MP3, an M4A or a WAV, not only an Ogg
- * file; and ACTION_SEND of such a file from another app's share sheet. Open types (FLAC), compatibility types and
- * other audio are not offered.
+ * import-types contract (L-25, [ImportTypes]), so another app can hand over an MP3, an M4A, a WAV or a native FLAC
+ * (D-938), not only an Ogg file; and ACTION_SEND of such a file from another app's share sheet. Ogg FLAC,
+ * compatibility types and other audio are not offered.
  */
 @RunWith(RobolectricTestRunner::class)
 class OpenWithTest {
@@ -36,7 +36,9 @@ class OpenWithTest {
             "audio/mp4",
             "audio/x-m4a",
             "audio/wav",
-            "audio/x-wav"
+            "audio/x-wav",
+            "audio/flac",
+            "audio/x-flac"
         )
         assertEquals(types.toSet(), types.toSet() intersect ImportTypes.ANDROID_MIME_TYPES.toSet())
         for (type in ImportTypes.ANDROID_MIME_TYPES) {
@@ -58,7 +60,8 @@ class OpenWithTest {
             assertEquals(type, listOf(MainActivity::class.java.name), shared(type))
         }
         assertTrue("shared text is not ours", shared("text/plain").isEmpty())
-        assertTrue("FLAC is still open (L-09, D-938)", shared("audio/flac").isEmpty())
+        assertTrue("Ogg FLAC stays unsupported (D102)", shared("audio/x-flac+ogg").isEmpty())
+        assertTrue("Ogg FLAC stays unsupported (D102)", shared("audio/x-oggflac").isEmpty())
     }
 
     @Test fun otherTypesDoNot() {
@@ -66,8 +69,8 @@ class OpenWithTest {
             "video/mp4",
             "video/ogg",
             "text/plain",
-            "audio/flac",
-            "audio/x-flac",
+            "audio/x-flac+ogg",
+            "audio/x-oggflac",
             "audio/aac",
             "application/ogg"
         )) {

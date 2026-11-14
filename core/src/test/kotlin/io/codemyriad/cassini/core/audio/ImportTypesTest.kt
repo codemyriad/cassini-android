@@ -18,6 +18,8 @@ class ImportTypesTest {
     private val types = contract.getJSONArray("types").objects()
     private val opus = types.single { it.getString("id") == "opus-ogg" }
     private val validation = opus.getJSONObject("contentValidation")
+    private val flac = types.single { it.getString("id") == "flac" }
+    private val header = flac.getJSONObject("headerValidation")
 
     @Test fun vendoredContractMatchesItsPin() {
         val pin = JSONObject(File(vendor, "UPSTREAM.json").readText()).getJSONObject("files")
@@ -47,7 +49,7 @@ class ImportTypesTest {
 
     @Test fun openEntriesAreTrackedAndNeverAccepted() {
         val open = types.filter { it.getString("status") == "open" }
-        assertTrue("FLAC stays open until L-09 / D-938", open.any { it.getString("id") == "flac" })
+        assertEquals("FLAC is decided (D-938, D102)", "decided", flac.getString("status"))
         val extensions = open.flatMap { it.getJSONArray("extensions").strings() }.toSet()
         val mimes = open.flatMap { it.getJSONArray("mimeTypes").strings() + it.getJSONArray("androidMimeTypes").strings() }
         assertEquals(extensions, ImportTypes.OPEN_EXTENSIONS)
@@ -58,6 +60,119 @@ class ImportTypesTest {
             assertEquals(Verdict.REJECT, ImportTypes.verdict("take$extension", "audio/ogg"))
         }
         for (mime in mimes) assertEquals(mime, Verdict.REJECT, ImportTypes.verdict("take.ogg", mime))
+    }
+
+    @Test fun headerValidationParametersMatchTheContract() {
+        assertEquals("D-938", flac.getJSONArray("decisions").strings().last())
+        assertFalse("headerValidation replaces contentValidation", flac.has("contentValidation"))
+        assertEquals(header.getInt("minProbeBytes"), ImportTypes.FLAC_MIN_PROBE_BYTES)
+        assertEquals("fLaC", ascii(header.getString("magicHex")))
+        assertEquals(header.getInt("firstMetadataBlockType"), ImportTypes.FLAC_STREAMINFO_BLOCK_TYPE)
+        assertEquals(header.getInt("streamInfoLength"), ImportTypes.FLAC_STREAMINFO_LENGTH)
+        assertEquals(header.getJSONArray("rejectedMimeTypes").strings().toSet(), ImportTypes.FLAC_REJECTED_MIME_TYPES)
+        assertTrue(ImportTypes.OGG_FLAC_MIME_TYPES.all { it in ImportTypes.FLAC_REJECTED_MIME_TYPES })
+        for (mime in ImportTypes.OGG_FLAC_MIME_TYPES) assertFalse(mime, mime in ImportTypes.ANDROID_MIME_TYPES)
+        assertFalse(".flac left the Ogg reject list", ".flac" in ImportTypes.REJECTED_EXTENSIONS)
+    }
+
+    @Test fun nativeFlacNeedsTheHeaderCheckAndOggFlacIsRejected() {
+        val cases = listOf(
+            Triple("take.flac", null, Verdict.VALIDATE_HEADER),
+            Triple("Take.FLAC", "audio/flac", Verdict.VALIDATE_HEADER),
+            Triple("take.flac", "audio/x-flac", Verdict.VALIDATE_HEADER),
+            Triple(null, "audio/flac", Verdict.VALIDATE_HEADER),
+            Triple("Voice memo", "audio/x-flac", Verdict.VALIDATE_HEADER),
+            // Ogg FLAC MIME types, whatever the extension.
+            Triple("take.flac", "audio/x-flac+ogg", Verdict.REJECT),
+            Triple("take.flac", "audio/x-oggflac", Verdict.REJECT),
+            Triple("take.ogg", "audio/x-flac+ogg", Verdict.REJECT),
+            Triple(null, "audio/x-oggflac", Verdict.REJECT),
+            // A broad Ogg MIME type on a .flac.
+            Triple("take.flac", "audio/ogg", Verdict.REJECT),
+            Triple("take.flac", "application/ogg", Verdict.REJECT),
+            Triple("take.flac", "video/ogg", Verdict.REJECT),
+            // Native FLAC is accepted only as .flac (or without an extension).
+            Triple("take.ogg", "audio/flac", Verdict.REJECT),
+            Triple("take.opus", "audio/x-flac", Verdict.REJECT),
+            Triple("take.mp3", "audio/flac", Verdict.REJECT),
+            Triple("take.oga", "audio/flac", Verdict.REJECT),
+        )
+        for ((name, mime, expected) in cases) assertEquals("$name $mime", expected, ImportTypes.verdict(name, mime))
+    }
+
+    @Test fun aNativeFlacHeaderPasses() {
+        assertTrue(ImportTypes.headerValidated(flacHeader()))
+        val long = flacHeader() + ByteArray(5000)
+        assertTrue("a longer file is read only to its head", ImportTypes.headerValidated(long))
+        assertTrue("STREAMINFO as the last metadata block", ImportTypes.headerValidated(flacHeader(blockType = 0x80)))
+        assertTrue("the lowest sample rate", ImportTypes.headerValidated(flacHeader(sampleRate = 1)))
+        assertTrue("the highest sample rate", ImportTypes.headerValidated(flacHeader(sampleRate = 0xfffff)))
+    }
+
+    @Test fun theCommittedFlacFixturePasses() {
+        val fixture = File(vendor, "../../fixtures/audio/fleurs-it-short.flac")
+        val head = fixture.inputStream().use { input -> input.readNBytes(ImportTypes.FLAC_MIN_PROBE_BYTES) }
+        assertEquals(ImportTypes.FLAC_MIN_PROBE_BYTES, head.size)
+        assertTrue(ImportTypes.headerValidated(head))
+        assertFalse("not an Ogg Opus stream", ImportTypes.contentValidated(head))
+    }
+
+    @Test fun truncatedOrCorruptFlacHeadersFail() {
+        val good = flacHeader()
+        assertEquals(ImportTypes.FLAC_MIN_PROBE_BYTES, good.size)
+        for (cut in 0 until good.size) assertFalse("cut at $cut", ImportTypes.headerValidated(good, cut))
+        assertFalse("cut at 41", ImportTypes.headerValidated(good.copyOf(41)))
+        assertFalse("empty", ImportTypes.headerValidated(ByteArray(0)))
+        assertFalse("lower-case magic", ImportTypes.headerValidated(good.copyOf().also { it[0] = 'F'.code.toByte() }))
+        assertFalse("zero sample rate", ImportTypes.headerValidated(flacHeader(sampleRate = 0)))
+        assertFalse("first block is PADDING", ImportTypes.headerValidated(flacHeader(blockType = 1)))
+        assertFalse("first block is VORBIS_COMMENT", ImportTypes.headerValidated(flacHeader(blockType = 4)))
+        assertFalse("STREAMINFO of 33 bytes", ImportTypes.headerValidated(flacHeader(length = 33)))
+        assertFalse("STREAMINFO of 35 bytes", ImportTypes.headerValidated(flacHeader(length = 35)))
+        assertFalse("STREAMINFO length high byte", ImportTypes.headerValidated(flacHeader(length = 0x010022)))
+        assertFalse("RIFF", ImportTypes.headerValidated("RIFF0000WAVEfmt ".toByteArray() + ByteArray(40)))
+    }
+
+    @Test fun oggFlacRenamedToFlacFails() {
+        // Ogg FLAC (RFC 9639 appendix): an OggS BOS page whose packet is 0x7F "FLAC", version, header count, "fLaC".
+        val mapping = byteArrayOf(0x7f) + "FLAC".toByteArray() + byteArrayOf(1, 0, 0, 1) + flacHeader()
+        val oggFlac = ogg(page(bos = true, serial = 9, payload = mapping))
+        assertTrue(oggFlac.size >= ImportTypes.FLAC_MIN_PROBE_BYTES)
+        assertFalse(ImportTypes.headerValidated(oggFlac))
+        assertFalse("nor is it Ogg Opus", ImportTypes.contentValidated(oggFlac))
+    }
+
+    @Test fun anId3PrefixedFlacFails() {
+        // ID3v2.4 header with a 10-byte tag body, then a valid native stream: non-conformant, rejected.
+        val id3 = "ID3".toByteArray() + byteArrayOf(4, 0, 0, 0, 0, 0, 10) + ByteArray(10)
+        assertFalse(ImportTypes.headerValidated(id3 + flacHeader()))
+    }
+
+    /**
+     * `fLaC`, a metadata block header ([blockType] byte, 24-bit [length]) and a 34-byte STREAMINFO with [sampleRate]
+     * (20 bits), mono, 16 bits per sample, as RFC 9639 section 8.2 lays it out.
+     */
+    @Suppress("MagicNumber")
+    private fun flacHeader(blockType: Int = 0, length: Int = 34, sampleRate: Int = 16_000): ByteArray {
+        val out = ByteArrayOutputStream()
+        out.write("fLaC".toByteArray())
+        out.write(blockType)
+        out.write(length ushr 16 and 0xff)
+        out.write(length ushr 8 and 0xff)
+        out.write(length and 0xff)
+        val info = ByteArray(34)
+        // Minimum and maximum block size 4608, frame sizes unknown.
+        info[0] = 0x12
+        info[2] = 0x12
+        // Sample rate (20 bits), channels - 1 (3 bits), bits per sample - 1 (5 bits), total samples (36 bits).
+        val channels = 0
+        val bits = 15
+        info[10] = (sampleRate ushr 12 and 0xff).toByte()
+        info[11] = (sampleRate ushr 4 and 0xff).toByte()
+        info[12] = ((sampleRate and 0x0f) shl 4 or (channels shl 1) or (bits ushr 4)).toByte()
+        info[13] = ((bits and 0x0f) shl 4).toByte()
+        out.write(info)
+        return out.toByteArray()
     }
 
     @Test fun contentValidationParametersMatchTheContract() {

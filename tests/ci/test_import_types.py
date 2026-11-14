@@ -22,12 +22,15 @@ class ImportTypesTest(unittest.TestCase):
 
     def test_repository_passes(self):
         CHECK.check(ROOT)
-        self.assertNotIn('audio/flac', CHECK.decided(ROOT))
+        self.assertIn('audio/flac', CHECK.decided(ROOT))
+        self.assertIn('audio/x-flac', CHECK.decided(ROOT))
         self.assertIn('audio/mpeg', CHECK.decided(ROOT))
+        for ogg_flac in ('audio/x-flac+ogg', 'audio/x-oggflac'):
+            self.assertNotIn(ogg_flac, CHECK.decided(ROOT))
 
     def test_a_broad_or_open_type_in_the_manifest_fails(self):
         manifest = self.root / CHECK.MANIFEST
-        for extra in ('audio/*', 'audio/flac', 'application/ogg'):
+        for extra in ('audio/*', 'audio/x-flac+ogg', 'audio/x-oggflac', 'application/ogg'):
             with self.subTest(extra=extra):
                 original = manifest.read_text()
                 manifest.write_text(original.replace(
@@ -40,8 +43,14 @@ class ImportTypesTest(unittest.TestCase):
     def test_a_newly_decided_type_must_reach_the_manifest(self):
         contract = self.root / CHECK.CONTRACT
         data = json.loads(contract.read_text())
-        next(t for t in data['types'] if t['id'] == 'flac')['status'] = 'decided'
+        data['types'].append({'id': 'aac', 'status': 'decided', 'androidMimeTypes': ['audio/aac']})
         contract.write_text(json.dumps(data))
+        with self.assertRaisesRegex(ValueError, 'differ'):
+            CHECK.check(self.root)
+
+    def test_a_manifest_without_native_flac_fails(self):
+        manifest = self.root / CHECK.MANIFEST
+        manifest.write_text(manifest.read_text().replace('<data android:mimeType="audio/x-flac" />', ''))
         with self.assertRaisesRegex(ValueError, 'differ'):
             CHECK.check(self.root)
 
