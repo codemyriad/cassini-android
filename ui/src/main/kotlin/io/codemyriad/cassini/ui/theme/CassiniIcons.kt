@@ -33,6 +33,9 @@ internal sealed interface GlyphPart {
     data class Rect(val x: Float, val y: Float, val width: Float, val height: Float, val rx: Float) : GlyphPart
 }
 
+/** A five-pointed star in the 24 viewport, shared by the outline and filled star glyphs. */
+private const val STAR = "M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"
+
 private fun paths(vararg d: String): List<GlyphPart> = d.map { GlyphPart.Path(it) }
 
 private fun circle(cx: Float, cy: Float, r: Float) = GlyphPart.Circle(cx, cy, r)
@@ -95,6 +98,12 @@ enum class Glyph(internal val parts: List<GlyphPart>, val filled: Boolean = fals
 
     /** No board: the Warn and Error trust chips. */
     Warn(paths("M12 4 3 20h18z", "M12 10v4M12 17v.5")),
+
+    /** No board: Star / Unstar in the Note actions sheet (L-34, D99). */
+    Star(paths(STAR)),
+
+    /** No board: the star on a starred Library row (L-34, D99). */
+    StarFilled(paths(STAR), filled = true),
     ;
 
     companion object {

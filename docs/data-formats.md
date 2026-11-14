@@ -75,7 +75,7 @@ A note with a valid checkpoint comes back paused.
 
 ## Room catalogue
 
-The database is `io.codemyriad.cassini.data.db.CassiniDatabase`, version 3. The schemas are in `data/schemas/`. Room stores the enums as `TEXT` with stable names, never as ordinals.
+The database is `io.codemyriad.cassini.data.db.CassiniDatabase`, version 4. The schemas are in `data/schemas/`. Room stores the enums as `TEXT` with stable names, never as ordinals.
 
 | Table | Key | Content |
 |---|---|---|
@@ -86,10 +86,11 @@ The database is `io.codemyriad.cassini.data.db.CassiniDatabase`, version 3. The 
 | `note_fts` | | An FTS4 table over `note_text` with `tokenizer = unicode61` and `remove_diacritics=1` |
 | `jobs` | `note_id` | The queue: order, kind, state, pause reason, failure, progress, attempts |
 | `note_voice_links` | `note_id`, `variant_id`, `speaker_id` | A copy of the matches in `voices/notes/<id>.json`: voice ID, state, score, seconds. No embeddings. |
+| `note_stars` | `note_id` | A starred note and when it was starred (L-34). Per-device Library state only: never in a Cassini file, an export or a ZIP archive. |
 
-Schema 2 added recording-time metadata. Schema 3 adds the derived `speakers.colour_index` column. Its explicit migration preserves notes and jobs, invalidating document signatures so startup re-derives the speaker cache from files. Variant-specific display ordinals remain separate from stored colour indices.
+Schema 2 added recording-time metadata. Schema 3 adds the derived `speakers.colour_index` column. Its explicit migration preserves notes and jobs, invalidating document signatures so startup re-derives the speaker cache from files. Variant-specific display ordinals remain separate from stored colour indices. Schema 4 adds the empty `note_stars` table and changes no existing row.
 
-The tables `variants`, `speakers`, `note_text`, `jobs` and `note_voice_links` cascade from `notes`. Each later schema version needs a written `Migration` and a `MigrationTestHelper` test. The code does not use `fallbackToDestructiveMigration`. If the database does not open, the app renames it `cassini.db.corrupt-<epoch>` and makes the catalogue again.
+The tables `variants`, `speakers`, `note_text`, `jobs`, `note_voice_links` and `note_stars` cascade from `notes`. A catalogue rebuilt from the files has no stars. Each later schema version needs a written `Migration` and a `MigrationTestHelper` test. The code does not use `fallbackToDestructiveMigration`. If the database does not open, the app renames it `cassini.db.corrupt-<epoch>` and makes the catalogue again.
 
 ## Settings
 

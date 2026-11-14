@@ -725,6 +725,24 @@ class NoteViewModelTest {
         }
     }
 
+    // Starring (L-34). -----------------------------------------------------------------------------------------
+
+    @Test
+    fun theActionsSheetStarsAndUnstarsTheNoteOnThisDevice() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        send(viewModel, NoteEvent.More)
+        assertFalse((viewModel.now().sheet as NoteSheet.Actions).ui.starred)
+        send(viewModel, NoteEvent.SheetAction(NoteAction.STAR))
+        assertEquals("starred:true", ports.calls.last())
+        assertNull(viewModel.now().sheet)
+        ports.details.value = ports.details.value!!.copy(star = io.codemyriad.cassini.data.db.NoteStarEntity(NOTE, 1))
+        advanceUntilIdle()
+        send(viewModel, NoteEvent.More)
+        assertTrue((viewModel.now().sheet as NoteSheet.Actions).ui.starred)
+        send(viewModel, NoteEvent.SheetAction(NoteAction.UNSTAR))
+        assertEquals("starred:false", ports.calls.last())
+    }
+
     // Trash. ----------------------------------------------------------------------------------------------------
 
     @Test

@@ -13,7 +13,8 @@ import java.time.LocalTime
  * formats; L-11, cassini-ux D99). It is false for a meeting without a completed transcript (a plain note, a
  * transcript queued, running or failed, the empty transcript of an audio-only Cassini file) and for a transcript this
  * app cannot read ([transcriptUnreadable]); the sheet then hides them and says why. [busyRow] shows the progress of a
- * write in that row. [recording] hides Move to trash (the note is the active capture).
+ * write in that row. [recording] hides Move to trash (the note is the active capture). [starred] makes the star
+ * row Unstar instead of Star (L-34, D99).
  *
  * ui.md writes `recordedAt` as one value; here it is the day the ViewModel classified ([recordedDay]) and the time
  * of day, as everywhere else (ui.md section 2).
@@ -33,6 +34,7 @@ data class NoteActionsUi(
     val recording: Boolean = false,
     val recordedLabel: String? = null,
     val transcriptUnreadable: Boolean = false,
+    val starred: Boolean = false,
 )
 
 /** What "Save a copy" saves first: the [Document] (the Cassini file, `.opus`) or the [Plain] audio file. */
@@ -85,6 +87,8 @@ enum class NoteAction {
     SHARE_SRT,
     SHARE_VTT,
     RENAME,
+    STAR,
+    UNSTAR,
     TRANSCRIBE,
     TRANSCRIBE_AGAIN,
     STOP,

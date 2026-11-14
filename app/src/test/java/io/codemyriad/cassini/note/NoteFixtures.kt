@@ -280,6 +280,10 @@ internal class FakeNotePorts : NotePorts {
         return RenameOutcome.Renamed
     }
 
+    override suspend fun setStarred(id: String, starred: Boolean) {
+        calls += "starred:$starred"
+    }
+
     override suspend fun selectVariant(id: String, variantId: String): Boolean {
         calls += "select:$variantId"
         return true

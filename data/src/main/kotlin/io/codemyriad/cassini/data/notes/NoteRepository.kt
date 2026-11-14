@@ -85,7 +85,7 @@ class NoteRepository(
 
     /**
      * Live notes matching [query] (`SearchQuery.fts`) with snippets. A query with nothing searchable yields the
-     * Library narrowed by date/origin, with an empty snippet and the plain title. A speaker requires a text match.
+     * Library narrowed by star/date/origin, with an empty snippet and the plain title. A speaker requires a text match.
      */
     fun search(
         query: String,
@@ -100,7 +100,7 @@ class NoteRepository(
                 notes.searchFlow(match).map { found ->
                     withContext(dispatchers.io) {
                         val candidates = found.filter { hit ->
-                            filters.includes(hit.row.recordingTime()?.day(zone), hit.row.origin, today)
+                            filters.includes(hit.row.recordingTime()?.day(zone), hit.row.origin, hit.row.starred, today)
                         }
                         matches.retain(candidates.mapTo(HashSet()) { it.row.id })
                         SpeakerSearch().use { matcher ->
@@ -118,7 +118,7 @@ class NoteRepository(
         return library().map { rows ->
             withContext(dispatchers.io) {
                 rows.filter {
-                    filters.includes(it.recordingTime()?.day(zone), it.origin, today)
+                    filters.includes(it.recordingTime()?.day(zone), it.origin, it.starred, today)
                 }.map { SearchRow(it, snippet = "", titleSnippet = it.title) }
             }
         }
@@ -136,6 +136,14 @@ class NoteRepository(
         cache.words(id, variantId, from, limit)
 
     fun trash(): Flow<List<TrashRow>> = notes.trashFlow()
+
+    /**
+     * Stars or unstars note [id] (L-34). Stars are per-device Library state in `note_stars`: never written into the
+     * Cassini file, an export or an archive (D53.1), so no document write follows.
+     */
+    suspend fun setStarred(id: String, starred: Boolean) {
+        if (starred) notes.star(id, clock()) else notes.unstar(id)
+    }
 
     fun counts(): Flow<Counts> = notes.counts()
 

@@ -10,6 +10,7 @@ import io.codemyriad.cassini.data.db.JobEntity
 import io.codemyriad.cassini.data.db.LibraryRow
 import io.codemyriad.cassini.data.db.NoteDetails
 import io.codemyriad.cassini.data.db.NoteEntity
+import io.codemyriad.cassini.data.db.NoteStarEntity
 import io.codemyriad.cassini.data.db.SearchRow
 import io.codemyriad.cassini.data.notes.RenameOutcome
 import io.codemyriad.cassini.notices.NoticeFacts
@@ -180,6 +181,21 @@ internal class FakeLibraryPorts : LibraryPorts {
     override suspend fun rename(id: String, title: String): RenameOutcome {
         actions += "rename $id $title"
         return RenameOutcome.Renamed
+    }
+
+    override suspend fun setStarred(id: String, starred: Boolean) {
+        actions += "starred $id $starred"
+        rows.value = rows.value.map { if (it.id == id) it.copy(starred = starred) else it }
+        detailsById.value = detailsById.value.mapValues { (key, details) ->
+            if (key == id) details.copy(star = if (starred) NoteStarEntity(id, starredAt = 1) else null) else details
+        }
+    }
+
+    override val libraryStarredOnly = MutableStateFlow(false)
+
+    override suspend fun setLibraryStarredOnly(starredOnly: Boolean) {
+        actions += "libraryStarredOnly $starredOnly"
+        libraryStarredOnly.value = starredOnly
     }
 
     override fun import(uris: List<String>) {

@@ -73,7 +73,11 @@ class GlyphMarkupTest {
     @Test fun everyGlyphHasUses() {
         assertEquals(Glyph.entries.toSet(), GlyphUses.keys)
         val noBoard = Glyph.entries.filter { glyph -> icons.none { it.parts == glyph.parts } }
-        assertEquals("glyphs without a board", listOf(Glyph.ChevronUp, Glyph.Share, Glyph.Warn), noBoard)
+        assertEquals(
+            "glyphs without a board",
+            listOf(Glyph.ChevronUp, Glyph.Share, Glyph.Warn, Glyph.Star, Glyph.StarFilled),
+            noBoard,
+        )
     }
 
     private fun parse(file: String, attributes: String, body: String): BoardIcon {

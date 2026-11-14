@@ -31,12 +31,20 @@ import io.codemyriad.cassini.ui.components.CassiniMenu
 import io.codemyriad.cassini.ui.components.CassiniMenuItem
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 
-/** D14 menus; scrolling retains every control at large font sizes or with long stored speaker names. */
+/**
+ * L-35 row `Starred` · `Speaker` · `Any date` · `Recorded by me` (D99) with the D14 menus; it scrolls horizontally, so
+ * every control stays reachable at large font sizes or with long stored speaker names.
+ */
 @Composable
 internal fun SearchFiltersBar(filters: SearchFiltersUi, onEvent: (LibraryEvent) -> Unit) {
     var speakerMenu by remember { mutableStateOf(false) }
     var dateMenu by remember { mutableStateOf(false) }
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        SearchChip(
+            stringResource(R.string.ui_search_filter_starred),
+            filters.starred,
+            onClick = { onEvent(LibraryEvent.ToggleSearchStarred) },
+        )
         Box {
             val name = filters.speaker
             SearchChip(
@@ -108,13 +116,13 @@ private fun SpeakerMenu(
 }
 
 @Composable
-private fun SearchChip(text: String, selected: Boolean, onClick: () -> Unit) {
+internal fun SearchChip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val colors = CassiniTheme.colors
     FilterChip(
         selected,
         onClick,
         label = { Text(text, style = CassiniTheme.type.fieldLabel) },
-        modifier = Modifier.heightIn(min = 48.dp),
+        modifier = modifier.heightIn(min = 48.dp),
         colors = FilterChipDefaults.filterChipColors(
             containerColor = colors.surface,
             labelColor = colors.ink,
@@ -131,5 +139,6 @@ private fun dateLabel(date: SearchDateUi): String = stringResource(
         SearchDateUi.TODAY -> R.string.ui_search_filter_date_today
         SearchDateUi.WEEK -> R.string.ui_search_filter_date_week
         SearchDateUi.MONTH -> R.string.ui_search_filter_date_month
+        SearchDateUi.YEAR -> R.string.ui_search_filter_date_year
     },
 )

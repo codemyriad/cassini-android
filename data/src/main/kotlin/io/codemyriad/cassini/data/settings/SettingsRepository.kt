@@ -199,6 +199,11 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
 
     suspend fun dismissParakeetDefaultNotice() = set(Keys.PARAKEET_DEFAULT_NOTICE, false)
 
+    /** The Library shows only starred notes at rest (L-34, D99): its `All` / `Starred` choice, remembered per device. */
+    val libraryStarredOnly: Flow<Boolean> = flag(Keys.LIBRARY_STARRED_ONLY)
+
+    suspend fun setLibraryStarredOnly(starredOnly: Boolean) = set(Keys.LIBRARY_STARRED_ONLY, starredOnly)
+
     private fun <T> key(key: Preferences.Key<T>): Flow<T?> = preferences.map { it[key] }.distinctUntilChanged()
 
     private fun flag(key: Preferences.Key<Boolean>): Flow<Boolean> =
@@ -243,6 +248,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         val NOTIFICATIONS_ASKED = booleanPreferencesKey("notifications.asked")
         val LAST_PURGE_AT = longPreferencesKey("trash.lastPurgeAt")
         val PLAYBACK_SPEED = floatPreferencesKey("playback.speed")
+        val LIBRARY_STARRED_ONLY = booleanPreferencesKey("library.starredOnly")
     }
 
     companion object {

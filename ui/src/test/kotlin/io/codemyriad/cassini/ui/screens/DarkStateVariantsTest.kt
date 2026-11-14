@@ -17,6 +17,8 @@ class DarkStateVariantsTest : VariantBoardTest() {
 
     @Test fun librarySearch() = library("library-search")
 
+    @Test fun libraryStarred() = library("library-starred")
+
     @Test fun libraryRecordingCard() = library("library-recording-card")
 
     @Test fun readSearch() = read("read-search")

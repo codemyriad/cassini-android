@@ -333,8 +333,8 @@ class SheetBehaviourTest {
                 onAction = { actions += it },
             )
         }
-        rule.onNodeWithText("Resume").performClick()
-        rule.onNodeWithText("Start over").performClick()
+        rule.onNodeWithText("Resume").performScrollTo().performClick()
+        rule.onNodeWithText("Start over").performScrollTo().performClick()
         rule.runOnIdle { assertEquals(listOf(NoteAction.RESUME, NoteAction.START_OVER), actions) }
     }
 
@@ -382,7 +382,7 @@ class SheetBehaviourTest {
         setThemed { NoteScreen(state, onEvent = { events += it }) }
         rule.onNodeWithText("Start over?").assertExists()
         rule.onNodeWithText("Start over").performClick()
-        rule.onNodeWithText("Transcribe again").performClick()
+        rule.onNodeWithText("Transcribe again").performScrollTo().performClick()
         rule.runOnIdle {
             assertEquals(
                 listOf(NoteEvent.ConfirmDialog, NoteEvent.SheetAction(NoteAction.TRANSCRIBE_AGAIN)),

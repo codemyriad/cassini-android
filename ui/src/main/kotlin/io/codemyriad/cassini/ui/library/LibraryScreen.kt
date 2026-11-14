@@ -75,7 +75,8 @@ private val BarTopPadding = LibraryActionBarMetrics.topPadding
 /**
  * Phase 1 Library: a native pinned search bar with a hidden All meetings heading, then a scrolling list.
  * Entry focus stays on the screen until the user enters Search (Navigation3 otherwise focuses the field).
- * Search filters scroll with results; snippets belong only to search. Recording and import notices remain,
+ * Search filters scroll with results; at rest the All / Starred row (L-34) takes their place. Snippets belong only
+ * to search. Recording and import notices remain,
  * while transcription is represented by its own row. The process-owned transfer dialogs stay in LibraryRoute.
  * Import/Record and the snackbar float above the measured list bottom inset. Empty search also handles Back.
  */
@@ -113,6 +114,10 @@ fun LibraryScreen(
                     item(key = "filters", contentType = "filters") {
                         Column(Modifier.padding(horizontal = 16.dp)) { SearchFiltersBar(state.searchFilters, onEvent) }
                     }
+                } else if (state.libraryFilters) {
+                    item(key = "library-filters", contentType = "filters") {
+                        LibraryFilterRow(state.libraryFilter, onEvent, Modifier.padding(horizontal = 16.dp))
+                    }
                 }
                 activity(state, onEvent)
                 imports(state.imports, onEvent)
@@ -122,6 +127,9 @@ fun LibraryScreen(
                 if (!state.loading) {
                     val results = state.results
                     if (results != null) results(results, onEvent) else sections(state.sections, onEvent)
+                    if (state.starredEmpty && results == null) {
+                        item(key = "starred-empty", contentType = "starred-empty") { StarredEmpty() }
+                    }
                 }
             }
         }
@@ -241,6 +249,8 @@ private fun NoteRowUi.event(action: NoteRowAction): LibraryEvent = when (action)
     NoteRowAction.TRY_AGAIN -> LibraryEvent.TryAgain(id)
     NoteRowAction.RENAME -> LibraryEvent.Rename(id)
     NoteRowAction.TRASH -> LibraryEvent.Trash(id)
+    NoteRowAction.STAR -> LibraryEvent.SetStarred(id, starred = true)
+    NoteRowAction.UNSTAR -> LibraryEvent.SetStarred(id, starred = false)
 }
 
 @Composable

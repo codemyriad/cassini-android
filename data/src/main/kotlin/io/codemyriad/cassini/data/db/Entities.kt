@@ -286,3 +286,25 @@ data class NoteVoiceLinkEntity(
     val score: Float,
     val seconds: Double,
 )
+
+/**
+ * A starred note (L-34, D99): per-device Library state, never written into the Cassini file or an export (D53.1).
+ * A row of its own rather than a `notes` column, so whole-row note writes (`CacheDao.replaceCache`, `NoteDao.update`)
+ * from an older snapshot cannot undo a star set meanwhile. Deleting the note deletes its star; a catalogue rebuild
+ * from the files starts with no stars.
+ */
+@Entity(
+    tableName = "note_stars",
+    foreignKeys = [
+        ForeignKey(
+            entity = NoteEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["note_id"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+)
+data class NoteStarEntity(
+    @PrimaryKey @ColumnInfo(name = "note_id") val noteId: String,
+    @ColumnInfo(name = "starred_at") val starredAt: Long,
+)

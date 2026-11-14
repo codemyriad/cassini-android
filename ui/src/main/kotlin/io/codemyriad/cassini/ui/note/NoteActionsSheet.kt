@@ -50,8 +50,8 @@ fun NoteActionsSheet(ui: NoteActionsUi, onAction: (NoteAction) -> Unit, onDismis
  * padding 12 (below the handle; 10.5 measured) / 12 / 20; the title (margin 12 horizontal, 2 below; 3.5 measured) and
  * the meta line
  * "Yesterday, 15:10 · 23:50 · 3 speakers" (12 below); "Save a copy" with the Cassini file or audio row, Markdown and
- * More formats; the divider; Rename, the transcribe row(s), Document info (documents only) and Move to trash (hidden
- * while recording). The content scrolls when it does not fit (large fonts, landscape).
+ * More formats; the divider; Rename, Star or Unstar (L-34), the transcribe row(s), Document info (documents only)
+ * and Move to trash (hidden while recording). The content scrolls when it does not fit (large fonts, landscape).
  */
 @Composable
 fun NoteActionsSheetContent(ui: NoteActionsUi, onAction: (NoteAction) -> Unit, modifier: Modifier = Modifier) {
@@ -81,6 +81,12 @@ fun NoteActionsSheetContent(ui: NoteActionsUi, onAction: (NoteAction) -> Unit, m
         SaveACopy(ui, document, onAction)
         SheetDivider()
         SheetActionRow(stringResource(R.string.ui_action_rename), Glyph.Pencil, { onAction(NoteAction.RENAME) })
+        // L-34 (D99): per-device star; never written into the Cassini file or an export (D53.1).
+        SheetActionRow(
+            label = stringResource(if (ui.starred) R.string.ui_meeting_unstar else R.string.ui_meeting_star),
+            glyph = Glyph.Star,
+            onClick = { onAction(if (ui.starred) NoteAction.UNSTAR else NoteAction.STAR) },
+        )
         TranscribeRows(ui.transcribeRow, stopBusy = ui.busyRow == NoteAction.STOP, onAction = onAction)
         if (document) {
             SheetActionRow(

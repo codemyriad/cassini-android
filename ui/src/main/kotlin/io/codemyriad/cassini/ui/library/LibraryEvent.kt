@@ -17,6 +17,16 @@ sealed interface LibraryEvent {
 
     data object ToggleRecordedByMe : LibraryEvent
 
+    /** The search row's `Starred` chip (L-35); it does not change the Library's choice. */
+    data object ToggleSearchStarred : LibraryEvent
+
+    /** A chip of the Library's `All` / `Starred` row at rest (L-34). */
+    data class SelectLibraryFilter(val filter: LibraryFilterUi) : LibraryEvent
+
+    /** The row's TalkBack custom action Star or Unstar (L-34). */
+    @Immutable
+    data class SetStarred(val id: String, val starred: Boolean) : LibraryEvent
+
     @Immutable
     data class OpenNote(val id: String) : LibraryEvent
 

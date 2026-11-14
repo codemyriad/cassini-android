@@ -167,6 +167,9 @@ interface NotePorts {
     // Edits.
     suspend fun rename(id: String, title: String): RenameOutcome
 
+    /** Stars or unstars the note on this device (L-34); never written into its Cassini file (D53.1). */
+    suspend fun setStarred(id: String, starred: Boolean)
+
     suspend fun selectVariant(id: String, variantId: String): Boolean
 
     suspend fun acknowledgeTrust(id: String)
@@ -338,6 +341,8 @@ class GraphNotePorts(private val graph: AppGraph, context: Context) : NotePorts 
     // Edits. -------------------------------------------------------------------------------------------------------
 
     override suspend fun rename(id: String, title: String): RenameOutcome = library.rename(id, title)
+
+    override suspend fun setStarred(id: String, starred: Boolean) = library.setStarred(id, starred)
 
     override suspend fun selectVariant(id: String, variantId: String): Boolean =
         graph.awaitCatalogue().notes.selectVariant(id, variantId)
