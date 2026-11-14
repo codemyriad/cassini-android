@@ -46,7 +46,6 @@ import io.codemyriad.cassini.ui.library.LibraryEvent
 import io.codemyriad.cassini.ui.library.LibraryScreen
 import io.codemyriad.cassini.ui.library.LibrarySheet
 import io.codemyriad.cassini.ui.library.LibraryUiState
-import io.codemyriad.cassini.ui.note.ExportKind
 import io.codemyriad.cassini.ui.note.NoteAction
 import io.codemyriad.cassini.ui.note.NoteSheet
 import io.codemyriad.cassini.ui.theme.CassiniTheme
@@ -238,21 +237,11 @@ class LibraryBehaviourTest {
 
     @Test fun theActionsSheetOpensInItsWindowAndSendsItsRows() {
         show(BoardFixtures.library.copy(sheet = LibrarySheet.Actions(BoardFixtures.noteActions)))
-        rule.onNodeWithText("Subtitles", substring = true).performClick()
+        rule.onNodeWithText("Markdown").performClick()
         rule.onNodeWithText("Document info").performClick()
         assertEvents(
-            LibraryEvent.SheetAction(NoteAction.SAVE_SUBTITLES),
+            LibraryEvent.SheetAction(NoteAction.SAVE_MARKDOWN),
             LibraryEvent.SheetAction(NoteAction.DOCUMENT_INFO),
-        )
-    }
-
-    @Test fun theSubtitleChooserExportsTheNote() {
-        show(BoardFixtures.library.copy(sheet = LibrarySheet.SubtitleFormat(BoardFixtures.supplier.id)))
-        rule.onNodeWithText("SubRip (.srt)").performClick()
-        rule.onNodeWithText("WebVTT (.vtt)").performClick()
-        assertEvents(
-            LibraryEvent.Export(BoardFixtures.supplier.id, ExportKind.SRT),
-            LibraryEvent.Export(BoardFixtures.supplier.id, ExportKind.VTT),
         )
     }
 

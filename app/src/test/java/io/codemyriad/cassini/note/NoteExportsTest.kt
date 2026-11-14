@@ -41,6 +41,21 @@ class NoteExportsTest {
         assertEquals(null, NoteExports.file(unreadable, file.kind))
     }
 
+    /** L-11 (D99): each subtitle format is its own row, so each shows its own progress. */
+    @Test
+    fun eachTextFormatHasItsOwnRow() {
+        val rows = io.codemyriad.cassini.ui.note.ExportKind.entries.associateWith { NoteExports.row(it) }
+        assertEquals(rows.size, rows.values.toSet().size)
+        assertEquals(
+            io.codemyriad.cassini.ui.note.NoteAction.SAVE_SRT,
+            rows[io.codemyriad.cassini.ui.note.ExportKind.SRT],
+        )
+        assertEquals(
+            io.codemyriad.cassini.ui.note.NoteAction.SAVE_VTT,
+            rows[io.codemyriad.cassini.ui.note.ExportKind.VTT],
+        )
+    }
+
     @Test
     fun aStoredPlaceholderIsExportedVerbatimUnderAnotherUiLanguage() {
         val labels = NoteExports.labels(italian, english)

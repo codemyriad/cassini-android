@@ -343,11 +343,11 @@ class AcceptanceWalkTest {
 
         rule.onNode(hasContentDescription(rule.text(UiR.string.ui_note_more_actions))).performClick()
         see(rule.text(UiR.string.ui_actions_save_copy), ignoreCase = true)
-        see(rule.text(UiR.string.ui_actions_document))
+        see(rule.text(UiR.string.ui_export_cassini_file))
         see(rule.text(UiR.string.ui_actions_document_info))
         shot("06-note-actions-and-export")
         Espresso.pressBack()
-        rule.waitGone(hasText(rule.text(UiR.string.ui_actions_document)))
+        rule.waitGone(hasText(rule.text(UiR.string.ui_export_cassini_file)))
         library()
     }
 

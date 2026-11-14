@@ -3,6 +3,7 @@ package io.codemyriad.cassini.ui.screens
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
@@ -27,7 +28,6 @@ import io.codemyriad.cassini.ui.fixtures.BoardFixtures
 import io.codemyriad.cassini.ui.fixtures.VariantFixtures
 import io.codemyriad.cassini.ui.format.FIXED_ZONE
 import io.codemyriad.cassini.ui.format.ProvideFixedFormat
-import io.codemyriad.cassini.ui.note.ExportKind
 import io.codemyriad.cassini.ui.note.MergeConfirmContent
 import io.codemyriad.cassini.ui.note.MergeEvent
 import io.codemyriad.cassini.ui.note.MergeSheetContent
@@ -41,7 +41,6 @@ import io.codemyriad.cassini.ui.note.NoteEvent
 import io.codemyriad.cassini.ui.note.NoteScreen
 import io.codemyriad.cassini.ui.note.NoteSheet
 import io.codemyriad.cassini.ui.note.SaveState
-import io.codemyriad.cassini.ui.note.SubtitleFormatSheetContent
 import io.codemyriad.cassini.ui.note.VersionsSheetContent
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import org.junit.Assert.assertEquals
@@ -187,17 +186,24 @@ class SheetBehaviourTest {
     @Test fun noteActionRowsSendTheirAction() {
         val actions = mutableListOf<NoteAction>()
         setThemed { NoteActionsSheetContent(BoardFixtures.noteActions, onAction = { actions += it }) }
-        rule.onNodeWithText("Cassini document").performClick()
-        rule.onNodeWithText("Subtitles", substring = true).performClick()
-        rule.onNodeWithText("Rename").performClick()
-        rule.onNodeWithText("Transcribe again").performClick()
-        rule.onNodeWithText("Document info").performClick()
+        rule.onNodeWithText("Cassini file").performClick()
+        rule.onNodeWithText("Markdown").performClick()
+        rule.onNodeWithText("More formats").performClick()
+        rule.onNodeWithText("Plain text").performScrollTo().performClick()
+        rule.onNodeWithText("Subtitles (SRT)").performScrollTo().performClick()
+        rule.onNodeWithText("Subtitles (WebVTT)").performScrollTo().performClick()
+        rule.onNodeWithText("Rename").performScrollTo().performClick()
+        rule.onNodeWithText("Transcribe again").performScrollTo().performClick()
+        rule.onNodeWithText("Document info").performScrollTo().performClick()
         rule.onNodeWithText("Move to trash").performScrollTo().performClick()
         rule.runOnIdle {
             assertEquals(
                 listOf(
                     NoteAction.SAVE_DOCUMENT,
-                    NoteAction.SAVE_SUBTITLES,
+                    NoteAction.SAVE_MARKDOWN,
+                    NoteAction.SAVE_TEXT,
+                    NoteAction.SAVE_SRT,
+                    NoteAction.SAVE_VTT,
                     NoteAction.RENAME,
                     NoteAction.TRANSCRIBE_AGAIN,
                     NoteAction.DOCUMENT_INFO,
@@ -212,36 +218,90 @@ class SheetBehaviourTest {
     @Test fun theShareButtonsSendTheirShareAction() {
         val actions = mutableListOf<NoteAction>()
         setThemed { NoteActionsSheetContent(BoardFixtures.noteActions, onAction = { actions += it }) }
-        rule.onNodeWithContentDescription("Share Cassini document").performClick()
-        rule.onNodeWithContentDescription("Share Transcript as text").performClick()
-        rule.onNodeWithContentDescription("Share Subtitles").performClick()
+        rule.onNodeWithContentDescription("Share Cassini file").performClick()
+        rule.onNodeWithContentDescription("Share Markdown").performClick()
+        rule.onNodeWithText("More formats").performClick()
+        rule.onNodeWithContentDescription("Share Plain text").performScrollTo().performClick()
+        rule.onNodeWithContentDescription("Share Subtitles (SRT)").performScrollTo().performClick()
+        rule.onNodeWithContentDescription("Share Subtitles (WebVTT)").performScrollTo().performClick()
         rule.runOnIdle {
-            assertEquals(listOf(NoteAction.SHARE_DOCUMENT, NoteAction.SHARE_TEXT, NoteAction.SHARE_SUBTITLES), actions)
+            assertEquals(
+                listOf(
+                    NoteAction.SHARE_DOCUMENT,
+                    NoteAction.SHARE_MARKDOWN,
+                    NoteAction.SHARE_TEXT,
+                    NoteAction.SHARE_SRT,
+                    NoteAction.SHARE_VTT,
+                ),
+                actions,
+            )
         }
     }
 
-    @Test fun aRowThatCannotExportCannotShare() {
+    /** L-11 (D99): Cassini file and Markdown first; the other text formats wait under More formats. */
+    @Test fun moreFormatsStartsClosedAndToggles() {
+        setThemed { NoteActionsSheetContent(BoardFixtures.noteActions, onAction = {}) }
+        rule.onNodeWithText("Plain text").assertDoesNotExist()
+        rule.onNodeWithText("Subtitles (SRT)").assertDoesNotExist()
+        rule.onNodeWithText("More formats").assert(SemanticsMatcher.keyIsDefined(SemanticsActions.Expand))
+        rule.onNodeWithText("More formats").performClick()
+        rule.onNodeWithText("Plain text").assertExists()
+        rule.onNodeWithText("Subtitles (WebVTT)").assertExists()
+        rule.onNodeWithText("More formats").assert(SemanticsMatcher.keyIsDefined(SemanticsActions.Collapse))
+        rule.onNodeWithText("More formats").performClick()
+        rule.onNodeWithText("Plain text").assertDoesNotExist()
+    }
+
+    /** An audio-only meeting hides the text formats (not greyed out) and says why (L-11, D99). */
+    @Test fun anAudioOnlyNoteHidesTheTextFormats() {
         setThemed {
             NoteActionsSheetContent(VariantFixtures.noteActions.getValue("actions-plain"), onAction = {})
         }
         rule.onNodeWithContentDescription("Share Audio file").assertIsEnabled()
-        rule.onNodeWithContentDescription("Share Transcript as text").assertIsNotEnabled()
-        rule.onNodeWithContentDescription("Share Subtitles").assertIsNotEnabled()
+        rule.onNodeWithText("No transcript yet, so only the audio can be exported.").assertExists()
+        rule.onNodeWithText("Markdown").assertDoesNotExist()
+        rule.onNodeWithText("More formats").assertDoesNotExist()
+        rule.onNodeWithText("Plain text").assertDoesNotExist()
+    }
+
+    /** Imported audio without a Cassini file offers its Original audio in place of the Cassini file (L-11, D99). */
+    @Test fun importedAudioOffersOriginalAudio() {
+        val actions = mutableListOf<NoteAction>()
+        setThemed {
+            NoteActionsSheetContent(
+                VariantFixtures.noteActions.getValue("actions-imported-audio"),
+                onAction = { actions += it },
+            )
+        }
+        rule.onNodeWithText("Original audio").performClick()
+        rule.onNodeWithText("The audio exactly as it was imported, without a transcript.").assertExists()
+        rule.onNodeWithText("Cassini file").assertDoesNotExist()
+        rule.onNodeWithText("No transcript yet, so only the audio can be exported.").assertExists()
+        rule.runOnIdle { assertEquals(listOf(NoteAction.SAVE_DOCUMENT), actions) }
+    }
+
+    @Test fun anUnreadableTranscriptSaysSoInsteadOfTheTextFormats() {
+        setThemed {
+            NoteActionsSheetContent(VariantFixtures.noteActions.getValue("actions-unreadable"), onAction = {})
+        }
+        rule.onNodeWithText("Cassini file").assertIsEnabled()
+        rule.onNodeWithText("Not available for this transcript").assertExists()
+        rule.onNodeWithText("More formats").assertDoesNotExist()
     }
 
     @Test fun aBusyRowCannotShare() {
         setThemed { NoteActionsSheetContent(VariantFixtures.noteActions.getValue("actions-busy"), onAction = {}) }
-        rule.onNodeWithContentDescription("Share Transcript as text").assertIsNotEnabled()
-        rule.onNodeWithContentDescription("Share Cassini document").assertIsEnabled()
+        rule.onNodeWithContentDescription("Share Plain text").assertIsNotEnabled()
+        rule.onNodeWithContentDescription("Share Cassini file").assertIsEnabled()
     }
 
-    @Test fun aPlainNoteDisablesTextExportAndHasNoDocumentInfo() {
+    @Test fun aPlainNoteHidesTextExportAndHasNoDocumentInfo() {
         val actions = mutableListOf<NoteAction>()
         setThemed {
             NoteActionsSheetContent(VariantFixtures.noteActions.getValue("actions-plain"), onAction = { actions += it })
         }
         rule.onNodeWithText("Audio file").assertIsEnabled()
-        rule.onNode(hasText("Transcript as text", substring = true).and(hasClickAction())).assertIsNotEnabled()
+        rule.onNode(hasText("Plain text", substring = true).and(hasClickAction())).assertDoesNotExist()
         rule.onNodeWithText("Document info").assertDoesNotExist()
         rule.onNodeWithText("Transcribe").performClick()
         rule.runOnIdle { assertEquals(listOf(NoteAction.TRANSCRIBE), actions) }
@@ -251,7 +311,7 @@ class SheetBehaviourTest {
         setThemed {
             NoteActionsSheetContent(VariantFixtures.noteActions.getValue("actions-busy"), onAction = {})
         }
-        rule.onNode(hasText("Transcript as text", substring = true).and(hasClickAction()))
+        rule.onNode(hasText("Plain text", substring = true).and(hasClickAction()))
             .assertIsNotEnabled()
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Saving…"))
     }
@@ -310,14 +370,6 @@ class SheetBehaviourTest {
         val merge = sealed.copy(sealed = MergeVersionsUi(shown = 1, added = 3))
         setThemed { MergeConfirmContent(merge, requireNotNull(merge.confirm), onEvent = {}) }
         rule.onNodeWithText("This adds version 3; version 1 stays available.", substring = true).assertExists()
-    }
-
-    @Test fun theSubtitleChooserExportsEitherFormat() {
-        val kinds = mutableListOf<ExportKind>()
-        setThemed { SubtitleFormatSheetContent(onExport = { kinds += it }) }
-        rule.onNodeWithText("WebVTT (.vtt)").performClick()
-        rule.onNodeWithText("SubRip (.srt)").performClick()
-        rule.runOnIdle { assertEquals(listOf(ExportKind.VTT, ExportKind.SRT), kinds) }
     }
 
     @Test fun theNoteScreenOpensTheSheetAndTheDialogInWindows() {

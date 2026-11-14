@@ -313,16 +313,9 @@
 
     <!-- Note actions and export (board 06, features.md section 6). -->
     <string name="ui_actions_save_copy">Guardar uma cópia</string>
-    <string name="ui_actions_document">Documento Cassini</string>
-    <string name="ui_actions_document_body">Áudio com a transcrição incluída. Reproduz-se em qualquer lado.</string>
     <string name="ui_actions_audio_file">Ficheiro de áudio</string>
     <string name="ui_actions_audio_file_body">A gravação tal como está. Ainda sem transcrição.</string>
-    <string name="ui_actions_text">Transcrição em texto</string>
-    <string name="ui_actions_subtitles">Legendas</string>
-    <string name="ui_actions_after_transcription">Disponível após a transcrição</string>
     <string name="ui_actions_not_readable">Indisponível para esta transcrição</string>
-    <string name="ui_actions_subrip_body">funciona na maioria dos leitores de vídeo</string>
-    <string name="ui_actions_webvtt_body">para leitores web</string>
     <string name="ui_actions_saved_file">«%1$s» guardado</string>
     <string name="ui_actions_save_failed">Não foi possível guardar o ficheiro</string>
     <string name="ui_actions_share">Partilhar %1$s</string>

@@ -34,7 +34,6 @@ import io.codemyriad.cassini.ui.library.LibraryUiState
 import io.codemyriad.cassini.ui.library.ProgressLine
 import io.codemyriad.cassini.ui.library.SearchDateUi
 import io.codemyriad.cassini.ui.library.SearchFiltersUi
-import io.codemyriad.cassini.ui.note.ExportKind
 import io.codemyriad.cassini.ui.note.NoteAction
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CancellationException
@@ -330,11 +329,6 @@ class LibraryViewModel(
             LibraryEvent.Undo -> undo()
             LibraryEvent.SnackbarTimeout -> snackbar.value = null
             is LibraryEvent.SheetAction -> sheetId.value?.let { id -> launch { sheetAction(id, event.action) } }
-            is LibraryEvent.Export -> {
-                // The Note screen owns the exports: it opens and starts this one (NoteKey.start).
-                closeSheet()
-                emit(LibraryEffect.OpenNote(NoteKey(event.id, start = start(event.kind))))
-            }
             LibraryEvent.DismissSheet -> closeSheet()
             is LibraryEvent.RenameConfirmed -> {
                 saved[KEY_DIALOG] = null
@@ -465,8 +459,9 @@ class LibraryViewModel(
                 closeSheet()
                 trash(id)
             }
-            NoteAction.SAVE_DOCUMENT, NoteAction.SAVE_TEXT, NoteAction.SAVE_MARKDOWN, NoteAction.SAVE_SUBTITLES, NoteAction.SHARE_DOCUMENT,
-            NoteAction.SHARE_TEXT, NoteAction.SHARE_MARKDOWN, NoteAction.SHARE_SUBTITLES, NoteAction.DOCUMENT_INFO,
+            NoteAction.SAVE_DOCUMENT, NoteAction.SAVE_TEXT, NoteAction.SAVE_MARKDOWN, NoteAction.SAVE_SRT,
+            NoteAction.SAVE_VTT, NoteAction.SHARE_DOCUMENT, NoteAction.SHARE_TEXT, NoteAction.SHARE_MARKDOWN,
+            NoteAction.SHARE_SRT, NoteAction.SHARE_VTT, NoteAction.DOCUMENT_INFO,
             -> {
                 // The exports, the shares and Document info are the Note screen's: it opens and starts the row.
                 closeSheet()
@@ -475,23 +470,17 @@ class LibraryViewModel(
         }
     }
 
-    private fun start(kind: ExportKind): NoteStart = when (kind) {
-        ExportKind.DOCUMENT -> NoteStart.SAVE_DOCUMENT
-        ExportKind.TEXT -> NoteStart.SAVE_TEXT
-        ExportKind.MARKDOWN -> NoteStart.SAVE_MARKDOWN
-        ExportKind.SRT -> NoteStart.SAVE_SRT
-        ExportKind.VTT -> NoteStart.SAVE_VTT
-    }
-
     private fun start(action: NoteAction): NoteStart? = when (action) {
         NoteAction.SAVE_DOCUMENT -> NoteStart.SAVE_DOCUMENT
         NoteAction.SAVE_TEXT -> NoteStart.SAVE_TEXT
         NoteAction.SAVE_MARKDOWN -> NoteStart.SAVE_MARKDOWN
-        NoteAction.SAVE_SUBTITLES -> NoteStart.CHOOSE_SUBTITLES
+        NoteAction.SAVE_SRT -> NoteStart.SAVE_SRT
+        NoteAction.SAVE_VTT -> NoteStart.SAVE_VTT
         NoteAction.SHARE_DOCUMENT -> NoteStart.SHARE_DOCUMENT
         NoteAction.SHARE_TEXT -> NoteStart.SHARE_TEXT
         NoteAction.SHARE_MARKDOWN -> NoteStart.SHARE_MARKDOWN
-        NoteAction.SHARE_SUBTITLES -> NoteStart.SHARE_SUBTITLES
+        NoteAction.SHARE_SRT -> NoteStart.SHARE_SRT
+        NoteAction.SHARE_VTT -> NoteStart.SHARE_VTT
         NoteAction.DOCUMENT_INFO -> NoteStart.DOCUMENT_INFO
         else -> null
     }

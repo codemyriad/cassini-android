@@ -53,7 +53,10 @@ object NoteExports {
         return if (textExportEnabled(details)) ExportFile(kind, mime, name) else null
     }
 
-    /** Text and subtitles need a readable transcript (features.md section 6). */
+    /**
+     * The text formats (Markdown, Plain text, SRT, WebVTT) need a completed, readable transcript (L-11, cassini-ux
+     * D99): a plain note, or one whose first transcription is queued, running or failed, is audio-only.
+     */
     fun textExportEnabled(details: NoteDetails): Boolean =
         details.note.audioKind == AudioKind.DOCUMENT && details.note.documentState !in NOT_READABLE &&
             NoteMapping.selected(details) != null
@@ -72,7 +75,8 @@ object NoteExports {
         ExportKind.DOCUMENT -> NoteAction.SAVE_DOCUMENT
         ExportKind.TEXT -> NoteAction.SAVE_TEXT
         ExportKind.MARKDOWN -> NoteAction.SAVE_MARKDOWN
-        ExportKind.SRT, ExportKind.VTT -> NoteAction.SAVE_SUBTITLES
+        ExportKind.SRT -> NoteAction.SAVE_SRT
+        ExportKind.VTT -> NoteAction.SAVE_VTT
     }
 
     /**

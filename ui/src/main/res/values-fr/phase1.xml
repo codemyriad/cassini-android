@@ -91,6 +91,18 @@
     <string name="ui_tx_suggestion_question">Est-ce %1$s ?</string>
     <string name="ui_tx_suggestion_yes">Oui</string>
     <string name="ui_tx_suggestion_no">Non</string>
+    <string name="ui_export_cassini_file">Fichier Cassini</string>
+    <string name="ui_export_cassini_file_body">L’audio avec la transcription intégrée. Se lit dans n’importe quel lecteur audio.</string>
+    <string name="ui_export_more_formats">Autres formats</string>
+    <string name="ui_export_plain_text">Texte brut</string>
+    <string name="ui_export_plain_text_body">La transcription sans mise en forme, pour n’importe quelle application.</string>
+    <string name="ui_export_srt">Sous-titres (SRT)</string>
+    <string name="ui_export_srt_body">Sous-titres minutés, pour les lecteurs et éditeurs vidéo.</string>
+    <string name="ui_export_vtt">Sous-titres (WebVTT)</string>
+    <string name="ui_export_vtt_body">Sous-titres avec horodatages et noms des intervenants, pour les lecteurs vidéo web.</string>
+    <string name="ui_export_original_audio">Audio d’origine</string>
+    <string name="ui_export_original_audio_body">L’audio tel qu’il a été importé, sans transcription.</string>
+    <string name="ui_export_audio_only">Pas encore de transcription, seul l’audio peut être exporté.</string>
     <string name="ui_subtitle_imported">Importée</string>
     <string name="ui_subtitle_imported_other_device">Importée · Transcrite sur un autre appareil</string>
 </resources>

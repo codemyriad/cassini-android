@@ -312,16 +312,9 @@
 
     <!-- Note actions and export. -->
     <string name="ui_actions_save_copy">Guardar una copia</string>
-    <string name="ui_actions_document">Documento Cassini</string>
-    <string name="ui_actions_document_body">Audio con la transcripción dentro. Se reproduce en cualquier lugar.</string>
     <string name="ui_actions_audio_file">Archivo de audio</string>
     <string name="ui_actions_audio_file_body">La grabación tal cual. Aún sin transcripción.</string>
-    <string name="ui_actions_text">Transcripción como texto</string>
-    <string name="ui_actions_subtitles">Subtítulos</string>
-    <string name="ui_actions_after_transcription">Disponible tras la transcripción</string>
     <string name="ui_actions_not_readable">No disponible para esta transcripción</string>
-    <string name="ui_actions_subrip_body">funciona en la mayoría de reproductores de video</string>
-    <string name="ui_actions_webvtt_body">para reproductores web</string>
     <string name="ui_actions_saved_file">Se guardó “%1$s”</string>
     <string name="ui_actions_save_failed">No se pudo guardar el archivo</string>
     <string name="ui_actions_share">Compartir %1$s</string>

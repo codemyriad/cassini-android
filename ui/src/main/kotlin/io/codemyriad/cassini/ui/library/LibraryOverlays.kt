@@ -13,12 +13,11 @@ import io.codemyriad.cassini.ui.components.RenameDialog
 import io.codemyriad.cassini.ui.components.RenameDialogContent
 import io.codemyriad.cassini.ui.note.DocumentInfoDialog
 import io.codemyriad.cassini.ui.note.NoteActionsSheet
-import io.codemyriad.cassini.ui.note.SubtitleFormatSheet
 import io.codemyriad.cassini.ui.note.startOverSpec
 import io.codemyriad.cassini.ui.note.stopAndTrashSpec
 import io.codemyriad.cassini.ui.note.transcribeFreshSpec
 
-/** A Library sheet in its window: the Note actions sheet, the subtitle chooser, or Document info (a dialog). */
+/** A Library sheet in its window: the Note actions sheet or Document info (a dialog). */
 @Composable
 internal fun LibrarySheetWindow(sheet: LibrarySheet, onEvent: (LibraryEvent) -> Unit) {
     val dismiss = { onEvent(LibraryEvent.DismissSheet) }
@@ -26,10 +25,6 @@ internal fun LibrarySheetWindow(sheet: LibrarySheet, onEvent: (LibraryEvent) -> 
         is LibrarySheet.Actions -> NoteActionsSheet(
             ui = sheet.ui,
             onAction = { onEvent(LibraryEvent.SheetAction(it)) },
-            onDismiss = dismiss,
-        )
-        is LibrarySheet.SubtitleFormat -> SubtitleFormatSheet(
-            onExport = { onEvent(LibraryEvent.Export(sheet.id, it)) },
             onDismiss = dismiss,
         )
         is LibrarySheet.Info -> DocumentInfoDialog(ui = sheet.ui, onDismiss = dismiss)

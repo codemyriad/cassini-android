@@ -15,6 +15,7 @@ import io.codemyriad.cassini.data.notes.recordingTime
 import io.codemyriad.cassini.engine.job.DownloadProgress
 import io.codemyriad.cassini.engine.job.JobPhase
 import io.codemyriad.cassini.engine.job.TimeLeft
+import io.codemyriad.cassini.note.NoteExports
 import io.codemyriad.cassini.notices.ImportState
 import io.codemyriad.cassini.notices.Notices
 import io.codemyriad.cassini.processing.InstallState
@@ -322,7 +323,7 @@ object LibraryMapping {
             ?: details.variants.firstOrNull { it.isDefault }
             ?: details.variants.minByOrNull { it.ordinal }
         val document = note.audioKind == AudioKind.DOCUMENT
-        val readable = note.documentState !in UNREADABLE_STATES
+        val textExport = NoteExports.textExportEnabled(details)
         val namesCarry = voiceModelReady &&
             details.speakers.any { it.variantId == selected?.variantId && !it.isPlaceholder }
         return NoteActionsUi(
@@ -336,9 +337,10 @@ object LibraryMapping {
             documentKind = if (document) {
                 DocumentKindUi.Document
             } else {
-                DocumentKindUi.Plain(note.audioFile.substringAfterLast('.', "opus"))
+                DocumentKindUi.Plain(note.audioFile.substringAfterLast('.', "opus"), imported = note.origin.imported)
             },
-            textExportEnabled = document && readable && selected?.readable == true,
+            textExportEnabled = textExport,
+            transcriptUnreadable = document && !textExport,
             transcribeRow = transcribeRow(details, namesCarry),
             busyRow = NoteAction.STOP.takeIf { stopBusy && details.job?.state == JobState.RUNNING },
             recording = note.audioKind == AudioKind.LIVE_CAPTURE && note.id == activeNoteId,
@@ -369,9 +371,6 @@ object LibraryMapping {
     /** Whether Transcribe again on [details] makes a fresh document, which needs a confirmation first. */
     fun needsFreshConfirmation(details: NoteDetails): Boolean =
         details.note.audioKind == AudioKind.DOCUMENT && details.note.documentState in FRESH_STATES
-
-    private val UNREADABLE_STATES =
-        setOf(DocumentState.UNREADABLE, DocumentState.INVALID_METADATA, DocumentState.UNKNOWN_FORMAT)
 
     private val REFUSED_STATES = setOf(DocumentState.UNVERIFIED, DocumentState.UNKNOWN_FORMAT)
 

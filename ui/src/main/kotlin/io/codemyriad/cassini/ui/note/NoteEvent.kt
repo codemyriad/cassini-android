@@ -83,10 +83,6 @@ sealed interface NoteEvent {
     @Immutable
     data class SheetAction(val action: NoteAction) : NoteEvent
 
-    /** An export, after the subtitle chooser for SRT and VTT. */
-    @Immutable
-    data class Export(val kind: ExportKind) : NoteEvent
-
     @Immutable
     data class RenameConfirmed(val title: String) : NoteEvent
 

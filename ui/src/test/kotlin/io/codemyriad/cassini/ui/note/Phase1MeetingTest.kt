@@ -76,7 +76,7 @@ class Phase1MeetingTest {
         rule.onNodeWithTag("meeting-scrolled-edge").assertIsDisplayed()
         rule.onNodeWithContentDescription("Back to all meetings").assertIsDisplayed()
         rule.onNodeWithContentDescription("Search in transcript").assertIsDisplayed()
-        rule.onNodeWithContentDescription("Share Cassini document").assertIsDisplayed()
+        rule.onNodeWithContentDescription("Share Cassini file").assertIsDisplayed()
     }
 
     @Test fun inlineNamesAndAllTopActionsKeepTheirExistingEvents() {
@@ -85,7 +85,7 @@ class Phase1MeetingTest {
         show(base.copy(playback = null), onEvent = { events += it })
         val speaker = base.turns.first()
         rule.onNodeWithTag("meeting-speaker-${speaker.speakerId}").performClick()
-        rule.onNodeWithContentDescription("Share Cassini document").performClick()
+        rule.onNodeWithContentDescription("Share Cassini file").performClick()
         rule.onNodeWithContentDescription("Search in transcript").performClick()
         rule.onNodeWithContentDescription("More actions").performClick()
         rule.runOnIdle {
