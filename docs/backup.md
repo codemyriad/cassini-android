@@ -154,11 +154,15 @@ from unchanged received bytes. AppGraph tests verify that its catalogue cannot e
 jobs or unvalidated rows, and invalid input prevents the live database from opening. These assertions
 use state and injected events, not elapsed-time budgets.
 
-The real API 35 arm64 local-transport matrix checks cloud refusal despite a stored opt-in, transfer
-off/on, a 26 MiB library exceeding the local D2D quota, a smaller successful retry with the warning
-cleared, and verified restores before and after that retry. Restored notes retain UTC, words and
-speaker labels; synthetic saved-voice matching works; models and unfinished jobs are excluded.
-Current commands, APK hashes and reports are retained with the PR evidence.
+The real API 35 arm64 local-transport matrix (`scripts/check-backup-transport.py`) starts from a fresh install
+with the D98 defaults (cloud backup, transfer and saved voices on, no choices file). It checks that an unencrypted
+cloud transport is refused despite cloud backup being on, that encrypted cloud is refused with cloud backup off and
+accepted with it on, transfer off/on, a 26 MiB library exceeding the local D2D quota, a smaller successful retry
+with the warning cleared, and verified restores before and after that retry. Each restored phone has no choices
+file and reads the D98 defaults: the source phone's choices never travel. Restored notes retain UTC, words and
+speaker labels; synthetic saved-voice matching works; models and unfinished jobs are excluded. The D97 run's
+commands, APK hashes and reports are retained with that PR's evidence; the D98 matrix needs an arm64 host and has
+not yet been rerun on this branch.
 
 To repeat on a task-owned disposable emulator, build the debug app and instrumentation APKs, then
 run `python3 scripts/check-backup-transport.py --help` for the SDK, APK and external output paths.
