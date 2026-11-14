@@ -459,7 +459,7 @@
     <string name="ui_banner_rec_stopped_file_title">Gravação interrompida — ficheiro cheio</string>
     <string name="ui_banner_rec_stopped_file_body">O Cassini termina as gravações M4A ao atingir 1\u00A0GB, cerca de 74\u00A0horas. A gravação até agora está guardada. Inicie uma nova gravação para continuar.</string>
     <string name="ui_banner_rec_file_low_title">Ficheiro de gravação quase cheio — restam cerca de %1$s</string>
-    <string name="ui_banner_rec_file_low_body">O Cassini termina as gravações M4A ao atingir 1\u00A0GB e guarda-as. Para continuar, termine e inicie uma nova gravação.</string>
+    <string name="ui_banner_rec_file_low_body">O Cassini termina as gravações M4A ao atingir 1\u00A0GB e guarda-as. Para continuar, pare e inicie uma nova gravação.</string>
     <string name="ui_banner_rec_stopped_storage_title">Gravação interrompida — armazenamento quase cheio</string>
     <string name="ui_banner_rec_stopped_storage_body">Menos de %1$s livres. A gravação até agora está guardada.</string>
     <string name="ui_banner_rec_mic_off_title">O acesso ao microfone está desativado</string>

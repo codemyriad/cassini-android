@@ -256,7 +256,7 @@ class BannerKindTest {
             title(BannerKind.REC_STORAGE_LOW, BannerArgs(ms1 = 10 * MIN, fileLimit = true)),
         )
         assertEquals(
-            "Cassini ends M4A recordings at 1\u00A0GB and saves them. To keep going, finish and start a new recording.",
+            "Cassini ends M4A recordings at 1\u00A0GB and saves them. To keep going, stop and start a new recording.",
             BannerText.body(res, BannerKind.REC_STORAGE_LOW, BannerArgs(fileLimit = true), f),
         )
         assertEquals(
