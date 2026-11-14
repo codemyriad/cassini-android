@@ -61,9 +61,9 @@ class Wave5StringsTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'SHA-256'):
             list(WAVE5.generated(self.root))
 
-    def test_the_phase1_catalog_keeps_the_phone_received_badge_until_l10(self):
+    def test_the_phase1_catalog_carries_the_l10_imported_badge(self):
         phase1 = {e['id']: e for e in json.loads((self.root / PIN.VENDOR / 'strings.json').read_text())['entries']}
-        self.assertEqual('Received', phase1['states.badge.received']['en'])
+        self.assertEqual('Imported', phase1['states.badge.received']['en'])
 
 
 if __name__ == '__main__':

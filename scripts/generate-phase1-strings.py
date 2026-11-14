@@ -83,6 +83,24 @@ LABELS = {
     'tx_suggestion_yes': ('transcribing.speakerSuggestion.yes', None),
     'tx_suggestion_no': ('transcribing.speakerSuggestion.no', None),
 }
+# L-10 (D99): the Meeting header subtitle of an imported meeting is the catalog's `format.previewSubtitle` followed by
+# the words after `{duration}` of these entries. Android keeps building the day, time and duration itself (the "Date
+# unknown" label included), so only that suffix is generated; `provenance_suffix` checks the rest is unchanged.
+SUFFIXES = {
+    'subtitle_imported': 'format.previewSubtitle.received',
+    'subtitle_imported_other_device': 'format.previewSubtitle.importedOtherDevice',
+}
+SUBTITLE = 'format.previewSubtitle'
+SUBTITLE_PLACEHOLDERS = {'day', 'time', 'duration'}
+SEPARATOR = ' · '
+
+
+def provenance_suffix(base, text):
+    """The words after `{duration} · ` of [text], which must start with the plain subtitle [base]."""
+    prefix = base + SEPARATOR
+    if not base.endswith('{duration}') or not text.startswith(prefix) or '{' in text[len(prefix):]:
+        raise ValueError('Imported subtitle no longer extends the plain subtitle')
+    return text[len(prefix):]
 
 
 def android_text(text, argument, *, literal=False):
@@ -129,6 +147,14 @@ def generated(root):
                 text = entry['en'] if locale == 'en' else entry['l10n'][locale]['text']
                 value = android_text(text, argument)
                 lines.append(f'    <string name="ui_{name}">{value}</string>')
+        base = entries[SUBTITLE]['en'] if locale == 'en' else entries[SUBTITLE]['l10n'][locale]['text']
+        for name, identifier in SUFFIXES.items():
+            entry = entries[identifier]
+            if set(entry.get('placeholders', {})) != SUBTITLE_PLACEHOLDERS:
+                raise ValueError(f'Shared placeholder declaration changed: {identifier}')
+            text = entry['en'] if locale == 'en' else entry['l10n'][locale]['text']
+            value = android_text(provenance_suffix(base, text), None)
+            lines.append(f'    <string name="ui_{name}">{value}</string>')
         lines.append('</resources>')
         yield root / 'ui/src/main/res' / qualifier / 'phase1.xml', '\n'.join(lines) + '\n'
 

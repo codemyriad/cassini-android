@@ -426,7 +426,7 @@ class NoteViewModel(
         return NoteUiState(
             noteId = noteId,
             title = note.title,
-            subtitle = NoteMapping.subtitle(note, now, clock.zone),
+            subtitle = NoteMapping.subtitle(note, now, clock.zone, NoteMapping.selected(details)),
             mode = mode,
             readOnlyReason = NoteMapping.readOnly(details, mode, core.namingOpen),
             chips = if (draft) null else NoteMapping.chips(details),

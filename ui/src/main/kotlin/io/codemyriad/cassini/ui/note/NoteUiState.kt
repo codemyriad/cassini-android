@@ -51,14 +51,24 @@ data class NoteUiState(
     val noWords: Boolean = false,
 )
 
-/** The top bar subtitle: "<day>, <time> · <duration>". */
+/**
+ * The top bar and meeting header subtitle: "<day>, <time> · <duration>", followed for a note not recorded on this
+ * device by its [provenance] (L-10, D99: "… · Imported", or "… · Imported · Transcribed on another device").
+ */
 @Immutable
 data class NoteSubtitleUi(
     val day: DayLabel,
     val time: LocalTime,
     val durationMs: Long,
     val recordedLabel: String? = null,
+    val provenance: ProvenanceUi? = null,
 )
+
+/**
+ * How an imported note came here (cassini-ux `format.previewSubtitle.received` and `.importedOtherDevice`): any
+ * imported note, or an imported Cassini file whose transcript on screen was made on another device.
+ */
+enum class ProvenanceUi { IMPORTED, IMPORTED_OTHER_DEVICE }
 
 /** The mode of the Note screen (features.md section 3, table). */
 sealed interface NoteMode {

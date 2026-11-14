@@ -1,7 +1,9 @@
 package io.codemyriad.cassini.note
 
 import io.codemyriad.cassini.core.asr.ProgressAnchor
+import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobState
+import io.codemyriad.cassini.core.library.Origin
 import io.codemyriad.cassini.engine.job.BatteryLine
 import io.codemyriad.cassini.engine.job.JobPhase
 import io.codemyriad.cassini.engine.job.ProgressHeadline
@@ -11,6 +13,7 @@ import io.codemyriad.cassini.engine.job.TimeLeft
 import io.codemyriad.cassini.processing.NoteJobState
 import io.codemyriad.cassini.ui.components.TrackAnchor
 import io.codemyriad.cassini.ui.note.NoteMode
+import io.codemyriad.cassini.ui.note.ProvenanceUi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -37,6 +40,38 @@ class NoteMappingTest {
         assertEquals(io.codemyriad.cassini.ui.format.DayLabel.Unknown, unknown.day)
         val local = NoteMapping.subtitle(note.copy(recordedAt = "2026-10-07T23:59:00"), now, zone)
         assertEquals("2026-10-07T23:59:00", local.recordedLabel)
+    }
+
+    @Test fun provenanceMarksEveryNoteNotRecordedHere() {
+        val details = documentNote()
+        val note = details.note
+        val variant = details.variants.single()
+        assertNull(NoteMapping.provenance(note, variant))
+        assertNull(NoteMapping.provenance(note.copy(origin = Origin.RECOVERED), variant))
+        val plain = note.copy(origin = Origin.IMPORTED_AUDIO, audioKind = AudioKind.PLAIN)
+        assertEquals(ProvenanceUi.IMPORTED, NoteMapping.provenance(plain, null))
+        // Imported audio transcribed on this phone keeps Imported without the attribution.
+        val transcribedHere = note.copy(origin = Origin.IMPORTED_AUDIO)
+        assertEquals(ProvenanceUi.IMPORTED, NoteMapping.provenance(transcribedHere, variant))
+    }
+
+    @Test fun anImportedCassiniFileWithItsOwnTranscriptWasTranscribedElsewhere() {
+        val details = documentNote()
+        val variant = details.variants.single()
+        val added = java.time.Instant.parse(requireNotNull(variant.createdAtUtc)).toEpochMilli()
+        val note = details.note.copy(origin = Origin.IMPORTED_DOCUMENT, addedAt = added + 1)
+        assertEquals(ProvenanceUi.IMPORTED_OTHER_DEVICE, NoteMapping.provenance(note, variant))
+        val undated = variant.copy(createdAtUtc = null)
+        assertEquals(ProvenanceUi.IMPORTED_OTHER_DEVICE, NoteMapping.provenance(note, undated))
+        // A variant written here after the import, an empty transcript (D12) or an unreadable one is not.
+        assertEquals(ProvenanceUi.IMPORTED, NoteMapping.provenance(note.copy(addedAt = added), variant))
+        assertEquals(ProvenanceUi.IMPORTED, NoteMapping.provenance(note, variant.copy(wordCount = 0)))
+        assertEquals(ProvenanceUi.IMPORTED, NoteMapping.provenance(note, variant.copy(readable = false)))
+        assertEquals(ProvenanceUi.IMPORTED, NoteMapping.provenance(note, variant.copy(createdAtUtc = "not a time")))
+        assertEquals(ProvenanceUi.IMPORTED, NoteMapping.provenance(note, null))
+        val now = io.codemyriad.cassini.library.NOW
+        val subtitle = NoteMapping.subtitle(note, now, io.codemyriad.cassini.library.ROME, variant)
+        assertEquals(ProvenanceUi.IMPORTED_OTHER_DEVICE, subtitle.provenance)
     }
 
     @Test

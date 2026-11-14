@@ -4,6 +4,7 @@ import io.codemyriad.cassini.core.format.DocumentState
 import io.codemyriad.cassini.core.format.Transcript
 import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobState
+import io.codemyriad.cassini.core.library.Origin
 import io.codemyriad.cassini.core.library.VariantKind
 import io.codemyriad.cassini.core.models.ModelCatalog
 import io.codemyriad.cassini.data.db.NoteDetails
@@ -28,6 +29,7 @@ import io.codemyriad.cassini.ui.format.TimeLeftUi
 import io.codemyriad.cassini.ui.note.NoteChipsUi
 import io.codemyriad.cassini.ui.note.NoteMode
 import io.codemyriad.cassini.ui.note.NoteSubtitleUi
+import io.codemyriad.cassini.ui.note.ProvenanceUi
 import io.codemyriad.cassini.ui.note.ReadOnlyReason
 import io.codemyriad.cassini.ui.note.TrustUi
 import io.codemyriad.cassini.ui.note.VersionChipUi
@@ -93,8 +95,11 @@ object NoteMapping {
     fun hasPlayer(mode: NoteMode): Boolean =
         mode !is NoteMode.Processing && mode != NoteMode.Unplayable && mode != NoteMode.Loading
 
-    /** Recording metadata for the native bar or the scrolling finished-meeting header. */
-    fun subtitle(note: NoteEntity, now: Instant, zone: ZoneId): NoteSubtitleUi {
+    /**
+     * Recording metadata for the native bar or the scrolling finished-meeting header, with the provenance of an
+     * imported note; [selected] is the variant on screen ([selected] of the details).
+     */
+    fun subtitle(note: NoteEntity, now: Instant, zone: ZoneId, selected: VariantEntity? = null): NoteSubtitleUi {
         val recording = note.recordingTime()
         val time = recording?.instant?.atZone(zone)?.toLocalTime() ?: java.time.LocalTime.MIDNIGHT
         return NoteSubtitleUi(
@@ -102,7 +107,28 @@ object NoteMapping {
             time,
             note.durationMs,
             recording?.label,
+            provenance(note, selected),
         )
+    }
+
+    /**
+     * L-10 (cassini-ux D99, as GNOME's L-57): null for a note recorded on this device, else Imported, or Imported
+     * and transcribed on another device when the transcript on screen came inside an imported Cassini file. A
+     * variant this app writes always has a `createdAtUtc` from after the import, so a variant without one, or from
+     * before the note was added, arrived with the file. An empty transcript (the audio-only Cassini file of D12) is
+     * not a transcript made elsewhere.
+     */
+    fun provenance(note: NoteEntity, selected: VariantEntity?): ProvenanceUi? = when {
+        !note.origin.imported -> null
+        selected != null && arrivedWithFile(note, selected) -> ProvenanceUi.IMPORTED_OTHER_DEVICE
+        else -> ProvenanceUi.IMPORTED
+    }
+
+    private fun arrivedWithFile(note: NoteEntity, variant: VariantEntity): Boolean {
+        val document = note.origin == Origin.IMPORTED_DOCUMENT && note.audioKind == AudioKind.DOCUMENT
+        val transcript = document && variant.readable && variant.wordCount > 0
+        val created = variant.createdAtUtc
+        return transcript && (created == null || instant(created)?.let { it.toEpochMilli() < note.addedAt } == true)
     }
 
     /** The trust chip of a document state. */
@@ -183,13 +209,14 @@ object NoteMapping {
     }
 
     /** When a variant was made: its `createdAtUtc`, else the note's recording time. */
-    fun createdAt(variant: VariantEntity, note: NoteEntity): Instant? = variant.createdAtUtc?.let {
-        try {
-            Instant.parse(it)
-        } catch (_: DateTimeParseException) {
-            null
-        }
-    } ?: note.recordingTime()?.instant
+    fun createdAt(variant: VariantEntity, note: NoteEntity): Instant? =
+        variant.createdAtUtc?.let(::instant) ?: note.recordingTime()?.instant
+
+    private fun instant(text: String): Instant? = try {
+        Instant.parse(text)
+    } catch (_: DateTimeParseException) {
+        null
+    }
 
     // The progress card. ------------------------------------------------------------------------------------------
 

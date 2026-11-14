@@ -4,7 +4,19 @@ package io.codemyriad.cassini.core.library
 // never by ordinal, so the declaration order is free but every name is persisted.
 
 /** How a note came to exist. Persisted by name, never rename. */
-enum class Origin { RECORDED, IMPORTED_AUDIO, IMPORTED_DOCUMENT, RECOVERED }
+enum class Origin {
+    RECORDED,
+    IMPORTED_AUDIO,
+    IMPORTED_DOCUMENT,
+    RECOVERED,
+    ;
+
+    /**
+     * Whether the note was not recorded on this device: cassini-ux `origin != own`, shown as "Imported" (L-10, D99).
+     * A recovered capture is this device's own recording.
+     */
+    val imported: Boolean get() = this == IMPORTED_AUDIO || this == IMPORTED_DOCUMENT
+}
 
 /**
  * What the note's audio file is: a capture still being written, plain audio without a transcript, a Cassini

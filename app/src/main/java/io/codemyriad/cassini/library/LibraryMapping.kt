@@ -112,6 +112,7 @@ object LibraryMapping {
             preview = hit?.snippet,
             highlighted = row.id == context.runningNoteId || row.jobState == JobState.RUNNING,
             transcriptionMinutes = context.transcriptionMinutes.takeIf { row.id == context.runningNoteId },
+            imported = row.origin.imported,
         )
     }
 

@@ -51,7 +51,8 @@ data class Highlighted(
 /**
  * One Library row (ui.md section 7). [titleRanges] highlight a title match. [day] is set in the flat search
  * results, where the meta line shows the day too; in day sections it is null (the section header names the day).
- * [highlighted] puts the row on surface (the running note).
+ * [highlighted] puts the row on surface (the running note). [imported] marks a note not recorded on this device
+ * (L-10): a finished row shows the outline "Imported" badge before its speaker-count pill.
  *
  * ui.md section 7 gives this field as `date: LocalDate?`. It is a [DayLabel] here, which the ViewModel classifies
  * with its clock (ui.md section 2: the UI never asks what today is), so a result from today reads "Today, 09:12".
@@ -69,6 +70,7 @@ data class NoteRowUi(
     val highlighted: Boolean = false,
     val transcriptionMinutes: Long? = null,
     val recordedLabel: String? = null,
+    val imported: Boolean = false,
 )
 
 /** What a Library row asks for: open, the long press, the inline suffixes and the TalkBack custom actions. */
