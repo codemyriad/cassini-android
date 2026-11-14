@@ -35,8 +35,8 @@ metadata = {
     "source": BASE, "revision": REVISION, "filename": FILENAME,
     "reference": row[2], "license": "CC-BY-4.0", "attribution": "Google FLEURS contributors (https://huggingface.co/datasets/google/fleurs)",
     "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
-    "modifications": "Extracted from dev.tar.gz and converted with ffmpeg to 16 kHz mono PCM16 WAV, AAC (M4A), MP3, native FLAC and "
-    "Opus for decoder checks. Nothing was cut or edited.",
+    "modifications": "Extracted from dev.tar.gz and converted with ffmpeg to 16 kHz mono PCM16 WAV, "
+    "AAC (M4A), MP3, native FLAC and Opus for decoder checks. Nothing was cut or edited.",
 }
 for suffix, options in {
     "flac": ["-c:a", "flac"],
