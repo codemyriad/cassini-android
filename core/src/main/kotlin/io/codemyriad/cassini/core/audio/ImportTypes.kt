@@ -101,16 +101,24 @@ object ImportTypes {
         val mime = normalizedMime(mimeType)
         val type = extension?.let { ext -> DECIDED.firstOrNull { ext in it.extensions } }
         return when {
-            mime != null && REJECTED_MIME_PREFIXES.any { mime.startsWith(it) } -> Verdict.REJECT
-            mime != null && mime in OPEN_MIME_TYPES -> Verdict.REJECT
-            extension != null && (extension in REJECTED_EXTENSIONS || extension in OPEN_EXTENSIONS) -> Verdict.REJECT
-            extension != null && type == null -> Verdict.REJECT
+            rejected(extension, mime, type) -> Verdict.REJECT
             type == OPUS_OGG -> Verdict.VALIDATE
             type != null -> if (mime in OPUS_OGG.compatibilityMimeTypes) Verdict.VALIDATE else Verdict.ACCEPT
             mime != null && DECIDED.any { it != OPUS_OGG && (mime in it.mimeTypes || mime in it.androidMimeTypes) } ->
                 Verdict.ACCEPT
             else -> Verdict.REJECT
         }
+    }
+
+    /**
+     * A rejected or open MIME type, or an extension that is rejected, open or not of a decided [type], whatever else
+     * the input reports.
+     */
+    private fun rejected(extension: String?, mime: String?, type: Type?): Boolean {
+        val badMime = mime != null && (REJECTED_MIME_PREFIXES.any { mime.startsWith(it) } || mime in OPEN_MIME_TYPES)
+        val badExtension = extension != null &&
+            (extension in REJECTED_EXTENSIONS || extension in OPEN_EXTENSIONS || type == null)
+        return badMime || badExtension
     }
 
     /**
@@ -122,18 +130,17 @@ object ImportTypes {
      */
     fun contentValidated(head: ByteArray, length: Int = head.size): Boolean {
         val end = length.coerceIn(0, head.size)
-        val first = page(head, 0, end) ?: return false
-        if (!first.bos || !startsWith(head, first.payload, end, OPUS_HEAD)) return false
-        val second = page(head, first.next, end) ?: return false
-        return !second.bos && second.serial == first.serial && startsWith(head, second.payload, end, OPUS_TAGS)
+        val first = page(head, 0, end)?.takeIf { it.bos && startsWith(head, it.payload, end, OPUS_HEAD) }
+        val second = first?.let { page(head, it.next, end) }
+        return first != null && second != null && !second.bos && second.serial == first.serial &&
+            startsWith(head, second.payload, end, OPUS_TAGS)
     }
 
     /** The lower-case extension of [displayName] with its dot, or null when the name has none. */
     fun extensionOf(displayName: String?): String? {
         val name = displayName?.trim()?.substringAfterLast('/')?.substringAfterLast('\\') ?: return null
         val dot = name.lastIndexOf('.')
-        if (dot <= 0 || dot == name.length - 1) return null
-        return name.substring(dot).lowercase(Locale.ROOT)
+        return if (dot <= 0 || dot == name.length - 1) null else name.substring(dot).lowercase(Locale.ROOT)
     }
 
     private fun normalizedMime(mimeType: String?): String? =
@@ -144,24 +151,28 @@ object ImportTypes {
     /** The Ogg page header at [offset] (RFC 3533 section 6), or null when it is not one or does not fit in [end]. */
     @Suppress("MagicNumber") // RFC 3533 header layout.
     private fun page(bytes: ByteArray, offset: Int, end: Int): Page? {
-        if (offset < 0 || offset + 27 > end || !startsWith(bytes, offset, end, OGG_CAPTURE)) return null
-        if (bytes[offset + 4].toInt() != 0) return null
+        // Short-circuit order: each byte read is inside the bounds checked before it.
+        val header = offset >= 0 && offset + 27 <= end && startsWith(bytes, offset, end, OGG_CAPTURE) &&
+            bytes[offset + 4].toInt() == 0 && offset + 27 + (bytes[offset + 26].toInt() and 0xff) <= end
+        if (!header) return null
         val segments = bytes[offset + 26].toInt() and 0xff
         val payload = offset + 27 + segments
-        if (payload > end) return null
         var size = 0
         for (i in 0 until segments) size += bytes[offset + 27 + i].toInt() and 0xff
         val serial = (bytes[offset + 14].toInt() and 0xff) or
             ((bytes[offset + 15].toInt() and 0xff) shl 8) or
             ((bytes[offset + 16].toInt() and 0xff) shl 16) or
             ((bytes[offset + 17].toInt() and 0xff) shl 24)
-        return Page(bos = bytes[offset + 5].toInt() and 0x02 != 0, serial = serial, payload = payload, next = payload + size)
+        return Page(
+            bos = bytes[offset + 5].toInt() and 0x02 != 0,
+            serial = serial,
+            payload = payload,
+            next = payload + size
+        )
     }
 
     private fun startsWith(bytes: ByteArray, offset: Int, end: Int, prefix: ByteArray): Boolean {
-        if (offset < 0 || offset + prefix.size > end) return false
-        for (i in prefix.indices) if (bytes[offset + i] != prefix[i]) return false
-        return true
+        return offset >= 0 && offset + prefix.size <= end && prefix.indices.all { bytes[offset + it] == prefix[it] }
     }
 
     private fun bytes(text: String) = text.toByteArray(Charsets.US_ASCII)

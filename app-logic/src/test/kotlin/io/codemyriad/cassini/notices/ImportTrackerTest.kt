@@ -82,7 +82,10 @@ class ImportTrackerTest {
         assertEquals(listOf(ImportCard(1, "good.m4a")), tracker.state.value.cards)
         tracker.start("bad").await()
         assertEquals("bad", entered.receive())
-        assertEquals(listOf(ImportCard(1, "good.m4a"), ImportCard(2, "bad.m4a", Failure.OPEN)), tracker.state.value.cards)
+        assertEquals(
+            listOf(ImportCard(1, "good.m4a"), ImportCard(2, "bad.m4a", Failure.OPEN)),
+            tracker.state.value.cards
+        )
         assertEquals(ImportFailure(Failure.OPEN, at = 3), tracker.state.value.failure)
         assertEquals(listOf("good.m4a"), tracker.state.value.running)
         release.complete("ok")
@@ -111,7 +114,10 @@ class ImportTrackerTest {
         assertEquals(listOf("a.mp3", "b.wav", "Imported audio"), tracker.state.value.running)
         tracker.finish(a)
         tracker.finish(b, Failure.OPEN)
-        assertEquals(listOf(ImportCard(b, "b.wav", Failure.OPEN), ImportCard(c, "Imported audio")), tracker.state.value.cards)
+        assertEquals(
+            listOf(ImportCard(b, "b.wav", Failure.OPEN), ImportCard(c, "Imported audio")),
+            tracker.state.value.cards
+        )
         assertNull("the picker shows its own summary", tracker.state.value.failure)
         tracker.dismissCard(c)
         assertEquals("a running card cannot be dismissed", 2, tracker.state.value.cards.size)

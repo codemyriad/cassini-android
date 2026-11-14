@@ -39,7 +39,10 @@ class ImportTypesTest {
             assertEquals(type.id, entry.getJSONArray("compatibilityMimeTypes").strings(), type.compatibilityMimeTypes)
             assertEquals(type.id, entry.getJSONArray("androidMimeTypes").strings(), type.androidMimeTypes)
         }
-        assertEquals(decided.flatMap { it.getJSONArray("androidMimeTypes").strings() }.distinct(), ImportTypes.ANDROID_MIME_TYPES)
+        assertEquals(
+            decided.flatMap { it.getJSONArray("androidMimeTypes").strings() }.distinct(),
+            ImportTypes.ANDROID_MIME_TYPES
+        )
     }
 
     @Test fun openEntriesAreTrackedAndNeverAccepted() {
@@ -103,7 +106,8 @@ class ImportTypesTest {
     }
 
     @Test fun oggOpusPassesTheStreamCheck() {
-        val file = ogg(page(bos = true, serial = 7, payload = opusHead()), page(bos = false, serial = 7, payload = opusTags()))
+        val file =
+            ogg(page(bos = true, serial = 7, payload = opusHead()), page(bos = false, serial = 7, payload = opusTags()))
         assertTrue(ImportTypes.contentValidated(file))
         assertTrue("a longer file is read only to its head", ImportTypes.contentValidated(file + ByteArray(5000)))
     }
@@ -119,10 +123,15 @@ class ImportTypesTest {
         assertEquals(8, magics.size)
         for (magic in magics) {
             val payload = magic + ByteArray(40)
-            val single = ogg(page(bos = true, serial = 3, payload = payload), page(bos = false, serial = 3, payload = opusTags()))
+            val single =
+                ogg(
+                    page(bos = true, serial = 3, payload = payload),
+                    page(bos = false, serial = 3, payload = opusTags())
+                )
             assertFalse(magic.toHex(), ImportTypes.contentValidated(single))
             // Opus multiplexed with video: the second page is another stream's BOS page.
-            val multiplexed = ogg(page(bos = true, serial = 3, payload = opusHead()), page(bos = true, serial = 4, payload = payload))
+            val multiplexed =
+                ogg(page(bos = true, serial = 3, payload = opusHead()), page(bos = true, serial = 4, payload = payload))
             assertFalse("multiplexed ${magic.toHex()}", ImportTypes.contentValidated(multiplexed))
         }
     }
@@ -134,9 +143,18 @@ class ImportTypesTest {
         assertFalse("no second page", ImportTypes.contentValidated(head))
         assertFalse("empty", ImportTypes.contentValidated(ByteArray(0)))
         assertFalse("RIFF", ImportTypes.contentValidated("RIFF0000WAVEfmt ".toByteArray()))
-        assertFalse("first page without BOS", ImportTypes.contentValidated(ogg(page(bos = false, serial = 1, payload = opusHead()), tags)))
-        assertFalse("tags of another stream", ImportTypes.contentValidated(ogg(head, page(bos = false, serial = 2, payload = opusTags()))))
-        assertFalse("OpusHead twice", ImportTypes.contentValidated(ogg(head, page(bos = false, serial = 1, payload = opusHead()))))
+        assertFalse(
+            "first page without BOS",
+            ImportTypes.contentValidated(ogg(page(bos = false, serial = 1, payload = opusHead()), tags))
+        )
+        assertFalse(
+            "tags of another stream",
+            ImportTypes.contentValidated(ogg(head, page(bos = false, serial = 2, payload = opusTags())))
+        )
+        assertFalse(
+            "OpusHead twice",
+            ImportTypes.contentValidated(ogg(head, page(bos = false, serial = 1, payload = opusHead())))
+        )
         // The check needs every byte up to the end of the OpusTags magic, and no more.
         val needed = head.size + 27 + 1 + "OpusTags".length
         for (cut in 0 until needed) assertFalse("cut at $cut", ImportTypes.contentValidated(good, cut))

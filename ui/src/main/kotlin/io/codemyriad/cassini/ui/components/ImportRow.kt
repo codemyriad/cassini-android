@@ -1,5 +1,6 @@
-// Composables are nouns in PascalCase; the numbers are the Library row's board values (ui.md section 7).
-@file:Suppress("FunctionNaming", "MagicNumber")
+// Composables are nouns in PascalCase; the numbers are the Library row's board values (ui.md section 7). The file
+// is named after its composable, not after the ImportRowUi class it also holds.
+@file:Suppress("FunctionNaming", "MagicNumber", "MatchingDeclarationName")
 
 package io.codemyriad.cassini.ui.components
 

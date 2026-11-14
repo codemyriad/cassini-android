@@ -29,7 +29,15 @@ class OpenWithTest {
     }
 
     @Test fun everyDecidedAudioTypeOpensInTheApp() {
-        val types = listOf("audio/ogg", "audio/opus", "audio/mpeg", "audio/mp4", "audio/x-m4a", "audio/wav", "audio/x-wav")
+        val types = listOf(
+            "audio/ogg",
+            "audio/opus",
+            "audio/mpeg",
+            "audio/mp4",
+            "audio/x-m4a",
+            "audio/wav",
+            "audio/x-wav"
+        )
         assertEquals(types.toSet(), types.toSet() intersect ImportTypes.ANDROID_MIME_TYPES.toSet())
         for (type in ImportTypes.ANDROID_MIME_TYPES) {
             assertEquals(type, listOf(MainActivity::class.java.name), handlers(type))
@@ -54,7 +62,15 @@ class OpenWithTest {
     }
 
     @Test fun otherTypesDoNot() {
-        for (type in listOf("video/mp4", "video/ogg", "text/plain", "audio/flac", "audio/x-flac", "audio/aac", "application/ogg")) {
+        for (type in listOf(
+            "video/mp4",
+            "video/ogg",
+            "text/plain",
+            "audio/flac",
+            "audio/x-flac",
+            "audio/aac",
+            "application/ogg"
+        )) {
             assertTrue(type, handlers(type).isEmpty())
         }
     }

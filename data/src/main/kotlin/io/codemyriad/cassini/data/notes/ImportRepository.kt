@@ -207,15 +207,12 @@ class ImportRepository(
         return when (val copied = copy(uri, tmp, size)) {
             is Copy.Failed -> copied.outcome
             is Copy.Done -> try {
-                if (validate && !ImportTypes.contentValidated(head(tmp))) {
-                    ImportOutcome.Rejected(Failure.OPEN, "not an Ogg Opus stream")
-                } else {
-                    notes.liveWithSource(copied.sha256)?.let { ImportOutcome.Existing(it) }
-                        ?: when (val staged = locks.withNoteLock(id, dispatchers.io) { classify(tmp, description) }) {
-                            is Classified.Rejected -> staged.outcome
-                            is Classified.Audio -> insert(id, description.displayName, staged, copied.sha256)
-                        }
-                }
+                notOggOpus(tmp, validate)
+                    ?: notes.liveWithSource(copied.sha256)?.let { ImportOutcome.Existing(it) }
+                    ?: when (val staged = locks.withNoteLock(id, dispatchers.io) { classify(tmp, description) }) {
+                        is Classified.Rejected -> staged.outcome
+                        is Classified.Audio -> insert(id, description.displayName, staged, copied.sha256)
+                    }
             } catch (error: SQLiteFullException) {
                 ImportOutcome.Rejected(Failure.SPACE, error.message, neededBytes = copied.bytes + limits.minFreeBytes)
             } catch (error: SQLException) {
@@ -225,18 +222,6 @@ class ImportRepository(
                 lowSpace(size, copied.bytes) ?: ImportOutcome.Rejected(Failure.SAVE, error.message)
             }
         }
-    }
-
-    /** The first [ImportTypes.MIN_PROBE_BYTES] of [file], or all of it when it is shorter. */
-    private fun head(file: File): ByteArray = file.inputStream().use { input ->
-        val head = ByteArray(ImportTypes.MIN_PROBE_BYTES)
-        var n = 0
-        while (n < head.size) {
-            val read = input.read(head, n, head.size - n)
-            if (read < 0) break
-            n += read
-        }
-        head.copyOf(n)
     }
 
     /** Step 6: the row, written only when no live note has the same bytes by now. */
@@ -405,4 +390,24 @@ class ImportRepository(
             return fromName ?: MIME_EXTENSIONS[mime?.lowercase(Locale.ROOT)] ?: "bin"
         }
     }
+}
+
+/** Step 4: with [validate], OPEN when the head of [file] is not an Ogg Opus stream ([ImportTypes.contentValidated]). */
+private fun notOggOpus(file: File, validate: Boolean): ImportOutcome? =
+    if (validate && !ImportTypes.contentValidated(head(file))) {
+        ImportOutcome.Rejected(Failure.OPEN, "not an Ogg Opus stream")
+    } else {
+        null
+    }
+
+/** The first [ImportTypes.MIN_PROBE_BYTES] of [file], or all of it when it is shorter. */
+private fun head(file: File): ByteArray = file.inputStream().use { input ->
+    val head = ByteArray(ImportTypes.MIN_PROBE_BYTES)
+    var n = 0
+    while (n < head.size) {
+        val read = input.read(head, n, head.size - n)
+        if (read < 0) break
+        n += read
+    }
+    head.copyOf(n)
 }
