@@ -78,6 +78,9 @@ interface LibraryPorts {
 
     fun dismissNotice(kind: BannerKind)
 
+    /** Dismiss on the card of the failed import [id] (L-25, W4.6). */
+    fun dismissImport(id: Long)
+
     /** Reads the notification permission again (ON_RESUME). */
     fun refreshNotices()
 
@@ -160,6 +163,8 @@ class GraphLibraryPorts(private val graph: AppGraph, context: Context) : Library
     }
 
     override fun dismissNotice(kind: BannerKind) = graph.notices.dismiss(kind)
+
+    override fun dismissImport(id: Long) = graph.notices.imports.dismissCard(id)
 
     override fun refreshNotices() = graph.notices.refreshNotifications()
 

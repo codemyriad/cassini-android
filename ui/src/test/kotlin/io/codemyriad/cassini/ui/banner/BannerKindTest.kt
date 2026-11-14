@@ -303,7 +303,7 @@ class BannerKindTest {
 
     @Test fun flagsTonesAndGroups() {
         assertEquals(
-            setOf(BannerKind.TX_CALCULATING, BannerKind.TX_BATTERY),
+            setOf(BannerKind.TX_CALCULATING, BannerKind.TX_BATTERY, BannerKind.IMPORTING),
             BannerKind.entries.filterNot { it.appEmitted }.toSet(),
         )
         val dismissible = BannerKind.entries.filter { it.dismissible }.toSet()

@@ -214,7 +214,7 @@ private fun open(graph: AppGraph, backStack: NavBackStack<NavKey>, link: DeepLin
         }
         is DeepLink.Import -> {
             // Through the import tracker, so the Library shows "Importing <name>…" and a failure's banner.
-            graph.viewedImports.start(link.uri)
+            graph.viewedImports.start(link.uri, link.mimeType)
             return
         }
     }

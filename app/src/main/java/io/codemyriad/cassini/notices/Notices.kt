@@ -120,10 +120,8 @@ object Notices {
     }
 
     private fun imports(imports: ImportState): List<Notice> {
+        // A running import has its "Importing…" card in the list (L-25, W4.5; LibraryViewModel), not a banner.
         val notices = mutableListOf<Notice>()
-        imports.running.lastOrNull()?.let { name ->
-            notices += Notice(BannerSpec(BannerKind.IMPORTING, BannerArgs(text = name), announce = true))
-        }
         imports.failure?.let { failure ->
             val kind = when (failure.failure) {
                 Failure.LARGE -> BannerKind.IMPORT_TOO_LARGE

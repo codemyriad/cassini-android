@@ -2,6 +2,7 @@ package io.codemyriad.cassini.ui.library
 
 import androidx.compose.runtime.Immutable
 import io.codemyriad.cassini.ui.banner.BannerSpec
+import io.codemyriad.cassini.ui.components.ImportRowUi
 import io.codemyriad.cassini.ui.components.NoteRowUi
 import io.codemyriad.cassini.ui.components.SnackbarSpec
 import io.codemyriad.cassini.ui.format.DayLabel
@@ -18,6 +19,8 @@ import kotlinx.collections.immutable.persistentListOf
  * - [query] is the search field text. While searching, [results] (the flat list, newest first, possibly empty)
  *   replaces [sections]; null means no search.
  * - The activity area shows [recording], then [progress], then [banners] (the empty and no-match banners too).
+ * - [imports] are the import cards, oldest first, above the notes (L-25, W4.5 and W4.6): "Importing…" while an import
+ *   runs, "Needs attention" when it failed.
  * - [snackbar] is the "moved to trash" snackbar; [sheet] the Note actions sheet of a long-pressed row, or the
  *   subtitle chooser or Document info that a row of it opens; [dialog] a rename or a confirmation from that sheet.
  *
@@ -36,6 +39,7 @@ data class LibraryUiState(
     val recording: RecordingPillUi? = null,
     val progress: ProgressBannerUi? = null,
     val banners: ImmutableList<BannerSpec> = persistentListOf(),
+    val imports: ImmutableList<ImportRowUi> = persistentListOf(),
     val sections: ImmutableList<DaySection> = persistentListOf(),
     val results: ImmutableList<NoteRowUi>? = null,
     val snackbar: SnackbarSpec? = null,

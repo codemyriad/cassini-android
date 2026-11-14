@@ -109,6 +109,30 @@ class DeepLinksTest {
         assertNull("a share without a file", send(null))
         assertNull(send("https://example.org/a.mp3"))
         assertNull("a shared path", send("file:///data/data/io.codemyriad.cassini/files/x"))
+        // The intent's type travels with the link: the import's fallback when the provider reports none.
+        assertEquals(
+            DeepLink.Import("content://chat/part/1", "audio/ogg"),
+            DeepLinks.parse(
+                action = DeepLinks.ACTION_SEND,
+                data = null,
+                open = null,
+                noteId = null,
+                stream = "content://chat/part/1",
+                ownPackage = OWN,
+                type = "audio/ogg",
+            ),
+        )
+        assertEquals(
+            DeepLink.Import("content://chat/part/2", "audio/opus"),
+            DeepLinks.parse(
+                action = DeepLinks.ACTION_VIEW,
+                data = "content://chat/part/2",
+                open = null,
+                noteId = null,
+                ownPackage = OWN,
+                type = "audio/opus",
+            ),
+        )
     }
 
     @Test fun theLauncherAndUnknownExtrasAskForNothing() {

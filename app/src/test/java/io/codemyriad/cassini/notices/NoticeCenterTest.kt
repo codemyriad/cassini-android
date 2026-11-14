@@ -306,10 +306,9 @@ class NoticeCenterTest {
         )
         assertTrue(Notices.library(NoticeFacts(), LibraryFacts(liveNotes = 3, query = "x", results = null)).isEmpty())
 
-        val importing = only(
-            Notices.library(NoticeFacts(imports = ImportState(running = listOf("call.m4a"))), loading),
-        )
-        assertEquals(BannerSpec(BannerKind.IMPORTING, BannerArgs(text = "call.m4a"), announce = true), importing)
+        // A running import has its "Importing…" card in the list (L-25, W4.5), no banner.
+        val running = ImportState(cards = listOf(ImportCard(1, "call.m4a"), ImportCard(2, "old.ogg", Failure.OPEN)))
+        assertTrue(Notices.library(NoticeFacts(imports = running), loading).isEmpty())
 
         val failures = mapOf(
             Failure.LARGE to BannerKind.IMPORT_TOO_LARGE,
@@ -385,7 +384,7 @@ class NoticeCenterTest {
             recovered = RecoveredNotice(1, "n", 1, latestAt = 10),
             consented = false,
             encoderMissing = true,
-            imports = ImportState(running = listOf("a.mp3"), failure = ImportFailure(Failure.WAV, at = 5)),
+            imports = ImportState(listOf(ImportCard(1, "a.mp3")), failure = ImportFailure(Failure.WAV, at = 5)),
             downloadFailure = DownloadFailure(DownloadError.NO_CONNECTION, at = 9),
         )
         val kinds = Notices.library(facts, LibraryFacts(liveNotes = 0, audioOnly = true)).map { it.kind }
@@ -397,7 +396,6 @@ class NoticeCenterTest {
                 BannerKind.NO_ENCODER,
                 BannerKind.RECOVERED, // info, at 10
                 BannerKind.DL_RECORD_NOW,
-                BannerKind.IMPORTING,
                 BannerKind.LIB_EMPTY, // plain
             ),
             kinds,
@@ -424,7 +422,7 @@ class NoticeCenterTest {
                     encoderMissing = true,
                     notificationsOff = true,
                     jobRunning = true,
-                    imports = ImportState(running = listOf("x")),
+                    imports = ImportState(listOf(ImportCard(1, "x"))),
                 ),
                 LibraryFacts(liveNotes = 0, audioOnly = true),
             ),

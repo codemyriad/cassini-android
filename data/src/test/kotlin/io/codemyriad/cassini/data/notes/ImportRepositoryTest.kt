@@ -3,6 +3,7 @@ package io.codemyriad.cassini.data.notes
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import io.codemyriad.cassini.core.Failure
+import io.codemyriad.cassini.core.audio.ImportTypes
 import io.codemyriad.cassini.core.audio.Limits
 import io.codemyriad.cassini.core.format.CassiniDocument
 import io.codemyriad.cassini.core.format.DocumentState
@@ -181,6 +182,156 @@ class ImportRepositoryTest {
         assertEquals(0, h.db.notes().noteCount())
     }
 
+    // The shared import-types contract (L-25, D-1030): a file the person picked, opened with or shared. ------------
+
+    private fun rejectedOpen(outcome: ImportOutcome) =
+        assertTrue("expected OPEN, got $outcome", outcome is ImportOutcome.Rejected && outcome.failure == Failure.OPEN)
+
+    /** A provider that reports [mime] for every Uri, over the bytes of [file] named [name]. */
+    private fun typed(file: File, name: String, mime: String?) = object : ImportSource {
+        override fun describe(uri: Uri) = ImportSource.Description(name, file.length(), mime)
+
+        override fun open(uri: Uri) = file.inputStream()
+    }
+
+    private val provided = Uri.parse("content://com.example.files/document/7")
+
+    @Test fun checkedImportsTakeEveryDecidedType() = runTest {
+        val wav = created(importer().import(input(fleurs("wav"), "a.wav"), checkType = true))
+        val opus = created(importer().import(input(fleurs("opus"), "b.opus"), checkType = true))
+        val m4a = created(importer().import(input(fleurs("m4a"), "d.m4a"), checkType = true))
+        val mp3 = created(importer(typed(fleurs("mp3"), "e.mp3", "audio/mpeg")).import(provided, checkType = true))
+        assertEquals(4, setOf(wav, opus, m4a, mp3).size)
+        // The same Ogg Opus bytes as .ogg pass the stream check and find the note they already are.
+        assertEquals(ImportOutcome.Existing(opus), importer().import(input(fleurs("opus"), "c.ogg"), checkType = true))
+    }
+
+    @Test fun checkedImportsRejectOtherTypesBeforeTheCopy() = runTest {
+        for (name in listOf("take.flac", "clip.aac", "clip.ogv", "clip.oga", "clip.spx", "voice.amr", "notes.txt")) {
+            rejectedOpen(importer().import(input(fleurs("wav"), name), checkType = true))
+        }
+        rejectedOpen(importer(typed(fleurs("wav"), "a.wav", "video/x-wav")).import(provided, checkType = true))
+        rejectedOpen(importer(typed(fleurs("opus"), "a.ogg", "audio/flac")).import(provided, checkType = true))
+        // Without an extension the MIME type decides; Opus/Ogg then still needs the stream check.
+        rejectedOpen(importer(typed(fleurs("mp3"), "", "audio/ogg")).import(provided, checkType = true))
+        created(importer(typed(fleurs("wav"), "", "audio/x-wav")).import(provided, checkType = true))
+        // No display name: the Uri's last segment gives the extension, an opaque id gives none.
+        val unnamed = object : ImportSource {
+            override fun describe(uri: Uri) = ImportSource.Description(null, null)
+
+            override fun open(uri: Uri) = fleurs("mp3").inputStream()
+        }
+        rejectedOpen(importer(unnamed).import(Uri.parse("content://x/document/msf%3A24"), checkType = true))
+        created(importer(unnamed).import(Uri.parse("content://x/share/voice.mp3"), checkType = true))
+        assertEquals(1, probe.calls.get())
+        assertEquals(2, h.db.notes().noteCount())
+        assertEquals(2, noteDirs().size)
+    }
+
+    @Test fun checkedOggMustBeAnOggOpusStream() = runTest {
+        val video = File(inputs, "video.ogg").apply { writeBytes(theoraOgg()) }
+        rejectedOpen(importer().import(Uri.fromFile(video), checkType = true))
+        rejectedOpen(importer().import(input(fleurs("mp3"), "song.opus"), checkType = true))
+        // A compatibility MIME type needs the same check, whatever the extension.
+        rejectedOpen(importer(typed(fleurs("mp3"), "song.mp3", "application/ogg")).import(provided, checkType = true))
+        assertEquals(emptyList<String>(), noteDirs())
+        assertEquals(0, h.db.notes().noteCount())
+        created(importer(typed(fleurs("opus"), "voice.ogg", "application/ogg")).import(provided, checkType = true))
+    }
+
+    @Test fun anExtensionlessOpusShareIsImportedAfterTheStreamCheck() = runTest {
+        // A messaging app's voice note: an opaque Uri, no extension, only the MIME type.
+        created(importer(typed(fleurs("opus"), "Voice message", "audio/opus")).import(provided, checkType = true))
+        // A title with a dot is no extension; the MIME type still decides.
+        created(importer(typed(fleurs("mp3"), "Recording 14.11.2026", "audio/mpeg")).import(provided, checkType = true))
+        assertEquals(2, h.db.notes().noteCount())
+    }
+
+    @Test fun aDisplayNameWithoutAnExtensionLeavesTheTypeToTheUri() = runTest {
+        val untyped = object : ImportSource {
+            override fun describe(uri: Uri) = ImportSource.Description("Voice 08.15", null)
+
+            override fun open(uri: Uri) = fleurs("opus").inputStream()
+        }
+        val id = created(importer(untyped).import(Uri.parse("content://x/share/rec_01.opus"), checkType = true))
+        assertEquals("Voice 08.15", h.row(id).title)
+    }
+
+    @Test fun theIntentTypeStandsInWhenTheProviderReportsNone() = runTest {
+        val opaque = Uri.parse("content://chat/part/1234")
+        rejectedOpen(importer(typed(fleurs("opus"), "", null)).import(opaque, checkType = true))
+        created(importer(typed(fleurs("opus"), "", null)).import(opaque, checkType = true, mimeType = "audio/ogg"))
+        // The provider's own type wins over the intent's.
+        rejectedOpen(
+            importer(typed(fleurs("opus"), "", "video/ogg")).import(opaque, checkType = true, mimeType = "audio/ogg")
+        )
+    }
+
+    @Test fun aLargeOggVideoIsRejectedFromItsHeadWithoutACopy() = runTest {
+        // A 5 GiB Ogg video on a nearly full disk: OPEN (not LARGE, not SPACE), after reading only the probe bytes.
+        for (limits in listOf(ImportLimits(), ImportLimits(usableSpace = { 0L }))) {
+            val stream = CountingStream(theoraOgg(), Limits.MAX_IMPORT_BYTES + (1L shl 30))
+            val source = object : ImportSource {
+                override fun describe(uri: Uri) = ImportSource.Description("film.ogg", stream.length, "audio/ogg")
+
+                override fun open(uri: Uri) = stream
+            }
+            rejectedOpen(importer(source, limits).import(provided, checkType = true))
+            assertTrue("read ${stream.consumed} bytes", stream.consumed <= ImportTypes.MIN_PROBE_BYTES)
+            assertEquals(emptyList<String>(), noteDirs())
+        }
+    }
+
+    @Test fun aValidOggOpusStillMeetsTheSizeAndSpaceLimits() = runTest {
+        val big = typed(fleurs("opus"), "voice.ogg", "audio/ogg")
+        val large = object : ImportSource by big {
+            override fun describe(uri: Uri) = big.describe(uri).copy(size = Limits.MAX_IMPORT_BYTES + 1)
+        }
+        val outcome = importer(large).import(provided, checkType = true)
+        val tooLarge = outcome is ImportOutcome.Rejected && outcome.failure == Failure.LARGE
+        assertTrue("expected LARGE, got $outcome", tooLarge)
+        val full = importer(big, ImportLimits(usableSpace = { 0L })).import(provided, checkType = true)
+        assertTrue("expected SPACE, got $full", full is ImportOutcome.Rejected && full.failure == Failure.SPACE)
+        assertEquals(emptyList<String>(), noteDirs())
+    }
+
+    /** [head] followed by zeros up to [length] bytes, counting what was read; nothing is held in memory. */
+    private class CountingStream(private val head: ByteArray, val length: Long) : java.io.InputStream() {
+        var consumed = 0L
+            private set
+
+        override fun read(): Int {
+            if (consumed >= length) return -1
+            val byte = if (consumed < head.size) head[consumed.toInt()].toInt() and 0xff else 0
+            consumed++
+            return byte
+        }
+
+        override fun read(b: ByteArray, off: Int, len: Int): Int {
+            if (consumed >= length) return if (len == 0) 0 else -1
+            val n = minOf(len.toLong(), length - consumed).toInt()
+            for (i in 0 until n) {
+                val at = consumed + i
+                b[off + i] = if (at < head.size) head[at.toInt()] else 0
+            }
+            consumed += n
+            return n
+        }
+    }
+
+    @Test fun uncheckedImportsKeepTheirFormerFormats() = runTest {
+        // Archive entries of Cassini's own exports (BulkTransfers) skip the contract: an older note still restores.
+        created(importer().import(input(fleurs("mp3"), "song.opus")))
+        created(importer().import(input(fleurs("m4a"), "memo.aac")))
+    }
+
+    /** One Ogg page whose BOS packet is a Theora header, as at the head of an Ogg video. */
+    private fun theoraOgg(): ByteArray {
+        val payload = byteArrayOf(0x80.toByte()) + "theora".toByteArray() + ByteArray(35)
+        val header = "OggS".toByteArray() + byteArrayOf(0, 2) + ByteArray(8) + byteArrayOf(9, 0, 0, 0) + ByteArray(8)
+        return header + byteArrayOf(1, payload.size.toByte()) + payload
+    }
+
     @Test fun theSameBytesTwiceGiveTheExistingLiveNote() = runTest {
         val first = created(importer().import(input(fleurs("wav"), "a.wav")))
         val again = importer().import(input(fleurs("wav"), "another name.wav"))
@@ -332,6 +483,7 @@ class ImportRepositoryTest {
         assertEquals("Meeting.final", ImportRepository.titleOf("Meeting.final.MP3"))
         assertEquals(".opus", ImportRepository.titleOf(".opus"))
         assertEquals("meeting", ImportRepository.titleOf("  meeting  "))
+        assertEquals("Recording 14.11.2026", ImportRepository.titleOf("Recording 14.11.2026"))
         assertEquals(ImportRepository.FALLBACK_TITLE, ImportRepository.titleOf(null))
         assertEquals(ImportRepository.FALLBACK_TITLE, ImportRepository.titleOf("   "))
         assertEquals("Audio importato", ImportRepository.titleOf(null, "Audio importato"))

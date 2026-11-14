@@ -37,16 +37,30 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <!-- content:// only: Cassini reads the file with its own permissions, so it never takes a path. -->
                 <data android:scheme="content" />
-                <!-- Every audio file the Library's picker imports (LibraryViewModel.IMPORT_TYPES), not only Ogg. -->
-                <data android:mimeType="audio/*" />
-                <data android:mimeType="application/ogg" />
+                <!-- The decided androidMimeTypes of cassini-ux contract/import-types.json (ImportTypes; checked by
+                     scripts/check-import-types.py): Opus/Ogg, MP3, M4A and WAV, never FLAC or a compatibility type. -->
+                <data android:mimeType="audio/opus" />
+                <data android:mimeType="audio/ogg" />
+                <data android:mimeType="audio/mpeg" />
+                <data android:mimeType="audio/mp4" />
+                <data android:mimeType="audio/x-m4a" />
+                <data android:mimeType="audio/mp4a-latm" />
+                <data android:mimeType="audio/wav" />
+                <data android:mimeType="audio/x-wav" />
             </intent-filter>
             <!-- An audio file shared from another app (a voice message, a recorder): imported as Open with does. -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="audio/*" />
-                <data android:mimeType="application/ogg" />
+                <!-- The same decided types as Open with above. -->
+                <data android:mimeType="audio/opus" />
+                <data android:mimeType="audio/ogg" />
+                <data android:mimeType="audio/mpeg" />
+                <data android:mimeType="audio/mp4" />
+                <data android:mimeType="audio/x-m4a" />
+                <data android:mimeType="audio/mp4a-latm" />
+                <data android:mimeType="audio/wav" />
+                <data android:mimeType="audio/x-wav" />
             </intent-filter>
         </activity>
         <service android:name=".whistle.WhistleService" android:exported="false" android:isolatedProcess="true" android:process=":whistle" />

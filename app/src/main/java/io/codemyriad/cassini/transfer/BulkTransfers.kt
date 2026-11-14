@@ -5,6 +5,7 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import android.util.Log
 import io.codemyriad.cassini.AppGraph
+import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.data.db.NoteEntity
 import io.codemyriad.cassini.data.notes.ArchiveLimits
@@ -80,17 +81,37 @@ class BulkTransfers(context: Context, private val graph: AppGraph) {
         start(total = uris.size, beginning = { graph.notices.imports.dismissFailure() }) { scratch ->
             var total = ImportSummary()
             for ((index, uri) in uris.withIndex()) {
+                // A cancelled selection imports nothing more: some failures return without suspending.
+                currentCoroutineContext().ensureActive()
                 mutable.value = mutable.value.copy(done = index + 1)
                 val previous = total
-                val result = importer.importOne(uri, scratch) { partial ->
-                    mutable.value = mutable.value.copy(summary = previous + partial)
+                // Each picked file has its Library card (L-25, W4.5); one that added nothing keeps it (W4.6).
+                val card = graph.notices.imports.begin(importer.nameOf(uri).orEmpty())
+                // Settled on every path: a cancel removes the card, an error leaves it failed; none stays "Importing…".
+                var cardFailure: Failure? = Failure.OPEN
+                try {
+                    val result = importer.importOne(uri, scratch) { partial ->
+                        mutable.value = mutable.value.copy(summary = previous + partial)
+                    }
+                    // Cancelled as the file failed: a cancelled transfer leaves no "Needs attention" card.
+                    currentCoroutineContext().ensureActive()
+                    cardFailure = cardFailure(result)
+                    total += result
+                    mutable.value = mutable.value.copy(summary = total)
+                } catch (cancelled: CancellationException) {
+                    cardFailure = null
+                    throw cancelled
+                } finally {
+                    graph.notices.imports.finish(card, cardFailure)
                 }
-                total += result
-                mutable.value = mutable.value.copy(summary = total)
             }
             TransferState(summary = total)
         }
     }
+
+    /** OPEN when the picked file added nothing (no note, no duplicate): its card stays with "Needs attention". */
+    private fun cardFailure(result: ImportSummary): Failure? =
+        if (result.imported == 0 && result.duplicates == 0) Failure.OPEN else null
 
     fun export(ids: List<String>, destination: Uri) = start(exporting = true, total = ids.size) { scratch ->
         try {

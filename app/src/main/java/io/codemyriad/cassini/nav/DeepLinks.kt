@@ -13,8 +13,11 @@ sealed interface DeepLink {
     /** A processing or results notification. [resume] is the Resume action of a paused note. */
     data class Note(val noteId: String, val resume: Boolean = false) : DeepLink
 
-    /** ACTION_VIEW or ACTION_SEND of a document or an audio file: import [uri], then open its note. */
-    data class Import(val uri: String) : DeepLink
+    /**
+     * ACTION_VIEW or ACTION_SEND of a document or an audio file: import [uri], then open its note. [mimeType] is the
+     * intent's type, the import's fallback when the provider reports none.
+     */
+    data class Import(val uri: String, val mimeType: String? = null) : DeepLink
 }
 
 /**
@@ -30,8 +33,8 @@ object DeepLinks {
 
     /**
      * The link of an intent with [action], the [data] uri, the shared [stream] (`EXTRA_STREAM` of ACTION_SEND: an
-     * audio file shared from another app) and the extras the notifications set ([open], [noteId], [resume]); null
-     * when the intent asks for nothing beyond the app (the launcher).
+     * audio file shared from another app), the intent's MIME [type] and the extras the notifications set ([open],
+     * [noteId], [resume]); null when the intent asks for nothing beyond the app (the launcher).
      */
     @Suppress("LongParameterList") // the parts of an intent that a link reads
     fun parse(
@@ -43,10 +46,11 @@ object DeepLinks {
         stream: String? = null,
         ownPackage: String = BuildConfig.APPLICATION_ID,
         ownAuthorities: Set<String> = ownAuthorities(ownPackage),
+        type: String? = null,
     ): DeepLink? =
         when {
-            action == ACTION_VIEW -> external(data, ownPackage, ownAuthorities)?.let(DeepLink::Import)
-            action == ACTION_SEND -> external(stream, ownPackage, ownAuthorities)?.let(DeepLink::Import)
+            action == ACTION_VIEW -> external(data, ownPackage, ownAuthorities)?.let { DeepLink.Import(it, type) }
+            action == ACTION_SEND -> external(stream, ownPackage, ownAuthorities)?.let { DeepLink.Import(it, type) }
             open == RecordingNotifications.OPEN_RECORDING -> DeepLink.Recording
             open == ProcessingNotifications.OPEN_NOTE && !noteId.isNullOrBlank() -> DeepLink.Note(noteId, resume)
             else -> null

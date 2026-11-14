@@ -190,6 +190,10 @@ internal class FakeLibraryPorts : LibraryPorts {
         actions += "dismiss $kind"
     }
 
+    override fun dismissImport(id: Long) {
+        actions += "dismiss import $id"
+    }
+
     override fun refreshNotices() {
         actions += "refresh"
     }

@@ -22,6 +22,7 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -34,6 +35,7 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.text.input.ImeAction
 import io.codemyriad.cassini.ui.banner.BannerKind
 import io.codemyriad.cassini.ui.banner.BannerSpec
+import io.codemyriad.cassini.ui.components.ImportRowUi
 import io.codemyriad.cassini.ui.components.TITLE_MAX_LENGTH
 import io.codemyriad.cassini.ui.fixtures.BoardFixtures
 import io.codemyriad.cassini.ui.fixtures.VariantFixtures
@@ -217,6 +219,21 @@ class LibraryBehaviourTest {
         val importing = BannerSpec(BannerKind.IMPORTING)
         show(BoardFixtures.library.copy(banners = persistentListOf(importing, importing)))
         rule.onAllNodesWithText("Importing", substring = true).assertCountEquals(2)
+    }
+
+    /** L-25 (W4.5, W4.6): running imports show "Importing…"; a failed one keeps its card and can be dismissed. */
+    @Test fun importCardsShowTheirBadgesAndOnlyAFailedOneCloses() {
+        val imports = persistentListOf(
+            ImportRowUi(1, "Quarterly review.m4a"),
+            ImportRowUi(2, "voice-note.ogg", failed = true),
+        )
+        show(BoardFixtures.library.copy(imports = imports))
+        rule.onNodeWithTag("import-row-1").assert(hasContentDescription("Quarterly review.m4a, Importing…"))
+        val failed = hasContentDescription("voice-note.ogg, Needs attention", substring = true)
+        rule.onNodeWithTag("import-row-2").assert(failed)
+        rule.onAllNodesWithContentDescription("Dismiss").assertCountEquals(1)
+        rule.onNodeWithContentDescription("Dismiss").performClick()
+        assertEvents(LibraryEvent.DismissImport(2))
     }
 
     @Test fun theActionsSheetOpensInItsWindowAndSendsItsRows() {
