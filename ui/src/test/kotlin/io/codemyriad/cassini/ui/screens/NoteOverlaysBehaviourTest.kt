@@ -13,7 +13,6 @@ import io.codemyriad.cassini.ui.fixtures.BoardFixtures
 import io.codemyriad.cassini.ui.fixtures.VariantFixtures
 import io.codemyriad.cassini.ui.format.FIXED_ZONE
 import io.codemyriad.cassini.ui.format.ProvideFixedFormat
-import io.codemyriad.cassini.ui.note.ExportKind
 import io.codemyriad.cassini.ui.note.MergeEvent
 import io.codemyriad.cassini.ui.note.NameSheetEvent
 import io.codemyriad.cassini.ui.note.NoteDialog
@@ -84,12 +83,6 @@ class NoteOverlaysBehaviourTest {
         show(withSheet(NoteSheet.Versions(VariantFixtures.versions)))
         rule.onNodeWithText("Version 1", substring = true).performClick()
         assertEvents(NoteEvent.PickVersion(0))
-    }
-
-    @Test fun theSubtitleChooserExports() {
-        show(withSheet(NoteSheet.SubtitleFormat))
-        rule.onNodeWithText("SubRip (.srt)").performClick()
-        assertEvents(NoteEvent.Export(ExportKind.SRT))
     }
 
     @Test fun documentInfoClosesTheSheet() {

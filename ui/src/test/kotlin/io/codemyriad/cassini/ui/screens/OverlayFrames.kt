@@ -14,7 +14,6 @@ import io.codemyriad.cassini.ui.note.NoteActionsSheetContent
 import io.codemyriad.cassini.ui.note.NoteDialogContent
 import io.codemyriad.cassini.ui.note.NoteSheet
 import io.codemyriad.cassini.ui.note.NoteUiState
-import io.codemyriad.cassini.ui.note.SubtitleFormatSheetContent
 import io.codemyriad.cassini.ui.note.VersionsSheetContent
 
 /**
@@ -44,7 +43,6 @@ private fun NoteSheetContent(sheet: NoteSheet) {
         is NoteSheet.NameSpeaker -> NameSpeakerSheetContent(sheet.ui, onEvent = {})
         is NoteSheet.Merge -> MergeSheetContent(sheet.ui, onEvent = {})
         is NoteSheet.Versions -> VersionsSheetContent(sheet.ui, onPick = {})
-        NoteSheet.SubtitleFormat -> SubtitleFormatSheetContent(onExport = {})
         is NoteSheet.Info -> error("Document info is a dialog")
     }
 }

@@ -465,7 +465,6 @@ internal object VariantFixtures {
         "read-snackbar-saved" to b.readAndListen.copy(
             snackbar = SnackbarSpec(SnackbarKind.SAVED_FILE, text = "Call with supplier.txt", durationMs = 10_000),
         ),
-        "read-subtitle-format" to b.readAndListen.copy(sheet = NoteSheet.SubtitleFormat),
         "read-rename" to b.readAndListen.copy(dialog = NoteDialog.Rename(b.readAndListen.title)),
         "read-transcribe-fresh" to b.readAndListen.copy(dialog = NoteDialog.TranscribeFresh),
         "read-read-only" to b.readAndListen.copy(dialog = NoteDialog.ReadOnly(ReadOnlyReason.JOB_PENDING)),
@@ -630,6 +629,7 @@ internal object VariantFixtures {
         ),
         "actions-unreadable" to b.noteActions.copy(
             textExportEnabled = false,
+            transcriptUnreadable = true,
             transcribeRow = TranscribeRowUi.TranscribeAgain(nextVersion = 1, namesCarry = false),
         ),
         "actions-stop" to b.noteActions.copy(
@@ -666,6 +666,16 @@ internal object VariantFixtures {
             textExportEnabled = false,
             transcribeRow = TranscribeRowUi.Transcribe,
             recording = true,
+        ),
+        "actions-imported-audio" to b.noteActions.copy(
+            noteId = b.voiceNote.id,
+            title = "voice-note",
+            recordedAt = LocalTime.of(8, 14),
+            durationMs = clock(2, 41),
+            speakers = 0,
+            documentKind = DocumentKindUi.Plain("m4a", imported = true),
+            textExportEnabled = false,
+            transcribeRow = TranscribeRowUi.Transcribe,
         ),
         "actions-no-names-carry" to b.noteActions.copy(
             transcribeRow = TranscribeRowUi.TranscribeAgain(nextVersion = 3, namesCarry = false),

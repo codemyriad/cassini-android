@@ -50,7 +50,7 @@ internal fun MeetingTopBar(state: NoteUiState, scrolled: Boolean, onEvent: (Note
                 MeetingIcon(Glyph.Search, stringResource(R.string.ui_note_search)) { onEvent(NoteEvent.OpenSearch) }
                 MeetingIcon(
                     Glyph.Share,
-                    stringResource(R.string.ui_actions_share, stringResource(R.string.ui_actions_document)),
+                    stringResource(R.string.ui_actions_share, stringResource(R.string.ui_export_cassini_file)),
                 ) {
                     onEvent(NoteEvent.SheetAction(NoteAction.SHARE_DOCUMENT))
                 }

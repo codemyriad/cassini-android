@@ -82,6 +82,19 @@ LABELS = {
     'tx_suggestion_question': ('transcribing.speakerSuggestion', 'name'),
     'tx_suggestion_yes': ('transcribing.speakerSuggestion.yes', None),
     'tx_suggestion_no': ('transcribing.speakerSuggestion.no', None),
+    # L-11 (D99): one export set; Markdown keeps its earlier resources (ui_actions_markdown, ui_markdown_description).
+    'export_cassini_file': ('export.cassiniFile.label', None),
+    'export_cassini_file_body': ('export.cassiniFile.description', None),
+    'export_more_formats': ('export.moreFormats', None),
+    'export_plain_text': ('export.plainText.label', None),
+    'export_plain_text_body': ('export.plainText.description', None),
+    'export_srt': ('export.srt.label', None),
+    'export_srt_body': ('export.srt.description', None),
+    'export_vtt': ('export.vtt.label', None),
+    'export_vtt_body': ('export.vtt.description', None),
+    'export_original_audio': ('export.originalAudio.label', None),
+    'export_original_audio_body': ('export.originalAudio.description', None),
+    'export_audio_only': ('export.audioOnly.note', None),
 }
 # L-10 (D99): the Meeting header subtitle of an imported meeting is the catalog's `format.previewSubtitle` followed by
 # the words after `{duration}` of these entries. Android keeps building the day, time and duration itself (the "Date
