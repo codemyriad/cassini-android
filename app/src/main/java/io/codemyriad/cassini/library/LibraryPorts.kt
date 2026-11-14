@@ -92,16 +92,22 @@ interface LibraryPorts {
 
     fun takeTrashed(note: TrashedNote)
 
-    /** Which automatic copies can leave the phone now (D97 choices, the cloud build flag, the API level). */
+    /** Which automatic copies can leave the phone now (D97/D98 choices, the cloud build flag, the API level). */
     val backupReach: Flow<BackupReach>
+
+    /** "Keep on this phone only" (D98): cloud backup and device-to-device transfer off, the card answered. */
+    suspend fun keepOnPhoneOnly() { error("Backup choices are unavailable") }
+
+    /** "Keep backup on" or the card's close button: the choices stay, the card does not show again. */
+    suspend fun dismissBackupCard() { error("Backup choices are unavailable") }
 }
 
 /**
  * The automatic channels that can copy the library off the phone: encrypted cloud Auto Backup ([cloud]) and
  * device-to-device transfer ([transfer]). The first-run hero and privacy line follow them (PARITY Wave 6 contract
- * sections 1-3, D98).
+ * sections 1-3, D98). [card] shows the once-only "Keep them on this phone only" card while cloud backup is on.
  */
-data class BackupReach(val cloud: Boolean, val transfer: Boolean)
+data class BackupReach(val cloud: Boolean, val transfer: Boolean, val card: Boolean = false)
 
 /** [LibraryPorts] over the app's graph. */
 @Suppress("TooManyFunctions") // one binding per port function
@@ -169,10 +175,15 @@ class GraphLibraryPorts(private val graph: AppGraph, context: Context) : Library
     override val backupReach: Flow<BackupReach>
         get() = graph.backupChoices.choices.map { choices ->
             BackupReach(
-                cloud = choices.cloudActive(BuildConfig.CLOUD_BACKUP_ENABLED),
+                cloud = choices.cloudActive(Build.VERSION.SDK_INT, BuildConfig.CLOUD_BACKUP_ENABLED),
                 transfer = choices.transferActive(Build.VERSION.SDK_INT),
+                card = choices.showBackupCard(Build.VERSION.SDK_INT, BuildConfig.CLOUD_BACKUP_ENABLED),
             )
         }.distinctUntilChanged()
+
+    override suspend fun keepOnPhoneOnly() = graph.backupChoices.keepOnPhoneOnly()
+
+    override suspend fun dismissBackupCard() = graph.backupChoices.acknowledgeNotice()
 
     override fun snackbarTimeoutMs(): Long {
         val manager = app.getSystemService(AccessibilityManager::class.java)

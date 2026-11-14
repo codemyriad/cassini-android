@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated from cassini-ux 31973ff9784fcc66c1c7993b903a336e8f2c1432; do not edit. -->
+<resources>
+    <string name="ui_backup_heading">Mudança e cópia de segurança</string>
+    <string name="ui_backup_cloud_title">Cópia de segurança encriptada na nuvem</string>
+    <string name="ui_backup_cloud_body_on">As reuniões são incluídas nas cópias de segurança do seu telemóvel e ao mudar para um telemóvel novo. Os modelos de voz transferidos não entram na cópia de segurança; o telemóvel novo volta a transferi-los.</string>
+    <string name="ui_backup_cloud_body_off">As reuniões não são adicionadas às cópias de segurança na nuvem. Desativar esta opção interrompe as próximas cópias de segurança, mas não elimina as que já estão guardadas na sua conta na nuvem.</string>
+    <string name="ui_backup_phone_only_body">As reuniões e as vozes guardadas ficam apenas neste telemóvel. Não entram em cópias de segurança nem são copiadas para um telemóvel novo; para guardar uma cópia, utilize «Exportar tudo como ZIP».</string>
+    <string name="ui_backup_voices_title">Incluir as vozes guardadas nas cópias de segurança</string>
+    <string name="ui_backup_voices_subtitle">As vozes guardadas são impressões vocais criadas no dispositivo para as pessoas a quem deu nome, para que um telemóvel novo ou restaurado continue a reconhecê-las automaticamente. Desative esta opção para manter as impressões vocais apenas neste telemóvel.</string>
+    <string name="ui_backup_voices_subtitle_off">As vozes guardadas ficam apenas neste telemóvel: não entram em cópias de segurança nem são copiadas para um telemóvel novo. Num telemóvel novo ou restaurado, terá de dar novamente nome aos oradores.</string>
+    <string name="ui_backup_learn_more">Saber mais</string>
+    <string name="ui_backup_info_title">Mudança e cópia de segurança</string>
+    <string name="ui_backup_info_what_heading">O que é incluído na cópia</string>
+    <string name="ui_backup_info_what_body">As suas reuniões, transcrições e nomes de oradores são incluídos enquanto a cópia de segurança estiver ativa. As vozes guardadas são incluídas enquanto «Incluir as vozes guardadas nas cópias de segurança» estiver ativo. Os modelos de voz transferidos nunca são incluídos; o seu telemóvel novo volta a transferi-los.</string>
+    <string name="ui_backup_info_android_heading">Cópia na nuvem do Android</string>
+    <string name="ui_backup_info_android_body">Quando a cópia de segurança do Android (Google ou Seedvault) está ativa, as cópias seguem a encriptação do seu telemóvel e as definições do fornecedor de cópias. O Android limita as cópias na nuvem de cada aplicação a 25 MB; para bibliotecas maiores, utilize «Exportar tudo como ZIP».</string>
+    <string name="ui_backup_info_over_quota">As suas reuniões ultrapassam o limite de 25 MB da cópia na nuvem do Android. Utilize «Exportar tudo como ZIP» para guardar uma cópia completa.</string>
+    <string name="ui_backup_info_manual_heading">Uma cópia guardada por si</string>
+    <string name="ui_backup_card_title">Manter apenas neste telemóvel</string>
+    <string name="ui_backup_card_body">As suas reuniões e vozes guardadas são incluídas na cópia de segurança encriptada na nuvem e copiadas ao mudar para um telemóvel novo, para que não as perca se este telemóvel for perdido ou substituído.</string>
+    <string name="ui_backup_card_action">Manter apenas neste telemóvel</string>
+    <string name="ui_backup_card_dismiss">Manter a cópia ativa</string>
+    <string name="ui_backup_card_close">Fechar aviso de cópia de segurança</string>
+    <string name="ui_settings_transfer_body_off_backup_on">Nada é copiado diretamente para um telemóvel novo. As reuniões da sua cópia de segurança na nuvem voltam quando a restaurar num telemóvel novo.</string>
+    <string name="ui_voices_privacy_phone">As impressões vocais são criadas neste telemóvel e nunca são incluídas nos ficheiros exportados ou partilhados. Só os nomes que escolher são incluídos.</string>
+</resources>

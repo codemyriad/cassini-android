@@ -3,6 +3,7 @@ package io.codemyriad.cassini.backup
 import android.os.Build
 import androidx.test.platform.app.InstrumentationRegistry
 import io.codemyriad.cassini.AppGraph
+import io.codemyriad.cassini.core.backup.BackupChoices
 import io.codemyriad.cassini.core.format.CassiniDocument
 import io.codemyriad.cassini.core.format.DocumentState
 import io.codemyriad.cassini.core.format.OggOpus
@@ -52,7 +53,8 @@ class BackupTransportFixtureTest {
     private val context = instrumentation.targetContext
     private val arguments = InstrumentationRegistry.getArguments()
     private val paths get() = AppPaths(context.filesDir, context.cacheDir)
-    private val choices get() = BackupChoicesStore(File(context.noBackupFilesDir, "choices.json"), Dispatchers.IO)
+    private val choicesFile get() = File(context.noBackupFilesDir, "choices.json")
+    private val choices get() = BackupChoicesStore(choicesFile, Dispatchers.IO)
 
     @Test fun ownedEmulatorFixture() = runBlocking<Unit>(Dispatchers.IO) {
         assertEquals("true", arguments.getString("ownedBackupEmulator"))
@@ -113,8 +115,17 @@ class BackupTransportFixtureTest {
         paths.people.writeText(VoiceCodec.encode(listOf(voice)))
         Files.setLastModifiedTime(paths.people.toPath(), FileTime.fromMillis(START.toEpochMilli() + 321))
         markers()
-        assertFalse(choices.choices.first().cloud)
-        assertTrue(choices.choices.first().transfer)
+        assertFreshDefaults("A fresh install has made no backup choice yet")
+    }
+
+    /** D98 defaults: cloud backup, transfer and saved voices on, card not yet acknowledged, read without a file. */
+    private suspend fun assertFreshDefaults(message: String) {
+        assertFalse(message, choicesFile.exists())
+        assertFalse(message, File(choicesFile.path + ".bak").exists())
+        val read = choices.choices.first()
+        assertEquals(message, BackupChoices(), read)
+        assertTrue("D98 turns cloud backup on by default", read.cloud && read.transfer && read.voices)
+        assertFalse("Reading the defaults must not create the choices file", choicesFile.exists())
     }
 
     private fun documentBytes(): ByteArray {
@@ -167,8 +178,8 @@ class BackupTransportFixtureTest {
         if (plain) assertEquals(START.toEpochMilli(), File(incoming, "notes/$PLAIN_ID/capture.opus").lastModified())
         assertFalse("Downloaded models must not travel", File(paths.root, "models").exists())
         assertFalse("Unfinished inference work must not travel", paths.work(ID).exists())
-        assertFalse("An old device's cloud opt-in must not travel", choices.choices.first().cloud)
-        assertTrue(choices.choices.first().transfer)
+        // Every stage before this restore stored an explicit choice on the source; none of it may travel.
+        assertFreshDefaults("The source phone's backup choices must not travel")
         val graph = AppGraph(
             context,
             AppGraph.Config(

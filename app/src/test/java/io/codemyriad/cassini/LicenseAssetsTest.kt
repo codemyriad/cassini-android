@@ -21,15 +21,18 @@ class LicenseAssetsTest {
 
     @Test fun privacyPolicyMatchesTheRepository() = same("PRIVACY.md", "PRIVACY.md")
 
-    @Test fun bundledPrivacyDescribesDefaultDirectTransferAndItsExclusions() {
+    @Test fun bundledPrivacyDescribesDefaultBackupTransferAndTheirExclusions() {
         val privacy = File(root, "app/src/main/assets/licenses/PRIVACY.md").readText()
         for (text in listOf(
-            "On Android 9 or later, direct device-to-device transfer copies your notes, the catalogue and saved voices",
-            "when “Move to a new phone” is on",
-            "This choice is on by default",
-            "Cloud backup is not used",
-            "Downloaded models and unfinished work are not copied",
-        )) assertTrue("Missing transfer disclosure: $text", text in privacy)
+            "Encrypted cloud backup: Android Backup (Google or Seedvault) includes your notes",
+            "Cassini adds them only when the backup is encrypted on the phone",
+            "Move to a new phone: direct device-to-device transfer",
+            "both on by default",
+            "“Include saved voices in backups” is on by default",
+            "Downloaded models, settings and unfinished work are never copied",
+            "it does not delete backups already stored in your cloud account",
+        )) assertTrue("Missing backup disclosure: $text", text in privacy)
+        assertTrue("Obsolete cloud denial", "Cloud backup is not used" !in privacy)
         assertTrue("Obsolete transfer denial", "Android does not back up the Cassini data" !in privacy)
     }
 

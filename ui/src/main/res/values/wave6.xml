@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated from cassini-ux 31973ff9784fcc66c1c7993b903a336e8f2c1432; do not edit. -->
+<resources>
+    <string name="ui_backup_heading">Moving and backup</string>
+    <string name="ui_backup_cloud_title">Encrypted cloud backup</string>
+    <string name="ui_backup_cloud_body_on">Meetings are included in your phone’s backups and when you move to a new phone. Downloaded speech models are not backed up; a new phone downloads them again.</string>
+    <string name="ui_backup_cloud_body_off">Meetings are not added to cloud backups. Turning this off stops future backups; it does not delete backups already stored in your cloud account.</string>
+    <string name="ui_backup_phone_only_body">Meetings and saved voices stay on this phone only. They are not backed up or copied to a new phone; to keep a copy, use Export All as ZIP.</string>
+    <string name="ui_backup_voices_title">Include saved voices in backups</string>
+    <string name="ui_backup_voices_subtitle">Saved voices are on-device voiceprints of people you have named, so a new or restored phone keeps recognising them automatically. Turn this off to keep voiceprints on this phone only.</string>
+    <string name="ui_backup_voices_subtitle_off">Saved voices stay on this phone only: they are not backed up or copied to a new phone. On a new or restored phone, you will need to name speakers again.</string>
+    <string name="ui_backup_learn_more">Learn more</string>
+    <string name="ui_backup_info_title">Moving and backup</string>
+    <string name="ui_backup_info_what_heading">What is backed up</string>
+    <string name="ui_backup_info_what_body">Your meetings, transcripts and speaker names are backed up while backup is on. Saved voices are included while “Include saved voices in backups” is on. Downloaded speech models are never backed up; your new phone downloads them again.</string>
+    <string name="ui_backup_info_android_heading">Android cloud backup</string>
+    <string name="ui_backup_info_android_body">When Android Backup (Google or Seedvault) is on, backups follow your phone’s encryption and backup provider settings. Android limits app cloud backups to 25 MB; for larger libraries, use Export All as ZIP.</string>
+    <string name="ui_backup_info_over_quota">Your meetings exceed Android’s 25 MB cloud backup limit. Use Export All as ZIP to keep a complete copy.</string>
+    <string name="ui_backup_info_manual_heading">A copy you keep yourself</string>
+    <string name="ui_backup_card_title">Keep them on this phone only</string>
+    <string name="ui_backup_card_body">Your meetings and saved voices are included in encrypted cloud backup and copied when you move to a new phone, so you don’t lose them if this phone is lost or replaced.</string>
+    <string name="ui_backup_card_action">Keep on this phone only</string>
+    <string name="ui_backup_card_dismiss">Keep backup on</string>
+    <string name="ui_backup_card_close">Dismiss backup notice</string>
+    <string name="ui_settings_transfer_body_off_backup_on">Nothing is copied directly to a new phone. Meetings in your cloud backup come back when you restore it on a new phone.</string>
+    <string name="ui_voices_privacy_phone">Voiceprints are created on this phone and are never written into exported or shared files. Only the names you choose are.</string>
+</resources>

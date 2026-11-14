@@ -23,15 +23,17 @@ import java.nio.file.attribute.BasicFileAttributes
 class BackupChoicesStoreTest {
     @get:Rule val folder = TemporaryFolder()
 
-    @Test fun missingChoicesDefaultToTransferOnlyAndWritesSurviveANewInstance() = runTest {
+    @Test fun missingChoicesDefaultToEverythingOnAndWritesSurviveANewInstance() = runTest {
         val file = File(folder.root, "choices.json")
         val store = BackupChoicesStore(file, Dispatchers.IO)
         assertEquals(BackupChoices(), store.choices.first())
-        store.setCloud(true)
+        assertTrue(store.choices.first().cloud)
+        store.setVoices(false)
         store.setTransfer(false)
         val restored = BackupChoicesStore(file, Dispatchers.IO).choices.first()
         assertFalse(restored.transfer)
         assertTrue(restored.cloud)
+        assertFalse(restored.voices)
         assertTrue(restored.noticeAcknowledged)
         val anotherDevice = BackupChoicesStore(File(folder.root, "other-device.json"), Dispatchers.IO)
         assertEquals(BackupChoices(), anotherDevice.choices.first())
@@ -59,6 +61,7 @@ class BackupChoicesStoreTest {
             "{",
             "x".repeat(5000),
             """{"version":99}""",
+            """{"version":2,"transfer":true,"cloud":true,"noticeAcknowledged":false,"quotaExceeded":false}""",
             """
             {"version":1,"transfer":true,"cloud":"true","noticeAcknowledged":false,"quotaExceeded":false}
         """
@@ -71,15 +74,59 @@ class BackupChoicesStoreTest {
         }
     }
 
-    @Test fun quotaStateAndAcknowledgementAreLocalAndPersisted() = runTest {
+    @Test fun quotaStateAndAcknowledgementAreLocalPersistedAndPerChannel() = runTest {
         val file = File(folder.root, "choices.json")
         val store = BackupChoicesStore(file, Dispatchers.IO)
         store.acknowledgeNotice()
         store.recordQuotaExceeded(true)
-        assertFalse(store.choices.first().showTransferNotice)
-        assertTrue(BackupChoicesStore(file, Dispatchers.IO).choices.first().quotaExceeded)
+        store.recordQuotaExceeded(true, cloud = true)
+        assertFalse(store.choices.first().showBackupCard(35, cloudEnabled = true))
+        val restored = BackupChoicesStore(file, Dispatchers.IO).choices.first()
+        assertTrue(restored.quotaExceeded)
+        assertTrue(restored.cloudQuotaExceeded)
         store.setCloud(true)
-        assertFalse(store.choices.first().quotaExceeded)
+        assertTrue(store.choices.first().quotaExceeded)
+        assertFalse(store.choices.first().cloudQuotaExceeded)
+    }
+
+    @Test fun keepOnPhoneOnlyTurnsOffBothAutomaticChannelsAndLeavesTheSwitchesIndependent() = runTest {
+        val file = File(folder.root, "choices.json")
+        val store = BackupChoicesStore(file, Dispatchers.IO)
+        store.recordQuotaExceeded(true, cloud = true)
+        store.keepOnPhoneOnly()
+        val value = BackupChoicesStore(file, Dispatchers.IO).choices.first()
+        assertEquals(
+            BackupChoices(transfer = false, cloud = false, voices = true, noticeAcknowledged = true),
+            value,
+        )
+        assertTrue(value.phoneOnly(35, cloudEnabled = true))
+        assertFalse(value.permits(35, 1, cloudEnabled = true))
+        assertFalse(value.permits(35, 2, cloudEnabled = true))
+        store.setTransfer(true)
+        assertFalse(store.choices.first().cloud)
+        assertTrue(store.choices.first().transfer)
+    }
+
+    @Test fun aVersion1FileKeepsItsCloudChoiceAndGainsSavedVoices() = runTest {
+        val file = File(folder.root, "choices.json")
+        file.writeText(
+            """{"version":1,"transfer":true,"cloud":false,"noticeAcknowledged":true,"quotaExceeded":true}""",
+        )
+        val store = BackupChoicesStore(file, Dispatchers.IO)
+        assertEquals(
+            BackupChoices(
+                transfer = true,
+                cloud = false,
+                voices = true,
+                noticeAcknowledged = true,
+                quotaExceeded = true,
+            ),
+            store.choices.first(),
+        )
+        store.setVoices(false)
+        val text = file.readText()
+        assertTrue(text, text.contains("\"version\":2"))
+        assertFalse(BackupChoicesStore(file, Dispatchers.IO).choices.first().cloud)
     }
 
     @Test fun turningTransferOffClearsThePersistedQuotaWarning() = runTest {

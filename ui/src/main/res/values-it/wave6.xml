@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated from cassini-ux 31973ff9784fcc66c1c7993b903a336e8f2c1432; do not edit. -->
+<resources>
+    <string name="ui_backup_heading">Trasferimento e backup</string>
+    <string name="ui_backup_cloud_title">Backup crittografato nel cloud</string>
+    <string name="ui_backup_cloud_body_on">Le riunioni sono incluse nei backup del telefono e quando passi a un nuovo telefono. I modelli vocali scaricati non sono inclusi nel backup: il nuovo telefono li scarica di nuovo.</string>
+    <string name="ui_backup_cloud_body_off">Le riunioni non vengono aggiunte ai backup nel cloud. Disattivare questa opzione ferma i backup futuri, ma non elimina quelli già salvati nel tuo account cloud.</string>
+    <string name="ui_backup_phone_only_body">Le riunioni e le voci salvate restano solo su questo telefono. Non vengono incluse nei backup né copiate su un nuovo telefono; per conservarne una copia, usa “Esporta tutto come ZIP”.</string>
+    <string name="ui_backup_voices_title">Includi le voci salvate nei backup</string>
+    <string name="ui_backup_voices_subtitle">Le voci salvate sono impronte vocali create sul dispositivo per le persone a cui hai dato un nome, così un telefono nuovo o ripristinato continua a riconoscerle automaticamente. Disattiva questa opzione per tenere le impronte vocali solo su questo telefono.</string>
+    <string name="ui_backup_voices_subtitle_off">Le voci salvate restano solo su questo telefono: non vengono incluse nei backup né copiate su un nuovo telefono. Su un telefono nuovo o ripristinato dovrai dare di nuovo un nome alle voci.</string>
+    <string name="ui_backup_learn_more">Scopri di più</string>
+    <string name="ui_backup_info_title">Trasferimento e backup</string>
+    <string name="ui_backup_info_what_heading">Cosa viene incluso nel backup</string>
+    <string name="ui_backup_info_what_body">Le tue riunioni, le trascrizioni e i nomi delle voci sono inclusi finché il backup è attivo. Le voci salvate sono incluse finché “Includi le voci salvate nei backup” è attivo. I modelli vocali scaricati non vengono mai inclusi: il nuovo telefono li scarica di nuovo.</string>
+    <string name="ui_backup_info_android_heading">Backup nel cloud Android</string>
+    <string name="ui_backup_info_android_body">Quando il backup di Android (Google o Seedvault) è attivo, i backup seguono la crittografia del telefono e le impostazioni del servizio di backup. Android limita i backup cloud delle app a 25 MB; per librerie più grandi, usa “Esporta tutto come ZIP”.</string>
+    <string name="ui_backup_info_over_quota">Le tue riunioni superano il limite di 25 MB del backup cloud di Android. Usa “Esporta tutto come ZIP” per conservare una copia completa.</string>
+    <string name="ui_backup_info_manual_heading">Una copia che conservi tu</string>
+    <string name="ui_backup_card_title">Mantieni solo su questo telefono</string>
+    <string name="ui_backup_card_body">Le tue riunioni e le voci salvate sono incluse nel backup crittografato nel cloud e vengono copiate quando passi a un nuovo telefono, così non le perdi se questo telefono viene perso o sostituito.</string>
+    <string name="ui_backup_card_action">Mantieni solo su questo telefono</string>
+    <string name="ui_backup_card_dismiss">Lascia il backup attivo</string>
+    <string name="ui_backup_card_close">Chiudi avviso sul backup</string>
+    <string name="ui_settings_transfer_body_off_backup_on">Nulla viene copiato direttamente su un nuovo telefono. Le riunioni nel tuo backup nel cloud tornano quando lo ripristini su un nuovo telefono.</string>
+    <string name="ui_voices_privacy_phone">Le impronte vocali vengono create su questo telefono e non vengono mai scritte nei file esportati o condivisi. Vengono inclusi solo i nomi che scegli.</string>
+</resources>

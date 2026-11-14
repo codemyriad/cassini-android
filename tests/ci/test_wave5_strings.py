@@ -34,15 +34,20 @@ class Wave5StringsTest(unittest.TestCase):
         PIN.check(self.root)
         catalog = {e['id']: e for e in json.loads((self.root / PIN.VENDOR / WAVE5.SOURCE).read_text())['entries']}
         outputs = list(WAVE5.generated(self.root))
-        self.assertEqual(len(WAVE5.LOCALES), len(outputs))
+        self.assertEqual(len(WAVE5.LOCALES) * len(WAVE5.OUTPUTS), len(outputs))
         for path, content in outputs:
             self.assertEqual((ROOT / path.relative_to(self.root)).read_text(), content)
             locale = next(k for k, v in WAVE5.LOCALES.items() if v == path.parent.name)
             resources = {e.get('name'): e.text for e in ET.fromstring(content)}
-            for name, identifier in WAVE5.LABELS.items():
+            for name, identifier in WAVE5.OUTPUTS[path.name].items():
                 entry = catalog[identifier]
                 expected = entry['en'] if locale == 'en' else entry['l10n'][locale]['text']
                 self.assertEqual(expected.replace("'", "\\'"), resources['ui_' + name], (locale, name))
+
+    def test_wave6_backup_copy_is_the_d98_android_wording(self):
+        self.assertEqual('backup.phoneOnlyCard.action', WAVE5.WAVE6_LABELS['backup_card_action'])
+        self.assertFalse(any(i.endswith('.ios') for i in WAVE5.WAVE6_LABELS.values()))
+        self.assertFalse(set(WAVE5.LABELS) & set(WAVE5.WAVE6_LABELS))
 
     def test_wave5_catalog_names_its_own_commit(self):
         entry = self.pin['files'][WAVE5.SOURCE]

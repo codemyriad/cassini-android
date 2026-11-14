@@ -140,7 +140,8 @@ fun LibraryScreen(
 }
 
 /**
- * Existing recording feedback and import/problem banners; no separate transcription progress or privacy card.
+ * The once-only backup card (D98), then existing recording feedback and import/problem banners; no separate
+ * transcription progress card.
  * The first item sits 14dp below the search/filter region, the next ones 8dp below the one before.
  */
 private fun LazyListScope.activity(state: LibraryUiState, onEvent: (LibraryEvent) -> Unit) {
@@ -149,6 +150,10 @@ private fun LazyListScope.activity(state: LibraryUiState, onEvent: (LibraryEvent
         val gap = if (first) 14.dp else 8.dp
         first = false
         return Modifier.padding(start = 16.dp, end = 16.dp, top = gap)
+    }
+    if (state.backupCard) {
+        val modifier = top()
+        item(key = "backup-card", contentType = "backup-card") { BackupCard(onEvent, modifier) }
     }
     state.recording?.let { recording ->
         val modifier = top()

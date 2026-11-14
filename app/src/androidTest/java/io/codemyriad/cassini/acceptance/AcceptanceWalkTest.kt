@@ -403,7 +403,7 @@ class AcceptanceWalkTest {
         rule.onNode(voices).performScrollTo().performClick()
         see(ANNA)
         see(PAOLO)
-        see(rule.text(UiR.string.ui_voices_privacy))
+        see(rule.text(UiR.string.ui_voices_privacy_phone))
         shot("07-saved-voices")
         Espresso.pressBack()
 

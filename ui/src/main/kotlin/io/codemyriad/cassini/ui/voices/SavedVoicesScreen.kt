@@ -109,7 +109,7 @@ fun SavedVoicesScreen(
 @Composable
 private fun SavedVoicesContent(state: SavedVoicesUiState, onEvent: (SavedVoicesEvent) -> Unit) {
     val c = CassiniTheme.colors
-    PrivacyLine(stringResource(R.string.ui_voices_privacy), style = PrivacyLineStyle.SavedVoices)
+    PrivacyLine(stringResource(R.string.ui_voices_privacy_phone), style = PrivacyLineStyle.SavedVoices)
     if (state.readOnly) {
         Banner(
             spec = UnreadableBanner,

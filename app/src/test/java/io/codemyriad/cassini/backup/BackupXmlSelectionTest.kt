@@ -14,7 +14,7 @@ import org.xmlpull.v1.XmlPullParser
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [26, 28, 35])
 class BackupXmlSelectionTest {
-    @Test fun compiledLegacyRulesSelectNoDataBefore28AndRequireD2dAfterward() {
+    @Test fun compiledLegacyRulesSelectNoDataBefore28AndTheLibraryCeilingAfterward() {
         val context: Context = ApplicationProvider.getApplicationContext()
         var includes = 0
         var excludes = 0
@@ -24,7 +24,8 @@ class BackupXmlSelectionTest {
                 when (xml.name) {
                     "include" -> {
                         includes++
-                        assertEquals("deviceToDeviceTransfer", xml.getAttributeValue(null, "requireFlags"))
+                        // D98: the agent decides per channel; requireFlags would AND transfer and encryption.
+                        assertEquals(null, xml.getAttributeValue(null, "requireFlags"))
                     }
                     "exclude" -> excludes++
                 }

@@ -92,7 +92,8 @@ fun Banner(
  * bottom with actions; radius 16; the tone's fill ([Tone.Plain] adds a 1 dp line border on surface). A 10 dp dot
  * (6 dp from the top), then the title (`button`, a heading) in the tone's text colour, the body (`body14`, text3,
  * 3 dp below) and the [actions] in a [FlowRow] (gap 8; top 10, compensated to 4 for the 48 dp buttons).
- * [announce] makes the banner a polite live region.
+ * [announce] makes the banner a polite live region. [dismissLabel] names the close button for TalkBack ("Dismiss" by
+ * default).
  */
 @Composable
 @Suppress("LongParameterList", "LongMethod") // The banner anatomy of ui.md section 6, one slot per part.
@@ -103,6 +104,7 @@ fun BannerCard(
     modifier: Modifier = Modifier,
     announce: Boolean = false,
     onDismiss: (() -> Unit)? = null,
+    dismissLabel: String? = null,
     actions: (@Composable FlowRowScope.() -> Unit)? = null,
 ) {
     val c = CassiniTheme.colors
@@ -167,7 +169,7 @@ fun BannerCard(
         if (onDismiss != null) {
             IconButton44(
                 glyph = Glyph.Close,
-                contentDescription = stringResource(R.string.ui_action_dismiss),
+                contentDescription = dismissLabel ?: stringResource(R.string.ui_action_dismiss),
                 onClick = onDismiss,
                 modifier = Modifier
                     .align(Alignment.TopEnd)

@@ -421,12 +421,35 @@ class SettingsViewModelTest {
         assertEquals(false, viewModel.now().backup?.transfer)
     }
 
+    @Test fun cloudAndSavedVoicesAreIndependentChoicesShownAsStored() = runTest(dispatcher) {
+        ports.backup.value = BackupChoices(cloudQuotaExceeded = true)
+        val viewModel = viewModel()
+        advanceUntilIdle()
+        assertEquals(true, viewModel.now().backup?.cloud)
+        assertEquals(true, viewModel.now().backup?.voices)
+        assertEquals(true, viewModel.now().backup?.cloudQuotaExceeded)
+        viewModel.onEvent(SettingsEvent.IncludeVoices(false))
+        advanceUntilIdle()
+        viewModel.onEvent(SettingsEvent.Cloud(false))
+        advanceUntilIdle()
+        assertEquals(
+            BackupChoices(cloud = false, voices = false, noticeAcknowledged = true, cloudQuotaExceeded = false),
+            ports.backup.value,
+        )
+        assertEquals(false, viewModel.now().backup?.cloud)
+        assertEquals(false, viewModel.now().backup?.voices)
+        assertEquals(true, viewModel.now().backup?.transfer)
+    }
+
     @Test fun anOldAndroidCannotPretendToSaveAnIndependentTransferChoice() = runTest(dispatcher) {
         ports.backup.value = BackupChoices()
         ports.transferAvailable = false
         val viewModel = viewModel()
         assertEquals(false, viewModel.now().backup?.transferAvailable)
+        assertEquals(false, viewModel.now().backup?.cloudAvailable)
         viewModel.onEvent(SettingsEvent.Transfer(false))
+        viewModel.onEvent(SettingsEvent.Cloud(false))
+        viewModel.onEvent(SettingsEvent.IncludeVoices(false))
         advanceUntilIdle()
         assertEquals(BackupChoices(), ports.backup.value)
         assertEquals(0, ports.transferWrites)
@@ -441,6 +464,17 @@ class SettingsViewModelTest {
             transferWrites++
             backupWrite?.await()
             backup.value = checkNotNull(backup.value).copy(transfer = enabled, noticeAcknowledged = true)
+        }
+
+        override suspend fun setCloud(enabled: Boolean) {
+            transferWrites++
+            backup.value = checkNotNull(backup.value)
+                .copy(cloud = enabled, noticeAcknowledged = true, cloudQuotaExceeded = false)
+        }
+
+        override suspend fun setVoices(enabled: Boolean) {
+            transferWrites++
+            backup.value = checkNotNull(backup.value).copy(voices = enabled, noticeAcknowledged = true)
         }
 
         override fun dismissParakeetDefault() {

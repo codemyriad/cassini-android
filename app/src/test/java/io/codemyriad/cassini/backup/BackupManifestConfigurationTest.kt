@@ -3,6 +3,7 @@ package io.codemyriad.cassini.backup
 import io.codemyriad.cassini.BuildConfig
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.w3c.dom.Element
 import java.io.File
@@ -30,13 +31,17 @@ class BackupManifestConfigurationTest {
         assertEquals("@xml/data_extraction_rules", attribute("dataExtractionRules"))
     }
 
-    @Test fun cloudAndPre28BackupExcludeEveryDomainWhileTheCloudBuildFlagIsOff() {
-        assertFalse(BuildConfig.CLOUD_BACKUP_ENABLED)
+    @Test fun pre28ExcludesEveryDomainAndLaterRulesShareOneLibraryCeiling() {
+        assertTrue(BuildConfig.CLOUD_BACKUP_ENABLED)
         checkExcludes(xml("app/src/main/res/xml/full_backup_content.xml"))
         val modern = xml("app/src/main/res/xml/data_extraction_rules.xml")
-        checkExcludes(modern.getElementsByTagName("cloud-backup").item(0) as Element)
+        val cloud = modern.getElementsByTagName("cloud-backup").item(0) as Element
+        // Cloud is skipped on a device without client-side encryption, so "Encrypted cloud backup" stays true.
+        assertEquals("true", cloud.getAttribute("disableIfNoEncryptionCapabilities"))
+        assertEquals(0, cloud.getElementsByTagName("exclude").length)
+        checkIncludes(cloud)
         checkIncludes(modern.getElementsByTagName("device-transfer").item(0) as Element)
-        checkIncludes(xml("app/src/main/res/xml-v28/full_backup_content.xml"), "deviceToDeviceTransfer")
+        checkIncludes(xml("app/src/main/res/xml-v28/full_backup_content.xml"))
     }
 
     private fun checkExcludes(parent: Element) {

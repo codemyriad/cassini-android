@@ -17,11 +17,10 @@ as the backup agent (`BackupChoices.cloudActive` and `transferActive`):
 | off | on | hidden | `android.privacy.processing` |
 | off | off | hidden | `privacy.onDevice.phone` ("The audio never leaves it.") |
 
-Today's builds pin `CLOUD_BACKUP_ENABLED` to `false` (`docs/backup.md`), so the shipped states are the last two
-rows. Cloud backup on by default (D-980) only needs that channel to report `cloud = true`; the hero then shows the
-qualifier and the backup line with no change here. Device transfer counts only from API 28, because the API 26–27
-rules exclude every backup domain. An unreadable choices file counts as both off, as it does for the agent. No
-hero or privacy claim is drawn until the choices have been read.
+Since D-980 (`docs/design/phase2-d980.md`) cloud backup is offered and on by default, so a fresh install shows the
+first row: the qualifier and the backup line. Device transfer and cloud backup count only from API 28, because
+Android 8 cannot tell the transports apart and the API 26–27 rules exclude every backup domain. An unreadable choices
+file counts as both off, as it does for the agent. No hero or privacy claim is drawn until the choices have been read.
 
 With the qualifier, the second line is read as one sentence (`firstRun.hero.subtitlePhoneNote`), so TalkBack never
 reads two strings joined in code. The privacy line is one TalkBack stop.
@@ -44,6 +43,6 @@ drawn on the canvas yet.
 
 ## Out of scope on Android
 
-- Settings parity for backups (the `Moving and backup` section, the phone-only card, saved-voices backup) is
+- Settings parity for backups (the `Moving and backup` section, the phone-only card, saved-voices backup) came in
   Wave 6, D-980.
 - Browser Companion is n/a on Android (PARITY).

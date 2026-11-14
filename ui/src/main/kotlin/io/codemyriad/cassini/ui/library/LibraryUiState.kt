@@ -27,6 +27,9 @@ import kotlinx.collections.immutable.persistentListOf
  * [query] is the text of a field. The field keeps its own copy and sends each change as [LibraryEvent.Query]; it
  * takes a different text from the state only when that text is not one it sent (SyncedText). Thus the
  * ViewModel can update this value through its StateFlow.
+ *
+ * [backupCard] shows the once-only "Keep them on this phone only" card (D98) above the activity while encrypted
+ * cloud backup is on; it is not shown during search.
  */
 @Immutable
 data class LibraryUiState(
@@ -43,6 +46,7 @@ data class LibraryUiState(
     val sheet: LibrarySheet? = null,
     val dialog: LibraryDialog? = null,
     val hero: FirstRunHeroUi? = null,
+    val backupCard: Boolean = false,
 )
 
 /**

@@ -25,8 +25,11 @@ class LibraryBackup(context: Context, private val paths: AppPaths, private val s
     private var failed = false
     private val catalogue = BackupCatalogue(context)
 
-    /** XML and this allowlist both omit settings, model receipts/weights, and unfinished inference work. */
-    fun prepare(): Pair<BackupManifest, File> {
+    /**
+     * XML and this allowlist both omit settings, model receipts/weights, and unfinished inference work. Without
+     * [includeVoices] the inventory lists nothing under `voices/` (D98), so the dataset is complete without them.
+     */
+    fun prepare(includeVoices: Boolean = true): Pair<BackupManifest, File> {
         Threads.assertOffMain("LibraryBackup.prepare")
         val transaction = LibraryRestoreTransaction(paths.root, staging)
         transaction.recover()
@@ -35,7 +38,7 @@ class LibraryBackup(context: Context, private val paths: AppPaths, private val s
         }
         BackupVoiceRecovery.recover(paths.root)
         catalogue.checkpoint(paths.database)
-        val manifest = BackupManifest.create(paths.root)
+        val manifest = BackupManifest.create(paths.root, includeVoices)
         val file = File(paths.root, BackupManifest.MANIFEST)
         Files.createDirectories(file.parentFile!!.toPath())
         val atomic = AtomicFile(file)

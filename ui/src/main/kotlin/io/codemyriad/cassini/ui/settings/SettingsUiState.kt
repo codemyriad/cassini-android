@@ -87,7 +87,12 @@ val ModelStatusUi.canOpenDownload: Boolean
 val ModelStatusUi.isInstalling: Boolean
     get() = this is ModelStatusUi.Downloading || this == ModelStatusUi.Checking
 
-/** Device-local choices. Neither switch claims Android has completed a backup. */
+/**
+ * The device-local choices of Moving and backup (PARITY Wave 6 contract §3, D98). No switch claims that Android has
+ * completed a backup. [transferAvailable] and [cloudAvailable] are false before API 28, where Android cannot tell the
+ * transports apart; [cloud] and [transfer] are the stored choices; [voices] is "Include saved voices in backups".
+ * [quotaExceeded] / [cloudQuotaExceeded] are the size refusals of the last transfer / cloud attempt.
+ */
 @Immutable
 data class BackupSettingsUi(
     val transfer: Boolean,
@@ -95,4 +100,14 @@ data class BackupSettingsUi(
     val quotaExceeded: Boolean,
     val saving: Boolean = false,
     val error: Boolean = false,
-)
+    val cloud: Boolean = true,
+    val cloudAvailable: Boolean = transferAvailable,
+    val voices: Boolean = true,
+    val cloudQuotaExceeded: Boolean = false,
+) {
+    val cloudOn: Boolean get() = cloudAvailable && cloud
+    val transferOn: Boolean get() = transferAvailable && transfer
+
+    /** No automatic copy leaves the phone: only now may the copy say "this phone only". */
+    val phoneOnly: Boolean get() = !cloudOn && !transferOn
+}
