@@ -81,13 +81,14 @@ class BackupPreflightTest {
 
     @Test fun savedVoicesOffLeavesEveryVoiceprintOutOfCloudAndTransfer() = runBlocking {
         val app: CassiniApplication = ApplicationProvider.getApplicationContext()
+        val agents = List(2) { Robolectric.setupBackupAgent(CassiniBackupAgent::class.java) }
         withContext(Dispatchers.IO) {
             library(app)
             val choices = BackupChoicesStore(File(app.noBackupFilesDir, "choices.json"), Dispatchers.IO)
             choices.setVoices(false)
-            for (flags in listOf(CLIENT_SIDE_ENCRYPTION, DEVICE_TO_DEVICE)) {
+            for ((agent, flags) in agents.zip(listOf(CLIENT_SIDE_ENCRYPTION, DEVICE_TO_DEVICE))) {
                 EmissionShadow.files.clear()
-                Robolectric.setupBackupAgent(CassiniBackupAgent::class.java).onFullBackup(output(flags))
+                agent.onFullBackup(output(flags))
                 assertEquals(listOf("notes/n/source.opus", BackupManifest.MANIFEST), emitted(app))
                 val inventory = BackupManifest.read(File(app.filesDir, BackupManifest.MANIFEST))
                 assertFalse(inventory.files.any { it.path.startsWith("voices/") })
@@ -97,9 +98,9 @@ class BackupPreflightTest {
 
     @Test fun unencryptedCloudAndTheCloudChoiceOffEmitNothing() = runBlocking {
         val app: CassiniApplication = ApplicationProvider.getApplicationContext()
+        val agent = Robolectric.setupBackupAgent(CassiniBackupAgent::class.java)
         withContext(Dispatchers.IO) {
             library(app)
-            val agent = Robolectric.setupBackupAgent(CassiniBackupAgent::class.java)
             assertThrows(IOException::class.java) { agent.onFullBackup(output(flags = 0)) }
             val choices = BackupChoicesStore(File(app.noBackupFilesDir, "choices.json"), Dispatchers.IO)
             choices.setCloud(false)
