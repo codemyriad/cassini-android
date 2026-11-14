@@ -276,29 +276,15 @@
     <string name="ui_versions_unreadable">No se puede leer</string>
 
     <!-- Name a speaker. -->
-    <string name="ui_name_speaks_for">Habla durante %1$s en esta nota</string>
-    <string name="ui_name_play_sample">Reproducir una muestra de esta voz</string>
     <string name="ui_name_stop_sample">Detener la muestra</string>
-    <string name="ui_name_voices_ranked">Voces guardadas, la más parecida primero</string>
-    <string name="ui_name_voices">Voces guardadas</string>
-    <string name="ui_name_likely">Probable</string>
     <string name="ui_name_show_all">Mostrar todas</string>
-    <string name="ui_name_same_person_saved">“%1$s” ya es una voz guardada.</string>
-    <string name="ui_name_same_person_question">¿Es la misma persona?</string>
-    <string name="ui_name_same_person">Misma persona</string>
-    <string name="ui_name_someone_else">Otra persona</string>
     <string name="ui_name_answer_first">Primero responde la pregunta de arriba</string>
     <string name="ui_name_rename_saved_saved_as">Esta voz está guardada como “%1$s”.</string>
     <string name="ui_name_rename_saved_question">¿Renombrar también la voz guardada?</string>
     <string name="ui_name_rename_saved">Renombrar voz guardada</string>
     <string name="ui_name_not">¿No es %1$s?</string>
-    <string name="ui_name_remember">Recordar esta voz en este teléfono</string>
     <string name="ui_name_remember_body">En las próximas notas, Cassini reconocerá a %1$s automáticamente.</string>
     <string name="ui_name_remember_body_unnamed">En las próximas notas, Cassini reconocerá a esta persona automáticamente.</string>
-    <string name="ui_name_remember_too_little">No hay suficiente habla para recordar esta voz.</string>
-    <string name="ui_name_remember_no_model">El reconocimiento de voces guardadas aún no está instalado.</string>
-    <string name="ui_name_merge_into">Fusionar con…</string>
-    <string name="ui_name_save">Guardar nombre</string>
 
     <!-- Merge sheet and confirmation. -->
     <string name="ui_merge_sheet_title">Fusionar a %1$s con…</string>
@@ -472,7 +458,7 @@
     <string name="ui_banner_rec_stopped_file_title">Grabación detenida — archivo lleno</string>
     <string name="ui_banner_rec_stopped_file_body">Cassini termina las grabaciones M4A al llegar a 1\u00A0GB, unas 74\u00A0horas. Lo grabado hasta ahora está guardado. Empieza una grabación nueva para continuar.</string>
     <string name="ui_banner_rec_file_low_title">Archivo de grabación casi lleno — quedan unos %1$s</string>
-    <string name="ui_banner_rec_file_low_body">Cassini termina las grabaciones M4A al llegar a 1\u00A0GB y las guarda. Para seguir, termina y empieza una grabación nueva.</string>
+    <string name="ui_banner_rec_file_low_body">Cassini termina las grabaciones M4A al llegar a 1\u00A0GB y las guarda. Para seguir, detén y empieza una grabación nueva.</string>
     <string name="ui_banner_rec_stopped_storage_title">Grabación detenida — almacenamiento casi lleno</string>
     <string name="ui_banner_rec_stopped_storage_body">Quedan menos de %1$s libres. Lo grabado hasta ahora está guardado.</string>
     <string name="ui_banner_rec_mic_off_title">El acceso al micrófono está desactivado</string>

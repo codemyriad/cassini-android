@@ -201,6 +201,8 @@ The title is "Versions". The sheet has one row for each variant, in the sequence
 
 ## 4. Name a speaker sheet (board 04) [CHANGED: one sheet replaces 3-4 chained dialogs]
 
+Phase 1 speaker-sheet presentation, quote excerpt, grouped saved voices, native Remember switch and shared catalog strings follow [WP6: Name a speaker](phase1-wp6.md) (`L-14`, `L-41`, `L-46`), retaining the reducer, enrolment, merge and storage contracts below.
+
 The sheet has two modes: SEALED (document OK, no job row) and DRAFT (job RUNNING or PAUSED, naming open). The pure reducer `SpeakerNaming` controls it: events go in, and the state of the sheet and the effects come out.
 
 1. Header: an avatar in the speaker tint (the placeholder number, or the first grapheme of the label). The title is the display label. "Speaks for 3 min 12 s in this note" (`speaking_ms`. For a draft, the app calculates it from the draft words, with the merges applied). Play sample (a11y "Play a sample of this voice") calls `playRange(sample_start_ms, sample_end_ms)`. It is disabled without a sample window.
@@ -361,7 +363,7 @@ A banner that the user can dismiss has a 48 dp close button at the end (a 20 dp 
 | Kind | Tone | Copy | Trigger | Actions |
 |---|---|---|---|---|
 | REC_PAUSED_OTHER_APP | warn | "Paused — another app is using audio" — "Resume when your call ends. Nothing was lost." | `pause == OTHER_APP` | Resume |
-| REC_STORAGE_LOW | warn | "Storage almost full — about 10 min left" — "Free some space to keep going. If it runs out, the recording saves automatically." For the AAC file limit (`BannerArgs.fileLimit`): "Recording file almost full — about 10 min left" — "Cassini ends M4A recordings at 1 GB and saves them. To keep going, finish and start a new recording." (not on the board) | StorageLow, or FileLimitNear for the file copy | – |
+| REC_STORAGE_LOW | warn | "Storage almost full — about 10 min left" — "Free some space to keep going. If it runs out, the recording saves automatically." For the AAC file limit (`BannerArgs.fileLimit`): "Recording file almost full — about 10 min left" — "Cassini ends M4A recordings at 1 GB and saves them. To keep going, stop and start a new recording." (not on the board) | StorageLow, or FileLimitNear for the file copy | – |
 | REC_STOPPED_FILE_LIMIT | warn | "Stopped — recording file is full" — "Cassini ends M4A recordings at 1 GB, about 74 hours. The recording so far is saved. Start a new recording to continue." (not on the board) | `Ended(StoppedAtFileLimit)`: an AAC file at 1 GB (also a notification in the background) | Open note |
 | REC_STOPPED_STORAGE | warn | "Stopped — storage almost full" — "Less than 200 MB free. The recording so far is saved." | `Ended(StoppedForSpace)` (also a notification in the background) | Open note |
 | REC_MIC_OFF | error | "Microphone access is off" — "Turn it on in system settings. Recording starts when you come back." | RECORD_AUDIO permanently denied | Open settings |

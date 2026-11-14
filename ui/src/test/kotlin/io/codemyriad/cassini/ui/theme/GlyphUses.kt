@@ -56,7 +56,6 @@ private fun use(size: Int, stroke: Float, tint: IconTint = IconTint.Ink, onBoard
  * markup test checks the on-board ones against design/reference/markup in both directions.
  */
 internal val GlyphUses: Map<Glyph, List<GlyphUse>> = mapOf(
-    Glyph.Logo to listOf(use(28, 1.6f), use(56, 1.3f, IconTint.Accent)),
     Glyph.Trash to listOf(use(22, 1.7f), use(24, 1.7f, IconTint.RedInk)),
     Glyph.Settings to listOf(use(22, 1.7f)),
     Glyph.Search to listOf(use(20, 1.8f, IconTint.Text2), use(21, 1.8f)),

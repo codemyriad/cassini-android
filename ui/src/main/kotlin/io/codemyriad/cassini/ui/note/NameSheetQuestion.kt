@@ -36,13 +36,8 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.R
-import io.codemyriad.cassini.ui.components.InkButton
-import io.codemyriad.cassini.ui.components.InkButtonSize
-import io.codemyriad.cassini.ui.components.SecondaryButton
-import io.codemyriad.cassini.ui.components.SecondaryButtonSize
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -78,12 +73,16 @@ private fun Modifier.pulseBorder(color: Color, shape: Shape, alpha: () -> Float)
     }
 }
 
-/** An open question of the sheet: the bold [saved] sentence, the question, and its two answers. */
+/** Sentinel used to locate the `{name}` placeholder span in localized duplicate notices. */
+private const val PLACEHOLDER_SENTINEL = "\u0000"
+
+/** An open question of the sheet: the [saved] sentence, optional [ask], and its two answers. */
 internal data class Question(
     val saved: String,
     val ask: String,
     val yes: String,
     val yesEvent: NameSheetEvent,
+    val boldRange: IntRange? = null,
 )
 
 /** The same-person question (features.md section 4, item 4) or the rename-saved question (item 5), else null. */
@@ -92,12 +91,17 @@ internal fun question(ui: NameSheetUi): Question? {
     val same = ui.samePerson
     val rename = ui.renameSaved
     return when {
-        same != null -> Question(
-            saved = stringResource(R.string.ui_name_same_person_saved, same),
-            ask = stringResource(R.string.ui_name_same_person_question),
-            yes = stringResource(R.string.ui_name_same_person),
-            yesEvent = NameSheetEvent.SamePerson,
-        )
+        same != null -> {
+            val start = stringResource(R.string.ui_sp_duplicate_notice, PLACEHOLDER_SENTINEL)
+                .indexOf(PLACEHOLDER_SENTINEL)
+            Question(
+                saved = stringResource(R.string.ui_sp_duplicate_notice, same),
+                ask = "",
+                yes = stringResource(R.string.ui_sp_same_person),
+                yesEvent = NameSheetEvent.SamePerson,
+                boldRange = if (start >= 0 && same.isNotEmpty()) start until (start + same.length) else null,
+            )
+        }
         rename != null -> Question(
             saved = stringResource(R.string.ui_name_rename_saved_saved_as, rename),
             ask = stringResource(R.string.ui_name_rename_saved_question),
@@ -144,7 +148,7 @@ internal fun QuestionCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(c.speakerQuestionWash)
+            .background(c.surfaceWash)
             .pulseBorder(c.speaker0, shape) { pulse.value }
             .semantics {
                 liveRegion = LiveRegionMode.Polite
@@ -154,7 +158,7 @@ internal fun QuestionCard(
             .padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 8.dp),
     ) {
         Text(
-            text = boldFirst(question.saved, question.ask),
+            text = questionText(question),
             style = CassiniTheme.type.body14,
             color = c.ink,
         )
@@ -162,22 +166,23 @@ internal fun QuestionCard(
             modifier = Modifier.padding(top = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            InkButton(
-                text = question.yes,
-                onClick = { onEvent(question.yesEvent) },
-                size = InkButtonSize.Medium,
-            )
-            SecondaryButton(
-                text = stringResource(R.string.ui_name_someone_else),
+            NameNoticeButton(question.yes, primary = true, onClick = { onEvent(question.yesEvent) })
+            NameNoticeButton(
+                stringResource(R.string.ui_sp_someone_else),
+                primary = false,
                 onClick = { onEvent(NameSheetEvent.SomeoneElse) },
-                size = SecondaryButtonSize.MediumPlain,
             )
         }
     }
 }
 
-private fun boldFirst(bold: String, rest: String): AnnotatedString = buildAnnotatedString {
-    withStyle(SpanStyle(fontWeight = FontWeight.W700)) { append(bold) }
-    append(' ')
-    append(rest)
+private fun questionText(question: Question): AnnotatedString = buildAnnotatedString {
+    append(question.saved)
+    question.boldRange?.let { range ->
+        addStyle(SpanStyle(fontWeight = FontWeight.SemiBold), range.first, range.last + 1)
+    }
+    if (question.ask.isNotEmpty()) {
+        append(' ')
+        append(question.ask)
+    }
 }

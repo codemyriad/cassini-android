@@ -46,6 +46,24 @@
         <item quantity="other">%1$s riunioni</item>
     </plurals>
     <string name="ui_tx_heading">In trascrizione</string>
+    <string name="ui_sp_dialog_a11y">Dai un nome a questa voce</string>
+    <string name="ui_sp_name">Nome</string>
+    <string name="ui_sp_play_sample">Riproduci un campione di questa voce</string>
+    <string name="ui_sp_quote">“%1$s”</string>
+    <string name="ui_sp_talk_time">Parla per %1$s in questa riunione</string>
+    <string name="ui_sp_duplicate_notice">%1$s è già tra le voci salvate.</string>
+    <string name="ui_sp_same_person">Stessa persona</string>
+    <string name="ui_sp_someone_else">Un’altra persona</string>
+    <string name="ui_sp_voices_ranked">Voci salvate, dalla più simile</string>
+    <string name="ui_sp_voices">Voci salvate</string>
+    <string name="ui_sp_likely">Probabile</string>
+    <string name="ui_sp_remember_title">Ricorda questa voce</string>
+    <string name="ui_sp_remember_body">La prossima volta Cassini darà automaticamente il nome %1$s.\nL’impronta vocale resta su questo telefono.</string>
+    <string name="ui_sp_remember_unnamed">La prossima volta Cassini darà automaticamente un nome a questa persona.\nL’impronta vocale resta su questo telefono.</string>
+    <string name="ui_sp_remember_too_short">Cassini ha bisogno di almeno 4 secondi di questa voce per ricordarla.</string>
+    <string name="ui_sp_remember_models">Per ricordare le voci, scarica e attiva “Distingui le voci” e “Riconosci le voci salvate” nelle impostazioni.</string>
+    <string name="ui_sp_merge">Unisci a…</string>
+    <string name="ui_sp_save">Salva il nome</string>
     <plurals name="ui_tx_eta_minutes">
         <item quantity="one">circa %1$s min rimanente</item>
         <item quantity="many">circa %1$s min rimanenti</item>

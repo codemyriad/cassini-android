@@ -831,6 +831,7 @@ class NoteViewModelTest {
         val open = (viewModel.now().sheet as NoteSheet.NameSpeaker).ui
         assertEquals(SpeakerNameUi.Placeholder(2, "Speaker 2"), open.label)
         assertEquals("", open.name)
+        assertEquals(WORDS.filter { it.speaker == "b" }.first().text, open.quote)
         assertTrue(open.remember)
 
         send(viewModel, NoteEvent.NameSheet(NameSheetEvent.NameChanged("Anna")))
@@ -877,6 +878,7 @@ class NoteViewModelTest {
         send(viewModel, NoteEvent.SpeakerTap("s1"))
         val sheet = (viewModel.now().sheet as NoteSheet.NameSpeaker).ui
         assertTrue(sheet.draft)
+        assertEquals("Lunga", sheet.quote)
         assertFalse("Transcribing has no player for the sample", sheet.canSample)
         send(
             viewModel,

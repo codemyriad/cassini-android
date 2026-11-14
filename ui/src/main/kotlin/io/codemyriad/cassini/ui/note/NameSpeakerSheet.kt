@@ -25,6 +25,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -35,6 +36,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
@@ -42,9 +44,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogWindowProvider
 import io.codemyriad.cassini.ui.R
 import io.codemyriad.cassini.ui.components.Avatar
-import io.codemyriad.cassini.ui.components.CassiniCheckboxRow
 import io.codemyriad.cassini.ui.components.CassiniSheet
 import io.codemyriad.cassini.ui.components.CassiniTextField
 import io.codemyriad.cassini.ui.components.DISABLED_ALPHA
@@ -53,7 +55,6 @@ import io.codemyriad.cassini.ui.components.NAME_MAX_LENGTH
 import io.codemyriad.cassini.ui.components.PrimaryButton
 import io.codemyriad.cassini.ui.components.SecondaryButton
 import io.codemyriad.cassini.ui.components.SecondaryButtonSize
-import io.codemyriad.cassini.ui.components.SpeakerNameUi
 import io.codemyriad.cassini.ui.components.TextButton
 import io.codemyriad.cassini.ui.components.display
 import io.codemyriad.cassini.ui.components.firstGrapheme
@@ -64,6 +65,7 @@ import io.codemyriad.cassini.ui.format.LocalFormat
 import io.codemyriad.cassini.ui.theme.CassiniIcon
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import io.codemyriad.cassini.ui.theme.Glyph
+import io.codemyriad.cassini.ui.theme.SpeakerTone
 
 /**
  * The Name a speaker sheet (board 04; features.md section 4) in its [CassiniSheet] window. Every control sends a
@@ -72,13 +74,27 @@ import io.codemyriad.cassini.ui.theme.Glyph
  */
 @Composable
 fun NameSpeakerSheet(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit, onDismiss: () -> Unit) {
-    CassiniSheet(onDismissRequest = onDismiss) { NameSpeakerSheetContent(ui, onEvent) }
+    val dialogTitle = stringResource(R.string.ui_sp_dialog_a11y)
+    CassiniSheet(onDismissRequest = onDismiss) {
+        val view = LocalView.current
+        SideEffect {
+            generateSequence(view.parent) { it.parent }
+                .filterIsInstance<DialogWindowProvider>()
+                .firstOrNull()
+                ?.window
+                ?.let { window ->
+                    window.setTitle(dialogTitle)
+                    window.attributes = window.attributes.apply { title = dialogTitle }
+                }
+        }
+        NameSpeakerSheetContent(ui, onEvent)
+    }
 }
 
 /**
  * The sheet's content, also drawn inline in screenshots (`SheetBoardFrame`): padding 16 (below the handle) / 20 /
- * 24 with a 16 dp gap. The header (avatar, title, "Speaks for …", Play sample), the Name field, the saved voices
- * card, "Not <name>?", the same-person or rename-saved question, Remember, and the footer (Merge into…, Cancel, Save
+ * 24 with a 16 dp gap. The header (title, speaking time, Play sample), the quote, the Name field and its question,
+ * the saved voices card, "Not <name>?", Remember, and the footer (Merge into…, Cancel, Save
  * name). When the content does not fit above the keyboard, the part above the footer scrolls and the footer stays
  * in view.
  *
@@ -118,10 +134,11 @@ fun NameSpeakerSheetContent(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit, 
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             SheetHeader(ui, onEvent)
+            if (ui.quote.isNotBlank()) SpeakerQuote(ui.quote)
             CassiniTextField(
                 value = ui.name,
                 onValueChange = { onEvent(NameSheetEvent.NameChanged(it)) },
-                label = stringResource(R.string.ui_name_label),
+                label = stringResource(R.string.ui_sp_name),
                 showFocus = if (ui.nameFieldFocused) true else null,
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.Words,
@@ -131,7 +148,11 @@ fun NameSpeakerSheetContent(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit, 
                 modifier = Modifier.padding(top = 3.dp),
                 keyboardActions = KeyboardActions(onDone = { save() }),
                 maxLength = NAME_MAX_LENGTH,
+                containerColor = CassiniTheme.colors.field,
             )
+            if (question != null) {
+                QuestionCard(question, pulses, onEvent, Modifier.focusRequester(questionFocus))
+            }
             if (ui.voices.isNotEmpty()) VoicesCard(ui, onEvent)
             ui.notName?.let { name ->
                 // The text button's 14 dp padding hangs into the sheet padding, so its text starts at the content edge.
@@ -141,16 +162,7 @@ fun NameSpeakerSheetContent(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit, 
                     modifier = Modifier.offset(x = (-14).dp),
                 )
             }
-            if (question != null) {
-                QuestionCard(question, pulses, onEvent, Modifier.focusRequester(questionFocus))
-            }
-            CassiniCheckboxRow(
-                checked = ui.remember,
-                onCheckedChange = { onEvent(NameSheetEvent.RememberChanged(it)) },
-                title = stringResource(R.string.ui_name_remember),
-                subtitle = rememberSubtitle(ui),
-                enabled = ui.rememberEnabled,
-            )
+            RememberVoiceCard(ui, rememberSubtitle(ui), onEvent)
         }
         // Bottom 25: board 04's Cancel is 50 dp tall (a content-box border) and centres Save in its row. Top 16: the
         // gap of the column above.
@@ -164,13 +176,12 @@ fun NameSpeakerSheetContent(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit, 
     }
 }
 
-/** Avatar 40, title `sheetTitle`, "Speaks for 3 min 12 s in this note", and the 44 dp Play sample button. */
+/** The speaker in ink and speaking time precede the field; sampling keeps its existing action. */
 @Composable
 private fun SheetHeader(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit) {
     val c = CassiniTheme.colors
     val label = ui.label.display()
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Avatar(text = avatarText(ui.label, label), tone = ui.tone)
         Column(Modifier.weight(1f)) {
             Text(
                 text = label,
@@ -178,7 +189,11 @@ private fun SheetHeader(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit) {
                 style = CassiniTheme.type.sheetTitle,
                 color = c.ink,
             )
-            Text(text = Durations.speaksFor(ui.speakingMs), style = CassiniTheme.type.caption, color = c.text2)
+            Text(
+                text = Durations.speaksFor(ui.speakingMs),
+                style = CassiniTheme.type.caption,
+                color = c.text2,
+            )
         }
         PlaySampleButton(
             sampling = ui.sampling,
@@ -188,13 +203,6 @@ private fun SheetHeader(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit) {
     }
 }
 
-/** The avatar's text: the placeholder number, or the first character (grapheme) of the name. */
-@Composable
-private fun avatarText(name: SpeakerNameUi, label: String): String {
-    if (name is SpeakerNameUi.Placeholder) return name.number.toString()
-    return firstGrapheme(label, LocalFormat.current.locale)
-}
-
 /**
  * Play sample: a 44 dp surface circle with a 1 dp line2 border and the filled Play 18 (Pause while [sampling]).
  * The 48 dp touch area overhangs the visual by 2 dp on each side, so the row keeps the board's 44 dp height.
@@ -202,7 +210,7 @@ private fun avatarText(name: SpeakerNameUi, label: String): String {
 @Composable
 private fun PlaySampleButton(sampling: Boolean, enabled: Boolean, onClick: () -> Unit) {
     val c = CassiniTheme.colors
-    val description = stringResource(if (sampling) R.string.ui_name_stop_sample else R.string.ui_name_play_sample)
+    val description = stringResource(if (sampling) R.string.ui_name_stop_sample else R.string.ui_sp_play_sample)
     Box(
         modifier = Modifier
             .overhang(2.dp)
@@ -226,7 +234,7 @@ private fun PlaySampleButton(sampling: Boolean, enabled: Boolean, onClick: () ->
 
 /**
  * "Saved voices, closest first" (or "Saved voices" without a voiceprint) and the list card: 1 dp line border,
- * radius 14; rows at least 52 dp, padding 14, gap 10, `body16`; the Likely row on surfaceWash with its tag; 1 dp
+ * radius 14; rows at least 56 dp, padding 14, gap 10, `body16`; the neutral Likely tag does not highlight its row; 1 dp
  * line dividers; then "Show all" in accentInk when more voices exist.
  */
 @Composable
@@ -235,7 +243,7 @@ private fun VoicesCard(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit) {
     val shape = CassiniTheme.shapes.row
     Column {
         Text(
-            text = stringResource(if (ui.ranked) R.string.ui_name_voices_ranked else R.string.ui_name_voices),
+            text = stringResource(if (ui.ranked) R.string.ui_sp_voices_ranked else R.string.ui_sp_voices),
             modifier = Modifier
                 .padding(bottom = 6.dp)
                 .semantics { heading() },
@@ -246,7 +254,8 @@ private fun VoicesCard(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit) {
             Modifier
                 .fillMaxWidth()
                 .clip(shape)
-                .border(1.dp, c.line, shape),
+                .background(c.field)
+                .border(1.dp, c.lineSoft, shape),
         ) {
             ui.voices.forEachIndexed { i, voice ->
                 if (i > 0) RowDivider()
@@ -254,6 +263,7 @@ private fun VoicesCard(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit) {
                     text = voice.name,
                     onClick = { onEvent(NameSheetEvent.PickVoice(voice.id)) },
                     likely = voice.likely,
+                    tone = voice.tone,
                 )
             }
             if (ui.showAll) {
@@ -269,25 +279,31 @@ private fun VoicesCard(ui: NameSheetUi, onEvent: (NameSheetEvent) -> Unit) {
 }
 
 @Composable
-private fun VoiceRow(text: String, onClick: () -> Unit, likely: Boolean = false, accent: Boolean = false) {
+private fun VoiceRow(
+    text: String,
+    onClick: () -> Unit,
+    likely: Boolean = false,
+    accent: Boolean = false,
+    tone: SpeakerTone? = null,
+) {
     val c = CassiniTheme.colors
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 52.dp)
-            .then(if (likely) Modifier.background(c.surfaceWash) else Modifier)
+            .heightIn(min = 56.dp)
             .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = 14.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (tone != null) Avatar(firstGrapheme(text, LocalFormat.current.locale), tone, size = 32.dp)
         Text(
             text = text,
             modifier = Modifier.weight(1f),
             style = CassiniTheme.type.body16,
             color = if (accent) c.accentInk else c.ink,
         )
-        if (likely) LikelyTag(stringResource(R.string.ui_name_likely))
+        if (likely) LikelyTag(stringResource(R.string.ui_sp_likely))
     }
 }
 
@@ -297,24 +313,25 @@ private fun RowDivider() {
         Modifier
             .fillMaxWidth()
             .height(1.dp)
-            .background(CassiniTheme.colors.line),
+            .background(CassiniTheme.colors.lineSoft),
     )
 }
 
 /** "Future notes will name Anna automatically. …", or why Remember is disabled. */
 @Composable
 private fun rememberSubtitle(ui: NameSheetUi): String {
-    if (!ui.rememberEnabled) {
-        return when (ui.rememberReason) {
-            RememberReason.NO_MODEL -> stringResource(R.string.ui_name_remember_no_model)
-            RememberReason.TOO_LITTLE_SPEECH, null -> stringResource(R.string.ui_name_remember_too_little)
+    val reason = ui.rememberReason
+    if (!ui.rememberEnabled && reason != null) {
+        return when (reason) {
+            RememberReason.NO_MODEL -> stringResource(R.string.ui_sp_remember_models)
+            RememberReason.TOO_LITTLE_SPEECH -> stringResource(R.string.ui_sp_remember_too_short)
         }
     }
     val name = ui.name.trim()
     return if (name.isEmpty()) {
-        stringResource(R.string.ui_name_remember_body_unnamed)
+        stringResource(R.string.ui_sp_remember_unnamed)
     } else {
-        stringResource(R.string.ui_name_remember_body, name)
+        stringResource(R.string.ui_sp_remember_body, name)
     }
 }
 
@@ -341,7 +358,16 @@ private fun Footer(
         itemVerticalAlignment = Alignment.CenterVertically,
     ) {
         if (ui.canMerge) {
-            TextButton(stringResource(R.string.ui_name_merge_into), onClick = { onEvent(NameSheetEvent.MergeInto) })
+            androidx.compose.material3.TextButton(
+                onClick = { onEvent(NameSheetEvent.MergeInto) },
+                modifier = Modifier.offset(x = (-12).dp).heightIn(min = 48.dp),
+            ) {
+                Text(
+                    stringResource(R.string.ui_sp_merge),
+                    style = CassiniTheme.type.label14,
+                    color = CassiniTheme.colors.ink,
+                )
+            }
         } else {
             Spacer(Modifier)
         }
@@ -355,7 +381,7 @@ private fun Footer(
                 size = SecondaryButtonSize.Regular,
             )
             PrimaryButton(
-                text = stringResource(R.string.ui_name_save),
+                text = stringResource(R.string.ui_sp_save),
                 onClick = onSave,
                 enabled = ui.save != SaveState.DISABLED,
                 blockedReason = if (ui.save == SaveState.BLOCKED_BY_QUESTION) {

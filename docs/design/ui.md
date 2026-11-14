@@ -14,7 +14,7 @@ banner/      BannerKind.kt (catalogue with tone, title, body and action resource
 library/ recording/ note/ models/ settings/ voices/ trash/ licenses/
              XxxScreen.kt (stateless), XxxUiState.kt, XxxEvent.kt
 res/         values/strings.xml, values-{it,fr,es,pt-rBR,pt-rPT}/strings.xml, values/colors.xml + values-night/colors.xml (ui_window_bg),
-             font/ui_*.ttf, drawable/ui_ic_logo.xml, drawable/ui_ic_stat_logo.xml,
+             font/ui_*.ttf, drawable-*dpi/ui_saturn_{nav,mid}.png, drawable/ui_ic_stat_logo.xml,
              drawable/ui_ic_launcher_{foreground,background,monochrome}.xml, mipmap-anydpi/ui_ic_launcher.xml (+ _round)
 src/test/    fixtures (BoardFixtures.kt, VariantFixtures.kt), BoardTest base, frames, screenshot tests, ContrastTest, FormatTest, FontAssetsTest
 src/test/screenshots/{light,dark,it,fontscale,variants,components,states}/*.png   committed goldens
@@ -199,13 +199,12 @@ All sizes are in sp, and they change with the system font size. Fixed heights be
 
 ### 4.5 Icons
 
-The app does not use `material-icons-extended`. Each icon is an `ImageVector` that comes from the SVG path data of the design (viewport 24, and 28 for the logo). The strokes have round caps and joins, and `Icon(tint)` gives the color. The stroke width is in viewport units.
+The app does not use `material-icons-extended`. Each icon is an `ImageVector` that comes from the SVG path data of the design (viewport 24). The strokes have round caps and joins, and `Icon(tint)` gives the color. The stroke width is in viewport units.
 
-The code has `enum class Glyph(paths, filled, viewport)` and `CassiniIcon(glyph, size, stroke, tint, contentDescription)`, with a cache for each (glyph, stroke). `addPathNodes` parses `d`. A circle is two arcs. The ellipse of the logo is in `group(rotate = -20f, pivotX = 14f, pivotY = 14f)`.
+The code has `enum class Glyph(paths, filled, viewport)` and `CassiniIcon(glyph, size, stroke, tint, contentDescription)`, with a cache for each (glyph, stroke). `addPathNodes` parses `d`. A circle is two arcs.
 
 | Glyph | Path data | Sizes / stroke |
 |---|---|---|
-| Logo (28) | circle(14,14,r5.5) + ellipse rx12 ry4.2 rotated −20° | 28/1.6 ink, 56/1.3 accent |
 | Trash | `M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13` | 22/1.7, 24/1.7 |
 | Settings | circle(12,12,3) + the gear path of board 00 | 22/1.7 |
 | Search | circle(11,11,7) + `m20 20-3.5-3.5` | 20/1.8, 21/1.8 |
@@ -231,7 +230,7 @@ The code has `enum class Glyph(paths, filled, viewport)` and `CassiniIcon(glyph,
 | Info | circle(12,12,9) + `M12 11v6M12 7.5v.5` | 24/1.7 |
 | Warn | `M12 4 3 20h18z` + `M12 10v4M12 17v.5` | 14/2 (trust chips) |
 
-The logo vector is also the adaptive launcher foreground (ink on bg, in `mipmap-anydpi/ui_ic_launcher.xml` with a monochrome layer) and the small notification icon `ui_ic_stat_logo`.
+The boards' line-art logo (a circle and an ellipse rotated −20°) is retired (L-04). The app draws the `cassini.talk` Saturn instead: the vendored cassini-ux `saturn-nav.svg` (37 x 24 dp, Library search field) and `saturn-mid.svg` (86 x 56 dp, Model download), rasterized per density and pinned by `scripts/check-nav-mark.py`. The line-art shape is still the adaptive launcher foreground (ink on bg, in `mipmap-anydpi/ui_ic_launcher.xml` with a monochrome layer) and the small notification icon `ui_ic_stat_logo`.
 
 ## 5. Touch targets
 
@@ -576,6 +575,8 @@ Phase 1 screen layout and bounded middle scroll follow [WP4: Android recording](
 
 ### Name a speaker (04)
 
+Phase 1 sheet layout, ink heading, speaker quote, inline duplicate notice, grouped saved-voice surfaces and native Remember switch follow [WP6: Name a speaker](phase1-wp6.md) (`L-14`, `L-41`, `L-46`).
+
 - Sheet padding: top 10, horizontal 20, bottom 24. Gap 16.
 - Header row: the avatar 40, the title in `sheetTitle`, the caption, and the play-sample button (a 44/48 circle with 1 dp line2).
 - The name field (`showFocus` in the board fixture).
@@ -610,7 +611,7 @@ Phase 1 screen layout and bounded middle scroll follow [WP4: Android recording](
 
 - A `Column(bg)` with padding 16/20/24.
 - Close (start offset −12, with a 48 layout).
-- The content: weight 1, gap 20, top 24. It has the logo 56/1.3 accent, `hero`, `heroBody` text3 with the size in bold, and a `GroupCard` with a 1 dp line. The rows of the card are 14/16, with the label in `body15` and the value in `monoSize` text2.
+- The content: weight 1, gap 20, top 24. It has the Saturn mark `saturn-mid` (86 x 56 dp, L-04), `hero`, `heroBody` text3 with the size in bold, and a `GroupCard` with a 1 dp line. The rows of the card are 14/16, with the label in `body15` and the value in `monoSize` text2.
 - Then the footnote in `body14` text2, exactly as on the board, and the added `TextButton` row "Where the models come from · Privacy" (48 dp).
 - At the bottom, a Column with gap 10: the large primary button and the `TextButton` "Not now — keep the audio".
 
@@ -809,6 +810,7 @@ Accepted deviations from the boards. The reviewer examines each one, and the tol
 13. The Library row suffixes keep their board size. Their 48 dp touch area comes from extended hit testing (section 5). ATF can report them, and the tests permit this.
 14. The UI without a board (the "no board" items of section 8, the dark theme, and the extra banners marked "not on the board" in features.md section 13) follows this document and waits for the review of the owner.
 15. Board 10: IMPORT_TOO_LARGE says "Choose a file under 4 GB." The board says 2 GB. The import limit changed on 2026-10-11 (architecture.md section 3.7).
+16. Boards 00 and 05: the line-art logo is the `cassini.talk` Saturn image (L-04): saturn-nav in the Library search field, saturn-mid (86 x 56 dp, 30 dp wider than the 56 dp board logo, same height) on Model download.
 
 Mapping to features.md section 14 (the acceptance list):
 

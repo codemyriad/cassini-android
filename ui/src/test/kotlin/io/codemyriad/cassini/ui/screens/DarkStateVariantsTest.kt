@@ -21,6 +21,20 @@ class DarkStateVariantsTest : VariantBoardTest() {
 
     @Test fun nameDraft() = nameSheet("name-draft")
 
+    @Test fun nameRenameSaved() = nameSheet("name-rename-saved")
+
+    @Test fun nameNotAuto() = nameSheet("name-not-auto")
+
+    @Test fun nameNoVoices() = nameSheet("name-no-voices")
+
+    @Test fun nameNoPrint() = nameSheet("name-no-print")
+
+    @Test fun nameNoModel() = nameSheet("name-no-model")
+
+    @Test fun nameShowAll() = nameSheet("name-show-all")
+
+    @Test fun nameSampling() = nameSheet("name-sampling")
+
     @Test fun voicesEmpty() = voices("voices-empty")
 
     @Test fun voicesError() = voices("voices-error")

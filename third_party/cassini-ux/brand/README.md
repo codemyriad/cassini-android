@@ -1,6 +1,6 @@
 # Brand token pin
 
-`tokens.json` and `mark/saturn-nav.svg` are byte-identical to their sources at
+`tokens.json`, `mark/saturn-nav.svg` and `mark/saturn-mid.svg` are byte-identical to their sources at
 cassini-ux commit `5e0c34e0f1bb390298dabdf4eedc494e933fd329`. The catalog,
 contracts and vectors use the same pin. [../UPSTREAM.json](../UPSTREAM.json)
 records each source path and SHA-256; `scripts/check-ux-pin.py` checks the bundle.

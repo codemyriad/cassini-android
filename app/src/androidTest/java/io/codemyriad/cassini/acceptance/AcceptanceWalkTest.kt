@@ -367,12 +367,12 @@ class AcceptanceWalkTest {
 
         list.performScrollToNode(speaker)
         rule.onAllNodes(speaker).onFirst().performSemanticsAction(SemanticsActions.OnClick)
-        val save = hasText(rule.text(UiR.string.ui_name_save)) and hasClickAction()
+        val save = hasText(rule.text(UiR.string.ui_sp_save)) and hasClickAction()
         rule.waitShown(save)
-        see(rule.text(UiR.string.ui_name_remember))
+        see(rule.text(UiR.string.ui_sp_remember_title))
         rule.onAllNodes(hasSetTextAction()).onLast().performTextReplacement(FIRST_NAME)
-        see(rule.text(UiR.string.ui_name_same_person_saved, ANNA))
-        see(rule.text(UiR.string.ui_name_same_person))
+        see(rule.text(UiR.string.ui_sp_duplicate_notice, ANNA))
+        see(rule.text(UiR.string.ui_sp_same_person))
         // Board 04 shows the sheet without the keyboard.
         Espresso.closeSoftKeyboard()
         rule.waitKeyboardClosed(save)

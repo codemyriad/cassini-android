@@ -22,8 +22,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.theme.CassiniTheme
+import io.codemyriad.cassini.ui.theme.sans
 
-/** "Likely": `tag12` (600) in accentInk on accentTint, radius 8, padding 2/8. */
+/** "Likely": semibold ink on a neutral fill; the row keeps its normal surface (L-46). */
 @Composable
 fun LikelyTag(text: String, modifier: Modifier = Modifier) {
     val c = CassiniTheme.colors
@@ -31,10 +32,10 @@ fun LikelyTag(text: String, modifier: Modifier = Modifier) {
         text = text,
         modifier = modifier
             .clip(CassiniTheme.shapes.tag)
-            .background(c.accentTint)
-            .padding(horizontal = 8.dp, vertical = 2.dp),
-        style = CassiniTheme.type.tag12,
-        color = c.accentInk,
+            .background(c.ink.copy(alpha = 0.12f))
+            .padding(horizontal = 9.dp, vertical = 4.dp),
+        style = sans(13, weight = 600),
+        color = c.ink,
         maxLines = 1,
     )
 }
