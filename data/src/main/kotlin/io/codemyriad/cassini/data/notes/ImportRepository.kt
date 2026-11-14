@@ -101,7 +101,15 @@ class ImportLimits(
     val maxBytes: Long = Limits.MAX_IMPORT_BYTES,
     val minFreeBytes: Long = Limits.MIN_FREE_BYTES,
     val usableSpace: (File) -> Long = File::getUsableSpace,
-)
+) {
+    /** LARGE above the cap, SPACE when [size] plus the free margin does not fit in [dir]; null when it fits. */
+    fun refusal(size: Long, dir: File): ImportOutcome.Rejected? = when {
+        size > maxBytes -> ImportOutcome.Rejected(Failure.LARGE, "size $size")
+        usableSpace(dir) < size + minFreeBytes ->
+            ImportOutcome.Rejected(Failure.SPACE, neededBytes = size + minFreeBytes)
+        else -> null
+    }
+}
 
 /**
  * "Import audio" (docs/architecture.md, section 4.2; features.md sections 1 and 13.5). An import:
@@ -175,18 +183,11 @@ class ImportRepository(
                 verdict == ImportTypes.Verdict.REJECT ->
                     ImportOutcome.Rejected(Failure.OPEN, "not an import type: ${description.mimeType}")
                 // An input that needs the stream check is checked first (in the copy): an Ogg video is OPEN, not LARGE.
-                !validate && size != null -> beyondLimits(size) ?: importNew(uri, description, size, validate)
+                !validate && size != null ->
+                    limits.refusal(size, paths.notes) ?: importNew(uri, description, size, validate)
                 else -> importNew(uri, description, size, validate)
             }
         }
-
-    /** Step 2 before the copy: LARGE above the cap, SPACE when the file plus the free margin does not fit. */
-    private fun beyondLimits(size: Long): ImportOutcome.Rejected? = when {
-        size > limits.maxBytes -> ImportOutcome.Rejected(Failure.LARGE, "size $size")
-        limits.usableSpace(paths.notes) < size + limits.minFreeBytes ->
-            ImportOutcome.Rejected(Failure.SPACE, neededBytes = size + limits.minFreeBytes)
-        else -> null
-    }
 
     private suspend fun importNew(
         uri: Uri,
@@ -281,14 +282,13 @@ class ImportRepository(
         val input = source.open(uri) ?: throw FileNotFoundException("no stream")
         val digest = MessageDigest.getInstance("SHA-256")
         val failed = input.useCancellable {
-            val probed = if (validate) head(input) else ByteArray(0)
+            val probed = if (validate) oggOpusHead(input) else ByteArray(0)
             currentCoroutineContext().ensureActive()
-            when {
-                validate && !ImportTypes.contentValidated(probed) ->
-                    Copy.Failed(ImportOutcome.Rejected(Failure.OPEN, "not an Ogg Opus stream"))
-                validate && size != null -> beyondLimits(size)?.let(Copy::Failed)
-                else -> null
-            } ?: tmp.outputStream().use { out -> pump(input, out, size, digest, probed) }
+            if (probed == null) {
+                return@useCancellable Copy.Failed(ImportOutcome.Rejected(Failure.OPEN, "not an Ogg Opus stream"))
+            }
+            val refused = size?.takeIf { validate }?.let { limits.refusal(it, paths.notes) }
+            refused?.let(Copy::Failed) ?: tmp.outputStream().use { out -> pump(input, out, size, digest, probed) }
         }
         failed ?: Copy.Done(Sha256.hex(digest), tmp.length())
     } catch (error: FileNotFoundException) {
@@ -417,7 +417,8 @@ class ImportRepository(
          */
         fun titleOf(displayName: String?, fallback: String = FALLBACK_TITLE): String {
             val name = displayName?.trim().orEmpty()
-            val stem = if (ImportTypes.extensionOf(name) != null) name.substringBeforeLast('.').ifBlank { name } else name
+            val extension = ImportTypes.extensionOf(name)
+            val stem = if (extension == null) name else name.dropLast(extension.length).ifBlank { name }
             return NoteTitles.fit(stem) ?: fallback
         }
 
@@ -441,6 +442,9 @@ private fun typeName(displayName: String?, uri: Uri): String? =
     displayName?.takeIf { ImportTypes.extensionOf(it) != null }
         ?: uri.lastPathSegment?.takeIf { ImportTypes.extensionOf(it) != null }
         ?: displayName
+
+/** [head] of [input] when it passes [ImportTypes.contentValidated], else null. */
+private fun oggOpusHead(input: InputStream): ByteArray? = head(input).takeIf { ImportTypes.contentValidated(it) }
 
 /** The first [ImportTypes.MIN_PROBE_BYTES] of [input], or all of it when it is shorter; nothing more is read. */
 private fun head(input: InputStream): ByteArray {

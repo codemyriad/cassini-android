@@ -288,7 +288,8 @@ class ImportRepositoryTest {
             override fun describe(uri: Uri) = big.describe(uri).copy(size = Limits.MAX_IMPORT_BYTES + 1)
         }
         val outcome = importer(large).import(provided, checkType = true)
-        assertTrue("expected LARGE, got $outcome", outcome is ImportOutcome.Rejected && outcome.failure == Failure.LARGE)
+        val tooLarge = outcome is ImportOutcome.Rejected && outcome.failure == Failure.LARGE
+        assertTrue("expected LARGE, got $outcome", tooLarge)
         val full = importer(big, ImportLimits(usableSpace = { 0L })).import(provided, checkType = true)
         assertTrue("expected SPACE, got $full", full is ImportOutcome.Rejected && full.failure == Failure.SPACE)
         assertEquals(emptyList<String>(), noteDirs())
@@ -307,8 +308,7 @@ class ImportRepositoryTest {
         }
 
         override fun read(b: ByteArray, off: Int, len: Int): Int {
-            if (len == 0) return 0
-            if (consumed >= length) return -1
+            if (consumed >= length) return if (len == 0) 0 else -1
             val n = minOf(len.toLong(), length - consumed).toInt()
             for (i in 0 until n) {
                 val at = consumed + i
