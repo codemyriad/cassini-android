@@ -5,6 +5,7 @@ import io.codemyriad.cassini.core.format.DocumentState
 import io.codemyriad.cassini.core.library.AudioKind
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.library.JobState
+import io.codemyriad.cassini.core.library.Origin
 import io.codemyriad.cassini.core.models.ModelPart
 import io.codemyriad.cassini.data.db.SearchRow
 import io.codemyriad.cassini.data.db.SpeakerEntity
@@ -53,6 +54,15 @@ class LibraryMappingTest {
         assertNull(LibraryMapping.row(stored, context, java.time.ZoneOffset.UTC).preview)
         val hit = LibraryMapping.Hit(day = DayLabel.Today, snippet = Highlighted("A matching snippet"))
         assertEquals(hit.snippet, LibraryMapping.row(stored, context, java.time.ZoneOffset.UTC, hit).preview)
+    }
+
+    @Test fun rowsOfNotesNotRecordedHereAreImported() {
+        val zone = java.time.ZoneOffset.UTC
+        val row = docRow("doc", DocumentState.OK, words = 10, speakers = 2)
+        assertFalse(LibraryMapping.row(row, context, zone).imported)
+        assertFalse(LibraryMapping.row(row.copy(origin = Origin.RECOVERED), context, zone).imported)
+        assertTrue(LibraryMapping.row(row.copy(origin = Origin.IMPORTED_DOCUMENT), context, zone).imported)
+        assertTrue(LibraryMapping.row(row.copy(origin = Origin.IMPORTED_AUDIO), context, zone).imported)
     }
 
     @Test fun rowEtaBelongsOnlyToTheRunningMeetingAndChangesAtMinuteBoundaries() {

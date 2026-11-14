@@ -71,6 +71,9 @@ fun NoteRow(row: NoteRowUi, day: DayLabel, onAction: (NoteRowAction) -> Unit, mo
             status.spokenText,
             row.recordedLabel,
         ),
+        stringResource(StatusBadgeKind.Received.label)
+            .takeIf { row.imported && row.status is NoteStatusUi.Transcribed }
+            ?.lowercase(locale),
         spokenSuffix(row.status, status)
             ?.takeIf { status.suffixAction == null }
             ?.trimStart('·', ' ', '\u00A0')

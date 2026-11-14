@@ -32,8 +32,6 @@ import io.codemyriad.cassini.ui.components.SpeakerNameUi
 import io.codemyriad.cassini.ui.components.display
 import io.codemyriad.cassini.ui.components.touchTarget
 import io.codemyriad.cassini.ui.components.turnHeaderSemantics
-import io.codemyriad.cassini.ui.format.Dates
-import io.codemyriad.cassini.ui.format.Durations
 import io.codemyriad.cassini.ui.format.Spoken
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import io.codemyriad.cassini.ui.theme.colors
@@ -54,11 +52,7 @@ internal fun MeetingHeader(state: NoteUiState, onEvent: (NoteEvent) -> Unit) {
             Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
                 state.subtitle?.let {
                     Text(
-                        stringResource(
-                            R.string.ui_join_dot,
-                            it.recordedLabel ?: Dates.dayTime(it.day, it.time),
-                            Durations.clock(it.durationMs),
-                        ),
+                        subtitleText(it),
                         style = CassiniTheme.type.monoTime,
                         color = c.text2,
                         modifier = Modifier.testTag("meeting-date"),

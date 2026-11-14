@@ -1,7 +1,8 @@
 # Shared Phase 1 contract
 
 The catalog, tokens, Saturn marks (nav, mid), contracts and vectors come from
-cassini-ux commit `5e0c34e0f1bb390298dabdf4eedc494e933fd329`. `UPSTREAM.json`
+cassini-ux commit `5e4f0bff95300f2ef795fe71244b22644cad5c25` (bumped from `5e0c34e` for L-10,
+`docs/design/phase2-d1035.md`). `UPSTREAM.json`
 records source paths and SHA-256 values. `scripts/check-ux-pin.py` verifies every
 input, requires the Phase 1 inputs and rejects per-file commit drift.
 
@@ -25,4 +26,4 @@ independent reference pins; this UI catalog update does not change those formats
 
 `wave5/strings.json` (D-975) is the catalog at cassini-ux `31973ff9784fcc66c1c7993b903a336e8f2c1432`, pinned
 at that commit in its own `UPSTREAM.json` entry. It supplies only the first-run hero and privacy-line resources
-(`scripts/generate-wave5-strings.py`, `docs/design/phase2-d975.md`). The Phase 1 catalog stays unchanged.
+(`scripts/generate-wave5-strings.py`, `docs/design/phase2-d975.md`).

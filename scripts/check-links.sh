@@ -10,6 +10,8 @@
 #   With no arguments it checks every tracked or new (not ignored) Markdown file, except the APK copies
 #   under app/src/main/assets/. Those copies are equal to the files at the repository root (LicenseAssetsTest),
 #   and their links resolve from the root, so the script checks the root files.
+#   It also skips the cassini-ux contracts vendored byte-for-byte under third_party/cassini-ux/contract/: their
+#   links point into the upstream repository, which is vendored only in part, and check-ux-pin.py forbids edits.
 # Exits 0 when every link resolves, 1 when a link is broken.
 set -euo pipefail
 files=()
@@ -21,7 +23,8 @@ cd "$(dirname "$0")/.."
 if ((${#files[@]} == 0)); then
     while IFS= read -r -d '' file; do
         files+=("$file")
-    done < <(git ls-files -z --cached --others --exclude-standard -- '*.md' ':!:app/src/main/assets/**')
+    done < <(git ls-files -z --cached --others --exclude-standard -- '*.md' ':!:app/src/main/assets/**' \
+        ':!:third_party/cassini-ux/contract/**')
 fi
 if ((${#files[@]} == 0)); then
     printf 'No Markdown files to check.\n'

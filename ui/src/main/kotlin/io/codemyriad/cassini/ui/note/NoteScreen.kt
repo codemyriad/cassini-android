@@ -43,8 +43,6 @@ import io.codemyriad.cassini.ui.components.PlaybackBar
 import io.codemyriad.cassini.ui.components.SpeedControl
 import io.codemyriad.cassini.ui.components.TopBarStyle
 import io.codemyriad.cassini.ui.components.screenContentWidth
-import io.codemyriad.cassini.ui.format.Dates
-import io.codemyriad.cassini.ui.format.Durations
 import io.codemyriad.cassini.ui.theme.CassiniTheme
 import io.codemyriad.cassini.ui.theme.Glyph
 
@@ -173,13 +171,7 @@ private val SnackbarOverChip = 40.dp
 @Composable
 private fun NoteTopBar(state: NoteUiState, onEvent: (NoteEvent) -> Unit, compact: Boolean) {
     val reading = state.mode == NoteMode.Reading
-    val subtitle = state.subtitle?.takeUnless { compact }?.let {
-        stringResource(
-            R.string.ui_join_dot,
-            it.recordedLabel ?: Dates.dayTime(it.day, it.time),
-            Durations.clock(it.durationMs),
-        )
-    }
+    val subtitle = state.subtitle?.takeUnless { compact }?.let { subtitleText(it) }
     CassiniTopBar(
         title = state.title,
         onBack = { onEvent(NoteEvent.Back) },

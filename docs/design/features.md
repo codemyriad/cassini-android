@@ -40,6 +40,7 @@ The Library has these parts, from the top to the bottom:
 5. List of notes. "List of notes" gives the details.
 6. Bottom bar: "Import audio" and the Record button. "Import audio" opens the system picker (`ACTION_OPEN_DOCUMENT`) with the decided `androidMimeTypes` of the shared import-types contract (Opus/Ogg, MP3, M4A, WAV; [phase2-d1030.md](phase2-d1030.md)) and Cassini's ZIP archives. While the app records, the Record button shows "Recording · 24:07" with the live dot, and it opens Recording again. Only one capture can exist at a time.
 7. Snackbar: "“<title>” moved to trash" with Undo (section 8). The Library shows it after Move to trash on the Note screen or in the actions sheet.
+8. A note not recorded on this device (imported audio, an opened or shared Cassini file, a ZIP entry) shows the outline "Imported" badge before its speaker-count pill once it is finished, and its Note screen subtitle ends with "· Imported" (L-10; [phase2-d1035.md](phase2-d1035.md)).
 
 ### Activity area
 

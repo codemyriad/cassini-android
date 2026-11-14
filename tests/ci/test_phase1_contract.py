@@ -32,6 +32,19 @@ class Phase1ContractTest(unittest.TestCase):
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes((ROOT / PIN.VENDOR / name).read_bytes())
 
+    def test_imported_subtitle_suffix_comes_from_the_catalog(self):
+        base = '{day}, {time} · {duration}'
+        self.assertEqual('Imported', STRINGS.provenance_suffix(base, base + ' · Imported'))
+        for text in ('{day} · {duration} · Imported', base + ' Imported', base + ' · Imported {day}'):
+            with self.assertRaisesRegex(ValueError, 'plain subtitle'):
+                STRINGS.provenance_suffix(base, text)
+        outputs = dict(STRINGS.generated(self.root))
+        english = ET.fromstring(outputs[self.root / 'ui/src/main/res/values/phase1.xml'])
+        strings = {e.get('name'): e.text for e in english.iter('string')}
+        self.assertEqual('Imported', strings['ui_badge_received'])
+        self.assertEqual('Imported', strings['ui_subtitle_imported'])
+        self.assertEqual('Imported · Transcribed on another device', strings['ui_subtitle_imported_other_device'])
+
     def test_exact_bundle_and_generated_resources_pass(self):
         PIN.check(self.root)
         outputs = list(STRINGS.generated(self.root))

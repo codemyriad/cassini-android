@@ -50,6 +50,8 @@ internal fun RowMeta(row: NoteRowUi, day: DayLabel, status: RowStatus, onAction:
             color = c.text2,
         )
         if (row.status is NoteStatusUi.Transcribed) {
+            // L-10: the outline "Imported" badge comes before the speaker-count pill; any other badge replaces it.
+            if (row.imported) StatusChip(stringResource(StatusBadgeKind.Received.label), StatusBadgeKind.Received)
             FinishedPill(row.status)
         } else {
             status.kind?.let { StatusChip(status.text, it) }
