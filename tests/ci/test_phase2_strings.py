@@ -6,6 +6,7 @@ import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+LEGACY_NOUN = re.compile(r'\b(notes?|not[ae]s?)\b', re.IGNORECASE)
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location('phase2_strings', ROOT / 'scripts/generate-phase2-strings.py')
 PHASE2 = importlib.util.module_from_spec(SPEC)
@@ -18,10 +19,19 @@ class Phase2StringsTest(unittest.TestCase):
         self.assertEqual(6, len(outputs))
         for path, content in outputs:
             self.assertEqual(content, path.read_text(), path)
-            legacy = r'\b(notes?|not[ae]s?)\b'
             for entry in ET.fromstring(content):
                 for text in entry.itertext():
-                    self.assertIsNone(re.search(legacy, text, re.IGNORECASE), (path, entry.get('name'), text))
+                    self.assertIsNone(LEGACY_NOUN.search(text), (path, entry.get('name'), text))
+
+    def test_phase2_screen_strings_have_no_legacy_meeting_nouns(self):
+        prefixes = ('ui_settings_', 'ui_voices_', 'ui_name_', 'ui_sp_', 'ui_tx_', 'ui_export_',
+                    'ui_backup_', 'ui_trash_', 'ui_headline_', 'ui_about_', 'ui_actions_')
+        for directory in PHASE2.phase1.LOCALES.values():
+            for path in (ROOT / 'ui/src/main/res' / directory).glob('*.xml'):
+                for entry in ET.parse(path).getroot():
+                    if entry.get('name', '').startswith(prefixes):
+                        for text in entry.itertext():
+                            self.assertIsNone(LEGACY_NOUN.search(text), (path, entry.get('name'), text))
 
     def test_catalog_checksum_drift_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
