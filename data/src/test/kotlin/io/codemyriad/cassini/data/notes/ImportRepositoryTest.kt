@@ -201,7 +201,11 @@ class ImportRepositoryTest {
         val opus = created(importer().import(input(fleurs("opus"), "b.opus"), checkType = true))
         val m4a = created(importer().import(input(fleurs("m4a"), "d.m4a"), checkType = true))
         val mp3 = created(importer(typed(fleurs("mp3"), "e.mp3", "audio/mpeg")).import(provided, checkType = true))
-        assertEquals(4, setOf(wav, opus, m4a, mp3).size)
+        val flac = created(importer(typed(fleurs("flac"), "f.FLAC", "audio/x-flac")).import(provided, checkType = true))
+        assertEquals(5, setOf(wav, opus, m4a, mp3, flac).size)
+        assertEquals("source.flac", h.row(flac).audioFile)
+        assertEquals(Origin.IMPORTED_AUDIO, h.row(flac).origin)
+        assertEquals(FLEURS_WAV_MS, h.row(flac).durationMs)
         // The same Ogg Opus bytes as .ogg pass the stream check and find the note they already are.
         assertEquals(ImportOutcome.Existing(opus), importer().import(input(fleurs("opus"), "c.ogg"), checkType = true))
     }
@@ -226,6 +230,91 @@ class ImportRepositoryTest {
         assertEquals(1, probe.calls.get())
         assertEquals(2, h.db.notes().noteCount())
         assertEquals(2, noteDirs().size)
+    }
+
+    @Test fun malformedFlacIsRejectedBeforeProbingOrWriting() = runTest {
+        val good = fleurs("flac").readBytes()
+        val invalid = listOf(
+            good.copyOf(41),
+            "ID3".toByteArray() + good,
+            theoraOgg(),
+            good.copyOf().apply { this[4] = 1 },
+            good.copyOf().apply { this[7] = 33 },
+            good.copyOf().apply {
+                this[18] = 0
+                this[19] = 0
+                this[20] = 0
+            },
+        )
+        for (bytes in invalid) {
+            val stream = CountingStream(bytes, bytes.size.toLong())
+            val source = object : ImportSource {
+                override fun describe(uri: Uri) = ImportSource.Description("take.flac", stream.length, "audio/flac")
+
+                override fun open(uri: Uri) = stream
+            }
+            rejectedOpen(importer(source).import(provided, checkType = true))
+            assertTrue(stream.consumed <= ImportTypes.FLAC_MIN_PROBE_BYTES)
+        }
+        for (mime in ImportTypes.FLAC_REJECTED_MIME_TYPES) {
+            rejectedOpen(importer(typed(fleurs("flac"), "take.flac", mime)).import(provided, checkType = true))
+        }
+        assertEquals(0, probe.calls.get())
+        assertEquals(0, h.db.notes().noteCount())
+        assertEquals(emptyList<String>(), noteDirs())
+    }
+
+    @Test fun extensionlessFlacSharesValidateAndUseTheFlacSuffix() = runTest {
+        for (mime in listOf("audio/flac", "audio/x-flac")) {
+            for (name in listOf(null, "Voice message", "Recording 14.11.2026")) {
+                val source = object : ImportSource {
+                    override fun describe(uri: Uri) = ImportSource.Description(name, null, mime)
+                    override fun open(uri: Uri) = fleurs("flac").inputStream()
+                }
+                val outcome = importer(source).import(Uri.parse("content://chat/voice/7"), checkType = true)
+                val id = when (outcome) {
+                    is ImportOutcome.Created -> outcome.noteId
+                    is ImportOutcome.Existing -> outcome.noteId
+                    else -> error("Expected valid FLAC, got $outcome")
+                }
+                assertEquals("source.flac", h.row(id).audioFile)
+            }
+            for (bytes in listOf(theoraOgg(), "ID3".toByteArray() + fleurs("flac").readBytes())) {
+                val stream = CountingStream(bytes, bytes.size.toLong())
+                val source = object : ImportSource {
+                    override fun describe(uri: Uri) = ImportSource.Description(null, null, mime)
+                    override fun open(uri: Uri) = stream
+                }
+                rejectedOpen(importer(source).import(Uri.parse("content://chat/voice/7"), checkType = true))
+                assertTrue(stream.consumed <= ImportTypes.FLAC_MIN_PROBE_BYTES)
+            }
+        }
+    }
+
+    @Test fun incompleteOrUnsupportedFlacNeverCreatesANote() = runTest {
+        val good = fleurs("flac").readBytes()
+        val invalid = listOf(
+            good.copyOf(42).apply { this[4] = 0x80.toByte() },
+            good.copyOf(8286),
+            good.copyOf(good.size / 2),
+            good.copyOf(256999),
+            good.copyOf().apply { this[lastIndex] = (this[lastIndex].toInt() xor 1).toByte() },
+            good.copyOf().apply {
+                this[18] = 0x2e
+                this[19] = 0xe0.toByte()
+            }, // 192 kHz
+            good.copyOf().apply { this[20] = (this[20].toInt() or 10).toByte() }, // Six channels
+        )
+        for (bytes in invalid) {
+            val source = object : ImportSource {
+                override fun describe(uri: Uri) = ImportSource.Description("take.flac", null, "audio/flac")
+                override fun open(uri: Uri) = bytes.inputStream()
+            }
+            rejectedOpen(importer(source).import(provided, checkType = true))
+        }
+        assertEquals(0, probe.calls.get())
+        assertEquals(0, h.db.notes().noteCount())
+        assertEquals(emptyList<String>(), noteDirs())
     }
 
     @Test fun checkedOggMustBeAnOggOpusStream() = runTest {

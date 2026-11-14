@@ -7,10 +7,12 @@ import android.media.MediaMuxer
 import android.net.Uri
 import android.os.Bundle
 import androidx.test.platform.app.InstrumentationRegistry
+import io.codemyriad.cassini.core.UserFacingException
 import io.codemyriad.cassini.core.asr.IncrementalTranscript
 import io.codemyriad.cassini.core.asr.SileroInputFilter
 import io.codemyriad.cassini.core.asr.Span
 import io.codemyriad.cassini.core.asr.SpeechFeed
+import io.codemyriad.cassini.core.audio.FlacStructure
 import io.codemyriad.cassini.core.audio.Limits
 import io.codemyriad.cassini.core.audio.PcmAudio
 import io.codemyriad.cassini.core.audio.PcmBuilder
@@ -64,7 +66,8 @@ class DeviceSmokeTest {
     @CiSmoke
     @Test fun importsCompressedAudioOnTheSameClock() {
         val reference = audioDecoder(context).decode(Uri.fromFile(fixture()))
-        for (name in listOf("fleurs-it-short.m4a", "fleurs-it-short.mp3", "fleurs-it-short.opus")) {
+        val names = listOf("fleurs-it-short.m4a", "fleurs-it-short.mp3", "fleurs-it-short.opus", "fleurs-it-short.flac")
+        for (name in names) {
             val file = fixture(name)
             try {
                 val audio = audioDecoder(context).decode(Uri.fromFile(file))
@@ -279,7 +282,7 @@ class DeviceSmokeTest {
 
     @CiSmoke
     @Test fun opusEncodingRunsInTheDecodePassAndTrimsLookahead() {
-        for (name in listOf("fleurs-it-short.m4a", "fleurs-it-short.wav")) {
+        for (name in listOf("fleurs-it-short.m4a", "fleurs-it-short.wav", "fleurs-it-short.flac")) {
             val file = fixture(name)
             val opus = File(context.cacheDir, "same-pass.opus")
             try {
@@ -295,6 +298,44 @@ class DeviceSmokeTest {
         }
     }
 
+
+    @CiSmoke
+    @Test fun nativeFlacResumeReachesTheSameEnd() {
+        val file = fixture("fleurs-it-short.flac")
+        try {
+            val duration = audioDecoder(context).stream(Uri.fromFile(file), { _, _ -> })
+            val resumedDuration = audioDecoder(context).stream(Uri.fromFile(file), { _, _ -> }, startSample = 8 * 16000)
+            assertEquals(duration, resumedDuration)
+        } finally { file.delete() }
+    }
+
+    @CiSmoke
+    @Test fun nativeFlacWithMissingMiddleFramesCannotFinishEncoding() {
+        val file = fixture("fleurs-it-short.flac")
+        val opus = File(context.cacheDir, "incomplete-flac.opus")
+        try {
+            val bytes = file.readBytes()
+            // Drop an interior frame. Valid first/final frames still pass the bounded structure check;
+            // the decoder must detect missing PCM, rather than silently seal a shorter document.
+            val frames = (8286 until bytes.size - 1).filter {
+                bytes[it].toInt() and 255 == 255 && bytes[it + 1].toInt() and 254 == 248
+            }
+            assertTrue(frames.size > 3)
+            file.writeBytes(bytes.copyOfRange(0, frames[1]) + bytes.copyOfRange(frames[2], bytes.size))
+            assertNotNull(FlacStructure.validated(file))
+            var failed = false
+            try {
+                StreamingOpusEncoder(opus).use { encoder ->
+                    audioDecoder(context).stream(Uri.fromFile(file), encoder::accept)
+                    encoder.finish()
+                }
+            } catch (_: UserFacingException) {
+                failed = true
+            }
+            assertTrue("Missing FLAC frames must fail before encoder.finish", failed)
+            assertTrue("The source must remain available after failure", file.isFile)
+        } finally { file.delete(); opus.delete() }
+    }
 
     /** Encodes the fixture once straight through and once with a checkpoint, a process death and a resume. */
     private fun encodeAcrossACheckpoint(check: (split: Int, original: File, resumed: File) -> Unit) {

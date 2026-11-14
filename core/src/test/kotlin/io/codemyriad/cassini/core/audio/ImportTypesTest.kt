@@ -47,7 +47,6 @@ class ImportTypesTest {
 
     @Test fun openEntriesAreTrackedAndNeverAccepted() {
         val open = types.filter { it.getString("status") == "open" }
-        assertTrue("FLAC stays open until L-09 / D-938", open.any { it.getString("id") == "flac" })
         val extensions = open.flatMap { it.getJSONArray("extensions").strings() }.toSet()
         val mimes = open.flatMap { it.getJSONArray("mimeTypes").strings() + it.getJSONArray("androidMimeTypes").strings() }
         assertEquals(extensions, ImportTypes.OPEN_EXTENSIONS)
@@ -110,6 +109,48 @@ class ImportTypesTest {
             Triple(".mp3", null, Verdict.REJECT),
         )
         for ((name, mime, expected) in cases) assertEquals("$name $mime", expected, ImportTypes.verdict(name, mime))
+    }
+
+    @Test fun nativeFlacAcceptsOpaqueSharesAndRejectsMismatchedTypes() {
+        for (mime in listOf(null, "audio/flac", "AUDIO/X-FLAC; charset=binary", "application/octet-stream")) {
+            assertEquals(Verdict.VALIDATE_FLAC, ImportTypes.verdict("Meeting.FLAC", mime))
+        }
+        for (mime in ImportTypes.FLAC_REJECTED_MIME_TYPES + "video/flac") {
+            assertEquals(mime, Verdict.REJECT, ImportTypes.verdict("Meeting.flac", mime))
+        }
+        for (mime in ImportTypes.FLAC.mimeTypes) {
+            for (name in listOf(null, "Voice message", "Recording 14.11.2026")) {
+                assertEquals(Verdict.VALIDATE_FLAC, ImportTypes.verdict(name, mime))
+            }
+            for (name in listOf("a.ogg", "a.opus", "a.mp3", "a.oga")) {
+                assertEquals(Verdict.REJECT, ImportTypes.verdict(name, mime))
+            }
+        }
+    }
+
+    @Test fun nativeFlacHeaderMatchesTheContract() {
+        val validation = types.single { it.getString("id") == "flac" }.getJSONObject("headerValidation")
+        assertEquals(validation.getInt("minProbeBytes"), ImportTypes.FLAC_MIN_PROBE_BYTES)
+        assertEquals(
+            validation.getJSONArray("rejectedMimeTypes").strings().toSet(),
+            ImportTypes.FLAC_REJECTED_MIME_TYPES
+        )
+        val good = ByteArray(42).apply {
+            ascii(validation.getString("magicHex")).toByteArray().copyInto(this)
+            this[4] = validation.getInt("firstMetadataBlockType").toByte()
+            this[7] = validation.getInt("streamInfoLength").toByte()
+            this[20] = 0x10 // Smallest nonzero 20-bit sample rate.
+        }
+        assertTrue(ImportTypes.flacHeaderValidated(good))
+        assertTrue(ImportTypes.flacHeaderValidated(good.copyOf().apply { this[4] = 0x80.toByte() }))
+        for (cut in 0 until good.size) assertFalse("cut $cut", ImportTypes.flacHeaderValidated(good.copyOf(cut)))
+        for ((offset, value) in listOf(0 to 0, 4 to 1, 5 to 1, 6 to 1, 7 to 33, 20 to 0, 20 to 0x0f)) {
+            val corrupt = good.copyOf().apply { this[offset] = value.toByte() }
+            assertFalse("$offset=$value", ImportTypes.flacHeaderValidated(corrupt))
+        }
+        assertFalse(ImportTypes.flacHeaderValidated("ID3".toByteArray() + good))
+        assertFalse(ImportTypes.flacHeaderValidated("OggS".toByteArray() + good))
+        assertFalse(ImportTypes.contentValidated(good))
     }
 
     @Test fun oggOpusPassesTheStreamCheck() {

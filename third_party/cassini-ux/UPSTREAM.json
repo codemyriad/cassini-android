@@ -68,8 +68,8 @@
     },
     "contract/import-types.json": {
       "source": "contract/import-types.json",
-      "commit": "03fd3bb7dc806c015c1079807eaf5bc548a9fd42",
-      "sha256": "bd80bb2b5ef176279ad6615e62960d19e693519867ab4fa0dded2d717584295d"
+      "commit": "d591497797749830aca33c14e4279c39d89162cb",
+      "sha256": "a6934fd26f12697b35e7754ba3c15dab4f122a28d027a7ed17b9a25ef44aaf68"
     },
     "wave5/strings.json": {
       "source": "strings/strings.json",

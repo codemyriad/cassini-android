@@ -10,6 +10,7 @@ import android.util.Log
 import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.UserFacingException
 import io.codemyriad.cassini.core.audio.DecoderResampler
+import io.codemyriad.cassini.core.audio.FlacStructure
 import io.codemyriad.cassini.core.audio.Limits
 import io.codemyriad.cassini.core.audio.Mp3Gapless
 import io.codemyriad.cassini.core.audio.PcmAudio
@@ -101,6 +102,7 @@ class AudioDecoder(
         try {
             // Android's Opus decoder removes pre-skip but can expose the final frame's padding.
             // Trust the independently verified Ogg EOS sample count, not codec buffer length.
+            val flac = try { FlacStructure.read(file) } catch (_: Exception) { throw UserFacingException(Failure.OPEN) }
             val opusSamples = try { OggOpus.scan(file).also { it.digest() }.sampleCount } catch (_: Exception) { null }
             extractor.setDataSource(file.absolutePath)
             val track = (0 until extractor.trackCount).firstOrNull {
@@ -146,6 +148,8 @@ class AudioDecoder(
             var resampler: DecoderResampler? = null
             var mono = FloatArray(0)
             var count = 0L
+            var flacFirstFrame: Long? = null
+            var flacDecodedFrames = 0L
             var next: Long? = null
             var inputEnded = false
             var outputEnded = false
@@ -161,6 +165,7 @@ class AudioDecoder(
                     backOffUs *= 2
                     extractor.seekTo(seekUs(), MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
                     next = null; count = 0L; inputEnded = false
+                    flacFirstFrame = null; flacDecodedFrames = 0L
                     lastProgress = System.nanoTime()
                 }
                 // Block only when neither side moved: a fixed wait per packet made an hour of Opus take minutes.
@@ -216,6 +221,21 @@ class AudioDecoder(
                                     // From the very start, a late first frame is a real leading gap, as in a full decode.
                                     count = if (firstFrame > firstNeededFrame(sampleRate, startSample)) 0L else firstFrame
                                 }
+                                if (flac != null) {
+                                    requireUser(
+                                        sampleRate == flac.sampleRate && channels == flac.channels,
+                                        Failure.AUDIO,
+                                    )
+                                    requireUser(
+                                        flacFirstFrame == null || firstFrame == flacFirstFrame + flacDecodedFrames,
+                                        Failure.AUDIO,
+                                    )
+                                    if (flacFirstFrame == null) {
+                                        requireUser(startSample > 0 || firstFrame == 0L, Failure.AUDIO)
+                                        flacFirstFrame = firstFrame
+                                    }
+                                    flacDecodedFrames += frames
+                                }
                                 next = firstFrame + frames
                                 // The verified end of the audio: the Ogg EOS sample count, or the length in the LAME tag.
                                 val endFrame = opusSamples?.let { it * sampleRate / 48000 } ?: gapless?.samples
@@ -255,6 +275,7 @@ class AudioDecoder(
                 }
             }
             requireUser(count > 0, Failure.EMPTY)
+            if (flac != null) requireUser(flac.decodedCompletely(flacFirstFrame ?: 0, flacDecodedFrames), Failure.AUDIO)
             requireNotNull(resampler).finish()
             return PcmAudio(out?.build() ?: FloatArray(0), Limits.ASR_RATE)
         } finally {

@@ -6,27 +6,41 @@ Decision L-25 (cassini-ux `COMPONENTS.md` section 7; `ALIGNMENT-PLAN.md` W0.7, W
 ## One accepted-types source
 
 `third_party/cassini-ux/contract/import-types.json` (`cassini-ux/import-types@1`) is vendored unchanged from cassini-ux
-`03fd3bb7dc806c015c1079807eaf5bc548a9fd42`. The contract landed after the Phase 1 bundle, so its `UPSTREAM.json`
+`d591497797749830aca33c14e4279c39d89162cb`. The contract landed after the Phase 1 bundle, so its `UPSTREAM.json`
 entry carries its own `commit`; `scripts/check-ux-pin.py` allows that only for this file and checks its bytes like
 the others. To update it, copy the new upstream file, record its commit and SHA-256 and update `ImportTypes`.
 
-`ImportTypes` (`:core`) holds the decided entries: Opus/Ogg (`.opus`, `.ogg`), MP3, M4A and WAV. `ImportTypesTest`
-fails when they differ from the vendored file; FLAC (`status: "open"`, L-09 / D-938) is tracked and rejected.
+`ImportTypes` (`:core`) holds the decided entries: Opus/Ogg (`.opus`, `.ogg`), MP3, M4A, WAV and native FLAC (D102 / D-938 / D-1049).
+`ImportTypesTest` fails when they differ from the vendored file.
 `scripts/check-import-types.py` checks that the manifest's Open with (`ACTION_VIEW`) and Share (`ACTION_SEND`) filters
 list exactly the decided `androidMimeTypes`. The system picker uses the same list plus Cassini's ZIP archives (D96).
 Android has no subclass-matching picker, so `compatibilityMimeTypes` are never declared.
 
 A file the person picks, opens with or shares to Cassini is checked in `ImportRepository` (`checkType`):
 
-1. Before the copy, `ImportTypes.verdict` rejects video MIME types, the open FLAC types, the contract's rejected Ogg
-   extensions (`.ogv`, `.oga`, `.ogx`, `.spx`, `.flac`) and every other extension. Opus/Ogg requires `.opus` or
-   `.ogg`; a file without an extension is accepted only under an MP3, M4A or WAV MIME type. Without a display
+1. Before the copy, `ImportTypes.verdict` rejects video MIME types, Ogg-FLAC MIME types, the contract's rejected Ogg
+   extensions (`.ogv`, `.oga`, `.ogx`, `.spx`) and every other extension. Opus/Ogg requires `.opus` or
+   `.ogg`; a file without an extension uses its MIME type, with stream validation for Opus/Ogg and native FLAC. Without a display
    name the extension comes from the Uri's last path segment (never used as the title).
-2. After the copy, an Opus/Ogg file and any file reported under a compatibility MIME type (`audio/ogg`,
+2. Before the copy, an Opus/Ogg file and any file reported under a compatibility MIME type (`audio/ogg`,
    `application/ogg`) must pass the contract's stream check on its first 1024 bytes: page 0 an OggS BOS page starting
    with `OpusHead`, page 1 a non-BOS page of the same stream starting with `OpusTags`. Ogg video (Theora, OGM, Dirac,
    Daala, Skeleton), Vorbis, Speex and FLAC-in-Ogg fail. Android applies the check to `.opus` too, not only to the
    ambiguous `.ogg`: a valid Opus file always passes, and an MP3 named `.opus` is rejected instead of being probed.
+
+3. Native `.flac` requires the first 42 bytes to start with `fLaC`, followed by a STREAMINFO metadata block
+   (type 0, ignoring the last-block bit) with length 34 and a nonzero 20-bit sample rate. Truncated headers,
+   ID3v2-prefixed streams, Ogg containers renamed to `.flac`, and broad Ogg or Ogg-FLAC MIME types fail before
+   staging bytes or probing. The bounded head is reused in the copy, so pipe-backed providers are read once.
+   Extensionless `audio/flac` and `audio/x-flac` shares use this same check; mismatched extensions fail.
+   After staging, validate the supported sample rate (8–96 kHz), one or two channels, metadata bounds,
+   the initial frame header at sample zero, and the final frame header and CRC-16 in a bounded tail window.
+   A known STREAMINFO sample count must end at the final frame. The decoder also checks actual PCM frame
+   continuity and the known sample count before success, including after a resume. Unknown sample counts
+   remain supported; a valid final frame is still required. Optional 128-byte ID3v1 trailers are allowed.
+   Archive restoration keeps its type-check bypass. These checks use RFC 9639 sections 8–9.
+   A valid FLAC is stored as plain imported audio and goes through the same `MediaExtractor` / `MediaCodec`
+   decode and streaming Opus portable-meeting pipeline as MP3 and M4A; it is never treated as a portable document.
 
 A rejection is `Failure.OPEN` ("Can't open this file"). Entries of Cassini's own ZIP archives skip the contract, so a
 backup that holds an older note in another format still restores.
@@ -48,6 +62,6 @@ Screenshots: `ImportCardsScreenshotTest` (`20-library-importing`, `21-library-im
 
 ## Differences from the desktop apps
 
-Android already decoded MP3, M4A and WAV through `MediaExtractor`; this change narrows what it accepts to the
-contract instead of `audio/*`. Formats it took before and the contract does not decide (AAC, AMR, 3GP, WebM, FLAC)
+Android decodes MP3, M4A, WAV and native FLAC through `MediaExtractor`; this change narrows what it accepts to the
+contract instead of `audio/*`. Formats it took before and the contract does not decide (AAC, AMR, 3GP, WebM)
 are no longer offered or imported from the picker, Open with or Share. Desktop drag-and-drop states do not apply.
