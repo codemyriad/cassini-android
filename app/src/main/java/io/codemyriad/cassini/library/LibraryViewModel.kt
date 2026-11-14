@@ -202,7 +202,8 @@ class LibraryViewModel(
         ports.recording,
         ports.notices,
         ports.voiceModelReady.onStart { emit(false) }.distinctUntilChanged(),
-    ) { processing, rec, facts, voices -> Live(processing, rec, facts, voices) }
+        ports.backupReach.map<BackupReach, BackupReach?> { it }.onStart { emit(null) }.catch { emit(null) },
+    ) { processing, rec, facts, voices, reach -> Live(processing, rec, facts, voices, reach) }
 
     val state: StateFlow<LibraryUiState> = combine(
         combine(rows, search, query, unavailable, environment, ::Listing),
@@ -238,6 +239,8 @@ class LibraryViewModel(
         val recording: RecordingState,
         val facts: NoticeFacts,
         val voiceModelReady: Boolean,
+        /** Null until the D97 choices are read: no privacy claim is drawn before then. */
+        val backupReach: BackupReach?,
     )
 
     private fun build(
@@ -269,13 +272,17 @@ class LibraryViewModel(
             audioOnly = mapped.audioOnly,
             unavailable = listing.unavailable,
         )
+        val notices = Notices.library(live.facts, facts)
+        val empty = notices.any { it.kind == BannerKind.LIB_EMPTY }
         return LibraryUiState(
             loading = listing.rows == null,
             query = listing.query,
             searchFilters = listing.environment.filters,
             recording = LibraryMapping.recordingPill(recording),
             progress = progress,
-            banners = Notices.library(live.facts, facts),
+            // The first-run hero replaces the empty-Library banner (L-27); until the choices are read, neither shows.
+            banners = if (empty) notices.filterNot { it.kind == BannerKind.LIB_EMPTY }.toImmutableList() else notices,
+            hero = live.backupReach?.takeIf { empty }?.let(LibraryMapping::hero),
             imports = LibraryMapping.imports(live.facts.imports),
             sections = mapped.sections,
             results = mapped.results,

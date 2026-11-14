@@ -11,6 +11,10 @@ class DarkStateVariantsTest : VariantBoardTest() {
 
     @Test fun libraryEmpty() = library("library-empty")
 
+    @Test fun libraryEmptyBackup() = library("library-empty-backup")
+
+    @Test fun libraryEmptyPhoneOnly() = library("library-empty-phone-only")
+
     @Test fun librarySearch() = library("library-search")
 
     @Test fun libraryRecordingCard() = library("library-recording-card")

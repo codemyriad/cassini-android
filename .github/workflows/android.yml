@@ -105,6 +105,7 @@ jobs:
           python3 -I scripts/check-import-types.py
           python3 -I scripts/check-nav-mark.py
           python3 -I scripts/generate-phase1-strings.py --check
+          python3 -I scripts/generate-wave5-strings.py --check
           python3 third_party/cassini-ux/vectors/states/verify.py
           python3 -I scripts/generate-brand-colors.py --check
           python3 -I scripts/check-brand-color-literals.py

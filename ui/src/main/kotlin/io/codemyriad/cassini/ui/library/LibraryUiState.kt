@@ -42,7 +42,28 @@ data class LibraryUiState(
     val snackbar: SnackbarSpec? = null,
     val sheet: LibrarySheet? = null,
     val dialog: LibraryDialog? = null,
+    val hero: FirstRunHeroUi? = null,
 )
+
+/**
+ * The first-run hero (L-27, D-975) that replaces the empty-Library banner: "Every word written down." over a dimmed
+ * "None of it uploaded.", which carries the "(except for encrypted cloud backup)" qualifier while [cloudBackup] is on
+ * (D-937), then the wave, the how-to line and the [privacy] line (PARITY Wave 6 contract sections 1-2, D98).
+ */
+@Immutable
+data class FirstRunHeroUi(val cloudBackup: Boolean, val privacy: FirstRunPrivacy)
+
+/** The first-run privacy line, chosen by which automatic copies can leave the phone (D98). */
+enum class FirstRunPrivacy {
+    /** Cloud backup on: "Written down on this phone. Never uploaded, except to your encrypted cloud backup." */
+    WITH_BACKUP,
+
+    /** Cloud backup off, device-to-device transfer on: "Transcription runs on this phone." */
+    PROCESSING,
+
+    /** Neither: "Written down on this phone. The audio never leaves it." */
+    PHONE_ONLY,
+}
 
 /** The recording card and the Record button's recording form: "Recording · <title>" and the elapsed time. */
 @Immutable

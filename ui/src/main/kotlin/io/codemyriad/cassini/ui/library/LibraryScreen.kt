@@ -116,6 +116,9 @@ fun LibraryScreen(
                 }
                 activity(state, onEvent)
                 imports(state.imports, onEvent)
+                state.hero?.takeIf { !state.loading }?.let { hero ->
+                    item(key = "first-run-hero", contentType = "hero") { FirstRunHero(hero) }
+                }
                 if (!state.loading) {
                     val results = state.results
                     if (results != null) results(results, onEvent) else sections(state.sections, onEvent)

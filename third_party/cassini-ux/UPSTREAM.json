@@ -70,6 +70,11 @@
       "source": "contract/import-types.json",
       "commit": "03fd3bb7dc806c015c1079807eaf5bc548a9fd42",
       "sha256": "bd80bb2b5ef176279ad6615e62960d19e693519867ab4fa0dded2d717584295d"
+    },
+    "wave5/strings.json": {
+      "source": "strings/strings.json",
+      "commit": "31973ff9784fcc66c1c7993b903a336e8f2c1432",
+      "sha256": "c634cdfbcf961391e1f3a084c4d8ac07aa10946a289ecba4da8ec1ebc25717ca"
     }
   }
 }
