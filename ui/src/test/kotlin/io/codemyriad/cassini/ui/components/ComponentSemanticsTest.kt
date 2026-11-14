@@ -300,7 +300,7 @@ class ComponentSemanticsTest {
         val card = rule.onNode(hasContentDescription(first))
         card.assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
-        assertEquals("Open note", card.fetchSemanticsNode().config[SemanticsActions.OnClick].label)
+        assertEquals("Open meeting", card.fetchSemanticsNode().config[SemanticsActions.OnClick].label)
         rule.runOnIdle {
             percent = 64
             line = "About 5–8 min left"
@@ -337,7 +337,7 @@ class ComponentSemanticsTest {
                     subtitle = "INT8 · 640 MB",
                     trailing = SettingsTrailing.Status("Ready", Tone.Ok),
                 )
-                SettingsRow("Trash", subtitle = "2 notes", trailing = SettingsTrailing.Chevron, onClick = {})
+                SettingsRow("Trash", subtitle = "2 meetings", trailing = SettingsTrailing.Chevron, onClick = {})
             }
         }
         val row = rule.onNodeWithText("Speech recognition").fetchSemanticsNode()

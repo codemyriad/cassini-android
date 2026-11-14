@@ -24,7 +24,7 @@ class Phase1RecordingAdaptiveScreenshotTest : BoardTest() {
             RecordingScreen(VariantFixtures.recording.getValue("recording-stopped-file-limit"), onEvent = {})
         }
         rule.mainClock.autoAdvance = true
-        rule.onNodeWithText("Open note").performScrollTo()
+        rule.onNodeWithText("Open meeting").performScrollTo()
         rule.waitForIdle()
         rule.mainClock.autoAdvance = false
         rule.mainClock.advanceTimeBy(1_000)

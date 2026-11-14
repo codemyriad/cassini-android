@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated from cassini-ux 3b7c28231272e5f88de0b2a460346c46ebad7339; do not edit. -->
+<resources>
+    <string name="ui_headline_waiting">Completamento della riunione precedente…</string>
+    <plurals name="ui_count_ahead_of_note">
+        <item quantity="one">%1$s riunione prima di questa.</item>
+        <item quantity="many">%1$s riunioni prima di questa.</item>
+        <item quantity="other">%1$s riunioni prima di questa.</item>
+    </plurals>
+    <string name="ui_action_open_note">Apri la riunione</string>
+    <string name="ui_settings_transfer_body">Quando configuri un nuovo telefono Android a partire da questo, le tue riunioni e le voci salvate vengono copiate direttamente sul nuovo telefono. Nulla viene inviato a un account cloud. I modelli scaricati non vengono copiati: il nuovo telefono li scarica di nuovo.</string>
+    <string name="ui_settings_transfer_body_off">Nulla viene copiato su un nuovo telefono. Se questo telefono viene perso o sostituito, le tue riunioni vanno perse, a meno che tu non le abbia esportate.</string>
+    <string name="ui_settings_transfer_too_large">Le tue riunioni e le voci salvate sono troppo grandi per essere trasferite in una sola volta. Esporta le riunioni come ZIP.</string>
+    <string name="ui_name_remember_body">Le prossime riunioni riconosceranno %1$s automaticamente.</string>
+    <string name="ui_name_remember_body_unnamed">Le prossime riunioni riconosceranno questa persona automaticamente.</string>
+    <plurals name="ui_count_notes">
+        <item quantity="one">%1$s riunione</item>
+        <item quantity="many">%1$s riunioni</item>
+        <item quantity="other">%1$s riunioni</item>
+    </plurals>
+    <string name="ui_voices_stale">Dai di nuovo il nome in una riunione per continuare a riconoscerla.</string>
+    <string name="ui_voices_footnote">Per aggiungere qualcuno, dai un nome a una voce in una riunione e lascia attivo “Ricorda questa voce”.</string>
+    <string name="ui_voices_forget_body">Cassini smette di riconoscere questa voce. I nomi già presenti nelle riunioni restano.</string>
+    <plurals name="ui_voices_forget_everyone_body">
+        <item quantity="one">Cassini smette di riconoscere %1$s voce salvata ed elimina le impronte vocali da ogni riunione. I nomi già presenti nelle riunioni restano.</item>
+        <item quantity="many">Cassini smette di riconoscere tutte le %1$s voci salvate ed elimina le impronte vocali da ogni riunione. I nomi già presenti nelle riunioni restano.</item>
+        <item quantity="other">Cassini smette di riconoscere tutte le %1$s voci salvate ed elimina le impronte vocali da ogni riunione. I nomi già presenti nelle riunioni restano.</item>
+    </plurals>
+    <string name="ui_trash_intro">Le riunioni qui vengono eliminate per sempre dopo 30 giorni, con il loro audio, le trascrizioni e le impronte vocali di quelle riunioni.</string>
+    <string name="ui_trash_delete_body">L’audio, le trascrizioni e le impronte vocali di questa riunione vengono eliminati. Non si può annullare.</string>
+    <plurals name="ui_trash_delete_all_title">
+        <item quantity="one">Eliminare %1$s riunione per sempre?</item>
+        <item quantity="many">Eliminare %1$s riunioni per sempre?</item>
+        <item quantity="other">Eliminare %1$s riunioni per sempre?</item>
+    </plurals>
+    <string name="ui_trash_is_empty_body">Le riunioni che elimini restano qui per 30 giorni.</string>
+</resources>

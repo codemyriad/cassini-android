@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated from cassini-ux 3b7c28231272e5f88de0b2a460346c46ebad7339; do not edit. -->
+<resources>
+    <string name="ui_headline_waiting">Terminando la reunión anterior…</string>
+    <plurals name="ui_count_ahead_of_note">
+        <item quantity="one">%1$s reunión antes de esta.</item>
+        <item quantity="many">%1$s reuniones antes de esta.</item>
+        <item quantity="other">%1$s reuniones antes de esta.</item>
+    </plurals>
+    <string name="ui_action_open_note">Abrir reunión</string>
+    <string name="ui_settings_transfer_body">Cuando configuras un teléfono Android nuevo a partir de este, tus reuniones y voces guardadas se copian directamente en él. No se envía nada a ninguna cuenta en la nube. Los modelos descargados no se copian; el teléfono nuevo los descarga otra vez.</string>
+    <string name="ui_settings_transfer_body_off">No se copia nada a un teléfono nuevo. Si pierdes o cambias este teléfono, tus reuniones se pierden, salvo que las hayas exportado.</string>
+    <string name="ui_settings_transfer_too_large">Tus reuniones y voces guardadas son demasiado grandes para transferirlas de una sola vez. Exporta tus reuniones como ZIP.</string>
+    <string name="ui_name_remember_body">En las próximas reuniones, Cassini reconocerá a %1$s automáticamente.</string>
+    <string name="ui_name_remember_body_unnamed">En las próximas reuniones, Cassini reconocerá a esta persona automáticamente.</string>
+    <plurals name="ui_count_notes">
+        <item quantity="one">%1$s reunión</item>
+        <item quantity="many">%1$s reuniones</item>
+        <item quantity="other">%1$s reuniones</item>
+    </plurals>
+    <string name="ui_voices_stale">Vuelve a poner nombre a esta persona en una reunión para que Cassini la siga reconociendo.</string>
+    <string name="ui_voices_footnote">Para añadir a alguien, pon nombre a un hablante en cualquier reunión y deja activado “Recordar esta voz”.</string>
+    <string name="ui_voices_forget_body">Cassini deja de reconocer esta voz. Los nombres que ya están en tus reuniones se mantienen.</string>
+    <plurals name="ui_voices_forget_everyone_body">
+        <item quantity="one">Cassini deja de reconocer %1$s voz guardada y elimina las huellas de voz de todas las reuniones. Los nombres que ya están en tus reuniones se mantienen.</item>
+        <item quantity="many">Cassini deja de reconocer las %1$s voces guardadas y elimina las huellas de voz de todas las reuniones. Los nombres que ya están en tus reuniones se mantienen.</item>
+        <item quantity="other">Cassini deja de reconocer las %1$s voces guardadas y elimina las huellas de voz de todas las reuniones. Los nombres que ya están en tus reuniones se mantienen.</item>
+    </plurals>
+    <string name="ui_trash_intro">Las reuniones de aquí se eliminan definitivamente tras 30 días, con su audio, sus transcripciones y las huellas de voz de esas reuniones.</string>
+    <string name="ui_trash_delete_body">Se eliminan su audio, sus transcripciones y las huellas de voz de esta reunión. No se puede deshacer.</string>
+    <plurals name="ui_trash_delete_all_title">
+        <item quantity="one">¿Eliminar %1$s reunión definitivamente?</item>
+        <item quantity="many">¿Eliminar %1$s reuniones definitivamente?</item>
+        <item quantity="other">¿Eliminar %1$s reuniones definitivamente?</item>
+    </plurals>
+    <string name="ui_trash_is_empty_body">Las reuniones que eliminas se quedan aquí 30 días.</string>
+</resources>

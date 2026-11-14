@@ -11,13 +11,13 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.util.Locale
 
-/** The pinned D97 catalog is the authority, including the trimmed recognition and Saved voices privacy copy. */
+/** The pinned shared catalog is the authority, including the trimmed recognition and Saved voices privacy copy. */
 @RunWith(RobolectricTestRunner::class)
 class TransferStringsTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
 
     @Test fun allSixLanguagesUseThePinnedTransferAndPrivacyCopy() {
-        val source = javaClass.getResourceAsStream("/transfer/strings.json")!!.bufferedReader().use { it.readText() }
+        val source = javaClass.getResourceAsStream("/phase2/strings.json")!!.bufferedReader().use { it.readText() }
         val catalog = JSONObject(source)
         val entries = catalog.getJSONArray("entries")
         for (tag in listOf("en", "it", "fr", "es", "pt-BR", "pt-PT")) {
@@ -28,6 +28,7 @@ class TransferStringsTest {
             for (index in 0 until entries.length()) {
                 val entry = entries.getJSONObject(index)
                 val id = entry.getString("id")
+                if (id !in IDS) continue
                 val expected = if (tag == "en") {
                     entry.getString("en")
                 } else {

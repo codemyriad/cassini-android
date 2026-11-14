@@ -27,3 +27,7 @@ independent reference pins; this UI catalog update does not change those formats
 `wave5/strings.json` (D-975) is the catalog at cassini-ux `31973ff9784fcc66c1c7993b903a336e8f2c1432`, pinned
 at that commit in its own `UPSTREAM.json` entry. It supplies only the first-run hero and privacy-line resources
 (`scripts/generate-wave5-strings.py`, `docs/design/phase2-d975.md`).
+
+`phase2/strings.json` (L-67, D-1048) is the complete catalog pinned independently for phone meeting nouns.
+`scripts/generate-phase2-strings.py` generates the affected Settings, Saved voices, transcription and shared-path
+resources in all six languages. See `docs/design/phase2-d1048.md`; the original Phase 1 and Wave 5 pins stay fixed.

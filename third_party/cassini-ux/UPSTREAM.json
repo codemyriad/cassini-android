@@ -75,6 +75,11 @@
       "source": "strings/strings.json",
       "commit": "31973ff9784fcc66c1c7993b903a336e8f2c1432",
       "sha256": "c634cdfbcf961391e1f3a084c4d8ac07aa10946a289ecba4da8ec1ebc25717ca"
+    },
+    "phase2/strings.json": {
+      "source": "strings/strings.json",
+      "commit": "3b7c28231272e5f88de0b2a460346c46ebad7339",
+      "sha256": "2052b3ea9f4a013bee3b7ce87bb33be2da6ede49f9004edc596d741d8aedda3c"
     }
   }
 }

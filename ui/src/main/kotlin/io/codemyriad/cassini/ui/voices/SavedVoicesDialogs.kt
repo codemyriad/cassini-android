@@ -55,7 +55,7 @@ fun SavedVoicesDialogContent(dialog: SavedVoicesDialog, onEvent: (SavedVoicesEve
 }
 
 /**
- * "Forget <name>?" — "Cassini stops recognising this voice. Names already in your notes stay." [Forget], or
+ * "Forget <name>?" — "Cassini stops recognising this voice. Names already in your meetings stay." [Forget], or
  * "Forget everyone?" — "Cassini stops recognising all 4 saved voices …" [Forget everyone]; both red.
  */
 @Composable
