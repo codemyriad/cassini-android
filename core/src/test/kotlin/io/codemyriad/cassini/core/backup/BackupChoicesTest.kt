@@ -49,4 +49,14 @@ class BackupChoicesTest {
         assertTrue(BackupChoices().permits(28, 2))
         assertFalse(BackupChoices(noticeAcknowledged = true).showTransferNotice)
     }
+
+    @Test fun activeChannelsFollowThePermitRules() {
+        assertTrue(BackupChoices().transferActive(28))
+        assertFalse(BackupChoices().transferActive(27)) // API 26-27 exclude every backup domain.
+        assertFalse(BackupChoices.UNREADABLE.transferActive(35))
+        assertFalse(BackupChoices(cloud = true).cloudActive(cloudEnabled = false)) // The build flag wins.
+        assertTrue(BackupChoices(cloud = true).cloudActive(cloudEnabled = true))
+        assertFalse(BackupChoices().cloudActive(cloudEnabled = true))
+        assertFalse(BackupChoices.UNREADABLE.cloudActive(cloudEnabled = true))
+    }
 }

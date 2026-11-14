@@ -5,6 +5,7 @@ import android.os.Build
 import android.view.accessibility.AccessibilityManager
 import androidx.core.net.toUri
 import io.codemyriad.cassini.AppGraph
+import io.codemyriad.cassini.BuildConfig
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.library.SearchFilters
 import io.codemyriad.cassini.core.models.ModelPart
@@ -87,7 +88,17 @@ interface LibraryPorts {
     val trashed: StateFlow<TrashedNote?>
 
     fun takeTrashed(note: TrashedNote)
+
+    /** Which automatic copies can leave the phone now (D97 choices, the cloud build flag, the API level). */
+    val backupReach: Flow<BackupReach>
 }
+
+/**
+ * The automatic channels that can copy the library off the phone: encrypted cloud Auto Backup ([cloud]) and
+ * device-to-device transfer ([transfer]). The first-run hero and privacy line follow them (PARITY Wave 6 contract
+ * sections 1-3, D98).
+ */
+data class BackupReach(val cloud: Boolean, val transfer: Boolean)
 
 /** [LibraryPorts] over the app's graph. */
 @Suppress("TooManyFunctions") // one binding per port function
@@ -149,6 +160,14 @@ class GraphLibraryPorts(private val graph: AppGraph, context: Context) : Library
     override val trashed: StateFlow<TrashedNote?> get() = graph.trashUndo.pending
 
     override fun takeTrashed(note: TrashedNote) = graph.trashUndo.take(note)
+
+    override val backupReach: Flow<BackupReach>
+        get() = graph.backupChoices.choices.map { choices ->
+            BackupReach(
+                cloud = choices.cloudActive(BuildConfig.CLOUD_BACKUP_ENABLED),
+                transfer = choices.transferActive(Build.VERSION.SDK_INT),
+            )
+        }.distinctUntilChanged()
 
     override fun snackbarTimeoutMs(): Long {
         val manager = app.getSystemService(AccessibilityManager::class.java)

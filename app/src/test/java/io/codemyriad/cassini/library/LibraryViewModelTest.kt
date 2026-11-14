@@ -24,6 +24,8 @@ import io.codemyriad.cassini.ui.banner.BannerKind
 import io.codemyriad.cassini.ui.components.NoteStatusUi
 import io.codemyriad.cassini.ui.components.SnackbarKind
 import io.codemyriad.cassini.ui.format.DayLabel
+import io.codemyriad.cassini.ui.library.FirstRunHeroUi
+import io.codemyriad.cassini.ui.library.FirstRunPrivacy
 import io.codemyriad.cassini.ui.library.LibraryDialog
 import io.codemyriad.cassini.ui.library.LibraryEvent
 import io.codemyriad.cassini.ui.library.LibrarySheet
@@ -33,6 +35,8 @@ import io.codemyriad.cassini.ui.note.ExportKind
 import io.codemyriad.cassini.ui.note.NoteAction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -77,9 +81,10 @@ class LibraryViewModelTest {
     private fun LibraryViewModel.now(): LibraryUiState = state.value
 
     @Test
-    fun groupsTheLibraryByDayAndShowsTheEmptyBanner() = runTest(dispatcher) {
+    fun groupsTheLibraryByDayAndShowsTheFirstRunHeroInsteadOfTheEmptyBanner() = runTest(dispatcher) {
         val viewModel = viewModel()
-        assertEquals(listOf(BannerKind.LIB_EMPTY), viewModel.now().banners.map { it.kind })
+        assertTrue(viewModel.now().banners.isEmpty())
+        assertEquals(FirstRunHeroUi(cloudBackup = false, privacy = FirstRunPrivacy.PROCESSING), viewModel.now().hero)
         ports.add(libraryRow("a", createdAt = daysAgo(0)))
         ports.add(libraryRow("b", createdAt = daysAgo(1)))
         advanceUntilIdle()
@@ -87,7 +92,44 @@ class LibraryViewModelTest {
         assertEquals(false, state.loading)
         assertEquals(listOf(DayLabel.Today, DayLabel.Yesterday), state.sections.map { it.label })
         assertTrue(state.banners.isEmpty())
+        assertNull(state.hero)
         assertNull(state.results)
+    }
+
+    @Test
+    fun theFirstRunHeroFollowsEveryAutomaticCopyThatCanLeaveThePhone() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        val expected = mapOf(
+            BackupReach(cloud = true, transfer = true) to FirstRunHeroUi(true, FirstRunPrivacy.WITH_BACKUP),
+            BackupReach(cloud = true, transfer = false) to FirstRunHeroUi(true, FirstRunPrivacy.WITH_BACKUP),
+            BackupReach(cloud = false, transfer = true) to FirstRunHeroUi(false, FirstRunPrivacy.PROCESSING),
+            BackupReach(cloud = false, transfer = false) to FirstRunHeroUi(false, FirstRunPrivacy.PHONE_ONLY),
+        )
+        for ((reach, hero) in expected) {
+            ports.backupReach.value = reach
+            advanceUntilIdle()
+            assertEquals(reach.toString(), hero, viewModel.now().hero)
+        }
+    }
+
+    @Test
+    fun noPrivacyClaimIsDrawnBeforeTheBackupChoicesAreRead() = runTest(dispatcher) {
+        val unread = object : LibraryPorts by ports {
+            override val backupReach: Flow<BackupReach> = emptyFlow()
+        }
+        val viewModel = LibraryViewModel(saved, unread, CLOCK, dispatcher)
+        backgroundScope.launch { viewModel.state.collect {} }
+        advanceUntilIdle()
+        assertNull(viewModel.now().hero)
+        assertTrue(viewModel.now().banners.none { it.kind == BannerKind.LIB_EMPTY })
+    }
+
+    @Test
+    fun searchingAnEmptyLibraryShowsNoHero() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        viewModel.onEvent(LibraryEvent.Query("budget"))
+        advanceUntilIdle()
+        assertNull(viewModel.now().hero)
     }
 
     @Test

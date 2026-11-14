@@ -7,6 +7,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 VENDOR = Path('third_party/cassini-ux')
+# Phase 2 inputs pinned at their own cassini-ux commit. Each must name that commit explicitly; every other input
+# shares the bundle commit. wave5/strings.json (D-975) carries the D98 first-run hero and privacy-line copy without
+# moving the Phase 1 catalog, whose later revision renames the phone "Received" badge before L-10 is decided.
+OWN_COMMIT = {'wave5/strings.json'}
 
 
 def check(root):
@@ -21,7 +25,10 @@ def check(root):
     for name, entry in pin['files'].items():
         if Path(name).is_absolute() or '..' in Path(name).parts:
             raise ValueError('Unsafe vendor path')
-        if entry.get('commit', pin['commit']) != pin['commit']:
+        if name in OWN_COMMIT:
+            if not re.fullmatch(r'[0-9a-f]{40}', entry.get('commit', '')):
+                raise ValueError(f'Separately pinned input needs its own commit: {name}')
+        elif entry.get('commit', pin['commit']) != pin['commit']:
             raise ValueError('Phase 1 inputs must share one commit')
         raw = (root / VENDOR / name).read_bytes()
         if hashlib.sha256(raw).hexdigest() != entry['sha256']:

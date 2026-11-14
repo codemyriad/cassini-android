@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated from cassini-ux 31973ff9784fcc66c1c7993b903a336e8f2c1432; do not edit. -->
+<resources>
+    <string name="ui_hero_title">Ogni parola trascritta.</string>
+    <string name="ui_hero_subtitle">Nulla viene caricato.</string>
+    <string name="ui_hero_backup_qualifier">(tranne per il backup crittografato nel cloud)</string>
+    <string name="ui_hero_subtitle_backup">Nulla viene caricato. (tranne per il backup crittografato nel cloud)</string>
+    <string name="ui_privacy_phone_only">Trascritto su questo telefono. L’audio non lo lascia mai.</string>
+    <string name="ui_privacy_with_backup">Trascritto su questo telefono. Mai caricato, tranne nel tuo backup crittografato nel cloud.</string>
+    <string name="ui_privacy_processing">La trascrizione avviene su questo telefono.</string>
+</resources>

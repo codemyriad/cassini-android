@@ -13,6 +13,15 @@ data class BackupChoices(
 
     val showTransferNotice: Boolean get() = transfer && !noticeAcknowledged
 
+    /**
+     * Whether an automatic copy can leave the phone, by the same rules as [permits]: cloud Auto Backup needs the
+     * build flag and the opt-in; device-to-device transfer needs the choice and API 28's transport flags (the
+     * API 26-27 rules exclude every backup domain). The first-run privacy line (D98) follows these values.
+     */
+    fun cloudActive(cloudEnabled: Boolean): Boolean = cloudEnabled && cloud
+
+    fun transferActive(api: Int): Boolean = api >= TRANSPORT_FLAGS_API && transfer
+
     companion object {
         const val TRANSPORT_FLAGS_API = 28
 

@@ -30,6 +30,10 @@ class StateVariantsTest : VariantBoardTest() {
 
     @Test fun libraryEmpty() = library("library-empty")
 
+    @Test fun libraryEmptyBackup() = library("library-empty-backup")
+
+    @Test fun libraryEmptyPhoneOnly() = library("library-empty-phone-only")
+
     @Test fun libraryNoResults() = library("library-no-results")
 
     @Test fun librarySearch() = library("library-search")

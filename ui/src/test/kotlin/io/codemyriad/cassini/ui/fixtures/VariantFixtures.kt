@@ -24,6 +24,8 @@ import io.codemyriad.cassini.ui.format.ProgressHeadline
 import io.codemyriad.cassini.ui.format.StageUi
 import io.codemyriad.cassini.ui.format.TimeLeftUi
 import io.codemyriad.cassini.ui.library.DaySection
+import io.codemyriad.cassini.ui.library.FirstRunHeroUi
+import io.codemyriad.cassini.ui.library.FirstRunPrivacy
 import io.codemyriad.cassini.ui.library.LibraryDialog
 import io.codemyriad.cassini.ui.library.LibrarySheet
 import io.codemyriad.cassini.ui.library.LibraryUiState
@@ -73,11 +75,11 @@ import io.codemyriad.cassini.ui.trash.TrashBackTo
 import io.codemyriad.cassini.ui.trash.TrashDialog
 import io.codemyriad.cassini.ui.voices.PersonUi
 import io.codemyriad.cassini.ui.voices.SavedVoicesDialog
+import java.time.LocalDate
+import java.time.LocalTime
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
-import java.time.LocalDate
-import java.time.LocalTime
 
 /** A banner with the board copy's arguments (features.md section 13). */
 internal fun banner(kind: BannerKind, args: BannerArgs = boardArgs(kind), announce: Boolean = false): BannerSpec =
@@ -130,7 +132,10 @@ internal object VariantFixtures {
 
     val library: Map<String, LibraryUiState> = mapOf(
         "library-loading" to LibraryUiState(loading = true),
-        "library-empty" to LibraryUiState(banners = persistentListOf(banner(BannerKind.LIB_EMPTY))),
+        // L-27 first-run hero (D-975): the shipped state (cloud backup off, transfer on) and the D98 backup-on state.
+        "library-empty" to LibraryUiState(hero = FirstRunHeroUi(false, FirstRunPrivacy.PROCESSING)),
+        "library-empty-backup" to LibraryUiState(hero = FirstRunHeroUi(true, FirstRunPrivacy.WITH_BACKUP)),
+        "library-empty-phone-only" to LibraryUiState(hero = FirstRunHeroUi(false, FirstRunPrivacy.PHONE_ONLY)),
         "library-no-results" to b.library.copy(
             query = "invoice",
             progress = null,
