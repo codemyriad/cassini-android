@@ -187,11 +187,11 @@ class SheetBehaviourTest {
         val actions = mutableListOf<NoteAction>()
         setThemed { NoteActionsSheetContent(BoardFixtures.noteActions, onAction = { actions += it }) }
         rule.onNodeWithText("Cassini file").performClick()
-        rule.onNodeWithText("Markdown").performClick()
+        rule.onNodeWithText("Markdown", substring = true).performClick()
         rule.onNodeWithText("More formats").performClick()
-        rule.onNodeWithText("Plain text").performScrollTo().performClick()
-        rule.onNodeWithText("Subtitles (SRT)").performScrollTo().performClick()
-        rule.onNodeWithText("Subtitles (WebVTT)").performScrollTo().performClick()
+        rule.onNodeWithText("Plain text", substring = true).performScrollTo().performClick()
+        rule.onNodeWithText("Subtitles (SRT)", substring = true).performScrollTo().performClick()
+        rule.onNodeWithText("Subtitles (WebVTT)", substring = true).performScrollTo().performClick()
         rule.onNodeWithText("Rename").performScrollTo().performClick()
         rule.onNodeWithText("Transcribe again").performScrollTo().performClick()
         rule.onNodeWithText("Document info").performScrollTo().performClick()
@@ -241,15 +241,15 @@ class SheetBehaviourTest {
     /** L-11 (D99): Cassini file and Markdown first; the other text formats wait under More formats. */
     @Test fun moreFormatsStartsClosedAndToggles() {
         setThemed { NoteActionsSheetContent(BoardFixtures.noteActions, onAction = {}) }
-        rule.onNodeWithText("Plain text").assertDoesNotExist()
-        rule.onNodeWithText("Subtitles (SRT)").assertDoesNotExist()
+        rule.onNodeWithText("Plain text", substring = true).assertDoesNotExist()
+        rule.onNodeWithText("Subtitles (SRT)", substring = true).assertDoesNotExist()
         rule.onNodeWithText("More formats").assert(SemanticsMatcher.keyIsDefined(SemanticsActions.Expand))
         rule.onNodeWithText("More formats").performClick()
-        rule.onNodeWithText("Plain text").assertExists()
-        rule.onNodeWithText("Subtitles (WebVTT)").assertExists()
+        rule.onNodeWithText("Plain text", substring = true).assertExists()
+        rule.onNodeWithText("Subtitles (WebVTT)", substring = true).assertExists()
         rule.onNodeWithText("More formats").assert(SemanticsMatcher.keyIsDefined(SemanticsActions.Collapse))
         rule.onNodeWithText("More formats").performClick()
-        rule.onNodeWithText("Plain text").assertDoesNotExist()
+        rule.onNodeWithText("Plain text", substring = true).assertDoesNotExist()
     }
 
     /** An audio-only meeting hides the text formats (not greyed out) and says why (L-11, D99). */
@@ -259,9 +259,9 @@ class SheetBehaviourTest {
         }
         rule.onNodeWithContentDescription("Share Audio file").assertIsEnabled()
         rule.onNodeWithText("No transcript yet, so only the audio can be exported.").assertExists()
-        rule.onNodeWithText("Markdown").assertDoesNotExist()
+        rule.onNodeWithText("Markdown", substring = true).assertDoesNotExist()
         rule.onNodeWithText("More formats").assertDoesNotExist()
-        rule.onNodeWithText("Plain text").assertDoesNotExist()
+        rule.onNodeWithText("Plain text", substring = true).assertDoesNotExist()
     }
 
     /** Imported audio without a Cassini file offers its Original audio in place of the Cassini file (L-11, D99). */
@@ -274,7 +274,8 @@ class SheetBehaviourTest {
             )
         }
         rule.onNodeWithText("Original audio").performClick()
-        rule.onNodeWithText("The audio exactly as it was imported, without a transcript.").assertExists()
+        val body = "The audio exactly as it was imported, without a transcript."
+        rule.onNodeWithText(body, substring = true).assertExists()
         rule.onNodeWithText("Cassini file").assertDoesNotExist()
         rule.onNodeWithText("No transcript yet, so only the audio can be exported.").assertExists()
         rule.runOnIdle { assertEquals(listOf(NoteAction.SAVE_DOCUMENT), actions) }

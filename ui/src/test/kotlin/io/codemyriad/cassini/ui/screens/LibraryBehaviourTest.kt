@@ -237,7 +237,7 @@ class LibraryBehaviourTest {
 
     @Test fun theActionsSheetOpensInItsWindowAndSendsItsRows() {
         show(BoardFixtures.library.copy(sheet = LibrarySheet.Actions(BoardFixtures.noteActions)))
-        rule.onNodeWithText("Markdown").performClick()
+        rule.onNodeWithText("Markdown", substring = true).performClick()
         rule.onNodeWithText("Document info").performClick()
         assertEvents(
             LibraryEvent.SheetAction(NoteAction.SAVE_MARKDOWN),
