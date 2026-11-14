@@ -64,7 +64,8 @@ class DeviceSmokeTest {
     @CiSmoke
     @Test fun importsCompressedAudioOnTheSameClock() {
         val reference = audioDecoder(context).decode(Uri.fromFile(fixture()))
-        for (name in listOf("fleurs-it-short.m4a", "fleurs-it-short.mp3", "fleurs-it-short.opus", "fleurs-it-short.flac")) {
+        val names = listOf("fleurs-it-short.m4a", "fleurs-it-short.mp3", "fleurs-it-short.opus", "fleurs-it-short.flac")
+        for (name in names) {
             val file = fixture(name)
             try {
                 val audio = audioDecoder(context).decode(Uri.fromFile(file))

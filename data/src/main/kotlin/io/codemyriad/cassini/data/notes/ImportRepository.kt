@@ -294,7 +294,9 @@ class ImportRepository(
                     ImportOutcome.Rejected(Failure.OPEN, "invalid import header")
                 )
             }
-            val refused = size?.takeIf { validate != ImportTypes.Verdict.ACCEPT }?.let { limits.refusal(it, paths.notes) }
+            val refused = size?.takeIf { validate != ImportTypes.Verdict.ACCEPT }?.let {
+                limits.refusal(it, paths.notes)
+            }
             refused?.let(Copy::Failed) ?: tmp.outputStream().use { out -> pump(input, out, size, digest, probed) }
         }
         failed ?: Copy.Done(Sha256.hex(digest), tmp.length())

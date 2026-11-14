@@ -128,7 +128,7 @@ object ImportTypes {
         val type = extension?.let { ext -> DECIDED.firstOrNull { ext in it.extensions } }
         return when {
             rejected(extension, mime, type) -> Verdict.REJECT
-            type == FLAC -> if (mime in FLAC_REJECTED_MIME_TYPES) Verdict.REJECT else Verdict.VALIDATE_FLAC
+            type == FLAC -> Verdict.VALIDATE_FLAC
             mime in FLAC.mimeTypes -> Verdict.REJECT // Native FLAC requires the .flac extension.
             type == OPUS_OGG -> Verdict.VALIDATE
             type != null -> if (mime in OPUS_OGG.compatibilityMimeTypes) Verdict.VALIDATE else Verdict.ACCEPT
@@ -148,7 +148,8 @@ object ImportTypes {
             (REJECTED_MIME_PREFIXES.any { mime.startsWith(it) } || mime in OPEN_MIME_TYPES || mime in OGG_FLAC_MIME_TYPES)
         val badExtension = extension != null &&
             (extension in REJECTED_EXTENSIONS || extension in OPEN_EXTENSIONS || type == null)
-        return badMime || badExtension
+        val badFlacMime = type == FLAC && mime in FLAC_REJECTED_MIME_TYPES
+        return badMime || badExtension || badFlacMime
     }
 
     /**
