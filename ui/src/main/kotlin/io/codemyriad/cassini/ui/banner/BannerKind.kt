@@ -51,7 +51,8 @@ enum class BannerGroup { TRUST, RECORDING, TRANSCRIPTION, DOWNLOAD, LIBRARY }
 /**
  * The banner catalogue (features.md section 13, board 10): every kind with its [tone], [title] and [body]
  * resources, the [BannerArgs] fields it [uses], its catalogue [actions] (first ink-filled, second outlined), whether
- * the app emits it ([appEmitted] is false for the catalogue-only TX_CALCULATING and TX_BATTERY) and whether the
+ * the app emits it ([appEmitted] is false for the catalogue-only TX_CALCULATING and TX_BATTERY, and for IMPORTING,
+ * which the Library's "Importing…" card replaces: L-25, W4.5) and whether the
  * user can [dismissible] it. [title] is a plurals resource for RECOVERED and TX_QUEUE_HELD; [body]
  * is 0 when the kind has no body. [BannerText] turns a kind and its arguments into text.
  */
@@ -330,7 +331,7 @@ enum class BannerKind(
         R.string.ui_banner_lib_no_match_body,
         uses = setOf(TEXT),
     ),
-    IMPORTING(INFO, LIB, R.string.ui_banner_importing_title, 0, uses = setOf(TEXT)),
+    IMPORTING(INFO, LIB, R.string.ui_banner_importing_title, 0, uses = setOf(TEXT), appEmitted = false),
     IMPORT_TOO_LARGE(
         ERROR,
         LIB,

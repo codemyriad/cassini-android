@@ -65,6 +65,11 @@
     "strings/strings.json": {
       "source": "strings/strings.json",
       "sha256": "4bbe42b47bbf2e6e61ed15b1c54cabf4096e92aca63b9ed84d428070baa52acf"
+    },
+    "contract/import-types.json": {
+      "source": "contract/import-types.json",
+      "commit": "03fd3bb7dc806c015c1079807eaf5bc548a9fd42",
+      "sha256": "bd80bb2b5ef176279ad6615e62960d19e693519867ab4fa0dded2d717584295d"
     }
   }
 }

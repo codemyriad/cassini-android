@@ -15,11 +15,13 @@ import io.codemyriad.cassini.data.notes.recordingTime
 import io.codemyriad.cassini.engine.job.DownloadProgress
 import io.codemyriad.cassini.engine.job.JobPhase
 import io.codemyriad.cassini.engine.job.TimeLeft
+import io.codemyriad.cassini.notices.ImportState
 import io.codemyriad.cassini.notices.Notices
 import io.codemyriad.cassini.processing.InstallState
 import io.codemyriad.cassini.processing.ProcessingState
 import io.codemyriad.cassini.recording.RecordingState
 import io.codemyriad.cassini.ui.components.Highlighted
+import io.codemyriad.cassini.ui.components.ImportRowUi
 import io.codemyriad.cassini.ui.components.NoteRowUi
 import io.codemyriad.cassini.ui.components.NoteStatusUi
 import io.codemyriad.cassini.ui.format.DayLabel
@@ -205,6 +207,10 @@ object LibraryMapping {
     // The activity area. --------------------------------------------------------------------------------------
 
     /** The recording card and the Record button's recording form, while a capture is Active. */
+    /** The Library's import cards (L-25, W4.5 and W4.6), oldest first: running ones and failed ones kept. */
+    fun imports(state: ImportState): ImmutableList<ImportRowUi> =
+        state.cards.map { ImportRowUi(it.id, it.name, it.failed) }.toImmutableList()
+
     fun recordingPill(state: RecordingState): RecordingPillUi? = (state as? RecordingState.Active)?.let {
         RecordingPillUi(it.title.ifBlank { it.defaultTitle }, elapsedMs = it.elapsedMs, paused = it.pause != null)
     }

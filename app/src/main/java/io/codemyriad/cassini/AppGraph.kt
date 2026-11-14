@@ -286,7 +286,8 @@ class AppGraph(context: Context, val config: Config) {
             describe = { uri -> withContext(dispatchers.io) { source.describe(uri.toUri()).displayName } },
             run = { uri ->
                 ready.await()
-                awaitCatalogue().imports.import(uri.toUri())
+                // Open with and Share: only the decided types of the shared import-types contract (L-25).
+                awaitCatalogue().imports.import(uri.toUri(), checkType = true)
             },
             rejected = { outcome ->
                 when (outcome) {

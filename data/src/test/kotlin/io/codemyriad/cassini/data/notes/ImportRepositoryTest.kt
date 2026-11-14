@@ -181,6 +181,68 @@ class ImportRepositoryTest {
         assertEquals(0, h.db.notes().noteCount())
     }
 
+    // The shared import-types contract (L-25, D-1030): a file the person picked, opened with or shared. ------------
+
+    private fun rejectedOpen(outcome: ImportOutcome) =
+        assertTrue("expected OPEN, got $outcome", outcome is ImportOutcome.Rejected && outcome.failure == Failure.OPEN)
+
+    /** A provider that reports [mime] for every Uri, over the bytes of [file] named [name]. */
+    private fun typed(file: File, name: String, mime: String?) = object : ImportSource {
+        override fun describe(uri: Uri) = ImportSource.Description(name, file.length(), mime)
+
+        override fun open(uri: Uri) = file.inputStream()
+    }
+
+    private val provided = Uri.parse("content://com.example.files/document/7")
+
+    @Test fun checkedImportsTakeEveryDecidedType() = runTest {
+        val wav = created(importer().import(input(fleurs("wav"), "a.wav"), checkType = true))
+        val opus = created(importer().import(input(fleurs("opus"), "b.opus"), checkType = true))
+        val m4a = created(importer().import(input(fleurs("m4a"), "d.m4a"), checkType = true))
+        val mp3 = created(importer(typed(fleurs("mp3"), "e.mp3", "audio/mpeg")).import(provided, checkType = true))
+        assertEquals(4, setOf(wav, opus, m4a, mp3).size)
+        // The same Ogg Opus bytes as .ogg pass the stream check and find the note they already are.
+        assertEquals(ImportOutcome.Existing(opus), importer().import(input(fleurs("opus"), "c.ogg"), checkType = true))
+    }
+
+    @Test fun checkedImportsRejectOtherTypesBeforeTheCopy() = runTest {
+        for (name in listOf("take.flac", "clip.aac", "clip.ogv", "clip.oga", "clip.spx", "voice.amr", "notes.txt")) {
+            rejectedOpen(importer().import(input(fleurs("wav"), name), checkType = true))
+        }
+        rejectedOpen(importer(typed(fleurs("wav"), "a.wav", "video/x-wav")).import(provided, checkType = true))
+        rejectedOpen(importer(typed(fleurs("opus"), "a.ogg", "audio/flac")).import(provided, checkType = true))
+        // Opus/Ogg needs its extension; MP3, M4A and WAV may arrive by MIME type alone.
+        rejectedOpen(importer(typed(fleurs("opus"), "", "audio/ogg")).import(provided, checkType = true))
+        created(importer(typed(fleurs("wav"), "", "audio/x-wav")).import(provided, checkType = true))
+        assertEquals(0, probe.calls.get())
+        assertEquals(1, h.db.notes().noteCount())
+        assertEquals(1, noteDirs().size)
+    }
+
+    @Test fun checkedOggMustBeAnOggOpusStream() = runTest {
+        val video = File(inputs, "video.ogg").apply { writeBytes(theoraOgg()) }
+        rejectedOpen(importer().import(Uri.fromFile(video), checkType = true))
+        rejectedOpen(importer().import(input(fleurs("mp3"), "song.opus"), checkType = true))
+        // A compatibility MIME type needs the same check, whatever the extension.
+        rejectedOpen(importer(typed(fleurs("mp3"), "song.mp3", "application/ogg")).import(provided, checkType = true))
+        assertEquals(emptyList<String>(), noteDirs())
+        assertEquals(0, h.db.notes().noteCount())
+        created(importer(typed(fleurs("opus"), "voice.ogg", "application/ogg")).import(provided, checkType = true))
+    }
+
+    @Test fun uncheckedImportsKeepTheirFormerFormats() = runTest {
+        // Archive entries of Cassini's own exports (BulkTransfers) skip the contract: an older note still restores.
+        created(importer().import(input(fleurs("mp3"), "song.opus")))
+        created(importer().import(input(fleurs("m4a"), "memo.aac")))
+    }
+
+    /** One Ogg page whose BOS packet is a Theora header, as at the head of an Ogg video. */
+    private fun theoraOgg(): ByteArray {
+        val payload = byteArrayOf(0x80.toByte()) + "theora".toByteArray() + ByteArray(35)
+        val header = "OggS".toByteArray() + byteArrayOf(0, 2) + ByteArray(8) + byteArrayOf(9, 0, 0, 0) + ByteArray(8)
+        return header + byteArrayOf(1, payload.size.toByte()) + payload
+    }
+
     @Test fun theSameBytesTwiceGiveTheExistingLiveNote() = runTest {
         val first = created(importer().import(input(fleurs("wav"), "a.wav")))
         val again = importer().import(input(fleurs("wav"), "another name.wav"))

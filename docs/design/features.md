@@ -38,7 +38,7 @@ The Library has these parts, from the top to the bottom:
 3. Privacy line [NEW]: a shield and "Transcribed on this phone. Audio never leaves it." The app always shows it.
 4. Activity area: the recording card, the transcription banner and the notices. "Activity area" gives the details.
 5. List of notes. "List of notes" gives the details.
-6. Bottom bar: "Import audio" and the Record button. "Import audio" opens the system picker (`ACTION_OPEN_DOCUMENT`, MIME `audio/*` and `application/ogg`). While the app records, the Record button shows "Recording · 24:07" with the live dot, and it opens Recording again. Only one capture can exist at a time.
+6. Bottom bar: "Import audio" and the Record button. "Import audio" opens the system picker (`ACTION_OPEN_DOCUMENT`) with the decided `androidMimeTypes` of the shared import-types contract (Opus/Ogg, MP3, M4A, WAV; [phase2-d1030.md](phase2-d1030.md)) and Cassini's ZIP archives. While the app records, the Record button shows "Recording · 24:07" with the live dot, and it opens Recording again. Only one capture can exist at a time.
 7. Snackbar: "“<title>” moved to trash" with Undo (section 8). The Library shows it after Move to trash on the Note screen or in the actions sheet.
 
 ### Activity area
@@ -48,7 +48,7 @@ The activity area shows these items, in this sequence:
 - Recording card [NEW]: the app shows it while `RecordingController.state` is `Active`. It is a dark card with "Recording · <title>" and the elapsed time, or with "Recording paused · <title>". The caption is "Tap to return". A tap opens Recording.
 - Transcription banner [NEW]: the app shows it while a job is RUNNING or a standalone download runs. The data comes from `ProcessingCoordinator.state` and `ModelInstallOwner`. The banner has the title "Transcribing <title>" and the percent, a 4 dp bar, and line 2 "About 6–9 min left · 1 more in queue".
 - The other forms of line 2 are "Calculating time left…", "Finishing the previous note…" (`WaitingForPrevious`), "Downloading speech recognition — 46%" and "Checking files — 80%". During a download, the title is "Getting ready to transcribe <title>", or "Downloading models" for a standalone download. At 0, the banner does not show the queue suffix. A tap opens the running note, or Settings for a standalone download.
-- Notices from `NoticeCenter` (section 13): queue held, recording recovered, record now transcribe later, notifications off, no Opus encoder, import errors, and "Importing <name>…".
+- Notices from `NoticeCenter` (section 13): queue held, recording recovered, record now transcribe later, notifications off, no Opus encoder and import errors. A running import has an "Importing…" card above the notes instead of a banner; a failed one keeps its card with "Needs attention" (L-25; [phase2-d1030.md](phase2-d1030.md)).
 
 ### List of notes
 
@@ -409,7 +409,7 @@ A failure of a best-effort part never shows a red banner. It shows in Settings. 
 |---|---|---|---|---|
 | LIB_EMPTY | plain | "No notes yet" — "Record something, or import an audio file." | No live notes and no query | Record, Import |
 | LIB_NO_MATCH | plain | "Nothing matches “invoice”" — "Try another word or title." | The search found nothing | – |
-| IMPORTING | info | "Importing <name>…" (not on the board) | An import operates | – |
+| IMPORTING | info | "Importing <name>…" (not on the board) | Not emitted since L-25: the Library's "Importing…" card replaces it ([phase2-d1030.md](phase2-d1030.md)) | – |
 | IMPORT_TOO_LARGE | error | "File too large" — "Choose a file under 4 GB." (the board has 2 GB, ui.md section 11) | Rejected(LARGE) | Choose another |
 | IMPORT_NO_SPACE | error | "Not enough space to import" — "This file needs about 1.4 GB free. Free some space and try again." | Rejected(SPACE) | Try again |
 | IMPORT_WAV | error | "Unsupported WAV" — "Use 16-bit PCM WAV, or MP3, M4A or Opus." | Rejected(WAV) | Choose another |
