@@ -76,4 +76,6 @@ class DarkStateVariantsTest : VariantBoardTest() {
     @Test fun modelsNoSpace() = models("models-no-space")
 
     @Test fun actionsPlain() = actions("actions-plain")
+
+    @Test fun actionsImportedAudio() = actions("actions-imported-audio")
 }

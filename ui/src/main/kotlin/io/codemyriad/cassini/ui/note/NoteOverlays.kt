@@ -41,10 +41,6 @@ internal fun NoteOverlays(state: NoteUiState, onEvent: (NoteEvent) -> Unit) {
             onPick = { onEvent(NoteEvent.PickVersion(it)) },
             onDismiss = dismissSheet,
         )
-        NoteSheet.SubtitleFormat -> SubtitleFormatSheet(
-            onExport = { onEvent(NoteEvent.Export(it)) },
-            onDismiss = dismissSheet,
-        )
         is NoteSheet.Info -> DocumentInfoDialog(ui = sheet.ui, onDismiss = dismissSheet)
         null -> Unit
     }

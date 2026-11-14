@@ -124,15 +124,11 @@ data class DaySection(val label: DayLabel, val rows: ImmutableList<NoteRowUi>)
 /**
  * The open sheet of the Library. ui.md section 7 gives only the actions sheet; the Library shows the full Note actions
  * sheet (features.md section 1), so the rows that open a second overlay on the Note screen open it here too:
- * Subtitles opens [SubtitleFormat] and Document info opens [Info] (drawn as a dialog, as on the Note screen).
+ * Document info opens [Info] (drawn as a dialog, as on the Note screen).
  */
 sealed interface LibrarySheet {
     @Immutable
     data class Actions(val ui: NoteActionsUi) : LibrarySheet
-
-    /** The SubRip / WebVTT chooser for note [id]; a row sends [LibraryEvent.Export]. */
-    @Immutable
-    data class SubtitleFormat(val id: String) : LibrarySheet
 
     /** Document info of note [id]. */
     @Immutable

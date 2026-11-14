@@ -3,6 +3,7 @@
 
 package io.codemyriad.cassini.ui.note
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.padding
@@ -10,8 +11,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.collapse
+import androidx.compose.ui.semantics.expand
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -42,9 +49,9 @@ fun NoteActionsSheet(ui: NoteActionsUi, onAction: (NoteAction) -> Unit, onDismis
  * The sheet's content (board 06; features.md section 6), also drawn inline in screenshots (`SheetBoardFrame`):
  * padding 12 (below the handle; 10.5 measured) / 12 / 20; the title (margin 12 horizontal, 2 below; 3.5 measured) and
  * the meta line
- * "Yesterday, 15:10 · 23:50 · 3 speakers" (12 below); "Save a copy" with the document or audio file row, text and
- * subtitles; the divider; Rename, Star or Unstar (L-34), the transcribe row(s), Document info (documents only) and Move to trash (hidden
- * while recording). The content scrolls when it does not fit (large fonts, landscape).
+ * "Yesterday, 15:10 · 23:50 · 3 speakers" (12 below); "Save a copy" with the Cassini file or audio row, Markdown and
+ * More formats; the divider; Rename, Star or Unstar (L-34), the transcribe row(s), Document info (documents only)
+ * and Move to trash (hidden while recording). The content scrolls when it does not fit (large fonts, landscape).
  */
 @Composable
 fun NoteActionsSheetContent(ui: NoteActionsUi, onAction: (NoteAction) -> Unit, modifier: Modifier = Modifier) {
@@ -113,17 +120,43 @@ private fun metaLine(ui: NoteActionsUi, document: Boolean): String {
 }
 
 /**
- * "Save a copy": the featured row (Cassini document `.opus`, or the plain Audio file with its own extension), then
- * Transcript as text and Subtitles, disabled with the reason when [NoteActionsUi.textExportEnabled] is false. A row
- * saves a copy through the system picker; its Share button sends the same file to another app (coordination D53).
+ * "Save a copy" (L-11, cassini-ux D99 and `PARITY.md` "Export formats"): the featured row first, then Markdown, then
+ * the "More formats" disclosure with Plain text, Subtitles (SRT) and Subtitles (WebVTT). The featured row is the
+ * Cassini file (`.opus`) of a document, "Original audio" for an imported plain note and "Audio file" for an own
+ * recording not yet transcribed. Without a completed transcript ([NoteActionsUi.textExportEnabled] false) the text
+ * formats are hidden, not disabled, and one line says why. A row saves a copy through the system picker; its Share
+ * button sends the same file to another app (coordination D53).
  */
 @Composable
 private fun ColumnScope.SaveACopy(ui: NoteActionsUi, document: Boolean, onAction: (NoteAction) -> Unit) {
     SheetSection(stringResource(R.string.ui_actions_save_copy))
+    AudioRow(ui, document, onAction)
+    if (!ui.textExportEnabled) {
+        val why = if (ui.transcriptUnreadable) R.string.ui_actions_not_readable else R.string.ui_export_audio_only
+        Text(
+            text = stringResource(why),
+            modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 4.dp),
+            style = CassiniTheme.type.caption,
+            color = CassiniTheme.colors.text2,
+        )
+        return
+    }
+    ExportRow(ui, MARKDOWN_ROW, onAction)
+    MoreFormats(ui, onAction)
+}
+
+/** The featured row: the Cassini file, the Original audio of an imported plain note, or an own recording's audio. */
+@Composable
+private fun AudioRow(ui: NoteActionsUi, document: Boolean, onAction: (NoteAction) -> Unit) {
     val plain = ui.documentKind as? DocumentKindUi.Plain
-    val documentLabel = stringResource(if (document) R.string.ui_actions_document else R.string.ui_actions_audio_file)
+    val (labelRes, bodyRes) = when {
+        document -> R.string.ui_export_cassini_file to R.string.ui_export_cassini_file_body
+        plain?.imported == true -> R.string.ui_export_original_audio to R.string.ui_export_original_audio_body
+        else -> R.string.ui_actions_audio_file to R.string.ui_actions_audio_file_body
+    }
+    val label = stringResource(labelRes)
     SheetActionRow(
-        label = documentLabel,
+        label = label,
         glyph = Glyph.Music,
         onClick = { onAction(NoteAction.SAVE_DOCUMENT) },
         extension = if (plain != null) {
@@ -131,52 +164,105 @@ private fun ColumnScope.SaveACopy(ui: NoteActionsUi, document: Boolean, onAction
         } else {
             stringResource(R.string.ui_ext_opus)
         },
-        subtitle = stringResource(
-            if (document) R.string.ui_actions_document_body else R.string.ui_actions_audio_file_body,
-        ),
+        subtitle = stringResource(bodyRes),
         style = SheetRowStyle.Featured,
         busy = ui.busyRow == NoteAction.SAVE_DOCUMENT,
-        share = rowShare(documentLabel) { onAction(NoteAction.SHARE_DOCUMENT) },
-    )
-    val reason = when {
-        ui.textExportEnabled -> null
-        document -> stringResource(R.string.ui_actions_not_readable)
-        else -> stringResource(R.string.ui_actions_after_transcription)
-    }
-    val textLabel = stringResource(R.string.ui_actions_text)
-    SheetActionRow(
-        label = textLabel,
-        glyph = Glyph.TextFile,
-        onClick = { onAction(NoteAction.SAVE_TEXT) },
-        extension = stringResource(R.string.ui_ext_txt),
-        subtitle = reason,
-        enabled = ui.textExportEnabled,
-        busy = ui.busyRow == NoteAction.SAVE_TEXT,
-        share = rowShare(textLabel) { onAction(NoteAction.SHARE_TEXT) },
-    )
-    val markdownLabel = stringResource(R.string.ui_actions_markdown)
-    SheetActionRow(
-        label = markdownLabel,
-        glyph = Glyph.TextFile,
-        onClick = { onAction(NoteAction.SAVE_MARKDOWN) },
-        extension = stringResource(R.string.ui_ext_md),
-        subtitle = reason ?: stringResource(R.string.ui_markdown_description),
-        enabled = ui.textExportEnabled,
-        busy = ui.busyRow == NoteAction.SAVE_MARKDOWN,
-        share = rowShare(markdownLabel) { onAction(NoteAction.SHARE_MARKDOWN) },
-    )
-    val subtitlesLabel = stringResource(R.string.ui_actions_subtitles)
-    SheetActionRow(
-        label = subtitlesLabel,
-        glyph = Glyph.Subtitles,
-        onClick = { onAction(NoteAction.SAVE_SUBTITLES) },
-        extension = stringResource(R.string.ui_ext_subtitles),
-        subtitle = reason,
-        enabled = ui.textExportEnabled,
-        busy = ui.busyRow == NoteAction.SAVE_SUBTITLES,
-        share = rowShare(subtitlesLabel) { onAction(NoteAction.SHARE_SUBTITLES) },
+        share = rowShare(label) { onAction(NoteAction.SHARE_DOCUMENT) },
     )
 }
+
+/**
+ * The "More formats" disclosure (closed when the sheet opens, open while one of its rows writes) and, when open,
+ * Plain text, Subtitles (SRT) and Subtitles (WebVTT). TalkBack hears it as expandable / collapsible.
+ */
+@Composable
+private fun MoreFormats(ui: NoteActionsUi, onAction: (NoteAction) -> Unit) {
+    val busy = MORE_FORMAT_ROWS.any { it.save == ui.busyRow }
+    var expanded by rememberSaveable(ui.noteId) { mutableStateOf(false) }
+    val open = expanded || busy
+    SheetActionRow(
+        label = stringResource(R.string.ui_export_more_formats),
+        glyph = if (open) Glyph.ChevronUp else Glyph.ChevronDown,
+        onClick = { expanded = !open },
+        modifier = Modifier.semantics {
+            if (open) {
+                collapse {
+                    expanded = false
+                    true
+                }
+            } else {
+                expand {
+                    expanded = true
+                    true
+                }
+            }
+        },
+        enabled = !busy,
+    )
+    if (open) MORE_FORMAT_ROWS.forEach { ExportRow(ui, it, onAction) }
+}
+
+/** A text format of "Save a copy": its catalog label and description, mono extension, glyph and actions. */
+private data class ExportFormatRow(
+    @StringRes val label: Int,
+    @StringRes val body: Int,
+    @StringRes val extension: Int,
+    val glyph: Glyph,
+    val save: NoteAction,
+    val share: NoteAction,
+)
+
+/** A text-format row with its Share button. */
+@Composable
+private fun ExportRow(ui: NoteActionsUi, row: ExportFormatRow, onAction: (NoteAction) -> Unit) {
+    val text = stringResource(row.label)
+    SheetActionRow(
+        label = text,
+        glyph = row.glyph,
+        onClick = { onAction(row.save) },
+        extension = stringResource(row.extension),
+        subtitle = stringResource(row.body),
+        busy = ui.busyRow == row.save,
+        share = rowShare(text) { onAction(row.share) },
+    )
+}
+
+private val MARKDOWN_ROW = ExportFormatRow(
+    label = R.string.ui_actions_markdown,
+    body = R.string.ui_markdown_description,
+    extension = R.string.ui_ext_md,
+    glyph = Glyph.TextFile,
+    save = NoteAction.SAVE_MARKDOWN,
+    share = NoteAction.SHARE_MARKDOWN,
+)
+
+/** The rows under "More formats", in the contract's order. */
+private val MORE_FORMAT_ROWS = listOf(
+    ExportFormatRow(
+        label = R.string.ui_export_plain_text,
+        body = R.string.ui_export_plain_text_body,
+        extension = R.string.ui_ext_txt,
+        glyph = Glyph.TextFile,
+        save = NoteAction.SAVE_TEXT,
+        share = NoteAction.SHARE_TEXT,
+    ),
+    ExportFormatRow(
+        label = R.string.ui_export_srt,
+        body = R.string.ui_export_srt_body,
+        extension = R.string.ui_ext_srt,
+        glyph = Glyph.Subtitles,
+        save = NoteAction.SAVE_SRT,
+        share = NoteAction.SHARE_SRT,
+    ),
+    ExportFormatRow(
+        label = R.string.ui_export_vtt,
+        body = R.string.ui_export_vtt_body,
+        extension = R.string.ui_ext_vtt,
+        glyph = Glyph.Subtitles,
+        save = NoteAction.SAVE_VTT,
+        share = NoteAction.SHARE_VTT,
+    ),
+)
 
 /** The Share button of a "Save a copy" row, spoken as "Share [label]". */
 @Composable

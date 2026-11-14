@@ -31,7 +31,6 @@ import io.codemyriad.cassini.ui.library.LibraryEvent
 import io.codemyriad.cassini.ui.library.LibrarySheet
 import io.codemyriad.cassini.ui.library.LibraryUiState
 import io.codemyriad.cassini.ui.library.RecordingPillUi
-import io.codemyriad.cassini.ui.note.ExportKind
 import io.codemyriad.cassini.ui.note.NoteAction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -423,6 +422,11 @@ class LibraryViewModelTest {
             val markdown = listOf(
                 NoteAction.SAVE_MARKDOWN to NoteStart.SAVE_MARKDOWN,
                 NoteAction.SHARE_MARKDOWN to NoteStart.SHARE_MARKDOWN,
+                NoteAction.SAVE_SRT to NoteStart.SAVE_SRT,
+                NoteAction.SAVE_VTT to NoteStart.SAVE_VTT,
+                NoteAction.SHARE_SRT to NoteStart.SHARE_SRT,
+                NoteAction.SHARE_VTT to NoteStart.SHARE_VTT,
+                NoteAction.SHARE_TEXT to NoteStart.SHARE_TEXT,
             )
             for ((action, start) in markdown) {
                 viewModel.onEvent(LibraryEvent.LongPress("d"))
@@ -435,8 +439,6 @@ class LibraryViewModelTest {
             advanceUntilIdle()
             viewModel.onEvent(LibraryEvent.SheetAction(NoteAction.DOCUMENT_INFO))
             assertEquals(LibraryEffect.OpenNote(NoteKey("d", start = NoteStart.DOCUMENT_INFO)), awaitItem())
-            viewModel.onEvent(LibraryEvent.Export("d", ExportKind.VTT))
-            assertEquals(LibraryEffect.OpenNote(NoteKey("d", start = NoteStart.SAVE_VTT)), awaitItem())
         }
         advanceUntilIdle()
         assertNull(viewModel.now().sheet)

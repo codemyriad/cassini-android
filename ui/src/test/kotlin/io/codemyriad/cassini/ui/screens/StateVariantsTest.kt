@@ -160,8 +160,6 @@ class StateVariantsTest : VariantBoardTest() {
 
     // Read & listen sheets and dialogs (features.md sections 3.2, 3.4 and 6).
 
-    @Test fun readSubtitleFormat() = readOverlay("read-subtitle-format")
-
     @Test fun readRename() = readOverlay("read-rename")
 
     @Test fun readTranscribeFresh() = readOverlay("read-transcribe-fresh")
@@ -223,6 +221,8 @@ class StateVariantsTest : VariantBoardTest() {
     @Test fun actionsRecording() = actions("actions-recording")
 
     @Test fun actionsNoNamesCarry() = actions("actions-no-names-carry")
+
+    @Test fun actionsImportedAudio() = actions("actions-imported-audio")
 
     // Model download (features.md section 5).
 

@@ -346,7 +346,7 @@ class NoteViewModel(
         val seekingMs: Long? = null,
     )
 
-    private enum class SheetKind { ACTIONS, VERSIONS, SUBTITLES, INFO, NAME }
+    private enum class SheetKind { ACTIONS, VERSIONS, INFO, NAME }
 
     private data class Loaded(val details: NoteDetails?)
 
@@ -551,7 +551,6 @@ class NoteViewModel(
                 NoteSheet.Actions(if (ui.busyRow != null) actions.copy(busyRow = ui.busyRow) else actions)
             }
             SheetKind.VERSIONS -> NoteSheet.Versions(NoteMapping.versions(details, now, clock.zone))
-            SheetKind.SUBTITLES -> NoteSheet.SubtitleFormat
             SheetKind.INFO -> NoteSheet.Info(info(details, ui.info))
             SheetKind.NAME -> ui.naming?.let { naming ->
                 SpeakerNaming.mergeUi(naming)?.let { NoteSheet.Merge(it) }
@@ -618,10 +617,6 @@ class NoteViewModel(
             NoteEvent.PreviousMatch -> stepMatch(-1)
             NoteEvent.CloseSearch -> setSearch(null)
             is NoteEvent.SheetAction -> launch { sheetAction(event.action) }
-            is NoteEvent.Export -> launch {
-                // The subtitle chooser serves both the save row and its Share button.
-                if (saved.get<Boolean>(KEY_SHARE_SUBTITLES) == true) share(event.kind) else requestExport(event.kind)
-            }
             is NoteEvent.RenameConfirmed -> {
                 local.update { it.copy(dialog = null) }
                 launch { ports.rename(noteId, event.title) }
@@ -873,11 +868,13 @@ class NoteViewModel(
             NoteAction.SAVE_DOCUMENT -> requestExport(ExportKind.DOCUMENT)
             NoteAction.SAVE_TEXT -> requestExport(ExportKind.TEXT)
             NoteAction.SAVE_MARKDOWN -> requestExport(ExportKind.MARKDOWN)
-            NoteAction.SAVE_SUBTITLES -> chooseSubtitles(details, share = false)
+            NoteAction.SAVE_SRT -> requestExport(ExportKind.SRT)
+            NoteAction.SAVE_VTT -> requestExport(ExportKind.VTT)
             NoteAction.SHARE_DOCUMENT -> share(ExportKind.DOCUMENT)
             NoteAction.SHARE_TEXT -> share(ExportKind.TEXT)
             NoteAction.SHARE_MARKDOWN -> share(ExportKind.MARKDOWN)
-            NoteAction.SHARE_SUBTITLES -> chooseSubtitles(details, share = true)
+            NoteAction.SHARE_SRT -> share(ExportKind.SRT)
+            NoteAction.SHARE_VTT -> share(ExportKind.VTT)
             NoteAction.RENAME -> {
                 closeSheet()
                 local.update { it.copy(dialog = NoteDialog.Rename(details.note.title)) }
@@ -940,11 +937,11 @@ class NoteViewModel(
             NoteStart.SAVE_MARKDOWN -> requestExport(ExportKind.MARKDOWN)
             NoteStart.SAVE_SRT -> requestExport(ExportKind.SRT)
             NoteStart.SAVE_VTT -> requestExport(ExportKind.VTT)
-            NoteStart.CHOOSE_SUBTITLES -> chooseSubtitles(details, share = false)
             NoteStart.SHARE_DOCUMENT -> share(ExportKind.DOCUMENT)
             NoteStart.SHARE_TEXT -> share(ExportKind.TEXT)
             NoteStart.SHARE_MARKDOWN -> share(ExportKind.MARKDOWN)
-            NoteStart.SHARE_SUBTITLES -> chooseSubtitles(details, share = true)
+            NoteStart.SHARE_SRT -> share(ExportKind.SRT)
+            NoteStart.SHARE_VTT -> share(ExportKind.VTT)
             NoteStart.DOCUMENT_INFO -> openInfo(details)
         }
     }
@@ -1064,7 +1061,6 @@ class NoteViewModel(
     // Exports. -------------------------------------------------------------------------------------------------------
 
     private suspend fun requestExport(kind: ExportKind) {
-        saved[KEY_SHARE_SUBTITLES] = null
         val details = details.filterNotNull().first().details ?: return
         val file = NoteExports.file(details, kind) ?: return
         saved[KEY_EXPORT] = kind.name
@@ -1082,20 +1078,12 @@ class NoteViewModel(
         snackbar(if (ok) SnackbarKind.SAVED_FILE else SnackbarKind.SAVE_FAILED, name)
     }
 
-    /** The Subtitles row or its Share button: the SubRip/WebVTT chooser, which then saves or shares (D53). */
-    private fun chooseSubtitles(details: NoteDetails, share: Boolean) {
-        if (!NoteExports.textExportEnabled(details)) return
-        saved[KEY_SHARE_SUBTITLES] = share
-        openSheet(SheetKind.SUBTITLES)
-    }
-
     /**
      * Share (coordination D53): writes the export of [kind] into a fresh share file (`ports.shareTarget`), the same
      * bytes as "Save a copy", then hands it to the system chooser ([NoteEffect.Share]). A failed write shows "Couldn't
      * share the file".
      */
     private suspend fun share(kind: ExportKind) {
-        saved[KEY_SHARE_SUBTITLES] = null
         val details = details.filterNotNull().first().details ?: return
         val file = NoteExports.file(details, kind) ?: return
         val target = ports.shareTarget(file.name)
@@ -1521,7 +1509,6 @@ class NoteViewModel(
 
         private const val KEY_SEARCH = "search"
         private const val KEY_EXPORT = "export"
-        private const val KEY_SHARE_SUBTITLES = "shareSubtitles"
         private const val KEY_NAME_SHEET = "nameSheet"
         private const val KEY_NAME_TEXT = "nameText"
         private const val KEY_STARTED = "started"

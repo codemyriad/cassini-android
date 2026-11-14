@@ -175,8 +175,6 @@ sealed interface NoteSheet {
     @Immutable
     data class Versions(val ui: VersionsUi) : NoteSheet
 
-    data object SubtitleFormat : NoteSheet
-
     @Immutable
     data class Info(val ui: InfoUi) : NoteSheet
 }

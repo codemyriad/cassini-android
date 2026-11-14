@@ -1,7 +1,6 @@
 package io.codemyriad.cassini.ui.library
 
 import androidx.compose.runtime.Immutable
-import io.codemyriad.cassini.ui.note.ExportKind
 import io.codemyriad.cassini.ui.note.NoteAction
 import io.codemyriad.cassini.ui.banner.BannerAction as BannerButton
 
@@ -87,10 +86,6 @@ sealed interface LibraryEvent {
     /** A row of the Note actions sheet. */
     @Immutable
     data class SheetAction(val action: NoteAction) : LibraryEvent
-
-    /** A row of the subtitle chooser ([LibrarySheet.SubtitleFormat]): export note [id] as [kind]. */
-    @Immutable
-    data class Export(val id: String, val kind: ExportKind) : LibraryEvent
 
     data object DismissSheet : LibraryEvent
 

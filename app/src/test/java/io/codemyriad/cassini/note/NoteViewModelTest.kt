@@ -584,9 +584,7 @@ class NoteViewModelTest {
         assertEquals("Weekly sync (1).txt", snackbar.text)
         assertNull("the sheet closes after the export", viewModel.now().sheet)
 
-        send(viewModel, NoteEvent.More, NoteEvent.SheetAction(NoteAction.SAVE_SUBTITLES))
-        assertEquals(NoteSheet.SubtitleFormat, viewModel.now().sheet)
-        send(viewModel, NoteEvent.Export(ExportKind.VTT))
+        send(viewModel, NoteEvent.More, NoteEvent.SheetAction(NoteAction.SAVE_VTT))
         assertEquals(NoteEffect.CreateFile("text/vtt", "Weekly sync.vtt"), effects.last())
         viewModel.onExportTarget(null)
         advanceUntilIdle()
@@ -618,20 +616,20 @@ class NoteViewModelTest {
         assertNull("the sheet closes", viewModel.now().sheet)
         assertNull("no snackbar for a share", viewModel.now().snackbar)
 
-        // Subtitles: the chooser opens first, then the chosen format is shared, not saved.
-        send(viewModel, NoteEvent.More, NoteEvent.SheetAction(NoteAction.SHARE_SUBTITLES))
-        assertEquals(NoteSheet.SubtitleFormat, viewModel.now().sheet)
-        send(viewModel, NoteEvent.Export(ExportKind.SRT))
+        // Each subtitle format has its own Share button (L-11), with no chooser in between.
+        send(viewModel, NoteEvent.More, NoteEvent.SheetAction(NoteAction.SHARE_SRT))
         assertEquals("application/x-subrip", (effects.last() as NoteEffect.Share).mime)
         assertEquals(TranscriptFormat.SRT, ports.exports.last().format)
+        send(viewModel, NoteEvent.More, NoteEvent.SheetAction(NoteAction.SHARE_VTT))
+        assertEquals("text/vtt", (effects.last() as NoteEffect.Share).mime)
+        assertEquals(TranscriptFormat.VTT, ports.exports.last().format)
 
-        // The Subtitles row itself still saves.
-        send(viewModel, NoteEvent.More, NoteEvent.SheetAction(NoteAction.SAVE_SUBTITLES))
-        send(viewModel, NoteEvent.Export(ExportKind.VTT))
-        assertEquals(NoteEffect.CreateFile("text/vtt", "Weekly sync.vtt"), effects.last())
+        // The SRT row itself saves.
+        send(viewModel, NoteEvent.More, NoteEvent.SheetAction(NoteAction.SAVE_SRT))
+        assertEquals(NoteEffect.CreateFile("application/x-subrip", "Weekly sync.srt"), effects.last())
 
         send(viewModel, NoteEvent.More, NoteEvent.SheetAction(NoteAction.SHARE_DOCUMENT))
-        assertEquals("exportCopy:file:///share/2/Weekly sync.opus", ports.calls.last { it.startsWith("exportCopy") })
+        assertEquals("exportCopy:file:///share/3/Weekly sync.opus", ports.calls.last { it.startsWith("exportCopy") })
         assertEquals("audio/ogg", (effects.last() as NoteEffect.Share).mime)
     }
 

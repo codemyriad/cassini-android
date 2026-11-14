@@ -100,15 +100,15 @@ class NoteFlowTest {
         rule.waitGone(hasText(rule.text(UiR.string.ui_versions_title)))
 
         // Save a copy: the document byte for byte.
-        val copy = export(rule.text(UiR.string.ui_actions_document), "copy.opus")
+        val copy = export(rule.text(UiR.string.ui_export_cassini_file), "copy.opus")
         val stored = runBlocking { documentFile(noteId) }
         assertEquals("document.opus", stored.name)
         assertArrayEquals("Save a copy is byte-identical to the stored document", stored.readBytes(), copy.readBytes())
 
         // The transcript exports equal the goldens.
-        val text = export(rule.text(UiR.string.ui_actions_text), "copy.txt").readText()
-        val srt = export(rule.text(UiR.string.ui_actions_subtitles), "copy.srt", rule.text(UiR.string.ui_subrip))
-        val vtt = export(rule.text(UiR.string.ui_actions_subtitles), "copy.vtt", rule.text(UiR.string.ui_webvtt))
+        val text = export(rule.text(UiR.string.ui_export_plain_text), "copy.txt", moreFormats = true).readText()
+        val srt = export(rule.text(UiR.string.ui_export_srt), "copy.srt", moreFormats = true)
+        val vtt = export(rule.text(UiR.string.ui_export_vtt), "copy.vtt", moreFormats = true)
         val results = listOf(
             golden("fleurs-it-short.txt", normalizeText(text)),
             golden("fleurs-it-short.srt", srt.readText()),
@@ -160,10 +160,10 @@ class NoteFlowTest {
     }
 
     /**
-     * Runs the export row [label] (and [format] in the subtitle chooser) with the picker answered by a file in the
+     * Runs the export row [label] (under "More formats" when [moreFormats]) with the picker answered by a file in the
      * scratch cache, and returns that file once the "Saved" snackbar shows.
      */
-    private fun export(label: String, name: String, format: String? = null): File {
+    private fun export(label: String, name: String, moreFormats: Boolean = false): File {
         val target = File(graph.paths.cache, "exports-test/$name")
         target.parentFile?.mkdirs()
         target.delete()
@@ -171,8 +171,8 @@ class NoteFlowTest {
         try {
             openActions()
             // A semantics click: the sheet may still be settling, and a touch then misses the window.
+            if (moreFormats) clickOnce(hasText(rule.text(UiR.string.ui_export_more_formats)) and hasClickAction())
             clickOnce(hasText(label, substring = true) and hasClickAction())
-            if (format != null) clickOnce(hasText(format, substring = true) and hasClickAction())
             rule.waitText(rule.text(UiR.string.ui_actions_saved_file, name))
             assertTrue("The export wrote $name before showing Saved", target.length() > 0)
         } finally {
