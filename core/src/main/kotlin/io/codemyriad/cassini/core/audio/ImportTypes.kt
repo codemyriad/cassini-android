@@ -82,7 +82,8 @@ object ImportTypes {
     const val MIN_PROBE_BYTES = 1024
 
     const val FLAC_MIN_PROBE_BYTES = 42
-    val FLAC_REJECTED_MIME_TYPES: Set<String> = setOf("audio/x-flac+ogg", "audio/x-oggflac", "audio/ogg", "application/ogg")
+    val FLAC_REJECTED_MIME_TYPES: Set<String> =
+        setOf("audio/x-flac+ogg", "audio/x-oggflac", "audio/ogg", "application/ogg")
     private val OGG_FLAC_MIME_TYPES = setOf("audio/x-flac+ogg", "audio/x-oggflac")
 
     /** D102 / RFC 9639: native marker, first STREAMINFO block of length 34, nonzero 20-bit sample rate. */
@@ -131,7 +132,7 @@ object ImportTypes {
             mime in FLAC.mimeTypes -> Verdict.REJECT // Native FLAC requires the .flac extension.
             type == OPUS_OGG -> Verdict.VALIDATE
             type != null -> if (mime in OPUS_OGG.compatibilityMimeTypes) Verdict.VALIDATE else Verdict.ACCEPT
-            mime != null && DECIDED.any { it != OPUS_OGG && (mime in it.mimeTypes || mime in it.androidMimeTypes) } ->
+            mime != null && DECIDED.any { it != OPUS_OGG && mime in it.mimeTypes } ->
                 Verdict.ACCEPT
             mime != null && mime in OPUS_OGG_MIME_TYPES -> Verdict.VALIDATE
             else -> Verdict.REJECT

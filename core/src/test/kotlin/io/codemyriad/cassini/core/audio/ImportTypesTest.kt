@@ -126,7 +126,10 @@ class ImportTypesTest {
     @Test fun nativeFlacHeaderMatchesTheContract() {
         val validation = types.single { it.getString("id") == "flac" }.getJSONObject("headerValidation")
         assertEquals(validation.getInt("minProbeBytes"), ImportTypes.FLAC_MIN_PROBE_BYTES)
-        assertEquals(validation.getJSONArray("rejectedMimeTypes").strings().toSet(), ImportTypes.FLAC_REJECTED_MIME_TYPES)
+        assertEquals(
+            validation.getJSONArray("rejectedMimeTypes").strings().toSet(),
+            ImportTypes.FLAC_REJECTED_MIME_TYPES
+        )
         val good = ByteArray(42).apply {
             ascii(validation.getString("magicHex")).toByteArray().copyInto(this)
             this[4] = validation.getInt("firstMetadataBlockType").toByte()
@@ -137,7 +140,8 @@ class ImportTypesTest {
         assertTrue(ImportTypes.flacHeaderValidated(good.copyOf().apply { this[4] = 0x80.toByte() }))
         for (cut in 0 until good.size) assertFalse("cut $cut", ImportTypes.flacHeaderValidated(good.copyOf(cut)))
         for ((offset, value) in listOf(0 to 0, 4 to 1, 5 to 1, 6 to 1, 7 to 33, 20 to 0, 20 to 0x0f)) {
-            assertFalse("$offset=$value", ImportTypes.flacHeaderValidated(good.copyOf().apply { this[offset] = value.toByte() }))
+            val corrupt = good.copyOf().apply { this[offset] = value.toByte() }
+            assertFalse("$offset=$value", ImportTypes.flacHeaderValidated(corrupt))
         }
         assertFalse(ImportTypes.flacHeaderValidated("ID3".toByteArray() + good))
         assertFalse(ImportTypes.flacHeaderValidated("OggS".toByteArray() + good))

@@ -290,7 +290,9 @@ class ImportRepository(
             }
             currentCoroutineContext().ensureActive()
             if (probed == null) {
-                return@useCancellable Copy.Failed(ImportOutcome.Rejected(Failure.OPEN, "invalid import header"))
+                return@useCancellable Copy.Failed(
+                    ImportOutcome.Rejected(Failure.OPEN, "invalid import header")
+                )
             }
             val refused = size?.takeIf { validate != ImportTypes.Verdict.ACCEPT }?.let { limits.refusal(it, paths.notes) }
             refused?.let(Copy::Failed) ?: tmp.outputStream().use { out -> pump(input, out, size, digest, probed) }

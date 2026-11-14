@@ -240,7 +240,11 @@ class ImportRepositoryTest {
             theoraOgg(),
             good.copyOf().apply { this[4] = 1 },
             good.copyOf().apply { this[7] = 33 },
-            good.copyOf().apply { this[18] = 0; this[19] = 0; this[20] = 0 },
+            good.copyOf().apply {
+                this[18] = 0
+                this[19] = 0
+                this[20] = 0
+            },
         )
         for (bytes in invalid) {
             val stream = CountingStream(bytes, bytes.size.toLong())
