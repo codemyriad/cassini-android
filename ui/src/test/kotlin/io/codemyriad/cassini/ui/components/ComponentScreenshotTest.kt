@@ -144,7 +144,7 @@ class ComponentScreenshotTest : BoardTest() {
                 title = "Getting ready to transcribe Interview — Marta, a note with a long title",
                 percent = null,
                 progress = null,
-                line = "Finishing the previous note…",
+                line = "Finishing the previous meeting…",
                 onClick = {},
             )
         }
@@ -337,7 +337,7 @@ class ComponentScreenshotTest : BoardTest() {
         SectionHeader("Privacy")
         GroupCard(Modifier.padding(horizontal = 16.dp)) {
             SettingsRow("Saved voices", subtitle = "4 people", trailing = SettingsTrailing.Chevron, onClick = {})
-            SettingsRow("Trash", subtitle = "2 notes", trailing = SettingsTrailing.Chevron, onClick = {})
+            SettingsRow("Trash", subtitle = "2 meetings", trailing = SettingsTrailing.Chevron, onClick = {})
         }
         SectionHeader("About")
         AboutCard(version = "0.1.0", onSourceClick = {}, modifier = Modifier.padding(horizontal = 16.dp))
@@ -373,7 +373,7 @@ class ComponentScreenshotTest : BoardTest() {
                 ),
                 onAction = {},
             )
-            BannerCard(tone = Tone.Plain, title = "Queued", body = "2 ahead of this note.") {
+            BannerCard(tone = Tone.Plain, title = "Queued", body = "2 ahead of this meeting.") {
                 SecondaryButton("Remove from queue", onClick = {})
             }
         }

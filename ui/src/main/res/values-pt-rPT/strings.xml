@@ -23,7 +23,6 @@
     <string name="ui_action_transcribe_again">Transcrever novamente</string>
     <string name="ui_action_play_anyway">Reproduzir mesmo assim</string>
     <string name="ui_action_open">Abrir</string>
-    <string name="ui_action_open_note">Abrir nota</string>
     <string name="ui_action_open_settings">Abrir definições</string>
     <string name="ui_action_turn_on">Ativar</string>
     <string name="ui_action_download">Transferir</string>
@@ -84,11 +83,6 @@
         <item quantity="many">%1$s oradores</item>
         <item quantity="other">%1$s oradores</item>
     </plurals>
-    <plurals name="ui_count_notes">
-        <item quantity="one">%1$s nota</item>
-        <item quantity="many">%1$s notas</item>
-        <item quantity="other">%1$s notas</item>
-    </plurals>
     <plurals name="ui_count_people">
         <item quantity="one">%1$s pessoa</item>
         <item quantity="many">%1$s pessoas</item>
@@ -113,11 +107,6 @@
         <item quantity="one">mais %1$s na fila</item>
         <item quantity="many">mais %1$s na fila</item>
         <item quantity="other">mais %1$s na fila</item>
-    </plurals>
-    <plurals name="ui_count_ahead_of_note">
-        <item quantity="one">%1$s nota antes desta.</item>
-        <item quantity="many">%1$s notas antes desta.</item>
-        <item quantity="other">%1$s notas antes desta.</item>
     </plurals>
     <plurals name="ui_count_names_from_voices">
         <item quantity="one">%1$s nome das vozes guardadas</item>
@@ -190,7 +179,6 @@
 
     <!-- Progress card (board 02, features.md section 3.1). -->
     <string name="ui_headline_starting">A iniciar…</string>
-    <string name="ui_headline_waiting">A concluir a nota anterior…</string>
     <string name="ui_headline_reading_audio">A ler o áudio</string>
     <string name="ui_headline_preparing">A preparar</string>
     <string name="ui_headline_words_and_speakers">A encontrar palavras e oradores</string>
@@ -283,8 +271,6 @@
     <string name="ui_name_rename_saved_question">Mudar também o nome da voz guardada?</string>
     <string name="ui_name_rename_saved">Mudar o nome da voz guardada</string>
     <string name="ui_name_not">Não é %1$s?</string>
-    <string name="ui_name_remember_body">Nas próximas notas, o Cassini reconhece %1$s automaticamente.</string>
-    <string name="ui_name_remember_body_unnamed">Nas próximas notas, o Cassini reconhece esta pessoa automaticamente.</string>
 
     <!-- Merge sheet and confirmation (features.md section 4, ui.md section 8). -->
     <string name="ui_merge_sheet_title">Juntar %1$s a…</string>
@@ -353,22 +339,14 @@
     <!-- Trash (board 09, features.md section 8). -->
     <string name="ui_trash_title">Lixo</string>
     <string name="ui_trash_empty_action">Esvaziar</string>
-    <string name="ui_trash_intro">As notas aqui são eliminadas definitivamente após 30 dias, com o áudio, as transcrições e as impressões vocais dessas notas.</string>
     <string name="ui_trash_deleted_on">Eliminada a %1$s</string>
     <string name="ui_trash_deleted_today">Eliminada hoje</string>
     <string name="ui_trash_deleted_yesterday">Eliminada ontem</string>
     <string name="ui_trash_restore">Restaurar</string>
     <string name="ui_trash_delete_now">Eliminar agora</string>
     <string name="ui_trash_delete_title">Eliminar «%1$s» definitivamente?</string>
-    <string name="ui_trash_delete_body">O áudio, as transcrições e as impressões vocais desta nota são eliminados. Esta ação não pode ser anulada.</string>
-    <plurals name="ui_trash_delete_all_title">
-        <item quantity="one">Eliminar %1$s nota definitivamente?</item>
-        <item quantity="many">Eliminar %1$s notas definitivamente?</item>
-        <item quantity="other">Eliminar %1$s notas definitivamente?</item>
-    </plurals>
     <string name="ui_trash_delete_all_body">O áudio, as transcrições e as impressões vocais são eliminados. Esta ação não pode ser anulada.</string>
     <string name="ui_trash_is_empty">O Lixo está vazio</string>
-    <string name="ui_trash_is_empty_body">As notas que eliminar ficam aqui durante 30 dias.</string>
 
     <!-- Saved voices (board 07, features.md section 10). -->
     <string name="ui_voices_title">Vozes guardadas</string>
@@ -377,18 +355,10 @@
     <string name="ui_voices_options">Opções para %1$s</string>
     <string name="ui_voices_forget">Esquecer…</string>
     <string name="ui_voices_forget_title">Esquecer %1$s?</string>
-    <string name="ui_voices_forget_body">O Cassini deixa de reconhecer esta voz. Os nomes já presentes nas suas notas mantêm-se.</string>
     <string name="ui_voices_forget_action">Esquecer</string>
     <string name="ui_voices_rename_title">Mudar o nome da voz guardada</string>
-    <string name="ui_voices_stale">Volte a dar o nome numa nota para continuar o reconhecimento</string>
-    <string name="ui_voices_footnote">Para adicionar alguém, dê nome a um orador em qualquer nota e mantenha «Memorizar esta voz» ativado.</string>
     <string name="ui_voices_forget_everyone">Esquecer todos…</string>
     <string name="ui_voices_forget_everyone_title">Esquecer todos?</string>
-    <plurals name="ui_voices_forget_everyone_body">
-        <item quantity="one">O Cassini deixa de reconhecer %1$s voz guardada e elimina as impressões vocais de todas as notas. Os nomes já presentes nas suas notas mantêm-se.</item>
-        <item quantity="many">O Cassini deixa de reconhecer todas as %1$s vozes guardadas e elimina as impressões vocais de todas as notas. Os nomes já presentes nas suas notas mantêm-se.</item>
-        <item quantity="other">O Cassini deixa de reconhecer todas as %1$s vozes guardadas e elimina as impressões vocais de todas as notas. Os nomes já presentes nas suas notas mantêm-se.</item>
-    </plurals>
     <string name="ui_voices_forget_everyone_action">Esquecer todos</string>
     <string name="ui_voices_empty">Ainda não há vozes guardadas</string>
 
@@ -562,10 +532,7 @@
     <string name="ui_day_unknown">Data desconhecida</string>
     <string name="ui_settings_transfer_heading">Mudança para um telemóvel novo</string>
     <string name="ui_settings_transfer_title">Passar para um telemóvel novo</string>
-    <string name="ui_settings_transfer_body">Ao configurar um telemóvel Android novo a partir deste, as suas notas e vozes guardadas são copiadas diretamente para ele. Nada é enviado para uma conta na nuvem. Os modelos transferidos não são copiados; o telemóvel novo volta a transferi-los.</string>
-    <string name="ui_settings_transfer_body_off">Nada é copiado para um telemóvel novo. Se este telemóvel for perdido ou substituído, as suas notas perdem-se, a menos que as tenha exportado.</string>
     <string name="ui_settings_transfer_export_hint">Para guardar uma cópia num local seguro, utilize «Exportar tudo como ZIP».</string>
-    <string name="ui_settings_transfer_too_large">As suas notas e vozes guardadas são demasiado grandes para serem passadas de uma só vez. Exporte as suas notas como ZIP.</string>
     <string name="ui_settings_transfer_unavailable">Esta opção requer o Android 9 ou mais recente.</string>
     <string name="ui_settings_transfer_choice_failed">Não foi possível guardar esta opção. Tente novamente.</string>
     <string name="ui_search_filter_any_date">Qualquer data</string>

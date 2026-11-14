@@ -100,7 +100,7 @@ class BackupSectionTest {
         rule.onNodeWithText("Move to a new phone").assertIsOff()
         assertNoQuotaWarning()
         rule.onNodeWithText(
-            "Nothing is copied to a new phone. If this phone is lost or replaced, your notes are gone unless you exported them.",
+            "Nothing is copied to a new phone. If this phone is lost or replaced, your meetings are gone unless you exported them.",
         ).assertExists()
         rule.onNodeWithText(CLOUD_OFF).assertExists()
         rule.onNodeWithText(PHONE_ONLY).assertExists()
@@ -126,7 +126,7 @@ class BackupSectionTest {
 
     private fun assertNoQuotaWarning() {
         rule.onAllNodesWithText(
-            "Your notes and saved voices are too large to move in one transfer. Export your notes as a ZIP instead.",
+            "Your meetings and saved voices are too large to move in one transfer. Export your meetings as a ZIP instead.",
         ).assertCountEquals(0)
     }
 
@@ -145,8 +145,8 @@ class BackupSectionTest {
         rule.onNodeWithText("Include saved voices in backups").assertIsNotEnabled()
         rule.onNodeWithText("Couldn’t save this choice. Try again.").assertExists()
         rule.onNodeWithText(
-            "Your notes and saved voices are too large to move in one transfer. " +
-                "Export your notes as a ZIP instead.",
+            "Your meetings and saved voices are too large to move in one transfer. " +
+                "Export your meetings as a ZIP instead.",
         ).assertExists()
     }
 

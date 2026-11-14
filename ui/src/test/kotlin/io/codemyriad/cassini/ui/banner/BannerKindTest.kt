@@ -89,12 +89,12 @@ private val ENGLISH: Map<BannerKind, Triple<String, String?, List<String>>> = ma
     BannerKind.REC_STOPPED_FILE_LIMIT to Triple(
         "Stopped — recording file is full",
         "Cassini ends M4A recordings at 1\u00A0GB, about 74\u00A0hours. The recording so far is saved. Start a new recording to continue.",
-        listOf("Open note"),
+        listOf("Open meeting"),
     ),
     BannerKind.REC_STOPPED_STORAGE to Triple(
         "Stopped — storage almost full",
         "Less than 200 MB free. The recording so far is saved.",
-        listOf("Open note"),
+        listOf("Open meeting"),
     ),
     BannerKind.REC_MIC_OFF to Triple(
         "Microphone access is off",
@@ -104,7 +104,7 @@ private val ENGLISH: Map<BannerKind, Triple<String, String?, List<String>>> = ma
     BannerKind.REC_MIC_FAILED to Triple(
         "Microphone stopped working",
         "Recording ended. The audio so far is in your library.",
-        listOf("Open note"),
+        listOf("Open meeting"),
     ),
     BannerKind.REC_COULD_NOT_START to
         Triple("Couldn’t start the microphone", "Another app may be using it. Try again.", listOf("Try again")),

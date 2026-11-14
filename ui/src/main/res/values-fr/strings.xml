@@ -23,7 +23,6 @@
     <string name="ui_action_transcribe_again">Transcrire à nouveau</string>
     <string name="ui_action_play_anyway">Lire quand même</string>
     <string name="ui_action_open">Ouvrir</string>
-    <string name="ui_action_open_note">Ouvrir la note</string>
     <string name="ui_action_open_settings">Ouvrir les paramètres</string>
     <string name="ui_action_turn_on">Activer</string>
     <string name="ui_action_download">Télécharger</string>
@@ -84,11 +83,6 @@
         <item quantity="many">%1$s intervenants</item>
         <item quantity="other">%1$s intervenants</item>
     </plurals>
-    <plurals name="ui_count_notes">
-        <item quantity="one">%1$s note</item>
-        <item quantity="many">%1$s notes</item>
-        <item quantity="other">%1$s notes</item>
-    </plurals>
     <plurals name="ui_count_people">
         <item quantity="one">%1$s personne</item>
         <item quantity="many">%1$s personnes</item>
@@ -113,11 +107,6 @@
         <item quantity="one">%1$s autre en attente</item>
         <item quantity="many">%1$s autres en attente</item>
         <item quantity="other">%1$s autres en attente</item>
-    </plurals>
-    <plurals name="ui_count_ahead_of_note">
-        <item quantity="one">%1$s note avant celle-ci.</item>
-        <item quantity="many">%1$s notes avant celle-ci.</item>
-        <item quantity="other">%1$s notes avant celle-ci.</item>
     </plurals>
     <plurals name="ui_count_names_from_voices">
         <item quantity="one">%1$s nom issu des voix mémorisées</item>
@@ -190,7 +179,6 @@
 
     <!-- Progress card (board 02, features.md section 3.1). -->
     <string name="ui_headline_starting">Démarrage…</string>
-    <string name="ui_headline_waiting">Fin de la note précédente…</string>
     <string name="ui_headline_reading_audio">Lecture de l’audio</string>
     <string name="ui_headline_preparing">Préparation</string>
     <string name="ui_headline_words_and_speakers">Recherche des mots et des intervenants</string>
@@ -283,8 +271,6 @@
     <string name="ui_name_rename_saved_question">Renommer aussi la voix mémorisée\u202F?</string>
     <string name="ui_name_rename_saved">Renommer la voix mémorisée</string>
     <string name="ui_name_not">Pas %1$s\u202F?</string>
-    <string name="ui_name_remember_body">Cassini nommera %1$s automatiquement dans les prochaines notes.</string>
-    <string name="ui_name_remember_body_unnamed">Cassini nommera cette personne automatiquement dans les prochaines notes.</string>
 
     <!-- Merge sheet and confirmation (features.md section 4, ui.md section 8). -->
     <string name="ui_merge_sheet_title">Fusionner %1$s avec…</string>
@@ -353,22 +339,14 @@
     <!-- Trash (board 09, features.md section 8). -->
     <string name="ui_trash_title">Corbeille</string>
     <string name="ui_trash_empty_action">Vider</string>
-    <string name="ui_trash_intro">Les notes placées ici sont supprimées définitivement après 30 jours, avec leur audio, leurs transcriptions et les empreintes vocales issues de ces notes.</string>
     <string name="ui_trash_deleted_on">Supprimée le %1$s</string>
     <string name="ui_trash_deleted_today">Supprimée aujourd’hui</string>
     <string name="ui_trash_deleted_yesterday">Supprimée hier</string>
     <string name="ui_trash_restore">Restaurer</string>
     <string name="ui_trash_delete_now">Supprimer maintenant</string>
     <string name="ui_trash_delete_title">Supprimer définitivement «\u202F%1$s\u202F»\u202F?</string>
-    <string name="ui_trash_delete_body">Son audio, ses transcriptions et les empreintes vocales de cette note sont supprimés. Cette action est irréversible.</string>
-    <plurals name="ui_trash_delete_all_title">
-        <item quantity="one">Supprimer définitivement %1$s note\u202F?</item>
-        <item quantity="many">Supprimer définitivement %1$s notes\u202F?</item>
-        <item quantity="other">Supprimer définitivement %1$s notes\u202F?</item>
-    </plurals>
     <string name="ui_trash_delete_all_body">Leur audio, leurs transcriptions et leurs empreintes vocales sont supprimés. Cette action est irréversible.</string>
     <string name="ui_trash_is_empty">La corbeille est vide</string>
-    <string name="ui_trash_is_empty_body">Les notes que vous supprimez restent ici 30 jours.</string>
 
     <!-- Saved voices (board 07, features.md section 10). -->
     <string name="ui_voices_title">Voix mémorisées</string>
@@ -377,18 +355,10 @@
     <string name="ui_voices_options">Options pour %1$s</string>
     <string name="ui_voices_forget">Oublier…</string>
     <string name="ui_voices_forget_title">Oublier %1$s\u202F?</string>
-    <string name="ui_voices_forget_body">Cassini cesse de reconnaître cette voix. Les noms déjà présents dans vos notes restent.</string>
     <string name="ui_voices_forget_action">Oublier</string>
     <string name="ui_voices_rename_title">Renommer la voix mémorisée</string>
-    <string name="ui_voices_stale">Nommez à nouveau cette voix dans une note pour continuer à la reconnaître</string>
-    <string name="ui_voices_footnote">Pour ajouter quelqu’un, nommez un intervenant dans une note et laissez «\u202FMémoriser cette voix\u202F» activé.</string>
     <string name="ui_voices_forget_everyone">Oublier tout le monde…</string>
     <string name="ui_voices_forget_everyone_title">Oublier tout le monde\u202F?</string>
-    <plurals name="ui_voices_forget_everyone_body">
-        <item quantity="one">Cassini cesse de reconnaître %1$s voix mémorisée et supprime les empreintes vocales de toutes les notes. Les noms déjà présents dans vos notes restent.</item>
-        <item quantity="many">Cassini cesse de reconnaître les %1$s voix mémorisées et supprime les empreintes vocales de toutes les notes. Les noms déjà présents dans vos notes restent.</item>
-        <item quantity="other">Cassini cesse de reconnaître les %1$s voix mémorisées et supprime les empreintes vocales de toutes les notes. Les noms déjà présents dans vos notes restent.</item>
-    </plurals>
     <string name="ui_voices_forget_everyone_action">Oublier tout le monde</string>
     <string name="ui_voices_empty">Aucune voix mémorisée pour l’instant</string>
 
@@ -562,10 +532,7 @@
     <string name="ui_day_unknown">Date inconnue</string>
     <string name="ui_settings_transfer_heading">Passage à un nouveau téléphone</string>
     <string name="ui_settings_transfer_title">Transférer vers un nouveau téléphone</string>
-    <string name="ui_settings_transfer_body">Lorsque vous configurez un nouveau téléphone Android à partir de celui-ci, vos notes et vos voix mémorisées y sont copiées directement. Rien n’est envoyé vers un compte cloud. Les modèles téléchargés ne sont pas copiés ; le nouveau téléphone les télécharge à nouveau.</string>
-    <string name="ui_settings_transfer_body_off">Rien n’est copié vers un nouveau téléphone. Si ce téléphone est perdu ou remplacé, vos notes sont perdues, sauf si vous les avez exportées.</string>
     <string name="ui_settings_transfer_export_hint">Pour garder une copie en lieu sûr, utilisez « Tout exporter en ZIP ».</string>
-    <string name="ui_settings_transfer_too_large">Vos notes et vos voix mémorisées sont trop volumineuses pour être transférées en une seule fois. Exportez plutôt vos notes en ZIP.</string>
     <string name="ui_settings_transfer_unavailable">Ce choix nécessite Android 9 ou une version ultérieure.</string>
     <string name="ui_settings_transfer_choice_failed">Impossible de sauvegarder ce choix. Réessayez.</string>
     <string name="ui_search_filter_any_date">Toutes les dates</string>

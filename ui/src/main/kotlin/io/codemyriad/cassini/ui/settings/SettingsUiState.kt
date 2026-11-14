@@ -7,7 +7,7 @@ import kotlinx.collections.immutable.ImmutableList
 
 /**
  * Settings (board 08, features.md section 11; ui.md section 7). [voices] and [trash] are the counts of the Privacy
- * rows ("4 people", "2 notes"; 0 reads "None yet" and "Empty"). [version] is the `versionName` of the About card.
+ * rows ("4 people", "2 meetings"; 0 reads "None yet" and "Empty"). [version] is the `versionName` of the About card.
  * [notificationsOff] shows the notifications banner.
  */
 @Immutable

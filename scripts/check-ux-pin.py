@@ -8,9 +8,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 VENDOR = Path('third_party/cassini-ux')
 # Phase 2 inputs pinned at their own cassini-ux commit. Each must name that commit explicitly; every other input
-# shares the bundle commit. wave5/strings.json (D-975) carries the D98 first-run hero and privacy-line copy;
+# shares the bundle commit. phase2/strings.json carries L-67 phone nouns (D-1048).
+# wave5/strings.json (D-975) carries the D98 first-run hero and privacy-line copy;
 # contract/import-types.json (D-1030) has its own contract pin. The bundle itself moved for L-10 (D-1035).
-OWN_COMMIT = {'wave5/strings.json', 'contract/import-types.json'}
+OWN_COMMIT = {'wave5/strings.json', 'contract/import-types.json', 'phase2/strings.json'}
 
 
 def check(root):

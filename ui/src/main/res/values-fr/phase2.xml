@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated from cassini-ux 3b7c28231272e5f88de0b2a460346c46ebad7339; do not edit. -->
+<resources>
+    <string name="ui_headline_waiting">Fin de la réunion précédente…</string>
+    <plurals name="ui_count_ahead_of_note">
+        <item quantity="one">%1$s réunion avant celle-ci.</item>
+        <item quantity="many">%1$s réunions avant celle-ci.</item>
+        <item quantity="other">%1$s réunions avant celle-ci.</item>
+    </plurals>
+    <string name="ui_action_open_note">Ouvrir la réunion</string>
+    <string name="ui_settings_transfer_body">Lorsque vous configurez un nouveau téléphone Android à partir de celui-ci, vos réunions et vos voix mémorisées y sont copiées directement. Rien n’est envoyé vers un compte cloud. Les modèles téléchargés ne sont pas copiés ; le nouveau téléphone les télécharge à nouveau.</string>
+    <string name="ui_settings_transfer_body_off">Rien n’est copié vers un nouveau téléphone. Si ce téléphone est perdu ou remplacé, vos réunions sont perdues, sauf si vous les avez exportées.</string>
+    <string name="ui_settings_transfer_too_large">Vos réunions et vos voix mémorisées sont trop volumineuses pour être transférées en une seule fois. Exportez plutôt vos réunions en ZIP.</string>
+    <string name="ui_name_remember_body">Cassini nommera %1$s automatiquement dans les prochaines réunions.</string>
+    <string name="ui_name_remember_body_unnamed">Cassini nommera cette personne automatiquement dans les prochaines réunions.</string>
+    <plurals name="ui_count_notes">
+        <item quantity="one">%1$s réunion</item>
+        <item quantity="many">%1$s réunions</item>
+        <item quantity="other">%1$s réunions</item>
+    </plurals>
+    <string name="ui_voices_stale">Nommez à nouveau cette personne dans une réunion pour que Cassini continue à la reconnaître.</string>
+    <string name="ui_voices_footnote">Pour ajouter quelqu’un, nommez un intervenant dans une réunion et laissez «\u202FMémoriser cette voix\u202F» activé.</string>
+    <string name="ui_voices_forget_body">Cassini cesse de reconnaître cette voix. Les noms déjà présents dans vos réunions restent.</string>
+    <plurals name="ui_voices_forget_everyone_body">
+        <item quantity="one">Cassini cesse de reconnaître %1$s voix mémorisée et supprime les empreintes vocales de toutes les réunions. Les noms déjà présents dans vos réunions restent.</item>
+        <item quantity="many">Cassini cesse de reconnaître les %1$s voix mémorisées et supprime les empreintes vocales de toutes les réunions. Les noms déjà présents dans vos réunions restent.</item>
+        <item quantity="other">Cassini cesse de reconnaître les %1$s voix mémorisées et supprime les empreintes vocales de toutes les réunions. Les noms déjà présents dans vos réunions restent.</item>
+    </plurals>
+    <string name="ui_trash_intro">Les réunions placées ici sont supprimées définitivement après 30 jours, avec leur audio, leurs transcriptions et les empreintes vocales issues de ces réunions.</string>
+    <string name="ui_trash_delete_body">Son audio, ses transcriptions et les empreintes vocales de cette réunion sont supprimés. Cette action est irréversible.</string>
+    <plurals name="ui_trash_delete_all_title">
+        <item quantity="one">Supprimer définitivement %1$s réunion\u202F?</item>
+        <item quantity="many">Supprimer définitivement %1$s réunions\u202F?</item>
+        <item quantity="other">Supprimer définitivement %1$s réunions\u202F?</item>
+    </plurals>
+    <string name="ui_trash_is_empty_body">Les réunions que vous supprimez restent ici 30 jours.</string>
+</resources>

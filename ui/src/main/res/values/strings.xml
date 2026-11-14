@@ -58,7 +58,6 @@
     <string name="ui_action_transcribe_again">Transcribe again</string>
     <string name="ui_action_play_anyway">Play anyway</string>
     <string name="ui_action_open">Open</string>
-    <string name="ui_action_open_note">Open note</string>
     <string name="ui_action_open_settings">Open settings</string>
     <string name="ui_action_turn_on">Turn on</string>
     <string name="ui_action_download">Download</string>
@@ -115,10 +114,6 @@
         <item quantity="one">%1$s speaker</item>
         <item quantity="other">%1$s speakers</item>
     </plurals>
-    <plurals name="ui_count_notes">
-        <item quantity="one">%1$s note</item>
-        <item quantity="other">%1$s notes</item>
-    </plurals>
     <plurals name="ui_count_people">
         <item quantity="one">%1$s person</item>
         <item quantity="other">%1$s people</item>
@@ -138,10 +133,6 @@
     <plurals name="ui_count_more_in_queue">
         <item quantity="one">%1$s more in queue</item>
         <item quantity="other">%1$s more in queue</item>
-    </plurals>
-    <plurals name="ui_count_ahead_of_note">
-        <item quantity="one">%1$s ahead of this note.</item>
-        <item quantity="other">%1$s ahead of this note.</item>
     </plurals>
     <plurals name="ui_count_names_from_voices">
         <item quantity="one">%1$s name from saved voices</item>
@@ -212,7 +203,6 @@
 
     <!-- Progress card (board 02, features.md section 3.1). -->
     <string name="ui_headline_starting">Starting…</string>
-    <string name="ui_headline_waiting">Finishing the previous note…</string>
     <string name="ui_headline_reading_audio">Reading the audio</string>
     <string name="ui_headline_preparing">Preparing</string>
     <string name="ui_headline_words_and_speakers">Finding words and speakers</string>
@@ -306,8 +296,6 @@
     <string name="ui_name_rename_saved_question">Also rename the saved voice?</string>
     <string name="ui_name_rename_saved">Rename saved voice</string>
     <string name="ui_name_not">Not %1$s?</string>
-    <string name="ui_name_remember_body">Future notes will name %1$s automatically.</string>
-    <string name="ui_name_remember_body_unnamed">Future notes will name this person automatically.</string>
 
     <!-- Merge sheet and confirmation (features.md section 4, ui.md section 8). -->
     <string name="ui_merge_sheet_title">Merge %1$s into…</string>
@@ -376,21 +364,14 @@
     <!-- Trash (board 09, features.md section 8). -->
     <string name="ui_trash_title">Trash</string>
     <string name="ui_trash_empty_action">Empty</string>
-    <string name="ui_trash_intro">Notes here are deleted for good after 30 days, with their audio, transcripts and voiceprints from those notes.</string>
     <string name="ui_trash_deleted_on">Deleted %1$s</string>
     <string name="ui_trash_deleted_today">Deleted today</string>
     <string name="ui_trash_deleted_yesterday">Deleted yesterday</string>
     <string name="ui_trash_restore">Restore</string>
     <string name="ui_trash_delete_now">Delete now</string>
     <string name="ui_trash_delete_title">Delete “%1$s” for good?</string>
-    <string name="ui_trash_delete_body">Its audio, transcripts and voiceprints from this note are deleted. This can’t be undone.</string>
-    <plurals name="ui_trash_delete_all_title">
-        <item quantity="one">Delete %1$s note for good?</item>
-        <item quantity="other">Delete %1$s notes for good?</item>
-    </plurals>
     <string name="ui_trash_delete_all_body">Their audio, transcripts and voiceprints are deleted. This can’t be undone.</string>
     <string name="ui_trash_is_empty">Trash is empty</string>
-    <string name="ui_trash_is_empty_body">Notes you delete stay here for 30 days.</string>
 
     <!-- Saved voices (board 07, features.md section 10). -->
     <string name="ui_voices_title">Saved voices</string>
@@ -399,17 +380,10 @@
     <string name="ui_voices_options">Options for %1$s</string>
     <string name="ui_voices_forget">Forget…</string>
     <string name="ui_voices_forget_title">Forget %1$s?</string>
-    <string name="ui_voices_forget_body">Cassini stops recognising this voice. Names already in your notes stay.</string>
     <string name="ui_voices_forget_action">Forget</string>
     <string name="ui_voices_rename_title">Rename saved voice</string>
-    <string name="ui_voices_stale">Name them again in a note to keep recognising them</string>
-    <string name="ui_voices_footnote">To add someone, name a speaker in any note and keep “Remember this voice” on.</string>
     <string name="ui_voices_forget_everyone">Forget everyone…</string>
     <string name="ui_voices_forget_everyone_title">Forget everyone?</string>
-    <plurals name="ui_voices_forget_everyone_body">
-        <item quantity="one">Cassini stops recognising %1$s saved voice and deletes the voiceprints from every note. Names already in your notes stay.</item>
-        <item quantity="other">Cassini stops recognising all %1$s saved voices and deletes the voiceprints from every note. Names already in your notes stay.</item>
-    </plurals>
     <string name="ui_voices_forget_everyone_action">Forget everyone</string>
     <string name="ui_voices_empty">No saved voices yet</string>
 
@@ -582,12 +556,9 @@
     <string name="ui_day_unknown">Date unknown</string>
 
     <string name="ui_settings_transfer_title">Move to a new phone</string>
-    <string name="ui_settings_transfer_body">When you set up a new Android phone from this one, your notes and saved voices are copied directly to it. Nothing is sent to a cloud account. Downloaded models are not copied; the new phone downloads them again.</string>
     <string name="ui_settings_transfer_unavailable">Choosing this needs Android 9 or newer.</string>
     <string name="ui_settings_transfer_heading">Moving to a new phone</string>
-    <string name="ui_settings_transfer_body_off">Nothing is copied to a new phone. If this phone is lost or replaced, your notes are gone unless you exported them.</string>
     <string name="ui_settings_transfer_export_hint">To keep a copy somewhere safe, use Export All as ZIP.</string>
-    <string name="ui_settings_transfer_too_large">Your notes and saved voices are too large to move in one transfer. Export your notes as a ZIP instead.</string>
     <string name="ui_settings_transfer_choice_failed">Couldn’t save this choice. Try again.</string>
     <string name="ui_search_filter_any_date">Any date</string>
     <string name="ui_search_filter_recorded_by_me">Recorded by me</string>

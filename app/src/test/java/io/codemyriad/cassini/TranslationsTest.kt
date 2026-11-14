@@ -144,9 +144,10 @@ class TranslationsTest {
         private val cache = mutableMapOf<String, Map<String, Entry>>()
 
         fun read(dir: String): Map<String, Entry> = cache.getOrPut(dir) {
-            val file = File(res, "$dir/strings.xml")
-            assertTrue("$file is missing", file.isFile)
-            entries(parse(file))
+            val directory = File(res, dir)
+            val files = listOf("strings.xml", "phase2.xml").map { File(directory, it) }.filter { it.isFile }
+            assertTrue("$directory has no resources", files.isNotEmpty())
+            files.flatMap { entries(parse(it)).entries }.associate { it.toPair() }
         }
     }
 
@@ -170,11 +171,12 @@ class TranslationsTest {
 
         fun canonicalVoiceDescription(name: String, tag: String): String? {
             val id = when (name) {
+                "ui_voices_stale" -> "savedVoices.row.stale"
                 "ui_name_remember_body" -> "android.speakers.rememberVoice.description"
                 "ui_name_remember_body_unnamed" -> "android.speakers.rememberVoice.description.unnamed"
                 else -> return null
             }
-            val source = File("../ui/src/test/resources/transfer/strings.json").readText()
+            val source = File("../third_party/cassini-ux/phase2/strings.json").readText()
             val catalog = JSONObject(source).getJSONArray("entries")
             val entry = (0 until catalog.length()).map { catalog.getJSONObject(it) }.single { it.getString("id") == id }
             return entry.getJSONObject("l10n").getJSONObject(tag).getString("text")

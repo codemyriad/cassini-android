@@ -129,7 +129,7 @@ class Phase1RecordingTest {
         val state = VariantFixtures.recording.getValue("recording-stopped-file-limit")
         show(fontScale = 2f, state = state)
         assertControlTargets()
-        rule.onNodeWithText("Open note").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Open meeting").performScrollTo().assertIsDisplayed()
         assertControlTargets()
         rule.onNodeWithContentDescription("74 hours 33 minutes").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Saving the recording…").performScrollTo().assertIsDisplayed()
