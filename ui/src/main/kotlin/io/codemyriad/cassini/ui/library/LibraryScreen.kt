@@ -48,6 +48,8 @@ import io.codemyriad.cassini.ui.R
 import io.codemyriad.cassini.ui.components.Banner
 import io.codemyriad.cassini.ui.components.CassiniSnackbarHost
 import io.codemyriad.cassini.ui.components.DayHeader
+import io.codemyriad.cassini.ui.components.ImportRow
+import io.codemyriad.cassini.ui.components.ImportRowUi
 import io.codemyriad.cassini.ui.components.LibraryActionBarMetrics
 import io.codemyriad.cassini.ui.components.LibraryBottomBar
 import io.codemyriad.cassini.ui.components.NoteRow
@@ -113,6 +115,7 @@ fun LibraryScreen(
                     }
                 }
                 activity(state, onEvent)
+                imports(state.imports, onEvent)
                 state.hero?.takeIf { !state.loading }?.let { hero ->
                     item(key = "first-run-hero", contentType = "hero") { FirstRunHero(hero) }
                 }
@@ -174,6 +177,20 @@ private fun LazyListScope.activity(state: LibraryUiState, onEvent: (LibraryEvent
                 onDismiss = { onEvent(LibraryEvent.DismissBanner(spec.id)) },
             )
         }
+    }
+}
+
+/**
+ * The import cards (L-25, W4.5 and W4.6): placeholders of the notes the imports are adding, above the list, 14 dp
+ * below the activity area and 12 dp apart like the rows.
+ */
+private fun LazyListScope.imports(imports: List<ImportRowUi>, onEvent: (LibraryEvent) -> Unit) {
+    itemsIndexed(imports, key = { _, row -> "import-${row.id}" }, contentType = { _, _ -> "import" }) { index, row ->
+        ImportRow(
+            row = row,
+            onDismiss = { onEvent(LibraryEvent.DismissImport(row.id)) },
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = if (index == 0) 14.dp else 12.dp),
+        )
     }
 }
 

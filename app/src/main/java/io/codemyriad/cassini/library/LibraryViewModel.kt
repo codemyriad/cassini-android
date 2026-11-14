@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.codemyriad.cassini.core.audio.ImportTypes
 import io.codemyriad.cassini.core.library.JobKind
 import io.codemyriad.cassini.core.library.JobState
 import io.codemyriad.cassini.core.library.SearchDate
@@ -282,6 +283,7 @@ class LibraryViewModel(
             // The first-run hero replaces the empty-Library banner (L-27); until the choices are read, neither shows.
             banners = if (empty) notices.filterNot { it.kind == BannerKind.LIB_EMPTY }.toImmutableList() else notices,
             hero = live.backupReach?.takeIf { empty }?.let(LibraryMapping::hero),
+            imports = LibraryMapping.imports(live.facts.imports),
             sections = mapped.sections,
             results = mapped.results,
             snackbar = snackbar,
@@ -324,6 +326,7 @@ class LibraryViewModel(
             is LibraryEvent.Trash -> launch { trash(event.id) }
             is LibraryEvent.BannerAction -> bannerAction(event.id, event.action)
             is LibraryEvent.DismissBanner -> kindOf(event.id)?.let(ports::dismissNotice)
+            is LibraryEvent.DismissImport -> ports.dismissImport(event.id)
             LibraryEvent.Undo -> undo()
             LibraryEvent.SnackbarTimeout -> snackbar.value = null
             is LibraryEvent.SheetAction -> sheetId.value?.let { id -> launch { sheetAction(id, event.action) } }
@@ -591,8 +594,12 @@ class LibraryViewModel(
     private fun dialogKey(kind: String, id: String) = "$kind$DIALOG_SEPARATOR$id"
 
     companion object {
-        /** The picker's types (features.md section 1, item 6). */
-        val IMPORT_TYPES = arrayOf("audio/*", "application/ogg", "application/zip", "application/x-zip-compressed")
+        /**
+         * The picker's types (features.md section 1, item 6): the decided `androidMimeTypes` of the shared
+         * import-types contract (L-25, [ImportTypes]) and Cassini's ZIP archives (D96).
+         */
+        val IMPORT_TYPES: Array<String> =
+            (ImportTypes.ANDROID_MIME_TYPES + listOf("application/zip", "application/x-zip-compressed")).toTypedArray()
 
         const val SEARCH_DEBOUNCE_MS = 150L
         private const val STOP_TIMEOUT_MS = 5_000L

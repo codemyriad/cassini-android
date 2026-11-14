@@ -57,6 +57,10 @@ sealed interface LibraryEvent {
     @Immutable
     data class BannerAction(val id: String, val action: BannerButton) : LibraryEvent
 
+    /** Dismiss on the card of failed import [id] (L-25, W4.6). */
+    @Immutable
+    data class DismissImport(val id: Long) : LibraryEvent
+
     @Immutable
     data class DismissBanner(val id: String) : LibraryEvent
 

@@ -15,6 +15,11 @@ Run `scripts/generate-brand-colors.py` for Kotlin and XML colour values. CI chec
 all generated output and the state vectors. These are build/test inputs, not
 runtime catalog assets. The mark is the canonical source for native rendering.
 
+`contract/import-types.json` (L-25, D-1030) is a Phase 2 contract pinned at its own
+cassini-ux commit, recorded in its `UPSTREAM.json` entry; `ImportTypesTest` and
+`scripts/check-import-types.py` keep the app and the manifest in step with it
+(`docs/design/phase2-d1030.md`).
+
 The older Markdown, search and interjection conformance fixtures retain their
 independent reference pins; this UI catalog update does not change those formats.
 

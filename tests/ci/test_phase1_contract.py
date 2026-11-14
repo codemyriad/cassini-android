@@ -141,6 +141,14 @@ class Phase1ContractTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'one commit'):
             PIN.check(self.root)
 
+    def test_import_types_contract_carries_its_own_explicit_commit(self):
+        entry = self.pin['files']['contract/import-types.json']
+        self.assertNotEqual(self.pin['commit'], entry['commit'])
+        del entry['commit']
+        (self.root / PIN.VENDOR / 'UPSTREAM.json').write_text(json.dumps(self.pin))
+        with self.assertRaisesRegex(ValueError, 'own commit'):
+            PIN.check(self.root)
+
     def test_recording_stop_uses_the_shared_stop_in_every_locale(self):
         catalog = json.loads((self.root / PIN.VENDOR / 'strings.json').read_text())
         stop = next(e for e in catalog['entries'] if e['id'] == 'common.stop')

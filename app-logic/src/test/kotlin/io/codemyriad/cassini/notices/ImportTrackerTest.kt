@@ -17,7 +17,7 @@ class ImportTrackerTest {
         val tracker = ImportTracker(
             scope = backgroundScope,
             describe = { it },
-            run = { uri ->
+            run = { uri, _ ->
                 entered.send(uri)
                 release.await()
             },
@@ -43,7 +43,7 @@ class ImportTrackerTest {
         val tracker = ImportTracker(
             scope = backgroundScope,
             describe = { throw IOException("name") },
-            run = { uri -> if (uri == "throw") throw IOException("open") else uri },
+            run = { uri, _ -> if (uri == "throw") throw IOException("open") else uri },
             rejected = { result -> if (result == "reject") ImportFailure(Failure.SPACE, 4096) else null },
             report = { message, _ -> reports += message },
             clock = { 7 },
@@ -61,5 +61,97 @@ class ImportTrackerTest {
         assertEquals("ok", tracker.start("ok").await())
         assertNull(tracker.state.value.failure)
         assertEquals(emptyList<String>(), tracker.state.value.running)
+    }
+
+    @Test fun aRunningImportHasAnImportingCardThatAFailureKeeps() = runTest {
+        val release = CompletableDeferred<String>()
+        val entered = Channel<String>(Channel.UNLIMITED)
+        val tracker = ImportTracker(
+            scope = backgroundScope,
+            describe = { "$it.m4a" },
+            run = { uri, _ ->
+                entered.send(uri)
+                if (uri == "bad") "reject" else release.await()
+            },
+            rejected = { result -> if (result == "reject") ImportFailure(Failure.OPEN) else null },
+            report = { _, error -> throw AssertionError(error) },
+            clock = { 3 },
+        )
+        val good = tracker.start("good")
+        assertEquals("good", entered.receive())
+        assertEquals(listOf(ImportCard(1, "good.m4a")), tracker.state.value.cards)
+        tracker.start("bad").await()
+        assertEquals("bad", entered.receive())
+        assertEquals(
+            listOf(ImportCard(1, "good.m4a"), ImportCard(2, "bad.m4a", Failure.OPEN)),
+            tracker.state.value.cards
+        )
+        assertEquals(ImportFailure(Failure.OPEN, at = 3), tracker.state.value.failure)
+        assertEquals(listOf("good.m4a"), tracker.state.value.running)
+        release.complete("ok")
+        good.await()
+        assertEquals(listOf(ImportCard(2, "bad.m4a", Failure.OPEN)), tracker.state.value.cards)
+        // The next import clears the failed card with the failure ("shown until dismissed or the next import").
+        val next = tracker.start("next")
+        assertEquals("next", entered.receive())
+        next.await()
+        assertEquals(emptyList<ImportCard>(), tracker.state.value.cards)
+        assertNull(tracker.state.value.failure)
+    }
+
+    @Test fun pickerImportsReportCardsWithoutTheBanner() = runTest {
+        val tracker = ImportTracker(
+            scope = backgroundScope,
+            describe = { it },
+            run = { uri, _ -> uri },
+            rejected = { _: String -> null },
+            report = { _, error -> throw AssertionError(error) },
+            fallbackName = { "Imported audio" },
+        )
+        val a = tracker.begin("a.mp3")
+        val b = tracker.begin("b.wav")
+        val c = tracker.begin("")
+        assertEquals(listOf("a.mp3", "b.wav", "Imported audio"), tracker.state.value.running)
+        tracker.finish(a)
+        tracker.finish(b, Failure.OPEN)
+        assertEquals(
+            listOf(ImportCard(b, "b.wav", Failure.OPEN), ImportCard(c, "Imported audio")),
+            tracker.state.value.cards
+        )
+        assertNull("the picker shows its own summary", tracker.state.value.failure)
+        tracker.dismissCard(c)
+        assertEquals("a running card cannot be dismissed", 2, tracker.state.value.cards.size)
+        tracker.dismissCard(b)
+        assertEquals(listOf(ImportCard(c, "Imported audio")), tracker.state.value.cards)
+        tracker.finish(c, Failure.SPACE)
+        tracker.dismissFailure()
+        assertEquals(emptyList<ImportCard>(), tracker.state.value.cards)
+    }
+
+    @Test fun aCancelledImportRemovesItsCard() = runTest {
+        val tracker = ImportTracker(
+            scope = backgroundScope,
+            describe = { it },
+            run = { _, _ -> CompletableDeferred<String>().await() },
+            rejected = { _: String -> null },
+            report = { _, error -> throw AssertionError(error) },
+        )
+        val job = tracker.start("x")
+        while (tracker.state.value.cards.isEmpty()) kotlinx.coroutines.yield()
+        job.cancelAndJoin()
+        assertEquals(emptyList<ImportCard>(), tracker.state.value.cards)
+        assertNull(tracker.state.value.failure)
+    }
+
+    @Test fun theIntentTypeReachesTheImport() = runTest {
+        val tracker = ImportTracker(
+            scope = backgroundScope,
+            describe = { it },
+            run = { uri, mimeType -> "$uri $mimeType" },
+            rejected = { _: String -> null },
+            report = { _, error -> throw AssertionError(error) },
+        )
+        assertEquals("a audio/ogg", tracker.start("a", "audio/ogg").await())
+        assertEquals("b null", tracker.start("b").await())
     }
 }

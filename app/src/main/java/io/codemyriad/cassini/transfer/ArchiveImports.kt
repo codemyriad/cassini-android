@@ -18,6 +18,16 @@ import java.io.InputStream
 internal class ArchiveImports(context: Context, private val graph: AppGraph) {
     private val source = ImportSource.of(context.contentResolver)
     private val archives = NoteArchives()
+
+    /** The display name of [uri] for its Library card, or null when the provider does not give one. */
+    fun nameOf(uri: Uri): String? = try {
+        source.describe(uri).displayName
+    } catch (@Suppress("TooGenericExceptionCaught") error: RuntimeException) {
+        // Third-party content providers can throw runtime exceptions; the card then gets the fallback title.
+        android.util.Log.w("CassiniImport", "Cannot name a selected file", error)
+        null
+    }
+
     suspend fun importOne(uri: Uri, scratch: File, progressChanged: (ImportSummary) -> Unit): ImportSummary {
         var progress = ImportSummary()
         return try {
@@ -34,7 +44,9 @@ internal class ArchiveImports(context: Context, private val graph: AppGraph) {
                     }
                 } ?: ImportSummary(failed = 1)
             } else {
-                ImportSummary().add(graph.awaitCatalogue().imports.import(uri))
+                // A picked file: only the decided types of the shared import-types contract (L-25). Archive entries
+                // above are Cassini's own exports and keep every format a note may have.
+                ImportSummary().add(graph.awaitCatalogue().imports.import(uri, checkType = true))
             }
         } catch (error: ArchiveRejected) {
             currentCoroutineContext().ensureActive()

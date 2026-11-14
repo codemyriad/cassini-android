@@ -44,18 +44,23 @@ val appResources: File = rootDir.resolve("ui/src/main/res")
 val diarizationPatch: File = rootDir.resolve("scripts/streaming-diarization.patch")
 // ModelCatalogTest compares the model list of the CI models workflow with the catalog.
 val ciModels: File = rootDir.resolve("scripts/ci-models.json")
+// ImportTypesTest compares ImportTypes with the vendored cassini-ux import-types contract and its pin.
+val uxVendor: File = rootDir.resolve("third_party/cassini-ux")
+val importTypes: File = uxVendor.resolve("contract/import-types.json")
+val uxPin: File = uxVendor.resolve("UPSTREAM.json")
 
 tasks.test {
     jvmArgumentProviders.add(
         CoreTestData(
             conformance = fileTree(conformanceDirectory),
             resources = fileTree(appResources) { include("values*/strings.xml") },
-            scripts = files(diarizationPatch, ciModels),
+            scripts = files(diarizationPatch, ciModels, importTypes, uxPin),
             properties = mapOf(
                 "cassini.conformance" to conformanceDirectory,
                 "cassini.appResources" to appResources.absolutePath,
                 "cassini.diarizationPatch" to diarizationPatch.absolutePath,
                 "cassini.ciModels" to ciModels.absolutePath,
+                "cassini.uxVendor" to uxVendor.absolutePath,
             ),
         ),
     )

@@ -288,5 +288,9 @@
   {"screen": "variants-name-sampling", "label": "Variants name sampling", "scheme": "dark", "lang": "en", "device": "phone", "path": "variants-dark/name-sampling.png"},
   {"screen": "variants-name-show-all", "label": "Variants name show all", "scheme": "dark", "lang": "en", "device": "phone", "path": "variants-dark/name-show-all.png"},
   {"screen": "library-large-text", "label": "Library large text (320dp, 1.5x)", "scheme": "light", "lang": "en", "device": "phone", "path": "light/18-library-large-text.png"},
-  {"screen": "library-large-text", "label": "Library large text (320dp, 1.5x)", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/18-library-large-text.png"}
+  {"screen": "library-large-text", "label": "Library large text (320dp, 1.5x)", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/18-library-large-text.png"},
+  {"screen": "20-library-importing", "label": "20 Library Importing", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/20-library-importing.png"},
+  {"screen": "20-library-importing", "label": "20 Library Importing", "scheme": "light", "lang": "en", "device": "phone", "path": "light/20-library-importing.png"},
+  {"screen": "21-library-import-failed", "label": "21 Library Import Failed", "scheme": "dark", "lang": "en", "device": "phone", "path": "dark/21-library-import-failed.png"},
+  {"screen": "21-library-import-failed", "label": "21 Library Import Failed", "scheme": "light", "lang": "en", "device": "phone", "path": "light/21-library-import-failed.png"}
 ]}

@@ -284,9 +284,10 @@ class AppGraph(context: Context, val config: Config) {
         val imports = ImportTracker(
             scope = appScope,
             describe = { uri -> withContext(dispatchers.io) { source.describe(uri.toUri()).displayName } },
-            run = { uri ->
+            run = { uri, mimeType ->
                 ready.await()
-                awaitCatalogue().imports.import(uri.toUri())
+                // Open with and Share: only the decided types of the shared import-types contract (L-25).
+                awaitCatalogue().imports.import(uri.toUri(), checkType = true, mimeType = mimeType)
             },
             rejected = { outcome ->
                 when (outcome) {
@@ -308,7 +309,9 @@ class AppGraph(context: Context, val config: Config) {
     val trashUndo = TrashUndo()
 
     /** ACTION_VIEW imports, through [NoticeCenter.imports]; the navigation opens each note when its import ends. */
-    val viewedImports: ViewedImports by lazy { ViewedImports(appScope) { uri -> notices.imports.start(uri) } }
+    val viewedImports: ViewedImports by lazy {
+        ViewedImports(appScope) { uri, mimeType -> notices.imports.start(uri, mimeType) }
+    }
 
     /** The Note screen's player (architecture 5.9). Main thread only. */
     val playback: PlaybackController by lazy {
