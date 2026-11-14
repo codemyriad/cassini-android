@@ -31,7 +31,6 @@ import io.codemyriad.cassini.ui.library.LibraryEvent
 import io.codemyriad.cassini.ui.library.LibrarySheet
 import io.codemyriad.cassini.ui.library.LibraryUiState
 import io.codemyriad.cassini.ui.library.RecordingPillUi
-import io.codemyriad.cassini.ui.note.ExportKind
 import io.codemyriad.cassini.ui.note.NoteAction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi

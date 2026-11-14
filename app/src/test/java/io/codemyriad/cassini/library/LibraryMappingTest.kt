@@ -345,6 +345,29 @@ class LibraryMappingTest {
         )
     }
 
+    /** L-11 (D99): which audio row and whether the text formats show, and why not. */
+    @Test
+    fun actionsSheetExportSet() {
+        val plain = details(libraryRow("p"))
+        val plainUi = LibraryMapping.actions(plain, null, NOW, ROME, voiceModelReady = true)
+        assertFalse(plainUi.textExportEnabled)
+        assertFalse(plainUi.transcriptUnreadable)
+
+        val unreadable = details(docRow("u", DocumentState.UNREADABLE))
+        val unreadableUi = LibraryMapping.actions(unreadable, null, NOW, ROME, voiceModelReady = true)
+        assertFalse(unreadableUi.textExportEnabled)
+        assertTrue("an unreadable transcript says so, not 'no transcript yet'", unreadableUi.transcriptUnreadable)
+
+        // Imported audio without a Cassini file offers Original audio; queued or running counts as audio-only.
+        val imported = plain.copy(note = plain.note.copy(origin = Origin.IMPORTED_AUDIO))
+        val importedUi = LibraryMapping.actions(imported, null, NOW, ROME, voiceModelReady = true)
+        assertEquals(DocumentKindUi.Plain("m4a", imported = true), importedUi.documentKind)
+        for (state in JobState.entries) {
+            val queued = LibraryMapping.actions(imported.copy(job = jobOf("p", state)), null, NOW, ROME, true)
+            assertFalse(state.name, queued.textExportEnabled)
+        }
+    }
+
     @Test
     fun actionsSheetRows() {
         val plain = details(libraryRow("p"))
@@ -400,21 +423,7 @@ class LibraryMappingTest {
         }
 
         val unreadable = details(docRow("u", DocumentState.UNREADABLE))
-        val unreadableUi = LibraryMapping.actions(unreadable, null, NOW, ROME, voiceModelReady = true)
-        assertFalse(unreadableUi.textExportEnabled)
-        assertTrue("an unreadable transcript says so, not 'no transcript yet'", unreadableUi.transcriptUnreadable)
-        assertFalse(plainUi.transcriptUnreadable)
-        assertFalse(docUi.transcriptUnreadable)
-
-        // L-11 (D99): imported audio without a Cassini file offers Original audio; queued or running counts as
-        // audio-only (no completed transcript).
-        val imported = plain.copy(note = plain.note.copy(origin = Origin.IMPORTED_AUDIO))
-        val importedUi = LibraryMapping.actions(imported, null, NOW, ROME, voiceModelReady = true)
-        assertEquals(DocumentKindUi.Plain("m4a", imported = true), importedUi.documentKind)
-        for (state in JobState.entries) {
-            val queued = LibraryMapping.actions(imported.copy(job = jobOf("p", state)), null, NOW, ROME, true)
-            assertFalse(state.name, queued.textExportEnabled)
-        }
+        assertFalse(LibraryMapping.actions(unreadable, null, NOW, ROME, voiceModelReady = true).textExportEnabled)
         assertTrue(LibraryMapping.needsFreshConfirmation(unreadable))
         assertFalse(LibraryMapping.needsFreshConfirmation(doc))
 
