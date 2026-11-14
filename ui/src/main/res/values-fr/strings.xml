@@ -459,7 +459,7 @@
     <string name="ui_banner_rec_stopped_file_title">Arrêté — fichier d’enregistrement plein</string>
     <string name="ui_banner_rec_stopped_file_body">Cassini arrête les enregistrements M4A à 1\u00A0Go, soit environ 74\u00A0heures. L’enregistrement effectué jusqu’ici est sauvegardé. Lancez un nouvel enregistrement pour continuer.</string>
     <string name="ui_banner_rec_file_low_title">Fichier d’enregistrement presque plein — il reste environ %1$s</string>
-    <string name="ui_banner_rec_file_low_body">Cassini arrête les enregistrements M4A à 1\u00A0Go et les sauvegarde. Pour continuer, terminez et lancez un nouvel enregistrement.</string>
+    <string name="ui_banner_rec_file_low_body">Cassini arrête les enregistrements M4A à 1\u00A0Go et les sauvegarde. Pour continuer, arrêtez et lancez un nouvel enregistrement.</string>
     <string name="ui_banner_rec_stopped_storage_title">Arrêté — stockage presque plein</string>
     <string name="ui_banner_rec_stopped_storage_body">Moins de %1$s libres. L’enregistrement effectué jusqu’ici est sauvegardé.</string>
     <string name="ui_banner_rec_mic_off_title">L’accès au microphone est désactivé</string>

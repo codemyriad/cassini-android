@@ -458,7 +458,7 @@
     <string name="ui_banner_rec_stopped_file_title">Grabación detenida — archivo lleno</string>
     <string name="ui_banner_rec_stopped_file_body">Cassini termina las grabaciones M4A al llegar a 1\u00A0GB, unas 74\u00A0horas. Lo grabado hasta ahora está guardado. Empieza una grabación nueva para continuar.</string>
     <string name="ui_banner_rec_file_low_title">Archivo de grabación casi lleno — quedan unos %1$s</string>
-    <string name="ui_banner_rec_file_low_body">Cassini termina las grabaciones M4A al llegar a 1\u00A0GB y las guarda. Para seguir, termina y empieza una grabación nueva.</string>
+    <string name="ui_banner_rec_file_low_body">Cassini termina las grabaciones M4A al llegar a 1\u00A0GB y las guarda. Para seguir, detén y empieza una grabación nueva.</string>
     <string name="ui_banner_rec_stopped_storage_title">Grabación detenida — almacenamiento casi lleno</string>
     <string name="ui_banner_rec_stopped_storage_body">Quedan menos de %1$s libres. Lo grabado hasta ahora está guardado.</string>
     <string name="ui_banner_rec_mic_off_title">El acceso al micrófono está desactivado</string>
