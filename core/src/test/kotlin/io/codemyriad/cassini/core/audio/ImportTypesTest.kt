@@ -111,15 +111,20 @@ class ImportTypesTest {
         for ((name, mime, expected) in cases) assertEquals("$name $mime", expected, ImportTypes.verdict(name, mime))
     }
 
-    @Test fun nativeFlacRequiresItsExtensionAndRejectsOggMimeTypes() {
+    @Test fun nativeFlacAcceptsOpaqueSharesAndRejectsMismatchedTypes() {
         for (mime in listOf(null, "audio/flac", "AUDIO/X-FLAC; charset=binary", "application/octet-stream")) {
             assertEquals(Verdict.VALIDATE_FLAC, ImportTypes.verdict("Meeting.FLAC", mime))
         }
         for (mime in ImportTypes.FLAC_REJECTED_MIME_TYPES + "video/flac") {
             assertEquals(mime, Verdict.REJECT, ImportTypes.verdict("Meeting.flac", mime))
         }
-        for (name in listOf(null, "Voice message", "a.ogg", "a.opus", "a.mp3")) {
-            assertEquals(Verdict.REJECT, ImportTypes.verdict(name, "audio/flac"))
+        for (mime in ImportTypes.FLAC.mimeTypes) {
+            for (name in listOf(null, "Voice message", "Recording 14.11.2026")) {
+                assertEquals(Verdict.VALIDATE_FLAC, ImportTypes.verdict(name, mime))
+            }
+            for (name in listOf("a.ogg", "a.opus", "a.mp3", "a.oga")) {
+                assertEquals(Verdict.REJECT, ImportTypes.verdict(name, mime))
+            }
         }
     }
 

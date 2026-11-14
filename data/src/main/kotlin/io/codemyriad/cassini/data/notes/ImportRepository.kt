@@ -6,6 +6,7 @@ import android.database.sqlite.SQLiteFullException
 import android.net.Uri
 import android.provider.OpenableColumns
 import io.codemyriad.cassini.core.Failure
+import io.codemyriad.cassini.core.audio.FlacStructure
 import io.codemyriad.cassini.core.audio.ImportTypes
 import io.codemyriad.cassini.core.audio.Limits
 import io.codemyriad.cassini.core.library.AudioKind
@@ -227,6 +228,9 @@ class ImportRepository(
         return when (val copied = copy(uri, tmp, size, validate)) {
             is Copy.Failed -> copied.outcome
             is Copy.Done -> try {
+                if (validate == ImportTypes.Verdict.VALIDATE_FLAC && FlacStructure.validated(tmp) == null) {
+                    return ImportOutcome.Rejected(Failure.OPEN, "invalid or incomplete FLAC")
+                }
                 notes.liveWithSource(copied.sha256)?.let { ImportOutcome.Existing(it) }
                     ?: when (val staged = locks.withNoteLock(id, dispatchers.io) { classify(tmp, description) }) {
                         is Classified.Rejected -> staged.outcome

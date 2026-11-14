@@ -116,7 +116,7 @@ object ImportTypes {
      * Decides from the file's [displayName] (its extension) and the [mimeType] its provider reports; either may be
      * null. Opus/Ogg needs the extension `.opus` or `.ogg` (contract rule) and always the stream check: `.ogg` is
      * ambiguous and `audio/ogg` is a compatibility type, so validating every Opus/Ogg input is the simple safe case.
-     * Native FLAC requires `.flac` and its header check, and rejects broad Ogg MIME types.
+     * Native FLAC requires its header check and rejects mismatched extensions and broad Ogg MIME types.
      * Other inputs reported under a compatibility MIME type need the Ogg check. A file without an
      * extension is accepted on an MP3, M4A or WAV MIME type. On Android a `content://` file often has no extension at
      * all (a messaging app's voice note, `content://…/part/1234`): one reported under an Opus/Ogg MIME type is
@@ -129,7 +129,7 @@ object ImportTypes {
         return when {
             rejected(extension, mime, type) -> Verdict.REJECT
             type == FLAC -> Verdict.VALIDATE_FLAC
-            mime in FLAC.mimeTypes -> Verdict.REJECT // Native FLAC requires the .flac extension.
+            mime in FLAC.mimeTypes -> flacMimeVerdict(extension)
             type == OPUS_OGG -> Verdict.VALIDATE
             type != null -> if (mime in OPUS_OGG.compatibilityMimeTypes) Verdict.VALIDATE else Verdict.ACCEPT
             mime != null && DECIDED.any { it != OPUS_OGG && mime in it.mimeTypes } ->
@@ -138,6 +138,8 @@ object ImportTypes {
             else -> Verdict.REJECT
         }
     }
+
+    private fun flacMimeVerdict(extension: String?) = if (extension == null) Verdict.VALIDATE_FLAC else Verdict.REJECT
 
     /**
      * A rejected or open MIME type, or an extension that is rejected, open or not of a decided [type], whatever else

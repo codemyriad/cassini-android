@@ -264,6 +264,59 @@ class ImportRepositoryTest {
         assertEquals(emptyList<String>(), noteDirs())
     }
 
+    @Test fun extensionlessFlacSharesValidateAndUseTheFlacSuffix() = runTest {
+        for (mime in listOf("audio/flac", "audio/x-flac")) {
+            for (name in listOf(null, "Voice message", "Recording 14.11.2026")) {
+                val source = object : ImportSource {
+                    override fun describe(uri: Uri) = ImportSource.Description(name, null, mime)
+                    override fun open(uri: Uri) = fleurs("flac").inputStream()
+                }
+                val outcome = importer(source).import(Uri.parse("content://chat/voice/7"), checkType = true)
+                val id = when (outcome) {
+                    is ImportOutcome.Created -> outcome.noteId
+                    is ImportOutcome.Existing -> outcome.noteId
+                    else -> error("Expected valid FLAC, got $outcome")
+                }
+                assertEquals("source.flac", h.row(id).audioFile)
+            }
+            for (bytes in listOf(theoraOgg(), "ID3".toByteArray() + fleurs("flac").readBytes())) {
+                val stream = CountingStream(bytes, bytes.size.toLong())
+                val source = object : ImportSource {
+                    override fun describe(uri: Uri) = ImportSource.Description(null, null, mime)
+                    override fun open(uri: Uri) = stream
+                }
+                rejectedOpen(importer(source).import(Uri.parse("content://chat/voice/7"), checkType = true))
+                assertTrue(stream.consumed <= ImportTypes.FLAC_MIN_PROBE_BYTES)
+            }
+        }
+    }
+
+    @Test fun incompleteOrUnsupportedFlacNeverCreatesANote() = runTest {
+        val good = fleurs("flac").readBytes()
+        val invalid = listOf(
+            good.copyOf(42).apply { this[4] = 0x80.toByte() },
+            good.copyOf(8286),
+            good.copyOf(good.size / 2),
+            good.copyOf(256999),
+            good.copyOf().apply { this[lastIndex] = (this[lastIndex].toInt() xor 1).toByte() },
+            good.copyOf().apply {
+                this[18] = 0x2e
+                this[19] = 0xe0.toByte()
+            }, // 192 kHz
+            good.copyOf().apply { this[20] = (this[20].toInt() or 10).toByte() }, // Six channels
+        )
+        for (bytes in invalid) {
+            val source = object : ImportSource {
+                override fun describe(uri: Uri) = ImportSource.Description("take.flac", null, "audio/flac")
+                override fun open(uri: Uri) = bytes.inputStream()
+            }
+            rejectedOpen(importer(source).import(provided, checkType = true))
+        }
+        assertEquals(0, probe.calls.get())
+        assertEquals(0, h.db.notes().noteCount())
+        assertEquals(emptyList<String>(), noteDirs())
+    }
+
     @Test fun checkedOggMustBeAnOggOpusStream() = runTest {
         val video = File(inputs, "video.ogg").apply { writeBytes(theoraOgg()) }
         rejectedOpen(importer().import(Uri.fromFile(video), checkType = true))
