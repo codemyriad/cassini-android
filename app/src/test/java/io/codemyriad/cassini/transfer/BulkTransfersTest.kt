@@ -73,6 +73,8 @@ class BulkTransfersTest {
         val label = context.getString(R.string.import_filter_cassini_and_zip)
         assertEquals(label, picker.getStringExtra(Intent.EXTRA_TITLE))
         assertTrue("application/zip" in LibraryViewModel.IMPORT_TYPES)
+        assertTrue("audio/flac" in LibraryViewModel.IMPORT_TYPES)
+        assertTrue("audio/x-flac" in LibraryViewModel.IMPORT_TYPES)
         val result = Intent().apply {
             clipData = ClipData.newRawUri("Audio", audio.toUri()).apply { addItem(ClipData.Item(zip.toUri())) }
         }
@@ -92,7 +94,7 @@ class BulkTransfersTest {
         val flac = folder.newFile("take.flac").apply { writeBytes(wav.readBytes()) }
         graph.transfers.import(listOf(flac.toUri(), wav.toUri()))
         assertEquals(1, finished().summary?.imported)
-        // The undecided type is refused by the import-types check and keeps "Needs attention"; the WAV's card went.
+        // The WAV renamed to .flac fails the native header check and keeps "Needs attention"; the WAV's card went.
         assertEquals(listOf("take.flac" to Failure.OPEN), cards().map { it.name to it.failure })
         // The same WAV again is a duplicate: it clears the earlier failed cards and leaves none of its own.
         graph.transfers.import(listOf(wav.toUri()))

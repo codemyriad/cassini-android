@@ -8,8 +8,8 @@ import java.util.Locale
  * `third_party/cassini-ux/UPSTREAM.json`. `ImportTypesTest` fails when these values and the vendored file disagree,
  * and `scripts/check-import-types.py` checks the manifest's Open with and Share filters against the same file.
  *
- * Entries with `status == "open"` (FLAC, native and Ogg) are never offered and are rejected here, as are Ogg video
- * and FLAC-in-Ogg arriving as `.ogg` or under a compatibility MIME type ([contentValidated]).
+ * Native FLAC requires [flacHeaderValidated]. Ogg video is rejected, as is
+ * FLAC-in-Ogg arriving as `.ogg` or under a compatibility MIME type ([contentValidated]).
  */
 object ImportTypes {
     /** One decided entry. Extensions keep their leading dot, as in the contract; everything is lower case. */
@@ -53,12 +53,20 @@ object ImportTypes {
         androidMimeTypes = listOf("audio/wav", "audio/x-wav"),
     )
 
-    /** The `status == "decided"` entries, in contract order. */
-    val DECIDED: List<Type> = listOf(OPUS_OGG, MP3, M4A, WAV)
+    val FLAC = Type(
+        id = "flac",
+        extensions = listOf(".flac"),
+        mimeTypes = listOf("audio/flac", "audio/x-flac"),
+        compatibilityMimeTypes = emptyList(),
+        androidMimeTypes = listOf("audio/flac", "audio/x-flac"),
+    )
 
-    /** Extensions and MIME types of the `status == "open"` entries (FLAC): tracked, never accepted. */
-    val OPEN_EXTENSIONS: Set<String> = setOf(".flac")
-    val OPEN_MIME_TYPES: Set<String> = setOf("audio/flac", "audio/x-flac", "audio/x-flac+ogg", "audio/x-oggflac")
+    /** The `status == "decided"` entries, in contract order. */
+    val DECIDED: List<Type> = listOf(OPUS_OGG, MP3, M4A, WAV, FLAC)
+
+    /** Extensions and MIME types of the `status == "open"` entries: tracked, never accepted. */
+    val OPEN_EXTENSIONS: Set<String> = emptySet()
+    val OPEN_MIME_TYPES: Set<String> = emptySet()
 
     /** The system picker's filter and the manifest's Open with / Share types: every decided `androidMimeTypes`. */
     val ANDROID_MIME_TYPES: List<String> = DECIDED.flatMap { it.androidMimeTypes }.distinct()
@@ -67,11 +75,22 @@ object ImportTypes {
 
     /** `.ogg` may hold anything Ogg can (video, FLAC, Vorbis): it always needs the stream check. */
     val AMBIGUOUS_EXTENSIONS: Set<String> = setOf(".ogg")
-    val REJECTED_EXTENSIONS: Set<String> = setOf(".ogv", ".oga", ".ogx", ".spx", ".flac")
+    val REJECTED_EXTENSIONS: Set<String> = setOf(".ogv", ".oga", ".ogx", ".spx")
     val REJECTED_MIME_PREFIXES: List<String> = listOf("video/")
 
     /** Bytes of the head [contentValidated] reads (or the whole file when it is shorter). */
     const val MIN_PROBE_BYTES = 1024
+
+    const val FLAC_MIN_PROBE_BYTES = 42
+    val FLAC_REJECTED_MIME_TYPES: Set<String> = setOf("audio/x-flac+ogg", "audio/x-oggflac", "audio/ogg", "application/ogg")
+    private val OGG_FLAC_MIME_TYPES = setOf("audio/x-flac+ogg", "audio/x-oggflac")
+
+    /** D102 / RFC 9639: native marker, first STREAMINFO block of length 34, nonzero 20-bit sample rate. */
+    @Suppress("MagicNumber") // RFC 9639 STREAMINFO layout.
+    fun flacHeaderValidated(head: ByteArray): Boolean =
+        head.size >= FLAC_MIN_PROBE_BYTES && startsWith(head, 0, head.size, bytes("fLaC")) &&
+            (head[4].toInt() and 0x7f) == 0 && head[5].toInt() == 0 && head[6].toInt() == 0 && head[7].toInt() == 34 &&
+            ((head[18].toInt() and 0xff) != 0 || (head[19].toInt() and 0xff) != 0 || (head[20].toInt() and 0xf0) != 0)
 
     private val OGG_CAPTURE = bytes("OggS")
     private val OPUS_HEAD = bytes("OpusHead")
@@ -85,6 +104,9 @@ object ImportTypes {
         /** Possibly a decided type: import it only when [contentValidated] passes on its head. */
         VALIDATE,
 
+        /** Native FLAC: require [flacHeaderValidated] before decoding. */
+        VALIDATE_FLAC,
+
         /** Not a decided type (unknown, open, video or a rejected Ogg extension). */
         REJECT,
     }
@@ -93,10 +115,11 @@ object ImportTypes {
      * Decides from the file's [displayName] (its extension) and the [mimeType] its provider reports; either may be
      * null. Opus/Ogg needs the extension `.opus` or `.ogg` (contract rule) and always the stream check: `.ogg` is
      * ambiguous and `audio/ogg` is a compatibility type, so validating every Opus/Ogg input is the simple safe case.
-     * Any input reported under a compatibility MIME type is validated, whatever its extension. A file without an
+     * Native FLAC requires `.flac` and its header check, and rejects broad Ogg MIME types.
+     * Other inputs reported under a compatibility MIME type need the Ogg check. A file without an
      * extension is accepted on an MP3, M4A or WAV MIME type. On Android a `content://` file often has no extension at
      * all (a messaging app's voice note, `content://…/part/1234`): one reported under an Opus/Ogg MIME type is
-     * validated, so the stream check alone decides; a wrong extension (`.ogv`, `.oga`, `.flac`…) is still rejected.
+     * validated, so the stream check alone decides; a wrong extension (`.ogv`, `.oga`…) is still rejected.
      */
     fun verdict(displayName: String?, mimeType: String?): Verdict {
         val extension = extensionOf(displayName)
@@ -104,6 +127,8 @@ object ImportTypes {
         val type = extension?.let { ext -> DECIDED.firstOrNull { ext in it.extensions } }
         return when {
             rejected(extension, mime, type) -> Verdict.REJECT
+            type == FLAC -> if (mime in FLAC_REJECTED_MIME_TYPES) Verdict.REJECT else Verdict.VALIDATE_FLAC
+            mime in FLAC.mimeTypes -> Verdict.REJECT // Native FLAC requires the .flac extension.
             type == OPUS_OGG -> Verdict.VALIDATE
             type != null -> if (mime in OPUS_OGG.compatibilityMimeTypes) Verdict.VALIDATE else Verdict.ACCEPT
             mime != null && DECIDED.any { it != OPUS_OGG && (mime in it.mimeTypes || mime in it.androidMimeTypes) } ->
@@ -118,7 +143,8 @@ object ImportTypes {
      * the input reports.
      */
     private fun rejected(extension: String?, mime: String?, type: Type?): Boolean {
-        val badMime = mime != null && (REJECTED_MIME_PREFIXES.any { mime.startsWith(it) } || mime in OPEN_MIME_TYPES)
+        val badMime = mime != null &&
+            (REJECTED_MIME_PREFIXES.any { mime.startsWith(it) } || mime in OPEN_MIME_TYPES || mime in OGG_FLAC_MIME_TYPES)
         val badExtension = extension != null &&
             (extension in REJECTED_EXTENSIONS || extension in OPEN_EXTENSIONS || type == null)
         return badMime || badExtension

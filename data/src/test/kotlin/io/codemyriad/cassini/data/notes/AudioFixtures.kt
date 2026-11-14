@@ -8,7 +8,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.atomic.AtomicInteger
 
-/** The FLEURS clip in fixtures/audio in [extension] (wav, m4a, mp3, opus). */
+/** The FLEURS clip in fixtures/audio in [extension] (wav, m4a, mp3, opus, flac). */
 fun fleurs(extension: String): File =
     File(checkNotNull(System.getProperty("cassini.fixtures")), "audio/fleurs-it-short.$extension")
 
@@ -36,6 +36,7 @@ class FakeProbe(private val durationMs: Long = FLEURS_WAV_MS) : AudioProbe {
                 if ("moov" in text) ProbedAudio("audio/mp4a-latm", durationMs) else null
             text.startsWith("ID3") || (bytes.size > 1 && bytes[0] == 0xFF.toByte() && bytes[1].toInt() and 0xE0 == 0xE0) ->
                 ProbedAudio("audio/mpeg", durationMs)
+            text.startsWith("fLaC") -> ProbedAudio("audio/flac", durationMs)
             else -> null
         }
     }

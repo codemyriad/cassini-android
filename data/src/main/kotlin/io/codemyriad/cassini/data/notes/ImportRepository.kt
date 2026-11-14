@@ -178,12 +178,12 @@ class ImportRepository(
                 ImportTypes.Verdict.ACCEPT
             }
             paths.notes.mkdirs()
-            val validate = verdict == ImportTypes.Verdict.VALIDATE
+            val validate = verdict
             when {
                 verdict == ImportTypes.Verdict.REJECT ->
                     ImportOutcome.Rejected(Failure.OPEN, "not an import type: ${description.mimeType}")
                 // An input that needs the stream check is checked first (in the copy): an Ogg video is OPEN, not LARGE.
-                !validate && size != null ->
+                validate == ImportTypes.Verdict.ACCEPT && size != null ->
                     limits.refusal(size, paths.notes) ?: importNew(uri, description, size, validate)
                 else -> importNew(uri, description, size, validate)
             }
@@ -193,7 +193,7 @@ class ImportRepository(
         uri: Uri,
         description: ImportSource.Description,
         size: Long?,
-        validate: Boolean,
+        validate: ImportTypes.Verdict,
     ): ImportOutcome {
         val id = newId()
         val dir = paths.note(id)
@@ -221,7 +221,7 @@ class ImportRepository(
         id: String,
         description: ImportSource.Description,
         size: Long?,
-        validate: Boolean,
+        validate: ImportTypes.Verdict,
     ): ImportOutcome {
         val tmp = File(paths.note(id), SOURCE_TMP)
         return when (val copied = copy(uri, tmp, size, validate)) {
@@ -278,16 +278,21 @@ class ImportRepository(
      * even created: a rejected input costs at most [ImportTypes.MIN_PROBE_BYTES] read and nothing written. The head
      * is then written first, so the stream is read once (a pipe-backed provider cannot be reopened).
      */
-    private suspend fun copy(uri: Uri, tmp: File, size: Long?, validate: Boolean): Copy = try {
+    private suspend fun copy(uri: Uri, tmp: File, size: Long?, validate: ImportTypes.Verdict): Copy = try {
         val input = source.open(uri) ?: throw FileNotFoundException("no stream")
         val digest = MessageDigest.getInstance("SHA-256")
         val failed = input.useCancellable {
-            val probed = if (validate) oggOpusHead(input) else ByteArray(0)
+            val probed = when (validate) {
+                ImportTypes.Verdict.VALIDATE -> oggOpusHead(input)
+                ImportTypes.Verdict.VALIDATE_FLAC -> head(input, ImportTypes.FLAC_MIN_PROBE_BYTES)
+                    .takeIf { ImportTypes.flacHeaderValidated(it) }
+                else -> ByteArray(0)
+            }
             currentCoroutineContext().ensureActive()
             if (probed == null) {
-                return@useCancellable Copy.Failed(ImportOutcome.Rejected(Failure.OPEN, "not an Ogg Opus stream"))
+                return@useCancellable Copy.Failed(ImportOutcome.Rejected(Failure.OPEN, "invalid import header"))
             }
-            val refused = size?.takeIf { validate }?.let { limits.refusal(it, paths.notes) }
+            val refused = size?.takeIf { validate != ImportTypes.Verdict.ACCEPT }?.let { limits.refusal(it, paths.notes) }
             refused?.let(Copy::Failed) ?: tmp.outputStream().use { out -> pump(input, out, size, digest, probed) }
         }
         failed ?: Copy.Done(Sha256.hex(digest), tmp.length())
@@ -406,6 +411,7 @@ class ImportRepository(
             "audio/mp4" to "m4a",
             "audio/aac" to "aac",
             "audio/flac" to "flac",
+            "audio/x-flac" to "flac",
             "audio/vorbis" to "ogg",
             "audio/3gpp" to "3gp",
             "audio/amr-wb" to "awb",
@@ -447,8 +453,8 @@ private fun typeName(displayName: String?, uri: Uri): String? =
 private fun oggOpusHead(input: InputStream): ByteArray? = head(input).takeIf { ImportTypes.contentValidated(it) }
 
 /** The first [ImportTypes.MIN_PROBE_BYTES] of [input], or all of it when it is shorter; nothing more is read. */
-private fun head(input: InputStream): ByteArray {
-    val head = ByteArray(ImportTypes.MIN_PROBE_BYTES)
+private fun head(input: InputStream, bytes: Int = ImportTypes.MIN_PROBE_BYTES): ByteArray {
+    val head = ByteArray(bytes)
     var n = 0
     while (n < head.size) {
         val read = input.read(head, n, head.size - n)

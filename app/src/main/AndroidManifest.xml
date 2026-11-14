@@ -38,7 +38,7 @@
                 <!-- content:// only: Cassini reads the file with its own permissions, so it never takes a path. -->
                 <data android:scheme="content" />
                 <!-- The decided androidMimeTypes of cassini-ux contract/import-types.json (ImportTypes; checked by
-                     scripts/check-import-types.py): Opus/Ogg, MP3, M4A and WAV, never FLAC or a compatibility type. -->
+                     scripts/check-import-types.py): Opus/Ogg, MP3, M4A, WAV and native FLAC. -->
                 <data android:mimeType="audio/opus" />
                 <data android:mimeType="audio/ogg" />
                 <data android:mimeType="audio/mpeg" />
@@ -47,6 +47,8 @@
                 <data android:mimeType="audio/mp4a-latm" />
                 <data android:mimeType="audio/wav" />
                 <data android:mimeType="audio/x-wav" />
+                <data android:mimeType="audio/flac" />
+                <data android:mimeType="audio/x-flac" />
             </intent-filter>
             <!-- An audio file shared from another app (a voice message, a recorder): imported as Open with does. -->
             <intent-filter>
@@ -61,6 +63,8 @@
                 <data android:mimeType="audio/mp4a-latm" />
                 <data android:mimeType="audio/wav" />
                 <data android:mimeType="audio/x-wav" />
+                <data android:mimeType="audio/flac" />
+                <data android:mimeType="audio/x-flac" />
             </intent-filter>
         </activity>
         <service android:name=".whistle.WhistleService" android:exported="false" android:isolatedProcess="true" android:process=":whistle" />

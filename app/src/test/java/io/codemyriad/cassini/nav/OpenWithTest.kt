@@ -36,7 +36,9 @@ class OpenWithTest {
             "audio/mp4",
             "audio/x-m4a",
             "audio/wav",
-            "audio/x-wav"
+            "audio/x-wav",
+            "audio/flac",
+            "audio/x-flac"
         )
         assertEquals(types.toSet(), types.toSet() intersect ImportTypes.ANDROID_MIME_TYPES.toSet())
         for (type in ImportTypes.ANDROID_MIME_TYPES) {
@@ -58,7 +60,7 @@ class OpenWithTest {
             assertEquals(type, listOf(MainActivity::class.java.name), shared(type))
         }
         assertTrue("shared text is not ours", shared("text/plain").isEmpty())
-        assertTrue("FLAC is still open (L-09, D-938)", shared("audio/flac").isEmpty())
+        assertTrue("Ogg FLAC stays unsupported", shared("audio/x-flac+ogg").isEmpty())
     }
 
     @Test fun otherTypesDoNot() {
@@ -66,8 +68,8 @@ class OpenWithTest {
             "video/mp4",
             "video/ogg",
             "text/plain",
-            "audio/flac",
-            "audio/x-flac",
+            "audio/x-flac+ogg",
+            "audio/x-oggflac",
             "audio/aac",
             "application/ogg"
         )) {
