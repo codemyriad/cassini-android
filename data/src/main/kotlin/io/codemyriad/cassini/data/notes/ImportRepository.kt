@@ -154,7 +154,9 @@ class ImportRepository(
             val description = described.copy(displayName = displayName ?: described.displayName)
             val size = description.size?.takeIf { it >= 0 }
             val verdict = if (checkType) {
-                ImportTypes.verdict(description.displayName, description.mimeType)
+                // Without a display name the Uri's last segment may still carry the extension (`…/voice.wav`); an
+                // opaque id (`msf:24`) has none. It only decides the type, never the title.
+                ImportTypes.verdict(description.displayName ?: uri.lastPathSegment, description.mimeType)
             } else {
                 ImportTypes.Verdict.ACCEPT
             }

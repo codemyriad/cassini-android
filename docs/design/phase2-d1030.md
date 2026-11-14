@@ -20,7 +20,8 @@ A file the person picks, opens with or shares to Cassini is checked in `ImportRe
 
 1. Before the copy, `ImportTypes.verdict` rejects video MIME types, the open FLAC types, the contract's rejected Ogg
    extensions (`.ogv`, `.oga`, `.ogx`, `.spx`, `.flac`) and every other extension. Opus/Ogg requires `.opus` or
-   `.ogg`; a file without an extension is accepted only under an MP3, M4A or WAV MIME type.
+   `.ogg`; a file without an extension is accepted only under an MP3, M4A or WAV MIME type. Without a display
+   name the extension comes from the Uri's last path segment (never used as the title).
 2. After the copy, an Opus/Ogg file and any file reported under a compatibility MIME type (`audio/ogg`,
    `application/ogg`) must pass the contract's stream check on its first 1024 bytes: page 0 an OggS BOS page starting
    with `OpusHead`, page 1 a non-BOS page of the same stream starting with `OpusTags`. Ogg video (Theora, OGM, Dirac,

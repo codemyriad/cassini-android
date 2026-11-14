@@ -214,9 +214,17 @@ class ImportRepositoryTest {
         // Opus/Ogg needs its extension; MP3, M4A and WAV may arrive by MIME type alone.
         rejectedOpen(importer(typed(fleurs("opus"), "", "audio/ogg")).import(provided, checkType = true))
         created(importer(typed(fleurs("wav"), "", "audio/x-wav")).import(provided, checkType = true))
-        assertEquals(0, probe.calls.get())
-        assertEquals(1, h.db.notes().noteCount())
-        assertEquals(1, noteDirs().size)
+        // No display name: the Uri's last segment gives the extension, an opaque id gives none.
+        val unnamed = object : ImportSource {
+            override fun describe(uri: Uri) = ImportSource.Description(null, null)
+
+            override fun open(uri: Uri) = fleurs("mp3").inputStream()
+        }
+        rejectedOpen(importer(unnamed).import(Uri.parse("content://x/document/msf%3A24"), checkType = true))
+        created(importer(unnamed).import(Uri.parse("content://x/share/voice.mp3"), checkType = true))
+        assertEquals(1, probe.calls.get())
+        assertEquals(2, h.db.notes().noteCount())
+        assertEquals(2, noteDirs().size)
     }
 
     @Test fun checkedOggMustBeAnOggOpusStream() = runTest {
