@@ -75,11 +75,11 @@ import io.codemyriad.cassini.ui.trash.TrashBackTo
 import io.codemyriad.cassini.ui.trash.TrashDialog
 import io.codemyriad.cassini.ui.voices.PersonUi
 import io.codemyriad.cassini.ui.voices.SavedVoicesDialog
-import java.time.LocalDate
-import java.time.LocalTime
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
+import java.time.LocalDate
+import java.time.LocalTime
 
 /** A banner with the board copy's arguments (features.md section 13). */
 internal fun banner(kind: BannerKind, args: BannerArgs = boardArgs(kind), announce: Boolean = false): BannerSpec =
