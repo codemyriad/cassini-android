@@ -17,15 +17,21 @@ import kotlinx.coroutines.launch
  * still opens the note, and a later deep link does not wait for the import. [ready] holds the note ids to open; the
  * navigation [take]s each one when it has opened it.
  */
-class ViewedImports(private val scope: CoroutineScope, private val import: (String) -> Deferred<ImportOutcome?>) {
+class ViewedImports(
+    private val scope: CoroutineScope,
+    private val import: (String, String?) -> Deferred<ImportOutcome?>,
+) {
     private val pending = MutableStateFlow<List<String>>(emptyList())
 
     val ready: StateFlow<List<String>> = pending.asStateFlow()
 
-    /** Imports [uri]; a failed import only shows its Library banner, and nothing opens. The job ends with it. */
-    fun start(uri: String): Job =
+    /**
+     * Imports [uri], with the intent's [mimeType] as the fallback type; a failed import only shows its Library banner,
+     * and nothing opens. The job ends with it.
+     */
+    fun start(uri: String, mimeType: String? = null): Job =
         scope.launch {
-            val noteId = when (val outcome = import(uri).await()) {
+            val noteId = when (val outcome = import(uri, mimeType).await()) {
                 is ImportOutcome.Created -> outcome.noteId
                 is ImportOutcome.Existing -> outcome.noteId
                 else -> null.also { Log.w(TAG, "Import of a viewed file ended with $outcome") }

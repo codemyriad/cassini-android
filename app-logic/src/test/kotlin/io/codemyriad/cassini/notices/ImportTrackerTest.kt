@@ -17,7 +17,7 @@ class ImportTrackerTest {
         val tracker = ImportTracker(
             scope = backgroundScope,
             describe = { it },
-            run = { uri ->
+            run = { uri, _ ->
                 entered.send(uri)
                 release.await()
             },
@@ -43,7 +43,7 @@ class ImportTrackerTest {
         val tracker = ImportTracker(
             scope = backgroundScope,
             describe = { throw IOException("name") },
-            run = { uri -> if (uri == "throw") throw IOException("open") else uri },
+            run = { uri, _ -> if (uri == "throw") throw IOException("open") else uri },
             rejected = { result -> if (result == "reject") ImportFailure(Failure.SPACE, 4096) else null },
             report = { message, _ -> reports += message },
             clock = { 7 },
@@ -69,7 +69,7 @@ class ImportTrackerTest {
         val tracker = ImportTracker(
             scope = backgroundScope,
             describe = { "$it.m4a" },
-            run = { uri ->
+            run = { uri, _ ->
                 entered.send(uri)
                 if (uri == "bad") "reject" else release.await()
             },
@@ -103,7 +103,7 @@ class ImportTrackerTest {
         val tracker = ImportTracker(
             scope = backgroundScope,
             describe = { it },
-            run = { it },
+            run = { uri, _ -> uri },
             rejected = { _: String -> null },
             report = { _, error -> throw AssertionError(error) },
             fallbackName = { "Imported audio" },
@@ -132,7 +132,7 @@ class ImportTrackerTest {
         val tracker = ImportTracker(
             scope = backgroundScope,
             describe = { it },
-            run = { CompletableDeferred<String>().await() },
+            run = { _, _ -> CompletableDeferred<String>().await() },
             rejected = { _: String -> null },
             report = { _, error -> throw AssertionError(error) },
         )
@@ -141,5 +141,17 @@ class ImportTrackerTest {
         job.cancelAndJoin()
         assertEquals(emptyList<ImportCard>(), tracker.state.value.cards)
         assertNull(tracker.state.value.failure)
+    }
+
+    @Test fun theIntentTypeReachesTheImport() = runTest {
+        val tracker = ImportTracker(
+            scope = backgroundScope,
+            describe = { it },
+            run = { uri, mimeType -> "$uri $mimeType" },
+            rejected = { _: String -> null },
+            report = { _, error -> throw AssertionError(error) },
+        )
+        assertEquals("a audio/ogg", tracker.start("a", "audio/ogg").await())
+        assertEquals("b null", tracker.start("b").await())
     }
 }

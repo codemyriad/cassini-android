@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicLong
  * The imports of the app (features.md sections 1 and 13.5): ACTION_VIEW and ACTION_SEND start one here, and the
  * Library's picker reports its files here, so the Library's import cards and the import errors show for either. An
  * import runs on [scope] and outlives the screen that started it. [describe] gives the display name of a uri for its
- * card, [run] imports it.
+ * card, [run] imports it with the MIME type its intent named (null when none).
  *
  * A new import clears the last failure ("shown until dismissed or the next import"); a failed one sets it.
  *
@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicLong
 class ImportTracker<T : Any>(
     private val scope: CoroutineScope,
     private val describe: suspend (String) -> String?,
-    private val run: suspend (String) -> T,
+    private val run: suspend (String, String?) -> T,
     private val rejected: (T) -> ImportFailure?,
     private val report: (String, Exception) -> Unit,
     private val clock: () -> Long = System::currentTimeMillis,
@@ -38,8 +38,11 @@ class ImportTracker<T : Any>(
 
     val state: StateFlow<ImportState> = mutable.asStateFlow()
 
-    /** Imports [uri]. The result is null when the import threw; that is shown as "Can't open this file". */
-    fun start(uri: String): Deferred<T?> = scope.async {
+    /**
+     * Imports [uri], whose intent named [mimeType]. The result is null when the import threw; that is shown as "Can't
+     * open this file".
+     */
+    fun start(uri: String, mimeType: String? = null): Deferred<T?> = scope.async {
         val name = try {
             describe(uri)
         } catch (cancelled: CancellationException) {
@@ -51,7 +54,7 @@ class ImportTracker<T : Any>(
         val card = ImportCard(ids.incrementAndGet(), name)
         mutable.update { ImportState(cards = it.cards.filterNot(ImportCard::failed) + card) }
         val outcome = try {
-            run(uri)
+            run(uri, mimeType)
         } catch (cancelled: CancellationException) {
             remove(card.id)
             throw cancelled

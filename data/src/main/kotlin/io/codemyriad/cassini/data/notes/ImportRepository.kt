@@ -106,15 +106,17 @@ class ImportLimits(
 /**
  * "Import audio" (docs/architecture.md, section 4.2; features.md sections 1 and 13.5). An import:
  *
- * 1. reads the display name, size and MIME type, and rejects LARGE above 4 GiB (`Limits.MAX_IMPORT_BYTES`); with
- *    `checkType` (a file the person picked, opened with or shared to Cassini) it also rejects OPEN a file that is
- *    not a decided type of the shared import-types contract ([ImportTypes.verdict], L-25);
- * 2. requires the size plus `Limits.MIN_FREE_BYTES` free, else SPACE with the bytes needed;
- * 3. copies the bytes into `notes/<newId>/source.tmp` while it hashes them (SHA-256) and enforces the cap and the free
- *    space, which also covers a provider that gave no size;
- * 4. with `checkType`, rejects OPEN an Opus/Ogg or compatibility-MIME input whose head is not an Ogg Opus stream
- *    ([ImportTypes.contentValidated]: Ogg video, Vorbis or FLAC-in-Ogg); then returns [ImportOutcome.Existing] when a
- *    live note has the same hash (a trashed one does not count);
+ * 1. reads the display name, size and MIME type; with `checkType` (a file the person picked, opened with or shared to
+ *    Cassini) it rejects OPEN a file that is not a decided type of the shared import-types contract
+ *    ([ImportTypes.verdict], L-25), and OPEN an Opus/Ogg or compatibility-MIME input whose first
+ *    [ImportTypes.MIN_PROBE_BYTES] are not an Ogg Opus stream ([ImportTypes.contentValidated]: Ogg video, Vorbis or
+ *    FLAC-in-Ogg). That head is read from the opened stream before anything is written, so a large Ogg video is
+ *    neither copied nor reported as too large or as needing space;
+ * 2. rejects LARGE above 4 GiB (`Limits.MAX_IMPORT_BYTES`), and requires the size plus `Limits.MIN_FREE_BYTES` free,
+ *    else SPACE with the bytes needed;
+ * 3. copies the bytes (the probed head first) into `notes/<newId>/source.tmp` in one pass while it hashes them
+ *    (SHA-256) and enforces the cap and the free space, which also covers a provider that gave no size;
+ * 4. returns [ImportOutcome.Existing] when a live note has the same hash (a trashed one does not count);
  * 5. classifies the file: Ogg Opus with Cassini metadata becomes `document.opus` (IMPORTED_DOCUMENT, verified now so
  *    the first open is cheap), other Ogg Opus `source.opus`, a 16-bit PCM WAV `source.wav` (any other WAV is
  *    rejected as WAV), and anything else `source.<ext>` when [probe] finds an audio track (else OPEN);
@@ -145,31 +147,46 @@ class ImportRepository(
 
     /**
      * [displayName] retains a staged archive/provider file's name without using it as a filesystem path. [checkType]
-     * applies the shared import-types contract (steps 1 and 4); entries of Cassini's own archives skip it, so a
-     * backup of an older note in another format still restores.
+     * applies the shared import-types contract (step 1); entries of Cassini's own archives skip it, so a backup of an
+     * older note in another format still restores. [mimeType] is the type the sending app put on its intent, used
+     * when the provider itself reports none.
      */
-    suspend fun import(uri: Uri, displayName: String? = null, checkType: Boolean = false): ImportOutcome =
+    suspend fun import(
+        uri: Uri,
+        displayName: String? = null,
+        checkType: Boolean = false,
+        mimeType: String? = null,
+    ): ImportOutcome =
         withContext(dispatchers.io) {
             val described = source.describe(uri)
-            val description = described.copy(displayName = displayName ?: described.displayName)
+            val description = described.copy(
+                displayName = displayName ?: described.displayName,
+                mimeType = described.mimeType ?: mimeType?.takeIf { it.isNotBlank() },
+            )
             val size = description.size?.takeIf { it >= 0 }
             val verdict = if (checkType) {
-                // Without a display name the Uri's last segment may still carry the extension (`…/voice.wav`); an
-                // opaque id (`msf:24`) has none. It only decides the type, never the title.
-                ImportTypes.verdict(description.displayName ?: uri.lastPathSegment, description.mimeType)
+                ImportTypes.verdict(typeName(description.displayName, uri), description.mimeType)
             } else {
                 ImportTypes.Verdict.ACCEPT
             }
             paths.notes.mkdirs()
+            val validate = verdict == ImportTypes.Verdict.VALIDATE
             when {
                 verdict == ImportTypes.Verdict.REJECT ->
                     ImportOutcome.Rejected(Failure.OPEN, "not an import type: ${description.mimeType}")
-                size != null && size > limits.maxBytes -> ImportOutcome.Rejected(Failure.LARGE, "size $size")
-                size != null && limits.usableSpace(paths.notes) < size + limits.minFreeBytes ->
-                    ImportOutcome.Rejected(Failure.SPACE, neededBytes = size + limits.minFreeBytes)
-                else -> importNew(uri, description, size, validate = verdict == ImportTypes.Verdict.VALIDATE)
+                // An input that needs the stream check is checked first (in the copy): an Ogg video is OPEN, not LARGE.
+                !validate && size != null -> beyondLimits(size) ?: importNew(uri, description, size, validate)
+                else -> importNew(uri, description, size, validate)
             }
         }
+
+    /** Step 2 before the copy: LARGE above the cap, SPACE when the file plus the free margin does not fit. */
+    private fun beyondLimits(size: Long): ImportOutcome.Rejected? = when {
+        size > limits.maxBytes -> ImportOutcome.Rejected(Failure.LARGE, "size $size")
+        limits.usableSpace(paths.notes) < size + limits.minFreeBytes ->
+            ImportOutcome.Rejected(Failure.SPACE, neededBytes = size + limits.minFreeBytes)
+        else -> null
+    }
 
     private suspend fun importNew(
         uri: Uri,
@@ -197,7 +214,7 @@ class ImportRepository(
         return outcome
     }
 
-    /** Steps 3 to 6 for the new note [id], whose directory exists; [validate] runs the stream check of step 4. */
+    /** Steps 3 to 6 for the new note [id], whose directory exists; [validate] runs the stream check of step 1. */
     private suspend fun stage(
         uri: Uri,
         id: String,
@@ -206,11 +223,10 @@ class ImportRepository(
         validate: Boolean,
     ): ImportOutcome {
         val tmp = File(paths.note(id), SOURCE_TMP)
-        return when (val copied = copy(uri, tmp, size)) {
+        return when (val copied = copy(uri, tmp, size, validate)) {
             is Copy.Failed -> copied.outcome
             is Copy.Done -> try {
-                notOggOpus(tmp, validate)
-                    ?: notes.liveWithSource(copied.sha256)?.let { ImportOutcome.Existing(it) }
+                notes.liveWithSource(copied.sha256)?.let { ImportOutcome.Existing(it) }
                     ?: when (val staged = locks.withNoteLock(id, dispatchers.io) { classify(tmp, description) }) {
                         is Classified.Rejected -> staged.outcome
                         is Classified.Audio -> insert(id, description.displayName, staged, copied.sha256)
@@ -255,11 +271,25 @@ class ImportRepository(
         class Failed(val outcome: ImportOutcome.Rejected) : Copy
     }
 
-    /** Step 3: copies the bytes into [tmp] with their SHA-256, enforcing the size cap and the free space. */
-    private suspend fun copy(uri: Uri, tmp: File, size: Long?): Copy = try {
+    /**
+     * Step 3: copies the bytes into [tmp] with their SHA-256, enforcing the size cap and the free space. With
+     * [validate] it first reads the head from the stream and runs the stream check and step 2 on it, before [tmp] is
+     * even created: a rejected input costs at most [ImportTypes.MIN_PROBE_BYTES] read and nothing written. The head
+     * is then written first, so the stream is read once (a pipe-backed provider cannot be reopened).
+     */
+    private suspend fun copy(uri: Uri, tmp: File, size: Long?, validate: Boolean): Copy = try {
         val input = source.open(uri) ?: throw FileNotFoundException("no stream")
         val digest = MessageDigest.getInstance("SHA-256")
-        val failed = input.useCancellable { tmp.outputStream().use { out -> pump(input, out, size, digest) } }
+        val failed = input.useCancellable {
+            val probed = if (validate) head(input) else ByteArray(0)
+            currentCoroutineContext().ensureActive()
+            when {
+                validate && !ImportTypes.contentValidated(probed) ->
+                    Copy.Failed(ImportOutcome.Rejected(Failure.OPEN, "not an Ogg Opus stream"))
+                validate && size != null -> beyondLimits(size)?.let(Copy::Failed)
+                else -> null
+            } ?: tmp.outputStream().use { out -> pump(input, out, size, digest, probed) }
+        }
         failed ?: Copy.Done(Sha256.hex(digest), tmp.length())
     } catch (error: FileNotFoundException) {
         currentCoroutineContext().ensureActive()
@@ -272,9 +302,18 @@ class ImportRepository(
         Copy.Failed(lowSpace(size, tmp.length()) ?: ImportOutcome.Rejected(Failure.OPEN, error.message))
     }
 
-    private suspend fun pump(input: InputStream, out: FileOutputStream, size: Long?, digest: MessageDigest): Copy.Failed? {
+    /** The copy loop of step 3; [head] is the part of the stream read already, written first. */
+    private suspend fun pump(
+        input: InputStream,
+        out: FileOutputStream,
+        size: Long?,
+        digest: MessageDigest,
+        head: ByteArray,
+    ): Copy.Failed? {
+        digest.update(head)
+        out.write(head)
         val buffer = ByteArray(BUFFER_BYTES)
-        var total = 0L
+        var total = head.size.toLong()
         var nextSpaceCheck = SPACE_CHECK_BYTES
         var failed: Copy.Failed? = null
         while (failed == null) {
@@ -373,12 +412,12 @@ class ImportRepository(
         )
 
         /**
-         * The note title from a display name: the name without its extension, trimmed and cut to 200 characters;
-         * [fallback] when nothing is left.
+         * The note title from a display name: the name without its extension ([ImportTypes.extensionOf]: a title
+         * such as "Voice 08.15" keeps its dot), trimmed and cut to 200 characters; [fallback] when nothing is left.
          */
         fun titleOf(displayName: String?, fallback: String = FALLBACK_TITLE): String {
             val name = displayName?.trim().orEmpty()
-            val stem = name.substringBeforeLast('.', name).ifBlank { name }
+            val stem = if (ImportTypes.extensionOf(name) != null) name.substringBeforeLast('.').ifBlank { name } else name
             return NoteTitles.fit(stem) ?: fallback
         }
 
@@ -394,16 +433,17 @@ class ImportRepository(
     }
 }
 
-/** Step 4: with [validate], OPEN when the head of [file] is not an Ogg Opus stream ([ImportTypes.contentValidated]). */
-private fun notOggOpus(file: File, validate: Boolean): ImportOutcome? =
-    if (validate && !ImportTypes.contentValidated(head(file))) {
-        ImportOutcome.Rejected(Failure.OPEN, "not an Ogg Opus stream")
-    } else {
-        null
-    }
+/**
+ * The name whose extension decides the type: the display name when it has one; else the Uri's last segment when that
+ * has one (`…/voice.wav`; an opaque id such as `msf:24` has none); else the display name. It never gives the title.
+ */
+private fun typeName(displayName: String?, uri: Uri): String? =
+    displayName?.takeIf { ImportTypes.extensionOf(it) != null }
+        ?: uri.lastPathSegment?.takeIf { ImportTypes.extensionOf(it) != null }
+        ?: displayName
 
-/** The first [ImportTypes.MIN_PROBE_BYTES] of [file], or all of it when it is shorter. */
-private fun head(file: File): ByteArray = file.inputStream().use { input ->
+/** The first [ImportTypes.MIN_PROBE_BYTES] of [input], or all of it when it is shorter; nothing more is read. */
+private fun head(input: InputStream): ByteArray {
     val head = ByteArray(ImportTypes.MIN_PROBE_BYTES)
     var n = 0
     while (n < head.size) {
@@ -411,5 +451,5 @@ private fun head(file: File): ByteArray = file.inputStream().use { input ->
         if (read < 0) break
         n += read
     }
-    head.copyOf(n)
+    return head.copyOf(n)
 }

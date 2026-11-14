@@ -36,7 +36,7 @@ class ImportGrantService : Service() {
         }
         running++
         val graph = (application as CassiniApplication).graph
-        graph.viewedImports.start(uri).invokeOnCompletion {
+        graph.viewedImports.start(uri, intent.type).invokeOnCompletion {
             main.post {
                 running--
                 stopIfIdle()
@@ -59,16 +59,16 @@ class ImportGrantService : Service() {
 
         /**
          * Imports [uri], which [context] (the activity that received it) can read now, with the grant passed on to
-         * the service.
+         * the service; [mimeType] is the type of the intent that brought it.
          * - The caller sent no read grant (a uri Cassini may not read for it): Android refuses to pass one on with a
          *   SecurityException. Nothing is imported, and the Library shows "Can't open this file", as for a file that
          *   cannot be read.
          * - The activity is in the foreground, so the start is allowed; if Android refuses it anyway, the import runs
          *   without the service and may lose the grant.
          */
-        fun start(context: Context, uri: String) {
+        fun start(context: Context, uri: String, mimeType: String? = null) {
             val intent = Intent(context, ImportGrantService::class.java)
-                .setData(uri.toUri())
+                .setDataAndType(uri.toUri(), mimeType)
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             val graph = (context.applicationContext as CassiniApplication).graph
             try {
@@ -78,7 +78,7 @@ class ImportGrantService : Service() {
                 graph.notices.imports.refuse(Failure.OPEN)
             } catch (refused: IllegalStateException) {
                 Log.w(TAG, "The import service could not start; importing without it", refused)
-                graph.viewedImports.start(uri)
+                graph.viewedImports.start(uri, mimeType)
             }
         }
     }

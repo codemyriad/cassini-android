@@ -81,21 +81,29 @@ class BulkTransfers(context: Context, private val graph: AppGraph) {
         start(total = uris.size, beginning = { graph.notices.imports.dismissFailure() }) { scratch ->
             var total = ImportSummary()
             for ((index, uri) in uris.withIndex()) {
+                // A cancelled selection imports nothing more: some failures return without suspending.
+                currentCoroutineContext().ensureActive()
                 mutable.value = mutable.value.copy(done = index + 1)
                 val previous = total
                 // Each picked file has its Library card (L-25, W4.5); one that added nothing keeps it (W4.6).
                 val card = graph.notices.imports.begin(importer.nameOf(uri).orEmpty())
-                val result = try {
-                    importer.importOne(uri, scratch) { partial ->
+                // Settled on every path: a cancel removes the card, an error leaves it failed; none stays "Importing…".
+                var cardFailure: Failure? = Failure.OPEN
+                try {
+                    val result = importer.importOne(uri, scratch) { partial ->
                         mutable.value = mutable.value.copy(summary = previous + partial)
                     }
+                    // Cancelled as the file failed: a cancelled transfer leaves no "Needs attention" card.
+                    currentCoroutineContext().ensureActive()
+                    cardFailure = cardFailure(result)
+                    total += result
+                    mutable.value = mutable.value.copy(summary = total)
                 } catch (cancelled: CancellationException) {
-                    graph.notices.imports.finish(card)
+                    cardFailure = null
                     throw cancelled
+                } finally {
+                    graph.notices.imports.finish(card, cardFailure)
                 }
-                graph.notices.imports.finish(card, cardFailure(result))
-                total += result
-                mutable.value = mutable.value.copy(summary = total)
             }
             TransferState(summary = total)
         }

@@ -86,10 +86,17 @@ class ImportTypesTest {
             Triple(null, "audio/mpeg", Verdict.ACCEPT),
             Triple(null, "audio/x-m4a", Verdict.ACCEPT),
             Triple(null, "audio/vnd.wave", Verdict.ACCEPT),
-            // Opus/Ogg requires its extension.
-            Triple(null, "audio/ogg", Verdict.REJECT),
-            Triple(null, "audio/opus", Verdict.REJECT),
+            // An extensionless content:// file under an Opus/Ogg MIME type: the stream check decides.
+            Triple(null, "audio/ogg", Verdict.VALIDATE),
+            Triple(null, "audio/opus", Verdict.VALIDATE),
+            Triple("Voice message", "audio/x-opus+ogg", Verdict.VALIDATE),
+            Triple(null, "application/ogg", Verdict.VALIDATE),
+            Triple(null, "video/ogg", Verdict.REJECT),
             Triple(null, null, Verdict.REJECT),
+            // A title with a dot but no extension does not hide the MIME type.
+            Triple("Recording 14.11.2026", "audio/mpeg", Verdict.ACCEPT),
+            Triple("Voice 08.15", "audio/opus", Verdict.VALIDATE),
+            Triple("Dr. Smith", "audio/mp4", Verdict.ACCEPT),
             Triple("clip.ogv", "audio/ogg", Verdict.REJECT),
             Triple("clip.oga", null, Verdict.REJECT),
             Triple("clip.spx", null, Verdict.REJECT),
@@ -169,6 +176,12 @@ class ImportTypesTest {
         assertEquals(null, ImportTypes.extensionOf("README"))
         assertEquals(null, ImportTypes.extensionOf(".hidden"))
         assertEquals(null, ImportTypes.extensionOf(null))
+        assertEquals(".3gp", ImportTypes.extensionOf("clip.3gp"))
+        assertEquals(null, ImportTypes.extensionOf("Recording 14.11.2026"))
+        assertEquals(null, ImportTypes.extensionOf("Voice 08.15"))
+        assertEquals(null, ImportTypes.extensionOf("Dr. Smith"))
+        assertEquals(null, ImportTypes.extensionOf("archive.toolong"))
+        assertEquals(null, ImportTypes.extensionOf("noextension."))
     }
 
     private fun opusHead(): ByteArray = "OpusHead".toByteArray() + byteArrayOf(1, 1, 0x38, 1, 0x80.toByte(), 0xbb.toByte(), 0, 0, 0, 0, 0)

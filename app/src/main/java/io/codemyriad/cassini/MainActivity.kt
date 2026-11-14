@@ -67,10 +67,11 @@ class MainActivity : AppCompatActivity() {
             stream = if (intent.action == Intent.ACTION_SEND) sharedStream(intent) else null,
             ownPackage = packageName,
             ownAuthorities = ownAuthorities,
+            type = intent.type,
         ) ?: return
         intent.putExtra(DeepLinks.EXTRA_HANDLED, true)
         // A file from another app: its read grant ends with this activity, so a service holds it for the import.
-        if (link is DeepLink.Import) ImportGrantService.start(this, link.uri) else links.trySend(link)
+        if (link is DeepLink.Import) ImportGrantService.start(this, link.uri, link.mimeType) else links.trySend(link)
     }
 
     /** The audio file of an ACTION_SEND from another app's share sheet. */

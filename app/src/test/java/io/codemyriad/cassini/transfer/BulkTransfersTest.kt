@@ -8,6 +8,7 @@ import androidx.core.net.toUri
 import androidx.test.core.app.ApplicationProvider
 import io.codemyriad.cassini.AppGraph
 import io.codemyriad.cassini.R
+import io.codemyriad.cassini.core.Failure
 import io.codemyriad.cassini.core.format.CassiniDocument
 import io.codemyriad.cassini.core.format.Transcript
 import io.codemyriad.cassini.core.format.Word
@@ -15,6 +16,8 @@ import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.data.CassiniDispatchers
 import io.codemyriad.cassini.data.notes.ImportSummary
 import io.codemyriad.cassini.library.LibraryViewModel
+import io.codemyriad.cassini.notices.ImportCard
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -30,7 +33,11 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
+import java.io.ByteArrayInputStream
 import java.io.File
+import java.io.FilterInputStream
+import java.util.concurrent.CountDownLatch
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
@@ -75,6 +82,51 @@ class BulkTransfersTest {
         val state = finished()
         assertEquals(ImportSummary(imported = 1, duplicates = 2, unsupported = 1), state.summary)
         assertEquals(1, graph.awaitCatalogue().notes.library().first().size)
+        // The new file and the archive of duplicates both added something: no card stays.
+        assertEquals(emptyList<ImportCard>(), cards())
+        assertNoStaging()
+    }
+
+    @Test fun aFileThatAddsNothingKeepsItsCardUntilTheNextSelection() = runBlocking {
+        val wav = File(fixtures, "fleurs-it-short.wav")
+        val flac = folder.newFile("take.flac").apply { writeBytes(wav.readBytes()) }
+        graph.transfers.import(listOf(flac.toUri(), wav.toUri()))
+        assertEquals(1, finished().summary?.imported)
+        // The undecided type is refused by the import-types check and keeps "Needs attention"; the WAV's card went.
+        assertEquals(listOf("take.flac" to Failure.OPEN), cards().map { it.name to it.failure })
+        // The same WAV again is a duplicate: it clears the earlier failed cards and leaves none of its own.
+        graph.transfers.import(listOf(wav.toUri()))
+        assertEquals(1, finished().summary?.duplicates)
+        assertEquals(emptyList<ImportCard>(), cards())
+    }
+
+    @Test fun aCancelledSelectionLeavesNoCards() = runBlocking {
+        withTimeout(20_000) { graph.ready.await() }
+        val wav = File(fixtures, "fleurs-it-short.wav").readBytes()
+        val entered = CompletableDeferred<Unit>()
+        val release = CountDownLatch(1)
+        val first = "content://test.blocking/a.wav".toUri()
+        val second = "content://test.blocking/b.wav".toUri()
+        val resolver = shadowOf(context.contentResolver)
+        // The first file stalls in its first read; the second has no stream and fails at once.
+        resolver.registerInputStreamSupplier(first) {
+            object : FilterInputStream(ByteArrayInputStream(wav)) {
+                override fun read(b: ByteArray, off: Int, len: Int): Int {
+                    entered.complete(Unit)
+                    release.await()
+                    return super.read(b, off, len)
+                }
+            }
+        }
+        resolver.registerInputStreamSupplier(second) { null }
+        graph.transfers.import(listOf(first, second))
+        withTimeout(20_000) { entered.await() }
+        assertEquals(1, cards().size)
+        graph.transfers.cancel()
+        release.countDown()
+        assertTrue(finished().cancelled)
+        assertEquals(emptyList<ImportCard>(), cards())
+        assertEquals(0, graph.awaitCatalogue().database.notes().noteCount())
         assertNoStaging()
     }
 
@@ -128,6 +180,7 @@ class BulkTransfersTest {
         val cancelled = finished()
         assertTrue(cancelled.cancelled)
         assertEquals(0, cancelled.summary?.imported ?: 0)
+        assertEquals(emptyList<ImportCard>(), cards())
         assertNoStaging()
     }
 
@@ -152,6 +205,8 @@ class BulkTransfersTest {
     private suspend fun finished(): BulkTransfers.TransferState = withTimeout(20_000) {
         graph.transfers.state.first { !it.running }
     }
+
+    private fun cards(): List<ImportCard> = graph.notices.imports.state.value.cards
 
     private fun assertNoStaging() {
         assertTrue(File(paths.cache, "bulk-transfers").listFiles().orEmpty().isEmpty())

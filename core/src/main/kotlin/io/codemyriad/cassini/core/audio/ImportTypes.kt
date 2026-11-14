@@ -94,7 +94,9 @@ object ImportTypes {
      * null. Opus/Ogg needs the extension `.opus` or `.ogg` (contract rule) and always the stream check: `.ogg` is
      * ambiguous and `audio/ogg` is a compatibility type, so validating every Opus/Ogg input is the simple safe case.
      * Any input reported under a compatibility MIME type is validated, whatever its extension. A file without an
-     * extension is accepted on an MP3, M4A or WAV MIME type only.
+     * extension is accepted on an MP3, M4A or WAV MIME type. On Android a `content://` file often has no extension at
+     * all (a messaging app's voice note, `content://…/part/1234`): one reported under an Opus/Ogg MIME type is
+     * validated, so the stream check alone decides; a wrong extension (`.ogv`, `.oga`, `.flac`…) is still rejected.
      */
     fun verdict(displayName: String?, mimeType: String?): Verdict {
         val extension = extensionOf(displayName)
@@ -106,6 +108,7 @@ object ImportTypes {
             type != null -> if (mime in OPUS_OGG.compatibilityMimeTypes) Verdict.VALIDATE else Verdict.ACCEPT
             mime != null && DECIDED.any { it != OPUS_OGG && (mime in it.mimeTypes || mime in it.androidMimeTypes) } ->
                 Verdict.ACCEPT
+            mime != null && mime in OPUS_OGG_MIME_TYPES -> Verdict.VALIDATE
             else -> Verdict.REJECT
         }
     }
@@ -136,12 +139,23 @@ object ImportTypes {
             startsWith(head, second.payload, end, OPUS_TAGS)
     }
 
-    /** The lower-case extension of [displayName] with its dot, or null when the name has none. */
+    /**
+     * The lower-case extension of [displayName] with its dot, or null when the name has none. Only a plausible file
+     * extension counts: one to five ASCII letters or digits with at least one letter. A provider's title without an
+     * extension may still have a dot ("Recording 14.11.2026", "Voice 08.15", "Dr. Smith"); that is no extension.
+     */
     fun extensionOf(displayName: String?): String? {
         val name = displayName?.trim()?.substringAfterLast('/')?.substringAfterLast('\\') ?: return null
         val dot = name.lastIndexOf('.')
-        return if (dot <= 0 || dot == name.length - 1) null else name.substring(dot).lowercase(Locale.ROOT)
+        val extension = if (dot <= 0) null else name.substring(dot + 1).lowercase(Locale.ROOT)
+        return extension?.takeIf { EXTENSION.matches(it) }?.let { ".$it" }
     }
+
+    /** Every MIME type an Opus/Ogg input may arrive under, compatibility types included. */
+    private val OPUS_OGG_MIME_TYPES: Set<String> =
+        (OPUS_OGG.mimeTypes + OPUS_OGG.androidMimeTypes + OPUS_OGG.compatibilityMimeTypes).toSet()
+
+    private val EXTENSION = Regex("(?=[a-z0-9]*[a-z])[a-z0-9]{1,5}")
 
     private fun normalizedMime(mimeType: String?): String? =
         mimeType?.substringBefore(';')?.trim()?.lowercase(Locale.ROOT)?.takeIf { it.isNotEmpty() }
