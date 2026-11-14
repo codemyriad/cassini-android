@@ -60,12 +60,11 @@ class ImportedProvenanceTest {
     }
 
     @Test fun theHeaderSubtitleEndsWithTheCatalogProvenance() {
-        assertEquals("Today, 10:02 · 48:13", subtitle(null))
-        assertEquals("Today, 10:02 · 48:13 · Imported", subtitle(ProvenanceUi.IMPORTED))
-        assertEquals(
-            "Today, 10:02 · 48:13 · Imported · Transcribed on another device",
-            subtitle(ProvenanceUi.IMPORTED_OTHER_DEVICE),
-        )
+        // The clock follows the device (12-hour under en-US); the provenance words follow the plain subtitle.
+        val plain = subtitle(null)
+        assertTrue(plain, plain.startsWith("Today, ") && plain.endsWith(" · 48:13"))
+        assertEquals("$plain · Imported", subtitle(ProvenanceUi.IMPORTED))
+        assertEquals("$plain · Imported · Transcribed on another device", subtitle(ProvenanceUi.IMPORTED_OTHER_DEVICE))
         assertEquals("Date unknown · 48:13 · Imported", subtitle(ProvenanceUi.IMPORTED, DayLabel.Unknown))
     }
 
@@ -73,7 +72,8 @@ class ImportedProvenanceTest {
     @Config(qualifiers = "it-rIT")
     fun theItalianSubtitleUsesTheCatalogWords() {
         assertTrue(subtitle(ProvenanceUi.IMPORTED).endsWith(" · Importata"))
-        assertTrue(subtitle(ProvenanceUi.IMPORTED_OTHER_DEVICE).endsWith(" · Importata · Trascritta su un altro dispositivo"))
+        val otherDevice = subtitle(ProvenanceUi.IMPORTED_OTHER_DEVICE)
+        assertTrue(otherDevice, otherDevice.endsWith(" · Importata · Trascritta su un altro dispositivo"))
     }
 
     private fun description(): String =

@@ -126,9 +126,9 @@ object NoteMapping {
 
     private fun arrivedWithFile(note: NoteEntity, variant: VariantEntity): Boolean {
         val document = note.origin == Origin.IMPORTED_DOCUMENT && note.audioKind == AudioKind.DOCUMENT
-        if (!document || !variant.readable || variant.wordCount == 0) return false
-        val created = variant.createdAtUtc ?: return true
-        return instant(created)?.let { it.toEpochMilli() < note.addedAt } ?: false
+        val transcript = document && variant.readable && variant.wordCount > 0
+        val created = variant.createdAtUtc
+        return transcript && (created == null || instant(created)?.let { it.toEpochMilli() < note.addedAt } == true)
     }
 
     /** The trust chip of a document state. */

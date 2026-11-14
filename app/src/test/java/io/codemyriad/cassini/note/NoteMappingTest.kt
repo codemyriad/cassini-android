@@ -51,7 +51,8 @@ class NoteMappingTest {
         val plain = note.copy(origin = Origin.IMPORTED_AUDIO, audioKind = AudioKind.PLAIN)
         assertEquals(ProvenanceUi.IMPORTED, NoteMapping.provenance(plain, null))
         // Imported audio transcribed on this phone keeps Imported without the attribution.
-        assertEquals(ProvenanceUi.IMPORTED, NoteMapping.provenance(note.copy(origin = Origin.IMPORTED_AUDIO), variant))
+        val transcribedHere = note.copy(origin = Origin.IMPORTED_AUDIO)
+        assertEquals(ProvenanceUi.IMPORTED, NoteMapping.provenance(transcribedHere, variant))
     }
 
     @Test fun anImportedCassiniFileWithItsOwnTranscriptWasTranscribedElsewhere() {
@@ -60,7 +61,8 @@ class NoteMappingTest {
         val added = java.time.Instant.parse(requireNotNull(variant.createdAtUtc)).toEpochMilli()
         val note = details.note.copy(origin = Origin.IMPORTED_DOCUMENT, addedAt = added + 1)
         assertEquals(ProvenanceUi.IMPORTED_OTHER_DEVICE, NoteMapping.provenance(note, variant))
-        assertEquals(ProvenanceUi.IMPORTED_OTHER_DEVICE, NoteMapping.provenance(note, variant.copy(createdAtUtc = null)))
+        val undated = variant.copy(createdAtUtc = null)
+        assertEquals(ProvenanceUi.IMPORTED_OTHER_DEVICE, NoteMapping.provenance(note, undated))
         // A variant written here after the import, an empty transcript (D12) or an unreadable one is not.
         assertEquals(ProvenanceUi.IMPORTED, NoteMapping.provenance(note.copy(addedAt = added), variant))
         assertEquals(ProvenanceUi.IMPORTED, NoteMapping.provenance(note, variant.copy(wordCount = 0)))
