@@ -328,7 +328,7 @@ class SheetBehaviourTest {
         )
         setThemed { NoteScreen(state, onEvent = { events += it }) }
         rule.onNodeWithText("Start over?").assertExists()
-        rule.onNodeWithText("Start over").performScrollTo().performClick()
+        rule.onNodeWithText("Start over").performClick()
         rule.onNodeWithText("Transcribe again").performScrollTo().performClick()
         rule.runOnIdle {
             assertEquals(
