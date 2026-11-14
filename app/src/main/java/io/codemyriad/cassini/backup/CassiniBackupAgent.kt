@@ -27,16 +27,24 @@ class CassiniBackupAgent : BackupAgent() {
         LibraryBackup(this, paths, File(noBackupFilesDir, "restores"))
     }
 
+    /** Whether the last [onFullBackup] went to the cloud; null before one ran on this instance. */
+    private var cloudRun: Boolean? = null
+
     override fun onFullBackup(data: FullBackupDataOutput) {
         requireQuiescent()
-        val flags = if (Build.VERSION.SDK_INT >= BackupChoices.TRANSPORT_FLAGS_API) data.transportFlags else 0
-        if (!choices.readBlocking().permits(Build.VERSION.SDK_INT, flags, BuildConfig.CLOUD_BACKUP_ENABLED)) {
-            // Never emit library bytes. XML separately excludes cloud; Binder exceptions do not guarantee transport failure.
+        val api = Build.VERSION.SDK_INT
+        val flags = if (api >= BackupChoices.TRANSPORT_FLAGS_API) data.transportFlags else 0
+        val current = choices.readBlocking()
+        if (!current.permits(api, flags, BuildConfig.CLOUD_BACKUP_ENABLED)) {
+            // Never emit library bytes. Binder exceptions do not guarantee transport failure.
             throw IOException("This backup transport is disabled")
         }
-        val (manifest, inventory) = library.prepare()
+        val cloud = !BackupChoices.isTransfer(api, flags)
+        cloudRun = cloud
+        // "Include saved voices in backups" off leaves every voiceprint out of both channels (D98).
+        val (manifest, inventory) = library.prepare(includeVoices = current.voices)
         // Let fullBackupFile account for every tar entry in the platform's measure-only preflight.
-        runBlocking(Dispatchers.IO) { choices.recordQuotaExceeded(false) }
+        runBlocking(Dispatchers.IO) { choices.recordQuotaExceeded(false, cloud) }
         for (entry in manifest.files) fullBackupFile(File(filesDir, entry.path), data)
         // Completion metadata is last; an interrupted stream cannot claim a complete dataset.
         fullBackupFile(inventory, data)
@@ -69,7 +77,7 @@ class CassiniBackupAgent : BackupAgent() {
     override fun onRestoreFinished() {
         requireQuiescent()
         try {
-            // Restore is authorized by Android, independently of this new device's default-off cloud choice.
+            // Restore is authorized by Android, independently of this new device's own backup choices.
             library.finishRestore()
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
             abandon(error)
@@ -78,7 +86,12 @@ class CassiniBackupAgent : BackupAgent() {
     }
 
     override fun onQuotaExceeded(backupDataBytes: Long, quotaBytes: Long) {
-        runBlocking(Dispatchers.IO) { choices.recordQuotaExceeded(true) }
+        // Android calls this on the agent that measured the dataset; without a measured run, warn on both channels.
+        val cloud = cloudRun
+        runBlocking(Dispatchers.IO) {
+            if (cloud != false) choices.recordQuotaExceeded(true, cloud = true)
+            if (cloud != true) choices.recordQuotaExceeded(true, cloud = false)
+        }
     }
 
     override fun onBackup(oldState: ParcelFileDescriptor?, data: BackupDataOutput, newState: ParcelFileDescriptor) {

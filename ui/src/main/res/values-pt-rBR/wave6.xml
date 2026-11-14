@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated from cassini-ux 31973ff9784fcc66c1c7993b903a336e8f2c1432; do not edit. -->
+<resources>
+    <string name="ui_backup_heading">Transferência e backup</string>
+    <string name="ui_backup_cloud_title">Backup criptografado na nuvem</string>
+    <string name="ui_backup_cloud_body_on">As reuniões são incluídas nos backups do seu celular e quando você muda para um novo celular. Os modelos de voz baixados não entram no backup; o novo celular os baixa novamente.</string>
+    <string name="ui_backup_cloud_body_off">As reuniões não são adicionadas aos backups na nuvem. Desativar esta opção interrompe os próximos backups, mas não exclui os backups já guardados na sua conta na nuvem.</string>
+    <string name="ui_backup_phone_only_body">As reuniões e as vozes salvas ficam apenas neste celular. Elas não entram em backups nem são copiadas para um novo celular; para guardar uma cópia, use “Exportar tudo como ZIP”.</string>
+    <string name="ui_backup_voices_title">Incluir as vozes salvas nos backups</string>
+    <string name="ui_backup_voices_subtitle">As vozes salvas são impressões de voz criadas no aparelho para as pessoas que você nomeou, para que um celular novo ou restaurado continue reconhecendo cada uma automaticamente. Desative esta opção para manter as impressões de voz apenas neste celular.</string>
+    <string name="ui_backup_voices_subtitle_off">As vozes salvas ficam apenas neste celular: elas não entram em backups nem são copiadas para um novo celular. Em um celular novo ou restaurado, você precisará nomear os locutores novamente.</string>
+    <string name="ui_backup_learn_more">Saiba mais</string>
+    <string name="ui_backup_info_title">Transferência e backup</string>
+    <string name="ui_backup_info_what_heading">O que entra no backup</string>
+    <string name="ui_backup_info_what_body">Suas reuniões, transcrições e nomes de locutores entram no backup enquanto ele estiver ativado. As vozes salvas são incluídas enquanto “Incluir as vozes salvas nos backups” estiver ativado. Os modelos de voz baixados nunca entram no backup; o seu novo celular os baixa novamente.</string>
+    <string name="ui_backup_info_android_heading">Backup na nuvem do Android</string>
+    <string name="ui_backup_info_android_body">Quando o backup do Android (Google ou Seedvault) está ativado, os backups seguem a criptografia do seu celular e os ajustes do provedor de backup. O Android limita o backup na nuvem de cada aplicativo a 25 MB; para bibliotecas maiores, use “Exportar tudo como ZIP”.</string>
+    <string name="ui_backup_info_over_quota">Suas reuniões ultrapassam o limite de 25 MB do backup na nuvem do Android. Use “Exportar tudo como ZIP” para guardar uma cópia completa.</string>
+    <string name="ui_backup_info_manual_heading">Uma cópia que você mesmo guarda</string>
+    <string name="ui_backup_card_title">Manter apenas neste celular</string>
+    <string name="ui_backup_card_body">Suas reuniões e vozes salvas são incluídas no backup criptografado na nuvem e copiadas quando você muda para um novo celular, para que você não as perca se este celular for perdido ou substituído.</string>
+    <string name="ui_backup_card_action">Manter apenas neste celular</string>
+    <string name="ui_backup_card_dismiss">Manter o backup ativado</string>
+    <string name="ui_backup_card_close">Fechar aviso de backup</string>
+    <string name="ui_settings_transfer_body_off_backup_on">Nada é copiado diretamente para um novo celular. As reuniões do seu backup na nuvem voltam quando você o restaura em um novo celular.</string>
+    <string name="ui_voices_privacy_phone">As impressões de voz são criadas neste celular e nunca são incluídas em arquivos exportados ou compartilhados. Só os nomes que você escolhe são incluídos.</string>
+</resources>

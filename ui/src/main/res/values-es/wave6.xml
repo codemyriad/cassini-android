@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated from cassini-ux 31973ff9784fcc66c1c7993b903a336e8f2c1432; do not edit. -->
+<resources>
+    <string name="ui_backup_heading">Traslado y copia de seguridad</string>
+    <string name="ui_backup_cloud_title">Copia de seguridad cifrada en la nube</string>
+    <string name="ui_backup_cloud_body_on">Las reuniones se incluyen en las copias de seguridad de tu teléfono y al cambiar a un teléfono nuevo. Los modelos de voz descargados no se copian; el teléfono nuevo los descarga otra vez.</string>
+    <string name="ui_backup_cloud_body_off">Las reuniones no se añaden a las copias de seguridad en la nube. Desactivar esta opción detiene las próximas copias de seguridad; no elimina las que ya están guardadas en tu cuenta en la nube.</string>
+    <string name="ui_backup_phone_only_body">Las reuniones y las voces guardadas se quedan solo en este teléfono. No se incluyen en copias de seguridad ni se copian a un teléfono nuevo; para guardar una copia, usa “Exportar todo como ZIP”.</string>
+    <string name="ui_backup_voices_title">Incluir las voces guardadas en las copias de seguridad</string>
+    <string name="ui_backup_voices_subtitle">Las voces guardadas son huellas de voz creadas en el dispositivo para las personas a las que has puesto nombre, de modo que un teléfono nuevo o restaurado siga reconociéndolas automáticamente. Desactívalo para mantener las huellas de voz solo en este teléfono.</string>
+    <string name="ui_backup_voices_subtitle_off">Las voces guardadas se quedan solo en este teléfono: no se incluyen en copias de seguridad ni se copian a un teléfono nuevo. En un teléfono nuevo o restaurado tendrás que volver a poner nombre a los hablantes.</string>
+    <string name="ui_backup_learn_more">Más información</string>
+    <string name="ui_backup_info_title">Traslado y copia de seguridad</string>
+    <string name="ui_backup_info_what_heading">Qué se incluye en la copia</string>
+    <string name="ui_backup_info_what_body">Tus reuniones, transcripciones y nombres de hablantes se guardan mientras la copia de seguridad está activa. Las voces guardadas se incluyen mientras “Incluir las voces guardadas en las copias de seguridad” está activo. Los modelos de voz descargados nunca se copian; tu teléfono nuevo los descarga otra vez.</string>
+    <string name="ui_backup_info_android_heading">Copia en la nube de Android</string>
+    <string name="ui_backup_info_android_body">Cuando la copia de seguridad de Android (Google o Seedvault) está activa, las copias siguen el cifrado de tu teléfono y los ajustes de tu proveedor de copias. Android limita las copias en la nube de cada aplicación a 25 MB; para bibliotecas más grandes, usa “Exportar todo como ZIP”.</string>
+    <string name="ui_backup_info_over_quota">Tus reuniones superan el límite de 25 MB de la copia en la nube de Android. Usa “Exportar todo como ZIP” para guardar una copia completa.</string>
+    <string name="ui_backup_info_manual_heading">Una copia que guardas tú</string>
+    <string name="ui_backup_card_title">Mantener solo en este teléfono</string>
+    <string name="ui_backup_card_body">Tus reuniones y voces guardadas se incluyen en la copia de seguridad cifrada en la nube y se copian al cambiar a un teléfono nuevo, para que no las pierdas si pierdes o cambias este teléfono.</string>
+    <string name="ui_backup_card_action">Mantener solo en este teléfono</string>
+    <string name="ui_backup_card_dismiss">Mantener la copia activa</string>
+    <string name="ui_backup_card_close">Cerrar aviso de copia de seguridad</string>
+    <string name="ui_settings_transfer_body_off_backup_on">No se copia nada directamente a un teléfono nuevo. Las reuniones de tu copia de seguridad en la nube vuelven cuando la restauras en un teléfono nuevo.</string>
+    <string name="ui_voices_privacy_phone">Las huellas de voz se crean en este teléfono y nunca se incluyen en los archivos exportados o compartidos. Solo se incluyen los nombres que eliges.</string>
+</resources>

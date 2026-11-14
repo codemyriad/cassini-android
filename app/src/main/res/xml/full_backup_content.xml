@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- API26–27 have no declarative device-transfer flag. Fail closed in every domain. -->
+<!-- API 26–27 have no transport flags, so neither cloud nor transfer can be told apart. Fail closed in every domain. -->
 <full-backup-content>
     <exclude domain="root" path="." />
     <exclude domain="file" path="." />

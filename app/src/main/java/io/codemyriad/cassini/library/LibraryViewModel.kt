@@ -282,6 +282,7 @@ class LibraryViewModel(
             // The first-run hero replaces the empty-Library banner (L-27); until the choices are read, neither shows.
             banners = if (empty) notices.filterNot { it.kind == BannerKind.LIB_EMPTY }.toImmutableList() else notices,
             hero = live.backupReach?.takeIf { empty }?.let(LibraryMapping::hero),
+            backupCard = live.backupReach?.card == true && !searching,
             sections = mapped.sections,
             results = mapped.results,
             snackbar = snackbar,
@@ -325,6 +326,9 @@ class LibraryViewModel(
             is LibraryEvent.BannerAction -> bannerAction(event.id, event.action)
             is LibraryEvent.DismissBanner -> kindOf(event.id)?.let(ports::dismissNotice)
             LibraryEvent.Undo -> undo()
+            // A failed write keeps the card: the choices did not change (BUG-CLASSES: no optimistic state).
+            LibraryEvent.KeepOnPhoneOnly -> launch { ports.keepOnPhoneOnly() }
+            LibraryEvent.DismissBackupCard -> launch { ports.dismissBackupCard() }
             LibraryEvent.SnackbarTimeout -> snackbar.value = null
             is LibraryEvent.SheetAction -> sheetId.value?.let { id -> launch { sheetAction(id, event.action) } }
             is LibraryEvent.Export -> {

@@ -22,8 +22,8 @@ android {
         applicationId = "io.codemyriad.cassini.talk"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        // D97: cloud backup stays unavailable until the product decision on Android's 25 MB limit.
-        buildConfigField("boolean", "CLOUD_BACKUP_ENABLED", "false")
+        // D98 (D-980): encrypted cloud backup is offered and on by default; the agent enforces the choices.
+        buildConfigField("boolean", "CLOUD_BACKUP_ENABLED", "true")
         versionCode = 18
         versionName = "0.4.2-beta.3"
         if (!abiApks) ndk { abiFilters += listOf("arm64-v8a", "x86_64") }

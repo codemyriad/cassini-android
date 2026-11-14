@@ -73,7 +73,12 @@ data class BackupManifest(val files: List<Entry>) {
             return parts.size == 2 && parts[0] == "notes" && id.matches(parts[1])
         }
 
-        fun create(root: File): BackupManifest = BackupManifest(inventory(root))
+        /**
+         * The library inventory. Without [includeVoices] ("Include saved voices in backups" off, D98) no file under
+         * `voices/` is listed, so neither the saved people nor any note's voiceprints leave the phone.
+         */
+        fun create(root: File, includeVoices: Boolean = true): BackupManifest =
+            BackupManifest(inventory(root, includeVoices))
 
         fun parse(text: String): BackupManifest {
             require(text.toByteArray(Charsets.UTF_8).size <= MAX_MANIFEST_BYTES) { "Oversized backup inventory" }
@@ -95,9 +100,10 @@ data class BackupManifest(val files: List<Entry>) {
             return BackupManifest(entries.sortedBy { it.path })
         }
 
-        private fun inventory(root: File): List<Entry> {
+        private fun inventory(root: File, includeVoices: Boolean): List<Entry> {
             val entries = ArrayList<Entry>()
-            for (name in listOf("cassini.db", "notes", "voices")) {
+            val roots = if (includeVoices) listOf("cassini.db", "notes", "voices") else listOf("cassini.db", "notes")
+            for (name in roots) {
                 val start = File(root, name).toPath()
                 if (Files.notExists(start, LinkOption.NOFOLLOW_LINKS)) continue
                 Files.walk(start).use { stream ->

@@ -62,6 +62,12 @@ sealed interface LibraryEvent {
 
     data object Undo : LibraryEvent
 
+    /** The backup card's "Keep on this phone only" (D98). */
+    data object KeepOnPhoneOnly : LibraryEvent
+
+    /** The backup card's "Keep backup on" or its close button. */
+    data object DismissBackupCard : LibraryEvent
+
     data object SnackbarTimeout : LibraryEvent
 
     /** A row of the Note actions sheet. */

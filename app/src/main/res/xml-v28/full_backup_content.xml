@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- API28–30: includes require D2D, so cloud never selects notes or saved voices. -->
+<!-- API 28–30: the library ceiling for both channels (D98). requireFlags would AND the flags, so the agent decides:
+     device-to-device transfer follows the transfer choice, cloud needs client-side encryption and the cloud choice. -->
 <full-backup-content>
-    <include domain="file" path="cassini.db" requireFlags="deviceToDeviceTransfer" />
-    <include domain="file" path="notes/" requireFlags="deviceToDeviceTransfer" />
-    <include domain="file" path="voices/" requireFlags="deviceToDeviceTransfer" />
-    <include domain="file" path="backup/manifest.json" requireFlags="deviceToDeviceTransfer" />
+    <include domain="file" path="cassini.db" />
+    <include domain="file" path="notes/" />
+    <include domain="file" path="voices/" />
+    <include domain="file" path="backup/manifest.json" />
 </full-backup-content>

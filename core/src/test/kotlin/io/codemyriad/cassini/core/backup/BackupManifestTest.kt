@@ -56,6 +56,22 @@ class BackupManifestTest {
         assertFalse(File(target, "settings.preferences_pb").exists())
     }
 
+    @Test fun savedVoicesOffLeavesEveryVoiceprintOutOfTheSnapshot() {
+        val source = folder.newFolder()
+        put(source, "cassini.db", "synthetic catalogue")
+        put(source, "notes/note-1/document.opus", "synthetic note")
+        val voice = Voice("voice-1", "Ada", "synthetic-model", floatArrayOf(1f, 0f, 0f), 1, 4.0, 1, 1)
+        put(source, "voices/people.json", VoiceCodec.encode(listOf(voice)))
+        put(source, "voices/generation", "1")
+        put(source, "voices/notes/note-1.json", "synthetic note voiceprints")
+        val manifest = BackupManifest.create(source, includeVoices = false)
+        assertEquals(setOf("cassini.db", "notes/note-1/document.opus"), manifest.files.mapTo(HashSet()) { it.path })
+        val target = staged(source, manifest)
+        BackupManifest.parse(manifest.json()).verify(target)
+        assertFalse(File(target, "voices").exists())
+        assertTrue(BackupManifest.create(source).files.any { it.path == "voices/notes/note-1.json" })
+    }
+
     @Test fun missingTruncatedOrExtraFilesNeverPassCompletenessValidation() {
         val source = folder.newFolder()
         put(source, "notes/n/document.opus", "original audio")

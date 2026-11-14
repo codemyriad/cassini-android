@@ -132,9 +132,13 @@ internal object VariantFixtures {
 
     val library: Map<String, LibraryUiState> = mapOf(
         "library-loading" to LibraryUiState(loading = true),
-        // L-27 first-run hero (D-975): the shipped state (cloud backup off, transfer on) and the D98 backup-on state.
+        // L-27 first-run hero (D-975): cloud backup off with transfer on, and the D98 default (backup on), where the
+        // once-only "Keep them on this phone only" card (D-980) shows above the hero.
         "library-empty" to LibraryUiState(hero = FirstRunHeroUi(false, FirstRunPrivacy.PROCESSING)),
-        "library-empty-backup" to LibraryUiState(hero = FirstRunHeroUi(true, FirstRunPrivacy.WITH_BACKUP)),
+        "library-empty-backup" to LibraryUiState(
+            hero = FirstRunHeroUi(true, FirstRunPrivacy.WITH_BACKUP),
+            backupCard = true,
+        ),
         "library-empty-phone-only" to LibraryUiState(hero = FirstRunHeroUi(false, FirstRunPrivacy.PHONE_ONLY)),
         "library-no-results" to b.library.copy(
             query = "invoice",

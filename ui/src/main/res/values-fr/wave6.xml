@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated from cassini-ux 31973ff9784fcc66c1c7993b903a336e8f2c1432; do not edit. -->
+<resources>
+    <string name="ui_backup_heading">Transfert et sauvegarde</string>
+    <string name="ui_backup_cloud_title">Sauvegarde cloud chiffrée</string>
+    <string name="ui_backup_cloud_body_on">Les réunions sont incluses dans les sauvegardes de votre téléphone et lorsque vous passez à un nouveau téléphone. Les modèles vocaux téléchargés ne sont pas sauvegardés ; le nouveau téléphone les télécharge à nouveau.</string>
+    <string name="ui_backup_cloud_body_off">Les réunions ne sont pas ajoutées aux sauvegardes cloud. Désactiver cette option arrête les prochaines sauvegardes ; cela ne supprime pas celles déjà stockées dans votre compte cloud.</string>
+    <string name="ui_backup_phone_only_body">Les réunions et les voix mémorisées restent uniquement sur ce téléphone. Elles ne sont ni sauvegardées ni copiées vers un nouveau téléphone ; pour en garder une copie, utilisez « Tout exporter en ZIP ».</string>
+    <string name="ui_backup_voices_title">Inclure les voix mémorisées dans les sauvegardes</string>
+    <string name="ui_backup_voices_subtitle">Les voix mémorisées sont les empreintes vocales créées sur l’appareil pour les personnes que vous avez nommées, afin qu’un téléphone neuf ou restauré continue à les reconnaître automatiquement. Désactivez cette option pour garder les empreintes vocales uniquement sur ce téléphone.</string>
+    <string name="ui_backup_voices_subtitle_off">Les voix mémorisées restent uniquement sur ce téléphone : elles ne sont ni sauvegardées ni copiées vers un nouveau téléphone. Sur un téléphone neuf ou restauré, vous devrez nommer à nouveau les intervenants.</string>
+    <string name="ui_backup_learn_more">En savoir plus</string>
+    <string name="ui_backup_info_title">Transfert et sauvegarde</string>
+    <string name="ui_backup_info_what_heading">Ce qui est sauvegardé</string>
+    <string name="ui_backup_info_what_body">Vos réunions, leurs transcriptions et les noms des intervenants sont sauvegardés tant que la sauvegarde est activée. Les voix mémorisées sont incluses tant que « Inclure les voix mémorisées dans les sauvegardes » est activé. Les modèles vocaux téléchargés ne sont jamais sauvegardés ; votre nouveau téléphone les télécharge à nouveau.</string>
+    <string name="ui_backup_info_android_heading">Sauvegarde cloud Android</string>
+    <string name="ui_backup_info_android_body">Lorsque la sauvegarde Android (Google ou Seedvault) est activée, les sauvegardes suivent le chiffrement de votre téléphone et les réglages de votre service de sauvegarde. Android limite les sauvegardes cloud des applications à 25 Mo ; pour des bibliothèques plus volumineuses, utilisez « Tout exporter en ZIP ».</string>
+    <string name="ui_backup_info_over_quota">Vos réunions dépassent la limite de 25 Mo de la sauvegarde cloud Android. Utilisez « Tout exporter en ZIP » pour garder une copie complète.</string>
+    <string name="ui_backup_info_manual_heading">Une copie que vous gardez vous-même</string>
+    <string name="ui_backup_card_title">Garder uniquement sur ce téléphone</string>
+    <string name="ui_backup_card_body">Vos réunions et vos voix mémorisées sont incluses dans la sauvegarde cloud chiffrée et copiées lorsque vous passez à un nouveau téléphone, afin de ne pas les perdre si ce téléphone est perdu ou remplacé.</string>
+    <string name="ui_backup_card_action">Garder uniquement sur ce téléphone</string>
+    <string name="ui_backup_card_dismiss">Garder la sauvegarde activée</string>
+    <string name="ui_backup_card_close">Fermer l’avis de sauvegarde</string>
+    <string name="ui_settings_transfer_body_off_backup_on">Rien n’est copié directement vers un nouveau téléphone. Les réunions de votre sauvegarde cloud reviennent lorsque vous la restaurez sur un nouveau téléphone.</string>
+    <string name="ui_voices_privacy_phone">Les empreintes vocales sont créées sur ce téléphone et ne sont jamais écrites dans les fichiers exportés ou partagés. Seuls les noms que vous choisissez y figurent.</string>
+</resources>

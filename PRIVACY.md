@@ -1,6 +1,6 @@
 # Privacy
 
-Cassini for Android processes and stores your recordings, transcripts and voiceprints on your phone. Cassini does not upload them to its servers. Android can copy them directly to a new phone as described below. Cassini has no accounts, no advertising, no analytics and no crash reports. The app connects to the internet only to download optional models, and only after you agree. Whistle is included on supported devices and basic transcription with it needs no model download. Its isolated worker has no internet permission.
+Cassini for Android processes and stores your recordings, transcripts and voiceprints on your phone. Cassini does not upload them to its servers. Android can include them in your encrypted cloud backup and copy them directly to a new phone, as described below. Cassini has no accounts, no advertising, no analytics and no crash reports. The app connects to the internet only to download optional models, and only after you agree. Whistle is included on supported devices and basic transcription with it needs no model download. Its isolated worker has no internet permission.
 
 This file applies to Cassini for Android 0.2 and later. The app shows the same text on its Licenses screen.
 
@@ -78,9 +78,14 @@ Before Cassini uses a downloaded file, it makes sure that the size and the SHA-2
 
 ## Backup and device transfer
 
-On Android 9 or later, direct device-to-device transfer copies your notes, the catalogue and saved voices when “Move to a new phone” is on. This choice is on by default and you can turn it off in Settings. Cloud backup is not used. Downloaded models and unfinished work are not copied.
+On Android 9 or later, Cassini offers two automatic copies, both on by default, which you can turn off separately in Settings, Moving and backup:
 
-On Android 8, this transfer choice is unavailable. Turning the choice on does not confirm that a transfer has completed. If you lose the phone or remove the app before keeping a copy elsewhere, you lose your notes. To keep a note, save a copy of it.
+- Encrypted cloud backup: Android Backup (Google or Seedvault) includes your notes, the catalogue and, if “Include saved voices in backups” is on, your saved voices. Cassini adds them only when the backup is encrypted on the phone (for example with a screen lock set). The backup follows your phone’s encryption and backup provider settings. Android limits an app’s cloud backup to 25 MB; when your library is larger, Android refuses it and Settings says so. Turning cloud backup off stops future backups; it does not delete backups already stored in your cloud account.
+- Move to a new phone: direct device-to-device transfer during a new phone’s setup copies the same data. It is not sent to a cloud account.
+
+“Include saved voices in backups” is on by default. When it is off, no saved voiceprints are included in either copy. The first time cloud backup is on, the Library offers “Keep on this phone only”, which turns off both copies. Downloaded models, settings and unfinished work are never copied. Cassini itself uploads nothing: the copies are made by Android.
+
+On Android 8, Android cannot tell these copies apart, so neither is made. Turning a choice on does not confirm that a backup or transfer has completed. If you lose the phone or remove the app before keeping a copy elsewhere, you can lose your notes. To keep a complete copy, use Export All as ZIP or save a copy of each note.
 
 ## Copies that you save
 

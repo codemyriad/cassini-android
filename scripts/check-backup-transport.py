@@ -179,11 +179,17 @@ def main():
             raise ValueError(f'Local transport was not selected: {selected}')
         adb('shell', 'bmgr', 'init', TRANSPORT)
         fixture('seed')
+        # D98: encrypted cloud follows the cloud choice; an unencrypted cloud transport is always refused.
+        adb('shell', 'settings', 'put', 'secure', 'backup_local_transport_parameters',
+            'is_encrypted=false,is_device_transfer=false')
+        fixture('choices', cloud=True, transfer=False)
+        backup('cloud-unencrypted-refused', False)
         adb('shell', 'settings', 'put', 'secure', 'backup_local_transport_parameters',
             'is_encrypted=true,is_device_transfer=false')
-        backup('cloud-default-off', False)
+        fixture('choices', cloud=False, transfer=True)
+        backup('cloud-off-refused', False)
         fixture('choices', cloud=True, transfer=False)
-        backup('cloud-old-opt-in-refused-by-build-flag', False)
+        backup('cloud-encrypted-on', True)
         adb('shell', 'settings', 'put', 'secure', 'backup_local_transport_parameters',
             'is_encrypted=true,is_device_transfer=true')
         fixture('choices', cloud=True, transfer=False)

@@ -1,26 +1,57 @@
-# Moving to a new phone (D97)
+# Moving and backup (D97, D98)
 
-Device transfer is enabled by the device-local choice in Settings.
-`BuildConfig.CLOUD_BACKUP_ENABLED` is fixed to `false` in every build type. There is no cloud switch
-or cloud-backup offer. The agent refuses cloud and unknown transports even if a stored preference
-contains an old opt-in. Android cloud Auto Backup has a 25 MB per-app limit; this is unsuitable for
-a library of recordings. Enabling cloud backup needs a separate product decision and UI copy.
+Two automatic channels can copy the library off the phone: encrypted Android cloud backup (Auto Backup through
+Google or Seedvault) and direct device-to-device transfer during a new phone's setup. D98 (D-980) turns cloud backup
+on by default; transfer was already on (D97). `BuildConfig.CLOUD_BACKUP_ENABLED` is `true` in every build type and
+remains the kill switch for the cloud channel. The Settings section and its copy follow cassini-ux `PARITY.md`,
+Wave 6 contract §3 (Android table); the design note is `docs/design/phase2-d980.md`.
 
 ## Choices and capability
 
-The device-local choices are in `noBackupFilesDir/choices.json`, outside the transport dataset.
-Transfer starts enabled. The Library explains it once; dismissal or changing the Settings switch
-acknowledges the notice. Turning it off does not request or confirm deletion of an earlier OS
-snapshot. A damaged or unreadable choices file disables transfer until the user saves a choice.
+The device-local choices are in `noBackupFilesDir/choices.json`, outside the transport dataset, so a restored or
+transferred library never brings the source phone's choices. Version 2 of the file holds:
 
-From Android 9, the agent identifies direct device transfer through Android's transport flags.
-Unknown transports are refused while the cloud build flag is off. Android 8 does not expose those
-flags: transfer is unavailable and Settings explains the limitation. Restore is separately
-authorized by Android; it can restore an earlier valid dataset after the source choice was turned
-off. It does not restore the source device's consent or notice state.
+| Field | Default | Meaning |
+|---|---|---|
+| `cloud` | on | Encrypted cloud backup. |
+| `transfer` | on | Device-to-device transfer. |
+| `voices` | on | "Include saved voices in backups": off leaves everything under `voices/` out of both channels. |
+| `noticeAcknowledged` | off | The once-only "Keep them on this phone only" card was answered, or a choice changed in Settings. |
+| `quotaExceeded` / `cloudQuotaExceeded` | off | The last transfer / cloud attempt was refused for its size. |
 
-The six app languages use the coordinator's canonical catalog entries from cassini-ux commit
-febfcc0 (see `ui/src/test/resources/transfer/UPSTREAM.json` for the full pin and hashes).
+A version 1 file (D97 builds) was written only after a choice in Settings or a refused transfer, while the copy said
+that nothing is sent to a cloud account. It keeps its stored `cloud = false`, so an update never starts uploading for
+someone who had already chosen; they can turn cloud backup on in Settings, and the card does not show while cloud is
+off. A missing file means the D98 defaults, so the card shows once. A damaged or unreadable file turns every channel
+off until the user saves a choice.
+
+The agent (`CassiniBackupAgent`) decides per run with `BackupChoices.permits`:
+
+- Before API 28 Android exposes no transport flags, so cloud and transfer cannot be told apart: both are refused and
+  `full_backup_content.xml` excludes every domain. Settings explains the limitation on each switch.
+- A transport with the device-to-device flag (2, or API 36.1's cross-platform 8) follows `transfer`.
+- Any other transport is cloud. It needs `cloud`, the build flag and `FLAG_CLIENT_SIDE_ENCRYPTION_ENABLED` (1), so the
+  "Encrypted cloud backup" title is true whenever bytes leave. An unencrypted or unknown transport is refused. On API
+  31+ `data_extraction_rules.xml` also sets `disableIfNoEncryptionCapabilities` on the cloud section.
+- With `voices` off, `LibraryBackup.prepare(includeVoices = false)` lists nothing under `voices/` (saved people,
+  generation and every note's voiceprints), so the dataset is complete without them and restore accepts it.
+
+The XML rules on API 28+ are the same library ceiling for both channels (`cassini.db`, `notes/`, `voices/`, the
+inventory); `requireFlags` would AND its flags, so the per-channel decision is the agent's. Seedvault can present
+itself as a device-to-device transport; such a backup then follows the transfer choice, and the phone-only state
+(both off) still emits nothing.
+
+"Keep on this phone only" on the card turns off cloud and transfer and answers the card; "Keep backup on" and the
+close button only answer it. Afterwards the switches are independent. Turning a channel off does not request or
+confirm deletion of an earlier OS snapshot (`backup.cloud.body.off` says so for cloud).
+
+From Android 9, the agent identifies direct device transfer through Android's transport flags. Restore is separately
+authorized by Android; it can restore an earlier valid dataset after the source choice was turned off. It does not
+restore the source device's choices or card state.
+
+The six app languages use the coordinator's canonical catalog entries: the D97 transfer copy from cassini-ux commit
+febfcc0 (see `ui/src/test/resources/transfer/UPSTREAM.json`) and the D98 Moving and backup copy from 31973ff
+(`third_party/cassini-ux/wave5/strings.json`, generated into `ui/src/main/res/values*/wave6.xml`).
 
 ## Quota and complete datasets
 
@@ -28,9 +59,11 @@ The agent lets `fullBackupFile` measure every tar-framed entry during Android's 
 the payload exceeds the reported quota. Android can then report the actual `Quota exceeded` result
 and invoke `onQuotaExceeded` before streaming. Throwing an exception before measurement would report
 zero bytes through the one-way Binder callback, so it is not used for quota detection.
-Settings shows `settings.transfer.tooLarge` after a quota failure and points to ZIP export. The
+Settings shows `settings.transfer.tooLarge` after a transfer quota failure and `backup.info.android.overQuota` after a
+cloud one (Android's 25 MB Auto Backup limit); both point to ZIP export. The agent remembers which channel it measured,
+so `onQuotaExceeded` records the warning for that channel only. The
 normal explanation also recommends Export All as ZIP. No smaller subset is silently substituted.
-Downloaded models are never transferred. A permitted retry clears the previous size warning only
+Downloaded models are never transferred. A permitted retry clears that channel's size warning only
 after snapshot preparation succeeds; a new quota refusal sets it again. Refused transports and failed
 preparation leave the warning intact. Unchanged choices do not create or replace an atomic file.
 
@@ -134,24 +167,14 @@ It refuses personal devices. Local transport checks do not prove an OEM's cable-
 
 ## Privacy page and Play data-safety draft — not published
 
-Proposed privacy-page copy for review:
-
-> Transcription runs on your phone. On Android 9 or newer, Android can copy your notes, library and
-> saved voices directly to a new phone during setup. This choice starts on; Cassini explains it once
-> and you can turn it off in Settings. Downloaded models are not copied. Saved voiceprints move with
-> enabled phone transfer but are never written into shared Cassini documents. Cassini does not offer
-> Android cloud backup. On Android 8, this transfer choice is unavailable.
->
-> Turning the choice on does not prove that a transfer has completed. Android can refuse a library
-> that exceeds the transfer limit; Cassini reports that failure. Save important notes as exported files.
-> Turning the choice off does not confirm deletion of any earlier OS snapshot.
-
-Proposed Play explanation for review: on-device transcription; optional direct phone-setup transfer
-of note audio, transcripts, library metadata, speaker names and saved voiceprints; no downloaded
-models; no cloud-backup offer. The purpose is migration to the user's new phone, not analytics or
-advertising. Review the current Play categories and OS-transfer treatment before submission; do not
-infer an exemption or retain an absolute claim that data cannot leave the phone. No store form or
-privacy page has been published by this PR.
+`PRIVACY.md` describes both channels as shipped by D98. Proposed Play explanation for review: on-device
+transcription; optional, default-on encrypted Android cloud backup (Google or Seedvault, only with client-side
+encryption) and direct phone-setup transfer of note audio, transcripts, library metadata, speaker names and, unless
+"Include saved voices in backups" is off, saved voiceprints; no downloaded models. Cassini itself sends none of it
+to its servers; Android's backup service does. The purpose is backup and migration to the user's new phone, not
+analytics or advertising. Review the current Play categories and OS-backup treatment before submission; do not
+infer an exemption or retain an absolute claim that data cannot leave the phone. No store form has been
+published by this PR.
 
 ## Platform references
 

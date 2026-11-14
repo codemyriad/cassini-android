@@ -19,7 +19,14 @@ import java.nio.file.LinkOption
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-/** Stored in noBackupFilesDir: neither a source cloud opt-in nor its notice acknowledgement travels. */
+/**
+ * Stored in noBackupFilesDir: neither the source phone's choices nor its card acknowledgement travels.
+ *
+ * Version 2 adds the D98 choices (cloud backup on by default, "Include saved voices in backups", per-channel size
+ * warnings). A version 1 file was written only after a choice in Settings or a refused transfer, while the copy said
+ * nothing is sent to a cloud account; it keeps its stored `cloud = false`, so an update never starts uploading for a
+ * person who had already chosen. They can turn cloud backup on in Settings.
+ */
 class BackupChoicesStore(private val file: File, private val io: CoroutineDispatcher) {
     private val revision = MutableStateFlow(0L)
     val choices = revision.map { withContext(io) { readBlocking() } }.distinctUntilChanged()
@@ -30,11 +37,30 @@ class BackupChoicesStore(private val file: File, private val io: CoroutineDispat
         it.copy(transfer = enabled, noticeAcknowledged = true, quotaExceeded = false)
     }
 
-    suspend fun setCloud(enabled: Boolean) = edit { it.copy(cloud = enabled, quotaExceeded = false) }
+    suspend fun setCloud(enabled: Boolean) = edit {
+        it.copy(cloud = enabled, noticeAcknowledged = true, cloudQuotaExceeded = false)
+    }
 
+    suspend fun setVoices(enabled: Boolean) = edit { it.copy(voices = enabled, noticeAcknowledged = true) }
+
+    /** "Keep on this phone only" (D98): no automatic copy at all. The switches stay independent afterwards. */
+    suspend fun keepOnPhoneOnly() = edit {
+        it.copy(
+            cloud = false,
+            transfer = false,
+            noticeAcknowledged = true,
+            quotaExceeded = false,
+            cloudQuotaExceeded = false,
+        )
+    }
+
+    /** "Keep backup on" or the card's close button: the choices stay as they are. */
     suspend fun acknowledgeNotice() = edit { it.copy(noticeAcknowledged = true) }
 
-    suspend fun recordQuotaExceeded(value: Boolean) = edit { it.copy(quotaExceeded = value) }
+    /** The size refusal of the last [cloud] or transfer attempt. */
+    suspend fun recordQuotaExceeded(value: Boolean, cloud: Boolean = false) = edit {
+        if (cloud) it.copy(cloudQuotaExceeded = value) else it.copy(quotaExceeded = value)
+    }
 
     fun readBlocking(): BackupChoices = lock.withLock {
         Threads.assertOffMain("BackupChoicesStore.readBlocking")
@@ -50,14 +76,7 @@ class BackupChoicesStore(private val file: File, private val io: CoroutineDispat
                 if (size > MAX_BYTES) throw IOException("Oversized backup choices")
                 String(bytes, 0, size, Charsets.UTF_8)
             }
-            val json = JSONObject(text)
-            if (json.opt("version") != VERSION) return@withLock BackupChoices.UNREADABLE
-            BackupChoices(
-                transfer = boolean(json, "transfer"),
-                cloud = boolean(json, "cloud"),
-                noticeAcknowledged = boolean(json, "noticeAcknowledged"),
-                quotaExceeded = boolean(json, "quotaExceeded"),
-            )
+            parse(JSONObject(text))
         } catch (_: FileNotFoundException) {
             val absent = Files.isDirectory(file.parentFile!!.toPath(), LinkOption.NOFOLLOW_LINKS) &&
                 Files.notExists(file.toPath(), LinkOption.NOFOLLOW_LINKS) &&
@@ -79,11 +98,10 @@ class BackupChoicesStore(private val file: File, private val io: CoroutineDispat
             val atomic = AtomicFile(file)
             val output = atomic.startWrite()
             try {
-                val json = JSONObject().put(
-                    "version",
-                    VERSION
-                ).put("transfer", value.transfer).put("cloud", value.cloud)
+                val json = JSONObject().put("version", VERSION)
+                    .put("transfer", value.transfer).put("cloud", value.cloud).put("voices", value.voices)
                     .put("noticeAcknowledged", value.noticeAcknowledged).put("quotaExceeded", value.quotaExceeded)
+                    .put("cloudQuotaExceeded", value.cloudQuotaExceeded)
                 output.write(json.toString().toByteArray(Charsets.UTF_8))
                 atomic.finishWrite(output)
             } catch (error: IOException) {
@@ -94,12 +112,32 @@ class BackupChoicesStore(private val file: File, private val io: CoroutineDispat
         }
     }
 
-    private fun boolean(json: JSONObject, name: String): Boolean =
-        json.opt(name) as? Boolean ?: throw JSONException("Invalid backup choice")
-
     private companion object {
-        const val VERSION = 1
+        const val VERSION = 2
+        const val VERSION_1 = 1
         const val MAX_BYTES = 4096
         val lock = ReentrantLock()
+
+        fun parse(json: JSONObject): BackupChoices = when (json.opt("version")) {
+            VERSION -> BackupChoices(
+                transfer = boolean(json, "transfer"),
+                cloud = boolean(json, "cloud"),
+                voices = boolean(json, "voices"),
+                noticeAcknowledged = boolean(json, "noticeAcknowledged"),
+                quotaExceeded = boolean(json, "quotaExceeded"),
+                cloudQuotaExceeded = boolean(json, "cloudQuotaExceeded"),
+            )
+            VERSION_1 -> BackupChoices(
+                transfer = boolean(json, "transfer"),
+                cloud = boolean(json, "cloud"),
+                voices = true,
+                noticeAcknowledged = boolean(json, "noticeAcknowledged"),
+                quotaExceeded = boolean(json, "quotaExceeded"),
+            )
+            else -> BackupChoices.UNREADABLE
+        }
+
+        fun boolean(json: JSONObject, name: String): Boolean =
+            json.opt(name) as? Boolean ?: throw JSONException("Invalid backup choice")
     }
 }

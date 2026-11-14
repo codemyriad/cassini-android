@@ -13,6 +13,12 @@ sealed interface SettingsEvent {
 
     data class Transfer(val enabled: Boolean) : SettingsEvent
 
+    /** "Encrypted cloud backup" (D98). */
+    data class Cloud(val enabled: Boolean) : SettingsEvent
+
+    /** "Include saved voices in backups" (D98). */
+    data class IncludeVoices(val enabled: Boolean) : SettingsEvent
+
     data object Back : SettingsEvent
 
     @Immutable

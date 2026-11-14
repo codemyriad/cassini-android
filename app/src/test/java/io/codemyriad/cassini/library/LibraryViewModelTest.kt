@@ -49,6 +49,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -110,6 +111,41 @@ class LibraryViewModelTest {
             advanceUntilIdle()
             assertEquals(reach.toString(), hero, viewModel.now().hero)
         }
+    }
+
+    @Test
+    fun keepOnPhoneOnlyHidesTheCardAndTheHeroThenSaysTheAudioNeverLeaves() = runTest(dispatcher) {
+        ports.backupReach.value = BackupReach(cloud = true, transfer = true, card = true)
+        val viewModel = viewModel()
+        advanceUntilIdle()
+        assertTrue(viewModel.now().backupCard)
+        assertEquals(FirstRunHeroUi(true, FirstRunPrivacy.WITH_BACKUP), viewModel.now().hero)
+        viewModel.onEvent(LibraryEvent.KeepOnPhoneOnly)
+        advanceUntilIdle()
+        assertTrue("keepOnPhoneOnly" in ports.actions)
+        assertFalse(viewModel.now().backupCard)
+        assertEquals(FirstRunHeroUi(false, FirstRunPrivacy.PHONE_ONLY), viewModel.now().hero)
+    }
+
+    @Test
+    fun keepBackupOnHidesTheCardAndKeepsTheBackupCopy() = runTest(dispatcher) {
+        ports.backupReach.value = BackupReach(cloud = true, transfer = true, card = true)
+        val viewModel = viewModel()
+        advanceUntilIdle()
+        viewModel.onEvent(LibraryEvent.DismissBackupCard)
+        advanceUntilIdle()
+        assertTrue("dismissBackupCard" in ports.actions)
+        assertFalse(viewModel.now().backupCard)
+        assertEquals(FirstRunHeroUi(true, FirstRunPrivacy.WITH_BACKUP), viewModel.now().hero)
+    }
+
+    @Test
+    fun theBackupCardIsNotShownWhileSearching() = runTest(dispatcher) {
+        ports.backupReach.value = BackupReach(cloud = true, transfer = true, card = true)
+        val viewModel = viewModel()
+        viewModel.onEvent(LibraryEvent.Query("budget"))
+        advanceUntilIdle()
+        assertFalse(viewModel.now().backupCard)
     }
 
     @Test

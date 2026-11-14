@@ -6,6 +6,7 @@ import android.os.ParcelFileDescriptor
 import androidx.test.core.app.ApplicationProvider
 import io.codemyriad.cassini.CassiniApplication
 import io.codemyriad.cassini.GraphFactory
+import io.codemyriad.cassini.core.backup.BackupChoices
 import io.codemyriad.cassini.core.backup.BackupManifest
 import io.codemyriad.cassini.data.AppPaths
 import io.codemyriad.cassini.data.backup.BackupChoicesStore
@@ -76,7 +77,7 @@ class CassiniBackupAgentTest {
         }
     }
 
-    @Test fun cloudIsRefusedBeforeAnyInventoryIsPublishedAndTheGraphStaysCold() {
+    @Test fun unencryptedCloudIsRefusedBeforeAnyInventoryIsPublishedAndTheGraphStaysCold() {
         val agent = Robolectric.setupBackupAgent(CassiniBackupAgent::class.java)
         val output = ReflectionHelpers.newInstance(FullBackupDataOutput::class.java)
         assertFalse(app.hasStartedGraph())
@@ -86,12 +87,13 @@ class CassiniBackupAgentTest {
         assertFalse(app.hasStartedGraph())
     }
 
-    @Test fun cloudBuildFlagRefusesEvenAnExistingOptIn() {
-        assertFalse(io.codemyriad.cassini.BuildConfig.CLOUD_BACKUP_ENABLED)
+    @Test fun theCloudChoiceOffRefusesEncryptedCloud() {
+        assertTrue(io.codemyriad.cassini.BuildConfig.CLOUD_BACKUP_ENABLED)
         val choices = BackupChoicesStore(File(app.noBackupFilesDir, "choices.json"), Dispatchers.IO)
-        binder { runBlocking { choices.setCloud(true) } }
+        binder { runBlocking { choices.setCloud(false) } }
         val agent = Robolectric.setupBackupAgent(CassiniBackupAgent::class.java)
         val output = ReflectionHelpers.newInstance(FullBackupDataOutput::class.java)
+        ReflectionHelpers.setField(output, "mTransportFlags", 1)
         val error = assertThrows(IOException::class.java) { binder { agent.onFullBackup(output) } }
         assertEquals("This backup transport is disabled", error.message)
         assertFalse(File(app.filesDir, BackupManifest.MANIFEST).exists())
@@ -126,7 +128,7 @@ class CassiniBackupAgentTest {
         assertTrue(binder { choices.readBlocking().quotaExceeded })
     }
 
-    @Test fun restoredLibraryDoesNotRequireOrRestoreAnOldCloudOptInAndDoesNotLoadModels() {
+    @Test fun restoredLibraryDoesNotRestoreTheSourceChoicesAndDoesNotLoadModels() {
         val source = folder.newFolder()
         File(source, "voices").mkdirs()
         File(source, "voices/people.json").writeText("Synthetic saved voice")
@@ -147,8 +149,8 @@ class CassiniBackupAgentTest {
         }
         assertEquals("Synthetic saved voice", File(app.filesDir, "voices/people.json").readText())
         assertEquals("target model", model.readText())
-        val choices = BackupChoicesStore(File(app.noBackupFilesDir, "choices.json"), Dispatchers.IO)
-        assertFalse(binder { choices.readBlocking().cloud })
+        // This phone keeps its own choices: restore writes none, so the D98 defaults and the card apply.
+        assertFalse(File(app.noBackupFilesDir, "choices.json").exists())
         assertFalse(app.hasStartedGraph())
     }
 
@@ -168,14 +170,12 @@ class CassiniBackupAgentTest {
         assertFalse(app.hasStartedGraph())
     }
 
-    @Test fun quotaCallbackPersistsAFailureWithoutClaimingAnUploadOrGrantingConsent() {
+    @Test fun quotaCallbackWithoutAMeasuredRunWarnsOnBothChannelsAndChangesNoChoice() {
         val agent = Robolectric.setupBackupAgent(CassiniBackupAgent::class.java)
         binder { agent.onQuotaExceeded(30_000_000, 25_000_000) }
         val choices = BackupChoicesStore(File(app.noBackupFilesDir, "choices.json"), Dispatchers.IO)
         val value = binder { choices.readBlocking() }
-        assertTrue(value.quotaExceeded)
-        assertFalse(value.cloud)
-        assertTrue(value.transfer)
+        assertEquals(BackupChoices(quotaExceeded = true, cloudQuotaExceeded = true), value)
         assertFalse(app.hasStartedGraph())
     }
 }

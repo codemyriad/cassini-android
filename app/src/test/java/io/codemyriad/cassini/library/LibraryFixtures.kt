@@ -106,8 +106,18 @@ internal class FakeLibraryPorts : LibraryPorts {
     override val notices = MutableStateFlow(NoticeFacts())
     override val voiceModelReady = MutableStateFlow(true)
 
-    /** The shipped default: cloud backup off in every build (docs/backup.md), transfer on. */
+    /** Cloud backup off, transfer on, so the older Library tests see no backup card. */
     override val backupReach = MutableStateFlow(BackupReach(cloud = false, transfer = true))
+
+    override suspend fun keepOnPhoneOnly() {
+        actions += "keepOnPhoneOnly"
+        backupReach.value = BackupReach(cloud = false, transfer = false, card = false)
+    }
+
+    override suspend fun dismissBackupCard() {
+        actions += "dismissBackupCard"
+        backupReach.value = backupReach.value.copy(card = false)
+    }
     var transcribeOutcome: TranscribeOutcome = TranscribeOutcome.Queued(changed = true)
     val actions = mutableListOf<String>()
     val searches = mutableListOf<String>()

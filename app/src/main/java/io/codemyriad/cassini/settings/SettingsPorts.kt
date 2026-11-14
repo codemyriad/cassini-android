@@ -41,7 +41,14 @@ interface SettingsPorts {
 
     val transferAvailable: Boolean get() = Build.VERSION.SDK_INT >= BackupChoices.TRANSPORT_FLAGS_API
 
+    /** Cloud backup needs API 28's transport flags and the build flag (D98). */
+    val cloudAvailable: Boolean get() = transferAvailable && BuildConfig.CLOUD_BACKUP_ENABLED
+
     suspend fun setTransfer(enabled: Boolean) { error("Backup choices are unavailable") }
+
+    suspend fun setCloud(enabled: Boolean) { error("Backup choices are unavailable") }
+
+    suspend fun setVoices(enabled: Boolean) { error("Backup choices are unavailable") }
 
     val speech: Flow<SpeechChoice>
 
@@ -82,6 +89,10 @@ class GraphSettingsPorts(private val graph: AppGraph) : SettingsPorts {
     override val backup: Flow<BackupChoices?> get() = graph.backupChoices.choices
 
     override suspend fun setTransfer(enabled: Boolean) = graph.backupChoices.setTransfer(enabled)
+
+    override suspend fun setCloud(enabled: Boolean) = graph.backupChoices.setCloud(enabled)
+
+    override suspend fun setVoices(enabled: Boolean) = graph.backupChoices.setVoices(enabled)
 
     override val speech: Flow<SpeechChoice> get() = graph.speech.state
 

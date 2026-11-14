@@ -71,6 +71,10 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
                 quotaExceeded = it.quotaExceeded,
                 saving = saving,
                 error = error,
+                cloud = it.cloud,
+                cloudAvailable = ports.cloudAvailable,
+                voices = it.voices,
+                cloudQuotaExceeded = it.cloudQuotaExceeded,
             )
         }
     }
@@ -125,7 +129,7 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
             SettingsEvent.DownloadParakeet -> emit(SettingsEffect.Open(ModelDownloadKey(parakeetOnly = true)))
             SettingsEvent.DismissParakeet -> ports.dismissParakeetSuggestion()
             SettingsEvent.DismissParakeetDefault -> ports.dismissParakeetDefault()
-            is SettingsEvent.Transfer -> saveBackup(transfer = event.enabled)
+            is SettingsEvent.Transfer, is SettingsEvent.Cloud, is SettingsEvent.IncludeVoices -> backupChoice(event)
             SettingsEvent.Back -> emit(SettingsEffect.Close)
             is SettingsEvent.Language -> choose(event.language)
             is SettingsEvent.ChooseSpeech -> chooseSpeech(event.model)
@@ -146,13 +150,25 @@ class SettingsViewModel(private val ports: SettingsPorts) : ViewModel() {
         ports.refreshNotices()
     }
 
-    private fun saveBackup(transfer: Boolean) {
-        if (backupSaving.value || !ports.transferAvailable) return
+    /** A Moving and backup switch; a channel Android cannot use on this phone never pretends to save. */
+    private fun backupChoice(event: SettingsEvent) {
+        when (event) {
+            is SettingsEvent.Transfer -> if (ports.transferAvailable) saveBackup { ports.setTransfer(event.enabled) }
+            is SettingsEvent.Cloud -> if (ports.cloudAvailable) saveBackup { ports.setCloud(event.enabled) }
+            is SettingsEvent.IncludeVoices -> if (ports.transferAvailable || ports.cloudAvailable) {
+                saveBackup { ports.setVoices(event.enabled) }
+            }
+            else -> Unit
+        }
+    }
+
+    private fun saveBackup(write: suspend () -> Unit) {
+        if (backupSaving.value) return
         backupSaving.value = true
         backupError.value = false
         viewModelScope.launch {
             try {
-                ports.setTransfer(transfer)
+                write()
             } catch (error: CancellationException) {
                 throw error
             } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {

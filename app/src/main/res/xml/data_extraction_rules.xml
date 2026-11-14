@@ -1,16 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Cloud is declaratively excluded while the cloud product flag is OFF. -->
+<!-- API 31+: the library ceiling for both channels (D98). Cloud is skipped without client-side encryption; the agent
+     emits only its allowlist and only for a channel the device-local choices permit (cloud backup, transfer and
+     "Include saved voices in backups"). -->
 <data-extraction-rules>
-    <cloud-backup>
-        <exclude domain="root" path="." />
-        <exclude domain="file" path="." />
-        <exclude domain="database" path="." />
-        <exclude domain="sharedpref" path="." />
-        <exclude domain="external" path="." />
-        <exclude domain="device_root" path="." />
-        <exclude domain="device_file" path="." />
-        <exclude domain="device_database" path="." />
-        <exclude domain="device_sharedpref" path="." />
+    <cloud-backup disableIfNoEncryptionCapabilities="true">
+        <include domain="file" path="cassini.db" />
+        <include domain="file" path="notes/" />
+        <include domain="file" path="voices/" />
+        <include domain="file" path="backup/manifest.json" />
     </cloud-backup>
     <device-transfer>
         <include domain="file" path="cassini.db" />
