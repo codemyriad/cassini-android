@@ -8,7 +8,8 @@ import java.io.File
 /**
  * Checks [Glyph] against the authoritative SVG elements in design/reference/markup: every icon of every board is a
  * glyph with the same elements and geometry, drawn at a size and stroke of [GlyphUses]; every on-board use appears
- * on a board.
+ * on a board. The boards' line-art logo (a circle and a rotated ellipse) is retired: L-04 replaces it with the
+ * cassini.talk Saturn image (saturn-nav in the Library search field, saturn-mid on Model download), so it is no glyph.
  */
 class GlyphMarkupTest {
     private val markupDir = File(checkNotNull(System.getProperty("cassini.repoRoot")), "design/reference/markup")
@@ -22,12 +23,23 @@ class GlyphMarkupTest {
         val stroke: Float,
     )
 
-    private val icons: List<BoardIcon> by lazy {
+    private val svgs: List<Triple<String, String, String>> by lazy {
         val files = markupDir.listFiles { f -> f.name.endsWith(".html") }.orEmpty().sortedBy { it.name }
         check(files.size == BOARD_FILES) { "expected $BOARD_FILES boards in $markupDir, found ${files.size}" }
         files.flatMap { file ->
-            SVG.findAll(file.readText()).map { parse(file.name, it.groupValues[1], it.groupValues[2]) }
+            SVG.findAll(file.readText()).map { Triple(file.name, it.groupValues[1], it.groupValues[2]) }
         }
+    }
+
+    private val icons: List<BoardIcon> by lazy {
+        svgs.filterNot { (_, _, body) -> RETIRED_LOGO in body }.map { (file, attributes, body) ->
+            parse(file, attributes, body)
+        }
+    }
+
+    @Test fun onlyTheRetiredLogoIsSkipped() {
+        val logos = svgs.filter { (_, _, body) -> RETIRED_LOGO in body }.map { it.first }
+        assertEquals(listOf("00-Library.html", "05-Model_download.html"), logos)
     }
 
     @Test fun everyBoardIconIsAGlyphAtAListedSize() {
@@ -74,13 +86,6 @@ class GlyphMarkupTest {
                 "path" -> GlyphPart.Path(a.getValue("d"))
                 "circle" -> GlyphPart.Circle(f("cx"), f("cy"), f("r"))
                 "rect" -> GlyphPart.Rect(f("x"), f("y"), f("width"), f("height"), f("rx"))
-                "ellipse" -> {
-                    val transform = checkNotNull(ROTATE.matchEntire(a.getValue("transform")))
-                    val rotate = transform.groupValues.drop(1).map { it.toFloat() }
-                    val pivot = rotate.drop(1)
-                    assertEquals("$file: the ellipse rotates about its centre", listOf(f("cx"), f("cy")), pivot)
-                    GlyphPart.Ellipse(f("cx"), f("cy"), f("rx"), f("ry"), rotate[0])
-                }
                 else -> error("$file: unexpected <$name> in an icon")
             }
         }.toList()
@@ -99,10 +104,10 @@ class GlyphMarkupTest {
 
     private companion object {
         const val BOARD_FILES = 11
-        const val MARKUP_ICONS = 37
+        const val MARKUP_ICONS = 35
+        const val RETIRED_LOGO = "<ellipse"
         val SVG = Regex("""<svg\b([^>]*)>(.*?)</svg>""", RegexOption.DOT_MATCHES_ALL)
         val ELEMENT = Regex("""<(\w+)\b([^>]*)>""")
         val ATTRIBUTE = Regex("""([\w-]+)="([^"]*)"""")
-        val ROTATE = Regex("""rotate\(([-\d.]+) ([-\d.]+) ([-\d.]+)\)""")
     }
 }

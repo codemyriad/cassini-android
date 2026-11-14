@@ -3,6 +3,7 @@ package io.codemyriad.cassini.ui.theme
 import android.graphics.drawable.AdaptiveIconDrawable
 import android.graphics.drawable.Drawable
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -31,6 +32,7 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.BoardTest
@@ -40,7 +42,8 @@ import org.robolectric.annotation.Config
 
 /**
  * Every glyph at its board sizes and strokes (components/icons-light.png, icons-dark.png), each followed by a 48 dp
- * enlargement, and the launcher and notification icons from the XML drawables (components/launcher.png).
+ * enlargement, and the launcher and notification icons from the XML drawables plus the Saturn marks
+ * (components/launcher.png).
  */
 @Config(qualifiers = "+h2400dp")
 class IconScreenshotTest : BoardTest() {
@@ -139,13 +142,14 @@ class IconScreenshotTest : BoardTest() {
                     Canvas(Modifier.size(48.dp)) { drawDrawable(tinted) }
                 }
             }
-            Caption("ui_ic_logo (28, 56) beside Glyph.Logo (28/1.6, 56/1.6)")
-            val logo = resources.getDrawable(R.drawable.ui_ic_logo, null)
-            Tile(CassiniTheme.colors.bg) {
-                Canvas(Modifier.size(28.dp)) { drawDrawable(logo) }
-                CassiniIcon(Glyph.Logo, 28.dp, 1.6f, CassiniTheme.colors.ink, contentDescription = null)
-                Canvas(Modifier.size(56.dp)) { drawDrawable(logo) }
-                CassiniIcon(Glyph.Logo, 56.dp, 1.6f, CassiniTheme.colors.ink, contentDescription = null)
+            Caption("Saturn marks (L-04): ui_saturn_nav 37 x 24, ui_saturn_mid 86 x 56, on light and dark bg")
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                listOf(LightColors.bg, DarkColors.bg).forEach { bg ->
+                    Tile(bg) {
+                        Image(painterResource(R.drawable.ui_saturn_nav), null, Modifier.size(37.dp, 24.dp))
+                        Image(painterResource(R.drawable.ui_saturn_mid), null, Modifier.size(86.dp, 56.dp))
+                    }
+                }
             }
         }
     }

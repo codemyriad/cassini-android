@@ -1,0 +1,43 @@
+{
+  "source_sha256": "2ed4f1ad9769916fcb0e65ffd51ee755202c8fab4f28e1101b5e02022c4ca5aa",
+  "upstream": "5e0c34e0f1bb390298dabdf4eedc494e933fd329",
+  "images": [
+    {
+      "density": "mdpi",
+      "width": 86,
+      "height": 56,
+      "sha256": "8489325d18b79f957f66932d075f02be17da940a597fb14d18bebb31b67bebd9",
+      "path": "ui/src/main/res/drawable-mdpi/ui_saturn_mid.png"
+    },
+    {
+      "density": "hdpi",
+      "width": 129,
+      "height": 84,
+      "sha256": "0b5709189093ff0c0e78309b7376b7008539ea762116c2f5b48b98f2f0c92a64",
+      "path": "ui/src/main/res/drawable-hdpi/ui_saturn_mid.png"
+    },
+    {
+      "density": "xhdpi",
+      "width": 172,
+      "height": 112,
+      "sha256": "bc1e28fedd31880edb83e6209c41e289b8bac52717e6805751656b6fa0f21bb7",
+      "path": "ui/src/main/res/drawable-xhdpi/ui_saturn_mid.png"
+    },
+    {
+      "density": "xxhdpi",
+      "width": 258,
+      "height": 168,
+      "sha256": "9cdd7454f1c5d59cd53066762577dee4c97b1bf53524a3d3d29861093f4cda43",
+      "path": "ui/src/main/res/drawable-xxhdpi/ui_saturn_mid.png"
+    },
+    {
+      "density": "xxxhdpi",
+      "width": 344,
+      "height": 224,
+      "sha256": "15b2284a7ea08fa4696fd25c020298aee8a7dc0372aa2b60c35b5ae4b9b4191f",
+      "path": "ui/src/main/res/drawable-xxxhdpi/ui_saturn_mid.png"
+    }
+  ],
+  "visual_inspection": "All five density exports inspected on light and dark backgrounds; canonical SVG gradients, filters and transparency retained.",
+  "renderer": "Headless Chrome 143 on Linux, transparent page, SVG drawn at output size; see scripts/render-mark-chrome.py"
+}

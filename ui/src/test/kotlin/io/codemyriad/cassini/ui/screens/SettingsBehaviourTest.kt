@@ -9,19 +9,24 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasNoClickAction
+import androidx.compose.ui.test.assertHeightIsEqualTo
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performFirstLinkClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.unit.dp
 import io.codemyriad.cassini.ui.fixtures.BoardFixtures
 import io.codemyriad.cassini.ui.fixtures.VariantFixtures
 import io.codemyriad.cassini.ui.format.FIXED_ZONE
@@ -96,6 +101,15 @@ class SettingsBehaviourTest {
                 events,
             )
         }
+    }
+
+    /** L-04: Model download draws the cassini.talk Saturn (saturn-mid, 86 x 56 dp), not the line-art logo. */
+    @Test fun modelDownloadShowsTheSaturnMidMark() {
+        setThemed { ModelDownloadScreen(BoardFixtures.modelDownload, onEvent = {}) }
+        rule.onNodeWithTag("saturn-mid", useUnmergedTree = true)
+            .assertIsDisplayed()
+            .assertWidthIsEqualTo(86.dp)
+            .assertHeightIsEqualTo(56.dp)
     }
 
     /** features.md section 0: the body total is the sum of the rounded rows (640 + 62), not the rounded byte sum (700). */

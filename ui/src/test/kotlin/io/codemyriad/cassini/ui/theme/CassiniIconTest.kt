@@ -36,13 +36,6 @@ class CassiniIconTest : BoardTest() {
         }
     }
 
-    @Test fun theLogoEllipseIsRotatedAboutTheCentre() {
-        val group = CassiniIcons.vector(Glyph.Logo, 1.6f).root.filterIsInstance<VectorGroup>().single()
-        assertEquals(-20f, group.rotation)
-        assertEquals(14f, group.pivotX)
-        assertEquals(14f, group.pivotY)
-    }
-
     @Test fun theCacheIsKeyedByGlyphAndStroke() {
         assertSame(CassiniIcons.vector(Glyph.Trash, 1.7f), CassiniIcons.vector(Glyph.Trash, 1.7f))
         assertNotSame(CassiniIcons.vector(Glyph.Trash, 1.7f), CassiniIcons.vector(Glyph.Trash, 1.8f))

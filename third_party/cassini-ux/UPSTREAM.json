@@ -54,6 +54,10 @@
       "source": "brand/mark/saturn-nav.svg",
       "sha256": "38b639fe49123ee236239a523183815505c33b826b135f63b65d691df7caf61e"
     },
+    "brand/mark/saturn-mid.svg": {
+      "source": "brand/mark/saturn-mid.svg",
+      "sha256": "2ed4f1ad9769916fcb0e65ffd51ee755202c8fab4f28e1101b5e02022c4ca5aa"
+    },
     "contract/HARMONY.md": {
       "source": "contract/HARMONY.md",
       "sha256": "8ddb3ac96ee39163afc9a0fb247b4568481ff861976ebc26f313f734b7c8ced7"
