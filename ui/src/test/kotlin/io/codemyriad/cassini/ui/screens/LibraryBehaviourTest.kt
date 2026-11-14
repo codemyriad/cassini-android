@@ -239,7 +239,7 @@ class LibraryBehaviourTest {
     @Test fun theActionsSheetOpensInItsWindowAndSendsItsRows() {
         show(BoardFixtures.library.copy(sheet = LibrarySheet.Actions(BoardFixtures.noteActions)))
         rule.onNodeWithText("Subtitles", substring = true).performClick()
-        rule.onNodeWithText("Document info").performClick()
+        rule.onNodeWithText("Document info").performScrollTo().performClick()
         assertEvents(
             LibraryEvent.SheetAction(NoteAction.SAVE_SUBTITLES),
             LibraryEvent.SheetAction(NoteAction.DOCUMENT_INFO),

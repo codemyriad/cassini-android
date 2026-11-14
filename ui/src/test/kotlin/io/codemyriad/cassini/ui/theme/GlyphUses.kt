@@ -82,4 +82,7 @@ internal val GlyphUses: Map<Glyph, List<GlyphUse>> = mapOf(
     // The Share buttons of the "Save a copy" rows (D53): no board shows them.
     Glyph.Share to listOf(use(22, 1.8f, IconTint.Accent, onBoard = false), use(22, 1.8f, onBoard = false)),
     Glyph.Warn to listOf(use(14, 2f, IconTint.AmberInk, onBoard = false)),
+    // L-34 starring (D99): no board shows it yet.
+    Glyph.Star to listOf(use(24, 1.7f, onBoard = false)),
+    Glyph.StarFilled to listOf(use(14, 0f, IconTint.Accent, onBoard = false)),
 )

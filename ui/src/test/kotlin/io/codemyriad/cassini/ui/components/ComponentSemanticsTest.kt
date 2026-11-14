@@ -169,7 +169,7 @@ class ComponentSemanticsTest {
         val weekly = rule.onNode(
             hasContentDescription("Weekly product sync, 48 minutes 13 seconds, today 10:02, transcribing"),
         )
-        assertEquals(listOf("Rename", "Move to trash"), weekly.customActionLabels())
+        assertEquals(listOf("Rename", "Star", "Move to trash"), weekly.customActionLabels())
         weekly.performClick()
         weekly.performTouchInput { longClick() }
         rule.runOnIdle { assertEquals(listOf(NoteRowAction.OPEN, NoteRowAction.LONG_PRESS), actions) }
@@ -178,20 +178,23 @@ class ComponentSemanticsTest {
         val board = rule.onNode(
             hasContentDescription("Board review prep, 34 minutes 12 seconds, yesterday 11:00, paused at 12:40"),
         )
-        assertEquals(listOf("Resume", "Rename", "Move to trash"), board.customActionLabels())
+        assertEquals(listOf("Resume", "Rename", "Star", "Move to trash"), board.customActionLabels())
         val custom = board.fetchSemanticsNode().config[SemanticsActions.CustomActions]
         rule.runOnIdle { custom.forEach { it.action() } }
-        assertEquals(listOf(NoteRowAction.RESUME, NoteRowAction.RENAME, NoteRowAction.TRASH), actions)
+        assertEquals(
+            listOf(NoteRowAction.RESUME, NoteRowAction.RENAME, NoteRowAction.STAR, NoteRowAction.TRASH),
+            actions,
+        )
     }
 
-    /** The note being recorded cannot move to trash (features.md section 6): its row offers only Rename. */
+    /** The note being recorded cannot move to trash (features.md section 6): its row offers Rename and Star. */
     @Test fun theRecordingRowHasNoTrashAction() {
         val (recording, day) = ComponentFixtures.otherRows.first { it.first.id == "rec" }
         setThemed {
             Column(Modifier.width(390.dp)) { NoteRow(recording, day, onAction = {}) }
         }
         val row = rule.onNode(hasContentDescription("Standup,", substring = true))
-        assertEquals(listOf("Rename"), row.customActionLabels())
+        assertEquals(listOf("Rename", "Star"), row.customActionLabels())
     }
 
     @Test fun aSearchResultRowSpeaksItsSuffixAndPreview() {

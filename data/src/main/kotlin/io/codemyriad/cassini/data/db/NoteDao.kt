@@ -219,6 +219,13 @@ abstract class NoteDao {
     @Query("UPDATE notes SET audio_kind = 'UNPLAYABLE', updated_at = :now WHERE id = :id")
     abstract suspend fun markUnplayable(id: String, now: Long): Int
 
+    /** Stars a note that exists (L-34); starring again keeps the first time. Per-device state only (D53.1). */
+    @Query("INSERT OR IGNORE INTO note_stars (note_id, starred_at) SELECT id, :at FROM notes WHERE id = :id")
+    abstract suspend fun star(id: String, at: Long)
+
+    @Query("DELETE FROM note_stars WHERE note_id = :id")
+    abstract suspend fun unstar(id: String)
+
     @Query("UPDATE notes SET trust_acknowledged = 1 WHERE id = :id")
     abstract suspend fun acknowledgeTrust(id: String)
 

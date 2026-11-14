@@ -882,6 +882,10 @@ class NoteViewModel(
                 closeSheet()
                 local.update { it.copy(dialog = NoteDialog.Rename(details.note.title)) }
             }
+            NoteAction.STAR, NoteAction.UNSTAR -> {
+                closeSheet()
+                ports.setStarred(noteId, action == NoteAction.STAR)
+            }
             NoteAction.TRANSCRIBE -> {
                 closeSheet()
                 transcribe(JobKind.TRANSCRIBE)

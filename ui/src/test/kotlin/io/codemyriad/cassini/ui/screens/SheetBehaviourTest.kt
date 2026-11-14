@@ -190,8 +190,8 @@ class SheetBehaviourTest {
         rule.onNodeWithText("Cassini document").performClick()
         rule.onNodeWithText("Subtitles", substring = true).performClick()
         rule.onNodeWithText("Rename").performClick()
-        rule.onNodeWithText("Transcribe again").performClick()
-        rule.onNodeWithText("Document info").performClick()
+        rule.onNodeWithText("Transcribe again").performScrollTo().performClick()
+        rule.onNodeWithText("Document info").performScrollTo().performClick()
         rule.onNodeWithText("Move to trash").performScrollTo().performClick()
         rule.runOnIdle {
             assertEquals(
@@ -272,8 +272,8 @@ class SheetBehaviourTest {
                 onAction = { actions += it },
             )
         }
-        rule.onNodeWithText("Resume").performClick()
-        rule.onNodeWithText("Start over").performClick()
+        rule.onNodeWithText("Resume").performScrollTo().performClick()
+        rule.onNodeWithText("Start over").performScrollTo().performClick()
         rule.runOnIdle { assertEquals(listOf(NoteAction.RESUME, NoteAction.START_OVER), actions) }
     }
 
@@ -328,8 +328,8 @@ class SheetBehaviourTest {
         )
         setThemed { NoteScreen(state, onEvent = { events += it }) }
         rule.onNodeWithText("Start over?").assertExists()
-        rule.onNodeWithText("Start over").performClick()
-        rule.onNodeWithText("Transcribe again").performClick()
+        rule.onNodeWithText("Start over").performScrollTo().performClick()
+        rule.onNodeWithText("Transcribe again").performScrollTo().performClick()
         rule.runOnIdle {
             assertEquals(
                 listOf(NoteEvent.ConfirmDialog, NoteEvent.SheetAction(NoteAction.TRANSCRIBE_AGAIN)),

@@ -74,6 +74,7 @@ fun NoteRow(row: NoteRowUi, day: DayLabel, onAction: (NoteRowAction) -> Unit, mo
         stringResource(StatusBadgeKind.Received.label)
             .takeIf { row.imported && row.status is NoteStatusUi.Transcribed }
             ?.lowercase(locale),
+        stringResource(R.string.ui_row_starred_a11y).takeIf { row.starred }?.lowercase(locale),
         spokenSuffix(row.status, status)
             ?.takeIf { status.suffixAction == null }
             ?.trimStart('·', ' ', '\u00A0')
@@ -209,8 +210,8 @@ private fun badgeRowStatus(kind: StatusBadgeKind, @StringRes spoken: Int): RowSt
 )
 
 /**
- * Rename always; Move to trash except on the note being recorded (features.md section 6, as the actions sheet);
- * Resume when paused; Try again when failed.
+ * Rename always; Star or Unstar (L-34); Move to trash except on the note being recorded (features.md section 6, as
+ * the actions sheet); Resume when paused; Try again when failed.
  */
 @Composable
 private fun customActions(row: NoteRowUi, onAction: (NoteRowAction) -> Unit): List<CustomAccessibilityAction> {
@@ -218,6 +219,7 @@ private fun customActions(row: NoteRowUi, onAction: (NoteRowAction) -> Unit): Li
     val trash = stringResource(R.string.ui_action_move_to_trash)
     val resume = stringResource(R.string.ui_action_resume)
     val tryAgain = stringResource(R.string.ui_action_try_again)
+    val star = stringResource(if (row.starred) R.string.ui_meeting_unstar else R.string.ui_meeting_star)
     return buildList {
         when (row.status) {
             is NoteStatusUi.Paused -> add(action(resume, NoteRowAction.RESUME, onAction))
@@ -225,6 +227,7 @@ private fun customActions(row: NoteRowUi, onAction: (NoteRowAction) -> Unit): Li
             else -> Unit
         }
         add(action(rename, NoteRowAction.RENAME, onAction))
+        add(action(star, if (row.starred) NoteRowAction.UNSTAR else NoteRowAction.STAR, onAction))
         if (row.status != NoteStatusUi.Recording) add(action(trash, NoteRowAction.TRASH, onAction))
     }
 }

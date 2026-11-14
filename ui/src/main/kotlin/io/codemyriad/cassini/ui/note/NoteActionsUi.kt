@@ -11,7 +11,7 @@ import java.time.LocalTime
  *
  * [textExportEnabled] enables the text and subtitle rows (false for plain notes and for UNREADABLE or
  * UNKNOWN_FORMAT documents). [busyRow] shows the progress of a write in that row. [recording] hides Move to trash
- * (the note is the active capture).
+ * (the note is the active capture). [starred] makes the star row Unstar instead of Star (L-34, D99).
  *
  * ui.md writes `recordedAt` as one value; here it is the day the ViewModel classified ([recordedDay]) and the time
  * of day, as everywhere else (ui.md section 2).
@@ -30,6 +30,7 @@ data class NoteActionsUi(
     val busyRow: NoteAction? = null,
     val recording: Boolean = false,
     val recordedLabel: String? = null,
+    val starred: Boolean = false,
 )
 
 /** What "Save a copy" saves first: the [Document] (`.opus` with the transcript) or the [Plain] audio file. */
@@ -77,6 +78,8 @@ enum class NoteAction {
     SHARE_MARKDOWN,
     SHARE_SUBTITLES,
     RENAME,
+    STAR,
+    UNSTAR,
     TRANSCRIBE,
     TRANSCRIBE_AGAIN,
     STOP,

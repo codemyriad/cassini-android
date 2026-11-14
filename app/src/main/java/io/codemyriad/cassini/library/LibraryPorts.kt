@@ -73,6 +73,14 @@ interface LibraryPorts {
 
     suspend fun rename(id: String, title: String): RenameOutcome
 
+    /** Stars or unstars a note on this device (L-34); never written into its Cassini file (D53.1). */
+    suspend fun setStarred(id: String, starred: Boolean)
+
+    /** The Library's `All` / `Starred` choice at rest (L-34): true for `Starred`. */
+    val libraryStarredOnly: Flow<Boolean>
+
+    suspend fun setLibraryStarredOnly(starredOnly: Boolean)
+
     /** Imports the picked [uris] as one background batch with a shared summary. */
     fun import(uris: List<String>)
 
@@ -157,6 +165,13 @@ class GraphLibraryPorts(private val graph: AppGraph, context: Context) : Library
 
     override suspend fun rename(id: String, title: String): RenameOutcome =
         graph.awaitCatalogue().notes.rename(id, title)
+
+    override suspend fun setStarred(id: String, starred: Boolean) =
+        graph.awaitCatalogue().notes.setStarred(id, starred)
+
+    override val libraryStarredOnly: Flow<Boolean> get() = graph.settings.libraryStarredOnly
+
+    override suspend fun setLibraryStarredOnly(starredOnly: Boolean) = graph.settings.setLibraryStarredOnly(starredOnly)
 
     override fun import(uris: List<String>) {
         graph.transfers.import(uris.map { it.toUri() })

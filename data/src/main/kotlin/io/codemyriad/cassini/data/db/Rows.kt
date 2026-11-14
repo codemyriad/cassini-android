@@ -28,7 +28,8 @@ internal object Sql {
             "n.origin, n.recorded_at, n.capture_started_at, " +
             "COALESCE(n.preview, NULLIF(substr(t.body, 1, 160), '')) AS preview, " +
             "j.state AS job_state, j.kind AS job_kind, j.pause_reason, j.failure, j.done_ms, j.total_ms, " +
-            "v.variant_id AS selected_variant, v.word_count, v.speaker_count, v.word_ends_bounded_by_audio"
+            "v.variant_id AS selected_variant, v.word_count, v.speaker_count, v.word_ends_bounded_by_audio, " +
+            "EXISTS (SELECT 1 FROM note_stars st WHERE st.note_id = n.id) AS starred"
 
     /** The joins [LIBRARY_COLUMNS] needs, after `FROM notes n` or a join that names `n`. */
     const val LIBRARY_JOINS =
@@ -63,6 +64,8 @@ data class LibraryRow(
     @ColumnInfo(name = "recorded_at") val recordedAt: String? = null,
     @ColumnInfo(name = "capture_started_at") val captureStartedAt: Long? = null,
     @ColumnInfo(name = "word_ends_bounded_by_audio") val wordEndsBoundedByAudio: Boolean? = null,
+    /** The note is starred on this device (L-34, `note_stars`). */
+    val starred: Boolean = false,
 )
 
 /**
@@ -115,7 +118,12 @@ data class NoteDetails(
     val speakers: List<SpeakerEntity>,
     @Relation(parentColumn = "id", entityColumn = "note_id")
     val job: JobEntity?,
-)
+    /** The note's star on this device (L-34); null when not starred. */
+    @Relation(parentColumn = "id", entityColumn = "note_id")
+    val star: NoteStarEntity? = null,
+) {
+    val starred: Boolean get() = star != null
+}
 
 /** Every cache row derived from one document, written in one transaction by [CacheDao.replaceCache]. */
 data class NoteCache(

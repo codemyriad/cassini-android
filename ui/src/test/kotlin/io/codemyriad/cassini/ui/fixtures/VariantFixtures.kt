@@ -147,6 +147,18 @@ internal object VariantFixtures {
             banners = persistentListOf(banner(BannerKind.LIB_NO_MATCH)),
         ),
         "library-search" to b.library.copy(query = "deliver", progress = null, results = searchResults),
+        // L-34 (D99): the All / Starred row at rest with Starred chosen, and the star on a starred row.
+        "library-starred" to b.library.copy(
+            progress = null,
+            libraryFilters = true,
+            libraryFilter = io.codemyriad.cassini.ui.library.LibraryFilterUi.STARRED,
+            sections = persistentListOf(
+                io.codemyriad.cassini.ui.library.DaySection(
+                    io.codemyriad.cassini.ui.format.DayLabel.Yesterday,
+                    persistentListOf(b.supplier.copy(starred = true, preview = null)),
+                ),
+            ),
+        ),
         "library-recording-card" to b.library.copy(
             recording = RecordingPillUi(title = "Standup", elapsedMs = clock(24, 7), paused = false),
         ),

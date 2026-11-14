@@ -91,6 +91,15 @@
     <string name="ui_tx_suggestion_question">¿Es %1$s?</string>
     <string name="ui_tx_suggestion_yes">Sí</string>
     <string name="ui_tx_suggestion_no">No</string>
+    <string name="ui_library_filter_all">Todas</string>
+    <string name="ui_library_filter_starred">Destacadas</string>
+    <string name="ui_library_filters_a11y">Filtros</string>
+    <string name="ui_library_starred_empty">Aún no hay nada destacado.</string>
+    <string name="ui_meeting_star">Destacar</string>
+    <string name="ui_meeting_unstar">Quitar destacado</string>
+    <string name="ui_row_starred_a11y">Destacada</string>
+    <string name="ui_search_filter_starred">Destacadas</string>
+    <string name="ui_search_filter_date_year">Este año</string>
     <string name="ui_subtitle_imported">Importada</string>
     <string name="ui_subtitle_imported_other_device">Importada · Transcrita en otro dispositivo</string>
 </resources>

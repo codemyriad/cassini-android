@@ -91,6 +91,15 @@
     <string name="ui_tx_suggestion_question">Est-ce %1$s ?</string>
     <string name="ui_tx_suggestion_yes">Oui</string>
     <string name="ui_tx_suggestion_no">Non</string>
+    <string name="ui_library_filter_all">Toutes</string>
+    <string name="ui_library_filter_starred">Avec étoile</string>
+    <string name="ui_library_filters_a11y">Filtres</string>
+    <string name="ui_library_starred_empty">Aucune étoile pour l’instant.</string>
+    <string name="ui_meeting_star">Ajouter une étoile</string>
+    <string name="ui_meeting_unstar">Retirer l’étoile</string>
+    <string name="ui_row_starred_a11y">Avec étoile</string>
+    <string name="ui_search_filter_starred">Avec étoile</string>
+    <string name="ui_search_filter_date_year">Cette année</string>
     <string name="ui_subtitle_imported">Importée</string>
     <string name="ui_subtitle_imported_other_device">Importée · Transcrite sur un autre appareil</string>
 </resources>

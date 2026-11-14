@@ -28,6 +28,10 @@ import kotlinx.collections.immutable.persistentListOf
  * takes a different text from the state only when that text is not one it sent (SyncedText). Thus the
  * ViewModel can update this value through its StateFlow.
  *
+ * [libraryFilter] is the Library's `All` / `Starred` choice at rest (L-34, D99), remembered on this device;
+ * [libraryFilters] shows its chip row (not while searching, nor before the first note). [starredEmpty] is set when
+ * `Starred` is chosen and no note is starred: the list shows `library.starred.empty`.
+ *
  * [backupCard] shows the once-only "Keep them on this phone only" card (D98) above the activity while encrypted
  * cloud backup is on; it is not shown during search.
  */
@@ -47,7 +51,13 @@ data class LibraryUiState(
     val dialog: LibraryDialog? = null,
     val hero: FirstRunHeroUi? = null,
     val backupCard: Boolean = false,
+    val libraryFilter: LibraryFilterUi = LibraryFilterUi.ALL,
+    val libraryFilters: Boolean = false,
+    val starredEmpty: Boolean = false,
 )
+
+/** The Library's filter at rest (L-34, D99): single choice, `All` by default. */
+enum class LibraryFilterUi { ALL, STARRED }
 
 /**
  * The first-run hero (L-27, D-975) that replaces the empty-Library banner: "Every word written down." over a dimmed
@@ -149,13 +159,18 @@ sealed interface LibraryDialog {
     data class StopAndTrash(val id: String) : LibraryDialog
 }
 
-/** D14 controls, deliberately absent from saved state. */
+/**
+ * D14 controls, deliberately absent from saved state. The row is `Starred` · `Speaker` · `Any date` ·
+ * `Recorded by me` (L-35, D99); [starred] starts as the Library's choice when Search opens.
+ */
 @Immutable
 data class SearchFiltersUi(
     val speaker: String? = null,
     val date: SearchDateUi = SearchDateUi.ANY,
     val recordedByMe: Boolean = false,
     val speakers: ImmutableList<String> = persistentListOf(),
+    val starred: Boolean = false,
 )
 
-enum class SearchDateUi { ANY, TODAY, WEEK, MONTH }
+/** The date menu in order: `Any date`, `Today`, `Past 7 days`, `Past 30 days`, `This year` (L-35). */
+enum class SearchDateUi { ANY, TODAY, WEEK, MONTH, YEAR }

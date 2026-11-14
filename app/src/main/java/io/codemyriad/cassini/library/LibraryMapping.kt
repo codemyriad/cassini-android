@@ -113,6 +113,7 @@ object LibraryMapping {
             highlighted = row.id == context.runningNoteId || row.jobState == JobState.RUNNING,
             transcriptionMinutes = context.transcriptionMinutes.takeIf { row.id == context.runningNoteId },
             imported = row.origin.imported,
+            starred = row.starred,
         )
     }
 
@@ -342,6 +343,7 @@ object LibraryMapping {
             transcribeRow = transcribeRow(details, namesCarry),
             busyRow = NoteAction.STOP.takeIf { stopBusy && details.job?.state == JobState.RUNNING },
             recording = note.audioKind == AudioKind.LIVE_CAPTURE && note.id == activeNoteId,
+            starred = details.starred,
         )
     }
 

@@ -1,6 +1,8 @@
 package io.codemyriad.cassini.core.library
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
@@ -12,6 +14,7 @@ class SearchFiltersTest {
     @Test fun eachRangeIncludesItsFirstMidnightAndExcludesTomorrow() {
         for (today in listOf(LocalDate.of(2026, 3, 29), LocalDate.of(2026, 10, 25))) {
             for ((range, days) in listOf(SearchDate.TODAY to 1L, SearchDate.WEEK to 7L, SearchDate.MONTH to 30L)) {
+                assertEquals(today.minusDays(days - 1), range.firstDay(today))
                 val first = today.minusDays(days - 1).atStartOfDay(zone).toInstant().toEpochMilli()
                 val tomorrow = today.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
                 assertFalse("$today/$range before first", range.includes(first - 1, today, zone))
@@ -65,11 +68,47 @@ class SearchFiltersTest {
         val at = today.atStartOfDay(zone).toInstant().toEpochMilli()
         val filters = SearchFilters(date = SearchDate.TODAY, recordedByMe = true)
         assertTrue(filters.includes(at, Origin.RECORDED, today, zone))
-        for (origin in listOf(Origin.IMPORTED_AUDIO, Origin.IMPORTED_DOCUMENT, Origin.RECOVERED)) {
+        // L-35: `origin = own`; a recovered capture is this device's own recording, an Imported note never is.
+        assertTrue(filters.includes(at, Origin.RECOVERED, today, zone))
+        for (origin in listOf(Origin.IMPORTED_AUDIO, Origin.IMPORTED_DOCUMENT)) {
             assertFalse(origin.name, filters.includes(at, origin, today, zone))
         }
         assertFalse(filters.includes(at - 1, Origin.RECORDED, today, zone))
         assertTrue(SearchFilters().includes(Long.MIN_VALUE, Origin.IMPORTED_AUDIO, today, zone))
         assertTrue(SearchFilters().includes(Long.MAX_VALUE, Origin.RECORDED, today, zone))
+    }
+
+    @Test fun thisYearStartsAtLocalMidnightOnTheFirstOfJanuary() {
+        for (today in listOf(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 11, 14), LocalDate.of(2028, 12, 31))) {
+            assertEquals(LocalDate.of(today.year, 1, 1), SearchDate.YEAR.firstDay(today))
+            val first = LocalDate.of(today.year, 1, 1).atStartOfDay(zone).toInstant().toEpochMilli()
+            val tomorrow = today.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+            assertFalse("$today before 1 January", SearchDate.YEAR.includes(first - 1, today, zone))
+            assertTrue("$today 1 January", SearchDate.YEAR.includes(first, today, zone))
+            assertTrue("$today end", SearchDate.YEAR.includes(tomorrow - 1, today, zone))
+            assertFalse("$today tomorrow", SearchDate.YEAR.includes(tomorrow, today, zone))
+        }
+        val today = LocalDate.of(2026, 11, 14)
+        assertFalse(SearchFilters(date = SearchDate.YEAR).includes(null, Origin.RECORDED, today))
+        assertFalse(SearchDate.YEAR.includes(LocalDate.of(2025, 12, 31), today))
+        assertTrue(SearchDate.YEAR.includes(LocalDate.of(2026, 1, 1), today))
+        assertNull(SearchDate.ANY.firstDay(today))
+    }
+
+    @Test fun starredKeepsOnlyStarredNotesAndCombinesWithTheOtherFilters() {
+        val today = LocalDate.of(2026, 11, 14)
+        val starred = SearchFilters(starred = true)
+        assertTrue(starred.includes(today, Origin.IMPORTED_AUDIO, starred = true, today))
+        assertFalse(starred.includes(today, Origin.RECORDED, starred = false, today))
+        assertFalse(starred.includes(today, Origin.RECORDED, today))
+        assertTrue(SearchFilters().includes(today, Origin.RECORDED, starred = false, today))
+        val all = SearchFilters(date = SearchDate.YEAR, recordedByMe = true, starred = true)
+        assertTrue(all.includes(today, Origin.RECORDED, starred = true, today))
+        assertFalse(all.includes(today, Origin.IMPORTED_DOCUMENT, starred = true, today))
+        assertFalse(all.includes(LocalDate.of(2025, 6, 1), Origin.RECORDED, starred = true, today))
+        assertFalse(all.includes(today, Origin.RECORDED, starred = false, today))
+        val at = today.atStartOfDay(zone).toInstant().toEpochMilli()
+        assertTrue(starred.includes(at, Origin.RECORDED, today, zone, starred = true))
+        assertFalse(starred.includes(at, Origin.RECORDED, today, zone))
     }
 }

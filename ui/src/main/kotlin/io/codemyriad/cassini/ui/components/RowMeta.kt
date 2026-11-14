@@ -28,7 +28,9 @@ import io.codemyriad.cassini.ui.R
 import io.codemyriad.cassini.ui.format.Counts
 import io.codemyriad.cassini.ui.format.Dates
 import io.codemyriad.cassini.ui.format.DayLabel
+import io.codemyriad.cassini.ui.theme.CassiniIcon
 import io.codemyriad.cassini.ui.theme.CassiniTheme
+import io.codemyriad.cassini.ui.theme.Glyph
 
 @Composable
 internal fun RowMeta(row: NoteRowUi, day: DayLabel, status: RowStatus, onAction: (NoteRowAction) -> Unit) {
@@ -40,6 +42,8 @@ internal fun RowMeta(row: NoteRowUi, day: DayLabel, status: RowStatus, onAction:
         verticalArrangement = Arrangement.spacedBy(4.dp),
         itemVerticalAlignment = Alignment.CenterVertically,
     ) {
+        // L-34: a starred row leads its meta line with the star; the row's description says "starred".
+        if (row.starred) CassiniIcon(Glyph.StarFilled, 14.dp, 0f, c.accent, contentDescription = null)
         Text(
             text = row.recordedLabel ?: if (day == DayLabel.Unknown) {
                 Dates.dayLabel(day)

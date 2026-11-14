@@ -7,7 +7,7 @@ import androidx.room.TypeConverters
 /**
  * The Room catalogue (docs/architecture.md, section 3.3), opened by absolute path at `AppPaths.database` through
  * [CassiniDatabaseOpener]. Version 2 adds the derived D95 recording time; version 3 adds the file-derived
- * speaker colour slot. Its explicit migration preserves authoritative
+ * speaker colour slot; version 4 adds the per-device stars (`note_stars`, L-34). Each explicit migration preserves authoritative
  * rows and jobs, invalidating legacy document signatures for off-main startup re-derivation, with a MigrationTestHelper test.
  * Destructive fallback migrations are forbidden: a database that cannot be opened is set aside and the catalogue
  * is rebuilt from the files.
@@ -22,6 +22,7 @@ import androidx.room.TypeConverters
         NoteFtsEntity::class,
         JobEntity::class,
         NoteVoiceLinkEntity::class,
+        NoteStarEntity::class,
     ],
     version = CassiniDatabase.VERSION,
     exportSchema = true,
@@ -29,10 +30,21 @@ import androidx.room.TypeConverters
 @TypeConverters(Converters::class)
 abstract class CassiniDatabase : RoomDatabase() {
     companion object {
-        const val VERSION = 3
+        const val VERSION = 4
+
+        /** Stars are new per-device state: an empty table, every existing row untouched. */
+        val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, VERSION) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `note_stars` (`note_id` TEXT NOT NULL, `starred_at` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`note_id`), FOREIGN KEY(`note_id`) REFERENCES `notes`(`id`) " +
+                        "ON UPDATE NO ACTION ON DELETE CASCADE )",
+                )
+            }
+        }
 
         /** Colour is a file fact; refresh derived rows without touching authoritative notes or jobs. */
-        val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, VERSION) {
+        val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE speakers ADD COLUMN colour_index INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("UPDATE notes SET document_signature = NULL WHERE audio_kind = 'DOCUMENT'")

@@ -82,6 +82,16 @@ LABELS = {
     'tx_suggestion_question': ('transcribing.speakerSuggestion', 'name'),
     'tx_suggestion_yes': ('transcribing.speakerSuggestion.yes', None),
     'tx_suggestion_no': ('transcribing.speakerSuggestion.no', None),
+    # L-34/L-35 (D99, PARITY Phase 2 §3): starring, the Library's All / Starred row and the new search filters.
+    'library_filter_all': ('library.filter.all', None),
+    'library_filter_starred': ('library.filter.starred', None),
+    'library_filters_a11y': ('library.filters.a11y', None),
+    'library_starred_empty': ('library.starred.empty', None),
+    'meeting_star': ('meeting.star', None),
+    'meeting_unstar': ('meeting.unstar', None),
+    'row_starred_a11y': ('library.row.starred.a11y', None),
+    'search_filter_starred': ('search.filter.starred', None),
+    'search_filter_date_year': ('search.filter.date.year', None),
 }
 # L-10 (D99): the Meeting header subtitle of an imported meeting is the catalog's `format.previewSubtitle` followed by
 # the words after `{duration}` of these entries. Android keeps building the day, time and duration itself (the "Date

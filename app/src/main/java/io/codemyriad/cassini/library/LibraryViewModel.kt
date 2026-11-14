@@ -29,6 +29,7 @@ import io.codemyriad.cassini.ui.components.SnackbarKind
 import io.codemyriad.cassini.ui.components.SnackbarSpec
 import io.codemyriad.cassini.ui.library.LibraryDialog
 import io.codemyriad.cassini.ui.library.LibraryEvent
+import io.codemyriad.cassini.ui.library.LibraryFilterUi
 import io.codemyriad.cassini.ui.library.LibrarySheet
 import io.codemyriad.cassini.ui.library.LibraryUiState
 import io.codemyriad.cassini.ui.library.ProgressLine
@@ -123,6 +124,14 @@ class LibraryViewModel(
     private var snackbarCount = 0L
     private val listingCache = LibraryListing()
     private val filters = MutableStateFlow(SearchFiltersUi())
+
+    /** The Library's `All` / `Starred` choice at rest (L-34), remembered per device; `All` until it is read. */
+    private val starredOnly: StateFlow<Boolean> = ports.libraryStarredOnly
+        .catch { error ->
+            Log.w(TAG, "The Library filter cannot be read", error)
+            emit(false)
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
     private val calendarRefresh = MutableStateFlow(0L)
     private val controls = combine(
         filters,
@@ -189,8 +198,10 @@ class LibraryViewModel(
             SearchDateUi.TODAY -> SearchDate.TODAY
             SearchDateUi.WEEK -> SearchDate.WEEK
             SearchDateUi.MONTH -> SearchDate.MONTH
+            SearchDateUi.YEAR -> SearchDate.YEAR
         },
         recordedByMe,
+        starred,
     )
 
     private val sheet: Flow<NoteDetails?> = sheetId.flatMapLatest { id ->
@@ -206,7 +217,10 @@ class LibraryViewModel(
     ) { processing, rec, facts, voices, reach -> Live(processing, rec, facts, voices, reach) }
 
     val state: StateFlow<LibraryUiState> = combine(
-        combine(rows, search, query, unavailable, environment, ::Listing),
+        combine(
+            combine(rows, search, query, unavailable, environment) { r, s, q, u, e -> Listing(r, s, q, u, e) },
+            starredOnly,
+        ) { listing, starred -> listing.copy(starredOnly = starred) },
         live,
         sheet,
         dialog,
@@ -217,6 +231,13 @@ class LibraryViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), LibraryUiState(loading = true))
 
     init {
+        // After process death the query survives but the filters do not: an open Search takes the Library's choice.
+        if (query.value.isNotBlank()) {
+            viewModelScope.launch {
+                val starred = ports.libraryStarredOnly.catch { emit(false) }.first()
+                if (filters.value == SearchFiltersUi()) filters.value = SearchFiltersUi(starred = starred)
+            }
+        }
         // Move to trash on the Note screen lands here with the Undo snackbar (architecture section 6).
         viewModelScope.launch {
             ports.trashed.filterNotNull().collect { note ->
@@ -232,6 +253,7 @@ class LibraryViewModel(
         val query: String,
         val unavailable: Boolean,
         val environment: SearchEnvironment,
+        val starredOnly: Boolean = false,
     )
 
     private data class Live(
@@ -263,7 +285,7 @@ class LibraryViewModel(
         val rows = listing.rows.orEmpty()
         val (searched, found) = listing.search
         val searching = listing.query.isNotBlank()
-        val mapped = listingCache.map(rows, found, searching, context, now, zone)
+        val mapped = listingCache.map(rows, found, searching, context, now, zone, listing.starredOnly)
         val facts = LibraryFacts(
             loading = listing.rows == null,
             liveNotes = rows.size,
@@ -284,6 +306,9 @@ class LibraryViewModel(
             banners = if (empty) notices.filterNot { it.kind == BannerKind.LIB_EMPTY }.toImmutableList() else notices,
             hero = live.backupReach?.takeIf { empty }?.let(LibraryMapping::hero),
             backupCard = live.backupReach?.card == true && !searching,
+            libraryFilter = if (listing.starredOnly) LibraryFilterUi.STARRED else LibraryFilterUi.ALL,
+            libraryFilters = !searching && rows.isNotEmpty(),
+            starredEmpty = !searching && listing.starredOnly && rows.isNotEmpty() && !mapped.anyStarred,
             imports = LibraryMapping.imports(live.facts.imports),
             sections = mapped.sections,
             results = mapped.results,
@@ -304,7 +329,11 @@ class LibraryViewModel(
     fun onEvent(event: LibraryEvent) {
         when (event) {
             is LibraryEvent.Query -> {
-                if (event.text.isBlank()) filters.value = SearchFiltersUi()
+                when {
+                    event.text.isBlank() -> filters.value = SearchFiltersUi()
+                    // L-35: Search opens with the Library's Starred choice; the other filters start cleared.
+                    query.value.isBlank() -> filters.value = SearchFiltersUi(starred = starredOnly.value)
+                }
                 saved[KEY_QUERY] = event.text
             }
             LibraryEvent.ClearQuery -> {
@@ -314,6 +343,12 @@ class LibraryViewModel(
             is LibraryEvent.FilterSpeaker -> filters.value = filters.value.copy(speaker = event.name)
             is LibraryEvent.FilterDate -> filters.value = filters.value.copy(date = event.date)
             LibraryEvent.ToggleRecordedByMe -> filters.value = filters.value.copy(recordedByMe = !filters.value.recordedByMe)
+            LibraryEvent.ToggleSearchStarred -> filters.value = filters.value.copy(starred = !filters.value.starred)
+            // No optimistic state: the row follows the stored choice (BUG-CLASSES).
+            is LibraryEvent.SelectLibraryFilter -> launch {
+                ports.setLibraryStarredOnly(event.filter == LibraryFilterUi.STARRED)
+            }
+            is LibraryEvent.SetStarred -> launch { ports.setStarred(event.id, event.starred) }
             is LibraryEvent.OpenNote -> openNote(event.id)
             is LibraryEvent.LongPress -> saved[KEY_SHEET] = event.id
             LibraryEvent.Record, LibraryEvent.ReturnToRecording -> emit(LibraryEffect.OpenRecording)
@@ -434,6 +469,10 @@ class LibraryViewModel(
                 closeSheet()
                 saved[KEY_DIALOG_TITLE] = details.note.title
                 saved[KEY_DIALOG] = dialogKey(DIALOG_RENAME, id)
+            }
+            NoteAction.STAR, NoteAction.UNSTAR -> {
+                closeSheet()
+                ports.setStarred(id, action == NoteAction.STAR)
             }
             NoteAction.TRANSCRIBE -> {
                 closeSheet()
