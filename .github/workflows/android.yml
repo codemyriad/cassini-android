@@ -273,10 +273,21 @@ jobs:
         env:
           DAILY_TEST_PLAN: ${{ inputs.daily_plan }}
         run: python3 -I scripts/daily-test-release.py apply
+      # The Gradle home above has a key that follows only the build scripts, so main cannot refresh it, and its task
+      # outputs went stale: 227 of 315 tasks ran again on every push, on main too (D-1063). Gradle's local build
+      # cache therefore has its own entry: main saves a new one on each run and every run restores the latest.
+      - name: Restore Gradle's task output cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.gradle/caches/build-cache-1
+          key: gradle-build-cache-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: gradle-build-cache-v1-
+      - name: Mark the restored task outputs as unread
+        run: python3 -I scripts/ci-build-cache.py prepare
       - name: Snapshot build memory limits before Gradle
         continue-on-error: true
         run: python3 -I scripts/ci-memory-evidence.py before
-      - name: Build APK, run unit and conformance tests, and lint
+      - name: Build APK, run the Android unit and screenshot tests, and lint
         env:
           BUILD_TYPE: ${{ (startsWith(github.ref, 'refs/tags/') || (inputs.daily_test && github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'))) && 'Release' || 'Debug' }}
           DEVICE_TEST_TYPE: ${{ (startsWith(github.ref, 'refs/tags/') || (inputs.daily_test && github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'))) && 'releaseTest' || 'debug' }}
@@ -291,9 +302,11 @@ jobs:
           if [ "$DEVICE_TEST_TYPE" = debug ]; then
             device_tasks+=(:app:assembleDebugAndroidTest)
           fi
+          # The core-only job runs :core:test and :app-logic:test (the conformance vectors); every job that needs
+          # build also needs core-only, so they do not run twice.
           ./gradlew --no-daemon --profile -Pandroid.builder.sdkDownload=false \
             ":app:assemble$BUILD_TYPE" :data:assembleDebugAndroidTest \
-            ciTest :bench:compileDebugKotlin ":app:lint$BUILD_TYPE" ":data:lint$BUILD_TYPE" ":ui:lint$BUILD_TYPE" \
+            ciTest -x :core:test -x :app-logic:test :bench:compileDebugKotlin ":app:lint$BUILD_TYPE" ":data:lint$BUILD_TYPE" ":ui:lint$BUILD_TYPE" \
             "${device_tasks[@]}"
           if [ "$DEVICE_TEST_TYPE" != debug ]; then
             ./gradlew --no-daemon --profile -Pandroid.builder.sdkDownload=false \
@@ -308,6 +321,21 @@ jobs:
         if: always()
         continue-on-error: true
         run: python3 -I scripts/ci-memory-evidence.py after
+      # Only an unsigned GitHub-hosted main build writes the entry, as for the Gradle home. It keeps only what this
+      # build read or wrote, so the entry stays one build's worth of outputs (scripts/ci-build-cache.py).
+      - name: Count the task outputs the build read and wrote
+        if: "!(github.ref == 'refs/heads/main' && runner.environment == 'github-hosted' && !inputs.daily_test)"
+        continue-on-error: true
+        run: python3 -I scripts/ci-build-cache.py report
+      - name: Keep only the task outputs this build read or wrote
+        if: github.ref == 'refs/heads/main' && runner.environment == 'github-hosted' && !inputs.daily_test
+        run: python3 -I scripts/ci-build-cache.py prune
+      - name: Save Gradle's task output cache
+        if: github.ref == 'refs/heads/main' && runner.environment == 'github-hosted' && !inputs.daily_test
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.gradle/caches/build-cache-1
+          key: gradle-build-cache-v1-${{ github.run_id }}-${{ github.run_attempt }}
       - name: List the Robolectric jars after the tests
         id: robolectric-used
         if: github.ref == 'refs/heads/main'
@@ -396,10 +424,6 @@ jobs:
             app/build/reports/tests/testDebugUnitTest/
             app/build/test-results/testDebugUnitTest/
             app/build/reports/lint-results-*.html
-            app-logic/build/reports/tests/
-            app-logic/build/test-results/test/
-            core/build/reports/tests/
-            core/build/test-results/test/
             engine/build/reports/tests/testDebugUnitTest/
             engine/build/test-results/testDebugUnitTest/
             data/build/reports/tests/testDebugUnitTest/
