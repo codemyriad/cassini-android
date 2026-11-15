@@ -69,7 +69,11 @@ interface LibraryPorts {
     /** Move to trash, stopping a running job first (architecture 5.2 rule 9). */
     suspend fun moveToTrash(id: String): Boolean
 
+    /** False when the note is no longer in Trash (restored already, or deleted for good). */
     suspend fun restore(id: String): Boolean
+
+    /** The ids of the notes in Trash: the Library's Undo ends when its note leaves (D-1057). */
+    fun trashedIds(): Flow<Set<String>>
 
     suspend fun rename(id: String, title: String): RenameOutcome
 
@@ -162,6 +166,9 @@ class GraphLibraryPorts(private val graph: AppGraph, context: Context) : Library
     override suspend fun moveToTrash(id: String): Boolean = graph.processing.moveToTrash(id)
 
     override suspend fun restore(id: String): Boolean = graph.processing.restore(id)
+
+    override fun trashedIds(): Flow<Set<String>> =
+        flow { emitAll(graph.awaitCatalogue().notes.trash()) }.map { rows -> rows.mapTo(HashSet()) { it.id } }
 
     override suspend fun rename(id: String, title: String): RenameOutcome =
         graph.awaitCatalogue().notes.rename(id, title)

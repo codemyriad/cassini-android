@@ -168,15 +168,23 @@ internal class FakeLibraryPorts : LibraryPorts {
         actions += "download"
     }
 
+    /** The notes in Trash; [moveToTrash] and [restore] keep it, a test changes it for Restore and Delete now. */
+    val trash = MutableStateFlow<Set<String>>(emptySet())
+
     override suspend fun moveToTrash(id: String): Boolean {
         actions += "trash $id"
+        trash.value = trash.value + id
         return true
     }
 
     override suspend fun restore(id: String): Boolean {
         actions += "restore $id"
-        return true
+        val trashed = id in trash.value
+        trash.value = trash.value - id
+        return trashed
     }
+
+    override fun trashedIds(): Flow<Set<String>> = trash
 
     override suspend fun rename(id: String, title: String): RenameOutcome {
         actions += "rename $id $title"

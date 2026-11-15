@@ -75,12 +75,13 @@ fun CassiniSnackbarHost(
 /**
  * [CassiniSnackbarHost] for a screen's [SnackbarSpec]: the copy of its kind ("“Call with supplier” moved to trash",
  * "Saved “<file>”", "Couldn't save the file") and, when [SnackbarSpec.undo], the Undo action ([onUndo]). The
- * spec's id restarts the timer for a second snackbar with the same text.
+ * spec's id restarts the timer for a second snackbar with the same text. [onTimeout] gets the spec whose time ran
+ * out, so a screen can ignore the end of a snackbar that a newer one has already replaced.
  */
 @Composable
 fun CassiniSnackbarHost(
     spec: SnackbarSpec?,
-    onTimeout: () -> Unit,
+    onTimeout: (SnackbarSpec) -> Unit,
     modifier: Modifier = Modifier,
     onUndo: () -> Unit = {},
 ) {
@@ -96,7 +97,8 @@ fun CassiniSnackbarHost(
     CassiniSnackbarHost(
         message = message,
         durationMs = spec?.durationMs ?: 0L,
-        onTimeout = onTimeout,
+        // Captures this composition's spec: the timer of a replaced spec reports the spec it was started for.
+        onTimeout = { spec?.let(onTimeout) },
         modifier = modifier,
         actionLabel = if (spec?.undo == true) stringResource(R.string.ui_action_undo) else null,
         onAction = onUndo,

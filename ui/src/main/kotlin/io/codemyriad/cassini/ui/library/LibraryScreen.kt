@@ -136,7 +136,7 @@ fun LibraryScreen(
         LibraryActions(state, onEvent) { barPx = it }
         CassiniSnackbarHost(
             spec = state.snackbar,
-            onTimeout = { onEvent(LibraryEvent.SnackbarTimeout) },
+            onTimeout = { onEvent(LibraryEvent.SnackbarTimeout(it.id)) },
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = bar - BarTopPadding),

@@ -42,12 +42,17 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingCommand
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -61,6 +66,7 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Clock
 import java.time.Instant
@@ -118,8 +124,21 @@ class LibraryViewModel(
     private val dialog: Flow<LibraryDialog?> = combine(dialogKey, dialogTitle) { key, title ->
         key?.let { dialogOf(it, title) }
     }
-    private val snackbar = MutableStateFlow<SnackbarSpec?>(null)
+
+    /** The note of the shown "moved to trash" snackbar, whose Undo restores it; null when Undo has nothing to do. */
     private var trashed: String? = null
+
+    /** [trashed] has been seen in Trash, so its absence now means it was restored or deleted for good (D-1057). */
+    private var trashedSeen = false
+
+    /** The ids in Trash at the last read; null until the first read. */
+    private var trashIds: Set<String>? = null
+
+    /**
+     * Ends the shown snackbar at its deadline. It runs in [viewModelScope], not in composition, so leaving the Library
+     * (Trash, Settings, a note) does not restart the time when the Library comes back (D-1057).
+     */
+    private var snackbarTimer: Job? = null
     private var snackbarCount = 0L
     private val listingCache = LibraryListing()
     private val filters = MutableStateFlow(SearchFiltersUi())
@@ -215,7 +234,8 @@ class LibraryViewModel(
         ports.backupReach.map<BackupReach, BackupReach?> { it }.onStart { emit(null) }.catch { emit(null) },
     ) { processing, rec, facts, voices, reach -> Live(processing, rec, facts, voices, reach) }
 
-    val state: StateFlow<LibraryUiState> = combine(
+    /** Everything in [state] but the snackbar, mapped on [compute]. */
+    private val built: Flow<LibraryUiState> = combine(
         combine(
             combine(rows, search, query, unavailable, environment) { r, s, q, u, e -> Listing(r, s, q, u, e) },
             starredOnly,
@@ -223,13 +243,31 @@ class LibraryViewModel(
         live,
         sheet,
         dialog,
-        snackbar,
-    ) { listing, live, sheet, dialog, snackbar ->
-        build(listing, live, sheet, dialog, snackbar)
+    ) { listing, live, sheet, dialog ->
+        build(listing, live, sheet, dialog)
     }.flowOn(compute)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), LibraryUiState(loading = true))
+
+    private val backingState = MutableStateFlow(LibraryUiState(loading = true))
+
+    /**
+     * The Library. [built] runs while the screen collects this (and 5 s after it stops), but the snackbar is written
+     * here directly: with no collector the upstream is stopped, and the screen must not come back to a snackbar that
+     * ended while it was away (Trash, a picker, the background; D-1057).
+     */
+    val state: StateFlow<LibraryUiState> = backingState.asStateFlow()
 
     init {
+        // stateIn's WhileSubscribed sharing, by hand: a built state keeps the snackbar already in [state] (an atomic
+        // update), so a build that was under way cannot bring back a snackbar that has just ended or been replaced.
+        viewModelScope.launch {
+            SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS)
+                .command(backingState.subscriptionCount)
+                .collectLatest { command ->
+                    if (command == SharingCommand.START) {
+                        built.collect { next -> backingState.update { next.copy(snackbar = it.snackbar) } }
+                    }
+                }
+        }
         // After process death the query survives but the filters do not: an open Search takes the Library's choice.
         if (query.value.isNotBlank()) {
             viewModelScope.launch {
@@ -243,6 +281,13 @@ class LibraryViewModel(
                 ports.takeTrashed(note)
                 showTrashed(note.noteId, note.title)
             }
+        }
+        // Undo ends when its note leaves Trash some other way: Restore, Delete now, Empty or the 30-day purge (D-1057).
+        viewModelScope.launch {
+            ports.trashedIds()
+                .distinctUntilChanged()
+                .catch { error -> Log.w(TAG, "Trash cannot be read", error) }
+                .collect(::onTrashChanged)
         }
     }
 
@@ -269,7 +314,6 @@ class LibraryViewModel(
         live: Live,
         details: NoteDetails?,
         dialog: LibraryDialog?,
-        snackbar: SnackbarSpec?,
     ): LibraryUiState {
         val now = Instant.now(clock)
         val zone = listing.environment.zone
@@ -311,7 +355,7 @@ class LibraryViewModel(
             imports = LibraryMapping.imports(live.facts.imports),
             sections = mapped.sections,
             results = mapped.results,
-            snackbar = snackbar,
+            snackbar = null, // [backingState] keeps its own
             sheet = details?.let {
                 val stopBusy = live.processing.notes[it.note.id]?.phase is JobPhase.Stopping
                 LibrarySheet.Actions(
@@ -366,7 +410,8 @@ class LibraryViewModel(
             // A failed write keeps the card: the choices did not change (BUG-CLASSES: no optimistic state).
             LibraryEvent.KeepOnPhoneOnly -> launch { ports.keepOnPhoneOnly() }
             LibraryEvent.DismissBackupCard -> launch { ports.dismissBackupCard() }
-            LibraryEvent.SnackbarTimeout -> snackbar.value = null
+            // The host's timer of a snackbar that has since been replaced does not end the new one.
+            is LibraryEvent.SnackbarTimeout -> if (state.value.snackbar?.id == event.id) clearSnackbar()
             is LibraryEvent.SheetAction -> sheetId.value?.let { id -> launch { sheetAction(id, event.action) } }
             LibraryEvent.DismissSheet -> closeSheet()
             is LibraryEvent.RenameConfirmed -> {
@@ -438,21 +483,58 @@ class LibraryViewModel(
     }
 
     private fun showTrashed(id: String, title: String) {
-        trashed = id
-        snackbar.value = SnackbarSpec(
+        val spec = SnackbarSpec(
             kind = SnackbarKind.MOVED_TO_TRASH,
             text = title,
             undo = true,
             durationMs = ports.snackbarTimeoutMs(),
             id = ++snackbarCount,
         )
+        trashed = id
+        trashedSeen = trashIds?.contains(id) == true
+        setSnackbar(spec)
+        snackbarTimer?.cancel()
+        snackbarTimer = viewModelScope.launch {
+            delay(spec.durationMs)
+            if (state.value.snackbar?.id == spec.id) clearSnackbar()
+        }
     }
 
+    /** The snackbar and its Undo end together. */
+    private fun clearSnackbar() {
+        snackbarTimer?.cancel()
+        snackbarTimer = null
+        setSnackbar(null)
+        trashed = null
+        trashedSeen = false
+    }
+
+    /** The snackbar lives in [state] itself, so it changes whether or not the screen collects [state]. */
+    private fun setSnackbar(spec: SnackbarSpec?) {
+        backingState.update { it.copy(snackbar = spec) }
+    }
+
+    private fun onTrashChanged(ids: Set<String>) {
+        trashIds = ids
+        val id = trashed ?: return
+        when {
+            id in ids -> trashedSeen = true
+            // Before the first read that holds it, the note may just not have reached the list yet.
+            trashedSeen -> clearSnackbar()
+        }
+    }
+
+    /**
+     * Undo puts [trashed] back. Once the note has left Trash the snackbar is gone ([onTrashChanged]), so Undo cannot
+     * be pressed; a restore that the repository still refuses (the note was deleted for good in between) is logged,
+     * and the row does not come back, so nothing claims the meeting was restored.
+     */
     private fun undo() {
         val id = trashed ?: return
-        trashed = null
-        snackbar.value = null
-        launch { ports.restore(id) }
+        clearSnackbar()
+        launch {
+            if (!ports.restore(id)) Log.w(TAG, "Undo: the note is no longer in Trash")
+        }
     }
 
     @Suppress("CyclomaticComplexMethod") // one branch per row of the Note actions sheet
@@ -634,7 +716,10 @@ class LibraryViewModel(
             (ImportTypes.ANDROID_MIME_TYPES + listOf("application/zip", "application/x-zip-compressed")).toTypedArray()
 
         const val SEARCH_DEBOUNCE_MS = 150L
-        private const val STOP_TIMEOUT_MS = 5_000L
+
+        /** How long the Library's flows keep running once the screen stops collecting [state]. */
+        const val STOP_TIMEOUT_MS = 5_000L
+
         private const val TAG = "CassiniLibrary"
 
         private const val KEY_QUERY = "query"

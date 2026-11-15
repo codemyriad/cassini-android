@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.InputModeManager
@@ -16,6 +17,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -124,5 +127,34 @@ class LibraryActionBarTest {
         record.performClick()
         rule.runOnIdle { assertEquals(listOf("import", "record"), events) }
         rule.onNodeWithText("Record", useUnmergedTree = true).assertExists()
+    }
+
+    @Test fun importPillIsOpaqueOverScrollingContentInLightMode() = opaqueImport(dark = false)
+
+    @Test fun importPillIsOpaqueOverScrollingContentInDarkMode() = opaqueImport(dark = true)
+
+    /**
+     * D-1057: list content under the bar's fade must not show through "Import audio". The pill sits over a backdrop
+     * of the record token (a colour far from bg), and its fill must read as the ink wash over bg all the same.
+     */
+    private fun opaqueImport(dark: Boolean) {
+        var expected = Color.Unspecified
+        rule.setContent {
+            CassiniTheme(darkTheme = dark) {
+                val c = CassiniTheme.colors
+                expected = c.ink.copy(alpha = 0.1f).compositeOver(c.bg)
+                Box(Modifier.width(390.dp).background(c.record)) {
+                    LibraryBottomBar(onImport = {}, onRecord = {})
+                }
+            }
+        }
+        val pill = rule.onNode(hasText("Import audio") and hasClickAction()).captureToImage()
+        // Mid-height, 8 dp in: inside the pill, left of its 16 dp padding, so neither the icon nor the label.
+        val inset = with(rule.density) { 8.dp.toPx() }.roundToInt()
+        val fill = pill.toPixelMap()[inset, pill.height / 2]
+        assertEquals(1f, fill.alpha, 0.005f)
+        assertEquals(expected.red, fill.red, 0.01f)
+        assertEquals(expected.green, fill.green, 0.01f)
+        assertEquals(expected.blue, fill.blue, 0.01f)
     }
 }

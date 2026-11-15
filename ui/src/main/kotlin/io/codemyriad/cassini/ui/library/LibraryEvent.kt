@@ -81,7 +81,8 @@ sealed interface LibraryEvent {
     /** The backup card's "Keep backup on" or its close button. */
     data object DismissBackupCard : LibraryEvent
 
-    data object SnackbarTimeout : LibraryEvent
+    /** The host's timer for the snackbar [id] ([io.codemyriad.cassini.ui.components.SnackbarSpec.id]) ran out. */
+    data class SnackbarTimeout(val id: Long) : LibraryEvent
 
     /** A row of the Note actions sheet. */
     @Immutable

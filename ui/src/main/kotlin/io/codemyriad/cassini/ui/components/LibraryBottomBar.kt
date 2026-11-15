@@ -187,6 +187,7 @@ private fun ImportIconButton(description: String, onClick: () -> Unit) {
 
 /**
  * The Library bottom bar: Import (left) and [RecordFab] (right) over a gradient from transparent bg to bg at 40 %;
+ * both buttons are opaque (Import's wash is composited over bg), so the list never shows through them;
  * padding 16 horizontal, top 28, bottom 24 plus the navigation bar inset. The list gives itself a bottom content
  * padding of at least 108 dp plus the navigation bars.
  *
@@ -241,6 +242,8 @@ fun LibraryBottomBar(
                     onClick = onImport,
                     size = SecondaryButtonSize.Medium,
                     glyph = Glyph.Import,
+                    // Opaque over the list that scrolls under the bar's fade (D-1057).
+                    backdrop = bg,
                 )
             } else {
                 ImportIconButton(importLabel, onImport)
