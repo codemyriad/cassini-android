@@ -47,9 +47,12 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingCommand
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -63,6 +66,7 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Clock
 import java.time.Instant
@@ -120,7 +124,6 @@ class LibraryViewModel(
     private val dialog: Flow<LibraryDialog?> = combine(dialogKey, dialogTitle) { key, title ->
         key?.let { dialogOf(it, title) }
     }
-    private val snackbar = MutableStateFlow<SnackbarSpec?>(null)
 
     /** The note of the shown "moved to trash" snackbar, whose Undo restores it; null when Undo has nothing to do. */
     private var trashed: String? = null
@@ -231,7 +234,8 @@ class LibraryViewModel(
         ports.backupReach.map<BackupReach, BackupReach?> { it }.onStart { emit(null) }.catch { emit(null) },
     ) { processing, rec, facts, voices, reach -> Live(processing, rec, facts, voices, reach) }
 
-    val state: StateFlow<LibraryUiState> = combine(
+    /** Everything in [state] but the snackbar, mapped on [compute]. */
+    private val built: Flow<LibraryUiState> = combine(
         combine(
             combine(rows, search, query, unavailable, environment) { r, s, q, u, e -> Listing(r, s, q, u, e) },
             starredOnly,
@@ -239,13 +243,31 @@ class LibraryViewModel(
         live,
         sheet,
         dialog,
-        snackbar,
-    ) { listing, live, sheet, dialog, snackbar ->
-        build(listing, live, sheet, dialog, snackbar)
+    ) { listing, live, sheet, dialog ->
+        build(listing, live, sheet, dialog)
     }.flowOn(compute)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), LibraryUiState(loading = true))
+
+    private val backingState = MutableStateFlow(LibraryUiState(loading = true))
+
+    /**
+     * The Library. [built] runs while the screen collects this (and 5 s after it stops), but the snackbar is written
+     * here directly: with no collector the upstream is stopped, and the screen must not come back to a snackbar that
+     * ended while it was away (Trash, a picker, the background; D-1057).
+     */
+    val state: StateFlow<LibraryUiState> = backingState.asStateFlow()
 
     init {
+        // stateIn's WhileSubscribed sharing, by hand: a built state keeps the snackbar already in [state] (an atomic
+        // update), so a build that was under way cannot bring back a snackbar that has just ended or been replaced.
+        viewModelScope.launch {
+            SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS)
+                .command(backingState.subscriptionCount)
+                .collectLatest { command ->
+                    if (command == SharingCommand.START) {
+                        built.collect { next -> backingState.update { next.copy(snackbar = it.snackbar) } }
+                    }
+                }
+        }
         // After process death the query survives but the filters do not: an open Search takes the Library's choice.
         if (query.value.isNotBlank()) {
             viewModelScope.launch {
@@ -292,7 +314,6 @@ class LibraryViewModel(
         live: Live,
         details: NoteDetails?,
         dialog: LibraryDialog?,
-        snackbar: SnackbarSpec?,
     ): LibraryUiState {
         val now = Instant.now(clock)
         val zone = listing.environment.zone
@@ -334,7 +355,7 @@ class LibraryViewModel(
             imports = LibraryMapping.imports(live.facts.imports),
             sections = mapped.sections,
             results = mapped.results,
-            snackbar = snackbar,
+            snackbar = null, // [backingState] keeps its own
             sheet = details?.let {
                 val stopBusy = live.processing.notes[it.note.id]?.phase is JobPhase.Stopping
                 LibrarySheet.Actions(
@@ -389,7 +410,8 @@ class LibraryViewModel(
             // A failed write keeps the card: the choices did not change (BUG-CLASSES: no optimistic state).
             LibraryEvent.KeepOnPhoneOnly -> launch { ports.keepOnPhoneOnly() }
             LibraryEvent.DismissBackupCard -> launch { ports.dismissBackupCard() }
-            LibraryEvent.SnackbarTimeout -> clearSnackbar()
+            // The host's timer of a snackbar that has since been replaced does not end the new one.
+            is LibraryEvent.SnackbarTimeout -> if (state.value.snackbar?.id == event.id) clearSnackbar()
             is LibraryEvent.SheetAction -> sheetId.value?.let { id -> launch { sheetAction(id, event.action) } }
             LibraryEvent.DismissSheet -> closeSheet()
             is LibraryEvent.RenameConfirmed -> {
@@ -470,11 +492,11 @@ class LibraryViewModel(
         )
         trashed = id
         trashedSeen = trashIds?.contains(id) == true
-        snackbar.value = spec
+        setSnackbar(spec)
         snackbarTimer?.cancel()
         snackbarTimer = viewModelScope.launch {
             delay(spec.durationMs)
-            if (snackbar.value?.id == spec.id) clearSnackbar()
+            if (state.value.snackbar?.id == spec.id) clearSnackbar()
         }
     }
 
@@ -482,9 +504,14 @@ class LibraryViewModel(
     private fun clearSnackbar() {
         snackbarTimer?.cancel()
         snackbarTimer = null
-        snackbar.value = null
+        setSnackbar(null)
         trashed = null
         trashedSeen = false
+    }
+
+    /** The snackbar lives in [state] itself, so it changes whether or not the screen collects [state]. */
+    private fun setSnackbar(spec: SnackbarSpec?) {
+        backingState.update { it.copy(snackbar = spec) }
     }
 
     private fun onTrashChanged(ids: Set<String>) {
@@ -689,7 +716,10 @@ class LibraryViewModel(
             (ImportTypes.ANDROID_MIME_TYPES + listOf("application/zip", "application/x-zip-compressed")).toTypedArray()
 
         const val SEARCH_DEBOUNCE_MS = 150L
-        private const val STOP_TIMEOUT_MS = 5_000L
+
+        /** How long the Library's flows keep running once the screen stops collecting [state]. */
+        const val STOP_TIMEOUT_MS = 5_000L
+
         private const val TAG = "CassiniLibrary"
 
         private const val KEY_QUERY = "query"

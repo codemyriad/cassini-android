@@ -24,6 +24,7 @@ import io.codemyriad.cassini.ui.banner.BannerAction
 import io.codemyriad.cassini.ui.banner.BannerKind
 import io.codemyriad.cassini.ui.components.NoteStatusUi
 import io.codemyriad.cassini.ui.components.SnackbarKind
+import io.codemyriad.cassini.ui.components.SnackbarSpec
 import io.codemyriad.cassini.ui.format.DayLabel
 import io.codemyriad.cassini.ui.library.FirstRunHeroUi
 import io.codemyriad.cassini.ui.library.FirstRunPrivacy
@@ -35,6 +36,7 @@ import io.codemyriad.cassini.ui.library.RecordingPillUi
 import io.codemyriad.cassini.ui.note.NoteAction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
@@ -72,11 +74,40 @@ class LibraryViewModelTest {
     @After
     fun tearDown() = Dispatchers.resetMain()
 
-    private fun TestScope.viewModel(): LibraryViewModel {
-        val viewModel = LibraryViewModel(saved, ports, CLOCK, dispatcher)
-        backgroundScope.launch { viewModel.state.collect {} }
+    private fun TestScope.viewModel(): LibraryViewModel = unwatchedViewModel().also { watch(it) }
+
+    private fun TestScope.unwatchedViewModel(): LibraryViewModel = LibraryViewModel(saved, ports, CLOCK, dispatcher)
+
+    /** The Library on screen: `collectAsStateWithLifecycle`. Cancel the job when the screen leaves. */
+    private fun TestScope.watch(
+        viewModel: LibraryViewModel,
+        seen: MutableList<SnackbarSpec?> = mutableListOf(),
+    ): Job {
+        val job = backgroundScope.launch { viewModel.state.collect { seen += it.snackbar } }
         runCurrent()
-        return viewModel
+        return job
+    }
+
+    /** The Library leaves the screen for longer than the ViewModel keeps its flows: the upstream stops. */
+    private fun TestScope.leaveTheScreen(screen: Job) {
+        screen.cancel()
+        advanceTimeBy(LibraryViewModel.STOP_TIMEOUT_MS + 1)
+        runCurrent()
+    }
+
+    /**
+     * The Library comes back: the first frame reads `state.value` before any collection, then every value the
+     * screen collects until the upstream (and a restarted search debounce) has settled must hold no snackbar.
+     */
+    private fun TestScope.assertTheScreenComesBackWithoutASnackbar(viewModel: LibraryViewModel) {
+        assertNull("first frame", viewModel.now().snackbar)
+        val seen = mutableListOf<SnackbarSpec?>()
+        watch(viewModel, seen)
+        advanceTimeBy(LibraryViewModel.SEARCH_DEBOUNCE_MS + 1)
+        runCurrent()
+        assertTrue(seen.isNotEmpty())
+        assertTrue("collected $seen", seen.all { it == null })
+        assertNull(viewModel.now().snackbar)
     }
 
     private fun LibraryViewModel.now(): LibraryUiState = state.value
@@ -425,20 +456,84 @@ class LibraryViewModelTest {
     @Test
     fun theSnackbarEndsAtItsDeadlineWhetherOrNotTheScreenShowsIt() = runTest(dispatcher) {
         ports.add(libraryRow("a"))
-        val viewModel = viewModel()
+        val viewModel = unwatchedViewModel()
+        val screen = watch(viewModel)
         viewModel.onEvent(LibraryEvent.Trash("a"))
         runCurrent()
         val shown = viewModel.now().snackbar!!
-        // No snackbar host runs here (the Library is off screen, under Trash): the ViewModel keeps the time.
-        advanceTimeBy(shown.durationMs - 1)
+        val sections = viewModel.now().sections
+        // The user opens Trash: the Library stops collecting, and after STOP_TIMEOUT_MS its upstream stops too.
+        leaveTheScreen(screen)
+        ports.add(libraryRow("b"))
+        runCurrent()
+        assertEquals("the upstream is stopped", sections, viewModel.now().sections)
+        assertSame(shown, viewModel.now().snackbar)
+        // No snackbar host runs (the Library is under Trash): the ViewModel keeps the time, with nobody collecting.
+        advanceTimeBy(shown.durationMs - 1 - (LibraryViewModel.STOP_TIMEOUT_MS + 1))
         runCurrent()
         assertSame(shown, viewModel.now().snackbar)
         advanceTimeBy(2)
         runCurrent()
         assertNull(viewModel.now().snackbar)
+        assertTheScreenComesBackWithoutASnackbar(viewModel)
+        assertTrue("the upstream runs again", viewModel.now().sections.flatMap { it.rows }.any { it.id == "b" })
         viewModel.onEvent(LibraryEvent.Undo)
         advanceUntilIdle()
         assertEquals(listOf("trash a"), ports.actions)
+    }
+
+    @Test
+    fun deleteNowInTrashWhileSearchingEndsTheSnackbarThatTheLibraryNeverShowsAgain() = runTest(dispatcher) {
+        ports.add(libraryRow("a", title = "Call with supplier"))
+        ports.add(libraryRow("b", title = "Call with bank"))
+        val viewModel = unwatchedViewModel()
+        val screen = watch(viewModel)
+        viewModel.onEvent(LibraryEvent.Query("call"))
+        advanceTimeBy(LibraryViewModel.SEARCH_DEBOUNCE_MS + 1)
+        runCurrent()
+        viewModel.onEvent(LibraryEvent.Trash("a"))
+        runCurrent()
+        assertTrue(viewModel.now().snackbar?.undo == true)
+        // The user opens Trash and stays there past STOP_TIMEOUT_MS, then taps Delete now (D-1057).
+        leaveTheScreen(screen)
+        assertTrue(viewModel.now().snackbar?.undo == true)
+        ports.trash.value = emptySet()
+        runCurrent()
+        assertNull(viewModel.now().snackbar)
+        // Back to the Library: the search restarts cold behind its debounce, and no snackbar shows meanwhile.
+        assertTheScreenComesBackWithoutASnackbar(viewModel)
+        assertEquals("call", viewModel.now().query)
+        viewModel.onEvent(LibraryEvent.Undo)
+        advanceUntilIdle()
+        assertEquals(listOf("trash a"), ports.actions)
+    }
+
+    @Test
+    fun theHostTimeoutOfAReplacedSnackbarKeepsTheNewOne() = runTest(dispatcher) {
+        ports.add(libraryRow("a"))
+        ports.add(libraryRow("b"))
+        ports.add(libraryRow("c"))
+        val viewModel = viewModel()
+        viewModel.onEvent(LibraryEvent.Trash("a"))
+        runCurrent()
+        val first = viewModel.now().snackbar!!
+        viewModel.onEvent(LibraryEvent.Trash("b"))
+        runCurrent()
+        val second = viewModel.now().snackbar!!
+        // The host's timer for "a" fires before the screen has recomposed with "b".
+        viewModel.onEvent(LibraryEvent.SnackbarTimeout(first.id))
+        runCurrent()
+        assertSame(second, viewModel.now().snackbar)
+        viewModel.onEvent(LibraryEvent.Undo)
+        advanceUntilIdle()
+        assertEquals(listOf("trash a", "trash b", "restore b"), ports.actions)
+
+        viewModel.onEvent(LibraryEvent.Trash("c"))
+        runCurrent()
+        val third = viewModel.now().snackbar!!
+        viewModel.onEvent(LibraryEvent.SnackbarTimeout(third.id))
+        runCurrent()
+        assertNull(viewModel.now().snackbar)
     }
 
     @Test
