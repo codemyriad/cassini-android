@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -217,9 +218,13 @@ fun InkButton(
     )
 }
 
-/** The outlined pill in the sizes of [SecondaryButtonSize], with an optional leading [glyph] (20 dp, stroke 1.8). */
+/**
+ * The outlined pill in the sizes of [SecondaryButtonSize], with an optional leading [glyph] (20 dp, stroke 1.8). Its
+ * fill is a translucent ink wash; a button that floats over scrolling content passes the screen's [backdrop] token
+ * (`bg`), and the wash is composited over it into an opaque fill of the same look, so nothing shows through (D-1057).
+ */
 @Composable
-@Suppress("LongParameterList") // Size, icon, padding override, enabled and busy.
+@Suppress("LongParameterList") // Size, icon, padding override, enabled, busy and the backdrop.
 fun SecondaryButton(
     text: String,
     onClick: () -> Unit,
@@ -229,6 +234,7 @@ fun SecondaryButton(
     padding: Dp = size.padding,
     enabled: Boolean = true,
     busy: Boolean = false,
+    backdrop: Color? = null,
 ) {
     val c = CassiniTheme.colors
     val t = CassiniTheme.type
@@ -244,7 +250,7 @@ fun SecondaryButton(
         modifier = modifier,
         visual = size.visual,
         padding = padding,
-        fill = c.ink.copy(alpha = 0.1f),
+        fill = c.ink.copy(alpha = 0.1f).let { wash -> backdrop?.let(wash::compositeOver) ?: wash },
         border = c.line2,
         textStyle = style,
         textColor = c.ink,

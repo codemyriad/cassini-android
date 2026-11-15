@@ -14,6 +14,7 @@ import io.codemyriad.cassini.nav.NoteKey
 import io.codemyriad.cassini.nav.NoteStart
 import io.codemyriad.cassini.notices.NoticeFacts
 import io.codemyriad.cassini.notices.RecoveredNotice
+import io.codemyriad.cassini.notices.TrashedNote
 import io.codemyriad.cassini.processing.ProcessingState
 import io.codemyriad.cassini.processing.QueuedNote
 import io.codemyriad.cassini.processing.TranscribeOutcome
@@ -349,7 +350,8 @@ class LibraryViewModelTest {
         ports.add(libraryRow("a", title = "Call with supplier"))
         val viewModel = viewModel()
         viewModel.onEvent(LibraryEvent.Trash("a"))
-        advanceUntilIdle()
+        // runCurrent, not advanceUntilIdle: virtual time must stay before the snackbar deadline.
+        runCurrent()
         val snackbar = viewModel.now().snackbar!!
         assertEquals(SnackbarKind.MOVED_TO_TRASH, snackbar.kind)
         assertEquals("Call with supplier", snackbar.text)
@@ -359,6 +361,117 @@ class LibraryViewModelTest {
         advanceUntilIdle()
         assertNull(viewModel.now().snackbar)
         assertEquals(listOf("trash a", "restore a"), ports.actions)
+    }
+
+    @Test
+    fun deleteNowInTrashEndsTheUndoSnackbarAndUndoNeverRestores() = runTest(dispatcher) {
+        ports.add(libraryRow("a", title = "Call with supplier"))
+        val viewModel = viewModel()
+        viewModel.onEvent(LibraryEvent.Trash("a"))
+        // runCurrent, not advanceUntilIdle: virtual time must stay before the snackbar deadline.
+        runCurrent()
+        assertEquals(SnackbarKind.MOVED_TO_TRASH, viewModel.now().snackbar?.kind)
+        // Trash › Delete now while the snackbar shows (D-1057).
+        ports.trash.value = emptySet()
+        runCurrent()
+        assertNull(viewModel.now().snackbar)
+        viewModel.onEvent(LibraryEvent.Undo)
+        advanceUntilIdle()
+        assertEquals(listOf("trash a"), ports.actions)
+    }
+
+    @Test
+    fun restoreOrEmptyInTrashEndsTheUndoSnackbarOfThatNoteOnly() = runTest(dispatcher) {
+        ports.add(libraryRow("a"))
+        ports.add(libraryRow("b"))
+        ports.trash.value = setOf("old")
+        val viewModel = viewModel()
+        viewModel.onEvent(LibraryEvent.Trash("a"))
+        // runCurrent, not advanceUntilIdle: virtual time must stay before the snackbar deadline.
+        runCurrent()
+        // Another note leaving Trash keeps the snackbar of "a".
+        ports.trash.value = ports.trash.value - "old"
+        runCurrent()
+        assertTrue(viewModel.now().snackbar?.undo == true)
+        // Trash › Restore of "a".
+        ports.trash.value = ports.trash.value - "a"
+        runCurrent()
+        assertNull(viewModel.now().snackbar)
+
+        viewModel.onEvent(LibraryEvent.Trash("b"))
+        runCurrent()
+        assertTrue(viewModel.now().snackbar?.undo == true)
+        // Trash › Empty.
+        ports.trash.value = emptySet()
+        runCurrent()
+        assertNull(viewModel.now().snackbar)
+    }
+
+    @Test
+    fun aNoteTrashedOnTheNoteScreenEndsItsSnackbarWhenItLeavesTrash() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        ports.trashed.value = TrashedNote("n", "From the note")
+        runCurrent()
+        // The Trash list has not caught up yet: the snackbar stays.
+        assertTrue(viewModel.now().snackbar?.undo == true)
+        ports.trash.value = setOf("n")
+        runCurrent()
+        assertTrue(viewModel.now().snackbar?.undo == true)
+        ports.trash.value = emptySet()
+        runCurrent()
+        assertNull(viewModel.now().snackbar)
+    }
+
+    @Test
+    fun theSnackbarEndsAtItsDeadlineWhetherOrNotTheScreenShowsIt() = runTest(dispatcher) {
+        ports.add(libraryRow("a"))
+        val viewModel = viewModel()
+        viewModel.onEvent(LibraryEvent.Trash("a"))
+        runCurrent()
+        val shown = viewModel.now().snackbar!!
+        // No snackbar host runs here (the Library is off screen, under Trash): the ViewModel keeps the time.
+        advanceTimeBy(shown.durationMs - 1)
+        runCurrent()
+        assertSame(shown, viewModel.now().snackbar)
+        advanceTimeBy(2)
+        runCurrent()
+        assertNull(viewModel.now().snackbar)
+        viewModel.onEvent(LibraryEvent.Undo)
+        advanceUntilIdle()
+        assertEquals(listOf("trash a"), ports.actions)
+    }
+
+    @Test
+    fun aSecondTrashRestartsTheDeadlineForTheNewSnackbarOnly() = runTest(dispatcher) {
+        ports.add(libraryRow("a"))
+        ports.add(libraryRow("b"))
+        val viewModel = viewModel()
+        viewModel.onEvent(LibraryEvent.Trash("a"))
+        runCurrent()
+        val duration = viewModel.now().snackbar!!.durationMs
+        advanceTimeBy(duration / 2)
+        viewModel.onEvent(LibraryEvent.Trash("b"))
+        runCurrent()
+        val second = viewModel.now().snackbar!!
+        advanceTimeBy(duration - 1)
+        runCurrent()
+        assertSame(second, viewModel.now().snackbar)
+        advanceTimeBy(2)
+        runCurrent()
+        assertNull(viewModel.now().snackbar)
+    }
+
+    @Test
+    fun undoOfANoteDeletedMeanwhileRestoresNothing() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        // The note never reached the Trash list here, then was deleted for good: restore refuses it.
+        ports.trashed.value = TrashedNote("gone", "Gone")
+        runCurrent()
+        viewModel.onEvent(LibraryEvent.Undo)
+        advanceUntilIdle()
+        assertNull(viewModel.now().snackbar)
+        assertEquals(listOf("restore gone"), ports.actions)
+        assertTrue(ports.rows.value.none { it.id == "gone" })
     }
 
     @Test

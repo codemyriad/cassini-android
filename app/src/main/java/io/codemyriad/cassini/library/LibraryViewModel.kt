@@ -42,7 +42,9 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -119,7 +121,21 @@ class LibraryViewModel(
         key?.let { dialogOf(it, title) }
     }
     private val snackbar = MutableStateFlow<SnackbarSpec?>(null)
+
+    /** The note of the shown "moved to trash" snackbar, whose Undo restores it; null when Undo has nothing to do. */
     private var trashed: String? = null
+
+    /** [trashed] has been seen in Trash, so its absence now means it was restored or deleted for good (D-1057). */
+    private var trashedSeen = false
+
+    /** The ids in Trash at the last read; null until the first read. */
+    private var trashIds: Set<String>? = null
+
+    /**
+     * Ends the shown snackbar at its deadline. It runs in [viewModelScope], not in composition, so leaving the Library
+     * (Trash, Settings, a note) does not restart the time when the Library comes back (D-1057).
+     */
+    private var snackbarTimer: Job? = null
     private var snackbarCount = 0L
     private val listingCache = LibraryListing()
     private val filters = MutableStateFlow(SearchFiltersUi())
@@ -244,6 +260,13 @@ class LibraryViewModel(
                 showTrashed(note.noteId, note.title)
             }
         }
+        // Undo ends when its note leaves Trash some other way: Restore, Delete now, Empty or the 30-day purge (D-1057).
+        viewModelScope.launch {
+            ports.trashedIds()
+                .distinctUntilChanged()
+                .catch { error -> Log.w(TAG, "Trash cannot be read", error) }
+                .collect(::onTrashChanged)
+        }
     }
 
     private data class Listing(
@@ -366,7 +389,7 @@ class LibraryViewModel(
             // A failed write keeps the card: the choices did not change (BUG-CLASSES: no optimistic state).
             LibraryEvent.KeepOnPhoneOnly -> launch { ports.keepOnPhoneOnly() }
             LibraryEvent.DismissBackupCard -> launch { ports.dismissBackupCard() }
-            LibraryEvent.SnackbarTimeout -> snackbar.value = null
+            LibraryEvent.SnackbarTimeout -> clearSnackbar()
             is LibraryEvent.SheetAction -> sheetId.value?.let { id -> launch { sheetAction(id, event.action) } }
             LibraryEvent.DismissSheet -> closeSheet()
             is LibraryEvent.RenameConfirmed -> {
@@ -438,21 +461,53 @@ class LibraryViewModel(
     }
 
     private fun showTrashed(id: String, title: String) {
-        trashed = id
-        snackbar.value = SnackbarSpec(
+        val spec = SnackbarSpec(
             kind = SnackbarKind.MOVED_TO_TRASH,
             text = title,
             undo = true,
             durationMs = ports.snackbarTimeoutMs(),
             id = ++snackbarCount,
         )
+        trashed = id
+        trashedSeen = trashIds?.contains(id) == true
+        snackbar.value = spec
+        snackbarTimer?.cancel()
+        snackbarTimer = viewModelScope.launch {
+            delay(spec.durationMs)
+            if (snackbar.value?.id == spec.id) clearSnackbar()
+        }
     }
 
+    /** The snackbar and its Undo end together. */
+    private fun clearSnackbar() {
+        snackbarTimer?.cancel()
+        snackbarTimer = null
+        snackbar.value = null
+        trashed = null
+        trashedSeen = false
+    }
+
+    private fun onTrashChanged(ids: Set<String>) {
+        trashIds = ids
+        val id = trashed ?: return
+        when {
+            id in ids -> trashedSeen = true
+            // Before the first read that holds it, the note may just not have reached the list yet.
+            trashedSeen -> clearSnackbar()
+        }
+    }
+
+    /**
+     * Undo puts [trashed] back. Once the note has left Trash the snackbar is gone ([onTrashChanged]), so Undo cannot
+     * be pressed; a restore that the repository still refuses (the note was deleted for good in between) is logged,
+     * and the row does not come back, so nothing claims the meeting was restored.
+     */
     private fun undo() {
         val id = trashed ?: return
-        trashed = null
-        snackbar.value = null
-        launch { ports.restore(id) }
+        clearSnackbar()
+        launch {
+            if (!ports.restore(id)) Log.w(TAG, "Undo: the note is no longer in Trash")
+        }
     }
 
     @Suppress("CyclomaticComplexMethod") // one branch per row of the Note actions sheet
