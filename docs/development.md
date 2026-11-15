@@ -92,6 +92,8 @@ The root task `ciTest` runs `:core:test` and `:app-logic:test`. For each Android
 ./gradlew detekt ciTest :app:lintDebug :data:lintDebug :ui:lintDebug
 ```
 
+In CI these checks are split across jobs: `checks` runs detekt, `core-only` runs `:core:test` and `:app-logic:test` with a JDK alone, and `build` runs the rest of `ciTest` with `-x :core:test -x :app-logic:test`, so the conformance tests do not run twice.
+
 | Tier | Command | Content |
 |---|---|---|
 | JVM | `:core:test`, `:app-logic:test`, `:engine:testDebugUnitTest`, `:app:testDebugUnitTest` | The engine tests, the codec goldens, the pure rules, `TranscriptionJob` with fakes, the coordinators and the ViewModels |
@@ -575,6 +577,8 @@ The workflows in `.github/workflows/` check builds, committed screenshot changes
 If you push a branch and do not open a pull request, CI does not run. A new push to a pull request stops the earlier run of the same workflow on it. Runs on `main` and on tags are never stopped by a newer push, so every commit on `main` gets a complete run.
 
 All runs restore the caches (the native runtime, the pinned source archives, Robolectric's `android-all` jars and the models). Only runs on `main` save them, because GitHub keeps at most 10 GB of caches for the repository and a pull request can only read its own entries and those of `main`. The Robolectric entry follows the Robolectric version. `main` saves a new one only when the tests downloaded a jar that the restored entry did not have, for example after a new `@Config(sdk = …)`. Until that commit is on `main`, the pull request runs download the jar. With `CM_RUNNER=hetzner` (below), only GitHub-hosted runs save them, so nothing a self-hosted machine wrote reaches a tag build, which restores them while it holds the release signing key.
+
+The Gradle home that `setup-gradle` saves has a key that follows only the build scripts, so `main` saves it once and cannot refresh it. Gradle's local build cache (`~/.gradle/caches/build-cache-1`) therefore has its own entry, `gradle-build-cache-v1-<run>`: every `build` job restores the latest one, and each unsigned GitHub-hosted run on `main` saves a new one. Before it saves, `scripts/ci-build-cache.py prune` deletes the entries that the build neither read nor wrote, so the entry holds one build's task outputs. It finds the read entries by their access time; when none changed (a `noatime` mount), it deletes nothing. Other runs print the same counts with `report`, in the step "Count the task outputs the build read and wrote".
 
 ### Runners
 
